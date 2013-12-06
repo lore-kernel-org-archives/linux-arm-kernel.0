@@ -1,51 +1,87 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 06 Dec 2013 12:35:10 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxM11bIDIvNF0gdmlkZW86IGlteGZiOiBBbHNvIGFkZCBw?=
- =?UTF-8?B?d21yIGZvciB0aGUgZGV2aWNlIHRyZWUu?=
-In-Reply-To: <20131206081640.GZ24559@pengutronix.de>
-References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
- <1386317034.190941796@f354.i.mail.ru>
- <20131206081640.GZ24559@pengutronix.de>
-Message-ID: <1386318910.581671226@f322.i.mail.ru>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 6 Dec 2013 08:44:53 +0000
+Subject: [PATCH v4 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <ac11b85d05765b3b68eff8c27041e965@agner.ch>
+References: <cover.1386108712.git.stefan@agner.ch>
+ <77384d24810d9a22fc04cad6f7468f54a9cbaafe.1386108712.git.stefan@agner.ch>
+ <52A0B2AF.60803@wwwdotorg.org>
+ <b2a1db4167d319d355dd2a3a844553bc@agner.ch>
+ <52A0BA85.4020201@wwwdotorg.org>
+ <ac11b85d05765b3b68eff8c27041e965@agner.ch>
+Message-ID: <20131206084453.GB13093@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Dec 06, 2013 at 12:03:54PM +0400, Alexander Shiyan wrote:
-...
-> > > >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
-> > > >  	register is not modified as recommended by the datasheet.
-> > > > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
-> > > > +	optional, but defining it is necessary to get the backlight working. If that
-> > > > +	property is ommited, the register is zeroed.
-> > > 
-> > > Why isn't this implemented as a backlight driver? Static devicetree
-> > > provided values is very limiting.
+> >> <snip>
+> >>>> @@ -493,13 +527,12 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
+> >>>>  		return -EIO;
+> >>>>  	}
+> >>>>
+> >>>> -	dev_info(&client->dev, "VERSIONCRC is %02x\n", ret);
+> >>>> -
+> >>>>  	tps6586x = devm_kzalloc(&client->dev, sizeof(*tps6586x), GFP_KERNEL);
+> >>>> -	if (tps6586x == NULL) {
+> >>>> -		dev_err(&client->dev, "memory for tps6586x alloc failed\n");
+> >>>> +	if (!tps6586x)
+> >>>>  		return -ENOMEM;
+> >>>> -	}
+> >>>> +
+> >>>> +	tps6586x->version = ret;
+> >>>
+> >>> I have to say, I dislike this version of the patch. Separating the
+> >>> reading of the version register from the assignment to tps6586x->version
+> >>> doesn't make any sense, especially given that the version value is
+> >>> stored in a variable named "ret"; that name isn't remotely related to
+> >>> what's stored there. What if someone comes along later and adds more
+> >>> code that assigns to ret between where it's repurposed for the version
+> >>> value and where it's assigned to tps6586x->version? It'd be extremely
+> >>> difficult for a patch reviewer to spot that given the limited context in
+> >>> a diff, and quite non-obvious to the person changing the code too..
+> >>
+> >> The value comes from the return value of i2c_smbus_read_byte_data. If
+> >> the value is below zero its an EIO error.
+> >>
+> >> I could add a variable "version", but for me it felt strange because we
+> >> check if version is below zero. This feels like its a wrong version
+> >> rather than a transmit error. So I would prefer ret over version. But I
+> >> agree, when one just reads the patch, its not obvious what exactly
+> >> happens.
 > > 
-> > Let's understand the terminology.
-> > This register should be renamed according to the datasheet, i.e. LPCCR.
-> > As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
-> > Yes, it works as PWM, but nothing do with the backlight subsystem.
-> > Yes, we can make a driver for this PWM, but how are we going to control it?
-> > I misunderstood something?
+> > In my opinion, using a variable named "version" here would be
+> > preferable. Testing that against <0 is just the way the I2C API works,
+> > so the same argument could be applied to any I2C access.
+
+So, FWIW I agree with Stephen and have done from the start. Please
+see my original comment from the first submission:
+
+> >       ret = i2c_smbus_read_byte_data(client, TPS6586X_VERSIONCRC);
+>   If you're going to do this, please change 'ret' to 'version'.
+
+> Hm, I try the empiric way:
 > 
-> I stumbled upon 'get the backlight working' which implied for me that it
-> should be a backlight driver. But you're right and now I remember we
-> talked about this already.
+> $ grep -r -e i2c_smbus_read_byte_data | grep "ret =" | wc -l
+> 139
+> $ grep -r -e i2c_smbus_read_byte_data | grep "version =" | wc -l
+> 3
+> 
+> Ok, thats not fair at all, version is usage specific whilst ret is not.
+> 
+> $ grep -r -e i2c_smbus_read_byte_data | grep " = " | wc -l
+> 703
 
-Hallelujah.
+I not really that worried about what everyone else does. I'm more
+concerned with doing what we deem to be the correct thing here.
 
-> I still think this should be something adjustable, not static data.
-> Maybe we could change the wording to something like "This property
-> provides the default value for the contrast control register" since even
-> if we add driver support for controlling the contrast we still want
-> to have a sane default.
+> On the other hand is the additional variable. But I think the compiler
+> will optimize that anyway, so this might not be an argument at all :-)
+> 
+> I see your point... Should I create another patch revision? Lee, is the
+> patch already merged?
 
-Sounds good.
+It isn't. Please submit another version as Stephen requests.
 
-> BTW the contrast could be controlled with a lcd_device (see
-> lcd_device_register) which seems to be very easy to implement.
-
-Address of register is placed within LCD area, so we cannot use this
-memory region, I think is no so easy as you say....
-
----
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
