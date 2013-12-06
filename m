@@ -1,228 +1,259 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 06 Dec 2013 09:34:49 -0500
-Subject: [PATCH 3/3] arm64: add EFI runtime services
-In-Reply-To: <20131205152510.GB974@darko.cambridge.arm.com>
-References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
- <1385762712-17043-4-git-send-email-msalter@redhat.com>
- <20131205152510.GB974@darko.cambridge.arm.com>
-Message-ID: <1386340489.1861.175.camel@deneb.redhat.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 6 Dec 2013 16:35:19 +0200
+Subject: [PATCH v3 07/10] drivers: phy: usb3/pipe3: Adapt pipe3 driver
+ to Generic PHY Framework
+In-Reply-To: <1385373690-12170-8-git-send-email-kishon@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1385373690-12170-8-git-send-email-kishon@ti.com>
+Message-ID: <52A1E0A7.80901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 15:25 +0000, Catalin Marinas wrote:
-> On Fri, Nov 29, 2013 at 10:05:12PM +0000, Mark Salter wrote:
-> > +
-> > +#define efi_remap(cookie, size) __ioremap((cookie), (size), PAGE_KERNEL_EXEC)
-> > +#define efi_ioremap(cookie, size) __ioremap((cookie), (size), \
-> > +                                           __pgprot(PROT_DEVICE_nGnRE))
-> > +#define efi_unmap(cookie) __iounmap((cookie))
-> > +#define efi_iounmap(cookie) __iounmap((cookie))
-> 
-> I prefer to use the ioremap_*() functions rather than the lower-level
-> __ioremap(). The ioremap_cache() should give us executable memory.
+Hi Kishon,
 
-okay
-
+On 11/25/2013 12:01 PM, Kishon Vijay Abraham I wrote:
+> Adapted omap-usb3 PHY driver to Generic PHY Framework and moved phy-omap-usb3
+> driver in drivers/usb/phy to drivers/phy and also renamed the file to
+> phy-ti-pipe3 since this same driver will be used for SATA PHY and
+> PCIE PHY.
 > 
-> Looking at the code, I think we have a bug with ioremap_cache() using
-> MT_NORMAL since it doesn't have the shareability bit (Device memory does
-> not require this on AArch64). PROT_DEFAULT should change to
-> pgprot_default | PTE_DIRTY.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/phy/Kconfig                                |   11 +
+>  drivers/phy/Makefile                               |    1 +
+>  .../phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c}     |  232 ++++++++++++--------
+>  drivers/usb/phy/Kconfig                            |   11 -
+>  drivers/usb/phy/Makefile                           |    1 -
+>  5 files changed, 149 insertions(+), 107 deletions(-)
+>  rename drivers/{usb/phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c} (55%)
 > 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index a344f3d..1abbfcc 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -33,6 +33,17 @@ config OMAP_USB2
+>  	  The USB OTG controller communicates with the comparator using this
+>  	  driver.
+>  
+> +config TI_PIPE3
+> +	tristate "TI PIPE3 PHY Driver"
+> +	depends on ARCH_OMAP2PLUS || COMPILE_TEST
+> +	select GENERIC_PHY
+> +	select OMAP_CONTROL_USB
+> +	help
+> +	  Enable this to support the PIPE3 PHY that is part of TI SOCs. This
+> +	  driver takes care of all the PHY functionality apart from comparator.
+> +	  This driver interacts with the "OMAP Control PHY Driver" to power
+> +	  on/off the PHY.
+> +
+>  config TWL4030_USB
+>  	tristate "TWL4030 USB Transceiver Driver"
+>  	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index d0caae9..94a1a79 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -6,4 +6,5 @@ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+>  obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+>  obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+>  obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
+> +obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
+>  obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+> diff --git a/drivers/usb/phy/phy-omap-usb3.c b/drivers/phy/phy-ti-pipe3.c
+> similarity index 55%
+> rename from drivers/usb/phy/phy-omap-usb3.c
+> rename to drivers/phy/phy-ti-pipe3.c
+> index 0c6ba29..410b286 100644
+> --- a/drivers/usb/phy/phy-omap-usb3.c
+> +++ b/drivers/phy/phy-ti-pipe3.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * omap-usb3 - USB PHY, talking to dwc3 controller in OMAP.
+> + * phy-ti-pipe3 - PIPE3 PHY driver.
+>   *
+>   * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
+>   * This program is free software; you can redistribute it and/or modify
+> @@ -19,10 +19,11 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> -#include <linux/usb/omap_usb.h>
+> +#include <linux/phy/phy.h>
+>  #include <linux/of.h>
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+> +#include <linux/io.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/delay.h>
+>  #include <linux/usb/omap_control_usb.h>
+> @@ -52,17 +53,34 @@
+>  
+>  /*
+>   * This is an Empirical value that works, need to confirm the actual
+> - * value required for the USB3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+> - * to be correctly reflected in the USB3PHY_PLL_STATUS register.
+> + * value required for the PIPE3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+> + * to be correctly reflected in the PIPE3PHY_PLL_STATUS register.
+>   */
+>  # define PLL_IDLE_TIME  100;
+>  
+> -struct usb_dpll_map {
+> +struct pipe3_dpll_params {
+> +	u16	m;
+> +	u8	n;
+> +	u8	freq:3;
+> +	u8	sd;
+> +	u32	mf;
+> +};
+> +
+> +struct ti_pipe3 {
+> +	void __iomem		*pll_ctrl_base;
+> +	struct device		*dev;
+> +	struct device		*control_dev;
+> +	struct clk		*wkupclk;
+> +	struct clk		*sys_clk;
+> +	struct clk		*optclk;
+> +};
+> +
+> +struct pipe3_dpll_map {
+>  	unsigned long rate;
+> -	struct usb_dpll_params params;
+> +	struct pipe3_dpll_params params;
+>  };
+>  
+> -static struct usb_dpll_map dpll_map[] = {
+> +static struct pipe3_dpll_map dpll_map[] = {
+>  	{12000000, {1250, 5, 4, 20, 0} },	/* 12 MHz */
+>  	{16800000, {3125, 20, 4, 20, 0} },	/* 16.8 MHz */
+>  	{19200000, {1172, 8, 4, 20, 65537} },	/* 19.2 MHz */
+> @@ -71,7 +89,18 @@ static struct usb_dpll_map dpll_map[] = {
+>  	{38400000, {3125, 47, 4, 20, 92843} },	/* 38.4 MHz */
+>  };
+>  
+> -static struct usb_dpll_params *omap_usb3_get_dpll_params(unsigned long rate)
+> +static inline u32 ti_pipe3_readl(void __iomem *addr, unsigned offset)
+> +{
+> +	return __raw_readl(addr + offset);
+> +}
+> +
+> +static inline void ti_pipe3_writel(void __iomem *addr, unsigned offset,
+> +	u32 data)
+> +{
+> +	__raw_writel(data, addr + offset);
+> +}
+> +
+> +static struct pipe3_dpll_params *ti_pipe3_get_dpll_params(unsigned long rate)
+>  {
+>  	int i;
+>  
+> @@ -83,110 +112,113 @@ static struct usb_dpll_params *omap_usb3_get_dpll_params(unsigned long rate)
+>  	return NULL;
+>  }
+>  
+> -static int omap_usb3_suspend(struct usb_phy *x, int suspend)
+> +static int ti_pipe3_power_off(struct phy *x)
+>  {
+> -	struct omap_usb *phy = phy_to_omapusb(x);
+> -	int	val;
+> +	struct ti_pipe3 *phy = phy_get_drvdata(x);
+> +	int val;
+>  	int timeout = PLL_IDLE_TIME;
+>  
+> -	if (suspend && !phy->is_suspended) {
+> -		val = omap_usb_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+> -		val |= PLL_IDLE;
+> -		omap_usb_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+> -
+> -		do {
+> -			val = omap_usb_readl(phy->pll_ctrl_base, PLL_STATUS);
+> -			if (val & PLL_TICOPWDN)
+> -				break;
+> -			udelay(1);
+> -		} while (--timeout);
+> -
+> -		omap_control_usb_phy_power(phy->control_dev, 0);
+> -
+> -		phy->is_suspended	= 1;
+> -	} else if (!suspend && phy->is_suspended) {
+> -		phy->is_suspended	= 0;
+> -
+> -		val = omap_usb_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+> -		val &= ~PLL_IDLE;
+> -		omap_usb_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+> -
+> -		do {
+> -			val = omap_usb_readl(phy->pll_ctrl_base, PLL_STATUS);
+> -			if (!(val & PLL_TICOPWDN))
+> -				break;
+> -			udelay(1);
+> -		} while (--timeout);
+> -	}
+> +	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+> +	val |= PLL_IDLE;
+> +	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+> +
+> +	do {
+> +		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+> +		if (val & PLL_TICOPWDN)
+> +			break;
+> +		usleep_range(1, 5);
 
-ah, yes.
+I had suggested to use sleep instead of udelay here but usleep for < 10 us might not be not optimal.
+see Documentation/timers/timers-howto.txt
 
-> > +       if (depth != 1 ||
-> > +           (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
-> > +               return 0;
-> > +
-> > +       pr_info("Getting EFI parameters from FDT.\n");
-> > +
-> > +       prop = of_get_flat_dt_prop(node, "linux,uefi-system-table", &len);
-> > +       if (!prop) {
-> > +               pr_err("No EFI system table in FDT\n");
-> > +               return 0;
-> > +       }
-> > +       efi_system_table = of_read_ulong(prop, len/4);
-> > +
-> > +       prop = of_get_flat_dt_prop(node, "linux,uefi-mmap-start", &len);
-> > +       if (!prop) {
-> > +               pr_err("No EFI memmap in FDT\n");
-> > +               return 0;
-> > +       }
-> > +       memmap.phys_map = (void *)of_read_ulong(prop, len/4);
-> > +
-> > +       prop = of_get_flat_dt_prop(node, "linux,uefi-mmap-size", &len);
-> > +       if (!prop) {
-> > +               pr_err("No EFI memmap size in FDT\n");
-> > +               return 0;
-> > +       }
-> > +       size = of_read_ulong(prop, len/4);
-> > +       memmap.map_end = memmap.phys_map + size;
-> > +
-> > +       /* reserve memmap */
-> > +       memblock_reserve((u64)memmap.phys_map, size);
-> > +
-> > +       prop = of_get_flat_dt_prop(node, "linux,uefi-mmap-desc-size", &len);
-> > +       if (!prop) {
-> > +               pr_err("No EFI memmap descriptor size in FDT\n");
-> > +               return 0;
-> > +       }
-> > +       memmap.desc_size = of_read_ulong(prop, len/4);
-> > +
-> > +       memmap.nr_map = size / memmap.desc_size;
-> > +
-> > +       prop = of_get_flat_dt_prop(node, "linux,uefi-mmap-desc-ver", &len);
-> > +       if (!prop) {
-> > +               pr_err("No EFI memmap descriptor version in FDT\n");
-> > +               return 0;
-> > +       }
-> > +       memmap.desc_version = of_read_ulong(prop, len/4);
-> > +
-> > +       if (uefi_debug) {
-> > +               pr_info("  EFI system table @ %p\n", (void *)efi_system_table);
-> > +               pr_info("  EFI mmap @ %p-%p\n", memmap.phys_map,
-> > +                       memmap.map_end);
-> > +               pr_info("  EFI mmap descriptor size = 0x%lx\n",
-> > +                       memmap.desc_size);
-> > +               pr_info("  EFI mmap descriptor version = 0x%lx\n",
-> > +                       memmap.desc_version);
-> > +       }
-> > +
-> > +       return 1;
-> > +}
-> 
-> Are these checks generic to other architectures? We may do with some
-> helpers to avoid duplication.
+Why can't we just use msleep(1)?
 
-That whole function could probably be shared.
+Do we know approximately how much time it takes for the block to power down?
 
-> 
-> > +
-> > +#define PGD_END  (&idmap_pg_dir[sizeof(idmap_pg_dir)/sizeof(pgd_t)])
-> 
-> Just &idmap_pg_dir[PTRS_PER_PGD] would do (or idmap_pg_dir +
-> ARRAY_SIZE(idmap_pg_dir)).
+> +	} while (--timeout);
+> +
 
-Should have been ARRAY_SIZE. I didn't want to use PTRS_PER_PGD in case
-that changed.
+what if there was a timeout? you need to exit with return code and preferably print an error message.
 
-> 
-> > +#ifndef CONFIG_SMP
-> > +#define PMD_FLAGS  (PMD_ATTRINDX(MT_NORMAL) | PMD_TYPE_SECT | PMD_SECT_AF)
-> > +#else
-> > +#define PMD_FLAGS  (PMD_ATTRINDX(MT_NORMAL) | PMD_TYPE_SECT | PMD_SECT_AF | \
-> > +                   PMD_SECT_S)
-> > +#endif
-> > +
-> > +static void __init create_idmap(unsigned long addr, unsigned long len)
-> 
-> I would change this to use the existing create_mapping() function which
-> takes care of allocating pud/pmd/ptes. We shouldn't duplicate this
-> functionality in two places. create_mapping() may need a slight change
-> since it assumes swapper_pg_dir but it's not much. It also uses
-> memblock_alloc() for early allocations.
+> +	omap_control_usb_phy_power(phy->control_dev, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ti_pipe3_power_on(struct phy *x)
+> +{
+> +	struct ti_pipe3 *phy = phy_get_drvdata(x);
+> +	int val;
+> +	int timeout = PLL_IDLE_TIME;
+> +
+> +	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+> +	val &= ~PLL_IDLE;
+> +	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+> +
+> +	do {
+> +		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+> +		if (!(val & PLL_TICOPWDN))
+> +			break;
+> +		usleep_range(1, 5);
+> +	} while (--timeout);
 
-I'll take a look at this.
+here as well.
+>  
+>  	return 0;
+>  }
+>  
+> -static void omap_usb_dpll_relock(struct omap_usb *phy)
+> +static void ti_pipe3_dpll_relock(struct ti_pipe3 *phy)
+>  {
+>  	u32		val;
+>  	unsigned long	timeout;
+>  
+> -	omap_usb_writel(phy->pll_ctrl_base, PLL_GO, SET_PLL_GO);
+> +	ti_pipe3_writel(phy->pll_ctrl_base, PLL_GO, SET_PLL_GO);
+>  
+>  	timeout = jiffies + msecs_to_jiffies(20);
+>  	do {
+> -		val = omap_usb_readl(phy->pll_ctrl_base, PLL_STATUS);
+> +		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+>  		if (val & PLL_LOCK)
+>  			break;
+>  	} while (!WARN_ON(time_after(jiffies, timeout)));
+>  }
 
-> 
-> > +static __init int memmap_walk(struct efi_memory_map *memmap,
-> > +                             int (*func)(efi_memory_desc_t *, void *),
-> > +                             void *private_data, int early)
-> 
-> Is this generic enough as a common helper between arm and arm64 (and
-> maybe x86)?
-
-Probably not as-is, but one could be made. 
-> 
-> > +static __init int reserve_region(efi_memory_desc_t *md, void *priv)
-> [...]
-> > +static __init void reserve_regions(void)
-> [...]
-> > +static int __init remap_region(efi_memory_desc_t *md, void *priv)
-> [...]
-> > +static int __init remap_regions(efi_memory_desc_t *map)
-> 
-> Same here (I haven't looked at the other implementations).
-
-Only in arm/arm64 patches and they are different.
-
-> 
-> > +/*
-> > + * Called from setup_arch with interrupts disabled.
-> > + */
-> > +void __init efi_enter_virtual_mode(void)
-> > +{
-> > +       void *newmap;
-> > +       efi_status_t status;
-> > +       u64 mapsize, total_freed = 0;
-> > +       int count;
-> > +
-> > +       if (!efi_enabled(EFI_BOOT)) {
-> > +               pr_info("EFI services will not be available.\n");
-> > +               return;
-> > +       }
-> > +
-> > +       pr_info("Remapping and enabling EFI services.\n");
-> > +
-> > +       mapsize = memmap.map_end - memmap.phys_map;
-> > +       memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
-> > +                                                  mapsize);
-> > +       memmap.map_end = memmap.map + mapsize;
-> > +
-> > +       /* Map the regions we reserved earlier */
-> > +       newmap = alloc_bootmem(mapsize);
-> 
-> memblock_alloc() (also check the other bootmem uses in this patch, arm64
-> is using memblock).
-
-Okay, the bootmem function do use the memblock interface with some leak
-detection added, but I can use memblock directly.
-
-> 
-> > +       if (newmap == NULL) {
-> > +               pr_err("Failed to allocate new EFI memmap\n");
-> > +               return;
-> > +       }
-> > +
-> > +       count = remap_regions(newmap);
-> > +       if (count <= 0) {
-> > +               pr_err("Failed to remap EFI regions.\n");
-> > +               return;
-> > +       }
-> > +
-> > +       efi.memmap = &memmap;
-> > +
-> > +       efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
-> > +       if (efi.systab)
-> > +               set_bit(EFI_SYSTEM_TABLES, &arm_efi_facility);
-> > +
-> > +       /*
-> > +        * efi.systab->runtime is a pointer to something guaranteed by
-> > +        * the UEFI specification to be 1:1 mapped.
-> > +        */
-> > +       runtime = (__force void *)efi_lookup_mapped_addr((u64)efi.systab->runtime);
-> > +
-> > +       /* Call SetVirtualAddressMap with the physical address of the map */
-> > +       efi.set_virtual_address_map = runtime->set_virtual_address_map;
-> > +
-> > +       /* boot time idmap_pg_dir is incomplete, so fill in missing parts */
-> > +       efi_setup_idmap();
-> > +
-> > +       cpu_switch_mm(idmap_pg_dir, &init_mm);
-> > +       flush_tlb_all();
-> > +       flush_cache_all();
-> > +
-> > +       status = efi.set_virtual_address_map(count * memmap.desc_size,
-> > +                                            memmap.desc_size,
-> > +                                            memmap.desc_version,
-> > +                                            newmap);
-> > +       cpu_set_reserved_ttbr0();
-> > +       flush_tlb_all();
-> > +       flush_cache_all();
-> 
-> What is the point of cache flusing here?
-
-Paranoia based on not knowing what the firmware will be caching.
-If it doesn't matter and there's nothing to worry about I can drop
-it. 
+cheers,
+-roger
