@@ -1,37 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Dec 2013 00:17:28 +0000
-Subject: [PATCH] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <20131206000253.GC21358@kroah.com>
-References: <20131205043544.GA28580@kroah.com>
- <1386286149-2855-1-git-send-email-ynvich@gmail.com>
- <20131206000253.GC21358@kroah.com>
-Message-ID: <20131206001728.GJ4360@n2100.arm.linux.org.uk>
+Date: Fri, 6 Dec 2013 00:23:45 +0000
+Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
+In-Reply-To: <20131206000610.GA30344@kroah.com>
+References: <20131204170703.GA14859@kroah.com>
+ <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
+ <20131204230239.GB9205@kroah.com>
+ <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
+ <20131205040104.GA14641@kroah.com> <52A0DE42.3080602@codeaurora.org>
+ <20131205201659.GA14539@kroah.com> <52A101F8.3060104@codeaurora.org>
+ <CANsc=4Vb-2br+K51NWsyQV25R3eJo_=YfpnXsh1G1ecRVDYc3w@mail.gmail.com>
+ <20131206000610.GA30344@kroah.com>
+Message-ID: <20131206002345.GK4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 04:02:53PM -0800, Greg Kroah-Hartman wrote:
-> On Fri, Dec 06, 2013 at 03:28:37AM +0400, Sergei Ianovich wrote:
-> > pxa2xx-uart was a separate uart platform driver. It was declaring
-> > the same device names and numbers as 8250 driver. As a result,
-> > it was impossible to use 8250 driver on PXA SoCs.
+On Thu, Dec 05, 2013 at 04:06:10PM -0800, Greg Kroah-Hartman wrote:
+> On Thu, Dec 05, 2013 at 06:54:49PM -0500, Adrien Verg? wrote:
+> > > Well, these patches were incorrect, so that's not really a valid
+> > > question :)
 > > 
-> > Upon closer examination pxa2xx-uart turned out to be a clone of
-> > 8250_core driver.
-> > 
-> > Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> > CC: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> > CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Should I correct the pid size and send them again?
 > 
-> Wonderful!
-> 
-> Can someone else test this to verify it works for them on their platform
-> as well?
+> I'm not the ARM maintainer, so I can't say if I would reject them or
+> not.
 
-I may be able to - one of the downsides though is that many of these
-systems had hard-coded scripts which started a getty on the original
-port - and that kind of makes it difficult to sort out.  This kind of
-change becomes very much one of Linus' "flag days".
+Neither am I someone who knows this code; it was contributed by TI, and
+I assume TI had I use for it.  I've no idea what that was or how it's
+even used - it's not something I particularly care about.
 
-So I'd suggest that we have a period where the old driver is still
-available, so at least people can choose to use the old major/minor
-numbers for a while.
+I'd much rather someone else who has a use for ETM (and thus knows what
+it should/can do) look after it.
