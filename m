@@ -1,40 +1,49 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 6 Dec 2013 13:09:06 -0800
-Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
-In-Reply-To: <1386350983-13281-8-git-send-email-wens@csie.org>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-8-git-send-email-wens@csie.org>
-Message-ID: <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 6 Dec 2013 22:09:57 +0100
+Subject: [PATCH] ARM: tegra: add missing break to fuse initialization code
+In-Reply-To: <1386362030-29187-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386362030-29187-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131206210957.GC1685@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/6 Chen-Yu Tsai <wens@csie.org>:
-> The CubieTruck uses the GMAC with an RGMII phy.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Fri, Dec 06, 2013 at 01:33:50PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Add a missing break to the switch in tegra_init_fuse() which determines
+> which SoC the code is running on. This prevents the Tegra30+ fuse
+> handling code from running on Tegra20.
+> 
+> Fixes: 3bd1ae57f7bb ("ARM: tegra: add fuses as device randomness")
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> index 8a1009d..af212a2 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> @@ -33,6 +33,14 @@
->                         pinctrl-0 = <&uart0_pins_a>;
->                         status = "okay";
->                 };
-> +
-> +               gmac: ethernet at 01c50000 {
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&gmac_pins_rgmii>;
-> +                       snps,phy-addr = <1>;
+> This is a fix for 3.13.
+> 
+>  arch/arm/mach-tegra/fuse.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+> index 9a4e910c3796..13995b0be9d9 100644
+> --- a/arch/arm/mach-tegra/fuse.c
+> +++ b/arch/arm/mach-tegra/fuse.c
+> @@ -198,6 +198,7 @@ void __init tegra_init_fuse(void)
+>  	switch (tegra_chip_id) {
+>  	case TEGRA20:
+>  		tegra20_fuse_init_randomness();
+> +		break;
+>  	case TEGRA30:
+>  	case TEGRA114:
+>  	default:
 
-What is this snps,phy-addr property? Why is not a standard device tree
-node for an Ethernet PHY node used?
+The code that follows here also doesn't have a break. While not strictly
+necessary it might be good to have one for consistency. Either way,
+though:
 
-> +                       phy-mode = "rgmii";
-
-Especially since you use the relatively standard "phy-mode" property here?
---
-Florian
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/55e25ca4/attachment.sig>
