@@ -1,49 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 6 Dec 2013 22:09:57 +0100
-Subject: [PATCH] ARM: tegra: add missing break to fuse initialization code
-In-Reply-To: <1386362030-29187-1-git-send-email-swarren@wwwdotorg.org>
-References: <1386362030-29187-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131206210957.GC1685@mithrandir>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 6 Dec 2013 13:10:19 -0800
+Subject: [PATCH 08/10] ARM: dts: sun7i: cubieboard2: Enable GMAC instead
+ of EMAC
+In-Reply-To: <1386350983-13281-9-git-send-email-wens@csie.org>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-9-git-send-email-wens@csie.org>
+Message-ID: <CAGVrzcYhA1S17AP8tO8m0Mjt3z=qq6feziOkwi2BwEuSPU=9Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 01:33:50PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Add a missing break to the switch in tegra_init_fuse() which determines
-> which SoC the code is running on. This prevents the Tegra30+ fuse
-> handling code from running on Tegra20.
-> 
-> Fixes: 3bd1ae57f7bb ("ARM: tegra: add fuses as device randomness")
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+2013/12/6 Chen-Yu Tsai <wens@csie.org>:
+> GMAC has better performance and fewer hardware issues.
+> Use the GMAC in MII mode for ethernet instead of the EMAC.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-> This is a fix for 3.13.
-> 
->  arch/arm/mach-tegra/fuse.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-> index 9a4e910c3796..13995b0be9d9 100644
-> --- a/arch/arm/mach-tegra/fuse.c
-> +++ b/arch/arm/mach-tegra/fuse.c
-> @@ -198,6 +198,7 @@ void __init tegra_init_fuse(void)
->  	switch (tegra_chip_id) {
->  	case TEGRA20:
->  		tegra20_fuse_init_randomness();
-> +		break;
->  	case TEGRA30:
->  	case TEGRA114:
->  	default:
+>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 23 ++++++++---------------
+>  1 file changed, 8 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> index 5c51cb8..9ef5848 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> @@ -19,21 +19,6 @@
+>         compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
+>
+>         soc at 01c00000 {
+> -               emac: ethernet at 01c0b000 {
+> -                       pinctrl-names = "default";
+> -                       pinctrl-0 = <&emac_pins_a>;
+> -                       phy = <&phy1>;
+> -                       status = "okay";
+> -               };
+> -
+> -               mdio at 01c0b080 {
+> -                       status = "okay";
+> -
+> -                       phy1: ethernet-phy at 1 {
+> -                               reg = <1>;
+> -                       };
+> -               };
+> -
+>                 pinctrl at 01c20800 {
+>                         led_pins_cubieboard2: led_pins at 0 {
+>                                 allwinner,pins = "PH20", "PH21";
+> @@ -60,6 +45,14 @@
+>                         pinctrl-0 = <&i2c1_pins_a>;
+>                         status = "okay";
+>                 };
+> +
+> +               gmac: ethernet at 01c50000 {
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&gmac_pins_mii>;
+> +                       snps,phy-addr = <1>;
 
-The code that follows here also doesn't have a break. While not strictly
-necessary it might be good to have one for consistency. Either way,
-though:
-
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/55e25ca4/attachment.sig>
+Same here, this is a custom property which has no reason to exist,
+keep the existing ethernet PHY node please.
+-- 
+Florian
