@@ -1,42 +1,56 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 06 Dec 2013 11:07:43 +0100
-Subject: [PATCH 2/2] ASoC: sh: rcar: Depend on ARCH_SHMOBILE_LEGACY
-In-Reply-To: <1384000429-3590-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1384000429-3590-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1682501.71qI5yTem5@avalon>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 06 Dec 2013 14:11:45 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSHYyXVsgMi8yXSBBUk06IGR0czogQWRkIHN1cHBvcnQgZm9y?=
+ =?UTF-8?B?IHRoZSBjcHVpbXg1MyBib2FyZCBmcm9tIEV1a3JlYSBhbmQgaXRzIGJhc2Vi?=
+ =?UTF-8?B?b2FyZC4=?=
+In-Reply-To: <1386323958-783-2-git-send-email-denis@eukrea.com>
+References: <1386323958-783-1-git-send-email-denis@eukrea.com>
+ <1386323958-783-2-git-send-email-denis@eukrea.com>
+Message-ID: <1386324705.359638944@f208.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san,
+Hello.
 
-What's your opinion about this patch ? It needs to be applied on top of 
-"[PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY" which has been 
-queued by Simon.
+> The following devices/functionalities were added:
+>  * Main and secondary UARTs.
+>  * i2c and the pcf8563 device.
+>  * Ethernet.
+>  * NAND.
+>  * The BP1 button.
+>  * The LED.
+>  * Watchdog.
+>  * SD.
+>  * USB host.
+...
 
-On Saturday 09 November 2013 13:33:49 Laurent Pinchart wrote:
-> The driver doesn't compile on multiplatform kernels as it requires
-> <mach/clock.h>.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  sound/soc/sh/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/sound/soc/sh/Kconfig b/sound/soc/sh/Kconfig
-> index 56d8ff6..ce7cfd6 100644
-> --- a/sound/soc/sh/Kconfig
-> +++ b/sound/soc/sh/Kconfig
-> @@ -36,6 +36,7 @@ config SND_SOC_SH4_SIU
-> 
->  config SND_SOC_RCAR
->  	tristate "R-Car series SRU/SCU/SSIU/SSI support"
-> +	depends on ARCH_SHMOBILE_LEGACY
->  	select SND_SIMPLE_CARD
->  	select RCAR_CLK_ADG
->  	help
+> +		reg_3p3v: regulator at 0 {
+> +			reg = <0>;
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
 
--- 
-Regards,
+"regulator-always-on" make no sense for virtual supplies.
 
-Laurent Pinchart
+...
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <MX53_UART1_PINGRP2>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <MX53_UART2_PINGRP2>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	fsl,uart-has-rtscts;
+
+So if you use "fsl,uart-has-rtscts", should you add MX53_UART1_PINGRP3
+into pinctls too?
+
+---
