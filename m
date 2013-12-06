@@ -1,13 +1,14 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 6 Dec 2013 16:44:49 +0000
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 06 Dec 2013 11:45:14 -0500 (EST)
 Subject: [PATCH] ARM: mcpm: remove redundant dsb instructions prior to sev
 In-Reply-To: <1386347645-16570-1-git-send-email-will.deacon@arm.com>
 References: <1386347645-16570-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20131206164449.GC4897@e103592.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.10.1312061144400.15948@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 04:34:05PM +0000, Will Deacon wrote:
+On Fri, 6 Dec 2013, Will Deacon wrote:
+
 > sync_cache_w already includes a dsb, so we can just use sev() directly
 > then following a cache-sync.
 > 
@@ -15,16 +16,9 @@ On Fri, Dec 06, 2013 at 04:34:05PM +0000, Will Deacon wrote:
 > Cc: Nicolas Pitre <nico@fluxnic.net>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-This makes sense.  I have a feeling the dsb_sev() calls originated
-during my original attempt to use dedicated uncached memory for the
-synchronisation buffer -- i.e., there was no cache flush.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-The extra dsbs do indeed look redundant now.
 
-Acked-by: Dave Martin <Dave.Martin@arm.com>
-
-Cheers
----Dave
 
 > ---
 > 
