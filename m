@@ -1,41 +1,92 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 06 Dec 2013 17:08:38 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSHY3XVsgMi8yXSB2aWRlbzogYmFja2xpZ2h0OiBncGlvLWJh?=
- =?UTF-8?B?Y2tsaWdodDogQWRkIERUIHN1cHBvcnQu?=
-In-Reply-To: <20131206130014.GB30625@ulmo.nvidia.com>
-References: <1386266109-16071-1-git-send-email-denis@eukrea.com>
- <1386266109-16071-2-git-send-email-denis@eukrea.com>
- <20131206130014.GB30625@ulmo.nvidia.com>
-Message-ID: <1386335318.12471946@f258.i.mail.ru>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri,  6 Dec 2013 13:14:43 +0000
+Subject: [PATCH] ARM64: dts: Add clock-frequency to model cpu nodes
+Message-ID: <1386335683-11405-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Dec 05, 2013 at 06:55:09PM +0100, Denis Carikli wrote:
-> [...]
-> > +Optional properties:
-> > +  - default-state: The initial state of the backlight.
-> > +    Valid values are "on", "off", and "keep".
-> > +    The "keep" setting will keep the backlight at whatever its current
-> > +    state is, without producing a glitch. The default is keep if this
-> > +    property is not present.
-> 
-> I'm not sure if "on", "off" and "keep" are a good choice for this
-> binding. Having strings for these tristate values seems suboptimal.
-> Other bindings have chosen a representation that, transposed to this
-> use-case, would read something like this:
-> 
-> 	- default-state: The initial state of the backlight. Valid
-> 	  values:
-> 	  - 0: off
-> 	  - 1: on
-> 
-> 	If the "default-state" property is not present, the default
-> 	will be to keep the current backlight state.
-> 
-> Which is in fact the exact behaviour that your binding describes, but
-> it's much more intuitive in my opinion.
+From: Mark Brown <broonie@linaro.org>
 
-Why we cannot use GPIO bindings for active level here?
-What a reason for "keep" state? Can this be an additional property?
+The clock-frequency property is meaningless for the models but it's a
+mandatory property so claim that all the cores run at 1MHz.
 
+Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
+ arch/arm64/boot/dts/foundation-v8.dts  | 4 ++++
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
+index 4a060906809d..f91b2fa41fb3 100644
+--- a/arch/arm64/boot/dts/foundation-v8.dts
++++ b/arch/arm64/boot/dts/foundation-v8.dts
+@@ -34,6 +34,7 @@
+ 			reg = <0x0 0x0>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+@@ -41,6 +42,7 @@
+ 			reg = <0x0 0x1>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 		cpu at 2 {
+ 			device_type = "cpu";
+@@ -48,6 +50,7 @@
+ 			reg = <0x0 0x2>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 		cpu at 3 {
+ 			device_type = "cpu";
+@@ -55,6 +58,7 @@
+ 			reg = <0x0 0x3>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+index 572005ea2217..d7debfe79d9f 100644
+--- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+@@ -37,6 +37,7 @@
+ 			reg = <0x0 0x0>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+@@ -44,6 +45,7 @@
+ 			reg = <0x0 0x1>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 		cpu at 2 {
+ 			device_type = "cpu";
+@@ -51,6 +53,7 @@
+ 			reg = <0x0 0x2>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 		cpu at 3 {
+ 			device_type = "cpu";
+@@ -58,6 +61,7 @@
+ 			reg = <0x0 0x3>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x0 0x8000fff8>;
++			clock-frequency = <1000000>;
+ 		};
+ 	};
+ 
+-- 
+1.8.5.1
