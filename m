@@ -1,29 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Dec 2013 01:47:51 +0100
-Subject: [PATCHv4 1/4] arm: dts: Add support for SD/MMC on SOCFPGA
-In-Reply-To: <1386281452.26656.8.camel@linux-builds1>
-References: <1386263677-7733-1-git-send-email-dinguyen@altera.com>
- <201312052208.38342.arnd@arndb.de> <1386281452.26656.8.camel@linux-builds1>
-Message-ID: <201312060147.51489.arnd@arndb.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 6 Dec 2013 01:53:19 +0100
+Subject: [PATCH 0/5] PM: Enable option of re-use runtime PM callbacks
+ at system suspend
+In-Reply-To: <Pine.LNX.4.44L0.1312051720330.869-100000@iolanthe.rowland.org>
+References: <CAJvTdKnqD3ccPUzh7kNMNqrEYFfD93Vh9hgFuKyHz+pjGNHdtA@mail.gmail.com>
+ <Pine.LNX.4.44L0.1312051720330.869-100000@iolanthe.rowland.org>
+Message-ID: <20131206005318.GB27953@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 December 2013, Dinh Nguyen wrote:
-> Perhaps Seungwon and Chris might have an opinion on this:
+On Thu 2013-12-05 17:21:50, Alan Stern wrote:
+> On Thu, 5 Dec 2013, Len Brown wrote:
 > 
-> From the Synopsys databook for this IP, using the SDMMC_CMD_USE_HOLD_REG
-> is not recommended for SDR104, SDR50 and DDR50 speed modes. For other
-> speeds, SDR12, and SDR25, it would be necessary to use
-> SDMMC_CMD_USE_HOLD_REG.
+> > This thread raises the question...
+> > 
+> > Do we still need to have PM_RUNTIME apart from PM_SLEEP?
+> > 
+> > What is the benefit of being able to build-in one one without the other?
+> > If that benefit is not significant, perhaps the time has come to
+> > replace them both with CONFIG_PM...
 > 
-> I am referencing v2.50a of the Synopsys DesignWare Cores Mobile Storage
-> Host Databook.
-> 
-> So I think a binary DT property should suffice?
+> There are lots of embedded/SoC platforms that implement PM_RUNTIME but
+> not PM_SLEEP.
 
-Well, if it depends on the interface speed, it is something the driver should
-actually be able to figure out itself, since it knows the speed that is used.
-
-That way, you don't even need a property or per-platform compatible string.
-
-	Arnd
+And lots of PCs where PM_SLEEP is useful but PM_RUNTIME is not :-).
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
