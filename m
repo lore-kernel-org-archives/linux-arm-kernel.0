@@ -1,49 +1,45 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 06 Dec 2013 14:47:35 -0700
-Subject: [GIT PULL] iommu: arm/smmu: fixes for 3.13
-In-Reply-To: <20131206175319.GD8853@mudshark.cambridge.arm.com>
-References: <20131206175319.GD8853@mudshark.cambridge.arm.com>
-Message-ID: <1386366455.25738.511.camel@ul30vt.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 6 Dec 2013 16:48:16 -0500
+Subject: [PATCH v2 0/5] Kesytone II USB support
+In-Reply-To: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
+References: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
+Message-ID: <52A24620.4060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-06 at 17:53 +0000, Will Deacon wrote:
-> Hi Alex (CC'ing Joerg),
-> 
-> Please can you pull the following fixes to the arm/smmu driver for 3.13?
+Wingman,
 
-Hi Will,
+On Wednesday 04 December 2013 03:10 PM, WingMan Kwok wrote:
+> Here is the updated version of the series which addresses comments from
+> earlier version [1].  The PHY register programming is moved to a separate
+> PHY driver.
+> 
+> Series adds USB host support for Keystone SOCs. Keystone SOCs uses dwc3
+> hardware IP implementation.  On Keystone II platforms, we use no-op phy driver.
+> 
+> All three patches are posted together just for completeness. Only first patch
+> is expected to go via usb tree and other two via linux-keystone tree.
+>
+The series looks fine now and probably can be split now.
+ 
+> Patchset are tested on Keystone II EVM with USB2.0 and USB3.0 flash drives.
+> 
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> WingMan Kwok (5):
+>   usb: dwc3: Add Keystone specific glue layer
+>   usb: phy: Add keystone usb phy driver
+Please update the minor comments on patch 1 and resubmit above
+two patches so that Felipe can pick these up. 
 
-I'll use my vfio tree since it's already included in next.  I've pulled
-to here:
+>   ARM: dts: keystone: Add usb phy devicetree bindings
+>   ARM: dts: keystone: Add usb devicetree bindings
+>   ARM: keystone: defconfig: enable USB support
+> 
+On the dts part just enable the phy,usb3 nodes from
+board dts file and have status disabled in common dts file.
+With those update, please repost them and I will take
+them in my 3.14 queue.
 
-git://github.com/awilliam/linux-vfio.git for-linus
-
-Unless something explodes I'll forward it on next week.  Thanks,
-
-Alex
-
-> --->8
-> 
-> The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
-> 
->   Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
-> 
-> for you to fetch changes up to 89a23cde75a7f0b3d8b0c156964eca0c23d2f1eb:
-> 
->   iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe() (2013-12-06 16:44:25 +0000)
-> 
-> ----------------------------------------------------------------
-> Wei Yongjun (1):
->       iommu/arm-smmu: fix error return code in arm_smmu_device_dt_probe()
-> 
-> Will Deacon (2):
->       iommu/arm-smmu: use mutex instead of spinlock for locking page tables
->       iommu/arm-smmu: remove potential NULL dereference on mapping path
-> 
->  drivers/iommu/arm-smmu.c | 66 ++++++++++++++++++++----------------------------
->  1 file changed, 28 insertions(+), 38 deletions(-)
+Regards,
+Santosh
