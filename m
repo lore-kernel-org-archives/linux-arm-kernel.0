@@ -1,34 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 6 Dec 2013 08:12:56 +0100
-Subject: [PATCHv13][ 1/4] video: imxfb: Introduce regulator support.
-In-Reply-To: <1386258219-26437-1-git-send-email-denis@eukrea.com>
-References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131206071256.GX24559@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 06 Dec 2013 15:31:49 +0800
+Subject: [GIT PULL][for 3.14] pull request for hisilicon clock driver
+In-Reply-To: <CAPtuhTibU4yTmoNdD-gsV6fp1gqMMjphvvHdCoF8a1r+zf_csA@mail.gmail.com>
+References: <529F0C4E.4080501@gmail.com>
+ <CAPtuhTibU4yTmoNdD-gsV6fp1gqMMjphvvHdCoF8a1r+zf_csA@mail.gmail.com>
+Message-ID: <52A17D65.9000005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 04:43:36PM +0100, Denis Carikli wrote:
-> This commit is based on the following commit by Fabio Estevam:
-> @@ -1020,6 +1045,12 @@ static int imxfb_probe(struct platform_device *pdev)
->  		goto failed_register;
->  	}
->  
-> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
-> +	if (IS_ERR(fbi->reg_lcd)) {
-> +		dev_info(&pdev->dev, "No lcd regulator used.\n");
+On 12/05/2013 08:28 AM, Mike Turquette wrote:
+> On Wed, Dec 4, 2013 at 3:04 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>> Hi Mike,
+>>
+>> Please help to merge this hisilicon clock driver.
+>>
+>> Regards
+>> Haojian
+>>
+>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>
+>>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>
+>> are available in the git repository at:
+>>
+>> ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+>> tags/clk-hisilicon
+>
+> Is there an anonymous ssh user that I can use to pull this? Otherwise
+> I cannot authenticate ;-)
+>
+> Alternatively you could provide an https:// or git:// URI for me to pull.
+>
+> Thanks!
+> Mike
+>
 
-Please remove this log spam or at least reduce it to dev_dbg. That's the
-typical message to which our customers keep asking us whether that's
-something they have to care about.
+I'm sorry that I didn't notice the ssh protocol at here. Please use 
+these links instead.
 
-Also, you should check for -EPROBE_DEFER here and return it in this
-case.
+git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+or
+https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+or
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/hzhuang1/linux.git
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Haojian
