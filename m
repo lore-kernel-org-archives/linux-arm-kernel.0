@@ -1,53 +1,30 @@
-From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
-Date: Thu, 5 Dec 2013 18:54:49 -0500
-Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
-In-Reply-To: <52A101F8.3060104@codeaurora.org>
-References: <CANsc=4VRLWhaVA15HrBEeM+FJC0tS+b5KKopDb7bP8nxzR8=zA@mail.gmail.com>
- <20131204070442.GA31665@kroah.com>
- <CANsc=4UHEG5cmg9SD3r3rsuJnM9zqq2WiTQdUwrYFr_kkbsVvg@mail.gmail.com>
- <20131204170703.GA14859@kroah.com>
- <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
- <20131204230239.GB9205@kroah.com>
- <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
- <20131205040104.GA14641@kroah.com>
- <52A0DE42.3080602@codeaurora.org>
- <20131205201659.GA14539@kroah.com>
- <52A101F8.3060104@codeaurora.org>
-Message-ID: <CANsc=4Vb-2br+K51NWsyQV25R3eJo_=YfpnXsh1G1ecRVDYc3w@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 5 Dec 2013 16:02:53 -0800
+Subject: [PATCH] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <1386286149-2855-1-git-send-email-ynvich@gmail.com>
+References: <20131205043544.GA28580@kroah.com>
+ <1386286149-2855-1-git-send-email-ynvich@gmail.com>
+Message-ID: <20131206000253.GC21358@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg and Christopher,
+On Fri, Dec 06, 2013 at 03:28:37AM +0400, Sergei Ianovich wrote:
+> pxa2xx-uart was a separate uart platform driver. It was declaring
+> the same device names and numbers as 8250 driver. As a result,
+> it was impossible to use 8250 driver on PXA SoCs.
+> 
+> Upon closer examination pxa2xx-uart turned out to be a clone of
+> 8250_core driver.
+> 
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Thank you for your feedback.
+Wonderful!
 
-2013/12/4 Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> What is it's purpose then?  At first glance, this seems to be exactly
-> what 'perf' provides already.  Doesn't perf work on ARM today?
+Can someone else test this to verify it works for them on their platform
+as well?
 
-On ARM, perf is unable to trace every instruction, and certainly not
-recording the number of cycles taken by every of them. Also, ETM is
-not just tracing the execution flow. It can trace data, trigger
-tracing on events such as address matching, data matching, context ID
-change, monitor CPRT... It would be sad not to use these capabilities.
+thanks,
 
-If we want perf to use ETM's full functionality, its framework clearly
-needs to be extended. Future Intel processors will embed Processor
-Trace [1], which seems to have similar capabilities as ETM on ARM. At
-that point, it will be easier to decide what should be in the kernel
-or in perf.
-
-I the meantime, while ETM is not supported elsewhere than in sysfs, it
-should at least be configurable. The current implementation is almost
-not usable.
-
-> Well, these patches were incorrect, so that's not really a valid
-> question :)
-
-Should I correct the pid size and send them again?
-
-Thanks,
-
-Adrien
-
-[1]: http://software.intel.com/en-us/blogs/2013/09/18/processor-tracing
+greg k-h
