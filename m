@@ -1,52 +1,77 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat,  7 Dec 2013 01:29:39 +0800
-Subject: [PATCH 06/10] ARM: dts: sun7i: Add pin muxing options for the GMAC
+Date: Sat,  7 Dec 2013 01:29:36 +0800
+Subject: [PATCH 03/10] net: stmmac: Use platform data tied with compatible
+ strings
 In-Reply-To: <1386350983-13281-1-git-send-email-wens@csie.org>
 References: <1386350983-13281-1-git-send-email-wens@csie.org>
-Message-ID: <1386350983-13281-7-git-send-email-wens@csie.org>
+Message-ID: <1386350983-13281-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 has EMAC and GMAC muxed on the same pins.
-Add pin sets with gmac function for MII and RGMII mode to the DTSI.
-
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 29 ++++++++++++++--------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index ebb2cce..64b1391 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -246,6 +246,28 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			gmac_pins_mii: gmac_mii {
-+				allwinner,pins = "PA0", "PA1", "PA2",
-+						"PA3", "PA4", "PA5", "PA6",
-+						"PA7", "PA8", "PA9", "PA10",
-+						"PA11", "PA12", "PA13", "PA14",
-+						"PA15", "PA16";
-+				allwinner,function = "gmac";
-+				allwinner,drive = <3>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			gmac_pins_rgmii: gmac_rgmii {
-+				allwinner,pins = "PA0", "PA1", "PA2",
-+						"PA3", "PA4", "PA5", "PA6",
-+						"PA7", "PA8", "PA10",
-+						"PA11", "PA12", "PA13",
-+						"PA15", "PA16";
-+				allwinner,function = "gmac";
-+				allwinner,drive = <3>;
-+				allwinner,pull = <0>;
-+			};
- 		};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 74c7aef..df3fd1c 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -26,8 +26,19 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_net.h>
++#include <linux/of_device.h>
+ #include "stmmac.h"
  
- 		timer at 01c20c00 {
++static const struct of_device_id stmmac_dt_ids[] = {
++	{ .compatible = "st,spear600-gmac"},
++	{ .compatible = "snps,dwmac-3.610"},
++	{ .compatible = "snps,dwmac-3.70a"},
++	{ .compatible = "snps,dwmac-3.710"},
++	{ .compatible = "snps,dwmac"},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
++
+ #ifdef CONFIG_OF
+ static int stmmac_probe_config_dt(struct platform_device *pdev,
+ 				  struct plat_stmmacenet_data *plat,
+@@ -35,10 +46,18 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct stmmac_dma_cfg *dma_cfg;
++	const struct of_device_id *device;
+ 
+ 	if (!np)
+ 		return -ENODEV;
+ 
++	device = of_match_device(stmmac_dt_ids, &pdev->dev);
++	if (!device)
++		return -ENODEV;
++
++	if (device->data)
++	    memcpy(plat, device->data, sizeof(*plat));
++
+ 	*mac = of_get_mac_address(np);
+ 	plat->interface = of_get_phy_mode(np);
+ 
+@@ -257,16 +276,6 @@ static const struct dev_pm_ops stmmac_pltfr_pm_ops = {
+ static const struct dev_pm_ops stmmac_pltfr_pm_ops;
+ #endif /* CONFIG_PM */
+ 
+-static const struct of_device_id stmmac_dt_ids[] = {
+-	{ .compatible = "st,spear600-gmac"},
+-	{ .compatible = "snps,dwmac-3.610"},
+-	{ .compatible = "snps,dwmac-3.70a"},
+-	{ .compatible = "snps,dwmac-3.710"},
+-	{ .compatible = "snps,dwmac"},
+-	{ /* sentinel */ }
+-};
+-MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
+-
+ struct platform_driver stmmac_pltfr_driver = {
+ 	.probe = stmmac_pltfr_probe,
+ 	.remove = stmmac_pltfr_remove,
 -- 
 1.8.5.1
