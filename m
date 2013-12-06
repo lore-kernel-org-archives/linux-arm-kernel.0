@@ -1,58 +1,30 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 06 Dec 2013 13:40:36 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxM11bIDIvNF0gdmlkZW86IGlteGZiOiBBbHNvIGFkZCBw?=
- =?UTF-8?B?d21yIGZvciB0aGUgZGV2aWNlIHRyZWUu?=
-In-Reply-To: <20131206093017.GB24559@pengutronix.de>
-References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
- <1386318910.581671226@f322.i.mail.ru>
- <20131206093017.GB24559@pengutronix.de>
-Message-ID: <1386322836.19413258@f177.i.mail.ru>
+From: arun.kk@samsung.com (Arun Kumar K)
+Date: Fri,  6 Dec 2013 15:18:01 +0530
+Subject: [PATCH 0/3] Exynos5420 Cpufreq support
+Message-ID: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > On Fri, Dec 06, 2013 at 12:03:54PM +0400, Alexander Shiyan wrote:
-> > ...
-> > > > > >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
-> > > > > >  	register is not modified as recommended by the datasheet.
-> > > > > > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
-> > > > > > +	optional, but defining it is necessary to get the backlight working. If that
-> > > > > > +	property is ommited, the register is zeroed.
-> > > > > 
-> > > > > Why isn't this implemented as a backlight driver? Static devicetree
-> > > > > provided values is very limiting.
-> > > > 
-> > > > Let's understand the terminology.
-> > > > This register should be renamed according to the datasheet, i.e. LPCCR.
-> > > > As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
-> > > > Yes, it works as PWM, but nothing do with the backlight subsystem.
-> > > > Yes, we can make a driver for this PWM, but how are we going to control it?
-> > > > I misunderstood something?
-> > > 
-> > > I stumbled upon 'get the backlight working' which implied for me that it
-> > > should be a backlight driver. But you're right and now I remember we
-> > > talked about this already.
-> > 
-> > Hallelujah.
-> > 
-> > > I still think this should be something adjustable, not static data.
-> > > Maybe we could change the wording to something like "This property
-> > > provides the default value for the contrast control register" since even
-> > > if we add driver support for controlling the contrast we still want
-> > > to have a sane default.
-> > 
-> > Sounds good.
-> > 
-> > > BTW the contrast could be controlled with a lcd_device (see
-> > > lcd_device_register) which seems to be very easy to implement.
-> > 
-> > Address of register is placed within LCD area, so we cannot use this
-> > memory region, I think is no so easy as you say....
-> 
-> We do not need a separate driver for this. Look for example at
-> drivers/video/bf537-lq035.c, it just calls lcd_device_register()
-> in its probe function.
+The patch series adds the cpufreq driver for exynos5420 with
+its dependencies. This initial version of the driver only
+modifies the A15 core frequencies.
 
-Nice. Seems this example even can handle LCD power
-regulator from "[1/4] video: imxfb: Introduce regulator support."
+Arjun.K.V (1):
+  cpufreq: exynos: Add exynos5420 cpufreq driver
 
----
+Arun Kumar K (2):
+  ARM: EXYNOS: Add exynos5 CPU clock divider offsets
+  clk: exynos5420: Add alias names for cpu clocks
+
+ arch/arm/mach-exynos/include/mach/regs-clock.h |   24 ++
+ drivers/clk/samsung/clk-exynos5420.c           |    9 +-
+ drivers/cpufreq/Kconfig.arm                    |   11 +
+ drivers/cpufreq/Makefile                       |    1 +
+ drivers/cpufreq/exynos-cpufreq.c               |    2 +
+ drivers/cpufreq/exynos-cpufreq.h               |    8 +
+ drivers/cpufreq/exynos5420-cpufreq.c           |  346 ++++++++++++++++++++++++
+ 7 files changed, 397 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/cpufreq/exynos5420-cpufreq.c
+
+-- 
+1.7.9.5
