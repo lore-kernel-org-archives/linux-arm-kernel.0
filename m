@@ -1,154 +1,68 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Fri,  6 Dec 2013 15:56:40 +0100
-Subject: [PATCH] ARM: i.MX28: dts: rename usbphy pin names
-Message-ID: <1386341800-12098-1-git-send-email-m.grzeschik@pengutronix.de>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri,  6 Dec 2013 15:04:42 +0000
+Subject: [PATCH v2] ARM: add support for the Cortex-A12 processor
+Message-ID: <1386342282-8769-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pins have nothing todo with the phy layer. We better rename them, so
-it gets clear they are routed to the ehci core not to any phy.
+The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
+doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Note that as the ACTLR cannot (usually) be written from non-secure, it is the
+responsibility of the bootloader/firmware to set this bit per core - it is
+done here in Linux as last resort in case of bad firmware.
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 ---
- arch/arm/boot/dts/imx28-cfa10037.dts | 2 +-
- arch/arm/boot/dts/imx28-cfa10049.dts | 2 +-
- arch/arm/boot/dts/imx28-cfa10057.dts | 2 +-
- arch/arm/boot/dts/imx28-cfa10058.dts | 2 +-
- arch/arm/boot/dts/imx28-m28cu3.dts   | 2 +-
- arch/arm/boot/dts/imx28-m28evk.dts   | 4 ++--
- arch/arm/boot/dts/imx28-sps1.dts     | 2 +-
- arch/arm/boot/dts/imx28.dtsi         | 6 +++---
- 8 files changed, 11 insertions(+), 11 deletions(-)
+This V2 patch also adds A12 in asm/cputype.h, necessary for KVM, perf, among
+other things.
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10037.dts b/arch/arm/boot/dts/imx28-cfa10037.dts
-index f93e9a7..3935e86 100644
---- a/arch/arm/boot/dts/imx28-cfa10037.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10037.dts
-@@ -54,7 +54,7 @@
- 	ahb at 80080000 {
- 		usb1: usb at 80090000 {
- 			vbus-supply = <&reg_usb1_vbus>;
--			pinctrl-0 = <&usbphy1_pins_a>;
-+			pinctrl-0 = <&usb1_pins_a>;
- 			pinctrl-names = "default";
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 7087b4b..f1d4e2a 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -274,7 +274,7 @@
- 	ahb at 80080000 {
- 		usb1: usb at 80090000 {
- 			vbus-supply = <&reg_usb1_vbus>;
--			pinctrl-0 = <&usbphy1_pins_a>;
-+			pinctrl-0 = <&usb1_pins_a>;
- 			pinctrl-names = "default";
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/imx28-cfa10057.dts b/arch/arm/boot/dts/imx28-cfa10057.dts
-index 3c13128..4f6394b 100644
---- a/arch/arm/boot/dts/imx28-cfa10057.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10057.dts
-@@ -134,7 +134,7 @@
- 	ahb at 80080000 {
- 		usb1: usb at 80090000 {
- 			vbus-supply = <&reg_usb1_vbus>;
--			pinctrl-0 = <&usbphy1_pins_a>;
-+			pinctrl-0 = <&usb1_pins_a>;
- 			pinctrl-names = "default";
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/imx28-cfa10058.dts b/arch/arm/boot/dts/imx28-cfa10058.dts
-index 2469d34..62382b6 100644
---- a/arch/arm/boot/dts/imx28-cfa10058.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10058.dts
-@@ -101,7 +101,7 @@
- 	ahb at 80080000 {
- 		usb1: usb at 80090000 {
- 			vbus-supply = <&reg_usb1_vbus>;
--			pinctrl-0 = <&usbphy1_pins_a>;
-+			pinctrl-0 = <&usb1_pins_a>;
- 			pinctrl-names = "default";
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/imx28-m28cu3.dts b/arch/arm/boot/dts/imx28-m28cu3.dts
-index d3958da..8f75736 100644
---- a/arch/arm/boot/dts/imx28-m28cu3.dts
-+++ b/arch/arm/boot/dts/imx28-m28cu3.dts
-@@ -180,7 +180,7 @@
- 		usb1: usb at 80090000 {
- 			vbus-supply = <&reg_usb1_vbus>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&usbphy1_pins_a>;
-+			pinctrl-0 = <&usb1_pins_a>;
- 			disable-over-current;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
-index 8e2477f..6a13e5c 100644
---- a/arch/arm/boot/dts/imx28-m28evk.dts
-+++ b/arch/arm/boot/dts/imx28-m28evk.dts
-@@ -248,14 +248,14 @@
- 		usb0: usb at 80080000 {
- 			vbus-supply = <&reg_usb0_vbus>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&usbphy0_pins_a>;
-+			pinctrl-0 = <&usb0_pins_a>;
- 			status = "okay";
- 		};
+ arch/arm/include/asm/cputype.h |    1 +
+ arch/arm/mm/proc-v7.S          |   11 +++++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 9672e97..b2d81bb 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -70,6 +70,7 @@
+ #define ARM_CPU_PART_CORTEX_A5		0xC050
+ #define ARM_CPU_PART_CORTEX_A15		0xC0F0
+ #define ARM_CPU_PART_CORTEX_A7		0xC070
++#define ARM_CPU_PART_CORTEX_A12		0xC0D0
  
- 		usb1: usb at 80090000 {
- 			vbus-supply = <&reg_usb1_vbus>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&usbphy1_pins_a>;
-+			pinctrl-0 = <&usb1_pins_a>;
- 			status = "okay";
- 		};
+ #define ARM_CPU_XSCALE_ARCH_MASK	0xe000
+ #define ARM_CPU_XSCALE_ARCH_V1		0x2000
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index c63d9bd..33788ff 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -185,6 +185,7 @@ __v7_cr7mp_setup:
+ 	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
+ 	b	1f
+ __v7_ca7mp_setup:
++__v7_ca12mp_setup:
+ __v7_ca15mp_setup:
+ 	mov	r10, #0
+ 1:
+@@ -479,6 +480,16 @@ __v7_ca7mp_proc_info:
+ 	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
  
-diff --git a/arch/arm/boot/dts/imx28-sps1.dts b/arch/arm/boot/dts/imx28-sps1.dts
-index 4870f07..097354c 100644
---- a/arch/arm/boot/dts/imx28-sps1.dts
-+++ b/arch/arm/boot/dts/imx28-sps1.dts
-@@ -106,7 +106,7 @@
- 		usb0: usb at 80080000 {
- 			vbus-supply = <&reg_usb0_vbus>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&usbphy0_pins_b>;
-+			pinctrl-0 = <&usb0_pins_b>;
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index cda19c8..5f29304 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -743,7 +743,7 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
--				usbphy0_pins_a: usbphy0 at 0 {
-+				usb0_pins_a: usb0 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						MX28_PAD_SSP2_SS2__USB0_OVERCURRENT
-@@ -753,7 +753,7 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
--				usbphy0_pins_b: usbphy0 at 1 {
-+				usb0_pins_b: usb0 at 1 {
- 					reg = <1>;
- 					fsl,pinmux-ids = <
- 						MX28_PAD_AUART1_CTS__USB0_OVERCURRENT
-@@ -763,7 +763,7 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
--				usbphy1_pins_a: usbphy1 at 0 {
-+				usb1_pins_a: usb1 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						MX28_PAD_SSP2_SS1__USB1_OVERCURRENT
+ 	/*
++	 * ARM Ltd. Cortex A12 processor.
++	 */
++	.type	__v7_ca12mp_proc_info, #object
++__v7_ca12mp_proc_info:
++	.long	0x410fc0d0
++	.long	0xff0ffff0
++	__v7_proc __v7_ca12mp_setup
++	.size	__v7_ca12mp_proc_info, . - __v7_ca12mp_proc_info
++
++	/*
+ 	 * ARM Ltd. Cortex A15 processor.
+ 	 */
+ 	.type	__v7_ca15mp_proc_info, #object
 -- 
-1.8.4.3
+1.7.9.5
