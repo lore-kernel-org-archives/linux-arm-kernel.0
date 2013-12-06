@@ -1,18 +1,18 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 07 Dec 2013 00:13:37 +0100
-Subject: [PATCHv0 1/3] ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts
- file
+Date: Sat, 07 Dec 2013 00:13:53 +0100
+Subject: [PATCHv0 3/3] ARM: mvebu: Enable NAND controller in ReadyNAS 2120
+ .dts file
 In-Reply-To: <cover.1386370808.git.arno@natisbad.org>
 References: <cover.1386370808.git.arno@natisbad.org>
-Message-ID: <44fca21c0eadbd1c59161a57a348f93e717b4f80.1386370808.git.arno@natisbad.org>
+Message-ID: <f511220629ebd85f1348d2e7a8247704d2c359d5.1386370808.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Now that NAND controller support is available for Armada 370
+Now that NAND controller support is available for Armada XP
 (cb28e2537a6f: ARM: mvebu: Add support for NAND controller in
-Armada 370/XP), this patch enables support for ReadyNAS 102 and
-defines default partition layout as delivered by NETGEAR.
+Armada 370/XP), this patch enables support for ReadyNAS 2120
+and defines default partition layout as delivered by NETGEAR.
 
 As described in similar commits 2be2bc39c6f0 (ARM: mvebu: Enable
 NAND controller in Armada XP GP board) and d8c552dddfbf (ARM:
@@ -22,15 +22,15 @@ not allow for setting of timing parameters yet.
 
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 36 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 36 ++++++++++++++++++++++++++
  1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index 1c2d13d..6a7383f 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -131,6 +131,42 @@
- 					pwm_polarity = <0>;
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index 8b2a787..f048b4e 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -211,6 +211,42 @@
+ 					reg = <0x4c>;
  				};
  			};
 +
