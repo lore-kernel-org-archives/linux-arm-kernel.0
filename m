@@ -1,37 +1,73 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 6 Dec 2013 12:43:55 +0100
-Subject: i.MX6/PCIe and MSI interrupts
-In-Reply-To: <201312061032.31944.jbe@pengutronix.de>
-References: <201312061032.31944.jbe@pengutronix.de>
-Message-ID: <201312061243.56069.marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Dec 2013 11:50:15 +0000
+Subject: [GIT PULL] Cacheflush updates for 3.12
+In-Reply-To: <1386256471.3525.13.camel@linaro1.home>
+References: <20130812173155.GI25995@mudshark.cambridge.arm.com>
+ <CAH9NwWd1AfN_YnO-fj94+wTbE8768H518=EndVcX=dFCV9WESg@mail.gmail.com>
+ <20131204161329.GA14145@mudshark.cambridge.arm.com>
+ <1386253407.3525.8.camel@linaro1.home>
+ <1386256471.3525.13.camel@linaro1.home>
+Message-ID: <20131206115015.GE16079@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 06, 2013 at 10:32:31 AM, J?rgen Beisert wrote:
-> Hi,
+Hi guys,
+
+I was out-of-office yesterday, so sorry for the radio silence.
+
+On Thu, Dec 05, 2013 at 03:14:31PM +0000, Jon Medhurst (Tixy) wrote:
+> On Thu, 2013-12-05 at 14:23 +0000, Jon Medhurst (Tixy) wrote:
+> > On Wed, 2013-12-04 at 16:13 +0000, Will Deacon wrote:
+> > > took another look at that patch and can't see anything obviously wrong
+> > > with it. 
+> > 
+> > If the memory region isn't guaranteed to be page aligned then doesn't it
+> > flush up to PAGE_SIZE-1 more bytes than requested and so exceed the
+> > bounds check in do_cache_op? Fixing this as below _appears_ to stop the
+> > Browser crashes I'm seeing (still doing some more testing)...
+
+Well spotted! We used to round down to a page, but I fixed that in the same
+series and didn't notice I'd introduce a bug here. Thanks for digging.
+
+Interesting that we've not heard more reports of this...
+
+> Actually, a smaller patch and one which avoids the possibility of
+> arithmetic owerflow is... 
 > 
-> is anybody out there who has MSI interrupts successfully working on i.MX6?
-> I tried with my i.MX6 and a Gbit network card but without success. In
-> legacy interrupt mode it works.
+> From: Jon Medhurst <tixy@linaro.org>
+> Date: Thu, 5 Dec 2013 14:29:24 +0000
+> Subject: [PATCH] ARM: cacheflush: correctly limit range of memory region
+>  being flushed
+> 
+> The __do_cache_op function operates with a 'chunk' size of one page
+> but fails to limit the size of the final chunk so as to not exceed
+> the specified memory region. Fix this.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
+>  arch/arm/kernel/traps.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index dbf0923..7940241 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -509,9 +509,10 @@ static inline int
+>  __do_cache_op(unsigned long start, unsigned long end)
+>  {
+>  	int ret;
+> -	unsigned long chunk = PAGE_SIZE;
+>  
+>  	do {
+> +		unsigned long chunk = min(PAGE_SIZE, end - start);
+> +
+>  		if (signal_pending(current)) {
+>  			struct thread_info *ti = current_thread_info();
 
-What precise model of card do you use ? Do you have a PCIe switch in the path or 
-just direct RC-EP connection ?
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-> I'm using various patches here from the list and the PCIe itself works. The
-> designware driver is prepared for MSI interrupts and the Exynos driver
-> makes use of it.
+Please can you put this into the patch system, along with a CC stable?
 
-OK
+Cheers,
 
-> I added the same glue code to the i.MX6 driver but I can't get the INTD
-> interrupt to fire when MSI arrives (while the INTA fires in legacy
-> interrupt mode). Some idea what needs to be done in the i.MX6 to get MSI
-> working? The Exynos driver additionally changes some bits in its chipset
-> beside the PCIe unit to enable the MSI interrupt to its CPU. Are there
-> some 'hidden' bits in the i.MX6 as well?
-
-Can you post your prototype patch for the PCIe MSI so we can see what you did 
-there please?
-
-Best regards,
-Marek Vasut
+Will
