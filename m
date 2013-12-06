@@ -1,59 +1,70 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 06 Dec 2013 12:03:54 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxM11bIDIvNF0gdmlkZW86IGlteGZiOiBBbHNvIGFkZCBw?=
- =?UTF-8?B?d21yIGZvciB0aGUgZGV2aWNlIHRyZWUu?=
-In-Reply-To: <20131206070525.GV24559@pengutronix.de>
-References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
- <1386258219-26437-2-git-send-email-denis@eukrea.com>
- <20131206070525.GV24559@pengutronix.de>
-Message-ID: <1386317034.190941796@f354.i.mail.ru>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Fri, 6 Dec 2013 09:05:49 +0100
+Subject: [GIT PULL] Cacheflush updates for 3.12
+In-Reply-To: <CAH9NwWdh-kT8Pgp-CU9x5HiA_C0aKaSDKEO_8OVaYfvpxH2u=Q@mail.gmail.com>
+References: <20130812173155.GI25995@mudshark.cambridge.arm.com>
+ <CAH9NwWd1AfN_YnO-fj94+wTbE8768H518=EndVcX=dFCV9WESg@mail.gmail.com>
+ <20131204161329.GA14145@mudshark.cambridge.arm.com>
+ <1386253407.3525.8.camel@linaro1.home>
+ <1386256471.3525.13.camel@linaro1.home>
+ <CAH9NwWdh-kT8Pgp-CU9x5HiA_C0aKaSDKEO_8OVaYfvpxH2u=Q@mail.gmail.com>
+Message-ID: <CAH9NwWe95V0MsswfE9JY7WpYLwxy9GqsMHnpXbz4aR3nyvKapA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Dec 05, 2013 at 04:43:37PM +0100, Denis Carikli wrote:
-> > pwmr has to be set to get the imxfb backlight work,
-> > though pwmr was only configurable trough the platform data.
-> > 
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Cc: linux-fbdev at vger.kernel.org
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Eric B?nard <eric@eukrea.com>
-> > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Acked-by: Grant Likely <grant.likely@linaro.org>
-> > ---
-> >  .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
-> >  drivers/video/imxfb.c                              |    2 ++
-> >  2 files changed, 5 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > index 46da08d..ac457ae 100644
-> > --- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > @@ -17,6 +17,9 @@ Required nodes:
-> >  Optional properties:
-> >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
-> >  	register is not modified as recommended by the datasheet.
-> > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
-> > +	optional, but defining it is necessary to get the backlight working. If that
-> > +	property is ommited, the register is zeroed.
-> 
-> Why isn't this implemented as a backlight driver? Static devicetree
-> provided values is very limiting.
+2013/12/5 Christian Gmeiner <christian.gmeiner@gmail.com>:
+> 2013/12/5 Jon Medhurst (Tixy) <tixy@linaro.org>:
+>> On Thu, 2013-12-05 at 14:23 +0000, Jon Medhurst (Tixy) wrote:
+>>> On Wed, 2013-12-04 at 16:13 +0000, Will Deacon wrote:
+>>> > took another look at that patch and can't see anything obviously wrong
+>>> > with it.
+>>>
+>>> If the memory region isn't guaranteed to be page aligned then doesn't it
+>>> flush up to PAGE_SIZE-1 more bytes than requested and so exceed the
+>>> bounds check in do_cache_op? Fixing this as below _appears_ to stop the
+>>> Browser crashes I'm seeing (still doing some more testing)...
+>>
+>> Actually, a smaller patch and one which avoids the possibility of
+>> arithmetic owerflow is...
+>>
+>> From: Jon Medhurst <tixy@linaro.org>
+>> Date: Thu, 5 Dec 2013 14:29:24 +0000
+>> Subject: [PATCH] ARM: cacheflush: correctly limit range of memory region
+>>  being flushed
+>>
+>> The __do_cache_op function operates with a 'chunk' size of one page
+>> but fails to limit the size of the final chunk so as to not exceed
+>> the specified memory region. Fix this.
+>>
+>> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+>> ---
+>>  arch/arm/kernel/traps.c |    3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index dbf0923..7940241 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -509,9 +509,10 @@ static inline int
+>>  __do_cache_op(unsigned long start, unsigned long end)
+>>  {
+>>         int ret;
+>> -       unsigned long chunk = PAGE_SIZE;
+>>
+>>         do {
+>> +               unsigned long chunk = min(PAGE_SIZE, end - start);
+>> +
+>>                 if (signal_pending(current)) {
+>>                         struct thread_info *ti = current_thread_info();
+>>
+>> --
+>> 1.7.10.4
+>>
+>>
+>
+> I am running my test overnight with this patch... stay tuned.
+>
 
-Let's understand the terminology.
-This register should be renamed according to the datasheet, i.e. LPCCR.
-As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
-Yes, it works as PWM, but nothing do with the backlight subsystem.
-Yes, we can make a driver for this PWM, but how are we going to control it?
-I misunderstood something?
+My test is still running, which is good.
 
----
+Tested-by: Christian Gmeiner <christian.gmeiner@gmail.com>
