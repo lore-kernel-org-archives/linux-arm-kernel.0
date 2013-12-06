@@ -1,28 +1,62 @@
-From: jbe@pengutronix.de (=?iso-8859-15?q?J=FCrgen_Beisert?=)
-Date: Fri, 6 Dec 2013 10:32:31 +0100
-Subject: i.MX6/PCIe and MSI interrupts
-Message-ID: <201312061032.31944.jbe@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 6 Dec 2013 10:30:17 +0100
+Subject: [PATCHv13][ 2/4] video: imxfb: Also add pwmr for the device tree.
+In-Reply-To: <1386318910.581671226@f322.i.mail.ru>
+References: <1386258219-26437-1-git-send-email-denis@eukrea.com>
+ <1386317034.190941796@f354.i.mail.ru>
+ <20131206081640.GZ24559@pengutronix.de>
+ <1386318910.581671226@f322.i.mail.ru>
+Message-ID: <20131206093017.GB24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 06, 2013 at 12:35:10PM +0400, Alexander Shiyan wrote:
+> > On Fri, Dec 06, 2013 at 12:03:54PM +0400, Alexander Shiyan wrote:
+> ...
+> > > > >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+> > > > >  	register is not modified as recommended by the datasheet.
+> > > > > +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
+> > > > > +	optional, but defining it is necessary to get the backlight working. If that
+> > > > > +	property is ommited, the register is zeroed.
+> > > > 
+> > > > Why isn't this implemented as a backlight driver? Static devicetree
+> > > > provided values is very limiting.
+> > > 
+> > > Let's understand the terminology.
+> > > This register should be renamed according to the datasheet, i.e. LPCCR.
+> > > As I pointed out earlier, it is NOT control the backlight, this is a contrast control.
+> > > Yes, it works as PWM, but nothing do with the backlight subsystem.
+> > > Yes, we can make a driver for this PWM, but how are we going to control it?
+> > > I misunderstood something?
+> > 
+> > I stumbled upon 'get the backlight working' which implied for me that it
+> > should be a backlight driver. But you're right and now I remember we
+> > talked about this already.
+> 
+> Hallelujah.
+> 
+> > I still think this should be something adjustable, not static data.
+> > Maybe we could change the wording to something like "This property
+> > provides the default value for the contrast control register" since even
+> > if we add driver support for controlling the contrast we still want
+> > to have a sane default.
+> 
+> Sounds good.
+> 
+> > BTW the contrast could be controlled with a lcd_device (see
+> > lcd_device_register) which seems to be very easy to implement.
+> 
+> Address of register is placed within LCD area, so we cannot use this
+> memory region, I think is no so easy as you say....
 
-is anybody out there who has MSI interrupts successfully working on i.MX6? I 
-tried with my i.MX6 and a Gbit network card but without success. In legacy 
-interrupt mode it works.
-I'm using various patches here from the list and the PCIe itself works. The 
-designware driver is prepared for MSI interrupts and the Exynos driver makes 
-use of it.
-I added the same glue code to the i.MX6 driver but I can't get the INTD 
-interrupt to fire when MSI arrives (while the INTA fires in legacy interrupt 
-mode). Some idea what needs to be done in the i.MX6 to get MSI working? The 
-Exynos driver additionally changes some bits in its chipset beside the PCIe 
-unit to enable the MSI interrupt to its CPU. Are there some 'hidden' bits in 
-the i.MX6 as well?
+We do not need a separate driver for this. Look for example at
+drivers/video/bf537-lq035.c, it just calls lcd_device_register()
+in its probe function.
 
-Regards,
-Juergen
+Sascha
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
