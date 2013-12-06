@@ -1,72 +1,51 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri,  6 Dec 2013 13:52:19 -0800
-Subject: [PATCH 3.10 48/58] clockevents: Prefer CPU local devices over global
- devices
-In-Reply-To: <20131206214844.906193530@linuxfoundation.org>
-References: <20131206214844.906193530@linuxfoundation.org>
-Message-ID: <20131206214849.344460410@linuxfoundation.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 6 Dec 2013 19:05:06 -0300
+Subject: [PATCH v5 00/14] Armada 370/XP NAND support
+In-Reply-To: <878uvx4pyr.fsf@natisbad.org>
+References: <20131202103305.GB2466@localhost> <87siubneuf.fsf@natisbad.org>
+ <20131203002225.GA5333@localhost> <87ob4xbs8l.fsf@natisbad.org>
+ <87iov5aapx.fsf@natisbad.org> <20131204142009.GB2486@localhost>
+ <87haaogx6j.fsf@natisbad.org> <87d2lbrpvy.fsf@natisbad.org>
+ <20131206125559.GA4208@localhost> <878uvx4pyr.fsf@natisbad.org>
+Message-ID: <20131206220505.GB2458@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10-stable review patch.  If anyone has any objections, please let me know.
+On Fri, Dec 06, 2013 at 10:41:32PM +0100, Arnaud Ebalard wrote:
+> Hi Ezequiel,
+> 
+> Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
+> 
+> > Hi Arnaud,
+> >
+> > On Thu, Dec 05, 2013 at 09:42:25PM +0100, Arnaud Ebalard wrote:
+> > [..]
+> >> [ 1488.150697] Waiting for device to be ready
+> >> [ 1488.150702] Device is ready
+> >> 
+> >> If you had the time to test the offending block on another device, did
+> >> you manage to reproduce what I get?
+> >> 
+> >
+> > Yes, I managed to reproduced your timeout. You found a bug on my
+> > dev_ready completion handler scheme, and now I officially hate this
+> > evil completion handler ;-)
+> >
+> > I've pushed a new branch for you to try:
+> >
+> > https://github.com/MISL-EBU-System-SW/mainline-public/tree/pxa3xx-armada-nand-new-ecc-v2
+> >
+> > Please give it a try, and test as heavily and creatively as you can
+> > think off.
+> 
+> Sorry, but I was unable to find any more bug, i.e. AFAICT it does work
+> as expected now :-) FWIW, thanks for your time, you can put my:
+> 
+> Tested-by: Arnaud Ebalard <arno@natisbad.org>
+> 
 
-------------------
-
-From: Stephen Boyd <sboyd@codeaurora.org>
-
-commit 70e5975d3a04be5479a28eec4a2fb10f98ad2785 upstream.
-
-On an SMP system with only one global clockevent and a dummy
-clockevent per CPU we run into problems. We want the dummy
-clockevents to be registered as the per CPU tick devices, but
-we can only achieve that if we register the dummy clockevents
-before the global clockevent or if we artificially inflate the
-rating of the dummy clockevents to be higher than the rating
-of the global clockevent. Failure to do so leads to boot
-hangs when the dummy timers are registered on all other CPUs
-besides the CPU that accepted the global clockevent as its tick
-device and there is no broadcast timer to poke the dummy
-devices.
-
-If we're registering multiple clockevents and one clockevent is
-global and the other is local to a particular CPU we should
-choose to use the local clockevent regardless of the rating of
-the device. This way, if the clockevent is a dummy it will take
-the tick device duty as long as there isn't a higher rated tick
-device and any global clockevent will be bumped out into
-broadcast mode, fixing the problem described above.
-
-Reported-and-tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Tested-by: soren.brinkmann at xilinx.com
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: John Stultz <john.stultz@linaro.org>
-Link: http://lkml.kernel.org/r/20130613183950.GA32061 at codeaurora.org
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Kim Phillips <kim.phillips@linaro.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- kernel/time/tick-common.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
---- a/kernel/time/tick-common.c
-+++ b/kernel/time/tick-common.c
-@@ -234,8 +234,13 @@ static bool tick_check_preferred(struct
- 			return false;
- 	}
- 
--	/* Use the higher rated one */
--	return !curdev || newdev->rating > curdev->rating;
-+	/*
-+	 * Use the higher rated one, but prefer a CPU local device with a lower
-+	 * rating than a non-CPU local device
-+	 */
-+	return !curdev ||
-+		newdev->rating > curdev->rating ||
-+	       !cpumask_equal(curdev->cpumask, newdev->cpumask);
- }
- 
- /*
+Great! I'll push the patches then with your tested-by.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
