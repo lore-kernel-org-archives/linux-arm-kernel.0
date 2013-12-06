@@ -1,29 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 6 Dec 2013 16:23:18 +0100
-Subject: [PATCH 2/2] ARM: tegra: enable MAX98090 audio driver in
- tegra_defconfig
-In-Reply-To: <1386196073-25193-2-git-send-email-swarren@wwwdotorg.org>
-References: <1386196073-25193-1-git-send-email-swarren@wwwdotorg.org>
- <1386196073-25193-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131206152317.GG32372@ulmo.nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 6 Dec 2013 15:34:36 +0000
+Subject: [PATCH v5 1/3] mfd: tps6586x: add version detection
+In-Reply-To: <20131206142605.GA32363@ulmo.nvidia.com>
+References: <cover.1386333697.git.stefan@agner.ch>
+ <7812fb79beac0a6a409090f43d129893f9f93b5b.1386333697.git.stefan@agner.ch>
+ <20131206142605.GA32363@ulmo.nvidia.com>
+Message-ID: <20131206153436.GB23519@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:27:53PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This audio driver is required by the Venice2 board.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/configs/tegra_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+On Fri, 06 Dec 2013, Thierry Reding wrote:
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/6a52e593/attachment-0001.sig>
+> On Fri, Dec 06, 2013 at 01:51:45PM +0100, Stefan Agner wrote:
+> > Use the VERSIONCRC to determine the exact device version. According to
+> > the datasheet this register can be used as device identifier. The
+> > identification is needed since some tps6586x regulators use a different
+> > voltage table.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > ---
+> > Changes since v4:
+> >   - Use variable named version instead of ret
+> > 
+> > Changes since v2:
+> >   - Avoid moving devm_kzalloc
+> > ---
+> >  drivers/mfd/tps6586x.c       | 50 +++++++++++++++++++++++++++++++++++++-------
+> >  include/linux/mfd/tps6586x.h |  7 +++++++
+> >  2 files changed, 49 insertions(+), 8 deletions(-)
+> 
+> I think I also already gave my Reviewed-by on both this and 2/3, neither
+> of which changed significantly enough to warrant that to be dropped. In
+> general it's fine to keep Reviewed-by and Acked-by as long as you're
+> only changing minor things.
+
+Don't worry Thierry, I'll ensure they are applied.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
