@@ -1,51 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 6 Dec 2013 15:12:37 +0100
-Subject: [PATCHv7][ 2/2] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <1386335318.12471946@f258.i.mail.ru>
-References: <1386266109-16071-1-git-send-email-denis@eukrea.com>
- <1386266109-16071-2-git-send-email-denis@eukrea.com>
- <20131206130014.GB30625@ulmo.nvidia.com>
- <1386335318.12471946@f258.i.mail.ru>
-Message-ID: <20131206141236.GA32313@ulmo.nvidia.com>
+From: jbe@pengutronix.de (=?iso-8859-15?q?J=FCrgen_Beisert?=)
+Date: Fri, 6 Dec 2013 15:15:50 +0100
+Subject: i.MX6/PCIe and MSI interrupts
+In-Reply-To: <CAB5oZtC_X6Tk+6c5sZB06kDmhOgqmqW0_QG1GKWAJgqNpg2tag@mail.gmail.com>
+References: <201312061032.31944.jbe@pengutronix.de>
+ <201312061243.56069.marex@denx.de>
+ <CAB5oZtC_X6Tk+6c5sZB06kDmhOgqmqW0_QG1GKWAJgqNpg2tag@mail.gmail.com>
+Message-ID: <201312061515.50436.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 05:08:38PM +0400, Alexander Shiyan wrote:
-> > On Thu, Dec 05, 2013 at 06:55:09PM +0100, Denis Carikli wrote:
-> > [...]
-> > > +Optional properties:
-> > > +  - default-state: The initial state of the backlight.
-> > > +    Valid values are "on", "off", and "keep".
-> > > +    The "keep" setting will keep the backlight at whatever its current
-> > > +    state is, without producing a glitch. The default is keep if this
-> > > +    property is not present.
-> > 
-> > I'm not sure if "on", "off" and "keep" are a good choice for this
-> > binding. Having strings for these tristate values seems suboptimal.
-> > Other bindings have chosen a representation that, transposed to this
-> > use-case, would read something like this:
-> > 
-> > 	- default-state: The initial state of the backlight. Valid
-> > 	  values:
-> > 	  - 0: off
-> > 	  - 1: on
-> > 
-> > 	If the "default-state" property is not present, the default
-> > 	will be to keep the current backlight state.
-> > 
-> > Which is in fact the exact behaviour that your binding describes, but
-> > it's much more intuitive in my opinion.
-> 
-> Why we cannot use GPIO bindings for active level here?
-> What a reason for "keep" state? Can this be an additional property?
+Hi Harro,
 
-Default state and active level are two different things.
+On Friday 06 December 2013 13:39:09 Harro Haan wrote:
+> [...]
+> Attached are my patches of the first attempt to get MSI working for
+> the i.MX6. It looks like MSI is working but MSIX is not in combination
+> with e1000e and SabreSD. I did some successful iperf tests in MSI
+> mode. I did the following hack in
+> drivers/net/ethernet/intel/e1000e/param.c to disable MSIX:
+>
+> -		if (adapter->flags & FLAG_HAS_MSIX) {
+> +		if (!(adapter->flags & FLAG_HAS_MSIX)/*TEMP*/) {
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/6b4b0460/attachment.sig>
+Arrrgh, after applying this change it starts to work immediately. So many 
+hours...
+
+> My MSI tests are not successful when testing it with a Xilinx PCIe
+> development board, while this FPGA design works properly with FSL
+> imx_3.0.35 (or on x86).
+
+Same here. Network chip works with MSI, PCIe FPGA does not.
+
+Regards and thanks for your help,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
