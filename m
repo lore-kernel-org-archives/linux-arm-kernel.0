@@ -1,67 +1,75 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 6 Dec 2013 14:30:03 -0600
-Subject: [PATCH v2 3/5] ARM: dts: keystone: Add usb phy devicetree bindings
-In-Reply-To: <1386187811-9596-4-git-send-email-w-kwok2@ti.com>
+Date: Fri, 6 Dec 2013 14:30:26 -0600
+Subject: [PATCH v2 4/5] ARM: dts: keystone: Add usb devicetree bindings
+In-Reply-To: <1386187811-9596-5-git-send-email-w-kwok2@ti.com>
 References: <1386187811-9596-1-git-send-email-w-kwok2@ti.com>
- <1386187811-9596-4-git-send-email-w-kwok2@ti.com>
-Message-ID: <20131206203003.GI21086@saruman.home>
+ <1386187811-9596-5-git-send-email-w-kwok2@ti.com>
+Message-ID: <20131206203026.GJ21086@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 04, 2013 at 03:10:09PM -0500, WingMan Kwok wrote:
-> Added device tree support for TI's Keystone USB PHY driver and updated the
-> Documentation with device tree binding information.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> ---
->  .../devicetree/bindings/usb/keystone-phy.txt       |   19 +++++++++++++++++++
->  arch/arm/boot/dts/keystone.dtsi                    |    7 +++++++
->  2 files changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/keystone-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/keystone-phy.txt b/Documentation/devicetree/bindings/usb/keystone-phy.txt
+Hi,
+
+On Wed, Dec 04, 2013 at 03:10:10PM -0500, WingMan Kwok wrote:
+> diff --git a/Documentation/devicetree/bindings/usb/keystone-usb.txt b/Documentation/devicetree/bindings/usb/keystone-usb.txt
 > new file mode 100644
-> index 0000000..300830d
+> index 0000000..ac2c7cc
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/keystone-phy.txt
-> @@ -0,0 +1,19 @@
-> +TI Keystone USB PHY
+> +++ b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+> @@ -0,0 +1,41 @@
+> +TI Keystone Soc USB Controller
+> +
+> +DWC3 GLUE
 > +
 > +Required properties:
-> + - compatible: should be "ti,keystone-usbphy".
+> + - compatible: should be "ti,keystone-dwc3".
 > + - #address-cells, #size-cells : should be '1' if the device has sub-nodes
 > +   with 'reg' property.
-> + - reg : Address and length of the usb phy control register set.
+> + - reg : Address and length of the register set for the USB subsystem on
+> +   the SOC.
+> + - interrupts : The irq number of this device that is used to interrupt the
+> +   MPU.
+> + - ranges: allows valid 1:1 translation between child's address space and
+> +   parent's address space.
+> + - clocks: Clock IDs array as required by the controller.
+> + - clock-names: names of clocks correseponding to IDs in the clock property.
 > +
-> +The main purpose of this PHY driver is to enable the USB PHY reference clock
-> +gate on the Keystone SOC for both the USB2 and USB3 PHY. Otherwise it is just
-> +an NOP PHY driver.  Hence this node is referenced as both the usb2 and usb3
-> +phy node in the USB Glue layer driver node.
+> +Sub-nodes:
+> +The dwc3 core should be added as subnode to Keystone DWC3 glue.
+> +- dwc3 :
+> +   The binding details of dwc3 can be found in:
+> +   Documentation/devicetree/bindings/usb/dwc3.txt
 > +
-> +usb_phy: usb_phy at 2620738 {
-> +	compatible = "ti,keystone-usbphy";
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	reg = <0x2620738 32>;
-> +};
+> +Example:
+> +	usb: usb at 2680000 {
+> +		compatible = "ti,keystone-dwc3";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x2680000 0x10000>;
+> +		clocks = <&clkusb>;
+> +		clock-names = "usb";
+> +		interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+> +		ranges;
+> +
+> +		dwc3 at 2690000 {
+> +			compatible = "synopsys,dwc3";
+> +			reg = <0x2690000 0x70000>;
+> +			interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
+> +			usb-phy = <&usb_phy>, <&usb_phy>;
+> +		};
+> +	};
 > diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-> index f6d6d9e..d497d9e 100644
+> index d497d9e..0911bb7 100644
 > --- a/arch/arm/boot/dts/keystone.dtsi
 > +++ b/arch/arm/boot/dts/keystone.dtsi
-> @@ -181,5 +181,12 @@
->  			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
->  			clocks = <&clkspi>;
+> @@ -188,5 +188,23 @@
+>  			#size-cells = <1>;
+>  			reg = <0x2620738 32>;
 >  		};
 > +
-> +		usb_phy: usb_phy at 2620738 {
-> +			compatible = "ti,keystone-usbphy";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0x2620738 32>;
+> +		usb: usb at 2680000 {
 
-should this one have status = "disabled"; and let board dts enable the
-PHY ?
+likewise, status = disabled ?
 
 -- 
 balbi
@@ -71,4 +79,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/0e279e40/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/1d736762/attachment-0001.sig>
