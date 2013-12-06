@@ -1,17 +1,17 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 07 Dec 2013 00:13:18 +0100
-Subject: [PATCHv0 2/3] ARM: mvebu: Enable NAND controller in ReadyNAS 104 .dts
+Date: Sat, 07 Dec 2013 00:13:37 +0100
+Subject: [PATCHv0 1/3] ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts
  file
 In-Reply-To: <cover.1386370808.git.arno@natisbad.org>
 References: <cover.1386370808.git.arno@natisbad.org>
-Message-ID: <654ea0d84013c473797c0902c75d3ac5d9c01981.1386370808.git.arno@natisbad.org>
+Message-ID: <44fca21c0eadbd1c59161a57a348f93e717b4f80.1386370808.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Now that NAND controller support is available for Armada 370
 (cb28e2537a6f: ARM: mvebu: Add support for NAND controller in
-Armada 370/XP), this patch enables support for ReadyNAS 104 and
+Armada 370/XP), this patch enables support for ReadyNAS 102 and
 defines default partition layout as delivered by NETGEAR.
 
 As described in similar commits 2be2bc39c6f0 (ARM: mvebu: Enable
@@ -22,15 +22,15 @@ not allow for setting of timing parameters yet.
 
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 36 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 36 ++++++++++++++++++++++++++
  1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index e48e5fb..272e2e2 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -133,6 +133,42 @@
- 					reg = <0x23>;
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 1c2d13d..6a7383f 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -131,6 +131,42 @@
+ 					pwm_polarity = <0>;
  				};
  			};
 +
