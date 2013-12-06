@@ -1,52 +1,24 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 6 Dec 2013 15:45:28 -0800
-Subject: [PATCH 2/2] ARM: dts: bcm28155-ap: Enable all the i2c busses
-In-Reply-To: <1386373528-13045-1-git-send-email-tim.kryger@linaro.org>
-References: <1386373528-13045-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1386373528-13045-3-git-send-email-tim.kryger@linaro.org>
+Date: Fri, 6 Dec 2013 15:45:26 -0800
+Subject: [PATCH 0/2] Enable I2C on bcm28155-ap
+Message-ID: <1386373528-13045-1-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable all available i2c busses.
+This series enables all the I2C busses on the bcm28155-ap board.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Christian Daudt <csd@broadcom.com>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
+These patches appeared in another series that was partially accepted.
+  https://lkml.org/lkml/2013/11/14/517
+
+It depends on:  https://lkml.org/lkml/2013/12/5/508
+
+Tim Kryger (2):
+  ARM: dts: bcm281xx: Add i2c busses
+  ARM: dts: bcm28155-ap: Enable all the i2c busses
+
+ arch/arm/boot/dts/bcm11351.dtsi   | 40 +++++++++++++++++++++++++++++++++++++++
  arch/arm/boot/dts/bcm28155-ap.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ 2 files changed, 60 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 08e47c2..bab302d 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -27,6 +27,26 @@
- 		status = "okay";
- 	};
- 
-+	i2c at 3e016000 {
-+		status="okay";
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 3e017000 {
-+		status="okay";
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 3e018000 {
-+		status="okay";
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 3500d000 {
-+		status="okay";
-+		clock-frequency = <400000>;
-+	};
-+
- 	sdio1: sdio at 3f180000 {
- 		max-frequency = <48000000>;
- 		status = "okay";
 -- 
 1.8.0.1
