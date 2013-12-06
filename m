@@ -1,98 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Dec 2013 13:30:41 -0800
-Subject: [GIT PULL] one regression fix and two more omap dt fixes
- against v3.13-rc2
-In-Reply-To: <pull-1386293533-80127>
-References: <pull-1386293533-80127>
-Message-ID: <20131206213041.GL26766@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  6 Dec 2013 14:31:02 -0700
+Subject: [PATCH V2] ARM: tegra: add missing break to fuse initialization code
+Message-ID: <1386365462-17635-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131205 17:33]:
-> The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
-> 
->   Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/yet-more-dt-regressions
-> 
-> for you to fetch changes up to 341ba42e76723f2c39da7e288703896ae3d85620:
-> 
->   ARM: OMAP2+: Fix the machine entry for am3517 (2013-12-05 16:25:30 -0800)
-> 
-> ----------------------------------------------------------------
-> A rather big fix for a regression where we have dropped omap4 hwmod
-> data earlier but are not initializing it from device tree. In addition
-> to this fix we eventually also be fix the issues in the .dts files
-> and drivers, but that's too intrusive for the -rc cycle and must be
-> done later on.
-> 
-> Also two more legacy booting vs device tree based booting fixes for
-> am3517 that I did not notice earlier until Nishant Menon reported
-> these to me few days ago. With these we're good to go having v3.13
-> working both for legacy booting and device tree based booting, and we
-> can then go ahed and drop the legacy booting for mach-omap2 for v3.14.
-> 
-> ----------------------------------------------------------------
-> Nishanth Menon (1):
->       ARM: OMAP2+: Fix the machine entry for am3517
+From: Stephen Warren <swarren@nvidia.com>
 
-Looks like this needs the following patch folded in.
+Add a missing break to the switch in tegra_init_fuse() which determines
+which SoC the code is running on. This prevents the Tegra30+ fuse
+handling code from running on Tegra20.
 
-Please ignore this pull request if not yet pulled, I'll post a new one
-shortly.
+Fixes: 3bd1ae57f7bb ("ARM: tegra: add fuses as device randomness")
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2: Add break to all cases
+---
+ arch/arm/mach-tegra/fuse.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Regards,
-
-Tony
-
-8< ----------------------------------
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Fri, 6 Dec 2013 13:21:03 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix build when am3517 is selected without omap3
-
-We should have the am3517 related entry under ARCH_OMAP3, not
-under CONFIG_SOC_AM33XX.
-
-Otherwise we can get build errors like this:
-
-undefined reference to `omap3_map_io'
-undefined reference to `am35xx_init_early'
-undefined reference to `omap3_init_late'
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index e94a215..8d972ff1 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -131,13 +131,6 @@ DT_MACHINE_START(OMAP3_GP_DT, "Generic OMAP3-GP (Flattened Device Tree)")
- 	.dt_compat	= omap3_gp_boards_compat,
- 	.restart	= omap3xxx_restart,
- MACHINE_END
--#endif
--
--#ifdef CONFIG_SOC_AM33XX
--static const char *am33xx_boards_compat[] __initdata = {
--	"ti,am33xx",
--	NULL,
--};
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index 9a4e910c3796..3a9c1f1c219d 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -198,10 +198,12 @@ void __init tegra_init_fuse(void)
+ 	switch (tegra_chip_id) {
+ 	case TEGRA20:
+ 		tegra20_fuse_init_randomness();
++		break;
+ 	case TEGRA30:
+ 	case TEGRA114:
+ 	default:
+ 		tegra30_fuse_init_randomness();
++		break;
+ 	}
  
- static const char *am3517_boards_compat[] __initdata = {
- 	"ti,am3517",
-@@ -156,6 +149,13 @@ DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
- 	.dt_compat	= am3517_boards_compat,
- 	.restart	= omap3xxx_restart,
- MACHINE_END
-+#endif
-+
-+#ifdef CONFIG_SOC_AM33XX
-+static const char *am33xx_boards_compat[] __initdata = {
-+	"ti,am33xx",
-+	NULL,
-+};
- 
- DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
+ 	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+-- 
+1.8.1.5
