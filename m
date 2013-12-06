@@ -1,47 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Dec 2013 17:32:13 -0800
-Subject: [GIT PULL] one regression fix and two more omap dt fixes against
- v3.13-rc2
-Message-ID: <pull-1386293533-80127>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Dec 2013 02:39:14 +0100
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <1383889128-12540-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
+ <1383889128-12540-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <201312060239.14832.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
+On Friday 08 November 2013, Zhangfei Gao wrote:
+> Add dw_mmc-k3.c for k3v2, support sd/emmc
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Tested-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
 
-  Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
+We are currently having the exact same discussion problem on the altera
+version of dw_mmc: It seems that all this driver does in addition to the
+common code is to have a custom way to set up the card clocks.
 
-are available in the git repository at:
+In both cases, there is a custom piece of IP logic providing this clock
+(here it is in the "hisilicon,pctrl" node). IMHO that should be a proper
+clock driver so you can use the existing call to clk_set_rate to set
+it up and not need a special platform driver at all.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/yet-more-dt-regressions
-
-for you to fetch changes up to 341ba42e76723f2c39da7e288703896ae3d85620:
-
-  ARM: OMAP2+: Fix the machine entry for am3517 (2013-12-05 16:25:30 -0800)
-
-----------------------------------------------------------------
-A rather big fix for a regression where we have dropped omap4 hwmod
-data earlier but are not initializing it from device tree. In addition
-to this fix we eventually also be fix the issues in the .dts files
-and drivers, but that's too intrusive for the -rc cycle and must be
-done later on.
-
-Also two more legacy booting vs device tree based booting fixes for
-am3517 that I did not notice earlier until Nishant Menon reported
-these to me few days ago. With these we're good to go having v3.13
-working both for legacy booting and device tree based booting, and we
-can then go ahed and drop the legacy booting for mach-omap2 for v3.14.
-
-----------------------------------------------------------------
-Nishanth Menon (1):
-      ARM: OMAP2+: Fix the machine entry for am3517
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Fix overwriting hwmod data with data from device tree
-      ARM: dts: Fix missing entries for am3517
-
- arch/arm/boot/dts/am3517-evm.dts    |  6 +--
- arch/arm/boot/dts/am3517.dtsi       | 63 ++++++++++++++++++++++++
- arch/arm/mach-omap2/board-generic.c | 18 +++++++
- arch/arm/mach-omap2/omap_hwmod.c    | 98 +++++++++++++++++++++++++++++--------
- 4 files changed, 162 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm/boot/dts/am3517.dtsi
+	Arnd
