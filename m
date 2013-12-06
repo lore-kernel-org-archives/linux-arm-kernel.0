@@ -1,37 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Dec 2013 14:56:59 +0100
-Subject: [PATCH v2 0/3] pinctrl: Qualcomm 8x74 pinctrl driver
-In-Reply-To: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CACRpkdaYPSJbL80tbFaNP9aTFc+_AKsT=rd-yxc0R6K-M_Tz9A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 6 Dec 2013 13:58:25 +0000
+Subject: [RFC part1 PATCH 0/7] Make ACPI core running on ARM64
+In-Reply-To: <201312052325.02603.arnd@arndb.de>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <201312052325.02603.arnd@arndb.de>
+Message-ID: <20131206135825.GG29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 6, 2013 at 3:10 AM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
+On Thu, Dec 05, 2013 at 11:25:02PM +0100, Arnd Bergmann wrote:
 
-> This series adds a pinctrl, pinmux, pinconf and gpiolib driver for the
-> Qualcomm TLMM block found in recent Qualcomm SoCs (8x60 and newer).
-> It designed with both v2 and v3 of the block in mind and comes with initial
-> definitions for the 8x74 SoCs.
-> This should be filled in with more data and definitions for more SoCs.
->
-> Regards,
-> Bjorn
->
-> v2
-> --
-> * Replaced subnode dt parsing with generic pinctrl function
-> * Installing irq_handler as chained irq handler
-> * Added call to handle_bad_irq() when no irqs are pending in irq handler
-> * Creating irq mapping at probe() and cleaned up the code accordingly
-> * Replaced pinctrl_add_gpio_range with gpiochip_add_pin_range
-> * Other minor updates based on review comments
+> However, as I mentioned before I am much more worried about the parts that
+> are not done (or not posted) yet and that will be required to actually
+> have working support for a real server system. Until we know more about
+> where this is heading, I think we should not merge any of the ARM specific
+> parts of your patches. Any patches that are reasonable cleanups and bug
+> fixes for the ACPI subsystem should of course get merged once they are
+> reviewed.
 
-I can't see any problem with these patches, and they only use standard
-bindings, so I've applied all three so we get some linux-next rotation
-and build coverage. Any remaining problems can certainly be fixed
-with incremental patches.
-
-Thanks!
-Linus Walleij
+OTOH if it's well encapsulated, is going to be required for any kind of
+ACPI use and gets to the point where people are OK with it by itself
+then I'm not sure what we'd gain by keeping it out of tree - it'd make
+the real system patch sets bigger and harder to review.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/f0f0bbf6/attachment.sig>
