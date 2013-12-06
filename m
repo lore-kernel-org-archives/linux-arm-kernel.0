@@ -1,31 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Dec 2013 13:58:25 +0000
-Subject: [RFC part1 PATCH 0/7] Make ACPI core running on ARM64
-In-Reply-To: <201312052325.02603.arnd@arndb.de>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312052325.02603.arnd@arndb.de>
-Message-ID: <20131206135825.GG29268@sirena.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 6 Dec 2013 15:03:34 +0100
+Subject: [PATCH 1/4] ARM: tegra: add I2C controllers to Tegra124 DT
+In-Reply-To: <1386196016-25128-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386196016-25128-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131206140333.GE30960@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 11:25:02PM +0100, Arnd Bergmann wrote:
+On Wed, Dec 04, 2013 at 03:26:53PM -0700, Stephen Warren wrote:
+[...]
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+[...]
+> @@ -176,6 +176,96 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	i2c at 7000c000 {
+> +		compatible = "nvidia,tegra114-i2c";
 
-> However, as I mentioned before I am much more worried about the parts that
-> are not done (or not posted) yet and that will be required to actually
-> have working support for a real server system. Until we know more about
-> where this is heading, I think we should not merge any of the ARM specific
-> parts of your patches. Any patches that are reasonable cleanups and bug
-> fixes for the ACPI subsystem should of course get merged once they are
-> reviewed.
+Aren't we supposed to always list the most specific compatible as well,
+just in case we ever need to implement a specific quirk in the future?
 
-OTOH if it's well encapsulated, is going to be required for any kind of
-ACPI use and gets to the point where people are OK with it by itself
-then I'm not sure what we'd gain by keeping it out of tree - it'd make
-the real system patch sets bigger and harder to review.
+So this would become:
+
+		compatible = "nvidia,tegra124-i2c", "nvidia,tegra114-i2c";
+
+Other than that, this is identical to a local patch that I have (minus
+the reset* and dma* properties).
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/f0f0bbf6/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/2f9dd0bd/attachment.sig>
