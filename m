@@ -1,63 +1,157 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 6 Dec 2013 13:16:00 -0800
-Subject: [PATCH V2] dma: tegra: register as an OF DMA controller
-In-Reply-To: <201312040222.03604.arnd@arndb.de>
-References: <1385416416-3536-1-git-send-email-swarren@wwwdotorg.org>
- <201311292208.26215.arnd@arndb.de> <529E1A49.6050808@wwwdotorg.org>
- <201312040222.03604.arnd@arndb.de>
-Message-ID: <CAPcyv4giXy++b6BJi8nNKEEY8PC-_4ATAH0_bN-YSOVH+8CaLw@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 6 Dec 2013 22:25:49 +0100 (CET)
+Subject: ARM: gic_arch_extn (Was: [PATCH v3] irqchip: mmp: add dt support
+ for wakeup)
+In-Reply-To: <20131205094931.GB4360@n2100.arm.linux.org.uk>
+References: <1386159214-31483-1-git-send-email-zhangwm@marvell.com>
+ <alpine.DEB.2.02.1312042234190.30673@ionos.tec.linutronix.de>
+ <alpine.DEB.2.02.1312042347350.30673@ionos.tec.linutronix.de>
+ <20131205005216.GA4360@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1312050157550.30673@ionos.tec.linutronix.de>
+ <20131205094931.GB4360@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1312062029560.30673@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 3, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 03 December 2013, Stephen Warren wrote:
->> On 11/29/2013 02:08 PM, Arnd Bergmann wrote:
->
->> > Can you try coming up with a different method to achieve the same
->> > where you use a different helper from the driver specific xlate
->> > function that does not require a callback?
->> >
->> > I think dma_get_slave_channel is great if you have one channel per
->> > request line and you can directly look up the channel from the
->> > DT data, but it is not good if you have pick a channel and work
->> > around the race.
->>
->> Hmm. Can you take a look at "[PATCH V4] dma: add
->> dma_get_any_slave_channel(), for use in of_xlate()" at the link below.
->> It still implements this via xlate, but I don't see any benefit in
->> making drivers use a different API to request slave channels based on
->> how the DMA controller works.
->>
->> http://lkml.org/lkml/2013/11/26/408
->>
->
-> Yes, I think that is good. I can think of a few variations of that
-> that I would prefer slightly over your code, but it's essentially
-> what I had in mind and I'm fine with that version getting merged
-> as well. Here are my ideas for further improvements, I'll leave
-> it up to you and the dmaengine maintainers to decide what to do
-> about them:
->
-> * Rather than calling private_candidate(), open-code the part you
->   need and remove the pointless dma_cap_mask comparison:
->
->         err = -EBUSY;
->         list_for_each_entry(chan, &dev->channels, device_node) {
->                 if (!chan->client_count) {
->                         err = dma_chan_get(chan);
->                         break;
->                 }
->         }
->
-> * Merge the new function with dma_get_slave_channel(). They really
->   do different things, but I think it still makes sense as an API
->   to require to always pass the dma_device pointer, and drivers
->   that want to get an arbitrary channel can just pass NULL as the
->   channel pointer.
->
+On Thu, 5 Dec 2013, Russell King - ARM Linux wrote:
+> So there's not much point discussing this with you until you:
+> 
+> (a) calm down
 
-* nod.
+Done so :)
 
-I have a similar reaction to dma_request_channel().  There should be
-more than enough use case to find some common ground and reduce the
-need for magic filter routines.
+> (b) analyse it properly and work out the frequency under which each
+> class of IRQ (those >= 32 and those < 32) call into these functions.
+
+Here you go:
+
+The frequency of invoking the gic_arch_extn callbacks is exactly equal
+to the frequency of interrupts in the system which go through the GIC
+at least for mask/unmask/eoi. The frequency of calls per interrupt
+depends on the interrupt type, but@minimum it is one.
+
+So basically it does for any interrupt independent of >= 32 or < 32:
+
+irq_fn(d)
+{
+	do_something_common(d);
+	if (gic_arch_extn.fn)
+	   gic_arch_extn.fn(d);
+	do_something_common(d);
+}
+
+which then does:
+
+extn_fn(d)
+{
+	if (this_irq_is_affected(d))
+	   do_some_more(d);
+}      
+
+So when this_irq_is_affected(d) boils down to
+
+   if (d->irq [<>] n)
+
+then I agree, that it's debatable, whether the conditonal function
+call and the simple this_irq_is_affected(d) check is worth to worry
+about. Though there are people who care about two pointless
+conditonals for various reasons.
+
+But at the point when this_irq_is_affected(d) is doing a loop lookup,
+then this really starts to smell badly.
+
+Sure you might argue, that it's the problem of that particular patch
+author to put a loop lookup into this_irq_is_affected().
+
+Fair enough, though you have to admit that the design of the
+gic_arch_extn actually enforces that, if you can't do a simple "if irq
+[<>] n" check for whatever reason.
+
+The alternative approach to that is to use different irq chip
+implementations for interrupts affected by gic_arch_extn and those
+which are not affected as we do in lot of other places do deal with
+the subtle differences of particular interrupt lines. That definitely
+would avoid that people try to stick more complex decision functions
+than "irq [<>] n" into this_irq_is_affected().
+
+Now looking at the locking szenario of GIC, it might eventually create
+quite some duplicated code, which is undesirable as well. OTOH, the
+locking requirements especially if I look at gic_[un]mask_irq and
+gic_eoi_irq are not entirely clear to me from the code.
+
+gic_[un]mask_irq(d)
+{
+	mask = 1 << SFT(gic_irq(d));
+
+	lock(controller_lock);
+	if (gic_arch_extn.irq_[un]mask)
+	   gic_arch_extn.irq_[un]mask(d);
+	writel(mask, GIC_ENABLE_[CLEAR|SET]);
+	unlock(controller_lock);
+}
+
+while
+
+gic_eoi_irq(d)
+{
+	if (gic_arch_extn.irq_eoi) {
+	   lock(controller_lock);
+	   gic_arch_extn.irq_eoi(d);
+	   unlock(controller_lock);
+	}
+	writel(gic_irq(d), GIC_EOI);
+}
+
+So is there a requirement to serialize the mask/unmask operations for
+a particular interrupt line against mask/unmask operations on a
+different core on some other interrupt line?
+
+  The operations for a particular interrupt line are already
+  serialized at the core code level.
+
+  The CLEAR/SET registers are designed to avoid locking in contrary to
+  the classic ENABLE reg, where you have to maintain consistency of
+  the full set of interrupts affected by that register.
+
+  So for the case where gic_arch_extn is not used, the locking is
+  completely pointless, right?
+
+Or is this locking required to maintain consistency between the
+gic_arch_extn.[un]mask and the GIC.[un]mask itself?
+
+And even if the locking is required for this, then having two separate
+chips with two different callbacks makes sense.
+
+gic_mask_irq()
+{
+	writel(mask, GIC_ENABLE_CLEAR);
+}
+
+gic_mask_extn_irq(d)
+{
+	lock(controller_lock);
+	gic_arch_extn.irq_mask(d);
+	gic_mask_irq(d);
+	unlock(controller_lock);
+}
+
+And then have the gic_chip and gic_extn_chip set for the various
+interrupt lines.
+
+That avoids several things:
+
+1) The locking for non gic_arch_extn interrupts
+
+2) Two conditionals for gic_arch_extn interrupts
+
+3) The enforcement of adding complex decision functions into the
+   gic_extn functions if there is no simple x < N check possible.
+
+I might have missed something as always, but@least I did a proper
+analysis of the code as it is understandable to a mere mortal.
+
+Thoughts?
+
+Thanks,
+
+	tglx
