@@ -1,32 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Dec 2013 00:23:45 +0000
-Subject: [PATCH 0/3] ARM Coresight: Enhance ETM tracing control
-In-Reply-To: <20131206000610.GA30344@kroah.com>
-References: <20131204170703.GA14859@kroah.com>
- <CANsc=4X7ThCvgz9bfu1ZZg9FCti5SMdbXL5tA584z-oZ_HEByg@mail.gmail.com>
- <20131204230239.GB9205@kroah.com>
- <CANsc=4UGi5sMdUW5qQDzEJx4h8NDU+-b=xOLBAZtzbV5ugz3Fg@mail.gmail.com>
- <20131205040104.GA14641@kroah.com> <52A0DE42.3080602@codeaurora.org>
- <20131205201659.GA14539@kroah.com> <52A101F8.3060104@codeaurora.org>
- <CANsc=4Vb-2br+K51NWsyQV25R3eJo_=YfpnXsh1G1ecRVDYc3w@mail.gmail.com>
- <20131206000610.GA30344@kroah.com>
-Message-ID: <20131206002345.GK4360@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Dec 2013 16:25:48 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix populating the hwmod data from device
+ tree
+In-Reply-To: <alpine.DEB.2.02.1312060006510.26450@utopia.booyaka.com>
+References: <20131120025620.GF10317@atomide.com>
+ <20131120181255.GG10317@atomide.com>
+ <20131120192209.GI10317@atomide.com>
+ <alpine.DEB.2.02.1311202148160.30143@utopia.booyaka.com>
+ <20131121000533.GJ10317@atomide.com>
+ <20131121014555.GL10317@atomide.com>
+ <20131121204814.GC10023@atomide.com>
+ <20131205172909.GB26766@atomide.com>
+ <alpine.DEB.2.02.1312060006510.26450@utopia.booyaka.com>
+Message-ID: <20131206002547.GK26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 04:06:10PM -0800, Greg Kroah-Hartman wrote:
-> On Thu, Dec 05, 2013 at 06:54:49PM -0500, Adrien Verg? wrote:
-> > > Well, these patches were incorrect, so that's not really a valid
-> > > question :)
-> > 
-> > Should I correct the pid size and send them again?
+* Paul Walmsley <paul@pwsan.com> [131205 16:09]:
+> On Thu, 5 Dec 2013, Tony Lindgren wrote:
 > 
-> I'm not the ARM maintainer, so I can't say if I would reject them or
-> not.
+> > * Tony Lindgren <tony@atomide.com> [131121 12:49]:
+> > > * Tony Lindgren <tony@atomide.com> [131120 17:46]:
+> > > > * Tony Lindgren <tony@atomide.com> [131120 16:06]:
+> > > > > 
+> > > > > They at least had interrupts listed looking at commit 3b9b10. Probably
+> > > > > the thing to do for now is to revert those changes, and see if we can
+> > > > > just remove the L3 entries from the .dtsi files.
+> > > > 
+> > > > Actually the patch I posted should be able to handle also the
+> > > > ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3" property in omap4.dtsi,
+> > > > but we're not currently parsing that as we only look at the children
+> > > > and not the properties of the OCP bus. Should be fixable, will take a look
+> > > > tomorrow if this approach makes sense to you.
+> > > 
+> > > OK this one seems to do the right thing for me.
+> > 
+> > No comments? I'll queue the patch below to the fixes, please yell
+> > if you see any issues with that.
+> 
+> Looks reasonable to me based on a quick glance:
+> 
+> Acked-by: Paul Walmsley <paul@pwsan.com>
+> 
+> Have not tested it though.
 
-Neither am I someone who knows this code; it was contributed by TI, and
-I assume TI had I use for it.  I've no idea what that was or how it's
-even used - it's not something I particularly care about.
+OK thanks for looking. I've used it with my mach-omap2 DT patches for past
+few weeks on various boards without issues.
+ 
+> I like the warning message for the bad data.
 
-I'd much rather someone else who has a use for ETM (and thus knows what
-it should/can do) look after it.
+:)
+
+Tony
