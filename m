@@ -1,68 +1,38 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri,  6 Dec 2013 15:04:42 +0000
-Subject: [PATCH v2] ARM: add support for the Cortex-A12 processor
-Message-ID: <1386342282-8769-1-git-send-email-jonathan.austin@arm.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 06 Dec 2013 16:04:52 +0100
+Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
+ without PCI on ARM64
+In-Reply-To: <201312052304.22302.arnd@arndb.de>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <20131203164111.GA13447@srcf.ucam.org> <529F376F.8050005@linaro.org>
+ <201312052304.22302.arnd@arndb.de>
+Message-ID: <52A1E794.1040008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
-doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
+On 05.12.2013 23:04, Arnd Bergmann wrote:
+> On Wednesday 04 December 2013, Hanjun Guo wrote:
+>> On 2013?12?04? 00:41, Matthew Garrett wrote:
+>>> Given the number of #ifdefs you're adding, wouldn't it make more sense
+>>> to just add stub functions to include/linux/pci.h?
+>>
+>> Thanks for the suggestion :)
+>>
+>> I can add stub functions in include/linux/pci.h for raw_pci_read()/
+>> raw_pci_write(), then can remove #ifdefs for acpi_os_read/write_pci_configuration().
+>
+> Actually I wonder about the usefulness of this patch in either form: Since ACPI
+> on ARM64 is only for servers, I would very much expect them to always come with
+> PCI, either physical host bridges with attached devices, or logical PCI functions
+> used to describe the on-SoC I/O devices. Even in case of virtual machines, you'd
+> normally use PCI as the method to communicate data about the virtio channels.
+>
+> Can you name a realistic use-case where you'd want ACPI but not PCI?
 
-Note that as the ACTLR cannot (usually) be written from non-secure, it is the
-responsibility of the bootloader/firmware to set this bit per core - it is
-done here in Linux as last resort in case of bad firmware.
+Yes you can describe SoC I/O devices using logical PCI functions only if 
+they are on PCI, correct me if I am wrong. Also, devices can be placed 
+only on IOMEM (like for ARM SoC) and it is hard to predict which way 
+vendors chose. So way don't let it be configurable? ACPI spec says 
+nothing like PCI is needed for ACPI, AFAIK.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
----
-This V2 patch also adds A12 in asm/cputype.h, necessary for KVM, perf, among
-other things.
-
- arch/arm/include/asm/cputype.h |    1 +
- arch/arm/mm/proc-v7.S          |   11 +++++++++++
- 2 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 9672e97..b2d81bb 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -70,6 +70,7 @@
- #define ARM_CPU_PART_CORTEX_A5		0xC050
- #define ARM_CPU_PART_CORTEX_A15		0xC0F0
- #define ARM_CPU_PART_CORTEX_A7		0xC070
-+#define ARM_CPU_PART_CORTEX_A12		0xC0D0
- 
- #define ARM_CPU_XSCALE_ARCH_MASK	0xe000
- #define ARM_CPU_XSCALE_ARCH_V1		0x2000
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index c63d9bd..33788ff 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -185,6 +185,7 @@ __v7_cr7mp_setup:
- 	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
- 	b	1f
- __v7_ca7mp_setup:
-+__v7_ca12mp_setup:
- __v7_ca15mp_setup:
- 	mov	r10, #0
- 1:
-@@ -479,6 +480,16 @@ __v7_ca7mp_proc_info:
- 	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
- 
- 	/*
-+	 * ARM Ltd. Cortex A12 processor.
-+	 */
-+	.type	__v7_ca12mp_proc_info, #object
-+__v7_ca12mp_proc_info:
-+	.long	0x410fc0d0
-+	.long	0xff0ffff0
-+	__v7_proc __v7_ca12mp_setup
-+	.size	__v7_ca12mp_proc_info, . - __v7_ca12mp_proc_info
-+
-+	/*
- 	 * ARM Ltd. Cortex A15 processor.
- 	 */
- 	.type	__v7_ca15mp_proc_info, #object
--- 
-1.7.9.5
+Tomasz
