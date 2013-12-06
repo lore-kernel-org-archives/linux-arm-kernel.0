@@ -1,43 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 06 Dec 2013 14:29:22 +0100
-Subject: [PATCHv5][ 2/8] staging: imx-drm: Add RGB666 support for
- parallel display.
-In-Reply-To: <20131206131403.GA30960@ulmo.nvidia.com>
-References: <1386268092-21719-1-git-send-email-denis@eukrea.com>
- <1386268092-21719-2-git-send-email-denis@eukrea.com>
- <20131206131403.GA30960@ulmo.nvidia.com>
-Message-ID: <1386336562.4088.5.camel@weser.hi.pengutronix.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 06 Dec 2013 08:34:30 -0500
+Subject: [PATCH 1/3] arm64: add EFI stub
+In-Reply-To: <20131206122511.301D6C40757@trevor.secretlab.ca>
+References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
+ < 1385762712-17043-2-git-send-email-msalter@redhat.com>
+ <20131205141853.GA974 @darko.cambridge.arm.com>
+ <1386254603.1861.120.camel@deneb.redhat.com>
+ < 20131205152806.GC974@darko.cambridge.arm.com>
+ <20131206122511.301D6C40757@trevor.secretlab.ca>
+Message-ID: <1386336870.1861.155.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 06.12.2013, 14:14 +0100 schrieb Thierry Reding:
-> On Thu, Dec 05, 2013 at 07:28:06PM +0100, Denis Carikli wrote:
-> [...]
-> > diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-> [...]
-> > @@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
-> >  		return IPU_DC_MAP_BGR666;
-> >  	case V4L2_PIX_FMT_BGR24:
-> >  		return IPU_DC_MAP_BGR24;
-> > +	case V4L2_PIX_FMT_RGB666:
-> > +		return IPU_DC_MAP_RGB666;
+On Fri, 2013-12-06 at 12:25 +0000, Grant Likely wrote:
+> On Thu, 5 Dec 2013 15:28:06 +0000, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Dec 05, 2013 at 02:43:23PM +0000, Mark Salter wrote:
+> > > On Thu, 2013-12-05 at 14:18 +0000, Catalin Marinas wrote:
+> > > > On Fri, Nov 29, 2013 at 10:05:10PM +0000, Mark Salter wrote:
+> > > > > This patch adds PE/COFF header fields to the start of the Image
+> > > > > so that it appears as an EFI application to EFI firmware. An EFI
+> > > > > stub is included to allow direct booting of the kernel Image. Due
+> > > > > to EFI firmware limitations, only little endian kernels with 4K
+> > > > > page sizes are supported at this time.
+> > > > 
+> > > > I don't fully understand the EFI firmware limitations but for big endian
+> > > > we could have the EFI_STUB wrapper in little endian and get the kernel
+> > > > to switch to big endian once booted. The image header should always be
+> > > > little endian.
+> > > 
+> > > That would be fun. :) You'd also have to switch back and forth to make
+> > > EFI runtime services calls.
+> > 
+> > OK, we'll have to live with this restriction.
 > 
-> Why is this DRM driver even using V4L2 pixel formats in the first place?
+> Or just disable runtime services on the switch to big ending. Big endian
+> should not disable the stub (but getting it to work could be a follow-up
+> patch)
 > 
-Because imx-drm is actually a misnomer. The i.MX IPU is a multifunction
-device, which as one part has the display controllers, but also camera
-interfaces and mem-to-mem scaler devices, which are hooked up via the
-V4L2 interface.
+The other problem with BE is that the PE/COFF masquerading is built into
+head.S so the same Image can be used for EFI and non-EFI. I don't see
+a BE opcode which we could us to provide the magic "MZ" at the start
+of a BE kernel Image.
 
-The generic IPU part, which is used for example for programming the DMA
-channels is using V4L2 pixel formats as a common base. We have patches
-to split this out and make this fact more visible. (The IPU core will be
-placed aside the Tegra host1x driver)
-
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--Mark
