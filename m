@@ -1,40 +1,117 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Sat, 7 Dec 2013 00:39:23 -0800
-Subject: Tegra baseline test results for v3.13-rc3
-Message-ID: <52A2DEBB.1000105@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Dec 2013 19:37:57 +0100
+Subject: [PATCH RFC 08/10] net: stmmac:sti: Add STi SOC glue driver.
+In-Reply-To: <529C8198.7000106@st.com>
+References: <1384264311-7308-1-git-send-email-srinivas.kandagatla@st.com>
+ <1384264383-7653-1-git-send-email-srinivas.kandagatla@st.com>
+ <20131129193715.GA3441@lukather> <529C8198.7000106@st.com>
+Message-ID: <20131206183757.GH24519@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.13-rc3.
-Logs and other details at:
+Hi Srinivas,
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.13-rc3/20131207002705/
+On Mon, Dec 02, 2013 at 12:48:24PM +0000, srinivas kandagatla wrote:
+> Hi Maxime,
+> 
+> Thankyou for the comments.
+> 
+> On 29/11/13 19:37, Maxime Ripard wrote:
+> >> +
+> >> > +ethernet0: ethernet0{
+> >> > +	#address-cells = <1>;
+> >> > +	#size-cells = <1>;
+> >> > +	compatible		= "st,stih415-dwmac";
+> >> > +	reg			= <0x148 0x4>;
+> >> > +	resets			= <&softreset STIH415_ETH0_SOFTRESET>;
+> >> > +	st,syscon		= <&syscfg_rear>;
+> >> > +	st,tx-retime-src	= "clk_125";
+> >> > +	ranges;
+> >> > +
+> >> > +	dwmac0:dwmac at fe810000 {
+> >> > +		device_type 	= "network";
+> >> > +		compatible	= "snps,dwmac", "snps,dwmac-3.610";
+> >> > +		reg 		= <0xfe810000 0x8000>;
+> >> > +		interrupts 	= <0 147 0>;
+> >> > +		interrupt-names = "macirq";
+> >> > +		...
+> >> > +	};
+> >> > +};
+> > Sorry for stepping up so late, but I dont' think this is the right way
+> > to do it.
+> > 
+> Not a issue.
+> 
+> > DT is to describe how the hardware is laid out in a system agnostic
+> > way, hence, it should not be impacted by the implementation details.
+> > 
+> If "hardware is laid out" means at SoC level? Then I attempted to do
+> describe it in system agnostic way.
+> 
+> On ST SoCs "snps,dwmac" IP always has a hw glue layer on top of it.
+> 
+> > The fact that you use a glue to the dwmac driver *is* an
+> > implementation detail.
+> 
+> Glue layer described here is actually a hardware glue on ST SoCs.
 
+Ho, ok, it makes sense then :)
 
-Test summary
-------------
+Sorry for the noise.
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+> > I think you'd rather have something like:
+> > 
+> > dwmac0: ethernet at fe810000 {
+> > 	compatible		= "st,stih415-dwmac";
+> > 	reg 			= <0xfe810000 0x8000 0x148 0x4>;
+> > 	resets			= <&softreset STIH415_ETH0_SOFTRESET>;
+> > 	st,syscon		= <&syscfg_rear>;
+> > 	st,tx-retime-src	= "clk_125";
+> > 	interrupts 		= <0 147 0>;
+> > 	interrupt-names 	= "macirq";Am happy to go with 
+> > 	...
+> > };
+> > 
+> > Then, the driver can have its init functions associated to the
+> > compatible you're using, through the .data field of the of_device_id
+> > structure, and you just call it in the generic driver at probe's time.
+> 
+> This is changing the device tree bindings for the generic driver.
+> Is this something Acceptable?
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+It really depends. As long as these are based on new compatibles, and
+you require these new properties only for this new compatible, it's
+fine most of the time.
 
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+> Peppe, are you Ok with such intrusive changes to the driver?
+> 
+> I did try few things before I sent this patch,
+> 
+> 1> Doing it via AUXDATA which was discouraged by Arnd.
+> 
+> 2> Doing it the way you suggested which did not fit in very neatly,
+> which looked like lot of SOC specific changes are added to generic driver.
+> 
+> 3> Doing it as this patch, influenced by dwc3 code drivers/usb/dwc3/,
+> Which fitted in very neatly without touching the existing generic driver.
+> 
+> stmmac driver is a generic synopsis driver which ST has written the
+> driver, so I did not want to pollute this driver with ST specific glue
+> logic bindings.
 
+Yeah, I didn't know that. My apologies.
 
-vmlinux object size
-(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839)):
-    text     data      bss    total  kernel
-  +38076    +1320        0   +39396  multi_v7_defconfig
-    +732       +8        0     +740  tegra_defconfig
+Thanks,
+Maxime
 
-  
-Boot-time memory difference
-(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-      -40k      40k        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-      -40k      40k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131206/0a0431ce/attachment.sig>
