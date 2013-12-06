@@ -1,60 +1,62 @@
-From: mlweber1@rockwellcollins.com (mlweber1 at rockwellcollins.com)
-Date: Thu, 5 Dec 2013 21:32:40 -0600
-Subject: Moschip MCS8142 SoC
-In-Reply-To: <201312060331.31958.arnd@arndb.de>
-References: <OF433D4F00.CB35F8E7-ON86257C37.004F3E8D@rockwellcollins.com>
- <201312060331.31958.arnd@arndb.de>
-Message-ID: <OF1C2A9619.4A882547-ON86257C39.0011D73C-86257C39.00137859@rockwellcollins.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 6 Dec 2013 11:07:14 +0800
+Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20131205092048.GE4636@norris.computersforpeace.net>
+References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
+ <20131127043253.GA9468@ld-irv-0074.broadcom.com>
+ <5298AA23.7080404@st.com>
+ <1386082273.18201.61.camel@shinybook.infradead.org>
+ <20131204184405.GE9468@ld-irv-0074.broadcom.com>
+ <20131205071224.GA8936@shlinux2.ap.freescale.net>
+ <20131205081101.GA4636@norris.computersforpeace.net>
+ <20131205075901.GA20407@shlinux2.ap.freescale.net>
+ <20131205092048.GE4636@norris.computersforpeace.net>
+Message-ID: <20131206030713.GA3710@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> wrote on 12/05/2013 08:31:31 PM:
+On Thu, Dec 05, 2013 at 01:20:48AM -0800, Brian Norris wrote:
+> SPI is not used only for SPI NOR; it is useful for other things, like
+> communicating with off-chip peripherals or microcontrollers, supporting
+> touchscreens, LEDs, media controllers, etc. So with a SPI NOR framework
+> living only in the MTD subsystem, I have to write two drivers: one
+> (under drivers/spi/) to use only-(a) for controlling non-flash SPI
+> devices, and one (under drivers/mtd/) to manage (a)+(b) on SPI NOR
+> flash.
 
-> From: Arnd Bergmann <arnd@arndb.de>
-> To: linux-arm-kernel at lists.infradead.org, Jonas Jensen 
-> <jonas.jensen@gmail.com>
-> Cc: mlweber1 at rockwellcollins.com, Florian Fainelli <florian@openwrt.org>
-> Date: 12/05/2013 08:31 PM
-> Subject: Re: Moschip MCS8142 SoC
-> 
-<snip>
+If the NOR is connected to a SPI bus controller which can attaches other SPI
+devices too, I think you use a pure SPI driver to access it;
 
-> Florian Fainelli (now on Cc) did the patch series for MCS814x in the 
-past,
-> see http://lwn.net/Articles/507006/. As far as I understand, MCS8140
-> and MCS8142 only differ in the CPU core, so the required code is 
-actually
-> almost identical.
-> However, I would now recommend doing the port on the latest kernel 
-version,
-> i.e. 3.13 at this point, for which you would not be able to reuse
-> much of the code, as we have redone all the interfaces to make it 
-simpler
-> to add a new platform. Essentially you add separate drivers to 
-> drivers/irqchip, drivers/clocksource, drivers/clk, 
-arch/arm/include/debug
-> and drivers/pci/host but won't need any actual code in arch/arm/mach-* 
-any
-> more at this point.
+If the NOR is connected to a SPI-NOR controller such as your spi-nor controller
+, you can use a SPI-NOR driver to access it.
 
-The newer FPGA SoC arch(s) we've been working with recently have been 
-using 
-that.  Nice and clean so I definitely agree that's the way to go. 
-Originally
-I was hoping that I could get an initial build with 3.3 just to get past 
-my
-current bug/issue we're working to resolve.... We'll see.
+
+Does your NOR flash connect to both the SPI bus controller and SPI-NOR
+controller at the same time? :) If it does connect to both of the controllers,
+I do not know how to handle it too.	   
+
 
 > 
-> Jonas Jensen is working on support for the "moxart" platform, which uses
-> the same fa526 core and which is similar in other regards, so I'd 
-recommend
-> looking at his code as examples for how to do this the right way.
+> If, however, we can define a spi_nor_transfer like Angus suggested, and
+> if we take that a step further and make it a first-class (but optional)
+> citizen of the SPI framework, then we could have drivers that support
+> SPI-only, SPI-NOR-only, or both.
+> 
+I guess Mark will not agree with this. :)
 
-Thanks, I'll take a look at (http://lwn.net/Articles/554101/).  I guess in 
 
-some ways this would at least get my chip booting past the initial arch 
-related asm stuff and if my DT is setup with the right serial port, the 
-console should at least show some output until it dies.
+thanks
+Huang Shijie
 
-Matt
+
+> Now, I'm not sure how exactly that sort of proposal would work yet, but
+> I wanted to test the waters to see
+>   - if this is a complete distortion of what Angus or David may have
+>     suggested;
+>   - if Mark thinks this is reasonable, or if he thinks I'm spouting
+>     nonsense; and
+>   - if there is some obvious alternate way to support what I describe
+>     without moving the SPI-NOR layer into the SPI subsystem.
+> 
+> Brian
+> 
