@@ -1,46 +1,30 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 06 Dec 2013 18:48:10 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSHY3XVsgMi8yXSB2aWRlbzogYmFja2xpZ2h0OiBncGlvLWJh?=
- =?UTF-8?B?Y2tsaWdodDogQWRkIERUIHN1cHBvcnQu?=
-In-Reply-To: <20131206141236.GA32313@ulmo.nvidia.com>
-References: <1386266109-16071-1-git-send-email-denis@eukrea.com>
- <1386335318.12471946@f258.i.mail.ru>
- <20131206141236.GA32313@ulmo.nvidia.com>
-Message-ID: <1386341290.792909778@f66.i.mail.ru>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 06 Dec 2013 15:57:14 +0100
+Subject: [PATCH v5 2/3] regulator: tps6586x: add and use correct voltage
+ table
+In-Reply-To: <20131206125502.GF29268@sirena.org.uk>
+References: <cover.1386333697.git.stefan@agner.ch>
+ <7c948660cda4684d28fa97f82295ab84f6ef658e.1386333697.git.stefan@agner.ch>
+ <20131206125502.GF29268@sirena.org.uk>
+Message-ID: <102f036079d68c84b87ec30a6566bb21@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Dec 06, 2013 at 05:08:38PM +0400, Alexander Shiyan wrote:
-> > > On Thu, Dec 05, 2013 at 06:55:09PM +0100, Denis Carikli wrote:
-> > > [...]
-> > > > +Optional properties:
-> > > > +  - default-state: The initial state of the backlight.
-> > > > +    Valid values are "on", "off", and "keep".
-> > > > +    The "keep" setting will keep the backlight at whatever its current
-> > > > +    state is, without producing a glitch. The default is keep if this
-> > > > +    property is not present.
-> > > 
-> > > I'm not sure if "on", "off" and "keep" are a good choice for this
-> > > binding. Having strings for these tristate values seems suboptimal.
-> > > Other bindings have chosen a representation that, transposed to this
-> > > use-case, would read something like this:
-> > > 
-> > > 	- default-state: The initial state of the backlight. Valid
-> > > 	  values:
-> > > 	  - 0: off
-> > > 	  - 1: on
-> > > 
-> > > 	If the "default-state" property is not present, the default
-> > > 	will be to keep the current backlight state.
-> > > 
-> > > Which is in fact the exact behaviour that your binding describes, but
-> > > it's much more intuitive in my opinion.
-> > 
-> > Why we cannot use GPIO bindings for active level here?
-> > What a reason for "keep" state? Can this be an additional property?
+Am 2013-12-06 13:55, schrieb Mark Brown:
+> On Fri, Dec 06, 2013 at 01:51:46PM +0100, Stefan Agner wrote:
+>> Depending on the regulator version, the voltage table might be
+>> different. Use version specific regulator tables in order to select
+>> correct voltage table. For the following regulator versions different
+>> voltage tables are now used:
 > 
-> Default state and active level are two different things.
+> I think this is the same as the last patch I reviewed but I don't see my
+> ack on it?
 
-OK. And what is "default" state? State before "unblank"?
+Oh sorry, its my first multi-revision submission. I didn't realized that
+it is my job to add them when doing a new revision... Lee, can you add
+that when you apply the patch? So far I see
 
----
+Acked-by: Mark Brown <broonie@linaro.org>
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+
+for this patch.
