@@ -1,146 +1,154 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 06 Dec 2013 09:55:54 -0500
-Subject: [PATCH 1/3] arm64: add EFI stub
-In-Reply-To: <20131205141853.GA974@darko.cambridge.arm.com>
-References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
- <1385762712-17043-2-git-send-email-msalter@redhat.com>
- <20131205141853.GA974@darko.cambridge.arm.com>
-Message-ID: <1386341754.1861.188.camel@deneb.redhat.com>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Fri,  6 Dec 2013 15:56:40 +0100
+Subject: [PATCH] ARM: i.MX28: dts: rename usbphy pin names
+Message-ID: <1386341800-12098-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-05 at 14:18 +0000, Catalin Marinas wrote:
-> Hi Mark,
-> 
-> On Fri, Nov 29, 2013 at 10:05:10PM +0000, Mark Salter wrote:
-> > +#include <linux/linkage.h>
-> > +#include <linux/init.h>
-> > +
-> > +#include <asm/assembler.h>
-> > +
-> > +#define EFI_LOAD_ERROR 0x8000000000000001
-> 
-> It's defined already but I see why you can't include efi.h here. Maybe a
-> comment.
+The pins have nothing todo with the phy layer. We better rename them, so
+it gets clear they are routed to the ehci core not to any phy.
 
-okay
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ arch/arm/boot/dts/imx28-cfa10037.dts | 2 +-
+ arch/arm/boot/dts/imx28-cfa10049.dts | 2 +-
+ arch/arm/boot/dts/imx28-cfa10057.dts | 2 +-
+ arch/arm/boot/dts/imx28-cfa10058.dts | 2 +-
+ arch/arm/boot/dts/imx28-m28cu3.dts   | 2 +-
+ arch/arm/boot/dts/imx28-m28evk.dts   | 4 ++--
+ arch/arm/boot/dts/imx28-sps1.dts     | 2 +-
+ arch/arm/boot/dts/imx28.dtsi         | 6 +++---
+ 8 files changed, 11 insertions(+), 11 deletions(-)
 
-> 
-> > +
-> > +       __INIT
-> > +
-> > +       /*
-> > +        * We arrive here from the EFI boot manager with:
-> > +        *
-> > +        *    * MMU on with identity-mapped RAM.
-> > +        *    * Icache and Dcache on
-> > +        *
-> > +        * We will most likely be running from some place other than where
-> > +        * we want to be. The kernel image wants to be placed at TEXT_OFFSET
-> > +        * from start of RAM.
-> > +        */
-> > +ENTRY(efi_stub_entry)
-> > +       stp     x29, x30, [sp, #-32]!
-> > +
-> > +       /*
-> > +        * Call efi_entry to do the real work.
-> > +        * x0 and x1 are already set up by firmware. Current runtime
-> > +        * address of image is calculated and passed via *image_addr.
-> > +        *
-> > +        * unsigned long efi_entry(void *handle,
-> > +        *                         efi_system_table_t *sys_table,
-> > +        *                         unsigned long *image_addr) ;
-> > +        */
-> > +       adrp    x8, _text
-> > +        add    x8, x8, #:lo12:_text
-> 
-> Minor: some wrong whitespace (but I don't trust our incoming mail server
-> either, it corrupts patches usually).
-
-I will fix it. (the whitespace, not your mail server)
-
-> 
-> > +       add     x2, sp, 16
-> > +       str     x8, [x2]
-> > +       bl      efi_entry
-> > +       cmn     x0, #1
-> > +       b.eq    efi_load_fail
-> > +
-> > +       /*
-> > +        * efi_entry() will have relocated the kernel image if necessary
-> > +        * and we return here with device tree address in x0 and the kernel
-> > +        * entry point stored at *image_addr. Save those values in registers
-> > +        * which are preserved by __flush_dcache_all.
-> > +        */
-> > +       ldr     x1, [sp, #16]
-> > +       mov     x20, x0
-> > +       mov     x21, x1
-> > +
-> > +       bl      __flush_dcache_all
-> 
-> Regarding __flush_dcache_all, I plan to remove it for all cases apart
-> from power management with the MMU disabled. With MMU enabled, there is
-> no guarantee that this function does the right thing. It's even worse in
-> the guest context.
-
-According to booting.txt, the dcache needs to be invalidated. Is there
-something existing I can use or do I need to write it?
-> 
-> > +       /* Turn off Dcache and MMU */
-> > +       mrs     x0, sctlr_el1
-> > +       bic     x0, x0, #1 << 0 // clear SCTLR.M
-> > +       bic     x0, x0, #1 << 2 // clear SCTLR.C
-> > +       msr     sctlr_el1, x0
-> > +       isb
-> 
-> I assume an EFI app is running with the MMU enabled (and UP only). Do we
-> always run it in EL1? What about EL2 mode (needed by KVM and Xen)?
-
-Good point. It could be non-secure EL2.
-
-> 
-> > +
-> > +       /* Jump to real entry point */
-> > +       mov     x0, x20
-> > +       mov     x1, xzr
-> > +       mov     x2, xzr
-> > +       mov     x3, xzr
-> > +       br      x21
-> > +
-> > +efi_load_fail:
-> > +       mov     x0, EFI_LOAD_ERROR
-> 
-> Needs #EFI_LOAD_ERROR (strange that gas doesn't complain).
-
-Hmm, no complaint but it DTRT.
-
-> > +/*
-> > + * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
-> > + * start of kernel and may not cross a 2MiB boundary. We set alignment to
-> > + * equal max size so we know it won't cross a 2MiB boudary.
-> > + */
-> > +#define MAX_DTB_SIZE   0x40000
-> 
-> 2MB is 0x200000 (or I don't understand the comment).
-
-I had a little trouble with it myself. :) The size was left over from
-older code which used it directly in an allocation. I'll fix the
-comment, drop MAX_DTB_SIZE, and fix DTB_ALIGN to be 2MiB.
-
-> > +
-> > +static unsigned long __init get_dram_base(efi_system_table_t *sys_table)
-> > +{
-> > +       efi_status_t status;
-> > +       unsigned long map_size, desc_size;
-> > +       unsigned long membase = EFI_ERROR;
-> > +       efi_memory_desc_t *memory_map;
-> > +       int i;
-> > +
-> > +       status = efi_get_memory_map(sys_table, &memory_map, &map_size,
-> > +                                   &desc_size, NULL, NULL);
-> > +       if (status == EFI_SUCCESS) {
-> 
-> Can you exit earlier here if !EFI_SUCCESS? It reduces the indentation
-> level.
-> 
-Yes.
+diff --git a/arch/arm/boot/dts/imx28-cfa10037.dts b/arch/arm/boot/dts/imx28-cfa10037.dts
+index f93e9a7..3935e86 100644
+--- a/arch/arm/boot/dts/imx28-cfa10037.dts
++++ b/arch/arm/boot/dts/imx28-cfa10037.dts
+@@ -54,7 +54,7 @@
+ 	ahb at 80080000 {
+ 		usb1: usb at 80090000 {
+ 			vbus-supply = <&reg_usb1_vbus>;
+-			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-0 = <&usb1_pins_a>;
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index 7087b4b..f1d4e2a 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -274,7 +274,7 @@
+ 	ahb at 80080000 {
+ 		usb1: usb at 80090000 {
+ 			vbus-supply = <&reg_usb1_vbus>;
+-			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-0 = <&usb1_pins_a>;
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-cfa10057.dts b/arch/arm/boot/dts/imx28-cfa10057.dts
+index 3c13128..4f6394b 100644
+--- a/arch/arm/boot/dts/imx28-cfa10057.dts
++++ b/arch/arm/boot/dts/imx28-cfa10057.dts
+@@ -134,7 +134,7 @@
+ 	ahb at 80080000 {
+ 		usb1: usb at 80090000 {
+ 			vbus-supply = <&reg_usb1_vbus>;
+-			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-0 = <&usb1_pins_a>;
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-cfa10058.dts b/arch/arm/boot/dts/imx28-cfa10058.dts
+index 2469d34..62382b6 100644
+--- a/arch/arm/boot/dts/imx28-cfa10058.dts
++++ b/arch/arm/boot/dts/imx28-cfa10058.dts
+@@ -101,7 +101,7 @@
+ 	ahb at 80080000 {
+ 		usb1: usb at 80090000 {
+ 			vbus-supply = <&reg_usb1_vbus>;
+-			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-0 = <&usb1_pins_a>;
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-m28cu3.dts b/arch/arm/boot/dts/imx28-m28cu3.dts
+index d3958da..8f75736 100644
+--- a/arch/arm/boot/dts/imx28-m28cu3.dts
++++ b/arch/arm/boot/dts/imx28-m28cu3.dts
+@@ -180,7 +180,7 @@
+ 		usb1: usb at 80090000 {
+ 			vbus-supply = <&reg_usb1_vbus>;
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-0 = <&usb1_pins_a>;
+ 			disable-over-current;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 8e2477f..6a13e5c 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -248,14 +248,14 @@
+ 		usb0: usb at 80080000 {
+ 			vbus-supply = <&reg_usb0_vbus>;
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&usbphy0_pins_a>;
++			pinctrl-0 = <&usb0_pins_a>;
+ 			status = "okay";
+ 		};
+ 
+ 		usb1: usb at 80090000 {
+ 			vbus-supply = <&reg_usb1_vbus>;
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-0 = <&usb1_pins_a>;
+ 			status = "okay";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx28-sps1.dts b/arch/arm/boot/dts/imx28-sps1.dts
+index 4870f07..097354c 100644
+--- a/arch/arm/boot/dts/imx28-sps1.dts
++++ b/arch/arm/boot/dts/imx28-sps1.dts
+@@ -106,7 +106,7 @@
+ 		usb0: usb at 80080000 {
+ 			vbus-supply = <&reg_usb0_vbus>;
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&usbphy0_pins_b>;
++			pinctrl-0 = <&usb0_pins_b>;
+ 			status = "okay";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index cda19c8..5f29304 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -743,7 +743,7 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
+-				usbphy0_pins_a: usbphy0 at 0 {
++				usb0_pins_a: usb0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+ 						MX28_PAD_SSP2_SS2__USB0_OVERCURRENT
+@@ -753,7 +753,7 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
+-				usbphy0_pins_b: usbphy0 at 1 {
++				usb0_pins_b: usb0 at 1 {
+ 					reg = <1>;
+ 					fsl,pinmux-ids = <
+ 						MX28_PAD_AUART1_CTS__USB0_OVERCURRENT
+@@ -763,7 +763,7 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
+-				usbphy1_pins_a: usbphy1 at 0 {
++				usb1_pins_a: usb1 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+ 						MX28_PAD_SSP2_SS1__USB1_OVERCURRENT
+-- 
+1.8.4.3
