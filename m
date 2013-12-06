@@ -1,82 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 Dec 2013 18:59:40 +0100
-Subject: [PATCH v3 2/3] arm: Add [U]EFI runtime services support
-In-Reply-To: <20131206175449.GD24997@rocoto.smurfnet.nu>
-References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org>
- <201312060259.48259.arnd@arndb.de>
- <20131206175449.GD24997@rocoto.smurfnet.nu>
-Message-ID: <201312061859.40224.arnd@arndb.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 6 Dec 2013 10:37:04 -0800
+Subject: MCS8142
+In-Reply-To: <OF8910DA33.769F3123-ON86257C39.000FEF6A-86257C39.0011CEEC@rockwellcollins.com>
+References: <OF98E40A9C.2937821E-ON86257C35.0070EFA2-86257C35.0071D5A4@rockwellcollins.com>
+ <CAGVrzcZf+wNXO54-_UDeToUCoqO9b2rosk7ugvQxT0joLRz3yQ@mail.gmail.com>
+ <OF178900CD.244DDA78-ON86257C36.004B4D2A-86257C36.004BEEAB@rockwellcollins.com>
+ <CAGVrzcb9asBzXqJBatksAXGevtsdpuS+nTZK7SHMgqsnzPYbgQ@mail.gmail.com>
+ <OF8910DA33.769F3123-ON86257C39.000FEF6A-86257C39.0011CEEC@rockwellcollins.com>
+Message-ID: <CAGVrzcYh4UExtYGvBO64cLOzYxCVuQgNvQdO8e_JrqDrqPuGRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 December 2013, Leif Lindholm wrote:
-> 
-> On Fri, Dec 06, 2013 at 02:59:48AM +0100, Arnd Bergmann wrote:
-> > On Thursday 28 November 2013, Leif Lindholm wrote:
-> > > @@ -898,6 +900,10 @@ void __init setup_arch(char **cmdline_p)
-> > >  	sanity_check_meminfo();
-> > >  	arm_memblock_init(&meminfo, mdesc);
-> > >  
-> > > +#ifdef CONFIG_EFI
-> > > +	uefi_memblock_arm_reserve_range();
-> > > +#endif
-> > > +
-> > 
-> > Better use 
-> > 
-> > 	if (IS_ENABLED(CONFIG_EFI))
-> > 
-> > here for readability and better build-time checking of the interface when
-> > CONFIG_EFI is disabled.
-> 
-> I think I'll do what Grant suggested and stub it out in asm/uefi.h.
+2013/12/5  <mlweber1@rockwellcollins.com>:
+>> Last I looked at their BSP it was total crap, but that's not a surprise.
+>
+> Ok, good to know :-)
+>
+> Currently I'm at the point of having a 3.3 kernel image built for fa526,
+> but I never get console output beyond the uboot starting kernel message.
+>
+> I think I have a couple items that I need to get past to make progress.
+> The first is get a toolchain I can trust. I've build a newer toolchain
+> (GCC4.7) that has fa526 support, but I think I need to back track and
+> switch to your 4.6 openWRT toolchain and just make sure I get a kernel
+> binary that "should" execute.  Do you happen to know if that toolchain
+> would support the fa526 arch?
 
-That's ok, too. I usually prefer the IS_ENABLED() method if there is only
-one caller, since it's harder to get wrong, but the result is similar.
+On the top of my head, the one in OpenWrt might be the only one, I am
+not sure of the fa526 patches status in upstream GCC.
 
-> > > +/*
-> > > + * Returns 1 if 'facility' is enabled, 0 otherwise.
-> > > + */
-> > > +int efi_enabled(int facility)
-> > > +{
-> > > +	return test_bit(facility, &arm_uefi_facility) != 0;
-> > > +}
-> > > +EXPORT_SYMBOL(efi_enabled);
-> > 
-> > I'd use EXPORT_SYMBOL_GPL() unless there is a documented reason why
-> > a symbol should be available to GPL-incompatible modules.
-> 
-> So ... this is duplicating x86 code which Matt Fleming has promised
-> to make generic. I'd prefer to keep it identical to x86 until this
-> copy goes away.
+> To boot that kernel, I'm using an existing uboot (2010) that seems
+> adequate for now.  However I assume I'll have to build a uImage with
+> appended device tree to get it to boot correctly without uboot DT
+> support.
 
-Ok, makes sense.
+That is correct. I would not touch the bootloader at this point.
 
-> > > +static int __init remap_region(efi_memory_desc_t *md, efi_memory_desc_t *entry)
-> > > +{
-> > > +	u64 va;
-> > > +	u64 paddr;
-> > > +	u64 size;
-> > > +
-> > > +	*entry = *md;
-> > > +	paddr = entry->phys_addr;
-> > > +	size = entry->num_pages << EFI_PAGE_SHIFT;
-> > > +
-> > > +	/*
-> > > +	 * Map everything writeback-capable as coherent memory,
-> > > +	 * anything else as device.
-> > > +	 */
-> > > +	if (md->attribute & EFI_MEMORY_WB)
-> > > +		va = (u64)((u32)uefi_remap(paddr, size) & 0xffffffffUL);
-> > > +	else
-> > > +		va = (u64)((u32)uefi_ioremap(paddr, size) & 0xffffffffUL);
-> > 
-> > Same here. Why is 'va' a u64?
-> 
-> Because the field in the structure (defined by UEFI) is 64-bit:
-> 
->         entry->virt_addr = va;
+> The other item that I need to figure out is what the default console
+> port name ended up as in the 3.3 or latest kernel.  One openWRT dts
+> file bootargs defined it as /dev/ttyMCS, but another defined it as the
+> standard /dev/ttyS0.
 
-I see. Maybe put the typecast in that final assignment then?
+About that, this is because the Moschip BSP came up with a different
+UART driver while the 8250 driver is perfectly usable as-is, at least
+for MCS8140. We do not even need quirks like if it was some funky 8250
+DesignWare UART, the plain 8250 works just fine. Since the 8250 driver
+exposes /dev/ttyS* devices, this is the reason why the DT command-line
+is using this.
 
-	Arnd
+>
+> Just to make this all a bit harder I don't currently have jtag
+> capability to this board, so I'm not sure the state the kernel is
+> getting to.  So to work around that I was going to start modifying
+> the initial kernel asm to toggle gpio so I could start narrowing
+> in on the failure point, but I'm still working on getting the gpio
+> to toggle using uboot reg access (seems to bus hang when I use the
+> gpio reg peripheral address defined in the 8140 gpio driver).
+
+Last I looked at the Moschip BSP, the 8142 had a slightly different
+register layout, in particular none of the base peripherals were at
+the same address as the ones in MCS8140, so this will need some
+tuning. First things would probably be to get the
+DEBUG_LL/early_printk console to output something.
+
+>
+>> > You wouldn't happen to have any technical material or knowledge
+>> > about the differences between the 8140 and 8142? (aside from the CPU)
+>> In fact I may, but certainly not as detailed for MCS8142 than it is
+>> for MCS8142. Let me get back to you on this once I am done with moving
+> in.
+>> In any case the code I wrote for OpenWrt should not be too bad to begin
+> with.
+>
+> Much appreciated.  Thanks
+> Matt
+>
+
+
+
+-- 
+Florian
