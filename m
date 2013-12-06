@@ -1,45 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 6 Dec 2013 00:07:50 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: Fix populating the hwmod data from device
- tree
-In-Reply-To: <20131205172909.GB26766@atomide.com>
-References: <20131120025620.GF10317@atomide.com>
- <20131120181255.GG10317@atomide.com> <20131120192209.GI10317@atomide.com>
- <alpine.DEB.2.02.1311202148160.30143@utopia.booyaka.com>
- <20131121000533.GJ10317@atomide.com> <20131121014555.GL10317@atomide.com>
- <20131121204814.GC10023@atomide.com> <20131205172909.GB26766@atomide.com>
-Message-ID: <alpine.DEB.2.02.1312060006510.26450@utopia.booyaka.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 5 Dec 2013 16:08:44 -0800
+Subject: [PATCH RFCv2 3/6] net: phy: provide phy_resume/phy_suspend helpers
+In-Reply-To: <1386171888-28190-4-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1384978913-8052-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1386171888-28190-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAGVrzcaTVbHCty2RWZM9jvETYVHV8fFRV1RXOYVauzf0-Arj7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Dec 2013, Tony Lindgren wrote:
+2013/12/4 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+> This adds helper functions to resume and suspend a given phy_device
+> by calling the corresponding driver callbacks if available.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Changelog:
+> RFCv1->RFCv2:
+> - only suspend if WOL is not enabled
+> - remove EXPORT_SYMBOL for phy_suspend/resume
+>
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/phy/phy_device.c |   24 ++++++++++++++++++++++++
+>  include/linux/phy.h          |    2 ++
+>  2 files changed, 26 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+> index d6447b3..6f0e9e4 100644
+> --- a/drivers/net/phy/phy_device.c
+> +++ b/drivers/net/phy/phy_device.c
+> @@ -625,6 +625,30 @@ void phy_detach(struct phy_device *phydev)
+>  }
+>  EXPORT_SYMBOL(phy_detach);
+>
+> +int phy_suspend(struct phy_device *phydev)
+> +{
+> +       struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
+> +       struct ethtool_wolinfo wol;
+> +
+> +       /* If the device has WOL enabled, we cannot suspend the PHY */
+> +       wol.cmd = ETHTOOL_GWOL;
+> +       phy_ethtool_get_wol(phydev, &wol);
+> +       if (wol.wolopts)
+> +               return -EBUSY;
 
-> * Tony Lindgren <tony@atomide.com> [131121 12:49]:
-> > * Tony Lindgren <tony@atomide.com> [131120 17:46]:
-> > > * Tony Lindgren <tony@atomide.com> [131120 16:06]:
-> > > > 
-> > > > They at least had interrupts listed looking at commit 3b9b10. Probably
-> > > > the thing to do for now is to revert those changes, and see if we can
-> > > > just remove the L3 entries from the .dtsi files.
-> > > 
-> > > Actually the patch I posted should be able to handle also the
-> > > ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3" property in omap4.dtsi,
-> > > but we're not currently parsing that as we only look at the children
-> > > and not the properties of the OCP bus. Should be fixable, will take a look
-> > > tomorrow if this approach makes sense to you.
-> > 
-> > OK this one seems to do the right thing for me.
-> 
-> No comments? I'll queue the patch below to the fixes, please yell
-> if you see any issues with that.
+I wonder if we should not set a flag in the phy device structure which
+says "someone called my phydrv->set_wol() callback, this succeeded and
+WoL is now enabled for me", rather than using this potentially racy
+call? This would have to be modified in phy_ethtool_set_wol() for
+instance?
 
-Looks reasonable to me based on a quick glance:
-
-Acked-by: Paul Walmsley <paul@pwsan.com>
-
-Have not tested it though.
-
-I like the warning message for the bad data.
-
-
-- Paul
+This is kind of theoretical though as I can't picture a case where
+this sequence of events would happen in real-life.
+--
+Florian
