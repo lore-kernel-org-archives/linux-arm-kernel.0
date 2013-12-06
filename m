@@ -1,68 +1,66 @@
-From: quozl@laptop.org (James Cameron)
-Date: Fri, 6 Dec 2013 22:05:43 +1100
-Subject: [PATCH] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <1386326057.7152.44.camel@host5.omatika.ru>
-References: <20131205043544.GA28580@kroah.com>
- <1386286149-2855-1-git-send-email-ynvich@gmail.com>
- <20131206000253.GC21358@kroah.com>
- <20131206001728.GJ4360@n2100.arm.linux.org.uk>
- <1386322131.7152.36.camel@host5.omatika.ru>
- <20131206095345.GQ16425@us.netrek.org>
- <1386326057.7152.44.camel@host5.omatika.ru>
-Message-ID: <20131206110542.GA14652@us.netrek.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 6 Dec 2013 12:23:05 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <20131205202825.GB4707@pengutronix.de>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+ <5283A8C7.30904@atmel.com> <529C4936.5060304@atmel.com>
+ <20131204102353.GI29721@pengutronix.de> <20131204170911.GC14859@kroah.com>
+ <20131204191606.GL29721@pengutronix.de> <52A0B060.4040203@atmel.com>
+ <20131205202825.GB4707@pengutronix.de>
+Message-ID: <52A1B399.3090104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 02:34:17PM +0400, Sergei Ianovich wrote:
-> On Fri, 2013-12-06 at 20:53 +1100, James Cameron wrote:
-> > I don't understand why /dev/ttyS2 (4,66) changed to /dev/ttyS0 (4,64)
-> > after the patch was applied to olpc-kernel/arm-3.5 but, as you say it
-> > doesn't change, perhaps there is something between 3.5 and now for me
-> > to watch out for.  My problem.
-> 
-> The old pxa.c set device ids explicitly:
-> -static int serial_pxa_probe_dt(struct platform_device *pdev,
-> -                              struct uart_pxa_port *sport)
-> -{
-> -       struct device_node *np = pdev->dev.of_node;
-> -       int ret;
-> -
-> -       if (!np)
-> -               return 1;
-> -
-> -       ret = of_alias_get_id(np, "serial");
-> -       if (ret < 0) {
-> -               dev_err(&pdev->dev, "failed to get alias id, errno %d
-> \n", ret);
-> -               return ret;
-> -       }
-> -       sport->port.line = ret;
-> -       return 0;
-> -}
-> 
-> and
-> 
-> -       ret = serial_pxa_probe_dt(dev, sport);
-> -       if (ret > 0)
-> -               sport->port.line = dev->id;
-> 
-> 
-> However, this is not possible with 8250_core. The latter assigns device
-> ids strictly in the call order of serial8250_register_8250_port().
-> 
-> Hope it helps.
+On 05/12/2013 21:28, Uwe Kleine-K?nig :
+> Hello Nicolas,
+>
+> On Thu, Dec 05, 2013 at 05:57:04PM +0100, Nicolas Ferre wrote:
+>> On 04/12/2013 20:16, Uwe Kleine-K?nig :
+>>> On Wed, Dec 04, 2013 at 09:09:11AM -0800, Greg Kroah-Hartman wrote:
+>>>> On Wed, Dec 04, 2013 at 11:23:53AM +0100, Uwe Kleine-K?nig wrote:
+>>>>> Hello Greg, hi Nicolas,
+>>>>>
+>>>>> On Mon, Dec 02, 2013 at 09:47:50AM +0100, Nicolas Ferre wrote:
+>>>>>> On 13/11/2013 17:28, Nicolas Ferre :
+>>>>>>> On 07/11/2013 10:25, Linus Walleij :
+>>>>>>>> This passes the errata fix using a GPIO to control the RTS pin
+>>>>>>>> on one of the AT91 chips to use gpiolib instead of the
+>>>>>>>> AT91-specific interfaces. Also remove the reliance on
+>>>>>>>> compile-time #defines and the cpu_* check and rely on the
+>>>>>>>> platform passing down the proper GPIO pin through platform
+>>>>>>>> data.
+>>>>>>>>
+>>>>>>>> This is a prerequisite for getting rid of the local GPIO
+>>>>>>>> implementation in the AT91 platform and move toward
+>>>>>>>> multiplatform.
+>>>>>>>>
+>>>>>>>> The patch also adds device tree support for getting the
+>>>>>>>> RTS GPIO pin from the device tree on DT boot paths.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>>>>>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>>>>>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> [...]
+>>> nferre: What is your plan with this patch? Do you have patches
+>>> depending on it, too, or is it ok if I take it?
+>>
+>> Well, the problem is that your branch generates conflicts with the
+>> at91/cleanup one that Olof have just pulled. They are not big
+>> conflicts, only additions of header files at the same location.
+>> Maybe you can rebase your branch on top of this cleanup branch
+>> (arm-soc/next/cleanup: 94c5216ee93b3b4).
+> Olof said on irc: "that's easy to fix, i'm ok with resolving that when i
+> merge". That is what I prefer because I don't want to retest everything
+> after rebasing.
+>>
+>> But, anyway I feel that it is better if you take the whole series in a raw.
+> So I can interpret this as your blessing to keep the patch in my series
+> based on 3.13-rc1?
 
-Yes, thanks, that explains it.
+Yes, sure.
+Moreover, I read that you agreed with Olof about the merge conflict: so 
+everything is good and thanks a lot for taking care of this Uwe.
 
-Your patch deprecates the use of property "linux,unit#" in the device
-tree for serial ports, or the numbering according to the ordering of
-the device tree.
-
-(On OLPC XO-4, we set the numbering according to the ordering, we don't
-use "linux,unit#".)
-
-It is sad to see device tree sawdust.  ;-)
-
+Bye,
 -- 
-James Cameron
-http://quozl.linux.org.au/
+Nicolas Ferre
