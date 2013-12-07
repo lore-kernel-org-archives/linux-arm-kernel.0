@@ -1,99 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 7 Dec 2013 11:33:35 +0100
-Subject: [PATCH 01/10] net: stmmac: Enable stmmac main clock when probing
- hardware
-In-Reply-To: <1386350983-13281-2-git-send-email-wens@csie.org>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-2-git-send-email-wens@csie.org>
-Message-ID: <20131207103335.GL24519@lukather>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 7 Dec 2013 11:56:06 +0100 (CET)
+Subject: [PATCH v2 4/9] clocksource/cadence_ttc: Use enable/disable_irq
+In-Reply-To: <f6d25456-8e30-4792-b184-21eb02dfaa1c@AM1EHSMHS001.ehs.local>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1385514296-26702-5-git-send-email-soren.brinkmann@xilinx.com>
+ <52972F3A.9090103@linaro.org>
+ <alpine.DEB.2.02.1311281507280.30673@ionos.tec.linutronix.de>
+ <b2ed3cbc-c9df-4235-8137-93514c05bffa@DB8EHSMHS031.ehs.local>
+ <alpine.DEB.2.02.1311281939000.30673@ionos.tec.linutronix.de>
+ <f6d25456-8e30-4792-b184-21eb02dfaa1c@AM1EHSMHS001.ehs.local>
+Message-ID: <alpine.DEB.2.02.1312071151340.30673@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Dec 07, 2013 at 01:29:34AM +0800, Chen-Yu Tsai wrote:
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+On Fri, 6 Dec 2013, S?ren Brinkmann wrote:
+> On Thu, Nov 28, 2013 at 08:07:10PM +0100, Thomas Gleixner wrote:
+> > There is a solution to this. We can identify the broadcast device in
+> > the core and serialize all callers including interrupts on a different
+> > cpu against the update. So no need for the disable/enable_irq() dance.
 > 
-> Guiseppe previously stated that the "stmmaceth" clock is the
-> main clock that drives the IP. The stmmac driver does not
-> enable this clock during the probe phase. When the driver is
-> built in to the kernel, this is fine because the clock maybe
-> on by default, or the boot loader had enabled it.
-> 
-> If stmmac is built as a module, when the module is loaded,
-> the clock may be found unused and disabled by the kernel.
+> IIUC, and please correct me if I'm wrong, with the patch I'd simply call
+> 'clockevents_update_freq() without having to disable IRQs. But I'm not
+> sure whether periodic mode is covered. I found, that I had to reprogram
+> the timer interval in my clock notifier callback when the timer
+> frequency changes. I think 'clockevents_update_freq()' only handles
+> oneshot mode. For that reason I call 'ttc_set_interval()' in the clock
+> notifier in case the timer is in periodic mode. For that call we'd still
+> have possible races. I guess the best solution would be to move that
+> functionality into 'clockevents_update_freq()'?
 
-This should be your commit log.
-
-And this is actually not related to the fact that we are building it
-as a module or not. You'd face the same issue with a statically built
-kernel if the bootloader didn't enable it.
-
-> 
->  drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 24 +++++++++++++----------
->  1 file changed, 14 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> index 8d4ccd3..7da71ed 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> @@ -2688,10 +2688,17 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
->  	if ((phyaddr >= 0) && (phyaddr <= 31))
->  		priv->plat->phy_addr = phyaddr;
->  
-> +	priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
-
-You can probably use devm_clk_get to make the exit path smaller.
-
-> +	if (IS_ERR(priv->stmmac_clk)) {
-> +		pr_warn("%s: warning: cannot get CSR clock\n", __func__);
-
-And dev_warn here.
-
-> +		goto error_clk_get;
-> +	}
-> +	clk_prepare_enable(priv->stmmac_clk);
-> +
->  	/* Init MAC and get the capabilities */
->  	ret = stmmac_hw_init(priv);
->  	if (ret)
-> -		goto error_free_netdev;
-> +		goto error_hw_init;
->  	ndev->netdev_ops = &stmmac_netdev_ops;
->  
-> @@ -2729,12 +2736,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
->  		goto error_netdev_register;
->  	}
->  
-> -	priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
-> -	if (IS_ERR(priv->stmmac_clk)) {
-> -		pr_warn("%s: warning: cannot get CSR clock\n", __func__);
-> -		goto error_clk_get;
-> -	}
-> -
->  	/* If a specific clk_csr value is passed from the platform
->  	 * this means that the CSR Clock Range selection cannot be
->  	 * changed at run-time and it is fixed. Viceversa the driver'll try to
-> @@ -2759,15 +2760,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
->  		}
->  	}
->  
-> +	clk_disable_unprepare(priv->stmmac_clk);
-> +
-
-Hu? Why do you disable the clock? don't you need it afterwards?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131207/2f937ed5/attachment.sig>
+Indeed.
