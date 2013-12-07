@@ -1,23 +1,44 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard)
-Date: Sat, 7 Dec 2013 11:07:37 +0100
-Subject: [PATCH 02/10] net: stmmac: Honor DT parameter to force DMA store
- and forward mode
-In-Reply-To: <CAGb2v67ZNtbQm+ZW5v_3wNbz1=oLhXks6gbTSjLYa=Nnoz8w-A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 7 Dec 2013 11:15:10 +0100
+Subject: [PATCH 10/10] ARM: dts: sun7i: Add ethernet alias for GMAC
+In-Reply-To: <1386350983-13281-11-git-send-email-wens@csie.org>
 References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-3-git-send-email-wens@csie.org>
- <20131206.162606.2277176361893801778.davem@davemloft.net>
- <CAGb2v67ZNtbQm+ZW5v_3wNbz1=oLhXks6gbTSjLYa=Nnoz8w-A@mail.gmail.com>
-Message-ID: <20131207100737.GI24519@lukather>
+ <1386350983-13281-11-git-send-email-wens@csie.org>
+Message-ID: <20131207101510.GJ24519@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 07, 2013 at 09:23:27AM +0800, Chen-Yu Tsai wrote:
-> Point taken. The current implementation will override settings passed from
-> platform data. ORing the two would be better.
+Hi Chen-Yu,
 
-Platform_data and DT-based configuration are pretty unlikely to be
-used together, so ORing it doesn't have much sense.
+On Sat, Dec 07, 2013 at 01:29:43AM +0800, Chen-Yu Tsai wrote:
+> U-Boot will insert MAC address into the device tree image.
+> It looks up ethernet[0-5] aliases to find the ethernet nodes.
+> Alias GMAC as ethernet0, as it is the only ethernet controller used.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 64b1391..f7c57c6 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -16,6 +16,10 @@
+>  / {
+>  	interrupt-parent = <&gic>;
+>  
+> +	aliases {
+> +		ethernet0 = &gmac;
+> +	};
+> +
 
+Actually, it conflicts with
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/211695.html
+
+Please rebase accordingly.
+
+Thanks,
 Maxime
 
 -- 
@@ -30,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131207/2bf76035/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131207/8f74ca29/attachment-0001.sig>
