@@ -1,44 +1,65 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 07 Dec 2013 21:07:15 +0100
-Subject: [PATCH] rtc: pxa: drop usage of CLOCK_TICK_RATE
-In-Reply-To: <52954A3D.3040108@gmail.com> (Haojian Zhuang's message of "Wed,
- 27 Nov 2013 09:26:21 +0800")
-References: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131126133731.GE28642@pengutronix.de> <52954A3D.3040108@gmail.com>
-Message-ID: <87mwkc77d8.fsf@free.fr>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 7 Dec 2013 14:49:34 -0600
+Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
+In-Reply-To: <20131207181052.GR4360@n2100.arm.linux.org.uk>
+References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
+ <201312052250.38986.arnd@arndb.de>
+ <CAL_JsqLf0Ubi55mc-p0-qPwY0LzHEZ-SF9QwcELkKPfZH=9t_g@mail.gmail.com>
+ <201312061741.33427.arnd@arndb.de>
+ <CAL_JsqJmwPwVmNzibr8S-RH8ibwCzXVFMdJA-STPTHG+H0113w@mail.gmail.com>
+ <20131207181052.GR4360@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+7j62ucsA96TbRrFSqHBR5SGUvWeqdsxtUvEtcbtdGyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
-
-> On 11/26/2013 09:37 PM, Uwe Kleine-K?nig wrote:
->> Hello,
+On Sat, Dec 7, 2013 at 12:10 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Dec 06, 2013 at 02:01:51PM -0600, Rob Herring wrote:
+>> On Fri, Dec 6, 2013 at 10:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > This prevents you from building a plain v6 SMP kernel, and we've
+>> > had a variation of that since CONFIG_SMP was first marked non-BROKEN.
 >>
->> [Cc: += akpm]
->>
->> On Fri, Nov 08, 2013 at 09:25:18PM +0100, Uwe Kleine-K?nig wrote:
->>> The symbol CLOCK_TICK_RATE is (at least on ARM) defined in an platform
->>> specific header <mach/timex.h>. There are plans to stop using and kill
->>> these platform specific headers. So fix the only user of pxa's
-n>>> <mach/timex.h> to not use it.
->>>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> Who is looking for this patch?
->>
->> Best regards
->> Uwe
-> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>> I'm saying a v6k enabled kernel would not work on pure v6 h/w. But
+>> since all implementations appear to support doubleword exclusives and
+>> there may not be any pure v6 only h/w, then we may never have a
+>> problem with the code below.
 >
-> I think that Alessandro could help to merge.
+> I wonder why we have the SMP_ON_UP option.  It's there so that we can
+> do exactly this - build a SMP kernel (so, one for V6K or later) _and_
+> have it run on non-SMP capable V6 platforms.
+
+Exactly, but __kuser_cmpxchg64 is missing the necessary SMP_ON_UP
+patching or correct ifdef logic. I have yet to get my head around what
+is the right fix here.
+
+> Now, while it's true that ARMv6 doesn't have the WFI instruction, and
+> that was introduced in ARMv6K, when we include support for ARMv6, we
+> don't use that instruction - we use its MCR equivalent.
 >
-> Alessandro,
-> Is it right?
+> Remember, we've specifically put work into the kernel so that ARMv6
+> can operate as part of the single zImage kernel precisely because we
+> have mixtures of SoCs which have this spread of architectures.
+>
+> So, as far as I'm aware, today, a kernel which has V6, V6K and V7
+> will work across all those CPUs.
+>
+> What's rather annoying in this thread is that you and Arnd are running
+> around seemingly making decisions on this without bothering to find out
+> the details, in persuit of endless cleanups.  Where is this heading?
+> Yet more fscking breakage of the ARM kernel, leading to platforms which
+> won't boot.  I'm getting rather sick and tired of cleaning up after
+> this kind of activity, so I'm going to tell you right now to stop this.
+>
+> I've had to push a whole load of footbridge patches into stable kernels
+> during the last fortnight because of this.  For instance, Rob, your
+> changes to the way that VGA was supported on ARM pretty much broke the
+> whole thing leading to an oops on boot at 0xb80000.
+>
+> Please stop this madness.
 
-Why won't you just remove TIMER_FREQ all together instead ?
-I don't remember why I put that in, but looking back at it, I don't find any
-use, so why don't we remove the line ?
+Highlighting the above issue and selecting the correct cpu option for
+various platforms is hardly madness. This doesn't affect just v6
+platforms, but also all v7 platforms in v6+v7 builds since less
+optimal non-v6K code paths are selected.
 
-Cheers.
-
---
-Robert
+Rob
