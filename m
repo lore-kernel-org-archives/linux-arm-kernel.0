@@ -1,39 +1,47 @@
-From: M.Mann@arkona-technologies.de (Matthias Mann)
-Date: Sat, 07 Dec 2013 23:02:48 +0100
-Subject: [PATCH v2] ARM: asm: add readq/writeq methods
-In-Reply-To: <yw1xd2l8l4oc.fsf@unicorn.mansr.com>
-References: <52A3472C.4010203@arkona-technologies.de>
- <CAFEAcA9iHdEvr5f7Cv4NB+5Js7BU3gL8Tfh1WhyM0T6Dh7LKWw@mail.gmail.com>
- <yw1xd2l8l4oc.fsf@unicorn.mansr.com>
-Message-ID: <52A39B08.8090205@arkona-technologies.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Sat,  7 Dec 2013 23:30:49 +0100
+Subject: [PATCH v2] rtc: pxa: drop unused #define TIMER_FREQ
+In-Reply-To: <87mwkc77d8.fsf@free.fr>
+References: <87mwkc77d8.fsf@free.fr>
+Message-ID: <1386455449-19678-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-M?ns Rullg?rd wrote:
-> Peter Maydell <peter.maydell@linaro.org> writes:
->
->> On 7 December 2013 16:05, Matthias Mann <M.Mann@arkona-technologies.de> wrote:
->>> Add readq/writeq methods for 32 bit ARM to allow transfering 64 bit words over
->>> PCIe as a single transfer.
->>> +#if __LINUX_ARM_ARCH__ >= 5
->>> +static inline u64 __raw_readq(const volatile void __iomem *addr)
->>> +{
->>> +       u64 val;
->>> +#if __LITTLE_ENDIAN
->>> +       asm volatile("ldrd %Q1, %R1, %0"
->>> +                    : "+Q" (*(volatile u64 __force *)addr),
->>> +                      "=r" (val));
->>> +#else
->>> +       asm volatile("ldrd %R1, %Q1, %0"
->>> +                    : "+Q" (*(volatile u64 __force *)addr),
->>> +                      "=r" (val));
->>> +#endif
->>> +       return val;
->>> +}
->> Given that ldrd/strd accesses are only a single 64 bit access
->> on CPUs with LPAE (on non-LPAE CPUs they may be
->> implemented as just a pair of 32 bit accesses) should the
->> condition be stricter than just __LINUX_ARM_ARCH__ >= 5 ?
-> What do actual CPUs, e.g. the A9, do?
->
-I've tested that on an Freescale i.MX6D which is a Cortex-A9 with an Altera Arria V GZ FPGA connected via PCIe. Using strd / ldrd I see a 64 bit TLP (length = 2) on the PCIe interface (this is on an uncachable 32 bit BAR).
+It seems this symbol was unused since the driver was introduced in
+commit dc94436 (rtc: driver for pxa27x and pxa3xx SoC) back in 2009.
+
+As a by-product this patch makes the driver stop "using" the symbol
+CLOCK_TICK_RATE which is about to be removed very soon (for ARM).
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Changes since (implicit) v1, sent with
+Message-id:1383942318-12569-1-git-send-email-u.kleine-koenig at pengutronix.de:
+
+ - drop define instead of s/CLOCK_TICK_RATE/get_clock_tick_rate()/; thanks to
+   Robert Jarzmik for pointing that out.
+
+Note I intend to send this patch as part of a series that removes
+<mach/timex.h> (and so CLOCK_TICK_RATE) on ARM. So dear maintainer please don't
+take this patch but give your blessing that I can take it. (Note, I'm not sure
+who's ack I need here; according to MAINTAINERS Alessandro Zummo maintains the
+rtc subsystem, but he doesn't seem to be that active for some time and it's
+mostly akpm who takes patches.)
+
+ drivers/rtc/rtc-pxa.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+index a355f2b..cccbf9d 100644
+--- a/drivers/rtc/rtc-pxa.c
++++ b/drivers/rtc/rtc-pxa.c
+@@ -32,7 +32,6 @@
+ 
+ #include <mach/hardware.h>
+ 
+-#define TIMER_FREQ		CLOCK_TICK_RATE
+ #define RTC_DEF_DIVIDER		(32768 - 1)
+ #define RTC_DEF_TRIM		0
+ #define MAXFREQ_PERIODIC	1000
+-- 
+1.8.4.3
