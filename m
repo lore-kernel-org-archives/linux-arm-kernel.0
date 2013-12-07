@@ -1,37 +1,51 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  7 Dec 2013 12:26:33 +0400
-Subject: [PATCH 2/5] ARM: dts: imx27-phytec-phycore-rdk: Change pinctrl
- settings for I2C1
+Date: Sat,  7 Dec 2013 12:26:36 +0400
+Subject: [PATCH 5/5] ARM: dts: imx27-phytec-phycore-som: Rename file to .dtsi
 In-Reply-To: <1386404796-8848-1-git-send-email-shc_work@mail.ru>
 References: <1386404796-8848-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1386404796-8848-2-git-send-email-shc_work@mail.ru>
+Message-ID: <1386404796-8848-5-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pullup resistor for I2C1 DATA line on PCM-970 board is missing.
-This patch adds internal pullup for local workaround.
+PCM-038 module cannot be used standalone. This patch renames
+module file to .dtsi and excludes it from compilation.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                                              | 1 -
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts                          | 2 +-
+ .../dts/{imx27-phytec-phycore-som.dts => imx27-phytec-phycore-som.dtsi} | 0
+ 3 files changed, 1 insertion(+), 2 deletions(-)
+ rename arch/arm/boot/dts/{imx27-phytec-phycore-som.dts => imx27-phytec-phycore-som.dtsi} (100%)
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 648c016..88cd3d9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -124,7 +124,6 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx27-apf27.dtb \
+ 	imx27-apf27dev.dtb \
+ 	imx27-pdk.dtb \
+-	imx27-phytec-phycore-som.dtb \
+ 	imx27-phytec-phycore-rdk.dtb \
+ 	imx27-phytec-phycard-s-som.dtb \
+ 	imx27-phytec-phycard-s-rdk.dtb \
 diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 2cb9e4b..0903e3a 100644
+index 0903e3a..7ada054 100644
 --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
 +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -37,7 +37,11 @@
- &iomuxc {
- 	imx27_phycore_rdk {
- 		pinctrl_i2c1: i2c1grp {
--			fsl,pins = <MX27_I2C1_PINGRP1>;
-+			/* Add pullup to DATA line */
-+			fsl,pins = <
-+				MX27_PAD_I2C_DATA__I2C_DATA	0x1
-+				MX27_PAD_I2C_CLK__I2C_CLK	0x0
-+			>;
- 		};
+@@ -7,7 +7,7 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
  
- 		pinctrl_uart1: uart1grp {
+-#include "imx27-phytec-phycore-som.dts"
++#include "imx27-phytec-phycore-som.dtsi"
+ 
+ / {
+ 	model = "Phytec pcm970";
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+similarity index 100%
+rename from arch/arm/boot/dts/imx27-phytec-phycore-som.dts
+rename to arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
 -- 
 1.8.3.2
