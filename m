@@ -1,40 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Dec 2013 23:19:58 +0000
-Subject: [REGRESSION,BISECTED] DMA mask issue on ReadyNAS 102 w/ 3.13.0-rc3
-In-Reply-To: <87haakfene.fsf@natisbad.org>
-References: <87haakfene.fsf@natisbad.org>
-Message-ID: <20131207231958.GS4360@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 7 Dec 2013 18:23:15 -0500
+Subject: [PATCH] mtd: nand: pxa3xx: Disable "armada370-nand" compatible
+ support
+In-Reply-To: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131207232315.GC11251@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 08, 2013 at 12:02:45AM +0100, Arnaud Ebalard wrote:
-> 3.13.0-rc2 worked just fine so I decided to git-bisect the issue and
-> ended up on 11a5aa32562e (ARM: dma-mapping: check DMA mask against
-> available memory).
+Ezequiel,
+
+I would prefer to call this a 'partial revert of c0f3b8643a6f ...'
+
+On Sat, Dec 07, 2013 at 12:39:47PM -0300, Ezequiel Garcia wrote:
+> Currently the "armada370-nand" compatible support is not complete,
+> and it was mistake to add it. Instead of completely removing the compatible,
+> let's just disable it until all the needed infrastructure is in place.
 > 
-> If it has already been reported and fixed, sorry for the noise.
+> Cc: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
 
-Please try this patch, thanks:
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f6b6bfa88ecf..c143a7bb681b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -185,7 +185,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 		 */
- 		if (sizeof(mask) != sizeof(dma_addr_t) &&
- 		    mask > (dma_addr_t)~0 &&
--		    dma_to_pfn(dev, ~0) > max_dma_pfn) {
-+		    dma_to_pfn(dev, ~0) < max_dma_pfn) {
- 			dev_warn(dev, "Coherent DMA mask %#llx is larger than dma_addr_t allows\n",
- 				 mask);
- 			dev_warn(dev, "Driver did not use or check the return value from dma_set_coherent_mask()?\n");
-@@ -1041,7 +1041,7 @@ int dma_supported(struct device *dev, u64 mask)
- 	 */
- 	if (sizeof(mask) != sizeof(dma_addr_t) &&
- 	    mask > (dma_addr_t)~0 &&
--	    dma_to_pfn(dev, ~0) > arm_dma_pfn_limit)
-+	    dma_to_pfn(dev, ~0) < min(max_pfn, arm_dma_pfn_limit))
- 		return 0;
- 
- 	/*
+> The compatible was added in:
+> 
+> commit c0f3b8643a6fa2461d70760ec49d21d2b031d611
+> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Date:   Sat Aug 10 16:34:52 2013 -0300
+> 
+>     mtd: nand: pxa3xx: Introduce 'marvell,armada370-nand' compatible string
+
+And add this as a oneline in the commit description.
+
+> 
+> Which means the fix should be applied in v3.12 and v3.13.
+> 
+> On Emilio's suggestion, I've opted for the disabling, given all the required
+> support is already queued for v3.14. I'll push a patch removing the #if 0
+> on top of current l2-mtd.git.
+> 
+> Brian: Do you think this is OK to be pushed now for v3.13?
+> 
+>  drivers/mtd/nand/pxa3xx_nand.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 3d143fe..2c5066f 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -333,10 +333,16 @@ static struct of_device_id pxa3xx_nand_dt_ids[] = {
+>  		.compatible = "marvell,pxa3xx-nand",
+>  		.data       = (void *)PXA3XX_NAND_VARIANT_PXA,
+>  	},
+> +/*
+> + * Currently, the armada370 support is incomplete and can cause the
+> + * system to crash. Disable it until all the infrastructure is in place.
+> + */
+> +#if 0
+>  	{
+>  		.compatible = "marvell,armada370-nand",
+>  		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA370,
+>  	},
+> +#endif
+
+I prefer to just remove the lines.
+
+thx,
+
+Jason.
