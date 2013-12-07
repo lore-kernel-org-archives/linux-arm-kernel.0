@@ -1,181 +1,99 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  7 Dec 2013 12:38:32 +0100
-Subject: [PATCH 1/2] ARM: sun7i: dt: Fix interrupt trigger types
-In-Reply-To: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1386416313-703-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat, 7 Dec 2013 12:46:16 +0100
+Subject: [PATCH 04/10] net: stmmac: sunxi platfrom extensions for GMAC in
+ Allwinner A20 SoC's
+In-Reply-To: <2030454.PFLhh6xOPI@flatron>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org>
+ <20131207102710.GK24519@lukather> <2030454.PFLhh6xOPI@flatron>
+Message-ID: <20131207114616.GM24519@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A20 uses the ARM GIC as its internal interrupts controller. The
-GIC can work on several interrupt triggers, and the A20 was actually setting it
-up to use a rising edge as a trigger, while it was actually a level high
-trigger, leading to some interrupts that would be completely ignored if the
-edge was missed.
+On Sat, Dec 07, 2013 at 12:12:26PM +0100, Tomasz Figa wrote:
+> On Saturday 07 of December 2013 11:27:10 Maxime Ripard wrote:
+> > Chen-Yu, Mike,
+> > 
+> > On Sat, Dec 07, 2013 at 01:29:37AM +0800, Chen-Yu Tsai wrote:
+> > > The Allwinner A20 has an ethernet controller that seems to be
+> > > an early version of Synopsys DesignWare MAC 10/100/1000 Universal,
+> > > which is supported by the stmmac driver.
+> > > 
+> > > Allwinner's GMAC requires setting additional registers in the SoC's
+> > > clock control unit.
+> > > 
+> > > The exact version of the DWMAC IP that Allwinner uses is unknown,
+> > > thus the exact feature set is unknown.
+> > > 
+> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > ---
+> > >  .../bindings/net/allwinner,sun7i-gmac.txt          | 22 +++++++
+> > >  drivers/net/ethernet/stmicro/stmmac/Kconfig        | 12 ++++
+> > >  drivers/net/ethernet/stmicro/stmmac/Makefile       |  1 +
+> > >  drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 76 ++++++++++++++++++++++
+> > >  drivers/net/ethernet/stmicro/stmmac/stmmac.h       |  3 +
+> > >  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  3 +
+> > >  6 files changed, 117 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/net/allwinner,sun7i-gmac.txt b/Documentation/devicetree/bindings/net/allwinner,sun7i-gmac.txt
+> > > new file mode 100644
+> > > index 0000000..271554a
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/net/allwinner,sun7i-gmac.txt
+> > > @@ -0,0 +1,22 @@
+> > > +* Allwinner GMAC ethernet controller
+> > > +
+> > > +This device is a platform glue layer for stmmac.
+> > > +Please see stmmac.txt for the other unchanged properties.
+> > > +
+> > > +Required properties:
+> > > + - compatible:  Should be "allwinner,sun7i-gmac"
+> > 
+> > Please use sun7i-a20-gmac here.
+> > 
+> > > + - reg: Address and length of register set for the device and corresponding
+> > > +   clock control
+> > >
+> > > +Examples:
+> > > +
+> > > +	gmac: ethernet at 01c50000 {
+> > > +		compatible = "allwinner,sun7i-gmac";
+> > > +		reg = <0x01c50000 0x10000>,
+> > > +		      <0x01c20164 0x4>;
+> > 
+> > This is actually a clock, and should probably be registered in the
+> > common clock framework.
+> > 
+> > Mike: This small register actually is a regular muxer/divider, except
+> > that it has some bits that are of interest to the ethernet controller
+> > (for example to set wether it's using GMII or RGMII to communicate
+> > with the phy), that, as far as I'm aware of, aren't really fitting
+> > into the CCF.
+> > 
+> > Do you have some recommendation on how to proceed?
+> > 
+> > Maybe make a thin "real" clock driver in this hardware glue, that
+> > provides !exported function to set this *GMII thing.
+> 
+> Is this register part of a bigger IP block that manages clocks for other
+> IP blocks than stmmac as well? If not, I don't see a point of exporting
+> a clock from inside of the GMAC "domain" just to feed it back into it
+> as the only user.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reported-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 42 ++++++++++++++++++++--------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+This register is actually part of the SoC clock controller. So it sits
+right beside the other clocks registers controlling the clocks of the
+other devices, and is not part of the GMAC IP itself.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index e46cfed..367611a 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -170,7 +170,7 @@
- 		emac: ethernet at 01c0b000 {
- 			compatible = "allwinner,sun4i-emac";
- 			reg = <0x01c0b000 0x1000>;
--			interrupts = <0 55 1>;
-+			interrupts = <0 55 4>;
- 			clocks = <&ahb_gates 17>;
- 			status = "disabled";
- 		};
-@@ -186,7 +186,7 @@
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun7i-a20-pinctrl";
- 			reg = <0x01c20800 0x400>;
--			interrupts = <0 28 1>;
-+			interrupts = <0 28 4>;
- 			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			interrupt-controller;
-@@ -251,12 +251,12 @@
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-timer";
- 			reg = <0x01c20c00 0x90>;
--			interrupts = <0 22 1>,
--				     <0 23 1>,
--				     <0 24 1>,
--				     <0 25 1>,
--				     <0 67 1>,
--				     <0 68 1>;
-+			interrupts = <0 22 4>,
-+				     <0 23 4>,
-+				     <0 24 4>,
-+				     <0 25 4>,
-+				     <0 67 4>,
-+				     <0 68 4>;
- 			clocks = <&osc24M>;
- 		};
- 
-@@ -273,7 +273,7 @@
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
--			interrupts = <0 1 1>;
-+			interrupts = <0 1 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 16>;
-@@ -283,7 +283,7 @@
- 		uart1: serial at 01c28400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28400 0x400>;
--			interrupts = <0 2 1>;
-+			interrupts = <0 2 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 17>;
-@@ -293,7 +293,7 @@
- 		uart2: serial at 01c28800 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28800 0x400>;
--			interrupts = <0 3 1>;
-+			interrupts = <0 3 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 18>;
-@@ -303,7 +303,7 @@
- 		uart3: serial at 01c28c00 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28c00 0x400>;
--			interrupts = <0 4 1>;
-+			interrupts = <0 4 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 19>;
-@@ -313,7 +313,7 @@
- 		uart4: serial at 01c29000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29000 0x400>;
--			interrupts = <0 17 1>;
-+			interrupts = <0 17 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 20>;
-@@ -323,7 +323,7 @@
- 		uart5: serial at 01c29400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29400 0x400>;
--			interrupts = <0 18 1>;
-+			interrupts = <0 18 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 21>;
-@@ -333,7 +333,7 @@
- 		uart6: serial at 01c29800 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29800 0x400>;
--			interrupts = <0 19 1>;
-+			interrupts = <0 19 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 22>;
-@@ -343,7 +343,7 @@
- 		uart7: serial at 01c29c00 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29c00 0x400>;
--			interrupts = <0 20 1>;
-+			interrupts = <0 20 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 23>;
-@@ -353,7 +353,7 @@
- 		i2c0: i2c at 01c2ac00 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2ac00 0x400>;
--			interrupts = <0 7 1>;
-+			interrupts = <0 7 4>;
- 			clocks = <&apb1_gates 0>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -362,7 +362,7 @@
- 		i2c1: i2c at 01c2b000 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2b000 0x400>;
--			interrupts = <0 8 1>;
-+			interrupts = <0 8 4>;
- 			clocks = <&apb1_gates 1>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -371,7 +371,7 @@
- 		i2c2: i2c at 01c2b400 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2b400 0x400>;
--			interrupts = <0 9 1>;
-+			interrupts = <0 9 4>;
- 			clocks = <&apb1_gates 2>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -380,7 +380,7 @@
- 		i2c3: i2c at 01c2b800 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2b800 0x400>;
--			interrupts = <0 88 1>;
-+			interrupts = <0 88 4>;
- 			clocks = <&apb1_gates 3>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -389,7 +389,7 @@
- 		i2c4: i2c at 01c2bc00 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2bc00 0x400>;
--			interrupts = <0 89 1>;
-+			interrupts = <0 89 4>;
- 			clocks = <&apb1_gates 15>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
+Maxime
+
 -- 
-1.8.4.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131207/4de81c50/attachment.sig>
