@@ -1,50 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 07 Dec 2013 20:57:05 +0400
-Subject: [PATCH] net: allwinner: emac: Add missing free_irq
-In-Reply-To: <1386415902-32697-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1386415902-32697-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <52A35361.8090608@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 7 Dec 2013 09:41:25 -0800
+Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
+In-Reply-To: <201312070552.34537.arnd@arndb.de>
+References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
+ <201312061741.33427.arnd@arndb.de>
+ <CAL_JsqJmwPwVmNzibr8S-RH8ibwCzXVFMdJA-STPTHG+H0113w@mail.gmail.com>
+ <201312070552.34537.arnd@arndb.de>
+Message-ID: <20131207174125.GP26766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Arnd Bergmann <arnd@arndb.de> [131206 20:54]:
+> On Friday 06 December 2013, Rob Herring wrote:
+> 
+> From this list it is pretty clear that we want V6K as the default as you
+> suggested, and I think we should eliminate any 'select CPU_V6K' except
+> for OMAP2 (unless I made a mistake in my platform list). Maybe Tony has
+> a better understanding of which OMAP2 systems are actually V6K or V6.
 
-On 07-12-2013 15:31, Maxime Ripard wrote:
+Yes both omap2420 and 2430 are just V6, not V6K.
 
-> The sun4i-emac driver uses devm_request_irq at .ndo_open time, but relies on
-> the managed device mechanism to actually free it. This causes an issue whenever
-> someone wants to restart the interface, the interrupt still being held, and not
-> yet released.
+Regards,
 
-> Fall back to using the regular request_irq at .ndo_open time, and introduce a
-> free_irq during .ndo_stop.
-
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Hi David,
-
-> It would be great if this patch would be applied to 3.13.
-
-> Thanks,
-> Maxime
-
-
->   drivers/net/ethernet/allwinner/sun4i-emac.c | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
-
-> diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> index 50b853a..38aba50 100644
-> --- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-> +++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> @@ -717,8 +717,8 @@ static int emac_open(struct net_device *dev)
->   	if (netif_msg_ifup(db))
->   		dev_dbg(db->dev, "enabling %s\n", dev->name);
->
-> -	if (devm_request_irq(db->dev, dev->irq, &emac_interrupt,
-> -			     0, dev->name, dev))
-> +	if (request_irq(dev->irq, &emac_interrupt,
-> +			0, dev->name, dev))
-
-    Doesn't it fit into single line?
-
-WBR, Sergei
+Tony
