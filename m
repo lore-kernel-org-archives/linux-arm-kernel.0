@@ -1,75 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 08 Dec 2013 01:08:21 +0300
-Subject: [PATCH] sh_eth: add R8A7791 support
-In-Reply-To: <20131118075433.GA1506@verge.net.au>
-References: <201311150211.36049.sergei.shtylyov@cogentembedded.com>
- <20131118075433.GA1506@verge.net.au>
-Message-ID: <52A39C55.2070204@cogentembedded.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 07 Dec 2013 21:41:39 +0000
+Subject: [PATCH v2] ARM: asm: add readq/writeq methods
+In-Reply-To: <CAFEAcA9iHdEvr5f7Cv4NB+5Js7BU3gL8Tfh1WhyM0T6Dh7LKWw@mail.gmail.com>
+ (Peter Maydell's message of "Sat, 7 Dec 2013 21:38:09 +0000")
+References: <52A3472C.4010203@arkona-technologies.de>
+ <CAFEAcA9iHdEvr5f7Cv4NB+5Js7BU3gL8Tfh1WhyM0T6Dh7LKWw@mail.gmail.com>
+Message-ID: <yw1xd2l8l4oc.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Peter Maydell <peter.maydell@linaro.org> writes:
 
-On 11/18/2013 10:54 AM, Simon Horman wrote:
+> On 7 December 2013 16:05, Matthias Mann <M.Mann@arkona-technologies.de> wrote:
+>> Add readq/writeq methods for 32 bit ARM to allow transfering 64 bit words over
+>> PCIe as a single transfer.
+>
+>> +#if __LINUX_ARM_ARCH__ >= 5
+>> +static inline u64 __raw_readq(const volatile void __iomem *addr)
+>> +{
+>> +       u64 val;
+>> +#if __LITTLE_ENDIAN
+>> +       asm volatile("ldrd %Q1, %R1, %0"
+>> +                    : "+Q" (*(volatile u64 __force *)addr),
+>> +                      "=r" (val));
+>> +#else
+>> +       asm volatile("ldrd %R1, %Q1, %0"
+>> +                    : "+Q" (*(volatile u64 __force *)addr),
+>> +                      "=r" (val));
+>> +#endif
+>> +       return val;
+>> +}
+>
+> Given that ldrd/strd accesses are only a single 64 bit access
+> on CPUs with LPAE (on non-LPAE CPUs they may be
+> implemented as just a pair of 32 bit accesses) should the
+> condition be stricter than just __LINUX_ARM_ARCH__ >= 5 ?
 
-    Too bad you haven't spoken out before I went and done this patch and its 
-follow-ups, at the point where I only laid out my plan of action in a reply to 
-Magnus...
+What do actual CPUs, e.g. the A9, do?
 
->> Add support for yet another ARM member of the R-Car family, R-Car M2, also known
->> as R8A7791 -- it will share the code and data with previously added R8A7790.
->> Since  the Ether devices in these SoCs are indistinguishable at least from the
->> driver's point of view,  do not introduce  a new platform device ID but modify
->> device name "r8a7790-ether" to "r8a779x-ether" throughout the files (and also
->> 'r8a7790_data' to 'r8a779x_data' in the driver), just like the names used for
->> R8A7778/9 SoCs.
-
-> I realise that this is the approach that has been taken previously by this
-> driver for some other SoCs but it is inconsistent with the approach that
-> has (recently) emerged for drivers for Renesas IP.
-
-> The problem with this approach is that although the hardware may appear to
-> be the same in the absence of some kind of version number for the IP we
-> can't be certain it is the same.  Some difference may come to light later
-> and then this system breaks down.
-
-    I don't think that'll be the case here, but do I understand your concern 
-about things breaking down.
-
-> Sure, at that point we can create a more fine-grained compatibility string.
-
-    Slight correction of terms: we're dealing with platform device ID here, 
-not (device tree) compatibility string.
-
-> But the approach that has emerged is that in the absence of a clearly
-> documented version number for the hardware the SoC name is used as the
-> version number.
-
-    I just deviated a little from this scheme by using a wildcard.
-
-> I am also not entirely happy with the approach taken by this patch for
-> two other reasons:
-
-> 1) It removes rather than deprecating an existing compatibility string.
->     Albeit one that may not actually be used in the wild.
-
-    We don't care about out of tree code, do we? At least I don't see how we 
-do that with our current platform device registration policy (mostly per board).
-
-> 2) It changes both drivers/net/ and arch/arm/mach-shmobile/ code.
->     This kind of cross-subsystem change can lead to conflicts which
->     make Linus grumpy: this has occurred recently with shmobile code
->     though not in this driver.
-
-    OK, let's do it your way, with adding another platform device ID, and so 
-doing only drivers/net/ change.
-
-> That said, I did successfully test this patch in conjunction with
-> companion patches for the r8A7791 SoC and Koelsch board.
-
-    I try not to post untested patches (except when I trust other people to do 
-the testing of their patches. :-)
-
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-WBR, Sergei
+-- 
+M?ns Rullg?rd
+mans at mansr.com
