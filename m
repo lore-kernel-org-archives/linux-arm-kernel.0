@@ -1,45 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Dec 2013 15:25:56 +0000
-Subject: [PATCH] ARM: asm: add readq/writeq methods
-In-Reply-To: <52A32C88.9010000@arkona-technologies.de>
-References: <52A32C88.9010000@arkona-technologies.de>
-Message-ID: <20131207152556.GP4360@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat,  7 Dec 2013 12:39:47 -0300
+Subject: [PATCH] mtd: nand: pxa3xx: Disable "armada370-nand" compatible support
+Message-ID: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 07, 2013 at 03:11:20PM +0100, Matthias Mann wrote:
-> Add readq/writeq methods for 32 bit ARM to allow transfering 64 bit words over
-> PCIe as a single transfer.
+Currently the "armada370-nand" compatible support is not complete,
+and it was mistake to add it. Instead of completely removing the compatible,
+let's just disable it until all the needed infrastructure is in place.
 
-Since these asm instructions are not universally implemented, use of these
-will lead to build time errors if a driver attempts to make use of these
-on an ARM architecture which doesn't support it.
+Cc: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+The compatible was added in:
 
-Hence, these need to be conditional - since they first appeared (iirc) in
-ARMv5, then they should be conditional on
+commit c0f3b8643a6fa2461d70760ec49d21d2b031d611
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Sat Aug 10 16:34:52 2013 -0300
 
-#if __LINUX_ARM_ARCH__ >= 5
+    mtd: nand: pxa3xx: Introduce 'marvell,armada370-nand' compatible string
 
-However, there's another issue here.  The use of readq/writeq() is
-controlled with various preprocessor or configuration symbols:
+Which means the fix should be applied in v3.12 and v3.13.
 
-#if BITS_PER_LONG >= 64
-#ifdef CONFIG_64BIT
-#ifndef readq
-#ifndef writeq
+On Emilio's suggestion, I've opted for the disabling, given all the required
+support is already queued for v3.14. I'll push a patch removing the #if 0
+on top of current l2-mtd.git.
 
-I much prefer the latter two, as it means drivers can individually
-implement the lacking support in a way which is appropriate for the device
-they're driving - which is especially important if reading a register has
-side effects.  In other words, readq() and writeq() is not something that
-can be provided by an arch where no 64-bit read/write IO instructions
-exist.
+Brian: Do you think this is OK to be pushed now for v3.13?
 
-This requires that where an architecture provides them, that they be
-accompanied by these definitions:
+ drivers/mtd/nand/pxa3xx_nand.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-#define readq readq
-#define writeq writeq
-
-to prevent the drivers own private definitions of these accessors
-conflicting.
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 3d143fe..2c5066f 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -333,10 +333,16 @@ static struct of_device_id pxa3xx_nand_dt_ids[] = {
+ 		.compatible = "marvell,pxa3xx-nand",
+ 		.data       = (void *)PXA3XX_NAND_VARIANT_PXA,
+ 	},
++/*
++ * Currently, the armada370 support is incomplete and can cause the
++ * system to crash. Disable it until all the infrastructure is in place.
++ */
++#if 0
+ 	{
+ 		.compatible = "marvell,armada370-nand",
+ 		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA370,
+ 	},
++#endif
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, pxa3xx_nand_dt_ids);
+-- 
+1.8.1.5
