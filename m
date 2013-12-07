@@ -1,125 +1,40 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  7 Dec 2013 12:26:32 +0400
-Subject: [PATCH 1/5] ARM: dts: i.MX: Move include "imxXX-pinfunc.h" into
- "imxXX-pingrp.h"
-Message-ID: <1386404796-8848-1-git-send-email-shc_work@mail.ru>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Sat, 7 Dec 2013 00:39:23 -0800
+Subject: Tegra baseline test results for v3.13-rc3
+Message-ID: <52A2DEBB.1000105@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pin function definitions are used for pin groups definitions,
-so move the header in the correspond "imxXX-pingrp.h".
+Here are some basic Tegra test results for Linux v3.13-rc3.
+Logs and other details at:
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx25-pingrp.h | 2 ++
- arch/arm/boot/dts/imx25.dtsi     | 1 -
- arch/arm/boot/dts/imx50-pingrp.h | 2 ++
- arch/arm/boot/dts/imx50.dtsi     | 1 -
- arch/arm/boot/dts/imx51-pingrp.h | 2 ++
- arch/arm/boot/dts/imx51.dtsi     | 1 -
- arch/arm/boot/dts/imx53-pingrp.h | 2 ++
- arch/arm/boot/dts/imx53.dtsi     | 1 -
- 8 files changed, 8 insertions(+), 4 deletions(-)
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.13-rc3/20131207002705/
 
-diff --git a/arch/arm/boot/dts/imx25-pingrp.h b/arch/arm/boot/dts/imx25-pingrp.h
-index 16c7a19..4a35a63 100644
---- a/arch/arm/boot/dts/imx25-pingrp.h
-+++ b/arch/arm/boot/dts/imx25-pingrp.h
-@@ -10,6 +10,8 @@
- #ifndef __DTS_IMX25_PINGRP_H
- #define __DTS_IMX25_PINGRP_H
- 
-+#include "imx25-pinfunc.h"
-+
- #define MX25_AUDMUX_PINGRP1 \
- 	MX25_PAD_KPP_COL3__AUD5_TXFS			0xe0 \
- 	MX25_PAD_KPP_COL2__AUD5_TXC			0xe0 \
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 1a86eab..9e9e3b8 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -10,7 +10,6 @@
-  */
- 
- #include "skeleton.dtsi"
--#include "imx25-pinfunc.h"
- #include "imx25-pingrp.h"
- 
- / {
-diff --git a/arch/arm/boot/dts/imx50-pingrp.h b/arch/arm/boot/dts/imx50-pingrp.h
-index d46b7e0..0f4ce8c 100644
---- a/arch/arm/boot/dts/imx50-pingrp.h
-+++ b/arch/arm/boot/dts/imx50-pingrp.h
-@@ -10,6 +10,8 @@
- #ifndef __DTS_IMX50_PINGRP_H
- #define __DTS_IMX50_PINGRP_H
- 
-+#include "imx50-pinfunc.h"
-+
- #define MX50_CSPI_PINGRP1 \
- 	MX50_PAD_CSPI_SCLK__CSPI_SCLK			0x00 \
- 	MX50_PAD_CSPI_MISO__CSPI_MISO			0x00 \
-diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-index fd3a50a..01c0499 100644
---- a/arch/arm/boot/dts/imx50.dtsi
-+++ b/arch/arm/boot/dts/imx50.dtsi
-@@ -12,7 +12,6 @@
-  */
- 
- #include "skeleton.dtsi"
--#include "imx50-pinfunc.h"
- #include "imx50-pingrp.h"
- #include <dt-bindings/clock/imx5-clock.h>
- 
-diff --git a/arch/arm/boot/dts/imx51-pingrp.h b/arch/arm/boot/dts/imx51-pingrp.h
-index 550d0d1..f63267b 100644
---- a/arch/arm/boot/dts/imx51-pingrp.h
-+++ b/arch/arm/boot/dts/imx51-pingrp.h
-@@ -10,6 +10,8 @@
- #ifndef __DTS_IMX51_PINGRP_H
- #define __DTS_IMX51_PINGRP_H
- 
-+#include "imx51-pinfunc.h"
-+
- #define MX51_AUDMUX_PINGRP1 \
- 	MX51_PAD_AUD3_BB_TXD__AUD3_TXD			0x80000000 \
- 	MX51_PAD_AUD3_BB_RXD__AUD3_RXD			0x80000000 \
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index cad5a56..61a2552 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -11,7 +11,6 @@
-  */
- 
- #include "skeleton.dtsi"
--#include "imx51-pinfunc.h"
- #include "imx51-pingrp.h"
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/clock/imx5-clock.h>
-diff --git a/arch/arm/boot/dts/imx53-pingrp.h b/arch/arm/boot/dts/imx53-pingrp.h
-index 561bc1b..ac8e73d 100644
---- a/arch/arm/boot/dts/imx53-pingrp.h
-+++ b/arch/arm/boot/dts/imx53-pingrp.h
-@@ -10,6 +10,8 @@
- #ifndef __DTS_IMX53_PINGRP_H
- #define __DTS_IMX53_PINGRP_H
- 
-+#include "imx53-pinfunc.h"
-+
- #define MX53_AUDMUX_PINGRP1 \
- 	MX53_PAD_KEY_COL0__AUDMUX_AUD5_TXC		0x80000000 \
- 	MX53_PAD_KEY_ROW0__AUDMUX_AUD5_TXD		0x80000000 \
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 885dbbd..175a94c 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -11,7 +11,6 @@
-  */
- 
- #include "skeleton.dtsi"
--#include "imx53-pinfunc.h"
- #include "imx53-pingrp.h"
- #include <dt-bindings/clock/imx5-clock.h>
- 
--- 
-1.8.3.2
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839)):
+    text     data      bss    total  kernel
+  +38076    +1320        0   +39396  multi_v7_defconfig
+    +732       +8        0     +740  tegra_defconfig
+
+  
+Boot-time memory difference
+(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+      -40k      40k        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+      -40k      40k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
