@@ -1,55 +1,86 @@
 From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Sat,  7 Dec 2013 13:40:49 +0530
-Subject: [PATCH v2 2/2] net: emaclite: add barriers to support Xilinx Zynq
- platform
-In-Reply-To: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
-References: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <1386403849-3153-2-git-send-email-sthokal@xilinx.com>
+Date: Sat,  7 Dec 2013 13:40:48 +0530
+Subject: [PATCH v2 1/2] net: emaclite: Remove unnecessary code that
+ enables/disables interrupts on PONG buffers
+Message-ID: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds barriers at appropriate places to ensure the driver
-works on Xilinx Zynq ARM-based SoC platform.
+There are no specific interrupts for the PONG buffer on both
+transmit and receive side, same interrupt is valid for both
+buffers. So, this patch removes this code.
 
 Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+Reviewed-by: Michal Simek <monstr@monstr.eu>
 ---
 Changes in v2:
 	rebased on v3.13.0-rc3.
-        added comments for memory barrier.
----
- drivers/net/ethernet/xilinx/xilinx_emaclite.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c |   38 -------------------------
+ 1 file changed, 38 deletions(-)
 
 diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index b2850fd..fefb8cd 100644
+index 74234a5..b2850fd 100644
 --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
 +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -220,6 +220,13 @@ static void xemaclite_aligned_write(void *src_ptr, u32 *dest_ptr,
- 		*to_u16_ptr++ = *from_u16_ptr++;
- 		*to_u16_ptr++ = *from_u16_ptr++;
+@@ -163,26 +163,9 @@ static void xemaclite_enable_interrupts(struct net_local *drvdata)
+ 	__raw_writel(reg_data | XEL_TSR_XMIT_IE_MASK,
+ 		     drvdata->base_addr + XEL_TSR_OFFSET);
  
-+		/* This barrier resolves occasional issues seen around
-+		 * cases where the data is not properly flushed out
-+		 * from the processor store buffers to the destination
-+		 * memory locations.
-+		 */
-+		wmb();
-+
- 		/* Output a word */
- 		*to_u32_ptr++ = align_buffer;
- 	}
-@@ -235,6 +242,12 @@ static void xemaclite_aligned_write(void *src_ptr, u32 *dest_ptr,
- 		for (; length > 0; length--)
- 			*to_u8_ptr++ = *from_u8_ptr++;
+-	/* Enable the Tx interrupts for the second Buffer if
+-	 * configured in HW */
+-	if (drvdata->tx_ping_pong != 0) {
+-		reg_data = __raw_readl(drvdata->base_addr +
+-				   XEL_BUFFER_OFFSET + XEL_TSR_OFFSET);
+-		__raw_writel(reg_data | XEL_TSR_XMIT_IE_MASK,
+-			     drvdata->base_addr + XEL_BUFFER_OFFSET +
+-			     XEL_TSR_OFFSET);
+-	}
+-
+ 	/* Enable the Rx interrupts for the first buffer */
+ 	__raw_writel(XEL_RSR_RECV_IE_MASK, drvdata->base_addr + XEL_RSR_OFFSET);
  
-+		/* This barrier resolves occasional issues seen around
-+		 * cases where the data is not properly flushed out
-+		 * from the processor store buffers to the destination
-+		 * memory locations.
-+		 */
-+		wmb();
- 		*to_u32_ptr = align_buffer;
- 	}
+-	/* Enable the Rx interrupts for the second Buffer if
+-	 * configured in HW */
+-	if (drvdata->rx_ping_pong != 0) {
+-		__raw_writel(XEL_RSR_RECV_IE_MASK, drvdata->base_addr +
+-			     XEL_BUFFER_OFFSET + XEL_RSR_OFFSET);
+-	}
+-
+ 	/* Enable the Global Interrupt Enable */
+ 	__raw_writel(XEL_GIER_GIE_MASK, drvdata->base_addr + XEL_GIER_OFFSET);
  }
+@@ -206,31 +189,10 @@ static void xemaclite_disable_interrupts(struct net_local *drvdata)
+ 	__raw_writel(reg_data & (~XEL_TSR_XMIT_IE_MASK),
+ 		     drvdata->base_addr + XEL_TSR_OFFSET);
+ 
+-	/* Disable the Tx interrupts for the second Buffer
+-	 * if configured in HW */
+-	if (drvdata->tx_ping_pong != 0) {
+-		reg_data = __raw_readl(drvdata->base_addr + XEL_BUFFER_OFFSET +
+-				   XEL_TSR_OFFSET);
+-		__raw_writel(reg_data & (~XEL_TSR_XMIT_IE_MASK),
+-			     drvdata->base_addr + XEL_BUFFER_OFFSET +
+-			     XEL_TSR_OFFSET);
+-	}
+-
+ 	/* Disable the Rx interrupts for the first buffer */
+ 	reg_data = __raw_readl(drvdata->base_addr + XEL_RSR_OFFSET);
+ 	__raw_writel(reg_data & (~XEL_RSR_RECV_IE_MASK),
+ 		     drvdata->base_addr + XEL_RSR_OFFSET);
+-
+-	/* Disable the Rx interrupts for the second buffer
+-	 * if configured in HW */
+-	if (drvdata->rx_ping_pong != 0) {
+-
+-		reg_data = __raw_readl(drvdata->base_addr + XEL_BUFFER_OFFSET +
+-				   XEL_RSR_OFFSET);
+-		__raw_writel(reg_data & (~XEL_RSR_RECV_IE_MASK),
+-			     drvdata->base_addr + XEL_BUFFER_OFFSET +
+-			     XEL_RSR_OFFSET);
+-	}
+ }
+ 
+ /**
 -- 
 1.7.9.5
