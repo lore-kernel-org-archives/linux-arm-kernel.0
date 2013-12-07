@@ -1,47 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sat,  7 Dec 2013 23:30:49 +0100
-Subject: [PATCH v2] rtc: pxa: drop unused #define TIMER_FREQ
-In-Reply-To: <87mwkc77d8.fsf@free.fr>
-References: <87mwkc77d8.fsf@free.fr>
-Message-ID: <1386455449-19678-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 08 Dec 2013 00:02:45 +0100
+Subject: [REGRESSION,BISECTED] DMA mask issue on ReadyNAS 102 w/ 3.13.0-rc3
+Message-ID: <87haakfene.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems this symbol was unused since the driver was introduced in
-commit dc94436 (rtc: driver for pxa27x and pxa3xx SoC) back in 2009.
+Hi,
 
-As a by-product this patch makes the driver stop "using" the symbol
-CLOCK_TICK_RATE which is about to be removed very soon (for ARM).
+I just pulled 3.13.0-rc3 and was unable to make it boot on my ReadyNAS
+102 (Armada 370 based): it kernel panics w/ a missing root fs, because
+my sata disk is no more seen. Looking at the log, I get the following:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Changes since (implicit) v1, sent with
-Message-id:1383942318-12569-1-git-send-email-u.kleine-koenig at pengutronix.de:
+[   71.855367] ahci 0000:01:00.0: AHCI 0001.0000 32 slots 2 ports 6 Gbps 0x3 impl SATA mode
+[   71.863498] ahci 0000:01:00.0: flags: 64bit ncq sntf led only pmp fbs pio slum part sxs 
+[   71.871650] ahci 0000:01:00.0: Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
+[   71.880806] ahci 0000:01:00.0: Driver did not use or check the return value from dma_set_coherent_mask()?
+[   71.890395] ahci 0000:01:00.0: failed to start port 0 (errno=-12)
 
- - drop define instead of s/CLOCK_TICK_RATE/get_clock_tick_rate()/; thanks to
-   Robert Jarzmik for pointing that out.
+...
 
-Note I intend to send this patch as part of a series that removes
-<mach/timex.h> (and so CLOCK_TICK_RATE) on ARM. So dear maintainer please don't
-take this patch but give your blessing that I can take it. (Note, I'm not sure
-who's ack I need here; according to MAINTAINERS Alessandro Zummo maintains the
-rtc subsystem, but he doesn't seem to be that active for some time and it's
-mostly akpm who takes patches.)
+[   72.134901] xhci_hcd 0000:02:00.0: xHCI Host Controller
+[   72.140188] xhci_hcd 0000:02:00.0: new USB bus registered, assigned bus number 2
+[   72.147631] xhci_hcd 0000:02:00.0: Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
+[   72.157136] xhci_hcd 0000:02:00.0: Driver did not use or check the return value from dma_set_coherent_mask()?
+[   72.167072] xhci_hcd 0000:02:00.0: Couldn't initialize memory
+[   72.172851] xhci_hcd 0000:02:00.0: can't setup: -12
+[   72.177741] xhci_hcd 0000:02:00.0: USB bus 2 deregistered
+[   72.183181] xhci_hcd 0000:02:00.0: init 0000:02:00.0 fail, -12
+[   72.189031] xhci_hcd: probe of 0000:02:00.0 failed with error -12
 
- drivers/rtc/rtc-pxa.c | 1 -
- 1 file changed, 1 deletion(-)
+3.13.0-rc2 worked just fine so I decided to git-bisect the issue and
+ended up on 11a5aa32562e (ARM: dma-mapping: check DMA mask against
+available memory).
 
-diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
-index a355f2b..cccbf9d 100644
---- a/drivers/rtc/rtc-pxa.c
-+++ b/drivers/rtc/rtc-pxa.c
-@@ -32,7 +32,6 @@
- 
- #include <mach/hardware.h>
- 
--#define TIMER_FREQ		CLOCK_TICK_RATE
- #define RTC_DEF_DIVIDER		(32768 - 1)
- #define RTC_DEF_TRIM		0
- #define MAXFREQ_PERIODIC	1000
--- 
-1.8.4.3
+If it has already been reported and fixed, sorry for the noise.
+
+Cheers,
+
+a+
