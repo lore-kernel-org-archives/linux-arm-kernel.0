@@ -1,74 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 07 Dec 2013 12:36:35 -0600
-Subject: [PATCH] ARM: cpu: Document and tweak clock-frequency property
-In-Reply-To: <1386331027-26065-1-git-send-email-broonie@kernel.org>
-References: <1386331027-26065-1-git-send-email-broonie@kernel.org>
-Message-ID: <52A36AB3.6060102@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 07 Dec 2013 21:07:15 +0100
+Subject: [PATCH] rtc: pxa: drop usage of CLOCK_TICK_RATE
+In-Reply-To: <52954A3D.3040108@gmail.com> (Haojian Zhuang's message of "Wed,
+ 27 Nov 2013 09:26:21 +0800")
+References: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131126133731.GE28642@pengutronix.de> <52954A3D.3040108@gmail.com>
+Message-ID: <87mwkc77d8.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2013 05:57 AM, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> The ARMv7 topology code uses the ePAPR specified mandatory clock-frequency
-> property to determine the relative performances of the CPUs along with the
-> CPU type. However with FDT we don't update to take account of the current
-> speed and if the cores are not running at full speed on boot then a device
-> tree which is accurate on boot can provide incorrect information about the
-> relative performances of the cores.
-> 
-> Document the current usage both to override ePAPR and to make the binding
-> within the kernel more complete. Ideally the kernel would use information
-> from the CPU frequency scaling drivers here but they may in turn consider
-> this property and such changes are likely to be part of the energy aware
-> scheduling work so not immediately available.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 91304353eea4..e3726f6bca92 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -191,6 +191,15 @@ nodes to be present and contain the properties described below.
->  			  property identifying a 64-bit zero-initialised
->  			  memory location.
->  
-> +	- clock-frequency
-> +		Usage: required
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-This breaks compatibility. It may be required for a feature in the
-kernel to work, but should not be required in general. Perhaps we need
-"optional/recommended" or "optional/required for new designs". Or we
-could say required only with heterogeneous cores.
+> On 11/26/2013 09:37 PM, Uwe Kleine-K?nig wrote:
+>> Hello,
+>>
+>> [Cc: += akpm]
+>>
+>> On Fri, Nov 08, 2013 at 09:25:18PM +0100, Uwe Kleine-K?nig wrote:
+>>> The symbol CLOCK_TICK_RATE is (at least on ARM) defined in an platform
+>>> specific header <mach/timex.h>. There are plans to stop using and kill
+>>> these platform specific headers. So fix the only user of pxa's
+n>>> <mach/timex.h> to not use it.
+>>>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Who is looking for this patch?
+>>
+>> Best regards
+>> Uwe
+> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>
+> I think that Alessandro could help to merge.
+>
+> Alessandro,
+> Is it right?
 
-> +		Value type: <u32> or <u64>
+Why won't you just remove TIMER_FREQ all together instead ?
+I don't remember why I put that in, but looking back at it, I don't find any
+use, so why don't we remove the line ?
 
-How do I determine the size? I think generally this property which is
-used in multiple bindings is always u32. Of course, that won't work for
-our 5GHz parts next year.
+Cheers.
 
-> +		Definition:
-> +			This is specified in ePAPR as the current clock
-> +			frequency of the CPU.  When used with these
-> +			extensions it should reflect the maximum clock
-> +			frequency for the CPU.
-
-What does extensions mean? cpu topology nodes?
-
-It is useful to have a standard way to determine the current cpu
-frequency. I've been asked for this several times on highbank. This
-could be cpufreq, but there is not always a driver loaded. lshw already
-has support for reading the frequency using this property. So I'm not
-real sure deviating from the ePAPR is a good idea.
-
-If a cpu only supports 1 frequency, then clock-frequency will always
-reflect the current and max freq. If a cpu supports multiple
-frequencies, then it should have an OPP table with those frequencies. We
-should then get max frequency from the OPP table rather than
-clock-frequency. It is clear that clock-frequency is insufficient to
-describe everything we need.
-
-Rob
+--
+Robert
