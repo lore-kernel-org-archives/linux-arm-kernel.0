@@ -1,14 +1,14 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  7 Dec 2013 12:38:33 +0100
-Subject: [PATCH 2/2] ARM: sun6i: dt: Fix interrupt trigger types
+Date: Sat,  7 Dec 2013 12:38:32 +0100
+Subject: [PATCH 1/2] ARM: sun7i: dt: Fix interrupt trigger types
 In-Reply-To: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1386416313-703-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1386416313-703-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 uses the ARM GIC as its internal interrupts controller. The
-GIC can work on several interrupt triggers, and the A31 was actually setting it
+The Allwinner A20 uses the ARM GIC as its internal interrupts controller. The
+GIC can work on several interrupt triggers, and the A20 was actually setting it
 up to use a rising edge as a trigger, while it was actually a level high
 trigger, leading to some interrupts that would be completely ignored if the
 edge was missed.
@@ -16,95 +16,166 @@ edge was missed.
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reported-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 42 ++++++++++++++++++++--------------------
+ 1 file changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index c1751a6..7f5878c 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -193,7 +193,10 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index e46cfed..367611a 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -170,7 +170,7 @@
+ 		emac: ethernet at 01c0b000 {
+ 			compatible = "allwinner,sun4i-emac";
+ 			reg = <0x01c0b000 0x1000>;
+-			interrupts = <0 55 1>;
++			interrupts = <0 55 4>;
+ 			clocks = <&ahb_gates 17>;
+ 			status = "disabled";
+ 		};
+@@ -186,7 +186,7 @@
  		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun6i-a31-pinctrl";
+ 			compatible = "allwinner,sun7i-a20-pinctrl";
  			reg = <0x01c20800 0x400>;
--			interrupts = <0 11 1>, <0 15 1>, <0 16 1>, <0 17 1>;
-+			interrupts = <0 11 4>,
-+				     <0 15 4>,
-+				     <0 16 4>,
-+				     <0 17 4>;
- 			clocks = <&apb1_gates 5>;
+-			interrupts = <0 28 1>;
++			interrupts = <0 28 4>;
+ 			clocks = <&apb0_gates 5>;
  			gpio-controller;
  			interrupt-controller;
-@@ -212,11 +215,11 @@
+@@ -251,12 +251,12 @@
  		timer at 01c20c00 {
  			compatible = "allwinner,sun4i-timer";
- 			reg = <0x01c20c00 0xa0>;
--			interrupts = <0 18 1>,
--				     <0 19 1>,
--				     <0 20 1>,
--				     <0 21 1>,
--				     <0 22 1>;
-+			interrupts = <0 18 4>,
-+				     <0 19 4>,
-+				     <0 20 4>,
-+				     <0 21 4>,
-+				     <0 22 4>;
+ 			reg = <0x01c20c00 0x90>;
+-			interrupts = <0 22 1>,
+-				     <0 23 1>,
+-				     <0 24 1>,
+-				     <0 25 1>,
+-				     <0 67 1>,
+-				     <0 68 1>;
++			interrupts = <0 22 4>,
++				     <0 23 4>,
++				     <0 24 4>,
++				     <0 25 4>,
++				     <0 67 4>,
++				     <0 68 4>;
  			clocks = <&osc24M>;
  		};
  
-@@ -228,7 +231,7 @@
+@@ -273,7 +273,7 @@
  		uart0: serial at 01c28000 {
  			compatible = "snps,dw-apb-uart";
  			reg = <0x01c28000 0x400>;
--			interrupts = <0 0 1>;
-+			interrupts = <0 0 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 16>;
-@@ -238,7 +241,7 @@
- 		uart1: serial at 01c28400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28400 0x400>;
 -			interrupts = <0 1 1>;
 +			interrupts = <0 1 4>;
  			reg-shift = <2>;
  			reg-io-width = <4>;
- 			clocks = <&apb2_gates 17>;
-@@ -248,7 +251,7 @@
- 		uart2: serial at 01c28800 {
+ 			clocks = <&apb1_gates 16>;
+@@ -283,7 +283,7 @@
+ 		uart1: serial at 01c28400 {
  			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28800 0x400>;
+ 			reg = <0x01c28400 0x400>;
 -			interrupts = <0 2 1>;
 +			interrupts = <0 2 4>;
  			reg-shift = <2>;
  			reg-io-width = <4>;
- 			clocks = <&apb2_gates 18>;
-@@ -258,7 +261,7 @@
- 		uart3: serial at 01c28c00 {
+ 			clocks = <&apb1_gates 17>;
+@@ -293,7 +293,7 @@
+ 		uart2: serial at 01c28800 {
  			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28c00 0x400>;
+ 			reg = <0x01c28800 0x400>;
 -			interrupts = <0 3 1>;
 +			interrupts = <0 3 4>;
  			reg-shift = <2>;
  			reg-io-width = <4>;
- 			clocks = <&apb2_gates 19>;
-@@ -268,7 +271,7 @@
- 		uart4: serial at 01c29000 {
+ 			clocks = <&apb1_gates 18>;
+@@ -303,7 +303,7 @@
+ 		uart3: serial at 01c28c00 {
  			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29000 0x400>;
+ 			reg = <0x01c28c00 0x400>;
 -			interrupts = <0 4 1>;
 +			interrupts = <0 4 4>;
  			reg-shift = <2>;
  			reg-io-width = <4>;
- 			clocks = <&apb2_gates 20>;
-@@ -278,7 +281,7 @@
+ 			clocks = <&apb1_gates 19>;
+@@ -313,7 +313,7 @@
+ 		uart4: serial at 01c29000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29000 0x400>;
+-			interrupts = <0 17 1>;
++			interrupts = <0 17 4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 20>;
+@@ -323,7 +323,7 @@
  		uart5: serial at 01c29400 {
  			compatible = "snps,dw-apb-uart";
  			reg = <0x01c29400 0x400>;
--			interrupts = <0 5 1>;
-+			interrupts = <0 5 4>;
+-			interrupts = <0 18 1>;
++			interrupts = <0 18 4>;
  			reg-shift = <2>;
  			reg-io-width = <4>;
- 			clocks = <&apb2_gates 21>;
+ 			clocks = <&apb1_gates 21>;
+@@ -333,7 +333,7 @@
+ 		uart6: serial at 01c29800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29800 0x400>;
+-			interrupts = <0 19 1>;
++			interrupts = <0 19 4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 22>;
+@@ -343,7 +343,7 @@
+ 		uart7: serial at 01c29c00 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29c00 0x400>;
+-			interrupts = <0 20 1>;
++			interrupts = <0 20 4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 23>;
+@@ -353,7 +353,7 @@
+ 		i2c0: i2c at 01c2ac00 {
+ 			compatible = "allwinner,sun4i-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+-			interrupts = <0 7 1>;
++			interrupts = <0 7 4>;
+ 			clocks = <&apb1_gates 0>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+@@ -362,7 +362,7 @@
+ 		i2c1: i2c at 01c2b000 {
+ 			compatible = "allwinner,sun4i-i2c";
+ 			reg = <0x01c2b000 0x400>;
+-			interrupts = <0 8 1>;
++			interrupts = <0 8 4>;
+ 			clocks = <&apb1_gates 1>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+@@ -371,7 +371,7 @@
+ 		i2c2: i2c at 01c2b400 {
+ 			compatible = "allwinner,sun4i-i2c";
+ 			reg = <0x01c2b400 0x400>;
+-			interrupts = <0 9 1>;
++			interrupts = <0 9 4>;
+ 			clocks = <&apb1_gates 2>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+@@ -380,7 +380,7 @@
+ 		i2c3: i2c at 01c2b800 {
+ 			compatible = "allwinner,sun4i-i2c";
+ 			reg = <0x01c2b800 0x400>;
+-			interrupts = <0 88 1>;
++			interrupts = <0 88 4>;
+ 			clocks = <&apb1_gates 3>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+@@ -389,7 +389,7 @@
+ 		i2c4: i2c at 01c2bc00 {
+ 			compatible = "allwinner,sun4i-i2c";
+ 			reg = <0x01c2bc00 0x400>;
+-			interrupts = <0 89 1>;
++			interrupts = <0 89 4>;
+ 			clocks = <&apb1_gates 15>;
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
 -- 
 1.8.4.2
