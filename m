@@ -1,51 +1,125 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  7 Dec 2013 12:26:36 +0400
-Subject: [PATCH 5/5] ARM: dts: imx27-phytec-phycore-som: Rename file to .dtsi
-In-Reply-To: <1386404796-8848-1-git-send-email-shc_work@mail.ru>
-References: <1386404796-8848-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1386404796-8848-5-git-send-email-shc_work@mail.ru>
+Date: Sat,  7 Dec 2013 12:26:32 +0400
+Subject: [PATCH 1/5] ARM: dts: i.MX: Move include "imxXX-pinfunc.h" into
+ "imxXX-pingrp.h"
+Message-ID: <1386404796-8848-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCM-038 module cannot be used standalone. This patch renames
-module file to .dtsi and excludes it from compilation.
+Pin function definitions are used for pin groups definitions,
+so move the header in the correspond "imxXX-pingrp.h".
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/Makefile                                              | 1 -
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts                          | 2 +-
- .../dts/{imx27-phytec-phycore-som.dts => imx27-phytec-phycore-som.dtsi} | 0
- 3 files changed, 1 insertion(+), 2 deletions(-)
- rename arch/arm/boot/dts/{imx27-phytec-phycore-som.dts => imx27-phytec-phycore-som.dtsi} (100%)
+ arch/arm/boot/dts/imx25-pingrp.h | 2 ++
+ arch/arm/boot/dts/imx25.dtsi     | 1 -
+ arch/arm/boot/dts/imx50-pingrp.h | 2 ++
+ arch/arm/boot/dts/imx50.dtsi     | 1 -
+ arch/arm/boot/dts/imx51-pingrp.h | 2 ++
+ arch/arm/boot/dts/imx51.dtsi     | 1 -
+ arch/arm/boot/dts/imx53-pingrp.h | 2 ++
+ arch/arm/boot/dts/imx53.dtsi     | 1 -
+ 8 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 648c016..88cd3d9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -124,7 +124,6 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-apf27.dtb \
- 	imx27-apf27dev.dtb \
- 	imx27-pdk.dtb \
--	imx27-phytec-phycore-som.dtb \
- 	imx27-phytec-phycore-rdk.dtb \
- 	imx27-phytec-phycard-s-som.dtb \
- 	imx27-phytec-phycard-s-rdk.dtb \
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 0903e3a..7ada054 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -7,7 +7,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
+diff --git a/arch/arm/boot/dts/imx25-pingrp.h b/arch/arm/boot/dts/imx25-pingrp.h
+index 16c7a19..4a35a63 100644
+--- a/arch/arm/boot/dts/imx25-pingrp.h
++++ b/arch/arm/boot/dts/imx25-pingrp.h
+@@ -10,6 +10,8 @@
+ #ifndef __DTS_IMX25_PINGRP_H
+ #define __DTS_IMX25_PINGRP_H
+ 
++#include "imx25-pinfunc.h"
++
+ #define MX25_AUDMUX_PINGRP1 \
+ 	MX25_PAD_KPP_COL3__AUD5_TXFS			0xe0 \
+ 	MX25_PAD_KPP_COL2__AUD5_TXC			0xe0 \
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 1a86eab..9e9e3b8 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -10,7 +10,6 @@
   */
  
--#include "imx27-phytec-phycore-som.dts"
-+#include "imx27-phytec-phycore-som.dtsi"
+ #include "skeleton.dtsi"
+-#include "imx25-pinfunc.h"
+ #include "imx25-pingrp.h"
  
  / {
- 	model = "Phytec pcm970";
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-rename to arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+diff --git a/arch/arm/boot/dts/imx50-pingrp.h b/arch/arm/boot/dts/imx50-pingrp.h
+index d46b7e0..0f4ce8c 100644
+--- a/arch/arm/boot/dts/imx50-pingrp.h
++++ b/arch/arm/boot/dts/imx50-pingrp.h
+@@ -10,6 +10,8 @@
+ #ifndef __DTS_IMX50_PINGRP_H
+ #define __DTS_IMX50_PINGRP_H
+ 
++#include "imx50-pinfunc.h"
++
+ #define MX50_CSPI_PINGRP1 \
+ 	MX50_PAD_CSPI_SCLK__CSPI_SCLK			0x00 \
+ 	MX50_PAD_CSPI_MISO__CSPI_MISO			0x00 \
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index fd3a50a..01c0499 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -12,7 +12,6 @@
+  */
+ 
+ #include "skeleton.dtsi"
+-#include "imx50-pinfunc.h"
+ #include "imx50-pingrp.h"
+ #include <dt-bindings/clock/imx5-clock.h>
+ 
+diff --git a/arch/arm/boot/dts/imx51-pingrp.h b/arch/arm/boot/dts/imx51-pingrp.h
+index 550d0d1..f63267b 100644
+--- a/arch/arm/boot/dts/imx51-pingrp.h
++++ b/arch/arm/boot/dts/imx51-pingrp.h
+@@ -10,6 +10,8 @@
+ #ifndef __DTS_IMX51_PINGRP_H
+ #define __DTS_IMX51_PINGRP_H
+ 
++#include "imx51-pinfunc.h"
++
+ #define MX51_AUDMUX_PINGRP1 \
+ 	MX51_PAD_AUD3_BB_TXD__AUD3_TXD			0x80000000 \
+ 	MX51_PAD_AUD3_BB_RXD__AUD3_RXD			0x80000000 \
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index cad5a56..61a2552 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include "skeleton.dtsi"
+-#include "imx51-pinfunc.h"
+ #include "imx51-pingrp.h"
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/imx5-clock.h>
+diff --git a/arch/arm/boot/dts/imx53-pingrp.h b/arch/arm/boot/dts/imx53-pingrp.h
+index 561bc1b..ac8e73d 100644
+--- a/arch/arm/boot/dts/imx53-pingrp.h
++++ b/arch/arm/boot/dts/imx53-pingrp.h
+@@ -10,6 +10,8 @@
+ #ifndef __DTS_IMX53_PINGRP_H
+ #define __DTS_IMX53_PINGRP_H
+ 
++#include "imx53-pinfunc.h"
++
+ #define MX53_AUDMUX_PINGRP1 \
+ 	MX53_PAD_KEY_COL0__AUDMUX_AUD5_TXC		0x80000000 \
+ 	MX53_PAD_KEY_ROW0__AUDMUX_AUD5_TXD		0x80000000 \
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 885dbbd..175a94c 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include "skeleton.dtsi"
+-#include "imx53-pinfunc.h"
+ #include "imx53-pingrp.h"
+ #include <dt-bindings/clock/imx5-clock.h>
+ 
 -- 
 1.8.3.2
