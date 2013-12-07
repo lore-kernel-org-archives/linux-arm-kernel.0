@@ -1,32 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 7 Dec 2013 11:56:06 +0100 (CET)
-Subject: [PATCH v2 4/9] clocksource/cadence_ttc: Use enable/disable_irq
-In-Reply-To: <f6d25456-8e30-4792-b184-21eb02dfaa1c@AM1EHSMHS001.ehs.local>
-References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
- <1385514296-26702-5-git-send-email-soren.brinkmann@xilinx.com>
- <52972F3A.9090103@linaro.org>
- <alpine.DEB.2.02.1311281507280.30673@ionos.tec.linutronix.de>
- <b2ed3cbc-c9df-4235-8137-93514c05bffa@DB8EHSMHS031.ehs.local>
- <alpine.DEB.2.02.1311281939000.30673@ionos.tec.linutronix.de>
- <f6d25456-8e30-4792-b184-21eb02dfaa1c@AM1EHSMHS001.ehs.local>
-Message-ID: <alpine.DEB.2.02.1312071151340.30673@ionos.tec.linutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 07 Dec 2013 12:06:03 +0100
+Subject: [PATCH 02/10] net: stmmac: Honor DT parameter to force DMA store
+ and forward mode
+In-Reply-To: <20131207100737.GI24519@lukather>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <CAGb2v67ZNtbQm+ZW5v_3wNbz1=oLhXks6gbTSjLYa=Nnoz8w-A@mail.gmail.com>
+ <20131207100737.GI24519@lukather>
+Message-ID: <2994980.boLDbkkER8@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Dec 2013, S?ren Brinkmann wrote:
-> On Thu, Nov 28, 2013 at 08:07:10PM +0100, Thomas Gleixner wrote:
-> > There is a solution to this. We can identify the broadcast device in
-> > the core and serialize all callers including interrupts on a different
-> > cpu against the update. So no need for the disable/enable_irq() dance.
+On Saturday 07 of December 2013 11:07:37 maxime.ripard wrote:
+> On Sat, Dec 07, 2013 at 09:23:27AM +0800, Chen-Yu Tsai wrote:
+> > Point taken. The current implementation will override settings passed from
+> > platform data. ORing the two would be better.
 > 
-> IIUC, and please correct me if I'm wrong, with the patch I'd simply call
-> 'clockevents_update_freq() without having to disable IRQs. But I'm not
-> sure whether periodic mode is covered. I found, that I had to reprogram
-> the timer interval in my clock notifier callback when the timer
-> frequency changes. I think 'clockevents_update_freq()' only handles
-> oneshot mode. For that reason I call 'ttc_set_interval()' in the clock
-> notifier in case the timer is in periodic mode. For that call we'd still
-> have possible races. I guess the best solution would be to move that
-> functionality into 'clockevents_update_freq()'?
+> Platform_data and DT-based configuration are pretty unlikely to be
+> used together, so ORing it doesn't have much sense.
 
-Indeed.
+In fact, the recommended way is to always use platform data alone if it is
+present or try to parse DT otherwise, so no mixing of data from these two
+sources should be done.
+
+Best regards,
+Tomasz
