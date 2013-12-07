@@ -1,46 +1,62 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 07 Dec 2013 18:40:22 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzNdIEFSTTogY2xwczcxMXg6IEFkZCBDTFBTNzExWCBp?=
- =?UTF-8?B?cnFjaGlwIGRyaXZlcg==?=
-In-Reply-To: <201312071530.07901.arnd@arndb.de>
-References: <1386008042-6826-1-git-send-email-shc_work@mail.ru>
- <201312071530.07901.arnd@arndb.de>
-Message-ID: <1386427222.453069261@f379.i.mail.ru>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 07 Dec 2013 15:12:24 +0000
+Subject: [PATCH] ARM: asm: add readq/writeq methods
+In-Reply-To: <52A32C88.9010000@arkona-technologies.de> (Matthias Mann's
+ message of "Sat, 07 Dec 2013 15:11:20 +0100")
+References: <52A32C88.9010000@arkona-technologies.de>
+Message-ID: <yw1xlhzwlmp3.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Monday 02 December 2013, Alexander Shiyan wrote:
-> > This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-...
-> > +static void clps711x_intc_unmask(struct irq_data *d)
-> > +{
-> > +	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-> > +	void __iomem *intmr = clps711x_intc->intmr[hwirq / 16];
-> > +	u32 tmp;
-> > +
-> > +	tmp = readl_relaxed(intmr);
-> > +	tmp |= 1 << (hwirq % 16);
-> > +	writel_relaxed(tmp, intmr);
-> > +}
-> 
-> These look rather simple, have you checked if you can reuse the generic
-> irqchip code?
+Matthias Mann <M.Mann@arkona-technologies.de> writes:
 
-I thought about it but did not come to a decision for EOI handlers.
+> Add readq/writeq methods for 32 bit ARM to allow transfering 64 bit words over
+> PCIe as a single transfer.
+>
+> Signed-off-by: Matthias Mann <m.mann@arkona-technologies.de>
+> ---
+> This patch creates checkpatch warnings, but I used the style used for the
+> existing functions.
+> It is based on branch next/soc of the arm-soc tree.
+>
+>  arch/arm/include/asm/io.h | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 3c597c2..0a8d015 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -94,6 +94,13 @@ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+>  		     : "r" (val));
+>  }
+>
+> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+> +{
+> +	asm volatile("strd %1, %0"
 
-...
-> > +void __init clps711x_intc_init(phys_addr_t base, resource_size_t size)
-> > +{
-> > +	BUG_ON(_clps711x_intc_init(NULL, base, size));
-> > +}
-> > +EXPORT_SYMBOL(clps711x_intc_init);
-> 
-> No need to export this symbol, because you don't call the function from
-> loadable modules.
+Please use "strd %Q1, %R1, %0" here instead of relying on the
+non-standard implicit second register operand.  Although current gcc
+versions always allocate 64-bit values in even/odd register pairs, there
+is no guarantee that this will always be the case (and llvm has no such
+restriction).  In Thumb2, the registers do not need to be consecutive,
+so implicitly adding 1 to the first register can silently result in
+incorrect code.
 
-OK. I will remove it in the next version by adding "maybe_unused" to this
-function to avoid possible warnings.
+For big endian, the register arguments need to be reversed.
 
----
+> +		     : "+Qo" (*(volatile u64 __force *)addr)
+
+The "o" constraint is not safe here.  The ldrd/strd instructions have a
+limited offset range compared to ldr/str, so there is a risk that the
+compiler-generated address is invalid.  Using "Q" forces the address to
+be a single register, which is always safe.  This is why the 16-bit
+versions of these functions use only "Q".  While this is slightly
+suboptimal, there is unfortunately no constraint describing the
+limitations of ldrd/strd addressing.
+
+> +		     : "r" (val));
+> +}
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
