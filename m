@@ -1,79 +1,50 @@
-From: M.Mann@arkona-technologies.de (Matthias Mann)
-Date: Sat, 07 Dec 2013 15:11:20 +0100
-Subject: [PATCH] ARM: asm: add readq/writeq methods
-Message-ID: <52A32C88.9010000@arkona-technologies.de>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 7 Dec 2013 16:16:23 +0200
+Subject: [PATCH v4 4/4] USB: OMAP1: Tahvo USB transceiver driver
+In-Reply-To: <20131206204629.GL21086@saruman.home>
+References: <1386339187-28466-1-git-send-email-aaro.koskinen@iki.fi>
+ <1386339187-28466-5-git-send-email-aaro.koskinen@iki.fi>
+ <20131206204629.GL21086@saruman.home>
+Message-ID: <20131207141623.GL30823@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add readq/writeq methods for 32 bit ARM to allow transfering 64 bit words over
-PCIe as a single transfer.
+Hi,
 
-Signed-off-by: Matthias Mann <m.mann@arkona-technologies.de>
----
-This patch creates checkpatch warnings, but I used the style used for the
-existing functions.
-It is based on branch next/soc of the arm-soc tree.
+On Fri, Dec 06, 2013 at 02:46:29PM -0600, Felipe Balbi wrote:
+> On Fri, Dec 06, 2013 at 04:13:07PM +0200, Aaro Koskinen wrote:
+> > Add Tahvo USB transceiver driver.
+> > 
+> > Based on old code from linux-omap tree. The original driver was written
+> > by Juha Yrj?l?, Tony Lindgren, and Timo Ter?s.
+> > 
+> > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> 
+> compile error:
 
- arch/arm/include/asm/io.h | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+[...]
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 3c597c2..0a8d015 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -94,6 +94,13 @@ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
- 		     : "r" (val));
- }
- 
-+static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strd %1, %0"
-+		     : "+Qo" (*(volatile u64 __force *)addr)
-+		     : "r" (val));
-+}
-+
- static inline u8 __raw_readb(const volatile void __iomem *addr)
- {
- 	u8 val;
-@@ -112,6 +119,15 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+static inline u64 __raw_readq(const volatile void __iomem *addr)
-+{
-+	u64 val;
-+	asm volatile("ldrd %1, %0"
-+		     : "+Qo" (*(volatile u64 __force *)addr),
-+		       "=r" (val));
-+	return val;
-+}
-+
- /*
-  * Architecture ioremap implementation.
-  */
-@@ -293,18 +309,23 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- 					__raw_readw(c)); __r; })
- #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
- 					__raw_readl(c)); __r; })
-+#define readq_relaxed(c) ({ u64 __r = le64_to_cpu((__force __le64) \
-+					__raw_readq(c)); __r; })
- 
- #define writeb_relaxed(v,c)	__raw_writeb(v,c)
- #define writew_relaxed(v,c)	__raw_writew((__force u16) cpu_to_le16(v),c)
- #define writel_relaxed(v,c)	__raw_writel((__force u32) cpu_to_le32(v),c)
-+#define writeq_relaxed(v,c)	__raw_writeq((__force u64) cpu_to_le64(v),c)
- 
- #define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
- #define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
- #define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-+#define readq(c)		({ u64 __v = readq_relaxed(c); __iormb(); __v; })
- 
- #define writeb(v,c)		({ __iowmb(); writeb_relaxed(v,c); })
- #define writew(v,c)		({ __iowmb(); writew_relaxed(v,c); })
- #define writel(v,c)		({ __iowmb(); writel_relaxed(v,c); })
-+#define writeq(v,c)		({ __iowmb(); writeq_relaxed(v,c); })
- 
- #define readsb(p,d,l)		__raw_readsb(p,d,l)
- #define readsw(p,d,l)		__raw_readsw(p,d,l)
--- 
-1.8.3.2
+> fixed it up with:
+>
+> diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
+> index 7cf1766..8bb833e 100644
+> --- a/drivers/usb/phy/phy-tahvo.c
+> +++ b/drivers/usb/phy/phy-tahvo.c
+> @@ -368,7 +368,9 @@ static int tahvo_usb_probe(struct platform_device *pdev)
+>  
+>  	tu->extcon.name = DRIVER_NAME;
+>  	tu->extcon.supported_cable = tahvo_cable;
+> -	ret = extcon_dev_register(&tu->extcon, &pdev->dev);
+> +	tu->extcon.dev.parent = &pdev->dev;
+> +
+> +	ret = extcon_dev_register(&tu->extcon);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "could not register extcon device: %d\n",
+>  			ret);
+> 
+> please make sure it still works with v3.13-rc2 + this patch.
+
+Yes, that works fine with 3.13-rc2. Sorry for this, I was accidentally
+testing & basing these patches on an old branch.
+
+A.
