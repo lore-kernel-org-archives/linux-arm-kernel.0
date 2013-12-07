@@ -1,40 +1,57 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 08 Dec 2013 00:02:45 +0100
-Subject: [REGRESSION,BISECTED] DMA mask issue on ReadyNAS 102 w/ 3.13.0-rc3
-Message-ID: <87haakfene.fsf@natisbad.org>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 7 Dec 2013 13:55:45 +0100
+Subject: =?utf-8?q?=E5=9B=9E=E5=A4=8D=EF=BC=9ARe=3A_i=2EMX6/PCIe_and_MSI?=
+ =?utf-8?q?_interrupts?=
+In-Reply-To: <5osi8whb6ebv6ffon2b3alai.1386368340782@email.android.com>
+References: <201312061032.31944.jbe@pengutronix.de>
+ <201312061515.50436.jbe@pengutronix.de>
+ <5osi8whb6ebv6ffon2b3alai.1386368340782@email.android.com>
+Message-ID: <201312071355.46007.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday, December 06, 2013 at 11:19:05 PM, Richard Zhu wrote:
+> Hi:
+> I find a way make imx6 pcie msi/msix work without modify e1000e driver.
+> But e1000e can?t work after suspend/resume.:(.
+> The other ep devices (iwl wifi, xhci) can work well.
+> I can post my modification next monday if you want.
 
-I just pulled 3.13.0-rc3 and was unable to make it boot on my ReadyNAS
-102 (Armada 370 based): it kernel panics w/ a missing root fs, because
-my sata disk is no more seen. Looking at the log, I get the following:
+Please do, thanks! :)
 
-[   71.855367] ahci 0000:01:00.0: AHCI 0001.0000 32 slots 2 ports 6 Gbps 0x3 impl SATA mode
-[   71.863498] ahci 0000:01:00.0: flags: 64bit ncq sntf led only pmp fbs pio slum part sxs 
-[   71.871650] ahci 0000:01:00.0: Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
-[   71.880806] ahci 0000:01:00.0: Driver did not use or check the return value from dma_set_coherent_mask()?
-[   71.890395] ahci 0000:01:00.0: failed to start port 0 (errno=-12)
+> Sent from Huawei Mobile
+> 
+> J?rgen Beisert <jbe@pengutronix.de>???
+> 
+> Hi Harro,
+> 
+> On Friday 06 December 2013 13:39:09 Harro Haan wrote:
+> > [...]
+> > Attached are my patches of the first attempt to get MSI working for
+> > the i.MX6. It looks like MSI is working but MSIX is not in combination
+> > with e1000e and SabreSD. I did some successful iperf tests in MSI
+> > mode. I did the following hack in
+> > drivers/net/ethernet/intel/e1000e/param.c to disable MSIX:
+> > 
+> > -             if (adapter->flags & FLAG_HAS_MSIX) {
+> > +             if (!(adapter->flags & FLAG_HAS_MSIX)/*TEMP*/) {
+> 
+> Arrrgh, after applying this change it starts to work immediately. So many
+> hours...
+> 
+> > My MSI tests are not successful when testing it with a Xilinx PCIe
+> > development board, while this FPGA design works properly with FSL
+> > imx_3.0.35 (or on x86).
+> 
+> Same here. Network chip works with MSI, PCIe FPGA does not.
+> 
+> Regards and thanks for your help,
+> Juergen
+> 
+> --
+> Pengutronix e.K.                              | Juergen Beisert            
+> | Linux Solutions for Science and Industry      |
+> http://www.pengutronix.de/  |
 
-...
-
-[   72.134901] xhci_hcd 0000:02:00.0: xHCI Host Controller
-[   72.140188] xhci_hcd 0000:02:00.0: new USB bus registered, assigned bus number 2
-[   72.147631] xhci_hcd 0000:02:00.0: Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
-[   72.157136] xhci_hcd 0000:02:00.0: Driver did not use or check the return value from dma_set_coherent_mask()?
-[   72.167072] xhci_hcd 0000:02:00.0: Couldn't initialize memory
-[   72.172851] xhci_hcd 0000:02:00.0: can't setup: -12
-[   72.177741] xhci_hcd 0000:02:00.0: USB bus 2 deregistered
-[   72.183181] xhci_hcd 0000:02:00.0: init 0000:02:00.0 fail, -12
-[   72.189031] xhci_hcd: probe of 0000:02:00.0 failed with error -12
-
-3.13.0-rc2 worked just fine so I decided to git-bisect the issue and
-ended up on 11a5aa32562e (ARM: dma-mapping: check DMA mask against
-available memory).
-
-If it has already been reported and fixed, sorry for the noise.
-
-Cheers,
-
-a+
+Best regards,
+Marek Vasut
