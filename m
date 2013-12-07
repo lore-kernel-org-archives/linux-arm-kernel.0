@@ -1,86 +1,126 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Sat,  7 Dec 2013 13:40:48 +0530
-Subject: [PATCH v2 1/2] net: emaclite: Remove unnecessary code that
- enables/disables interrupts on PONG buffers
-Message-ID: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
+From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
+Date: Sat, 7 Dec 2013 13:43:21 +0530
+Subject: [PATCH] ARM : unwinder : Prevent data abort due to stack overflow
+In-Reply-To: <20131206121149.GA4897@e103592.cambridge.arm.com>
+References: <1386310193-6434-1-git-send-email-a.anurag@samsung.com>
+ <20131206121149.GA4897@e103592.cambridge.arm.com>
+Message-ID: <CAPoNrtsHOXJMUsgUE_MET298n_H2sC2P+RbfUoG=kqK9chTTHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no specific interrupts for the PONG buffer on both
-transmit and receive side, same interrupt is valid for both
-buffers. So, this patch removes this code.
+>>
+>> +     /* we are just starting, initialize last register set as 0 */
+>> +     ctrl.last_register_set = 0;
+>> +
+>>       while (ctrl.entries > 0) {
+>> -             int urc = unwind_exec_insn(&ctrl);
+>> +             int urc;
+>> +             if ((ctrl.sp_high - ctrl.vrs[SP]) < TOTAL_REGISTERS)
+>> +                     ctrl.last_register_set = 1;
+>
+>If this is done once per unwind_exec_insn(), I think it would be better
+>to put the check at the start of unwind_exec_insn() instead of outside.
 
-Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-Reviewed-by: Michal Simek <monstr@monstr.eu>
----
-Changes in v2:
-	rebased on v3.13.0-rc3.
+I think it is better to do the above check here only because this check
+is strictly not a part of decoder and execution cycle.
 
- drivers/net/ethernet/xilinx/xilinx_emaclite.c |   38 -------------------------
- 1 file changed, 38 deletions(-)
+I think uniwnd_exec_insn(), should only be used for decoding and
+execution of instruction, as you have suggested earlier. So, it makes
+sense to keep it in unwind_frame only().
 
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 74234a5..b2850fd 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -163,26 +163,9 @@ static void xemaclite_enable_interrupts(struct net_local *drvdata)
- 	__raw_writel(reg_data | XEL_TSR_XMIT_IE_MASK,
- 		     drvdata->base_addr + XEL_TSR_OFFSET);
- 
--	/* Enable the Tx interrupts for the second Buffer if
--	 * configured in HW */
--	if (drvdata->tx_ping_pong != 0) {
--		reg_data = __raw_readl(drvdata->base_addr +
--				   XEL_BUFFER_OFFSET + XEL_TSR_OFFSET);
--		__raw_writel(reg_data | XEL_TSR_XMIT_IE_MASK,
--			     drvdata->base_addr + XEL_BUFFER_OFFSET +
--			     XEL_TSR_OFFSET);
--	}
--
- 	/* Enable the Rx interrupts for the first buffer */
- 	__raw_writel(XEL_RSR_RECV_IE_MASK, drvdata->base_addr + XEL_RSR_OFFSET);
- 
--	/* Enable the Rx interrupts for the second Buffer if
--	 * configured in HW */
--	if (drvdata->rx_ping_pong != 0) {
--		__raw_writel(XEL_RSR_RECV_IE_MASK, drvdata->base_addr +
--			     XEL_BUFFER_OFFSET + XEL_RSR_OFFSET);
--	}
--
- 	/* Enable the Global Interrupt Enable */
- 	__raw_writel(XEL_GIER_GIE_MASK, drvdata->base_addr + XEL_GIER_OFFSET);
- }
-@@ -206,31 +189,10 @@ static void xemaclite_disable_interrupts(struct net_local *drvdata)
- 	__raw_writel(reg_data & (~XEL_TSR_XMIT_IE_MASK),
- 		     drvdata->base_addr + XEL_TSR_OFFSET);
- 
--	/* Disable the Tx interrupts for the second Buffer
--	 * if configured in HW */
--	if (drvdata->tx_ping_pong != 0) {
--		reg_data = __raw_readl(drvdata->base_addr + XEL_BUFFER_OFFSET +
--				   XEL_TSR_OFFSET);
--		__raw_writel(reg_data & (~XEL_TSR_XMIT_IE_MASK),
--			     drvdata->base_addr + XEL_BUFFER_OFFSET +
--			     XEL_TSR_OFFSET);
--	}
--
- 	/* Disable the Rx interrupts for the first buffer */
- 	reg_data = __raw_readl(drvdata->base_addr + XEL_RSR_OFFSET);
- 	__raw_writel(reg_data & (~XEL_RSR_RECV_IE_MASK),
- 		     drvdata->base_addr + XEL_RSR_OFFSET);
--
--	/* Disable the Rx interrupts for the second buffer
--	 * if configured in HW */
--	if (drvdata->rx_ping_pong != 0) {
--
--		reg_data = __raw_readl(drvdata->base_addr + XEL_BUFFER_OFFSET +
--				   XEL_RSR_OFFSET);
--		__raw_writel(reg_data & (~XEL_RSR_RECV_IE_MASK),
--			     drvdata->base_addr + XEL_BUFFER_OFFSET +
--			     XEL_RSR_OFFSET);
--	}
- }
- 
- /**
+
+On Fri, Dec 6, 2013 at 5:41 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Fri, Dec 06, 2013 at 06:09:53AM +0000, Anurag Aggarwal wrote:
+>> While unwinding backtrace, stack overflow is possible. This stack
+>> overflow can sometimes lead to data abort in system if the area after
+>> stack is not mapped to physical memory.
+>>
+>> To prevent this problem from happening, execute the instructions that
+>> can cause a data abort in separate helper functions, where a check for
+>> feasibility is made before reading each word from the stack.
+>>
+>> Signed-off-by: Anurag Aggarwal <a.anurag@samsung.com>
+>> ---
+>>  arch/arm/kernel/unwind.c | 138 ++++++++++++++++++++++++++++++++++-------------
+>>  1 file changed, 100 insertions(+), 38 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+>> index 00df012..6d854f8 100644
+>> --- a/arch/arm/kernel/unwind.c
+>> +++ b/arch/arm/kernel/unwind.c
+>> @@ -49,6 +49,8 @@
+>>  #include <asm/traps.h>
+>>  #include <asm/unwind.h>
+>>
+>> +#define TOTAL_REGISTERS 16
+>> +
+>>  /* Dummy functions to avoid linker complaints */
+>>  void __aeabi_unwind_cpp_pr0(void)
+>>  {
+>> @@ -66,9 +68,11 @@ void __aeabi_unwind_cpp_pr2(void)
+>>  EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
+>>
+>>  struct unwind_ctrl_block {
+>> -     unsigned long vrs[16];          /* virtual register set */
+>> +     unsigned long vrs[TOTAL_REGISTERS];     /* virtual register set */
+>>       const unsigned long *insn;      /* pointer to the current instructions word */
+>> +     unsigned long sp_high;          /* highest value of sp allowed*/
+>>       int entries;                    /* number of entries left to interpret */
+>> +     int last_register_set;          /* store if we are at the last set */
+>
+> I find the name and comment a bit confusing here.  Also, strictly
+> speaking it can be a bool.
+>
+> Maybe:
+>
+>         /*
+>          * true: check for stack overflow for each register pop;
+>          * false: save overhead if there is plenty of stack remaining.
+>          */
+>         bool check_each_pop;
+>
+>
+> It shouldn't be too hard to understand from reading the code though, so
+> I'm happy with your version if you prefer.
+>
+> [...]
+>
+>> @@ -382,11 +438,17 @@ int unwind_frame(struct stackframe *frame)
+>>               return -URC_FAILURE;
+>>       }
+>>
+>> +     /* we are just starting, initialize last register set as 0 */
+>> +     ctrl.last_register_set = 0;
+>> +
+>>       while (ctrl.entries > 0) {
+>> -             int urc = unwind_exec_insn(&ctrl);
+>> +             int urc;
+>> +             if ((ctrl.sp_high - ctrl.vrs[SP]) < TOTAL_REGISTERS)
+>> +                     ctrl.last_register_set = 1;
+>
+> If this is done once per unwind_exec_insn(), I think it would be better
+> to put the check at the start of unwind_exec_insn() instead of outside.
+>
+>
+> The check still looks wrong too?
+>
+> ctrl.sp_high - ctrl.vrs[SP] gives the available space in bytes, but
+> TOTAL_REGISTERS is measured in words.
+>
+>
+> One way to get the correct value would be simply
+>
+>         sizeof ctrl.vrs
+>
+> since that's the array we're trying to fill from the stack.
+>
+> (in that case I guess that the TOTAL_REGISTERS macro might not be needed
+> again)
+>
+> Cheers
+> ---Dave
+
+
+
 -- 
-1.7.9.5
+Anurag Aggarwal
