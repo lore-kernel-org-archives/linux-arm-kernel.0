@@ -1,70 +1,28 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 6 Dec 2013 17:57:09 -0800
-Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
-In-Reply-To: <CAGb2v64yFhkTXvdq=1VpemULhXew-5fvmSoTBzEb6iFDiSqy1Q@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 7 Dec 2013 10:13:44 +0800
+Subject: [PATCH 03/10] net: stmmac: Use platform data tied with compatible
+ strings
+In-Reply-To: <20131206.162633.125107323851595113.davem@davemloft.net>
 References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-8-git-send-email-wens@csie.org>
- <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
- <CAGb2v64yFhkTXvdq=1VpemULhXew-5fvmSoTBzEb6iFDiSqy1Q@mail.gmail.com>
-Message-ID: <CAGVrzcaxV88dU3vEVGUiEQihUHLxq+QvQVQ6VvmOFVRsqbbX7w@mail.gmail.com>
+ <1386350983-13281-4-git-send-email-wens@csie.org>
+ <20131206.162633.125107323851595113.davem@davemloft.net>
+Message-ID: <CAGb2v64eeq0v+nZ0gNOVTvWbEuk52DOX-aX0K=jO6tvSun8uCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/6 Chen-Yu Tsai <wens@csie.org>:
-> On Sat, Dec 7, 2013 at 5:09 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>> The CubieTruck uses the GMAC with an RGMII phy.
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
->>>  1 file changed, 8 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>> index 8a1009d..af212a2 100644
->>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>> @@ -33,6 +33,14 @@
->>>                         pinctrl-0 = <&uart0_pins_a>;
->>>                         status = "okay";
->>>                 };
->>> +
->>> +               gmac: ethernet at 01c50000 {
->>> +                       pinctrl-names = "default";
->>> +                       pinctrl-0 = <&gmac_pins_rgmii>;
->>> +                       snps,phy-addr = <1>;
->>
->> What is this snps,phy-addr property? Why is not a standard device tree
->> node for an Ethernet PHY node used?
+On Sat, Dec 7, 2013 at 5:26 AM, David Miller <davem@davemloft.net> wrote:
+> From: Chen-Yu Tsai <wens@csie.org>
+> Date: Sat,  7 Dec 2013 01:29:36 +0800
 >
-> This property is implemented by stmmac and documented in the DT
-> bindings. stmmac has not been updated to use Ethernet PHY nodes.
-
-This driver property should be removed and deprecated since there is
-an ePAPR standardized Ethernet PHY node. What I am worried here is the
-loss of information, the standard Ethernet DT node allows to specify
-much more information (clause, maximum speed, compatible string
-etc...).
-
+>> +     device = of_match_device(stmmac_dt_ids, &pdev->dev);
+>> +     if (!device)
+>> +             return -ENODEV;
+>> +
+>> +     if (device->data)
+>> +         memcpy(plat, device->data, sizeof(*plat));
+>> +
 >
-> Removing this property will not affect the function of the driver.
-> The driver probes its MDIO bus and selects the lowest available
-> address if not specified.
+> Don't invent your own indentation using spaces, this memcpy()
+> call is not indented properly, it should be two TABs.
 
-So if this is just giving the driver a hint on where to  probe for a
-PHY on the MDIO bus, then let's drop it and use the standard DT node
-no?
-
->
->>> +                       phy-mode = "rgmii";
->>
->> Especially since you use the relatively standard "phy-mode" property here?
->
-> Used as specified in stmmac DT bindings.
-
-That one is kind of okay because of_get_phy_mode() knows about it,
-even though ePAPR states this should be "phy-connection-type", so I am
-okay with keeping that one because current practice and helpers are
-here.
--- 
-Florian
+Noted. Will fix.
