@@ -1,42 +1,55 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 7 Dec 2013 10:49:38 +0400
-Subject: [PATCH 0/3] ARM: clps711x: IRQCHIP driver
-In-Reply-To: <1386008082-6867-1-git-send-email-shc_work@mail.ru>
-References: <1386008082-6867-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131207104938.e4a311a8d15e717f3c10d1dc@mail.ru>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Sat,  7 Dec 2013 13:40:49 +0530
+Subject: [PATCH v2 2/2] net: emaclite: add barriers to support Xilinx Zynq
+ platform
+In-Reply-To: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
+References: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <1386403849-3153-2-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  2 Dec 2013 22:14:42 +0400
-Alexander Shiyan <shc_work@mail.ru> wrote:
+This patch adds barriers at appropriate places to ensure the driver
+works on Xilinx Zynq ARM-based SoC platform.
 
-> This series is devoted to new CLPS711X irqchip driver.
-> The driver designed for booting from ATAGS and devicetree.
-> 
-> Alexander Shiyan (3):
->   ARM: clps711x: Add CLPS711X irqchip driver
->   ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
->     driver
->   ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
-> 
->  .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
->  arch/arm/Kconfig                                   |   2 -
->  arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
->  arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
->  arch/arm/mach-clps711x/board-clep7312.c            |   2 -
->  arch/arm/mach-clps711x/board-edb7211.c             |   2 -
->  arch/arm/mach-clps711x/board-p720t.c               |   2 -
->  arch/arm/mach-clps711x/common.c                    | 201 +----------------
->  arch/arm/mach-clps711x/common.h                    |   5 +-
->  arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
->  drivers/irqchip/Kconfig                            |   8 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-clps711x.c                     | 246 +++++++++++++++++++++
->  13 files changed, 302 insertions(+), 228 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
->  create mode 100644 drivers/irqchip/irq-clps711x.c
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+Changes in v2:
+	rebased on v3.13.0-rc3.
+        added comments for memory barrier.
+---
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Any comments on this series?
-
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index b2850fd..fefb8cd 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -220,6 +220,13 @@ static void xemaclite_aligned_write(void *src_ptr, u32 *dest_ptr,
+ 		*to_u16_ptr++ = *from_u16_ptr++;
+ 		*to_u16_ptr++ = *from_u16_ptr++;
+ 
++		/* This barrier resolves occasional issues seen around
++		 * cases where the data is not properly flushed out
++		 * from the processor store buffers to the destination
++		 * memory locations.
++		 */
++		wmb();
++
+ 		/* Output a word */
+ 		*to_u32_ptr++ = align_buffer;
+ 	}
+@@ -235,6 +242,12 @@ static void xemaclite_aligned_write(void *src_ptr, u32 *dest_ptr,
+ 		for (; length > 0; length--)
+ 			*to_u8_ptr++ = *from_u8_ptr++;
+ 
++		/* This barrier resolves occasional issues seen around
++		 * cases where the data is not properly flushed out
++		 * from the processor store buffers to the destination
++		 * memory locations.
++		 */
++		wmb();
+ 		*to_u32_ptr = align_buffer;
+ 	}
+ }
 -- 
-Alexander Shiyan <shc_work@mail.ru>
+1.7.9.5
