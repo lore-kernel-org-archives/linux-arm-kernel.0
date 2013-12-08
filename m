@@ -1,32 +1,44 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  8 Dec 2013 15:13:58 +0100
-Subject: [PATCH v4 1/9] irqchip: add DesignWare APB ICTL interrupt controller
+Date: Sun,  8 Dec 2013 15:14:04 +0100
+Subject: [PATCH v4 7/9] ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
 In-Reply-To: <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386512047-874-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386512047-874-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an irqchip driver and corresponding devicetree binding for the
-secondary interrupt controllers based on Synopsys DesignWare IP dw_apb_ictl.
+This adds very basic device tree files for the Marvell Armada 1500 SoC
+(Berlin BG2) and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has
+nodes for cpus, some clocks, l2 cache controller, local timer, apb timers,
+uart, and interrupt controllers. The Sony NSZ-GS7 is a GoogleTV consumer
+device comprising the Armada 1500 SoC above.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: Jisheng Zhang <jszhang@marvell.com>
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 ---
 Changelog:
-v2->v4:
+v3->v4:
+- rename dts/dtsi to vendor,name.dts[i] (Suggested by Kumar Gala)
+v2->v3:
 - none
 v1->v2:
-- reword binding docu for reg property and add FIQ decoding note
-  (Suggested by Mark Rutland)
-- add cleanup on error path (Reported by Jisheng Zhang)
+- add "arm,pl310-cache" compatible to l2cc (Suggested by Mark Rutland)
+- replace 88DE3xxx numbering with SoC variant name
+  (Requested by Jisheng Zhang)
+RCFv2->v1:
+- switch to (soon to be) correct "marvell,pj4b" cpu compatible
+- reference fixed-clock for uarts instead of hard-coded clock-frequency
+- disable timers except two for clksrc and clkevt
 RFCv1->RFCv2:
-- added copyright reference
+- add binding documentation (Reported by Jason Cooper)
+- change l2cc from aurora to tauros3 (Reported by Thomas Petazzoni)
+- add copyright reference
+- adapt compatibles to mach-berlin instead of mach-mvebu
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -36,87 +48,66 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- .../interrupt-controller/snps,dw-apb-ictl.txt      |  32 +++++
- drivers/irqchip/Kconfig                            |   4 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-dw-apb-ictl.c                  | 150 +++++++++++++++++++++
- 4 files changed, 187 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
- create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
+ .../devicetree/bindings/arm/marvell,berlin.txt     |  24 +++
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/marvell,berlin2.dtsi             | 227 +++++++++++++++++++++
+ arch/arm/boot/dts/sony,nsz-gs7.dts                 |  29 +++
+ 4 files changed, 282 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
+ create mode 100644 arch/arm/boot/dts/marvell,berlin2.dtsi
+ create mode 100644 arch/arm/boot/dts/sony,nsz-gs7.dts
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
 new file mode 100644
-index 0000000..4929117
+index 0000000..737afa5
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
-@@ -0,0 +1,32 @@
-+Synopsys DesignWare APB interrupt controller (dw_apb_ictl)
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -0,0 +1,24 @@
++Marvell Berlin SoC Family Device Tree Bindings
++---------------------------------------------------------------
 +
-+Synopsys DesignWare provides interrupt controller IP for APB known as
-+dw_apb_ictl. The IP is used as secondary interrupt controller in some SoCs with
-+APB bus, e.g. Marvell Armada 1500.
++Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
++shall have the following properties:
 +
-+Required properties:
-+- compatible: shall be "snps,dw-apb-ictl"
-+- reg: physical base address of the controller and length of memory mapped
-+  region starting with ENABLE_LOW register
-+- interrupt-controller: identifies the node as an interrupt controller
-+- #interrupt-cells: number of cells to encode an interrupt-specifier, shall be 1
-+- interrupts: interrupt reference to primary interrupt controller
-+- interrupt-parent: (optional) reference specific primary interrupt controller
++* Required root node properties:
++compatible: must contain "marvell,berlin"
 +
-+The interrupt sources map to the corresponding bits in the interrupt
-+registers, i.e.
-+- 0 maps to bit 0 of low interrupts,
-+- 1 maps to bit 1 of low interrupts,
-+- 32 maps to bit 0 of high interrupts,
-+- 33 maps to bit 1 of high interrupts,
-+- (optional) fast interrupts start at 64.
++In addition, the above compatible shall be extended with the specific
++SoC and board used. Currently known SoC compatibles are:
++    "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
++    "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
++    "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
++    "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
 +
-+Example:
-+	aic: interrupt-controller at 3000 {
-+		compatible = "snps,dw-apb-ictl";
-+		reg = <0x3000 0xc00>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 3792a1a..940638d 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -30,6 +30,10 @@ config ARM_VIC_NR
- 	  The maximum number of VICs available in the system, for
- 	  power management.
- 
-+config DW_APB_ICTL
-+	bool
-+	select IRQ_DOMAIN
++* Example:
 +
- config IMGPDC_IRQ
- 	bool
- 	select GENERIC_IRQ_CHIP
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index c60b901..6427323 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
- obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
- obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
- obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
-+obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
- obj-$(CONFIG_METAG)			+= irq-metag-ext.o
- obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
- obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
-diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
++/ {
++	model = "Sony NSZ-GS7";
++	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
++
++	...
++}
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d57c1a6..f742800 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -45,6 +45,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+ 	bcm28155-ap.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
++dtb-$(CONFIG_ARCH_BERLIN) += \
++	sony,nsz-gs7.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+diff --git a/arch/arm/boot/dts/marvell,berlin2.dtsi b/arch/arm/boot/dts/marvell,berlin2.dtsi
 new file mode 100644
-index 0000000..31e231e
+index 0000000..56a1af2
 --- /dev/null
-+++ b/drivers/irqchip/irq-dw-apb-ictl.c
-@@ -0,0 +1,150 @@
++++ b/arch/arm/boot/dts/marvell,berlin2.dtsi
+@@ -0,0 +1,227 @@
 +/*
-+ * Synopsys DW APB ICTL irqchip driver.
++ * Device Tree Include file for Marvell Armada 1500 (Berlin BG2) SoC
 + *
 + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 + *
@@ -128,142 +119,254 @@ index 0000000..31e231e
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
++#include "skeleton.dtsi"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
-+#include "irqchip.h"
++/ {
++	model = "Marvell Armada 1500 (BG2) SoC";
++	compatible = "marvell,berlin2", "marvell,berlin";
 +
-+#define APB_INT_ENABLE_L	0x00
-+#define APB_INT_ENABLE_H	0x04
-+#define APB_INT_MASK_L		0x08
-+#define APB_INT_MASK_H		0x0c
-+#define APB_INT_FINALSTATUS_L	0x30
-+#define APB_INT_FINALSTATUS_H	0x34
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct irq_chip *chip = irq_get_chip(irq);
-+	struct irq_chip_generic *gc = irq_get_handler_data(irq);
-+	struct irq_domain *d = gc->private;
-+	u32 stat;
-+	int n;
++		cpu at 0 {
++			compatible = "marvell,pj4b";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <0>;
++		};
 +
-+	chained_irq_enter(chip, desc);
++		cpu at 1 {
++			compatible = "marvell,pj4b";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <1>;
++		};
++	};
 +
-+	for (n = 0; n < gc->num_ct; n++) {
-+		stat = readl_relaxed(gc->reg_base +
-+				     APB_INT_FINALSTATUS_L + 4 * n);
-+		while (stat) {
-+			u32 hwirq = ffs(stat) - 1;
-+			generic_handle_irq(irq_find_mapping(d,
-+					    gc->irq_base + hwirq + 32 * n));
-+			stat &= ~(1 << hwirq);
-+		}
-+	}
++	clocks {
++		smclk: sysmgr-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
 +
-+	chained_irq_exit(chip, desc);
-+}
++		cfgclk: cfg-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <100000000>;
++		};
 +
-+static int __init dw_apb_ictl_init(struct device_node *np,
-+				   struct device_node *parent)
-+{
-+	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-+	struct resource r;
-+	struct irq_domain *domain;
-+	struct irq_chip_generic *gc;
-+	void __iomem *iobase;
-+	int ret, nrirqs, irq;
-+	u32 reg;
++		sysclk: system-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <400000000>;
++		};
++	};
 +
-+	/* Map the parent interrupt for the chained handler */
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (irq <= 0) {
-+		pr_err("%s: unable to parse irq\n", np->full_name);
-+		return -EINVAL;
-+	}
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupt-parent = <&gic>;
 +
-+	ret = of_address_to_resource(np, 0, &r);
-+	if (ret) {
-+		pr_err("%s: unable to get resource\n", np->full_name);
-+		return ret;
-+	}
++		ranges = <0 0xf7000000 0x1000000>;
 +
-+	if (!request_mem_region(r.start, resource_size(&r), np->full_name)) {
-+		pr_err("%s: unable to request mem region\n", np->full_name);
-+		return -ENOMEM;
-+	}
++		l2: l2-cache-controller at ac0000 {
++			compatible = "marvell,tauros3-cache", "arm,pl310-cache";
++			reg = <0xac0000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++		};
 +
-+	iobase = ioremap(r.start, resource_size(&r));
-+	if (!iobase) {
-+		pr_err("%s: unable to map resource\n", np->full_name);
-+		ret = -ENOMEM;
-+		goto err_release;
-+	}
++		gic: interrupt-controller at ad1000 {
++			compatible = "arm,cortex-a9-gic";
++			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
 +
-+	/*
-+	 * DW IP can be configured to allow 2-64 irqs. We can determine
-+	 * the number of irqs supported by writing into enable register
-+	 * and look for bits not set, as corresponding flip-flops will
-+	 * have been removed by sythesis tool.
-+	 */
++		local-timer at ad0600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0xad0600 0x20>;
++			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysclk>;
++		};
 +
-+	/* mask and enable all interrupts */
-+	writel(~0, iobase + APB_INT_MASK_L);
-+	writel(~0, iobase + APB_INT_MASK_H);
-+	writel(~0, iobase + APB_INT_ENABLE_L);
-+	writel(~0, iobase + APB_INT_ENABLE_H);
++		apb at e80000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
 +
-+	reg = readl(iobase + APB_INT_ENABLE_H);
-+	if (reg)
-+		nrirqs = 32 + fls(reg);
-+	else
-+		nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
++			ranges = <0 0xe80000 0x10000>;
++			interrupt-parent = <&aic>;
 +
-+	domain = irq_domain_add_linear(np, nrirqs,
-+				       &irq_generic_chip_ops, NULL);
-+	if (!domain) {
-+		pr_err("%s: unable to add irq domain\n", np->full_name);
-+		ret = -ENOMEM;
-+		goto err_unmap;
-+	}
++			timer0: timer at 2c00 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c00 0x14>;
++				interrupts = <8>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "okay";
++			};
 +
-+	ret = irq_alloc_domain_generic_chips(domain, 32, (nrirqs > 32) ? 2 : 1,
-+					     np->name, handle_level_irq, clr, 0,
-+					     IRQ_GC_INIT_MASK_CACHE);
-+	if (ret) {
-+		pr_err("%s: unable to alloc irq domain gc\n", np->full_name);
-+		goto err_unmap;
-+	}
++			timer1: timer at 2c14 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c14 0x14>;
++				interrupts = <9>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "okay";
++			};
 +
-+	gc = irq_get_domain_generic_chip(domain, 0);
-+	gc->private = domain;
-+	gc->reg_base = iobase;
++			timer2: timer at 2c28 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c28 0x14>;
++				interrupts = <10>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
 +
-+	gc->chip_types[0].regs.mask = APB_INT_MASK_L;
-+	gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
-+	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
++			timer3: timer at 2c3c {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c3c 0x14>;
++				interrupts = <11>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
 +
-+	if (nrirqs > 32) {
-+		gc->chip_types[1].regs.mask = APB_INT_MASK_H;
-+		gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
-+		gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
-+	}
++			timer4: timer at 2c50 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c50 0x14>;
++				interrupts = <12>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
 +
-+	irq_set_handler_data(irq, gc);
-+	irq_set_chained_handler(irq, dw_apb_ictl_handler);
++			timer5: timer at 2c64 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c64 0x14>;
++				interrupts = <13>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
 +
-+	return 0;
++			timer6: timer at 2c78 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c78 0x14>;
++				interrupts = <14>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
 +
-+err_unmap:
-+	iounmap(iobase);
-+err_release:
-+	release_mem_region(r.start, resource_size(&r));
-+	return ret;
-+}
-+IRQCHIP_DECLARE(dw_apb_ictl,
-+		"snps,dw-apb-ictl", dw_apb_ictl_init);
++			timer7: timer at 2c8c {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c8c 0x14>;
++				interrupts = <15>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			aic: interrupt-controller at 3000 {
++				compatible = "snps,dw-apb-ictl";
++				reg = <0x3000 0xc00>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
++		apb at fc0000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ranges = <0 0xfc0000 0x10000>;
++			interrupt-parent = <&sic>;
++
++			uart0: serial at 9000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x9000 0x100>;
++				reg-shift = <2>;
++				reg-io-width = <1>;
++				interrupts = <8>;
++				clocks = <&smclk>;
++				status = "disabled";
++			};
++
++			uart1: serial at a000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0xa000 0x100>;
++				reg-shift = <2>;
++				reg-io-width = <1>;
++				interrupts = <9>;
++				clocks = <&smclk>;
++				status = "disabled";
++			};
++
++			uart2: serial at b000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0xb000 0x100>;
++				reg-shift = <2>;
++				reg-io-width = <1>;
++				interrupts = <10>;
++				clocks = <&smclk>;
++				status = "disabled";
++			};
++
++			sic: interrupt-controller at e000 {
++				compatible = "snps,dw-apb-ictl";
++				reg = <0xe000 0x400>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/sony,nsz-gs7.dts b/arch/arm/boot/dts/sony,nsz-gs7.dts
+new file mode 100644
+index 0000000..a6b1482
+--- /dev/null
++++ b/arch/arm/boot/dts/sony,nsz-gs7.dts
+@@ -0,0 +1,29 @@
++/*
++ * Device Tree file for Sony NSZ-GS7
++ *
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++
++#include "marvell,berlin2.dtsi"
++
++/ {
++	model = "Sony NSZ-GS7";
++	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x40000000>; /* 1 GB */
++	};
++};
++
++&uart0 { status = "okay"; };
 -- 
 1.8.4.rc3
