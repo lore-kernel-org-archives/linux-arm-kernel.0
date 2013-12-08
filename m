@@ -1,72 +1,26 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Sun, 08 Dec 2013 19:52:56 +0100
-Subject: [PATCH v4 1/3] usb: ohci-at91: replace request_mem_region +
- ioremap by devm_ioremap_resource
-In-Reply-To: <52A4BAF6.501@cogentembedded.com>
-References: <1386514980-6383-1-git-send-email-b.brezillon@overkiz.com>
- <1386514980-6383-2-git-send-email-b.brezillon@overkiz.com>
- <52A4BAF6.501@cogentembedded.com>
-Message-ID: <52A4C008.6050705@overkiz.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sun, 8 Dec 2013 13:07:39 -0600
+Subject: [PATCH v2 01/15] mfd: menelaus: Drop __exit section annotation
+In-Reply-To: <20131203095136.GF11828@lee--X1>
+References: <1386042188-12246-1-git-send-email-balbi@ti.com>
+ <20131203095136.GF11828@lee--X1>
+Message-ID: <20131208190739.GA18977@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Dec 03, 2013 at 09:51:36AM +0000, Lee Jones wrote:
+> The code looks mostly fine, but the implementation of the commit logs
+> seems lazy. Please submit a v3 using coherent sentences with full
+> explanations and correct punctuation.
 
-Le 08/12/2013 19:31, Sergei Shtylyov a ?crit :
-> Hello.
->
-> On 12/08/2013 06:02 PM, Boris BREZILLON wrote:
->
->> Replace the request_mem_region + ioremap calls by the
->> devm_ioremap_resource call which does the same things but with device
->> managed resources.
->
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
->> ---
->>   drivers/usb/host/ohci-at91.c |   28 +++++++---------------------
->>   1 file changed, 7 insertions(+), 21 deletions(-)
->
->> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
->> index 8c356af..fe2ecc5 100644
->> --- a/drivers/usb/host/ohci-at91.c
->> +++ b/drivers/usb/host/ohci-at91.c
->> @@ -158,24 +158,18 @@ static int usb_hcd_at91_probe(const struct 
->> hc_driver *driver,
->>       hcd->rsrc_start = res->start;
->>       hcd->rsrc_len = resource_size(res);
->>
->> -    if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, 
->> hcd_name)) {
->> -        pr_debug("request_mem_region failed\n");
->> -        retval = -EBUSY;
->> -        goto err1;
->> -    }
->> -
->> -    hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
->> -    if (!hcd->regs) {
->> -        pr_debug("ioremap failed\n");
->> -        retval = -EIO;
->> -        goto err2;
->> +    hcd->regs = devm_ioremap_resource(dev, res);
->> +    if (IS_ERR(hcd->regs)) {
->> +        dev_dbg(dev, "devm_ioremap_resource failed\n");
->
->    I've already told you devm_ioremap_resource() prints the detailed 
-> error message. No need to duplicate it.
->
+example ?
 
-Oops, sorry, this is an oversight.
-I'll send a new version removing this line.
-
-Best Regards,
-
-Boris
-
->> +        retval = PTR_ERR(hcd->regs);
->> +        goto err;
->>       }
->
-> WBR, Sergei
->
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131208/5a051299/attachment.sig>
