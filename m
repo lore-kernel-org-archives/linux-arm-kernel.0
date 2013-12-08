@@ -1,48 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 7 Dec 2013 21:21:55 -0500 (EST)
-Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
-In-Reply-To: <CAL_Jsq+7j62ucsA96TbRrFSqHBR5SGUvWeqdsxtUvEtcbtdGyQ@mail.gmail.com>
-References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
- <201312052250.38986.arnd@arndb.de>
- <CAL_JsqLf0Ubi55mc-p0-qPwY0LzHEZ-SF9QwcELkKPfZH=9t_g@mail.gmail.com>
- <201312061741.33427.arnd@arndb.de>
- <CAL_JsqJmwPwVmNzibr8S-RH8ibwCzXVFMdJA-STPTHG+H0113w@mail.gmail.com>
- <20131207181052.GR4360@n2100.arm.linux.org.uk>
- <CAL_Jsq+7j62ucsA96TbRrFSqHBR5SGUvWeqdsxtUvEtcbtdGyQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.10.1312072111410.15948@knanqh.ubzr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 8 Dec 2013 03:44:56 +0100
+Subject: [RFC part1 PATCH 0/7] Make ACPI core running on ARM64
+In-Reply-To: <20131206135825.GG29268@sirena.org.uk>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <201312052325.02603.arnd@arndb.de> <20131206135825.GG29268@sirena.org.uk>
+Message-ID: <201312080344.56317.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 7 Dec 2013, Rob Herring wrote:
-
-> On Sat, Dec 7, 2013 at 12:10 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Dec 06, 2013 at 02:01:51PM -0600, Rob Herring wrote:
-> >> On Fri, Dec 6, 2013 at 10:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > This prevents you from building a plain v6 SMP kernel, and we've
-> >> > had a variation of that since CONFIG_SMP was first marked non-BROKEN.
-> >>
-> >> I'm saying a v6k enabled kernel would not work on pure v6 h/w. But
-> >> since all implementations appear to support doubleword exclusives and
-> >> there may not be any pure v6 only h/w, then we may never have a
-> >> problem with the code below.
-> >
-> > I wonder why we have the SMP_ON_UP option.  It's there so that we can
-> > do exactly this - build a SMP kernel (so, one for V6K or later) _and_
-> > have it run on non-SMP capable V6 platforms.
+On Friday 06 December 2013, Mark Brown wrote:
+> On Thu, Dec 05, 2013 at 11:25:02PM +0100, Arnd Bergmann wrote:
 > 
-> Exactly, but __kuser_cmpxchg64 is missing the necessary SMP_ON_UP
-> patching or correct ifdef logic. I have yet to get my head around what
-> is the right fix here.
+> > However, as I mentioned before I am much more worried about the parts that
+> > are not done (or not posted) yet and that will be required to actually
+> > have working support for a real server system. Until we know more about
+> > where this is heading, I think we should not merge any of the ARM specific
+> > parts of your patches. Any patches that are reasonable cleanups and bug
+> > fixes for the ACPI subsystem should of course get merged once they are
+> > reviewed.
+> 
+> OTOH if it's well encapsulated, is going to be required for any kind of
+> ACPI use and gets to the point where people are OK with it by itself
+> then I'm not sure what we'd gain by keeping it out of tree - it'd make
+> the real system patch sets bigger and harder to review.
 
-The right fix is probably to leave it as is and optimize your user space 
-for ARMv6k instead, meaning that this operation would then be 
-implemented inline rather than relying on the kernel helper.
+I'd agree as soon as someone can convince me that we actually want ACPI
+support in the kernel for ARM64 servers. As far as I'm concerned it's quite
+possible that the people who have worked on this for the past couple of
+years behind closed doors know what they are doing and it will all be
+good, but it's also possible that it turns into a huge trainwreck once
+we see multiple implementations that have fundamentally incompatible
+requirements regarding what they want from ACPI and we end up not doing
+it at all. I just don't have enough information at this point to know which
+of the two is true and I'd like to ensure that accepting the patches
+that meet your criteria above would not be seen as an endorsement to do
+crazy stuff later.
 
-Otherwise if you really want to optimize the kernel helper at runtime 
-for ARMv6k when ARMv6 is also configured in, then you could do some 
-instruction patching in kuser_init() as we already do for getting the 
-TLS value.
-
-
-Nicolas
+	Arnd
