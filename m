@@ -1,72 +1,53 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Sun, 8 Dec 2013 19:22:37 +0000
-Subject: [PATCH] ARM: cpu: Document and tweak clock-frequency property
-In-Reply-To: <CAFEAcA8qsb0f_5dVbytCD3fGQdT+W4=PJudCY1f-ee4Pwm=0=Q@mail.gmail.com>
-References: <1386331027-26065-1-git-send-email-broonie@kernel.org>
- <52A36AB3.6060102@gmail.com> <20131208161922.GK29268@sirena.org.uk>
- <CAFEAcA8qsb0f_5dVbytCD3fGQdT+W4=PJudCY1f-ee4Pwm=0=Q@mail.gmail.com>
-Message-ID: <20131208192237.GM29268@sirena.org.uk>
+Date: Sun, 8 Dec 2013 19:40:40 +0000
+Subject: [RFC part1 PATCH 0/7] Make ACPI core running on ARM64
+In-Reply-To: <201312080344.56317.arnd@arndb.de>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <201312052325.02603.arnd@arndb.de>
+ <20131206135825.GG29268@sirena.org.uk>
+ <201312080344.56317.arnd@arndb.de>
+Message-ID: <20131208194040.GN29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 08, 2013 at 04:38:58PM +0000, Peter Maydell wrote:
+On Sun, Dec 08, 2013 at 03:44:56AM +0100, Arnd Bergmann wrote:
+> On Friday 06 December 2013, Mark Brown wrote:
 
-> Sorry, but there is already shipping software (kvmtool
-> and QEMU) which isn't emitting clock-frequency properties
-> for cpu nodes, based on what you documented in the kernel
-> doc file, which says:
+> > OTOH if it's well encapsulated, is going to be required for any kind of
+> > ACPI use and gets to the point where people are OK with it by itself
+> > then I'm not sure what we'd gain by keeping it out of tree - it'd make
+> > the real system patch sets bigger and harder to review.
 
-I didn't document anything here except this patch, I was just trying to
-reconcile the implementation with the documentation.
+> I'd agree as soon as someone can convince me that we actually want ACPI
+> support in the kernel for ARM64 servers. As far as I'm concerned it's quite
+> possible that the people who have worked on this for the past couple of
+> years behind closed doors know what they are doing and it will all be
+> good, but it's also possible that it turns into a huge trainwreck once
+> we see multiple implementations that have fundamentally incompatible
+> requirements regarding what they want from ACPI and we end up not doing
+> it at all. I just don't have enough information at this point to know which
+> of the two is true and I'd like to ensure that accepting the patches
+> that meet your criteria above would not be seen as an endorsement to do
+> crazy stuff later.
 
-> "The ARM architecture, in accordance with the ePAPR, requires
-> the cpus and cpu nodes to be present and contain the properties
-> described below."
+I do share all your concerns about the closed door stuff, and I'm also
+not convinced that they'll be able to control the things people try to
+do with it if it does become at all successful.  
 
-> not "must contain the properties described below and also
-> any others that the ePAPR spec says are mandatory".
-
-I think that's a fairly tortured way of reading the language there to be
-honest (and doesn't reflect the actual deployed code reading the binding
-which does use this property without documentation outside ePAPR and does
-warn if it's absent).  If that really is how we want to read things then
-we probably ought to delete the reference to ePAPR both here and in the
-other binding documentation we have and fork the specs.
-
-> So I'm afraid you're stuck with this being an optional property.
-
-Like I say I think a reasonable and robust implementation shouldn't
-reject a device tree with it missing but that doesn't stop the device
-tree being out of spec.  This is also the existing kernel behaviour for
-this property so we're stuck with it anyway and my goal here was to
-minimise our deviation from the spec so I introduced the minimum
-practical change in the process of copying it in for discoverability.
-
-This sort of situation is going to become more and more common as people
-actually look at device trees in production; the kernel will have to be
-robust against device trees that it previously accepted even if they are
-out of spec (and should just generally be robust in parsing).  We've got
-to understand that the kernel will fill the role Windows does for PCs -
-things that run well enough with existing kernels are going to end up
-being released regardless of spec conformance.  Kernels should be
-liberal in what they accept, DTs should be conservative in what they
-contain and both need to understand that the other is going to get it
-wrong some of the time.
-
-> (It's also not at all clear what a virtual machine's devicetree
-> should set the clock-frequency properties to anyway...)
-
-Yes, it's a poorly considered property all round.  Most currently
-available silicon has variable clocks for the cores which is an issue
-with a fixed DT like FDT provides and like you say for simulators and so
-on it's meaningless.
-
-Ideally someone with the time/enthuisiasm will get this dealt with more
-sensibly in a future revision of ePAPR.
+That said I don't think anyone could be in any reasonable doubt as to
+the concerns that people have at this point and I do worry that keeping
+everything out of tree will both increase reviwer fatigue if it does end
+up getting merged and increase the chances that we end up with a
+deployed fiat accomplait being submitted.  We can always add dire
+warnings and so on to the code and Kconfig to try to remind people but
+so long as it's neither getting in the way of anything else nor making
+any real decisions (as opposed to basics for the core spec) I'm not sure
+how much we gain, if it never goes anywhere it can just sit and rot
+quietly in a corner until it gets in the way.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131208/ba398e33/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131208/81755432/attachment-0001.sig>
