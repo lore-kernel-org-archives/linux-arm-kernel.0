@@ -1,38 +1,24 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 7 Dec 2013 22:35:26 -0300
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 7 Dec 2013 20:40:49 -0500
 Subject: [PATCH] mtd: nand: pxa3xx: Disable "armada370-nand" compatible
  support
-In-Reply-To: <20131207232315.GC11251@titan.lakedaemon.net>
+In-Reply-To: <20131208013525.GA4487@localhost>
 References: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <20131207232315.GC11251@titan.lakedaemon.net>
-Message-ID: <20131208013525.GA4487@localhost>
+ <20131208013525.GA4487@localhost>
+Message-ID: <20131208014049.GJ11251@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 07, 2013 at 06:23:15PM -0500, Jason Cooper wrote:
-> > +/*
-> > + * Currently, the armada370 support is incomplete and can cause the
-> > + * system to crash. Disable it until all the infrastructure is in place.
-> > + */
-> > +#if 0
-> >  	{
-> >  		.compatible = "marvell,armada370-nand",
-> >  		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA370,
-> >  	},
-> > +#endif
-> 
-> I prefer to just remove the lines.
-> 
+On Sat, Dec 07, 2013 at 10:35:26PM -0300, Ezequiel Garcia wrote:
+> If we agree to remove the lines, shall we also revert the binding
+> documentation, removing the compatible from there as well?
 
-I'm actually fine either way. Did both (disable and remove) but since all
-the code is already sitting and waiting for v3.14 thought it might be cleaner
-to just "disable" it.
+I think this is unnecessary.  We're trying to prevent breaking
+bisection.  No one in their right mind should be developing (and
+referring to docs) at a random commit.  As long as the docs are correct,
+leave them alone.
 
-Brian (given you're going to take the patch): what do you think?
+thx,
 
-If we agree to remove the lines, shall we also revert the binding
-documentation, removing the compatible from there as well?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Jason.
