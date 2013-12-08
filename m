@@ -1,22 +1,29 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  8 Dec 2013 15:13:59 +0100
-Subject: [PATCH v4 2/9] MAINTAINERS: add ARM Marvell Berlin SoC
+Date: Sun,  8 Dec 2013 15:14:03 +0100
+Subject: [PATCH v4 6/9] ARM: add Marvell Berlin UART0 lowlevel debug
 In-Reply-To: <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386512047-874-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386512047-874-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds Marvell Berlin SoC to the list of maintainers. I am taking
-maintainership for arch/arm/mach-berlin/.
+This adds UART0 as found on Marvell 88DE3xxx SoCs, e.g. Armada 1500
+to the list of possible lowlevel debug options.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Changelog:
-any->v4:
+v2->v4:
 - none
+v1->v2:
+- replace 88DE3xxx numbering with SoC variant name
+  (Requested by Jisheng Zhang)
+RFCv1->RFCv2:
+- have separate DEBUG option due to separate mach- directory
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
@@ -25,25 +32,43 @@ Cc: Kevin Hilman <khilman@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8285ed4..33c7187 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1032,6 +1032,12 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-mvebu/
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5765abf..2571558 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -94,6 +94,14 @@ choice
+ 		depends on ARCH_BCM2835
+ 		select DEBUG_UART_PL01X
  
-+ARM/Marvell Berlin SoC support
-+M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-berlin/
++	config DEBUG_BERLIN_UART
++		bool "Marvell Berlin SoC Debug UART"
++		depends on ARCH_BERLIN
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Marvell Berlin SoC based platforms.
 +
- ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
- M:	Jason Cooper <jason@lakedaemon.net>
- M:	Andrew Lunn <andrew@lunn.ch>
+ 	config DEBUG_CLPS711X_UART1
+ 		bool "Kernel low-level debugging messages via UART1"
+ 		depends on ARCH_CLPS711X
+@@ -1011,6 +1019,7 @@ config DEBUG_UART_PHYS
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
++	default 0xf7fc9000 if DEBUG_BERLIN_UART
+ 	default 0xf8b00000 if DEBUG_HI3716_UART
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+@@ -1036,6 +1045,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
++	default 0xf7fc9000 if DEBUG_BERLIN_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
 -- 
 1.8.4.rc3
