@@ -1,15 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  8 Dec 2013 15:14:02 +0100
-Subject: [PATCH v4 5/9] ARM: add Marvell Berlin SoCs to multi_v7_defconfig
+Date: Sun,  8 Dec 2013 15:14:01 +0100
+Subject: [PATCH v4 4/9] ARM: add Marvell Berlin SoC familiy to Marvell doc
 In-Reply-To: <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386512047-874-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386512047-874-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Marvell Berlin SoC family, Marvell Armada 1500
-(BG2), and Marvell Armada 1500-mini (BG2CD) to the multi_v7_defconfig.
+This adds known facts and rumors about the Marvell Berlin (88DE3xxx) SoC
+family to the Marvell SoC documentation.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Reviewed-by: Jason Cooper <jason@lakedaemon.net>
@@ -18,36 +18,61 @@ Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Changelog:
 v3->v4:
-- none
+- remove Armada 1000 which has been discontinued by Marvell
+- remove BG2 steppings
 v2->v3:
-- also add BG2CD (Armada 1500-mini)
-v1->v2:
-- replace 88DE3xxx numbering with SoC variant name
-  (Requested by Jisheng Zhang)
+- add stepping Z1 to Armada 1000 (88DE3010)
+RFCv2->v1:
+- move Berlin below PXA/MMP[23] where it belongs to
+- add note about IP (re-)used in Berlin SoCs
+RFCv1->RFCv2:
+- initial patch
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Kevin Hilman <khilman@linaro.org>
+Cc: linux-doc at vger.kernel.org 
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/arm/Marvell/README | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4a5903e..cce4150 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -7,6 +7,9 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_MOBILE=y
-+CONFIG_ARCH_BERLIN=y
-+CONFIG_MACH_BERLIN_BG2=y
-+CONFIG_MACH_BERLIN_BG2CD=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_KEYSTONE=y
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index da0151d..5a930c1 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -211,6 +211,30 @@ MMP/MMP2 family (communication processor)
+    Linux kernel mach directory: arch/arm/mach-mmp
+    Linux kernel plat directory: arch/arm/plat-pxa
+ 
++Berlin family (Digital Entertainment)
++-------------------------------------
++
++  Flavors:
++	88DE3005, Armada 1500-mini
++		Design name:	BG2CD
++		Core:		ARM Cortex-A9, PL310 L2CC
++		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500-mini/
++	88DE3100, Armada 1500
++		Design name:	BG2
++		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
++		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500/
++		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
++	88DE????
++		Design name:	BG3
++		Core:		ARM Cortex-A15, CA15 integrated L2CC
++
++  Homepage: http://www.marvell.com/digital-entertainment/
++  Directory: arch/arm/mach-berlin
++
++  Comments:
++   * This line of SoCs is based on Marvell Sheeva or ARM Cortex CPUs
++     with Synopsys DesignWare (IRQ, GPIO, Timers, ...) and PXA IP (SDHCI, USB, ETH, ...).
++
+ Long-term plans
+ ---------------
+ 
 -- 
 1.8.4.rc3
