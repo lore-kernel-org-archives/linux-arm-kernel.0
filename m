@@ -1,30 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 8 Dec 2013 04:02:41 +0100
+Date: Sun, 8 Dec 2013 04:39:45 +0100
 Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
-In-Reply-To: <alpine.LFD.2.10.1312072111410.15948@knanqh.ubzr>
+In-Reply-To: <20131207181052.GR4360@n2100.arm.linux.org.uk>
 References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
- <CAL_Jsq+7j62ucsA96TbRrFSqHBR5SGUvWeqdsxtUvEtcbtdGyQ@mail.gmail.com>
- <alpine.LFD.2.10.1312072111410.15948@knanqh.ubzr>
-Message-ID: <201312080402.42101.arnd@arndb.de>
+ <CAL_JsqJmwPwVmNzibr8S-RH8ibwCzXVFMdJA-STPTHG+H0113w@mail.gmail.com>
+ <20131207181052.GR4360@n2100.arm.linux.org.uk>
+Message-ID: <201312080439.46063.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 08 December 2013, Nicolas Pitre wrote:
-> The right fix is probably to leave it as is and optimize your user space 
-> for ARMv6k instead, meaning that this operation would then be 
-> implemented inline rather than relying on the kernel helper.
+On Saturday 07 December 2013, Russell King - ARM Linux wrote:
+> So, as far as I'm aware, today, a kernel which has V6, V6K and V7
+> will work across all those CPUs.
+> 
+> What's rather annoying in this thread is that you and Arnd are running
+> around seemingly making decisions on this without bothering to find out
+> the details, in persuit of endless cleanups.  Where is this heading?
 
-That would not make the program run on ARMv6 though. The bug we're trying
-to fix is for running a kernel with ARMv6k support built-in on an
-OMAP2 with ARMv6. The kuser helper already supports cmpxchg for pure
-v6 builds, but that code doesn't get built (and isn't SMP safe) with
-CONFIG_CPU_V6K or CONFIG_CPU_V7 enabled.
- 
-> Otherwise if you really want to optimize the kernel helper at runtime 
-> for ARMv6k when ARMv6 is also configured in, then you could do some 
-> instruction patching in kuser_init() as we already do for getting the 
-> TLS value.
+I admit that we've been stumbling a bit in the dark at some points, but
+that doesn't mean every idea ends up in a patch that even gets submitted.
 
-This does sound like the cleanest solution.
+What I've concluded so far is (please correct any statements that you
+find are wrong):
+
+* there is no harm in "select HAVE_SMP if CPU_V7" for multiplatform, as
+  was the original suggestion. Whether we want to actually do that is
+  open for discussion when someone submits a patch.
+
+* It was a mistake (I guess mine) to 'select CPU_V6' from ARCH_MULTI_V6,
+  since that makes V6K based platforms slower without a reason, and we
+  probably want to do something else.
+
+* A kernel which enables V6, V6K and V7 has a broken kuser_cmpxchg64
+  implementation on pre-V6K CPUs.
+
+* Most platforms (possibly every one but OMAP2) that select CPU_V6
+  today are actually V6K compatible. It's probably worth asking those
+  V6 platform maintainers to change their CPU selection after confirming
+  that they are V6K-only.
+
+* I'm still trying to understand the full implications of
+  CONFIG_CPU_USE_DOMAIN, but according to the comment in 247055aa21ffe
+  "ARM: 6384/1: Remove the domain switching on ARMv6k/v7 CPUs", it seems
+  to be a bug to enable this on v6k or v7 CPUs, which we currently do
+  whenever CPU_V6 (implied by CONFIG_MULTI_V6) is enabled.
 
 	Arnd
