@@ -1,43 +1,57 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Sun, 8 Dec 2013 16:38:58 +0000
-Subject: [PATCH] ARM: cpu: Document and tweak clock-frequency property
-In-Reply-To: <20131208161922.GK29268@sirena.org.uk>
-References: <1386331027-26065-1-git-send-email-broonie@kernel.org>
- <52A36AB3.6060102@gmail.com> <20131208161922.GK29268@sirena.org.uk>
-Message-ID: <CAFEAcA8qsb0f_5dVbytCD3fGQdT+W4=PJudCY1f-ee4Pwm=0=Q@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 08 Dec 2013 21:31:18 +0300
+Subject: [PATCH v4 1/3] usb: ohci-at91: replace request_mem_region +
+ ioremap by devm_ioremap_resource
+In-Reply-To: <1386514980-6383-2-git-send-email-b.brezillon@overkiz.com>
+References: <1386514980-6383-1-git-send-email-b.brezillon@overkiz.com>
+ <1386514980-6383-2-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52A4BAF6.501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 December 2013 16:19, Mark Brown <broonie@kernel.org> wrote:
-> On Sat, Dec 07, 2013 at 12:36:35PM -0600, Rob Herring wrote:
->> On 12/06/2013 05:57 AM, Mark Brown wrote:
+Hello.
+
+On 12/08/2013 06:02 PM, Boris BREZILLON wrote:
+
+> Replace the request_mem_region + ioremap calls by the
+> devm_ioremap_resource call which does the same things but with device
+> managed resources.
+
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>   drivers/usb/host/ohci-at91.c |   28 +++++++---------------------
+>   1 file changed, 7 insertions(+), 21 deletions(-)
+
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 8c356af..fe2ecc5 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -158,24 +158,18 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	hcd->rsrc_start = res->start;
+>   	hcd->rsrc_len = resource_size(res);
 >
->> > +   - clock-frequency
->> > +           Usage: required
->
->> This breaks compatibility. It may be required for a feature in the
->
-> It doesn't, it's listed as mandatory in ePAPR section 3.7.1 which is
-> already part of our bindings - this is merely copying that information
-> into the binding document in the kernel so that it's more discoverable
-> and so that we can tweak the definition to reflect reality a bit more
-> closely.
+> -	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+> -		pr_debug("request_mem_region failed\n");
+> -		retval = -EBUSY;
+> -		goto err1;
+> -	}
+> -
+> -	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
+> -	if (!hcd->regs) {
+> -		pr_debug("ioremap failed\n");
+> -		retval = -EIO;
+> -		goto err2;
+> +	hcd->regs = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(hcd->regs)) {
+> +		dev_dbg(dev, "devm_ioremap_resource failed\n");
 
-Sorry, but there is already shipping software (kvmtool
-and QEMU) which isn't emitting clock-frequency properties
-for cpu nodes, based on what you documented in the kernel
-doc file, which says:
-"The ARM architecture, in accordance with the ePAPR, requires
-the cpus and cpu nodes to be present and contain the properties
-described below."
+    I've already told you devm_ioremap_resource() prints the detailed error 
+message. No need to duplicate it.
 
-not "must contain the properties described below and also
-any others that the ePAPR spec says are mandatory".
+> +		retval = PTR_ERR(hcd->regs);
+> +		goto err;
+>   	}
 
-So I'm afraid you're stuck with this being an optional property.
-
-(It's also not at all clear what a virtual machine's devicetree
-should set the clock-frequency properties to anyway...)
-
-thanks
--- PMM
+WBR, Sergei
