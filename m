@@ -1,216 +1,101 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  8 Dec 2013 10:53:29 +0400
-Subject: [PATCH RFC] ARM: Provide default restart handler
-Message-ID: <1386485609-4174-1-git-send-email-shc_work@mail.ru>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sun, 08 Dec 2013 11:05:35 +0400
+Subject: [PATCH v2 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <201312080321.12001.arnd@arndb.de>
+References: <1385879185-22455-3-git-send-email-ynvich@gmail.com>
+ <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <201312080321.12001.arnd@arndb.de>
+Message-ID: <1386486335.7152.83.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides default restart handler if it is not explicitly specified.
+On Sun, 2013-12-08 at 03:21 +0100, Arnd Bergmann wrote:
+> On Friday 06 December 2013, Sergei Ianovich wrote:
+> You have some rather unusual options in here. I'd suggest you go through
+> the reduced defconfig file and remove all options that look like they
+> are unnecessary for your system.
+> 
+> It's probably based on some distro config that enables lots of modules
+> you don't actually want.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/kernel/setup.c                 | 7 +++++++
- arch/arm/mach-clps711x/board-autcpu12.c | 1 -
- arch/arm/mach-clps711x/board-cdb89712.c | 1 -
- arch/arm/mach-clps711x/board-clep7312.c | 1 -
- arch/arm/mach-clps711x/board-edb7211.c  | 1 -
- arch/arm/mach-clps711x/board-p720t.c    | 1 -
- arch/arm/mach-clps711x/common.c         | 5 -----
- arch/arm/mach-clps711x/common.h         | 3 ---
- arch/arm/mach-mmp/brownstone.c          | 1 -
- arch/arm/mach-mmp/common.c              | 5 -----
- arch/arm/mach-mmp/common.h              | 1 -
- arch/arm/mach-mmp/flint.c               | 1 -
- arch/arm/mach-mmp/jasper.c              | 1 -
- arch/arm/mach-mmp/tavorevb.c            | 1 -
- arch/arm/mach-mmp/ttc_dkb.c             | 1 -
- 15 files changed, 7 insertions(+), 24 deletions(-)
+I tried to future-proof the config, by enabling all partition tables and
+USB disks and modems that could be plugged into the device.
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 6a1b8a8..c74f98f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -862,6 +862,11 @@ void __init hyp_mode_check(void)
- #endif
- }
- 
-+static void default_arm_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	soft_restart(0);
-+}
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	const struct machine_desc *mdesc;
-@@ -900,6 +905,8 @@ void __init setup_arch(char **cmdline_p)
- 
- 	if (mdesc->restart)
- 		arm_pm_restart = mdesc->restart;
-+	else
-+		arm_pm_restart = default_arm_restart;
- 
- 	unflatten_device_tree();
- 
-diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
-index f8d71a8..cf2f1d9 100644
---- a/arch/arm/mach-clps711x/board-autcpu12.c
-+++ b/arch/arm/mach-clps711x/board-autcpu12.c
-@@ -273,6 +273,5 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
- 	.init_machine	= autcpu12_init,
- 	.init_late	= autcpu12_init_late,
- 	.handle_irq	= clps711x_handle_irq,
--	.restart	= clps711x_restart,
- MACHINE_END
- 
-diff --git a/arch/arm/mach-clps711x/board-cdb89712.c b/arch/arm/mach-clps711x/board-cdb89712.c
-index a9e38c6..491bc37 100644
---- a/arch/arm/mach-clps711x/board-cdb89712.c
-+++ b/arch/arm/mach-clps711x/board-cdb89712.c
-@@ -146,5 +146,4 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
- 	.init_time	= clps711x_timer_init,
- 	.init_machine	= cdb89712_init,
- 	.handle_irq	= clps711x_handle_irq,
--	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/board-clep7312.c b/arch/arm/mach-clps711x/board-clep7312.c
-index b476424..5295b49 100644
---- a/arch/arm/mach-clps711x/board-clep7312.c
-+++ b/arch/arm/mach-clps711x/board-clep7312.c
-@@ -43,5 +43,4 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.handle_irq	= clps711x_handle_irq,
--	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index fe6184e..89a0d72 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -187,5 +187,4 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
- 	.init_machine	= edb7211_init,
- 	.init_late	= edb7211_init_late,
- 	.handle_irq	= clps711x_handle_irq,
--	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
-index dd81b06..be5b2e9 100644
---- a/arch/arm/mach-clps711x/board-p720t.c
-+++ b/arch/arm/mach-clps711x/board-p720t.c
-@@ -372,5 +372,4 @@ MACHINE_START(P720T, "ARM-Prospector720T")
- 	.init_machine	= p720t_init,
- 	.init_late	= p720t_init_late,
- 	.handle_irq	= clps711x_handle_irq,
--	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index 134641d..416d150 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -384,11 +384,6 @@ void __init clps711x_timer_init(void)
- 	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
- }
- 
--void clps711x_restart(enum reboot_mode mode, const char *cmd)
--{
--	soft_restart(0);
--}
--
- static void clps711x_idle(void)
- {
- 	clps_writel(1, HALT);
-diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-index 9a6767b..1763585 100644
---- a/arch/arm/mach-clps711x/common.h
-+++ b/arch/arm/mach-clps711x/common.h
-@@ -4,8 +4,6 @@
-  * Common bits.
-  */
- 
--#include <linux/reboot.h>
--
- #define CLPS711X_NR_IRQS	(33)
- #define CLPS711X_NR_GPIO	(4 * 8 + 3)
- #define CLPS711X_GPIO(prt, bit)	((prt) * 8 + (bit))
-@@ -14,5 +12,4 @@ extern void clps711x_map_io(void);
- extern void clps711x_init_irq(void);
- extern void clps711x_timer_init(void);
- extern void clps711x_handle_irq(struct pt_regs *regs);
--extern void clps711x_restart(enum reboot_mode mode, const char *cmd);
- extern void clps711x_init_early(void);
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index ac25544..4b3d668 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -227,5 +227,4 @@ MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
- 	.init_irq	= mmp2_init_irq,
- 	.init_time	= mmp2_timer_init,
- 	.init_machine	= brownstone_init,
--	.restart	= mmp_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-mmp/common.c b/arch/arm/mach-mmp/common.c
-index c03b4ab..b1f004a 100644
---- a/arch/arm/mach-mmp/common.c
-+++ b/arch/arm/mach-mmp/common.c
-@@ -46,8 +46,3 @@ void __init mmp_map_io(void)
- 	/* this is early, initialize mmp_chip_id here */
- 	mmp_chip_id = __raw_readl(MMP_CHIPID);
- }
--
--void mmp_restart(enum reboot_mode mode, const char *cmd)
--{
--	soft_restart(0);
--}
-diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-index cf445ba..6dd1fcc 100644
---- a/arch/arm/mach-mmp/common.h
-+++ b/arch/arm/mach-mmp/common.h
-@@ -4,7 +4,6 @@
- extern void timer_init(int irq);
- 
- extern void __init mmp_map_io(void);
--extern void mmp_restart(enum reboot_mode, const char *);
- extern void __init pxa168_clk_init(void);
- extern void __init pxa910_clk_init(void);
- extern void __init mmp2_clk_init(void);
-diff --git a/arch/arm/mach-mmp/flint.c b/arch/arm/mach-mmp/flint.c
-index 6291c33..02cd8e7 100644
---- a/arch/arm/mach-mmp/flint.c
-+++ b/arch/arm/mach-mmp/flint.c
-@@ -130,5 +130,4 @@ MACHINE_START(FLINT, "Flint Development Platform")
- 	.init_irq       = mmp2_init_irq,
- 	.init_time	= mmp2_timer_init,
- 	.init_machine   = flint_init,
--	.restart	= mmp_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
-index 0e9e5c0..feb9553 100644
---- a/arch/arm/mach-mmp/jasper.c
-+++ b/arch/arm/mach-mmp/jasper.c
-@@ -184,5 +184,4 @@ MACHINE_START(MARVELL_JASPER, "Jasper Development Platform")
- 	.init_irq       = mmp2_init_irq,
- 	.init_time	= mmp2_timer_init,
- 	.init_machine   = jasper_init,
--	.restart	= mmp_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
-index cdfc9bf..9fbfe12 100644
---- a/arch/arm/mach-mmp/tavorevb.c
-+++ b/arch/arm/mach-mmp/tavorevb.c
-@@ -112,5 +112,4 @@ MACHINE_START(TAVOREVB, "PXA910 Evaluation Board (aka TavorEVB)")
- 	.init_irq       = pxa910_init_irq,
- 	.init_time	= pxa910_timer_init,
- 	.init_machine   = tavorevb_init,
--	.restart	= mmp_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index cfadd97..44a6e74 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -311,5 +311,4 @@ MACHINE_START(TTC_DKB, "PXA910-based TTC_DKB Development Platform")
- 	.init_irq       = pxa910_init_irq,
- 	.init_time	= pxa910_timer_init,
- 	.init_machine   = ttc_dkb_init,
--	.restart	= mmp_restart,
- MACHINE_END
--- 
-1.8.3.2
+I'll remove those. However, I would like to retain config options
+related to low latency and small kernel size. Keeping them will
+hopefully allow being notified about changes affecting the system.
+
+Will this fly?
+
+> > +#define LP8X4X_FPGA_PHYS     0x17000000
+> > +#define LP8X4X_FPGA_VIRT     ((void *) 0xf1000000)
+> > +#define LP8X4X_P2V(x)                IOMEM((x) - LP8X4X_FPGA_PHYS + LP8X4X_FPGA_VIRT)
+> > +#define LP8X4X_V2P(x)                ((x) - LP8X4X_FPGA_VIRT + LP8X4X_FPGA_PHYS)
+> 
+> I think you misunderstood my comment, the point was that you should
+> move the IOMEM() to the LP8X4X_FPGA_VIRT definition, like
+> 
+> #define LP8X4X_FPGA_VIRT        ((void __iomem *) 0xf1000000)
+> #define LP8X4X_P2V(x)           (x) - LP8X4X_FPGA_PHYS + LP8X4X_FPGA_VIRT)
+> 
+> which would result in the correct type because of pointer arithmetics.
+> 
+> > +/* board level registers in the FPGA */
+> > +
+> > +#define LP8X4X_EOI           LP8X4X_P2V(0x17009006)
+> > +#define LP8X4X_INSINT                LP8X4X_P2V(0x17009008)
+> > +#define LP8X4X_ENSYSINT              LP8X4X_P2V(0x1700900A)
+> > +#define LP8X4X_PRIMINT               LP8X4X_P2V(0x1700900C)
+> > +#define LP8X4X_SECOINT               LP8X4X_P2V(0x1700900E)
+> > +#define LP8X4X_ENRISEINT     LP8X4X_P2V(0x17009010)
+> > +#define LP8X4X_CLRRISEINT    LP8X4X_P2V(0x17009012)
+> > +#define LP8X4X_ENHILVINT     LP8X4X_P2V(0x17009014)
+> > +#define LP8X4X_CLRHILVINT    LP8X4X_P2V(0x17009016)
+> > +#define LP8X4X_ENFALLINT     LP8X4X_P2V(0x17009018)
+> > +#define LP8X4X_CLRFALLINT    LP8X4X_P2V(0x1700901a)
+> 
+> Thinking about this again, it's actually better if you just get rid of
+> LP8X4X_P2V() entirely and redefine these to
+> 
+> #define LP8X4X_EOI              0x0006
+> #define LP8X4X_INSINT           0x0008
+> ...
+> 
+> and change the users to do e.g.
+> 
+>         readl(LP8X4X_FPGA_VIRT + LP8X4X_INSINT);
+
+I am trying to boot the system with device tree. If I manage, I'll move
+this code into drivers/irqchip/ as a platform device. Otherwise, I'll
+make this change.
+
+> This is closer to the normal way of adding the offset to an __iomem
+> pointer returned from ioremap.
+> 
+> > +     platform_device_register_resndata(NULL, "pxa2xx-flash", 0,
+> > +                     &lp8x4x_flash_resources[0], 1,
+> > +                     &lp8x4x_flash_data[0], sizeof(lp8x4x_flash_data[0]));
+> > +     platform_device_register_resndata(NULL, "pxa2xx-flash", 1,
+> > +                     &lp8x4x_flash_resources[1], 1,
+> > +                     &lp8x4x_flash_data[1], sizeof(lp8x4x_flash_data[1]));
+> > +     platform_device_register_simple("dm9000", 0,
+> > +                     &lp8x4x_dm9000_resources[0], 3);
+> > +     platform_device_register_simple("dm9000", 1,
+> > +                     &lp8x4x_dm9000_resources[3], 3);
+> 
+> This looks much better than the first version, a slight improvement IMHO would
+> be to split the resource arrays into one symbol per device to turn this into
+> 
+> platform_device_register_resndata(NULL, "pxa2xx-flash", 0,
+>                         &lp8x4x_flash_resources0, 1,
+>                         &lp8x4x_flash_data0, sizeof(lp8x4x_flash_data0));
+> platform_device_register_resndata(NULL, "pxa2xx-flash", 1,
+>                         &lp8x4x_flash_resources1, 1,
+>                         &lp8x4x_flash_data1, sizeof(lp8x4x_flash_data1));
+> 
+> It's not important though if you have a strong preference for the way you
+> did this, it just seems unusual.
+
+I'll make this change, if device tree doesn't boot.
+
+Thanks for reviewing.
