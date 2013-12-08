@@ -1,68 +1,86 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  8 Dec 2013 15:40:30 +0100
-Subject: [PATCH v1 5/6] net: phy: suspend unused PHYs on mdio_bus in
- late_initcall
-In-Reply-To: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1386171888-28190-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386513631-11284-6-git-send-email-sebastian.hesselbarth@gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Sun,  8 Dec 2013 15:59:59 +0100
+Subject: [PATCH v4] usb: ohci-at91: fix irq and iomem resource retrieval
+Message-ID: <1386514799-6295-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since phy_attach ensures PHYs are resumed, we can now suspend all
-PHYs that have no attached netdev after initcalls.
+When using dt resources retrieval (interrupts and reg properties) there is
+no predefined order for these resources in the platform dev resources
+table.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Retrieve resources using platform_get_resource and platform_get_irq
+functions instead of direct resource table entries to avoid resource type
+mismatch.
+
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
-Changelog:
-RFCv2->v1:
-- simplify phydev reference (Suggested by Sergei Shtylyov)
+Changes since v3:
+ - replace platform_get_resource call with IORESOURCE_IRQ argument by
+   platform_get_irq
 
-Cc: David Miller <davem@davemloft.net>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Mugunthan V N <mugunthanvnm@ti.com>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/net/phy/mdio_bus.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Changes since v2:
+ - split the patch series to isolate the urgent fix provided by this patch
 
-diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-index 5617876..9ccf9c6 100644
---- a/drivers/net/phy/mdio_bus.c
-+++ b/drivers/net/phy/mdio_bus.c
-@@ -320,6 +320,29 @@ static int mdio_bus_match(struct device *dev, struct device_driver *drv)
- 		(phydev->phy_id & phydrv->phy_id_mask));
- }
+Changes since v1:
+ - none
+
+ drivers/usb/host/ohci-at91.c |   26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 418444e..8c356af 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -136,23 +136,27 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	struct ohci_hcd *ohci;
+ 	int retval;
+ 	struct usb_hcd *hcd = NULL;
+-
+-	if (pdev->num_resources != 2) {
+-		pr_debug("hcd probe: invalid num_resources");
+-		return -ENODEV;
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	int irq;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_dbg(dev, "hcd probe: missing memory resource\n");
++		return -ENXIO;
+ 	}
  
-+static int mdio_bus_suspend_unused(struct device *busdev, void *data)
-+{
-+	struct mii_bus *bus = to_mii_bus(busdev);
-+	int i;
-+
-+	for (i = 0; i < PHY_MAX_ADDR; i++) {
-+		if (!bus->phy_map[i])
-+			continue;
-+
-+		if (!bus->phy_map[i]->attached_dev)
-+			phy_suspend(bus->phy_map[i]);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mdio_bus_class_suspend_unused(void)
-+{
-+	return class_for_each_device(&mdio_bus_class, NULL, NULL,
-+				     mdio_bus_suspend_unused);
-+}
-+late_initcall_sync(mdio_bus_class_suspend_unused);
-+
- #ifdef CONFIG_PM
+-	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+-			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+-		pr_debug("hcd probe: invalid resource type\n");
+-		return -ENODEV;
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_dbg(dev, "hcd probe: missing irq resource\n");
++		return irq;
+ 	}
  
- static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
+ 	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
+ 	if (!hcd)
+ 		return -ENOMEM;
+-	hcd->rsrc_start = pdev->resource[0].start;
+-	hcd->rsrc_len = resource_size(&pdev->resource[0]);
++	hcd->rsrc_start = res->start;
++	hcd->rsrc_len = resource_size(res);
+ 
+ 	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+ 		pr_debug("request_mem_region failed\n");
+@@ -199,7 +203,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	ohci->num_ports = board->ports;
+ 	at91_start_hc(pdev);
+ 
+-	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
++	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (retval == 0)
+ 		return retval;
+ 
 -- 
-1.8.4.rc3
+1.7.9.5
