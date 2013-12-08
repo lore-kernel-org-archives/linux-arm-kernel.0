@@ -1,134 +1,52 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon,  9 Dec 2013 02:53:45 +0400
-Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
+Date: Mon,  9 Dec 2013 02:53:46 +0400
+Subject: [PATCH 6/9] ARM: dts: pxa3xx: move declaration to header
 In-Reply-To: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
 References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
  <1386543229-1542-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1386543229-1542-6-git-send-email-ynvich@gmail.com>
+Message-ID: <1386543229-1542-7-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Non-dts implementation supply required DMA channel numbers as
-IORESOURCE_DMA. However, there is was no way to get them from
-device tree.
+This way it will be more difficult to change the declaration in one
+place, but not the other.
+
+In addition, the change allows to use the binding for pxa-gpio on
+other PXA CPUs.
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 CC: Daniel Mack <zonque@gmail.com>
 CC: Arnd Bergmann <arnd@arndb.de>
 ---
- Documentation/devicetree/bindings/mmc/pxa-mmc.txt |  2 +
- arch/arm/boot/dts/pxa27x.dtsi                     |  4 ++
- drivers/mmc/host/pxamci.c                         | 50 ++++++++++++++++++-----
- 3 files changed, 45 insertions(+), 11 deletions(-)
+ arch/arm/mach-pxa/include/mach/irqs.h | 4 ++++
+ arch/arm/mach-pxa/pxa3xx.c            | 2 --
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-index b7025de..27447ec 100644
---- a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-@@ -5,6 +5,7 @@ Driver bindings for the PXA MCI (MMC/SDIO) interfaces
- Required properties:
- - compatible: Should be "marvell,pxa-mmc".
- - vmmc-supply: A regulator for VMMC
-+- marvell,dma-channels: 2 PXA DMA channels [0] for RX, [1] for TX
- 
- Optional properties:
- - marvell,detect-delay-ms: sets the detection delay timeout in ms.
-@@ -19,6 +20,7 @@ mmc0: mmc at 41100000 {
- 	compatible = "marvell,pxa-mmc";
- 	reg = <0x41100000 0x1000>;
- 	interrupts = <23>;
-+	marvell,dma-channels = <21 22>;
- 	cd-gpios = <&gpio 23 0>;
- 	wp-gpios = <&gpio 24 0>;
- };
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 44df554..3f97520 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -16,5 +16,9 @@
- 			interrupts = <8>, <9>, <10>;
- 			interrupt-names = "gpio0", "gpio1", "gpio_mux";
- 		};
-+
-+		mmc at 41100000 {
-+			marvell,dma-channels = <21 22>;
-+		};
- 	};
- };
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 32fe113..8c7a110 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -613,11 +613,37 @@ static int pxamci_of_init(struct platform_device *pdev)
- 
-         return 0;
- }
-+
-+static int pxamci_of_init_dma(struct platform_device *pdev,
-+		struct pxamci_host *host)
-+{
-+        struct device_node *np = pdev->dev.of_node;
-+        u32 tmp;
-+	int ret;
-+
-+	ret = of_property_read_u32_index(np, "marvell,dma-channels", 0, &tmp);
-+	if (ret < 0)
-+		return ret;
-+	host->dma_drcmrrx = tmp;
-+
-+	ret = of_property_read_u32_index(np, "marvell,dma-channels", 1, &tmp);
-+	if (ret < 0)
-+		return ret;
-+	host->dma_drcmrtx = tmp;
-+
-+	return 0;
-+}
- #else
- static int pxamci_of_init(struct platform_device *pdev)
- {
-         return 0;
- }
-+
-+static int pxamci_of_init_dma(struct platform_device *pdev,
-+		struct pxamci_host *host)
-+{
-+	return -ENODATA;
-+}
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
+index 48c2fd8..0d71ae9 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -113,4 +113,8 @@ void ichp_handle_irq(struct pt_regs *);
+ void pxa_init_irq(int irq_nr, int (*set_wake)(struct irq_data *, unsigned int));
  #endif
  
- static int pxamci_probe(struct platform_device *pdev)
-@@ -741,19 +767,21 @@ static int pxamci_probe(struct platform_device *pdev)
++#ifdef CONFIG_OF
++extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
++#endif /* CONFIG_OF */
++
+ #endif /* __ASM_MACH_IRQS_H */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 87011f3..2397dec 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -42,8 +42,6 @@
+ #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
+ #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
  
- 	platform_set_drvdata(pdev, mmc);
- 
--	dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--	if (!dmarx) {
--		ret = -ENXIO;
--		goto out;
--	}
--	host->dma_drcmrrx = dmarx->start;
-+	if (pxamci_of_init_dma(pdev, host) < 0) {
-+		dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+		if (!dmarx) {
-+			ret = -ENXIO;
-+			goto out;
-+		}
-+		host->dma_drcmrrx = dmarx->start;
- 
--	dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
--	if (!dmatx) {
--		ret = -ENXIO;
--		goto out;
-+		dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
-+		if (!dmatx) {
-+			ret = -ENXIO;
-+			goto out;
-+		}
-+		host->dma_drcmrtx = dmatx->start;
- 	}
--	host->dma_drcmrtx = dmatx->start;
- 
- 	if (host->pdata) {
- 		gpio_cd = host->pdata->gpio_card_detect;
+-extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
+-
+ static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
 -- 
 1.8.4.3
