@@ -1,55 +1,59 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Sun, 8 Dec 2013 22:55:28 +0000
-Subject: [PATCH] ARM: cpu: Document and tweak clock-frequency property
-In-Reply-To: <20131208215026.GO29268@sirena.org.uk>
-References: <1386331027-26065-1-git-send-email-broonie@kernel.org>
- <52A36AB3.6060102@gmail.com> <20131208161922.GK29268@sirena.org.uk>
- <CAFEAcA8qsb0f_5dVbytCD3fGQdT+W4=PJudCY1f-ee4Pwm=0=Q@mail.gmail.com>
- <20131208192237.GM29268@sirena.org.uk>
- <CAFEAcA9oCPi0dj89NJ0k2wOsbVBCV=3=7FBrn=xuYdouJWc98Q@mail.gmail.com>
- <20131208215026.GO29268@sirena.org.uk>
-Message-ID: <CAFEAcA_GG_GW0ZXbTPMp7M0foK_sjUwYx0kk_YULVn0d9ozosA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 8 Dec 2013 15:09:40 -0800
+Subject: [GIT PULL] two regression fixes and two more omap dt fixes against
+ v3.13-rc2
+Message-ID: <pull-1386544180-415931>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 December 2013 21:50, Mark Brown <broonie@kernel.org> wrote:
-> On Sun, Dec 08, 2013 at 07:51:59PM +0000, Peter Maydell wrote:
->> On 8 December 2013 19:22, Mark Brown <broonie@kernel.org> wrote:
->> > (and doesn't reflect the actual deployed code reading the binding
->> > which does use this property without documentation outside ePAPR and does
->> > warn if it's absent)
->
->> This code should be fixed, then... (I'm pretty sure the kernel
->> has not always warned about the absence of this property,
->> or there would not be such a wide prevalence of DTs and
->> DT generating code which omitted it.)
->
-> Too late for that, it's shipping in stable kernels.
+The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
 
-> There does come a point where it's just nitpicking and not helpful but
-> if it has a substantial effect on functionality then it's useful.  In
-> this case suppressing the warning for non-asymmetric systems might be
-> sensible.
+  Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
 
-Hmm, so "mandatory for non-symmetric [I assume you mean
-that and not really 'non-asymmetric'?], otherwise optional" ?
-I think that would be reasonable and preserve backwards
-compatibility.
+are available in the git repository at:
 
-> For all practical purposes it is currently optional but the spec says
-> it is mandatory.  I would rather err on the side of not changing the
-> documentation in case someone does work based on ePAPR and/or an old
-> kernel and since doing that keeps the spec more stable even if we do
-> implement in a more tolerant fashion within Linux (as we should).
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/yet-more-dt-regressions-take2
 
-As I say, I don't think your specification currently does say
-it is mandatory. If the documentation doesn't clearly list
-it as a mandatory parameter, and a large number of
-people writing DTS files or DT generation code haven't
-put it in, and the kernel didn't complain about it not being
-present for a long long time, then de facto it is optional,
-and you should make your documentation conform with reality
-and fix bugs where the kernel isn't coping with that.
+for you to fetch changes up to f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
 
-thanks
--- PMM
+  ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
+
+----------------------------------------------------------------
+A rather big fix for a regression where we have dropped omap4 hwmod
+data earlier but are not initializing it from device tree. In addition
+to this fix we eventually also be fix the issues in the .dts files
+and drivers, but that's too intrusive for the -rc cycle and must be
+done later on.
+
+Also a fix for a regression where we now are wrongly trying to initialize
+devices on secure omaps like n900 and n9* when booted using device tree.
+We need to set aes, sham and timer12 to disabled mode for secure
+devices as they are claimed by the firmware running in the secure mode.
+
+And two more legacy booting vs device tree based booting fixes for
+am3517 that I did not notice earlier until Nishant Menon reported
+these to me few days ago. With these we're good to go having v3.13
+working both for legacy booting and device tree based booting, and we
+can then go ahed and drop the legacy booting for mach-omap2 for v3.14.
+
+----------------------------------------------------------------
+Nishanth Menon (1):
+      ARM: OMAP2+: Fix the machine entry for am3517
+
+Tony Lindgren (3):
+      ARM: OMAP2+: Fix overwriting hwmod data with data from device tree
+      ARM: dts: Fix missing entries for am3517
+      ARM: dts: Fix booting for secure omaps
+
+ arch/arm/boot/dts/am3517-evm.dts     |  6 +--
+ arch/arm/boot/dts/am3517.dtsi        | 63 +++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-n900.dts     |  2 +-
+ arch/arm/boot/dts/omap3-n950-n9.dtsi |  2 +-
+ arch/arm/boot/dts/omap34xx-hs.dtsi   | 16 ++++++
+ arch/arm/boot/dts/omap36xx-hs.dtsi   | 16 ++++++
+ arch/arm/mach-omap2/board-generic.c  | 18 +++++++
+ arch/arm/mach-omap2/omap_hwmod.c     | 98 ++++++++++++++++++++++++++++--------
+ 8 files changed, 196 insertions(+), 25 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am3517.dtsi
+ create mode 100644 arch/arm/boot/dts/omap34xx-hs.dtsi
+ create mode 100644 arch/arm/boot/dts/omap36xx-hs.dtsi
