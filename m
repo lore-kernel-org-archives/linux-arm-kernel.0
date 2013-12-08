@@ -1,39 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 8 Dec 2013 03:44:56 +0100
-Subject: [RFC part1 PATCH 0/7] Make ACPI core running on ARM64
-In-Reply-To: <20131206135825.GG29268@sirena.org.uk>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312052325.02603.arnd@arndb.de> <20131206135825.GG29268@sirena.org.uk>
-Message-ID: <201312080344.56317.arnd@arndb.de>
+Date: Sun, 8 Dec 2013 04:02:41 +0100
+Subject: [PATCH] ARM: clean-up common multi-platform kconfig options
+In-Reply-To: <alpine.LFD.2.10.1312072111410.15948@knanqh.ubzr>
+References: <1386262722-26016-1-git-send-email-robherring2@gmail.com>
+ <CAL_Jsq+7j62ucsA96TbRrFSqHBR5SGUvWeqdsxtUvEtcbtdGyQ@mail.gmail.com>
+ <alpine.LFD.2.10.1312072111410.15948@knanqh.ubzr>
+Message-ID: <201312080402.42101.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 December 2013, Mark Brown wrote:
-> On Thu, Dec 05, 2013 at 11:25:02PM +0100, Arnd Bergmann wrote:
-> 
-> > However, as I mentioned before I am much more worried about the parts that
-> > are not done (or not posted) yet and that will be required to actually
-> > have working support for a real server system. Until we know more about
-> > where this is heading, I think we should not merge any of the ARM specific
-> > parts of your patches. Any patches that are reasonable cleanups and bug
-> > fixes for the ACPI subsystem should of course get merged once they are
-> > reviewed.
-> 
-> OTOH if it's well encapsulated, is going to be required for any kind of
-> ACPI use and gets to the point where people are OK with it by itself
-> then I'm not sure what we'd gain by keeping it out of tree - it'd make
-> the real system patch sets bigger and harder to review.
+On Sunday 08 December 2013, Nicolas Pitre wrote:
+> The right fix is probably to leave it as is and optimize your user space 
+> for ARMv6k instead, meaning that this operation would then be 
+> implemented inline rather than relying on the kernel helper.
 
-I'd agree as soon as someone can convince me that we actually want ACPI
-support in the kernel for ARM64 servers. As far as I'm concerned it's quite
-possible that the people who have worked on this for the past couple of
-years behind closed doors know what they are doing and it will all be
-good, but it's also possible that it turns into a huge trainwreck once
-we see multiple implementations that have fundamentally incompatible
-requirements regarding what they want from ACPI and we end up not doing
-it at all. I just don't have enough information at this point to know which
-of the two is true and I'd like to ensure that accepting the patches
-that meet your criteria above would not be seen as an endorsement to do
-crazy stuff later.
+That would not make the program run on ARMv6 though. The bug we're trying
+to fix is for running a kernel with ARMv6k support built-in on an
+OMAP2 with ARMv6. The kuser helper already supports cmpxchg for pure
+v6 builds, but that code doesn't get built (and isn't SMP safe) with
+CONFIG_CPU_V6K or CONFIG_CPU_V7 enabled.
+ 
+> Otherwise if you really want to optimize the kernel helper at runtime 
+> for ARMv6k when ARMv6 is also configured in, then you could do some 
+> instruction patching in kuser_init() as we already do for getting the 
+> TLS value.
+
+This does sound like the cleanest solution.
 
 	Arnd
