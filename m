@@ -1,234 +1,308 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  8 Dec 2013 15:14:00 +0100
-Subject: [PATCH v4 3/9] ARM: l2x0: add Marvell Tauros3 support
+Date: Sun,  8 Dec 2013 15:14:05 +0100
+Subject: [PATCH v4 8/9] ARM: add Armada 1500-mini and Chromecast device tree
+ files
 In-Reply-To: <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386512047-874-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386512047-874-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Marvell Tauros3 cache controller which
-is compatible with pl310 cache controller but broadcasts L1 cache
-operations to L2 cache. While updating the binding documentation,
-clean up the list of possible compatibles. Also reorder driver
-compatibles in alphabetical order.
+This adds very basic device tree files for the Marvell Armada
+1500-mini SoC (Berlin BG2CD) and the Google Chromecast. Currently,
+SoC only has nodes for cpu, some clocks, l2 cache controller, local
+timer, apb timers, uart, and interrupt controllers.
+The Google Chromecast is a consumer device comprising the Armada
+1500-mini SoC above.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
 Changelog:
 v3->v4:
-- reorder compatibles alphabetically (see [1])
-  [1] http://www.kernelhub.org/?msg=372182&p=2
-v2->v3:
-- none
-v1->v2:
-- add tauros3 data without outer cache ops (Suggested by Jisheng Zhang)
-- reorder compatibles to allow derivates to be compatible with ARM
-  controllers (Suggested by Mark Rutland)
+- rename dts/dtsi to vendor,name.dts[i] (Suggested by Kumar Gala)
+- remove non-mainline l2 properties (Reported by Jisheng Zhang)
+v3:
+- initial patch
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Kevin Hilman <khilman@linaro.org>
-Cc: devicetree at vger.kernel.org 
-Cc: linux-doc at vger.kernel.org 
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt | 23 ++++++------
- arch/arm/include/asm/hardware/cache-l2x0.h     |  1 +
- arch/arm/mm/cache-l2x0.c                       | 48 +++++++++++++++++++++-----
- arch/arm/mm/cache-tauros3.h                    | 41 ++++++++++++++++++++++
- 4 files changed, 94 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mm/cache-tauros3.h
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/google,chromecast.dts  |  29 +++++
+ arch/arm/boot/dts/marvell,berlin2cd.dtsi | 210 +++++++++++++++++++++++++++++++
+ 3 files changed, 240 insertions(+)
+ create mode 100644 arch/arm/boot/dts/google,chromecast.dts
+ create mode 100644 arch/arm/boot/dts/marvell,berlin2cd.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index c0c7626..b513cb8 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -7,20 +7,21 @@ The ARM L2 cache representation in the device tree should be done as follows:
- Required properties:
- 
- - compatible : should be one of:
--	"arm,pl310-cache"
--	"arm,l220-cache"
--	"arm,l210-cache"
--	"marvell,aurora-system-cache": Marvell Controller designed to be
-+  "arm,pl310-cache"
-+  "arm,l220-cache"
-+  "arm,l210-cache"
-+  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
-+  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
-+     offset needs to be added to the address before passing down to the L2
-+     cache controller
-+  "marvell,aurora-system-cache": Marvell Controller designed to be
-      compatible with the ARM one, with system cache mode (meaning
-      maintenance operations on L1 are broadcasted to the L2 and L2
-      performs the same operation).
--	"marvell,"aurora-outer-cache: Marvell Controller designed to be
--	 compatible with the ARM one with outer cache mode.
--	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
--	offset needs to be added to the address before passing down to the L2
--	cache controller
--	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
--	                               "brcm,bcm11351-a2-pl310-cache"
-+  "marvell,aurora-outer-cache": Marvell Controller designed to be
-+     compatible with the ARM one with outer cache mode.
-+  "marvell,tauros3-cache": Marvell Tauros3 cache controller, compatible
-+     with arm,pl310-cache controller.
- - cache-unified : Specifies the cache is a unified cache.
- - cache-level : Should be set to 2 for a level 2 cache.
- - reg : Physical base address and size of cache controller's memory mapped
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 3b2c40b..6795ff7 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -131,6 +131,7 @@ struct l2x0_regs {
- 	unsigned long prefetch_ctrl;
- 	unsigned long pwr_ctrl;
- 	unsigned long ctrl;
-+	unsigned long aux2_ctrl;
- };
- 
- extern struct l2x0_regs l2x0_saved_regs;
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 447da6f..7abde2c 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -25,6 +25,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include "cache-tauros3.h"
- #include "cache-aurora-l2.h"
- 
- #define CACHE_LINE_SIZE		32
-@@ -767,6 +768,14 @@ static void aurora_save(void)
- 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- }
- 
-+static void __init tauros3_save(void)
-+{
-+	l2x0_saved_regs.aux2_ctrl =
-+		readl_relaxed(l2x0_base + TAUROS3_AUX2_CTRL);
-+	l2x0_saved_regs.prefetch_ctrl =
-+		readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-+}
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f742800..39b5e4e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -46,6 +46,7 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+ 	bcm28155-ap.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += \
++	google,chromecast.dtb	\
+ 	sony,nsz-gs7.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+diff --git a/arch/arm/boot/dts/google,chromecast.dts b/arch/arm/boot/dts/google,chromecast.dts
+new file mode 100644
+index 0000000..42e37e7
+--- /dev/null
++++ b/arch/arm/boot/dts/google,chromecast.dts
+@@ -0,0 +1,29 @@
++/*
++ * Device Tree file for Google Chromecast
++ *
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- static void l2x0_resume(void)
- {
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-@@ -821,6 +830,18 @@ static void aurora_resume(void)
- 	}
- }
- 
-+static void tauros3_resume(void)
-+{
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		writel_relaxed(l2x0_saved_regs.aux2_ctrl,
-+			       l2x0_base + TAUROS3_AUX2_CTRL);
-+		writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
-+			       l2x0_base + L2X0_PREFETCH_CTRL);
-+	}
++/dts-v1/;
 +
-+	l2x0_resume();
-+}
++#include "marvell,berlin2cd.dtsi"
 +
- static void __init aurora_broadcast_l2_commands(void)
- {
- 	__u32 u;
-@@ -906,6 +927,15 @@ static const struct l2x0_of_data aurora_no_outer_data = {
- 	},
- };
- 
-+static const struct l2x0_of_data tauros3_data = {
-+	.setup = NULL,
-+	.save  = tauros3_save,
-+	/* Tauros3 broadcasts L1 cache operations to L2 */
-+	.outer_cache = {
-+		.resume      = tauros3_resume,
-+	},
++/ {
++	model = "Google Chromecast";
++	compatible = "google,chromecast", "marvell,berlin2cd", "marvell,berlin";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>; /* 512 MB */
++	};
 +};
 +
- static const struct l2x0_of_data bcm_l2x0_data = {
- 	.setup = pl310_of_setup,
- 	.save  = pl310_save,
-@@ -922,17 +952,19 @@ static const struct l2x0_of_data bcm_l2x0_data = {
- };
- 
- static const struct of_device_id l2x0_ids[] __initconst = {
--	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
--	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
- 	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
--	{ .compatible = "marvell,aurora-system-cache",
--	  .data = (void *)&aurora_no_outer_data},
--	{ .compatible = "marvell,aurora-outer-cache",
--	  .data = (void *)&aurora_with_outer_data},
--	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
--	  .data = (void *)&bcm_l2x0_data},
-+	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
-+	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
- 	{ .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
- 	  .data = (void *)&bcm_l2x0_data},
-+	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
-+	  .data = (void *)&bcm_l2x0_data},
-+	{ .compatible = "marvell,aurora-outer-cache",
-+	  .data = (void *)&aurora_with_outer_data},
-+	{ .compatible = "marvell,aurora-system-cache",
-+	  .data = (void *)&aurora_no_outer_data},
-+	{ .compatible = "marvell,tauros3-cache",
-+	  .data = (void *)&tauros3_data },
- 	{}
- };
- 
-diff --git a/arch/arm/mm/cache-tauros3.h b/arch/arm/mm/cache-tauros3.h
++&uart0 { status = "okay"; };
+diff --git a/arch/arm/boot/dts/marvell,berlin2cd.dtsi b/arch/arm/boot/dts/marvell,berlin2cd.dtsi
 new file mode 100644
-index 0000000..02c0a97
+index 0000000..094968c
 --- /dev/null
-+++ b/arch/arm/mm/cache-tauros3.h
-@@ -0,0 +1,41 @@
++++ b/arch/arm/boot/dts/marvell,berlin2cd.dtsi
+@@ -0,0 +1,210 @@
 +/*
-+ * Marvell Tauros3 cache controller includes
++ * Device Tree Include file for Marvell Armada 1500-mini (Berlin BG2CD) SoC
 + *
 + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 + *
 + * based on GPL'ed 2.6 kernel sources
 + *  (c) Marvell International Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef __ASM_ARM_HARDWARE_TAUROS3_H
-+#define __ASM_ARM_HARDWARE_TAUROS3_H
++#include "skeleton.dtsi"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
-+/*
-+ * Marvell Tauros3 L2CC is compatible with PL310 r0p0
-+ * but with PREFETCH_CTRL (r2p0) and an additional event counter.
-+ * Also, there is AUX2_CTRL for some Marvell specific control.
-+ */
++/ {
++	model = "Marvell Armada 1500-mini (BG2CD) SoC";
++	compatible = "marvell,berlin2cd", "marvell,berlin";
 +
-+#define TAUROS3_EVENT_CNT2_CFG		0x224
-+#define TAUROS3_EVENT_CNT2_VAL		0x228
-+#define TAUROS3_INV_ALL			0x780
-+#define TAUROS3_CLEAN_ALL		0x784
-+#define TAUROS3_AUX2_CTRL		0x820
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+/* Registers shifts and masks */
-+#define TAUROS3_AUX2_CTRL_LINEFILL_BURST8_EN	(1 << 2)
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <0>;
++		};
++	};
 +
-+#endif
++	clocks {
++		smclk: sysmgr-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++
++		cfgclk: cfg-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <75000000>;
++		};
++
++		sysclk: system-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <300000000>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupt-parent = <&gic>;
++
++		ranges = <0 0xf7000000 0x1000000>;
++
++		l2: l2-cache-controller at ac0000 {
++			compatible = "arm,pl310-cache";
++			reg = <0xac0000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++		};
++
++		gic: interrupt-controller at ad1000 {
++			compatible = "arm,cortex-a9-gic";
++			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
++
++		local-timer at ad0600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0xad0600 0x20>;
++			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysclk>;
++		};
++
++		apb at e80000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ranges = <0 0xe80000 0x10000>;
++			interrupt-parent = <&aic>;
++
++			timer0: timer at 2c00 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c00 0x14>;
++				interrupts = <8>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "okay";
++			};
++
++			timer1: timer at 2c14 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c14 0x14>;
++				interrupts = <9>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "okay";
++			};
++
++			timer2: timer at 2c28 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c28 0x14>;
++				interrupts = <10>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			timer3: timer at 2c3c {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c3c 0x14>;
++				interrupts = <11>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			timer4: timer at 2c50 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c50 0x14>;
++				interrupts = <12>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			timer5: timer at 2c64 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c64 0x14>;
++				interrupts = <13>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			timer6: timer at 2c78 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c78 0x14>;
++				interrupts = <14>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			timer7: timer at 2c8c {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c8c 0x14>;
++				interrupts = <15>;
++				clocks = <&cfgclk>;
++				clock-names = "timer";
++				status = "disabled";
++			};
++
++			aic: interrupt-controller at 3000 {
++				compatible = "snps,dw-apb-ictl";
++				reg = <0x3000 0xc00>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
++		apb at fc0000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ranges = <0 0xfc0000 0x10000>;
++			interrupt-parent = <&sic>;
++
++			uart0: serial at 9000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x9000 0x100>;
++				reg-shift = <2>;
++				reg-io-width = <1>;
++				interrupts = <8>;
++				clocks = <&smclk>;
++				status = "disabled";
++			};
++
++			uart1: serial at a000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0xa000 0x100>;
++				reg-shift = <2>;
++				reg-io-width = <1>;
++				interrupts = <9>;
++				clocks = <&smclk>;
++				status = "disabled";
++			};
++
++			sic: interrupt-controller at e000 {
++				compatible = "snps,dw-apb-ictl";
++				reg = <0xe000 0x400>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++	};
++};
 -- 
 1.8.4.rc3
