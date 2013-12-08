@@ -1,57 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 08 Dec 2013 21:31:18 +0300
-Subject: [PATCH v4 1/3] usb: ohci-at91: replace request_mem_region +
- ioremap by devm_ioremap_resource
-In-Reply-To: <1386514980-6383-2-git-send-email-b.brezillon@overkiz.com>
-References: <1386514980-6383-1-git-send-email-b.brezillon@overkiz.com>
- <1386514980-6383-2-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52A4BAF6.501@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 8 Dec 2013 12:54:08 -0500
+Subject: [PATCH] ARM: DT: Dove: Use symbolic names from gpio.h
+In-Reply-To: <1386517687-28820-1-git-send-email-andrew@lunn.ch>
+References: <1386517687-28820-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20131208175408.GL11251@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 12/08/2013 06:02 PM, Boris BREZILLON wrote:
-
-> Replace the request_mem_region + ioremap calls by the
-> devm_ioremap_resource call which does the same things but with device
-> managed resources.
-
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+On Sun, Dec 08, 2013 at 04:48:07PM +0100, Andrew Lunn wrote:
+> Replace 0 and 1 with GPIO_ACTIVE_HIGH, GPIO_ACTIVE_LOW
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->   drivers/usb/host/ohci-at91.c |   28 +++++++---------------------
->   1 file changed, 7 insertions(+), 21 deletions(-)
+>  arch/arm/boot/dts/dove-cubox.dts  |  8 ++++----
+>  arch/arm/boot/dts/dove-d2plug.dts |  6 +++---
+>  arch/arm/boot/dts/dove-d3plug.dts | 12 ++++++------
+>  arch/arm/boot/dts/dove.dtsi       |  1 +
+>  4 files changed, 14 insertions(+), 13 deletions(-)
 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 8c356af..fe2ecc5 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -158,24 +158,18 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   	hcd->rsrc_start = res->start;
->   	hcd->rsrc_len = resource_size(res);
->
-> -	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-> -		pr_debug("request_mem_region failed\n");
-> -		retval = -EBUSY;
-> -		goto err1;
-> -	}
-> -
-> -	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-> -	if (!hcd->regs) {
-> -		pr_debug("ioremap failed\n");
-> -		retval = -EIO;
-> -		goto err2;
-> +	hcd->regs = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(hcd->regs)) {
-> +		dev_dbg(dev, "devm_ioremap_resource failed\n");
+Applied to mvebu/dt
 
-    I've already told you devm_ioremap_resource() prints the detailed error 
-message. No need to duplicate it.
+thx,
 
-> +		retval = PTR_ERR(hcd->regs);
-> +		goto err;
->   	}
-
-WBR, Sergei
+Jason.
