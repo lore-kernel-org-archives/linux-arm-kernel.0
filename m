@@ -1,104 +1,43 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 09 Dec 2013 17:56:05 +0000
-Subject: [PATCH] ARM64: dts: Add clock-frequency to model cpu nodes
-In-Reply-To: <1386335683-11405-1-git-send-email-broonie@kernel.org>
-References: <1386335683-11405-1-git-send-email-broonie@kernel.org>
-Message-ID: <1386611765.3380.70.camel@linaro1.home>
+From: courtney.cavin@sonymobile.com (Courtney Cavin)
+Date: Mon, 9 Dec 2013 09:57:51 -0800
+Subject: [PATCH CFT] ARM:MSM: Enable ARM_PATCH_PHYS_VIRT and
+ AUTO_ZRELADDR default
+In-Reply-To: <1386582050-21375-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+References: <1386582050-21375-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+Message-ID: <20131209175751.GB15223@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-06 at 13:14 +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
+On Mon, Dec 09, 2013 at 10:40:50AM +0100, panchaxari wrote:
+> ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR have been enabled as default configs
+> to MSM platform
 > 
-> The clock-frequency property is meaningless for the models but it's a
-> mandatory property so claim that all the cores run at 1MHz.
-
-Is it a mandatory property? I know we seem to get ugly warnings if it's
-missing but I see no mention of it at all in
-Documentation/devicetree/bindings/arm/cpus.txt (am I looking in the
-wrong place?)
-
-I think this attribute got merged into the kernel with the early power
-related scheduling efforts, but given the state of all that at the
-moment I was guessing it might be obsolete.
-
--- Tixy
-
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/boot/dts/foundation-v8.dts  | 4 ++++
->  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 4 ++++
->  2 files changed, 8 insertions(+)
+> Introduction of PHYS_VIRT config as default would enable phy-to-virt and
+> virt-to-phy translation function at boot and module loading time
+> and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
+> enable calculation of kernel load address at run time.
 > 
-> diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
-> index 4a060906809d..f91b2fa41fb3 100644
-> --- a/arch/arm64/boot/dts/foundation-v8.dts
-> +++ b/arch/arm64/boot/dts/foundation-v8.dts
-> @@ -34,6 +34,7 @@
->  			reg = <0x0 0x0>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  		cpu at 1 {
->  			device_type = "cpu";
-> @@ -41,6 +42,7 @@
->  			reg = <0x0 0x1>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  		cpu at 2 {
->  			device_type = "cpu";
-> @@ -48,6 +50,7 @@
->  			reg = <0x0 0x2>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  		cpu at 3 {
->  			device_type = "cpu";
-> @@ -55,6 +58,7 @@
->  			reg = <0x0 0x3>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  	};
->  
-> diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> index 572005ea2217..d7debfe79d9f 100644
-> --- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> +++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> @@ -37,6 +37,7 @@
->  			reg = <0x0 0x0>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  		cpu at 1 {
->  			device_type = "cpu";
-> @@ -44,6 +45,7 @@
->  			reg = <0x0 0x1>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  		cpu at 2 {
->  			device_type = "cpu";
-> @@ -51,6 +53,7 @@
->  			reg = <0x0 0x2>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  		cpu at 3 {
->  			device_type = "cpu";
-> @@ -58,6 +61,7 @@
->  			reg = <0x0 0x3>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x0 0x8000fff8>;
-> +			clock-frequency = <1000000>;
->  		};
->  	};
->  
+> PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
+> systems with NOR flash devices, and ZRELADDR config is mutually exclusive
+> to ZBOOT_ROM.
+> 
+> CFT::Call For Testing
+> 
+> Requesting maintainers of MSM platforms to evaluate the changes on the board
+> and comment, as I dont have the board for testing and also requesting an ACK
+> 
+> Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+
+We run with these enabled on our development boards already.
+
+Tested-by: Courtney Cavin <courtney.cavin@sonymobile.com>
+
+-Courtney
