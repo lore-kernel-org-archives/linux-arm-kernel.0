@@ -1,59 +1,52 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 08 Dec 2013 16:16:15 -0800 (PST)
-Subject: [alsa-devel] [PATCH 2/2] ASoC: sh: rcar: Depend
- on	ARCH_SHMOBILE_LEGACY
-In-Reply-To: <1682501.71qI5yTem5@avalon>
-References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1384000429-3590-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1682501.71qI5yTem5@avalon>
-Message-ID: <87wqjevpyv.wl%kuninori.morimoto.gx@renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 01:54:59 +0100
+Subject: [PATCH v2 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <1386486335.7152.83.camel@host5.omatika.ru>
+References: <1385879185-22455-3-git-send-email-ynvich@gmail.com>
+ <201312080321.12001.arnd@arndb.de>
+ <1386486335.7152.83.camel@host5.omatika.ru>
+Message-ID: <201312090154.59534.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent
-
-Thank you for your patch
-
-> What's your opinion about this patch ? It needs to be applied on top of 
-> "[PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY" which has been 
-> queued by Simon.
+On Sunday 08 December 2013, Sergei Ianovich wrote:
+> On Sun, 2013-12-08 at 03:21 +0100, Arnd Bergmann wrote:
+> > On Friday 06 December 2013, Sergei Ianovich wrote:
+> > You have some rather unusual options in here. I'd suggest you go through
+> > the reduced defconfig file and remove all options that look like they
+> > are unnecessary for your system.
+> > 
+> > It's probably based on some distro config that enables lots of modules
+> > you don't actually want.
 > 
-> On Saturday 09 November 2013 13:33:49 Laurent Pinchart wrote:
-> > The driver doesn't compile on multiplatform kernels as it requires
-> > <mach/clock.h>.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> >  sound/soc/sh/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/sound/soc/sh/Kconfig b/sound/soc/sh/Kconfig
-> > index 56d8ff6..ce7cfd6 100644
-> > --- a/sound/soc/sh/Kconfig
-> > +++ b/sound/soc/sh/Kconfig
-> > @@ -36,6 +36,7 @@ config SND_SOC_SH4_SIU
-> > 
-> >  config SND_SOC_RCAR
-> >  	tristate "R-Car series SRU/SCU/SSIU/SSI support"
-> > +	depends on ARCH_SHMOBILE_LEGACY
-> >  	select SND_SIMPLE_CARD
-> >  	select RCAR_CLK_ADG
-> >  	help
+> I tried to future-proof the config, by enabling all partition tables and
+> USB disks and modems that could be plugged into the device.
+> 
+> I'll remove those. However, I would like to retain config options
+> related to low latency and small kernel size. Keeping them will
+> hopefully allow being notified about changes affecting the system.
+> 
+> Will this fly?
 
-<mach/clock.h> had been removed by this patch.
-Does it solve your issue ?
+Yes, of course, keep as many as you need. I was just trying to ensure
+that you had put some thought in it, and e.g. the various USB serial
+modules and some other things appeared to be fairly random, but I can
+see them making sense now.
 
-commit d3be689e6a07c00123786659b4429b07cf4272ac
-Author: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Date:   Tue Sep 24 01:25:08 2013 -0700
+> > #define LP8X4X_EOI              0x0006
+> > #define LP8X4X_INSINT           0x0008
+> > ...
+> > 
+> > and change the users to do e.g.
+> > 
+> >         readl(LP8X4X_FPGA_VIRT + LP8X4X_INSINT);
+> 
+> I am trying to boot the system with device tree. If I manage, I'll move
+> this code into drivers/irqchip/ as a platform device. Otherwise, I'll
+> make this change.
 
-    ASoC: rcar: remove unnecessary mach/clock.h
-    
-    ${LINUX}/sound/soc/sh driver can be compiled from
-    SuperH and ARM.
-    but, ${LINUX}/sound/soc/sh/rcar driver included
-    SH-ARM specific header.
-    This patch removes it
-    
-    Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-    Signed-off-by: Mark Brown <broonie@linaro.org>
+Ok, cool. If you need help with the DT conversion, just ask here or on
+IRC (#armlinux or #mvlinux on freenode.net, there might also be a
+PXA specific channel I don't know).
+
+	Arnd
