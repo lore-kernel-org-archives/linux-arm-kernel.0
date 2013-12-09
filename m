@@ -1,34 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Dec 2013 16:58:53 +0000
-Subject: [Patch v2 2/2] ASoC: atmel: sam9x5_wm8731: remove
- platform_set_drvdata
-In-Reply-To: <52A59955.8000100@atmel.com>
-References: <1385546710-11308-1-git-send-email-voice.shen@atmel.com>
- <1385546710-11308-2-git-send-email-voice.shen@atmel.com>
- <52A59955.8000100@atmel.com>
-Message-ID: <20131209165853.GS29268@sirena.org.uk>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 09 Dec 2013 18:02:21 +0100
+Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
+In-Reply-To: <201312091748.58386.arnd@arndb.de>
+References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
+ <201312091648.13802.arnd@arndb.de> <52A5ED03.2070306@overkiz.com>
+ <201312091748.58386.arnd@arndb.de>
+Message-ID: <52A5F79D.9070408@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 11:20:05AM +0100, Nicolas Ferre wrote:
+On 09/12/2013 17:48, Arnd Bergmann wrote:
+> On Monday 09 December 2013, boris brezillon wrote:
+>> Hello Arnd,
+>>
+>> On 09/12/2013 16:48, Arnd Bergmann wrote:
+>>> On Monday 09 December 2013, boris brezillon wrote:
+>>>>> You are adding "clock-names" properties in a lot of cases. Are you sure you
+>>>>> are using the strings that are documented in the respective device bindings
+>>>>> for each name? In a lot of cases, drivers just want an anonymous clock
+>>>>> and we don't name them.
+>>>> I rechecked it, and almost all drivers call [devm_]clk_get with a
+>>>> specific clock
+>>>> name, and as a result we must specify the "clock-names" property.
+>>>> The only exceptions I found are the spi and PIT (Periodic Interval
+>>>> Timer) drivers,
+>>>> and "clock-names" property is not defined in these nodes.
+>>> Yes, I understood that the *drivers* use the names, but are they actually
+>>> documented in the device bindings? If not, it might be better to change the
+>>> drivers.
+>> We have to keep both clk system working for at91 platform (new CCF based
+>> clk implementations and old clk implementations) for two reasons:
+>> 1) the new clk implemetations are only compatible with DT enabled boards
+>>       and some at91 boards are not yet ported to DT.
+>> 2) we decided to move to the new clk implementations in multiple steps
+>> (one SoC
+>>       family after another) in order to ease PATCH review.
+>>
+>> If we change the drivers to avoid specific clock name request
+>> ([devm]_clk_get(dev, NULL)),
+>> we will have to change the old static clk lookup tables
+>> (i.e.
+>> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9g45.c#L226,
+>> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9260.c#L202,
+>> ...).
+> Yes, that is a bit painful, but we really need to ensure that the drivers
+> implement the documented binding. If they don't match we have to either
+> review and change all the binding documents, or change the static clock
+> tables and the drivers.
+>
+> Note that I have not checked your binding documents for the devices in
+> question. If they already document these names, we don't need to change
+> anything.
 
-> It seems that this patch has not been applied to your "next" branch
-> (aka ping)...
+Are you talking about drivers or clk binding documentation ?
+In either cases they're not defined :-), but I'd like to know which 
+file(s) I
+should update.
 
-If you think something has been forgotten please resend.  If it's
-genuinely been lost it's going to need resending and the mail just leads
-to more mails, a resend can be directly applied.  I had thought I'd
-replied to this at the time but it seems I didn't, or at least I can't
-see my reply on the list...  sorry about that.
+I'd rather not change the static clock lookup tables, but if you prefer this
+approach (and Nicolas agrees), I'll propose a series modifying the drivers
+and clk lookup table.
 
-The question was if we should change this or if we should change the
-core to not overwrite something that probably ought to be the driver's
-domain?  Looking at the code I think we're probably doing the right
-thing but it'd be good to consider.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/06881f6f/attachment.sig>
+Whatever solution is choosen, I guess I'll have to update the drivers dt
+binding documentation anyway ;-).
+
+Best Regards,
+
+Boris
+
+>
+> 	Arnd
