@@ -1,50 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:47 -0500
-Subject: [PATCH v3 14/23] mm/lib/cpumask: Use memblock apis for early memory
- allocations
-In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 9 Dec 2013 15:56:41 -0600
+Subject: [PATCH v3 01/23] mm/memblock: debug: correct displaying of upper
+ memory boundary
+In-Reply-To: <1386625856-12942-2-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-15-git-send-email-santosh.shilimkar@ti.com>
+ <1386625856-12942-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131209215641.GF29143@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to memblock interfaces for early memory allocator instead of
-bootmem allocator. No functional change in beahvior than what it is
-in current code from bootmem users points of view.
+On Mon, Dec 09, 2013 at 04:50:34PM -0500, Santosh Shilimkar wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> When debugging is enabled (cmdline has "memblock=debug") the memblock
+> will display upper memory boundary per each allocated/freed memory range
+> wrongly. For example:
+>  memblock_reserve: [0x0000009e7e8000-0x0000009e7ed000] _memblock_early_alloc_try_nid_nopanic+0xfc/0x12c
+> 
+> The 0x0000009e7ed000 is displayed instead of 0x0000009e7ecfff
+> 
+> Hence, correct this by changing formula used to calculate upper memory
+> boundary to (u64)base + size - 1 instead of  (u64)base + size everywhere
+> in the debug messages.
+> 
+> Cc: Yinghai Lu <yinghai@kernel.org>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Tejun Heo <tj@kernel.org>
+> Acked-by: Tejun Heo <tj@kernel.org>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Archs already converted to NO_BOOTMEM now directly use memblock
-interfaces instead of bootmem wrappers build on top of memblock. And the
-archs which still uses bootmem, these new apis just fallback to exiting
-bootmem APIs.
+Very minor patch but perhaps we should Cc: stable here ? not that it
+matters much...
 
-Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- lib/cpumask.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/lib/cpumask.c b/lib/cpumask.c
-index d327b87..b810b75 100644
---- a/lib/cpumask.c
-+++ b/lib/cpumask.c
-@@ -140,7 +140,7 @@ EXPORT_SYMBOL(zalloc_cpumask_var);
-  */
- void __init alloc_bootmem_cpumask_var(cpumask_var_t *mask)
- {
--	*mask = alloc_bootmem(cpumask_size());
-+	*mask = memblock_virt_alloc(cpumask_size(), 0);
- }
- 
- /**
-@@ -161,6 +161,6 @@ EXPORT_SYMBOL(free_cpumask_var);
-  */
- void __init free_bootmem_cpumask_var(cpumask_var_t mask)
- {
--	free_bootmem(__pa(mask), cpumask_size());
-+	memblock_free_early(__pa(mask), cpumask_size());
- }
- #endif
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/b729d3dc/attachment.sig>
