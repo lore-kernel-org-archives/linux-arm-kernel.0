@@ -1,64 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 09 Dec 2013 17:14:22 +0000
-Subject: [PATCH 1/2 v2] arm/arm64: KVM: =?UTF-8?Q?arch=5Ftimer=3A=20In?=
- =?UTF-8?Q?itialize=20cntvoff=20at=20kvm=5Finit?=
-In-Reply-To: <1384657926-28194-2-git-send-email-christoffer.dall@linaro.org>
-References: <1384657926-28194-1-git-send-email-christoffer.dall@linaro.org>
- <1384657926-28194-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <e2352c2fd2be8308b5800254706c0b61@www.loen.fr>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Dec 2013 09:16:18 -0800
+Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
+ 4.7.2-5)
+In-Reply-To: <alpine.DEB.2.02.1312090936530.32309@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
+ <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
+ <alpine.DEB.2.02.1312090936530.32309@utopia.booyaka.com>
+Message-ID: <20131209171618.GC11433@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-17 03:12, Christoffer Dall wrote:
-> Initialize the cntvoff at kvm_init_vm time, not before running the 
-> VCPUs
-> at the first time because that will overwrite any potentially 
-> restored
-> values from user space.
->
-> Cc: Marc Zynger <marc.zyngier@arm.com>
-> Cc: Andre Przywara <andre.przywara@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+* Paul Walmsley <paul@pwsan.com> [131209 01:55]:
+> On Mon, 25 Nov 2013, Paul Walmsley wrote:
+> 
+> > On Mon, 25 Nov 2013, Paul Walmsley wrote:
+> > 
+> > > Boot to userspace:
+> > >     FAIL ( 1/11): 37xxevm
+> > 
+> > So looks like this is due to the switchover to DT-based booting for 37xx 
+> > EVM.  Will plug that in here and re-test.
+> 
+> Here's the updated test report.  Looks like dynamic idle PM tests are 
+> failing on the 37xxevm now.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Off-idle and wake-up events work but need these two pending patches:
 
-> ---
->
-> Changelog[v2]:
->  - Call kvm_timer_init from kvm_arch_init_vm instead of moving the 
-> cntvoff to
->    vcpu initialization, which would be redundant.
->
->  arch/arm/kvm/arm.c  |    2 ++
->  virt/kvm/arm/vgic.c |    1 -
->  2 files changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index e312e4a..2bc2ec4 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -137,6 +137,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned 
-> long type)
->  	if (ret)
->  		goto out_free_stage2_pgd;
->
-> +	kvm_timer_init(kvm);
-> +
->  	/* Mark the initial VMID generation invalid */
->  	kvm->arch.vmid_gen = 0;
->
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 685fc72..81e9481 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1409,7 +1409,6 @@ int kvm_vgic_init(struct kvm *kvm)
->  	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
->  		vgic_set_target_reg(kvm, 0, i);
->
-> -	kvm_timer_init(kvm);
->  	kvm->arch.vgic.ready = true;
->  out:
->  	mutex_unlock(&kvm->lock);
+1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+   http://lkml.org/lkml/2013/11/22/520
 
--- 
-Fast, cheap, reliable. Pick two.
+2. [PATCH] ARM: dts: Fix omap serial wake-up when booted with device tree
+   http://www.spinics.net/lists/devicetree/msg13374.html
+
+Without the first one we get some nasty looking harmless warnings, so I've
+been holding off to merging #2 until #1 is fixed.
+
+Regards,
+
+Tony
