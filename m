@@ -1,41 +1,75 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon, 09 Dec 2013 16:09:18 +0400
-Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
-In-Reply-To: <52A59991.1060305@gmail.com>
-References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
- <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <1386543229-1542-6-git-send-email-ynvich@gmail.com>
- <201312090233.58592.arnd@arndb.de> <52A587A0.1050503@gmail.com>
- <1386581672.7152.108.camel@host5.omatika.ru> <52A59991.1060305@gmail.com>
-Message-ID: <1386590958.7152.135.camel@host5.omatika.ru>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Dec 2013 11:55:47 +0100
+Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
+In-Reply-To: <20131203114450.GG13726@S2101-09.ap.freescale.net>
+References: <1385998768-23512-1-git-send-email-marex@denx.de>
+ <20131203114450.GG13726@S2101-09.ap.freescale.net>
+Message-ID: <201312091155.47947.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-09 at 11:21 +0100, Daniel Mack wrote:
-> On 12/09/2013 10:34 AM, Sergei Ianovich wrote:
-> > Nice to have Daniel in this conversation. Your patch series is a big and
-> > important work. However, I am not sure I will ever land as is exactly
-> > for this reason.
+On Tuesday, December 03, 2013 at 12:44:52 PM, Shawn Guo wrote:
+> On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
+> > Add DRM flags for the LCD display clock polarity so the pixelclk-active
+> > DT property can be properly handled by drivers using the DRM API.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Dave Airlie <airlied@gmail.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > 
+> >  drivers/gpu/drm/drm_modes.c | 5 +++++
+> >  include/uapi/drm/drm_mode.h | 3 +++
+> >  2 files changed, 8 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+> > index 85071a1..d1f3bfc 100644
+> > --- a/drivers/gpu/drm/drm_modes.c
+> > +++ b/drivers/gpu/drm/drm_modes.c
+> > @@ -537,6 +537,11 @@ int drm_display_mode_from_videomode(const struct
+> > videomode *vm,
+> > 
+> >  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+> >  	
+> >  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+> >  	
+> >  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
+> > 
+> > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
+> > +		dmode->flags |= DRM_MODE_FLAG_PIXELCLK_PPOL;
+> > +	else if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+> > +		dmode->flags |= DRM_MODE_FLAG_PIXELCLK_NPOL;
+> > +
+> > 
+> >  	drm_mode_set_name(dmode);
+> >  	
+> >  	return 0;
+> > 
+> > diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+> > index f104c26..a6169ca 100644
+> > --- a/include/uapi/drm/drm_mode.h
+> > +++ b/include/uapi/drm/drm_mode.h
+> > @@ -73,6 +73,9 @@
+> > 
+> >  #define  DRM_MODE_FLAG_3D_TOP_AND_BOTTOM	(7<<14)
+> >  #define  DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF	(8<<14)
+> > 
+> > +/* CRTC LCD clock polarity flags. */
+> > +#define DRM_MODE_FLAG_PIXELCLK_PPOL		(1<<19)
+> > +#define DRM_MODE_FLAG_PIXELCLK_NPOL		(1<<20)
 > 
-> Well, I wouldn't be so certain about that statement. As I wrote in the
-> cover letter, most of the work is actually done, and I successfully
-> tested the new DMA support with a some of the drivers I ported. Others
-> were ported blindly, and in case of no reaction, I'd dare to merge them
-> and wait for people to report back in case of trouble.
-
-If breaking things is an option, I am definitely wrong. I assumed the
-opposite.
-
-> > My proposal in to actually add new drivers for each platform device with
-> > DMA and mark new ones EXPERIMENTAL.
+> Marek,
 > 
-> That would cause tree-wide cross-dependencies between drivers, because
-> the two DMA controllers can't be used at the same time, and the PXA
-> specific API will be unavailable when the mmp-dma driver is selected. My
-> patch series (and the DMA controller framework for that matter) aims for
-> the opposite - the unification of APIs and drivers.
+> It looks that Denis (copied) is working on the same problem, so you may
+> want to be aware of his effort [1][2].
 
-Not sure I got this point. My proposal is to keep the existing DMA
-intact until we are ready to remove it. I understand this approach
-requires considerably more work inside DMA to allow both driver to
-coexist than wholesale replacement. I still think big change is risky.
+He also just sent a new patchset, so I would focus on his work instead. It makes 
+more sense as he is not breaking the userland stuff.
+
+Thank you Shawn, Russell!
+
+Best regards,
+Marek Vasut
