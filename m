@@ -1,132 +1,164 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 09 Dec 2013 18:38:57 +1000
-Subject: [PATCH] ARM: imx: use __initconst for const init definition
-In-Reply-To: <1386569668-15365-1-git-send-email-shawn.guo@linaro.org>
-References: <1386569668-15365-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <52A581A1.3020509@uclinux.org>
+Date: Mon, 09 Dec 2013 18:42:00 +1000
+Subject: [PATCH][RESEND] ARM: misc: remove deprecated IRQF_DISABLED
+In-Reply-To: <1386565230-19228-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381550411-5824-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <1386565230-19228-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <52A58258.1060303@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/13 16:14, Shawn Guo wrote:
-> 0-DAY kernel build testing backend reports the following.
+On 09/12/13 15:00, Michael Opdenacker wrote:
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+> from miscellaneous code in mach-xxx and plat-xxx
 >
->   scripts/checkpatch.pl 0001-ARM-imx-add-support-code-for-IMX50-based-machines.patch
->   # many are suggestions rather than must-fix
+> This flag is a NOOP since 2.6.35 and it will be removed one day.
 >
->   ERROR: Use of const init definition must use __initconst
->   #80: arch/arm/mach-imx/mach-imx50.c:26:
->   +static const char *imx50_dt_board_compat[] __initdata = {
->
-> While at it, fix the error globally for IMX platform.
->
-> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-For what its worth:
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 
 Acked-by: Greg Ungerer <gerg@uclinux.org>
 
 
-
 > ---
->   arch/arm/mach-imx/imx31-dt.c    |    2 +-
->   arch/arm/mach-imx/imx51-dt.c    |    2 +-
->   arch/arm/mach-imx/mach-imx50.c  |    2 +-
->   arch/arm/mach-imx/mach-imx53.c  |    2 +-
->   arch/arm/mach-imx/mach-imx6q.c  |    2 +-
->   arch/arm/mach-imx/mach-imx6sl.c |    2 +-
->   arch/arm/mach-imx/mach-vf610.c  |    2 +-
->   7 files changed, 7 insertions(+), 7 deletions(-)
+>   arch/arm/mach-ebsa110/core.c             | 2 +-
+>   arch/arm/mach-integrator/integrator_ap.c | 2 +-
+>   arch/arm/mach-ks8695/time.c              | 2 +-
+>   arch/arm/mach-netx/time.c                | 2 +-
+>   arch/arm/mach-rpc/dma.c                  | 2 +-
+>   arch/arm/mach-rpc/time.c                 | 1 -
+>   arch/arm/mach-sa1100/time.c              | 2 +-
+>   arch/arm/mach-u300/timer.c               | 2 +-
+>   arch/arm/plat-iop/time.c                 | 2 +-
+>   arch/arm/plat-pxa/dma.c                  | 2 +-
+>   10 files changed, 9 insertions(+), 10 deletions(-)
 >
-> diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
-> index 818a1cc..e1e70ef 100644
-> --- a/arch/arm/mach-imx/imx31-dt.c
-> +++ b/arch/arm/mach-imx/imx31-dt.c
-> @@ -25,7 +25,7 @@ static void __init imx31_dt_init(void)
->   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->   }
+> diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+> index 68ac934d4565..8254e716b095 100644
+> --- a/arch/arm/mach-ebsa110/core.c
+> +++ b/arch/arm/mach-ebsa110/core.c
+> @@ -206,7 +206,7 @@ ebsa110_timer_interrupt(int irq, void *dev_id)
 >
-> -static const char *imx31_dt_board_compat[] __initdata = {
-> +static const char *imx31_dt_board_compat[] __initconst = {
->   	"fsl,imx31",
->   	NULL
+>   static struct irqaction ebsa110_timer_irq = {
+>   	.name		= "EBSA110 Timer Tick",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= ebsa110_timer_interrupt,
 >   };
-> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-> index bece8a6..0230d78 100644
-> --- a/arch/arm/mach-imx/imx51-dt.c
-> +++ b/arch/arm/mach-imx/imx51-dt.c
-> @@ -29,7 +29,7 @@ static void __init imx51_dt_init(void)
->   	platform_device_register_full(&devinfo);
->   }
 >
-> -static const char *imx51_dt_board_compat[] __initdata = {
-> +static const char *imx51_dt_board_compat[] __initconst = {
->   	"fsl,imx51",
->   	NULL
+> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+> index d50dc2dbfd89..699abfdbc673 100644
+> --- a/arch/arm/mach-integrator/integrator_ap.c
+> +++ b/arch/arm/mach-integrator/integrator_ap.c
+> @@ -368,7 +368,7 @@ static struct clock_event_device integrator_clockevent = {
+>
+>   static struct irqaction integrator_timer_irq = {
+>   	.name		= "timer",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= integrator_timer_interrupt,
+>   	.dev_id		= &integrator_clockevent,
 >   };
-> diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
-> index 2f74fad..77b77a9 100644
-> --- a/arch/arm/mach-imx/mach-imx50.c
-> +++ b/arch/arm/mach-imx/mach-imx50.c
-> @@ -23,7 +23,7 @@ static void __init imx50_dt_init(void)
->   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->   }
+> diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
+> index 426c97662f5b..a197874bf382 100644
+> --- a/arch/arm/mach-ks8695/time.c
+> +++ b/arch/arm/mach-ks8695/time.c
+> @@ -122,7 +122,7 @@ static irqreturn_t ks8695_timer_interrupt(int irq, void *dev_id)
 >
-> -static const char *imx50_dt_board_compat[] __initdata = {
-> +static const char *imx50_dt_board_compat[] __initconst = {
->   	"fsl,imx50",
->   	NULL
+>   static struct irqaction ks8695_timer_irq = {
+>   	.name		= "ks8695_tick",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER,
+> +	.flags		= IRQF_TIMER,
+>   	.handler	= ks8695_timer_interrupt,
 >   };
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index c9c4d8d..6585090 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -31,7 +31,7 @@ static void __init imx53_dt_init(void)
->   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->   }
 >
-> -static const char *imx53_dt_board_compat[] __initdata = {
-> +static const char *imx53_dt_board_compat[] __initconst = {
->   	"fsl,imx53",
->   	NULL
+> diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
+> index 6df42e643031..3177c7a40930 100644
+> --- a/arch/arm/mach-netx/time.c
+> +++ b/arch/arm/mach-netx/time.c
+> @@ -99,7 +99,7 @@ netx_timer_interrupt(int irq, void *dev_id)
+>
+>   static struct irqaction netx_timer_irq = {
+>   	.name		= "NetX Timer Tick",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= netx_timer_interrupt,
 >   };
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 7e5ec34..d2ea6e6 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -273,7 +273,7 @@ static void __init imx6q_init_irq(void)
->   	irqchip_init();
+>
+> diff --git a/arch/arm/mach-rpc/dma.c b/arch/arm/mach-rpc/dma.c
+> index 85883b2e0e49..6d3517dc4772 100644
+> --- a/arch/arm/mach-rpc/dma.c
+> +++ b/arch/arm/mach-rpc/dma.c
+> @@ -141,7 +141,7 @@ static int iomd_request_dma(unsigned int chan, dma_t *dma)
+>   	struct iomd_dma *idma = container_of(dma, struct iomd_dma, dma);
+>
+>   	return request_irq(idma->irq, iomd_dma_handle,
+> -			   IRQF_DISABLED, idma->dma.device_id, idma);
+> +			   0, idma->dma.device_id, idma);
 >   }
 >
-> -static const char *imx6q_dt_compat[] __initdata = {
-> +static const char *imx6q_dt_compat[] __initconst = {
->   	"fsl,imx6dl",
->   	"fsl,imx6q",
->   	NULL,
-> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-> index 2f952e3..cca183a 100644
-> --- a/arch/arm/mach-imx/mach-imx6sl.c
-> +++ b/arch/arm/mach-imx/mach-imx6sl.c
-> @@ -61,7 +61,7 @@ static void __init imx6sl_init_irq(void)
->   	irqchip_init();
->   }
+>   static void iomd_free_dma(unsigned int chan, dma_t *dma)
+> diff --git a/arch/arm/mach-rpc/time.c b/arch/arm/mach-rpc/time.c
+> index 9a6def14df01..9a5158861ca9 100644
+> --- a/arch/arm/mach-rpc/time.c
+> +++ b/arch/arm/mach-rpc/time.c
+> @@ -75,7 +75,6 @@ ioc_timer_interrupt(int irq, void *dev_id)
 >
-> -static const char *imx6sl_dt_compat[] __initdata = {
-> +static const char *imx6sl_dt_compat[] __initconst = {
->   	"fsl,imx6sl",
->   	NULL,
+>   static struct irqaction ioc_timer_irq = {
+>   	.name		= "timer",
+> -	.flags		= IRQF_DISABLED,
+>   	.handler	= ioc_timer_interrupt
 >   };
-> diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-> index af0cb8a..2d8aef5 100644
-> --- a/arch/arm/mach-imx/mach-vf610.c
-> +++ b/arch/arm/mach-imx/mach-vf610.c
-> @@ -26,7 +26,7 @@ static void __init vf610_init_irq(void)
->   	irqchip_init();
->   }
 >
-> -static const char *vf610_dt_compat[] __initdata = {
-> +static const char *vf610_dt_compat[] __initconst = {
->   	"fsl,vf610",
->   	NULL,
+> diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
+> index 713c86cd3d64..a98fded8c432 100644
+> --- a/arch/arm/mach-sa1100/time.c
+> +++ b/arch/arm/mach-sa1100/time.c
+> @@ -112,7 +112,7 @@ static struct clock_event_device ckevt_sa1100_osmr0 = {
+>
+>   static struct irqaction sa1100_timer_irq = {
+>   	.name		= "ost0",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= sa1100_ost0_interrupt,
+>   	.dev_id		= &ckevt_sa1100_osmr0,
 >   };
+> diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
+> index 9a5f9fb352ce..f4669c4225c3 100644
+> --- a/arch/arm/mach-u300/timer.c
+> +++ b/arch/arm/mach-u300/timer.c
+> @@ -329,7 +329,7 @@ static irqreturn_t u300_timer_interrupt(int irq, void *dev_id)
+>
+>   static struct irqaction u300_timer_irq = {
+>   	.name		= "U300 Timer Tick",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= u300_timer_interrupt,
+>   };
+>
+> diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
+> index 29606bd75f3f..71626e323c78 100644
+> --- a/arch/arm/plat-iop/time.c
+> +++ b/arch/arm/plat-iop/time.c
+> @@ -127,7 +127,7 @@ iop_timer_interrupt(int irq, void *dev_id)
+>   static struct irqaction iop_timer_irq = {
+>   	.name		= "IOP Timer Tick",
+>   	.handler	= iop_timer_interrupt,
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>   	.dev_id		= &iop_clockevent,
+>   };
+>
+> diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
+> index 79ef102e3b2b..054fc5a1a11c 100644
+> --- a/arch/arm/plat-pxa/dma.c
+> +++ b/arch/arm/plat-pxa/dma.c
+> @@ -377,7 +377,7 @@ int __init pxa_init_dma(int irq, int num_ch)
+>   		spin_lock_init(&dma_channels[i].lock);
+>   	}
+>
+> -	ret = request_irq(irq, dma_irq_handler, IRQF_DISABLED, "DMA", NULL);
+> +	ret = request_irq(irq, dma_irq_handler, 0, "DMA", NULL);
+>   	if (ret) {
+>   		printk (KERN_CRIT "Wow!  Can't register IRQ for DMA\n");
+>   		kfree(dma_channels);
 >
