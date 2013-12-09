@@ -1,45 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 10 Dec 2013 05:37:59 +0900
-Subject: [PATCH v4 2/4] clk: exynos5410: register clocks using common
- clock framework
-In-Reply-To: <1914850.6CAa0SzDWP@amdc1227>
-References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
- <1385456288-20398-3-git-send-email-v.tyrtov@samsung.com>
- <1914850.6CAa0SzDWP@amdc1227>
-Message-ID: <52A62A27.7080408@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 9 Dec 2013 12:46:07 -0800
+Subject: [PATCH] mtd: nand: pxa3xx: Disable "armada370-nand" compatible
+ support
+In-Reply-To: <20131208014049.GJ11251@titan.lakedaemon.net>
+References: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131207232315.GC11251@titan.lakedaemon.net>
+ <20131208013525.GA4487@localhost>
+ <20131208014049.GJ11251@titan.lakedaemon.net>
+Message-ID: <20131209204607.GV27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/13 01:34, Tomasz Figa wrote:
-> Hi Vyacheslav, Tarek,
->
-> On Tuesday 26 of November 2013 12:58:06 Vyacheslav Tyrtov wrote:
->> From: Tarek Dakhran<t.dakhran@samsung.com>
->>
->> The EXYNOS5410 clocks are statically listed and registered
->> using the Samsung specific common clock helper functions.
->>
->> Signed-off-by: Tarek Dakhran<t.dakhran@samsung.com>
->> Signed-off-by: Vyacheslav Tyrtov<v.tyrtov@samsung.com>
->> ---
->>   .../devicetree/bindings/clock/exynos5410-clock.txt |  54 +++++
->>   drivers/clk/samsung/Makefile                       |   1 +
->>   drivers/clk/samsung/clk-exynos5410.c               | 239 +++++++++++++++++++++
->>   include/dt-bindings/clock/exynos5410.h             |  32 +++
->>   4 files changed, 326 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->>   create mode 100644 drivers/clk/samsung/clk-exynos5410.c
->>   create mode 100644 include/dt-bindings/clock/exynos5410.h
->
-> Acked-by: Tomasz Figa<t.figa@samsung.com>
->
-Tomasz, thanks for your ack on clk stuff.
+Hi Ezequiel,
 
-> This should go through Samsung tree, I guess, since it's a dependency
-> of other patches in this series and doesn't depend on any things from
-> clock tree. Mike, Kukjin, are you okay with this?
->
-Yeah, I'm fine on this series but 4th patch for supporting dual cluster.
+On Sat, Dec 07, 2013 at 08:40:49PM -0500, Jason Cooper wrote:
+> On Sat, Dec 07, 2013 at 10:35:26PM -0300, Ezequiel Garcia wrote:
+> > If we agree to remove the lines, shall we also revert the binding
+> > documentation, removing the compatible from there as well?
+> 
+> I think this is unnecessary.  We're trying to prevent breaking
+> bisection.  No one in their right mind should be developing (and
+> referring to docs) at a random commit.  As long as the docs are correct,
+> leave them alone.
 
-Let me take 1 to 3 patches firstly. Thanks.
-- Kukjin
+I agree, we don't need to drop all the docs, just the lines with the
+'compatible' property. And #if 0 is a no-go; let's just delete the
+lines.
+
+Yes, the docs will appear in 3.12 and 3.13 even though the driver
+support won't be there until 3.14, but that's OK IMO.
+
+Do you think this should go to 3.12.y stable? If so, please add the
+appropriate Cc tag. BTW, you moved these lines around in 3.13 so far,
+so the patch probably won't apply 100% clean.
+
+Can you refresh this patch according to Jason's comments and resend?
+
+Brian
