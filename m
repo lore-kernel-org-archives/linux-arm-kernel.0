@@ -1,26 +1,38 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 9 Dec 2013 17:06:17 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core
- running without PCI on ARM64
-In-Reply-To: <201312091735.05014.arnd@arndb.de>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <20131209115050.GA19163@arm.com> <52A5C024.5050702@linaro.org>
- <201312091735.05014.arnd@arndb.de>
-Message-ID: <20131209170617.GC30717@srcf.ucam.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Dec 2013 09:10:20 -0800
+Subject: [PATCH 5/8] gpio: twl4030: Fix regression for twl gpio output
+In-Reply-To: <CACRpkdb1XEJjykRD3MGmjHvTX40JtTZU7uDRAvpGLBdoREChmw@mail.gmail.com>
+References: <1384396537-3486-1-git-send-email-tony@atomide.com>
+ <1384396537-3486-6-git-send-email-tony@atomide.com>
+ <529DDCE3.5020902@ti.com>
+ <CACRpkdb1XEJjykRD3MGmjHvTX40JtTZU7uDRAvpGLBdoREChmw@mail.gmail.com>
+Message-ID: <20131209171020.GB11433@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 05:35:04PM +0100, Arnd Bergmann wrote:
+* Linus Walleij <linus.walleij@linaro.org> [131209 05:10]:
+> On Tue, Dec 3, 2013 at 2:30 PM, Roger Quadros <rogerq@ti.com> wrote:
+> 
+> (...)
+> > This patch causes a regression with LED outputs (GPO) on twl4030 on 3.13-rc2.
+> > As one of the LED GPO is used for USB host on beagleboard, it will cause failure
+> > of USB host probe.
+> (...)
+> > Below is a proposed fix for this.
+> 
+> Roger, Tony: what happened with this? Have you hashed this out?
+> I ACK Roger's fixup too if that needs to be merged into the OMAP
+> tree.
 
-> Exactly. In particular we don't want people to get the wrong idea about
-> where we are heading, so making it possible to use this code on embedded
-> systems for me is a reason *not* to take the patch.
+There's an updated version from Roger posted that I acked:
 
-People are trying to deploy ACPI-based embedded x86, and most of the 
-ACPI/DT integration discussion seems to have been based on the idea that 
-this is a worthwhile thing to support. If we're not interested in doing 
-so then we should probably make that a whole kernel decision rather than 
-a per architecture one.
+[PATCH v2 1/1] gpio: twl4030: Fix regression for twl gpio LED output
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+http://lkml.org/lkml/2013/12/5/65
+
+I also commented on the dependencies there, but basically you can
+pick it up unless you want me to. Should be cc stable as well.
+
+Regards,
+
+Tony
