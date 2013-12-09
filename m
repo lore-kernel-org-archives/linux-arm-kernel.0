@@ -1,14 +1,12 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:50 -0500
-Subject: [PATCH v3 17/23] mm/page_cgroup: Use memblock apis for early memory
+Date: Mon, 9 Dec 2013 16:50:54 -0500
+Subject: [PATCH v3 21/23] mm/ARM: kernel: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-18-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-22-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Grygorii Strashko <grygorii.strashko@ti.com>
 
 Switch to memblock interfaces for early memory allocator instead of
 bootmem allocator. No functional change in beahvior than what it is
@@ -22,30 +20,37 @@ bootmem APIs.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Johannes Weiner <hannes@cmpxchg.org>
-Cc: Michal Hocko <mhocko@suse.cz>
-Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/page_cgroup.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/kernel/devtree.c |    2 +-
+ arch/arm/kernel/setup.c   |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/mm/page_cgroup.c b/mm/page_cgroup.c
-index 6d757e3a..d8bd2c5 100644
---- a/mm/page_cgroup.c
-+++ b/mm/page_cgroup.c
-@@ -54,8 +54,9 @@ static int __init alloc_node_page_cgroup(int nid)
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 739c3df..5a0041e 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -33,7 +33,7 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
  
- 	table_size = sizeof(struct page_cgroup) * nr_pages;
+ void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
+ {
+-	return alloc_bootmem_align(size, align);
++	return memblock_virt_alloc(size, align);
+ }
  
--	base = __alloc_bootmem_node_nopanic(NODE_DATA(nid),
--			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-+	base = memblock_virt_alloc_try_nid_nopanic(
-+			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
-+			BOOTMEM_ALLOC_ACCESSIBLE, nid);
- 	if (!base)
- 		return -ENOMEM;
- 	NODE_DATA(nid)->node_page_cgroup = base;
+ void __init arm_dt_memblock_reserve(void)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6a1b8a8..fffb978 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -717,7 +717,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	kernel_data.end     = virt_to_phys(_end - 1);
+ 
+ 	for_each_memblock(memory, region) {
+-		res = alloc_bootmem_low(sizeof(*res));
++		res = memblock_virt_alloc(sizeof(*res), 0);
+ 		res->name  = "System RAM";
+ 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+ 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
 -- 
 1.7.9.5
