@@ -1,33 +1,19 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  9 Dec 2013 05:44:00 +0100
-Subject: [PATCH][RESEND][ARM] floppy.h: remove deprecated IRQF_DISABLED
-In-Reply-To: <1381546640-4713-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1381546640-4713-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <1386564240-18885-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Dec 2013 12:45:44 +0800
+Subject: [PATCH] ARM: dts: mxs: add #io-channel-cells to mx28 lradc
+In-Reply-To: <52A25E66.6040403@free-electrons.com>
+References: <1386361231-20427-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <52A25E66.6040403@free-electrons.com>
+Message-ID: <20131209044543.GG825@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+On Sat, Dec 07, 2013 at 12:31:50AM +0100, Alexandre Belloni wrote:
+> Commit message should have been:
+> 
+> Adding #io-channel-cells property to lradc allows us to use the lradc as
+> an iio provider.
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+Added the commit log and applied the patch.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/include/asm/floppy.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/floppy.h b/arch/arm/include/asm/floppy.h
-index c9f03eccc9d8..f4882553fbb0 100644
---- a/arch/arm/include/asm/floppy.h
-+++ b/arch/arm/include/asm/floppy.h
-@@ -25,7 +25,7 @@
- 
- #define fd_inb(port)		inb((port))
- #define fd_request_irq()	request_irq(IRQ_FLOPPYDISK,floppy_interrupt,\
--					    IRQF_DISABLED,"floppy",NULL)
-+					    0,"floppy",NULL)
- #define fd_free_irq()		free_irq(IRQ_FLOPPYDISK,NULL)
- #define fd_disable_irq()	disable_irq(IRQ_FLOPPYDISK)
- #define fd_enable_irq()		enable_irq(IRQ_FLOPPYDISK)
--- 
-1.8.3.2
+Shawn
