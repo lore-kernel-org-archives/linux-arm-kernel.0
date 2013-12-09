@@ -1,33 +1,52 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  9 Dec 2013 05:55:56 +0100
-Subject: [PATCH][RESEND] ARM: LPC32xx: remove deprecated IRQF_DISABLED
-In-Reply-To: <1381548100-5035-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1381548100-5035-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <1386564956-19152-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Dec 2013 12:57:05 +0800
+Subject: [PATCH] ARM: dts: mxs: Add iio-hwmon to crystalfontz boards
+In-Reply-To: <1386362843-20798-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1386362843-20798-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20131209045702.GH825@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+On Fri, Dec 06, 2013 at 09:47:23PM +0100, Alexandre Belloni wrote:
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> 
+> This won't work until those patches are applied:
+>  https://lkml.org/lkml/2013/12/6/676
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+I won't have this patch in my tree until next cycle.  But if this DTS
+change does not cause any regression on my tree, I can still apply it,
+and the feature will work when it gets merged into linux-next together
+with the driver changes.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/mach-lpc32xx/timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>  and http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/216963.html
+> 
+> However, I'm wondering if it wouldn't make sense to add it directly in
+> imx28.dtsi
 
-diff --git a/arch/arm/mach-lpc32xx/timer.c b/arch/arm/mach-lpc32xx/timer.c
-index 20eab63d10ba..4e5837299c04 100644
---- a/arch/arm/mach-lpc32xx/timer.c
-+++ b/arch/arm/mach-lpc32xx/timer.c
-@@ -90,7 +90,7 @@ static irqreturn_t lpc32xx_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction lpc32xx_timer_irq = {
- 	.name		= "LPC32XX Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= lpc32xx_timer_interrupt,
- };
- 
--- 
-1.8.3.2
+Since it sounds like a SoC configuration rather than board one, having
+the change in imx28.dtsi makes sense to me. 
+
+Shawn
+
+> 
+>  arch/arm/boot/dts/imx28-cfa10036.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+> index cabb6171a19d..51ebf36dd7b9 100644
+> --- a/arch/arm/boot/dts/imx28-cfa10036.dts
+> +++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+> @@ -114,4 +114,9 @@
+>  			default-state = "on";
+>  		};
+>  	};
+> +
+> +	iio_hwmon {
+> +		compatible = "iio-hwmon";
+> +		io-channels = <&lradc 8>;
+> +	};
+>  };
+> -- 
+> 1.8.3.2
+> 
