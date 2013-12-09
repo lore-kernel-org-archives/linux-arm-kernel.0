@@ -1,36 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Dec 2013 03:09:23 +0100
-Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
-In-Reply-To: <1385650228-8906-1-git-send-email-b.brezillon@overkiz.com>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
- <1385650228-8906-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <201312090309.23723.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Dec 2013 02:15:44 +0000 (UTC)
+Subject: [PATCH 1/3] ARM: OMAP4+: hwmod data: Don't prevent RESET of USB
+ Host module
+In-Reply-To: <20131209015838.GA11433@atomide.com>
+References: <1386080748-17005-1-git-send-email-rogerq@ti.com>
+ <1386080748-17005-2-git-send-email-rogerq@ti.com>
+ <alpine.DEB.2.02.1312090125170.32309@utopia.booyaka.com>
+ <20131209015838.GA11433@atomide.com>
+Message-ID: <alpine.DEB.2.02.1312090213210.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 November 2013, Boris BREZILLON wrote:
-> @@ -92,6 +103,8 @@
->  				dma-names = "tx", "rx";
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_spi0>;
-> +				clocks = <&spi0_clk>;
-> +				clock-names = "spi_clk";
->  				status = "disabled";
->  			};
->  
-> @@ -101,6 +114,8 @@
->  				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 4>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-> +				clocks = <&ssc0_clk>;
-> +				clock-names = "pclk";
->  				status = "disabled";
->  			};
->  
+On Sun, 8 Dec 2013, Tony Lindgren wrote:
 
-You are adding "clock-names" properties in a lot of cases. Are you sure you
-are using the strings that are documented in the respective device bindings
-for each name? In a lot of cases, drivers just want an anonymous clock
-and we don't name them.
+> * Paul Walmsley <paul@pwsan.com> [131208 17:27]:
+> > On Tue, 3 Dec 2013, Roger Quadros wrote:
+> > 
+> > > Without this, the USB devices are sometimes not detected on OMAP4 Panda
+> > > with u-boot v2013.10.
+> > > 
+> > > Unlike what the comment states, errata i660 does not state that we
+> > > can't RESET the USB host module. Instead it states that RESET is the
+> > > only way to recover from a deadlock situation.
+> > > 
+> > > RESET ensures that the module is in a known good state irrespective
+> > > of what bootloader does with the module, so it must be done at boot.
+> > > 
+> > > Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> > 
+> > Acked-by: Paul Walmsley <paul@pwsan.com>
+> > 
+> > Will you pick this up for the -rc series, or do you want me or Tony to?  
+> > Roger writes that this one's pretty important.
+> 
+> I suggest that you just queue this with your other fixes so we get
+> things working.
 
-	Arnd
+I'm going to wait until tomorrow anyway to see if Sathya responds to my 
+other E-mail, so maybe Beno?t will let us know by then.
+
+
+- Paul
