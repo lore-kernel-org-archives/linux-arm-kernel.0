@@ -1,87 +1,100 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 09 Dec 2013 10:55:26 +0100
-Subject: [PATCH 2/3] pinctrl: at91: initialize config parameter to 0
-In-Reply-To: <52A57E55.40808@atmel.com>
-References: <1386421734-10240-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1386421734-10240-2-git-send-email-alexandre.belloni@free-electrons.com>
- <52A57E55.40808@atmel.com>
-Message-ID: <52A5938E.40201@free-electrons.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Dec 2013 09:56:30 +0000 (UTC)
+Subject: OMAP baseline test results for v3.13-rc2
+Message-ID: <alpine.DEB.2.02.1312090955420.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 09/12/2013 09:24, Nicolas Ferre wrote:
-> On 07/12/2013 14:08, Alexandre Belloni :
->> When passing a not initialized config parameter, at91_pinconf_get()
->> would return
->> a bogus value. Fix that by initializing it to zero before using it.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> ---
->>   drivers/pinctrl/pinctrl-at91.c | 3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-at91.c
->> b/drivers/pinctrl/pinctrl-at91.c
->> index 6446dc804aa7..b0b78f3468ae 100644
->> --- a/drivers/pinctrl/pinctrl-at91.c
->> +++ b/drivers/pinctrl/pinctrl-at91.c
->> @@ -722,7 +722,8 @@ static int at91_pinconf_get(struct pinctrl_dev
->> *pctldev,
->>       unsigned pin;
->>       int div;
->>
->> -    dev_dbg(info->dev, "%s:%d, pin_id=%d, config=0x%lx", __func__,
->> __LINE__, pin_id, *config);
->> +    *config = 0;
->> +    dev_dbg(info->dev, "%s:%d, pin_id=%d", __func__, __LINE__, pin_id);
->>       pio = pin_to_controller(info, pin_to_bank(pin_id));
->>       pin = pin_id % MAX_NB_GPIO_PER_BANK;
->
-> Beyond this patch, I must say that I am puzzled by this function.
->
-> What I read from the prototype documentation and what I see in
-> different implementations is different...
->
-> Linus, can we have a review of this function because it seems not in
-> line with what is used for u300 (but on the other hand looks like the
-> what is returned by pinctrl-exynos5440.c driver for example).
->
-> What would be the consequences if we change this function's behavior:
-> I mean use of -EINVAL for pin configuration "available but disabled"
-> as said in include/linux/pinctrl/pinconf.h?
->
+Here are some basic OMAP test results for Linux v3.13-rc2.
+Logs and other details at:
 
->From what I understand, it doesn't really matter because that function
-is never used. I guess the best implementation is the tegra one ;)
+    http://www.pwsan.com/omap/testlogs/test_v3.13-rc2/20131208173520/
 
-It is only called in one specific case:
- - you have ops->is_generic == true (that is only true for a few
-implmentations)
- - and you are dumping the pinconf state using debugfs
 
-I'm actually wondering if the checks for the ops->pin_config_get are not
-a bit overkill. We check for that function in:
- - pinconf_check_ops()
- - before calling it in pin_config_get_for_pin() which is only used
-once, in the same path : dump using debugfs and having ops->is_generic
-== true
- - in pinconf_pins_show() which is the function calling also in the same
-path
+Test summary
+------------
 
-What I would do is:
- - remove all the checks in pinconf_check_ops() and pinconf_pins_show()
-so that people are not pressured to implement a function that is simply
-never used.
- - modify pin_config_get_for_pin() by removing the dev_err() call and
-returning -ENOTSUPP instead of -EINVAL (it doesn't change the behaviour
-but I feel -ENOTSUPP is more appropriate)
+Build: zImage:
+    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
 
-I have a patch ready but I can't test it as I don't own any of the
-is_generic platforms.
+Build: uImage+dtb:
+    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Build: uImage:
+    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 4/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460varsomom
+    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+PM: chip off via dynamic idle:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+
+vmlinux object size
+(delta in bytes from test_v3.13-rc1 (6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae)):
+   text     data      bss    total  kernel
+   +620      +16        0     +636  omap1_defconfig
+   +652      +24        0     +676  omap1_defconfig_1510innovator_only
+   +620       -8        0     +612  omap1_defconfig_5912osk_only
+  +8904     +192      +64    +9160  omap2plus_defconfig
+  +4624      -32        0    +4592  omap2plus_defconfig_2430sdp_only
+  +4808     +128     +128    +5064  omap2plus_defconfig_cpupm
+   +556      -32      +32     +556  omap2plus_defconfig_n800_multi_omap2xxx
+  +4652       +8      +32    +4692  omap2plus_defconfig_n800_only_a
+  +4808     +128      +64    +5000  omap2plus_defconfig_no_pm
+  +4120      +64        0    +4184  omap2plus_defconfig_omap2_4_only
+  +4808     +200      +64    +5072  omap2plus_defconfig_omap3_4_only
+  +1648     +108     -788     +968  rmk_omap3430_ldp_allnoconfig
+  +1184     +128      +64    +1376  rmk_omap3430_ldp_oldconfig
+   +208      +52     -412     -152  rmk_omap4430_sdp_allnoconfig
+  +2692       -4      +64    +2752  rmk_omap4430_sdp_oldnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.13-rc1 (6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
+    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig
