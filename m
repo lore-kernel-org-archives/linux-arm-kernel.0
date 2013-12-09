@@ -1,103 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 9 Dec 2013 09:48:01 -0800
-Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
-In-Reply-To: <CAGb2v675Cg6S512zfM1z4b+wqE_PesDGWdgcmpzWmPzyzXqbeA@mail.gmail.com>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-8-git-send-email-wens@csie.org>
- <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
- <CAGb2v64yFhkTXvdq=1VpemULhXew-5fvmSoTBzEb6iFDiSqy1Q@mail.gmail.com>
- <CAGVrzcaxV88dU3vEVGUiEQihUHLxq+QvQVQ6VvmOFVRsqbbX7w@mail.gmail.com>
- <CAGb2v675Cg6S512zfM1z4b+wqE_PesDGWdgcmpzWmPzyzXqbeA@mail.gmail.com>
-Message-ID: <CAGVrzcaVJtoVhEfV+ZiMOkm3F8NBCf2YRcZSrZPMRfQfEr1u=g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Dec 2013 09:50:06 -0800
+Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
+In-Reply-To: <CAAfyv37e9+OLH-KegPCEhc0sbBS7UVnaSGU0mBw2AxAN9D7Akw@mail.gmail.com>
+References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
+ <529D9D43.6040101@ti.com>
+ <CAAfyv37Vie1vZK2XQ1cfVq6eVnSuaBLfykk6pU8fwEyqvPF4BA@mail.gmail.com>
+ <CAAfyv35gVVNydrk8vifSyidpFjEXjGiT4-i2dgN5Un2=FuHaqQ@mail.gmail.com>
+ <20131205184323.GF26766@atomide.com>
+ <CAAfyv37e9+OLH-KegPCEhc0sbBS7UVnaSGU0mBw2AxAN9D7Akw@mail.gmail.com>
+Message-ID: <20131209175006.GD12527@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/8 Chen-Yu Tsai <wens@csie.org>:
-> Florian, Giuseppe:
->
-> On Sat, Dec 7, 2013 at 9:57 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>> On Sat, Dec 7, 2013 at 5:09 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>>>> The CubieTruck uses the GMAC with an RGMII phy.
->>>>>
->>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>>> ---
->>>>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
->>>>>  1 file changed, 8 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>> index 8a1009d..af212a2 100644
->>>>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>> @@ -33,6 +33,14 @@
->>>>>                         pinctrl-0 = <&uart0_pins_a>;
->>>>>                         status = "okay";
->>>>>                 };
->>>>> +
->>>>> +               gmac: ethernet at 01c50000 {
->>>>> +                       pinctrl-names = "default";
->>>>> +                       pinctrl-0 = <&gmac_pins_rgmii>;
->>>>> +                       snps,phy-addr = <1>;
->>>>
->>>> What is this snps,phy-addr property? Why is not a standard device tree
->>>> node for an Ethernet PHY node used?
->>>
->>> This property is implemented by stmmac and documented in the DT
->>> bindings. stmmac has not been updated to use Ethernet PHY nodes.
->>
->> This driver property should be removed and deprecated since there is
->> an ePAPR standardized Ethernet PHY node. What I am worried here is the
->> loss of information, the standard Ethernet DT node allows to specify
->> much more information (clause, maximum speed, compatible string
->> etc...).
->
-> Giuseppe, any thoughts on this?
->
->>> Removing this property will not affect the function of the driver.
->>> The driver probes its MDIO bus and selects the lowest available
->>> address if not specified.
->>
->> So if this is just giving the driver a hint on where to  probe for a
->> PHY on the MDIO bus, then let's drop it and use the standard DT node
->> no?
->
-> Sure. I will remove it from the DT.
->
-> The stmmac driver does not have a seperate MDIO bus driver, nor
-> does it support Ethernet PHY node bindings. So I will not add
-> a phy node at this moment.
+* Belisko Marek <marek.belisko@gmail.com> [131208 23:36]:
+> Hi Tony,
+> 
+> On Thu, Dec 5, 2013 at 7:43 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Belisko Marek <marek.belisko@gmail.com> [131203 01:21]:
+> >> On Tue, Dec 3, 2013 at 10:08 AM, Belisko Marek <marek.belisko@gmail.com> wrote:
+> >> > Hi,
+> >> >
+> >> > On Tue, Dec 3, 2013 at 9:58 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> >> >> Hi,
+> >> >>
+> >> >> On Tuesday 03 December 2013 02:03 PM, Marek Belisko wrote:
+> >> >>> Without this change when booting omap3 device (gta04) with board file
+> >> >>> leads to follwing errors:
+> >> >>>
+> >> >>> [    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
+> >> >>> [    1.209075] HS USB OTG: no transceiver configured
+> >> >>> [    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+> >> >>>
+> >> >>> and usb isn't working.
+> >> >>>
+> >> >>> This is probably regression caused by commit: 6c27f939
+> >> >>
+> >> >> I think a better fix would be to have this merged..
+> >> >> https://lkml.org/lkml/2013/7/26/91
+> >> > Yes I see but how this could help with current situation? Ho you then
+> >> > specify device number?
+> >> I was too fast with reply sorry. I can see whole series and it is of
+> >> course correct solution. But as I said
+> >> can we except to be merged to 3.13. If not Tony can you pick my patch.
+> >
+> > If it's a regression, then let's get it merged for the -rc cycle.
+> Yes it is regression and without that usb on most omap3 based boards
+> without DT will not work.
+> >
+> > So please try to follow up on getting the proper fix merged, meanwhile
+> > I'll mark this thread as read. If you need this one merged for some
+> > reason, then please report to get it back to my radar.
 
-This will create needless churn in the DT if you do not do it now,
-worse actually, we switch from a DT which specifically described
-Ethernet PHY nodes properly to a version where it does, to ultimately
-a newer version which does.
+I'm still clueless which USB regression fix to apply for the -rc cycle
+though.. Hoping to see a single patch which clearly states the issue
+and has acks.
 
-Considering that the absence of a "snps,phy-addr" property will still
-result in the MDIO bus to be probed, keeping the existing Ethernet PHY
-nodes, referencing them correclty with a "phy-handle" property, but
-having no explicit support for these in the driver will not result in
-a functional change, and will reduce the DT churn. Also, you could
-still sneak a patch in this patchset which parses the standard
-EThernet PHY node binding.
+Regards,
 
->
->>>>> +                       phy-mode = "rgmii";
->>>>
->>>> Especially since you use the relatively standard "phy-mode" property here?
->>>
->>> Used as specified in stmmac DT bindings.
->>
->> That one is kind of okay because of_get_phy_mode() knows about it,
->> even though ePAPR states this should be "phy-connection-type", so I am
->> okay with keeping that one because current practice and helpers are
->> here.
->
-> It seems all ARM DTs currently use "phy-mode".
-
-Which is why I said "is kind of okay", but this is not what the
-standard came up with, ARM is not exactly the best DT-citizen out
-there as people are prone to making up new properties when the
-standard already defines some, anyway....
---
-Florian
+Tony
