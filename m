@@ -1,120 +1,70 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 9 Dec 2013 15:26:09 +0800
-Subject: [PATCH 01/10] net: stmmac: Enable stmmac main clock when probing
- hardware
-In-Reply-To: <52A56DE5.5010206@st.com>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-2-git-send-email-wens@csie.org> <52A56DE5.5010206@st.com>
-Message-ID: <CAGb2v67ySacOLsYDZ14SgWLS7-3kMq7G48nb2Ubz+Sfycbg9fw@mail.gmail.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Mon, 9 Dec 2013 08:35:11 +0100
+Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
+In-Reply-To: <20131205184323.GF26766@atomide.com>
+References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
+ <529D9D43.6040101@ti.com>
+ <CAAfyv37Vie1vZK2XQ1cfVq6eVnSuaBLfykk6pU8fwEyqvPF4BA@mail.gmail.com>
+ <CAAfyv35gVVNydrk8vifSyidpFjEXjGiT4-i2dgN5Un2=FuHaqQ@mail.gmail.com>
+ <20131205184323.GF26766@atomide.com>
+Message-ID: <CAAfyv37e9+OLH-KegPCEhc0sbBS7UVnaSGU0mBw2AxAN9D7Akw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peppe,
+Hi Tony,
 
-On Mon, Dec 9, 2013 at 3:14 PM, Giuseppe CAVALLARO
-<peppe.cavallaro@st.com> wrote:
-> Hello Chen-Yu
+On Thu, Dec 5, 2013 at 7:43 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Belisko Marek <marek.belisko@gmail.com> [131203 01:21]:
+>> On Tue, Dec 3, 2013 at 10:08 AM, Belisko Marek <marek.belisko@gmail.com> wrote:
+>> > Hi,
+>> >
+>> > On Tue, Dec 3, 2013 at 9:58 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> >> Hi,
+>> >>
+>> >> On Tuesday 03 December 2013 02:03 PM, Marek Belisko wrote:
+>> >>> Without this change when booting omap3 device (gta04) with board file
+>> >>> leads to follwing errors:
+>> >>>
+>> >>> [    1.203308] musb-hdrc musb-hdrc.0.auto: unable to find phy
+>> >>> [    1.209075] HS USB OTG: no transceiver configured
+>> >>> [    1.214019] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+>> >>>
+>> >>> and usb isn't working.
+>> >>>
+>> >>> This is probably regression caused by commit: 6c27f939
+>> >>
+>> >> I think a better fix would be to have this merged..
+>> >> https://lkml.org/lkml/2013/7/26/91
+>> > Yes I see but how this could help with current situation? Ho you then
+>> > specify device number?
+>> I was too fast with reply sorry. I can see whole series and it is of
+>> course correct solution. But as I said
+>> can we except to be merged to 3.13. If not Tony can you pick my patch.
 >
+> If it's a regression, then let's get it merged for the -rc cycle.
+Yes it is regression and without that usb on most omap3 based boards
+without DT will not work.
 >
-> On 12/6/2013 6:29 PM, Chen-Yu Tsai wrote:
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>
->> Guiseppe previously stated that the "stmmaceth" clock is the
->> main clock that drives the IP. The stmmac driver does not
->> enable this clock during the probe phase. When the driver is
->> built in to the kernel, this is fine because the clock maybe
->> on by default, or the boot loader had enabled it.
->>
->> If stmmac is built as a module, when the module is loaded,
->> the clock may be found unused and disabled by the kernel.
+> So please try to follow up on getting the proper fix merged, meanwhile
+> I'll mark this thread as read. If you need this one merged for some
+> reason, then please report to get it back to my radar.
 >
+> Regards,
 >
-> the clk_prepare_enable is then called in the open.
-> Is it not working for you?
-> Do you mean that the stmmac_hw_init fails if you do not move
-> the clk_get and clk_prepare_enable on top of the stmmac_dvr_probe?
->
+> Tony
 
-Exactly. The clock needs to be enabled prior to stmmac_dvr_probe.
-Otherwise, stmmac_mdio_register will fail to find a usable PHY.
+BR,
 
-The DWMAC core I am working with does not support chip ID or
-HW capability flags. I suspect those would fail, too.
+marek
 
-Disabling the clock at the end of stmmac_dvr_probe is to make
-sure it plays nice with existing power management callbacks.
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
 
-Chen-Yu
-
->>
->>   drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 24
->> +++++++++++++----------
->>   1 file changed, 14 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> index 8d4ccd3..7da71ed 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> @@ -2688,10 +2688,17 @@ struct stmmac_priv *stmmac_dvr_probe(struct device
->> *device,
->>         if ((phyaddr >= 0) && (phyaddr <= 31))
->>                 priv->plat->phy_addr = phyaddr;
->>
->> +       priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
->> +       if (IS_ERR(priv->stmmac_clk)) {
->> +               pr_warn("%s: warning: cannot get CSR clock\n", __func__);
->> +               goto error_clk_get;
->> +       }
->> +       clk_prepare_enable(priv->stmmac_clk);
->> +
->>         /* Init MAC and get the capabilities */
->>         ret = stmmac_hw_init(priv);
->>         if (ret)
->> -               goto error_free_netdev;
->> +               goto error_hw_init;
->>
->>         ndev->netdev_ops = &stmmac_netdev_ops;
->>
->> @@ -2729,12 +2736,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device
->> *device,
->>                 goto error_netdev_register;
->>         }
->>
->> -       priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
->> -       if (IS_ERR(priv->stmmac_clk)) {
->> -               pr_warn("%s: warning: cannot get CSR clock\n", __func__);
->> -               goto error_clk_get;
->> -       }
->> -
->>         /* If a specific clk_csr value is passed from the platform
->>          * this means that the CSR Clock Range selection cannot be
->>          * changed at run-time and it is fixed. Viceversa the driver'll
->> try to
->> @@ -2759,15 +2760,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device
->> *device,
->>                 }
->>         }
->>
->> +       clk_disable_unprepare(priv->stmmac_clk);
->> +
->>         return priv;
->>
->>   error_mdio_register:
->> -       clk_put(priv->stmmac_clk);
->> -error_clk_get:
->>         unregister_netdev(ndev);
->>   error_netdev_register:
->>         netif_napi_del(&priv->napi);
->> -error_free_netdev:
->> +error_hw_init:
->> +       clk_disable_unprepare(priv->stmmac_clk);
->> +       clk_put(priv->stmmac_clk);
->> +error_clk_get:
->>         free_netdev(ndev);
->>
->>         return NULL;
->>
->
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
