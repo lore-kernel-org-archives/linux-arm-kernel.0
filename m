@@ -1,70 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 Dec 2013 14:43:32 +0100
-Subject: [PATCH] ARM: at91/at91rm9200ek.dts: rearrange nodes in address
- ascending order
-Message-ID: <1386596612-26818-1-git-send-email-nicolas.ferre@atmel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 09 Dec 2013 17:44:48 +0400
+Subject: [PATCH 04/10] net: stmmac: sunxi platfrom extensions for GMAC
+ in Allwinner A20 SoC's
+In-Reply-To: <52A5A7B2.4000509@st.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A7B2.4000509@st.com>
+Message-ID: <52A5C950.7070903@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91rm9200ek.dts | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+Hello.
 
-diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-index 31f5c3293d07..df6b0aa0e4dd 100644
---- a/arch/arm/boot/dts/at91rm9200ek.dts
-+++ b/arch/arm/boot/dts/at91rm9200ek.dts
-@@ -29,18 +29,9 @@
- 
- 	ahb {
- 		apb {
--			dbgu: serial at fffff200 {
--				status = "okay";
--			};
--
--			usart1: serial at fffc4000 {
--				pinctrl-0 =
--						<&pinctrl_uart1
--						 &pinctrl_uart1_rts
--						 &pinctrl_uart1_cts
--						 &pinctrl_uart1_dtr_dsr
--						 &pinctrl_uart1_dcd
--						 &pinctrl_uart1_ri>;
-+			usb1: gadget at fffb0000 {
-+				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
-+				atmel,pullup-gpio = <&pioD 5 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 
-@@ -54,9 +45,14 @@
- 				};
- 			};
- 
--			usb1: gadget at fffb0000 {
--				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
--				atmel,pullup-gpio = <&pioD 5 GPIO_ACTIVE_HIGH>;
-+			usart1: serial at fffc4000 {
-+				pinctrl-0 =
-+						<&pinctrl_uart1
-+						 &pinctrl_uart1_rts
-+						 &pinctrl_uart1_cts
-+						 &pinctrl_uart1_dtr_dsr
-+						 &pinctrl_uart1_dcd
-+						 &pinctrl_uart1_ri>;
- 				status = "okay";
- 			};
- 
-@@ -69,6 +65,10 @@
- 					reg = <0>;
- 				};
- 			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
- 		};
- 
- 		usb0: ohci at 00300000 {
--- 
-1.8.2.2
+On 09-12-2013 15:21, srinivas kandagatla wrote:
+
+>> +static int sun7i_gmac_init(struct platform_device *pdev)
+>> +{
+>> +	struct resource *res;
+>> +	struct device *dev = &pdev->dev;
+>> +	void __iomem *addr = NULL;
+>> +	struct plat_stmmacenet_data *plat_dat = NULL;
+
+    No need to initialize it since you're assigning to it right below.
+
+>> +	u32 priv_clk_reg;
+>> +
+>> +	plat_dat = dev_get_platdata(&pdev->dev);
+>> +	if (!plat_dat)
+>> +		return -EINVAL;
+
+> dev_get_platdata will return NULL for DT, So this function will fail all
+> the time.
+
+    Indeed, unless the probe() method assigns it from the 'data' field of
+'struct of_device_id'.
+
+> How is it supposed to work?
+> Am I missing some thing?
+
+    Look at stmmac_pltfr_probe().
+
+> --srini
+
+WBR, Sergei
