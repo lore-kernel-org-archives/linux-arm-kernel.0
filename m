@@ -1,23 +1,59 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon, 09 Dec 2013 13:42:31 +0400
-Subject: [PATCH 4/9] ARM: pxa: remove unused variable
-In-Reply-To: <52A585D9.4000605@gmail.com>
-References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
- <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <1386543229-1542-5-git-send-email-ynvich@gmail.com>
- <52A585D9.4000605@gmail.com>
-Message-ID: <1386582151.7152.113.camel@host5.omatika.ru>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 9 Dec 2013 17:12:57 +0800
+Subject: [PATCH v5 12/15] usb: phy: Add set_wakeup API
+In-Reply-To: <52A58252.6090502@pengutronix.de>
+References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
+ <1386570664-6713-13-git-send-email-peter.chen@freescale.com>
+ <52A58252.6090502@pengutronix.de>
+Message-ID: <20131209091256.GC5291@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-09 at 09:56 +0100, Daniel Mack wrote:
-> A similar patch was already merged by Haojian recently. You should
-> probably rebase your patch stack on top of his maintainer tree.
+On Mon, Dec 09, 2013 at 09:41:54AM +0100, Marc Kleine-Budde wrote:
+> On 12/09/2013 07:31 AM, Peter Chen wrote:
+> > This API is used to set wakeup enable at PHY registers, in that
+> > case, the PHY can be waken up from suspend due to external events,
+> 
+> I' no native speaker, but I think it's "to be woken up".
 
-I've just come across the patch you mention in the arm mailing list.
+Thanks, will change.
 
-Could you please provide a link to Haojian's official public repository?
+> >  
+> >  static inline int
+> > +usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
+> > +{
+> > +	if (x && x->set_wakeup)
+> 
+> can x be NULL?
+> 
 
-If possible, a link link to your repository will also be very helpful.
+Possible, this function is PHY's API, it may be called uninitialized.
 
-My tree is at https://github.com/yanovich/linux
+Peter
+
+> > +		return x->set_wakeup(x, enabled);
+> > +	else
+> > +		return 0;
+> > +}
+> > +
+> > +static inline int
+> >  usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
+> >  {
+> >  	if (x && x->notify_connect)
+> > 
+> 
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
+
+
+
+-- 
+
+Best Regards,
+Peter Chen
