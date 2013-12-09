@@ -1,55 +1,152 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Dec 2013 17:48:58 +0100
-Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
-In-Reply-To: <52A5ED03.2070306@overkiz.com>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
- <201312091648.13802.arnd@arndb.de> <52A5ED03.2070306@overkiz.com>
-Message-ID: <201312091748.58386.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 09 Dec 2013 16:49:45 +0000
+Subject: [PATCH v3 8/9] KVM: arm-vgic: Add =?UTF-8?Q?GICD=5FSPENDSGIR?=
+ =?UTF-8?Q?=20and=20GICD=5FCPENDSGIR=20handlers?=
+In-Reply-To: <1384662620-13795-9-git-send-email-christoffer.dall@linaro.org>
+References: <1384662620-13795-1-git-send-email-christoffer.dall@linaro.org>
+ <1384662620-13795-9-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <420f1b04f251cf67d67ef49a9e08c1e9@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 December 2013, boris brezillon wrote:
-> Hello Arnd,
-> 
-> On 09/12/2013 16:48, Arnd Bergmann wrote:
-> > On Monday 09 December 2013, boris brezillon wrote:
-> >>> You are adding "clock-names" properties in a lot of cases. Are you sure you
-> >>> are using the strings that are documented in the respective device bindings
-> >>> for each name? In a lot of cases, drivers just want an anonymous clock
-> >>> and we don't name them.
-> >> I rechecked it, and almost all drivers call [devm_]clk_get with a
-> >> specific clock
-> >> name, and as a result we must specify the "clock-names" property.
-> >> The only exceptions I found are the spi and PIT (Periodic Interval
-> >> Timer) drivers,
-> >> and "clock-names" property is not defined in these nodes.
-> > Yes, I understood that the *drivers* use the names, but are they actually
-> > documented in the device bindings? If not, it might be better to change the
-> > drivers.
-> 
-> We have to keep both clk system working for at91 platform (new CCF based
-> clk implementations and old clk implementations) for two reasons:
-> 1) the new clk implemetations are only compatible with DT enabled boards
->      and some at91 boards are not yet ported to DT.
-> 2) we decided to move to the new clk implementations in multiple steps 
-> (one SoC
->      family after another) in order to ease PATCH review.
-> 
-> If we change the drivers to avoid specific clock name request 
-> ([devm]_clk_get(dev, NULL)),
-> we will have to change the old static clk lookup tables
-> (i.e. 
-> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9g45.c#L226,
-> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9260.c#L202, 
-> ...).
+On 2013-11-17 04:30, Christoffer Dall wrote:
+> Handle MMIO accesses to the two registers which should support both 
+> the
+> case where the VMs want to read/write either of these registers and 
+> the
+> case where user space reads/writes these registers to do save/restore 
+> of
+> the VGIC state.
+>
+> Note that the added complexity compared to simple set/clear enable
+> registers stems from the bookkeping of source cpu ids.  It may be
+> possible to change the underlying data structure to simplify the
+> complexity, but since this is not in the critical path at all, this 
+> will
+> do.
+>
+> Also note that reading this register from a live guest will not be
+> accurate compared to on hardware, because some state may be living on
+> the CPU LRs and the only way to give a consistent read would be to 
+> force
+> stop all the VCPUs and request them to unqueu the LR state onto the
+> distributor.  Until we have an actual user of live reading this
+> register, we can live with the difference.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Yes, that is a bit painful, but we really need to ensure that the drivers
-implement the documented binding. If they don't match we have to either 
-review and change all the binding documents, or change the static clock
-tables and the drivers.
+Looks pretty good to me. Small note below, but otherwise:
 
-Note that I have not checked your binding documents for the devices in
-question. If they already document these names, we don't need to change
-anything.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	Arnd
+>
+> Changelog[v3]:
+>  - Renamed read/write SGI set/clear functions
+>  - Rely on unqueuing of interrupts from LRs instead of reading LRs
+>    directly
+>  - Deduplicate code
+>
+> Changelog[v2]:
+>  - Use struct kvm_exit_mmio accessors for ->data field.
+> ---
+>  virt/kvm/arm/vgic.c |   70
+> ++++++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 66 insertions(+), 4 deletions(-)
+>
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 44c669b..16053eb 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -655,18 +655,80 @@ static void vgic_unqueue_irqs(struct kvm_vcpu 
+> *vcpu)
+>  	}
+>  }
+>
+> -static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+> -				  struct kvm_exit_mmio *mmio,
+> -				  phys_addr_t offset)
+> +/* Handle reads of GICD_CPENDSGIRn and GICD_SPENDSGIRn */
+> +static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+> +					struct kvm_exit_mmio *mmio,
+> +					phys_addr_t offset)
+>  {
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	int sgi;
+> +	int min_sgi = (offset & ~0x3) * 4;
+> +	int max_sgi = min_sgi + 3;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	u32 reg = 0;
+> +
+> +	/* Copy source SGIs from distributor side */
+> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> +		int shift = 8 * (sgi - min_sgi);
+> +		reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
+> +	}
+> +
+> +	mmio_data_write(mmio, ~0, reg);
+>  	return false;
+>  }
+>
+> +static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+> +					 struct kvm_exit_mmio *mmio,
+> +					 phys_addr_t offset, bool set)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	int sgi;
+> +	int min_sgi = (offset & ~0x3) * 4;
+> +	int max_sgi = min_sgi + 3;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	u32 reg;
+> +	bool updated = false;
+> +
+> +	reg = mmio_data_read(mmio, ~0);
+> +
+> +	/* Clear pending SGIs on the distributor */
+> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> +		u8 mask = reg >> (8 * (sgi - min_sgi));
+> +		if (set) {
+> +			if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
+> +				updated = true;
+> +			dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
+> +		} else {
+> +			if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
+> +				updated = true;
+> +			dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
+> +		}
+> +	}
+> +
+> +	if (updated)
+> +		vgic_update_state(vcpu->kvm);
+
+So I realize we have that construct everywhere. Surely it'd be worth it 
+moving the mmio calls to vgic_update_state into vgic_handle_mmio. Or 
+have I missed something?
+
+> +	return updated;
+> +}
+> +
+>  static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
+>  				struct kvm_exit_mmio *mmio,
+>  				phys_addr_t offset)
+>  {
+> -	return false;
+> +	if (!mmio->is_write)
+> +		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
+> +	else
+> +		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, true);
+> +}
+> +
+> +static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+> +				  struct kvm_exit_mmio *mmio,
+> +				  phys_addr_t offset)
+> +{
+> +	if (!mmio->is_write)
+> +		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
+> +	else
+> +		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, false);
+>  }
+>
+>  /*
+
+-- 
+Fast, cheap, reliable. Pick two.
