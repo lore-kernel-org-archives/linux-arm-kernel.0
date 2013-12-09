@@ -1,39 +1,78 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 9 Dec 2013 14:22:17 +0000
-Subject: [PATCH] ARM : unwinder : Prevent data abort due to stack overflow
-In-Reply-To: <CAPoNrtsHOXJMUsgUE_MET298n_H2sC2P+RbfUoG=kqK9chTTHw@mail.gmail.com>
-References: <1386310193-6434-1-git-send-email-a.anurag@samsung.com>
- <20131206121149.GA4897@e103592.cambridge.arm.com>
- <CAPoNrtsHOXJMUsgUE_MET298n_H2sC2P+RbfUoG=kqK9chTTHw@mail.gmail.com>
-Message-ID: <20131209142212.GA4281@e103592.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 09 Dec 2013 15:17:04 +0100
+Subject: questions of cpuidle
+In-Reply-To: <52A5C846.30308@linaro.org>
+References: <52A5C846.30308@linaro.org>
+Message-ID: <52A5D0E0.7050201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 07, 2013 at 01:43:21PM +0530, Anurag Aggarwal wrote:
-> >>
-> >> +     /* we are just starting, initialize last register set as 0 */
-> >> +     ctrl.last_register_set = 0;
-> >> +
-> >>       while (ctrl.entries > 0) {
-> >> -             int urc = unwind_exec_insn(&ctrl);
-> >> +             int urc;
-> >> +             if ((ctrl.sp_high - ctrl.vrs[SP]) < TOTAL_REGISTERS)
-> >> +                     ctrl.last_register_set = 1;
-> >
-> >If this is done once per unwind_exec_insn(), I think it would be better
-> >to put the check at the start of unwind_exec_insn() instead of outside.
-> 
-> I think it is better to do the above check here only because this check
-> is strictly not a part of decoder and execution cycle.
-> 
-> I think uniwnd_exec_insn(), should only be used for decoding and
-> execution of instruction, as you have suggested earlier. So, it makes
-> sense to keep it in unwind_frame only().
+On 12/09/2013 02:40 PM, Alex Shi wrote:
+>
+> Sorry for a idiot of cpuidle.
+>
+> I just find few cpu set TIMER_STOP on cpuidle, like omap4 and big.Little
+> driver. Does that mean other ARM cpu or x86 cpu can get the timer
+> interrupt in cpuidle?
+>
+> If the timer stopped during cpuidle, does that means at least one cpu
+> cann't get into deep c-state since system need a cpu to wake up other
+> deep c-state cpu? Or sth I missed?
+>
+> If the cpu stopped the interrupt during deep c-state and without
+> monitor/mwait support, which kind of ipi can wake the cpu? I mean like a
+> x86 cpu, APIC stopped in c3 mode, but actually ipi send via apic bus. So
+> I don't know which ipi work?
 
-It's debatable, since the stack checking is an intrinsic part of insn
-execution.  But since there is only one call site for unwind_exec_insn
-and it is unlikely than another will appear in the future, I am happy
-for it to remain in your current form.
+Hi Alex,
 
-Cheers
----Dave
+there are several timers on the system, the local and the external. On 
+ARM we find the local timers twd. Depending on the depth of the idle 
+state, they can be shutdown.
+
+All the cpus can go to a deep idle state because the timer expiration 
+will be delegated to a timer which does not belong to the power domain 
+of the idle state.
+
+The idle state contains the flag TIMER_STOP when the idle state power 
+downs the local timer.
+
+The cpuidle common framework checks this flag when entering the idle 
+state and calls clock_events_notify(ENTER/EXIT). That tells the time 
+framework to switch to another timer on the system in replacement of the 
+local one.
+
+The external timer will be programmed to the next event and will store 
+the cpu which is concerned by this expiration. This timer is called the 
+broadcast timer.
+
+When the broadcast timer expires there are two cases:
+
+* if the timer has the CLOCK_EVT_FEAT_DYNIRQ set, when the time 
+framework switched to this timer as described above, it also set the irq 
+affinity to the cpu. So no IPI happens because the interrupt occurs 
+directly to the targeted cpu
+
+* if the timer has *no* CLOCK_EVT_FEAT_DYNIRQ set, then the interrupt 
+will occur to any cpus belonging to the cpumask (usually cpu0), and if 
+the timer must expires for another cpu then an IPI is emitted to the 
+cpu. The IPI is the IPI_TIMER.
+
+Concerning the wake up of the cpu: the cpu disabled the irq and goes to 
+sleep, it is up to the firmware to wake up the cpu when an interrupt 
+occurs. It will exits its sleep state, call clock_events_notify(EXIT), 
+by this way re-switching to the local timer, and then re-enabling the 
+local interrupt which leads to the interrupt handler.
+
+There are some more informations in the wiki page [1].
+
+   -- Daniel
+
+[1] https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/WakeUpSources
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
