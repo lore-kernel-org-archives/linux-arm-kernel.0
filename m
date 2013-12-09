@@ -1,72 +1,39 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 09 Dec 2013 15:05:46 +0100
-Subject: [PATCH] ARM: at91/at91rm9200ek.dts: rearrange nodes in address
- ascending order
-In-Reply-To: <1386596612-26818-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1386596612-26818-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <52A5CE3A.7070900@overkiz.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 9 Dec 2013 14:22:17 +0000
+Subject: [PATCH] ARM : unwinder : Prevent data abort due to stack overflow
+In-Reply-To: <CAPoNrtsHOXJMUsgUE_MET298n_H2sC2P+RbfUoG=kqK9chTTHw@mail.gmail.com>
+References: <1386310193-6434-1-git-send-email-a.anurag@samsung.com>
+ <20131206121149.GA4897@e103592.cambridge.arm.com>
+ <CAPoNrtsHOXJMUsgUE_MET298n_H2sC2P+RbfUoG=kqK9chTTHw@mail.gmail.com>
+Message-ID: <20131209142212.GA4281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 14:43, Nicolas Ferre wrote:
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Boris BREZILLON<b.brezillon@overkiz.com>
-> ---
->   arch/arm/boot/dts/at91rm9200ek.dts | 30 +++++++++++++++---------------
->   1 file changed, 15 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-> index 31f5c3293d07..df6b0aa0e4dd 100644
-> --- a/arch/arm/boot/dts/at91rm9200ek.dts
-> +++ b/arch/arm/boot/dts/at91rm9200ek.dts
-> @@ -29,18 +29,9 @@
->   
->   	ahb {
->   		apb {
-> -			dbgu: serial at fffff200 {
-> -				status = "okay";
-> -			};
-> -
-> -			usart1: serial at fffc4000 {
-> -				pinctrl-0 =
-> -						<&pinctrl_uart1
-> -						 &pinctrl_uart1_rts
-> -						 &pinctrl_uart1_cts
-> -						 &pinctrl_uart1_dtr_dsr
-> -						 &pinctrl_uart1_dcd
-> -						 &pinctrl_uart1_ri>;
-> +			usb1: gadget at fffb0000 {
-> +				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
-> +				atmel,pullup-gpio = <&pioD 5 GPIO_ACTIVE_HIGH>;
->   				status = "okay";
->   			};
->   
-> @@ -54,9 +45,14 @@
->   				};
->   			};
->   
-> -			usb1: gadget at fffb0000 {
-> -				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
-> -				atmel,pullup-gpio = <&pioD 5 GPIO_ACTIVE_HIGH>;
-> +			usart1: serial at fffc4000 {
-> +				pinctrl-0 =
-> +						<&pinctrl_uart1
-> +						 &pinctrl_uart1_rts
-> +						 &pinctrl_uart1_cts
-> +						 &pinctrl_uart1_dtr_dsr
-> +						 &pinctrl_uart1_dcd
-> +						 &pinctrl_uart1_ri>;
->   				status = "okay";
->   			};
->   
-> @@ -69,6 +65,10 @@
->   					reg = <0>;
->   				};
->   			};
-> +
-> +			dbgu: serial at fffff200 {
-> +				status = "okay";
-> +			};
->   		};
->   
->   		usb0: ohci at 00300000 {
+On Sat, Dec 07, 2013 at 01:43:21PM +0530, Anurag Aggarwal wrote:
+> >>
+> >> +     /* we are just starting, initialize last register set as 0 */
+> >> +     ctrl.last_register_set = 0;
+> >> +
+> >>       while (ctrl.entries > 0) {
+> >> -             int urc = unwind_exec_insn(&ctrl);
+> >> +             int urc;
+> >> +             if ((ctrl.sp_high - ctrl.vrs[SP]) < TOTAL_REGISTERS)
+> >> +                     ctrl.last_register_set = 1;
+> >
+> >If this is done once per unwind_exec_insn(), I think it would be better
+> >to put the check at the start of unwind_exec_insn() instead of outside.
+> 
+> I think it is better to do the above check here only because this check
+> is strictly not a part of decoder and execution cycle.
+> 
+> I think uniwnd_exec_insn(), should only be used for decoding and
+> execution of instruction, as you have suggested earlier. So, it makes
+> sense to keep it in unwind_frame only().
+
+It's debatable, since the stack checking is an intrinsic part of insn
+execution.  But since there is only one call site for unwind_exec_insn
+and it is unlikely than another will appear in the future, I am happy
+for it to remain in your current form.
+
+Cheers
+---Dave
