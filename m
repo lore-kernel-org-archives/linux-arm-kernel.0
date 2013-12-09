@@ -1,43 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 10 Dec 2013 06:07:14 +0900
-Subject: [PATCH 1/3] ARM: dts: Leave Exynos5250 SPI controller disabled
- by default
-In-Reply-To: <5026211.5mW8H3pyKS@amdc1227>
-References: <1385381710-5212-1-git-send-email-broonie@kernel.org>
- <5026211.5mW8H3pyKS@amdc1227>
-Message-ID: <52A63102.5040708@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 22:05:08 +0100
+Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
+In-Reply-To: <52A5F79D.9070408@overkiz.com>
+References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
+ <201312091748.58386.arnd@arndb.de> <52A5F79D.9070408@overkiz.com>
+Message-ID: <201312092205.08933.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/13 00:23, Tomasz Figa wrote:
-> Hi Kukjin,
->
-Hi,
+On Monday 09 December 2013, boris brezillon wrote:
+> Are you talking about drivers or clk binding documentation ?
+> In either cases they're not defined :-), but I'd like to know which 
+> file(s) I should update.
 
-> On Monday 25 of November 2013 12:15:08 Mark Brown wrote:
->> From: Mark Brown<broonie@linaro.org>
->>
->> Rather than requiring each board to explicitly disable the SPI controllers
->> it is not using instead require boards to enable those that they are using.
->> This is less work overall since normally at most one of the controllers is
->> in use and avoids issues caused by inappropriate pinmuxing.
->>
->> Signed-off-by: Mark Brown<broonie@linaro.org>
->> Acked-by: Tomasz Figa<t.figa@samsung.com>
->> ---
->>   arch/arm/boot/dts/cros5250-common.dtsi    |  9 +--------
->>   arch/arm/boot/dts/exynos5250-arndale.dts  | 12 ------------
->>   arch/arm/boot/dts/exynos5250-smdk5250.dts |  6 ++----
->>   arch/arm/boot/dts/exynos5250.dtsi         |  3 +++
->>   4 files changed, 6 insertions(+), 24 deletions(-)
->
-> Seems like you have missed this series. Could you apply it?
->
-Yeah, thanks for your gentle reminder.
+I mean bindings for the devices using these clocks. Each of them should
+list among its properties something like
 
-+ Doug and Olof
+|Mandatory properties:
+|  clocks:	One phandle and clock specifier for xxxx
+|  clock-names:	The name of this clock, must be "xxxx"
 
-BTW, Doug and Olof, are you OK with changing the name of cros5250-common 
-DT file? Basically, I agree with Mark's patch.
+Of course if we decide to make it an anonymous clock, we still need to
+document the fact that the clock is required.
 
-- Kukjin
+> I'd rather not change the static clock lookup tables, but if you prefer this
+> approach (and Nicolas agrees), I'll propose a series modifying the drivers
+> and clk lookup table.
+> 
+> Whatever solution is choosen, I guess I'll have to update the drivers dt
+> binding documentation anyway ;-).
+
+Ok. FWIW, I think the best way to stage the clock updates (if the decision
+is to make them anonymous) would be to duplicate all the clocks in question
+in a first patch, and then submit changes for each driver to the respective
+subsystem maintainers with a patch based on the first changeset.
+
+Once all the drivers are converted (i.e. the following merge window), we can
+remove the obsolete entries.
+
+	Arnd
