@@ -1,152 +1,108 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 09 Dec 2013 16:49:45 +0000
-Subject: [PATCH v3 8/9] KVM: arm-vgic: Add =?UTF-8?Q?GICD=5FSPENDSGIR?=
- =?UTF-8?Q?=20and=20GICD=5FCPENDSGIR=20handlers?=
-In-Reply-To: <1384662620-13795-9-git-send-email-christoffer.dall@linaro.org>
-References: <1384662620-13795-1-git-send-email-christoffer.dall@linaro.org>
- <1384662620-13795-9-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <420f1b04f251cf67d67ef49a9e08c1e9@www.loen.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Dec 2013 16:50:04 +0000
+Subject: [PATCH V7 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1386151791-4881-3-git-send-email-vkale@apm.com>
+References: <1386151791-4881-1-git-send-email-vkale@apm.com>
+ <1386151791-4881-3-git-send-email-vkale@apm.com>
+Message-ID: <20131209165003.GJ13908@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-17 04:30, Christoffer Dall wrote:
-> Handle MMIO accesses to the two registers which should support both 
-> the
-> case where the VMs want to read/write either of these registers and 
-> the
-> case where user space reads/writes these registers to do save/restore 
-> of
-> the VGIC state.
->
-> Note that the added complexity compared to simple set/clear enable
-> registers stems from the bookkeping of source cpu ids.  It may be
-> possible to change the underlying data structure to simplify the
-> complexity, but since this is not in the critical path at all, this 
-> will
-> do.
->
-> Also note that reading this register from a live guest will not be
-> accurate compared to on hardware, because some state may be living on
-> the CPU LRs and the only way to give a consistent read would be to 
-> force
-> stop all the VCPUs and request them to unqueu the LR state onto the
-> distributor.  Until we have an actual user of live reading this
-> register, we can live with the difference.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi Vinayak,
 
-Looks pretty good to me. Small note below, but otherwise:
+On Wed, Dec 04, 2013 at 10:09:51AM +0000, Vinayak Kale wrote:
+> Add support for irq registration when pmu interrupt is percpu.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Getting closer...
 
->
-> Changelog[v3]:
->  - Renamed read/write SGI set/clear functions
->  - Rely on unqueuing of interrupts from LRs instead of reading LRs
->    directly
->  - Deduplicate code
->
-> Changelog[v2]:
->  - Use struct kvm_exit_mmio accessors for ->data field.
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
 > ---
->  virt/kvm/arm/vgic.c |   70
-> ++++++++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 66 insertions(+), 4 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 44c669b..16053eb 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -655,18 +655,80 @@ static void vgic_unqueue_irqs(struct kvm_vcpu 
-> *vcpu)
->  	}
+>  arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
+>  1 file changed, 78 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..d8e6667 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -22,6 +22,7 @@
+>  
+>  #include <linux/bitmap.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/export.h>
+>  #include <linux/perf_event.h>
+> @@ -363,26 +364,52 @@ validate_group(struct perf_event *event)
 >  }
->
-> -static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
-> -				  struct kvm_exit_mmio *mmio,
-> -				  phys_addr_t offset)
-> +/* Handle reads of GICD_CPENDSGIRn and GICD_SPENDSGIRn */
-> +static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
-> +					struct kvm_exit_mmio *mmio,
-> +					phys_addr_t offset)
->  {
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	int sgi;
-> +	int min_sgi = (offset & ~0x3) * 4;
-> +	int max_sgi = min_sgi + 3;
-> +	int vcpu_id = vcpu->vcpu_id;
-> +	u32 reg = 0;
-> +
-> +	/* Copy source SGIs from distributor side */
-> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-> +		int shift = 8 * (sgi - min_sgi);
-> +		reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
-> +	}
-> +
-> +	mmio_data_write(mmio, ~0, reg);
->  	return false;
->  }
->
-> +static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
-> +					 struct kvm_exit_mmio *mmio,
-> +					 phys_addr_t offset, bool set)
+>  
+>  static void
+> +armpmu_disable_percpu_irq(void *data)
 > +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	int sgi;
-> +	int min_sgi = (offset & ~0x3) * 4;
-> +	int max_sgi = min_sgi + 3;
-> +	int vcpu_id = vcpu->vcpu_id;
-> +	u32 reg;
-> +	bool updated = false;
-> +
-> +	reg = mmio_data_read(mmio, ~0);
-> +
-> +	/* Clear pending SGIs on the distributor */
-> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-> +		u8 mask = reg >> (8 * (sgi - min_sgi));
-> +		if (set) {
-> +			if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
-> +				updated = true;
-> +			dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
-> +		} else {
-> +			if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
-> +				updated = true;
-> +			dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
-> +		}
-> +	}
-> +
-> +	if (updated)
-> +		vgic_update_state(vcpu->kvm);
-
-So I realize we have that construct everywhere. Surely it'd be worth it 
-moving the mmio calls to vgic_update_state into vgic_handle_mmio. Or 
-have I missed something?
-
-> +	return updated;
+> +	disable_percpu_irq((long)data);
 > +}
-> +
->  static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
->  				struct kvm_exit_mmio *mmio,
->  				phys_addr_t offset)
->  {
-> -	return false;
-> +	if (!mmio->is_write)
-> +		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-> +	else
-> +		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, true);
-> +}
-> +
-> +static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
-> +				  struct kvm_exit_mmio *mmio,
-> +				  phys_addr_t offset)
-> +{
-> +	if (!mmio->is_write)
-> +		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-> +	else
-> +		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, false);
->  }
->
->  /*
 
--- 
-Fast, cheap, reliable. Pick two.
+Given that we wait for the CPUs to finish enabling/disabling the IRQ, I
+actually meant pass the pointer to the IRQ, which removes the horrible
+casts in the caller.
+
+> +	if (irq_is_percpu(irq)) {
+> +		cpumask_clear(&armpmu->active_irqs);
+
+Thanks for moving the mask manipulation out. It now makes it obvious that we
+don't care about the mask at all for PPIs, so that can be removed (the code
+you have is racy against hotplug anyway).
+
+I took the liberty of writing a fixup for you (see below). Can you test it
+on your platform please?
+
+Cheers,
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 503c1eeedc1c..5b1cd792274a 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -366,7 +366,8 @@ validate_group(struct perf_event *event)
+ static void
+ armpmu_disable_percpu_irq(void *data)
+ {
+-       disable_percpu_irq((long)data);
++       unsigned int irq = *(unsigned int *)data;
++       disable_percpu_irq(irq);
+ }
+ 
+ static void
+@@ -385,8 +386,7 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+                return;
+ 
+        if (irq_is_percpu(irq)) {
+-               cpumask_clear(&armpmu->active_irqs);
+-               on_each_cpu(armpmu_disable_percpu_irq, (void *)(long)irq, 1);
++               on_each_cpu(armpmu_disable_percpu_irq, &irq, 1);
+                free_percpu_irq(irq, &cpu_hw_events);
+        } else {
+                for (i = 0; i < irqs; ++i) {
+@@ -402,7 +402,8 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+ static void
+ armpmu_enable_percpu_irq(void *data)
+ {
+-       enable_percpu_irq((long)data, IRQ_TYPE_NONE);
++       unsigned int irq = *(unsigned int *)data;
++       enable_percpu_irq(irq, IRQ_TYPE_NONE);
+ }
+ 
+ static int
+@@ -440,8 +441,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+                        return err;
+                }
+ 
+-               on_each_cpu(armpmu_enable_percpu_irq, (void *)(long)irq, 1);
+-               cpumask_setall(&armpmu->active_irqs);
++               on_each_cpu(armpmu_enable_percpu_irq, &irq, 1);
+        } else {
+                for (i = 0; i < irqs; ++i) {
+                        err = 0;
