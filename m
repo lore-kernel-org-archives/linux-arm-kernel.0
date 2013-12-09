@@ -1,138 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 11:35:48 -0500
-Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <5294CC0C.9000203@ti.com>
-References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
- <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
- <5294CC0C.9000203@ti.com>
-Message-ID: <52A5F164.1040305@ti.com>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Mon,  9 Dec 2013 17:35:45 +0100
+Subject: [PATCH] arm: move arm_dma_limit to setup_dma_zone
+Message-ID: <1386606945-2385-1-git-send-email-murzin.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kumar,
+Since 4dcfa600 (ARM: DMA-API: better handing of DMA masks for coherent
+allocations) arm_dma_limit_pfn has almost substituted the arm_dma_limit. The
+remaining user is dma_contiguous_reserve(). It is also referenced in
+setup_dma_zone() to calculate arm_dma_limit_pfn.
 
-On Tuesday 26 November 2013 11:27 AM, Grygorii Strashko wrote:
-> On 11/22/2013 11:04 PM, Kumar Gala wrote:
->>
->> On Nov 20, 2013, at 9:46 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->>
->>> Add bindings for AEMIF controller drivers/memory/ti-aemif.c
->>>
->>
->> Binding shouldn?t normally refer to code.
->>
->> Just saying something like:
->>
->> Adding binging for TI Async External Memory Interface (AEMIF) controller.
->>
->>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>> .../bindings/memory-controllers/ti-aemif.txt       |  198 ++++++++++++++++++++
->>> 1 file changed, 198 insertions(+)
->>> create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>> new file mode 100644
->>> index 0000000..be0c0cb
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>> @@ -0,0 +1,198 @@
->>> +* Device tree bindings for Texas instruments AEMIF controller
->>> +
->>> +Th Async External Memory Interface (EMIF16/AEMIF) controller is intended to
->>
->> The?
->>
->>> +provide a glue-less interface to a variety of asynchronous memory devices like
->>> +ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
->>> +can be accessed at any given time via four chip selects with 64M byte access
->>> +per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
->>> +and Mobile SDR are not supported.
->>> +
->>> +Documentation:
->>> +Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
->>> +OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
->>> +Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
->>> +
->>> +Required properties:
->>> +
->>> +- compatible:		"ti,davinci-aemif"
->>> +			"ti,keystone-aemif"
->>> +			"ti,omap-L138-aemif"
->>> +
->>> +- #address-cells:	Must be 2. The first cell is the memory partition
->>> +			number. The 0 partition is for chip selects. And the
->>> +			second cell is the offset into the partition, for the 0
->>> +			partition it corresponds to chip select offset.
->>> +
->>
->> Is the first cell just the chip select number?
-> 
-> No. It's rather memory range/partition number. Now there are 2 partitions:
-> - control partition which is common for all CS interfaces
-> - CS-specific partition/range
-> (this one can be splitted according to specific SoC requirement)
-> 
-> As per Keystone TCI6638K2K
->  Datasheet http://www.ti.com/lit/ds/sprs836d/sprs836d.pdf:
-> 
-> 1) the memory range 0 will be from 0x30000000 size 0x10000000:
-> 00 3000 0000 - 00 33FF FFFF 64M EMIF16 CE0
-> 00 3400 0000 - 00 37FF FFFF 64M EMIF16 CE1
-> 00 3800 0000 - 00 3BFF FFFF 64M EMIF16 CE2
-> 00 3C00 0000 - 00 3FFF FFFF 64M EMIF16 CE3
-> 
-> 2) the memory range 1:
-> 00 2100 0A00 - 00 2100 0AFF 256 AEMIF Config
-> 
-> And AEMIF node contains definition:
-> ranges = <0 0 0x30000000 0x10000000
-> 	  1 0 0x21000A00 0x0000100>;
-> 
-> 
-> Child node has (nand):
->  reg = <0 0 0x4000000 (cs0)
->         - or - 0 0x4000000 0x4000000 (cs1)
->         - or - 0 0x8000000 0x4000000 (cs2)
-> 	- or - 0 0xC000000 0x4000000 (cs3)
-> 	- and -
->         1 0 0x0000100>; (for all cs)
-> 
-> For example for cs2 child node the resulting mem range 0 will be calculated as
-> 
-> from: 0x30000000 + (0 0x8000000 - 0 0)
-> size: 0x4000000
-> 
-> We don't encode CS number in reg/ranges, because it will allow simply change 
-> AEMIF DT definitions depending on each SoC
-> (AEMIF CS memory range can be continuous as above or not, if not - additional
-> range/partition can be added and child device can select the proper one).
-> 
->>
->> I?m wondering if this is similar to FSL Localbus controller, see the binding:
->>
->> bindings/powerpc/fsl/lbc.txt
-> 
-> Don't think so :) it looks similar just because of using standard bindings
-> (gpmc-nand.c mvebu-devbus.txt ti-gpmc.txt and etc.)
-> 
->>
->>> +- #size-cells:		Must be set to 1.
->>> +
->>> +- reg:			contains offset/length value for AEMIF control registers
->>> +			space.
->>> +
->>> +- ranges:		Must be set up to reflect the memory layout for 4
->>> +			chipselects and for AEMIF control range.
->>> +
->>> +- clocks:		phandle reference to the controller clock. Required only
->>> +			if clock tree data present in device tree.
->>> +			See clock-bindings.txt
+Kill the global arm_dma_limit and equip setup_zone_dma with the local one.
 
-Are you ok with above description on why cs property is needed. We will need
-your ack ;-) to take these patches forward.
+Reported-by: Vassili Karpov <av1474@comtv.ru>
+Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+---
+ arch/arm/mm/init.c |    6 ++++--
+ arch/arm/mm/mm.h   |    2 --
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Regards,
-Santosh
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 3e8f106..7583951 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -208,7 +208,6 @@ EXPORT_SYMBOL(arm_dma_zone_size);
+  * allocations.  This must be the smallest DMA mask in the system,
+  * so a successful GFP_DMA allocation will always satisfy this.
+  */
+-phys_addr_t arm_dma_limit;
+ unsigned long arm_dma_pfn_limit;
+ 
+ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
+@@ -227,6 +226,8 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
+ void __init setup_dma_zone(const struct machine_desc *mdesc)
+ {
+ #ifdef CONFIG_ZONE_DMA
++	phys_addr_t arm_dma_limit;
++
+ 	if (mdesc->dma_zone_size) {
+ 		arm_dma_zone_size = mdesc->dma_zone_size;
+ 		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
+@@ -381,7 +382,8 @@ void __init arm_memblock_init(struct meminfo *mi,
+ 	 * reserve memory for DMA contigouos allocations,
+ 	 * must come from DMA area inside low memory
+ 	 */
+-	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
++	dma_contiguous_reserve(min((phys_addr_t)arm_dma_pfn_limit << PAGE_SHIFT,
++				   arm_lowmem_limit));
+ 
+ 	arm_memblock_steal_permitted = false;
+ 	memblock_allow_resize();
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index d5a982d..11f3509 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -80,10 +80,8 @@ extern __init void add_static_vm_early(struct static_vm *svm);
+ #endif
+ 
+ #ifdef CONFIG_ZONE_DMA
+-extern phys_addr_t arm_dma_limit;
+ extern unsigned long arm_dma_pfn_limit;
+ #else
+-#define arm_dma_limit ((phys_addr_t)~0)
+ #define arm_dma_pfn_limit (~0ul >> PAGE_SHIFT)
+ #endif
+ 
+-- 
+1.7.10.4
