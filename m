@@ -1,45 +1,81 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 09 Dec 2013 10:04:32 +0100
-Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
-In-Reply-To: <201312090233.58592.arnd@arndb.de>
-References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
- <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <1386543229-1542-6-git-send-email-ynvich@gmail.com>
- <201312090233.58592.arnd@arndb.de>
-Message-ID: <52A587A0.1050503@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 09 Dec 2013 10:05:17 +0100
+Subject: [PATCH v5 15/15] usb: phy-mxs: Add sync time after controller
+ clear phcd
+In-Reply-To: <1386570664-6713-16-git-send-email-peter.chen@freescale.com>
+References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
+ <1386570664-6713-16-git-send-email-peter.chen@freescale.com>
+Message-ID: <52A587CD.7010203@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2013 02:33 AM, Arnd Bergmann wrote:
-> On Sunday 08 December 2013, Sergei Ianovich wrote:
->> Non-dts implementation supply required DMA channel numbers as
->> IORESOURCE_DMA. However, there is was no way to get them from
->> device tree.
+On 12/09/2013 07:31 AM, Peter Chen wrote:
+> After clear portsc.phcd, PHY needs 200us stable time for switch
+> 32K clock to AHB clock.
+
+If this is a general bugbix, please move it to the start of this series
+and add stable on Cc. I think I hit the bug on the second USB port of a
+custom MX28 board, the stmp_reset_block() in the USB phy will fail.
+
+Is the problem documented somewhere?
+
+Is it possible to add the delay in the clock framework? I think only the
+regulator framework has a configurable delay for the regulator to stabilize.
+
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
 > 
-> I just wrote a lengthy reply to this email to explain in what ways
-> you got it wrong, but then I saw that Daniel has already done all
-> the work in the right way in August, so nevermind that.
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index e18fdf3..7ae5225 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -151,6 +151,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
+>  	return mxs_phy->data == &imx6sl_phy_data;
+>  }
+>  
+> +/*
+> + * PHY needs some 32K cycles to switch from 32K clock to
+> + * bus (such as AHB/AXI, etc) clock.
+> + */
+> +static void mxs_phy_clock_switch(void)
+> +{
+> +	usleep_range(300, 400);
+> +}
+> +
+>  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+>  {
+>  	int ret;
+> @@ -276,6 +285,7 @@ static int mxs_phy_init(struct usb_phy *phy)
+>  {
+>  	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
+>  
+> +	mxs_phy_clock_switch();
+>  	clk_prepare_enable(mxs_phy->clk);
+>  	return mxs_phy_hw_init(mxs_phy);
+>  }
+> @@ -300,6 +310,7 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+>  		       x->io_priv + HW_USBPHY_CTRL_SET);
+>  		clk_disable_unprepare(mxs_phy->clk);
+>  	} else {
+> +		mxs_phy_clock_switch();
+>  		clk_prepare_enable(mxs_phy->clk);
+>  		writel(BM_USBPHY_CTRL_CLKGATE,
+>  		       x->io_priv + HW_USBPHY_CTRL_CLR);
 > 
-> It hasn't made it upstream yet, but see http://list-archives.org/2013/08/07/linux-mtd-lists-infradead-org/patch-00-20-arm-pxa-move-core-and-drivers-to-dmaengine/f/3444199144
-> for how it's done. Maybe Daniel can comment on the status of his
-> patches.
 
-I recently rebased all my patches on top of 3.13-rc3, and will resend in
-couple of days.
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-The real problem here is that by reworking the DMA related PXA bits, all
-drivers have to be changed at once, and a gradual transition seems
-impossible. For that, I was asking for help in areas where I don't have
-any hardware to test my patches on, but unfortunately, nobody got back
-to me yet.
-
-In particular, the pxa camera driver is something Robert (cc) wanted to
-have a look at. Robert, any updates on this?
-
-
-Anyway, I'll have to clean up some details and will resend my patches
-very soon.
-
-
-Thanks,
-Daniel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/2a1a086e/attachment.sig>
