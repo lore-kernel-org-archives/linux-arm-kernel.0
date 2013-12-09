@@ -1,15 +1,14 @@
 From: w-kwok2@ti.com (WingMan Kwok)
-Date: Mon, 9 Dec 2013 17:17:04 -0500
-Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
+Date: Mon, 9 Dec 2013 17:17:03 -0500
+Subject: [PATCH v3 1/2] usb: dwc3: Add Keystone specific glue layer
 In-Reply-To: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
 References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <1386627424-373-3-git-send-email-w-kwok2@ti.com>
+Message-ID: <1386627424-373-2-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Keystone platform USB PHY driver support. Current main purpose
-of this driver is to enable the PHY reference clock gate on the
-Keystone SoC. Otherwise it is a nop PHY.
+Add Keystone platform specific glue layer to support
+USB3 Host mode.
 
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Felipe Balbi <balbi@ti.com>
@@ -17,189 +16,249 @@ Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 ---
- drivers/usb/phy/Kconfig        |   10 +++
- drivers/usb/phy/Makefile       |    1 +
- drivers/usb/phy/phy-keystone.c |  142 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 153 insertions(+)
- create mode 100644 drivers/usb/phy/phy-keystone.c
+ drivers/usb/dwc3/Kconfig         |    7 ++
+ drivers/usb/dwc3/Makefile        |    1 +
+ drivers/usb/dwc3/dwc3-keystone.c |  205 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 213 insertions(+)
+ create mode 100644 drivers/usb/dwc3/dwc3-keystone.c
 
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 08e2f39..c6792f43 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -40,6 +40,16 @@ config ISP1301_OMAP
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called isp1301_omap.
+diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+index 70fc430..e2c730f 100644
+--- a/drivers/usb/dwc3/Kconfig
++++ b/drivers/usb/dwc3/Kconfig
+@@ -70,6 +70,13 @@ config USB_DWC3_PCI
+ 	  One such PCIe-based platform is Synopsys' PCIe HAPS model of
+ 	  this IP.
  
-+config KEYSTONE_USB_PHY
-+	tristate "Keystone USB PHY Driver"
-+	depends on ARCH_KEYSTONE
-+	select USB_PHY
-+	select NOP_USB_XCEIV
++config USB_DWC3_KEYSTONE
++	tristate "Texas Instruments Keystone2 Platforms"
++	default USB_DWC3
 +	help
-+	  Enable this to support Keystone USB phy. This driver provides
-+	  interface to interact with USB 2.0 and USB 3.0 PHY that is part
-+	  of the Keystone SOC.
++	  Support of USB2/3 functionality in TI Keystone2 platforms.
++	  Say 'Y' or 'M' here if you have one such device
 +
- config MV_U3D_PHY
- 	bool "Marvell USB 3.0 PHY controller Driver"
- 	depends on CPU_MMP3
-diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-index 022c1da..311b47b 100644
---- a/drivers/usb/phy/Makefile
-+++ b/drivers/usb/phy/Makefile
-@@ -30,3 +30,4 @@ obj-$(CONFIG_USB_RCAR_PHY)		+= phy-rcar-usb.o
- obj-$(CONFIG_USB_RCAR_GEN2_PHY)		+= phy-rcar-gen2-usb.o
- obj-$(CONFIG_USB_ULPI)			+= phy-ulpi.o
- obj-$(CONFIG_USB_ULPI_VIEWPORT)		+= phy-ulpi-viewport.o
-+obj-$(CONFIG_KEYSTONE_USB_PHY)		+= phy-keystone.o
-diff --git a/drivers/usb/phy/phy-keystone.c b/drivers/usb/phy/phy-keystone.c
+ comment "Debugging features"
+ 
+ config USB_DWC3_DEBUG
+diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
+index dd17601..10ac3e7 100644
+--- a/drivers/usb/dwc3/Makefile
++++ b/drivers/usb/dwc3/Makefile
+@@ -32,3 +32,4 @@ endif
+ obj-$(CONFIG_USB_DWC3_OMAP)		+= dwc3-omap.o
+ obj-$(CONFIG_USB_DWC3_EXYNOS)		+= dwc3-exynos.o
+ obj-$(CONFIG_USB_DWC3_PCI)		+= dwc3-pci.o
++obj-$(CONFIG_USB_DWC3_KEYSTONE)		+= dwc3-keystone.o
+diff --git a/drivers/usb/dwc3/dwc3-keystone.c b/drivers/usb/dwc3/dwc3-keystone.c
 new file mode 100644
-index 0000000..e025eb2
+index 0000000..33f71330b
 --- /dev/null
-+++ b/drivers/usb/phy/phy-keystone.c
-@@ -0,0 +1,142 @@
-+/*
-+ * phy-keystone - USB PHY, talking to dwc3 controller in Keystone.
++++ b/drivers/usb/dwc3/dwc3-keystone.c
+@@ -0,0 +1,205 @@
++/**
++ * dwc3-keystone.c - Keystone Specific Glue layer
 + *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * Copyright (C) 2010-2013 Texas Instruments Incorporated - http://www.ti.com
 + *
 + * Author: WingMan Kwok <w-kwok2@ti.com>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2  of
++ * the License as published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
 + */
 +
++#include <linux/clk.h>
 +#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/interrupt.h>
 +#include <linux/platform_device.h>
-+#include <linux/usb/usb_phy_gen_xceiv.h>
++#include <linux/dma-mapping.h>
 +#include <linux/io.h>
-+#include <linux/of.h>
++#include <linux/of_platform.h>
 +
-+#include "phy-generic.h"
++/* USBSS register offsets */
++#define USBSS_REVISION		0x0000
++#define USBSS_SYSCONFIG		0x0010
++#define USBSS_IRQ_EOI		0x0018
++#define USBSS_IRQSTATUS_RAW_0	0x0020
++#define USBSS_IRQSTATUS_0	0x0024
++#define USBSS_IRQENABLE_SET_0	0x0028
++#define USBSS_IRQENABLE_CLR_0	0x002c
 +
-+/* USB PHY control register offsets */
-+#define USB_PHY_CTL_UTMI		0x0000
-+#define USB_PHY_CTL_PIPE		0x0004
-+#define USB_PHY_CTL_PARAM_1		0x0008
-+#define USB_PHY_CTL_PARAM_2		0x000c
-+#define USB_PHY_CTL_CLOCK		0x0010
-+#define USB_PHY_CTL_PLL			0x0014
++/* IRQ register bits */
++#define USBSS_IRQ_EOI_LINE(n)	BIT(n)
++#define USBSS_IRQ_EVENT_ST	BIT(0)
++#define USBSS_IRQ_COREIRQ_EN	BIT(0)
++#define USBSS_IRQ_COREIRQ_CLR	BIT(0)
 +
-+#define PHY_REF_SSP_EN			BIT(29)
++static u64 kdwc3_dma_mask;
 +
-+struct keystone_usbphy {
-+	struct usb_phy_gen_xceiv	usb_phy_gen;
-+	void __iomem			*phy_ctrl;
++struct dwc3_keystone {
++	struct device			*dev;
++	struct clk			*clk;
++	void __iomem			*usbss;
 +};
 +
-+static inline u32 keystone_usbphy_readl(void __iomem *base, u32 offset)
++static inline u32 kdwc3_readl(void __iomem *base, u32 offset)
 +{
 +	return readl(base + offset);
 +}
 +
-+static inline void keystone_usbphy_writel(void __iomem *base,
-+					  u32 offset, u32 value)
++static inline void kdwc3_writel(void __iomem *base, u32 offset, u32 value)
 +{
 +	writel(value, base + offset);
 +}
 +
-+static int keystone_usbphy_init(struct usb_phy *phy)
++static void kdwc3_enable_irqs(struct dwc3_keystone *kdwc)
 +{
-+	struct keystone_usbphy *k_phy = dev_get_drvdata(phy->dev);
 +	u32 val;
 +
-+	val  = keystone_usbphy_readl(k_phy->phy_ctrl, USB_PHY_CTL_CLOCK);
-+	keystone_usbphy_writel(k_phy->phy_ctrl, USB_PHY_CTL_CLOCK,
-+				val | PHY_REF_SSP_EN);
-+	udelay(20);
-+	return 0;
++	val = kdwc3_readl(kdwc->usbss, USBSS_IRQENABLE_SET_0);
++	val = USBSS_IRQ_COREIRQ_EN;
++	kdwc3_writel(kdwc->usbss, USBSS_IRQENABLE_SET_0, val);
 +}
 +
-+static void keystone_usbphy_shutdown(struct usb_phy *phy)
++static void kdwc3_disable_irqs(struct dwc3_keystone *kdwc)
 +{
-+	struct keystone_usbphy *k_phy = dev_get_drvdata(phy->dev);
 +	u32 val;
 +
-+	val  = keystone_usbphy_readl(k_phy->phy_ctrl, USB_PHY_CTL_CLOCK);
-+	keystone_usbphy_writel(k_phy->phy_ctrl, USB_PHY_CTL_CLOCK,
-+				val &= ~PHY_REF_SSP_EN);
++	val = kdwc3_readl(kdwc->usbss, USBSS_IRQENABLE_SET_0);
++	val &= ~USBSS_IRQ_COREIRQ_EN;
++	kdwc3_writel(kdwc->usbss, USBSS_IRQENABLE_SET_0, val);
 +}
 +
-+static int keystone_usbphy_probe(struct platform_device *pdev)
++static irqreturn_t dwc3_keystone_interrupt(int irq, void *_kdwc)
++{
++	struct dwc3_keystone	*kdwc = _kdwc;
++
++	kdwc3_writel(kdwc->usbss, USBSS_IRQENABLE_CLR_0, USBSS_IRQ_COREIRQ_CLR);
++	kdwc3_writel(kdwc->usbss, USBSS_IRQSTATUS_0, USBSS_IRQ_EVENT_ST);
++	kdwc3_writel(kdwc->usbss, USBSS_IRQENABLE_SET_0, USBSS_IRQ_COREIRQ_EN);
++	kdwc3_writel(kdwc->usbss, USBSS_IRQ_EOI, USBSS_IRQ_EOI_LINE(0));
++
++	return IRQ_HANDLED;
++}
++
++static int kdwc3_probe(struct platform_device *pdev)
 +{
 +	struct device		*dev = &pdev->dev;
-+	struct keystone_usbphy	*k_phy;
++	struct device_node	*node = pdev->dev.of_node;
++	struct dwc3_keystone	*kdwc;
 +	struct resource		*res;
-+	int ret;
++	int			error, irq;
 +
-+	k_phy = devm_kzalloc(dev, sizeof(*k_phy), GFP_KERNEL);
-+	if (!k_phy)
++	kdwc = devm_kzalloc(dev, sizeof(*kdwc), GFP_KERNEL);
++	if (!kdwc)
 +		return -ENOMEM;
++
++	platform_set_drvdata(pdev, kdwc);
++
++	kdwc->dev = dev;
 +
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	if (!res) {
-+		dev_err(dev, "missing usb phy resource\n");
++		dev_err(dev, "missing usbss resource\n");
 +		return -EINVAL;
 +	}
 +
-+	k_phy->phy_ctrl = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(k_phy->phy_ctrl))
-+		return PTR_ERR(k_phy->phy_ctrl);
++	kdwc->usbss = devm_ioremap_resource(dev, res);
++	if (IS_ERR(kdwc->usbss))
++		return PTR_ERR(kdwc->usbss);
 +
-+	ret = usb_phy_gen_create_phy(dev, &k_phy->usb_phy_gen,
-+			USB_PHY_TYPE_USB2, 0, false);
-+	if (ret)
-+		return ret;
++	kdwc3_dma_mask = dma_get_mask(dev);
++	dev->dma_mask = &kdwc3_dma_mask;
 +
-+	ret = usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
-+	if (ret)
-+		return ret;
-+	k_phy->usb_phy_gen.phy.init = keystone_usbphy_init;
-+	k_phy->usb_phy_gen.phy.shutdown = keystone_usbphy_shutdown;
++	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
++	if (IS_ERR_OR_NULL(kdwc->clk)) {
++		dev_err(kdwc->dev, "unable to get kdwc usb clock\n");
++		return -ENODEV;
++	}
 +
-+	platform_set_drvdata(pdev, k_phy);
++	error = clk_prepare_enable(kdwc->clk);
++	if (error < 0) {
++		dev_dbg(kdwc->dev, "unable to enable usb clock, err %d\n",
++			error);
++		return error;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "missing irq\n");
++		goto err_irq;
++	}
++
++	error = devm_request_irq(dev, irq, dwc3_keystone_interrupt, IRQF_SHARED,
++			dev_name(dev), kdwc);
++	if (error) {
++		dev_err(dev, "failed to request IRQ #%d --> %d\n",
++				irq, error);
++		goto err_irq;
++	}
++
++	kdwc3_enable_irqs(kdwc);
++
++	error = of_platform_populate(node, NULL, NULL, dev);
++	if (error) {
++		dev_err(&pdev->dev, "failed to create dwc3 core\n");
++		goto err_core;
++	}
 +
 +	return 0;
++
++err_core:
++	kdwc3_disable_irqs(kdwc);
++err_irq:
++	clk_disable_unprepare(kdwc->clk);
++
++	return error;
 +}
 +
-+static int keystone_usbphy_remove(struct platform_device *pdev)
++static int kdwc3_remove_core(struct device *dev, void *c)
 +{
-+	struct keystone_usbphy *k_phy = platform_get_drvdata(pdev);
++	struct platform_device *pdev = to_platform_device(dev);
 +
-+	usb_remove_phy(&k_phy->usb_phy_gen.phy);
++	platform_device_unregister(pdev);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id keystone_usbphy_ids[] = {
-+	{ .compatible = "ti,keystone-usbphy" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, keystone_usbphy_ids);
++static int kdwc3_remove(struct platform_device *pdev)
++{
++	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
 +
-+static struct platform_driver keystone_usbphy_driver = {
-+	.probe          = keystone_usbphy_probe,
-+	.remove         = keystone_usbphy_remove,
-+	.driver         = {
-+		.name   = "keystone-usbphy",
-+		.owner  = THIS_MODULE,
-+		.of_match_table = of_match_ptr(keystone_usbphy_ids),
++	kdwc3_disable_irqs(kdwc);
++	clk_disable_unprepare(kdwc->clk);
++	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
++	platform_set_drvdata(pdev, NULL);
++	return 0;
++}
++
++static const struct of_device_id kdwc3_of_match[] = {
++	{ .compatible = "ti,keystone-dwc3", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, kdwc3_of_match);
++
++static struct platform_driver kdwc3_driver = {
++	.probe		= kdwc3_probe,
++	.remove		= kdwc3_remove,
++	.driver		= {
++		.name	= "keystone-dwc3",
++		.owner	        = THIS_MODULE,
++		.of_match_table	= kdwc3_of_match,
 +	},
 +};
 +
-+module_platform_driver(keystone_usbphy_driver);
++module_platform_driver(kdwc3_driver);
 +
-+MODULE_ALIAS("platform: keystone-usbphy");
-+MODULE_AUTHOR("Texas Instruments Inc.");
-+MODULE_DESCRIPTION("Keystone USB phy driver");
++MODULE_ALIAS("platform:keystone-dwc3");
++MODULE_AUTHOR("WingMan Kwok <w-kwok2@ti.com>");
 +MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("DesignWare USB3 KEYSTONE Glue Layer");
 -- 
 1.7.9.5
