@@ -1,29 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 11:27:23 -0500
-Subject: [PATCH v5 0/5] Update Davinci watchdog driver
-In-Reply-To: <1386185970-14488-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386185970-14488-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52A5EF6B.6060700@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 17:28:07 +0100
+Subject: [PATCHv5 2/4] clk: socfpga: Add a hook for SD/MMC driver to
+ control CIU clock settings
+In-Reply-To: <1386597462-29471-3-git-send-email-dinguyen@altera.com>
+References: <1386597462-29471-1-git-send-email-dinguyen@altera.com>
+ <1386597462-29471-3-git-send-email-dinguyen@altera.com>
+Message-ID: <201312091728.07940.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wim,
-
-On Wednesday 04 December 2013 02:39 PM, Ivan Khoronzhuk wrote:
-> These patches are intended to update Davinci watchdog to use WDT core
-> and reuse driver for keystone arch, because Keystone uses the similar
-> IP like Davinci.
+On Monday 09 December 2013, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-
-[..]
-
-> v4..v5:
-> - watchdog: davinci: change driver to use WDT core
-> 	switched off CONFIG_WATCHDOG_NOWAYOUT option
+> Populate the .prepare function in the clk-ops for the "sdmmc_clk" that represents
+> the "ciu" clock for the SD/MMC driver. The prepare function will handle setting
+> the correct clock-phase for the CIU clock of the SD/MMC IP.
 > 
-Can you please apply the series to your watchdog tree ?
-Do let me know if you want us to prepare a git branch
-to pull from.
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
-Regards,
-Santosh
+Please see my comments for this patch for v4, it still looks wrong to me.
+The other three patches are good though.
+
+	Arnd
