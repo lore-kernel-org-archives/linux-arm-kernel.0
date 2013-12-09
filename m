@@ -1,16 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Dec 2013 12:43:12 +0800
-Subject: [PATCH] ARM: i.MX28: dts: rename usbphy pin names
-In-Reply-To: <1386341800-12098-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1386341800-12098-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20131209044310.GF825@S2101-09.ap.freescale.net>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Mon,  9 Dec 2013 05:44:00 +0100
+Subject: [PATCH][RESEND][ARM] floppy.h: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381546640-4713-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381546640-4713-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <1386564240-18885-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 03:56:40PM +0100, Michael Grzeschik wrote:
-> The pins have nothing todo with the phy layer. We better rename them, so
-> it gets clear they are routed to the ehci core not to any phy.
-> 
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-Applied, thanks.
+It's a NOOP since 2.6.35 and it will be removed one day.
+
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/include/asm/floppy.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/floppy.h b/arch/arm/include/asm/floppy.h
+index c9f03eccc9d8..f4882553fbb0 100644
+--- a/arch/arm/include/asm/floppy.h
++++ b/arch/arm/include/asm/floppy.h
+@@ -25,7 +25,7 @@
+ 
+ #define fd_inb(port)		inb((port))
+ #define fd_request_irq()	request_irq(IRQ_FLOPPYDISK,floppy_interrupt,\
+-					    IRQF_DISABLED,"floppy",NULL)
++					    0,"floppy",NULL)
+ #define fd_free_irq()		free_irq(IRQ_FLOPPYDISK,NULL)
+ #define fd_disable_irq()	disable_irq(IRQ_FLOPPYDISK)
+ #define fd_enable_irq()		enable_irq(IRQ_FLOPPYDISK)
+-- 
+1.8.3.2
