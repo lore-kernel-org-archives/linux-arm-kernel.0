@@ -1,118 +1,115 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 09 Dec 2013 17:04:41 -0600
-Subject: [PATCH] clk: socfpga: Map the clk manager base address in the
- clock driver
-In-Reply-To: <201312092231.13441.arnd@arndb.de>
-References: <1386617447-1260-1-git-send-email-dinguyen@altera.com>
- <201312092231.13441.arnd@arndb.de>
-Message-ID: <52A64C89.2030100@gmail.com>
+From: galak@kernel.crashing.org (Kumar Gala)
+Date: Mon, 9 Dec 2013 17:09:11 -0600
+Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <5294CC0C.9000203@ti.com>
+References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
+ <5294CC0C.9000203@ti.com>
+Message-ID: <01B6F752-AD19-437E-B6A6-CC167B6C34BF@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 12/9/13 3:31 PM, Arnd Bergmann wrote:
-> On Monday 09 December 2013, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> The clk manager's base address was being mapped in SOCFPGA's arch code and
->> being extern'ed out to the clock driver. This method is not correct, and the
->> arch code was not really doing anything with that clk manager anyways.
->>
->> This patch moves the mapping of the clk manager's base address in the clock
->> driver itself.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Ok, thanks for doing this cleanup. A few comments for further simplification:
->
->> -extern void __iomem *clk_mgr_base_addr;
->> -
->>  struct socfpga_clk {
->>  	struct clk_gate hw;
->>  	char *parent_name;
->>  	char *clk_name;
->> +	void __iomem *clk_mgr_base_addr;
->>  	u32 fixed_div;
->>  	void __iomem *div_reg;
->>  	u32 width;	/* only valid if div_reg != 0 */
->
-> I think there is no need to make this a per-clock field, it's fine to
-> have a 'static' variable in the place of the 'extern' declaration you have now.
-Ok.
->
->> @@ -129,7 +130,11 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
->>  	if (WARN_ON(!socfpga_clk))
->>  		return NULL;
->>  
->> -	socfpga_clk->hw.reg = clk_mgr_base_addr + reg;
->> +	/* Map the clk manager register */
->> +	clk_mgr_np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
->> +	socfpga_clk->hw.reg = of_iomap(clk_mgr_np, 0);
->> +	BUG_ON(!socfpga_clk->hw.reg);
->> +	socfpga_clk->hw.reg += reg;
->>  
->>  	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
->>  	if (rc)
-> Instead of mapping it every time, I suggest something along the lines of
-> this patch:
->
-> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-> index 81dd31a..1a14742 100644
-> --- a/drivers/clk/socfpga/clk.c
-> +++ b/drivers/clk/socfpga/clk.c
-> @@ -55,7 +55,7 @@
->  #define div_mask(width)	((1 << (width)) - 1)
->  #define streq(a, b) (strcmp((a), (b)) == 0)
->  
-> -extern void __iomem *clk_mgr_base_addr;
-> +static void __iomem *clk_mgr_base_addr;
->  
->  struct socfpga_clk {
->  	struct clk_gate hw;
-> @@ -322,19 +322,30 @@ static void __init socfpga_pll_init(struct device_node *node)
->  {
->  	socfpga_clk_init(node, &clk_pll_ops);
->  }
-> -CLK_OF_DECLARE(socfpga_pll, "altr,socfpga-pll-clock", socfpga_pll_init);
->  
->  static void __init socfpga_periph_init(struct device_node *node)
->  {
->  	socfpga_clk_init(node, &periclk_ops);
->  }
-> -CLK_OF_DECLARE(socfpga_periph, "altr,socfpga-perip-clk", socfpga_periph_init);
->  
->  static void __init socfpga_gate_init(struct device_node *node)
->  {
->  	socfpga_gate_clk_init(node, &gateclk_ops);
->  }
-> -CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
-> +
-> +static struct of_device_id socfpga_child_clocks[] = {
-> +	{ "altr,socfpga-pll-clock", socfpga_pll_init },
-> +	{ "altr,socfpga-perip-clk", socfpga_periph_init },
-> +	{ "altr,socfpga-gate-clk", socfpga_gate_init },
-> +	{},
-> +};
-> +
-> +static void __init socfpga_pll_init(struct device_node *node)
-> +{
-> +	clk_mgr_base_addr = of_iomap(node, 0);
-> +	of_clk_init(socfpga_child_clocks);
-> +}
-> +CLK_OF_DECLARE(socfpga_mgr, "altr,clk-mgr", socfpga_clkmgr_init);
->  
->  void __init socfpga_init_clocks(void)
->  {
->
->
-> On a related note, I'd also like to see socfpga_init_clocks() disappear. It should
-> be trivial to just add the "mpuclk" into the DT as a separate
-> compatible = "fixed-factor-clock" node.
-Please see:
+On Nov 26, 2013, at 10:27 AM, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/216664.html
+> On 11/22/2013 11:04 PM, Kumar Gala wrote:
+>> 
+>> On Nov 20, 2013, at 9:46 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+>> 
+>>> Add bindings for AEMIF controller drivers/memory/ti-aemif.c
+>>> 
+>> 
+>> Binding shouldn?t normally refer to code.
+>> 
+>> Just saying something like:
+>> 
+>> Adding binging for TI Async External Memory Interface (AEMIF) controller.
+>> 
+>> 
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
+>>> .../bindings/memory-controllers/ti-aemif.txt       |  198 ++++++++++++++++++++
+>>> 1 file changed, 198 insertions(+)
+>>> create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>>> new file mode 100644
+>>> index 0000000..be0c0cb
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>>> @@ -0,0 +1,198 @@
+>>> +* Device tree bindings for Texas instruments AEMIF controller
+>>> +
+>>> +Th Async External Memory Interface (EMIF16/AEMIF) controller is intended to
+>> 
+>> The?
+>> 
+>>> +provide a glue-less interface to a variety of asynchronous memory devices like
+>>> +ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
+>>> +can be accessed at any given time via four chip selects with 64M byte access
+>>> +per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
+>>> +and Mobile SDR are not supported.
+>>> +
+>>> +Documentation:
+>>> +Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+>>> +OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+>>> +Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+>>> +
+>>> +Required properties:
+>>> +
+>>> +- compatible:		"ti,davinci-aemif"
+>>> +			"ti,keystone-aemif"
+>>> +			"ti,omap-L138-aemif"
+>>> +
+>>> +- #address-cells:	Must be 2. The first cell is the memory partition
+>>> +			number. The 0 partition is for chip selects. And the
+>>> +			second cell is the offset into the partition, for the 0
+>>> +			partition it corresponds to chip select offset.
+>>> +
+>> 
+>> Is the first cell just the chip select number?
+> 
+> No. It's rather memory range/partition number. Now there are 2 partitions:
+> - control partition which is common for all CS interfaces
+> - CS-specific partition/range
+> (this one can be splitted according to specific SoC requirement)
+> 
+> As per Keystone TCI6638K2K
+> Datasheet http://www.ti.com/lit/ds/sprs836d/sprs836d.pdf:
+> 
+> 1) the memory range 0 will be from 0x30000000 size 0x10000000:
+> 00 3000 0000 - 00 33FF FFFF 64M EMIF16 CE0
+> 00 3400 0000 - 00 37FF FFFF 64M EMIF16 CE1
+> 00 3800 0000 - 00 3BFF FFFF 64M EMIF16 CE2
+> 00 3C00 0000 - 00 3FFF FFFF 64M EMIF16 CE3
+> 
+> 2) the memory range 1:
+> 00 2100 0A00 - 00 2100 0AFF 256 AEMIF Config
+> 
+> And AEMIF node contains definition:
+> ranges = <0 0 0x30000000 0x10000000
+> 	  1 0 0x21000A00 0x0000100>;
+> 
+> 
+> Child node has (nand):
+> reg = <0 0 0x4000000 (cs0)
+>        - or - 0 0x4000000 0x4000000 (cs1)
+>        - or - 0 0x8000000 0x4000000 (cs2)
+> 	- or - 0 0xC000000 0x4000000 (cs3)
+> 	- and -
+>        1 0 0x0000100>; (for all cs)
+> 
+> For example for cs2 child node the resulting mem range 0 will be calculated as
+> 
+> from: 0x30000000 + (0 0x8000000 - 0 0)
+> size: 0x4000000
+> 
+> We don't encode CS number in reg/ranges, because it will allow simply change 
+> AEMIF DT definitions depending on each SoC
+> (AEMIF CS memory range can be continuous as above or not, if not - additional
+> range/partition can be added and child device can select the proper one).
 
-Thanks for the review.
+This is quite confusing.  I think the ranges property needs far more description as part of the top level controller node.  It spec out what the various fields are in the ranges property.
 
-Dinh
->
-> 	Arnd
+- k
