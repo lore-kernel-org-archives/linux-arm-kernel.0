@@ -1,55 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 9 Dec 2013 10:14:22 -0600
-Subject: [PATCH v2 01/15] mfd: menelaus: Drop __exit section annotation
-In-Reply-To: <20131209093748.GA12675@lee--X1>
-References: <1386042188-12246-1-git-send-email-balbi@ti.com>
- <20131203095136.GF11828@lee--X1>
- <20131208190739.GA18977@saruman.home>
- <20131209093748.GA12675@lee--X1>
-Message-ID: <20131209161422.GC24047@saruman.home>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 09 Dec 2013 17:15:22 +0100
+Subject: [PATCH 1/3] ARM: EXYNOS: pmu: Constify data tables
+In-Reply-To: <CAGS+omDq95paoHsf5-i2gbRoSGvqn36zNO93KHGi2FGhfGMsrw@mail.gmail.com>
+References: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
+ <1922780.plAOmhqzpW@amdc1227>
+ <CAGS+omDq95paoHsf5-i2gbRoSGvqn36zNO93KHGi2FGhfGMsrw@mail.gmail.com>
+Message-ID: <30145891.cE1204QWiC@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 10 of December 2013 00:11:40 Daniel Kurtz wrote:
+> Hi Tomasz,
+> 
+> Thank you for the reviews.
+> 
+> On Dec 9, 2013 5:15 AM, "Tomasz Figa" <t.figa@samsung.com> wrote:
+> >
+> > Hi Daniel,
+> >
+> > On Thursday 21 of November 2013 02:21:24 Daniel Kurtz wrote:
+> > > These tables are all immutable, make them const to save 4416 bytes of RAM.
+> > >
+> > > size arch/arm/mach-exynos/pmu.o
+> > >    text          data     bss
+> > >     848          4420       4         // before
+> > >    5264             4       4         // after
+> >
+> > I'm not sure where the mentioned saving of RAM is. Moving data between
+> > sections is not supposed to make it use less memory, I believe.
+> 
+> You are correct.  This was my misunderstanding from doing too much
+> work with microcontrollers, where .text sections are accessed in place
+> from FLASH for code and const data, but .data memory is copied from a
+> FLASH section to a second RAM section at init for access at runtime.
+> Most modern Linux systems copy/decompress their code and data sections
+> from external storage to RAM anyway, so there is no actual memory
+> savings (except potentially the compiler may be able to optimize a bit
+> more with the const hint).
+> 
+> >
+> > Anyway, it's a good practice to mark constant data as const, to disallow
+> > changing them at runtime by mistake, so the patch is fine. Except some
+> > issues I commented on inline.
+> 
+> Were there supposed to be inline comments?  I don't see any.
 
-On Mon, Dec 09, 2013 at 09:37:48AM +0000, Lee Jones wrote:
-> > > The code looks mostly fine, but the implementation of the commit logs
-> > > seems lazy. Please submit a v3 using coherent sentences with full
-> > > explanations and correct punctuation.
-> > 
-> > example ?
-> 
-> All of your commit messages.
-> 
-> > that macro just helps removing some extra
-> 
->   ^- Sentences start with an uppercase character.
-> 
-> > line of code and hides ffs() calls.
-> > 
-> > while at that, also fix a variable shadowing
-> 
->   ^- Sentences start with an uppercase character.
-> 
-> > bug where 'int irq' was being redeclared inside
-> > inner loop while it was also argument to interrupt
-> > handler.
-> 
->   < ---------------   50 chars   ----------------- >
-> 
-> Please use the full 72 char (or there abouts) width of the buffer.
+Oops, sorry for this, forgot to remove the last sentence. I initially had
+one question about the constant pointers below, but I read through the
+full code again and answered it myself.
 
-I don't see any mention of punctuation problems, however. Also, you're
-not complaining about the content at all, which tells me those sentences
-aren't as incoherent as you claimed before. But fair enough, I'll fix
-those up and add Aaro's Tested-by
+The patch is fine.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/3696edec/attachment.sig>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
