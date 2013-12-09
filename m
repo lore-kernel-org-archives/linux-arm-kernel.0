@@ -1,60 +1,59 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 9 Dec 2013 14:30:56 +0800
-Subject: [PATCH v5 07/15] usb: phy: add notify suspend and resume callback
+Date: Mon, 9 Dec 2013 14:30:54 +0800
+Subject: [PATCH v5 05/15] ARM: dts: imx6: add anatop phandle for usbphy
 In-Reply-To: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
 References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386570664-6713-8-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386570664-6713-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They are used to notify PHY that the controller enters suspend
-or finishes resume.
+Add anatop phandle for usbphy
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- include/linux/usb/phy.h |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 6c0b1c5..a747960 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -116,6 +116,11 @@ struct usb_phy {
- 			enum usb_device_speed speed);
- 	int	(*notify_disconnect)(struct usb_phy *x,
- 			enum usb_device_speed speed);
-+	int	(*notify_suspend)(struct usb_phy *x,
-+			enum usb_device_speed speed);
-+	int	(*notify_resume)(struct usb_phy *x,
-+			enum usb_device_speed speed);
-+
- };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 59154dc..4e74962 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -557,6 +557,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks 182>;
++				fsl,anatop = <&anatop>;
+ 			};
  
- /**
-@@ -282,6 +287,24 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
- 		return 0;
- }
+ 			usbphy2: usbphy at 020ca000 {
+@@ -564,6 +565,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks 183>;
++				fsl,anatop = <&anatop>;
+ 			};
  
-+static inline int usb_phy_notify_suspend
-+	(struct usb_phy *x, enum usb_device_speed speed)
-+{
-+	if (x && x->notify_suspend)
-+		return x->notify_suspend(x, speed);
-+	else
-+		return 0;
-+}
-+
-+static inline int usb_phy_notify_resume
-+	(struct usb_phy *x, enum usb_device_speed speed)
-+{
-+	if (x && x->notify_resume)
-+		return x->notify_resume(x, speed);
-+	else
-+		return 0;
-+}
-+
- /* notifiers */
- static inline int
- usb_register_notifier(struct usb_phy *x, struct notifier_block *nb)
+ 			snvs at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..30322b5 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -489,6 +489,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			usbphy2: usbphy at 020ca000 {
+@@ -496,6 +497,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			snvs at 020cc000 {
 -- 
 1.7.8
