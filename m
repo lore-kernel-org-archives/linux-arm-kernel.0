@@ -1,30 +1,62 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 09 Dec 2013 14:14:45 +0100
-Subject: [PATCH 1/3] ARM: EXYNOS: pmu: Constify data tables
-In-Reply-To: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
-References: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <1922780.plAOmhqzpW@amdc1227>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 09 Dec 2013 17:16:37 +0400
+Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <52A59991.1060305@gmail.com>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-6-git-send-email-ynvich@gmail.com>
+ <201312090233.58592.arnd@arndb.de> <52A587A0.1050503@gmail.com>
+ <1386581672.7152.108.camel@host5.omatika.ru> <52A59991.1060305@gmail.com>
+Message-ID: <1386594997.7152.164.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Mon, 2013-12-09 at 11:21 +0100, Daniel Mack wrote:
+> On 12/09/2013 10:34 AM, Sergei Ianovich wrote:
+> > On Mon, 2013-12-09 at 10:04 +0100, Daniel Mack wrote:
+> >> On 12/09/2013 02:33 AM, Arnd Bergmann wrote:
+> >>> It hasn't made it upstream yet, but see http://list-archives.org/2013/08/07/linux-mtd-lists-infradead-org/patch-00-20-arm-pxa-move-core-and-drivers-to-dmaengine/f/3444199144
+> >>> for how it's done. Maybe Daniel can comment on the status of his
+> >>> patches.
+> >>
+...
+> The only real problem is the PXA camera driver, which does tricky things
+> like hot re-queuing of DMA descriptors. That one needs fixing before the
+> series can land.
 
-On Thursday 21 of November 2013 02:21:24 Daniel Kurtz wrote:
-> These tables are all immutable, make them const to save 4416 bytes of RAM.
-> 
-> size arch/arm/mach-exynos/pmu.o
->    text	   data	    bss
->     848	   4420	      4		// before
->    5264	      4	      4		// after
+My impression is that his series is hard to land. I've expressed my
+concerns about big changes in a separate mail.
 
-I'm not sure where the mentioned saving of RAM is. Moving data between
-sections is not supposed to make it use less memory, I believe.
+PXA device tree support issue is practically orthogonal. As of August
+2013, Daniel's dma series doesn't add any dt support. After new DMA is
+working, we will need to add dt support in the same drivers.
 
-Anyway, it's a good practice to mark constant data as const, to disallow
-changing them at runtime by mistake, so the patch is fine. Except some
-issues I commented on inline.
+Basically we have three options:
+A. Wait for Daniel DMA, than for PXA clock, than do dt support
+ pros: 
+ * correct order
+ cons:
+ * need to wait, possibly a long time
+ * dt boot not possible, while we wait
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+B. Provide 'hackish' support to dt, than correct hacks when DMA is
+merged.
+ pros:
+ * parallel development
+ * healthier kernel code (current PXA usb driver won't compile with dt
+enabled)
+ cons:
+ * wrong concept (like my patch 5/9) until DMA is working
+ * need to recompile dtb files when kernel changes
 
-Best regards,
-Tomasz
+C. Use 'fake' DMA provider dt binding to emulate existing DMA until new
+DMA is merged, than 
+ pros:
+ * parallel development
+ * healthier kernel code
+ * correct device trees from the beginning
+ cons:
+ * more work
+ * still need to recompile dtbs when clock support is merged
+
+Any ideas?
