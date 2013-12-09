@@ -1,52 +1,85 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Dec 2013 01:37:54 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix usage of invalid iclk / oclk
- when clock node is not present
-In-Reply-To: <1386019001-10144-1-git-send-email-nm@ti.com>
-References: <1386019001-10144-1-git-send-email-nm@ti.com>
-Message-ID: <alpine.DEB.2.02.1312090137340.32309@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 02:47:24 +0100
+Subject: [PATCH 9/9] ARM: pxa27x: device tree support ICP DAS LP-8x4x
+In-Reply-To: <1386543229-1542-10-git-send-email-ynvich@gmail.com>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-10-git-send-email-ynvich@gmail.com>
+Message-ID: <201312090247.24978.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On Sunday 08 December 2013, Sergei Ianovich wrote:
+> +
+> +#ifdef CONFIG_PXA27x
+> +extern void __init pxa27x_dt_init_irq(void);
 
-On Mon, 2 Dec 2013, Nishanth Menon wrote:
+This is not the right place to put an 'extern' declaration, it should go into
+a header file if it's really needed. Ideally you would not need it at all
+and just add an IRQCHIP_DECLARE() line into the driver to automatically
+probe it.
 
-> commit dc75925d(OMAP: hwmod: Fix the missing braces) introduced
-> missing braces, however, we just set return result if clk_get fail
-> and we populate the error pointer in clk pointer and pass it along to
-> clk_prepare. This is wrong. The intent seems to be retry remaining
-> clocks if they are available and warn the ones we cant find clks for.
-> 
-> With the current logic, we see the following crash:
-> omap_hwmod: l3_main: cannot clk_get interface_clk emac_ick
-> Unable to handle kernel NULL pointer dereference at virtual address 00000032
-> pgd = c0004000
-> [00000032] *pgd=00000000
-> Internal error: Oops: 5 [#1] SMP ARM
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0-rc1-00044-gcc9fd5a-dirty #19
-> task: ce0c3440 ti: ce0c4000 task.ti: ce0c4000
-> PC is at __clk_prepare+0x10/0x74
-> LR is at clk_prepare+0x14/0x24
->   <snip>
-> [<c044d59c>] (__clk_prepare+0x10/0x74) from [<c044d9b0>] (clk_prepare+0x14/0x24)
-> [<c044d9b0>] (clk_prepare+0x14/0x24) from [<c077d8c4>] (_init+0x24c/0x3bc)
-> [<c077d8c4>] (_init+0x24c/0x3bc) from [<c0027328>] (omap_hwmod_for_each+0x34/0x5c)
-> [<c0027328>] (omap_hwmod_for_each+0x34/0x5c) from [<c077dfa0>] (__omap_hwmod_setup_all+0x24/0x40)
-> [<c077dfa0>] (__omap_hwmod_setup_all+0x24/0x40) from [<c0008928>] (do_one_initcall+0x38/0x168)
-> [<c0008928>] (do_one_initcall+0x38/0x168) from [<c0771be8>] (kernel_init_freeable+0xfc/0x1cc)
-> [<c0771be8>] (kernel_init_freeable+0xfc/0x1cc) from [<c0521064>] (kernel_init+0x8/0x110)
-> [<c0521064>] (kernel_init+0x8/0x110) from [<c000e568>] (ret_from_fork+0x14/0x2c)
-> Code: e92d4038 e2504000 01a05004 0a000005 (e5943034)
-> 
-> So, just warn and continue instead of proceeding and crashing, with
-> missing clock nodes/bad data, we will eventually fail, however we
-> should now have enough information to identify the culprit.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> +static const struct of_dev_auxdata pxa27x_auxdata_lookup[] __initconst = {
+> +	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
+> +	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
+> +	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40700000, "pxa2xx-uart.2", NULL),
+> +	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x41600000, "pxa2xx-uart.3", NULL),
+> +	OF_DEV_AUXDATA("marvell,pxa-mmc",	0x41100000, "pxa2xx-mci.0", NULL),
+> +	OF_DEV_AUXDATA("intel,pxa27x-gpio",	0x40e00000, "pxa27x-gpio", NULL),
+> +	OF_DEV_AUXDATA("marvell,pxa-ohci",	0x4c000000, "pxa27x-ohci", NULL),
+> +	OF_DEV_AUXDATA("mrvl,pxa-i2c",		0x40301680, "pxa2xx-i2c.0", NULL),
+> +	{}
+> +};
 
-Thanks, queued for v3.13-rc.
+I guess these are needed only for clock management purposes at the moment?
 
+> +static void __init pxa27x_init_early(void)
+> +{
+> +	pxa27x_skip_init();
+> +}
 
-- Paul
+I would prefer not to have an init_early function at all, and instead
+check "if (of_have_populated_dt())" in pxa27x_init, or to split
+that function into two.
+
+> +static const char *pxa27x_dt_board_compat[] __initdata = {
+> +	"marvell,pxa27x",
+> +	NULL,
+> +};
+> +
+> +#ifdef CONFIG_MACH_LP8X4X
+> +static const char *lp8x4x_dt_board_compat[] __initdata = {
+> +	"marvell,lp8x4x",
+> +	NULL,
+> +};
+
+Note that you should not have wildcards in any "compatible" strings.
+Just list all the combinations here (pxa270, pxa271, pxa272, and whatever
+you need for lp8x4x).
+
+> +static void lp8x4x_restart(enum reboot_mode mode, const char *cmd)
+> +{
+> +	/* Switch off fast-bus and turbo mode */
+> +	asm volatile("mcr       p14, 0, %0, c6, c0, 0" : :
+> +			"r"(2));
+> +	/* SDRAM hangs on watchdog reset on Marvell PXA270 (erratum 71) */
+> +	pxa_restart(REBOOT_SOFT, cmd);
+> +}
+> +#endif
+> +#endif
+
+Since the only difference here is the restart logic, I would prefer here to
+have only a single DT_MACHINE_START() and do
+
+static void pxa27x_restart(enum reboot_mode mode, const char *cmd)
+{
+	/* Switch off fast-bus and turbo mode */
+	if (of_machine_is_compatible("marvell,lp8x4x"))
+		asm volatile("mcr       p14, 0, %0, c6, c0, 0" : : "r"(2));
+
+	/* SDRAM hangs on watchdog reset on Marvell PXA270 (erratum 71) */
+	if (of_machine_is_compatible("marvell,pxa270"))
+		pxa_restart(REBOOT_SOFT, cmd);
+}
+
+	Arnd
