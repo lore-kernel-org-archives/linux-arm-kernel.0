@@ -1,84 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Dec 2013 09:40:00 -0800
-Subject: [PATCH v2 2/2] arm: omap: remove *.auto* from device names given
- in usb_bind_phy
-In-Reply-To: <CABxcv=kYAB5MKtW0O1RLZUXPxiTmoSDD0nuHB=Bjy2gy+wzvhQ@mail.gmail.com>
-References: <1386331571-30903-1-git-send-email-kishon@ti.com>
- <1386331571-30903-3-git-send-email-kishon@ti.com>
- <CABxcv=n67gNq6ayx+t_mfZ0++UBKkXpH9avXvRKFEH4VUrwy0g@mail.gmail.com>
- <20131206210835.GM21086@saruman.home> <52A55E2C.7070500@ti.com>
- <CABxcv=kYAB5MKtW0O1RLZUXPxiTmoSDD0nuHB=Bjy2gy+wzvhQ@mail.gmail.com>
-Message-ID: <20131209174000.GA12527@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 9 Dec 2013 09:48:01 -0800
+Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
+In-Reply-To: <CAGb2v675Cg6S512zfM1z4b+wqE_PesDGWdgcmpzWmPzyzXqbeA@mail.gmail.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-8-git-send-email-wens@csie.org>
+ <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
+ <CAGb2v64yFhkTXvdq=1VpemULhXew-5fvmSoTBzEb6iFDiSqy1Q@mail.gmail.com>
+ <CAGVrzcaxV88dU3vEVGUiEQihUHLxq+QvQVQ6VvmOFVRsqbbX7w@mail.gmail.com>
+ <CAGb2v675Cg6S512zfM1z4b+wqE_PesDGWdgcmpzWmPzyzXqbeA@mail.gmail.com>
+Message-ID: <CAGVrzcaVJtoVhEfV+ZiMOkm3F8NBCf2YRcZSrZPMRfQfEr1u=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [131209 03:51]:
-> Hi Kishon,
-> 
-> On Mon, Dec 9, 2013 at 7:07 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> > Hi,
-> >
-> >
-> > On Saturday 07 December 2013 02:38 AM, Felipe Balbi wrote:
-> >>
-> >> Hi,
-> >>
-> >> On Fri, Dec 06, 2013 at 01:14:38PM +0100, Javier Martinez Canillas wrote:
-> >>>
-> >>> On Fri, Dec 6, 2013 at 1:06 PM, Kishon Vijay Abraham I <kishon@ti.com>
-> >>> wrote:
-> >>>>
-> >>>> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while
-> >>>> creating
-> >>>> MUSB core device. So in usb_bind_phy (binds the controller with the
-> >>>> PHY), the
-> >>>> device name of the controller had *.auto* in it. Since with using
-> >>>> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in
-> >>>> advance,
-> >>>> the data given in usb_bind_phy became obsolete and usb_get_phy was
-> >>>> failing.
-> >>>> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO.
-> >>>> Corresponding
-> >>>> change is done in board file here.
-> >>>>
-> >>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>>> ---
-> >>>>   arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
-> >>>>   arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
-> >>>>   arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
-> >>>>   arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
-> >>>>   arch/arm/mach-omap2/board-ldp.c            |    2 +-
-> >>>>   arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
-> >>>>   arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
-> >>>>   arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
-> >>>>   arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
-> >>>>   arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
-> >>>>   arch/arm/mach-omap2/board-overo.c          |    2 +-
-> >>>>   arch/arm/mach-omap2/board-rx51.c           |    2 +-
-> >>>>   12 files changed, 12 insertions(+), 12 deletions(-)
-> >>>>
-> >>>
-> >>> You can drop this patch since boards files are being removed for v3.14
-> >>
-> >>
-> >> if we can drop this patch, the whole series is invalid, since we'll be
-> >> using DT phandles to find PHYs going forward, no ?
-> >>
-> > yeah. But in one of the other threads, Tony seemed ok to take a patch that
-> > fixes the same issue in mach-omap2/twl-common.c. So it's better to confirm
-> > with Tony.
-> >
-> 
-> Yes, I just read the other thread ("[PATCH] omap: twl-common: Fix
-> musb-hdrc device name") and I see that these patches are fixing a
-> v3.13 regression and are meant for the -rc cycle and not for v3.14.
+2013/12/8 Chen-Yu Tsai <wens@csie.org>:
+> Florian, Giuseppe:
+>
+> On Sat, Dec 7, 2013 at 9:57 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
+>>> On Sat, Dec 7, 2013 at 5:09 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
+>>>>> The CubieTruck uses the GMAC with an RGMII phy.
+>>>>>
+>>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>>>> ---
+>>>>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
+>>>>>  1 file changed, 8 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>>>>> index 8a1009d..af212a2 100644
+>>>>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>>>>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>>>>> @@ -33,6 +33,14 @@
+>>>>>                         pinctrl-0 = <&uart0_pins_a>;
+>>>>>                         status = "okay";
+>>>>>                 };
+>>>>> +
+>>>>> +               gmac: ethernet at 01c50000 {
+>>>>> +                       pinctrl-names = "default";
+>>>>> +                       pinctrl-0 = <&gmac_pins_rgmii>;
+>>>>> +                       snps,phy-addr = <1>;
+>>>>
+>>>> What is this snps,phy-addr property? Why is not a standard device tree
+>>>> node for an Ethernet PHY node used?
+>>>
+>>> This property is implemented by stmmac and documented in the DT
+>>> bindings. stmmac has not been updated to use Ethernet PHY nodes.
+>>
+>> This driver property should be removed and deprecated since there is
+>> an ePAPR standardized Ethernet PHY node. What I am worried here is the
+>> loss of information, the standard Ethernet DT node allows to specify
+>> much more information (clause, maximum speed, compatible string
+>> etc...).
+>
+> Giuseppe, any thoughts on this?
+>
+>>> Removing this property will not affect the function of the driver.
+>>> The driver probes its MDIO bus and selects the lowest available
+>>> address if not specified.
+>>
+>> So if this is just giving the driver a hint on where to  probe for a
+>> PHY on the MDIO bus, then let's drop it and use the standard DT node
+>> no?
+>
+> Sure. I will remove it from the DT.
+>
+> The stmmac driver does not have a seperate MDIO bus driver, nor
+> does it support Ethernet PHY node bindings. So I will not add
+> a phy node at this moment.
 
-Sorry guys, I'm a bit lost with these USB regression fixes.
-Which regression fix do we need for v3.13-rc series?
+This will create needless churn in the DT if you do not do it now,
+worse actually, we switch from a DT which specifically described
+Ethernet PHY nodes properly to a version where it does, to ultimately
+a newer version which does.
 
-If there's an option, I'd rather not touch all the board-*.c files as
-those are about to get dropped for v3.14.
+Considering that the absence of a "snps,phy-addr" property will still
+result in the MDIO bus to be probed, keeping the existing Ethernet PHY
+nodes, referencing them correclty with a "phy-handle" property, but
+having no explicit support for these in the driver will not result in
+a functional change, and will reduce the DT churn. Also, you could
+still sneak a patch in this patchset which parses the standard
+EThernet PHY node binding.
 
-Regards,
+>
+>>>>> +                       phy-mode = "rgmii";
+>>>>
+>>>> Especially since you use the relatively standard "phy-mode" property here?
+>>>
+>>> Used as specified in stmmac DT bindings.
+>>
+>> That one is kind of okay because of_get_phy_mode() knows about it,
+>> even though ePAPR states this should be "phy-connection-type", so I am
+>> okay with keeping that one because current practice and helpers are
+>> here.
+>
+> It seems all ARM DTs currently use "phy-mode".
 
-Tony
+Which is why I said "is kind of okay", but this is not what the
+standard came up with, ARM is not exactly the best DT-citizen out
+there as people are prone to making up new properties when the
+standard already defines some, anyway....
+--
+Florian
