@@ -1,46 +1,68 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 9 Dec 2013 18:08:56 -0300
-Subject: [PATCH] mtd: nand: pxa3xx: Disable "armada370-nand" compatible
- support
-In-Reply-To: <20131209204607.GV27149@ld-irv-0074.broadcom.com>
-References: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131207232315.GC11251@titan.lakedaemon.net>
- <20131208013525.GA4487@localhost>
- <20131208014049.GJ11251@titan.lakedaemon.net>
- <20131209204607.GV27149@ld-irv-0074.broadcom.com>
-Message-ID: <20131209210855.GB31944@localhost>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 10 Dec 2013 06:17:29 +0900
+Subject: [PATCH][RESEND] ARM: SAMSUNG: remove IRQF_DISABLED
+In-Reply-To: <1386579735-4065-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <000801cec874$%han@samsung.com>
+ <1386579735-4065-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <52A63369.8010000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 12:46:07PM -0800, Brian Norris wrote:
-> Hi Ezequiel,
-> 
-> On Sat, Dec 07, 2013 at 08:40:49PM -0500, Jason Cooper wrote:
-> > On Sat, Dec 07, 2013 at 10:35:26PM -0300, Ezequiel Garcia wrote:
-> > > If we agree to remove the lines, shall we also revert the binding
-> > > documentation, removing the compatible from there as well?
-> > 
-> > I think this is unnecessary.  We're trying to prevent breaking
-> > bisection.  No one in their right mind should be developing (and
-> > referring to docs) at a random commit.  As long as the docs are correct,
-> > leave them alone.
-> 
-> I agree, we don't need to drop all the docs, just the lines with the
-> 'compatible' property. And #if 0 is a no-go; let's just delete the
-> lines.
-> 
-> Yes, the docs will appear in 3.12 and 3.13 even though the driver
-> support won't be there until 3.14, but that's OK IMO.
-> 
-> Do you think this should go to 3.12.y stable? If so, please add the
-> appropriate Cc tag. BTW, you moved these lines around in 3.13 so far,
-> so the patch probably won't apply 100% clean.
-> 
-> Can you refresh this patch according to Jason's comments and resend?
-> 
+On 12/09/13 18:02, Michael Opdenacker wrote:
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+>
+> It's a NOOP since 2.6.35 and it will be removed one day.
+>
+> Signed-off-by: Michael Opdenacker<michael.opdenacker@free-electrons.com>
+> Reviewed-by: Jingoo Han<jg1.han@samsung.com>
+> ---
+>   arch/arm/mach-s3c24xx/dma.c         | 2 +-
+>   arch/arm/mach-s3c24xx/simtec-usb.c  | 3 +--
+>   arch/arm/mach-s3c64xx/mach-smartq.c | 2 +-
+>   3 files changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c24xx/dma.c b/arch/arm/mach-s3c24xx/dma.c
+> index 4a65cba3295d..a8dafc174fe3 100644
+> --- a/arch/arm/mach-s3c24xx/dma.c
+> +++ b/arch/arm/mach-s3c24xx/dma.c
+> @@ -742,7 +742,7 @@ int s3c2410_dma_request(enum dma_ch channel,
+>   		chan->irq_claimed = 1;
+>   		local_irq_restore(flags);
+>
+> -		err = request_irq(chan->irq, s3c2410_dma_irq, IRQF_DISABLED,
+> +		err = request_irq(chan->irq, s3c2410_dma_irq, 0,
+>   				  client->name, (void *)chan);
+>
+>   		local_irq_save(flags);
+> diff --git a/arch/arm/mach-s3c24xx/simtec-usb.c b/arch/arm/mach-s3c24xx/simtec-usb.c
+> index 2ed2e32430dc..bb3eac6a7697 100644
+> --- a/arch/arm/mach-s3c24xx/simtec-usb.c
+> +++ b/arch/arm/mach-s3c24xx/simtec-usb.c
+> @@ -78,8 +78,7 @@ static void usb_simtec_enableoc(struct s3c2410_hcd_info *info, int on)
+>
+>   	if (on) {
+>   		ret = request_irq(BAST_IRQ_USBOC, usb_simtec_ocirq,
+> -				  IRQF_DISABLED | IRQF_TRIGGER_RISING |
+> -				   IRQF_TRIGGER_FALLING,
+> +				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>   				  "USB Over-current", info);
+>   		if (ret != 0) {
+>   			printk(KERN_ERR "failed to request usb oc irq\n");
+> diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+> index a6b338fd0470..08a889c141da 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smartq.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+> @@ -106,7 +106,7 @@ static void smartq_usb_host_enableoc(struct s3c2410_hcd_info *info, int on)
+>
+>   	if (on) {
+>   		ret = request_irq(gpio_to_irq(S3C64XX_GPL(10)),
+> -				  smartq_usb_host_ocirq, IRQF_DISABLED |
+> +				  smartq_usb_host_ocirq,
+>   				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>   				  "USB host overcurrent", info);
+>   		if (ret != 0)
 
-Sure!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Looks OK to me, applied.
+
+Thanks,
+Kukjin
