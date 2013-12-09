@@ -1,56 +1,123 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 9 Dec 2013 11:37:40 +0530
-Subject: [PATCH v2 2/2] arm: omap: remove *.auto* from device names given
- in usb_bind_phy
-In-Reply-To: <20131206210835.GM21086@saruman.home>
-References: <1386331571-30903-1-git-send-email-kishon@ti.com>
- <1386331571-30903-3-git-send-email-kishon@ti.com>
- <CABxcv=n67gNq6ayx+t_mfZ0++UBKkXpH9avXvRKFEH4VUrwy0g@mail.gmail.com>
- <20131206210835.GM21086@saruman.home>
-Message-ID: <52A55E2C.7070500@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Dec 2013 14:14:28 +0800
+Subject: [PATCH] ARM: imx: use __initconst for const init definition
+Message-ID: <1386569668-15365-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+0-DAY kernel build testing backend reports the following.
 
-On Saturday 07 December 2013 02:38 AM, Felipe Balbi wrote:
-> Hi,
->
-> On Fri, Dec 06, 2013 at 01:14:38PM +0100, Javier Martinez Canillas wrote:
->> On Fri, Dec 6, 2013 at 1:06 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
->>> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
->>> device name of the controller had *.auto* in it. Since with using
->>> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
->>> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
->>> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
->>> change is done in board file here.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>   arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
->>>   arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
->>>   arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
->>>   arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
->>>   arch/arm/mach-omap2/board-ldp.c            |    2 +-
->>>   arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
->>>   arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
->>>   arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
->>>   arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
->>>   arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
->>>   arch/arm/mach-omap2/board-overo.c          |    2 +-
->>>   arch/arm/mach-omap2/board-rx51.c           |    2 +-
->>>   12 files changed, 12 insertions(+), 12 deletions(-)
->>>
->>
->> You can drop this patch since boards files are being removed for v3.14
->
-> if we can drop this patch, the whole series is invalid, since we'll be
-> using DT phandles to find PHYs going forward, no ?
->
-yeah. But in one of the other threads, Tony seemed ok to take a patch 
-that fixes the same issue in mach-omap2/twl-common.c. So it's better to 
-confirm with Tony.
+ scripts/checkpatch.pl 0001-ARM-imx-add-support-code-for-IMX50-based-machines.patch
+ # many are suggestions rather than must-fix
 
-Thanks
-Kishon
+ ERROR: Use of const init definition must use __initconst
+ #80: arch/arm/mach-imx/mach-imx50.c:26:
+ +static const char *imx50_dt_board_compat[] __initdata = {
+
+While at it, fix the error globally for IMX platform.
+
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/imx31-dt.c    |    2 +-
+ arch/arm/mach-imx/imx51-dt.c    |    2 +-
+ arch/arm/mach-imx/mach-imx50.c  |    2 +-
+ arch/arm/mach-imx/mach-imx53.c  |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c  |    2 +-
+ arch/arm/mach-imx/mach-imx6sl.c |    2 +-
+ arch/arm/mach-imx/mach-vf610.c  |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
+index 818a1cc..e1e70ef 100644
+--- a/arch/arm/mach-imx/imx31-dt.c
++++ b/arch/arm/mach-imx/imx31-dt.c
+@@ -25,7 +25,7 @@ static void __init imx31_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *imx31_dt_board_compat[] __initdata = {
++static const char *imx31_dt_board_compat[] __initconst = {
+ 	"fsl,imx31",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+index bece8a6..0230d78 100644
+--- a/arch/arm/mach-imx/imx51-dt.c
++++ b/arch/arm/mach-imx/imx51-dt.c
+@@ -29,7 +29,7 @@ static void __init imx51_dt_init(void)
+ 	platform_device_register_full(&devinfo);
+ }
+ 
+-static const char *imx51_dt_board_compat[] __initdata = {
++static const char *imx51_dt_board_compat[] __initconst = {
+ 	"fsl,imx51",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+index 2f74fad..77b77a9 100644
+--- a/arch/arm/mach-imx/mach-imx50.c
++++ b/arch/arm/mach-imx/mach-imx50.c
+@@ -23,7 +23,7 @@ static void __init imx50_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *imx50_dt_board_compat[] __initdata = {
++static const char *imx50_dt_board_compat[] __initconst = {
+ 	"fsl,imx50",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index c9c4d8d..6585090 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -31,7 +31,7 @@ static void __init imx53_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *imx53_dt_board_compat[] __initdata = {
++static const char *imx53_dt_board_compat[] __initconst = {
+ 	"fsl,imx53",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 7e5ec34..d2ea6e6 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -273,7 +273,7 @@ static void __init imx6q_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static const char *imx6q_dt_compat[] __initdata = {
++static const char *imx6q_dt_compat[] __initconst = {
+ 	"fsl,imx6dl",
+ 	"fsl,imx6q",
+ 	NULL,
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 2f952e3..cca183a 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -61,7 +61,7 @@ static void __init imx6sl_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static const char *imx6sl_dt_compat[] __initdata = {
++static const char *imx6sl_dt_compat[] __initconst = {
+ 	"fsl,imx6sl",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index af0cb8a..2d8aef5 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -26,7 +26,7 @@ static void __init vf610_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static const char *vf610_dt_compat[] __initdata = {
++static const char *vf610_dt_compat[] __initconst = {
+ 	"fsl,vf610",
+ 	NULL,
+ };
+-- 
+1.7.9.5
