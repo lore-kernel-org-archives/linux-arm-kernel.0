@@ -1,56 +1,38 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 9 Dec 2013 13:39:18 +0530
-Subject: [PATCH 6/7] clk/samsung: add support for pll2650xx
-In-Reply-To: <1386345391-23482-7-git-send-email-rahul.sharma@samsung.com>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-7-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAK9yfHzVv0097HEcRiJjvhANE-ev133+1fHTYgvOgd-0E6MfAQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 09 Dec 2013 16:06:47 +0800
+Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
+ maps and map logical cpu id to APIC id
+In-Reply-To: <201312060009.54801.arnd@arndb.de>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
+ <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
+ <201312060009.54801.arnd@arndb.de>
+Message-ID: <52A57A17.40400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+On 2013-12-6 7:09, Arnd Bergmann wrote:
+> On Wednesday 04 December 2013, Rob Herring wrote:
+>>> index a0c2ca6..1428024 100644
+>>> --- a/arch/arm64/kernel/smp.c
+>>> +++ b/arch/arm64/kernel/smp.c
+>>> @@ -420,7 +420,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>>                 if (err)
+>>>                         continue;
+>>>
+>>> +#ifndef CONFIG_ACPI
+>>>                 set_cpu_present(cpu, true);
+>>> +#endif
+>>
+>> Should this be moved to DT cpu topology related code?
+> 
+> More importantly, the #ifndef is certainly wrong here: It is important that you can
+> turn CONFIG_ACPI on or off without impacting the run-time code path for non-ACPI
+> systems. The snippet above breaks this because we no longer set the
+> cpu mask when ACPI is turned on but not used.
 
-On 6 December 2013 21:26, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> Add support for pll2650xx in samsung pll file. This pll variant
-> is close to pll36xx but uses CON2 registers instead of CON1.
->
-> Aud_pll in Exynos5260 is pll2650xx and uses this code.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> ---
->  drivers/clk/samsung/clk-pll.c |  101 +++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/samsung/clk-pll.h |    2 +-
->  2 files changed, 102 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-> index 237a889..60c5679 100644
-> --- a/drivers/clk/samsung/clk-pll.c
-> +++ b/drivers/clk/samsung/clk-pll.c
-> @@ -811,6 +811,101 @@ static const struct clk_ops samsung_pll2550xx_clk_min_ops = {
->         .recalc_rate = samsung_pll2550xx_recalc_rate,
->  };
->
-> +/*
-> + * PLL2650XX Clock Type
-> + */
-> +
-> +/* Maximum lock time can be 3000 * PDIV cycles */
-> +#define PLL2650XX_LOCK_FACTOR (3000)
-> +
-> +#define PLL2650XX_MDIV_SHIFT           (9)
-> +#define PLL2650XX_PDIV_SHIFT           (3)
-> +#define PLL2650XX_SDIV_SHIFT           (0)
-> +#define PLL2650XX_KDIV_SHIFT           (0)
-> +#define PLL2650XX_MDIV_MASK            (0x1ff)
-> +#define PLL2650XX_PDIV_MASK            (0x3f)
-> +#define PLL2650XX_SDIV_MASK            (0x7)
-> +#define PLL2650XX_KDIV_MASK            (0xffff)
-> +#define PLL2650XX_PLL_ENABLE_SHIFT     (23)
-> +#define PLL2650XX_PLL_LOCKTIME_SHIFT   (21)
-> +#define PLL2650XX_PLL_FOUTMASK_SHIFT   (31)
+Good point, I'll rework this patch to find a better solution.
 
-nit: Braces are unnecessary.
+Thanks for your comments.
 
--- 
-With warm regards,
-Sachin
+Hanjun
