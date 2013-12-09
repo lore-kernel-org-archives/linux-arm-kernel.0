@@ -1,55 +1,340 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 09 Dec 2013 10:21:32 -0700
-Subject: [PATCH v11 0/7] ARM: support for the Trusted Foundations secure
- monitor
-In-Reply-To: <CAAVeFuKh7T42AfAud=ZJ-j_7BgeRUFOytD7CNQ_DFdZeQRHj4A@mail.gmail.com>
-References: <1385274652-16415-1-git-send-email-acourbot@nvidia.com>
- <20131126001033.GB21634@quad.lixom.net>
- <CAAVeFuKh7T42AfAud=ZJ-j_7BgeRUFOytD7CNQ_DFdZeQRHj4A@mail.gmail.com>
-Message-ID: <52A5FC1C.70400@wwwdotorg.org>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Mon, 09 Dec 2013 17:23:59 +0000
+Subject: [PATCH 2/2 v3 RESEND] ARM/KVM: save and restore generic timer
+ registers
+In-Reply-To: <1384657926-28194-3-git-send-email-christoffer.dall@linaro.org>
+References: <1384657926-28194-1-git-send-email-christoffer.dall@linaro.org>
+ <1384657926-28194-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <8b57ae85bf660ced7a337776c48af381@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 05:48 PM, Alexandre Courbot wrote:
-> On Tue, Nov 26, 2013 at 9:10 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Sun, Nov 24, 2013 at 03:30:45PM +0900, Alexandre Courbot wrote:
->>> New rebase that should be ready-to-apply on the latest Tegra tree. The last
->>> remaining blocker is Russell's approval for this series and it is my hope to
->>> obtain it with this version.
->>>
->>> There has been quite some debate around this series, notably about the SMC
->>> calling conventions and whether the firmware interface should be moved out of
->>> arch/arm. I hope that all the questions have been answered and that we can move
->>> forward with this series that enables NVIDIA-branded retail Tegra devices to run
->>> mainline.
->>>
->>> Changes since v10:
->>> - Rebased on top of more recent sources since some files have been renamed in
->>>   mach-tegra.
->>> - Gave a final proof-read and extensive testing.
->>>
->>> Alexandre Courbot (7):
->>>   ARM: add basic support for Trusted Foundations
->>>   of: add vendor prefix for Trusted Logic Mobility
->>>   of: add Trusted Foundations bindings documentation
->>>   ARM: tegra: add support for Trusted Foundations
->>>   ARM: tegra: split setting of CPU reset handler
->>>   ARM: tegra: set CPU reset handler using firmware
->>>   ARM: tegra: support Trusted Foundations by default
->>
->> Ok, this looks good to me. Russell, do you want the first patch in your
->> tree or are you ok with acking that and we can take everything through
->> arm-soc?
->>
->> The alternative is that we can have Stephen provide a stable branch with
->> the first patch on it and we both merge that, then the rest goes on top
->> of that through arm-soc.
-> 
-> Russell, ping?
+On 2013-11-17 03:12, Christoffer Dall wrote:
+> From: Andre Przywara <andre.przywara@linaro.org>
+>
+> For migration to work we need to save (and later restore) the state 
+> of
+> each cores virtual generic timer.
+> Since this is per VCPU, we can use the [gs]et_one_reg ioctl and 
+> export
+> the three needed registers (control, counter, compare value).
+> Though they live in cp15 space, we don't use the existing list, since
+> they need special accessor functions and the arch timer is optional.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>
+> Changes from v1:
+> - move code out of coproc.c and into guest.c and arch_timer.c
+> - present the registers with their native CP15 addresses, but without
+>   using space in the VCPU's cp15 array
+> - do the user space copying in the accessor functions
+>
+> Changes from v2:
+> - fix compilation without CONFIG_ARCH_TIMER
+> - fix compilation for arm64 by defining the appropriate registers 
+> there
+> - move userspace access out of arch_timer.c into coproc.c
+>
+>   [ Removed whitespace in function declaration - Christoffer ]
+>
+>  arch/arm/include/asm/kvm_host.h   |    3 ++
+>  arch/arm/include/uapi/asm/kvm.h   |   16 +++++++
+>  arch/arm/kvm/guest.c              |   92
+> ++++++++++++++++++++++++++++++++++++-
+>  arch/arm64/include/uapi/asm/kvm.h |   25 ++++++++++
+>  virt/kvm/arm/arch_timer.c         |   34 ++++++++++++++
+>  5 files changed, 169 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_host.h
+> b/arch/arm/include/asm/kvm_host.h
+> index 8a6f6db..098f7dd 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -225,4 +225,7 @@ static inline int
+> kvm_arch_dev_ioctl_check_extension(long ext)
+>  int kvm_perf_init(void);
+>  int kvm_perf_teardown(void);
+>
+> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+> +int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm/include/uapi/asm/kvm.h
+> b/arch/arm/include/uapi/asm/kvm.h
+> index c498b60..bd3b2f7 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -119,6 +119,22 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
+>  #define KVM_REG_ARM_32_CRN_SHIFT	11
+>
+> +#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | 
+> \
+> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
+> +#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | 
+> \
+> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 
+> | \
+> +					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
+> +					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
+> +					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
+> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
+> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
 
-Russell, are you OK with this series? If you could ack patch 1, that
-would be great.
+Surely we can build a nice set of macros for that. See:
+http://git.kernel.org/cgit/linux/kernel/git/will/kvmtool.git/commit/?h=kvmtool/arm&id=74797cf796b47dea98229568772f879a566d7259
 
-If I don't hear otherwise by Friday, I think the best thing is to merge
-the whole series through the Tegra tree, although I'll structure it so
-that patch 1 can be merged into other branches separately if needed.
+and the way we construct accessors for MPIDR. And if you reuse those, 
+we can delete them from kvmtool!
+
+>  /* Normal registers are mapped as coprocessor 16. */
+>  #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+>  #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) 
+> / 4)
+> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+> index 20f8d97..2786eae 100644
+> --- a/arch/arm/kvm/guest.c
+> +++ b/arch/arm/kvm/guest.c
+> @@ -109,6 +109,83 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu
+> *vcpu, struct kvm_regs *regs)
+>  	return -EINVAL;
+>  }
+>
+> +#ifndef CONFIG_KVM_ARM_TIMER
+> +
+> +#define NUM_TIMER_REGS 0
+> +
+> +static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user 
+> *uindices)
+> +{
+> +	return 0;
+> +}
+> +
+> +static bool is_timer_reg(u64 index)
+> +{
+> +	return false;
+> +}
+> +
+> +int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 
+> value)
+> +{
+> +	return 0;
+> +}
+> +
+> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+> +{
+> +	return 0;
+> +}
+> +
+> +#else
+> +
+> +#define NUM_TIMER_REGS 3
+> +
+> +static bool is_timer_reg(u64 index)
+> +{
+> +	switch (index) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> +
+> +static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user 
+> *uindices)
+> +{
+> +	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
+> +		return -EFAULT;
+> +	uindices++;
+> +	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
+> +		return -EFAULT;
+> +	uindices++;
+> +	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
+> +		return -EFAULT;
+> +
+> +	return 0;
+> +}
+> +
+> +#endif
+> +
+> +static int set_timer_reg(struct kvm_vcpu *vcpu, const struct
+> kvm_one_reg *reg)
+> +{
+> +	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	u64 val;
+> +	int ret;
+> +
+> +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+> +	if (ret != 0)
+> +		return ret;
+> +
+> +	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
+> +}
+> +
+> +static int get_timer_reg(struct kvm_vcpu *vcpu, const struct
+> kvm_one_reg *reg)
+> +{
+> +	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	u64 val;
+> +
+> +	val = kvm_arm_timer_get_reg(vcpu, reg->id);
+> +	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
+> +}
+> +
+>  static unsigned long num_core_regs(void)
+>  {
+>  	return sizeof(struct kvm_regs) / sizeof(u32);
+> @@ -121,7 +198,8 @@ static unsigned long num_core_regs(void)
+>   */
+>  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+>  {
+> -	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu);
+> +	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu)
+> +		+ NUM_TIMER_REGS;
+>  }
+>
+>  /**
+> @@ -133,6 +211,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu
+> *vcpu, u64 __user *uindices)
+>  {
+>  	unsigned int i;
+>  	const u64 core_reg = KVM_REG_ARM | KVM_REG_SIZE_U32 | 
+> KVM_REG_ARM_CORE;
+> +	int ret;
+>
+>  	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(u32); i++) {
+>  		if (put_user(core_reg | i, uindices))
+> @@ -140,6 +219,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu
+> *vcpu, u64 __user *uindices)
+>  		uindices++;
+>  	}
+>
+> +	ret = copy_timer_indices(vcpu, uindices);
+> +	if (ret)
+> +		return ret;
+> +	uindices += NUM_TIMER_REGS;
+> +
+>  	return kvm_arm_copy_coproc_indices(vcpu, uindices);
+>  }
+>
+> @@ -153,6 +237,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const
+> struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+>  		return get_core_reg(vcpu, reg);
+>
+> +	if (is_timer_reg(reg->id))
+> +		return get_timer_reg(vcpu, reg);
+> +
+>  	return kvm_arm_coproc_get_reg(vcpu, reg);
+>  }
+>
+> @@ -166,6 +253,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const
+> struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+>  		return set_core_reg(vcpu, reg);
+>
+> +	if (is_timer_reg(reg->id))
+> +		return set_timer_reg(vcpu, reg);
+> +
+>  	return kvm_arm_coproc_set_reg(vcpu, reg);
+>  }
+>
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h
+> b/arch/arm64/include/uapi/asm/kvm.h
+> index 5031f42..9e2ab9e 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -129,6 +129,31 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM64_SYSREG_OP2_MASK	0x0000000000000007
+>  #define KVM_REG_ARM64_SYSREG_OP2_SHIFT	0
+>
+> +#define KVM_REG_ARM64_32_SYSREG	(KVM_REG_ARM64 | KVM_REG_SIZE_U32 | 
+> \
+> +					KVM_REG_ARM64_SYSREG)
+> +#define KVM_REG_ARM64_64_SYSREG	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | 
+> \
+> +					KVM_REG_ARM64_SYSREG)
+> +#define KVM_REG_ARM_TIMER_CTL	(KVM_REG_ARM64_32_SYSREG | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_OP0_SHIFT) | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_OP1_SHIFT) | \
+> +				(14ULL << KVM_REG_ARM64_SYSREG_CRN_SHIFT) | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_CRM_SHIFT) | \
+> +				( 1ULL << KVM_REG_ARM64_SYSREG_OP2_SHIFT))
+> +
+> +#define KVM_REG_ARM_TIMER_CNT	(KVM_REG_ARM64_64_SYSREG | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_OP0_SHIFT) | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_OP1_SHIFT) | \
+> +				(14ULL << KVM_REG_ARM64_SYSREG_CRN_SHIFT) | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_CRM_SHIFT) | \
+> +				( 2ULL << KVM_REG_ARM64_SYSREG_OP2_SHIFT))
+> +
+> +#define KVM_REG_ARM_TIMER_CVAL	(KVM_REG_ARM64_64_SYSREG | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_OP0_SHIFT) | \
+> +				( 3ULL << KVM_REG_ARM64_SYSREG_OP1_SHIFT) | \
+> +				(14ULL << KVM_REG_ARM64_SYSREG_CRN_SHIFT) | \
+> +				( 0ULL << KVM_REG_ARM64_SYSREG_CRM_SHIFT) | \
+> +				( 2ULL << KVM_REG_ARM64_SYSREG_OP2_SHIFT))
+
+Same here. It hurts! ;-)
+
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>  #define KVM_ARM_IRQ_TYPE_MASK		0xff
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index c2e1ef4..5081e80 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -182,6 +182,40 @@ static void kvm_timer_init_interrupt(void *info)
+>  	enable_percpu_irq(host_vtimer_irq, 0);
+>  }
+>
+> +int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 
+> value)
+> +{
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +	switch (regid) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +		timer->cntv_ctl = value;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - value;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		timer->cntv_cval = value;
+> +		break;
+> +	default:
+> +		return -1;
+> +	}
+> +	return 0;
+> +}
+> +
+> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+> +{
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +	switch (regid) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +		return timer->cntv_ctl;
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +		return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		return timer->cntv_cval;
+> +	}
+> +	return (u64)-1;
+> +}
+>
+>  static int kvm_timer_cpu_notify(struct notifier_block *self,
+>  				unsigned long action, void *cpu)
+
+-- 
+Who you jivin' with that Cosmik Debris?
