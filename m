@@ -1,62 +1,61 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 09 Dec 2013 18:27:54 +0800
-Subject: panda board es failed on cpuidle
-In-Reply-To: <52A594D3.4060809@linaro.org>
-References: <52A5936E.5050409@linaro.org> <52A594D3.4060809@linaro.org>
-Message-ID: <52A59B2A.2030702@linaro.org>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 09 Dec 2013 11:34:02 +0100
+Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
+ board
+In-Reply-To: <CACRpkdag5=QYsWe81ocpkMp2APaoBAOOn2r0iAVdf9DHTKrSXA@mail.gmail.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>	<1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>	<20131120145926.GE14627@ns203013.ovh.net>	<528CDFFB.1020601@overkiz.com>	<CACRpkdboBg4YOnMNiar0DDBVnoky=zNky+Pzyp1=P_POtH15qQ@mail.gmail.com>	<528DE1C4.6060900@overkiz.com>	<CACRpkdZdweyWJefttiuiYAJ9qhahLbnj7eHUiLV_83UA41X_uQ@mail.gmail.com>	<5294D64D.7000100@overkiz.com>	<CACRpkdZoAjuWVpWZfvPgOAd7qB1ZBtC+45nD3SYay3SrMhqwVA@mail.gmail.com>	<52986CA8.3010601@overkiz.com>
+ <CACRpkdag5=QYsWe81ocpkMp2APaoBAOOn2r0iAVdf9DHTKrSXA@mail.gmail.com>
+Message-ID: <52A59C9A.6000306@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Strashko,
+Hello Linus,
 
-
-On 12/09/2013 06:00 PM, Daniel Lezcano wrote:
-> On 12/09/2013 10:54 AM, Alex Shi wrote:
->> my panda board ES failed to boot up when I use omap2plus_defconfig +
->> CPU_IDLE.
->> Is it a known issue or I missed sth in kernel?
+On 29/11/2013 14:31, Linus Walleij wrote:
+> On Fri, Nov 29, 2013 at 11:30 AM, boris brezillon
+> <b.brezillon@overkiz.com> wrote:
+>> On 29/11/2013 11:03, Linus Walleij wrote:
+>>> I guess one way is to obtain this GPIO in board code and just
+>>> flick it depending on which device you register.
+> (...)
+>> The whole goal of moving from board files to dt is to drop all board
+>> specific processing or initialization and only keep a common description
+>> with generic drivers capable of handling common use cases.
 >>
->> CONFIG_CPU_IDLE=y
->> # CONFIG_CPU_IDLE_MULTIPLE_DRIVERS is not set
->> CONFIG_CPU_IDLE_GOV_LADDER=y
->> CONFIG_CPU_IDLE_GOV_MENU=y
->> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+>> I'm not sure providing new board specific drivers is a good solution
+>> (even if it is the simplest way to achieve our goal).
 >>
->>
->> kernel hang after the following output.
->>
->>      2.276641] omap_hsmmc 4809c000.mmc: pins are not configured from
->> the driver
->> [    2.325531] pinctrl-single 4a31e040.pinmux: mux offset out of
->> range: 0x38 (0x38)
->> [    2.333648] pinctrl-single 4a31e040.pinmux: could not add functions
->> for pinmux_wl12xx_pins 56x
->> [    2.343231] omap-dma-engine 4a056000.dma-controller: allocating
->> channel for 60
->> [    2.351043] omap-dma-engine 4a056000.dma-controller: allocating
->> channel for 59
->> [    2.358917] 480d5000.mmc supply vmmc_aux not found, using dummy
->> regulator
->> [    2.383331] hw-breakpoint: Failed to enable monitor mode on CPU 0.
->> [    2.390411] hw-breakpoint: CPU 0 failed to disable vector catch
-> 
-> Yes, I saw an email talking about a hang with cpuidle + omap4.
-> 
-> The thread is http://www.spinics.net/lists/linux-omap/msg99899.html
-> 
-> and the patch bringing the fix is
-> https://patchwork.kernel.org/patch/3084521/
-> 
+>> Could we have something similar to pinctrl but with gpios :
+>> when the device is probed the device/driver core code request the gpio
+>> configure it appropriately and set it to the requested value (if configured
+>> as output).
+> This has been suggested under the name "GPIO hogs" in the past.
+>
+> It would work similar to how pinctrl hogs work by associating the
+> GPIO line the controller itself, using some specific string
+> like gpio-input-hogs = <...> / gpio-output-hogs = <...>;
+>
+> The gpiolib core will then grab and set up these before
+> returning from the registration call so noone ever gets a chance
+> to use them.
+One more question, and I'm done :).
 
-Seems the patch still is not in v3.13-rc3 kernel
-Any update for this issue?
-
-> Hope that helps.
-> 
->   -- Daniel
-> 
+In which case should we use output-high or output-low config
+instead of gpio-output-hogs ?
 
 
--- 
-Thanks
-    Alex
+Best Regards,
+
+Boris
+>> These are just thoughts, and I guess introducing new code in the
+>> device/driver core
+>> code is not that easy, especially when this code is here to handle specific
+>> case
+>> like ours.
+> It is very easy, just write the patch, iterate it (these patches get
+> a lot of scrutiny as it is core code, so expect some work and time
+> to get it done), and then unless there is a blocker, I would merge it.
+> The concept is entirely sound, just that someone needs to step
+> up and do the work...
+> Yours,
+> Linus Walleij
