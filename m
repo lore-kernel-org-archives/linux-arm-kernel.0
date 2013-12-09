@@ -1,28 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon,  9 Dec 2013 15:06:47 -0700
-Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
-Message-ID: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+Date: Mon,  9 Dec 2013 15:06:48 -0700
+Subject: [PATCH 2/3] rtc: honor device tree /alias entries when assigning IDs
+In-Reply-To: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1386626809-6251-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-mfd_add_device() assigns .of_node in the device objects it creates only
-if the mfd_cell for the device has the .of_compatible field set and the
-DT node for the top-level MFD device contains a child whose compatible
-property matches the cell's .of_compatible field.
+Assign RTC device IDs based on device tree /aliases entries if present,
+falling back to the existing numbering scheme if there is no /aliases
+entry (which includes when the system isn't booted using DT), or there
+is a numbering conflict.
 
-This leaves .of_node unset in many cases. When this happens, entries in
-the DT /aliases property which refer to the top-level MFD DT node will
-never match the MFD child devices, hence causing the requested alias not
-to be honored.
+This is useful in systems with multiple RTC devices, to ensure that the
+best RTC device is selected as /dev/rtc0, which provides the overall
+system time.
 
-Solve this by setting each MFD child device's .of_node equal to the top-
-level MFD device's .of_node field in the cases where it would otherwise
-remain unset.
-
-The first use-case for this will be aliases for the TPS6586x's RTC
-device.
+For example, Tegra has an on-SoC RTC that is not battery backed,
+typically coupled with an off-SoC RTC that is battery backed. Only the
+latter is useful for populating the system time, yet the former is
+useful e.g. for wakeup timing, since the time is not lost when the
+system is sleeps.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
@@ -30,21 +30,50 @@ The 3 patches in this series are all independent; they can be applied
 to their respective subsystems in any order. I'm simply posting them as
 a series to make the use-case more obvious.
 ---
- drivers/mfd/mfd-core.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/rtc/class.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-index 267649244737..32e8d47d9002 100644
---- a/drivers/mfd/mfd-core.c
-+++ b/drivers/mfd/mfd-core.c
-@@ -117,6 +117,8 @@ static int mfd_add_device(struct device *parent, int id,
- 			}
- 		}
- 	}
-+	if (!pdev->dev.of_node)
-+		pdev->dev.of_node = parent->of_node;
+diff --git a/drivers/rtc/class.c b/drivers/rtc/class.c
+index 02426812bebc..7989b5d030cb 100644
+--- a/drivers/rtc/class.c
++++ b/drivers/rtc/class.c
+@@ -14,6 +14,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
  
- 	if (cell->pdata_size) {
- 		ret = platform_device_add_data(pdev,
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/rtc.h>
+ #include <linux/kdev_t.h>
+ #include <linux/idr.h>
+@@ -157,12 +158,25 @@ struct rtc_device *rtc_device_register(const char *name, struct device *dev,
+ {
+ 	struct rtc_device *rtc;
+ 	struct rtc_wkalrm alrm;
+-	int id, err;
++	int of_id, id = -1, err;
++
++	if (dev->of_node) {
++		of_id = of_alias_get_id(dev->of_node, "rtc");
++		if (of_id >= 0) {
++			id = ida_simple_get(&rtc_ida, of_id, of_id + 1,
++					    GFP_KERNEL);
++			if (id < 0)
++				dev_warn(dev, "/aliases ID %d not available\n",
++					 of_id);
++		}
++	}
+ 
+-	id = ida_simple_get(&rtc_ida, 0, 0, GFP_KERNEL);
+ 	if (id < 0) {
+-		err = id;
+-		goto exit;
++		id = ida_simple_get(&rtc_ida, 0, 0, GFP_KERNEL);
++		if (id < 0) {
++			err = id;
++			goto exit;
++		}
+ 	}
+ 
+ 	rtc = kzalloc(sizeof(struct rtc_device), GFP_KERNEL);
 -- 
 1.8.1.5
