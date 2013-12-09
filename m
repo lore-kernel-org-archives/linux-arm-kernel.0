@@ -1,79 +1,120 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 9 Dec 2013 07:57:40 -0600
-Subject: [PATCHv5 2/4] clk: socfpga: Add a hook for SD/MMC driver to control
- CIU clock settings
+Date: Mon, 9 Dec 2013 07:57:39 -0600
+Subject: [PATCHv5 1/4] arm: dts: Add support for SD/MMC on SOCFPGA
 In-Reply-To: <1386597462-29471-1-git-send-email-dinguyen@altera.com>
 References: <1386597462-29471-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1386597462-29471-3-git-send-email-dinguyen@altera.com>
+Message-ID: <1386597462-29471-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Populate the .prepare function in the clk-ops for the "sdmmc_clk" that represents
-the "ciu" clock for the SD/MMC driver. The prepare function will handle setting
-the correct clock-phase for the CIU clock of the SD/MMC IP.
+Use the standard "snps,dw-mshc" binding that will support SD/MMC on
+Altera's SOCFPGA platform.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 ---
-v5: Use the "snps,dw-mshc" binding
-v4: none
+v5: Use the standard "snps,dw-mshc" binding
+v4: Re-use "rockchip,rk2928-dw-mshc" binding
 v3: none
 v2: none
 ---
- drivers/clk/socfpga/clk.c |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/socfpga.dtsi          |   11 +++++++++++
+ arch/arm/boot/dts/socfpga_arria5.dtsi   |   12 ++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi |   12 ++++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts        |   12 ++++++++++++
+ 4 files changed, 47 insertions(+)
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 60cb2f5..fe2670e 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -55,7 +55,13 @@
- #define div_mask(width)	((1 << (width)) - 1)
- #define streq(a, b) (strcmp((a), (b)) == 0)
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index f936476..9e78c1d 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -469,6 +469,17 @@
+ 			cache-level = <2>;
+ 		};
  
-+#define SYSMGR_SDMMCGRP_CTRL_OFFSET	0x108
-+/* SDMMC Group for System Manager defines */
-+#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
-+	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
++		mmc: dwmmc0 at ff704000 {
++			compatible = "snps,dw-mshc";
++			reg = <0xff704000 0x1000>;
++			interrupts = <0 139 4>;
++			fifo-depth = <0x400>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
++			clock-names = "biu", "ciu";
++		};
 +
- extern void __iomem *clk_mgr_base_addr;
-+extern void __iomem *sys_manager_base_addr;
+ 		/* Local timer */
+ 		timer at fffec600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+index a85b404..112b7e2 100644
+--- a/arch/arm/boot/dts/socfpga_arria5.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+@@ -27,6 +27,18 @@
+ 			};
+ 		};
  
- struct socfpga_clk {
- 	struct clk_gate hw;
-@@ -68,6 +74,22 @@ struct socfpga_clk {
- };
- #define to_socfpga_clk(p) container_of(p, struct socfpga_clk, hw.hw)
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			samsung,dw-mshc-sdr-timing = <0 3>;
++
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
++
+ 		serial0 at ffc02000 {
+ 			clock-frequency = <100000000>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+index a8716f6..52b1501 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+@@ -28,6 +28,18 @@
+ 			};
+ 		};
  
-+static int sdmmc_ciuclk_prepare(struct clk_hw *hwclk)
-+{
-+	struct device_node *np;
-+	u32 timing[2];
-+	u32 hs_timing;
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			samsung,dw-mshc-sdr-timing = <0 3>;
 +
-+	np = of_find_compatible_node(NULL, NULL, "snps,dw-mshc");
-+	if (of_property_read_u32_array(np, "samsung,dw-mshc-sdr-timing", timing, 2)) {
-+		pr_err("SDMMC: cannot find samsung,dw-mshc-sdr-timing!\n");
-+		return -ENODATA;
-+	}
-+	hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
-+	writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
-+	return 0;
-+}
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
 +
- static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
- 					 unsigned long parent_rate)
- {
-@@ -274,6 +296,9 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
- 		socfpga_clk->hw.reg = clk_mgr_base_addr + clk_gate[0];
- 		socfpga_clk->hw.bit_idx = clk_gate[1];
+ 		ethernet at ff702000 {
+ 			phy-mode = "rgmii";
+ 			phy-addr = <0xffffffff>; /* probe for phy addr */
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index d1ec0ca..7dc709b 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -41,6 +41,18 @@
+ 			};
+ 		};
  
-+		if (streq(clk_name, "sdmmc_clk"))
-+			gateclk_ops.prepare = sdmmc_ciuclk_prepare;
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			samsung,dw-mshc-sdr-timing = <0 3>;
 +
- 		gateclk_ops.enable = clk_gate_ops.enable;
- 		gateclk_ops.disable = clk_gate_ops.disable;
- 	}
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
++
+ 		ethernet at ff700000 {
+ 			phy-mode = "gmii";
+ 			status = "okay";
 -- 
 1.7.9.5
