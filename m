@@ -1,53 +1,52 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:37 -0500
-Subject: [PATCH v3 04/23] mm/memblock: remove unnecessary inclusions of
- bootmem.h
+Date: Mon, 9 Dec 2013 16:50:43 -0500
+Subject: [PATCH v3 10/23] mm/printk: Use memblock apis for early memory
+ allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-11-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Switch to memblock interfaces for early memory allocator instead of
+bootmem allocator. No functional change in beahvior than what it is
+in current code from bootmem users points of view.
 
-Clean-up to remove depedency with bootmem headers.
+Archs already converted to NO_BOOTMEM now directly use memblock
+interfaces instead of bootmem wrappers build on top of memblock. And the
+archs which still uses bootmem, these new apis just fallback to exiting
+bootmem APIs.
 
 Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Tejun Heo <tj@kernel.org>
-Reviewed-by: Tejun Heo <tj@kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/char/mem.c  |    1 -
- mm/memory_hotplug.c |    1 -
- 2 files changed, 2 deletions(-)
+ kernel/printk/printk.c |   10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/char/mem.c b/drivers/char/mem.c
-index f895a8c..92c5937 100644
---- a/drivers/char/mem.c
-+++ b/drivers/char/mem.c
-@@ -22,7 +22,6 @@
- #include <linux/device.h>
- #include <linux/highmem.h>
- #include <linux/backing-dev.h>
--#include <linux/bootmem.h>
- #include <linux/splice.h>
- #include <linux/pfn.h>
- #include <linux/export.h>
-diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-index 489f235..cf1736d 100644
---- a/mm/memory_hotplug.c
-+++ b/mm/memory_hotplug.c
-@@ -9,7 +9,6 @@
- #include <linux/swap.h>
- #include <linux/interrupt.h>
- #include <linux/pagemap.h>
--#include <linux/bootmem.h>
- #include <linux/compiler.h>
- #include <linux/export.h>
- #include <linux/pagevec.h>
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index be7c86b..f8b41bd 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -757,14 +757,10 @@ void __init setup_log_buf(int early)
+ 		return;
+ 
+ 	if (early) {
+-		unsigned long mem;
+-
+-		mem = memblock_alloc(new_log_buf_len, PAGE_SIZE);
+-		if (!mem)
+-			return;
+-		new_log_buf = __va(mem);
++		new_log_buf =
++			memblock_virt_alloc(new_log_buf_len, PAGE_SIZE);
+ 	} else {
+-		new_log_buf = alloc_bootmem_nopanic(new_log_buf_len);
++		new_log_buf = memblock_virt_alloc_nopanic(new_log_buf_len, 0);
+ 	}
+ 
+ 	if (unlikely(!new_log_buf)) {
 -- 
 1.7.9.5
