@@ -1,66 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 10 Dec 2013 06:19:39 +0900
-Subject: [PATCH] ARM: SAMSUNG: remove unused SAMSUNG_GPIOLIB_4BIT Kconfig
- parameter
-In-Reply-To: <1386563907-18808-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <000001ced94433863209a92960$%han@samsung.com>
- <1386563907-18808-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <52A633EB.4070503@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Dec 2013 01:14:03 +0300
+Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <52A620C5.9030600@cogentembedded.com>
+References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>	<201310310219.58963.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoTa6-UP88146KPy9zNXNTRynBVqWZYb1k=0MK03NMJqhw@mail.gmail.com>
+ <5272A98B.3030705@cogentembedded.com> <52A620C5.9030600@cogentembedded.com>
+Message-ID: <52A640AB.9000105@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/13 13:38, Michael Opdenacker wrote:
-> This removes the SAMSUNG_GPIOLIB_4BIT Kconfig parameter,
-> which was no longer used anywhere in the source code
-> and Makefiles.
->
-> Signed-off-by: Michael Opdenacker<michael.opdenacker@free-electrons.com>
-> Reviewed-by: Jingoo Han<jg1.han@samsung.com>
-> ---
->   arch/arm/Kconfig              | 1 -
->   arch/arm/plat-samsung/Kconfig | 8 --------
->   2 files changed, 9 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c1f1a7eee953..5e227a371401 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -740,7 +740,6 @@ config ARCH_S3C64XX
->   	select S3C_DEV_NAND
->   	select S3C_GPIO_TRACK
->   	select SAMSUNG_ATAGS
-> -	select SAMSUNG_GPIOLIB_4BIT
->   	select SAMSUNG_WAKEMASK
->   	select SAMSUNG_WDT_RESET
->   	select USB_ARCH_HAS_OHCI
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 6d95d60276d6..58645a58d0d8 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -24,7 +24,6 @@ config PLAT_S5P
->   	select S3C_GPIO_TRACK
->   	select S5P_GPIO_DRVSTR
->   	select SAMSUNG_CLKSRC if !COMMON_CLK
-> -	select SAMSUNG_GPIOLIB_4BIT
->   	help
->   	  Base platform code for Samsung's S5P series SoC.
->
-> @@ -115,13 +114,6 @@ config S5P_GPIO_INT
->
->   # options for gpio configuration support
->
-> -config SAMSUNG_GPIOLIB_4BIT
-> -	bool
-> -	help
-> -	  GPIOlib file contains the 4 bit modification functions for gpio
-> -	  configuration. GPIOlib shall be compiled only for S3C64XX and S5P
-> -	  series of processors.
-> -
->   config S5P_GPIO_DRVSTR
->   	bool
->   	help
+On 12/09/2013 10:57 PM, Sergei Shtylyov wrote:
 
-OK, applied.
+>>>> Register Ether platform device and pin data on  the  Koelsch board.
+>>>> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
 
-Thanks
-Kukjin
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>> Thanks for your patch. Just like on the Lager board we also need to
+>>> tie in the PHY IRQ pin.
+
+>>     Not only on the Lager board, BOCK-W also I think.
+
+>>> Polling is not good enough when the hardware
+>>> can do better. Can you please share your PHY IRQ plans with us?
+
+>>     It's on my agenda now -- will start after I do away with the CAN driver
+>> and the current Koelsch Ether support.
+
+>     I have now implemented PHY IRQ support for BOCK-W, Lager, and Koelsch
+> boards (had to extend the Micrel PHY driver to recognize undocumented
+> KSZ8041RNLI PHY ID for that) but I must say that the PHY interrupt doesn't get
+> generated on either of the board and I don't know why yet (I can't rule out
+> the INTC driver issue); that's bad news. Good news is that even this doesn't
+> prevent phylib from working properly as it still polls the PHY once a second.
+
+    Forgot to note that using PHY IRQ on Lager/Koelsch seems quite pointless 
+to me as we're using ETH_LINK signal on these boards and Ether core generates 
+interrupts on the change of this signal using which the driver actually 
+controls packet Rx/Tx; Micrel PHY driver also only enables interrupts on link 
+up/down -- so it seems only useful on BOCK-W where we ignore ETH_LINK and so 
+the driver controls packet Rx/Tx from the phylib's adjust_link() callback.
+
+>>> Best,
+
+>>> / magnus
+
+WBR, Sergei
