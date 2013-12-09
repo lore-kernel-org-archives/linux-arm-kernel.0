@@ -1,36 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Dec 2013 09:44:25 +0100
-Subject: [PATCH v2] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <20131209083815.GA5231@xps8300>
-References: <1386286149-2855-1-git-send-email-ynvich@gmail.com>
- <1386321003-8960-1-git-send-email-ynvich@gmail.com>
- <20131209083815.GA5231@xps8300>
-Message-ID: <20131209084425.GO24559@pengutronix.de>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Mon,  9 Dec 2013 09:51:52 +0100
+Subject: [PATCH v5 0/3] usb: ohci-at91: various improvements
+Message-ID: <1386579115-4324-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 10:38:15AM +0200, Heikki Krogerus wrote:
-> Hi,
-> 
-> > +	return 0;
-> > +
-> > + err_clk:
-> > +	clk_unprepare(data->clk);
-> > + err_free_clk:
-> > +	devm_clk_put(&pdev->dev, data->clk);
-> > + err_free:
-> > +	devm_kfree(&pdev->dev, data);
-> 
-> And there labels could be dropped.
+Hello,
 
-This should really be fixed. Explicitly releasing devm_* allocated
-resources invalidates the whole idea of the devm functions. People
-looking for templates shouldn't find examples for this in the kernel.
+This patch series moves the different driver resources (clks and iomem)
+retrieval to the device managed versions (devm_ functions).
 
-Sascha
+Best Regards,
+
+Boris
+
+Changes since v4:
+ - remove unneeded debug trace in case devm_ioremap_resource fails
+   (an error message is already printed within this function)
+
+Changes since v3:
+ - replace devm_request_and_ioremap call by devm_ioremap_resource
+
+Changes since v2:
+ - split urgent fix and resource retrieval improvements
+
+Boris BREZILLON (3):
+  usb: ohci-at91: replace request_mem_region + ioremap by
+    devm_ioremap_resource
+  usb: ohci-at91: use dev variable instead of &pdev->dev
+  usb: ohci-at91: use device managed clk retrieval
+
+ drivers/usb/host/ohci-at91.c |   67 ++++++++++++------------------------------
+ 1 file changed, 18 insertions(+), 49 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
