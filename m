@@ -1,48 +1,53 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:42 -0500
-Subject: [PATCH v3 09/23] mm/init: Use memblock apis for early memory
- allocations
+Date: Mon, 9 Dec 2013 16:50:37 -0500
+Subject: [PATCH v3 04/23] mm/memblock: remove unnecessary inclusions of
+ bootmem.h
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-10-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to memblock interfaces for early memory allocator instead of
-bootmem allocator. No functional change in beahvior than what it is
-in current code from bootmem users points of view.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Archs already converted to NO_BOOTMEM now directly use memblock
-interfaces instead of bootmem wrappers build on top of memblock.
-And the archs which still uses bootmem, these new apis just fall
-back to exiting bootmem APIs.
+Clean-up to remove depedency with bootmem headers.
 
 Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Tejun Heo <tj@kernel.org>
+Reviewed-by: Tejun Heo <tj@kernel.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- init/main.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/char/mem.c  |    1 -
+ mm/memory_hotplug.c |    1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/init/main.c b/init/main.c
-index febc511..d3e3cff 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -355,9 +355,11 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
-  */
- static void __init setup_command_line(char *command_line)
- {
--	saved_command_line = alloc_bootmem(strlen (boot_command_line)+1);
--	initcall_command_line = alloc_bootmem(strlen (boot_command_line)+1);
--	static_command_line = alloc_bootmem(strlen (command_line)+1);
-+	saved_command_line =
-+		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
-+	initcall_command_line =
-+		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
-+	static_command_line = memblock_virt_alloc(strlen(command_line) + 1, 0);
- 	strcpy (saved_command_line, boot_command_line);
- 	strcpy (static_command_line, command_line);
- }
+diff --git a/drivers/char/mem.c b/drivers/char/mem.c
+index f895a8c..92c5937 100644
+--- a/drivers/char/mem.c
++++ b/drivers/char/mem.c
+@@ -22,7 +22,6 @@
+ #include <linux/device.h>
+ #include <linux/highmem.h>
+ #include <linux/backing-dev.h>
+-#include <linux/bootmem.h>
+ #include <linux/splice.h>
+ #include <linux/pfn.h>
+ #include <linux/export.h>
+diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
+index 489f235..cf1736d 100644
+--- a/mm/memory_hotplug.c
++++ b/mm/memory_hotplug.c
+@@ -9,7 +9,6 @@
+ #include <linux/swap.h>
+ #include <linux/interrupt.h>
+ #include <linux/pagemap.h>
+-#include <linux/bootmem.h>
+ #include <linux/compiler.h>
+ #include <linux/export.h>
+ #include <linux/pagevec.h>
 -- 
 1.7.9.5
