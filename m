@@ -1,45 +1,36 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 10 Dec 2013 02:10:03 +0300
-Subject: [PATCH v3 2/3] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <CAMuHMdXDHMRy2LTEa50omMs0dV9Vdf2woBsNAHzhkceXDfqyOg@mail.gmail.com>
-References: <201312082348.17588.sergei.shtylyov@cogentembedded.com>	<201312082352.45265.sergei.shtylyov@cogentembedded.com>	<CAMuHMdWFmO4d4b77JDY0_Z5NuQFoP73-PVho2dwAOY4ES57Dug@mail.gmail.com>	<52A62753.8060202@cogentembedded.com>
- <CAMuHMdXDHMRy2LTEa50omMs0dV9Vdf2woBsNAHzhkceXDfqyOg@mail.gmail.com>
-Message-ID: <52A64DCB.8000504@cogentembedded.com>
+From: w-kwok2@ti.com (WingMan Kwok)
+Date: Mon, 9 Dec 2013 17:17:02 -0500
+Subject: [PATCH v3 0/2] Kesytone II USB host and PHY drivers
+Message-ID: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2013 10:40 PM, Geert Uytterhoeven wrote:
+Here is the updated version of the series which addresses comments from
+earlier version [1]. The lock in the isr is removed as per the discussion.
 
->>>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
->>>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
+Series adds USB host support for Keystone SOCs. Keystone SOCs uses dwc3
+hardware IP implementation.  On Keystone II platforms, we use no-op phy driver.
 
->>>> +/* Ether */
->>>> +static const struct sh_eth_plat_data ether_pdata __initconst = {
->>>> +       .phy                    = 0x1,
->>>> +       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
->>>> +       .phy_interface          = PHY_INTERFACE_MODE_RMII,
->>>> +       .ether_link_active_low  = 1,
->>>> +};
+Patchset are tested on Keystone II EVM with USB2.0 and USB3.0 flash drives
+along with dts changes.
 
->>> With the above, NFS root is terrible slow,
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
->>     Do you get NFS timeout(s) on booting? I do. It's a known issue.
+WingMan Kwok (2):
+  usb: dwc3: Add Keystone specific glue layer
+  usb: phy: Add keystone usb phy driver
 
-> I only saw "NFS server not responding" once.
+ drivers/usb/dwc3/Kconfig         |    7 ++
+ drivers/usb/dwc3/Makefile        |    1 +
+ drivers/usb/dwc3/dwc3-keystone.c |  205 ++++++++++++++++++++++++++++++++++++++
+ drivers/usb/phy/Kconfig          |   10 ++
+ drivers/usb/phy/Makefile         |    1 +
+ drivers/usb/phy/phy-keystone.c   |  142 ++++++++++++++++++++++++++
+ 6 files changed, 366 insertions(+)
+ create mode 100644 drivers/usb/dwc3/dwc3-keystone.c
+ create mode 100644 drivers/usb/phy/phy-keystone.c
 
-    Yes, I meant that by NFS timeout. Sometimes I see 2 of them in a row.
-
->>     You can try my simplistic 'sh_eth' driver patch:
-
->> http://marc.info/?l=linux-sh&m=137911743723032
-
-> Thanks, that also fixes the problem!
-
-    Let's hope Florian's patches get queued for 3.14. You can also test them 
-meanwhile...
-
-> Gr{oetje,eeting}s,
->
->                          Geert
-
-WBR, Sergei
+[1] http://www.spinics.net/lists/linux-usb/msg98861.html
+-- 
+1.7.9.5
