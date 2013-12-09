@@ -1,69 +1,48 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:35 -0500
-Subject: [PATCH v3 02/23] mm/memblock: debug: don't free reserved array if
- !ARCH_DISCARD_MEMBLOCK
+Date: Mon, 9 Dec 2013 16:50:42 -0500
+Subject: [PATCH v3 09/23] mm/init: Use memblock apis for early memory
+ allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-10-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Switch to memblock interfaces for early memory allocator instead of
+bootmem allocator. No functional change in beahvior than what it is
+in current code from bootmem users points of view.
 
-Now the Nobootmem allocator will always try to free memory allocated for
-reserved memory regions (free_low_memory_core_early()) without taking
-into to account current memblock debugging configuration
-(CONFIG_ARCH_DISCARD_MEMBLOCK and CONFIG_DEBUG_FS state).
-As result if:
- - CONFIG_DEBUG_FS defined
- - CONFIG_ARCH_DISCARD_MEMBLOCK not defined;
--  reserved memory regions array have been resized during boot
-
-then:
-- memory allocated for reserved memory regions array will be freed to
-buddy allocator;
-- debug_fs entry "sys/kernel/debug/memblock/reserved" will show garbage
-instead of state of memory reservations. like:
-   0: 0x98393bc0..0x9a393bbf
-   1: 0xff120000..0xff11ffff
-   2: 0x00000000..0xffffffff
-
-Hence, do not free memory allocated for reserved memory regions if
-defined(CONFIG_DEBUG_FS) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK).
+Archs already converted to NO_BOOTMEM now directly use memblock
+interfaces instead of bootmem wrappers build on top of memblock.
+And the archs which still uses bootmem, these new apis just fall
+back to exiting bootmem APIs.
 
 Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
 Cc: Tejun Heo <tj@kernel.org>
-Reviewed-by: Tejun Heo <tj@kernel.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/memblock.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ init/main.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/mm/memblock.c b/mm/memblock.c
-index aab5669..39855d4 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -265,6 +265,19 @@ phys_addr_t __init_memblock get_allocated_memblock_reserved_regions_info(
- 	if (memblock.reserved.regions == memblock_reserved_init_regions)
- 		return 0;
- 
-+	/*
-+	 * Don't allow nobootmem allocator to free reserved memory regions
-+	 * array if
-+	 *  - CONFIG_DEBUG_FS is enabled;
-+	 *  - CONFIG_ARCH_DISCARD_MEMBLOCK is not enabled;
-+	 *  - reserved memory regions array have been resized during boot.
-+	 * Otherwise debug_fs entry "sys/kernel/debug/memblock/reserved"
-+	 * will show garbage instead of state of memory reservations.
-+	 */
-+	if (IS_ENABLED(CONFIG_DEBUG_FS) &&
-+	    !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
-+		return 0;
-+
- 	*addr = __pa(memblock.reserved.regions);
- 
- 	return PAGE_ALIGN(sizeof(struct memblock_region) *
+diff --git a/init/main.c b/init/main.c
+index febc511..d3e3cff 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -355,9 +355,11 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
+  */
+ static void __init setup_command_line(char *command_line)
+ {
+-	saved_command_line = alloc_bootmem(strlen (boot_command_line)+1);
+-	initcall_command_line = alloc_bootmem(strlen (boot_command_line)+1);
+-	static_command_line = alloc_bootmem(strlen (command_line)+1);
++	saved_command_line =
++		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
++	initcall_command_line =
++		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
++	static_command_line = memblock_virt_alloc(strlen(command_line) + 1, 0);
+ 	strcpy (saved_command_line, boot_command_line);
+ 	strcpy (static_command_line, command_line);
+ }
 -- 
 1.7.9.5
