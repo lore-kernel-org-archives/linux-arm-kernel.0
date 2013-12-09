@@ -1,44 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 09 Dec 2013 17:44:48 +0400
-Subject: [PATCH 04/10] net: stmmac: sunxi platfrom extensions for GMAC
- in Allwinner A20 SoC's
-In-Reply-To: <52A5A7B2.4000509@st.com>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A7B2.4000509@st.com>
-Message-ID: <52A5C950.7070903@cogentembedded.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 9 Dec 2013 14:52:00 +0100
+Subject: [PATCH 3/3] arm64: add EFI runtime services
+In-Reply-To: <1385762712-17043-4-git-send-email-msalter@redhat.com>
+References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
+ <1385762712-17043-4-git-send-email-msalter@redhat.com>
+Message-ID: <20131209135158.GH24997@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Apologies for late feedback.
 
-On 09-12-2013 15:21, srinivas kandagatla wrote:
+On Fri, Nov 29, 2013 at 05:05:12PM -0500, Mark Salter wrote:
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> new file mode 100644
+> index 0000000..1bad8a7
+> --- /dev/null
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -0,0 +1,507 @@
+> +/*
+> + * Extensible Firmware Interface
+> + *
+> + * Based on Extensible Firmware Interface Specification version 2.3.1
 
->> +static int sun7i_gmac_init(struct platform_device *pdev)
->> +{
->> +	struct resource *res;
->> +	struct device *dev = &pdev->dev;
->> +	void __iomem *addr = NULL;
->> +	struct plat_stmmacenet_data *plat_dat = NULL;
+Actually, for arm64, we're relying on UEFI 2.4 or later.
 
-    No need to initialize it since you're assigning to it right below.
+> + *
+> + * Copyright (C) 2013 Linaro Ltd.
 
->> +	u32 priv_clk_reg;
->> +
->> +	plat_dat = dev_get_platdata(&pdev->dev);
->> +	if (!plat_dat)
->> +		return -EINVAL;
+And I'd say you've easily done enough here to motivate adding Red Hat.
 
-> dev_get_platdata will return NULL for DT, So this function will fail all
-> the time.
+> + *
+> + * Adapted for arm64 from arch/arm/kernel/efi.c code
+> + */
+> +
+> +#include <linux/efi.h>
+> +#include <linux/export.h>
+> +#include <linux/memblock.h>
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/sched.h>
+> +#include <linux/slab.h>
+> +#include <linux/bootmem.h>
+> +
+> +#include <asm/cacheflush.h>
+> +#include <asm/efi.h>
+> +#include <asm/tlbflush.h>
+> +#include <asm/mmu_context.h>
+> +
+> +#define efi_early_remap(a, b) \
+> +	((__force void *)early_ioremap((a), (b)))
 
-    Indeed, unless the probe() method assigns it from the 'data' field of
-'struct of_device_id'.
+Do we not want early_memremap() here, rather than early_ioremap()?
 
-> How is it supposed to work?
-> Am I missing some thing?
-
-    Look at stmmac_pltfr_probe().
-
-> --srini
-
-WBR, Sergei
+/
+    Leif
