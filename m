@@ -1,72 +1,62 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 09 Dec 2013 18:02:21 +0100
-Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
-In-Reply-To: <201312091748.58386.arnd@arndb.de>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
- <201312091648.13802.arnd@arndb.de> <52A5ED03.2070306@overkiz.com>
- <201312091748.58386.arnd@arndb.de>
-Message-ID: <52A5F79D.9070408@overkiz.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 09 Dec 2013 18:03:51 +0100
+Subject: [PATCH v3 3/5] dt-bindings: add binding for clock-controller of
+ s3c2443 and following
+In-Reply-To: <201312031623.10187.heiko@sntech.de>
+References: <201312031619.58062.heiko@sntech.de>
+ <201312031623.10187.heiko@sntech.de>
+Message-ID: <6031022.c4eBMggiUt@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 17:48, Arnd Bergmann wrote:
-> On Monday 09 December 2013, boris brezillon wrote:
->> Hello Arnd,
->>
->> On 09/12/2013 16:48, Arnd Bergmann wrote:
->>> On Monday 09 December 2013, boris brezillon wrote:
->>>>> You are adding "clock-names" properties in a lot of cases. Are you sure you
->>>>> are using the strings that are documented in the respective device bindings
->>>>> for each name? In a lot of cases, drivers just want an anonymous clock
->>>>> and we don't name them.
->>>> I rechecked it, and almost all drivers call [devm_]clk_get with a
->>>> specific clock
->>>> name, and as a result we must specify the "clock-names" property.
->>>> The only exceptions I found are the spi and PIT (Periodic Interval
->>>> Timer) drivers,
->>>> and "clock-names" property is not defined in these nodes.
->>> Yes, I understood that the *drivers* use the names, but are they actually
->>> documented in the device bindings? If not, it might be better to change the
->>> drivers.
->> We have to keep both clk system working for at91 platform (new CCF based
->> clk implementations and old clk implementations) for two reasons:
->> 1) the new clk implemetations are only compatible with DT enabled boards
->>       and some at91 boards are not yet ported to DT.
->> 2) we decided to move to the new clk implementations in multiple steps
->> (one SoC
->>       family after another) in order to ease PATCH review.
->>
->> If we change the drivers to avoid specific clock name request
->> ([devm]_clk_get(dev, NULL)),
->> we will have to change the old static clk lookup tables
->> (i.e.
->> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9g45.c#L226,
->> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9260.c#L202,
->> ...).
-> Yes, that is a bit painful, but we really need to ensure that the drivers
-> implement the documented binding. If they don't match we have to either
-> review and change all the binding documents, or change the static clock
-> tables and the drivers.
->
-> Note that I have not checked your binding documents for the devices in
-> question. If they already document these names, we don't need to change
-> anything.
+Hi Heiko,
 
-Are you talking about drivers or clk binding documentation ?
-In either cases they're not defined :-), but I'd like to know which 
-file(s) I
-should update.
+On Tuesday 03 of December 2013 16:23:09 Heiko St?bner wrote:
+> Starting with the s3c2443 the s3c24xx series got a new clock tree
+> compared to the previous s3c24xx socs. This binding describes the
+> clock controller found in the s3c2443, s3c2416 and s3c2450 socs.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  .../bindings/clock/samsung,s3c2443-clock.txt       |   46 ++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt b/Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
+> new file mode 100644
+> index 0000000..a3eb4ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
+> @@ -0,0 +1,46 @@
+> +* Samsung S3C2443 Clock Controller
+> +
+> +The S3C2443 clock controller generates and supplies clock to various controllers
+> +within the SoC. The clock binding described here is applicable to all SoCs in
+> +the s3c24x family starting with the s3c2443.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +  - "samsung,s3c2416-clock" - controller compatible with S3C2416 SoC.
+> +  - "samsung,s3c2443-clock" - controller compatible with S3C2443 SoC.
+> +  - "samsung,s3c2450-clock" - controller compatible with S3C2450 SoC.
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. Some of the clocks are available only
+> +on a particular SoC.
+> +
+> +All available clocks are defined as preprocessor macros in
+> +dt-bindings/clock/samsung,s3c2443-clock.h header and can be used in device
+> +tree sources.
 
-I'd rather not change the static clock lookup tables, but if you prefer this
-approach (and Nicolas agrees), I'll propose a series modifying the drivers
-and clk lookup table.
+I believe this driver needs some external clocks to be defined as fixed
+rate clocks using generic bindings. It should be noted what clocks are
+needed here in the documentation.
 
-Whatever solution is choosen, I guess I'll have to update the drivers dt
-binding documentation anyway ;-).
+Otherwise the patch looks fine.
 
-Best Regards,
-
-Boris
-
->
-> 	Arnd
+Best regards,
+Tomasz
