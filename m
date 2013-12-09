@@ -1,47 +1,69 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:38 -0500
-Subject: [PATCH v3 05/23] mm/memblock: drop WARN and use SMP_CACHE_BYTES as a
- default alignment
+Date: Mon, 9 Dec 2013 16:50:35 -0500
+Subject: [PATCH v3 02/23] mm/memblock: debug: don't free reserved array if
+ !ARCH_DISCARD_MEMBLOCK
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Don't produce warning and interpret 0 as "default align" equal to
-SMP_CACHE_BYTES in case if caller of memblock_alloc_base_nid() doesn't
-specify alignment for the block (align == 0).
+Now the Nobootmem allocator will always try to free memory allocated for
+reserved memory regions (free_low_memory_core_early()) without taking
+into to account current memblock debugging configuration
+(CONFIG_ARCH_DISCARD_MEMBLOCK and CONFIG_DEBUG_FS state).
+As result if:
+ - CONFIG_DEBUG_FS defined
+ - CONFIG_ARCH_DISCARD_MEMBLOCK not defined;
+-  reserved memory regions array have been resized during boot
 
-This is done in preparation of introducing common memblock alloc
-interface to make code behavior consistent. More details are
-in below thread :
-	https://lkml.org/lkml/2013/10/13/117.
+then:
+- memory allocated for reserved memory regions array will be freed to
+buddy allocator;
+- debug_fs entry "sys/kernel/debug/memblock/reserved" will show garbage
+instead of state of memory reservations. like:
+   0: 0x98393bc0..0x9a393bbf
+   1: 0xff120000..0xff11ffff
+   2: 0x00000000..0xffffffff
+
+Hence, do not free memory allocated for reserved memory regions if
+defined(CONFIG_DEBUG_FS) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK).
 
 Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Tejun Heo <tj@kernel.org>
+Reviewed-by: Tejun Heo <tj@kernel.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/memblock.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ mm/memblock.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/mm/memblock.c b/mm/memblock.c
-index 39855d4..784958d 100644
+index aab5669..39855d4 100644
 --- a/mm/memblock.c
 +++ b/mm/memblock.c
-@@ -883,8 +883,8 @@ static phys_addr_t __init memblock_alloc_base_nid(phys_addr_t size,
- {
- 	phys_addr_t found;
+@@ -265,6 +265,19 @@ phys_addr_t __init_memblock get_allocated_memblock_reserved_regions_info(
+ 	if (memblock.reserved.regions == memblock_reserved_init_regions)
+ 		return 0;
  
--	if (WARN_ON(!align))
--		align = __alignof__(long long);
-+	if (!align)
-+		align = SMP_CACHE_BYTES;
++	/*
++	 * Don't allow nobootmem allocator to free reserved memory regions
++	 * array if
++	 *  - CONFIG_DEBUG_FS is enabled;
++	 *  - CONFIG_ARCH_DISCARD_MEMBLOCK is not enabled;
++	 *  - reserved memory regions array have been resized during boot.
++	 * Otherwise debug_fs entry "sys/kernel/debug/memblock/reserved"
++	 * will show garbage instead of state of memory reservations.
++	 */
++	if (IS_ENABLED(CONFIG_DEBUG_FS) &&
++	    !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
++		return 0;
++
+ 	*addr = __pa(memblock.reserved.regions);
  
- 	/* align @size to avoid excessive fragmentation on reserved array */
- 	size = round_up(size, align);
+ 	return PAGE_ALIGN(sizeof(struct memblock_region) *
 -- 
 1.7.9.5
