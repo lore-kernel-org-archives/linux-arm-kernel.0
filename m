@@ -1,24 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Dec 2013 17:28:07 +0100
-Subject: [PATCHv5 2/4] clk: socfpga: Add a hook for SD/MMC driver to
- control CIU clock settings
-In-Reply-To: <1386597462-29471-3-git-send-email-dinguyen@altera.com>
-References: <1386597462-29471-1-git-send-email-dinguyen@altera.com>
- <1386597462-29471-3-git-send-email-dinguyen@altera.com>
-Message-ID: <201312091728.07940.arnd@arndb.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 9 Dec 2013 08:34:22 -0800
+Subject: [PATCH v5] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <20131002231751.4343.81234@quantum>
+References: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
+ <b625092b-682c-4072-85a6-9f9d7f378ec0@VA3EHSMHS043.ehs.local>
+ <20131002231751.4343.81234@quantum>
+Message-ID: <20131209163422.GA14048@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 December 2013, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, Oct 02, 2013 at 04:17:51PM -0700, Mike Turquette wrote:
+> Quoting S?ren Brinkmann (2013-10-02 10:20:38)
+> > Hi Mike,
+> > 
+> > could you please comment on this/apply it to clk-next?
 > 
-> Populate the .prepare function in the clk-ops for the "sdmmc_clk" that represents
-> the "ciu" clock for the SD/MMC driver. The prepare function will handle setting
-> the correct clock-phase for the CIU clock of the SD/MMC IP.
+> It looks good and is in the queue. Will show up in clk-next in a few
+> days.
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+What happened with this driver ? I just noticed it is not upstream,
+nor in -next. I don't recall seeing any objections, so I am a bit puzzled.
 
-Please see my comments for this patch for v4, it still looks wrong to me.
-The other three patches are good though.
-
-	Arnd
+Thanks,
+Guenter
