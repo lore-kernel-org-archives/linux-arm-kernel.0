@@ -1,36 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Dec 2013 11:22:44 +0100
-Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized using
- pinfunc.
-In-Reply-To: <20131205150747.GW29268@sirena.org.uk>
-References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
- <528BB1F2.4080107@wwwdotorg.org>
- <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
- <528BB913.6080409@wwwdotorg.org>
- <CAH9JG2UjnL5bZzNUuJhWY3GpwPD=rJvR2O4Hcpm33G+prSS=BA@mail.gmail.com>
- <CACRpkdbyjm0X9RX+8WjqQxBPyRjBOAunkqVcO-0KUd1PTdGavA@mail.gmail.com>
- <5293ACA6.7060403@bracey.fi>
- <CACRpkdYrPd9tnO48bA_5n+-k=KEDyhY7czkCNhTZfpgF3ar+LQ@mail.gmail.com>
- <20131205150747.GW29268@sirena.org.uk>
-Message-ID: <CACRpkdZ7YCt7NvDDqgv6CZS07wkfVJ1NRZHFhqKxcYbdW7pXnQ@mail.gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 09 Dec 2013 18:27:54 +0800
+Subject: panda board es failed on cpuidle
+In-Reply-To: <52A594D3.4060809@linaro.org>
+References: <52A5936E.5050409@linaro.org> <52A594D3.4060809@linaro.org>
+Message-ID: <52A59B2A.2030702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 4:07 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Dec 03, 2013 at 10:29:42AM +0100, Linus Walleij wrote:
->
->> So a suggested patch to support weak hogs would be interesting
->> to look at. Can you provide details on how you think this would
->> work?
->
-> Or should we be going and applying the default state to all devices on
-> init without worrying about a driver appearing?
+Add Strashko,
 
-That doesn't really work: if you have an unused device not in the
-DT you usually mark it "disabled", and then the DT core doesn't
-even create a platform_device for this node.
 
-So doing this would involve parsing the tree and ... yuck.
+On 12/09/2013 06:00 PM, Daniel Lezcano wrote:
+> On 12/09/2013 10:54 AM, Alex Shi wrote:
+>> my panda board ES failed to boot up when I use omap2plus_defconfig +
+>> CPU_IDLE.
+>> Is it a known issue or I missed sth in kernel?
+>>
+>> CONFIG_CPU_IDLE=y
+>> # CONFIG_CPU_IDLE_MULTIPLE_DRIVERS is not set
+>> CONFIG_CPU_IDLE_GOV_LADDER=y
+>> CONFIG_CPU_IDLE_GOV_MENU=y
+>> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+>>
+>>
+>> kernel hang after the following output.
+>>
+>>      2.276641] omap_hsmmc 4809c000.mmc: pins are not configured from
+>> the driver
+>> [    2.325531] pinctrl-single 4a31e040.pinmux: mux offset out of
+>> range: 0x38 (0x38)
+>> [    2.333648] pinctrl-single 4a31e040.pinmux: could not add functions
+>> for pinmux_wl12xx_pins 56x
+>> [    2.343231] omap-dma-engine 4a056000.dma-controller: allocating
+>> channel for 60
+>> [    2.351043] omap-dma-engine 4a056000.dma-controller: allocating
+>> channel for 59
+>> [    2.358917] 480d5000.mmc supply vmmc_aux not found, using dummy
+>> regulator
+>> [    2.383331] hw-breakpoint: Failed to enable monitor mode on CPU 0.
+>> [    2.390411] hw-breakpoint: CPU 0 failed to disable vector catch
+> 
+> Yes, I saw an email talking about a hang with cpuidle + omap4.
+> 
+> The thread is http://www.spinics.net/lists/linux-omap/msg99899.html
+> 
+> and the patch bringing the fix is
+> https://patchwork.kernel.org/patch/3084521/
+> 
 
-Yours,
-Linus Walleij
+Seems the patch still is not in v3.13-rc3 kernel
+Any update for this issue?
+
+> Hope that helps.
+> 
+>   -- Daniel
+> 
+
+
+-- 
+Thanks
+    Alex
