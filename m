@@ -1,33 +1,23 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  9 Dec 2013 10:38:50 +0100
-Subject: [PATCH][RESEND] clocksource: vt8500: remove deprecated IRQF_DISABLED
-In-Reply-To: <1381639194-6861-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1381639194-6861-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <1386581930-4618-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 09 Dec 2013 13:42:31 +0400
+Subject: [PATCH 4/9] ARM: pxa: remove unused variable
+In-Reply-To: <52A585D9.4000605@gmail.com>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-5-git-send-email-ynvich@gmail.com>
+ <52A585D9.4000605@gmail.com>
+Message-ID: <1386582151.7152.113.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+On Mon, 2013-12-09 at 09:56 +0100, Daniel Mack wrote:
+> A similar patch was already merged by Haojian recently. You should
+> probably rebase your patch stack on top of his maintainer tree.
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+I've just come across the patch you mention in the arm mailing list.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- drivers/clocksource/vt8500_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Could you please provide a link to Haojian's official public repository?
 
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index ad3c0e83a779..1098ed3b9b89 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -124,7 +124,7 @@ static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction irq = {
- 	.name    = "vt8500_timer",
--	.flags   = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags   = IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler = vt8500_timer_interrupt,
- 	.dev_id  = &clockevent,
- };
--- 
-1.8.3.2
+If possible, a link link to your repository will also be very helpful.
+
+My tree is at https://github.com/yanovich/linux
