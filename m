@@ -1,83 +1,93 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 09 Dec 2013 20:00:51 +0100
-Subject: [PATCH v5 4/5] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <20130913045135.GI17188@intel.com>
-References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
- <1377086938-29145-5-git-send-email-zonque@gmail.com>
- <20130825163337.GD2748@intel.com> <522F3ECB.3070307@gmail.com>
- <20130913045135.GI17188@intel.com>
-Message-ID: <52A61363.7060500@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 09 Dec 2013 20:04:21 +0100
+Subject: [linux-sunxi] Re: [PATCH 04/10] net: stmmac: sunxi platfrom
+ extensions for GMAC in Allwinner A20 SoC's
+In-Reply-To: <CAGb2v64LNxnz--vn0u9zwmt7MQJZ=uz2fs0H3zDSse_XDfdK4Q@mail.gmail.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A52C.50605@st.com>
+ <52A5ECF4.6030301@redhat.com>
+ <CAGb2v64LNxnz--vn0u9zwmt7MQJZ=uz2fs0H3zDSse_XDfdK4Q@mail.gmail.com>
+Message-ID: <52A61435.6040803@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi,
 
-Very sorry for such a long delay. I only get to pick up on this topic
-now. Hope you can remember the context of the discussion :)
-
-On 09/13/2013 06:51 AM, Vinod Koul wrote:
-> On Tue, Sep 10, 2013 at 05:46:19PM +0200, Daniel Mack wrote:
->> Hi Vinod,
+On 12/09/2013 06:56 PM, Chen-Yu Tsai wrote:
+> Hi,
+>
+> On Tue, Dec 10, 2013 at 12:16 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
 >>
->> Sorry for the late response, I've been on vacations.
 >>
->> On 25.08.2013 18:33, Vinod Koul wrote:
->>> On Wed, Aug 21, 2013 at 02:08:57PM +0200, Daniel Mack wrote:
->>>> In order to report the channel's residue, we walk the list of running
->>>> descriptors, look for those which match the cookie, and then try to find
->>>> the descriptor which defines upper and lower boundaries that embrace the
->>>> current transport pointer.
+>> On 12/09/2013 12:10 PM, srinivas kandagatla wrote:
 >>>
->>>>
->>>> +		/*
->>>> +		 * 'passed' will be latched once we found the descriptor which
->>>> +		 * lies inside the boundaries of the curr pointer. All
->>>> +		 * descriptors that occur in the list _after_ we found that
->>>> +		 * partially handled descriptor are still to be processed and
->>>> +		 * are hence added to the residual bytes counter.
->>>> +		 */
->>> do you have multiple descriptors for one transaction? Should be No.
+>>> Hi Chen,
+>>> Good to know that Allwinner uses gmac.
+>>>
+>>> On ST SoC, we have very similar requirements, before we merge any of
+>>> these changes I think we need to come up with common way to solve both
+>>> Allwinner and ST SOCs use cases.
+>>>
+>>> I have already posted few patches on to net-dev
+>>> http://lkml.org/lkml/2013/11/12/243 to add Glue driver on top of stmmac
+>>> driver.
+>>>
+>>>
+>>> There are few reasons for the way I have done it.
+>>>
+>>> 1> I did not want to modify gmac driver in any sense to when a new SOC
+>>> support is added.
+>>> 2> As the SOC specific glue logic sits on top of standard GMAC IP, it
+>>> makes sense to represent it proper harware hierarchy.
 >>
->> Sure, that can be the case. One transaction could span across multiple
->> descriptors, especially if its overall length exceeds the maximum length
->> of one descriptor.
-> Yes and these addiional descriptor for a transacation should be child
-> descriptors. 
-> The child descriptors should have ->parent point to parent descriptor and ->next
-> to next in the chain of children.
+>>
+>> On top often is not the correct term / how things are done in practice.
+>>
+>> Most of the time the glue are modifications to the ip block, iow in
+>> hardware they are not nested / hierarchical at all. We've had similar
+>> constructs for ahci platform drivers and there we are actively trying to
+>> move away from the whole nested platform devices as that has various
+>> issues:
+>>
+>> 1) It is wrong / does not reflect reality
+>> 2) It breaks deferred probing which is often used on SOCs
+>>
+>> I actually think Wens' approach using a SOC specific init function
+>> in platform data is sound, and this is also used a lot else where.
+>>
+>> As for using the nested approach elsewhere, I only know about AHCI
+>> platform driver doing that, and there we are actively trying to move
+>> away from it.
+>>
+>>
+>> Now reading this has also made me take a closer look at wens' patch
+>> for this. Wens, I see that you directly modify registers in the ccm
+>> that is a big no-no instead you should add a helper function to
+>> sunxi-clk.c and use that, see ie:
+>> https://bitbucket.org/emiliolopez/linux/commits/2b95847d9aa4aa13317dd7358ffcbd951dcb5eff?at=master
+>
+> Yes, this has been raised by Maxime. The odd "GMAC_IF_TYPE_RGMII" or
+> "gmac interface type bit" has been bugging me.
+>
+> Additionally, the TX clock has 2 inputs (not counting MII [1]).
+> The internal one is most likely controlled by the GMAC. The clock
+> rate is set internally to match the link speed. The external clock
+> source has controllable dividers to get the correct clock rate.
+> This shouldn't be hard to model with CCF though.
+>
+> In hardware, this is probably a mux between the GMAC clock generator
+> and the GMAC data transmit logic.
+>
+> My current plan is to choose MII when the clock is disabled,
+> and choose either of the inputs when it is enabled. I will
+> have to learn more about the CCF first.
 
-I looked into your idea and implemented it, but I really feel having an
-explicit chain pointer for each descriptor is redundant information.
+OK, in this case I would be tempted to just go with a custom sunxi
+function in the sunx-clk mode like what we have for the mmc stuff,
+but if you think you can model this with the regular clock stuff,
+that is of course fine too :)
 
-Hence, let me summarize again how the driver currently works:
+Regards,
 
-* Any of the prep_* function will allocate a number of descriptors to
-accommodate the payload, and link them all together via the 'node'
-list_head, forming a transaction.
-
-* The last descriptor in a transaction has the DCMD_ENDIRQEN flag set.
-
-* When tx_submit() is called, each descriptor in the linked list will be
-assigned a cookie, and then entire list of the transaction is appended
-to the chain_pending list. At this point, the information of where a
-transaction ends is no longer visible in the 'node' list head.
-
-* start_pending_queue() moves the chain_pending entries to chain_running.
-
-When determining the channel's residue, we need to find the transaction
-currently in progress, and then count upwards until we reach the end of
-the transaction chain.
-
-So, while I could add a ->next pointer to the descriptors, and only use
-that to link up descriptors of one transaction in the prep_*()
-functions, that extra information doesn't actually buy us anything, as
-the same information is already stored in the DCMD_ENDIRQEN flag.
-
-
-I rebased the residue patch on top of Joe's cleanup work, and I can
-resubmit if you want me to. Maybe that serves as a better foundation for
-the ongoing discussion :)
-
-
-Many thanks,
-Daniel
+Hans
