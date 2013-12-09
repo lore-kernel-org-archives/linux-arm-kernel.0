@@ -1,89 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 Dec 2013 16:23:05 +0100
-Subject: [GIT PULL] at91: dt for 3.14 #1
-Message-ID: <1386602585-1927-1-git-send-email-nicolas.ferre@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 09 Dec 2013 16:23:03 +0100
+Subject: [PATCH 1/3] ARM: dts: Leave Exynos5250 SPI controller disabled by
+ default
+In-Reply-To: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+References: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+Message-ID: <5026211.5mW8H3pyKS@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi Kukjin,
 
-First pull-request focusing on DT material for AT91 on 3.14. This one is also
-based on the "cleanup" material already in arm-soc tree (at91/sama5-ccf) like
-all other AT91 pull-requests for 3.14.
+On Monday 25 of November 2013 12:15:08 Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> Rather than requiring each board to explicitly disable the SPI controllers
+> it is not using instead require boards to enable those that they are using.
+> This is less work overall since normally at most one of the controllers is
+> in use and avoids issues caused by inappropriate pinmuxing.
+> 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> Acked-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/boot/dts/cros5250-common.dtsi    |  9 +--------
+>  arch/arm/boot/dts/exynos5250-arndale.dts  | 12 ------------
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts |  6 ++----
+>  arch/arm/boot/dts/exynos5250.dtsi         |  3 +++
+>  4 files changed, 6 insertions(+), 24 deletions(-)
 
-Thanks, best regards,
+Seems like you have missed this series. Could you apply it?
 
-The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
-
-  ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to ca594844e4a53f778811c06feef60bdf36bc5fec:
-
-  ARM: at91/at91rm9200ek.dts: rearrange nodes in address ascending order (2013-12-09 15:08:57 +0100)
-
-----------------------------------------------------------------
-First DT pull-request for 3.14
-- many little corrections and documentation updates
-- LCD FB Device Tree for at91sam9263 and at91sam9g45 boards
-- crypto peripherals DT entries + DMA specification
-- new Cosino board
-
-----------------------------------------------------------------
-Bo Shen (1):
-      ARM: at91: sama5d3: enable qt1070 as a wakeup source
-
-Boris BREZILLON (2):
-      ARM: at91/dt: add ethernet phy to at91rm9200ek board
-      ARM: at91/dt: add atmel,pullup-gpio to at91rm9200ek usb1 definition
-
-Jean-Christophe PLAGNIOL-VILLARD (6):
-      ARM: at91: sam9g45: add fb dt support
-      ARM: at91: sam9263: add fb dt support
-      ARM: at91: at9sam9m10g45ek: add dt lcd support
-      ARM: at91: sam9263ek: add dt lcd support
-      ARM: at91: Animeo IP: fix mtd partition table
-      ARM: at91: dt: at91rm9200ek: add emac and nor flash support
-
-Ludovic Desroches (2):
-      ARM: at91: at91sam9g45: set default mmc pinctrl-names
-      ARM: at91: at91sam9g45: add i2c pinctrl
-
-Nicolas Ferre (9):
-      ARM: at91/trivial: fix at91rm9200 rts/cts pinctrl definitions
-      ARM: at91/dt: binding: add precision to AIC documentation
-      ARM: at91/dt: binding: add missing compatibility string in SDRAM/DDR documentation
-      ARM: at91/dt/trivial: use macro for AES irq type
-      ARM: at91/dt/trivial: before sama5d3, Atmel MPU were using at91 prefix
-      ARM: at91/dt/sama5d3: add DMA information to SHA/AES/TDES nodes
-      ARM: at91: add i2c2 pinctrl speficifation to sama5d3 DT
-      ARM: at91: add uart aliases to sama5d3 dtsi
-      ARM: at91/at91rm9200ek.dts: rearrange nodes in address ascending order
-
-Rodolfo Giometti (1):
-      ARM: at91: add support for Cosino board series by HCE Engineering
-
- .../devicetree/bindings/arm/atmel-aic.txt          |   1 +
- .../devicetree/bindings/arm/atmel-at91.txt         |   3 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/animeo_ip.dts                    |  31 ++----
- arch/arm/boot/dts/at91-cosino.dtsi                 | 122 +++++++++++++++++++++
- arch/arm/boot/dts/at91-cosino_mega2560.dts         |  84 ++++++++++++++
- arch/arm/boot/dts/at91rm9200.dtsi                  |   4 +-
- arch/arm/boot/dts/at91rm9200ek.dts                 |  57 ++++++++--
- arch/arm/boot/dts/at91sam9263.dtsi                 |  37 +++++++
- arch/arm/boot/dts/at91sam9263ek.dts                |  30 +++++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  67 +++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts             |  29 +++++
- arch/arm/boot/dts/sama5d3.dtsi                     |  26 ++++-
- arch/arm/boot/dts/sama5d3_uart.dtsi                |   5 +
- arch/arm/boot/dts/sama5d3xdm.dtsi                  |   1 +
- 15 files changed, 457 insertions(+), 41 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-cosino.dtsi
- create mode 100644 arch/arm/boot/dts/at91-cosino_mega2560.dts
-
--- 
-Nicolas Ferre
+Best regards,
+Tomasz
