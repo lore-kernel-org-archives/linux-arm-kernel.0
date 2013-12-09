@@ -1,63 +1,45 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  9 Dec 2013 10:02:15 +0100
-Subject: [PATCH][RESEND] ARM: SAMSUNG: remove IRQF_DISABLED
-In-Reply-To: <000801cec874$%han@samsung.com>
-References: <000801cec874$%han@samsung.com>
-Message-ID: <1386579735-4065-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 09 Dec 2013 10:04:32 +0100
+Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <201312090233.58592.arnd@arndb.de>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-6-git-send-email-ynvich@gmail.com>
+ <201312090233.58592.arnd@arndb.de>
+Message-ID: <52A587A0.1050503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+On 12/09/2013 02:33 AM, Arnd Bergmann wrote:
+> On Sunday 08 December 2013, Sergei Ianovich wrote:
+>> Non-dts implementation supply required DMA channel numbers as
+>> IORESOURCE_DMA. However, there is was no way to get them from
+>> device tree.
+> 
+> I just wrote a lengthy reply to this email to explain in what ways
+> you got it wrong, but then I saw that Daniel has already done all
+> the work in the right way in August, so nevermind that.
+> 
+> It hasn't made it upstream yet, but see http://list-archives.org/2013/08/07/linux-mtd-lists-infradead-org/patch-00-20-arm-pxa-move-core-and-drivers-to-dmaengine/f/3444199144
+> for how it's done. Maybe Daniel can comment on the status of his
+> patches.
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+I recently rebased all my patches on top of 3.13-rc3, and will resend in
+couple of days.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm/mach-s3c24xx/dma.c         | 2 +-
- arch/arm/mach-s3c24xx/simtec-usb.c  | 3 +--
- arch/arm/mach-s3c64xx/mach-smartq.c | 2 +-
- 3 files changed, 3 insertions(+), 4 deletions(-)
+The real problem here is that by reworking the DMA related PXA bits, all
+drivers have to be changed at once, and a gradual transition seems
+impossible. For that, I was asking for help in areas where I don't have
+any hardware to test my patches on, but unfortunately, nobody got back
+to me yet.
 
-diff --git a/arch/arm/mach-s3c24xx/dma.c b/arch/arm/mach-s3c24xx/dma.c
-index 4a65cba3295d..a8dafc174fe3 100644
---- a/arch/arm/mach-s3c24xx/dma.c
-+++ b/arch/arm/mach-s3c24xx/dma.c
-@@ -742,7 +742,7 @@ int s3c2410_dma_request(enum dma_ch channel,
- 		chan->irq_claimed = 1;
- 		local_irq_restore(flags);
- 
--		err = request_irq(chan->irq, s3c2410_dma_irq, IRQF_DISABLED,
-+		err = request_irq(chan->irq, s3c2410_dma_irq, 0,
- 				  client->name, (void *)chan);
- 
- 		local_irq_save(flags);
-diff --git a/arch/arm/mach-s3c24xx/simtec-usb.c b/arch/arm/mach-s3c24xx/simtec-usb.c
-index 2ed2e32430dc..bb3eac6a7697 100644
---- a/arch/arm/mach-s3c24xx/simtec-usb.c
-+++ b/arch/arm/mach-s3c24xx/simtec-usb.c
-@@ -78,8 +78,7 @@ static void usb_simtec_enableoc(struct s3c2410_hcd_info *info, int on)
- 
- 	if (on) {
- 		ret = request_irq(BAST_IRQ_USBOC, usb_simtec_ocirq,
--				  IRQF_DISABLED | IRQF_TRIGGER_RISING |
--				   IRQF_TRIGGER_FALLING,
-+				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
- 				  "USB Over-current", info);
- 		if (ret != 0) {
- 			printk(KERN_ERR "failed to request usb oc irq\n");
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index a6b338fd0470..08a889c141da 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -106,7 +106,7 @@ static void smartq_usb_host_enableoc(struct s3c2410_hcd_info *info, int on)
- 
- 	if (on) {
- 		ret = request_irq(gpio_to_irq(S3C64XX_GPL(10)),
--				  smartq_usb_host_ocirq, IRQF_DISABLED |
-+				  smartq_usb_host_ocirq,
- 				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
- 				  "USB host overcurrent", info);
- 		if (ret != 0)
--- 
-1.8.3.2
+In particular, the pxa camera driver is something Robert (cc) wanted to
+have a look at. Robert, any updates on this?
+
+
+Anyway, I'll have to clean up some details and will resend my patches
+very soon.
+
+
+Thanks,
+Daniel
