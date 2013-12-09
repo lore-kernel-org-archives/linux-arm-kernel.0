@@ -1,62 +1,40 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 09 Dec 2013 18:03:51 +0100
-Subject: [PATCH v3 3/5] dt-bindings: add binding for clock-controller of
- s3c2443 and following
-In-Reply-To: <201312031623.10187.heiko@sntech.de>
-References: <201312031619.58062.heiko@sntech.de>
- <201312031623.10187.heiko@sntech.de>
-Message-ID: <6031022.c4eBMggiUt@amdc1227>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 9 Dec 2013 17:04:22 +0000
+Subject: [PATCH] pinctrl: samsung: Allow pin value to be initialized
+ using pinfunc.
+In-Reply-To: <CACRpkdZ7YCt7NvDDqgv6CZS07wkfVJ1NRZHFhqKxcYbdW7pXnQ@mail.gmail.com>
+References: <1384881351-10782-1-git-send-email-t.figa@samsung.com>
+ <528BB1F2.4080107@wwwdotorg.org>
+ <CAD=FV=XS0dbE7zfgDGVdp84h4fHH6tfO8aN_HNh1LbOjYy51aQ@mail.gmail.com>
+ <528BB913.6080409@wwwdotorg.org>
+ <CAH9JG2UjnL5bZzNUuJhWY3GpwPD=rJvR2O4Hcpm33G+prSS=BA@mail.gmail.com>
+ <CACRpkdbyjm0X9RX+8WjqQxBPyRjBOAunkqVcO-0KUd1PTdGavA@mail.gmail.com>
+ <5293ACA6.7060403@bracey.fi>
+ <CACRpkdYrPd9tnO48bA_5n+-k=KEDyhY7czkCNhTZfpgF3ar+LQ@mail.gmail.com>
+ <20131205150747.GW29268@sirena.org.uk>
+ <CACRpkdZ7YCt7NvDDqgv6CZS07wkfVJ1NRZHFhqKxcYbdW7pXnQ@mail.gmail.com>
+Message-ID: <20131209170422.GT29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Mon, Dec 09, 2013 at 11:22:44AM +0100, Linus Walleij wrote:
+> On Thu, Dec 5, 2013 at 4:07 PM, Mark Brown <broonie@kernel.org> wrote:
 
-On Tuesday 03 of December 2013 16:23:09 Heiko St?bner wrote:
-> Starting with the s3c2443 the s3c24xx series got a new clock tree
-> compared to the previous s3c24xx socs. This binding describes the
-> clock controller found in the s3c2443, s3c2416 and s3c2450 socs.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  .../bindings/clock/samsung,s3c2443-clock.txt       |   46 ++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt b/Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
-> new file mode 100644
-> index 0000000..a3eb4ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
-> @@ -0,0 +1,46 @@
-> +* Samsung S3C2443 Clock Controller
-> +
-> +The S3C2443 clock controller generates and supplies clock to various controllers
-> +within the SoC. The clock binding described here is applicable to all SoCs in
-> +the s3c24x family starting with the s3c2443.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be one of the following.
-> +  - "samsung,s3c2416-clock" - controller compatible with S3C2416 SoC.
-> +  - "samsung,s3c2443-clock" - controller compatible with S3C2443 SoC.
-> +  - "samsung,s3c2450-clock" - controller compatible with S3C2450 SoC.
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- #clock-cells: should be 1.
-> +
-> +Each clock is assigned an identifier and client nodes can use this identifier
-> +to specify the clock which they consume. Some of the clocks are available only
-> +on a particular SoC.
-> +
-> +All available clocks are defined as preprocessor macros in
-> +dt-bindings/clock/samsung,s3c2443-clock.h header and can be used in device
-> +tree sources.
+> > Or should we be going and applying the default state to all devices on
+> > init without worrying about a driver appearing?
 
-I believe this driver needs some external clocks to be defined as fixed
-rate clocks using generic bindings. It should be noted what clocks are
-needed here in the documentation.
+> That doesn't really work: if you have an unused device not in the
+> DT you usually mark it "disabled", and then the DT core doesn't
+> even create a platform_device for this node.
 
-Otherwise the patch looks fine.
+> So doing this would involve parsing the tree and ... yuck.
 
-Best regards,
-Tomasz
+Hrm, yeah, good point.  That's got a low awesomeness factor even though
+it should work.  Boo.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/075f08bc/attachment.sig>
