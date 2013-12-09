@@ -1,18 +1,52 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Dec 2013 01:35:07 +0000 (UTC)
-Subject: [PATCH v2 0/3] ARM: OMAP2+: USB Host bug fixes for 3.13 rc
-In-Reply-To: <529EFD42.9070507@ti.com>
-References: <1386080748-17005-1-git-send-email-rogerq@ti.com>
- <529EFD42.9070507@ti.com>
-Message-ID: <alpine.DEB.2.02.1312090134430.32309@utopia.booyaka.com>
+Date: Mon, 9 Dec 2013 01:37:54 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix usage of invalid iclk / oclk
+ when clock node is not present
+In-Reply-To: <1386019001-10144-1-git-send-email-nm@ti.com>
+References: <1386019001-10144-1-git-send-email-nm@ti.com>
+Message-ID: <alpine.DEB.2.02.1312090137340.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Dec 2013, Tomi Valkeinen wrote:
+Hi Nishanth,
 
-> Tested on Panda and Beagle xM. Works fine for me.
+On Mon, 2 Dec 2013, Nishanth Menon wrote:
 
-Thanks, added your Tested-by's to both patches that I've queued.
+> commit dc75925d(OMAP: hwmod: Fix the missing braces) introduced
+> missing braces, however, we just set return result if clk_get fail
+> and we populate the error pointer in clk pointer and pass it along to
+> clk_prepare. This is wrong. The intent seems to be retry remaining
+> clocks if they are available and warn the ones we cant find clks for.
+> 
+> With the current logic, we see the following crash:
+> omap_hwmod: l3_main: cannot clk_get interface_clk emac_ick
+> Unable to handle kernel NULL pointer dereference at virtual address 00000032
+> pgd = c0004000
+> [00000032] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0-rc1-00044-gcc9fd5a-dirty #19
+> task: ce0c3440 ti: ce0c4000 task.ti: ce0c4000
+> PC is at __clk_prepare+0x10/0x74
+> LR is at clk_prepare+0x14/0x24
+>   <snip>
+> [<c044d59c>] (__clk_prepare+0x10/0x74) from [<c044d9b0>] (clk_prepare+0x14/0x24)
+> [<c044d9b0>] (clk_prepare+0x14/0x24) from [<c077d8c4>] (_init+0x24c/0x3bc)
+> [<c077d8c4>] (_init+0x24c/0x3bc) from [<c0027328>] (omap_hwmod_for_each+0x34/0x5c)
+> [<c0027328>] (omap_hwmod_for_each+0x34/0x5c) from [<c077dfa0>] (__omap_hwmod_setup_all+0x24/0x40)
+> [<c077dfa0>] (__omap_hwmod_setup_all+0x24/0x40) from [<c0008928>] (do_one_initcall+0x38/0x168)
+> [<c0008928>] (do_one_initcall+0x38/0x168) from [<c0771be8>] (kernel_init_freeable+0xfc/0x1cc)
+> [<c0771be8>] (kernel_init_freeable+0xfc/0x1cc) from [<c0521064>] (kernel_init+0x8/0x110)
+> [<c0521064>] (kernel_init+0x8/0x110) from [<c000e568>] (ret_from_fork+0x14/0x2c)
+> Code: e92d4038 e2504000 01a05004 0a000005 (e5943034)
+> 
+> So, just warn and continue instead of proceeding and crashing, with
+> missing clock nodes/bad data, we will eventually fail, however we
+> should now have enough information to identify the culprit.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+
+Thanks, queued for v3.13-rc.
 
 
 - Paul
