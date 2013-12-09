@@ -1,86 +1,55 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Mon, 9 Dec 2013 07:10:34 +0000
-Subject: [PATCH] ARM: dts: vf610: make pinctrl nodes board specific
-In-Reply-To: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
-References: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <c605b6ebe1df4c79a9cbce61e9e0c96a@BLUPR03MB373.namprd03.prod.outlook.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 9 Dec 2013 12:43:37 +0530
+Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
+ platform doesn't have PHY
+In-Reply-To: <20131205075828.GA32583@xps8300>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1385373690-12170-5-git-send-email-kishon@ti.com>
+ <20131204144027.GB21055@xps8300> <52A01E86.50406@ti.com>
+ <20131205075828.GA32583@xps8300>
+Message-ID: <52A56DA1.1010808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Data: Monday, December 09, 2013 2:51 PM + 800
+Hi,
 
->To: linux-arm-kernel at lists.infradead.org
->Cc: Lu Jingchang-B35083; Duan Fugang-B38611; Shawn Guo
->Subject: [PATCH] ARM: dts: vf610: make pinctrl nodes board specific
+On Thursday 05 December 2013 01:28 PM, Heikki Krogerus wrote:
+> Hi,
 >
->Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that boards
->that share the same pinctrl setting do not have to define it time and time
->again in <board>.dts.  However, along with the devices and use cases being
->added continuously, the pinctrl setting nodes under iomuxc becomes more than
->expected.  This bloats device tree blob for particular board unnecessarily
->since only a small subset of those pinctrl setting nodes will be used by the
->board.  It impacts not only the DTB file size but also the run-time device tree
->lookup efficiency.
+> On Thu, Dec 05, 2013 at 12:04:46PM +0530, Kishon Vijay Abraham I wrote:
+>> On Wednesday 04 December 2013 08:10 PM, Heikki Krogerus wrote:
+>>> On Mon, Nov 25, 2013 at 03:31:24PM +0530, Kishon Vijay Abraham I wrote:
+>>>> There can be systems which does not have an external phy, so get
+>>>> phy only if no quirks are added that indicates the PHY is not present.
+>>>> Introduced two quirk flags to indicate the *absence* of usb2 phy and
+>>>> usb3 phy. Also remove checking if return value is -ENXIO since it's now
+>>>> changed to always enable usb_phy layer.
+>>>
+>>> Can you guys explain why is something like this needed? Like with
+>>> clocks and gpios, the device drivers shouldn't need to care any more
+>>> if the platform has the phys or not. -ENODEV tells you your platform
+>>
+>> Shouldn't we report if a particular platform needs a PHY and not able to get
+>> it. How will a user know if a particular controller is not working because it's
+>> not able to get and initialize the PHYs? Don't you think in such cases it's
+>> better to fail (and return from probe) because the controller will not work
+>> anyway without the PHY?
 >
->The patch provides a solution to avoid this device tree bloating problem while
->still keeping boards share the common pinctrl setting data by using DTC macro
->support.  It creates <soc>-pingrp.h and move all those pinctrl setting data
->into there as macro definitions.  The <board>.dts will instead define the
->pinctrl setting nodes that are necessary for the board by referring to the
->macros in <soc>-pingrp.h, so that only the pinctrl setting data that will be
->used by the board will get compiled into the DTB for the board.
+> My point is that you do not need to separately tell this to the driver
+> like you do with the quirks (if you did, then you would need to fix
+> your framework and not hack the drivers).
 >
->With the changes, the pinctrl setting nodes becomes local to particular board,
->and it makes no sense to continue numbering the setting for given peripheral.
->Thus, all the pinctrl phandler name gets updated to have only peripheral name
->in there.
->
->Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->---
->This should have been done in the patch series [1], but somehow got missed in
->the first place.  So add one more patch to take care of VF610.
->
->[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/277649
->
-> arch/arm/boot/dts/vf610-cosmic.dts |   16 +++-
-> arch/arm/boot/dts/vf610-twr.dts    |   34 +++++--
-> arch/arm/boot/dts/vf610.dtsi       |  172 +-----------------------------------
-> 3 files changed, 44 insertions(+), 178 deletions(-)
->
->diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-
->cosmic.dts
->index c42e4f9..432960a 100644
->--- a/arch/arm/boot/dts/vf610-cosmic.dts
->+++ b/arch/arm/boot/dts/vf610-cosmic.dts
->@@ -36,12 +36,24 @@
-> &fec1 {
-> 	phy-mode = "rmii";
-> 	pinctrl-names = "default";
->-	pinctrl-0 = <&pinctrl_fec1_1>;
->+	pinctrl-0 = <&pinctrl_fec1>;
-> 	status = "okay";
-> };
->
->+&iomuxc {
->+	vf610-cosmic {
->+		pinctrl_fec1: fec1grp {
->+			fsl,pins = <VF610_FEC1_PINGRP1>;
->+		};
->+
->+		pinctrl_uart1: uart1grp {
->+			fsl,pins = <VF610_UART1_PINGRP1>;
->+		};
->+	};
->+};
->+
-Keep things in alphabetical order...
+> Like I said, ENODEV tells you that there is no phy on this platform
+> for you, allowing you to safely continue. If your phy driver is not
+> loaded, the framework already returns EPROBE_DEFER, right. Any other
 
-> &uart1 {
-> 	pinctrl-names = "default";
->-	pinctrl-0 = <&pinctrl_uart1_1>;
->+	pinctrl-0 = <&pinctrl_uart1>;
-> 	status = "okay";
-> };
+right. but that doesn't consider broken dt data. With quirks we'll able 
+to tell if a controller in a particular platform has PHY or not without 
+depending on the dt data.
+> error when getting the phy you can consider critical. They are the
+> errors telling you that you do need a phy on this platform, but
+> something actually went wrong when getting it.
+Not on all scenarios though :-s
 
-Other is fine.
+Thanks
+Kishon
