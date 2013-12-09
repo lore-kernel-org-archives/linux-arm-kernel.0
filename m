@@ -1,59 +1,70 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 9 Dec 2013 17:12:57 +0800
-Subject: [PATCH v5 12/15] usb: phy: Add set_wakeup API
-In-Reply-To: <52A58252.6090502@pengutronix.de>
-References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
- <1386570664-6713-13-git-send-email-peter.chen@freescale.com>
- <52A58252.6090502@pengutronix.de>
-Message-ID: <20131209091256.GC5291@shlinux1.ap.freescale.net>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Mon,  9 Dec 2013 15:10:50 +0530
+Subject: [PATCH CFT] ARM:MSM: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
+ default
+Message-ID: <1386582050-21375-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 09:41:54AM +0100, Marc Kleine-Budde wrote:
-> On 12/09/2013 07:31 AM, Peter Chen wrote:
-> > This API is used to set wakeup enable at PHY registers, in that
-> > case, the PHY can be waken up from suspend due to external events,
-> 
-> I' no native speaker, but I think it's "to be woken up".
+ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR have been enabled as default configs
+to MSM platform
 
-Thanks, will change.
+Introduction of PHYS_VIRT config as default would enable phy-to-virt and
+virt-to-phy translation function at boot and module loading time
+and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
+enable calculation of kernel load address at run time.
 
-> >  
-> >  static inline int
-> > +usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
-> > +{
-> > +	if (x && x->set_wakeup)
-> 
-> can x be NULL?
-> 
+PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
+systems with NOR flash devices, and ZRELADDR config is mutually exclusive
+to ZBOOT_ROM.
 
-Possible, this function is PHY's API, it may be called uninitialized.
+CFT::Call For Testing
 
-Peter
+Requesting maintainers of MSM platforms to evaluate the changes on the board
+and comment, as I dont have the board for testing and also requesting an ACK
 
-> > +		return x->set_wakeup(x, enabled);
-> > +	else
-> > +		return 0;
-> > +}
-> > +
-> > +static inline int
-> >  usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
-> >  {
-> >  	if (x && x->notify_connect)
-> > 
-> 
-> Marc
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 
+---
+ARCH_MSM supports for Qualcomm MSM/QSD based systems.  This runs on the apps
+processor of the MSM/QSD and depends on a shared memory interface to the modem
+processor which runs the baseband stack and controls some vital subsystems
+like clock and power control.
 
+Snapdragon is based on ARMv7 instruction set. And supports Random memory devices
+like DDR1, LPDDR2 and LPDDR3. And storage memory devices like NAND, eMMC.
 
+Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
+and ZRELADDR
+---------------------------------------------------
+
+https://lkml.org/lkml/2011/10/14/434
+
+-------------------------------------------------
+---
+ arch/arm/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 13621ed..3b77864 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -638,6 +638,8 @@ config ARCH_PXA
+ config ARCH_MSM
+ 	bool "Qualcomm MSM"
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
+ 	select CLKSRC_OF if OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
 -- 
-
-Best Regards,
-Peter Chen
+1.7.10.4
