@@ -1,44 +1,100 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Dec 2013 02:15:44 +0000 (UTC)
-Subject: [PATCH 1/3] ARM: OMAP4+: hwmod data: Don't prevent RESET of USB
- Host module
-In-Reply-To: <20131209015838.GA11433@atomide.com>
-References: <1386080748-17005-1-git-send-email-rogerq@ti.com>
- <1386080748-17005-2-git-send-email-rogerq@ti.com>
- <alpine.DEB.2.02.1312090125170.32309@utopia.booyaka.com>
- <20131209015838.GA11433@atomide.com>
-Message-ID: <alpine.DEB.2.02.1312090213210.32309@utopia.booyaka.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 9 Dec 2013 10:43:29 +0800
+Subject: [PATCH 01/10] net: stmmac: Enable stmmac main clock when probing
+ hardware
+In-Reply-To: <20131207103335.GL24519@lukather>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-2-git-send-email-wens@csie.org>
+ <20131207103335.GL24519@lukather>
+Message-ID: <CAGb2v65YOSq_BMWSzSHX8w_hbo+0vwquBT2pnLuwNVZkWRfLvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 8 Dec 2013, Tony Lindgren wrote:
+Hi,
 
-> * Paul Walmsley <paul@pwsan.com> [131208 17:27]:
-> > On Tue, 3 Dec 2013, Roger Quadros wrote:
-> > 
-> > > Without this, the USB devices are sometimes not detected on OMAP4 Panda
-> > > with u-boot v2013.10.
-> > > 
-> > > Unlike what the comment states, errata i660 does not state that we
-> > > can't RESET the USB host module. Instead it states that RESET is the
-> > > only way to recover from a deadlock situation.
-> > > 
-> > > RESET ensures that the module is in a known good state irrespective
-> > > of what bootloader does with the module, so it must be done at boot.
-> > > 
-> > > Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> > 
-> > Acked-by: Paul Walmsley <paul@pwsan.com>
-> > 
-> > Will you pick this up for the -rc series, or do you want me or Tony to?  
-> > Roger writes that this one's pretty important.
-> 
-> I suggest that you just queue this with your other fixes so we get
-> things working.
+On Sat, Dec 7, 2013 at 6:33 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Sat, Dec 07, 2013 at 01:29:34AM +0800, Chen-Yu Tsai wrote:
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>
+>> Guiseppe previously stated that the "stmmaceth" clock is the
+>> main clock that drives the IP. The stmmac driver does not
+>> enable this clock during the probe phase. When the driver is
+>> built in to the kernel, this is fine because the clock maybe
+>> on by default, or the boot loader had enabled it.
+>>
+>> If stmmac is built as a module, when the module is loaded,
+>> the clock may be found unused and disabled by the kernel.
+>
+> This should be your commit log.
+>
+> And this is actually not related to the fact that we are building it
+> as a module or not. You'd face the same issue with a statically built
+> kernel if the bootloader didn't enable it.
 
-I'm going to wait until tomorrow anyway to see if Sathya responds to my 
-other E-mail, so maybe Beno?t will let us know by then.
+Noted. Will revise commit log.
 
+>
+>>
+>>  drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 24 +++++++++++++----------
+>>  1 file changed, 14 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+>> index 8d4ccd3..7da71ed 100644
+>> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+>> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+>> @@ -2688,10 +2688,17 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+>>       if ((phyaddr >= 0) && (phyaddr <= 31))
+>>               priv->plat->phy_addr = phyaddr;
+>>
+>> +     priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
+>
+> You can probably use devm_clk_get to make the exit path smaller.
 
-- Paul
+As it stands, the driver does not call clk_put in the exit path.
+Using devm_clk_get here would be a good fix.
+
+>
+>> +     if (IS_ERR(priv->stmmac_clk)) {
+>> +             pr_warn("%s: warning: cannot get CSR clock\n", __func__);
+>
+> And dev_warn here.
+>
+>> +             goto error_clk_get;
+>> +     }
+>> +     clk_prepare_enable(priv->stmmac_clk);
+>> +
+>>       /* Init MAC and get the capabilities */
+>>       ret = stmmac_hw_init(priv);
+>>       if (ret)
+>> -             goto error_free_netdev;
+>> +             goto error_hw_init;
+>>       ndev->netdev_ops = &stmmac_netdev_ops;
+>>
+>> @@ -2729,12 +2736,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+>>               goto error_netdev_register;
+>>       }
+>>
+>> -     priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
+>> -     if (IS_ERR(priv->stmmac_clk)) {
+>> -             pr_warn("%s: warning: cannot get CSR clock\n", __func__);
+>> -             goto error_clk_get;
+>> -     }
+>> -
+>>       /* If a specific clk_csr value is passed from the platform
+>>        * this means that the CSR Clock Range selection cannot be
+>>        * changed at run-time and it is fixed. Viceversa the driver'll try to
+>> @@ -2759,15 +2760,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+>>               }
+>>       }
+>>
+>> +     clk_disable_unprepare(priv->stmmac_clk);
+>> +
+>
+> Hu? Why do you disable the clock? don't you need it afterwards?
+
+The clock is enabled in *_open (when the network interface is used),
+and disabled in *_close.
