@@ -1,47 +1,59 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon,  9 Dec 2013 10:25:23 +0100
-Subject: [PATCH v2] dma: fix vchan_cookie_complete() debug print
-In-Reply-To: <1386344529-25617-1-git-send-email-jonas.jensen@gmail.com>
-References: <1386344529-25617-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1386581123-4706-1-git-send-email-jonas.jensen@gmail.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Mon, 9 Dec 2013 11:26:04 +0200
+Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
+ platform doesn't have PHY
+In-Reply-To: <52A56DA1.1010808@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1385373690-12170-5-git-send-email-kishon@ti.com>
+ <20131204144027.GB21055@xps8300> <52A01E86.50406@ti.com>
+ <20131205075828.GA32583@xps8300> <52A56DA1.1010808@ti.com>
+Message-ID: <20131209092604.GC5231@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vchan_cookie_complete() is supposed to print the cookie value
-but it's always zero because:
+Hi,
 
-dma_cookie_complete() is called prior to dev_vdbg()
+On Mon, Dec 09, 2013 at 12:43:37PM +0530, Kishon Vijay Abraham I wrote:
+> On Thursday 05 December 2013 01:28 PM, Heikki Krogerus wrote:
+> >On Thu, Dec 05, 2013 at 12:04:46PM +0530, Kishon Vijay Abraham I wrote:
+> >>On Wednesday 04 December 2013 08:10 PM, Heikki Krogerus wrote:
+> >>>On Mon, Nov 25, 2013 at 03:31:24PM +0530, Kishon Vijay Abraham I wrote:
+> >>>>There can be systems which does not have an external phy, so get
+> >>>>phy only if no quirks are added that indicates the PHY is not present.
+> >>>>Introduced two quirk flags to indicate the *absence* of usb2 phy and
+> >>>>usb3 phy. Also remove checking if return value is -ENXIO since it's now
+> >>>>changed to always enable usb_phy layer.
+> >>>
+> >>>Can you guys explain why is something like this needed? Like with
+> >>>clocks and gpios, the device drivers shouldn't need to care any more
+> >>>if the platform has the phys or not. -ENODEV tells you your platform
+> >>
+> >>Shouldn't we report if a particular platform needs a PHY and not able to get
+> >>it. How will a user know if a particular controller is not working because it's
+> >>not able to get and initialize the PHYs? Don't you think in such cases it's
+> >>better to fail (and return from probe) because the controller will not work
+> >>anyway without the PHY?
+> >
+> >My point is that you do not need to separately tell this to the driver
+> >like you do with the quirks (if you did, then you would need to fix
+> >your framework and not hack the drivers).
+> >
+> >Like I said, ENODEV tells you that there is no phy on this platform
+> >for you, allowing you to safely continue. If your phy driver is not
+> >loaded, the framework already returns EPROBE_DEFER, right. Any other
+> 
+> right. but that doesn't consider broken dt data. With quirks we'll
+> able to tell if a controller in a particular platform has PHY or not
+> without depending on the dt data.
 
-Move the call, place it after dev_vdbg().
+Broken dt data? What kind of scenario are you thinking here? Do you
+mean case where the dt does not describe the phy on a platform that
+depends on it? Shouldn't that problem be fixed in the dt and not
+hacked in the drivers? Or are you thinking about something else?
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+Is there a case where something like that is actually happening?
 
-Notes:
-    Changes since v1:
-    
-    1. remove local dma_cookie_t
-    2. call dma_cookie_complete() after dev_vdbg()
-    
-    Applies to next-20131209
+Br,
 
- drivers/dma/virt-dma.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
-index 85c19d6..7d6f611 100644
---- a/drivers/dma/virt-dma.h
-+++ b/drivers/dma/virt-dma.h
-@@ -85,9 +85,9 @@ static inline void vchan_cookie_complete(struct virt_dma_desc *vd)
- {
- 	struct virt_dma_chan *vc = to_virt_chan(vd->tx.chan);
- 
--	dma_cookie_complete(&vd->tx);
- 	dev_vdbg(vc->chan.device->dev, "txd %p[%x]: marked complete\n",
- 		vd, vd->tx.cookie);
-+	dma_cookie_complete(&vd->tx);
- 	list_add_tail(&vd->node, &vc->desc_completed);
- 
- 	tasklet_schedule(&vc->task);
 -- 
-1.8.2.1
+heikki
