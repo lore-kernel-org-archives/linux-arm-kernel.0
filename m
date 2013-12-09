@@ -1,35 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Dec 2013 13:59:05 +0800
-Subject: [PATCH v2 1/2] can + ARM i.MX53: use 24 MHz clock parent on i.MX53
-In-Reply-To: <529DB86B.9010401@pengutronix.de>
-References: <1385414121-21493-1-git-send-email-mkl@pengutronix.de>
- <20131126045340.GJ30476@S2101-09.ap.freescale.net>
- <52945B40.5020200@pengutronix.de>
- <20131126143258.GA5685@S2101-09.ap.freescale.net>
- <529DB86B.9010401@pengutronix.de>
-Message-ID: <20131209055903.GI825@S2101-09.ap.freescale.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 9 Dec 2013 11:37:40 +0530
+Subject: [PATCH v2 2/2] arm: omap: remove *.auto* from device names given
+ in usb_bind_phy
+In-Reply-To: <20131206210835.GM21086@saruman.home>
+References: <1386331571-30903-1-git-send-email-kishon@ti.com>
+ <1386331571-30903-3-git-send-email-kishon@ti.com>
+ <CABxcv=n67gNq6ayx+t_mfZ0++UBKkXpH9avXvRKFEH4VUrwy0g@mail.gmail.com>
+ <20131206210835.GM21086@saruman.home>
+Message-ID: <52A55E2C.7070500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 11:54:35AM +0100, Marc Kleine-Budde wrote:
-> Hello Shawn,
-> 
-> On 11/26/2013 03:33 PM, Shawn Guo wrote:
-> > On Tue, Nov 26, 2013 at 09:26:40AM +0100, Marc Kleine-Budde wrote:
-> >> The problem is, that the wrong clock is being used. An all i.mx, but not
-> >> on imx6, both clocks are the same, the bug doesn't show up. So before we
-> >> can use the 24 MHz clock on mx53, we have to fix the driver.
-> > 
-> > So it sounds like a more appropriate merging path would be that,
-> > you send the driver fix right away to mainline via net tree with
-> > v3.13-rc series, and I rebase IMX tree on the -rc that has the fix,
-> > and then apply the DTS patch.
-> 
-> The patch is now in Linus master:
-> 1a3e517 can: flexcan: use correct clock as base for bit rate calculation
-> 
-> So it should be in the v3.13-rc3.
+Hi,
 
-Ok, v3.13-rc3 is out and the clock patch is applied.
+On Saturday 07 December 2013 02:38 AM, Felipe Balbi wrote:
+> Hi,
+>
+> On Fri, Dec 06, 2013 at 01:14:38PM +0100, Javier Martinez Canillas wrote:
+>> On Fri, Dec 6, 2013 at 1:06 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Previously MUSB wrapper (OMAP) device used PLATFORM_DEVID_AUTO while creating
+>>> MUSB core device. So in usb_bind_phy (binds the controller with the PHY), the
+>>> device name of the controller had *.auto* in it. Since with using
+>>> PLATFORM_DEVID_AUTO, there is no way to know the exact device name in advance,
+>>> the data given in usb_bind_phy became obsolete and usb_get_phy was failing.
+>>> So MUSB wrapper was modified not to use PLATFORM_DEVID_AUTO. Corresponding
+>>> change is done in board file here.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>   arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
+>>>   arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+>>>   arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+>>>   arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+>>>   arch/arm/mach-omap2/board-ldp.c            |    2 +-
+>>>   arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+>>>   arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
+>>>   arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+>>>   arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+>>>   arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+>>>   arch/arm/mach-omap2/board-overo.c          |    2 +-
+>>>   arch/arm/mach-omap2/board-rx51.c           |    2 +-
+>>>   12 files changed, 12 insertions(+), 12 deletions(-)
+>>>
+>>
+>> You can drop this patch since boards files are being removed for v3.14
+>
+> if we can drop this patch, the whole series is invalid, since we'll be
+> using DT phandles to find PHYs going forward, no ?
+>
+yeah. But in one of the other threads, Tony seemed ok to take a patch 
+that fixes the same issue in mach-omap2/twl-common.c. So it's better to 
+confirm with Tony.
 
-Shawn
+Thanks
+Kishon
