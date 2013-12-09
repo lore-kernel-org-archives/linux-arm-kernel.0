@@ -1,75 +1,72 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 9 Dec 2013 11:55:47 +0100
-Subject: [PATCH 1/3] drm: Add LCD display clock polarity flags
-In-Reply-To: <20131203114450.GG13726@S2101-09.ap.freescale.net>
-References: <1385998768-23512-1-git-send-email-marex@denx.de>
- <20131203114450.GG13726@S2101-09.ap.freescale.net>
-Message-ID: <201312091155.47947.marex@denx.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 09 Dec 2013 13:57:55 +0100
+Subject: [alsa-devel] [PATCH 2/2] ASoC: sh: rcar: Depend
+ on	ARCH_SHMOBILE_LEGACY
+In-Reply-To: <87wqjevpyv.wl%kuninori.morimoto.gx@renesas.com>
+References: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1682501.71qI5yTem5@avalon> <87wqjevpyv.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <1435437.c06ZnyD3fz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 03, 2013 at 12:44:52 PM, Shawn Guo wrote:
-> On Mon, Dec 02, 2013 at 04:39:26PM +0100, Marek Vasut wrote:
-> > Add DRM flags for the LCD display clock polarity so the pixelclk-active
-> > DT property can be properly handled by drivers using the DRM API.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Dave Airlie <airlied@gmail.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > 
-> >  drivers/gpu/drm/drm_modes.c | 5 +++++
-> >  include/uapi/drm/drm_mode.h | 3 +++
-> >  2 files changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> > index 85071a1..d1f3bfc 100644
-> > --- a/drivers/gpu/drm/drm_modes.c
-> > +++ b/drivers/gpu/drm/drm_modes.c
-> > @@ -537,6 +537,11 @@ int drm_display_mode_from_videomode(const struct
-> > videomode *vm,
-> > 
-> >  		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
-> >  	
-> >  	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
-> >  	
-> >  		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
-> > 
-> > +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
-> > +		dmode->flags |= DRM_MODE_FLAG_PIXELCLK_PPOL;
-> > +	else if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-> > +		dmode->flags |= DRM_MODE_FLAG_PIXELCLK_NPOL;
-> > +
-> > 
-> >  	drm_mode_set_name(dmode);
-> >  	
-> >  	return 0;
-> > 
-> > diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
-> > index f104c26..a6169ca 100644
-> > --- a/include/uapi/drm/drm_mode.h
-> > +++ b/include/uapi/drm/drm_mode.h
-> > @@ -73,6 +73,9 @@
-> > 
-> >  #define  DRM_MODE_FLAG_3D_TOP_AND_BOTTOM	(7<<14)
-> >  #define  DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF	(8<<14)
-> > 
-> > +/* CRTC LCD clock polarity flags. */
-> > +#define DRM_MODE_FLAG_PIXELCLK_PPOL		(1<<19)
-> > +#define DRM_MODE_FLAG_PIXELCLK_NPOL		(1<<20)
+Hi Morimoto-san,
+
+On Sunday 08 December 2013 16:16:15 Kuninori Morimoto wrote:
+> Hi Laurent
 > 
-> Marek,
+> Thank you for your patch
 > 
-> It looks that Denis (copied) is working on the same problem, so you may
-> want to be aware of his effort [1][2].
+> > What's your opinion about this patch ? It needs to be applied on top of
+> > "[PATCH 1/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY" which has
+> > been queued by Simon.
+> > 
+> > On Saturday 09 November 2013 13:33:49 Laurent Pinchart wrote:
+> > > The driver doesn't compile on multiplatform kernels as it requires
+> > > <mach/clock.h>.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > ---
+> > > 
+> > >  sound/soc/sh/Kconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/sound/soc/sh/Kconfig b/sound/soc/sh/Kconfig
+> > > index 56d8ff6..ce7cfd6 100644
+> > > --- a/sound/soc/sh/Kconfig
+> > > +++ b/sound/soc/sh/Kconfig
+> > > @@ -36,6 +36,7 @@ config SND_SOC_SH4_SIU
+> > > 
+> > >  config SND_SOC_RCAR
+> > >  
+> > >  	tristate "R-Car series SRU/SCU/SSIU/SSI support"
+> > > 
+> > > +	depends on ARCH_SHMOBILE_LEGACY
+> > > 
+> > >  	select SND_SIMPLE_CARD
+> > >  	select RCAR_CLK_ADG
+> > >  	help
+> 
+> <mach/clock.h> had been removed by this patch.
+> Does it solve your issue ?
 
-He also just sent a new patchset, so I would focus on his work instead. It makes 
-more sense as he is not breaking the userland stuff.
+Yes that fixes my issue, thank you.
 
-Thank you Shawn, Russell!
+> commit d3be689e6a07c00123786659b4429b07cf4272ac
+> Author: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Date:   Tue Sep 24 01:25:08 2013 -0700
+> 
+>     ASoC: rcar: remove unnecessary mach/clock.h
+> 
+>     ${LINUX}/sound/soc/sh driver can be compiled from
+>     SuperH and ARM.
+>     but, ${LINUX}/sound/soc/sh/rcar driver included
+>     SH-ARM specific header.
+>     This patch removes it
+> 
+>     Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>     Signed-off-by: Mark Brown <broonie@linaro.org>
+-- 
+Regards,
 
-Best regards,
-Marek Vasut
+Laurent Pinchart
