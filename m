@@ -1,46 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 09 Dec 2013 21:20:08 +0300
-Subject: [PATCH v5 15/15] usb: phy-mxs: Add sync time after controller
- clear phcd
-In-Reply-To: <1386570664-6713-16-git-send-email-peter.chen@freescale.com>
-References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
- <1386570664-6713-16-git-send-email-peter.chen@freescale.com>
-Message-ID: <52A609D8.1050300@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 18:20:22 +0100
+Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
+ without PCI on ARM64
+In-Reply-To: <20131209165548.GE19163@arm.com>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <201312091735.05014.arnd@arndb.de> <20131209165548.GE19163@arm.com>
+Message-ID: <201312091820.23006.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Monday 09 December 2013, Catalin Marinas wrote:
+> CONFIG_PCI does not exist on arm64 yet (we have some internal patches
+> but may not be ready to be posted before the holidays; they try to share
+> code with other archs, so more discussions before merging). We could add
+> CONFIG_PCI and some dummy functions on arm64 for development (not to be
+> upstreamed) or Hanjun could continue to use the current patch before we
+> get PCI working. In the order of priorities, we'll have to merge PCI
+> before ACPI anyway.
 
-On 12/09/2013 09:31 AM, Peter Chen wrote:
+Well, lack of PCI support on ARM64 is a much better reason for accepting
+the patch than potential use on non-server platforms of course.
 
-> After clear portsc.phcd, PHY needs 200us stable time for switch
-> 32K clock to AHB clock.
+What is the status of the PCI work though? I suspect it won't be all
+that hard to add minimal PCI support for a simple mmconfig plus
+fixed I/O space based host of the kind that qemu can easily provide.
 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->   drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
->   1 files changed, 11 insertions(+), 0 deletions(-)
+The hard part that we want to share code with other architectures is
+supporting pluggable host controllers, and I think we can defer that
+a bit.
 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index e18fdf3..7ae5225 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -151,6 +151,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
->   	return mxs_phy->data == &imx6sl_phy_data;
->   }
->
-> +/*
-> + * PHY needs some 32K cycles to switch from 32K clock to
-> + * bus (such as AHB/AXI, etc) clock.
-> + */
-> +static void mxs_phy_clock_switch(void)
-> +{
-> +	usleep_range(300, 400);
-> +}
-> +
-
-    Don't think this is a good name for this function since it doesn't really 
-switch anything, just waits. I'd suggest something like 
-mxs_phy_clock_switch_delay().
-
-WBR, Sergei
+	Arnd
