@@ -1,50 +1,39 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 09 Dec 2013 17:17:07 +0100
-Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
-In-Reply-To: <201312091648.13802.arnd@arndb.de>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
- <201312090309.23723.arnd@arndb.de> <52A582AB.6010504@overkiz.com>
- <201312091648.13802.arnd@arndb.de>
-Message-ID: <52A5ED03.2070306@overkiz.com>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 9 Dec 2013 08:17:21 -0800
+Subject: [PATCH 1/2] ARM: bcm_defconfig: CONFIG_OABI_COMPAT default off
+In-Reply-To: <1386284438-11099-2-git-send-email-tim.kryger@linaro.org>
+References: <1386284438-11099-1-git-send-email-tim.kryger@linaro.org>
+ <1386284438-11099-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYr3u6z+6CKf+u+hEMo+D4Nz=P43zKJGBJy=ZDVyNBBt4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Thu, Dec 5, 2013 at 3:00 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> Now that CONFIG_OABI_COMPAT is off by default, remove the explicit
+> disabling of this feature.
+>
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  arch/arm/configs/bcm_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+> index 287ac1d..574e046 100644
+> --- a/arch/arm/configs/bcm_defconfig
+> +++ b/arch/arm/configs/bcm_defconfig
+> @@ -29,7 +29,6 @@ CONFIG_ARCH_BCM_MOBILE=y
+>  CONFIG_ARM_THUMBEE=y
+>  CONFIG_PREEMPT=y
+>  CONFIG_AEABI=y
+> -# CONFIG_OABI_COMPAT is not set
+>  # CONFIG_COMPACTION is not set
+>  CONFIG_ZBOOT_ROM_TEXT=0x0
+>  CONFIG_ZBOOT_ROM_BSS=0x0
+> --
+> 1.8.0.1
+>
+Applied to armsoc/for-3.14/soc
 
-On 09/12/2013 16:48, Arnd Bergmann wrote:
-> On Monday 09 December 2013, boris brezillon wrote:
->>> You are adding "clock-names" properties in a lot of cases. Are you sure you
->>> are using the strings that are documented in the respective device bindings
->>> for each name? In a lot of cases, drivers just want an anonymous clock
->>> and we don't name them.
->> I rechecked it, and almost all drivers call [devm_]clk_get with a
->> specific clock
->> name, and as a result we must specify the "clock-names" property.
->> The only exceptions I found are the spi and PIT (Periodic Interval
->> Timer) drivers,
->> and "clock-names" property is not defined in these nodes.
-> Yes, I understood that the *drivers* use the names, but are they actually
-> documented in the device bindings? If not, it might be better to change the
-> drivers.
-
-We have to keep both clk system working for at91 platform (new CCF based
-clk implementations and old clk implementations) for two reasons:
-1) the new clk implemetations are only compatible with DT enabled boards
-     and some at91 boards are not yet ported to DT.
-2) we decided to move to the new clk implementations in multiple steps 
-(one SoC
-     family after another) in order to ease PATCH review.
-
-If we change the drivers to avoid specific clock name request 
-([devm]_clk_get(dev, NULL)),
-we will have to change the old static clk lookup tables
-(i.e. 
-http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9g45.c#L226,
-http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9260.c#L202, 
-...).
-
-Best Regards,
-
-Boris
-
-> 	Arnd
+ thanks,
+   csd
