@@ -1,42 +1,118 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 9 Dec 2013 14:52:29 -0800
-Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
-In-Reply-To: <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
-References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
- <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
-Message-ID: <20131209225229.GE22760@cbox>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 09 Dec 2013 17:04:41 -0600
+Subject: [PATCH] clk: socfpga: Map the clk manager base address in the
+ clock driver
+In-Reply-To: <201312092231.13441.arnd@arndb.de>
+References: <1386617447-1260-1-git-send-email-dinguyen@altera.com>
+ <201312092231.13441.arnd@arndb.de>
+Message-ID: <52A64C89.2030100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 09:19:58PM +0530, Anup Patel wrote:
-> Currently, we don't have an exit reason for VM reset emulation
-> in user space hence this patch adds exit reason KVM_EXIT_RESET
-> for this purpose.
-> 
-> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
-> in-kernel PSCI support to reset VMs.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  include/uapi/linux/kvm.h |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 902f124..64a04cc 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->  #define KVM_EXIT_WATCHDOG         21
->  #define KVM_EXIT_S390_TSCH        22
->  #define KVM_EXIT_EPR              23
-> +#define KVM_EXIT_RESET            24
+On 12/9/13 3:31 PM, Arnd Bergmann wrote:
+> On Monday 09 December 2013, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> The clk manager's base address was being mapped in SOCFPGA's arch code and
+>> being extern'ed out to the clock driver. This method is not correct, and the
+>> arch code was not really doing anything with that clk manager anyways.
+>>
+>> This patch moves the mapping of the clk manager's base address in the clock
+>> driver itself.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Ok, thanks for doing this cleanup. A few comments for further simplification:
+>
+>> -extern void __iomem *clk_mgr_base_addr;
+>> -
+>>  struct socfpga_clk {
+>>  	struct clk_gate hw;
+>>  	char *parent_name;
+>>  	char *clk_name;
+>> +	void __iomem *clk_mgr_base_addr;
+>>  	u32 fixed_div;
+>>  	void __iomem *div_reg;
+>>  	u32 width;	/* only valid if div_reg != 0 */
+>
+> I think there is no need to make this a per-clock field, it's fine to
+> have a 'static' variable in the place of the 'extern' declaration you have now.
+Ok.
+>
+>> @@ -129,7 +130,11 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
+>>  	if (WARN_ON(!socfpga_clk))
+>>  		return NULL;
+>>  
+>> -	socfpga_clk->hw.reg = clk_mgr_base_addr + reg;
+>> +	/* Map the clk manager register */
+>> +	clk_mgr_np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
+>> +	socfpga_clk->hw.reg = of_iomap(clk_mgr_np, 0);
+>> +	BUG_ON(!socfpga_clk->hw.reg);
+>> +	socfpga_clk->hw.reg += reg;
+>>  
+>>  	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
+>>  	if (rc)
+> Instead of mapping it every time, I suggest something along the lines of
+> this patch:
+>
+> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> index 81dd31a..1a14742 100644
+> --- a/drivers/clk/socfpga/clk.c
+> +++ b/drivers/clk/socfpga/clk.c
+> @@ -55,7 +55,7 @@
+>  #define div_mask(width)	((1 << (width)) - 1)
+>  #define streq(a, b) (strcmp((a), (b)) == 0)
 >  
->  /* For KVM_EXIT_INTERNAL_ERROR */
->  /* Emulate instruction failed. */
-> -- 
-> 1.7.9.5
-> 
+> -extern void __iomem *clk_mgr_base_addr;
+> +static void __iomem *clk_mgr_base_addr;
+>  
+>  struct socfpga_clk {
+>  	struct clk_gate hw;
+> @@ -322,19 +322,30 @@ static void __init socfpga_pll_init(struct device_node *node)
+>  {
+>  	socfpga_clk_init(node, &clk_pll_ops);
+>  }
+> -CLK_OF_DECLARE(socfpga_pll, "altr,socfpga-pll-clock", socfpga_pll_init);
+>  
+>  static void __init socfpga_periph_init(struct device_node *node)
+>  {
+>  	socfpga_clk_init(node, &periclk_ops);
+>  }
+> -CLK_OF_DECLARE(socfpga_periph, "altr,socfpga-perip-clk", socfpga_periph_init);
+>  
+>  static void __init socfpga_gate_init(struct device_node *node)
+>  {
+>  	socfpga_gate_clk_init(node, &gateclk_ops);
+>  }
+> -CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
+> +
+> +static struct of_device_id socfpga_child_clocks[] = {
+> +	{ "altr,socfpga-pll-clock", socfpga_pll_init },
+> +	{ "altr,socfpga-perip-clk", socfpga_periph_init },
+> +	{ "altr,socfpga-gate-clk", socfpga_gate_init },
+> +	{},
+> +};
+> +
+> +static void __init socfpga_pll_init(struct device_node *node)
+> +{
+> +	clk_mgr_base_addr = of_iomap(node, 0);
+> +	of_clk_init(socfpga_child_clocks);
+> +}
+> +CLK_OF_DECLARE(socfpga_mgr, "altr,clk-mgr", socfpga_clkmgr_init);
+>  
+>  void __init socfpga_init_clocks(void)
+>  {
+>
+>
+> On a related note, I'd also like to see socfpga_init_clocks() disappear. It should
+> be trivial to just add the "mpuclk" into the DT as a separate
+> compatible = "fixed-factor-clock" node.
+Please see:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/216664.html
+
+Thanks for the review.
+
+Dinh
+>
+> 	Arnd
