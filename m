@@ -1,41 +1,111 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 9 Dec 2013 10:21:55 +0530
-Subject: [PATCH 2/7] pinctrl: exynos: add exynos5260 SoC specific data
-In-Reply-To: <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAK9yfHxJP8gUpvngcT-iu3j0+=J60X3DojRe9OXb3uek+VVqaQ@mail.gmail.com>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Mon,  9 Dec 2013 05:52:24 +0100
+Subject: [PATCH][RESEND] ARM: IXP4xx: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381547864-4970-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381547864-4970-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <1386564744-19065-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul, Young-Gun,
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-On 6 December 2013 21:26, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> From: Young-Gun Jang <yg1004.jang@samsung.com>
->
-> Add Samsung Exynos5260 SoC specific data to enable pinctrl
-> support for all platforms based on EXYNOS5260.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+It's a NOOP since 2.6.35 and it will be removed one day.
 
-Author's (Young-Gun Jang) signed-off by is missing here.
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/mach-ixp4xx/common.c        | 2 +-
+ arch/arm/mach-ixp4xx/dsmg600-setup.c | 3 +--
+ arch/arm/mach-ixp4xx/fsg-setup.c     | 6 ++----
+ arch/arm/mach-ixp4xx/nas100d-setup.c | 3 +--
+ arch/arm/mach-ixp4xx/nslu2-setup.c   | 6 ++----
+ 5 files changed, 7 insertions(+), 13 deletions(-)
 
-[snip]
-
-> +
-> +/* pin banks of exynos5260 pin-controller 2 */
-> +static struct samsung_pin_bank exynos5260_pin_banks2[] = {
-> +       EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
-> +       EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
-> +};
-> +
-> +/*
-> + * Samsung pinctrl driver data for Exynos5260 SoC. Exynos5420 SoC includes
-
-s/5420/5260 ?
-
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 9edaf4734fa8..340b2c9c51f4 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -312,7 +312,7 @@ static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id)
+ 
+ static struct irqaction ixp4xx_timer_irq = {
+ 	.name		= "timer1",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= ixp4xx_timer_interrupt,
+ 	.dev_id		= &clockevent_ixp4xx,
+ };
+diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+index 736dc692d540..43ee06d3abe5 100644
+--- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
++++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+@@ -233,8 +233,7 @@ static int __init dsmg600_gpio_init(void)
+ 
+ 	gpio_request(DSMG600_RB_GPIO, "reset button");
+ 	if (request_irq(gpio_to_irq(DSMG600_RB_GPIO), &dsmg600_reset_handler,
+-		IRQF_DISABLED | IRQF_TRIGGER_LOW,
+-		"DSM-G600 reset button", NULL) < 0) {
++		IRQF_TRIGGER_LOW, "DSM-G600 reset button", NULL) < 0) {
+ 
+ 		printk(KERN_DEBUG "Reset Button IRQ %d not available\n",
+ 			gpio_to_irq(DSMG600_RB_GPIO));
+diff --git a/arch/arm/mach-ixp4xx/fsg-setup.c b/arch/arm/mach-ixp4xx/fsg-setup.c
+index 429966b756ed..5c4b0c4a1b37 100644
+--- a/arch/arm/mach-ixp4xx/fsg-setup.c
++++ b/arch/arm/mach-ixp4xx/fsg-setup.c
+@@ -208,16 +208,14 @@ static void __init fsg_init(void)
+ 	platform_add_devices(fsg_devices, ARRAY_SIZE(fsg_devices));
+ 
+ 	if (request_irq(gpio_to_irq(FSG_RB_GPIO), &fsg_reset_handler,
+-			IRQF_DISABLED | IRQF_TRIGGER_LOW,
+-			"FSG reset button", NULL) < 0) {
++			IRQF_TRIGGER_LOW, "FSG reset button", NULL) < 0) {
+ 
+ 		printk(KERN_DEBUG "Reset Button IRQ %d not available\n",
+ 			gpio_to_irq(FSG_RB_GPIO));
+ 	}
+ 
+ 	if (request_irq(gpio_to_irq(FSG_SB_GPIO), &fsg_power_handler,
+-			IRQF_DISABLED | IRQF_TRIGGER_LOW,
+-			"FSG power button", NULL) < 0) {
++			IRQF_TRIGGER_LOW, "FSG power button", NULL) < 0) {
+ 
+ 		printk(KERN_DEBUG "Power Button IRQ %d not available\n",
+ 			gpio_to_irq(FSG_SB_GPIO));
+diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
+index 507cb5233537..4e0f762bc651 100644
+--- a/arch/arm/mach-ixp4xx/nas100d-setup.c
++++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
+@@ -295,8 +295,7 @@ static void __init nas100d_init(void)
+ 	pm_power_off = nas100d_power_off;
+ 
+ 	if (request_irq(gpio_to_irq(NAS100D_RB_GPIO), &nas100d_reset_handler,
+-		IRQF_DISABLED | IRQF_TRIGGER_LOW,
+-		"NAS100D reset button", NULL) < 0) {
++		IRQF_TRIGGER_LOW, "NAS100D reset button", NULL) < 0) {
+ 
+ 		printk(KERN_DEBUG "Reset Button IRQ %d not available\n",
+ 			gpio_to_irq(NAS100D_RB_GPIO));
+diff --git a/arch/arm/mach-ixp4xx/nslu2-setup.c b/arch/arm/mach-ixp4xx/nslu2-setup.c
+index ba5f1cda2a9d..88c025f52d8d 100644
+--- a/arch/arm/mach-ixp4xx/nslu2-setup.c
++++ b/arch/arm/mach-ixp4xx/nslu2-setup.c
+@@ -265,16 +265,14 @@ static void __init nslu2_init(void)
+ 	pm_power_off = nslu2_power_off;
+ 
+ 	if (request_irq(gpio_to_irq(NSLU2_RB_GPIO), &nslu2_reset_handler,
+-		IRQF_DISABLED | IRQF_TRIGGER_LOW,
+-		"NSLU2 reset button", NULL) < 0) {
++		IRQF_TRIGGER_LOW, "NSLU2 reset button", NULL) < 0) {
+ 
+ 		printk(KERN_DEBUG "Reset Button IRQ %d not available\n",
+ 			gpio_to_irq(NSLU2_RB_GPIO));
+ 	}
+ 
+ 	if (request_irq(gpio_to_irq(NSLU2_PB_GPIO), &nslu2_power_handler,
+-		IRQF_DISABLED | IRQF_TRIGGER_HIGH,
+-		"NSLU2 power button", NULL) < 0) {
++		IRQF_TRIGGER_HIGH, "NSLU2 power button", NULL) < 0) {
+ 
+ 		printk(KERN_DEBUG "Power Button IRQ %d not available\n",
+ 			gpio_to_irq(NSLU2_PB_GPIO));
 -- 
-With warm regards,
-Sachin
+1.8.3.2
