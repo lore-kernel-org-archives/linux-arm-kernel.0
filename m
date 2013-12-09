@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:54 -0500
-Subject: [PATCH v3 21/23] mm/ARM: kernel: Use memblock apis for early memory
+Date: Mon, 9 Dec 2013 16:50:56 -0500
+Subject: [PATCH v3 23/23] mm/ARM: OMAP: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-22-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-24-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,37 +20,38 @@ bootmem APIs.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/devtree.c |    2 +-
- arch/arm/kernel/setup.c   |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 739c3df..5a0041e 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -33,7 +33,7 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e3f0eca..f03f8b8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2695,9 +2695,7 @@ static int __init _alloc_links(struct omap_hwmod_link **ml,
+ 	sz = sizeof(struct omap_hwmod_link) * LINKS_PER_OCP_IF;
  
- void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
- {
--	return alloc_bootmem_align(size, align);
-+	return memblock_virt_alloc(size, align);
+ 	*sl = NULL;
+-	*ml = alloc_bootmem(sz);
+-
+-	memset(*ml, 0, sz);
++	*ml = memblock_virt_alloc(sz, 0);
+ 
+ 	*sl = (void *)(*ml) + sizeof(struct omap_hwmod_link);
+ 
+@@ -2816,9 +2814,7 @@ static int __init _alloc_linkspace(struct omap_hwmod_ocp_if **ois)
+ 	pr_debug("omap_hwmod: %s: allocating %d byte linkspace (%d links)\n",
+ 		 __func__, sz, max_ls);
+ 
+-	linkspace = alloc_bootmem(sz);
+-
+-	memset(linkspace, 0, sz);
++	linkspace = memblock_virt_alloc(sz, 0);
+ 
+ 	return 0;
  }
- 
- void __init arm_dt_memblock_reserve(void)
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 6a1b8a8..fffb978 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -717,7 +717,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
- 	kernel_data.end     = virt_to_phys(_end - 1);
- 
- 	for_each_memblock(memory, region) {
--		res = alloc_bootmem_low(sizeof(*res));
-+		res = memblock_virt_alloc(sizeof(*res), 0);
- 		res->name  = "System RAM";
- 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
- 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
 -- 
 1.7.9.5
