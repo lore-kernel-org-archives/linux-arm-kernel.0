@@ -1,50 +1,55 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 11:44:05 -0500
-Subject: [PATCH v3 0/9] Reuse davinci-nand driver for Keystone arch
-In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52A5F355.9020704@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 17:48:58 +0100
+Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
+In-Reply-To: <52A5ED03.2070306@overkiz.com>
+References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
+ <201312091648.13802.arnd@arndb.de> <52A5ED03.2070306@overkiz.com>
+Message-ID: <201312091748.58386.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+On Monday 09 December 2013, boris brezillon wrote:
+> Hello Arnd,
+> 
+> On 09/12/2013 16:48, Arnd Bergmann wrote:
+> > On Monday 09 December 2013, boris brezillon wrote:
+> >>> You are adding "clock-names" properties in a lot of cases. Are you sure you
+> >>> are using the strings that are documented in the respective device bindings
+> >>> for each name? In a lot of cases, drivers just want an anonymous clock
+> >>> and we don't name them.
+> >> I rechecked it, and almost all drivers call [devm_]clk_get with a
+> >> specific clock
+> >> name, and as a result we must specify the "clock-names" property.
+> >> The only exceptions I found are the spi and PIT (Periodic Interval
+> >> Timer) drivers,
+> >> and "clock-names" property is not defined in these nodes.
+> > Yes, I understood that the *drivers* use the names, but are they actually
+> > documented in the device bindings? If not, it might be better to change the
+> > drivers.
+> 
+> We have to keep both clk system working for at91 platform (new CCF based
+> clk implementations and old clk implementations) for two reasons:
+> 1) the new clk implemetations are only compatible with DT enabled boards
+>      and some at91 boards are not yet ported to DT.
+> 2) we decided to move to the new clk implementations in multiple steps 
+> (one SoC
+>      family after another) in order to ease PATCH review.
+> 
+> If we change the drivers to avoid specific clock name request 
+> ([devm]_clk_get(dev, NULL)),
+> we will have to change the old static clk lookup tables
+> (i.e. 
+> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9g45.c#L226,
+> http://lxr.free-electrons.com/source/arch/arm/mach-at91/at91sam9260.c#L202, 
+> ...).
 
-On Thursday 05 December 2013 12:25 PM, Ivan Khoronzhuk wrote:
-> This series contains fixes and updates of Davinci nand driver in
-> order to reuse it for Keystone platform.
-> 
-> v2..v3:
-> - mtd: nand: davinci: don't set timings if AEMIF is used
-> 	dropped, it would be replaced by alone patch
-> 	ARM: davinci: aemif: get rid of davinci-nand driver dependency on aemif
-> 
-> v1..v2
-> The series is combination of two following series:
-> - Davinci nand driver fixes and updates:
-> https://lkml.org/lkml/2013/11/20/271
-> - Reuse davinci-nand driver for Keystone arch
-> https://lkml.org/lkml/2013/11/20/315
-> 
-> - mtd: nand: davinci: extend description of bindings
-> 	clarified changeset description
-> 
-> - mtd: nand: davinci: reuse driver for Keystone arch
-> 	removed "ti,keystone-nand" compatible from driver
-> 
-> Ivan Khoronzhuk (9):
->   mtd: nand: davinci: fix driver registration
->   mtd: nand: davinci: return ENOMEM if memory allocation is failed
->   mtd: nand: davinci: check required ti,davinci-chipselect property
->   mtd: nand: davinci: simplify error handling
->   mtd: nand: davinci: move bindings under mtd
->   mtd: nand: davinci: extend description of bindings
->   mtd: nand: davinci: adjust DT properties to MTD generic
->   mtd: nand: davinci: reuse driver for Keystone arch
->   mtd: nand: davinci: don't request AEMIF address range
-> 
-Can you please pick up the $subject series if you are happy
-with it ?
-It lets us re-use Davinci nand driver on Keystone SOCs.
+Yes, that is a bit painful, but we really need to ensure that the drivers
+implement the documented binding. If they don't match we have to either 
+review and change all the binding documents, or change the static clock
+tables and the drivers.
 
-Regards,
-Santosh
+Note that I have not checked your binding documents for the devices in
+question. If they already document these names, we don't need to change
+anything.
+
+	Arnd
