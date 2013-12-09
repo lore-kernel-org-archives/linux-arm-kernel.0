@@ -1,39 +1,34 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Mon, 9 Dec 2013 08:17:21 -0800
-Subject: [PATCH 1/2] ARM: bcm_defconfig: CONFIG_OABI_COMPAT default off
-In-Reply-To: <1386284438-11099-2-git-send-email-tim.kryger@linaro.org>
-References: <1386284438-11099-1-git-send-email-tim.kryger@linaro.org>
- <1386284438-11099-2-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYr3u6z+6CKf+u+hEMo+D4Nz=P43zKJGBJy=ZDVyNBBt4A@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 9 Dec 2013 21:50:16 +0530
+Subject: [PATCH 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag to
+ mout_apll
+In-Reply-To: <1466487.IbnMiN0f0X@amdc1227>
+References: <1385007454-5234-1-git-send-email-sachin.kamat@linaro.org>
+ <1466487.IbnMiN0f0X@amdc1227>
+Message-ID: <CAK9yfHwwsf7GqZ-7Fc_CwmnHf=A9GN7Dtqve7Woh+khJKr8oDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 3:00 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> Now that CONFIG_OABI_COMPAT is off by default, remove the explicit
-> disabling of this feature.
->
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
->  arch/arm/configs/bcm_defconfig | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-> index 287ac1d..574e046 100644
-> --- a/arch/arm/configs/bcm_defconfig
-> +++ b/arch/arm/configs/bcm_defconfig
-> @@ -29,7 +29,6 @@ CONFIG_ARCH_BCM_MOBILE=y
->  CONFIG_ARM_THUMBEE=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
-> -# CONFIG_OABI_COMPAT is not set
->  # CONFIG_COMPACTION is not set
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
-> --
-> 1.8.0.1
->
-Applied to armsoc/for-3.14/soc
+Hi Tomasz,
 
- thanks,
-   csd
+On 9 December 2013 19:01, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Sachin,
+>
+> On Thursday 21 of November 2013 09:47:34 Sachin Kamat wrote:
+>> Add CLK_SET_RATE_PARENT flag to be able to change the frequency
+>> to desired value.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5250.c |    3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> Your patch description is a bit off. It doesn't say frequency of what
+> clock will be able to be changed to "desired value" and what is the reason
+> for this change.
+
+Yes, I realize that now. Will update and resend. Thanks for review.
+
+-- 
+With warm regards,
+Sachin
