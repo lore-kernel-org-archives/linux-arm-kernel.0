@@ -1,69 +1,172 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Mon,  9 Dec 2013 17:35:45 +0100
-Subject: [PATCH] arm: move arm_dma_limit to setup_dma_zone
-Message-ID: <1386606945-2385-1-git-send-email-murzin.v@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 09 Dec 2013 16:38:33 +0000
+Subject: [PATCH v3 7/9] KVM: arm-vgic: Support unqueueing of LRs to the
+ dist
+In-Reply-To: <1384662620-13795-8-git-send-email-christoffer.dall@linaro.org>
+References: <1384662620-13795-1-git-send-email-christoffer.dall@linaro.org>
+ <1384662620-13795-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <ec8aca55520ec17d0c59d63ceae63d06@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 4dcfa600 (ARM: DMA-API: better handing of DMA masks for coherent
-allocations) arm_dma_limit_pfn has almost substituted the arm_dma_limit. The
-remaining user is dma_contiguous_reserve(). It is also referenced in
-setup_dma_zone() to calculate arm_dma_limit_pfn.
+On 2013-11-17 04:30, Christoffer Dall wrote:
+> To properly access the VGIC state from user space it is very 
+> unpractical
+> to have to loop through all the LRs in all register access functions.
+> Instead, support moving all pending state from LRs to the 
+> distributor,
+> but leave active state LRs alone.
+>
+> Note that to accurately present the active and pending state to VCPUs
+> reading these distributor registers from a live VM, we would have to
+> stop all other VPUs than the calling VCPU and ask each CPU to unqueue
+> their LR state onto the distributor and add fields to track active 
+> state
+> on the distributor side as well.  We don't have any users of such
+> functionality yet and there are other inaccuracies of the GIC 
+> emulation,
+> so don't provide accurate synchronized access to this state just yet.
+> However, when the time comes, having this function should help.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> Changelog[3]:
+>  - New patch in series
+> ---
+>  virt/kvm/arm/vgic.c |   80
+> +++++++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 75 insertions(+), 5 deletions(-)
+>
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index ecf6dcf..44c669b 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -589,6 +589,72 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu 
+> *vcpu,
+>  	return false;
+>  }
+>
+> +#define LR_CPUID(lr)	\
+> +	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
+> +#define LR_IRQID(lr)	\
+> +	((lr) & GICH_LR_VIRTUALID)
+> +
+> +static void vgic_retire_lr(int lr_nr, int irq, struct vgic_cpu 
+> *vgic_cpu)
+> +{
+> +	clear_bit(lr_nr, vgic_cpu->lr_used);
+> +	vgic_cpu->vgic_lr[lr_nr] &= ~GICH_LR_STATE;
+> +	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
+> +}
+> +
+> +/**
+> + * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
+> + * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
+> + *
+> + * Move any pending IRQs that have already been assigned to LRs back 
+> to the
+> + * emulated distributor state so that the complete emulated state
+> can be read
+> + * from the main emulation structures without investigating the LRs.
+> + *
+> + * Note that IRQs in the active state in the LRs get their pending
+> state moved
+> + * to the distributor but the active state stays in the LRs, because
+> we don't
+> + * track the active state on the distributor side.
+> + */
+> +static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	int i, irq, source_cpu;
+> +	u32 *lr;
+> +
+> +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+> +		lr = &vgic_cpu->vgic_lr[i];
+> +		irq = LR_IRQID(*lr);
+> +		source_cpu = LR_CPUID(*lr);
+> +
+> +		/*
+> +		 * If the LR holds only an active interrupt (not pending) then
+> +		 * just leave it alone.
+> +		 */
+> +		if (!__test_and_clear_bit(__ffs(GICH_LR_PENDING_BIT),
+> +					  (unsigned long *)lr))
+> +			continue;
 
-Kill the global arm_dma_limit and equip setup_zone_dma with the local one.
+Now you got me confused. The comment talks about the active bit, but 
+you're actually clearing the pending bit. Surely that deserves a better 
+explanation.
 
-Reported-by: Vassili Karpov <av1474@comtv.ru>
-Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
----
- arch/arm/mm/init.c |    6 ++++--
- arch/arm/mm/mm.h   |    2 --
- 2 files changed, 4 insertions(+), 4 deletions(-)
+> +
+> +		/*
+> +		 * If the interrupt was only pending (not "active" or "pending
+> +		 * and active") then we have effectively cleared the LR and it
+> +		 * should be marked as free for other use.
+> +		 */
+> +		if (!(*lr & GICH_LR_STATE))
+> +			vgic_retire_lr(i, irq, vgic_cpu);
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 3e8f106..7583951 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -208,7 +208,6 @@ EXPORT_SYMBOL(arm_dma_zone_size);
-  * allocations.  This must be the smallest DMA mask in the system,
-  * so a successful GFP_DMA allocation will always satisfy this.
-  */
--phys_addr_t arm_dma_limit;
- unsigned long arm_dma_pfn_limit;
- 
- static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
-@@ -227,6 +226,8 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
- void __init setup_dma_zone(const struct machine_desc *mdesc)
- {
- #ifdef CONFIG_ZONE_DMA
-+	phys_addr_t arm_dma_limit;
-+
- 	if (mdesc->dma_zone_size) {
- 		arm_dma_zone_size = mdesc->dma_zone_size;
- 		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
-@@ -381,7 +382,8 @@ void __init arm_memblock_init(struct meminfo *mi,
- 	 * reserve memory for DMA contigouos allocations,
- 	 * must come from DMA area inside low memory
- 	 */
--	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
-+	dma_contiguous_reserve(min((phys_addr_t)arm_dma_pfn_limit << PAGE_SHIFT,
-+				   arm_lowmem_limit));
- 
- 	arm_memblock_steal_permitted = false;
- 	memblock_allow_resize();
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index d5a982d..11f3509 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -80,10 +80,8 @@ extern __init void add_static_vm_early(struct static_vm *svm);
- #endif
- 
- #ifdef CONFIG_ZONE_DMA
--extern phys_addr_t arm_dma_limit;
- extern unsigned long arm_dma_pfn_limit;
- #else
--#define arm_dma_limit ((phys_addr_t)~0)
- #define arm_dma_pfn_limit (~0ul >> PAGE_SHIFT)
- #endif
- 
+Why not directly testing the active bit? It'd be more consistent with 
+the above if you used a similar method.
+
+> +		/*
+> +		 * Finally, reestablish the pending state on the distributor
+> +		 * and the CPU interface.  It may have already been pending,
+> +		 * but that is fine, then we are only setting a few bits that
+> +		 * were already set.
+> +		 */
+> +		vgic_dist_irq_set(vcpu, irq);
+> +		if (irq < VGIC_NR_SGIS)
+> +			dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
+> +		vgic_update_state(vcpu->kvm);
+> +	}
+> +}
+> +
+>  static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+>  				  struct kvm_exit_mmio *mmio,
+>  				  phys_addr_t offset)
+> @@ -848,8 +914,6 @@ static void vgic_update_state(struct kvm *kvm)
+>  	}
+>  }
+>
+> -#define LR_CPUID(lr)	\
+> -	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
+>  #define MK_LR_PEND(src, irq)	\
+>  	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | 
+> (irq))
+>
+> @@ -871,9 +935,7 @@ static void vgic_retire_disabled_irqs(struct
+> kvm_vcpu *vcpu)
+>  		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
+>
+>  		if (!vgic_irq_is_enabled(vcpu, irq)) {
+> -			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
+> -			clear_bit(lr, vgic_cpu->lr_used);
+> -			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
+> +			vgic_retire_lr(lr, irq, vgic_cpu);
+>  			if (vgic_irq_is_active(vcpu, irq))
+>  				vgic_irq_clear_active(vcpu, irq);
+>  		}
+> @@ -1664,6 +1726,14 @@ static int vgic_attr_regs_access(struct
+> kvm_device *dev,
+>  		}
+>  	}
+>
+> +	/*
+> +	 * Move all pending IRQs from the LRs on all VCPUs so the pending
+> +	 * state can be properly represented in the register state 
+> accessible
+> +	 * through this API.
+> +	 */
+> +	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm)
+> +		vgic_unqueue_irqs(tmp_vcpu);
+> +
+>  	offset -= r->base;
+>  	r->handle_mmio(vcpu, &mmio, offset);
+>  	spin_unlock(&vgic->lock);
+
 -- 
-1.7.10.4
+Fast, cheap, reliable. Pick two.
