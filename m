@@ -1,34 +1,61 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 9 Dec 2013 21:50:16 +0530
-Subject: [PATCH 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag to
- mout_apll
-In-Reply-To: <1466487.IbnMiN0f0X@amdc1227>
-References: <1385007454-5234-1-git-send-email-sachin.kamat@linaro.org>
- <1466487.IbnMiN0f0X@amdc1227>
-Message-ID: <CAK9yfHwwsf7GqZ-7Fc_CwmnHf=A9GN7Dtqve7Woh+khJKr8oDA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 9 Dec 2013 10:21:15 -0600
+Subject: [PATCH v3 05/15] mfd: menelaus: Use for_each_set_bit()
+In-Reply-To: <1386606085-26838-1-git-send-email-balbi@ti.com>
+References: <20131209161422.GC24047@saruman.home>
+ <1386606085-26838-1-git-send-email-balbi@ti.com>
+Message-ID: <1386606085-26838-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+That macro just helps removing some extra line of code and hides ffs()
+calls.
 
-On 9 December 2013 19:01, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Sachin,
->
-> On Thursday 21 of November 2013 09:47:34 Sachin Kamat wrote:
->> Add CLK_SET_RATE_PARENT flag to be able to change the frequency
->> to desired value.
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> ---
->>  drivers/clk/samsung/clk-exynos5250.c |    3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> Your patch description is a bit off. It doesn't say frequency of what
-> clock will be able to be changed to "desired value" and what is the reason
-> for this change.
+While at that, also fix a variable shadowing bug where 'int irq' was
+being redeclared inside inner loop while it was also argument to
+interrupt handler.
 
-Yes, I realize that now. Will update and resend. Thanks for review.
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/mfd/menelaus.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+index 11dc4d3..9ccbb79 100644
+--- a/drivers/mfd/menelaus.c
++++ b/drivers/mfd/menelaus.c
+@@ -795,24 +795,22 @@ static irqreturn_t menelaus_irq(int irq, void *_menelaus)
+ {
+ 	struct menelaus_chip *menelaus = _menelaus;
+ 	void (*handler)(struct menelaus_chip *menelaus);
+-	unsigned isr;
++	unsigned long isr;
++	unsigned long i;
+ 
+ 	isr = (menelaus_read_reg(MENELAUS_INT_STATUS2)
+ 			& ~menelaus->mask2) << 8;
+ 	isr |= menelaus_read_reg(MENELAUS_INT_STATUS1)
+ 		& ~menelaus->mask1;
+ 
+-	while (isr) {
+-		int irq = fls(isr) - 1;
+-		isr &= ~(1 << irq);
+-
++	for_each_set_bit(i, &isr, 16) {
+ 		mutex_lock(&menelaus->lock);
+-		menelaus_disable_irq(irq);
+-		menelaus_ack_irq(irq);
+-		handler = menelaus->handlers[irq];
++		menelaus_disable_irq(i);
++		menelaus_ack_irq(i);
++		handler = menelaus->handlers[i];
+ 		if (handler)
+ 			handler(menelaus);
+-		menelaus_enable_irq(irq);
++		menelaus_enable_irq(i);
+ 		mutex_unlock(&menelaus->lock);
+ 	}
+ 
 -- 
-With warm regards,
-Sachin
+1.8.4.GIT
