@@ -1,49 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Dec 2013 18:01:55 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core
- running without PCI on ARM64
-In-Reply-To: <201312091820.23006.arnd@arndb.de>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312091735.05014.arnd@arndb.de> <20131209165548.GE19163@arm.com>
- <201312091820.23006.arnd@arndb.de>
-Message-ID: <20131209180155.GG19163@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 9 Dec 2013 18:05:41 +0000
+Subject: [PATCH] ARM64: dts: Add clock-frequency to model cpu nodes
+In-Reply-To: <1386611765.3380.70.camel@linaro1.home>
+References: <1386335683-11405-1-git-send-email-broonie@kernel.org>
+ <1386611765.3380.70.camel@linaro1.home>
+Message-ID: <20131209180541.GQ29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 05:20:22PM +0000, Arnd Bergmann wrote:
-> On Monday 09 December 2013, Catalin Marinas wrote:
-> > CONFIG_PCI does not exist on arm64 yet (we have some internal patches
-> > but may not be ready to be posted before the holidays; they try to share
-> > code with other archs, so more discussions before merging). We could add
-> > CONFIG_PCI and some dummy functions on arm64 for development (not to be
-> > upstreamed) or Hanjun could continue to use the current patch before we
-> > get PCI working. In the order of priorities, we'll have to merge PCI
-> > before ACPI anyway.
-> 
-> Well, lack of PCI support on ARM64 is a much better reason for accepting
-> the patch than potential use on non-server platforms of course.
+On Mon, Dec 09, 2013 at 05:56:05PM +0000, Jon Medhurst (Tixy) wrote:
+> On Fri, 2013-12-06 at 13:14 +0000, Mark Brown wrote:
 
-As I said above about priorities, we are not in a hurry to merge ACPI
-for arm64 before PCI is supported.
+> > The clock-frequency property is meaningless for the models but it's a
+> > mandatory property so claim that all the cores run at 1MHz.
 
-> What is the status of the PCI work though? I suspect it won't be all
-> that hard to add minimal PCI support for a simple mmconfig plus
-> fixed I/O space based host of the kind that qemu can easily provide.
+> Is it a mandatory property? I know we seem to get ugly warnings if it's
+> missing but I see no mention of it at all in
+> Documentation/devicetree/bindings/arm/cpus.txt (am I looking in the
+> wrong place?)
 
-Liviu (ARM engineer) has been working on generalising the microblaze
-code (which is very similar to powerpc) and enable it on arm64. The
-patches will be posted soon (though may slip into the new year) but
-there will be many discussions on how to do this best, so I don't expect
-a quick merge.
+It's mandatory according to ePAPR (see my separate patch copying the
+definition into our copy of the binding documents).
 
-In parallel, Will is looking at getting PCI to work with kvmtool and
-that's something we could merge sooner (but again, in the new year).
+> I think this attribute got merged into the kernel with the early power
+> related scheduling efforts, but given the state of all that at the
+> moment I was guessing it might be obsolete.
 
-> The hard part that we want to share code with other architectures is
-> supporting pluggable host controllers, and I think we can defer that
-> a bit.
-
-Indeed, this would take time.
-
--- 
-Catalin
+No, it's still being used.  At the minute mainline should in theory
+balance tasks well enough between the cores when they're all enabled, it
+just won't figure out that it's useful to shut one of the clusters down.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/eb3a6602/attachment-0001.sig>
