@@ -1,74 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 09 Dec 2013 15:40:50 +0000
-Subject: [PATCH v3 4/9] irqchip: arm-gic: Define additional MMIO offsets
- and masks
-In-Reply-To: <1384662620-13795-5-git-send-email-christoffer.dall@linaro.org>
-References: <1384662620-13795-1-git-send-email-christoffer.dall@linaro.org>
- <1384662620-13795-5-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <a01cc77df8dc220a6475ed70ca97f99f@www.loen.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 9 Dec 2013 23:45:13 +0800
+Subject: [linux-sunxi] Re: [PATCH 04/10] net: stmmac: sunxi platfrom
+ extensions for GMAC in Allwinner A20 SoC's
+In-Reply-To: <52A5C950.7070903@cogentembedded.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A7B2.4000509@st.com>
+ <52A5C950.7070903@cogentembedded.com>
+Message-ID: <CAGb2v65T4jqvrW=ZX3fcEm22rU0DEgsRJ2NtXDQ2406Ou5G9MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-17 04:30, Christoffer Dall wrote:
-> Define CPU interface offsets for the GICC_ABPR, GICC_APR, and 
-> GICC_IIDR
-> registers.  Define distributor registers for the GICD_SPENDSGIR and 
-> the
-> GICD_CPENDSGIR.  KVM/ARM needs to know about these definitions to 
-> fully
-> support save/restore of the VGIC.
->
-> Also define some masks and shifts for the various GICH_VMCR fields.
->
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Dec 9, 2013 at 9:44 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello.
+>
+>
+> On 09-12-2013 15:21, srinivas kandagatla wrote:
+>
+>>> +static int sun7i_gmac_init(struct platform_device *pdev)
+>>> +{
+>>> +       struct resource *res;
+>>> +       struct device *dev = &pdev->dev;
+>>> +       void __iomem *addr = NULL;
+>>> +       struct plat_stmmacenet_data *plat_dat = NULL;
+>
+>
+>    No need to initialize it since you're assigning to it right below.
+>
+>
+>>> +       u32 priv_clk_reg;
+>>> +
+>>> +       plat_dat = dev_get_platdata(&pdev->dev);
+>>> +       if (!plat_dat)
+>>> +               return -EINVAL;
+>
+>
+>> dev_get_platdata will return NULL for DT, So this function will fail all
+>> the time.
+>
+>
+>    Indeed, unless the probe() method assigns it from the 'data' field of
+> 'struct of_device_id'.
+>
+>
+>> How is it supposed to work?
+>> Am I missing some thing?
+>
+>
+>    Look at stmmac_pltfr_probe().
 
-> ---
->  include/linux/irqchip/arm-gic.h |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/include/linux/irqchip/arm-gic.h
-> b/include/linux/irqchip/arm-gic.h
-> index 0e5d9ec..28b28fc 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -17,6 +17,9 @@
->  #define GIC_CPU_EOI			0x10
->  #define GIC_CPU_RUNNINGPRI		0x14
->  #define GIC_CPU_HIGHPRI			0x18
-> +#define GIC_CPU_ALIAS_BINPOINT		0x1c
-> +#define GIC_CPU_ACTIVEPRIO		0xd0
-> +#define GIC_CPU_IDENT			0xfc
->
->  #define GIC_DIST_CTRL			0x000
->  #define GIC_DIST_CTR			0x004
-> @@ -31,6 +34,8 @@
->  #define GIC_DIST_TARGET			0x800
->  #define GIC_DIST_CONFIG			0xc00
->  #define GIC_DIST_SOFTINT		0xf00
-> +#define GIC_DIST_SGI_CLEAR		0xf10
-> +#define GIC_DIST_SGI_SET		0xf20
->
->  #define GICH_HCR			0x0
->  #define GICH_VTR			0x4
-> @@ -54,6 +59,15 @@
->  #define GICH_LR_ACTIVE_BIT		(1 << 29)
->  #define GICH_LR_EOI			(1 << 19)
->
-> +#define GICH_VMCR_CTRL_SHIFT		0
-> +#define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
-> +#define GICH_VMCR_PRIMASK_SHIFT		27
-> +#define GICH_VMCR_PRIMASK_MASK		(0x1f << GICH_VMCR_PRIMASK_SHIFT)
-> +#define GICH_VMCR_BINPOINT_SHIFT	21
-> +#define GICH_VMCR_BINPOINT_MASK		(0x7 << GICH_VMCR_BINPOINT_SHIFT)
-> +#define GICH_VMCR_ALIAS_BINPOINT_SHIFT	18
-> +#define GICH_VMCR_ALIAS_BINPOINT_MASK	(0x7 <<
-> GICH_VMCR_ALIAS_BINPOINT_SHIFT)
-> +
->  #define GICH_MISR_EOI			(1 << 0)
->  #define GICH_MISR_U			(1 << 1)
+Actually, Srinivas is right.
+The platform data assigned from the 'data field' is not the same one as
+dev_get_platdata().
 
--- 
-Fast, cheap, reliable. Pick two.
+This is something I missed when I was reworking the patches.
+
+
+ChenYu
