@@ -1,123 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Dec 2013 14:14:28 +0800
-Subject: [PATCH] ARM: imx: use __initconst for const init definition
-Message-ID: <1386569668-15365-1-git-send-email-shawn.guo@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 9 Dec 2013 11:53:01 +0530
+Subject: [PATCH 1/7] ARM: EXYNOS: initial board support for exynos5260 SoC
+In-Reply-To: <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAK9yfHzX1+Rp3DCZiJSjE7VO6+TaDW7iqUZVpgRNkjVJofWauA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-0-DAY kernel build testing backend reports the following.
+Hi Rahul,
 
- scripts/checkpatch.pl 0001-ARM-imx-add-support-code-for-IMX50-based-machines.patch
- # many are suggestions rather than must-fix
+On 6 December 2013 21:26, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> This patch add basic arch side support for exynos5260 SoC.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 
- ERROR: Use of const init definition must use __initconst
- #80: arch/arm/mach-imx/mach-imx50.c:26:
- +static const char *imx50_dt_board_compat[] __initdata = {
+Since you are posting the patch, your signed off is also required.
 
-While at it, fix the error globally for IMX platform.
+[snip]
 
-Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/imx31-dt.c    |    2 +-
- arch/arm/mach-imx/imx51-dt.c    |    2 +-
- arch/arm/mach-imx/mach-imx50.c  |    2 +-
- arch/arm/mach-imx/mach-imx53.c  |    2 +-
- arch/arm/mach-imx/mach-imx6q.c  |    2 +-
- arch/arm/mach-imx/mach-imx6sl.c |    2 +-
- arch/arm/mach-imx/mach-vf610.c  |    2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
+>  void exynos4_restart(enum reboot_mode mode, const char *cmd)
+>  {
+>         __raw_writel(0x1, S5P_SWRESET);
+> @@ -371,7 +387,8 @@ static void __init exynos4_map_io(void)
+>  static void __init exynos5_map_io(void)
+>  {
+>         iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
+> -
+> +       if (soc_is_exynos5260())
+> +               iotable_init(exynos5260_iodesc, ARRAY_SIZE(exynos5260_iodesc));
 
-diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
-index 818a1cc..e1e70ef 100644
---- a/arch/arm/mach-imx/imx31-dt.c
-+++ b/arch/arm/mach-imx/imx31-dt.c
-@@ -25,7 +25,7 @@ static void __init imx31_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const char *imx31_dt_board_compat[] __initdata = {
-+static const char *imx31_dt_board_compat[] __initconst = {
- 	"fsl,imx31",
- 	NULL
- };
-diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-index bece8a6..0230d78 100644
---- a/arch/arm/mach-imx/imx51-dt.c
-+++ b/arch/arm/mach-imx/imx51-dt.c
-@@ -29,7 +29,7 @@ static void __init imx51_dt_init(void)
- 	platform_device_register_full(&devinfo);
- }
- 
--static const char *imx51_dt_board_compat[] __initdata = {
-+static const char *imx51_dt_board_compat[] __initconst = {
- 	"fsl,imx51",
- 	NULL
- };
-diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
-index 2f74fad..77b77a9 100644
---- a/arch/arm/mach-imx/mach-imx50.c
-+++ b/arch/arm/mach-imx/mach-imx50.c
-@@ -23,7 +23,7 @@ static void __init imx50_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const char *imx50_dt_board_compat[] __initdata = {
-+static const char *imx50_dt_board_compat[] __initconst = {
- 	"fsl,imx50",
- 	NULL
- };
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index c9c4d8d..6585090 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -31,7 +31,7 @@ static void __init imx53_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const char *imx53_dt_board_compat[] __initdata = {
-+static const char *imx53_dt_board_compat[] __initconst = {
- 	"fsl,imx53",
- 	NULL
- };
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 7e5ec34..d2ea6e6 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -273,7 +273,7 @@ static void __init imx6q_init_irq(void)
- 	irqchip_init();
- }
- 
--static const char *imx6q_dt_compat[] __initdata = {
-+static const char *imx6q_dt_compat[] __initconst = {
- 	"fsl,imx6dl",
- 	"fsl,imx6q",
- 	NULL,
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 2f952e3..cca183a 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -61,7 +61,7 @@ static void __init imx6sl_init_irq(void)
- 	irqchip_init();
- }
- 
--static const char *imx6sl_dt_compat[] __initdata = {
-+static const char *imx6sl_dt_compat[] __initconst = {
- 	"fsl,imx6sl",
- 	NULL,
- };
-diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-index af0cb8a..2d8aef5 100644
---- a/arch/arm/mach-imx/mach-vf610.c
-+++ b/arch/arm/mach-imx/mach-vf610.c
-@@ -26,7 +26,7 @@ static void __init vf610_init_irq(void)
- 	irqchip_init();
- }
- 
--static const char *vf610_dt_compat[] __initdata = {
-+static const char *vf610_dt_compat[] __initconst = {
- 	"fsl,vf610",
- 	NULL,
- };
+Add this after 5250 to maintain numerical order.
+
+>         if (soc_is_exynos5250())
+>                 iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
+>  }
+
+[snip]
+>
+>  #define S5P_VA_SYSRAM          S3C_ADDR(0x02400000)
+>  #define S5P_VA_SYSRAM_NS       S3C_ADDR(0x02410000)
+> +
+Unnecessary blank line addition.
+
+
 -- 
-1.7.9.5
+With warm regards,
+Sachin
