@@ -1,92 +1,41 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Mon,  9 Dec 2013 09:51:55 +0100
-Subject: [PATCH v5 3/3] usb: ohci-at91: use device managed clk retrieval
-In-Reply-To: <1386579115-4324-1-git-send-email-b.brezillon@overkiz.com>
-References: <1386579115-4324-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1386579115-4324-4-git-send-email-b.brezillon@overkiz.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 09 Dec 2013 09:56:57 +0100
+Subject: [PATCH 4/9] ARM: pxa: remove unused variable
+In-Reply-To: <1386543229-1542-5-git-send-email-ynvich@gmail.com>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-5-git-send-email-ynvich@gmail.com>
+Message-ID: <52A585D9.4000605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_get calls by devm_clk_get calls.
+On 12/08/2013 11:53 PM, Sergei Ianovich wrote:
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Daniel Mack <zonque@gmail.com>
+> ---
+>  arch/arm/mach-pxa/irq.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> index b6cc181..432842c 100644
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -236,7 +236,6 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+>  {
+>  	struct device_node *node;
+>  	const struct of_device_id *of_id;
+> -	struct pxa_intc_conf *conf;
+>  	struct resource res;
+>  	int n, ret;
+>  
+> @@ -246,7 +245,6 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+>  		return;
+>  	}
+>  	of_id = of_match_node(intc_ids, node);
+> -	conf = of_id->data;
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ohci-at91.c |   30 +++++++-----------------------
- 1 file changed, 7 insertions(+), 23 deletions(-)
+A similar patch was already merged by Haojian recently. You should
+probably rebase your patch stack on top of his maintainer tree.
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 8c0c4a4..9aa485e 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -164,30 +164,30 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		goto err;
- 	}
- 
--	iclk = clk_get(dev, "ohci_clk");
-+	iclk = devm_clk_get(dev, "ohci_clk");
- 	if (IS_ERR(iclk)) {
- 		dev_err(dev, "failed to get ohci_clk\n");
- 		retval = PTR_ERR(iclk);
- 		goto err;
- 	}
--	fclk = clk_get(dev, "uhpck");
-+	fclk = devm_clk_get(dev, "uhpck");
- 	if (IS_ERR(fclk)) {
- 		dev_err(dev, "failed to get uhpck\n");
- 		retval = PTR_ERR(fclk);
--		goto err4;
-+		goto err;
- 	}
--	hclk = clk_get(dev, "hclk");
-+	hclk = devm_clk_get(dev, "hclk");
- 	if (IS_ERR(hclk)) {
- 		dev_err(dev, "failed to get hclk\n");
- 		retval = PTR_ERR(hclk);
--		goto err5;
-+		goto err;
- 	}
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		uclk = clk_get(dev, "usb_clk");
-+		uclk = devm_clk_get(dev, "usb_clk");
- 		if (IS_ERR(uclk)) {
- 			dev_err(dev, "failed to get uclk\n");
- 			retval = PTR_ERR(uclk);
--			goto err6;
-+			goto err;
- 		}
- 	}
- 
-@@ -203,15 +203,6 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	/* Error handling */
- 	at91_stop_hc(pdev);
- 
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
-- err6:
--	clk_put(hclk);
-- err5:
--	clk_put(fclk);
-- err4:
--	clk_put(iclk);
--
-  err:
- 	usb_put_hcd(hcd);
- 	return retval;
-@@ -236,13 +227,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- 	usb_remove_hcd(hcd);
- 	at91_stop_hc(pdev);
- 	usb_put_hcd(hcd);
--
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_put(uclk);
--	clk_put(hclk);
--	clk_put(fclk);
--	clk_put(iclk);
--	fclk = iclk = hclk = NULL;
- }
- 
- /*-------------------------------------------------------------------------*/
--- 
-1.7.9.5
+
+Daniel
