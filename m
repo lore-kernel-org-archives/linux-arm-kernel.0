@@ -1,76 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon,  9 Dec 2013 19:08:33 +0000
-Subject: [PATCH] ARM: topology: Staticise non-exported symbols
-Message-ID: <1386616113-26211-1-git-send-email-broonie@kernel.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 9 Dec 2013 11:08:56 -0800
+Subject: Merge order in Armada 370/XP (mvebu) NAND support
+In-Reply-To: <20131206221217.GC2458@localhost>
+References: <20131206184544.GA14986@localhost>
+ <20131206192540.GU29282@titan.lakedaemon.net>
+ <20131206221217.GC2458@localhost>
+Message-ID: <20131209190856.GQ27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Fri, Dec 06, 2013 at 07:12:18PM -0300, Ezequiel Garcia wrote:
+> On Fri, Dec 06, 2013 at 02:25:40PM -0500, Jason Cooper wrote:
+> > On Fri, Dec 06, 2013 at 03:45:45PM -0300, Ezequiel Garcia wrote:
+> > > Jason/Brian: What do you think we can do?
+> > 
+> > Revert the change adding the compatible string in the first place?
+> 
+> Yes, that probably is the best thing to do.
+> 
+> Brian: what do you think? I can send you a revert of the
+> "armada370-nand" compatible addition to be pushed for v3.13-rc4?
 
-These symbols are only referenced in this source file so can be made
-static, and the efficiency table is constant data so can be declared as
-such.  This avoids polluting the global namespace and fixes warnings
-from sparse.
+Yes, I think dropping the "armada370-nand" compatible string would be a
+good solution for 3.13. Are there any use cases where "armada370-nand"
+is needed and operational on 3.12? (e.g., is 2KB page support fine?)
+Because if there are *no* valid use cases for compatible =
+"armada370-nand" yet, then we might want this to go to 3.12.y stable as
+well, right?
 
-The function arch_scale_freq_power() is still not prototyped or static,
-this is a separate issue as this is overriding a weak symbol from the
-scheduler which neglects to provide a prototype.
+> The compatible can be added on top of l2-mtd.git, after all
+> the needed support is in the driver.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm/kernel/topology.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Sure.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 85a87370f144..0bc94b1fd1ae 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -68,16 +68,16 @@ struct cpu_efficiency {
-  * Processors that are not defined in the table,
-  * use the default SCHED_POWER_SCALE value for cpu_scale.
-  */
--struct cpu_efficiency table_efficiency[] = {
-+static const struct cpu_efficiency table_efficiency[] = {
- 	{"arm,cortex-a15", 3891},
- 	{"arm,cortex-a7",  2048},
- 	{NULL, },
- };
- 
--unsigned long *__cpu_capacity;
-+static unsigned long *__cpu_capacity;
- #define cpu_capacity(cpu)	__cpu_capacity[cpu]
- 
--unsigned long middle_capacity = 1;
-+static unsigned long middle_capacity = 1;
- 
- /*
-  * Iterate all CPUs' descriptor in DT and compute the efficiency
-@@ -89,7 +89,7 @@ unsigned long middle_capacity = 1;
-  */
- static void __init parse_dt_topology(void)
- {
--	struct cpu_efficiency *cpu_eff;
-+	const struct cpu_efficiency *cpu_eff;
- 	struct device_node *cn = NULL;
- 	unsigned long min_capacity = (unsigned long)(-1);
- 	unsigned long max_capacity = 0;
-@@ -158,7 +158,7 @@ static void __init parse_dt_topology(void)
-  * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
-  * function returns directly for SMP system.
-  */
--void update_cpu_power(unsigned int cpu)
-+static void update_cpu_power(unsigned int cpu)
- {
- 	if (!cpu_capacity(cpu))
- 		return;
-@@ -185,7 +185,7 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
- 	return &cpu_topology[cpu].core_sibling;
- }
- 
--void update_siblings_masks(unsigned int cpuid)
-+static void update_siblings_masks(unsigned int cpuid)
- {
- 	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
- 	int cpu;
--- 
-1.8.5.1
+I'll take a look at your "revert" patch and see if we can get it
+upstream for 3.13.
+
+Thanks,
+Brian
