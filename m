@@ -1,51 +1,36 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 09 Dec 2013 09:43:23 +0100
-Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
-In-Reply-To: <201312090309.23723.arnd@arndb.de>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
- <1385650228-8906-1-git-send-email-b.brezillon@overkiz.com>
- <201312090309.23723.arnd@arndb.de>
-Message-ID: <52A582AB.6010504@overkiz.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Dec 2013 09:44:25 +0100
+Subject: [PATCH v2] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <20131209083815.GA5231@xps8300>
+References: <1386286149-2855-1-git-send-email-ynvich@gmail.com>
+ <1386321003-8960-1-git-send-email-ynvich@gmail.com>
+ <20131209083815.GA5231@xps8300>
+Message-ID: <20131209084425.GO24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Mon, Dec 09, 2013 at 10:38:15AM +0200, Heikki Krogerus wrote:
+> Hi,
+> 
+> > +	return 0;
+> > +
+> > + err_clk:
+> > +	clk_unprepare(data->clk);
+> > + err_free_clk:
+> > +	devm_clk_put(&pdev->dev, data->clk);
+> > + err_free:
+> > +	devm_kfree(&pdev->dev, data);
+> 
+> And there labels could be dropped.
 
-On 09/12/2013 03:09, Arnd Bergmann wrote:
-> On Thursday 28 November 2013, Boris BREZILLON wrote:
->> @@ -92,6 +103,8 @@
->>   				dma-names = "tx", "rx";
->>   				pinctrl-names = "default";
->>   				pinctrl-0 = <&pinctrl_spi0>;
->> +				clocks = <&spi0_clk>;
->> +				clock-names = "spi_clk";
->>   				status = "disabled";
->>   			};
->>   
->> @@ -101,6 +114,8 @@
->>   				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 4>;
->>   				pinctrl-names = "default";
->>   				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
->> +				clocks = <&ssc0_clk>;
->> +				clock-names = "pclk";
->>   				status = "disabled";
->>   			};
->>   
-> You are adding "clock-names" properties in a lot of cases. Are you sure you
-> are using the strings that are documented in the respective device bindings
-> for each name? In a lot of cases, drivers just want an anonymous clock
-> and we don't name them.
+This should really be fixed. Explicitly releasing devm_* allocated
+resources invalidates the whole idea of the devm functions. People
+looking for templates shouldn't find examples for this in the kernel.
 
-I rechecked it, and almost all drivers call [devm_]clk_get with a 
-specific clock
-name, and as a result we must specify the "clock-names" property.
-The only exceptions I found are the spi and PIT (Periodic Interval 
-Timer) drivers,
-and "clock-names" property is not defined in these nodes.
+Sascha
 
-
-Best Regards,
-
-Boris
->
-> 	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
