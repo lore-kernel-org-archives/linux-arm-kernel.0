@@ -1,32 +1,87 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 09 Dec 2013 17:54:54 +0800
-Subject: panda board es failed on cpuidle
-Message-ID: <52A5936E.5050409@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 09 Dec 2013 10:55:26 +0100
+Subject: [PATCH 2/3] pinctrl: at91: initialize config parameter to 0
+In-Reply-To: <52A57E55.40808@atmel.com>
+References: <1386421734-10240-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1386421734-10240-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <52A57E55.40808@atmel.com>
+Message-ID: <52A5938E.40201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-my panda board ES failed to boot up when I use omap2plus_defconfig + CPU_IDLE.
-Is it a known issue or I missed sth in kernel?
+Hi,
 
-CONFIG_CPU_IDLE=y
-# CONFIG_CPU_IDLE_MULTIPLE_DRIVERS is not set
-CONFIG_CPU_IDLE_GOV_LADDER=y
-CONFIG_CPU_IDLE_GOV_MENU=y
-CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+On 09/12/2013 09:24, Nicolas Ferre wrote:
+> On 07/12/2013 14:08, Alexandre Belloni :
+>> When passing a not initialized config parameter, at91_pinconf_get()
+>> would return
+>> a bogus value. Fix that by initializing it to zero before using it.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> ---
+>>   drivers/pinctrl/pinctrl-at91.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pinctrl/pinctrl-at91.c
+>> b/drivers/pinctrl/pinctrl-at91.c
+>> index 6446dc804aa7..b0b78f3468ae 100644
+>> --- a/drivers/pinctrl/pinctrl-at91.c
+>> +++ b/drivers/pinctrl/pinctrl-at91.c
+>> @@ -722,7 +722,8 @@ static int at91_pinconf_get(struct pinctrl_dev
+>> *pctldev,
+>>       unsigned pin;
+>>       int div;
+>>
+>> -    dev_dbg(info->dev, "%s:%d, pin_id=%d, config=0x%lx", __func__,
+>> __LINE__, pin_id, *config);
+>> +    *config = 0;
+>> +    dev_dbg(info->dev, "%s:%d, pin_id=%d", __func__, __LINE__, pin_id);
+>>       pio = pin_to_controller(info, pin_to_bank(pin_id));
+>>       pin = pin_id % MAX_NB_GPIO_PER_BANK;
+>
+> Beyond this patch, I must say that I am puzzled by this function.
+>
+> What I read from the prototype documentation and what I see in
+> different implementations is different...
+>
+> Linus, can we have a review of this function because it seems not in
+> line with what is used for u300 (but on the other hand looks like the
+> what is returned by pinctrl-exynos5440.c driver for example).
+>
+> What would be the consequences if we change this function's behavior:
+> I mean use of -EINVAL for pin configuration "available but disabled"
+> as said in include/linux/pinctrl/pinconf.h?
+>
 
+>From what I understand, it doesn't really matter because that function
+is never used. I guess the best implementation is the tegra one ;)
 
-kernel hang after the following output.
+It is only called in one specific case:
+ - you have ops->is_generic == true (that is only true for a few
+implmentations)
+ - and you are dumping the pinconf state using debugfs
 
-    2.276641] omap_hsmmc 4809c000.mmc: pins are not configured from the driver
-[    2.325531] pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
-[    2.333648] pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
-[    2.343231] omap-dma-engine 4a056000.dma-controller: allocating channel for 60
-[    2.351043] omap-dma-engine 4a056000.dma-controller: allocating channel for 59
-[    2.358917] 480d5000.mmc supply vmmc_aux not found, using dummy regulator
-[    2.383331] hw-breakpoint: Failed to enable monitor mode on CPU 0.
-[    2.390411] hw-breakpoint: CPU 0 failed to disable vector catch
+I'm actually wondering if the checks for the ops->pin_config_get are not
+a bit overkill. We check for that function in:
+ - pinconf_check_ops()
+ - before calling it in pin_config_get_for_pin() which is only used
+once, in the same path : dump using debugfs and having ops->is_generic
+== true
+ - in pinconf_pins_show() which is the function calling also in the same
+path
 
+What I would do is:
+ - remove all the checks in pinconf_check_ops() and pinconf_pins_show()
+so that people are not pressured to implement a function that is simply
+never used.
+ - modify pin_config_get_for_pin() by removing the dev_err() call and
+returning -ENOTSUPP instead of -EINVAL (it doesn't change the behaviour
+but I feel -ENOTSUPP is more appropriate)
+
+I have a patch ready but I can't test it as I don't own any of the
+is_generic platforms.
 
 -- 
-Thanks
-    Alex
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
