@@ -1,75 +1,41 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 9 Dec 2013 12:53:30 +0100 (CET)
-Subject: [PATCH] serial: pl011: also enable DMA Rx polling with no platform
- data
-In-Reply-To: <1385631664-32607-1-git-send-email-linus.walleij@linaro.org>
-References: <1385631664-32607-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <Pine.LNX.4.64.1312091229550.30018@axis700.grange>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 09 Dec 2013 16:09:18 +0400
+Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <52A59991.1060305@gmail.com>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-6-git-send-email-ynvich@gmail.com>
+ <201312090233.58592.arnd@arndb.de> <52A587A0.1050503@gmail.com>
+ <1386581672.7152.108.camel@host5.omatika.ru> <52A59991.1060305@gmail.com>
+Message-ID: <1386590958.7152.135.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An earlier patch "serial: pl011: use DMA RX polling by default" enabled
-DMA Rx polling on PL011 only in configurations, using platform data. A
-simple extension of that patch also enables DMA Rx polling when no
-platform data is used, e.g. in Device Tree configurations. In such cases
-a default poll timeout and an automatically calculated poll rate will be
-used.
+On Mon, 2013-12-09 at 11:21 +0100, Daniel Mack wrote:
+> On 12/09/2013 10:34 AM, Sergei Ianovich wrote:
+> > Nice to have Daniel in this conversation. Your patch series is a big and
+> > important work. However, I am not sure I will ever land as is exactly
+> > for this reason.
+> 
+> Well, I wouldn't be so certain about that statement. As I wrote in the
+> cover letter, most of the work is actually done, and I successfully
+> tested the new DMA support with a some of the drivers I ported. Others
+> were ported blindly, and in case of no reaction, I'd dare to merge them
+> and wait for people to report back in case of trouble.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- drivers/tty/serial/amba-pl011.c |   39 ++++++++++++++++++---------------------
- 1 files changed, 18 insertions(+), 21 deletions(-)
+If breaking things is an option, I am definitely wrong. I assumed the
+opposite.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index e593f8d..baecdfa 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -327,28 +327,25 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
- 		dmaengine_slave_config(chan, &rx_conf);
- 		uap->dmarx.chan = chan;
- 
--		if (plat) {
--			/* Set poll rate if specified. */
--			if (plat->dma_rx_poll_rate) {
--				uap->dmarx.auto_poll_rate = false;
--				uap->dmarx.poll_rate = plat->dma_rx_poll_rate;
--			} else {
--				/*
--				 * 100 ms defaults to poll rate if not
--				 * specified. This will be adjusted with
--				 * the baud rate at set_termios.
--				 */
--				uap->dmarx.auto_poll_rate = true;
--				uap->dmarx.poll_rate =  100;
--			}
--			/* 3 secs defaults poll_timeout if not specified. */
--			if (plat->dma_rx_poll_timeout)
--				uap->dmarx.poll_timeout =
--					plat->dma_rx_poll_timeout;
--			else
--				uap->dmarx.poll_timeout = 3000;
--		} else
-+		/* Set poll rate if specified. */
-+		if (plat && plat->dma_rx_poll_rate) {
- 			uap->dmarx.auto_poll_rate = false;
-+			uap->dmarx.poll_rate = plat->dma_rx_poll_rate;
-+		} else {
-+			/*
-+			 * 100 ms defaults to poll rate if not
-+			 * specified. This will be adjusted with
-+			 * the baud rate at set_termios.
-+			 */
-+			uap->dmarx.auto_poll_rate = true;
-+			uap->dmarx.poll_rate =  100;
-+		}
-+		/* 3 secs defaults poll_timeout if not specified. */
-+		if (plat && plat->dma_rx_poll_timeout)
-+			uap->dmarx.poll_timeout =
-+				plat->dma_rx_poll_timeout;
-+		else
-+			uap->dmarx.poll_timeout = 3000;
- 
- 		dev_info(uap->port.dev, "DMA channel RX %s\n",
- 			 dma_chan_name(uap->dmarx.chan));
--- 
-1.7.2.5
+> > My proposal in to actually add new drivers for each platform device with
+> > DMA and mark new ones EXPERIMENTAL.
+> 
+> That would cause tree-wide cross-dependencies between drivers, because
+> the two DMA controllers can't be used at the same time, and the PXA
+> specific API will be unavailable when the mmp-dma driver is selected. My
+> patch series (and the DMA controller framework for that matter) aims for
+> the opposite - the unification of APIs and drivers.
+
+Not sure I got this point. My proposal is to keep the existing DMA
+intact until we are ready to remove it. I understand this approach
+requires considerably more work inside DMA to allow both driver to
+coexist than wholesale replacement. I still think big change is risky.
