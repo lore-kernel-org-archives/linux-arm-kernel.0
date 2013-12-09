@@ -1,38 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Dec 2013 17:39:27 +0100
-Subject: [PATCH 9/9] ARM: pxa27x: device tree support ICP DAS LP-8x4x
-In-Reply-To: <1386604530.7152.184.camel@host5.omatika.ru>
-References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
- <1386602213.7152.180.camel@host5.omatika.ru>
- <1386604530.7152.184.camel@host5.omatika.ru>
-Message-ID: <201312091739.27920.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 9 Dec 2013 11:44:05 -0500
+Subject: [PATCH v3 0/9] Reuse davinci-nand driver for Keystone arch
+In-Reply-To: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52A5F355.9020704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 December 2013, Sergei Ianovich wrote:
-> anovich wrote:
-> > On Mon, 2013-12-09 at 02:47 +0100, Arnd Bergmann wrote:
-> > > On Sunday 08 December 2013, Sergei Ianovich wrote:
-> > > > +
-> > > > +#ifdef CONFIG_PXA27x
-> > > > +extern void __init pxa27x_dt_init_irq(void);
-> > 
-> > > > +static void __init pxa27x_init_early(void)
-> > > > +{
-> > > > +     pxa27x_skip_init();
-> > > > +}
-> > > 
-> > > I would prefer not to have an init_early function at all, and instead
-> > > check "if (of_have_populated_dt())" in pxa27x_init, or to split
-> > > that function into two.
+David,
+
+On Thursday 05 December 2013 12:25 PM, Ivan Khoronzhuk wrote:
+> This series contains fixes and updates of Davinci nand driver in
+> order to reuse it for Keystone platform.
 > 
-> Although this is counterintuitive, it works. Since of_populate_dt() is
-> not required for of_have_populated_dt() to return true, should we rename
-> of_have_populated_dt() to of_have_dt()?
+> v2..v3:
+> - mtd: nand: davinci: don't set timings if AEMIF is used
+> 	dropped, it would be replaced by alone patch
+> 	ARM: davinci: aemif: get rid of davinci-nand driver dependency on aemif
+> 
+> v1..v2
+> The series is combination of two following series:
+> - Davinci nand driver fixes and updates:
+> https://lkml.org/lkml/2013/11/20/271
+> - Reuse davinci-nand driver for Keystone arch
+> https://lkml.org/lkml/2013/11/20/315
+> 
+> - mtd: nand: davinci: extend description of bindings
+> 	clarified changeset description
+> 
+> - mtd: nand: davinci: reuse driver for Keystone arch
+> 	removed "ti,keystone-nand" compatible from driver
+> 
+> Ivan Khoronzhuk (9):
+>   mtd: nand: davinci: fix driver registration
+>   mtd: nand: davinci: return ENOMEM if memory allocation is failed
+>   mtd: nand: davinci: check required ti,davinci-chipselect property
+>   mtd: nand: davinci: simplify error handling
+>   mtd: nand: davinci: move bindings under mtd
+>   mtd: nand: davinci: extend description of bindings
+>   mtd: nand: davinci: adjust DT properties to MTD generic
+>   mtd: nand: davinci: reuse driver for Keystone arch
+>   mtd: nand: davinci: don't request AEMIF address range
+> 
+Can you please pick up the $subject series if you are happy
+with it ?
+It lets us re-use Davinci nand driver on Keystone SOCs.
 
-I don't think it's worth the change. The explanation for the current
-terminoligy is that of_unflatten() populates the DT device_node structures
-in the kernel from the FTD blob, while of_platform_populate populates the
-platform_device infrastructure from the device nodes.
-
-	Arnd
+Regards,
+Santosh
