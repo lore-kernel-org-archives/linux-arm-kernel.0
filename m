@@ -1,19 +1,21 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:39 -0500
-Subject: [PATCH v3 06/23] mm/memblock: reorder parameters of
- memblock_find_in_range_node
+Date: Mon, 9 Dec 2013 16:50:44 -0500
+Subject: [PATCH v3 11/23] mm/page_alloc: Use memblock apis for early memory
+ allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-12-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Switch to memblock interfaces for early memory allocator instead of
+bootmem allocator. No functional change in beahvior than what it is
+in current code from bootmem users points of view.
 
-Reorder parameters of memblock_find_in_range_node to be consistent
-with other memblock APIs.
-
-The change was suggested by Tejun Heo <tj@kernel.org>.
+Archs already converted to NO_BOOTMEM now directly use memblock
+interfaces instead of bootmem wrappers build on top of memblock. And the
+archs which still uses bootmem, these new apis just fallback to exiting
+bootmem APIs.
 
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
@@ -21,89 +23,92 @@ Cc: Andrew Morton <akpm@linux-foundation.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- include/linux/memblock.h |    5 +++--
- mm/memblock.c            |   16 ++++++++--------
- mm/nobootmem.c           |    2 +-
- 3 files changed, 12 insertions(+), 11 deletions(-)
+ mm/page_alloc.c |   27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 77c60e5..dca4533 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -47,8 +47,9 @@ extern int memblock_debug;
- #define memblock_dbg(fmt, ...) \
- 	if (memblock_debug) printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 580a5f0..ed64107 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -4210,7 +4210,6 @@ static noinline __init_refok
+ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
+ {
+ 	int i;
+-	struct pglist_data *pgdat = zone->zone_pgdat;
+ 	size_t alloc_size;
  
--phys_addr_t memblock_find_in_range_node(phys_addr_t start, phys_addr_t end,
--				phys_addr_t size, phys_addr_t align, int nid);
-+phys_addr_t memblock_find_in_range_node(phys_addr_t size, phys_addr_t align,
-+					    phys_addr_t start, phys_addr_t end,
-+					    int nid);
- phys_addr_t memblock_find_in_range(phys_addr_t start, phys_addr_t end,
- 				   phys_addr_t size, phys_addr_t align);
- phys_addr_t get_allocated_memblock_reserved_regions_info(phys_addr_t *addr);
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 784958d..8786503 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -154,10 +154,10 @@ __memblock_find_range_top_down(phys_addr_t start, phys_addr_t end,
+ 	/*
+@@ -4226,7 +4225,8 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
+ 
+ 	if (!slab_is_available()) {
+ 		zone->wait_table = (wait_queue_head_t *)
+-			alloc_bootmem_node_nopanic(pgdat, alloc_size);
++			memblock_virt_alloc_node_nopanic(
++				alloc_size, zone->zone_pgdat->node_id);
+ 	} else {
+ 		/*
+ 		 * This case means that a zone whose size was 0 gets new memory
+@@ -4346,13 +4346,14 @@ bool __meminit early_pfn_in_nid(unsigned long pfn, int node)
+ #endif
  
  /**
-  * memblock_find_in_range_node - find free area in given range and node
-- * @start: start of candidate range
-- * @end: end of candidate range, can be %MEMBLOCK_ALLOC_{ANYWHERE|ACCESSIBLE}
-  * @size: size of free area to find
-  * @align: alignment of free area to find
-+ * @start: start of candidate range
-+ * @end: end of candidate range, can be %MEMBLOCK_ALLOC_{ANYWHERE|ACCESSIBLE}
-  * @nid: nid of the free area to find, %MAX_NUMNODES for any node
+- * free_bootmem_with_active_regions - Call free_bootmem_node for each active range
++ * free_bootmem_with_active_regions - Call memblock_free_early_nid for each active range
+  * @nid: The node to free memory on. If MAX_NUMNODES, all nodes are freed.
+- * @max_low_pfn: The highest PFN that will be passed to free_bootmem_node
++ * @max_low_pfn: The highest PFN that will be passed to memblock_free_early_nid
   *
-  * Find @size free area aligned to @align in the specified range and node.
-@@ -173,9 +173,9 @@ __memblock_find_range_top_down(phys_addr_t start, phys_addr_t end,
-  * RETURNS:
-  * Found address on success, 0 on failure.
+  * If an architecture guarantees that all ranges registered with
+  * add_active_ranges() contain no holes and may be freed, this
+- * this function may be used instead of calling free_bootmem() manually.
++ * this function may be used instead of calling memblock_free_early_nid()
++ * manually.
   */
--phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t start,
--					phys_addr_t end, phys_addr_t size,
--					phys_addr_t align, int nid)
-+phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
-+					phys_addr_t align, phys_addr_t start,
-+					phys_addr_t end, int nid)
+ void __init free_bootmem_with_active_regions(int nid, unsigned long max_low_pfn)
  {
- 	int ret;
- 	phys_addr_t kernel_end;
-@@ -238,8 +238,8 @@ phys_addr_t __init_memblock memblock_find_in_range(phys_addr_t start,
- 					phys_addr_t end, phys_addr_t size,
- 					phys_addr_t align)
- {
--	return memblock_find_in_range_node(start, end, size, align,
--					   MAX_NUMNODES);
-+	return memblock_find_in_range_node(size, align, start, end,
-+					    MAX_NUMNODES);
+@@ -4364,9 +4365,9 @@ void __init free_bootmem_with_active_regions(int nid, unsigned long max_low_pfn)
+ 		end_pfn = min(end_pfn, max_low_pfn);
+ 
+ 		if (start_pfn < end_pfn)
+-			free_bootmem_node(NODE_DATA(this_nid),
+-					  PFN_PHYS(start_pfn),
+-					  (end_pfn - start_pfn) << PAGE_SHIFT);
++			memblock_free_early_nid(PFN_PHYS(start_pfn),
++					(end_pfn - start_pfn) << PAGE_SHIFT,
++					this_nid);
+ 	}
  }
  
- static void __init_memblock memblock_remove_region(struct memblock_type *type, unsigned long r)
-@@ -889,7 +889,7 @@ static phys_addr_t __init memblock_alloc_base_nid(phys_addr_t size,
- 	/* align @size to avoid excessive fragmentation on reserved array */
- 	size = round_up(size, align);
- 
--	found = memblock_find_in_range_node(0, max_addr, size, align, nid);
-+	found = memblock_find_in_range_node(size, align, 0, max_addr, nid);
- 	if (found && !memblock_reserve(found, size))
- 		return found;
- 
-diff --git a/mm/nobootmem.c b/mm/nobootmem.c
-index 2c254d3..59777e0 100644
---- a/mm/nobootmem.c
-+++ b/mm/nobootmem.c
-@@ -41,7 +41,7 @@ static void * __init __alloc_memory_core_early(int nid, u64 size, u64 align,
- 	if (limit > memblock.current_limit)
- 		limit = memblock.current_limit;
- 
--	addr = memblock_find_in_range_node(goal, limit, size, align, nid);
-+	addr = memblock_find_in_range_node(size, align, goal, limit, nid);
- 	if (!addr)
- 		return NULL;
- 
+@@ -4637,8 +4638,9 @@ static void __init setup_usemap(struct pglist_data *pgdat,
+ 	unsigned long usemapsize = usemap_size(zone_start_pfn, zonesize);
+ 	zone->pageblock_flags = NULL;
+ 	if (usemapsize)
+-		zone->pageblock_flags = alloc_bootmem_node_nopanic(pgdat,
+-								   usemapsize);
++		zone->pageblock_flags =
++			memblock_virt_alloc_node_nopanic(usemapsize,
++							 pgdat->node_id);
+ }
+ #else
+ static inline void setup_usemap(struct pglist_data *pgdat, struct zone *zone,
+@@ -4832,7 +4834,8 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 		size =  (end - start) * sizeof(struct page);
+ 		map = alloc_remap(pgdat->node_id, size);
+ 		if (!map)
+-			map = alloc_bootmem_node_nopanic(pgdat, size);
++			map = memblock_virt_alloc_node_nopanic(size,
++							       pgdat->node_id);
+ 		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
+ 	}
+ #ifndef CONFIG_NEED_MULTIPLE_NODES
+@@ -5858,7 +5861,7 @@ void *__init alloc_large_system_hash(const char *tablename,
+ 	do {
+ 		size = bucketsize << log2qty;
+ 		if (flags & HASH_EARLY)
+-			table = alloc_bootmem_nopanic(size);
++			table = memblock_virt_alloc_nopanic(size, 0);
+ 		else if (hashdist)
+ 			table = __vmalloc(size, GFP_ATOMIC, PAGE_KERNEL);
+ 		else {
 -- 
 1.7.9.5
