@@ -1,100 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Dec 2013 09:56:30 +0000 (UTC)
-Subject: OMAP baseline test results for v3.13-rc2
-Message-ID: <alpine.DEB.2.02.1312090955420.32309@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 9 Dec 2013 10:57:39 +0100
+Subject: [GIT PULL] at91: soc updates for 3.14 #1
+Message-ID: <1386583059-22281-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd, Olof, Kevin,
 
-Here are some basic OMAP test results for Linux v3.13-rc2.
-Logs and other details at:
+This pull-request is for addition of sama5d36 and its Evaluation Kit. The
+patches are stacked on the "cleanup" material already in arm-soc tree
+(at91/sama5-ccf) like all other AT91 pull-requests for 3.14.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.13-rc2/20131208173520/
+Thanks, best regards,
 
+The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
 
-Test summary
-------------
+  ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
 
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+are available in the git repository at:
 
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
+  git://github.com/at91linux/linux-at91.git tags/at91-soc
 
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
+for you to fetch changes up to 0a72922b8dab2a1ce9cc977e9b1850556b48b4aa:
 
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
+  ARM: at91: sama5d3/dt: add sama5d36ek dts files (2013-12-09 09:50:53 +0100)
 
-PM: chip retention via suspend:
-    FAIL ( 4/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460varsomom
-    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 4460pandaes
+----------------------------------------------------------------
+First soc pull-request for 3.14
+Addition of the sama5d36 SoC as a member of the sama5d3 family
+- SoC code and Device Tree file
+- Evaluation Kit (EK board) Device Tree file
 
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+----------------------------------------------------------------
+Josh Wu (2):
+      ARM: at91: sama5d3: add support for sama5d36 chip
+      ARM: at91: sama5d3/dt: add sama5d36ek dts files
 
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
+ arch/arm/boot/dts/Makefile            |  2 ++
+ arch/arm/boot/dts/sama5d3.dtsi        |  2 +-
+ arch/arm/boot/dts/sama5d36.dtsi       | 20 +++++++++++++
+ arch/arm/boot/dts/sama5d36ek.dts      | 53 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/Kconfig            |  2 +-
+ arch/arm/mach-at91/include/mach/cpu.h |  3 +-
+ arch/arm/mach-at91/setup.c            |  4 +++
+ 7 files changed, 83 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sama5d36.dtsi
+ create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
 
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-
-vmlinux object size
-(delta in bytes from test_v3.13-rc1 (6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae)):
-   text     data      bss    total  kernel
-   +620      +16        0     +636  omap1_defconfig
-   +652      +24        0     +676  omap1_defconfig_1510innovator_only
-   +620       -8        0     +612  omap1_defconfig_5912osk_only
-  +8904     +192      +64    +9160  omap2plus_defconfig
-  +4624      -32        0    +4592  omap2plus_defconfig_2430sdp_only
-  +4808     +128     +128    +5064  omap2plus_defconfig_cpupm
-   +556      -32      +32     +556  omap2plus_defconfig_n800_multi_omap2xxx
-  +4652       +8      +32    +4692  omap2plus_defconfig_n800_only_a
-  +4808     +128      +64    +5000  omap2plus_defconfig_no_pm
-  +4120      +64        0    +4184  omap2plus_defconfig_omap2_4_only
-  +4808     +200      +64    +5072  omap2plus_defconfig_omap3_4_only
-  +1648     +108     -788     +968  rmk_omap3430_ldp_allnoconfig
-  +1184     +128      +64    +1376  rmk_omap3430_ldp_oldconfig
-   +208      +52     -412     -152  rmk_omap4430_sdp_allnoconfig
-  +2692       -4      +64    +2752  rmk_omap4430_sdp_oldnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.13-rc1 (6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  37xxevm        omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
-    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
-    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
-    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig
+-- 
+Nicolas Ferre
