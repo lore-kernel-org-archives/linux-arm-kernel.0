@@ -1,77 +1,51 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 09 Dec 2013 09:41:54 +0100
-Subject: [PATCH v5 12/15] usb: phy: Add set_wakeup API
-In-Reply-To: <1386570664-6713-13-git-send-email-peter.chen@freescale.com>
-References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
- <1386570664-6713-13-git-send-email-peter.chen@freescale.com>
-Message-ID: <52A58252.6090502@pengutronix.de>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 09 Dec 2013 09:43:23 +0100
+Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
+In-Reply-To: <201312090309.23723.arnd@arndb.de>
+References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
+ <1385650228-8906-1-git-send-email-b.brezillon@overkiz.com>
+ <201312090309.23723.arnd@arndb.de>
+Message-ID: <52A582AB.6010504@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2013 07:31 AM, Peter Chen wrote:
-> This API is used to set wakeup enable at PHY registers, in that
-> case, the PHY can be waken up from suspend due to external events,
+Hello Arnd,
 
-I' no native speaker, but I think it's "to be woken up".
+On 09/12/2013 03:09, Arnd Bergmann wrote:
+> On Thursday 28 November 2013, Boris BREZILLON wrote:
+>> @@ -92,6 +103,8 @@
+>>   				dma-names = "tx", "rx";
+>>   				pinctrl-names = "default";
+>>   				pinctrl-0 = <&pinctrl_spi0>;
+>> +				clocks = <&spi0_clk>;
+>> +				clock-names = "spi_clk";
+>>   				status = "disabled";
+>>   			};
+>>   
+>> @@ -101,6 +114,8 @@
+>>   				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 4>;
+>>   				pinctrl-names = "default";
+>>   				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+>> +				clocks = <&ssc0_clk>;
+>> +				clock-names = "pclk";
+>>   				status = "disabled";
+>>   			};
+>>   
+> You are adding "clock-names" properties in a lot of cases. Are you sure you
+> are using the strings that are documented in the respective device bindings
+> for each name? In a lot of cases, drivers just want an anonymous clock
+> and we don't name them.
 
-> like vbus change, dp/dm change and id change.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  include/linux/usb/phy.h |   16 ++++++++++++++++
->  1 files changed, 16 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-> index a747960..c6ebe1d 100644
-> --- a/include/linux/usb/phy.h
-> +++ b/include/linux/usb/phy.h
-> @@ -111,6 +111,13 @@ struct usb_phy {
->  	int	(*set_suspend)(struct usb_phy *x,
->  				int suspend);
->  
-> +	/*
-> +	 * Set wakeup enable for PHY, in that case, the PHY can be
-> +	 * waken up from suspend status due to external events,
-> +	 * like vbus change, dp/dm change and id.
-> +	 */
-> +	int	(*set_wakeup)(struct usb_phy *x, bool enabled);
-> +
->  	/* notify phy connect status change */
->  	int	(*notify_connect)(struct usb_phy *x,
->  			enum usb_device_speed speed);
-> @@ -270,6 +277,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
->  }
->  
->  static inline int
-> +usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
-> +{
-> +	if (x && x->set_wakeup)
+I rechecked it, and almost all drivers call [devm_]clk_get with a 
+specific clock
+name, and as a result we must specify the "clock-names" property.
+The only exceptions I found are the spi and PIT (Periodic Interval 
+Timer) drivers,
+and "clock-names" property is not defined in these nodes.
 
-can x be NULL?
 
-> +		return x->set_wakeup(x, enabled);
-> +	else
-> +		return 0;
-> +}
-> +
-> +static inline int
->  usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
->  {
->  	if (x && x->notify_connect)
-> 
+Best Regards,
 
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/b30773b6/attachment.sig>
+Boris
+>
+> 	Arnd
