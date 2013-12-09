@@ -1,50 +1,77 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 09 Dec 2013 10:52:33 +0100
-Subject: [PATCH v5 09/15] usb: phy-mxs: Enable IC fixes for related SoCs
-In-Reply-To: <20131209090749.GB5291@shlinux1.ap.freescale.net>
-References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
- <1386570664-6713-10-git-send-email-peter.chen@freescale.com>
- <52A58179.2050702@pengutronix.de>
- <20131209090749.GB5291@shlinux1.ap.freescale.net>
-Message-ID: <52A592E1.7040506@pengutronix.de>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 09 Dec 2013 13:53:55 +0400
+Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <1386581672.7152.108.camel@host5.omatika.ru>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386543229-1542-6-git-send-email-ynvich@gmail.com>
+ <201312090233.58592.arnd@arndb.de> <52A587A0.1050503@gmail.com>
+ <1386581672.7152.108.camel@host5.omatika.ru>
+Message-ID: <1386582835.7152.117.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2013 10:07 AM, Peter Chen wrote:
-> On Mon, Dec 09, 2013 at 09:38:17AM +0100, Marc Kleine-Budde wrote:
->> On 12/09/2013 07:30 AM, Peter Chen wrote:
->>> Some PHY bugs are fixed by IC logic, but these bits are not
->>> enabled by default, so we enable them at driver.
->>
->> Which bugs are fixed by enabling this bit? Is it only suspend related?
->> Can you document them or better add a pointer to the documentation.
+On Mon, 2013-12-09 at 13:34 +0400, Sergei Ianovich wrote:
+> On Mon, 2013-12-09 at 10:04 +0100, Daniel Mack wrote:
+> > On 12/09/2013 02:33 AM, Arnd Bergmann wrote:
+> > > On Sunday 08 December 2013, Sergei Ianovich wrote:
+> > >> Non-dts implementation supply required DMA channel numbers as
+> > >> IORESOURCE_DMA. However, there is was no way to get them from
+> > >> device tree.
+> > > 
+> > > I just wrote a lengthy reply to this email to explain in what ways
+> > > you got it wrong, but then I saw that Daniel has already done all
+> > > the work in the right way in August, so nevermind that.
+> > > 
+> > > It hasn't made it upstream yet, but see http://list-archives.org/2013/08/07/linux-mtd-lists-infradead-org/patch-00-20-arm-pxa-move-core-and-drivers-to-dmaengine/f/3444199144
+> > > for how it's done. Maybe Daniel can comment on the status of his
+> > > patches.
+> > 
+> > I recently rebased all my patches on top of 3.13-rc3, and will resend in
+> > couple of days.
+> > 
+> > The real problem here is that by reworking the DMA related PXA bits, all
+> > drivers have to be changed at once, and a gradual transition seems
+> > impossible. For that, I was asking for help in areas where I don't have
+> > any hardware to test my patches on, but unfortunately, nobody got back
+> > to me yet.
 > 
-> I will add more, in fact, it fixes the bug which flag BIT(1) and BIT(2)
-> stands for.
+> Nice to have Daniel in this conversation. Your patch series is a big and
+> important work. However, I am not sure I will ever land as is exactly
+> for this reason.
+
+s/I will/it will/
+
+> DMA is a per-physical-device concept, not per-platform. Only the DMA
+> controller is per-platform. This means we need to rewrite all platform
+> drivers at once. This is roughly equivalent to adding a new platform
+> support in one patch, which is not going to work.
 > 
->>
->> Further I don't like the idea of adding code, or enabling a feature on
->> certain hardware, that is broken in the first place and fixing it in a
->> later patch. Think about squashing it into the correct patch.
+> In patch 08/20 in the series above, you change 10% lines of the pxa mmc
+> driver. If we don't count boilerplate lines, this will amount to over
+> 50%. In other word, the output is a new driver.
+
+s/other word/other words/
+
+> My proposal in to actually add new drivers for each platform device with
+> DMA and mark new ones EXPERIMENTAL. When they receive adequate testing
+> we remove the tag and mark the old one OBSOLETE. When we have a new
+> driver for every device presently supported, we will drop the whole old
+> series.
+
+s/proposal in/proposal is/
+
+> This should be very close to a gradual transition.
 > 
-> No fixes are related with this patch, you can see there is no "-"
-> at this patch.
+> While we are in transition, I propose that we allow 'hackish' support
+> for device tree in the existing drivers. Platform devices are declared
+> in dtsi files, so when we move to a new driver we just change the
+> compatible string there. Actual devices with their one dts file won't
+> need any change. They will need a dtb recompile, though. This way we can
+> begin a migration to device tree in pxa immediately.
 
-Yes, there isn't any broken code (thus no "-"), but you first enable a
-feature in the hardware and in a later patch (this one) make it work
-properly.
+s/their one/their own/
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> The patch series does just that.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/6e0b29e2/attachment-0001.sig>
+Sorry for noise.
