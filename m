@@ -1,132 +1,216 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 09 Dec 2013 15:11:48 +0000
-Subject: [PATCH v3 1/9] ARM: KVM: Allow creating the VGIC after VCPUs
-In-Reply-To: <1384662620-13795-2-git-send-email-christoffer.dall@linaro.org>
-References: <1384662620-13795-1-git-send-email-christoffer.dall@linaro.org>
- <1384662620-13795-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <2c589fa830580a618dfd01e25567fb6f@www.loen.fr>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon,  9 Dec 2013 16:16:03 +0100
+Subject: [PATCH v8] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1381330482-13846-1-git-send-email-jonas.jensen@gmail.com>
+References: <1381330482-13846-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1386602163-28479-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-17 04:30, Christoffer Dall wrote:
-> Rework the VGIC initialization slightly to allow initialization of 
-> the
-> vgic cpu-specific state even if the irqchip (the VGIC) hasn't been
-> created by user space yet.  This is safe, because the vgic data
-> structures are already allocated when the CPU is allocated if VGIC
-> support is compiled into the kernel.  Further, the init process does 
-> not
-> depend on any other information and the sacrifice is a slight
-> performance degradation for creating VMs in the no-VGIC case.
->
-> The reason is that the new device control API doesn't mandate 
-> creating
-> the VGIC before creating the VCPU and it is unreasonable to require 
-> user
-> space to create the VGIC before creating the VCPUs.
->
-> At the same time move the irqchip_in_kernel check out of
-> kvm_vcpu_first_run_init and into the init function to make the 
-> per-vcpu
-> and global init functions symmetric and add comments on the exported
-> functions making it a bit easier to understand the init flow by only
-> looking at vgic.c.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+This patch adds MOXA ART SoCs clock driver support.
 
-Looks good to me:
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Notes:
+    Thanks for the replies.
+    
+    As indicated by Sylwester, that it's discouraged to use hardware
+    to register DT properties (multiplier-* divisor-*),
+    I decided to remove them.
+    
+    They were only added as extra safety in cases where the
+    implementation must be changed.
+    Code readability is better of without them, and when something
+    needs to change, it's probably better to do it directly.
+    
+    Changes since v7:
+    
+    1. remove hardware to register properties (multiplier-* divisor-*)
+    2. remove redundant parentheses
+    3. check clk_register_fixed_rate() return value
+    
+    Applies to next-20131209
 
-         M.
+ .../bindings/clock/moxa,moxart-clock.txt           |  37 +++++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-moxart.c                           | 112 +++++++++++++++++++++
+ 3 files changed, 150 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+ create mode 100644 drivers/clk/clk-moxart.c
 
-> ---
->  arch/arm/kvm/arm.c  |    7 ++++---
->  virt/kvm/arm/vgic.c |   22 +++++++++++++++++++---
->  2 files changed, 23 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 2bc2ec4..e80b6a1 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -464,6 +464,8 @@ static void update_vttbr(struct kvm *kvm)
->
->  static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->  {
-> +	int ret;
-> +
->  	if (likely(vcpu->arch.has_run_once))
->  		return 0;
->
-> @@ -473,9 +475,8 @@ static int kvm_vcpu_first_run_init(struct 
-> kvm_vcpu *vcpu)
->  	 * Initialize the VGIC before running a vcpu the first time on
->  	 * this VM.
->  	 */
-> -	if (irqchip_in_kernel(vcpu->kvm) &&
-> -	    unlikely(!vgic_initialized(vcpu->kvm))) {
-> -		int ret = kvm_vgic_init(vcpu->kvm);
-> +	if (unlikely(!vgic_initialized(vcpu->kvm))) {
-> +		ret = kvm_vgic_init(vcpu->kvm);
->  		if (ret)
->  			return ret;
->  	}
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 81e9481..5e9df47 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1243,15 +1243,19 @@ static irqreturn_t
-> vgic_maintenance_handler(int irq, void *data)
->  	return IRQ_HANDLED;
->  }
->
-> +/**
-> + * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
-> + * @vcpu: pointer to the vcpu struct
-> + *
-> + * Initialize the vgic_cpu struct and vgic_dist struct fields 
-> pertaining to
-> + * this vcpu and enable the VGIC for this VCPU
-> + */
->  int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	int i;
->
-> -	if (!irqchip_in_kernel(vcpu->kvm))
-> -		return 0;
-> -
->  	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
->  		return -EBUSY;
->
-> @@ -1383,10 +1387,22 @@ out:
->  	return ret;
->  }
->
-> +/**
-> + * kvm_vgic_init - Initialize global VGIC state before running any 
-> VCPUs
-> + * @kvm: pointer to the kvm struct
-> + *
-> + * Map the virtual CPU interface into the VM before running any 
-> VCPUs.  We
-> + * can't do this at creation time, because user space must first set 
-> the
-> + * virtual CPU interface address in the guest physical address 
-> space.  Also
-> + * initialize the ITARGETSRn regs to 0 on the emulated distributor.
-> + */
->  int kvm_vgic_init(struct kvm *kvm)
->  {
->  	int ret = 0, i;
->
-> +	if (!irqchip_in_kernel(kvm))
-> +		return 0;
-> +
->  	mutex_lock(&kvm->lock);
->
->  	if (vgic_initialized(kvm))
-
+diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+new file mode 100644
+index 0000000..bc59ceb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+@@ -0,0 +1,37 @@
++Device Tree Clock bindings for arch-moxart
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++MOXA ART SoCs allow to determine PLL output and APB frequencies
++by reading registers holding multiplier and divisor information.
++
++Required properties:
++- compatible : Must be "moxa,moxart-pll-clock" or "moxa,moxart-apb-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle to parent clock
++
++Optional properties for "moxa,moxart-pll-clock":
++- clock-output-names : Should contain clock name
++
++Optional properties for "moxa,moxart-apb-clock":
++- clock-output-names : Should contain clock name
++
++
++For example:
++
++	clk_pll: clk_pll at 98100000 {
++		compatible = "moxa,moxart-pll-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++		clocks = <&ref12>;
++	};
++
++	clk_apb: clk_apb at 98100000 {
++		compatible = "moxa,moxart-apb-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++		clocks = <&pll0>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index ace7309..f07eb3b 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
++obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+new file mode 100644
+index 0000000..f0436a3
+--- /dev/null
++++ b/drivers/clk/clk-moxart.c
+@@ -0,0 +1,112 @@
++/*
++ * MOXA ART SoCs clock driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
++
++void __init moxart_of_pll_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *ref_clk;
++	unsigned long rate;
++	unsigned int mul;
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	mul = readl(base + 0x30) >> 3 & 0x3f;
++	iounmap(base);
++
++	ref_clk = of_clk_get(node, 0);
++	if (IS_ERR(ref_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = mul * clk_get_rate(ref_clk);
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
++	       moxart_of_pll_clk_init);
++
++void __init moxart_of_apb_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *pll_clk;
++	unsigned long rate;
++	unsigned int div, val;
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	val = readl(base + 0xc) >> 4 & 0x7;
++	iounmap(base);
++
++	switch (val) {
++	case 1:
++		div = 3;
++		break;
++	case 2:
++		div = 4;
++		break;
++	case 3:
++		div = 6;
++		break;
++	case 4:
++		div = 8;
++		break;
++	default:
++		div = 2;
++		break;
++	}
++
++	pll_clk = of_clk_get(node, 0);
++	if (IS_ERR(pll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = clk_get_rate(pll_clk) / (div * 2);
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
++	       moxart_of_apb_clk_init);
 -- 
-Fast, cheap, reliable. Pick two.
+1.8.2.1
