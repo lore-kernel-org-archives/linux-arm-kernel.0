@@ -1,37 +1,60 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 9 Dec 2013 14:30:53 +0800
-Subject: [PATCH v5 04/15] usb: doc: phy-mxs: update binding for adding anatop
- phandle
+Date: Mon, 9 Dec 2013 14:30:56 +0800
+Subject: [PATCH v5 07/15] usb: phy: add notify suspend and resume callback
 In-Reply-To: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
 References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386570664-6713-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386570664-6713-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add anatop phandle which is used to access anatop registers to
-control PHY's power and other USB operations.
+They are used to notify PHY that the controller enters suspend
+or finishes resume.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ include/linux/usb/phy.h |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-index d850e55..059536c 100644
---- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-@@ -5,10 +5,12 @@ Required properties:
- for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
- - reg: Should contain registers location and length
- - interrupts: Should contain phy interrupt
-+- fsl,anatop: phandle for anatop register, it is only for imx6 SoC series
- 
- Example:
- usbphy1: usbphy at 020c9000 {
- 	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 	reg = <0x020c9000 0x1000>;
- 	interrupts = <0 44 0x04>;
-+	fsl,anatop = <&anatop>;
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 6c0b1c5..a747960 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -116,6 +116,11 @@ struct usb_phy {
+ 			enum usb_device_speed speed);
+ 	int	(*notify_disconnect)(struct usb_phy *x,
+ 			enum usb_device_speed speed);
++	int	(*notify_suspend)(struct usb_phy *x,
++			enum usb_device_speed speed);
++	int	(*notify_resume)(struct usb_phy *x,
++			enum usb_device_speed speed);
++
  };
+ 
+ /**
+@@ -282,6 +287,24 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
+ 		return 0;
+ }
+ 
++static inline int usb_phy_notify_suspend
++	(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x && x->notify_suspend)
++		return x->notify_suspend(x, speed);
++	else
++		return 0;
++}
++
++static inline int usb_phy_notify_resume
++	(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x && x->notify_resume)
++		return x->notify_resume(x, speed);
++	else
++		return 0;
++}
++
+ /* notifiers */
+ static inline int
+ usb_register_notifier(struct usb_phy *x, struct notifier_block *nb)
 -- 
 1.7.8
