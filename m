@@ -1,42 +1,37 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:55 -0500
-Subject: [PATCH v3 22/23] mm/ARM: mm: Use memblock apis for early memory
- allocations
+Date: Mon, 9 Dec 2013 16:50:52 -0500
+Subject: [PATCH v3 19/23] mm/memory_hotplug: Use memblock apis for early
+ memory allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-23-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-20-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to memblock interfaces for early memory allocator instead of
-bootmem allocator. No functional change in beahvior than what it is
-in current code from bootmem users points of view.
-
-Archs already converted to NO_BOOTMEM now directly use memblock
-interfaces instead of bootmem wrappers build on top of memblock. And the
-archs which still uses bootmem, these new apis just fallback to exiting
-bootmem APIs.
+Correct ensure_zone_is_initialized() function description according
+to the introduced memblock APIs for early memory allocations.
 
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mm/init.c |    2 +-
+ mm/memory_hotplug.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 3e8f106..bee6d2c 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -461,7 +461,7 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * free the section of the memmap array.
- 	 */
- 	if (pg < pgend)
--		free_bootmem(pg, pgend - pg);
-+		memblock_free_early(pg, pgend - pg);
+diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
+index cf1736d..4f158ec 100644
+--- a/mm/memory_hotplug.c
++++ b/mm/memory_hotplug.c
+@@ -268,7 +268,7 @@ static void fix_zone_id(struct zone *zone, unsigned long start_pfn,
  }
  
- /*
+ /* Can fail with -ENOMEM from allocating a wait table with vmalloc() or
+- * alloc_bootmem_node_nopanic() */
++ * alloc_bootmem_node_nopanic()/memblock_virt_alloc_node_nopanic() */
+ static int __ref ensure_zone_is_initialized(struct zone *zone,
+ 			unsigned long start_pfn, unsigned long num_pages)
+ {
 -- 
 1.7.9.5
