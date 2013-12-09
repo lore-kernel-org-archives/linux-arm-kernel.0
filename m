@@ -1,59 +1,46 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 9 Dec 2013 11:26:04 +0200
-Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
- platform doesn't have PHY
-In-Reply-To: <52A56DA1.1010808@ti.com>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1385373690-12170-5-git-send-email-kishon@ti.com>
- <20131204144027.GB21055@xps8300> <52A01E86.50406@ti.com>
- <20131205075828.GA32583@xps8300> <52A56DA1.1010808@ti.com>
-Message-ID: <20131209092604.GC5231@xps8300>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 9 Dec 2013 17:00:42 +0800
+Subject: [PATCH v5 08/15] usb: phy-mxs: Add implementation of
+ nofity_suspend and notify_resume
+In-Reply-To: <52A57FE0.5030009@pengutronix.de>
+References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
+ <1386570664-6713-9-git-send-email-peter.chen@freescale.com>
+ <52A57FE0.5030009@pengutronix.de>
+Message-ID: <20131209090041.GA5291@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 09, 2013 at 12:43:37PM +0530, Kishon Vijay Abraham I wrote:
-> On Thursday 05 December 2013 01:28 PM, Heikki Krogerus wrote:
-> >On Thu, Dec 05, 2013 at 12:04:46PM +0530, Kishon Vijay Abraham I wrote:
-> >>On Wednesday 04 December 2013 08:10 PM, Heikki Krogerus wrote:
-> >>>On Mon, Nov 25, 2013 at 03:31:24PM +0530, Kishon Vijay Abraham I wrote:
-> >>>>There can be systems which does not have an external phy, so get
-> >>>>phy only if no quirks are added that indicates the PHY is not present.
-> >>>>Introduced two quirk flags to indicate the *absence* of usb2 phy and
-> >>>>usb3 phy. Also remove checking if return value is -ENXIO since it's now
-> >>>>changed to always enable usb_phy layer.
-> >>>
-> >>>Can you guys explain why is something like this needed? Like with
-> >>>clocks and gpios, the device drivers shouldn't need to care any more
-> >>>if the platform has the phys or not. -ENODEV tells you your platform
-> >>
-> >>Shouldn't we report if a particular platform needs a PHY and not able to get
-> >>it. How will a user know if a particular controller is not working because it's
-> >>not able to get and initialize the PHYs? Don't you think in such cases it's
-> >>better to fail (and return from probe) because the controller will not work
-> >>anyway without the PHY?
-> >
-> >My point is that you do not need to separately tell this to the driver
-> >like you do with the quirks (if you did, then you would need to fix
-> >your framework and not hack the drivers).
-> >
-> >Like I said, ENODEV tells you that there is no phy on this platform
-> >for you, allowing you to safely continue. If your phy driver is not
-> >loaded, the framework already returns EPROBE_DEFER, right. Any other
+On Mon, Dec 09, 2013 at 09:31:28AM +0100, Marc Kleine-Budde wrote:
+> On 12/09/2013 07:30 AM, Peter Chen wrote:
+> > Implementation of notify_suspend and notify_resume will be different
+> > according to mxs_phy_data->flags.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/phy/phy-mxs-usb.c |   55 ++++++++++++++++++++++++++++++++++++++---
+> >  1 files changed, 51 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > index 0ef930a..e3df53f 100644
+> > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > @@ -166,8 +166,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+> >  static int mxs_phy_on_connect(struct usb_phy *phy,
+> >  		enum usb_device_speed speed)
+> >  {
+> > -	dev_dbg(phy->dev, "%s speed device has connected\n",
+> > -		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
+> > +	dev_dbg(phy->dev, "%s device has connected\n",
+> > +		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
 > 
-> right. but that doesn't consider broken dt data. With quirks we'll
-> able to tell if a controller in a particular platform has PHY or not
-> without depending on the dt data.
+> What about creating a mxs_phy_dbg() function that adds the "HS" "FS/LS"
+> prefix when printing?
+> 
 
-Broken dt data? What kind of scenario are you thinking here? Do you
-mean case where the dt does not describe the phy on a platform that
-depends on it? Shouldn't that problem be fixed in the dt and not
-hacked in the drivers? Or are you thinking about something else?
-
-Is there a case where something like that is actually happening?
-
-Br,
+No, sometimes, there is no speed information when we want to debug
+mxs phy.
 
 -- 
-heikki
+
+Best Regards,
+Peter Chen
