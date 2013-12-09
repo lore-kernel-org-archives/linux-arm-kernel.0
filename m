@@ -1,69 +1,41 @@
-From: w-kwok2@ti.com (WingMan Kwok)
-Date: Mon, 9 Dec 2013 17:32:13 -0500
-Subject: [PATCH v3 3/3] ARM: keystone: defconfig: enable USB support
-In-Reply-To: <1386628333-1849-1-git-send-email-w-kwok2@ti.com>
-References: <1386628333-1849-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <1386628333-1849-4-git-send-email-w-kwok2@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 9 Dec 2013 17:39:39 -0500
+Subject: [PATCH v3 01/23] mm/memblock: debug: correct displaying of upper
+ memory boundary
+In-Reply-To: <20131209215641.GF29143@saruman.home>
+References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386625856-12942-2-git-send-email-santosh.shilimkar@ti.com>
+ <20131209215641.GF29143@saruman.home>
+Message-ID: <52A646AB.1030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the USB support (Host mode only) on TI's Keystone platform.
-It also enables the support of usb mass storage, FAT and Ext4
-filesystems to test rootfs mount over an USB disk.
+On Monday 09 December 2013 04:56 PM, Felipe Balbi wrote:
+> On Mon, Dec 09, 2013 at 04:50:34PM -0500, Santosh Shilimkar wrote:
+>> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>>
+>> When debugging is enabled (cmdline has "memblock=debug") the memblock
+>> will display upper memory boundary per each allocated/freed memory range
+>> wrongly. For example:
+>>  memblock_reserve: [0x0000009e7e8000-0x0000009e7ed000] _memblock_early_alloc_try_nid_nopanic+0xfc/0x12c
+>>
+>> The 0x0000009e7ed000 is displayed instead of 0x0000009e7ecfff
+>>
+>> Hence, correct this by changing formula used to calculate upper memory
+>> boundary to (u64)base + size - 1 instead of  (u64)base + size everywhere
+>> in the debug messages.
+>>
+>> Cc: Yinghai Lu <yinghai@kernel.org>
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> Cc: Tejun Heo <tj@kernel.org>
+>> Acked-by: Tejun Heo <tj@kernel.org>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Very minor patch but perhaps we should Cc: stable here ? not that it
+> matters much...
+> 
+Yeah... No major fix as such from stable perspective.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
----
- arch/arm/configs/keystone_defconfig |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 9943e5d..a018244 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -115,6 +115,8 @@ CONFIG_MTD_UBI=y
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_EEPROM_AT24=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -129,10 +131,24 @@ CONFIG_SPI_DAVINCI=y
- CONFIG_SPI_SPIDEV=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_DEBUG=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC3=y
-+CONFIG_USB_DWC3_DEBUG=y
-+CONFIG_USB_DWC3_VERBOSE=y
-+CONFIG_KEYSTONE_USB_PHY=y
- CONFIG_DMADEVICES=y
- CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_MEMORY=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_FS_WBUF_VERIFY=y
-@@ -144,6 +160,8 @@ CONFIG_ROOT_NFS=y
- CONFIG_NFSD=y
- CONFIG_NFSD_V3=y
- CONFIG_NFSD_V3_ACL=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_SHIRQ=y
- CONFIG_DEBUG_INFO=y
--- 
-1.7.9.5
+regards,
+Santosh
