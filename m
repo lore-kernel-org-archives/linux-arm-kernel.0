@@ -1,28 +1,26 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 09 Dec 2013 14:35:28 +0100
-Subject: [PATCH] clk: samsung: exynos4: Correct SRC_MFC register
-In-Reply-To: <1385097668-24620-1-git-send-email-sw0312.kim@samsung.com>
-References: <1385097668-24620-1-git-send-email-sw0312.kim@samsung.com>
-Message-ID: <4009792.HvWcr5GnEc@amdc1227>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 09 Dec 2013 21:40:22 +0800
+Subject: questions of cpuidle
+Message-ID: <52A5C846.30308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Seung-Woo,
 
-On Friday 22 of November 2013 14:21:08 Seung-Woo Kim wrote:
-> The SRC_MFC register was incorrect. This patch corrects it.
-> 
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+Sorry for a idiot of cpuidle.
 
-Good catch.
+I just find few cpu set TIMER_STOP on cpuidle, like omap4 and big.Little
+driver. Does that mean other ARM cpu or x86 cpu can get the timer
+interrupt in cpuidle?
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+If the timer stopped during cpuidle, does that means at least one cpu
+cann't get into deep c-state since system need a cpu to wake up other
+deep c-state cpu? Or sth I missed?
 
-I guess this could go as a fix for current rc, through clk-fixes.
-Mike, what do you think?
+If the cpu stopped the interrupt during deep c-state and without
+monitor/mwait support, which kind of ipi can wake the cpu? I mean like a
+x86 cpu, APIC stopped in c3 mode, but actually ipi send via apic bus. So
+I don't know which ipi work?
 
-Best regards,
-Tomasz
+-- 
+Thanks
+    Alex
