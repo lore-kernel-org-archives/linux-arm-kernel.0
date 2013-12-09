@@ -1,41 +1,228 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 17:39:39 -0500
-Subject: [PATCH v3 01/23] mm/memblock: debug: correct displaying of upper
- memory boundary
-In-Reply-To: <20131209215641.GF29143@saruman.home>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-2-git-send-email-santosh.shilimkar@ti.com>
- <20131209215641.GF29143@saruman.home>
-Message-ID: <52A646AB.1030900@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Dec 2013 14:51:56 -0800
+Subject: [PATCH 2/2] ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and
+ SYSTEM_RESET to user space
+In-Reply-To: <1385394599-15439-3-git-send-email-anup.patel@linaro.org>
+References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+ <1385394599-15439-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <20131209225156.GD22760@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 December 2013 04:56 PM, Felipe Balbi wrote:
-> On Mon, Dec 09, 2013 at 04:50:34PM -0500, Santosh Shilimkar wrote:
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> When debugging is enabled (cmdline has "memblock=debug") the memblock
->> will display upper memory boundary per each allocated/freed memory range
->> wrongly. For example:
->>  memblock_reserve: [0x0000009e7e8000-0x0000009e7ed000] _memblock_early_alloc_try_nid_nopanic+0xfc/0x12c
->>
->> The 0x0000009e7ed000 is displayed instead of 0x0000009e7ecfff
->>
->> Hence, correct this by changing formula used to calculate upper memory
->> boundary to (u64)base + size - 1 instead of  (u64)base + size everywhere
->> in the debug messages.
->>
->> Cc: Yinghai Lu <yinghai@kernel.org>
->> Cc: Andrew Morton <akpm@linux-foundation.org>
->> Cc: Tejun Heo <tj@kernel.org>
->> Acked-by: Tejun Heo <tj@kernel.org>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Mon, Nov 25, 2013 at 09:19:59PM +0530, Anup Patel wrote:
+> The PSCI SYSTEM_OFF and SYSTEM_RESET functions are system-level
+> functions hence cannot be fully emulated by the in-kernel PSCI
+> emulation code.
 > 
-> Very minor patch but perhaps we should Cc: stable here ? not that it
-> matters much...
+> To tackle this, we forward PSCI SYSTEM_OFF and SYSTEM_RESET function
+> calls from guest to user space (i.e. QEMU or KVMTOOL) via KVM run
+> structure using KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET exit reasons.
 > 
-Yeah... No major fix as such from stable perspective.
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_psci.h   |    2 +-
+>  arch/arm/include/uapi/asm/kvm.h   |    2 ++
+>  arch/arm/kvm/handle_exit.c        |    7 ++++++-
+>  arch/arm/kvm/psci.c               |   38 +++++++++++++++++++++++++++++--------
+>  arch/arm64/include/asm/kvm_psci.h |    2 +-
+>  arch/arm64/include/uapi/asm/kvm.h |    2 ++
+>  arch/arm64/kvm/handle_exit.c      |   10 ++++++----
+>  7 files changed, 48 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
+> index 9a83d98..992d7f1 100644
+> --- a/arch/arm/include/asm/kvm_psci.h
+> +++ b/arch/arm/include/asm/kvm_psci.h
+> @@ -18,6 +18,6 @@
+>  #ifndef __ARM_KVM_PSCI_H__
+>  #define __ARM_KVM_PSCI_H__
+>  
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+> +int kvm_psci_call(struct kvm_vcpu *vcpu);
+>  
+>  #endif /* __ARM_KVM_PSCI_H__ */
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index c498b60..f4de20c 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -172,6 +172,8 @@ struct kvm_arch_memory_slot {
+>  #define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
+>  #define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
+>  #define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
+> +#define KVM_PSCI_FN_SYSTEM_OFF		KVM_PSCI_FN(4)
+> +#define KVM_PSCI_FN_SYSTEM_RESET	KVM_PSCI_FN(5)
+>  
+>  #define KVM_PSCI_RET_SUCCESS		0
+>  #define KVM_PSCI_RET_NI			((unsigned long)-1)
+> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+> index a920790..c96c7e8 100644
+> --- a/arch/arm/kvm/handle_exit.c
+> +++ b/arch/arm/kvm/handle_exit.c
+> @@ -40,11 +40,16 @@ static int handle_svc_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> +	int ret;
+> +
+>  	trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
+>  		      kvm_vcpu_hvc_get_imm(vcpu));
+>  
+> -	if (kvm_psci_call(vcpu))
+> +	ret = kvm_psci_call(vcpu);
+> +	if (ret == 0)
+>  		return 1;
+> +	else if (ret > 0)
+> +		return 0;
+>  
+>  	kvm_inject_undefined(vcpu);
+>  	return 1;
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 0881bf1..c8d3fcd 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -84,18 +84,31 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	return KVM_PSCI_RET_SUCCESS;
+>  }
+>  
+> +static void kvm_psci_system_off(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->run->exit_reason = KVM_EXIT_SHUTDOWN;
+> +}
+> +
+> +static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->run->exit_reason = KVM_EXIT_RESET;
+> +}
+> +
+>  /**
+>   * kvm_psci_call - handle PSCI call if r0 value is in range
+>   * @vcpu: Pointer to the VCPU struct
+>   *
+>   * Handle PSCI calls from guests through traps from HVC instructions.
+> - * The calling convention is similar to SMC calls to the secure world where
+> - * the function number is placed in r0 and this function returns true if the
+> - * function number specified in r0 is withing the PSCI range, and false
+> - * otherwise.
+> + * The calling convention is similar to SMC calls to the secure world
+> + * where the function number is placed in r0 and function number
+> + * specified in r0 is withing the PSCI range.
+> + *
+> + * This function returns: 0 (success), > 0 (success but exit to user
+> + * space), and < 0 (failure)
 
-regards,
-Santosh
+Hmmm, I think this is a bit confusing because it essentially does the
+reverse of all the other kvm internal return convention.  Wouldn't it
+make more sense to have 0 (success, but exit to user space), 1 (success,
+resume VM), and < 0 (failure).
+
+Also note that you are general-casing all error codes that may happen to
+mean that it did not match the PSCI function to anything well-known.
+In this case, that's sort of ok, because we don't expect the PSCI code
+to randomly fail (if it does, it reports it to the caller in the return
+register), but not fail, as in, I'm out of memory or anything like that.
+But I think you can clarify this in the comment, by saying something
+like:
+
+Errors:
+ -EINVAL: Unrecognized PSCI function
+
+in the comment for the function.
+
+>   */
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>  {
+> +	int ret = 0;
+>  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>  	unsigned long val;
+>  
+> @@ -111,11 +124,20 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>  	case KVM_PSCI_FN_MIGRATE:
+>  		val = KVM_PSCI_RET_NI;
+>  		break;
+> -
+> +	case KVM_PSCI_FN_SYSTEM_OFF:
+> +		kvm_psci_system_off(vcpu);
+> +		val = KVM_PSCI_RET_SUCCESS;
+> +		ret = 1;
+> +		break;
+> +	case KVM_PSCI_FN_SYSTEM_RESET:
+> +		kvm_psci_system_reset(vcpu);
+> +		val = KVM_PSCI_RET_SUCCESS;
+> +		ret = 1;
+> +		break;
+>  	default:
+> -		return false;
+> +		return -EINVAL;
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> -	return true;
+> +	return ret;
+>  }
+> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+> index e301a48..9bd0ee8 100644
+> --- a/arch/arm64/include/asm/kvm_psci.h
+> +++ b/arch/arm64/include/asm/kvm_psci.h
+> @@ -18,6 +18,6 @@
+>  #ifndef __ARM64_KVM_PSCI_H__
+>  #define __ARM64_KVM_PSCI_H__
+>  
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+> +int kvm_psci_call(struct kvm_vcpu *vcpu);
+>  
+>  #endif /* __ARM64_KVM_PSCI_H__ */
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index d9f026b..f678902 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -158,6 +158,8 @@ struct kvm_arch_memory_slot {
+>  #define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
+>  #define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
+>  #define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
+> +#define KVM_PSCI_FN_SYSTEM_OFF		KVM_PSCI_FN(4)
+> +#define KVM_PSCI_FN_SYSTEM_RESET	KVM_PSCI_FN(5)
+>  
+>  #define KVM_PSCI_RET_SUCCESS		0
+>  #define KVM_PSCI_RET_NI			((unsigned long)-1)
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 8da5606..a5b5b6a 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -30,8 +30,13 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+>  
+>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	if (kvm_psci_call(vcpu))
+> +	int ret;
+> +
+> +	ret = kvm_psci_call(vcpu);
+> +	if (ret == 0)
+>  		return 1;
+> +	else if (ret > 0)
+> +		return 0;
+>  
+>  	kvm_inject_undefined(vcpu);
+>  	return 1;
+> @@ -39,9 +44,6 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	if (kvm_psci_call(vcpu))
+> -		return 1;
+> -
+
+Isn't this an unrelated change, which should go in a separate patch with
+some justification text for the change?
+
+>  	kvm_inject_undefined(vcpu);
+>  	return 1;
+>  }
+> -- 
+> 1.7.9.5
+> 
+
+Otherwise, it looks overall to go in the right direction.
+
+-Christoffer
