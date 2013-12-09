@@ -1,37 +1,51 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:52 -0500
-Subject: [PATCH v3 19/23] mm/memory_hotplug: Use memblock apis for early
- memory allocations
+Date: Mon, 9 Dec 2013 16:50:50 -0500
+Subject: [PATCH v3 17/23] mm/page_cgroup: Use memblock apis for early memory
+ allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-20-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-18-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct ensure_zone_is_initialized() function description according
-to the introduced memblock APIs for early memory allocations.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
+
+Switch to memblock interfaces for early memory allocator instead of
+bootmem allocator. No functional change in beahvior than what it is
+in current code from bootmem users points of view.
+
+Archs already converted to NO_BOOTMEM now directly use memblock
+interfaces instead of bootmem wrappers build on top of memblock. And the
+archs which still uses bootmem, these new apis just fallback to exiting
+bootmem APIs.
 
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/memory_hotplug.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ mm/page_cgroup.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-index cf1736d..4f158ec 100644
---- a/mm/memory_hotplug.c
-+++ b/mm/memory_hotplug.c
-@@ -268,7 +268,7 @@ static void fix_zone_id(struct zone *zone, unsigned long start_pfn,
- }
+diff --git a/mm/page_cgroup.c b/mm/page_cgroup.c
+index 6d757e3a..d8bd2c5 100644
+--- a/mm/page_cgroup.c
++++ b/mm/page_cgroup.c
+@@ -54,8 +54,9 @@ static int __init alloc_node_page_cgroup(int nid)
  
- /* Can fail with -ENOMEM from allocating a wait table with vmalloc() or
-- * alloc_bootmem_node_nopanic() */
-+ * alloc_bootmem_node_nopanic()/memblock_virt_alloc_node_nopanic() */
- static int __ref ensure_zone_is_initialized(struct zone *zone,
- 			unsigned long start_pfn, unsigned long num_pages)
- {
+ 	table_size = sizeof(struct page_cgroup) * nr_pages;
+ 
+-	base = __alloc_bootmem_node_nopanic(NODE_DATA(nid),
+-			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
++	base = memblock_virt_alloc_try_nid_nopanic(
++			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
++			BOOTMEM_ALLOC_ACCESSIBLE, nid);
+ 	if (!base)
+ 		return -ENOMEM;
+ 	NODE_DATA(nid)->node_page_cgroup = base;
 -- 
 1.7.9.5
