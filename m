@@ -1,66 +1,76 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Dec 2013 19:07:41 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: hwmod code/data: fixes for v3.13-rc
-Message-ID: <alpine.DEB.2.02.1312091906150.32309@utopia.booyaka.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon,  9 Dec 2013 19:08:33 +0000
+Subject: [PATCH] ARM: topology: Staticise non-exported symbols
+Message-ID: <1386616113-26211-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+From: Mark Brown <broonie@linaro.org>
 
-Hi Tony,
+These symbols are only referenced in this source file so can be made
+static, and the efficiency table is constant data so can be declared as
+such.  This avoids polluting the global namespace and fixes warnings
+from sparse.
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+The function arch_scale_freq_power() is still not prototyped or static,
+this is a separate issue as this is overriding a weak symbol from the
+scheduler which neglects to provide a prototype.
 
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm/kernel/topology.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13-rc/hwmod-fixes-a
-
-for you to fetch changes up to 0e7dc862cf687234ed1b01a6b2461b782ea0bca0:
-
-  ARM: OMAP2+: hwmod: Fix usage of invalid iclk / oclk when clock node is not present (2013-12-09 11:51:30 -0700)
-
-- ----------------------------------------------------------------
-ARM: OMAP2+: hwmod code/data: fixes for v3.13-rc
-
-Fix a few hwmod code problems involving recovery with bad data and bad
-IP block OCP reset handling.  Also, fix the hwmod data to enable IP
-block OCP reset for the OMAP USBHOST devices on OMAP3+.
-
-Basic build, boot, and PM tests are available here:
-
-http://www.pwsan.com/omap/testlogs/prcm_fixes_a_v3.13-rc/20131209030611/
-
-- ----------------------------------------------------------------
-Nishanth Menon (1):
-      ARM: OMAP2+: hwmod: Fix usage of invalid iclk / oclk when clock node is not present
-
-Roger Quadros (3):
-      ARM: OMAP4+: hwmod data: Don't prevent RESET of USB Host module
-      ARM: OMAP2+: hwmod: Fix SOFTRESET logic
-      ARM: OMAP3: hwmod data: Don't prevent RESET of USB Host module
-
- arch/arm/mach-omap2/omap_hwmod.c           | 45 +++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 13 ++-------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 12 ++------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 13 ++-------
- 4 files changed, 52 insertions(+), 31 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.15 (GNU/Linux)
-
-iQIcBAEBAgAGBQJSphSWAAoJEMePsQ0LvSpLBGwP/19ygCpEptuQk3AKY411jgXl
-rGEkdGlYcoHSd03ci2LjKds7iJgDnWdpCbrtfcRBmqSChlTk1AKqs8bnkQqYpY9P
-j5g3aacwROsutc74xCDJFHY0mAIQ1wfIoj5oUmM3mgX4ftKpNyYZ0gRxfPX/29eO
-YwOjzXEyHeRJ20UwL41Tp24Q1O6hziCDc1N0iMa+Yzbaf1Lwbq8la7FxOdmj+6la
-ex06qt0VELv9B3gQATR8lvDoFIlJ+3AVDnR5z1ODRvZqE1XKMZ7koF/La6fBqfqd
-pk7Nq7x3sN3TtDQb1dkvIrCOVwqYZnjkLXZ5UNam6tTnmDkB50ttoaJIoO0t+BA5
-ALRkC9ni1StKKInTCJr1ncSmzaY1xCU1ePOrcxVDOvsxvmcUBtX50d9kRAssfkze
-eanyJoCBAKIgSR82vpaS4qwGsiPRU4NPPIcKvtsWzd9Oot84QvDOGvVv5730l9iU
-csJWay8rba9THbBNoghg2y5P4MBtsXFxCif1kXGyp9JZCek4wQZJAiHzXxqu/DIO
-QcK2uHwVNWS/vlyvoUmu3BB0p08sy5xKHm/eqwAS3bUag42vK4YI1Q6bfulXmt5W
-dslDMwVf/BbbbKO8Tee3vIWVc6NNVV5NHKTRvRtL85vt2+X63Ld1oZvOBq5A/hoF
-x4Gdw6dkexIhE+5YsuHN
-=hGE8
------END PGP SIGNATURE-----
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 85a87370f144..0bc94b1fd1ae 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -68,16 +68,16 @@ struct cpu_efficiency {
+  * Processors that are not defined in the table,
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+-struct cpu_efficiency table_efficiency[] = {
++static const struct cpu_efficiency table_efficiency[] = {
+ 	{"arm,cortex-a15", 3891},
+ 	{"arm,cortex-a7",  2048},
+ 	{NULL, },
+ };
+ 
+-unsigned long *__cpu_capacity;
++static unsigned long *__cpu_capacity;
+ #define cpu_capacity(cpu)	__cpu_capacity[cpu]
+ 
+-unsigned long middle_capacity = 1;
++static unsigned long middle_capacity = 1;
+ 
+ /*
+  * Iterate all CPUs' descriptor in DT and compute the efficiency
+@@ -89,7 +89,7 @@ unsigned long middle_capacity = 1;
+  */
+ static void __init parse_dt_topology(void)
+ {
+-	struct cpu_efficiency *cpu_eff;
++	const struct cpu_efficiency *cpu_eff;
+ 	struct device_node *cn = NULL;
+ 	unsigned long min_capacity = (unsigned long)(-1);
+ 	unsigned long max_capacity = 0;
+@@ -158,7 +158,7 @@ static void __init parse_dt_topology(void)
+  * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
+  * function returns directly for SMP system.
+  */
+-void update_cpu_power(unsigned int cpu)
++static void update_cpu_power(unsigned int cpu)
+ {
+ 	if (!cpu_capacity(cpu))
+ 		return;
+@@ -185,7 +185,7 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
+ 	return &cpu_topology[cpu].core_sibling;
+ }
+ 
+-void update_siblings_masks(unsigned int cpuid)
++static void update_siblings_masks(unsigned int cpuid)
+ {
+ 	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
+ 	int cpu;
+-- 
+1.8.5.1
