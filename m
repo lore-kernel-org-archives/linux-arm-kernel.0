@@ -1,145 +1,39 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  9 Dec 2013 21:15:11 +0100
-Subject: [PATCH] ARM: dts: stmpe-ts: fix wrong bindings
-Message-ID: <1386620111-1413-1-git-send-email-stefan@agner.ch>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Dec 2013 00:34:17 +0300
+Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
+ 4.7.2-5)
+In-Reply-To: <20131209191452.GA13171@atomide.com>
+References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
+ <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
+ <alpine.DEB.2.02.1312090936530.32309@utopia.booyaka.com>
+ <20131209171618.GC11433@atomide.com> <20131209191452.GA13171@atomide.com>
+Message-ID: <52A63759.70601@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bindings for STMPE touchscreen device to match the documented
-bindings and the actual bindings used by the driver.
+Hello.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-I don't have any of these hardware, but the error is obvious. The device
-probably works anyway since the device/driver will use default values.
----
- arch/arm/boot/dts/imx53-m53evk.dts  | 20 ++++++++++----------
- arch/arm/boot/dts/spear1310-evb.dts | 18 +++++++++---------
- arch/arm/boot/dts/spear1340-evb.dts | 18 +++++++++---------
- arch/arm/boot/dts/spear320-hmi.dts  | 20 ++++++++++----------
- 4 files changed, 38 insertions(+), 38 deletions(-)
+On 12/09/2013 10:14 PM, Tony Lindgren wrote:
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 7d304d0..e97f298 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -165,17 +165,17 @@
- 		irq-trigger = <0x1>;
- 
- 		stmpe_touchscreen {
--			compatible = "stmpe,ts";
-+			compatible = "st,stmpe-ts";
- 			reg = <0>;
--			ts,sample-time = <4>;
--			ts,mod-12b = <1>;
--			ts,ref-sel = <0>;
--			ts,adc-freq = <1>;
--			ts,ave-ctrl = <3>;
--			ts,touch-det-delay = <3>;
--			ts,settling = <4>;
--			ts,fraction-z = <7>;
--			ts,i-drive = <1>;
-+			st,sample-time = <4>;
-+			st,mod-12b = <1>;
-+			st,ref-sel = <0>;
-+			st,adc-freq = <1>;
-+			st,ave-ctrl = <3>;
-+			st,touch-det-delay = <3>;
-+			st,settling = <4>;
-+			st,fraction-z = <7>;
-+			st,i-drive = <1>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index b56a801..fe2ece2 100644
---- a/arch/arm/boot/dts/spear1310-evb.dts
-+++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -369,15 +369,15 @@
- 
- 					stmpe_touchscreen {
- 						compatible = "st,stmpe-ts";
--						ts,sample-time = <4>;
--						ts,mod-12b = <1>;
--						ts,ref-sel = <0>;
--						ts,adc-freq = <1>;
--						ts,ave-ctrl = <1>;
--						ts,touch-det-delay = <2>;
--						ts,settling = <2>;
--						ts,fraction-z = <7>;
--						ts,i-drive = <1>;
-+						st,sample-time = <4>;
-+						st,mod-12b = <1>;
-+						st,ref-sel = <0>;
-+						st,adc-freq = <1>;
-+						st,ave-ctrl = <1>;
-+						st,touch-det-delay = <2>;
-+						st,settling = <2>;
-+						st,fraction-z = <7>;
-+						st,i-drive = <1>;
- 					};
- 				};
- 
-diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
-index d6c30ae..d3dcba9 100644
---- a/arch/arm/boot/dts/spear1340-evb.dts
-+++ b/arch/arm/boot/dts/spear1340-evb.dts
-@@ -480,15 +480,15 @@
- 
- 					stmpe_touchscreen {
- 						compatible = "st,stmpe-ts";
--						ts,sample-time = <4>;
--						ts,mod-12b = <1>;
--						ts,ref-sel = <0>;
--						ts,adc-freq = <1>;
--						ts,ave-ctrl = <1>;
--						ts,touch-det-delay = <2>;
--						ts,settling = <2>;
--						ts,fraction-z = <7>;
--						ts,i-drive = <1>;
-+						st,sample-time = <4>;
-+						st,mod-12b = <1>;
-+						st,ref-sel = <0>;
-+						st,adc-freq = <1>;
-+						st,ave-ctrl = <1>;
-+						st,touch-det-delay = <2>;
-+						st,settling = <2>;
-+						st,fraction-z = <7>;
-+						st,i-drive = <1>;
- 					};
- 				};
- 
-diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
-index 3075d2d..2a5d013 100644
---- a/arch/arm/boot/dts/spear320-hmi.dts
-+++ b/arch/arm/boot/dts/spear320-hmi.dts
-@@ -256,17 +256,17 @@
- 					};
- 
- 					stmpe610-ts {
--						compatible = "stmpe,ts";
-+						compatible = "st,stmpe-ts";
- 						reg = <0>;
--						ts,sample-time = <4>;
--						ts,mod-12b = <1>;
--						ts,ref-sel = <0>;
--						ts,adc-freq = <1>;
--						ts,ave-ctrl = <1>;
--						ts,touch-det-delay = <3>;
--						ts,settling = <4>;
--						ts,fraction-z = <7>;
--						ts,i-drive = <1>;
-+						st,sample-time = <4>;
-+						st,mod-12b = <1>;
-+						st,ref-sel = <0>;
-+						st,adc-freq = <1>;
-+						st,ave-ctrl = <1>;
-+						st,touch-det-delay = <3>;
-+						st,settling = <4>;
-+						st,fraction-z = <7>;
-+						st,i-drive = <1>;
- 					};
- 				};
- 			};
--- 
-1.8.4.2
+>>>>> Boot to userspace:
+>>>>>      FAIL ( 1/11): 37xxevm
+
+>>>> So looks like this is due to the switchover to DT-based booting for 37xx
+>>>> EVM.  Will plug that in here and re-test.
+
+>>> Here's the updated test report.  Looks like dynamic idle PM tests are
+>>> failing on the 37xxevm now.
+
+>> Off-idle and wake-up events work but need these two pending patches:
+
+>> 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+>>     http://lkml.org/lkml/2013/11/22/520
+
+> Oops, this is the wrong patch, it should be:
+
+> 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+>     http://lkml.org/lkml/2013/11/22/520
+
+    Isn't it the same patch and link? :-)
+
+WBR, Sergei
