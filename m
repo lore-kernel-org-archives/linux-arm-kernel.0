@@ -1,38 +1,84 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 09 Dec 2013 16:06:47 +0800
-Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
- maps and map logical cpu id to APIC id
-In-Reply-To: <201312060009.54801.arnd@arndb.de>
-References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
- <1386088753-2850-3-git-send-email-hanjun.guo@linaro.org>
- <CAL_JsqKF-_GCRR1d5Hs0F6pCMfLxUYkXAAp9hY7Ywuu1C+aZ0A@mail.gmail.com>
- <201312060009.54801.arnd@arndb.de>
-Message-ID: <52A57A17.40400@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Dec 2013 09:18:33 +0100
+Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
+In-Reply-To: <52A24E08.706@codeaurora.org>
+References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <52A24E08.706@codeaurora.org>
+Message-ID: <CACRpkdb+9DE6WNfBSp9Y8ErhHjaE-PdezJbYvsLLhiCjXfmA-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-12-6 7:09, Arnd Bergmann wrote:
-> On Wednesday 04 December 2013, Rob Herring wrote:
->>> index a0c2ca6..1428024 100644
->>> --- a/arch/arm64/kernel/smp.c
->>> +++ b/arch/arm64/kernel/smp.c
->>> @@ -420,7 +420,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->>>                 if (err)
->>>                         continue;
->>>
->>> +#ifndef CONFIG_ACPI
->>>                 set_cpu_present(cpu, true);
->>> +#endif
->>
->> Should this be moved to DT cpu topology related code?
-> 
-> More importantly, the #ifndef is certainly wrong here: It is important that you can
-> turn CONFIG_ACPI on or off without impacting the run-time code path for non-ACPI
-> systems. The snippet above breaks this because we no longer set the
-> cpu mask when ACPI is turned on but not used.
+On Fri, Dec 6, 2013 at 11:22 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 12/05/13 18:10, Bjorn Andersson wrote:
 
-Good point, I'll rework this patch to find a better solution.
+As the driver is merged I expect fixes to come in as additional patches.
 
-Thanks for your comments.
+>> Add initial definition of parameters for pinctrl-msm for the msm8x74
+>> platform.
+>
+> Hmm. We've tried to remove 'x' from our code because it isn't really
+> accurate and leads to more confusion.
 
-Hanjun
+So does this pin controller have a real name in the data sheet?
+
+I usually prefer to name the drivers after the name of the IP
+block rather than the SoC if possible.
+
+Or should it just be named pinctrl-msm.c?
+
+>> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7)     \
+>> +     {                                               \
+>> +             .name = "gpio" #id,                     \
+>> +             .pins = gpio##id##_pins,                \
+>> +             .npins = ARRAY_SIZE(gpio##id##_pins),   \
+>> +             .funcs = {                              \
+>> +                     MSM_MUX_NA, /* gpio mode */     \
+>> +                     MSM_MUX_##f1,                   \
+>> +                     MSM_MUX_##f2,                   \
+>> +                     MSM_MUX_##f3,                   \
+>> +                     MSM_MUX_##f4,                   \
+>> +                     MSM_MUX_##f5,                   \
+>> +                     MSM_MUX_##f6,                   \
+>> +                     MSM_MUX_##f7                    \
+>> +             },                                      \
+>> +             .ctl_reg = 0x1000 + 0x10 * id ,         \
+>
+> Weird trailing space here.
+
+Please send patches.
+
+> Also, do we ever plan to have anything more than the gpio pins and the
+> sdc pins? It seems like we spend a lot of space describing exactly the
+> same thing in these structs for each of the 146 gpio pins when we could
+> just know that range 0 to 146 is gpio pins and have different code for
+> that part vs the 6 or something sd pins.
+
+Some platforms use the .gpio_request_enable()/.gpio_disable_free()
+instead of one group per pin for this very reason.
+
+>> +static struct of_device_id msm8x74_pinctrl_of_match[] = {
+>
+> const?
+
+Please send patches.
+
+>> +static int __init msm8x74_pinctrl_init(void)
+>> +{
+>> +     return platform_driver_register(&msm8x74_pinctrl_driver);
+>> +}
+>> +arch_initcall(msm8x74_pinctrl_init);
+>> +
+>> +static void __exit msm8x74_pinctrl_exit(void)
+>> +{
+>> +     platform_driver_unregister(&msm8x74_pinctrl_driver);
+>> +}
+>> +module_exit(msm8x74_pinctrl_exit);
+>
+> Why not module_platform_driver()? I thought pinctrl supported deferred
+> probing?
+
+It does. Tested patches accepted.
+
+Yours,
+Linus Walleij
