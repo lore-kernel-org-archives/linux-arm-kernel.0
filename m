@@ -1,108 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Dec 2013 16:50:04 +0000
-Subject: [PATCH V7 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1386151791-4881-3-git-send-email-vkale@apm.com>
-References: <1386151791-4881-1-git-send-email-vkale@apm.com>
- <1386151791-4881-3-git-send-email-vkale@apm.com>
-Message-ID: <20131209165003.GJ13908@mudshark.cambridge.arm.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 9 Dec 2013 16:50:57 +0000
+Subject: [PATCH] xen/arm64: do not call the swiotlb functions twice
+In-Reply-To: <1386605160-3185-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <1386605160-3185-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1386607857.7812.66.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinayak,
-
-On Wed, Dec 04, 2013 at 10:09:51AM +0000, Vinayak Kale wrote:
-> Add support for irq registration when pmu interrupt is percpu.
-
-Getting closer...
-
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> ---
->  arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
->  1 file changed, 78 insertions(+), 30 deletions(-)
+On Mon, 2013-12-09 at 16:06 +0000, Stefano Stabellini wrote:
+> On arm64 the dma_map_ops implementation is based on the swiotlb.
+> swiotlb-xen, used by default in dom0 on Xen, is also based on the
+> swiotlb.
 > 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index cea1594..d8e6667 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -22,6 +22,7 @@
->  
->  #include <linux/bitmap.h>
->  #include <linux/interrupt.h>
-> +#include <linux/irq.h>
->  #include <linux/kernel.h>
->  #include <linux/export.h>
->  #include <linux/perf_event.h>
-> @@ -363,26 +364,52 @@ validate_group(struct perf_event *event)
->  }
->  
->  static void
-> +armpmu_disable_percpu_irq(void *data)
-> +{
-> +	disable_percpu_irq((long)data);
-> +}
+> Avoid calling into the default arm64 dma_map_ops functions from
+> xen_dma_map_page, xen_dma_unmap_page, xen_dma_sync_single_for_cpu, and
+> xen_dma_sync_single_for_device otherwise we end up calling into the
+> swiotlb twice.
+> 
+> When arm64 gets a non-swiotlb based implementation of dma_map_ops, we'll
+> probably have to reintroduce dma_map_ops calls in page-coherent.h.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: catalin.marinas at arm.com
+> CC: Will.Deacon at arm.com
 
-Given that we wait for the CPUs to finish enabling/disabling the IRQ, I
-actually meant pass the pointer to the IRQ, which removes the horrible
-casts in the caller.
+Tested-by: Ian Campbell <ian.campbell@citrix.com>
 
-> +	if (irq_is_percpu(irq)) {
-> +		cpumask_clear(&armpmu->active_irqs);
-
-Thanks for moving the mask manipulation out. It now makes it obvious that we
-don't care about the mask at all for PPIs, so that can be removed (the code
-you have is racy against hotplug anyway).
-
-I took the liberty of writing a fixup for you (see below). Can you test it
-on your platform please?
-
-Cheers,
-
-Will
-
---->8
-
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 503c1eeedc1c..5b1cd792274a 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -366,7 +366,8 @@ validate_group(struct perf_event *event)
- static void
- armpmu_disable_percpu_irq(void *data)
- {
--       disable_percpu_irq((long)data);
-+       unsigned int irq = *(unsigned int *)data;
-+       disable_percpu_irq(irq);
- }
- 
- static void
-@@ -385,8 +386,7 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
-                return;
- 
-        if (irq_is_percpu(irq)) {
--               cpumask_clear(&armpmu->active_irqs);
--               on_each_cpu(armpmu_disable_percpu_irq, (void *)(long)irq, 1);
-+               on_each_cpu(armpmu_disable_percpu_irq, &irq, 1);
-                free_percpu_irq(irq, &cpu_hw_events);
-        } else {
-                for (i = 0; i < irqs; ++i) {
-@@ -402,7 +402,8 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
- static void
- armpmu_enable_percpu_irq(void *data)
- {
--       enable_percpu_irq((long)data, IRQ_TYPE_NONE);
-+       unsigned int irq = *(unsigned int *)data;
-+       enable_percpu_irq(irq, IRQ_TYPE_NONE);
- }
- 
- static int
-@@ -440,8 +441,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
-                        return err;
-                }
- 
--               on_each_cpu(armpmu_enable_percpu_irq, (void *)(long)irq, 1);
--               cpumask_setall(&armpmu->active_irqs);
-+               on_each_cpu(armpmu_enable_percpu_irq, &irq, 1);
-        } else {
-                for (i = 0; i < irqs; ++i) {
-                        err = 0;
+Ian.
