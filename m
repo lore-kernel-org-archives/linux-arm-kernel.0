@@ -1,42 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Dec 2013 10:11:39 +0800
-Subject: [PATCH] ARM: dts: imx53: Enable AHCI SATA for imx53-qsb
-In-Reply-To: <1386081578-3651-1-git-send-email-robertcnelson@gmail.com>
-References: <1386081578-3651-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <20131209021137.GA825@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Dec 2013 03:09:23 +0100
+Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
+In-Reply-To: <1385650228-8906-1-git-send-email-b.brezillon@overkiz.com>
+References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
+ <1385650228-8906-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <201312090309.23723.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 08:39:38AM -0600, Robert Nelson wrote:
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Linux-IDE <linux-ide@vger.kernel.org>
-
-Applied, thanks.
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx53-qsb.dts | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> index 91a5935..ea927be 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> @@ -307,6 +307,10 @@
->  	status = "okay";
->  };
+On Thursday 28 November 2013, Boris BREZILLON wrote:
+> @@ -92,6 +103,8 @@
+>  				dma-names = "tx", "rx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_spi0>;
+> +				clocks = <&spi0_clk>;
+> +				clock-names = "spi_clk";
+>  				status = "disabled";
+>  			};
 >  
-> +&sata {
-> +	status = "okay";
-> +};
-> +
->  &vpu {
->  	status = "okay";
->  };
-> -- 
-> 1.8.4.3
-> 
+> @@ -101,6 +114,8 @@
+>  				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 4>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+> +				clocks = <&ssc0_clk>;
+> +				clock-names = "pclk";
+>  				status = "disabled";
+>  			};
+>  
+
+You are adding "clock-names" properties in a lot of cases. Are you sure you
+are using the strings that are documented in the respective device bindings
+for each name? In a lot of cases, drivers just want an anonymous clock
+and we don't name them.
+
+	Arnd
