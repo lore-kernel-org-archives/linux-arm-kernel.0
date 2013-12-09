@@ -1,39 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 10 Dec 2013 00:34:17 +0300
-Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
- 4.7.2-5)
-In-Reply-To: <20131209191452.GA13171@atomide.com>
-References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
- <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
- <alpine.DEB.2.02.1312090936530.32309@utopia.booyaka.com>
- <20131209171618.GC11433@atomide.com> <20131209191452.GA13171@atomide.com>
-Message-ID: <52A63759.70601@cogentembedded.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 10 Dec 2013 05:37:59 +0900
+Subject: [PATCH v4 2/4] clk: exynos5410: register clocks using common
+ clock framework
+In-Reply-To: <1914850.6CAa0SzDWP@amdc1227>
+References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
+ <1385456288-20398-3-git-send-email-v.tyrtov@samsung.com>
+ <1914850.6CAa0SzDWP@amdc1227>
+Message-ID: <52A62A27.7080408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 12/10/13 01:34, Tomasz Figa wrote:
+> Hi Vyacheslav, Tarek,
+>
+> On Tuesday 26 of November 2013 12:58:06 Vyacheslav Tyrtov wrote:
+>> From: Tarek Dakhran<t.dakhran@samsung.com>
+>>
+>> The EXYNOS5410 clocks are statically listed and registered
+>> using the Samsung specific common clock helper functions.
+>>
+>> Signed-off-by: Tarek Dakhran<t.dakhran@samsung.com>
+>> Signed-off-by: Vyacheslav Tyrtov<v.tyrtov@samsung.com>
+>> ---
+>>   .../devicetree/bindings/clock/exynos5410-clock.txt |  54 +++++
+>>   drivers/clk/samsung/Makefile                       |   1 +
+>>   drivers/clk/samsung/clk-exynos5410.c               | 239 +++++++++++++++++++++
+>>   include/dt-bindings/clock/exynos5410.h             |  32 +++
+>>   4 files changed, 326 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+>>   create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+>>   create mode 100644 include/dt-bindings/clock/exynos5410.h
+>
+> Acked-by: Tomasz Figa<t.figa@samsung.com>
+>
+Tomasz, thanks for your ack on clk stuff.
 
-On 12/09/2013 10:14 PM, Tony Lindgren wrote:
+> This should go through Samsung tree, I guess, since it's a dependency
+> of other patches in this series and doesn't depend on any things from
+> clock tree. Mike, Kukjin, are you okay with this?
+>
+Yeah, I'm fine on this series but 4th patch for supporting dual cluster.
 
->>>>> Boot to userspace:
->>>>>      FAIL ( 1/11): 37xxevm
-
->>>> So looks like this is due to the switchover to DT-based booting for 37xx
->>>> EVM.  Will plug that in here and re-test.
-
->>> Here's the updated test report.  Looks like dynamic idle PM tests are
->>> failing on the 37xxevm now.
-
->> Off-idle and wake-up events work but need these two pending patches:
-
->> 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
->>     http://lkml.org/lkml/2013/11/22/520
-
-> Oops, this is the wrong patch, it should be:
-
-> 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
->     http://lkml.org/lkml/2013/11/22/520
-
-    Isn't it the same patch and link? :-)
-
-WBR, Sergei
+Let me take 1 to 3 patches firstly. Thanks.
+- Kukjin
