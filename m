@@ -1,115 +1,86 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 9 Dec 2013 14:31:03 +0800
-Subject: [PATCH v5 14/15] usb: phy-mxs: Add system suspend/resume API
-In-Reply-To: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
-References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386570664-6713-15-git-send-email-peter.chen@freescale.com>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Mon, 9 Dec 2013 07:10:34 +0000
+Subject: [PATCH] ARM: dts: vf610: make pinctrl nodes board specific
+In-Reply-To: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
+References: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <c605b6ebe1df4c79a9cbce61e9e0c96a@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need this to keep PHY's power on or off during the system
-suspend mode. If we need to enable USB wakeup, then we
-must keep PHY's power being on during the system suspend mode.
-Otherwise, we need to keep PHY's power being off to save power.
+From: Shawn Guo <shawn.guo@linaro.org>
+Data: Monday, December 09, 2013 2:51 PM + 800
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/phy/phy-mxs-usb.c |   48 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 48 insertions(+), 0 deletions(-)
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Lu Jingchang-B35083; Duan Fugang-B38611; Shawn Guo
+>Subject: [PATCH] ARM: dts: vf610: make pinctrl nodes board specific
+>
+>Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that boards
+>that share the same pinctrl setting do not have to define it time and time
+>again in <board>.dts.  However, along with the devices and use cases being
+>added continuously, the pinctrl setting nodes under iomuxc becomes more than
+>expected.  This bloats device tree blob for particular board unnecessarily
+>since only a small subset of those pinctrl setting nodes will be used by the
+>board.  It impacts not only the DTB file size but also the run-time device tree
+>lookup efficiency.
+>
+>The patch provides a solution to avoid this device tree bloating problem while
+>still keeping boards share the common pinctrl setting data by using DTC macro
+>support.  It creates <soc>-pingrp.h and move all those pinctrl setting data
+>into there as macro definitions.  The <board>.dts will instead define the
+>pinctrl setting nodes that are necessary for the board by referring to the
+>macros in <soc>-pingrp.h, so that only the pinctrl setting data that will be
+>used by the board will get compiled into the DTB for the board.
+>
+>With the changes, the pinctrl setting nodes becomes local to particular board,
+>and it makes no sense to continue numbering the setting for given peripheral.
+>Thus, all the pinctrl phandler name gets updated to have only peripheral name
+>in there.
+>
+>Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>---
+>This should have been done in the patch series [1], but somehow got missed in
+>the first place.  So add one more patch to take care of VF610.
+>
+>[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/277649
+>
+> arch/arm/boot/dts/vf610-cosmic.dts |   16 +++-
+> arch/arm/boot/dts/vf610-twr.dts    |   34 +++++--
+> arch/arm/boot/dts/vf610.dtsi       |  172 +-----------------------------------
+> 3 files changed, 44 insertions(+), 178 deletions(-)
+>
+>diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-
+>cosmic.dts
+>index c42e4f9..432960a 100644
+>--- a/arch/arm/boot/dts/vf610-cosmic.dts
+>+++ b/arch/arm/boot/dts/vf610-cosmic.dts
+>@@ -36,12 +36,24 @@
+> &fec1 {
+> 	phy-mode = "rmii";
+> 	pinctrl-names = "default";
+>-	pinctrl-0 = <&pinctrl_fec1_1>;
+>+	pinctrl-0 = <&pinctrl_fec1>;
+> 	status = "okay";
+> };
+>
+>+&iomuxc {
+>+	vf610-cosmic {
+>+		pinctrl_fec1: fec1grp {
+>+			fsl,pins = <VF610_FEC1_PINGRP1>;
+>+		};
+>+
+>+		pinctrl_uart1: uart1grp {
+>+			fsl,pins = <VF610_UART1_PINGRP1>;
+>+		};
+>+	};
+>+};
+>+
+Keep things in alphabetical order...
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index f2372a8..e18fdf3 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -57,6 +57,10 @@
- #define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
- 
- /* Anatop Registers */
-+#define ANADIG_ANA_MISC0			0x150
-+#define ANADIG_ANA_MISC0_SET			0x154
-+#define ANADIG_ANA_MISC0_CLR			0x158
-+
- #define ANADIG_USB1_VBUS_DET_STAT		0x1c0
- #define ANADIG_USB2_VBUS_DET_STAT		0x220
- 
-@@ -65,6 +69,9 @@
- #define ANADIG_USB2_LOOPBACK_SET		0x244
- #define ANADIG_USB2_LOOPBACK_CLR		0x248
- 
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
-+
- #define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
- #define BM_ANADIG_USB2_VBUS_DET_STAT_VBUS_VALID	BIT(3)
- 
-@@ -249,6 +256,22 @@ static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
- 
- }
- 
-+static void mxs_phy_enable_ldo_in_suspend(struct mxs_phy *mxs_phy, bool on)
-+{
-+	unsigned int reg = on ? ANADIG_ANA_MISC0_SET : ANADIG_ANA_MISC0_CLR;
-+
-+	/* If the SoCs don't have anatop, quit */
-+	if (!mxs_phy->regmap_anatop)
-+		return;
-+
-+	if (is_imx6q_phy(mxs_phy))
-+		regmap_write(mxs_phy->regmap_anatop, reg,
-+			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
-+	else if (is_imx6sl_phy(mxs_phy))
-+		regmap_write(mxs_phy->regmap_anatop,
-+			reg, BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL);
-+}
-+
- static int mxs_phy_init(struct usb_phy *phy)
- {
- 	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-@@ -440,6 +463,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	device_set_wakeup_capable(&pdev->dev, true);
-+
- 	ret = usb_add_phy_dev(&mxs_phy->phy);
- 	if (ret)
- 		return ret;
-@@ -456,6 +481,28 @@ static int mxs_phy_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int mxs_phy_system_suspend(struct device *dev)
-+{
-+	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		mxs_phy_enable_ldo_in_suspend(mxs_phy, true);
-+
-+	return 0;
-+}
-+
-+static int mxs_phy_system_resume(struct device *dev)
-+{
-+	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		mxs_phy_enable_ldo_in_suspend(mxs_phy, false);
-+
-+	return 0;
-+}
-+
-+SIMPLE_DEV_PM_OPS(mxs_phy_pm, mxs_phy_system_suspend, mxs_phy_system_resume);
-+
- static struct platform_driver mxs_phy_driver = {
- 	.probe = mxs_phy_probe,
- 	.remove = mxs_phy_remove,
-@@ -463,6 +510,7 @@ static struct platform_driver mxs_phy_driver = {
- 		.name = DRIVER_NAME,
- 		.owner	= THIS_MODULE,
- 		.of_match_table = mxs_phy_dt_ids,
-+		.pm = &mxs_phy_pm,
- 	 },
- };
- 
--- 
-1.7.8
+> &uart1 {
+> 	pinctrl-names = "default";
+>-	pinctrl-0 = <&pinctrl_uart1_1>;
+>+	pinctrl-0 = <&pinctrl_uart1>;
+> 	status = "okay";
+> };
+
+Other is fine.
