@@ -1,27 +1,28 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 09 Dec 2013 14:31:48 +0100
-Subject: [PATCH 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag to
- mout_apll
-In-Reply-To: <1385007454-5234-1-git-send-email-sachin.kamat@linaro.org>
-References: <1385007454-5234-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1466487.IbnMiN0f0X@amdc1227>
+Date: Mon, 09 Dec 2013 14:35:28 +0100
+Subject: [PATCH] clk: samsung: exynos4: Correct SRC_MFC register
+In-Reply-To: <1385097668-24620-1-git-send-email-sw0312.kim@samsung.com>
+References: <1385097668-24620-1-git-send-email-sw0312.kim@samsung.com>
+Message-ID: <4009792.HvWcr5GnEc@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hi Seung-Woo,
 
-On Thursday 21 of November 2013 09:47:34 Sachin Kamat wrote:
-> Add CLK_SET_RATE_PARENT flag to be able to change the frequency
-> to desired value.
+On Friday 22 of November 2013 14:21:08 Seung-Woo Kim wrote:
+> The SRC_MFC register was incorrect. This patch corrects it.
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
 > ---
->  drivers/clk/samsung/clk-exynos5250.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  drivers/clk/samsung/clk-exynos4.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 
-Your patch description is a bit off. It doesn't say frequency of what
-clock will be able to be changed to "desired value" and what is the reason
-for this change.
+Good catch.
+
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+
+I guess this could go as a fix for current rc, through clk-fixes.
+Mike, what do you think?
 
 Best regards,
 Tomasz
