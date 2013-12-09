@@ -1,164 +1,77 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 09 Dec 2013 18:42:00 +1000
-Subject: [PATCH][RESEND] ARM: misc: remove deprecated IRQF_DISABLED
-In-Reply-To: <1386565230-19228-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1381550411-5824-1-git-send-email-michael.opdenacker@free-electrons.com>
- <1386565230-19228-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <52A58258.1060303@uclinux.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 09 Dec 2013 09:41:54 +0100
+Subject: [PATCH v5 12/15] usb: phy: Add set_wakeup API
+In-Reply-To: <1386570664-6713-13-git-send-email-peter.chen@freescale.com>
+References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
+ <1386570664-6713-13-git-send-email-peter.chen@freescale.com>
+Message-ID: <52A58252.6090502@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/13 15:00, Michael Opdenacker wrote:
-> This patch proposes to remove the use of the IRQF_DISABLED flag
-> from miscellaneous code in mach-xxx and plat-xxx
->
-> This flag is a NOOP since 2.6.35 and it will be removed one day.
->
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+On 12/09/2013 07:31 AM, Peter Chen wrote:
+> This API is used to set wakeup enable at PHY registers, in that
+> case, the PHY can be waken up from suspend due to external events,
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+I' no native speaker, but I think it's "to be woken up".
 
-
+> like vbus change, dp/dm change and id change.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->   arch/arm/mach-ebsa110/core.c             | 2 +-
->   arch/arm/mach-integrator/integrator_ap.c | 2 +-
->   arch/arm/mach-ks8695/time.c              | 2 +-
->   arch/arm/mach-netx/time.c                | 2 +-
->   arch/arm/mach-rpc/dma.c                  | 2 +-
->   arch/arm/mach-rpc/time.c                 | 1 -
->   arch/arm/mach-sa1100/time.c              | 2 +-
->   arch/arm/mach-u300/timer.c               | 2 +-
->   arch/arm/plat-iop/time.c                 | 2 +-
->   arch/arm/plat-pxa/dma.c                  | 2 +-
->   10 files changed, 9 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-> index 68ac934d4565..8254e716b095 100644
-> --- a/arch/arm/mach-ebsa110/core.c
-> +++ b/arch/arm/mach-ebsa110/core.c
-> @@ -206,7 +206,7 @@ ebsa110_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction ebsa110_timer_irq = {
->   	.name		= "EBSA110 Timer Tick",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= ebsa110_timer_interrupt,
->   };
->
-> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-> index d50dc2dbfd89..699abfdbc673 100644
-> --- a/arch/arm/mach-integrator/integrator_ap.c
-> +++ b/arch/arm/mach-integrator/integrator_ap.c
-> @@ -368,7 +368,7 @@ static struct clock_event_device integrator_clockevent = {
->
->   static struct irqaction integrator_timer_irq = {
->   	.name		= "timer",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= integrator_timer_interrupt,
->   	.dev_id		= &integrator_clockevent,
->   };
-> diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
-> index 426c97662f5b..a197874bf382 100644
-> --- a/arch/arm/mach-ks8695/time.c
-> +++ b/arch/arm/mach-ks8695/time.c
-> @@ -122,7 +122,7 @@ static irqreturn_t ks8695_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction ks8695_timer_irq = {
->   	.name		= "ks8695_tick",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER,
-> +	.flags		= IRQF_TIMER,
->   	.handler	= ks8695_timer_interrupt,
->   };
->
-> diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
-> index 6df42e643031..3177c7a40930 100644
-> --- a/arch/arm/mach-netx/time.c
-> +++ b/arch/arm/mach-netx/time.c
-> @@ -99,7 +99,7 @@ netx_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction netx_timer_irq = {
->   	.name		= "NetX Timer Tick",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= netx_timer_interrupt,
->   };
->
-> diff --git a/arch/arm/mach-rpc/dma.c b/arch/arm/mach-rpc/dma.c
-> index 85883b2e0e49..6d3517dc4772 100644
-> --- a/arch/arm/mach-rpc/dma.c
-> +++ b/arch/arm/mach-rpc/dma.c
-> @@ -141,7 +141,7 @@ static int iomd_request_dma(unsigned int chan, dma_t *dma)
->   	struct iomd_dma *idma = container_of(dma, struct iomd_dma, dma);
->
->   	return request_irq(idma->irq, iomd_dma_handle,
-> -			   IRQF_DISABLED, idma->dma.device_id, idma);
-> +			   0, idma->dma.device_id, idma);
->   }
->
->   static void iomd_free_dma(unsigned int chan, dma_t *dma)
-> diff --git a/arch/arm/mach-rpc/time.c b/arch/arm/mach-rpc/time.c
-> index 9a6def14df01..9a5158861ca9 100644
-> --- a/arch/arm/mach-rpc/time.c
-> +++ b/arch/arm/mach-rpc/time.c
-> @@ -75,7 +75,6 @@ ioc_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction ioc_timer_irq = {
->   	.name		= "timer",
-> -	.flags		= IRQF_DISABLED,
->   	.handler	= ioc_timer_interrupt
->   };
->
-> diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
-> index 713c86cd3d64..a98fded8c432 100644
-> --- a/arch/arm/mach-sa1100/time.c
-> +++ b/arch/arm/mach-sa1100/time.c
-> @@ -112,7 +112,7 @@ static struct clock_event_device ckevt_sa1100_osmr0 = {
->
->   static struct irqaction sa1100_timer_irq = {
->   	.name		= "ost0",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= sa1100_ost0_interrupt,
->   	.dev_id		= &ckevt_sa1100_osmr0,
->   };
-> diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
-> index 9a5f9fb352ce..f4669c4225c3 100644
-> --- a/arch/arm/mach-u300/timer.c
-> +++ b/arch/arm/mach-u300/timer.c
-> @@ -329,7 +329,7 @@ static irqreturn_t u300_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction u300_timer_irq = {
->   	.name		= "U300 Timer Tick",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= u300_timer_interrupt,
->   };
->
-> diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-> index 29606bd75f3f..71626e323c78 100644
-> --- a/arch/arm/plat-iop/time.c
-> +++ b/arch/arm/plat-iop/time.c
-> @@ -127,7 +127,7 @@ iop_timer_interrupt(int irq, void *dev_id)
->   static struct irqaction iop_timer_irq = {
->   	.name		= "IOP Timer Tick",
->   	.handler	= iop_timer_interrupt,
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->   	.dev_id		= &iop_clockevent,
->   };
->
-> diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
-> index 79ef102e3b2b..054fc5a1a11c 100644
-> --- a/arch/arm/plat-pxa/dma.c
-> +++ b/arch/arm/plat-pxa/dma.c
-> @@ -377,7 +377,7 @@ int __init pxa_init_dma(int irq, int num_ch)
->   		spin_lock_init(&dma_channels[i].lock);
->   	}
->
-> -	ret = request_irq(irq, dma_irq_handler, IRQF_DISABLED, "DMA", NULL);
-> +	ret = request_irq(irq, dma_irq_handler, 0, "DMA", NULL);
->   	if (ret) {
->   		printk (KERN_CRIT "Wow!  Can't register IRQ for DMA\n");
->   		kfree(dma_channels);
->
+>  include/linux/usb/phy.h |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+> index a747960..c6ebe1d 100644
+> --- a/include/linux/usb/phy.h
+> +++ b/include/linux/usb/phy.h
+> @@ -111,6 +111,13 @@ struct usb_phy {
+>  	int	(*set_suspend)(struct usb_phy *x,
+>  				int suspend);
+>  
+> +	/*
+> +	 * Set wakeup enable for PHY, in that case, the PHY can be
+> +	 * waken up from suspend status due to external events,
+> +	 * like vbus change, dp/dm change and id.
+> +	 */
+> +	int	(*set_wakeup)(struct usb_phy *x, bool enabled);
+> +
+>  	/* notify phy connect status change */
+>  	int	(*notify_connect)(struct usb_phy *x,
+>  			enum usb_device_speed speed);
+> @@ -270,6 +277,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+>  }
+>  
+>  static inline int
+> +usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
+> +{
+> +	if (x && x->set_wakeup)
+
+can x be NULL?
+
+> +		return x->set_wakeup(x, enabled);
+> +	else
+> +		return 0;
+> +}
+> +
+> +static inline int
+>  usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
+>  {
+>  	if (x && x->notify_connect)
+> 
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/b30773b6/attachment.sig>
