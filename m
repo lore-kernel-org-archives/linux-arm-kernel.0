@@ -1,41 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Dec 2013 22:05:08 +0100
-Subject: [PATCH v4 3/6] ARM: at91/dt: define sama5d3 clocks
-In-Reply-To: <52A5F79D.9070408@overkiz.com>
-References: <1385650171-8756-1-git-send-email-b.brezillon@overkiz.com>
- <201312091748.58386.arnd@arndb.de> <52A5F79D.9070408@overkiz.com>
-Message-ID: <201312092205.08933.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 9 Dec 2013 18:08:56 -0300
+Subject: [PATCH] mtd: nand: pxa3xx: Disable "armada370-nand" compatible
+ support
+In-Reply-To: <20131209204607.GV27149@ld-irv-0074.broadcom.com>
+References: <1386430787-2962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131207232315.GC11251@titan.lakedaemon.net>
+ <20131208013525.GA4487@localhost>
+ <20131208014049.GJ11251@titan.lakedaemon.net>
+ <20131209204607.GV27149@ld-irv-0074.broadcom.com>
+Message-ID: <20131209210855.GB31944@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 December 2013, boris brezillon wrote:
-> Are you talking about drivers or clk binding documentation ?
-> In either cases they're not defined :-), but I'd like to know which 
-> file(s) I should update.
-
-I mean bindings for the devices using these clocks. Each of them should
-list among its properties something like
-
-|Mandatory properties:
-|  clocks:	One phandle and clock specifier for xxxx
-|  clock-names:	The name of this clock, must be "xxxx"
-
-Of course if we decide to make it an anonymous clock, we still need to
-document the fact that the clock is required.
-
-> I'd rather not change the static clock lookup tables, but if you prefer this
-> approach (and Nicolas agrees), I'll propose a series modifying the drivers
-> and clk lookup table.
+On Mon, Dec 09, 2013 at 12:46:07PM -0800, Brian Norris wrote:
+> Hi Ezequiel,
 > 
-> Whatever solution is choosen, I guess I'll have to update the drivers dt
-> binding documentation anyway ;-).
+> On Sat, Dec 07, 2013 at 08:40:49PM -0500, Jason Cooper wrote:
+> > On Sat, Dec 07, 2013 at 10:35:26PM -0300, Ezequiel Garcia wrote:
+> > > If we agree to remove the lines, shall we also revert the binding
+> > > documentation, removing the compatible from there as well?
+> > 
+> > I think this is unnecessary.  We're trying to prevent breaking
+> > bisection.  No one in their right mind should be developing (and
+> > referring to docs) at a random commit.  As long as the docs are correct,
+> > leave them alone.
+> 
+> I agree, we don't need to drop all the docs, just the lines with the
+> 'compatible' property. And #if 0 is a no-go; let's just delete the
+> lines.
+> 
+> Yes, the docs will appear in 3.12 and 3.13 even though the driver
+> support won't be there until 3.14, but that's OK IMO.
+> 
+> Do you think this should go to 3.12.y stable? If so, please add the
+> appropriate Cc tag. BTW, you moved these lines around in 3.13 so far,
+> so the patch probably won't apply 100% clean.
+> 
+> Can you refresh this patch according to Jason's comments and resend?
+> 
 
-Ok. FWIW, I think the best way to stage the clock updates (if the decision
-is to make them anonymous) would be to duplicate all the clocks in question
-in a first patch, and then submit changes for each driver to the respective
-subsystem maintainers with a patch based on the first changeset.
-
-Once all the drivers are converted (i.e. the following merge window), we can
-remove the obsolete entries.
-
-	Arnd
+Sure!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
