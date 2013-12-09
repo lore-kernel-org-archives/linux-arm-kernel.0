@@ -1,114 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 8 Dec 2013 17:58:39 -0800
-Subject: [PATCH 1/3] ARM: OMAP4+: hwmod data: Don't prevent RESET of USB
- Host module
-In-Reply-To: <alpine.DEB.2.02.1312090125170.32309@utopia.booyaka.com>
-References: <1386080748-17005-1-git-send-email-rogerq@ti.com>
- <1386080748-17005-2-git-send-email-rogerq@ti.com>
- <alpine.DEB.2.02.1312090125170.32309@utopia.booyaka.com>
-Message-ID: <20131209015838.GA11433@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Dec 2013 10:11:39 +0800
+Subject: [PATCH] ARM: dts: imx53: Enable AHCI SATA for imx53-qsb
+In-Reply-To: <1386081578-3651-1-git-send-email-robertcnelson@gmail.com>
+References: <1386081578-3651-1-git-send-email-robertcnelson@gmail.com>
+Message-ID: <20131209021137.GA825@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [131208 17:27]:
-> Hi Beno?t,
-> 
-> On Tue, 3 Dec 2013, Roger Quadros wrote:
-> 
-> > Without this, the USB devices are sometimes not detected on OMAP4 Panda
-> > with u-boot v2013.10.
-> > 
-> > Unlike what the comment states, errata i660 does not state that we
-> > can't RESET the USB host module. Instead it states that RESET is the
-> > only way to recover from a deadlock situation.
-> > 
-> > RESET ensures that the module is in a known good state irrespective
-> > of what bootloader does with the module, so it must be done at boot.
-> > 
-> > Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> Will you pick this up for the -rc series, or do you want me or Tony to?  
-> Roger writes that this one's pretty important.
+On Tue, Dec 03, 2013 at 08:39:38AM -0600, Robert Nelson wrote:
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Linux-IDE <linux-ide@vger.kernel.org>
 
-I suggest that you just queue this with your other fixes so we get
-things working.
+Applied, thanks.
 
-Regards,
+Shawn
 
-Tony
- 
- 
-> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 12 ++----------
-> >  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 13 +++----------
-> >  2 files changed, 5 insertions(+), 20 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > index 1e5b12c..3318cae9 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > @@ -2937,7 +2937,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_usb_host_hs_sysc = {
-> >  	.sysc_offs	= 0x0010,
-> >  	.syss_offs	= 0x0014,
-> >  	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE |
-> > -			   SYSC_HAS_SOFTRESET),
-> > +			   SYSC_HAS_SOFTRESET | SYSC_HAS_RESET_STATUS),
-> >  	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> >  			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
-> >  			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
-> > @@ -3001,15 +3001,7 @@ static struct omap_hwmod omap44xx_usb_host_hs_hwmod = {
-> >  	 * hence HWMOD_SWSUP_MSTANDBY
-> >  	 */
-> >  
-> > -	/*
-> > -	 * During system boot; If the hwmod framework resets the module
-> > -	 * the module will have smart idle settings; which can lead to deadlock
-> > -	 * (above Errata Id:i660); so, dont reset the module during boot;
-> > -	 * Use HWMOD_INIT_NO_RESET.
-> > -	 */
-> > -
-> > -	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
-> > -			  HWMOD_INIT_NO_RESET,
-> > +	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
-> >  };
-> >  
-> >  /*
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> > index 9e08d69..e297d62 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> > @@ -1544,7 +1544,8 @@ static struct omap_hwmod_class_sysconfig omap54xx_usb_host_hs_sysc = {
-> >  	.rev_offs	= 0x0000,
-> >  	.sysc_offs	= 0x0010,
-> >  	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-> > -			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-> > +			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-> > +			   SYSC_HAS_RESET_STATUS),
-> >  	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> >  			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
-> >  			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
-> > @@ -1598,15 +1599,7 @@ static struct omap_hwmod omap54xx_usb_host_hs_hwmod = {
-> >  	 * hence HWMOD_SWSUP_MSTANDBY
-> >  	 */
-> >  
-> > -	/*
-> > -	 * During system boot; If the hwmod framework resets the module
-> > -	 * the module will have smart idle settings; which can lead to deadlock
-> > -	 * (above Errata Id:i660); so, dont reset the module during boot;
-> > -	 * Use HWMOD_INIT_NO_RESET.
-> > -	 */
-> > -
-> > -	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
-> > -			  HWMOD_INIT_NO_RESET,
-> > +	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
-> >  	.main_clk	= "l3init_60m_fclk",
-> >  	.prcm = {
-> >  		.omap4 = {
-> > -- 
-> > 1.8.3.2
-> > 
+> ---
+>  arch/arm/boot/dts/imx53-qsb.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+> index 91a5935..ea927be 100644
+> --- a/arch/arm/boot/dts/imx53-qsb.dts
+> +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> @@ -307,6 +307,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&sata {
+> +	status = "okay";
+> +};
+> +
+>  &vpu {
+>  	status = "okay";
+>  };
+> -- 
+> 1.8.4.3
 > 
-> - Paul
