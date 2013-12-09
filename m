@@ -1,25 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 9 Dec 2013 08:34:22 -0800
-Subject: [PATCH v5] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <20131002231751.4343.81234@quantum>
-References: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
- <b625092b-682c-4072-85a6-9f9d7f378ec0@VA3EHSMHS043.ehs.local>
- <20131002231751.4343.81234@quantum>
-Message-ID: <20131209163422.GA14048@roeck-us.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 09 Dec 2013 17:34:44 +0100
+Subject: [PATCH v4 2/4] clk: exynos5410: register clocks using common clock
+ framework
+In-Reply-To: <1385456288-20398-3-git-send-email-v.tyrtov@samsung.com>
+References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
+ <1385456288-20398-3-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <1914850.6CAa0SzDWP@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 04:17:51PM -0700, Mike Turquette wrote:
-> Quoting S?ren Brinkmann (2013-10-02 10:20:38)
-> > Hi Mike,
-> > 
-> > could you please comment on this/apply it to clk-next?
-> 
-> It looks good and is in the queue. Will show up in clk-next in a few
-> days.
-> 
-What happened with this driver ? I just noticed it is not upstream,
-nor in -next. I don't recall seeing any objections, so I am a bit puzzled.
+Hi Vyacheslav, Tarek,
 
-Thanks,
-Guenter
+On Tuesday 26 of November 2013 12:58:06 Vyacheslav Tyrtov wrote:
+> From: Tarek Dakhran <t.dakhran@samsung.com>
+> 
+> The EXYNOS5410 clocks are statically listed and registered
+> using the Samsung specific common clock helper functions.
+> 
+> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> ---
+>  .../devicetree/bindings/clock/exynos5410-clock.txt |  54 +++++
+>  drivers/clk/samsung/Makefile                       |   1 +
+>  drivers/clk/samsung/clk-exynos5410.c               | 239 +++++++++++++++++++++
+>  include/dt-bindings/clock/exynos5410.h             |  32 +++
+>  4 files changed, 326 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+>  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+>  create mode 100644 include/dt-bindings/clock/exynos5410.h
+
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+
+This should go through Samsung tree, I guess, since it's a dependency
+of other patches in this series and doesn't depend on any things from
+clock tree. Mike, Kukjin, are you okay with this?
+
+Best regards,
+Tomasz
