@@ -1,92 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Dec 2013 10:00:47 +0000 (UTC)
-Subject: OMAP baseline test results for v3.13-rc3
-Message-ID: <alpine.DEB.2.02.1312090957460.32309@utopia.booyaka.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 09 Dec 2013 11:00:51 +0100
+Subject: panda board es failed on cpuidle
+In-Reply-To: <52A5936E.5050409@linaro.org>
+References: <52A5936E.5050409@linaro.org>
+Message-ID: <52A594D3.4060809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/09/2013 10:54 AM, Alex Shi wrote:
+> my panda board ES failed to boot up when I use omap2plus_defconfig + CPU_IDLE.
+> Is it a known issue or I missed sth in kernel?
+>
+> CONFIG_CPU_IDLE=y
+> # CONFIG_CPU_IDLE_MULTIPLE_DRIVERS is not set
+> CONFIG_CPU_IDLE_GOV_LADDER=y
+> CONFIG_CPU_IDLE_GOV_MENU=y
+> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+>
+>
+> kernel hang after the following output.
+>
+>      2.276641] omap_hsmmc 4809c000.mmc: pins are not configured from the driver
+> [    2.325531] pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x38 (0x38)
+> [    2.333648] pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_wl12xx_pins 56x
+> [    2.343231] omap-dma-engine 4a056000.dma-controller: allocating channel for 60
+> [    2.351043] omap-dma-engine 4a056000.dma-controller: allocating channel for 59
+> [    2.358917] 480d5000.mmc supply vmmc_aux not found, using dummy regulator
+> [    2.383331] hw-breakpoint: Failed to enable monitor mode on CPU 0.
+> [    2.390411] hw-breakpoint: CPU 0 failed to disable vector catch
 
-Here are some basic OMAP test results for Linux v3.13-rc3.
-Logs and other details at:
+Yes, I saw an email talking about a hang with cpuidle + omap4.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.13-rc3/20131208173612/
+The thread is http://www.spinics.net/lists/linux-omap/msg99899.html
 
+and the patch bringing the fix is 
+https://patchwork.kernel.org/patch/3084521/
 
-Test summary
-------------
+Hope that helps.
 
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
+   -- Daniel
 
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-
-vmlinux object size
-(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839)):
-   text     data      bss    total  kernel
-   +376        0        0     +376  omap1_defconfig
-   +332        0        0     +332  omap1_defconfig_1510innovator_only
-  +1368        0        0    +1368  omap1_defconfig_5912osk_only
-   +448    +1816        0    +2264  omap2plus_defconfig
-    +44    +1952        0    +1996  omap2plus_defconfig_2430sdp_only
-   +520    +1784        0    +2304  omap2plus_defconfig_cpupm
-  +4372      +16        0    +4388  omap2plus_defconfig_n800_multi_omap2xxx
-   +308      -16        0     +292  omap2plus_defconfig_n800_only_a
-   +320    +1816        0    +2136  omap2plus_defconfig_no_pm
-   +448    +1816        0    +2264  omap2plus_defconfig_omap2_4_only
-   +448    +1784        0    +2232  omap2plus_defconfig_omap3_4_only
-   +416      +16     -156     +276  rmk_omap3430_ldp_allnoconfig
-   +176      +16        0     +192  rmk_omap3430_ldp_oldconfig
-   +280      -16     -116     +148  rmk_omap4430_sdp_allnoconfig
-   +256     +896        0    +1152  rmk_omap4430_sdp_oldnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  4460varsomom   omap2plus_defconfig
-    -4k     4k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
