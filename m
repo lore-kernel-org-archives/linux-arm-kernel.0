@@ -1,14 +1,12 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 9 Dec 2013 16:50:49 -0500
-Subject: [PATCH v3 16/23] mm/hugetlb: Use memblock apis for early memory
+Date: Mon, 9 Dec 2013 16:50:46 -0500
+Subject: [PATCH v3 13/23] mm/lib/swiotlb: Use memblock apis for early memory
  allocations
 In-Reply-To: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1386625856-12942-17-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386625856-12942-14-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Grygorii Strashko <grygorii.strashko@ti.com>
 
 Switch to memblock interfaces for early memory allocator instead of
 bootmem allocator. No functional change in beahvior than what it is
@@ -22,39 +20,85 @@ bootmem APIs.
 Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/hugetlb.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ lib/swiotlb.c |   35 ++++++++++++++++++++---------------
+ 1 file changed, 20 insertions(+), 15 deletions(-)
 
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index dee6cf4..e16c56e 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1280,9 +1280,9 @@ int __weak alloc_bootmem_huge_page(struct hstate *h)
- 	for_each_node_mask_to_alloc(h, nr_nodes, node, &node_states[N_MEMORY]) {
- 		void *addr;
+diff --git a/lib/swiotlb.c b/lib/swiotlb.c
+index e4399fa..615f3de 100644
+--- a/lib/swiotlb.c
++++ b/lib/swiotlb.c
+@@ -172,8 +172,9 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
+ 	/*
+ 	 * Get the overflow emergency buffer
+ 	 */
+-	v_overflow_buffer = alloc_bootmem_low_pages_nopanic(
+-						PAGE_ALIGN(io_tlb_overflow));
++	v_overflow_buffer = memblock_virt_alloc_nopanic(
++						PAGE_ALIGN(io_tlb_overflow),
++						PAGE_SIZE);
+ 	if (!v_overflow_buffer)
+ 		return -ENOMEM;
  
--		addr = __alloc_bootmem_node_nopanic(NODE_DATA(node),
--				huge_page_size(h), huge_page_size(h), 0);
--
-+		addr = memblock_virt_alloc_try_nid_nopanic(
-+				huge_page_size(h), huge_page_size(h),
-+				0, BOOTMEM_ALLOC_ACCESSIBLE, node);
- 		if (addr) {
- 			/*
- 			 * Use the beginning of the huge page to store the
-@@ -1322,8 +1322,8 @@ static void __init gather_bootmem_prealloc(void)
+@@ -184,11 +185,15 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
+ 	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
+ 	 * between io_tlb_start and io_tlb_end.
+ 	 */
+-	io_tlb_list = alloc_bootmem_pages(PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
++	io_tlb_list = memblock_virt_alloc(
++				PAGE_ALIGN(io_tlb_nslabs * sizeof(int)),
++				PAGE_SIZE);
+ 	for (i = 0; i < io_tlb_nslabs; i++)
+  		io_tlb_list[i] = IO_TLB_SEGSIZE - OFFSET(i, IO_TLB_SEGSIZE);
+ 	io_tlb_index = 0;
+-	io_tlb_orig_addr = alloc_bootmem_pages(PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
++	io_tlb_orig_addr = memblock_virt_alloc(
++				PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)),
++				PAGE_SIZE);
  
- #ifdef CONFIG_HIGHMEM
- 		page = pfn_to_page(m->phys >> PAGE_SHIFT);
--		free_bootmem_late((unsigned long)m,
--				  sizeof(struct huge_bootmem_page));
-+		memblock_free_late(__pa(m),
-+				   sizeof(struct huge_bootmem_page));
- #else
- 		page = virt_to_page(m);
- #endif
+ 	if (verbose)
+ 		swiotlb_print_info();
+@@ -215,13 +220,13 @@ swiotlb_init(int verbose)
+ 	bytes = io_tlb_nslabs << IO_TLB_SHIFT;
+ 
+ 	/* Get IO TLB memory from the low pages */
+-	vstart = alloc_bootmem_low_pages_nopanic(PAGE_ALIGN(bytes));
++	vstart = memblock_virt_alloc_nopanic(PAGE_ALIGN(bytes), PAGE_SIZE);
+ 	if (vstart && !swiotlb_init_with_tbl(vstart, io_tlb_nslabs, verbose))
+ 		return;
+ 
+ 	if (io_tlb_start)
+-		free_bootmem(io_tlb_start,
+-				 PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
++		memblock_free_early(io_tlb_start,
++				    PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
+ 	pr_warn("Cannot allocate SWIOTLB buffer");
+ 	no_iotlb_memory = true;
+ }
+@@ -357,14 +362,14 @@ void __init swiotlb_free(void)
+ 		free_pages((unsigned long)phys_to_virt(io_tlb_start),
+ 			   get_order(io_tlb_nslabs << IO_TLB_SHIFT));
+ 	} else {
+-		free_bootmem_late(io_tlb_overflow_buffer,
+-				  PAGE_ALIGN(io_tlb_overflow));
+-		free_bootmem_late(__pa(io_tlb_orig_addr),
+-				  PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
+-		free_bootmem_late(__pa(io_tlb_list),
+-				  PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
+-		free_bootmem_late(io_tlb_start,
+-				  PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
++		memblock_free_late(io_tlb_overflow_buffer,
++				   PAGE_ALIGN(io_tlb_overflow));
++		memblock_free_late(__pa(io_tlb_orig_addr),
++				   PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
++		memblock_free_late(__pa(io_tlb_list),
++				   PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
++		memblock_free_late(io_tlb_start,
++				   PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
+ 	}
+ 	io_tlb_nslabs = 0;
+ }
 -- 
 1.7.9.5
