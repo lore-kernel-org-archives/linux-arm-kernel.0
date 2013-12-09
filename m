@@ -1,40 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon,  9 Dec 2013 15:06:49 -0700
-Subject: [PATCH 3/3] ARM: tegra: set up /aliases entries for RTCs
-In-Reply-To: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
-References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1386626809-6251-3-git-send-email-swarren@wwwdotorg.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Dec 2013 02:10:03 +0300
+Subject: [PATCH v3 2/3] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <CAMuHMdXDHMRy2LTEa50omMs0dV9Vdf2woBsNAHzhkceXDfqyOg@mail.gmail.com>
+References: <201312082348.17588.sergei.shtylyov@cogentembedded.com>	<201312082352.45265.sergei.shtylyov@cogentembedded.com>	<CAMuHMdWFmO4d4b77JDY0_Z5NuQFoP73-PVho2dwAOY4ES57Dug@mail.gmail.com>	<52A62753.8060202@cogentembedded.com>
+ <CAMuHMdXDHMRy2LTEa50omMs0dV9Vdf2woBsNAHzhkceXDfqyOg@mail.gmail.com>
+Message-ID: <52A64DCB.8000504@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 12/09/2013 10:40 PM, Geert Uytterhoeven wrote:
 
-This ensures that the PMIC RTC provides the system time, rather than
-the on-SoC RTC, which is not battery-backed.
+>>>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
+>>>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This patch is just an example. If the previous two patches are accepted,
-I'll flesh this patch out to cover all boards, and repost.
----
- arch/arm/boot/dts/tegra20-seaboard.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+>>>> +/* Ether */
+>>>> +static const struct sh_eth_plat_data ether_pdata __initconst = {
+>>>> +       .phy                    = 0x1,
+>>>> +       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
+>>>> +       .phy_interface          = PHY_INTERFACE_MODE_RMII,
+>>>> +       .ether_link_active_low  = 1,
+>>>> +};
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index ff63da7ff00d..1e62b7c5611f 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -6,6 +6,11 @@
- 	model = "NVIDIA Seaboard";
- 	compatible = "nvidia,seaboard", "nvidia,tegra20";
- 
-+	aliases {
-+		rtc0 = "/i2c at 7000d000/tps6586x at 34";
-+		rtc1 = "/rtc at 7000e000";
-+	};
-+
- 	memory {
- 		reg = <0x00000000 0x40000000>;
- 	};
--- 
-1.8.1.5
+>>> With the above, NFS root is terrible slow,
+
+>>     Do you get NFS timeout(s) on booting? I do. It's a known issue.
+
+> I only saw "NFS server not responding" once.
+
+    Yes, I meant that by NFS timeout. Sometimes I see 2 of them in a row.
+
+>>     You can try my simplistic 'sh_eth' driver patch:
+
+>> http://marc.info/?l=linux-sh&m=137911743723032
+
+> Thanks, that also fixes the problem!
+
+    Let's hope Florian's patches get queued for 3.14. You can also test them 
+meanwhile...
+
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+
+WBR, Sergei
