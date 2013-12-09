@@ -1,267 +1,238 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 9 Dec 2013 17:56:08 +0000
-Subject: [PATCH V6] ARM : unwinder : Prevent data abort due to stack
- overflow
-In-Reply-To: <1386586064-28170-1-git-send-email-a.anurag@samsung.com>
-References: <1386586064-28170-1-git-send-email-a.anurag@samsung.com>
-Message-ID: <20131209175608.GB4281@e103592.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 9 Dec 2013 10:54:29 -0800
+Subject: [RFC part2 PATCH 9/9] ACPI / GIC: Initialize GIC using the
+ information in MADT
+In-Reply-To: <529F4F39.9090001@arm.com>
+References: <1386088753-2850-1-git-send-email-hanjun.guo@linaro.org>
+ <1386088753-2850-10-git-send-email-hanjun.guo@linaro.org>
+ <529E1443.9040509@arm.com> <529F4B2A.6060508@linaro.org>
+ <529F4F39.9090001@arm.com>
+Message-ID: <20131209185429.GB27562@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 04:17:44PM +0530, Anurag Aggarwal wrote:
-> While unwinding backtrace, stack overflow is possible. This stack
-> overflow can sometimes lead to data abort in system if the area after
-> stack is not mapped to physical memory.
+On Wed, Dec 04, 2013 at 03:50:17PM +0000, Marc Zyngier wrote:
+> On 04/12/13 15:32, Hanjun Guo wrote:
+> > On 2013?12?04? 01:26, Marc Zyngier wrote:
+> >> Hi Hanjun,
+> >>
+> >> On 03/12/13 16:39, Hanjun Guo wrote:
+> >>> In MADT table, there are GIC cpu interface base address and
+> >>> GIC distributor base address, use them to convert GIC to ACPI.
+> >>>
+> >>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>> ---
+> >>>   arch/arm64/kernel/irq.c      |    5 ++++
+> >>>   drivers/acpi/plat/arm-core.c |   66 ++++++++++++++++++++++++++++++++++++------
+> >>>   include/linux/acpi.h         |    6 ++++
+> >>>   3 files changed, 68 insertions(+), 9 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+> >>> index 473e5db..a9e68bf 100644
+> >>> --- a/arch/arm64/kernel/irq.c
+> >>> +++ b/arch/arm64/kernel/irq.c
+> >>> @@ -25,6 +25,7 @@
+> >>>   #include <linux/irq.h>
+> >>>   #include <linux/smp.h>
+> >>>   #include <linux/init.h>
+> >>> +#include <linux/acpi.h>
+> >>>   #include <linux/irqchip.h>
+> >>>   #include <linux/seq_file.h>
+> >>>   #include <linux/ratelimit.h>
+> >>> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+> >>>   void __init init_IRQ(void)
+> >>>   {
+> >>>   	irqchip_init();
+> >>> +
+> >>> +	if (!handle_arch_irq)
+> >>> +		acpi_gic_init();
+> >>> +
+> >> Why is the GIC hardcoded?
+> > 
+> > Very good question, thanks. I considered GIC only in my patch set.
+> > I have no idea how to handle the GIC hardcoded problem here for
+> > now, but I will figure it out later.
+> > 
+> > If any suggestion, I will appreciate a lot.
+> > 
+> >> How are you going to support other interrupt
+> >> controllers?
+> > 
+> > ACPI 5.0 supports GICv2 only for now, if we want to
+> > support other interrupt controller, we should introduce
+> > some OEM table and parsing it, and it will not covered
+> > by this patch set.
+> > 
+> >>>   	if (!handle_arch_irq)
+> >>>   		panic("No interrupt controller found.");
+> >>>   }
+> >>> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+> >>> index 17c99e1..509b847 100644
+> >>> --- a/drivers/acpi/plat/arm-core.c
+> >>> +++ b/drivers/acpi/plat/arm-core.c
+> >>> @@ -29,6 +29,7 @@
+> >>>   #include <linux/module.h>
+> >>>   #include <linux/irq.h>
+> >>>   #include <linux/irqdomain.h>
+> >>> +#include <linux/irqchip/arm-gic.h>
+> >>>   #include <linux/slab.h>
+> >>>   #include <linux/bootmem.h>
+> >>>   #include <linux/ioport.h>
+> >>> @@ -211,11 +212,21 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+> >>>   	return 0;
+> >>>   }
+> >>>   
+> >>> +#ifdef CONFIG_ARM_GIC
+> >>> +/*
+> >>> + * Hard code here, we can not get memory size from MADT (but FDT does),
+> >>> + * this size is described in ARMv8 foudation model's User Guide
+> >>> + */
+> >>> +#define GIC_DISTRIBUTOR_MEMORY_SIZE (SZ_8K)
+> >>> +#define GIC_CPU_INTERFACE_MEMORY_SIZE (SZ_4K)
+> >> Aside from the incorrect sizes, how do you plan to address the other
+> >> regions that the GICv2 specification describes?
+> > 
+> > Did these regions have the same base address? I mean the same
+> > as GIC distributor base address and GIC cpu interface base address.
+> > 
+> > if yes, since the base address is stored in gic_init(), it can be for 
+> > furture
+> > use. if I misunderstood your question, please let me know.
 > 
-> To prevent this problem from happening, execute the instructions that
-> can cause a data abort in separate helper functions, where a check for
-> feasibility is made before reading each word from the stack.
+> Look at the VGIC implementation for KVM in virt/kvm/arm. It does its own
+> probing of the additional regions used for virtualization.
 > 
-> Signed-off-by: Anurag Aggarwal <a.anurag@samsung.com>
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-I can confirm that the kernel "doesn't crash" with this applied, and
-that backtracing at least partially works.  But this is not really
-sufficient to demontrate that the now code works better than the old
-code in corner cases (which is the point of the patch).
-
-Can you give details of what additional testing you have, or plan to
-do?
-
-Cheers
----Dave
-
-> ---
->  arch/arm/kernel/unwind.c |  137 +++++++++++++++++++++++++++++++++------------
->  1 files changed, 100 insertions(+), 37 deletions(-)
+> The GIC and VGIC code are completely separate, and you'll need to find
+> an acceptable solution for that too.
 > 
-> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-> index 00df012..3c21769 100644
-> --- a/arch/arm/kernel/unwind.c
-> +++ b/arch/arm/kernel/unwind.c
-> @@ -68,6 +68,12 @@ EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
->  struct unwind_ctrl_block {
->  	unsigned long vrs[16];		/* virtual register set */
->  	const unsigned long *insn;	/* pointer to the current instructions word */
-> +	unsigned long sp_high;		/* highest value of sp allowed */
-> +	/*
-> +	 * 1 : check for stack overflow for each register pop.
-> +	 * 0 : save overhead if there is plenty of stack remaining.
-> +	 */
-> +	int check_each_pop;
->  	int entries;			/* number of entries left to interpret */
->  	int byte;			/* current byte number in the instructions word */
->  };
-> @@ -235,12 +241,85 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
->  	return ret;
->  }
->  
-> +/* Before poping a register check whether it is feasible or not */
-> +static int unwind_pop_register(struct unwind_ctrl_block *ctrl,
-> +				unsigned long **vsp, unsigned int reg)
-> +{
-> +	if (unlikely(ctrl->check_each_pop))
-> +		if (*vsp >= (unsigned long *)ctrl->sp_high)
-> +			return -URC_FAILURE;
-> +
-> +	ctrl->vrs[reg] = *(*vsp)++;
-> +	return URC_OK;
-> +}
-> +
-> +/* Helper functions to execute the instructions */
-> +static int unwind_exec_pop_subset_r4_to_r13(struct unwind_ctrl_block *ctrl,
-> +						unsigned long mask)
-> +{
-> +	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> +	int load_sp, reg = 4;
-> +
-> +	load_sp = mask & (1 << (13 - 4));
-> +	while (mask) {
-> +		if (mask & 1)
-> +			if (unwind_pop_register(ctrl, &vsp, reg))
-> +				return -URC_FAILURE;
-> +		mask >>= 1;
-> +		reg++;
-> +	}
-> +	if (!load_sp)
-> +		ctrl->vrs[SP] = (unsigned long)vsp;
-> +
-> +	return URC_OK;
-> +}
-> +
-> +static int unwind_exec_pop_r4_to_rN(struct unwind_ctrl_block *ctrl,
-> +					unsigned long insn)
-> +{
-> +	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> +	int reg;
-> +
-> +	/* pop R4-R[4+bbb] */
-> +	for (reg = 4; reg <= 4 + (insn & 7); reg++)
-> +		if (unwind_pop_register(ctrl, &vsp, reg))
-> +				return -URC_FAILURE;
-> +
-> +	if (insn & 0x80)
-> +		if (unwind_pop_register(ctrl, &vsp, 14))
-> +				return -URC_FAILURE;
-> +
-> +	ctrl->vrs[SP] = (unsigned long)vsp;
-> +
-> +	return URC_OK;
-> +}
-> +
-> +static int unwind_exec_pop_subset_r0_to_r3(struct unwind_ctrl_block *ctrl,
-> +						unsigned long mask)
-> +{
-> +	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> +	int reg = 0;
-> +
-> +	/* pop R0-R3 according to mask */
-> +	while (mask) {
-> +		if (mask & 1)
-> +			if (unwind_pop_register(ctrl, &vsp, reg))
-> +				return -URC_FAILURE;
-> +		mask >>= 1;
-> +		reg++;
-> +	}
-> +	ctrl->vrs[SP] = (unsigned long)vsp;
-> +
-> +	return URC_OK;
-> +}
-> +
->  /*
->   * Execute the current unwind instruction.
->   */
->  static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  {
->  	unsigned long insn = unwind_get_byte(ctrl);
-> +	int ret = URC_OK;
->  
->  	pr_debug("%s: insn = %08lx\n", __func__, insn);
->  
-> @@ -250,8 +329,6 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  		ctrl->vrs[SP] -= ((insn & 0x3f) << 2) + 4;
->  	else if ((insn & 0xf0) == 0x80) {
->  		unsigned long mask;
-> -		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> -		int load_sp, reg = 4;
->  
->  		insn = (insn << 8) | unwind_get_byte(ctrl);
->  		mask = insn & 0x0fff;
-> @@ -261,29 +338,16 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  			return -URC_FAILURE;
->  		}
->  
-> -		/* pop R4-R15 according to mask */
-> -		load_sp = mask & (1 << (13 - 4));
-> -		while (mask) {
-> -			if (mask & 1)
-> -				ctrl->vrs[reg] = *vsp++;
-> -			mask >>= 1;
-> -			reg++;
-> -		}
-> -		if (!load_sp)
-> -			ctrl->vrs[SP] = (unsigned long)vsp;
-> +		ret = unwind_exec_pop_subset_r4_to_r13(ctrl, mask);
-> +		if (ret)
-> +			goto error;
->  	} else if ((insn & 0xf0) == 0x90 &&
->  		   (insn & 0x0d) != 0x0d)
->  		ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
->  	else if ((insn & 0xf0) == 0xa0) {
-> -		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> -		int reg;
-> -
-> -		/* pop R4-R[4+bbb] */
-> -		for (reg = 4; reg <= 4 + (insn & 7); reg++)
-> -			ctrl->vrs[reg] = *vsp++;
-> -		if (insn & 0x80)
-> -			ctrl->vrs[14] = *vsp++;
-> -		ctrl->vrs[SP] = (unsigned long)vsp;
-> +		ret = unwind_exec_pop_r4_to_rN(ctrl, insn);
-> +		if (ret)
-> +			goto error;
->  	} else if (insn == 0xb0) {
->  		if (ctrl->vrs[PC] == 0)
->  			ctrl->vrs[PC] = ctrl->vrs[LR];
-> @@ -291,8 +355,6 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  		ctrl->entries = 0;
->  	} else if (insn == 0xb1) {
->  		unsigned long mask = unwind_get_byte(ctrl);
-> -		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-> -		int reg = 0;
->  
->  		if (mask == 0 || mask & 0xf0) {
->  			pr_warning("unwind: Spare encoding %04lx\n",
-> @@ -300,14 +362,9 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  			return -URC_FAILURE;
->  		}
->  
-> -		/* pop R0-R3 according to mask */
-> -		while (mask) {
-> -			if (mask & 1)
-> -				ctrl->vrs[reg] = *vsp++;
-> -			mask >>= 1;
-> -			reg++;
-> -		}
-> -		ctrl->vrs[SP] = (unsigned long)vsp;
-> +		ret = unwind_exec_pop_subset_r0_to_r3(ctrl, mask);
-> +		if (ret)
-> +			goto error;
->  	} else if (insn == 0xb2) {
->  		unsigned long uleb128 = unwind_get_byte(ctrl);
->  
-> @@ -320,7 +377,8 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->  	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
->  		 ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
->  
-> -	return URC_OK;
-> +error:
-> +	return ret;
->  }
->  
->  /*
-> @@ -329,13 +387,13 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
->   */
->  int unwind_frame(struct stackframe *frame)
->  {
-> -	unsigned long high, low;
-> +	unsigned long low;
->  	const struct unwind_idx *idx;
->  	struct unwind_ctrl_block ctrl;
->  
-> -	/* only go to a higher address on the stack */
-> +	/* store the highest address on the stack to avoid crossing it*/
->  	low = frame->sp;
-> -	high = ALIGN(low, THREAD_SIZE);
-> +	ctrl.sp_high = ALIGN(low, THREAD_SIZE);
->  
->  	pr_debug("%s(pc = %08lx lr = %08lx sp = %08lx)\n", __func__,
->  		 frame->pc, frame->lr, frame->sp);
-> @@ -382,11 +440,16 @@ int unwind_frame(struct stackframe *frame)
->  		return -URC_FAILURE;
->  	}
->  
-> +	ctrl.check_each_pop = 0;
-> +
->  	while (ctrl.entries > 0) {
-> -		int urc = unwind_exec_insn(&ctrl);
-> +		int urc;
-> +		if ((ctrl.sp_high - ctrl.vrs[SP]) < sizeof(ctrl.vrs))
-> +			ctrl.check_each_pop = 1;
-> +		urc = unwind_exec_insn(&ctrl);
->  		if (urc < 0)
->  			return urc;
-> -		if (ctrl.vrs[SP] < low || ctrl.vrs[SP] >= high)
-> +		if (ctrl.vrs[SP] < low || ctrl.vrs[SP] >= ctrl.sp_high)
->  			return -URC_FAILURE;
->  	}
->  
-> -- 
-> 1.7.9.msysgit.0
+> >>>   static int __init
+> >>>   acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+> >>>   				const unsigned long end)
+> >>>   {
+> >>>   	struct acpi_madt_generic_distributor *distributor = NULL;
+> >>> +	void __iomem *dist_base = NULL;
+> >>> +	void __iomem *cpu_base = NULL;
+> >>>   
+> >>>   	distributor = (struct acpi_madt_generic_distributor *)header;
+> >>>   
+> >>> @@ -224,8 +235,43 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+> >>>   
+> >>>   	acpi_table_print_madt_entry(header);
+> >>>   
+> >>> +	/* GIC is initialised after page_init(), no need for early_ioremap */
+> >>> +	dist_base = ioremap(distributor->base_address,
+> >>> +				GIC_CPU_INTERFACE_MEMORY_SIZE);
+> >>> +	if (!dist_base) {
+> >>> +		pr_warn(PREFIX "unable to map gic dist registers\n");
+> >>> +		return -ENOMEM;
+> >>> +	}
+> >>> +
+> >>> +	/*
+> >>> +	 * acpi_lapic_addr is stored in acpi_parse_madt(),
+> >>> +	 * so we can use it here for GIC init
+> >>> +	 */
+> >>> +	if (acpi_lapic_addr) {
+> >>> +		iounmap(dist_base);
+> >>> +		pr_warn(PREFIX "Invalid GIC cpu interface base address\n");
+> >>> +		return -EINVAL;
+> >>> +	}
+> >>> +
+> >>> +	cpu_base = ioremap(acpi_lapic_addr, GIC_CPU_INTERFACE_MEMORY_SIZE);
+> >>> +	if (!cpu_base) {
+> >>> +		iounmap(dist_base);
+> >>> +		pr_warn(PREFIX "unable to map gic cpu registers\n");
+> >>> +		return -ENOMEM;
+> >>> +	}
+> >>> +
+> >>> +	gic_init(distributor->gic_id, -1, dist_base, cpu_base);
+> >>> +
+> >>>   	return 0;
+> >>>   }
+> >>> +#else
+> >>> +static int __init
+> >>> +acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+> >>> +				const unsigned long end)
+> >>> +{
+> >>> +	return -ENODEV;
+> >>> +}
+> >>> +#endif /* CONFIG_ARM_GIC */
+> >>>   
+> >>>   /*
+> >>>    * Parse GIC cpu interface related entries in MADT
+> >>> @@ -234,7 +280,7 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+> >>>   static int __init acpi_parse_madt_gic_entries(void)
+> >>>   {
+> >>>   	int count;
+> >>> -
+> >>> +
+> >>>   	/*
+> >>>   	 * do a partial walk of MADT to determine how many CPUs
+> >>>   	 * we have including disabled CPUs
+> >>> @@ -468,19 +514,21 @@ static void __init acpi_process_madt(void)
+> >>>   		 * Parse MADT GIC cpu interface entries
+> >>>   		 */
+> >>>   		error = acpi_parse_madt_gic_entries();
+> >>> -		if (!error) {
+> >>> -			/*
+> >>> -			 * Parse MADT GIC distributor entries
+> >>> -			 */
+> >>> -			acpi_parse_madt_gic_distributor_entries();
+> >>> -		}
+> >>> +		if (!error)
+> >>> +			pr_info("Using ACPI for processor (GIC) configuration information\n");
+> >>>   	}
+> >>>   
+> >>> -	pr_info("Using ACPI for processor (GIC) configuration information\n");
+> >>> -
+> >>>   	return;
+> >>>   }
+> >>>   
+> >>> +int __init acpi_gic_init(void)
+> >>> +{
+> >>> +	/*
+> >>> +	 * Parse MADT GIC distributor entries
+> >>> +	 */
+> >>> +	return acpi_parse_madt_gic_distributor_entries();
+> >>> +}
+> >>> +
+> >> Why can't you do the GIC init in the GIC code? We've tried hard to make
+> >> interrupt controllers discoverable and self contained.
+> > 
+> > thanks for your suggestion, Rob also had the same suggestion,
+> > will try to update it in next version.
+> > 
+> >> What are you
+> >> going to do when ACPI adds GICv3 to the mix? I don't really think this
+> >> model (shoving everything into the core ACPI code) is sustainable in the
+> >> long run...
+> > 
+> > Since GICv3 related ACPI proposal is not public and not goes into ACPI
+> > spec, my suggestion is that we implement GICv2 only for now and post
+> > another patches for GICv3 when the new ACPI spec is available.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Certainly. But I think you should aim for a scalable solution right
+> away, instead of starting with something that we already know won't work
+> for stuff that is already around the corner (which is what I infer from
+> your "non public" statement).
+
+Again, I wonder if we might be better off converting GIC info (since
+it's likely to be there on all systems) in the EFI boot wrapper into
+FDT data when ACPI is provided.
+
+Essentially, if we can describe:
+* Memory
+* Console uart (if one exists) for debug
+* Timers
+* Interrupts
+(Possibly PCI host controllers too but I'm less sure that can be done
+generically)
+
+in the FDT stub, then we can keep a lot of the lowlevel init code common
+instead of diverging. We can also get away from having to update both ACPI and
+DT for GICv3, etc, reducing boilerplate code in the kernel to handle both.
+
+If we have to add some properties to bring across some ACPI information we can
+of course do so, hopefully it'll be a small amount.
+
+
+-Olof
