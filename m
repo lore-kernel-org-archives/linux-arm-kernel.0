@@ -1,51 +1,75 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 Dec 2013 10:57:39 +0100
-Subject: [GIT PULL] at91: soc updates for 3.14 #1
-Message-ID: <1386583059-22281-1-git-send-email-nicolas.ferre@atmel.com>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Mon,  9 Dec 2013 10:59:08 +0100
+Subject: [PATCH][RESEND] [SCSI]: ARM: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381039136-11749-1-git-send-email-michael.opdenacker@free-electrons.co>
+References: <1381039136-11749-1-git-send-email-michael.opdenacker@free-electrons.co>
+Message-ID: <1386583148-5010-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-This pull-request is for addition of sama5d36 and its Evaluation Kit. The
-patches are stacked on the "cleanup" material already in arm-soc tree
-(at91/sama5-ccf) like all other AT91 pull-requests for 3.14.
+It's a NOOP since 2.6.35 and it will be removed one day.
 
-Thanks, best regards,
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ drivers/scsi/arm/acornscsi.c | 2 +-
+ drivers/scsi/arm/cumana_1.c  | 2 +-
+ drivers/scsi/arm/cumana_2.c  | 2 +-
+ drivers/scsi/arm/powertec.c  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
-
-  ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-soc
-
-for you to fetch changes up to 0a72922b8dab2a1ce9cc977e9b1850556b48b4aa:
-
-  ARM: at91: sama5d3/dt: add sama5d36ek dts files (2013-12-09 09:50:53 +0100)
-
-----------------------------------------------------------------
-First soc pull-request for 3.14
-Addition of the sama5d36 SoC as a member of the sama5d3 family
-- SoC code and Device Tree file
-- Evaluation Kit (EK board) Device Tree file
-
-----------------------------------------------------------------
-Josh Wu (2):
-      ARM: at91: sama5d3: add support for sama5d36 chip
-      ARM: at91: sama5d3/dt: add sama5d36ek dts files
-
- arch/arm/boot/dts/Makefile            |  2 ++
- arch/arm/boot/dts/sama5d3.dtsi        |  2 +-
- arch/arm/boot/dts/sama5d36.dtsi       | 20 +++++++++++++
- arch/arm/boot/dts/sama5d36ek.dts      | 53 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Kconfig            |  2 +-
- arch/arm/mach-at91/include/mach/cpu.h |  3 +-
- arch/arm/mach-at91/setup.c            |  4 +++
- 7 files changed, 83 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/sama5d36.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
-
+diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
+index 09ba1869d366..059ff477a398 100644
+--- a/drivers/scsi/arm/acornscsi.c
++++ b/drivers/scsi/arm/acornscsi.c
+@@ -2971,7 +2971,7 @@ static int acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
+ 	ec->irqaddr	= ashost->fast + INT_REG;
+ 	ec->irqmask	= 0x0a;
+ 
+-	ret = request_irq(host->irq, acornscsi_intr, IRQF_DISABLED, "acornscsi", ashost);
++	ret = request_irq(host->irq, acornscsi_intr, 0, "acornscsi", ashost);
+ 	if (ret) {
+ 		printk(KERN_CRIT "scsi%d: IRQ%d not free: %d\n",
+ 			host->host_no, ashost->scsi.irq, ret);
+diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
+index b679778376c5..f8e060900052 100644
+--- a/drivers/scsi/arm/cumana_1.c
++++ b/drivers/scsi/arm/cumana_1.c
+@@ -262,7 +262,7 @@ static int cumanascsi1_probe(struct expansion_card *ec,
+ 		goto out_unmap;
+ 	}
+ 
+-	ret = request_irq(host->irq, cumanascsi_intr, IRQF_DISABLED,
++	ret = request_irq(host->irq, cumanascsi_intr, 0,
+ 			  "CumanaSCSI-1", host);
+ 	if (ret) {
+ 		printk("scsi%d: IRQ%d not free: %d\n",
+diff --git a/drivers/scsi/arm/cumana_2.c b/drivers/scsi/arm/cumana_2.c
+index 58915f29055b..abc66f5263ec 100644
+--- a/drivers/scsi/arm/cumana_2.c
++++ b/drivers/scsi/arm/cumana_2.c
+@@ -431,7 +431,7 @@ static int cumanascsi2_probe(struct expansion_card *ec,
+ 		goto out_free;
+ 
+ 	ret = request_irq(ec->irq, cumanascsi_2_intr,
+-			  IRQF_DISABLED, "cumanascsi2", info);
++			  0, "cumanascsi2", info);
+ 	if (ret) {
+ 		printk("scsi%d: IRQ%d not free: %d\n",
+ 		       host->host_no, ec->irq, ret);
+diff --git a/drivers/scsi/arm/powertec.c b/drivers/scsi/arm/powertec.c
+index abc9593615e9..5e1b73e1b743 100644
+--- a/drivers/scsi/arm/powertec.c
++++ b/drivers/scsi/arm/powertec.c
+@@ -358,7 +358,7 @@ static int powertecscsi_probe(struct expansion_card *ec,
+ 		goto out_free;
+ 
+ 	ret = request_irq(ec->irq, powertecscsi_intr,
+-			  IRQF_DISABLED, "powertec", info);
++			  0, "powertec", info);
+ 	if (ret) {
+ 		printk("scsi%d: IRQ%d not free: %d\n",
+ 		       host->host_no, ec->irq, ret);
 -- 
-Nicolas Ferre
+1.8.3.2
