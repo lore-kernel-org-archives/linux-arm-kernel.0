@@ -1,40 +1,47 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 9 Dec 2013 11:08:56 -0800
-Subject: Merge order in Armada 370/XP (mvebu) NAND support
-In-Reply-To: <20131206221217.GC2458@localhost>
-References: <20131206184544.GA14986@localhost>
- <20131206192540.GU29282@titan.lakedaemon.net>
- <20131206221217.GC2458@localhost>
-Message-ID: <20131209190856.GQ27149@ld-irv-0074.broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Dec 2013 11:14:53 -0800
+Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
+ 4.7.2-5)
+In-Reply-To: <20131209171618.GC11433@atomide.com>
+References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
+ <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
+ <alpine.DEB.2.02.1312090936530.32309@utopia.booyaka.com>
+ <20131209171618.GC11433@atomide.com>
+Message-ID: <20131209191452.GA13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 06, 2013 at 07:12:18PM -0300, Ezequiel Garcia wrote:
-> On Fri, Dec 06, 2013 at 02:25:40PM -0500, Jason Cooper wrote:
-> > On Fri, Dec 06, 2013 at 03:45:45PM -0300, Ezequiel Garcia wrote:
-> > > Jason/Brian: What do you think we can do?
+* Tony Lindgren <tony@atomide.com> [131209 09:17]:
+> * Paul Walmsley <paul@pwsan.com> [131209 01:55]:
+> > On Mon, 25 Nov 2013, Paul Walmsley wrote:
 > > 
-> > Revert the change adding the compatible string in the first place?
+> > > On Mon, 25 Nov 2013, Paul Walmsley wrote:
+> > > 
+> > > > Boot to userspace:
+> > > >     FAIL ( 1/11): 37xxevm
+> > > 
+> > > So looks like this is due to the switchover to DT-based booting for 37xx 
+> > > EVM.  Will plug that in here and re-test.
+> > 
+> > Here's the updated test report.  Looks like dynamic idle PM tests are 
+> > failing on the 37xxevm now.
 > 
-> Yes, that probably is the best thing to do.
+> Off-idle and wake-up events work but need these two pending patches:
 > 
-> Brian: what do you think? I can send you a revert of the
-> "armada370-nand" compatible addition to be pushed for v3.13-rc4?
+> 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+>    http://lkml.org/lkml/2013/11/22/520
 
-Yes, I think dropping the "armada370-nand" compatible string would be a
-good solution for 3.13. Are there any use cases where "armada370-nand"
-is needed and operational on 3.12? (e.g., is 2KB page support fine?)
-Because if there are *no* valid use cases for compatible =
-"armada370-nand" yet, then we might want this to go to 3.12.y stable as
-well, right?
+Oops, this is the wrong patch, it should be:
 
-> The compatible can be added on top of l2-mtd.git, after all
-> the needed support is in the driver.
-
-Sure.
-
-I'll take a look at your "revert" patch and see if we can get it
-upstream for 3.13.
-
-Thanks,
-Brian
+1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+   http://lkml.org/lkml/2013/11/22/520
+ 
+> 2. [PATCH] ARM: dts: Fix omap serial wake-up when booted with device tree
+>    http://www.spinics.net/lists/devicetree/msg13374.html
+> 
+> Without the first one we get some nasty looking harmless warnings, so I've
+> been holding off to merging #2 until #1 is fixed.
+> 
+> Regards,
+> 
+> Tony
