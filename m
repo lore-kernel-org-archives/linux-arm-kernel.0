@@ -1,234 +1,74 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 09 Dec 2013 19:45:57 +0100
-Subject: [RFC v2 1/4] power: asv: Add common ASV support for Samsung SoCs
-In-Reply-To: <1384515691-26299-2-git-send-email-sachin.kamat@linaro.org>
-References: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
- <1384515691-26299-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <4229773.U5JovcREjb@amdc1227>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 9 Dec 2013 19:52:40 +0100
+Subject: [PATCH v3 2/3] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <201312082352.45265.sergei.shtylyov@cogentembedded.com>
+References: <201312082348.17588.sergei.shtylyov@cogentembedded.com>
+ <201312082352.45265.sergei.shtylyov@cogentembedded.com>
+Message-ID: <CAMuHMdWFmO4d4b77JDY0_Z5NuQFoP73-PVho2dwAOY4ES57Dug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yadwinder, Sachin,
+Hi Sergei,
 
-On Friday 15 of November 2013 17:11:28 Sachin Kamat wrote:
-> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> 
-> This patch introduces a common ASV (Adaptive Supply Voltage) basic framework
-> for samsung SoCs. It provides common APIs (to be called by users to get ASV
-> values or init opp_table) and an interface for SoC specific drivers to
-> register ASV members (instances).
-[snip]
-> diff --git a/drivers/power/asv/asv.c b/drivers/power/asv/asv.c
-> new file mode 100644
-> index 000000000000..3f2c31a0d3a9
-> --- /dev/null
-> +++ b/drivers/power/asv/asv.c
-> @@ -0,0 +1,176 @@
-> +/*
-> + * ASV(Adaptive Supply Voltage) common core
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/io.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/slab.h>
-> +#include <linux/device.h>
-> +#include <linux/power/asv-driver.h>
-> +
-> +static LIST_HEAD(asv_list);
-> +static DEFINE_MUTEX(asv_mutex);
-> +
-> +struct asv_member {
-> +	struct list_head		node;
-> +	struct asv_info *asv_info;
+On Sun, Dec 8, 2013 at 9:52 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Register Ether platform device and pin data on  the  Koelsch board.
+> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-nit: Inconsistent indentation of member names. In general I would
-recommend dropping the tabs between types and names and using a single
-space instead, since this is more future proof - you will never have to
-change other lines to add new ones.
+> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
+> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
 
+> +/* Ether */
+> +static const struct sh_eth_plat_data ether_pdata __initconst = {
+> +       .phy                    = 0x1,
+> +       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
+> +       .phy_interface          = PHY_INTERFACE_MODE_RMII,
+> +       .ether_link_active_low  = 1,
 > +};
-> +
-> +static void add_asv_member(struct asv_member *asv_mem)
-> +{
-> +	mutex_lock(&asv_mutex);
-> +	list_add_tail(&asv_mem->node, &asv_list);
-> +	mutex_unlock(&asv_mutex);
-> +}
-> +
-> +static struct asv_member *asv_get_mem(enum asv_type_id asv_type)
 
-I don't really like this enum based look-up. It's hard to define an enum
-that covers any possible existing and future platforms that would not be
-bloated with single platform specific entries. IMHO something string based
-could be more scalable.
+With the above, NFS root is terrible slow, and ping indicates more than
+10% packet loss. I was trying to debootstrap Debian jessie, but gave up
+after a few hours.
 
-> +{
-> +	struct asv_member *asv_mem;
-> +	struct asv_info *asv_info;
-> +
-> +	list_for_each_entry(asv_mem, &asv_list, node) {
-> +		asv_info = asv_mem->asv_info;
-> +		if (asv_type == asv_info->type)
-> +			return asv_mem;
-> +	}
+Based on earlier discussions I found in the mailing list archives, I
+replaced the
+".ether_link_active_low = 1" by ".no_ether_link = 1", and the problem went away.
+Debootstrap completed in about one hour.  No more noticable packet loss
+during normal operation.
+I do still get "net eth0: Receive FIFO Overflow" once in a while, though (e.g.
+when running nuttcp).
 
-Don't you need any kind of locking here? A mutex in add_asv_member()
-suggests that read access to the list should be protected as well.
+# nuttcp -r amd64box
+  112.8022 MB /  10.14 sec =   93.3131 Mbps 2 %TX 15 %RX 0 retrans 0.28 msRTT
+# nuttcp -t amd64box
+   94.1981 MB /  10.04 sec =   78.7000 Mbps 3 %TX 5 %RX 0 retrans
 
-> +
-> +	return NULL;
-> +}
-> +
-> +unsigned int asv_get_volt(enum asv_type_id target_type,
-> +						unsigned int target_freq)
+With ".ether_link_active_low = 1", performance is halved:
 
-Do you need this function at all? I believe this is all about populating
-device's OPP array with frequencies and voltages according to its ASV
-level. Users will be able to query for required voltage using standard OPP
-calls then, without a need for ASV specific functions like this one.
+# nuttcp -r amd64box
+   56.0736 MB /  10.11 sec =   46.5290 Mbps 0 %TX 8 %RX 0 retrans 996.39 msRTT
+# nuttcp -t amd64box
+   47.7191 MB /  10.03 sec =   39.8991 Mbps 1 %TX 2 %RX 0 retrans
 
-> +{
-> +	struct asv_member *asv_mem = asv_get_mem(target_type);
-> +	struct asv_freq_table *dvfs_table;
-> +	struct asv_info *asv_info;
-> +	unsigned int i;
-> +
-> +	if (!asv_mem)
-> +		return 0;
-> +
-> +	asv_info = asv_mem->asv_info;
-> +	dvfs_table = asv_info->dvfs_table;
-> +
-> +	for (i = 0; i < asv_info->nr_dvfs_level; i++) {
-> +		if (dvfs_table[i].freq == target_freq)
-> +			return dvfs_table[i].volt;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +int asv_init_opp_table(struct device *dev, enum asv_type_id target_type)
-> +{
-> +	struct asv_member *asv_mem = asv_get_mem(target_type);
-> +	struct asv_info *asv_info;
-> +	struct asv_freq_table *dvfs_table;
-> +	unsigned int i;
-> +
-> +	if (!asv_mem)
-> +		return -EINVAL;
-> +
-> +	asv_info = asv_mem->asv_info;
-> +	dvfs_table = asv_info->dvfs_table;
-> +
-> +	for (i = 0; i < asv_info->nr_dvfs_level; i++) {
-> +		if (dev_pm_opp_add(dev, dvfs_table[i].freq * 1000,
-> +			dvfs_table[i].volt)) {
-> +			dev_warn(dev, "Failed to add OPP %d\n",
-> +				 dvfs_table[i].freq);
+BTW, I'm using renesas-devel-v3.13-rc2-20131205, with the following 4 patches
+from you applied on top:
+      sh_eth: add R8A7791 support
+      ARM: shmobile: r8a7791: add Ether clock
+      ARM: shmobile: Koelsch: add Ether support
+      ARM: shmobile: Koelsch: enable Ether in defconfig
+Anything I'm missing?
 
-Hmm, shouldn't it be considered a failure instead?
+Thanks!
 
-> +			continue;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct asv_member *asv_init_member(struct asv_info *asv_info)
-> +{
-> +	struct asv_member *asv_mem;
-> +	int ret = 0;
-> +
-> +	if (!asv_info) {
-> +		pr_err("No ASV info provided\n");
-> +		return NULL;
+Gr{oetje,eeting}s,
 
-I'd suggest adopting the ERR_PTR() convention, which allows returning more
-information about the error.
+                        Geert
 
-> +	}
-> +
-> +	asv_mem = kzalloc(sizeof(*asv_mem), GFP_KERNEL);
-> +	if (!asv_mem) {
-> +		pr_err("Allocation failed for member: %s\n", asv_info->name);
-> +		return NULL;
-> +	}
-> +
-> +	asv_mem->asv_info = kmemdup(asv_info, sizeof(*asv_info), GFP_KERNEL);
-> +	if (!asv_mem->asv_info) {
-> +		pr_err("Copying asv_info failed for member: %s\n",
-> +			asv_info->name);
-> +		kfree(asv_mem);
-> +		return NULL;
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-For consistency, the error here should be handled as below, by using the
-error path.
-
-> +	}
-> +	asv_info = asv_mem->asv_info;
-> +
-> +	if (asv_info->ops->get_asv_group) {
-> +		ret = asv_info->ops->get_asv_group(asv_info);
-> +		if (ret) {
-> +			pr_err("get_asv_group failed for %s : %d\n",
-> +				asv_info->name, ret);
-> +			goto err;
-> +		}
-> +	}
-> +
-> +	if (asv_info->ops->init_asv)
-> +		ret = asv_info->ops->init_asv(asv_info);
-> +		if (ret) {
-> +			pr_err("asv_init failed for %s : %d\n",
-> +				asv_info->name, ret);
-> +			goto err;
-> +		}
-> +
-> +	/* In case of parsing table from DT, we may need to add flag to identify
-> +	DT supporting members and call init_asv_table from asv_init_opp_table(
-> +	after getting dev_node from dev,if required), instead of calling here.
-> +	*/
-
-coding style: Wrong multi-line comment style.
-
-/*
- * This is a valid multi-line comment.
- */
-
-> +
-> +	if (asv_info->ops->init_asv_table) {
-> +		ret = asv_info->ops->init_asv_table(asv_info);
-> +		if (ret) {
-> +			pr_err("init_asv_table failed for %s : %d\n",
-> +				asv_info->name, ret);
-> +			goto err;
-> +		}
-> +	}
-
-Hmm, I don't see a point of these three separate callbacks above.
-
-In general, I'd suggest a different architecture. I'd see this more as:
-
-1) Platform code registers static platform device to instantiate SoC ASV
-   driver.
-2) SoC specific ASV driver probes, reads group ID from hardware register,
-   calls register_asv_member() with appropriate DVFS table for detected
-   group.
-3) Driver using ASV calls asv_init_opp_table() with its struct device and
-   ASV member name, which causes the ASV code to fill device's operating
-   point using OPP calls.
-
-Now client driver has all the information it needs and the work of ASV
-subsystem is done. The control flow between drivers would be much simpler
-and no callbacks would have to be called.
-
-Best regards,
-Tomasz
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
