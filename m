@@ -1,93 +1,50 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 9 Dec 2013 17:19:52 +0800
-Subject: [PATCH v5 15/15] usb: phy-mxs: Add sync time after controller
- clear phcd
-In-Reply-To: <52A587CD.7010203@pengutronix.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 09 Dec 2013 10:52:33 +0100
+Subject: [PATCH v5 09/15] usb: phy-mxs: Enable IC fixes for related SoCs
+In-Reply-To: <20131209090749.GB5291@shlinux1.ap.freescale.net>
 References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
- <1386570664-6713-16-git-send-email-peter.chen@freescale.com>
- <52A587CD.7010203@pengutronix.de>
-Message-ID: <20131209091951.GD5291@shlinux1.ap.freescale.net>
+ <1386570664-6713-10-git-send-email-peter.chen@freescale.com>
+ <52A58179.2050702@pengutronix.de>
+ <20131209090749.GB5291@shlinux1.ap.freescale.net>
+Message-ID: <52A592E1.7040506@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 10:05:17AM +0100, Marc Kleine-Budde wrote:
-> On 12/09/2013 07:31 AM, Peter Chen wrote:
-> > After clear portsc.phcd, PHY needs 200us stable time for switch
-> > 32K clock to AHB clock.
+On 12/09/2013 10:07 AM, Peter Chen wrote:
+> On Mon, Dec 09, 2013 at 09:38:17AM +0100, Marc Kleine-Budde wrote:
+>> On 12/09/2013 07:30 AM, Peter Chen wrote:
+>>> Some PHY bugs are fixed by IC logic, but these bits are not
+>>> enabled by default, so we enable them at driver.
+>>
+>> Which bugs are fixed by enabling this bit? Is it only suspend related?
+>> Can you document them or better add a pointer to the documentation.
 > 
-> If this is a general bugbix, please move it to the start of this series
-> and add stable on Cc. I think I hit the bug on the second USB port of a
-> custom MX28 board, the stmp_reset_block() in the USB phy will fail.
-
-Not a bug-fix, just the requirement for the PHY leaves low power mode.
-Does the bug exists with my this patchset, or just current mainline code?
-
+> I will add more, in fact, it fixes the bug which flag BIT(1) and BIT(2)
+> stands for.
 > 
-> Is the problem documented somewhere?
+>>
+>> Further I don't like the idea of adding code, or enabling a feature on
+>> certain hardware, that is broken in the first place and fixing it in a
+>> later patch. Think about squashing it into the correct patch.
 > 
-> Is it possible to add the delay in the clock framework? I think only the
-> regulator framework has a configurable delay for the regulator to stabilize.
+> No fixes are related with this patch, you can see there is no "-"
+> at this patch.
 
-It is just related to mxs PHY's hardware timing. It is better to add
-it at specific driver.
+Yes, there isn't any broken code (thus no "-"), but you first enable a
+feature in the hardware and in a later patch (this one) make it work
+properly.
 
-Peter
-
-> 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
-> >  1 files changed, 11 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > index e18fdf3..7ae5225 100644
-> > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > @@ -151,6 +151,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
-> >  	return mxs_phy->data == &imx6sl_phy_data;
-> >  }
-> >  
-> > +/*
-> > + * PHY needs some 32K cycles to switch from 32K clock to
-> > + * bus (such as AHB/AXI, etc) clock.
-> > + */
-> > +static void mxs_phy_clock_switch(void)
-> > +{
-> > +	usleep_range(300, 400);
-> > +}
-> > +
-> >  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-> >  {
-> >  	int ret;
-> > @@ -276,6 +285,7 @@ static int mxs_phy_init(struct usb_phy *phy)
-> >  {
-> >  	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-> >  
-> > +	mxs_phy_clock_switch();
-> >  	clk_prepare_enable(mxs_phy->clk);
-> >  	return mxs_phy_hw_init(mxs_phy);
-> >  }
-> > @@ -300,6 +310,7 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
-> >  		       x->io_priv + HW_USBPHY_CTRL_SET);
-> >  		clk_disable_unprepare(mxs_phy->clk);
-> >  	} else {
-> > +		mxs_phy_clock_switch();
-> >  		clk_prepare_enable(mxs_phy->clk);
-> >  		writel(BM_USBPHY_CTRL_CLKGATE,
-> >  		       x->io_priv + HW_USBPHY_CTRL_CLR);
-> > 
-> 
-> Marc
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
-
-
-
+Marc
 -- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Best Regards,
-Peter Chen
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/6e0b29e2/attachment-0001.sig>
