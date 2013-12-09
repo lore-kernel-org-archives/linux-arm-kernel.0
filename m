@@ -1,57 +1,70 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 09 Dec 2013 17:15:22 +0100
-Subject: [PATCH 1/3] ARM: EXYNOS: pmu: Constify data tables
-In-Reply-To: <CAGS+omDq95paoHsf5-i2gbRoSGvqn36zNO93KHGi2FGhfGMsrw@mail.gmail.com>
-References: <1384971686-7208-1-git-send-email-djkurtz@chromium.org>
- <1922780.plAOmhqzpW@amdc1227>
- <CAGS+omDq95paoHsf5-i2gbRoSGvqn36zNO93KHGi2FGhfGMsrw@mail.gmail.com>
-Message-ID: <30145891.cE1204QWiC@amdc1227>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 09 Dec 2013 17:16:52 +0100
+Subject: [linux-sunxi] Re: [PATCH 04/10] net: stmmac: sunxi platfrom
+ extensions for GMAC in Allwinner A20 SoC's
+In-Reply-To: <52A5A52C.50605@st.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A52C.50605@st.com>
+Message-ID: <52A5ECF4.6030301@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 of December 2013 00:11:40 Daniel Kurtz wrote:
-> Hi Tomasz,
-> 
-> Thank you for the reviews.
-> 
-> On Dec 9, 2013 5:15 AM, "Tomasz Figa" <t.figa@samsung.com> wrote:
-> >
-> > Hi Daniel,
-> >
-> > On Thursday 21 of November 2013 02:21:24 Daniel Kurtz wrote:
-> > > These tables are all immutable, make them const to save 4416 bytes of RAM.
-> > >
-> > > size arch/arm/mach-exynos/pmu.o
-> > >    text          data     bss
-> > >     848          4420       4         // before
-> > >    5264             4       4         // after
-> >
-> > I'm not sure where the mentioned saving of RAM is. Moving data between
-> > sections is not supposed to make it use less memory, I believe.
-> 
-> You are correct.  This was my misunderstanding from doing too much
-> work with microcontrollers, where .text sections are accessed in place
-> from FLASH for code and const data, but .data memory is copied from a
-> FLASH section to a second RAM section at init for access at runtime.
-> Most modern Linux systems copy/decompress their code and data sections
-> from external storage to RAM anyway, so there is no actual memory
-> savings (except potentially the compiler may be able to optimize a bit
-> more with the const hint).
-> 
-> >
-> > Anyway, it's a good practice to mark constant data as const, to disallow
-> > changing them at runtime by mistake, so the patch is fine. Except some
-> > issues I commented on inline.
-> 
-> Were there supposed to be inline comments?  I don't see any.
+Hi,
 
-Oops, sorry for this, forgot to remove the last sentence. I initially had
-one question about the constant pointers below, but I read through the
-full code again and answered it myself.
+On 12/09/2013 12:10 PM, srinivas kandagatla wrote:
+> Hi Chen,
+> Good to know that Allwinner uses gmac.
+>
+> On ST SoC, we have very similar requirements, before we merge any of
+> these changes I think we need to come up with common way to solve both
+> Allwinner and ST SOCs use cases.
+>
+> I have already posted few patches on to net-dev
+> http://lkml.org/lkml/2013/11/12/243 to add Glue driver on top of stmmac
+> driver.
+>
+>
+> There are few reasons for the way I have done it.
+>
+> 1> I did not want to modify gmac driver in any sense to when a new SOC
+> support is added.
+> 2> As the SOC specific glue logic sits on top of standard GMAC IP, it
+> makes sense to represent it proper harware hierarchy.
 
-The patch is fine.
+On top often is not the correct term / how things are done in practice.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Most of the time the glue are modifications to the ip block, iow in
+hardware they are not nested / hierarchical at all. We've had similar
+constructs for ahci platform drivers and there we are actively trying to
+move away from the whole nested platform devices as that has various
+issues:
 
-Best regards,
-Tomasz
+1) It is wrong / does not reflect reality
+2) It breaks deferred probing which is often used on SOCs
+
+I actually think Wens' approach using a SOC specific init function
+in platform data is sound, and this is also used a lot else where.
+
+As for using the nested approach elsewhere, I only know about AHCI
+platform driver doing that, and there we are actively trying to move
+away from it.
+
+
+Now reading this has also made me take a closer look at wens' patch
+for this. Wens, I see that you directly modify registers in the ccm
+that is a big no-no instead you should add a helper function to
+sunxi-clk.c and use that, see ie:
+https://bitbucket.org/emiliolopez/linux/commits/2b95847d9aa4aa13317dd7358ffcbd951dcb5eff?at=master
+
+
+Giuseppe, I get the feeling the 0x148 registers st-gmac is using is
+the same story, but I could be wrong. One important reason why accessing
+regs like this directly is a big no no is because it is impossible to
+do proper locking between multiple users, so 2 users doing read / modify / write
+could end up racing. So accesses to such registers should always happen
+through a single driver.
+
+
+Regards,
+
+Hans
