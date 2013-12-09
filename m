@@ -1,70 +1,33 @@
-From: panchaxari.prasannamurthy@linaro.org (panchaxari)
-Date: Mon,  9 Dec 2013 15:10:50 +0530
-Subject: [PATCH CFT] ARM:MSM: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
- default
-Message-ID: <1386582050-21375-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 09 Dec 2013 10:49:56 +0100
+Subject: [PATCH 4/9] ARM: pxa: remove unused variable
+In-Reply-To: <1386582151.7152.113.camel@host5.omatika.ru>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>	
+ <1386543229-1542-1-git-send-email-ynvich@gmail.com>	
+ <1386543229-1542-5-git-send-email-ynvich@gmail.com>	
+ <52A585D9.4000605@gmail.com> <1386582151.7152.113.camel@host5.omatika.ru>
+Message-ID: <52A59244.2000908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR have been enabled as default configs
-to MSM platform
+On 12/09/2013 10:42 AM, Sergei Ianovich wrote:
+> On Mon, 2013-12-09 at 09:56 +0100, Daniel Mack wrote:
+>> A similar patch was already merged by Haojian recently. You should
+>> probably rebase your patch stack on top of his maintainer tree.
+> 
+> I've just come across the patch you mention in the arm mailing list.
+> 
+> Could you please provide a link to Haojian's official public repository?
 
-Introduction of PHYS_VIRT config as default would enable phy-to-virt and
-virt-to-phy translation function at boot and module loading time
-and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
-enable calculation of kernel load address at run time.
+According to MAINTAINERS, it's here:
 
-PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
-systems with NOR flash devices, and ZRELADDR config is mutually exclusive
-to ZBOOT_ROM.
+  git://github.com/hzhuang1/linux.git
 
-CFT::Call For Testing
+But it seems it hasn't seen an update recently. Haojian?
 
-Requesting maintainers of MSM platforms to evaluate the changes on the board
-and comment, as I dont have the board for testing and also requesting an ACK
+> If possible, a link link to your repository will also be very helpful.
 
-Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-msm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+  https://github.com/zonque/linux/tree/pxa-dma-v2
 
----
-ARCH_MSM supports for Qualcomm MSM/QSD based systems.  This runs on the apps
-processor of the MSM/QSD and depends on a shared memory interface to the modem
-processor which runs the baseband stack and controls some vital subsystems
-like clock and power control.
 
-Snapdragon is based on ARMv7 instruction set. And supports Random memory devices
-like DDR1, LPDDR2 and LPDDR3. And storage memory devices like NAND, eMMC.
-
-Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
-and ZRELADDR
----------------------------------------------------
-
-https://lkml.org/lkml/2011/10/14/434
-
--------------------------------------------------
----
- arch/arm/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 13621ed..3b77864 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -638,6 +638,8 @@ config ARCH_PXA
- config ARCH_MSM
- 	bool "Qualcomm MSM"
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_PATCH_PHYS_VIRT
-+	select AUTO_ZRELADDR
- 	select CLKSRC_OF if OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
--- 
-1.7.10.4
+Daniel
