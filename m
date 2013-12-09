@@ -1,56 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Dec 2013 11:32:36 -0800
-Subject: OMAP baseline test results for v3.13-rc1 (toolchain Debian
- 4.7.2-5)
-In-Reply-To: <20131209191452.GA13171@atomide.com>
-References: <alpine.DEB.2.02.1311250731410.1364@utopia.booyaka.com>
- <alpine.DEB.2.02.1311251514330.1364@utopia.booyaka.com>
- <alpine.DEB.2.02.1312090936530.32309@utopia.booyaka.com>
- <20131209171618.GC11433@atomide.com>
- <20131209191452.GA13171@atomide.com>
-Message-ID: <20131209193235.GB13171@atomide.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 9 Dec 2013 20:40:30 +0100
+Subject: [PATCH v3 2/3] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <52A62753.8060202@cogentembedded.com>
+References: <201312082348.17588.sergei.shtylyov@cogentembedded.com>
+ <201312082352.45265.sergei.shtylyov@cogentembedded.com>
+ <CAMuHMdWFmO4d4b77JDY0_Z5NuQFoP73-PVho2dwAOY4ES57Dug@mail.gmail.com>
+ <52A62753.8060202@cogentembedded.com>
+Message-ID: <CAMuHMdXDHMRy2LTEa50omMs0dV9Vdf2woBsNAHzhkceXDfqyOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131209 11:16]:
-> * Tony Lindgren <tony@atomide.com> [131209 09:17]:
-> > * Paul Walmsley <paul@pwsan.com> [131209 01:55]:
-> > > On Mon, 25 Nov 2013, Paul Walmsley wrote:
-> > > 
-> > > > On Mon, 25 Nov 2013, Paul Walmsley wrote:
-> > > > 
-> > > > > Boot to userspace:
-> > > > >     FAIL ( 1/11): 37xxevm
-> > > > 
-> > > > So looks like this is due to the switchover to DT-based booting for 37xx 
-> > > > EVM.  Will plug that in here and re-test.
-> > > 
-> > > Here's the updated test report.  Looks like dynamic idle PM tests are 
-> > > failing on the 37xxevm now.
-> > 
-> > Off-idle and wake-up events work but need these two pending patches:
-> > 
-> > 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
-> >    http://lkml.org/lkml/2013/11/22/520
-> 
-> Oops, this is the wrong patch, it should be:
-> 
-> 1. [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
->    http://lkml.org/lkml/2013/11/22/520
+On Mon, Dec 9, 2013 at 9:25 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+>>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
+>>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
+>>
+>>
+>>> +/* Ether */
+>>> +static const struct sh_eth_plat_data ether_pdata __initconst = {
+>>> +       .phy                    = 0x1,
+>>> +       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
+>>> +       .phy_interface          = PHY_INTERFACE_MODE_RMII,
+>>> +       .ether_link_active_low  = 1,
+>>> +};
+>
+>> With the above, NFS root is terrible slow,
+>
+>    Do you get NFS timeout(s) on booting? I do. It's a known issue.
 
-Never mind, I need to take a break.
-  
-> > 2. [PATCH] ARM: dts: Fix omap serial wake-up when booted with device tree
-> >    http://www.spinics.net/lists/devicetree/msg13374.html
-> > 
-> > Without the first one we get some nasty looking harmless warnings, so I've
-> > been holding off to merging #2 until #1 is fixed.
-> > 
-> > Regards,
-> > 
-> > Tony
-> 
-> _______________________________________________
-> Kernel-build-reports mailing list
-> Kernel-build-reports at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/kernel-build-reports
+I only saw "NFS server not responding" once.
+
+>    You can try my simplistic 'sh_eth' driver patch:
+>
+> http://marc.info/?l=linux-sh&m=137911743723032
+
+Thanks, that also fixes the problem!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
