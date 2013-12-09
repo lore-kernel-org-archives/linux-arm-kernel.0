@@ -1,75 +1,92 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  9 Dec 2013 10:59:08 +0100
-Subject: [PATCH][RESEND] [SCSI]: ARM: remove deprecated IRQF_DISABLED
-In-Reply-To: <1381039136-11749-1-git-send-email-michael.opdenacker@free-electrons.co>
-References: <1381039136-11749-1-git-send-email-michael.opdenacker@free-electrons.co>
-Message-ID: <1386583148-5010-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Dec 2013 10:00:47 +0000 (UTC)
+Subject: OMAP baseline test results for v3.13-rc3
+Message-ID: <alpine.DEB.2.02.1312090957460.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+Here are some basic OMAP test results for Linux v3.13-rc3.
+Logs and other details at:
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- drivers/scsi/arm/acornscsi.c | 2 +-
- drivers/scsi/arm/cumana_1.c  | 2 +-
- drivers/scsi/arm/cumana_2.c  | 2 +-
- drivers/scsi/arm/powertec.c  | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+    http://www.pwsan.com/omap/testlogs/test_v3.13-rc3/20131208173612/
 
-diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
-index 09ba1869d366..059ff477a398 100644
---- a/drivers/scsi/arm/acornscsi.c
-+++ b/drivers/scsi/arm/acornscsi.c
-@@ -2971,7 +2971,7 @@ static int acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
- 	ec->irqaddr	= ashost->fast + INT_REG;
- 	ec->irqmask	= 0x0a;
- 
--	ret = request_irq(host->irq, acornscsi_intr, IRQF_DISABLED, "acornscsi", ashost);
-+	ret = request_irq(host->irq, acornscsi_intr, 0, "acornscsi", ashost);
- 	if (ret) {
- 		printk(KERN_CRIT "scsi%d: IRQ%d not free: %d\n",
- 			host->host_no, ashost->scsi.irq, ret);
-diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
-index b679778376c5..f8e060900052 100644
---- a/drivers/scsi/arm/cumana_1.c
-+++ b/drivers/scsi/arm/cumana_1.c
-@@ -262,7 +262,7 @@ static int cumanascsi1_probe(struct expansion_card *ec,
- 		goto out_unmap;
- 	}
- 
--	ret = request_irq(host->irq, cumanascsi_intr, IRQF_DISABLED,
-+	ret = request_irq(host->irq, cumanascsi_intr, 0,
- 			  "CumanaSCSI-1", host);
- 	if (ret) {
- 		printk("scsi%d: IRQ%d not free: %d\n",
-diff --git a/drivers/scsi/arm/cumana_2.c b/drivers/scsi/arm/cumana_2.c
-index 58915f29055b..abc66f5263ec 100644
---- a/drivers/scsi/arm/cumana_2.c
-+++ b/drivers/scsi/arm/cumana_2.c
-@@ -431,7 +431,7 @@ static int cumanascsi2_probe(struct expansion_card *ec,
- 		goto out_free;
- 
- 	ret = request_irq(ec->irq, cumanascsi_2_intr,
--			  IRQF_DISABLED, "cumanascsi2", info);
-+			  0, "cumanascsi2", info);
- 	if (ret) {
- 		printk("scsi%d: IRQ%d not free: %d\n",
- 		       host->host_no, ec->irq, ret);
-diff --git a/drivers/scsi/arm/powertec.c b/drivers/scsi/arm/powertec.c
-index abc9593615e9..5e1b73e1b743 100644
---- a/drivers/scsi/arm/powertec.c
-+++ b/drivers/scsi/arm/powertec.c
-@@ -358,7 +358,7 @@ static int powertecscsi_probe(struct expansion_card *ec,
- 		goto out_free;
- 
- 	ret = request_irq(ec->irq, powertecscsi_intr,
--			  IRQF_DISABLED, "powertec", info);
-+			  0, "powertec", info);
- 	if (ret) {
- 		printk("scsi%d: IRQ%d not free: %d\n",
- 		       host->host_no, ec->irq, ret);
--- 
-1.8.3.2
+
+Test summary
+------------
+
+Build: uImage:
+    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
+
+Build: zImage:
+    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+PM: chip off via dynamic idle:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+
+vmlinux object size
+(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839)):
+   text     data      bss    total  kernel
+   +376        0        0     +376  omap1_defconfig
+   +332        0        0     +332  omap1_defconfig_1510innovator_only
+  +1368        0        0    +1368  omap1_defconfig_5912osk_only
+   +448    +1816        0    +2264  omap2plus_defconfig
+    +44    +1952        0    +1996  omap2plus_defconfig_2430sdp_only
+   +520    +1784        0    +2304  omap2plus_defconfig_cpupm
+  +4372      +16        0    +4388  omap2plus_defconfig_n800_multi_omap2xxx
+   +308      -16        0     +292  omap2plus_defconfig_n800_only_a
+   +320    +1816        0    +2136  omap2plus_defconfig_no_pm
+   +448    +1816        0    +2264  omap2plus_defconfig_omap2_4_only
+   +448    +1784        0    +2232  omap2plus_defconfig_omap3_4_only
+   +416      +16     -156     +276  rmk_omap3430_ldp_allnoconfig
+   +176      +16        0     +192  rmk_omap3430_ldp_oldconfig
+   +280      -16     -116     +148  rmk_omap4430_sdp_allnoconfig
+   +256     +896        0    +1152  rmk_omap4430_sdp_oldnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.13-rc2 (dc1ccc48159d63eca5089e507c82c7d22ef60839))
+  avail  rsrvd   high  freed  board          kconfig
+    -4k     4k      .      .  4460varsomom   omap2plus_defconfig
+    -4k     4k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
