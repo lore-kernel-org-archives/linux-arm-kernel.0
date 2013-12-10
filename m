@@ -1,182 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Dec 2013 19:37:21 +0100
-Subject: [PATCH RESEND 1/2] ARM: sun7i: dt: Fix interrupt trigger types
-In-Reply-To: <1386700642-8302-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1386700642-8302-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1386700642-8302-2-git-send-email-maxime.ripard@free-electrons.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Dec 2013 19:31:34 +0100
+Subject: [PATCH] ARM: pxa: prevent PXA270 occasional reboot freezes
+In-Reply-To: <52A6F19B.8090309@gmail.com>
+References: <1386650355-2503-1-git-send-email-ynvich@gmail.com>
+ <52A6D44C.1010504@gmail.com> <52A6F19B.8090309@gmail.com>
+Message-ID: <201312101931.34108.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A20 uses the ARM GIC as its internal interrupts controller. The
-GIC can work on several interrupt triggers, and the A20 was actually setting it
-up to use a rising edge as a trigger, while it was actually a level high
-trigger, leading to some interrupts that would be completely ignored if the
-edge was missed.
+On Tuesday, December 10, 2013 at 11:48:59 AM, Daniel Mack wrote:
+> On 12/10/2013 09:43 AM, Haojian Zhuang wrote:
+> > On 12/10/2013 12:39 PM, Sergei Ianovich wrote:
+> >> Erratum 71 of PXA270M Processor Family Specification Update
+> >> (April 19, 2010) explains that watchdog reset time is just
+> >> 8us insead of 10ms in EMTS.
+> >> 
+> >> If SDRAM is not reset, it causes memory bus congestion and
+> >> the device hangs. We put SDRAM in selfresh mode before watchdog
+> >> reset, removing potential freezes.
+> >> 
+> >> Without this patch PXA270-based ICP DAS LP-8x4x hangs after up to 40
+> >> reboots. With this patch it has successfully rebooted 500 times.
+> >> 
+> >> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> >> ---
+> >> 
+> >>   arch/arm/mach-pxa/reset.c | 8 +++++++-
+> >>   1 file changed, 7 insertions(+), 1 deletion(-)
+> >> 
+> >> diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
+> >> index 0d5dd64..263b152 100644
+> >> --- a/arch/arm/mach-pxa/reset.c
+> >> +++ b/arch/arm/mach-pxa/reset.c
+> >> @@ -13,6 +13,7 @@
+> >> 
+> >>   #include <mach/regs-ost.h>
+> >>   #include <mach/reset.h>
+> >> 
+> >> +#include <mach/smemc.h>
+> >> 
+> >>   unsigned int reset_status;
+> >>   EXPORT_SYMBOL(reset_status);
+> >> 
+> >> @@ -81,6 +82,12 @@ static void do_hw_reset(void)
+> >> 
+> >>   	writel_relaxed(OSSR_M3, OSSR);
+> >>   	/* ... in 100 ms */
+> >>   	writel_relaxed(readl_relaxed(OSCR) + 368640, OSMR3);
+> >> 
+> >> +	/*
+> >> +	 * SDRAM hangs on watchdog reset on Marvell PXA270 (erratum 71)
+> >> +	 * we put SDRAM into self-refresh to prevent that
+> >> +	 */
+> >> +	while (1)
+> >> +		writel_relaxed(MDREFR_SLFRSH, MDREFR);
+> >> 
+> >>   }
+> >>   
+> >>   void pxa_restart(enum reboot_mode mode, const char *cmd)
+> >> 
+> >> @@ -104,4 +111,3 @@ void pxa_restart(enum reboot_mode mode, const char
+> >> *cmd)
+> >> 
+> >>   		break;
+> >>   	
+> >>   	}
+> >>   
+> >>   }
+> >> 
+> >> -
+> > 
+> > Hi Daniel/Marek/Igor,
+> > 
+> > Could you help to try this patch? I'm lack of PXA27x board.
+> 
+> I don't have any either right now ...
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-Cc: stable at vger.kernel.org #3.12+
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 42 ++++++++++++++++++++--------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+On VPAC270
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index e46cfed..367611a 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -170,7 +170,7 @@
- 		emac: ethernet at 01c0b000 {
- 			compatible = "allwinner,sun4i-emac";
- 			reg = <0x01c0b000 0x1000>;
--			interrupts = <0 55 1>;
-+			interrupts = <0 55 4>;
- 			clocks = <&ahb_gates 17>;
- 			status = "disabled";
- 		};
-@@ -186,7 +186,7 @@
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun7i-a20-pinctrl";
- 			reg = <0x01c20800 0x400>;
--			interrupts = <0 28 1>;
-+			interrupts = <0 28 4>;
- 			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			interrupt-controller;
-@@ -251,12 +251,12 @@
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-timer";
- 			reg = <0x01c20c00 0x90>;
--			interrupts = <0 22 1>,
--				     <0 23 1>,
--				     <0 24 1>,
--				     <0 25 1>,
--				     <0 67 1>,
--				     <0 68 1>;
-+			interrupts = <0 22 4>,
-+				     <0 23 4>,
-+				     <0 24 4>,
-+				     <0 25 4>,
-+				     <0 67 4>,
-+				     <0 68 4>;
- 			clocks = <&osc24M>;
- 		};
- 
-@@ -273,7 +273,7 @@
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
--			interrupts = <0 1 1>;
-+			interrupts = <0 1 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 16>;
-@@ -283,7 +283,7 @@
- 		uart1: serial at 01c28400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28400 0x400>;
--			interrupts = <0 2 1>;
-+			interrupts = <0 2 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 17>;
-@@ -293,7 +293,7 @@
- 		uart2: serial at 01c28800 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28800 0x400>;
--			interrupts = <0 3 1>;
-+			interrupts = <0 3 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 18>;
-@@ -303,7 +303,7 @@
- 		uart3: serial at 01c28c00 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28c00 0x400>;
--			interrupts = <0 4 1>;
-+			interrupts = <0 4 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 19>;
-@@ -313,7 +313,7 @@
- 		uart4: serial at 01c29000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29000 0x400>;
--			interrupts = <0 17 1>;
-+			interrupts = <0 17 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 20>;
-@@ -323,7 +323,7 @@
- 		uart5: serial at 01c29400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29400 0x400>;
--			interrupts = <0 18 1>;
-+			interrupts = <0 18 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 21>;
-@@ -333,7 +333,7 @@
- 		uart6: serial at 01c29800 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29800 0x400>;
--			interrupts = <0 19 1>;
-+			interrupts = <0 19 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 22>;
-@@ -343,7 +343,7 @@
- 		uart7: serial at 01c29c00 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c29c00 0x400>;
--			interrupts = <0 20 1>;
-+			interrupts = <0 20 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb1_gates 23>;
-@@ -353,7 +353,7 @@
- 		i2c0: i2c at 01c2ac00 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2ac00 0x400>;
--			interrupts = <0 7 1>;
-+			interrupts = <0 7 4>;
- 			clocks = <&apb1_gates 0>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -362,7 +362,7 @@
- 		i2c1: i2c at 01c2b000 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2b000 0x400>;
--			interrupts = <0 8 1>;
-+			interrupts = <0 8 4>;
- 			clocks = <&apb1_gates 1>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -371,7 +371,7 @@
- 		i2c2: i2c at 01c2b400 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2b400 0x400>;
--			interrupts = <0 9 1>;
-+			interrupts = <0 9 4>;
- 			clocks = <&apb1_gates 2>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -380,7 +380,7 @@
- 		i2c3: i2c at 01c2b800 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2b800 0x400>;
--			interrupts = <0 88 1>;
-+			interrupts = <0 88 4>;
- 			clocks = <&apb1_gates 3>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
-@@ -389,7 +389,7 @@
- 		i2c4: i2c at 01c2bc00 {
- 			compatible = "allwinner,sun4i-i2c";
- 			reg = <0x01c2bc00 0x400>;
--			interrupts = <0 89 1>;
-+			interrupts = <0 89 4>;
- 			clocks = <&apb1_gates 15>;
- 			clock-frequency = <100000>;
- 			status = "disabled";
--- 
-1.8.4.2
+Tested-by: Marek Vasut <marex@denx.de>
+
+Best regards,
+Marek Vasut
