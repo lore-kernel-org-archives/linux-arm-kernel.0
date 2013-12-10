@@ -1,44 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Dec 2013 15:47:51 -0800
-Subject: [PATCH 1/5] mmc: msm_sdcc: Limit driver to platforms that use it
-In-Reply-To: <1386185952-27259-2-git-send-email-sboyd@codeaurora.org>
-References: <1386185952-27259-1-git-send-email-sboyd@codeaurora.org>
- <1386185952-27259-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52A7A827.3030607@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Dec 2013 23:50:00 +0000
+Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
+In-Reply-To: <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
+References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+ <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131210235000.GK11468@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/13 11:39, Stephen Boyd wrote:
-> The msm_sdcc driver uses mach specific dma APIs. This is not
-> compatible with the multi-platform ARM effort. Let's only compile
-> this driver on MSM devices that are prepared to support it,
-> allowing the DT based MSM devices to enter the multi-platform ARM
-> build.
->
-> Cc: Chris Ball <cjb@laptop.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+On Tue, Dec 10, 2013 at 03:35:18PM -0800, Stephen Boyd wrote:
 
-Chris, can you please ack/review this change?
+> +	while (val_size) {
+> +		ret = ssbi_read(context, *(u16 *)reg, val, 1);
+> +		if (ret)
+> +			return ret;
+> +		reg += sizeof(u16);
+> +		val += sizeof(u8);
+> +		val_size -= sizeof(u8);
 
->  drivers/mmc/host/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..4e8ca9d 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -324,7 +324,7 @@ config MMC_ATMELMCI
->  
->  config MMC_MSM
->  	tristate "Qualcomm SDCC Controller Support"
-> -	depends on MMC && ARCH_MSM
-> +	depends on MMC && (ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50)
->  	help
->  	  This provides support for the SD/MMC cell found in the
->  	  MSM and QSD SOCs from Qualcomm. The controller also has
+I'd expect this to generate out of bounds accesses and bad interactions
+on the bus if we go through the loop more than once since it appears to
+incrementing the address of reg for every register.  I'm also having a
+hard time understanding why this is doing a read per byte, ssbi_read()
+seems to map fairly directly onto the interface of the operation so
+there doesn't seem to be any reason for this loop to exist in the first
+place.
 
+Has this been tested?  
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+It'd be helpful to CC the entire series, or at least the patches this
+builds on...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/1f9dde51/attachment.sig>
