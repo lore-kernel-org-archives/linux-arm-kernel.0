@@ -1,29 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Dec 2013 20:49:22 +0800
-Subject: [PATCHv8][ 2/5] ARM: dts: mbimxsd25: Add sound support.
-In-Reply-To: <1385567664-758-2-git-send-email-denis@eukrea.com>
-References: <1385567664-758-1-git-send-email-denis@eukrea.com>
- <1385567664-758-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131210124920.GA26728@S2101-09.ap.freescale.net>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 10 Dec 2013 12:53:28 +0000
+Subject: [RFC part2 PATCH 2/9] ARM64 / ACPI: Prefill cpu possible/present
+ maps and map logical cpu id to APIC id
+In-Reply-To: <1385999094-3152-3-git-send-email-hanjun.guo@linaro.org>
+References: <1385999094-3152-1-git-send-email-hanjun.guo@linaro.org> <
+ 1385999094-3152-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20131210125328.923F2C40A27@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 04:54:21PM +0100, Denis Carikli wrote:
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Liam Girdwood <lgirdwood@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: alsa-devel at alsa-project.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+On Mon,  2 Dec 2013 23:44:47 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> When boot the kernel with MADT, the cpu possible and present maps should be
+> prefilled for cpu topology and acpi based cpu hot-plug.
+> 
+> The logic cpu id maps to APIC id (GIC id) is also implemented, it is needed
+> for acpi processor drivers.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+[...]
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index a0c2ca6..1428024 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -420,7 +420,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  		if (err)
+>  			continue;
+>  
+> +#ifndef CONFIG_ACPI
+>  		set_cpu_present(cpu, true);
+> +#endif
+>  		max_cpus--;
+>  	}
+>  }
 
-Applied this one and mbimxsd51 one, but not the other two, as I do not
-have imx35-eukrea-mbimxsd35-baseboard.dts and
-imx53-eukrea-mbimxsd53-baseboard.dts in my tree.
+This looks wrong. Will this break non-ACPI booting when CONFIG_ACPI is
+enabled? The decision on whether or not to run code must be made at
+runtime.
 
-Shawn
+g.
