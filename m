@@ -1,69 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Dec 2013 13:25:08 -0600
-Subject: OMAP still fails - usb phy stuff
-In-Reply-To: <20131210183809.GL13171@atomide.com>
-References: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
- <20131210183809.GL13171@atomide.com>
-Message-ID: <20131210192508.GB2464@saruman.home>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Dec 2013 20:26:19 +0100
+Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
+Message-ID: <1386703583-8386-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 10:38:10AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 05:10]:
-> > I still see some OMAP randconfigs failing with this:
-> > 
-> > arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
-> > dss-common.c:(.text+0x1396c): undefined reference to `usb_bind_phy'
-> > arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
-> > dss-common.c:(.init.text+0x6c90): undefined reference to `usb_bind_phy'
-> > drivers/built-in.o: In function `omap_usb2_remove':
-> > powercap_sys.c:(.text+0x3520): undefined reference to `usb_remove_phy'
-> > drivers/built-in.o: In function `omap_usb_power_off':
-> > powercap_sys.c:(.text+0x3544): undefined reference to `omap_control_usb_phy_power'
-> > drivers/built-in.o: In function `omap_usb_power_on':
-> > powercap_sys.c:(.text+0x3568): undefined reference to `omap_control_usb_phy_power'
-> > drivers/built-in.o: In function `omap_usb2_probe':
-> > powercap_sys.c:(.text+0x3638): undefined reference to `omap_control_usb_phy_power'
-> > powercap_sys.c:(.text+0x36d4): undefined reference to `usb_add_phy_dev'
-> > drivers/built-in.o: In function `omap_usb2_suspend':
-> > powercap_sys.c:(.text+0x37d0): undefined reference to `omap_control_usb_phy_power'
-> > powercap_sys.c:(.text+0x37f4): undefined reference to `omap_control_usb_phy_power'
-> > drivers/built-in.o: In function `omap_usb2_set_comparator':
-> > powercap_sys.c:(.text+0x3844): undefined reference to `usb_get_phy'
-> > drivers/built-in.o: In function `isp1704_charger_remove':
-> > powercap_sys.c:(.text+0x48d5ec): undefined reference to `usb_put_phy'
-> > drivers/built-in.o: In function `isp1704_charger_probe':
-> > powercap_sys.c:(.text+0x48d64c): undefined reference to `usb_get_phy'
-> > powercap_sys.c:(.text+0x48d884): undefined reference to `usb_put_phy'
-> > drivers/built-in.o: In function `twl4030_bci_probe':
-> > powercap_sys.c:(.init.text+0x13fd4): undefined reference to `usb_get_phy'
-> > powercap_sys.c:(.init.text+0x14114): undefined reference to `usb_put_phy'
-> > 
-> > Probably caused by over-use of the damned select statement:
-> > 
-> > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
-> > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
-> > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
-> > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
-> > 
-> > You have to wonder why OMAP_USB2 can be enabled when USB_SUPPORT is
-> > disabled.
-> 
-> Yeah this causes constant randconfig errors. Felipe, I thought you
-> had some fixes lined up for these few weeks ago already when we
-> last talked about it?
+When finishing the ahash request, the ahash_op_unaligned_done() will
+call complete() on the request. Yet, this will not call the correct
+complete callback. The correct complete callback was previously stored
+in the requests' private data, as seen in ahash_op_unaligned(). This
+patch restores the correct complete callback and .data field of the
+request before calling complete() on it.
 
-For the warnings, yeah. Greg's pull request hasn't been appliet yet
-(need to check again, checked yesterday).
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: linux-crypto at vger.kernel.org
+---
+ crypto/ahash.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-For the build error, I'll send something today.
-
+diff --git a/crypto/ahash.c b/crypto/ahash.c
+index 793a27f..a92dc38 100644
+--- a/crypto/ahash.c
++++ b/crypto/ahash.c
+@@ -213,7 +213,10 @@ static void ahash_op_unaligned_done(struct crypto_async_request *req, int err)
+ 
+ 	ahash_op_unaligned_finish(areq, err);
+ 
+-	complete(data, err);
++	areq->base.complete = complete;
++	areq->base.data = data;
++
++	complete(&areq->base, err);
+ }
+ 
+ static int ahash_op_unaligned(struct ahash_request *req,
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/dfcbea7d/attachment.sig>
+1.8.4.3
