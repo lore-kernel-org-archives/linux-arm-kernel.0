@@ -1,122 +1,57 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 10 Dec 2013 12:40:40 +0200
-Subject: [PATCH 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <01B6F752-AD19-437E-B6A6-CC167B6C34BF@kernel.crashing.org>
-References: <1384962416-14862-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1384962416-14862-3-git-send-email-ivan.khoronzhuk@ti.com>
- <817E4263-5E61-4471-AED0-5C97FD2B902F@kernel.crashing.org>
- <5294CC0C.9000203@ti.com>
- <01B6F752-AD19-437E-B6A6-CC167B6C34BF@kernel.crashing.org>
-Message-ID: <52A6EFA8.8090804@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Dec 2013 10:42:31 +0000
+Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
+In-Reply-To: <20131210102555.GB2338@mudshark.cambridge.arm.com>
+References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
+ <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
+ <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
+ <52A66211.6010707@codeaurora.org>
+ <83dd58eb-9a44-4b76-aa68-4669b26acab8@email.android.com>
+ <20131210102555.GB2338@mudshark.cambridge.arm.com>
+Message-ID: <20131210104231.GB2521@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 01:09 AM, Kumar Gala wrote:
+On Tue, Dec 10, 2013 at 10:25:56AM +0000, Will Deacon wrote:
+> On Tue, Dec 10, 2013 at 12:40:20AM +0000, Konrad Rzeszutek Wilk wrote:
+> > Laura Abbott <lauraa@codeaurora.org> wrote:
+> > >On 12/9/2013 4:29 PM, Konrad Rzeszutek Wilk wrote:
+> > >> Laura Abbott <lauraa@codeaurora.org> wrote:
+> > >>> Some architectures may implement the CMA APIs to allow allocation
+> > >>> of larger contiguous blocks of memory. Add support in the swiotlb
+> > >>> alloc/free functions to allocate from the CMA APIs instead of the
+> > >>> basic page allocator.
+> > >>>
+> > >>> Cc: Will Deacon <will.deacon@arm.com>
+> > >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > >>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > >>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > >>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > >...
+> > >>>
+> > >>
+> > >> Can this be done in the platform dma_ops functions instead?
+> > >>
+> > >
+> > >I suppose it could but that seems like it would result in lots of 
+> > >duplicated code if every architecture that uses swiotlb wants to use
+> > >CMA.
+> > >
+> > >Thanks,
+> > >Laura
+> > 
+> > Then let's do that it that way. Thank you.
 > 
-> On Nov 26, 2013, at 10:27 AM, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> 
->> On 11/22/2013 11:04 PM, Kumar Gala wrote:
->>>
->>> On Nov 20, 2013, at 9:46 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->>>
->>>> Add bindings for AEMIF controller drivers/memory/ti-aemif.c
->>>>
->>>
->>> Binding shouldn?t normally refer to code.
->>>
->>> Just saying something like:
->>>
->>> Adding binging for TI Async External Memory Interface (AEMIF) controller.
->>>
->>>
->>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> ---
->>>> .../bindings/memory-controllers/ti-aemif.txt       |  198 ++++++++++++++++++++
->>>> 1 file changed, 198 insertions(+)
->>>> create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>>> new file mode 100644
->>>> index 0000000..be0c0cb
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>>> @@ -0,0 +1,198 @@
->>>> +* Device tree bindings for Texas instruments AEMIF controller
->>>> +
->>>> +Th Async External Memory Interface (EMIF16/AEMIF) controller is intended to
->>>
->>> The?
->>>
->>>> +provide a glue-less interface to a variety of asynchronous memory devices like
->>>> +ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
->>>> +can be accessed at any given time via four chip selects with 64M byte access
->>>> +per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
->>>> +and Mobile SDR are not supported.
->>>> +
->>>> +Documentation:
->>>> +Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
->>>> +OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
->>>> +Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
->>>> +
->>>> +Required properties:
->>>> +
->>>> +- compatible:		"ti,davinci-aemif"
->>>> +			"ti,keystone-aemif"
->>>> +			"ti,omap-L138-aemif"
->>>> +
->>>> +- #address-cells:	Must be 2. The first cell is the memory partition
->>>> +			number. The 0 partition is for chip selects. And the
->>>> +			second cell is the offset into the partition, for the 0
->>>> +			partition it corresponds to chip select offset.
->>>> +
->>>
->>> Is the first cell just the chip select number?
->>
->> No. It's rather memory range/partition number. Now there are 2 partitions:
->> - control partition which is common for all CS interfaces
->> - CS-specific partition/range
->> (this one can be splitted according to specific SoC requirement)
->>
->> As per Keystone TCI6638K2K
->> Datasheet http://www.ti.com/lit/ds/sprs836d/sprs836d.pdf:
->>
->> 1) the memory range 0 will be from 0x30000000 size 0x10000000:
->> 00 3000 0000 - 00 33FF FFFF 64M EMIF16 CE0
->> 00 3400 0000 - 00 37FF FFFF 64M EMIF16 CE1
->> 00 3800 0000 - 00 3BFF FFFF 64M EMIF16 CE2
->> 00 3C00 0000 - 00 3FFF FFFF 64M EMIF16 CE3
->>
->> 2) the memory range 1:
->> 00 2100 0A00 - 00 2100 0AFF 256 AEMIF Config
->>
->> And AEMIF node contains definition:
->> ranges = <0 0 0x30000000 0x10000000
->> 	  1 0 0x21000A00 0x0000100>;
->>
->>
->> Child node has (nand):
->> reg = <0 0 0x4000000 (cs0)
->>         - or - 0 0x4000000 0x4000000 (cs1)
->>         - or - 0 0x8000000 0x4000000 (cs2)
->> 	- or - 0 0xC000000 0x4000000 (cs3)
->> 	- and -
->>         1 0 0x0000100>; (for all cs)
->>
->> For example for cs2 child node the resulting mem range 0 will be calculated as
->>
->> from: 0x30000000 + (0 0x8000000 - 0 0)
->> size: 0x4000000
->>
->> We don't encode CS number in reg/ranges, because it will allow simply change
->> AEMIF DT definitions depending on each SoC
->> (AEMIF CS memory range can be continuous as above or not, if not - additional
->> range/partition can be added and child device can select the proper one).
-> 
-> This is quite confusing.  I think the ranges property needs far more description as part of the top level controller node.  It spec out what the various fields are in the ranges property.
-> 
+> Note that once arch/arm64 starts growing things like support for non-coherent
+> DMA and IOMMU mappings, we'll probably want to factor out a bunch of the
+> boilerplat from our dma-mapping.c file into places like lib/iommu-helper.c.
 
-Yes, you are right, description is quite poor. I should describe it more clearly
+For coherency, we could build it on top of whatever dma (allocation) ops
+are registered, whether swiotlb or iommu (see part of
+https://git.kernel.org/cgit/linux/kernel/git/cmarinas/linux-aarch64.git/commit/?h=devel&id=c67fe405be6b55399c9e53dfeba5e2c6b930e429)
+
+Regarding iommu, I don't think we need CMA on top, so it makes sense to
+keep the CMA in the swiotlb code.
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Catalin
