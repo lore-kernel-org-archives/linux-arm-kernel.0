@@ -1,26 +1,65 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 10 Dec 2013 09:29:10 -0800
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14 (set #2)
-In-Reply-To: <20131208003236.GD11251@titan.lakedaemon.net> (Jason Cooper's
- message of "Sat, 7 Dec 2013 19:32:36 -0500")
-References: <20131208003236.GD11251@titan.lakedaemon.net>
-Message-ID: <878uvs8vix.fsf@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 09:29:59 -0800
+Subject: [GIT PULL] wl1251 platform data changes for v3.14
+In-Reply-To: <87bo0oae3j.fsf@linaro.org>
+References: <52a69d42.0722440a.102e.ffffa0e3SMTPIN_ADDED_BROKEN@mx.google.com>
+ <87bo0oae3j.fsf@linaro.org>
+Message-ID: <20131210172958.GI13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason@lakedaemon.net> writes:
+* Kevin Hilman <khilman@linaro.org> [131210 08:03]:
+> Hi Tony,
+> 
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > The following changes since commit 736e812636ea72be444b85fa7e92554967459069:
+> >
+> >   ARM: OMAP2+: Remove unused platform init code and headers (2013-12-08 14:15:46 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/omap3-board-removal-wl1251
+> >
+> > for you to fetch changes up to ce226391aec803a49b39c22d3385057c9db02f30:
+> >
+> >   Merge branch 'wl1251-pdata' into omap-for-v3.14/omap3-board-removal (2013-12-09 19:39:51 -0800)
+> >
+> > ----------------------------------------------------------------
+> >
+> > Minimal changes for the wl151 platform data that would otherwise
+> > cause merge conflicts between the wireless tree and linux-omap
+> > tree. This was discussed on the mailing lists here:
+> >
+> > http://www.spinics.net/lists/linux-omap/msg99906.html
+> >
+> > ----------------------------------------------------------------
+> > Luciano Coelho (1):
+> >       wl1251: split wl251 platform data to a separate structure
+> >
+> > Sebastian Reichel (1):
+> >       wl1251: move power GPIO handling into the driver
+> >
+> > Tony Lindgren (1):
+> >       Merge branch 'wl1251-pdata' into omap-for-v3.14/omap3-board-removal
+> >
+> >  drivers/net/wireless/ti/wilink_platform_data.c | 37 +++++++++++++++++++++-----
+> >  drivers/net/wireless/ti/wl1251/sdio.c          | 31 ++++++++++++++-------
+> >  drivers/net/wireless/ti/wl1251/spi.c           | 35 +++++++++++++++---------
+> >  drivers/net/wireless/ti/wl1251/wl1251.h        |  2 +-
+> >  include/linux/wl12xx.h                         | 24 +++++++++++++++--
+> >  5 files changed, 97 insertions(+), 32 deletions(-)
+> 
+> This was sent as a pull request to arm-soc, but looks like it should be
+> going through the net tree.
 
-> Guys,
->
-> Nothing big here, Arnaud's been busy wit hthe Netgear boards ;-)
->
-> In -next for 5 days or so.
->
-> This is an incremental pull, from tags/mvebu-dt-3.14 in mvebu/dt branch.
-> Olof pulled the first set into arm-soc/cleanup, so this branch will
-> depend upon that.
+Oh this was to merge in a shared branch between wireless tree and
+linux-omap to avoid merge conflicts as agreed with John Linville,
+see the link above.
 
-Looks like the first set of your DT changes is in next/dt (not our
-cleanup branch) so I pulled this into next/dt as well.
+But let's wait on this one too as it seems at least Russell needs
+some more time to deal with the dropping of legacy booting.
 
-Kevin
+Regards,
+
+Tony
