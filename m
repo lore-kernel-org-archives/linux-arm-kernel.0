@@ -1,70 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Dec 2013 10:19:59 +0000
-Subject: [RFCv2 endianess 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
-References: <1386309134-1822-1-git-send-email-Li.Xiubo@freescale.com>
- <1386309134-1822-2-git-send-email-Li.Xiubo@freescale.com>
- <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
-Message-ID: <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Dec 2013 11:22:45 +0100
+Subject: [GIT PULL] two Integrator devicetree patches
+Message-ID: <CACRpkdZcrEtHC+Q0YHOuL8yXQrMixL=n2Nagbk6NBAmdmnnXHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 05:10:01AM +0000, Li.Xiubo at freescale.com wrote:
-> Hi Mark, Therry,
->
-> Is this series of patches ok about endianess fix?
->
-> Here I add one boolen big-endian property.
+Hi ARM SoC folks,
 
-[...]
+here are two patches targeted for v3.14 that I'd like includes
+in ARM SoC for testing in -next.
 
-> > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> > +             const void __iomem *addr)
-> > +{
-> > +     if (likely(fpc->big_endian))
-> > +             return ioread32be(addr);
-> > +     else
-> > +             return readl(addr);
-> > +}
+Please pull them in!
 
-It looks a little odd to to have two different accessors here.
+Yours,
+Linus Walleij
 
-Could these not be unified somehow?
 
-> > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
-> > +             u32 val, void __iomem *addr)
-> > +{
-> > +     if (likely(fpc->big_endian))
-> > +             iowrite32be(val, addr);
-> > +     else
-> > +             writel(val, addr);
-> > +}
+The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
 
-Likewise.
+  Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
 
-[...]
+are available in the git repository at:
 
-> > +static int fsl_pwm_probe(struct platform_device *pdev) {
-> > +     int ret;
-> > +     struct fsl_pwm_chip *fpc;
-> > +     struct resource *res;
-> > +     struct device_node *np = pdev->dev.of_node;
-> > +
-> > +     fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
-> > +     if (!fpc)
-> > +             return -ENOMEM;
-> > +
-> > +     mutex_init(&fpc->lock);
-> > +
-> > +     fpc->chip.dev = &pdev->dev;
-> > +
-> > +     if (of_get_property(np, "big-endian", NULL))
-> > +             fpc->big_endian = 1;
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/integrator-v3.14-1
 
-You can use of_property_read_bool:
+for you to fetch changes up to 307b96677c98bc444262e3d1a7d26c0ca8a1c6e0:
 
-fpc->big_endian = of_property_read_bool(np, "big-endian");
+  ARM: integrator: move EBI to the device tree (2013-12-04 16:22:31 +0100)
 
-Otherwise, the DT stuff looks fine.
+----------------------------------------------------------------
+Two integrator device tree patches for v3.14:
 
-Mark.
+- Delete some static core module mappings.
+
+- Move EBI location to the device tree.
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: integrator: delete static core module mappings
+      ARM: integrator: move EBI to the device tree
+
+ Documentation/devicetree/bindings/arm/arm-boards |  8 ++++
+ arch/arm/boot/dts/integrator.dtsi                |  5 ++
+ arch/arm/mach-integrator/integrator_ap.c         | 60 ++++++++++++------------
+ arch/arm/mach-integrator/integrator_cp.c         | 14 ------
+ 4 files changed, 44 insertions(+), 43 deletions(-)
