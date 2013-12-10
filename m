@@ -1,52 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Dec 2013 12:40:56 -0800
-Subject: [PATCH] phy: omap_usb2: fix module dependency
-In-Reply-To: <1386707097-25650-1-git-send-email-balbi@ti.com>
-References: <1386707097-25650-1-git-send-email-balbi@ti.com>
-Message-ID: <20131210204056.GV13171@atomide.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Dec 2013 12:46:35 -0800
+Subject: [PATCH v3 01/36] mtd: st_spi_fsm: Allocate resources and
+ register with MTD framework
+In-Reply-To: <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131210204635.GD27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [131210 12:26]:
-> Due to over-use of select statements, we could
-> fall into a situation where CONFIG_USB_PHY would
-> be enabled while CONFIG_USB_SUPPORT wouldn't.
-> 
-> This would generate a situation where usb_bind_phy()
-> would not be defined and kernel build for some
-> OMAP2PLUS platforms would fail.
-> 
-> Fix this by replacing a 'select' with a more proper
-> 'depends on'.
+On Fri, Nov 29, 2013 at 12:18:50PM +0000, Lee Jones wrote:
+> --- /dev/null
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -0,0 +1,111 @@
 
-Do we also need to update omap2plus_defconfig to select
-OMAP_CONTROL_USB in this patch?
+[...]
 
-Regards,
+> +static struct of_device_id stfsm_match[] = {
+> +	{ .compatible = "st,spi-fsm", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, spi_fsm_match);
 
-Tony
- 
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/phy/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index a344f3d..d8b1a9a 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -24,9 +24,9 @@ config PHY_EXYNOS_MIPI_VIDEO
->  config OMAP_USB2
->  	tristate "OMAP USB2 PHY Driver"
->  	depends on ARCH_OMAP2PLUS
-> +	depends on OMAP_CONTROL_USB
->  	select GENERIC_PHY
->  	select USB_PHY
-> -	select OMAP_CONTROL_USB
->  	help
->  	  Enable this to support the transceiver that is part of SOC. This
->  	  driver takes care of all the PHY functionality apart from comparator.
-> -- 
-> 1.8.4.GIT
-> 
+s/spi_fsm_match/stfsm_match/
+
+This doesn't compile.
+
+Brian
