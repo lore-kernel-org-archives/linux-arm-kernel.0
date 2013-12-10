@@ -1,75 +1,97 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 10 Dec 2013 19:04:00 +0400
-Subject: [PATCH 08/20] mmc: host: pxamci: switch over to dmaengine use
-In-Reply-To: <52A6F17D.4090902@gmail.com>
-References: <1375889649-14638-9-git-send-email-zonque>
- <1386667657-26355-1-git-send-email-ynvich@gmail.com>
- <1386671112.7152.219.camel@host5.omatika.ru> <52A6F17D.4090902@gmail.com>
-Message-ID: <1386687840.7152.245.camel@host5.omatika.ru>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 10 Dec 2013 23:05:03 +0800
+Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: introduce
+ CONFIG_ACPI_REDUCED_HARDWARE to enable this ACPI mode
+In-Reply-To: <20131210123717.59493C40A27@trevor.secretlab.ca>
+References: <1386192127-28564-1-git-send-email-al.stone@linaro.org> <
+ 1386192127-28564-2-git-send-email-al.stone@linaro.org>
+ <20131210123717.59493C40A27@trevor.secretlab.ca>
+Message-ID: <52A72D9F.1070004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-10 at 11:48 +0100, Daniel Mack wrote:
-> I'd say something like bonnie++ is a more deterministic test for such
-> things, considering that the first fsck might have fixed things that the
-> 2nd didn't have to touch.
+On 2013?12?10? 20:37, Grant Likely wrote:
+> On Wed,  4 Dec 2013 14:22:03 -0700, al.stone at linaro.org wrote:
+>> From: Al Stone <al.stone@linaro.org>
+>>
+>> To enable the hardware reduced mode of ACPI on some platforms (such as
+>> ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
+>> to TRUE in the ACPICA source.
+>>
+>> This can be done more resonably by introducing a kernel config item
+>> to enable/disable ACPI_REDUCED_HARDWARE.  We can then change the kernel
+>> config instead of having to modify the kernel source directly to enable
+>> the reduced hardware mode of ACPI.
+>>
+>> Lv Zheng suggested that this configuration item does not belong in ACPICA,
+>> the upstream source for much of the ACPI internals, but rather to the
+>> Linux kernel itself.  Hence, we introduce this flag so that we can make
+>> ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
+>> please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
+>>
+>> Support for X86 in hardware reduced mode is also provided to make it
+>> simpler to debug this mode, and to provide for probable use in such
+>> products.  Hardware reduced mode, despite the name, exists primarily
+>> to allow newer platforms to use a much simpler form of ACPI that does
+>> not require supporting the legacy of previous versions of the specification,
+>> and is likely to be used more often in the near future as a result.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> ---
+>>   drivers/acpi/Kconfig            | 8 ++++++++
+>>   include/acpi/platform/aclinux.h | 6 ++++++
+>>   2 files changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index 5d92485..66e6bb2 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -343,6 +343,14 @@ config ACPI_BGRT
+>>   	  data from the firmware boot splash. It will appear under
+>>   	  /sys/firmware/acpi/bgrt/ .
+>>   
+>> +config ACPI_REDUCED_HARDWARE
+>> +	bool "Hardware-reduced ACPI support"
+>> +	depends on X86 || ARM || ARM64
+>> +	help
+>> +	This config adds support for Hardware-reduced ACPI. When this option
+>> +	is selected, will generate a specialized version of ACPICA that ONLY
+>> +	supports the ACPI "reduced hardware".
+>> +
+>>   source "drivers/acpi/apei/Kconfig"
+>>   
+>>   config ACPI_EXTLOG
+>> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+>> index 28f4f4d..a33f502 100644
+>> --- a/include/acpi/platform/aclinux.h
+>> +++ b/include/acpi/platform/aclinux.h
+>> @@ -52,6 +52,12 @@
+>>   
+>>   #ifdef __KERNEL__
+>>   
+>> +/* Compile for reduced hardware mode if requested for this kernel config */
+>> +
+>> +#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+>> +#define ACPI_REDUCED_HARDWARE 1
+>> +#endif
+> Will this change the way ACPICA is compiled? Will it disable
+> non-hardware-reduced mode?
 
-The old driver:
-Version  1.96       ------Sequential Output------ --Sequential Input- --Random-
-Concurrency   1     -Per Chr- --Block-- -Rewrite- -Per Chr- --Block-- --Seeks--
-Machine        Size K/sec %CP K/sec %CP K/sec %CP K/sec %CP K/sec %CP  /sec %CP
-pac26          300M    41  81   280   1   246   2   278  96  3056  10  99.2  23
-Latency              1424ms    1054ms     510ms   95978us   86277us    3510ms
-Version  1.96       ------Sequential Create------ --------Random Create--------
-pac26               -Create-- --Read--- -Delete-- -Create-- --Read--- -Delete--
-              files  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP
-                 16   354  42 16254  97   325  10   490  30 +++++ +++  1320  37
-Latency              2354ms   48094us    6165ms    2979ms     586us    1116us
-1.96,1.96,pac26,1,1386675098,300M,,41,81,280,1,246,2,278,96,3056,10,99.2,23,16,,,,,354,42,16254,97,325,10,490,30,+++++,+++,1320,37,1424ms,1054ms,510ms,95978us,86277us,3510ms,2354ms,48094us,6165ms,2979ms,586us,1116us
+Both yes. ACPICA supports reduced hardware mode when
+ACPI_REDUCED_HARWARE is TRUE at compile time. There is
+no way to support both normal ACPI and hardware reduced
+ACPI with single binary image for now.
 
-The new driver:
-Version  1.96       ------Sequential Output------ --Sequential Input- --Random-
-Concurrency   1     -Per Chr- --Block-- -Rewrite- -Per Chr- --Block-- --Seeks--
-Machine        Size K/sec %CP K/sec %CP K/sec %CP K/sec %CP K/sec %CP  /sec %CP
-pac26          300M    38  77     0   0   218   2   267  93  1762   6  84.0  19
-Latency              2522ms 138668225     792ms   67960us     141ms   16313ms
-Version  1.96       ------Sequential Create------ --------Random Create--------
-pac26               -Create-- --Read--- -Delete-- -Create-- --Read--- -Delete--
-              files  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP
-                 16   304  38 14930  95   383  13   525  31 +++++ +++  1042  28
-Latency             13481ms   49916us    7144ms    4075ms     624us     993us
-1.96,1.96,pac26,1,1639,300M,,38,77,0,0,218,2,267,93,1762,6,84.0,19,16,,,,,304,38,14930,95,383,13,525,31,+++++,+++,1042,28,2522ms,138668225,792ms,67960us,141ms,16313ms,13481ms,49916us,7144ms,4075ms,624us,993us
+> If so, then this is a big problem. Enabling
+> the hardware reduced feature should *not* break normal ACPI usage.
 
-I forgot to run 'time bonnie++', so there is no hard numbers about total
-time. My impression is that the old and new driver tests have run for 30
-and 60 minutes respectively.
+It will break normal ACPI usage but it is ok I think. Since
+lots of features are not supported in the hardware in hardware
+reduced mode, and normal ACPI will not run probably such as
+leading kernel panic when refer to some registers which are not
+exist on reduced hardware, we should introduce this kernel
+config and modify the ACPI drivers to avoid such failures.
 
-> Apart from that, your findings are interesting. I only tested pxamci
-> with a Wifi card connected via SDIO, and didn't see such a big
-> difference in performance.
-> 
-> > Conclusions:
-> > 1. The card itself is fine.
-> > 
-> > 2. There are issues with new DMA driver. I am ready to test patches,
-> > without questions.
-> > 
-> > 3. There are issues with the MMC stack in my ARM device. Please drop a
-> > pointer where to start digging.
-> 
-> Alright, thanks a lot for offering help! You could start having a look
-> at the DMA descriptors and see whether they differ in size, compared to
-> the old implementation. Taking time stamps to measure the turnaround
-> cycle of the transfers would be another thing that you can try.
-> 
-> I'm not aware of any code in the mmp_pdma driver that would burn lots of
-> CPU cycles, but that doesn't mean there aren't any.
-
-I can test patches, but I am not sure I can provide any meaningful help
-with performance. Sorry.
-
-In point 3 I was talking about non-DMA related performance. The device
-has been busy running bonnie++, so I haven't had a change to verify. It
-looks like my device is working with 1-bit-wide bus instead of
-4-bit-wide (Bad block checking ran at 19500000 bits per second which
-matches bus clock speed).
+Thanks
+Hanjun
