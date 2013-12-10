@@ -1,80 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 Dec 2013 20:13:15 +0100
-Subject: [GIT PULL RESEND2] clocksource/clockevents fixes for 3.13
-Message-ID: <52A767CB.3010501@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Dec 2013 19:15:35 +0000
+Subject: [PATCH v2] dma: pl330: ensure DMA descriptors are zero-initialised
+In-Reply-To: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
+References: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20131210191535.GA18218@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Dec 02, 2013 at 06:01:30PM +0000, Will Deacon wrote:
+> I see the following splat with 3.13-rc1 when attempting to perform DMA:
+> 
+> [  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
+> [  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
+> [  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
+> [  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
+> [  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
+> [  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
+> [  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
+> [  253.005010] LR is at pl330_tasklet+0x3c8/0x550
+> [  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
+> [  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
+> [  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
+> [  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
+> [  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
+> [  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> [  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
+> [  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
+> 
+> This is due to desc->txd.unmap containing garbage (uninitialised memory).
+> 
+> Rather than add another dummy initialisation to _init_desc, instead
+> ensure that the descriptors are zero-initialised during allocation and
+> remove the dummy, per-field initialisation.
+> 
+> Cc: Andriy Shevchenko <andriy.shevchenko@intel.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Hi Thomas, Ingo,
+Ping? It would be great to see this merged as a fix.
 
-here are the fixes for 3.13 based on timers/urgent
+Cheers,
 
-  * Axel Lin added a missing dependency on CLKSRC_MMIO in the Kconfig 
-for the time-efm32
+Will
 
-  * Dinh Nguyen fixed read_sched_clock to return the right value and 
-added the clksrc-of missing definition for the dw_apb_timer
-
-  * Ezequiel Garcia registered the sched clock after the counter, thus 
-preventing time jump in the traces for the armada-370-xp
-
-  * Marc Zyngier stopped the timer before enabling the irq in order to 
-prevent it to be fired before the clockevent is registered for the sunxi
-
-  * Thierry Reding removed a of_node_put in clksrc-of because the 
-reference is not held
-
-Thanks
-   -- Daniel
-
-----------------------------------------------------------------
-
-The following changes since commit 0e576acbc1d9600cf2d9b4a141a2554639959d50:
-
-   nohz: Fix another inconsistency between CONFIG_NO_HZ=n and nohz=off 
-(2013-11-29 12:23:03 +0100)
-
-are available in the git repository at:
-
-   git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/fixes
-
-for you to fetch changes up to 9ab4727c1d41e50b67aecde4bf11879560a3ca78:
-
-   clocksource: dw_apb_timer_of: Fix support for dts binding 
-"snps,dw-apb-timer" (2013-12-10 19:49:18 +0100)
-
-----------------------------------------------------------------
-Axel Lin (1):
-       clocksource: time-efm32: Select CLKSRC_MMIO
-
-Dinh Nguyen (2):
-       clocksource: dw_apb_timer_of: Fix read_sched_clock
-       clocksource: dw_apb_timer_of: Fix support for dts binding 
-"snps,dw-apb-timer"
-
-Ezequiel Garcia (1):
-       clocksource: armada-370-xp: Register sched_clock after the 
-counter reset
-
-Marc Zyngier (1):
-       clocksource: sunxi: Stop timer from ticking before enabling 
-interrupts
-
-Thierry Reding (1):
-       clocksource: clksrc-of: Do not drop unheld reference on device node
-
-  drivers/clocksource/Kconfig              |    1 +
-  drivers/clocksource/clksrc-of.c          |    1 -
-  drivers/clocksource/dw_apb_timer_of.c    |    7 ++++---
-  drivers/clocksource/sun4i_timer.c        |    3 +++
-  drivers/clocksource/time-armada-370-xp.c |   10 +++++-----
-  5 files changed, 13 insertions(+), 9 deletions(-)
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> ---
+>  drivers/dma/pl330.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 98641eaca080..769f865b71db 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2492,12 +2492,9 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
+>  
+>  static inline void _init_desc(struct dma_pl330_desc *desc)
+>  {
+> -	desc->pchan = NULL;
+>  	desc->req.x = &desc->px;
+>  	desc->req.token = desc;
+>  	desc->rqcfg.swap = SWAP_NO;
+> -	desc->rqcfg.privileged = 0;
+> -	desc->rqcfg.insnaccess = 0;
+>  	desc->rqcfg.scctl = SCCTRL0;
+>  	desc->rqcfg.dcctl = DCCTRL0;
+>  	desc->req.cfg = &desc->rqcfg;
+> @@ -2517,7 +2514,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
+>  	if (!pdmac)
+>  		return 0;
+>  
+> -	desc = kmalloc(count * sizeof(*desc), flg);
+> +	desc = kcalloc(count, sizeof(*desc), flg);
+>  	if (!desc)
+>  		return 0;
+>  
+> -- 
+> 1.8.2.2
+> 
