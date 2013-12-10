@@ -1,52 +1,38 @@
-From: ananaza@iki.fi (Antti Miettinen)
-Date: Tue, 10 Dec 2013 08:31:56 +0200
-Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
- (Lorenzo Pieralisi's message of "Mon, 2 Dec 2013 16:20:05 +0000")
-References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <87lhztgqsj.fsf@iki.fi>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 10 Dec 2013 14:33:31 +0800
+Subject: questions of cpuidle
+In-Reply-To: <52A5D0E0.7050201@linaro.org>
+References: <52A5C846.30308@linaro.org> <52A5D0E0.7050201@linaro.org>
+Message-ID: <52A6B5BB.3060506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On 12/09/2013 10:17 PM, Daniel Lezcano wrote:
+> 
+> Concerning the wake up of the cpu: the cpu disabled the irq and goes to
+> sleep, it is up to the firmware to wake up the cpu when an interrupt
+> occurs. It will exits its sleep state, call clock_events_notify(EXIT),
+> by this way re-switching to the local timer, and then re-enabling the
+> local interrupt which leads to the interrupt handler.
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> +	- latency
-> +		Usage: Required
-> +		Value type: <u32>
-> +		Definition: Worst case latency in microseconds required to
-> +			    enter and exit the C-state.
-> +
-> +	- min-residency
-> +		Usage: Required
-> +		Value type: <u32>
-> +		Definition: Time in microseconds required for the CPU to be in
-> +			    the C-state to make up for the dynamic power
-> +			    consumed to enter/exit the C-state in order to
-> +			    break even in terms of power consumption compared
-> +			    to C1 state (wfi).
-> +			    This parameter depends on the operating conditions
-> +			    (operating point, cache state) and must assume
-> +			    worst case scenario.
+Thanks a lots for excellent article and detailed explains!
 
-I have a concern with these. I know it is not the fault of this patch as
-these parameters are what current cpuidle governor/driver interface
-uses, but..
+So, if the firmware is in response to wake up cpu. that means there is a
+unit which control the firmware and it can not be power down. Do you
+know which unit running the firmware to wake up deep idle CPU.
+And does the wake up pass via GIC to CPU? If so, does the GIC need keep
+awake when all cpu idle? If not, how the firmware give the interrupt to
+CPU? And I am wondering if the deep idle cpu voltage get to near 0.
+How the cpu get the interrupt signal?
 
-Power state entry/exit latencies can be vary quite a lot. Especially CPU
-and memory frequencies affect them as can e.g. PMIC properties. Also
-power level during entry/exit depends on clocks and voltages. Also the
-power level of a sleep state can be context dependent (clocks and
-voltages). These mean that also the minimum residency for energy break
-even varies. Defining a minimum residency against C1 is a bit
-arbitrary. There is no guarantee that the break even order of idle
-states remains constant over device context changes.
+> 
+> There are some more informations in the wiki page [1].
+> 
+>   -- Daniel
+> 
+> [1] https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/WakeUpSources
 
-I have not really properly thought through this but here's an idea.. how
-about an alternative interface between governor and driver? The cpuidle
-core would provide the expected wakeup time and currently enforced
-minimum latency to the driver and the driver would make the decision
-about the state to choose.
 
-	--Antti
+-- 
+Thanks
+    Alex
