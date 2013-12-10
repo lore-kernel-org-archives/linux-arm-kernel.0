@@ -1,39 +1,45 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 12:08:10 -0800
-Subject: [PATCH v3 03/36] mtd: st_spi_fsm: Initialise and configure the
- FSM for normal working conditions
-In-Reply-To: <20131210190100.GA27149@ld-irv-0074.broadcom.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-4-git-send-email-lee.jones@linaro.org>
- <20131210190100.GA27149@ld-irv-0074.broadcom.com>
-Message-ID: <20131210200810.GB27149@ld-irv-0074.broadcom.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 10 Dec 2013 21:05:29 +0100
+Subject: [PATCH 01/10] net: stmmac: Enable stmmac main clock when probing
+ hardware
+In-Reply-To: <CAGb2v65YOSq_BMWSzSHX8w_hbo+0vwquBT2pnLuwNVZkWRfLvA@mail.gmail.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-2-git-send-email-wens@csie.org>
+ <20131207103335.GL24519@lukather>
+ <CAGb2v65YOSq_BMWSzSHX8w_hbo+0vwquBT2pnLuwNVZkWRfLvA@mail.gmail.com>
+Message-ID: <20131210200529.GD3651@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 11:01:00AM -0800, Brian Norris wrote:
-> On Fri, Nov 29, 2013 at 12:18:52PM +0000, Lee Jones wrote:
-> > +	/*
-> > +	 * Calculate clk_div - values between 2 and 128
-> > +	 * Multiple of 2, rounded up
-> > +	 */
-> > +	clk_div = 2*((emi_freq + (2*spi_freq - 1))/(2*spi_freq));
+Hi,
+
+On Mon, Dec 09, 2013 at 10:43:29AM +0800, Chen-Yu Tsai wrote:
+> >> @@ -2759,15 +2760,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+> >>               }
+> >>       }
+> >>
+> >> +     clk_disable_unprepare(priv->stmmac_clk);
+> >> +
+> >
+> > Hu? Why do you disable the clock? don't you need it afterwards?
 > 
-> I think this can use the <linux/kerne.h> round_up() macro. Also, you're
-> missing some spacing. Possibly:
-> 
-> 	clk_div = 2 * round_up(emi_freq, 2 * spi_freq);
+> The clock is enabled in *_open (when the network interface is used),
+> and disabled in *_close.
 
-Sorry, I was reading one thing and writing another; this would be
-DIV_ROUND_UP():
+Maybe it is the real issue then.
 
-	clk_div = 2 * DIV_ROUND_UP(emi_freq, 2 * spi_freq);
+Why don't you move the clk_disable to _remove then?
 
-> > +		fsm->fifo_dir_delay = (clk_div + 9) / 10;
-> 
-> round_down()?
+Maxime
 
-Sorry, I again meant DIV_ROUND_UP:
-
-		fsm->fifo_dir_delay = DIV_ROUND_UP(clk_div, 10);
-
-Brian
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/6c85ba55/attachment.sig>
