@@ -1,89 +1,46 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 11 Dec 2013 02:42:23 +0400
-Subject: [PATCH] arm: sa1100: collie: add support for IrDA transceiver
-Message-ID: <1386715343-17868-1-git-send-email-dbaryshkov@gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 10 Dec 2013 22:42:57 +0000
+Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <CAFECyb93r5QGWRYDQxzWJ-xtptWBAEiQtAx=woLC5x+3WhbNqQ@mail.gmail.com>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org> <
+ CAHCPf3s_SXYXLRwvn7tzqTCQ-gB=emRMK_dXkEmw_HWigiD7Mw@mail.gmail.com> <
+ 20131210123035.D1586C40A27@trevor.secretlab.ca> <
+ CAFECyb93r5QGWRYDQxzWJ-xtptWBAEiQtAx=woLC5x+3WhbNqQ@mail.gmail.com>
+Message-ID: <20131210224257.62196C40CE1@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Collie has onboard IrDA transceiver controlled via active-low gpio. Add
-corresponding platform data.
+On Tue, 10 Dec 2013 10:29:34 -0800, Roy Franz <roy.franz@linaro.org> wrote:
+> On Tue, Dec 10, 2013 at 4:30 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> > On Fri, 6 Dec 2013 11:20:45 -0600, Matt Sealey <neko@bakuhatsu.net> wrote:
+> >> On Wed, Dec 4, 2013 at 4:44 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> >> > On Wed, Dec 04, 2013 at 03:06:47PM -0600, Matt Sealey wrote:
+> >> Grant suggested I should propose some patches; sure, if I'm not otherwise busy.
+> >>
+> >> Maybe the Linaro guys can recommend a platform (real or emulated) that
+> >> would be best to test it on with the available UEFI?
+> >
+> > Roy Franz (cc'd) has got UEFI running under QEMU. A few modifications
+> > were required to both stock UEFI and QEMU. I'm not sure what the status
+> > of mainlining those patches is. I think there are still a few things
+> > that Roy has to fix, but you should be able to get the current patches
+> > from him to get going.
+> >
+> > g.
+> >
+> 
+> Hi Grant and Matt,
+> 
+> I have put together a quick wiki page describing the current status,
+> with git trees for
+> UEFI and QEMU, and instructions for running the model.  I just whipped
+> this up now, so it
+> is pretty basic, but should have all the required information.
+> 
+> https://wiki.linaro.org/LEG/Engineering/Kernel/UEFI/VersatileExpress/QEMU
+> 
+> Please let me know if you have any questions.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/collie.c              | 33 ++++++++++++++++++++++++++++++
- arch/arm/mach-sa1100/include/mach/collie.h |  2 +-
- 2 files changed, 34 insertions(+), 1 deletion(-)
+Thanks Roy.
 
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index 7fb96eb..8faccba 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -41,6 +41,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/irda.h>
- 
- #include <asm/hardware/scoop.h>
- #include <asm/mach/sharpsl_param.h>
-@@ -94,6 +95,37 @@ static struct mcp_plat_data collie_mcp_data = {
- 	.codec_pdata	= &collie_ucb1x00_data,
- };
- 
-+static int collie_ir_startup(struct device *dev)
-+{
-+	int rc = gpio_request(COLLIE_GPIO_IR_ON, "IrDA");
-+	if (rc)
-+		return rc;
-+	rc = gpio_direction_output(COLLIE_GPIO_IR_ON, 1);
-+
-+	if (!rc)
-+		return 0;
-+
-+	gpio_free(COLLIE_GPIO_IR_ON);
-+	return rc;
-+}
-+
-+static void collie_ir_shutdown(struct device *dev)
-+{
-+	gpio_free(COLLIE_GPIO_IR_ON);
-+}
-+
-+static int collie_ir_set_power(struct device *dev, unsigned int state)
-+{
-+	gpio_set_value(COLLIE_GPIO_IR_ON, !state);
-+	return 0;
-+}
-+
-+static struct irda_platform_data collie_ir_data = {
-+	.startup = collie_ir_startup,
-+	.shutdown = collie_ir_shutdown,
-+	.set_power = collie_ir_set_power,
-+};
-+
- /*
-  * Collie AC IN
-  */
-@@ -365,6 +397,7 @@ static void __init collie_init(void)
- 	sa11x0_register_mtd(&collie_flash_data, collie_flash_resources,
- 			    ARRAY_SIZE(collie_flash_resources));
- 	sa11x0_register_mcp(&collie_mcp_data);
-+	sa11x0_register_irda(&collie_ir_data);
- 
- 	sharpsl_save_param();
- }
-diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
-index f33679d..0ef22f9 100644
---- a/arch/arm/mach-sa1100/include/mach/collie.h
-+++ b/arch/arm/mach-sa1100/include/mach/collie.h
-@@ -78,7 +78,7 @@ extern void locomolcd_power(int on);
- #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
- #define COLLIE_TC35143_GPIO_TBL_CHK     UCB_IO_1
- #define COLLIE_TC35143_GPIO_VPEN_ON     UCB_IO_2
--#define COLLIE_TC35143_GPIO_IR_ON       UCB_IO_3
-+#define COLLIE_GPIO_IR_ON		(COLLIE_TC35143_GPIO_BASE + 3)
- #define COLLIE_TC35143_GPIO_AMP_ON      UCB_IO_4
- #define COLLIE_TC35143_GPIO_VERSION1    UCB_IO_5
- #define COLLIE_TC35143_GPIO_FS8KLPF     UCB_IO_5
--- 
-1.8.4.3
+g.
