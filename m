@@ -1,33 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Dec 2013 09:02:29 +0000
-Subject: [PATCH v3 10/15] mfd: menelaus: Pass menelaus_chip argument to
- menelaus <-> time helpers
-In-Reply-To: <1386606085-26838-10-git-send-email-balbi@ti.com>
-References: <20131209161422.GC24047@saruman.home>
- <1386606085-26838-1-git-send-email-balbi@ti.com>
- <1386606085-26838-10-git-send-email-balbi@ti.com>
-Message-ID: <20131210090229.GS12675@lee--X1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Dec 2013 10:06:10 +0100
+Subject: [PATCH] pinctrl: make the MSM SoC driver depend on OF
+Message-ID: <1386666370-6394-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 09 Dec 2013, Felipe Balbi wrote:
+We had a compilation failure on x86_64 due to missing OF support
+as this was an implicit dependency. Add an explicit dependency
+on OF and OF_IRQ on the SoC driver.
 
-> time_to_menelaus() and menelaus_to_time() are static and can easily
-> receive a struct menelaus_chip pointer argument.
-> 
-> After this patch, the_menelaus is only used on exported functions which
-> are currently being used by board-n8x0.c.
-> 
-> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/mfd/menelaus.c | 17 ++++++++---------
->  1 file changed, 8 insertions(+), 9 deletions(-)
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Total failure with older approaches: what we need to do is
+  have the *SoC subdriver* depend on OF and OF_IRQ. This is
+  because the placeholder bool PINCTRL_MSM cannot cascade its
+  dependencies when a subdriver selects it, Kconfig is smart
+  but not that smart.
+ChangeLog v1->v2:
+- OK so "depends on OF" did not work here let's try to simply
+  select OF and OF_IRQ for this then? It's one of those
+  "warning: (PINCTRL_MSM8X74) selects PINCTRL_MSM which has
+  unmet direct dependencies (PINCTRL && OF)" that I simply
+  cannot find my way out of :-/
+---
+ drivers/pinctrl/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Same.
-
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 06e057bb3376..30fcb897eb99 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -211,6 +211,7 @@ config PINCTRL_MSM
+ 
+ config PINCTRL_MSM8X74
+ 	bool "Qualcomm 8x74 pin controller driver"
++	depends on OF && OF_IRQ
+ 	select PINCTRL_MSM
+ 
+ config PINCTRL_NOMADIK
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.1
