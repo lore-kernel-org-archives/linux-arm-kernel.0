@@ -1,85 +1,85 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Dec 2013 20:19:22 +0100
-Subject: [PATCH V2 3/5] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <20131203110958.GF13726@S2101-09.ap.freescale.net>
-References: <1385932823-3860-1-git-send-email-marex@denx.de>
- <1385932823-3860-3-git-send-email-marex@denx.de>
- <20131203110958.GF13726@S2101-09.ap.freescale.net>
-Message-ID: <201312102019.22473.marex@denx.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 11:27:27 -0800
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
+In-Reply-To: <20131210185902.GO13171@atomide.com>
+References: <pull-1386643347-596413>
+ <alpine.DEB.2.02.1312101034360.32309@utopia.booyaka.com>
+ <20131210185902.GO13171@atomide.com>
+Message-ID: <20131210192726.GR13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 03, 2013 at 12:10:02 PM, Shawn Guo wrote:
-> On Sun, Dec 01, 2013 at 10:20:21PM +0100, Marek Vasut wrote:
-> > Add support for the MXS DCP block. The driver currently supports
-> > SHA-1/SHA-256 hashing and AES-128 CBC/ECB modes. The non-standard
-> > CRC32 is not yet supported.
+* Tony Lindgren <tony@atomide.com> [131210 11:00]:
+> * Paul Walmsley <paul@pwsan.com> [131210 10:47]:
+> > On Mon, 9 Dec 2013, Tony Lindgren wrote:
 > > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: linux-crypto at vger.kernel.org
-> > ---
+> > > The following changes since commit f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
+> > > 
+> > >   ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/omap3-board-removal-signed
+> > > 
+> > > for you to fetch changes up to 736e812636ea72be444b85fa7e92554967459069:
+> > > 
+> > >   ARM: OMAP2+: Remove unused platform init code and headers (2013-12-08 14:15:46 -0800)
 > > 
-> >  .../devicetree/bindings/crypto/fsl-dcp.txt         |   18 +
-> >  drivers/crypto/Kconfig                             |   17 +
-> >  drivers/crypto/Makefile                            |    1 +
-> >  drivers/crypto/mxs-dcp.c                           | 1100
-> >  ++++++++++++++++++++ 4 files changed, 1136 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-dcp.txt
+> > The description in Tony's pull request below alludes to what regressions 
+> > will occur when this is pulled.  But just to state it in terms of what 
+> > happened on the local testbed here when I tried it:
+> > 
+> > - CM-T3517 booting will break since there's no .dts file for it.  Are
+> >   there other boards that will be affected here too?
 > 
-> Since it creates new device tree bindings, please copy
-> devicetree at vger.kernel.org, so that DT experts can have a chance to
-> review the bindings.
-
-OK, makes sense.
- 
-> Shawn
+> Yeah the cm-t3770 is on my todo list, but I've left it last as it's my
+> home router and has been behaving quite nicely.
 > 
-> >  create mode 100644 drivers/crypto/mxs-dcp.c
-> > 
-> > V2: Use dma_{un,}map_single instead of large coherent chunk
-> > 
-> >       Use the DMA mapping function on DCP buffers instead of the large
-> >       coherent chunk. This reduces the amount of cache
-> >       flushes/invalidations and write buffer drains as we do not need to
-> >       do this every time we operate with the coherent memory chunk, but
-> >       only when really needed.
-> >     
-> >     Make sure rctx is always inited
-> >     
-> >       The crypto request context is not zeroed out by the crypto API.
-> >       While this is not documented anywhere, it will produce arcane and
-> >       hard to debug problems. Fix the DCP code so that the request
-> >       context is always properly initialized.
-> >     
-> >     Minor code and coding-style fixes.
-> > 
-> > diff --git a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
-> > b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt new file mode
-> > 100644
-> > index 0000000..ee8fbf9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
-> > @@ -0,0 +1,18 @@
-> > +Freescale DCP (Data Co-Processor) found on i.MX23/i.MX28 .
-> > +
-> > +Required properties:
-> > +- compatible : Should be "fsl,<soc>-dcp"
-> > +- reg : Should contain MXS DCP registers location and length
-> > +- interrupts : Should contain MXS DCP interrupt numbers, VMI IRQ and DCP
-> > IRQ +               must be supplied, optionally Secure IRQ can be
-> > present, but +	       is currently not implemented and not used.
-> > +
-> > +Example:
-> > +
-> > +dcp at 80028000 {
-> > +	compatible = "fsl,imx28-dcp", "fsl,imx23-dcp";
-> > +	reg = <0x80028000 0x2000>;
-> > +	interrupts = <52 53>;
-> > +	status = "okay";
-> > +};
+> That should then cover:
+> 
+> SBC-T3530
+> http://compulab.co.il/products/sbcs/sbc-t3530/
+> 
+> SBC-T3517
+> http://compulab.co.il/products/sbcs/sbc-t3517/
+> 
+> SBC-T3730
+> http://compulab.co.il/products/sbcs/sbc-t3730/
+> 
+> They all seem to have the same baseboard, and the CPU module is
+> different. So getting the 3530 and 3517 variants working should
+> be trivial. I don't have 3530 or 3517 variants, so somebody else
+> will need to do those two.
+> 
+> And Nishant just posted a .dts file for the 3517 craneboard.
 
-[...]
+And here's a list of other boards we don't have .dts file for if
+people have these:
+
+board-devkit8000.c		omap3-ldp.dts or omap3-beagle.dts is a good starting point
+board-omap3logic.c		omap3-ldp.dts or omap3-beagle.dts is a good starting point
+board-omap3pandora.c		omap3-ldp.dts or omap3-beagle.dts is a good starting point
+board-omap3stalker.c
+board-omap3touchbook.c
+
+For the ones above, omap3-ldp.dts or omap3-beagle.dts are good starting
+points. There's the DPI display pdata patch too, but it seems we want to
+wait to see if Tomi gets his display changes done before applying that.
+
+I don't have any of the ones above, so people using those please
+do the .dts files ASAP.
+
+Or send me those boards with working boot loaders and I'll do them at
+a rate of one board per day or so.. And then you're stuck with my
+criteria of "usable" which is usually serial port and NFS root unless
+I really like the board, mhuwahuaaaahh!
+
+board-ti8168evm.c
+
+I doubt ti8168evm has even worked for a long time.. It's in pretty
+sorry state unfortunately with missing clock support and missing
+handle_irq entry in the board-ti8168evm.c.
+
+Regards,
+
+Tony
