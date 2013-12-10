@@ -1,93 +1,114 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 11 Dec 2013 07:48:54 +0900
-Subject: [PATCH] ARM: topology: Staticise non-exported symbols
-In-Reply-To: <1386673649-15181-2-git-send-email-broonie@kernel.org>
-References: <1386673649-15181-1-git-send-email-broonie@kernel.org>
- <1386673649-15181-2-git-send-email-broonie@kernel.org>
-Message-ID: <001201cef5fa$00b90e40$022b2ac0$%han@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 10 Dec 2013 22:49:12 +0000
+Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: introduce
+ CONFIG_ACPI_REDUCED_HARDWARE to enable this ACPI mode
+In-Reply-To: <52A72D9F.1070004@linaro.org>
+References: <1386192127-28564-1-git-send-email-al.stone@linaro.org> <
+ 1386192127-28564-2-git-send-email-al.stone@linaro.org> <20131210123717.
+ 59493C40A27@trevor.secretlab.ca> <52A72D9F.1070004@linaro.org>
+Message-ID: <20131210224912.996FCC40CE1@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 10, 2013 8:07 PM, Mark Brown wrote:
-> 
-> From: Mark Brown <broonie@linaro.org>
-> 
-> These symbols are only referenced in this source file so can be made
-> static, and the efficiency table is constant data so can be declared as
-> such.  This avoids polluting the global namespace and fixes warnings
-> from sparse.
-> 
-> The function arch_scale_freq_power() is still not prototyped or static,
-> this is a separate issue as this is overriding a weak symbol from the
-> scheduler which neglects to provide a prototype.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+Hi Hanjun,
 
-It looks good.
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+Okay, so after talking with Al and Graeme on IRC, I think I understand
+what is going on. The fact that ACPICA doesn't allow for both normal and
+hardware reduced support in the same build is a very big problem.
+However, it isn't a problem for ARM since we'll never support
+non-hardware reduced mode. The x86 folks need to work that out when/if
+they ever add support for hardware reduced mode.
 
-Best regards,
-Jingoo Han
+So I would say the thing to do is only allow hardware reduced mode to be
+enabled on ARM, and make it ultra clear in the config text that it
+cannot be supported on x86 before ACPICA is fixed.
 
-> ---
->  arch/arm/kernel/topology.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+g.
+
+On Tue, 10 Dec 2013 23:05:03 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> On 2013???12???10??? 20:37, Grant Likely wrote:
+> > On Wed,  4 Dec 2013 14:22:03 -0700, al.stone at linaro.org wrote:
+> >> From: Al Stone <al.stone@linaro.org>
+> >>
+> >> To enable the hardware reduced mode of ACPI on some platforms (such as
+> >> ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
+> >> to TRUE in the ACPICA source.
+> >>
+> >> This can be done more resonably by introducing a kernel config item
+> >> to enable/disable ACPI_REDUCED_HARDWARE.  We can then change the kernel
+> >> config instead of having to modify the kernel source directly to enable
+> >> the reduced hardware mode of ACPI.
+> >>
+> >> Lv Zheng suggested that this configuration item does not belong in ACPICA,
+> >> the upstream source for much of the ACPI internals, but rather to the
+> >> Linux kernel itself.  Hence, we introduce this flag so that we can make
+> >> ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
+> >> please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
+> >>
+> >> Support for X86 in hardware reduced mode is also provided to make it
+> >> simpler to debug this mode, and to provide for probable use in such
+> >> products.  Hardware reduced mode, despite the name, exists primarily
+> >> to allow newer platforms to use a much simpler form of ACPI that does
+> >> not require supporting the legacy of previous versions of the specification,
+> >> and is likely to be used more often in the near future as a result.
+> >>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Signed-off-by: Al Stone <al.stone@linaro.org>
+> >> ---
+> >>   drivers/acpi/Kconfig            | 8 ++++++++
+> >>   include/acpi/platform/aclinux.h | 6 ++++++
+> >>   2 files changed, 14 insertions(+)
+> >>
+> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> >> index 5d92485..66e6bb2 100644
+> >> --- a/drivers/acpi/Kconfig
+> >> +++ b/drivers/acpi/Kconfig
+> >> @@ -343,6 +343,14 @@ config ACPI_BGRT
+> >>   	  data from the firmware boot splash. It will appear under
+> >>   	  /sys/firmware/acpi/bgrt/ .
+> >>   
+> >> +config ACPI_REDUCED_HARDWARE
+> >> +	bool "Hardware-reduced ACPI support"
+> >> +	depends on X86 || ARM || ARM64
+> >> +	help
+> >> +	This config adds support for Hardware-reduced ACPI. When this option
+> >> +	is selected, will generate a specialized version of ACPICA that ONLY
+> >> +	supports the ACPI "reduced hardware".
+> >> +
+> >>   source "drivers/acpi/apei/Kconfig"
+> >>   
+> >>   config ACPI_EXTLOG
+> >> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+> >> index 28f4f4d..a33f502 100644
+> >> --- a/include/acpi/platform/aclinux.h
+> >> +++ b/include/acpi/platform/aclinux.h
+> >> @@ -52,6 +52,12 @@
+> >>   
+> >>   #ifdef __KERNEL__
+> >>   
+> >> +/* Compile for reduced hardware mode if requested for this kernel config */
+> >> +
+> >> +#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+> >> +#define ACPI_REDUCED_HARDWARE 1
+> >> +#endif
+> > Will this change the way ACPICA is compiled? Will it disable
+> > non-hardware-reduced mode?
 > 
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 85a87370f144..0bc94b1fd1ae 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -68,16 +68,16 @@ struct cpu_efficiency {
->   * Processors that are not defined in the table,
->   * use the default SCHED_POWER_SCALE value for cpu_scale.
->   */
-> -struct cpu_efficiency table_efficiency[] = {
-> +static const struct cpu_efficiency table_efficiency[] = {
->  	{"arm,cortex-a15", 3891},
->  	{"arm,cortex-a7",  2048},
->  	{NULL, },
->  };
+> Both yes. ACPICA supports reduced hardware mode when
+> ACPI_REDUCED_HARWARE is TRUE at compile time. There is
+> no way to support both normal ACPI and hardware reduced
+> ACPI with single binary image for now.
 > 
-> -unsigned long *__cpu_capacity;
-> +static unsigned long *__cpu_capacity;
->  #define cpu_capacity(cpu)	__cpu_capacity[cpu]
+> > If so, then this is a big problem. Enabling
+> > the hardware reduced feature should *not* break normal ACPI usage.
 > 
-> -unsigned long middle_capacity = 1;
-> +static unsigned long middle_capacity = 1;
+> It will break normal ACPI usage but it is ok I think. Since
+> lots of features are not supported in the hardware in hardware
+> reduced mode, and normal ACPI will not run probably such as
+> leading kernel panic when refer to some registers which are not
+> exist on reduced hardware, we should introduce this kernel
+> config and modify the ACPI drivers to avoid such failures.
 > 
->  /*
->   * Iterate all CPUs' descriptor in DT and compute the efficiency
-> @@ -89,7 +89,7 @@ unsigned long middle_capacity = 1;
->   */
->  static void __init parse_dt_topology(void)
->  {
-> -	struct cpu_efficiency *cpu_eff;
-> +	const struct cpu_efficiency *cpu_eff;
->  	struct device_node *cn = NULL;
->  	unsigned long min_capacity = (unsigned long)(-1);
->  	unsigned long max_capacity = 0;
-> @@ -158,7 +158,7 @@ static void __init parse_dt_topology(void)
->   * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
->   * function returns directly for SMP system.
->   */
-> -void update_cpu_power(unsigned int cpu)
-> +static void update_cpu_power(unsigned int cpu)
->  {
->  	if (!cpu_capacity(cpu))
->  		return;
-> @@ -185,7 +185,7 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
->  	return &cpu_topology[cpu].core_sibling;
->  }
+> Thanks
+> Hanjun
 > 
-> -void update_siblings_masks(unsigned int cpuid)
-> +static void update_siblings_masks(unsigned int cpuid)
->  {
->  	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
->  	int cpu;
-> --
-> 1.8.5.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
