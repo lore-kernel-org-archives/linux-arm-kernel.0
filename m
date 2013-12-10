@@ -1,41 +1,89 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 11 Dec 2013 02:36:39 +0400
-Subject: [PATCH v2 0/5]
-In-Reply-To: <CALT56yN5XkQhKENHwg56+B8-oirQ0k-dL7_Vx=RQHQsgcyNhaA@mail.gmail.com>
-References: <1384639650-3919-1-git-send-email-dbaryshkov@gmail.com>
- <CALT56yN5XkQhKENHwg56+B8-oirQ0k-dL7_Vx=RQHQsgcyNhaA@mail.gmail.com>
-Message-ID: <CALT56yNWF_OJG-VJapoSTotwo1R6W+uNdPmx6Uy+O2CAKT=C8w@mail.gmail.com>
+Date: Wed, 11 Dec 2013 02:42:23 +0400
+Subject: [PATCH] arm: sa1100: collie: add support for IrDA transceiver
+Message-ID: <1386715343-17868-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+Collie has onboard IrDA transceiver controlled via active-low gpio. Add
+corresponding platform data.
 
-On Tue, Nov 26, 2013 at 3:08 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> On Sun, Nov 17, 2013 at 2:07 AM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->> Please apply the following patches that fix the sa1100 framebuffer and PCMCIA
->> timings calculation if CPU frequency driver is not available.
->>
->> Changes since V1:
->> * Corrected patch adding sa1111 pcmcia device - offset was wrong.
->>
->> ----------------------------------------------------------------
->> Dmitry Eremin-Solenikov (5):
->>       arm: sa1100: add cpu clock
->>       fbdev: sa1100fb: make use of device clock
->>       pcmcia: sa1100: make use of device clock
->>       arm: sa1100: add a clock alias for sa1111 pcmcia device
->>       pcmcia: sa1111: make use of device clock
->
-> Ping. Tested on collie (except sa1111).
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-sa1100/collie.c              | 33 ++++++++++++++++++++++++++++++
+ arch/arm/mach-sa1100/include/mach/collie.h |  2 +-
+ 2 files changed, 34 insertions(+), 1 deletion(-)
 
-Ping again. Without these patches: it is impossible to get framebuffer
-to work on collie. Also adding these patches make it possible to disable
-cpu freq thus saving few kb, which is important for kexecboot kernels.
-
-Can we get at least first two patches, so that collie can have working FB?
-
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 7fb96eb..8faccba 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -41,6 +41,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
++#include <asm/mach/irda.h>
+ 
+ #include <asm/hardware/scoop.h>
+ #include <asm/mach/sharpsl_param.h>
+@@ -94,6 +95,37 @@ static struct mcp_plat_data collie_mcp_data = {
+ 	.codec_pdata	= &collie_ucb1x00_data,
+ };
+ 
++static int collie_ir_startup(struct device *dev)
++{
++	int rc = gpio_request(COLLIE_GPIO_IR_ON, "IrDA");
++	if (rc)
++		return rc;
++	rc = gpio_direction_output(COLLIE_GPIO_IR_ON, 1);
++
++	if (!rc)
++		return 0;
++
++	gpio_free(COLLIE_GPIO_IR_ON);
++	return rc;
++}
++
++static void collie_ir_shutdown(struct device *dev)
++{
++	gpio_free(COLLIE_GPIO_IR_ON);
++}
++
++static int collie_ir_set_power(struct device *dev, unsigned int state)
++{
++	gpio_set_value(COLLIE_GPIO_IR_ON, !state);
++	return 0;
++}
++
++static struct irda_platform_data collie_ir_data = {
++	.startup = collie_ir_startup,
++	.shutdown = collie_ir_shutdown,
++	.set_power = collie_ir_set_power,
++};
++
+ /*
+  * Collie AC IN
+  */
+@@ -365,6 +397,7 @@ static void __init collie_init(void)
+ 	sa11x0_register_mtd(&collie_flash_data, collie_flash_resources,
+ 			    ARRAY_SIZE(collie_flash_resources));
+ 	sa11x0_register_mcp(&collie_mcp_data);
++	sa11x0_register_irda(&collie_ir_data);
+ 
+ 	sharpsl_save_param();
+ }
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index f33679d..0ef22f9 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -78,7 +78,7 @@ extern void locomolcd_power(int on);
+ #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
+ #define COLLIE_TC35143_GPIO_TBL_CHK     UCB_IO_1
+ #define COLLIE_TC35143_GPIO_VPEN_ON     UCB_IO_2
+-#define COLLIE_TC35143_GPIO_IR_ON       UCB_IO_3
++#define COLLIE_GPIO_IR_ON		(COLLIE_TC35143_GPIO_BASE + 3)
+ #define COLLIE_TC35143_GPIO_AMP_ON      UCB_IO_4
+ #define COLLIE_TC35143_GPIO_VERSION1    UCB_IO_5
+ #define COLLIE_TC35143_GPIO_FS8KLPF     UCB_IO_5
 -- 
-With best wishes
-Dmitry
+1.8.4.3
