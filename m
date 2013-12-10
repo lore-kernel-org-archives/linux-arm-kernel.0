@@ -1,35 +1,31 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 10 Dec 2013 17:15:24 +0000
-Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
-In-Reply-To: <52A748DE.8000508@cogentembedded.com>
-References: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
- <52A748DE.8000508@cogentembedded.com>
-Message-ID: <52A74C2C.9020805@codethink.co.uk>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 10 Dec 2013 09:18:58 -0800
+Subject: [PATCH 0/4] Add missing components for X-Gene reboot drivers.
+In-Reply-To: <1386181979-26547-1-git-send-email-fkan@apm.com>
+References: <1386181979-26547-1-git-send-email-fkan@apm.com>
+Message-ID: <CAL85gmC1xRdwN0kj2w-ScNNFqEy8KC800gmV0NH36TCYcLg33Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/13 17:01, Sergei Shtylyov wrote:
-> Hello.
->
-> On 10-12-2013 19:53, Ben Dooks wrote:
->
->> If the system has been started in non-secure mode, then the ARM generic
->> timer is not configurable during the kernel initialisation. Currently
->> the only thing we can check for is if the timer has been correctly
->> configured during the boot process.
->
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+Any update on this? Thanks
 
-
->   * bla
->   * bla
->   */
+On Wed, Dec 4, 2013 at 10:32 AM, Feng Kan <fkan@apm.com> wrote:
+> Add dts node for X-Gene reboot driver. Apply documentation dts binding.
+> Some minor compile warning fix and enable reboot driver by default.
 >
-> WBR, Sergei
-
-Thanks, fixed.
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> Feng Kan (4):
+>   Documentation: add dts binding for X-Gene reboot dts node.
+>   arm64: add missing dts entry for X-Gene platform.
+>   arm64: Enable system reset via arch Kconfig for X-Gene system.
+>   arm64: removed using of the mask attribute in the dts for reset bit.
+>
+>  .../devicetree/bindings/arm64/xgene/reboot.txt     |   11 +++++++++++
+>  arch/arm64/Kconfig                                 |    1 +
+>  arch/arm64/boot/dts/apm-storm.dtsi                 |    5 +++++
+>  drivers/power/reset/xgene-reboot.c                 |    5 ++---
+>  4 files changed, 19 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm64/xgene/reboot.txt
+>
+> --
+> 1.7.6.1
+>
