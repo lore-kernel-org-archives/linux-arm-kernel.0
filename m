@@ -1,84 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Dec 2013 19:31:34 +0100
-Subject: [PATCH] ARM: pxa: prevent PXA270 occasional reboot freezes
-In-Reply-To: <52A6F19B.8090309@gmail.com>
-References: <1386650355-2503-1-git-send-email-ynvich@gmail.com>
- <52A6D44C.1010504@gmail.com> <52A6F19B.8090309@gmail.com>
-Message-ID: <201312101931.34108.marex@denx.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 10:43:49 -0800
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
+In-Reply-To: <201312101936.54483.arnd@arndb.de>
+References: <pull-1386643347-596413>
+ <20131210143547.GA32243@n2100.arm.linux.org.uk>
+ <20131210160144.GG13171@atomide.com>
+ <201312101936.54483.arnd@arndb.de>
+Message-ID: <20131210184349.GM13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 10, 2013 at 11:48:59 AM, Daniel Mack wrote:
-> On 12/10/2013 09:43 AM, Haojian Zhuang wrote:
-> > On 12/10/2013 12:39 PM, Sergei Ianovich wrote:
-> >> Erratum 71 of PXA270M Processor Family Specification Update
-> >> (April 19, 2010) explains that watchdog reset time is just
-> >> 8us insead of 10ms in EMTS.
-> >> 
-> >> If SDRAM is not reset, it causes memory bus congestion and
-> >> the device hangs. We put SDRAM in selfresh mode before watchdog
-> >> reset, removing potential freezes.
-> >> 
-> >> Without this patch PXA270-based ICP DAS LP-8x4x hangs after up to 40
-> >> reboots. With this patch it has successfully rebooted 500 times.
-> >> 
-> >> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> >> ---
-> >> 
-> >>   arch/arm/mach-pxa/reset.c | 8 +++++++-
-> >>   1 file changed, 7 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
-> >> index 0d5dd64..263b152 100644
-> >> --- a/arch/arm/mach-pxa/reset.c
-> >> +++ b/arch/arm/mach-pxa/reset.c
-> >> @@ -13,6 +13,7 @@
-> >> 
-> >>   #include <mach/regs-ost.h>
-> >>   #include <mach/reset.h>
-> >> 
-> >> +#include <mach/smemc.h>
-> >> 
-> >>   unsigned int reset_status;
-> >>   EXPORT_SYMBOL(reset_status);
-> >> 
-> >> @@ -81,6 +82,12 @@ static void do_hw_reset(void)
-> >> 
-> >>   	writel_relaxed(OSSR_M3, OSSR);
-> >>   	/* ... in 100 ms */
-> >>   	writel_relaxed(readl_relaxed(OSCR) + 368640, OSMR3);
-> >> 
-> >> +	/*
-> >> +	 * SDRAM hangs on watchdog reset on Marvell PXA270 (erratum 71)
-> >> +	 * we put SDRAM into self-refresh to prevent that
-> >> +	 */
-> >> +	while (1)
-> >> +		writel_relaxed(MDREFR_SLFRSH, MDREFR);
-> >> 
-> >>   }
-> >>   
-> >>   void pxa_restart(enum reboot_mode mode, const char *cmd)
-> >> 
-> >> @@ -104,4 +111,3 @@ void pxa_restart(enum reboot_mode mode, const char
-> >> *cmd)
-> >> 
-> >>   		break;
-> >>   	
-> >>   	}
-> >>   
-> >>   }
-> >> 
-> >> -
+* Arnd Bergmann <arnd@arndb.de> [131210 10:38]:
+> On Tuesday 10 December 2013, Tony Lindgren wrote:
+> > The crappy part here is the fact that we need to build the kernel with
+> > appended DTB. Maybe there's something more we can do to make it easier.
 > > 
-> > Hi Daniel/Marek/Igor,
-> > 
-> > Could you help to try this patch? I'm lack of PXA27x board.
 > 
-> I don't have any either right now ...
+> You are aware of the impedence matcher project [1], right?
 
-On VPAC270
+Oh OK cool :) AFAIK the only omaps we're currently supporting in the
+mainline tree where the bootloader cannot be updated easily are the
+n9* that require a signed bootloader. But I think those already have
+some kind of 3rd stage bootloaders available for them.
 
-Tested-by: Marek Vasut <marex@denx.de>
+Regards,
 
-Best regards,
-Marek Vasut
+Tony
+ 
+> [1] https://github.com/zonque/pxa-impedance-matcher
