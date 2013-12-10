@@ -1,51 +1,33 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 10 Dec 2013 10:45:38 -0600
-Subject: [RESEND PATCH] clk: socfpga: Remove socfpga_init_clocks
-Message-ID: <1386693938-29657-1-git-send-email-dinguyen@altera.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Dec 2013 16:49:07 +0000
+Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131210164907.GA11468@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
 
-The only thing that socfpga_init_clocks was doing setting up the smp_twd clock.
-Now that twd-timer's clock phandle is populated in the DTS, we can remove
-this function.
+> +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
+> +{
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	raw_spin_lock_irqsave(&__io_lock, flags);
+> +	value = readl_relaxed(reg) & ~mask;
+> +	value |= (set & mask);
+> +	writel_relaxed(value, reg);
+> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> +}
+> +EXPORT_SYMBOL(atomic_io_modify_relaxed);
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
- arch/arm/mach-socfpga/socfpga.c |    1 -
- drivers/clk/socfpga/clk.c       |   10 ----------
- 2 files changed, 11 deletions(-)
-
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index c43c281..d86231e 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -102,7 +102,6 @@ static void __init socfpga_cyclone5_init(void)
- {
- 	l2x0_of_init(0, ~0UL);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	socfpga_init_clocks();
- }
- 
- static const char *altera_dt_match[] = {
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index d10dd4f..67ad200 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -348,13 +348,3 @@ static void __init socfpga_clkmgr_init(struct device_node *node)
- }
- CLK_OF_DECLARE(socfpga_mgr, "altr,clk-mgr", socfpga_clkmgr_init);
- 
--void __init socfpga_init_clocks(void)
--{
--	struct clk *clk;
--	int ret;
--
--	clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
--	ret = clk_register_clkdev(clk, NULL, "smp_twd");
--	if (ret)
--		pr_err("smp_twd alias not registered\n");
--}
--- 
-1.7.9.5
+This looks quite generic - why is it in architecture specific code?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/a9b3a487/attachment.sig>
