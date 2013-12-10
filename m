@@ -1,181 +1,567 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 10 Dec 2013 14:11:37 +0100
-Subject: [PATCH v1 4/4] powerpc/512x: dts: add MPC5125 clock specs
+Date: Tue, 10 Dec 2013 14:11:36 +0100
+Subject: [PATCH v1 3/4] powerpc/512x: clk: support MPC5121/5123/5125 SoC
+ variants
 In-Reply-To: <1386681097-14126-1-git-send-email-gsi@denx.de>
 References: <1386681097-14126-1-git-send-email-gsi@denx.de>
-Message-ID: <1386681097-14126-5-git-send-email-gsi@denx.de>
+Message-ID: <1386681097-14126-4-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add clock related specs to the MPC5125 "tower" board DTS
-- add clock providers (crystal/oscillator, clock control module)
-- add consumers (the CAN, SDHC, I2C, DIU, FEC, USB, PSC peripherals)
+improve the common clock support code for MPC512x
+
+- expand the CCM register set declaration with MPC5125 related registers
+  (which reside in the previously "reserved" area)
+- tell the MPC5121, MPC5123, and MPC5125 SoC variants apart, and derive
+  the availability of components and their clocks from the detected SoC
+  (MBX, AXE, VIU, SPDIF, PATA, SATA, PCI, second FEC, second SDHC,
+  number of PSC components, type of NAND flash controller,
+  interpretation of the CPMF bitfield, PSC/CAN mux0 stage input clocks,
+  output clocks on SoC pins)
+- add backwards compatibility (allow operation against a device tree
+  which lacks clock related specs) for MPC5125 FECs, too
+
+telling SoC variants apart and adjusting the clock tree's generation
+occurs at runtime, a common generic binary supports all of the chips
+
+the MPC5125 approach to the NFC clock (one register with two counters
+for the high and low periods of the clock) is not implemented, as there
+are no users and there is no common implementation which supports this
+kind of clock -- the new implementation would be unused and could not
+get verified, so it shall wait until there is demand
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/boot/dts/mpc5125twr.dts |   53 +++++++++++++++++++++++++++++++++-
- 1 file changed, 52 insertions(+), 1 deletion(-)
+ arch/powerpc/include/asm/mpc5121.h            |    7 +-
+ arch/powerpc/platforms/512x/clock-commonclk.c |  339 +++++++++++++++++++++----
+ include/dt-bindings/clock/mpc512x-clock.h     |    9 +-
+ 3 files changed, 309 insertions(+), 46 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/mpc5125twr.dts b/arch/powerpc/boot/dts/mpc5125twr.dts
-index 0a0fe92216ae..806479ffc607 100644
---- a/arch/powerpc/boot/dts/mpc5125twr.dts
-+++ b/arch/powerpc/boot/dts/mpc5125twr.dts
-@@ -12,6 +12,8 @@
-  * option) any later version.
+diff --git a/arch/powerpc/include/asm/mpc5121.h b/arch/powerpc/include/asm/mpc5121.h
+index 887d3d6133e3..4a69cd1d5041 100644
+--- a/arch/powerpc/include/asm/mpc5121.h
++++ b/arch/powerpc/include/asm/mpc5121.h
+@@ -37,7 +37,12 @@ struct mpc512x_ccm {
+ 	u32	cccr;	/* CFM Clock Control Register */
+ 	u32	dccr;	/* DIU Clock Control Register */
+ 	u32	mscan_ccr[4];	/* MSCAN Clock Control Registers */
+-	u8	res[0x98]; /* Reserved */
++	u32	out_ccr[4];	/* OUT CLK Configure Registers */
++	u32	rsv0[2];	/* Reserved */
++	u32	scfr3;		/* System Clock Frequency Register 3 */
++	u32	rsv1[3];	/* Reserved */
++	u32	spll_lock_cnt;	/* System PLL Lock Counter */
++	u8	res[0x6c];	/* Reserved */
+ };
+ 
+ /*
+diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
+index b5190fcb81bb..af8d50d58af5 100644
+--- a/arch/powerpc/platforms/512x/clock-commonclk.c
++++ b/arch/powerpc/platforms/512x/clock-commonclk.c
+@@ -36,7 +36,8 @@ enum {
+ #define NR_PSCS			12
+ #define NR_MSCANS		4
+ #define NR_SPDIFS		1
+-#define NR_MCLKS		(NR_PSCS + NR_MSCANS + NR_SPDIFS)
++#define NR_OUTCLK		4
++#define NR_MCLKS		(NR_PSCS + NR_MSCANS + NR_SPDIFS + NR_OUTCLK)
+ 
+ /* extend the public set of clocks by adding internal slots for management */
+ enum {
+@@ -46,11 +47,11 @@ enum {
+ 	MPC512x_CLK_DDR,
+ 	MPC512x_CLK_MEM,
+ 	MPC512x_CLK_IIM,
+-	MPC512x_CLK_SDHC_2,
+ 	/* intermediates in div+gate combos or fractional dividers */
+ 	MPC512x_CLK_DDR_UG,
+ 	MPC512x_CLK_SDHC_x4,
+ 	MPC512x_CLK_SDHC_UG,
++	MPC512x_CLK_SDHC2_UG,
+ 	MPC512x_CLK_DIU_x4,
+ 	MPC512x_CLK_DIU_UG,
+ 	MPC512x_CLK_MBX_BUS_UG,
+@@ -76,6 +77,144 @@ static struct clk_onecell_data clk_data;
+ static struct mpc512x_ccm __iomem *clkregs;
+ static DEFINE_SPINLOCK(clklock);
+ 
++/* SoC variants {{{ */
++
++/*
++ * tell SoC variants apart as they are rather similar yet not identical,
++ * cache the result in an enum to not repeatedly run the expensive OF test
++ *
++ * MPC5123 is an MPC5121 without the MBX graphics accelerator
++ *
++ * MPC5125 has many more differences: no MBX, no AXE, no VIU, no SPDIF,
++ * no PATA, no SATA, no PCI, two FECs (of different compatibility name),
++ * only 10 PSCs (of different compatibility name), two SDHCs, different
++ * NFC IP block, output clocks, system PLL status query, different CPMF
++ * interpretation, no CFM, different fourth PSC/CAN mux0 input -- yet
++ * those differences can get folded into this clock provider support
++ * code and don't warrant a separate highly redundant implementation
++ */
++
++static enum soc_type {
++	MPC512x_SOC_MPC5121,
++	MPC512x_SOC_MPC5123,
++	MPC512x_SOC_MPC5125,
++} soc;
++
++static void mpc512x_clk_determine_soc(void)
++{
++	if (of_machine_is_compatible("fsl,mpc5121")) {
++		soc = MPC512x_SOC_MPC5121;
++		return;
++	}
++	if (of_machine_is_compatible("fsl,mpc5123")) {
++		soc = MPC512x_SOC_MPC5123;
++		return;
++	}
++	if (of_machine_is_compatible("fsl,mpc5125")) {
++		soc = MPC512x_SOC_MPC5125;
++		return;
++	}
++}
++
++static bool soc_has_mbx(void)
++{
++	if (soc == MPC512x_SOC_MPC5121)
++		return true;
++	return false;
++}
++
++static bool soc_has_axe(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return false;
++	return true;
++}
++
++static bool soc_has_viu(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return false;
++	return true;
++}
++
++static bool soc_has_spdif(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return false;
++	return true;
++}
++
++static bool soc_has_pata(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return false;
++	return true;
++}
++
++static bool soc_has_sata(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return false;
++	return true;
++}
++
++static bool soc_has_pci(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return false;
++	return true;
++}
++
++static bool soc_has_fec2(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return true;
++	return false;
++}
++
++static int soc_max_pscnum(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return 10;
++	return 12;
++}
++
++static bool soc_has_sdhc2(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return true;
++	return false;
++}
++
++static bool soc_has_nfc_5125(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return true;
++	return false;
++}
++
++static bool soc_has_outclk(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return true;
++	return false;
++}
++
++static bool soc_has_cpmf_0_bypass(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return true;
++	return false;
++}
++
++static bool soc_has_mclk_mux0_canin(void)
++{
++	if (soc == MPC512x_SOC_MPC5125)
++		return true;
++	return false;
++}
++
++/* }}} SoC variants */
+ /* common clk API wrappers {{{ */
+ 
+ /* convenience wrappers around the common clk API */
+@@ -196,12 +335,23 @@ static int get_sys_div_x2(void)
   */
- 
-+#include <dt-bindings/clock/mpc512x-clock.h>
-+
- /dts-v1/;
- 
- / {
-@@ -54,6 +56,17 @@
- 		reg = <0x30000000 0x08000>;		// 32K at 0x30000000
+ static int get_cpmf_mult_x2(void)
+ {
+-	static int cpmf_to_mult[] = {
++	static int cpmf_to_mult_x36[] = {
++		/* 0b000 is "times 36" */
+ 		72, 2, 2, 3, 4, 5, 6, 7,
  	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc: osc {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <33000000>;
-+		};
++	static int cpmf_to_mult_0by[] = {
++		/* 0b000 is "bypass" */
++		2, 2, 2, 3, 4, 5, 6, 7,
 +	};
 +
- 	soc at 80000000 {
- 		compatible = "fsl,mpc5121-immr";
- 		#address-cells = <1>;
-@@ -87,9 +100,12 @@
- 			reg = <0xe00 0x100>;
- 		};
++	int *cpmf_to_mult;
+ 	int cpmf;
  
--		clock at f00 {	// Clock control
-+		clks: clock at f00 {	// Clock control
- 			compatible = "fsl,mpc5121-clock";
- 			reg = <0xf00 0x100>;
-+			#clock-cells = <1>;
-+			clocks = <&osc>;
-+			clock-names = "osc";
- 		};
+ 	cpmf = get_bit_field(&clkregs->spmr, 16, 4);
++	if (soc_has_cpmf_0_bypass())
++		cpmf_to_mult = cpmf_to_mult_0by;
++	else
++		cpmf_to_mult = cpmf_to_mult_x36;
+ 	return cpmf_to_mult[cpmf];
+ }
  
- 		pmc at 1000{  // Power Management Controller
-@@ -114,18 +130,33 @@
- 			compatible = "fsl,mpc5121-mscan";
- 			interrupts = <12 0x8>;
- 			reg = <0x1300 0x80>;
-+			clocks = <&clks MPC512x_CLK_BDLC>,
-+				 <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SYS>,
-+				 <&clks MPC512x_CLK_REF>,
-+				 <&clks MPC512x_CLK_MSCAN0_MCLK>;
-+			clock-names = "ipg", "ips", "sys", "ref", "mclk";
- 		};
+@@ -347,14 +497,19 @@ static void mpc512x_clk_setup_ref_clock(struct device_node *np, int bus_freq,
+  * it's the very data type dictated by <linux/clk-provider.h>,
+  * "fixing" this warning will break compilation
+  */
+-static const char *parent_names_mux0[] = {
++static const char *parent_names_mux0_spdif[] = {
+ 	"sys", "ref", "psc-mclk-in", "spdif-tx",
+ };
  
- 		can at 1380 {
- 			compatible = "fsl,mpc5121-mscan";
- 			interrupts = <13 0x8>;
- 			reg = <0x1380 0x80>;
-+			clocks = <&clks MPC512x_CLK_BDLC>,
-+				 <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SYS>,
-+				 <&clks MPC512x_CLK_REF>,
-+				 <&clks MPC512x_CLK_MSCAN1_MCLK>;
-+			clock-names = "ipg", "ips", "sys", "ref", "mclk";
- 		};
++static const char *parent_names_mux0_canin[] = {
++	"sys", "ref", "psc-mclk-in", "can-clk-in",
++};
++
+ enum mclk_type {
+ 	MCLK_TYPE_PSC,
+ 	MCLK_TYPE_MSCAN,
+ 	MCLK_TYPE_SPDIF,
++	MCLK_TYPE_OUTCLK,
+ };
  
- 		sdhc at 1500 {
- 			compatible = "fsl,mpc5121-sdhc";
- 			interrupts = <8 0x8>;
- 			reg = <0x1500 0x100>;
-+			clocks = <&clks MPC512x_CLK_IPS>,
-+				 <&clks MPC512x_CLK_SDHC>;
-+			clock-names = "ipg", "per";
- 		};
+ struct mclk_setup_data {
+@@ -394,6 +549,15 @@ struct mclk_setup_data {
+ 	"spdif_mclk", \
+ }
  
- 		i2c at 1700 {
-@@ -134,6 +165,8 @@
- 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
- 			reg = <0x1700 0x20>;
- 			interrupts = <0x9 0x8>;
-+			clocks = <&clks MPC512x_CLK_I2C>;
-+			clock-names = "ipg";
- 		};
++#define MCLK_SETUP_DATA_OUTCLK(id) { \
++	MCLK_TYPE_OUTCLK, 0, \
++	"out" #id "-mux0", \
++	"out" #id "-en0", \
++	"out" #id "_mclk_div", \
++	{ "out" #id "_mclk_div", "dummy", }, \
++	"out" #id "_clk", \
++}
++
+ static struct mclk_setup_data mclk_psc_data[] = {
+ 	MCLK_SETUP_DATA_PSC(0),
+ 	MCLK_SETUP_DATA_PSC(1),
+@@ -420,6 +584,13 @@ static struct mclk_setup_data mclk_spdif_data[] = {
+ 	MCLK_SETUP_DATA_SPDIF,
+ };
  
- 		i2c at 1720 {
-@@ -142,6 +175,8 @@
- 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
- 			reg = <0x1720 0x20>;
- 			interrupts = <0xa 0x8>;
-+			clocks = <&clks MPC512x_CLK_I2C>;
-+			clock-names = "ipg";
- 		};
++static struct mclk_setup_data mclk_outclk_data[] = {
++	MCLK_SETUP_DATA_OUTCLK(0),
++	MCLK_SETUP_DATA_OUTCLK(1),
++	MCLK_SETUP_DATA_OUTCLK(2),
++	MCLK_SETUP_DATA_OUTCLK(3),
++};
++
+ /* setup the MCLK clock subtree of an individual PSC/MSCAN/SPDIF */
+ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry, size_t idx)
+ {
+@@ -447,6 +618,13 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry, size_t idx)
+ 			     + (NR_PSCS + NR_MSCANS) * MCLK_MAX_IDX;
+ 		mccr_reg = &clkregs->spccr;
+ 		break;
++	case MCLK_TYPE_OUTCLK:
++		clks_idx_pub = MPC512x_CLK_OUT0_CLK + idx;
++		clks_idx_int = MPC512x_CLK_MCLKS_FIRST
++			     + (NR_PSCS + NR_MSCANS + NR_SPDIFS + idx)
++			     * MCLK_MAX_IDX;
++		mccr_reg = &clkregs->out_ccr[idx];
++		break;
+ 	default:
+ 		return;
+ 	}
+@@ -495,7 +673,10 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry, size_t idx)
+ 	 */
+ 	clks[clks_idx_int + MCLK_IDX_MUX0] = mpc512x_clk_muxed(
+ 			entry->name_mux0,
+-			&parent_names_mux0[0], ARRAY_SIZE(parent_names_mux0),
++			soc_has_mclk_mux0_canin()
++				? &parent_names_mux0_canin[0]
++				: &parent_names_mux0_spdif[0],
++			ARRAY_SIZE(parent_names_mux0_spdif),
+ 			mccr_reg, 14, 2);
+ 	clks[clks_idx_int + MCLK_IDX_EN0] = mpc512x_clk_gated(
+ 			entry->name_en0, entry->name_mux0,
+@@ -576,6 +757,12 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
+ 	clks[MPC512x_CLK_SDHC_UG] = mpc512x_clk_divider("sdhc-ug", "sdhc-x4", 0,
+ 							&clkregs->scfr2, 1, 7,
+ 							CLK_DIVIDER_ONE_BASED);
++	if (soc_has_sdhc2()) {
++		clks[MPC512x_CLK_SDHC2_UG] = mpc512x_clk_divider(
++				"sdhc2-ug", "sdhc-x4", 0, &clkregs->scfr2,
++				9, 7, CLK_DIVIDER_ONE_BASED);
++	}
++
+ 	clks[MPC512x_CLK_DIU_x4] = mpc512x_clk_factor("diu-x4", "csb", 4, 1);
+ 	clks[MPC512x_CLK_DIU_UG] = mpc512x_clk_divider("diu-ug", "diu-x4", 0,
+ 						       &clkregs->scfr1, 0, 8,
+@@ -592,19 +779,32 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
+ 	div = 2;	/* compensate for the fractional factor */
+ 	clks[MPC512x_CLK_E300] = mpc512x_clk_factor("e300", "csb", mul, div);
  
- 		i2c at 1740 {
-@@ -150,6 +185,8 @@
- 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
- 			reg = <0x1740 0x20>;
- 			interrupts = <0xb 0x8>;
-+			clocks = <&clks MPC512x_CLK_I2C>;
-+			clock-names = "ipg";
- 		};
+-	clks[MPC512x_CLK_MBX_BUS_UG] = mpc512x_clk_factor("mbx-bus-ug", "csb",
+-							  1, 2);
+-	clks[MPC512x_CLK_MBX_UG] = mpc512x_clk_divtable("mbx-ug", "mbx-bus-ug",
+-							&clkregs->scfr1, 14, 3,
+-							divtab_1234);
+-	clks[MPC512x_CLK_MBX_3D_UG] = mpc512x_clk_factor("mbx-3d-ug", "mbx-ug",
+-							 1, 1);
+-	clks[MPC512x_CLK_PCI_UG] = mpc512x_clk_divtable("pci-ug", "csb",
+-							&clkregs->scfr1, 20, 3,
+-							divtab_2346);
+-	clks[MPC512x_CLK_NFC_UG] = mpc512x_clk_divtable("nfc-ug", "ips",
+-							&clkregs->scfr1, 8, 3,
+-							divtab_1234);
++	if (soc_has_mbx()) {
++		clks[MPC512x_CLK_MBX_BUS_UG] = mpc512x_clk_factor(
++				"mbx-bus-ug", "csb", 1, 2);
++		clks[MPC512x_CLK_MBX_UG] = mpc512x_clk_divtable(
++				"mbx-ug", "mbx-bus-ug", &clkregs->scfr1,
++				14, 3, divtab_1234);
++		clks[MPC512x_CLK_MBX_3D_UG] = mpc512x_clk_factor(
++				"mbx-3d-ug", "mbx-ug", 1, 1);
++	}
++	if (soc_has_pci()) {
++		clks[MPC512x_CLK_PCI_UG] = mpc512x_clk_divtable(
++				"pci-ug", "csb", &clkregs->scfr1,
++				20, 3, divtab_2346);
++	}
++	if (soc_has_nfc_5125()) {
++		/*
++		 * XXX TODO implement 5125 NFC clock setup logic,
++		 * with high/low period counters in clkregs->scfr3,
++		 * currently there are no users so it's ENOIMPL
++		 */
++		clks[MPC512x_CLK_NFC_UG] = ERR_PTR(-ENOTSUPP);
++	} else {
++		clks[MPC512x_CLK_NFC_UG] = mpc512x_clk_divtable(
++				"nfc-ug", "ips", &clkregs->scfr1,
++				8, 3, divtab_1234);
++	}
+ 	clks[MPC512x_CLK_LPC_UG] = mpc512x_clk_divtable("lpc-ug", "ips",
+ 							&clkregs->scfr1, 11, 3,
+ 							divtab_1234);
+@@ -613,10 +813,12 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
+ 						  &clkregs->sccr1, 30);
+ 	clks[MPC512x_CLK_NFC] = mpc512x_clk_gated("nfc", "nfc-ug",
+ 						  &clkregs->sccr1, 29);
+-	clks[MPC512x_CLK_PATA] = mpc512x_clk_gated("pata", "ips",
+-						   &clkregs->sccr1, 28);
++	if (soc_has_pata()) {
++		clks[MPC512x_CLK_PATA] = mpc512x_clk_gated(
++				"pata", "ips", &clkregs->sccr1, 28);
++	}
+ 	/* for PSCs there is a "registers" gate and a bitrate MCLK subtree */
+-	for (mclk_idx = 0; mclk_idx < ARRAY_SIZE(mclk_psc_data); mclk_idx++) {
++	for (mclk_idx = 0; mclk_idx < soc_max_pscnum(); mclk_idx++) {
+ 		char name[12];
+ 		snprintf(name, sizeof(name), "psc%d", mclk_idx);
+ 		clks[MPC512x_CLK_PSC0 + mclk_idx] = mpc512x_clk_gated(
+@@ -625,19 +827,29 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
+ 	}
+ 	clks[MPC512x_CLK_PSC_FIFO] = mpc512x_clk_gated("psc-fifo", "ips",
+ 						       &clkregs->sccr1, 15);
+-	clks[MPC512x_CLK_SATA] = mpc512x_clk_gated("sata", "ips",
+-						   &clkregs->sccr1, 14);
++	if (soc_has_sata()) {
++		clks[MPC512x_CLK_SATA] = mpc512x_clk_gated(
++				"sata", "ips", &clkregs->sccr1, 14);
++	}
+ 	clks[MPC512x_CLK_FEC] = mpc512x_clk_gated("fec", "ips",
+ 						  &clkregs->sccr1, 13);
+-	clks[MPC512x_CLK_PCI] = mpc512x_clk_gated("pci", "pci-ug",
+-						  &clkregs->sccr1, 11);
++	if (soc_has_pci()) {
++		clks[MPC512x_CLK_PCI] = mpc512x_clk_gated(
++				"pci", "pci-ug", &clkregs->sccr1, 11);
++	}
+ 	clks[MPC512x_CLK_DDR] = mpc512x_clk_gated("ddr", "ddr-ug",
+ 						  &clkregs->sccr1, 10);
++	if (soc_has_fec2()) {
++		clks[MPC512x_CLK_FEC2] = mpc512x_clk_gated(
++				"fec2", "ips", &clkregs->sccr1, 9);
++	}
  
- 		i2ccontrol at 1760 {
-@@ -161,6 +198,8 @@
- 			compatible = "fsl,mpc5121-diu";
- 			reg = <0x2100 0x100>;
- 			interrupts = <64 0x8>;
-+			clocks = <&clks MPC512x_CLK_DIU>;
-+			clock-names = "ipg";
- 		};
+ 	clks[MPC512x_CLK_DIU] = mpc512x_clk_gated("diu", "diu-ug",
+ 						  &clkregs->sccr2, 31);
+-	clks[MPC512x_CLK_AXE] = mpc512x_clk_gated("axe", "csb",
+-						  &clkregs->sccr2, 30);
++	if (soc_has_axe()) {
++		clks[MPC512x_CLK_AXE] = mpc512x_clk_gated(
++				"axe", "csb", &clkregs->sccr2, 30);
++	}
+ 	clks[MPC512x_CLK_MEM] = mpc512x_clk_gated("mem", "ips",
+ 						  &clkregs->sccr2, 29);
+ 	clks[MPC512x_CLK_USB1] = mpc512x_clk_gated("usb1", "csb",
+@@ -654,21 +866,35 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
+ 	clks[MPC512x_CLK_SDHC] = mpc512x_clk_gated("sdhc", "sdhc-ug",
+ 						   &clkregs->sccr2, 24);
+ 	/* there is only one SPDIF component, which shares MCLK support code */
+-	clks[MPC512x_CLK_SPDIF] = mpc512x_clk_gated("spdif", "ips",
+-						    &clkregs->sccr2, 23);
+-	mpc512x_clk_setup_mclk(&mclk_spdif_data[0], 0);
+-	clks[MPC512x_CLK_MBX_BUS] = mpc512x_clk_gated("mbx-bus", "mbx-bus-ug",
+-						      &clkregs->sccr2, 22);
+-	clks[MPC512x_CLK_MBX] = mpc512x_clk_gated("mbx", "mbx-ug",
+-						  &clkregs->sccr2, 21);
+-	clks[MPC512x_CLK_MBX_3D] = mpc512x_clk_gated("mbx-3d", "mbx-3d-ug",
+-						     &clkregs->sccr2, 20);
++	if (soc_has_spdif()) {
++		clks[MPC512x_CLK_SPDIF] = mpc512x_clk_gated(
++				"spdif", "ips", &clkregs->sccr2, 23);
++		mpc512x_clk_setup_mclk(&mclk_spdif_data[0], 0);
++	}
++	if (soc_has_mbx()) {
++		clks[MPC512x_CLK_MBX_BUS] = mpc512x_clk_gated(
++				"mbx-bus", "mbx-bus-ug", &clkregs->sccr2, 22);
++		clks[MPC512x_CLK_MBX] = mpc512x_clk_gated(
++				"mbx", "mbx-ug", &clkregs->sccr2, 21);
++		clks[MPC512x_CLK_MBX_3D] = mpc512x_clk_gated(
++				"mbx-3d", "mbx-3d-ug", &clkregs->sccr2, 20);
++	}
+ 	clks[MPC512x_CLK_IIM] = mpc512x_clk_gated("iim", "csb",
+ 						  &clkregs->sccr2, 19);
+-	clks[MPC512x_CLK_VIU] = mpc512x_clk_gated("viu", "csb",
+-						  &clkregs->sccr2, 18);
+-	clks[MPC512x_CLK_SDHC_2] = mpc512x_clk_gated("sdhc-2", "sdhc-ug",
+-						     &clkregs->sccr2, 17);
++	if (soc_has_viu()) {
++		clks[MPC512x_CLK_VIU] = mpc512x_clk_gated(
++				"viu", "csb", &clkregs->sccr2, 18);
++	}
++	if (soc_has_sdhc2()) {
++		clks[MPC512x_CLK_SDHC2] = mpc512x_clk_gated(
++				"sdhc-2", "sdhc2-ug", &clkregs->sccr2, 17);
++	}
++
++	if (soc_has_outclk()) {
++		size_t idx;	/* used as mclk_idx, just to trim line length */
++		for (idx = 0; idx < ARRAY_SIZE(mclk_outclk_data); idx++)
++			mpc512x_clk_setup_mclk(&mclk_outclk_data[idx], idx);
++	}
  
- 		mdio at 2800 {
-@@ -180,6 +219,8 @@
- 			interrupts = <4 0x8>;
- 			phy-handle = < &phy0 >;
- 			phy-connection-type = "rmii";
-+			clocks = <&clks MPC512x_CLK_FEC>;
-+			clock-names = "per";
- 		};
+ 	/*
+ 	 * externally provided clocks (when implemented in hardware,
+@@ -678,10 +904,18 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
+ 	if (!freq)
+ 		freq = 25000000;
+ 	clks[MPC512x_CLK_PSC_MCLK_IN] = mpc512x_clk_fixed("psc_mclk_in", freq);
+-	freq = get_freq_from_dt("spdif_tx_in");
+-	clks[MPC512x_CLK_SPDIF_TX_IN] = mpc512x_clk_fixed("spdif_tx_in", freq);
+-	freq = get_freq_from_dt("spdif_rx_in");
+-	clks[MPC512x_CLK_SPDIF_TX_IN] = mpc512x_clk_fixed("spdif_rx_in", freq);
++	if (soc_has_mclk_mux0_canin()) {
++		freq = get_freq_from_dt("can_clk_in");
++		clks[MPC512x_CLK_CAN_CLK_IN] = mpc512x_clk_fixed(
++				"can_clk_in", freq);
++	} else {
++		freq = get_freq_from_dt("spdif_tx_in");
++		clks[MPC512x_CLK_SPDIF_TX_IN] = mpc512x_clk_fixed(
++				"spdif_tx_in", freq);
++		freq = get_freq_from_dt("spdif_rx_in");
++		clks[MPC512x_CLK_SPDIF_TX_IN] = mpc512x_clk_fixed(
++				"spdif_rx_in", freq);
++	}
  
- 		// IO control
-@@ -196,6 +237,8 @@
- 			interrupts = <43 0x8>;
- 			dr_mode = "host";
- 			phy_type = "ulpi";
-+			clocks = <&clks MPC512x_CLK_USB1>;
-+			clock-names = "ipg";
- 		};
+ 	/* fixed frequency for AC97, always 24.567MHz */
+ 	clks[MPC512x_CLK_AC97] = mpc512x_clk_fixed("ac97", 24567000);
+@@ -884,6 +1118,20 @@ static void mpc5121_clk_provide_backwards_compat(void)
+ 		NODE_PREP;
+ 		NODE_CHK("per", clks[MPC512x_CLK_FEC], 0, FEC);
+ 	}
++	/*
++	 * MPC5125 has two FECs: FEC1 at 0x2800, FEC2@0x4800;
++	 * the clock items don't "form an array" since FEC2 was
++	 * added only later and was not allowed to shift all other
++	 * clock item indices, so the numbers aren't adjacent
++	 */
++	FOR_NODES("fsl,mpc5125-fec") {
++		NODE_PREP;
++		if (res.start & 0x4000)
++			idx = MPC512x_CLK_FEC2;
++		else
++			idx = MPC512x_CLK_FEC;
++		NODE_CHK("per", clks[idx], 0, FEC);
++	}
  
- 		// 5125 PSCs are not 52xx or 5121 PSC compatible
-@@ -206,6 +249,9 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC1>,
-+				 <&clks MPC512x_CLK_PSC1_MCLK>;
-+			clock-names = "ipg", "mclk";
- 		};
+ 	FOR_NODES("fsl,mpc5121-usb2-dr") {
+ 		NODE_PREP;
+@@ -933,6 +1181,9 @@ int __init mpc5121_clk_init(void)
+ 	clkregs = of_iomap(clk_np, 0);
+ 	WARN_ON(!clkregs);
  
- 		// PSC9 uart1 aka ttyPSC1
-@@ -215,12 +261,17 @@
- 			interrupts = <40 0x8>;
- 			fsl,rx-fifo-size = <16>;
- 			fsl,tx-fifo-size = <16>;
-+			clocks = <&clks MPC512x_CLK_PSC9>,
-+				 <&clks MPC512x_CLK_PSC9_MCLK>;
-+			clock-names = "ipg", "mclk";
- 		};
++	/* determine the SoC variant we run on */
++	mpc512x_clk_determine_soc();
++
+ 	/* invalidate all not yet registered clock slots */
+ 	mpc512x_clk_preset_data();
  
- 		pscfifo at 11f00 {
- 			compatible = "fsl,mpc5121-psc-fifo";
- 			reg = <0x11f00 0x100>;
- 			interrupts = <40 0x8>;
-+			clocks = <&clks MPC512x_CLK_PSC_FIFO>;
-+			clock-names = "ipg";
- 		};
+diff --git a/include/dt-bindings/clock/mpc512x-clock.h b/include/dt-bindings/clock/mpc512x-clock.h
+index 9e81b3b99a32..4f94919327ce 100644
+--- a/include/dt-bindings/clock/mpc512x-clock.h
++++ b/include/dt-bindings/clock/mpc512x-clock.h
+@@ -63,7 +63,14 @@
+ #define MPC512x_CLK_PSC9		55
+ #define MPC512x_CLK_PSC10		56
+ #define MPC512x_CLK_PSC11		57
++#define MPC512x_CLK_SDHC2		58
++#define MPC512x_CLK_FEC2		59
++#define MPC512x_CLK_OUT0_CLK		60
++#define MPC512x_CLK_OUT1_CLK		61
++#define MPC512x_CLK_OUT2_CLK		62
++#define MPC512x_CLK_OUT3_CLK		63
++#define MPC512x_CLK_CAN_CLK_IN		64
  
- 		dma at 14000 {
+-#define MPC512x_CLK_LAST_PUBLIC		57
++#define MPC512x_CLK_LAST_PUBLIC		64
+ 
+ #endif
 -- 
 1.7.10.4
