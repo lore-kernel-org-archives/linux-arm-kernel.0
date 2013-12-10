@@ -1,87 +1,78 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 Dec 2013 08:27:07 +0100
-Subject: questions of cpuidle
-In-Reply-To: <52A6B5BB.3060506@linaro.org>
-References: <52A5C846.30308@linaro.org> <52A5D0E0.7050201@linaro.org>
- <52A6B5BB.3060506@linaro.org>
-Message-ID: <52A6C24B.3030800@linaro.org>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 9 Dec 2013 23:28:31 -0800
+Subject: [PATCH 1/2] ARM: dts: bcm281xx: Add i2c busses
+In-Reply-To: <1386373528-13045-2-git-send-email-tim.kryger@linaro.org>
+References: <1386373528-13045-1-git-send-email-tim.kryger@linaro.org>
+ <1386373528-13045-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYpbHUsxOkG-VuVwVv7kakBJNnwTa-8+DNMbQ-xZNpPFnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 07:33 AM, Alex Shi wrote:
-> On 12/09/2013 10:17 PM, Daniel Lezcano wrote:
->>
->> Concerning the wake up of the cpu: the cpu disabled the irq and
->> goes to sleep, it is up to the firmware to wake up the cpu when an
->> interrupt occurs. It will exits its sleep state, call
->> clock_events_notify(EXIT), by this way re-switching to the local
->> timer, and then re-enabling the local interrupt which leads to the
->> interrupt handler.
+On Fri, Dec 6, 2013 at 3:45 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> Add the DTS nodes for all the i2c busses in the SoC.
 >
-> Thanks a lots for excellent article and detailed explains!
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  arch/arm/boot/dts/bcm11351.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 >
-> So, if the firmware is in response to wake up cpu. that means there
-> is a unit which control the firmware and it can not be power down.
-
-Correct.
-
-> Do you know which unit running the firmware to wake up deep idle
-> CPU.
-
-That depends on the SoC implementation.
-
-Some SoC have a "Power Management Unit". The PMU has several idle states
-defined, each of them are described in the technical reference manual
-(TRM) with the wake up sources.
-
-Some SoC don't have any PMU and the idle states are very few, keeping
-most of the logic on.
-
-Some other SoC hide the PMU behind PSCI calls.
-
-> And does the wake up pass via GIC to CPU? If so, does the GIC need
-> keep awake when all cpu idle? If not, how the firmware give the
-> interrupt to CPU? And I am wondering if the deep idle cpu voltage get
-> to near 0. How the cpu get the interrupt signal?
-
-If a deep idle state powers down the GIC, it is up to the PMU to proxy
-the interrupts. When an interrupt occurs, the PMU powers up the logic,
-including the GIC. The notifier call chain with cpu_suspend / cpu_resume
-will save and restore the GIC registers.
-
-But this is hardware specific and will depend on how the PMU is
-implemented and how far it goes in the power management.
-
-You have a good example in the drivers/cpuidle/cpuidle-ux500.c to
-understand with the comments how the interrupts are handled through the
-power management unit.
-
-In the Xillinx documentation available on the web [1], the chapter 24.4
-gives the information about one kind of PMU.
-
-I believe the mechanism is pretty similar on all the hardware but it is
-obfuscated by a generic power instruction like mwait.
-
-   -- Daniel
-
-[1]
-http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
-
-
->> There are some more informations in the wiki page [1].
->>
->> -- Daniel
->>
->> [1]
->> https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/WakeUpSources
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> index 1246885..4bfd7e3 100644
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -146,6 +146,46 @@
+>                 status = "disabled";
+>         };
 >
->>
+> +       i2c at 3e016000 {
+> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> +               reg = <0x3e016000 0x80>;
+> +               interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               clocks = <&bsc1_clk>;
+> +               status = "disabled";
+> +       };
+> +
+> +       i2c at 3e017000 {
+> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> +               reg = <0x3e017000 0x80>;
+> +               interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               clocks = <&bsc2_clk>;
+> +               status = "disabled";
+> +       };
+> +
+> +       i2c at 3e018000 {
+> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> +               reg = <0x3e018000 0x80>;
+> +               interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               clocks = <&bsc3_clk>;
+> +               status = "disabled";
+> +       };
+> +
+> +       i2c at 3500d000 {
+> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> +               reg = <0x3500d000 0x80>;
+> +               interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               clocks = <&pmu_bsc_clk>;
+> +               status = "disabled";
+> +       };
+> +
+>         clocks {
+>                 bsc1_clk: bsc1 {
+>                         compatible = "fixed-clock";
+> --
+> 1.8.0.1
 >
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Applied to armsoc/for-3.14/dt
+ thanks,
+  csd
