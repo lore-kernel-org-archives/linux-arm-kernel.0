@@ -1,69 +1,66 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 11 Dec 2013 00:03:46 +0800
-Subject: [PATCH v6 0/7] Optimize jump label implementation for ARM64
-Message-ID: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Dec 2013 16:07:03 +0000
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
+In-Reply-To: <20131210160144.GG13171@atomide.com>
+References: <pull-1386643347-596413>
+ <20131210143547.GA32243@n2100.arm.linux.org.uk>
+ <20131210160144.GG13171@atomide.com>
+Message-ID: <20131210160703.GB32243@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset tries to optimize arch specfic jump label implementation
-for ARM64 by dynamic kernel text patching.
+On Tue, Dec 10, 2013 at 08:01:44AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 06:37]:
+> > On Mon, Dec 09, 2013 at 06:42:27PM -0800, Tony Lindgren wrote:
+> > > We can now finally make mach-omap2 to boot with device tree only and get
+> > > rid of over 20k lines of platform init code that way.
+> > > 
+> > > Most basic devices already work using device tree based initialization
+> > > and the remaining devices can be initialized using platform data
+> > > with pdata-quirks.c.
+> > > 
+> > > So for most missing boards it's just a question of adding a .dts file
+> > > that should be fairly similar to one of the existing .dts files as
+> > > we've tried to cover all basic omap3 board types.
+> > > 
+> > > For people getting started updating their board files to for device
+> > > tree, there are some basic instructions in commit 8dc8b3ddf5d7
+> > > (ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
+> > > DT only for booting).
+> > > 
+> > > Please also note that there are also some related fixes making their way
+> > > into the mainline kernel that are needed for some use cases:
+> > > 
+> > > PM off-idle for omap3 and wake-up events need the following two patches:
+> > 
+> > While this is good, what seems to be happening is a complete switch
+> > from one method of booting to a different method of booting with no
+> > compatibility inbetween.  We're going from only supporting the ATAG
+> > booting protocol for these platforms in v3.12 to only supporting the
+> > DT booting protocol in v3.13.  There's no forward or backwards
+> > compatibility - it's one or the other.
+> 
+> Hmm hey this is for v3.14, not for v3.13.
 
-To enable this feature, your toolchain must support "asm goto" extension
-and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
-"%c", and there's a patch for it now:
-http://gcc.gnu.org/ml/gcc-patches/2013-10/msg01314.html
+Yes, I meant 3.14.
 
-It has been tested on ARM Fast mode and a real hardware platform.
+> > This is bad: this is the kind of "flag day" change which Linus hates -
+> > and I hate it because it means I need to update my build test system
+> > at the same time that arm-soc merges this stuff.
+> 
+> Unfortunately there's no way around that unless we carry the legacy
+> booting setup for longer. We can certainly postpone the flip over if
+> if there's a real neeed to do it.
+> 
+> But if the issue is just building an appended DTB image, I'd rather just
+> get done with it as that problem we're always going to have no matter
+> how much we delay the flip over.
 
-Any comments are welcomed!
+Right, so I should just turn off building OMAP3 for the remainder of this
+cycle.
 
-V5->V6:
-1) optimize stop_machine() related code
-2) simplify aarch64_insn_patch_text_nosync() interface
-3) refine comments
+What's the fscking point me running a build system, because if I switch
+it now, OMAP3 breaks.  If I don't switch it now and your pull request is
+merged, it breaks at that point.
 
-V4->V5:
-1) rework the stop_machine() related code
-2) rework aarch64_insn_gen_nop()
-
-V3->V4:
-1) resolve a race condition in kernel text patching
-2) address other review comments
-
-V2->V3:
-1) fix a bug in comparing signed and unsigned values
-2) detect big endian by checking __AARCH64EB__
-
-V1->V2: address review comments of V1
-1) refine comments
-2) add a new interface to always synchronize with stop_machine()
-   when patching code
-3) handle endian issue when patching code
-
-Jiang Liu (7):
-  arm64: introduce basic aarch64 instruction decoding helpers
-  arm64: introduce interfaces to hotpatch kernel and module code
-  arm64: move encode_insn_immediate() from module.c to insn.c
-  arm64: introduce aarch64_insn_gen_{nop|branch_imm}() helper functions
-  arm64, jump label: detect %c support for ARM64
-  arm64, jump label: optimize jump label implementation
-  jump_label: use defined macros instead of hard-coding for better
-    readability
-
- arch/arm64/Kconfig                  |   1 +
- arch/arm64/include/asm/insn.h       | 108 +++++++++++++
- arch/arm64/include/asm/jump_label.h |  51 ++++++
- arch/arm64/kernel/Makefile          |   3 +-
- arch/arm64/kernel/insn.c            | 302 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/jump_label.c      |  59 +++++++
- arch/arm64/kernel/module.c          | 157 ++++++-------------
- include/linux/jump_label.h          |  15 +-
- scripts/gcc-goto.sh                 |   2 +-
- 9 files changed, 581 insertions(+), 117 deletions(-)
- create mode 100644 arch/arm64/include/asm/insn.h
- create mode 100644 arch/arm64/include/asm/jump_label.h
- create mode 100644 arch/arm64/kernel/insn.c
- create mode 100644 arch/arm64/kernel/jump_label.c
-
--- 
-1.8.1.2
+This is utterly insane.
