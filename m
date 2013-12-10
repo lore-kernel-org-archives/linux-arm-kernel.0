@@ -1,38 +1,30 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 10 Dec 2013 15:43:31 +0530
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <20131209235035.GA11632@n2100.arm.linux.org.uk>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131128055706.GM8834@intel.com>
- <20131209235035.GA11632@n2100.arm.linux.org.uk>
-Message-ID: <20131210101331.GG29580@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Dec 2013 11:13:09 +0000
+Subject: [PATCH 1/3] ARM: dts: Leave Exynos5250 SPI controller disabled
+ by default
+In-Reply-To: <CAD=FV=XEKUFWEM-30Bx0pVBOT8X0zXsdHyzq=pDY8TOcdGHgRg@mail.gmail.com>
+References: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+ <CAD=FV=XEKUFWEM-30Bx0pVBOT8X0zXsdHyzq=pDY8TOcdGHgRg@mail.gmail.com>
+Message-ID: <20131210111309.GD29268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
-> > + Dan
-> > 
-> > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
-> > > The following commit:
-> > > 
-> > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
-> > > 
-> > > removed the last caller to mv_desc_get_dest_addr(), creating the
-> > > warning:
-> > > 
-> > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
-> > >   but not used [-Wunused-function]
-> > > 
-> > > Remove it.
-> > > 
-> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > Acked-by: Vinod Koul <vinod.koul@intel.com>
-> > 
-> > This should go thru Dan's tree
-> 
-> So what's happening with this patch?  I don't see it in -rc yet.
-Dan has applied this to his next. So this should show us in next rc1
+On Mon, Dec 09, 2013 at 04:57:01PM -0800, Doug Anderson wrote:
 
---
-~Vinod
+> I'm a little surprised that I don't see removal of spi_0 on SMDK5250.
+> When I apply your patch to ToT Linux I still see this in
+> "exynos5250-smdk5250.dts":
+
+>         spi_0: spi at 12d20000 {
+>                 status = "disabled";
+>         };
+
+I suspect that one went AWOL during rebasing - these have been kicking
+around since September.  Resent with that added.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/88bbd7a4/attachment.sig>
