@@ -1,168 +1,61 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 09 Dec 2013 19:29:57 -0500
-Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
-In-Reply-To: <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
-References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
- <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 10 Dec 2013 00:27:01 -0800
+Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
+In-Reply-To: <52A63829.10509@codeaurora.org>
+References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <52A24E08.706@codeaurora.org>
+ <CACRpkdb+9DE6WNfBSp9Y8ErhHjaE-PdezJbYvsLLhiCjXfmA-A@mail.gmail.com>
+ <52A63829.10509@codeaurora.org>
+Message-ID: <20131210082700.GE11990@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laura Abbott <lauraa@codeaurora.org> wrote:
->Some architectures may implement the CMA APIs to allow allocation
->of larger contiguous blocks of memory. Add support in the swiotlb
->alloc/free functions to allocate from the CMA APIs instead of the
->basic page allocator.
->
->Cc: Will Deacon <will.deacon@arm.com>
->Cc: Catalin Marinas <catalin.marinas@arm.com>
->Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->---
->lib/swiotlb.c |   92
->+++++++++++++++++++++++++++++++++++++++++++++++++++++----
-> 1 files changed, 86 insertions(+), 6 deletions(-)
->
->diff --git a/lib/swiotlb.c b/lib/swiotlb.c
->index e4399fa..77b4b17 100644
->--- a/lib/swiotlb.c
->+++ b/lib/swiotlb.c
->@@ -29,6 +29,9 @@
-> #include <linux/ctype.h>
-> #include <linux/highmem.h>
-> #include <linux/gfp.h>
->+#include <linux/dma-contiguous.h>
->+#include <linux/io.h>
->+#include <linux/vmalloc.h>
+On Mon 09 Dec 13:37 PST 2013, Stephen Boyd wrote:
+
+> On 12/09/13 00:18, Linus Walleij wrote:
+> > On Fri, Dec 6, 2013 at 11:22 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> On 12/05/13 18:10, Bjorn Andersson wrote:
+> > As the driver is merged I expect fixes to come in as additional patches.
+> >
+> >>> Add initial definition of parameters for pinctrl-msm for the msm8x74
+> >>> platform.
+> >> Hmm. We've tried to remove 'x' from our code because it isn't really
+> >> accurate and leads to more confusion.
+> > So does this pin controller have a real name in the data sheet?
 > 
-> #include <asm/io.h>
-> #include <asm/dma.h>
->@@ -610,6 +613,66 @@ void swiotlb_tbl_sync_single(struct device *hwdev,
->phys_addr_t tlb_addr,
-> }
-> EXPORT_SYMBOL_GPL(swiotlb_tbl_sync_single);
-> 
->+static void * __alloc_from_contiguous(struct device *hwdev, size_t
->size,
->+					struct page **ret_page)
->+{
->+	unsigned long order = get_order(size);
->+	size_t count = size >> PAGE_SHIFT;
->+	struct page *page;
->+	void *ptr = NULL;
->+
->+	page = dma_alloc_from_contiguous(hwdev, count, order);
->+	if (!page)
->+		return NULL;
->+
->+	if (PageHighMem(page)) {
->+		struct vm_struct *area;
->+		unsigned long addr;
->+
->+		/*
->+		 * DMA allocation can be mapped to user space, so lets
->+		 * set VM_USERMAP flags too.
->+		 */
->+		area = get_vm_area(size, VM_USERMAP);
->+		if (!area)
->+			goto err;
->+		addr = (unsigned long)area->addr;
->+		area->phys_addr = __pfn_to_phys(page_to_pfn(page));
->+
->+		if (ioremap_page_range(addr, addr + size, area->phys_addr,
->+		    PAGE_KERNEL)) {
->+			vunmap((void *)addr);
->+			goto err;
->+		}
->+		ptr = area->addr;
->+	} else {
->+		ptr = page_address(page);
->+	}
->+
->+	*ret_page = page;
->+	return ptr;
->+
->+err:
->+	dma_release_from_contiguous(hwdev, page, count);
->+	return NULL;
->+}
->+
->+static void __free_from_contiguous(struct device *hwdev, struct page
->*page,
->+				void *cpu_addr, size_t size)
->+{
->+	if (PageHighMem(page)) {
->+		struct vm_struct *area = find_vm_area(cpu_addr);
->+		if (!area) {
->+			WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
->+			return;
->+		}
->+		unmap_kernel_range((unsigned long)cpu_addr, size);
->+		vunmap(cpu_addr);
->+	}
->+	dma_release_from_contiguous(hwdev, page, size >> PAGE_SHIFT);
->+}
->+
->+
-> void *
-> swiotlb_alloc_coherent(struct device *hwdev, size_t size,
-> 		       dma_addr_t *dma_handle, gfp_t flags)
->@@ -618,18 +681,27 @@ swiotlb_alloc_coherent(struct device *hwdev,
->size_t size,
-> 	void *ret;
-> 	int order = get_order(size);
-> 	u64 dma_mask = DMA_BIT_MASK(32);
->+	struct page *page;
-> 
-> 	if (hwdev && hwdev->coherent_dma_mask)
-> 		dma_mask = hwdev->coherent_dma_mask;
-> 
->-	ret = (void *)__get_free_pages(flags, order);
->-	if (ret) {
->+	if (IS_ENABLED(CONFIG_DMA_CMA)) {
->+		ret = __alloc_from_contiguous(hwdev, size, &page);
->+		dev_addr = phys_to_dma(hwdev, page_to_phys(page));
->+	} else {
->+		ret = (void *)__get_free_pages(flags, order);
-> 		dev_addr = swiotlb_virt_to_bus(hwdev, ret);
->+	}
->+	if (ret) {
-> 		if (dev_addr + size - 1 > dma_mask) {
-> 			/*
-> 			 * The allocated memory isn't reachable by the device.
-> 			 */
->-			free_pages((unsigned long) ret, order);
->+			if(IS_ENABLED(CONFIG_DMA_CMA))
->+				__free_from_contiguous(hwdev, page, ret, size);
->+			else
->+				free_pages((unsigned long) ret, order);
-> 			ret = NULL;
-> 		}
-> 	}
->@@ -673,11 +745,19 @@ swiotlb_free_coherent(struct device *hwdev,
->size_t size, void *vaddr,
-> 	phys_addr_t paddr = dma_to_phys(hwdev, dev_addr);
-> 
-> 	WARN_ON(irqs_disabled());
->-	if (!is_swiotlb_buffer(paddr))
->-		free_pages((unsigned long)vaddr, get_order(size));
->-	else
->+	if (!is_swiotlb_buffer(paddr)) {
->+		if (IS_ENABLED(CONFIG_DMA_CMA)) {
->+			__free_from_contiguous(hwdev,
->+				pfn_to_page(paddr >> PAGE_SHIFT),
->+				vaddr,
->+				size);
->+		} else {
->+			free_pages((unsigned long)vaddr, get_order(size));
->+		}
->+	} else {
-> 		/* DMA_TO_DEVICE to avoid memcpy in swiotlb_tbl_unmap_single */
-> 		swiotlb_tbl_unmap_single(hwdev, paddr, size, DMA_TO_DEVICE);
->+	}
-> }
-> EXPORT_SYMBOL(swiotlb_free_coherent);
+> We call it TLMM (top-level mode mux). So far there have been three major
+> revisions of the hardware and 8974 uses the latest version.
 > 
 
-Can this be done in the platform dma_ops functions instead?
+The pinctrl-msm.c driver would be the TLMM (v2 and v3) driver...
+
+> >
+> > I usually prefer to name the drivers after the name of the IP
+> > block rather than the SoC if possible.
+> >
+> > Or should it just be named pinctrl-msm.c?
+> 
+> Leaving the pinctrl-msm.c file as in these patches is fine. For the SoC
+> specific data files we should use the base chip name which in this case
+> is 8974. I suppose the goal of pinctrl-msm8x74.c is to support 8974 and
+> 8074 SoCs in the same file because they're almost exactly the same minus
+> some pins losing their "modem" functions. Given that, the file names are
+> fine but the binding and the data structures should be specific about
+> which SoC we're talking about.
+
+...and the pinctrl-msm8x74.c would be the data for SoCs matching that name.
+
+Currently we know that 8074 is a 8974 without modem and the document I have
+describing this incarnation of the SoC describes 8274, 8674 and 8974.
+
+So as Stephen suggest; we could keep the name pinctrl-msm8x74.c as is and
+we change the compatible to be explicit about this is qcom,msm8974-pinctrl.
+
+That would give us room to handle any differences between 8074 and 8974 within
+this file.
+
+What do you say? Should I prepare a patch for this?
+
+Regards,
+Bjorn
