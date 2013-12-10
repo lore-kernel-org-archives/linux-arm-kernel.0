@@ -1,82 +1,57 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 10 Dec 2013 00:41:41 -0800
-Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
-In-Reply-To: <52A24E08.706@codeaurora.org>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
- <52A24E08.706@codeaurora.org>
-Message-ID: <20131210084140.GF11990@sonymobile.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 9 Dec 2013 16:48:54 -0800
+Subject: [PATCH 1/3] ARM: dts: Leave Exynos5250 SPI controller disabled by
+ default
+In-Reply-To: <52A63102.5040708@samsung.com>
+References: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+ <5026211.5mW8H3pyKS@amdc1227> <52A63102.5040708@samsung.com>
+Message-ID: <CAD=FV=XidnbfVTzr5saGKn2J8sdukfbh6SGtZEKgVQQsumA8Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 06 Dec 14:22 PST 2013, Stephen Boyd wrote:
+Hi,
 
-> > +config PINCTRL_MSM8X74
-> > +	bool "Qualcomm 8x74 pin controller driver"
-> > +	select PINCTRL_MSM
-> 
-> No help?
-> 
+On Mon, Dec 9, 2013 at 1:07 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 12/10/13 00:23, Tomasz Figa wrote:
+>>
+>> Hi Kukjin,
+>>
+> Hi,
+>
+>
+>> On Monday 25 of November 2013 12:15:08 Mark Brown wrote:
+>>>
+>>> From: Mark Brown<broonie@linaro.org>
+>>>
+>>> Rather than requiring each board to explicitly disable the SPI
+>>> controllers
+>>> it is not using instead require boards to enable those that they are
+>>> using.
+>>> This is less work overall since normally at most one of the controllers
+>>> is
+>>> in use and avoids issues caused by inappropriate pinmuxing.
+>>>
+>>> Signed-off-by: Mark Brown<broonie@linaro.org>
+>>> Acked-by: Tomasz Figa<t.figa@samsung.com>
+>>> ---
+>>>   arch/arm/boot/dts/cros5250-common.dtsi    |  9 +--------
+>>>   arch/arm/boot/dts/exynos5250-arndale.dts  | 12 ------------
+>>>   arch/arm/boot/dts/exynos5250-smdk5250.dts |  6 ++----
+>>>   arch/arm/boot/dts/exynos5250.dtsi         |  3 +++
+>>>   4 files changed, 6 insertions(+), 24 deletions(-)
+>>
+>>
+>> Seems like you have missed this series. Could you apply it?
+>>
+> Yeah, thanks for your gentle reminder.
+>
+> + Doug and Olof
+>
+> BTW, Doug and Olof, are you OK with changing the name of cros5250-common DT
+> file? Basically, I agree with Mark's patch.
 
-I could write something up, although I guess someone will add a
-select PINCTRL_MSM8X74 in the mach-msm Kconfig and then we're done
-with it.
+I don't see anything that's changing a name, so perhaps I'm confused
+or missing something.  Mark's patch looks good to me so I'll add a
+reviewed by...
 
-> > +		.ctl_reg = 0x1000 + 0x10 * id ,		\
-> 
-> Weird trailing space here.
-> 
-
-Oops.
-
-> Also, do we ever plan to have anything more than the gpio pins and the
-> sdc pins? It seems like we spend a lot of space describing exactly the
-> same thing in these structs for each of the 146 gpio pins when we could
-> just know that range 0 to 146 is gpio pins and have different code for
-> that part vs the 6 or something sd pins.
-> 
-
-We have to have a pingroup list, so I did look at having that list
-referencing a common object with the gpio/sdc specific data.
-
-But just having it in one large blob is the way that other pinctrl
-drivers does it and hence a common problem to pinctrl and multi-platform
-arm support.
-
-I have not seen any code in the open referencing the other pins, so I
-left them out for now.
-
-> > +
-> > +static struct of_device_id msm8x74_pinctrl_of_match[] = {
-> 
-> const?
-> 
-
-Of course.
-
-> >
-> > +
-> > +static int __init msm8x74_pinctrl_init(void)
-> > +{
-> > +	return platform_driver_register(&msm8x74_pinctrl_driver);
-> > +}
-> > +arch_initcall(msm8x74_pinctrl_init);
-> > +
-> > +static void __exit msm8x74_pinctrl_exit(void)
-> > +{
-> > +	platform_driver_unregister(&msm8x74_pinctrl_driver);
-> > +}
-> > +module_exit(msm8x74_pinctrl_exit);
-> 
-> Why not module_platform_driver()? I thought pinctrl supported deferred
-> probing?
-> 
-
-As this pinctrl/gpiochip/interrupt-controller is a fairly central part
-of the system there's plenty of things that would just end up being deferred.
-
-Most other pinctrl driver does arch_initcall or core_initcall, so I followed
-suit and brought it in early.
-
-Regards,
-Bjorn
+-Doug
