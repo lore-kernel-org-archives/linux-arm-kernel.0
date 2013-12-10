@@ -1,76 +1,52 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 Dec 2013 20:16:08 +0100
-Subject: [PATCH 2/6] clocksource: armada-370-xp: Register sched_clock after
- the counter reset
+Date: Tue, 10 Dec 2013 20:16:09 +0100
+Subject: [PATCH 3/6] clocksource: clksrc-of: Do not drop unheld reference on
+ device node
 In-Reply-To: <1386702972-25565-1-git-send-email-daniel.lezcano@linaro.org>
 References: <52A767CB.3010501@linaro.org>
  <1386702972-25565-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1386702972-25565-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1386702972-25565-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+From: Thierry Reding <thierry.reding@gmail.com>
 
-This commit registers the sched_clock _after_ the counter reset
-(instead of before). This removes the timestamp 'jump' in kernel
-log messages.
+When booting a recent kernel on ARM with OF_DYNAMIC enabled, the kernel
+warns about the following:
 
-Before this change:
+	[    0.000000] ERROR: Bad of_node_put() on /timer at 50004600
+	[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.12.0-rc5-next-20131017-00077-gedfd827-dirty #406
+	[    0.000000] [<c0015b68>] (unwind_backtrace+0x0/0xf4) from [<c00117e4>] (show_stack+0x10/0x14)
+	[    0.000000] [<c00117e4>] (show_stack+0x10/0x14) from [<c055f734>] (dump_stack+0x9c/0xc8)
+	[    0.000000] [<c055f734>] (dump_stack+0x9c/0xc8) from [<c03b47d4>] (of_node_release+0x90/0x9c)
+	[    0.000000] [<c03b47d4>] (of_node_release+0x90/0x9c) from [<c03b5084>] (of_find_matching_node_and_match+0x78/0xb4)
+	[    0.000000] [<c03b5084>] (of_find_matching_node_and_match+0x78/0xb4) from [<c07887c8>] (clocksource_of_init+0x60/0x70)
+	[    0.000000] [<c07887c8>] (clocksource_of_init+0x60/0x70) from [<c076e99c>] (start_kernel+0x1f4/0x33c)
+	[    0.000000] [<c076e99c>] (start_kernel+0x1f4/0x33c) from [<80008074>] (0x80008074)
 
-[    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
-[    0.000000] Initializing Coherency fabric
-[    0.000000] Aurora cache controller enabled
-[    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
-[  163.507447] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
-[  163.521419] pid_max: default: 32768 minimum: 301
-[  163.526185] Mount-cache hash table entries: 512
-[  163.531095] CPU: Testing write buffer coherency: ok
+This is caused by clocksource_of_init() dropping a reference on the
+device node that it never took. The reference taken by the loop is
+implicitly dropped on subsequent iterations. See the implementation of
+and the comment on top of the of_find_matching_node_and_match()
+function for reference (no pun intended).
 
-After this change:
-
-[    0.000000] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
-[    0.000000] Initializing Coherency fabric
-[    0.000000] Aurora cache controller enabled
-[    0.000000] l2x0: 16 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12, Cache size: 1024 kB
-[    0.016849] Calibrating delay loop... 1325.05 BogoMIPS (lpj=662528)
-[    0.030820] pid_max: default: 32768 minimum: 301
-[    0.035588] Mount-cache hash table entries: 512
-[    0.040500] CPU: Testing write buffer coherency: ok
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/clocksource/time-armada-370-xp.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/clocksource/clksrc-of.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d8e47e5..4e7f680 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -256,11 +256,6 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	ticks_per_jiffy = (timer_clk + HZ / 2) / HZ;
+diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
+index 35639cf4..b9ddd9e 100644
+--- a/drivers/clocksource/clksrc-of.c
++++ b/drivers/clocksource/clksrc-of.c
+@@ -35,6 +35,5 @@ void __init clocksource_of_init(void)
  
- 	/*
--	 * Set scale and timer for sched_clock.
--	 */
--	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
--
--	/*
- 	 * Setup free-running clocksource timer (interrupts
- 	 * disabled).
- 	 */
-@@ -270,6 +265,11 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
- 			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
- 
-+	/*
-+	 * Set scale and timer for sched_clock.
-+	 */
-+	sched_clock_register(armada_370_xp_read_sched_clock, 32, timer_clk);
-+
- 	clocksource_mmio_init(timer_base + TIMER0_VAL_OFF,
- 			      "armada_370_xp_clocksource",
- 			      timer_clk, 300, 32, clocksource_mmio_readl_down);
+ 		init_func = match->data;
+ 		init_func(np);
+-		of_node_put(np);
+ 	}
+ }
 -- 
 1.7.9.5
