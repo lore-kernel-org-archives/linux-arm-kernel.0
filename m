@@ -1,57 +1,36 @@
-From: t.dakhran@samsung.com (Tarek Dakhran)
-Date: Tue, 10 Dec 2013 13:50:25 +0400
-Subject: [PATCH v4 2/4] clk: exynos5410: register clocks using common clock
- framework
-In-Reply-To: <52A62A27.7080408@samsung.com>
-References: <1385456288-20398-1-git-send-email-v.tyrtov@samsung.com>
- <1385456288-20398-3-git-send-email-v.tyrtov@samsung.com>
- <1914850.6CAa0SzDWP@amdc1227> <52A62A27.7080408@samsung.com>
-Message-ID: <52A6E3E1.1060907@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Dec 2013 10:56:02 +0100
+Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
+ without PCI on ARM64
+In-Reply-To: <20131209170617.GC30717@srcf.ucam.org>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <20131209115050.GA19163@arm.com> <52A5C024.5050702@linaro.org>
+ <201312091735.05014.arnd@arndb.de>
+ <20131209170617.GC30717@srcf.ucam.org>
+Message-ID: <CACRpkdYyiLAGerKuOjYO2eGz7cEWvy=SjD5Z1fo_0yU6Uwy7tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 12:37 AM, Kukjin Kim wrote:
-> On 12/10/13 01:34, Tomasz Figa wrote:
->> Hi Vyacheslav, Tarek,
->>
->> On Tuesday 26 of November 2013 12:58:06 Vyacheslav Tyrtov wrote:
->>> From: Tarek Dakhran<t.dakhran@samsung.com>
->>>
->>> The EXYNOS5410 clocks are statically listed and registered
->>> using the Samsung specific common clock helper functions.
->>>
->>> Signed-off-by: Tarek Dakhran<t.dakhran@samsung.com>
->>> Signed-off-by: Vyacheslav Tyrtov<v.tyrtov@samsung.com>
->>> ---
->>>   .../devicetree/bindings/clock/exynos5410-clock.txt |  54 +++++
->>>   drivers/clk/samsung/Makefile                       |   1 +
->>>   drivers/clk/samsung/clk-exynos5410.c               | 239 
->>> +++++++++++++++++++++
->>>   include/dt-bindings/clock/exynos5410.h             |  32 +++
->>>   4 files changed, 326 insertions(+)
->>>   create mode 100644 
->>> Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->>>   create mode 100644 drivers/clk/samsung/clk-exynos5410.c
->>>   create mode 100644 include/dt-bindings/clock/exynos5410.h
->>
->> Acked-by: Tomasz Figa<t.figa@samsung.com>
->>
-> Tomasz, thanks for your ack on clk stuff.
+On Mon, Dec 9, 2013 at 6:06 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> On Mon, Dec 09, 2013 at 05:35:04PM +0100, Arnd Bergmann wrote:
 >
->> This should go through Samsung tree, I guess, since it's a dependency
->> of other patches in this series and doesn't depend on any things from
->> clock tree. Mike, Kukjin, are you okay with this?
->>
-> Yeah, I'm fine on this series but 4th patch for supporting dual cluster.
+>> Exactly. In particular we don't want people to get the wrong idea about
+>> where we are heading, so making it possible to use this code on embedded
+>> systems for me is a reason *not* to take the patch.
 >
-> Let me take 1 to 3 patches firstly. Thanks.
-> - Kukjin
->
+> People are trying to deploy ACPI-based embedded x86, and most of the
+> ACPI/DT integration discussion seems to have been based on the idea that
+> this is a worthwhile thing to support.
 
-Hi,
+I have only seen Intel doing this, are there more people doing that?
 
-Today (10/12/2013) I will release [PATCH v5] without dual cluster support.
-EDCS (exynos dual cluster support) will be moved to separate patch.
+As noted on patch [0/7] I still get patches for embedded x86 which
+use ISA-style probing for embedded x86, e.g:
+http://marc.info/?l=linux-gpio&m=138559852307673&w=2
 
-Best regards,
-     Tarek Dakhran.
+At the same time some people are refining SFI (simple firmware
+interface) support for GPIO, albeit I think that was for elder
+embedded x86'es.
+
+Yours,
+Linus Walleij
