@@ -1,50 +1,46 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 10 Dec 2013 03:13:34 +0100
-Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
-In-Reply-To: <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
-References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
- <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
-Message-ID: <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 10 Dec 2013 09:45:44 +0800
+Subject: [PATCH v5 09/15] usb: phy-mxs: Enable IC fixes for related SoCs
+In-Reply-To: <52A592E1.7040506@pengutronix.de>
+References: <1386570664-6713-1-git-send-email-peter.chen@freescale.com>
+ <1386570664-6713-10-git-send-email-peter.chen@freescale.com>
+ <52A58179.2050702@pengutronix.de>
+ <20131209090749.GB5291@shlinux1.ap.freescale.net>
+ <52A592E1.7040506@pengutronix.de>
+Message-ID: <20131210014543.GA24228@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
-
-> Currently, we don't have an exit reason for VM reset emulation
-> in user space hence this patch adds exit reason KVM_EXIT_RESET
-> for this purpose.
+On Mon, Dec 09, 2013 at 10:52:33AM +0100, Marc Kleine-Budde wrote:
+> On 12/09/2013 10:07 AM, Peter Chen wrote:
+> > On Mon, Dec 09, 2013 at 09:38:17AM +0100, Marc Kleine-Budde wrote:
+> >> On 12/09/2013 07:30 AM, Peter Chen wrote:
+> >>> Some PHY bugs are fixed by IC logic, but these bits are not
+> >>> enabled by default, so we enable them at driver.
+> >>
+> >> Which bugs are fixed by enabling this bit? Is it only suspend related?
+> >> Can you document them or better add a pointer to the documentation.
+> > 
+> > I will add more, in fact, it fixes the bug which flag BIT(1) and BIT(2)
+> > stands for.
+> > 
+> >>
+> >> Further I don't like the idea of adding code, or enabling a feature on
+> >> certain hardware, that is broken in the first place and fixing it in a
+> >> later patch. Think about squashing it into the correct patch.
+> > 
+> > No fixes are related with this patch, you can see there is no "-"
+> > at this patch.
 > 
-> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
-> in-kernel PSCI support to reset VMs.
+> Yes, there isn't any broken code (thus no "-"), but you first enable a
+> feature in the hardware and in a later patch (this one) make it work
+> properly.
 > 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
-> include/uapi/linux/kvm.h |    1 +
-> 1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 902f124..64a04cc 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -171,6 +171,7 @@ struct kvm_pit_config {
-> #define KVM_EXIT_WATCHDOG         21
-> #define KVM_EXIT_S390_TSCH        22
-> #define KVM_EXIT_EPR              23
-> +#define KVM_EXIT_RESET            24
 
-I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
+Sorry? I haven't enabled related hardware feature at previous patches.
+These two bits are enable bit, we just need to enable it.
 
-I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
+-- 
 
-Can we treat it as such? Could you please make this a common exit number that's called something like
-
-  KVM_EXIT_SYSTEM_EVENT
-
-with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
-
-That way it's obvious what's going on and people don't get confused.
-
-
-Alex
+Best Regards,
+Peter Chen
