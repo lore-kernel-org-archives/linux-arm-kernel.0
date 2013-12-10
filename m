@@ -1,47 +1,68 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Dec 2013 15:35:15 -0800
-Subject: [PATCH 0/8] Modernize pm8921 with irqdomains + regmap
-Message-ID: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+Date: Tue, 10 Dec 2013 15:35:16 -0800
+Subject: [PATCH 1/8] mfd: ssbi: Remove platform data structs and hide ssbi
+ type enum
+In-Reply-To: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1386718523-2587-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches lay the groundwork for converting the pm8921 code to 
-devicetree as well as simplify the API by migrating the core code
-to use the regmap API instead of the custom pm8xxx read/write wrapper.
+The ssbi driver assumes that the device is DT based. Remove the
+platform data structs that will never be used and hide the enum
+in the only C file that uses it.
 
-Please note, I put the generic regmap change in this set of patches.
-Hopefully Mark and Samuel/Lee can sort out how these patches should
-merge.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/mfd/ssbi.c   |  6 ++++++
+ include/linux/ssbi.h | 17 +----------------
+ 2 files changed, 7 insertions(+), 16 deletions(-)
 
-Srinivas Ramana (1):
-  regmap: Add support for using regmap over ssbi
-
-Stephen Boyd (7):
-  mfd: ssbi: Remove platform data structs and hide ssbi type enum
-  mfd: ssbi: Constify buffer in ssbi_write
-  mfd: ssbi: Mark match table const
-  mfd: Move pm8xxx-irq.c contents into only driver that uses it
-  mfd: pm8921: Update for genirq changes
-  mfd: pm8921: Migrate to irqdomains
-  mfd: pm8921: Use ssbi regmap
-
- drivers/base/regmap/Kconfig       |   5 +-
- drivers/base/regmap/Makefile      |   1 +
- drivers/base/regmap/regmap-ssbi.c | 103 ++++++++++
- drivers/mfd/Kconfig               |  12 +-
- drivers/mfd/pm8921-core.c         | 416 +++++++++++++++++++++++++++++++++-----
- drivers/mfd/pm8xxx-irq.c          | 371 ---------------------------------
- drivers/mfd/ssbi.c                |  16 +-
- include/linux/mfd/pm8xxx/irq.h    |  59 ------
- include/linux/mfd/pm8xxx/pm8921.h |  30 ---
- include/linux/regmap.h            |   4 +
- include/linux/ssbi.h              |  19 +-
- 11 files changed, 486 insertions(+), 550 deletions(-)
- create mode 100644 drivers/base/regmap/regmap-ssbi.c
- delete mode 100644 drivers/mfd/pm8xxx-irq.c
- delete mode 100644 include/linux/mfd/pm8xxx/irq.h
- delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
-
+diff --git a/drivers/mfd/ssbi.c b/drivers/mfd/ssbi.c
+index 102a2284..435c6f7 100644
+--- a/drivers/mfd/ssbi.c
++++ b/drivers/mfd/ssbi.c
+@@ -65,6 +65,12 @@
+ 
+ #define SSBI_TIMEOUT_US			100
+ 
++enum ssbi_controller_type {
++	MSM_SBI_CTRL_SSBI = 0,
++	MSM_SBI_CTRL_SSBI2,
++	MSM_SBI_CTRL_PMIC_ARBITER,
++};
++
+ struct ssbi {
+ 	struct device		*slave;
+ 	void __iomem		*base;
+diff --git a/include/linux/ssbi.h b/include/linux/ssbi.h
+index 44ef5da..a92561a 100644
+--- a/include/linux/ssbi.h
++++ b/include/linux/ssbi.h
+@@ -17,22 +17,7 @@
+ 
+ #include <linux/types.h>
+ 
+-struct ssbi_slave_info {
+-	const char	*name;
+-	void		*platform_data;
+-};
+-
+-enum ssbi_controller_type {
+-	MSM_SBI_CTRL_SSBI = 0,
+-	MSM_SBI_CTRL_SSBI2,
+-	MSM_SBI_CTRL_PMIC_ARBITER,
+-};
+-
+-struct ssbi_platform_data {
+-	struct ssbi_slave_info	slave;
+-	enum ssbi_controller_type controller_type;
+-};
+-
+ int ssbi_write(struct device *dev, u16 addr, u8 *buf, int len);
+ int ssbi_read(struct device *dev, u16 addr, u8 *buf, int len);
++
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
