@@ -1,40 +1,52 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Dec 2013 11:20:41 +0100
-Subject: [PATCH] ARM i.MX5: fix obvious typo in ldb_di0_gate clk definition
-In-Reply-To: <1386670515-6017-1-git-send-email-LW@KARO-electronics.de>
-References: <1386670515-6017-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1386670841.4096.6.camel@weser.hi.pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Dec 2013 10:25:56 +0000
+Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
+In-Reply-To: <83dd58eb-9a44-4b76-aa68-4669b26acab8@email.android.com>
+References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
+ <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
+ <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
+ <52A66211.6010707@codeaurora.org>
+ <83dd58eb-9a44-4b76-aa68-4669b26acab8@email.android.com>
+Message-ID: <20131210102555.GB2338@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Shawn to CC as likely he would be the one taking this patch.
-
-Am Dienstag, den 10.12.2013, 11:15 +0100 schrieb Lothar Wa?mann:
-> ldb_di0_gate is registerd with the clk index of IMX5_CLK_LDB_DI1_GATE,
-> thus the DI0 interface will be turned off inadvertently during boot.
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+On Tue, Dec 10, 2013 at 12:40:20AM +0000, Konrad Rzeszutek Wilk wrote:
+> Laura Abbott <lauraa@codeaurora.org> wrote:
+> >On 12/9/2013 4:29 PM, Konrad Rzeszutek Wilk wrote:
+> >> Laura Abbott <lauraa@codeaurora.org> wrote:
+> >>> Some architectures may implement the CMA APIs to allow allocation
+> >>> of larger contiguous blocks of memory. Add support in the swiotlb
+> >>> alloc/free functions to allocate from the CMA APIs instead of the
+> >>> basic page allocator.
+> >>>
+> >>> Cc: Will Deacon <will.deacon@arm.com>
+> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> >>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >...
+> >>>
+> >>
+> >> Can this be done in the platform dma_ops functions instead?
+> >>
+> >
+> >I suppose it could but that seems like it would result in lots of 
+> >duplicated code if every architecture that uses swiotlb wants to use
+> >CMA.
+> >
+> >Thanks,
+> >Laura
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index e349fd5..e063d93 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -514,7 +514,7 @@ static void __init mx53_clocks_init(struct device_node *np)
->  	clk[IMX5_CLK_LDB_DI0_DIV]	= imx_clk_divider_flags("ldb_di0_div", "ldb_di0_div_3_5", MXC_CCM_CSCMR2, 10, 1, 0);
->  	clk[IMX5_CLK_LDB_DI0_SEL]	= imx_clk_mux_flags("ldb_di0_sel", MXC_CCM_CSCMR2, 8, 1,
->  						mx53_ldb_di0_sel, ARRAY_SIZE(mx53_ldb_di0_sel), CLK_SET_RATE_PARENT);
-> -	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
-> +	clk[IMX5_CLK_LDB_DI0_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
->  	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di1_gate", "ldb_di1_div", MXC_CCM_CCGR6, 30);
->  	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
->  						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel));
+> Then let's do that it that way. Thank you.
 
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Note that once arch/arm64 starts growing things like support for non-coherent
+DMA and IOMMU mappings, we'll probably want to factor out a bunch of the
+boilerplat from our dma-mapping.c file into places like lib/iommu-helper.c.
+
+However, until then, I can see this making sense to live in the arch-code.
+Ultimately, the swiotlb code could just call a helper, but for now we can
+rip-out the highmem parts (which doesn't leave much) and put it under
+arch/arm64.
+
+Will
