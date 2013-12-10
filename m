@@ -1,78 +1,120 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Mon, 9 Dec 2013 23:28:31 -0800
-Subject: [PATCH 1/2] ARM: dts: bcm281xx: Add i2c busses
-In-Reply-To: <1386373528-13045-2-git-send-email-tim.kryger@linaro.org>
-References: <1386373528-13045-1-git-send-email-tim.kryger@linaro.org>
- <1386373528-13045-2-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYpbHUsxOkG-VuVwVv7kakBJNnwTa-8+DNMbQ-xZNpPFnw@mail.gmail.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Tue, 10 Dec 2013 13:00:26 +0530
+Subject: [PATCH V7 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <20131209165003.GJ13908@mudshark.cambridge.arm.com>
+References: <1386151791-4881-1-git-send-email-vkale@apm.com>
+ <1386151791-4881-3-git-send-email-vkale@apm.com>
+ <20131209165003.GJ13908@mudshark.cambridge.arm.com>
+Message-ID: <CAPrCYkfS9h_yoQMcrQDXpW_3FcSfiPz0aeNX+_gc=G4exSEVWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 6, 2013 at 3:45 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> Add the DTS nodes for all the i2c busses in the SoC.
+Hi Will,
+
+
+On Mon, Dec 9, 2013 at 10:20 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Vinayak,
 >
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Christian Daudt <csd@broadcom.com>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
->  arch/arm/boot/dts/bcm11351.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+> On Wed, Dec 04, 2013 at 10:09:51AM +0000, Vinayak Kale wrote:
+>> Add support for irq registration when pmu interrupt is percpu.
 >
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index 1246885..4bfd7e3 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -146,6 +146,46 @@
->                 status = "disabled";
->         };
+> Getting closer...
 >
-> +       i2c at 3e016000 {
-> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
-> +               reg = <0x3e016000 0x80>;
-> +               interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               clocks = <&bsc1_clk>;
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 3e017000 {
-> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
-> +               reg = <0x3e017000 0x80>;
-> +               interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               clocks = <&bsc2_clk>;
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 3e018000 {
-> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
-> +               reg = <0x3e018000 0x80>;
-> +               interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               clocks = <&bsc3_clk>;
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 3500d000 {
-> +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
-> +               reg = <0x3500d000 0x80>;
-> +               interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               clocks = <&pmu_bsc_clk>;
-> +               status = "disabled";
-> +       };
-> +
->         clocks {
->                 bsc1_clk: bsc1 {
->                         compatible = "fixed-clock";
-> --
-> 1.8.0.1
+>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>> Signed-off-by: Tuan Phan <tphan@apm.com>
+>> ---
+>>  arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
+>>  1 file changed, 78 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index cea1594..d8e6667 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -22,6 +22,7 @@
+>>
+>>  #include <linux/bitmap.h>
+>>  #include <linux/interrupt.h>
+>> +#include <linux/irq.h>
+>>  #include <linux/kernel.h>
+>>  #include <linux/export.h>
+>>  #include <linux/perf_event.h>
+>> @@ -363,26 +364,52 @@ validate_group(struct perf_event *event)
+>>  }
+>>
+>>  static void
+>> +armpmu_disable_percpu_irq(void *data)
+>> +{
+>> +     disable_percpu_irq((long)data);
+>> +}
 >
-Applied to armsoc/for-3.14/dt
- thanks,
-  csd
+> Given that we wait for the CPUs to finish enabling/disabling the IRQ, I
+> actually meant pass the pointer to the IRQ, which removes the horrible
+> casts in the caller.
+>
+>> +     if (irq_is_percpu(irq)) {
+>> +             cpumask_clear(&armpmu->active_irqs);
+>
+> Thanks for moving the mask manipulation out. It now makes it obvious that we
+> don't care about the mask at all for PPIs, so that can be removed (the code
+> you have is racy against hotplug anyway).
+>
+> I took the liberty of writing a fixup for you (see below). Can you test it
+> on your platform please?
+
+Below fixup works fine on APM platform.
+Do you want me to send this fixup as part of next revision of the
+patch or will you apply it yourself? (For later case, you have my ack)
+
+>
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 503c1eeedc1c..5b1cd792274a 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -366,7 +366,8 @@ validate_group(struct perf_event *event)
+>  static void
+>  armpmu_disable_percpu_irq(void *data)
+>  {
+> -       disable_percpu_irq((long)data);
+> +       unsigned int irq = *(unsigned int *)data;
+> +       disable_percpu_irq(irq);
+>  }
+>
+>  static void
+> @@ -385,8 +386,7 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+>                 return;
+>
+>         if (irq_is_percpu(irq)) {
+> -               cpumask_clear(&armpmu->active_irqs);
+> -               on_each_cpu(armpmu_disable_percpu_irq, (void *)(long)irq, 1);
+> +               on_each_cpu(armpmu_disable_percpu_irq, &irq, 1);
+>                 free_percpu_irq(irq, &cpu_hw_events);
+>         } else {
+>                 for (i = 0; i < irqs; ++i) {
+> @@ -402,7 +402,8 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+>  static void
+>  armpmu_enable_percpu_irq(void *data)
+>  {
+> -       enable_percpu_irq((long)data, IRQ_TYPE_NONE);
+> +       unsigned int irq = *(unsigned int *)data;
+> +       enable_percpu_irq(irq, IRQ_TYPE_NONE);
+>  }
+>
+>  static int
+> @@ -440,8 +441,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>                         return err;
+>                 }
+>
+> -               on_each_cpu(armpmu_enable_percpu_irq, (void *)(long)irq, 1);
+> -               cpumask_setall(&armpmu->active_irqs);
+> +               on_each_cpu(armpmu_enable_percpu_irq, &irq, 1);
+>         } else {
+>                 for (i = 0; i < irqs; ++i) {
+>                         err = 0;
+
+Acked-by: Vinayak Kale <vkale@apm.com>
