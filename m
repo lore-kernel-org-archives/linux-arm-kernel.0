@@ -1,80 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Dec 2013 19:15:35 +0000
-Subject: [PATCH v2] dma: pl330: ensure DMA descriptors are zero-initialised
-In-Reply-To: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
-References: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20131210191535.GA18218@mudshark.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 10 Dec 2013 20:16:07 +0100
+Subject: [PATCH 1/6] clocksource: time-efm32: Select CLKSRC_MMIO
+In-Reply-To: <52A767CB.3010501@linaro.org>
+References: <52A767CB.3010501@linaro.org>
+Message-ID: <1386702972-25565-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 06:01:30PM +0000, Will Deacon wrote:
-> I see the following splat with 3.13-rc1 when attempting to perform DMA:
-> 
-> [  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
-> [  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
-> [  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
-> [  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
-> [  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
-> [  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
-> [  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
-> [  253.005010] LR is at pl330_tasklet+0x3c8/0x550
-> [  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
-> [  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
-> [  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
-> [  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
-> [  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
-> [  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
-> [  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
-> 
-> This is due to desc->txd.unmap containing garbage (uninitialised memory).
-> 
-> Rather than add another dummy initialisation to _init_desc, instead
-> ensure that the descriptors are zero-initialised during allocation and
-> remove the dummy, per-field initialisation.
-> 
-> Cc: Andriy Shevchenko <andriy.shevchenko@intel.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+From: Axel Lin <axel.lin@ingics.com>
 
-Ping? It would be great to see this merged as a fix.
+The time-efm32 driver uses the clocksource MMIO functions.
+Thus it needs to select CLKSRC_MMIO in Kconfig.
 
-Cheers,
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/clocksource/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Will
-
-> ---
->  drivers/dma/pl330.c | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 98641eaca080..769f865b71db 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2492,12 +2492,9 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
->  
->  static inline void _init_desc(struct dma_pl330_desc *desc)
->  {
-> -	desc->pchan = NULL;
->  	desc->req.x = &desc->px;
->  	desc->req.token = desc;
->  	desc->rqcfg.swap = SWAP_NO;
-> -	desc->rqcfg.privileged = 0;
-> -	desc->rqcfg.insnaccess = 0;
->  	desc->rqcfg.scctl = SCCTRL0;
->  	desc->rqcfg.dcctl = DCCTRL0;
->  	desc->req.cfg = &desc->rqcfg;
-> @@ -2517,7 +2514,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
->  	if (!pdmac)
->  		return 0;
->  
-> -	desc = kmalloc(count * sizeof(*desc), flg);
-> +	desc = kcalloc(count, sizeof(*desc), flg);
->  	if (!desc)
->  		return 0;
->  
-> -- 
-> 1.8.2.2
-> 
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 5c07a56..634c4d6 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -75,6 +75,7 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ config CLKSRC_EFM32
+ 	bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
+ 	depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
++	select CLKSRC_MMIO
+ 	default ARCH_EFM32
+ 	help
+ 	  Support to use the timers of EFM32 SoCs as clock source and clock
+-- 
+1.7.9.5
