@@ -1,49 +1,16 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 10 Dec 2013 16:52:35 +0200
-Subject: [PATCH 1/2] arm: dts: keystone: add watchdog entry
-In-Reply-To: <1386686869-729-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386686869-729-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52A72AB3.5000900@ti.com>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Tue, 10 Dec 2013 06:53:16 -0800
+Subject: questions of cpuidle
+In-Reply-To: <52A6AFD1.4010002@linaro.org>
+References: <52A5C846.30308@linaro.org> <52A5E135.2020500@linux.vnet.ibm.com>
+ <52A6AFD1.4010002@linaro.org>
+Message-ID: <52A72ADC.6000003@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ CC
-devicetree at vger.kernel.org
-linux-arm-kernel at lists.infradead.org
-linux-kernel at vger.kernel.org
-
-On 12/10/2013 04:47 PM, Ivan Khoronzhuk wrote:
-> Add watchdog entry to keystone device tree.
->
-> Acked-by: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
-> Based on
-> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-> keystone/master
->
->   arch/arm/boot/dts/keystone.dtsi |    6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-> index f6d6d9e..54a8ff7 100644
-> --- a/arch/arm/boot/dts/keystone.dtsi
-> +++ b/arch/arm/boot/dts/keystone.dtsi
-> @@ -181,5 +181,11 @@
->   			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
->   			clocks = <&clkspi>;
->   		};
-> +
-> +		wdt: wdt at 022f0080 {
-> +			compatible = "ti,keystone-wdt","ti,davinci-wdt";
-> +			reg = <0x022f0080 0x80>;
-> +			clocks = <&clkwdtimer0>;
-> +		};
->   	};
->   };
->
-
-
--- 
-Regards,
-Ivan Khoronzhuk
+On 12/9/2013 10:08 PM, Alex Shi wrote:
+> And for monitor/mwait idle method, seems deep c-state cpu need to keep a
+> eye on memory bus. So seems the memory controller in cpu package is
+> impossible to get into sleep, right?
+not the memory bus
+the cache coherency logic ;-)
