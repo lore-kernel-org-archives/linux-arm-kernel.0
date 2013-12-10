@@ -1,75 +1,113 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Dec 2013 15:43:11 -0800
-Subject: [PATCH 2/7] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
+Date: Tue, 10 Dec 2013 15:43:12 -0800
+Subject: [PATCH 3/7] Input: pm8xxx-vibrator - Migrate to devm_* APIs
 In-Reply-To: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
 References: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1386718996-3733-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1386718996-3733-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the regmap APIs for this driver instead of custom pm8xxx
-APIs. This breaks this driver's dependency on the pm8xxx APIs and
-allows us to easily port it to other bus protocols in the future.
+Simplify the error paths and reduce the lines of code in this
+driver by using the devm_* APIs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/input/misc/pmic8xxx-pwrkey.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ drivers/input/misc/pm8xxx-vibrator.c | 44 +++++++++++-------------------------
+ 1 file changed, 13 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-index 233b216..a4de105 100644
---- a/drivers/input/misc/pmic8xxx-pwrkey.c
-+++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-@@ -18,9 +18,9 @@
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/log2.h>
+diff --git a/drivers/input/misc/pm8xxx-vibrator.c b/drivers/input/misc/pm8xxx-vibrator.c
+index ec086f6..2a92ab0 100644
+--- a/drivers/input/misc/pm8xxx-vibrator.c
++++ b/drivers/input/misc/pm8xxx-vibrator.c
+@@ -186,13 +186,13 @@ static int pm8xxx_vib_probe(struct platform_device *pdev)
+ 	int error;
+ 	u8 val;
  
--#include <linux/mfd/pm8xxx/core.h>
- #include <linux/input/pmic8xxx-pwrkey.h>
+-	vib = kzalloc(sizeof(*vib), GFP_KERNEL);
+-	input_dev = input_allocate_device();
+-	if (!vib || !input_dev) {
+-		dev_err(&pdev->dev, "couldn't allocate memory\n");
+-		error = -ENOMEM;
+-		goto err_free_mem;
+-	}
++	vib = devm_kzalloc(&pdev->dev, sizeof(*vib), GFP_KERNEL);
++	if (!vib)
++		return -ENOMEM;
++
++	input_dev = devm_input_allocate_device(&pdev->dev);
++	if (!input_dev)
++		return -ENOMEM;
  
- #define PON_CNTL_1 0x1C
-@@ -83,7 +83,8 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	int key_press_irq = platform_get_irq(pdev, 1);
- 	int err;
- 	unsigned int delay;
--	u8 pon_cntl;
-+	unsigned int pon_cntl;
-+	struct regmap *regmap;
- 	struct pmic8xxx_pwrkey *pwrkey;
- 	const struct pm8xxx_pwrkey_platform_data *pdata =
- 					dev_get_platdata(&pdev->dev);
-@@ -108,6 +109,10 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 		err = -ENOMEM;
+ 	INIT_WORK(&vib->work, pm8xxx_work_handler);
+ 	vib->dev = &pdev->dev;
+@@ -201,17 +201,17 @@ static int pm8xxx_vib_probe(struct platform_device *pdev)
+ 	/* operate in manual mode */
+ 	error = pm8xxx_vib_read_u8(vib, &val, VIB_DRV);
+ 	if (error < 0)
+-		goto err_free_mem;
++		return error;
++
+ 	val &= ~VIB_DRV_EN_MANUAL_MASK;
+ 	error = pm8xxx_vib_write_u8(vib, val, VIB_DRV);
+ 	if (error < 0)
+-		goto err_free_mem;
++		return error;
+ 
+ 	vib->reg_vib_drv = val;
+ 
+ 	input_dev->name = "pm8xxx_vib_ffmemless";
+ 	input_dev->id.version = 1;
+-	input_dev->dev.parent = &pdev->dev;
+ 	input_dev->close = pm8xxx_vib_close;
+ 	input_set_drvdata(input_dev, vib);
+ 	input_set_capability(vib->vib_input_dev, EV_FF, FF_RUMBLE);
+@@ -221,35 +221,18 @@ static int pm8xxx_vib_probe(struct platform_device *pdev)
+ 	if (error) {
+ 		dev_err(&pdev->dev,
+ 			"couldn't register vibrator as FF device\n");
+-		goto err_free_mem;
++		return error;
  	}
  
-+	regmap = dev_get_regmap(pdev->dev.parent, NULL);
-+	if (!regmap)
-+		return -ENODEV;
-+
- 	input_set_capability(pwr, EV_KEY, KEY_POWER);
+ 	error = input_register_device(input_dev);
+ 	if (error) {
+ 		dev_err(&pdev->dev, "couldn't register input device\n");
+-		goto err_destroy_memless;
++		input_ff_destroy(input_dev);
++		return error;
+ 	}
  
- 	pwr->name = "pmic8xxx_pwrkey";
-@@ -116,7 +121,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	delay = (pdata->kpd_trigger_delay_us << 10) / USEC_PER_SEC;
- 	delay = 1 + ilog2(delay);
+ 	platform_set_drvdata(pdev, vib);
+ 	return 0;
+-
+-err_destroy_memless:
+-	input_ff_destroy(input_dev);
+-err_free_mem:
+-	input_free_device(input_dev);
+-	kfree(vib);
+-
+-	return error;
+-}
+-
+-static int pm8xxx_vib_remove(struct platform_device *pdev)
+-{
+-	struct pm8xxx_vib *vib = platform_get_drvdata(pdev);
+-
+-	input_unregister_device(vib->vib_input_dev);
+-	kfree(vib);
+-
+-	return 0;
+ }
  
--	err = pm8xxx_readb(pdev->dev.parent, PON_CNTL_1, &pon_cntl);
-+	err = regmap_read(regmap, PON_CNTL_1, &pon_cntl);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed reading PON_CNTL_1 err=%d\n", err);
- 		return err;
-@@ -129,7 +134,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	else
- 		pon_cntl &= ~PON_CNTL_PULL_UP;
+ #ifdef CONFIG_PM_SLEEP
+@@ -268,7 +251,6 @@ static SIMPLE_DEV_PM_OPS(pm8xxx_vib_pm_ops, pm8xxx_vib_suspend, NULL);
  
--	err = pm8xxx_writeb(pdev->dev.parent, PON_CNTL_1, pon_cntl);
-+	err = regmap_write(regmap, PON_CNTL_1, pon_cntl);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed writing PON_CNTL_1 err=%d\n", err);
- 		return err;
+ static struct platform_driver pm8xxx_vib_driver = {
+ 	.probe		= pm8xxx_vib_probe,
+-	.remove		= pm8xxx_vib_remove,
+ 	.driver		= {
+ 		.name	= "pm8xxx-vib",
+ 		.owner	= THIS_MODULE,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
