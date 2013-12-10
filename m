@@ -1,37 +1,52 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Dec 2013 12:36:57 -0800
-Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
-In-Reply-To: <20131210165958.GH13171@atomide.com>
-References: <pull-1386643347-596413>
- <20131210143547.GA32243@n2100.arm.linux.org.uk>
- <20131210160144.GG13171@atomide.com>
- <20131210160703.GB32243@n2100.arm.linux.org.uk>
- <20131210165958.GH13171@atomide.com>
-Message-ID: <20131210203657.GU13171@atomide.com>
+Date: Tue, 10 Dec 2013 12:40:56 -0800
+Subject: [PATCH] phy: omap_usb2: fix module dependency
+In-Reply-To: <1386707097-25650-1-git-send-email-balbi@ti.com>
+References: <1386707097-25650-1-git-send-email-balbi@ti.com>
+Message-ID: <20131210204056.GV13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131210 09:01]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 08:08]:
-> > 
-> > Right, so I should just turn off building OMAP3 for the remainder of this
-> > cycle.
-> > 
-> > What's the fscking point me running a build system, because if I switch
-> > it now, OMAP3 breaks.  If I don't switch it now and your pull request is
-> > merged, it breaks at that point.
+* Felipe Balbi <balbi@ti.com> [131210 12:26]:
+> Due to over-use of select statements, we could
+> fall into a situation where CONFIG_USB_PHY would
+> be enabled while CONFIG_USB_SUPPORT wouldn't.
 > 
-> Fair enough, I hear you.
->  
-> > This is utterly insane.
+> This would generate a situation where usb_bind_phy()
+> would not be defined and kernel build for some
+> OMAP2PLUS platforms would fail.
 > 
-> Well let's do this. Let's merge the parts that add stuff now, then wait
-> a week (or longer as needed) so you have both ways working with linux
-> next for a while. Does that sounds reasonable to you?
+> Fix this by replacing a 'select' with a more proper
+> 'depends on'.
 
-OK I've added a tag to the same branch earlier before we remove any of
-the legacy omap3 support and sent a new pull request.
+Do we also need to update omap2plus_defconfig to select
+OMAP_CONTROL_USB in this patch?
 
 Regards,
 
 Tony
+ 
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/phy/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index a344f3d..d8b1a9a 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -24,9 +24,9 @@ config PHY_EXYNOS_MIPI_VIDEO
+>  config OMAP_USB2
+>  	tristate "OMAP USB2 PHY Driver"
+>  	depends on ARCH_OMAP2PLUS
+> +	depends on OMAP_CONTROL_USB
+>  	select GENERIC_PHY
+>  	select USB_PHY
+> -	select OMAP_CONTROL_USB
+>  	help
+>  	  Enable this to support the transceiver that is part of SOC. This
+>  	  driver takes care of all the PHY functionality apart from comparator.
+> -- 
+> 1.8.4.GIT
+> 
