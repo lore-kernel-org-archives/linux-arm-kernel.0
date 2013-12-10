@@ -1,32 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Dec 2013 23:50:35 +0000
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <20131128055706.GM8834@intel.com>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131128055706.GM8834@intel.com>
-Message-ID: <20131209235035.GA11632@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 9 Dec 2013 17:01:54 -0700
+Subject: [PATCH 1/9] PCI: Use dev_is_pci() to check whether it is pci
+ device
+In-Reply-To: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
+References: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20131210000154.GE4699@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
-> + Dan
-> 
-> On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
-> > The following commit:
-> > 
-> >   54f8d501e842 dmaengine: remove DMA unmap from drivers
-> > 
-> > removed the last caller to mv_desc_get_dest_addr(), creating the
-> > warning:
-> > 
-> >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
-> >   but not used [-Wunused-function]
-> > 
-> > Remove it.
-> > 
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
-> 
-> This should go thru Dan's tree
+[+cc arch lists]
 
-So what's happening with this patch?  I don't see it in -rc yet.
+On Thu, Dec 05, 2013 at 07:52:53PM +0800, Yijing Wang wrote:
+> Use dev_is_pci() instead of directly compare
+> pci_bus_type to check whether it is pci device.
+> 
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+
+I applied all these to my pci/yijing-dev_is_pci branch for v3.14, thanks!
+
+Browse them here: http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/yijing-dev_is_pci
+
+This should be no functional change.
+
+ arch/alpha/kernel/pci_iommu.c        |    2 +-
+ arch/arm/common/it8152.c             |    4 ++--
+ arch/arm/mach-ixp4xx/common-pci.c    |    6 +++---
+ arch/ia64/hp/common/sba_iommu.c      |    2 +-
+ arch/ia64/sn/pci/pci_dma.c           |   24 ++++++++++++------------
+ arch/parisc/kernel/drivers.c         |   22 +++++-----------------
+ arch/powerpc/sysdev/fsl_pci.c        |    2 +-
+ arch/sparc/include/asm/dma-mapping.h |   10 ++++------
+ arch/sparc/kernel/iommu.c            |    2 +-
+ arch/sparc/kernel/ioport.c           |    4 +---
+ arch/x86/kernel/acpi/boot.c          |    4 +---
+ drivers/pci/pci-acpi.c               |    2 +-
+ 12 files changed, 33 insertions(+), 51 deletions(-)
+
+Bjorn
+
+> ---
+>  drivers/pci/pci-acpi.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+> index 577074e..e0431f1 100644
+> --- a/drivers/pci/pci-acpi.c
+> +++ b/drivers/pci/pci-acpi.c
+> @@ -358,7 +358,7 @@ static void pci_acpi_cleanup(struct device *dev)
+>  
+>  static bool pci_acpi_bus_match(struct device *dev)
+>  {
+> -	return dev->bus == &pci_bus_type;
+> +	return dev_is_pci(dev);
+>  }
+>  
+>  static struct acpi_bus_type acpi_pci_bus = {
+> -- 
+> 1.7.1
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
