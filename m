@@ -1,117 +1,107 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 10 Dec 2013 12:17:30 -0700
-Subject: Build breakage from 'ARM: mm: use phys_addr_t appropriately in
- p2v and v2p conversions'
-In-Reply-To: <20131125233654.GV16735@n2100.arm.linux.org.uk>
-References: <20131125223636.GA20822@obsidianresearch.com>
- <20131125232003.GU16735@n2100.arm.linux.org.uk>
- <20131125233654.GV16735@n2100.arm.linux.org.uk>
-Message-ID: <20131210191730.GT5429@obsidianresearch.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Dec 2013 11:16:53 -0800
+Subject: [PATCH v4 0/9] ARM: Initial support for Marvell Berlin SoCs
+In-Reply-To: <52A674F1.7000104@gmail.com>
+References: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1386512047-874-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131210014043.GA32701@quad.lixom.net>
+ <52A674F1.7000104@gmail.com>
+Message-ID: <20131210191653.GA10105@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 25, 2013 at 11:36:54PM +0000, Russell King - ARM Linux wrote:
- 
-> Actually, I think Nicolas' commit:
+On Tue, Dec 10, 2013 at 02:57:05AM +0100, Sebastian Hesselbarth wrote:
+> On 12/10/2013 02:40 AM, Olof Johansson wrote:
+> >On Sun, Dec 08, 2013 at 03:13:57PM +0100, Sebastian Hesselbarth wrote:
+> >>Hopefully last round of initial support patches for Marvell Berlin SoCs
+> >>before I can send the final PR for v3.14.
+> >>
+> >>Compared to last version sent, this patch set has now a Reviewed-by from
+> >>Thomas Gleixner for the irqchip driver (Thanks for that!). Also, l2x0
+> >>compatibles can now be reordered alphabetically instead of by derivate
+> >>thanks to [1].
+> >>
+> >>Marvell Docs have been updated to not mention Armada 1000 which has been
+> >>discontinued by Marvell and vanished from their website. The dtsi/dts file
+> >>have been renamed to vendor,name.dts[i], which is the preferred new naming
+> >>scheme.
+> >>
+> >>Open issues are the never ending dw_apb_timers_of story, which I ignore
+> >>for now and hope they get in someday. Also, TWD SMP dependency and
+> >>early l2x0_of_init will be addressed at a later date. At the current
+> >>feature set of Berlin SoC, I don't see why the above issues should further
+> >>stall this patches.
+> >>
+> >>I guess, all patches can go through ARM SoC tree, except Tauros3 patch
+> >>which I should submit to Russell's patch tracker?
+> >
+> >Yep, sounds good.
+> >
+> >I took a cursory glance at the patchset and it looks sane to me. I didn't
+> >review in detail though.
+> >
+> >One open question: Why don't you just add this to mach-mvebu? I thought
+> >all modern Marvell platforms were going to converge on that eventually
+> >anyway, and it's easy to add it now that it's early and simple..
 > 
-> 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef
+> Olof,
 > 
-> was wrong to remove PLAT_PHYS_OFFSET.  So, partially undoing Nicolas'
-> patch, and reordering things a little, we end up with this, which if
-> it weren't for the comment would be 5 lines shorter!
+> I started with mach-mvebu in the first RFC, but Berlin SoCs are from a
+> different business unit at Marvell and are more PXA compatible than
+> Orion/Kirkwood/Armada 370/XP. Most notably, they lack the "mbus" and
+> IP is either from PXA/MMP or Synopsys DW. Thomas Petazzoni and also
+> Jisheng Zhang from Marvell suggested to not put it into mvebu but
+> have a different mach folder instead.
 
-Not sure where this thread ended up, but:
+Hmm, ok. Well, maybe later on we can look at aggregating them more again. It'd
+be nice to get fewer top-level platform directories per vendor.
 
-Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-
-On ARM kirkwood with 3.13-rc3
-
-Regards,
-Jason
- 
->  arch/arm/include/asm/memory.h |   23 ++++++++++++-----------
->  arch/arm/kernel/head-nommu.S  |    4 ++--
->  arch/arm/kernel/head.S        |    2 +-
->  3 files changed, 15 insertions(+), 14 deletions(-)
+> >Also, see below:
+> >
+> >>Sebastian Hesselbarth (9):
+> >>   irqchip: add DesignWare APB ICTL interrupt controller
+> >>   MAINTAINERS: add ARM Marvell Berlin SoC
+> >>   ARM: l2x0: add Marvell Tauros3 support
+> >>   ARM: add Marvell Berlin SoC familiy to Marvell doc
+> >>   ARM: add Marvell Berlin SoCs to multi_v7_defconfig
+> >>   ARM: add Marvell Berlin UART0 lowlevel debug
+> >>   ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
+> >>   ARM: add Armada 1500-mini and Chromecast device tree files
+> >>   ARM: add initial support for Marvell Berlin SoCs
+> >>
+> >>  Documentation/arm/Marvell/README                   |  24 +++
+> >>  Documentation/devicetree/bindings/arm/l2cc.txt     |  23 ++-
+> >>  .../devicetree/bindings/arm/marvell,berlin.txt     |  24 +++
+> >>  .../interrupt-controller/snps,dw-apb-ictl.txt      |  32 +++
+> >>  MAINTAINERS                                        |   6 +
+> >>  arch/arm/Kconfig                                   |   2 +
+> >>  arch/arm/Kconfig.debug                             |  10 +
+> >>  arch/arm/Makefile                                  |   1 +
+> >>  arch/arm/boot/dts/Makefile                         |   3 +
+> >>  arch/arm/boot/dts/google,chromecast.dts            |  29 +++
+> >>  arch/arm/boot/dts/marvell,berlin2.dtsi             | 227 +++++++++++++++++++++
+> >>  arch/arm/boot/dts/marvell,berlin2cd.dtsi           | 210 +++++++++++++++++++
+> >>  arch/arm/boot/dts/sony,nsz-gs7.dts                 |  29 +++
+> >
+> >We have had a long-standing standard of naming the dts files
+> ><family>-<board>.dts (or <soc_vendor>-<board>.dts).  Let's continue
+> >sticking to that since it helps keep the namespace somewhat segmented per
+> >platform in arch/arm/boot/dts.
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 9ecccc865046..c7e0d708e911 100644
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -157,6 +157,16 @@
->  #endif
->  #define ARCH_PGD_MASK		((1 << ARCH_PGD_SHIFT) - 1)
->  
-> +/*
-> + * PLAT_PHYS_OFFSET is the offset (from zero) of the start of physical
-> + * memory.  This is used for XIP and NoMMU kernels, or by kernels which
-> + * have their own mach/memory.h.  Assembly code must always use
-> + * PLAT_PHYS_OFFSET and not PHYS_OFFSET.
-> + */
-> +#ifndef PLAT_PHYS_OFFSET
-> +#define PLAT_PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> +#endif
-> +
->  #ifndef __ASSEMBLY__
->  
->  /*
-> @@ -239,6 +249,8 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  
->  #else
->  
-> +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> +
->  static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
->  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> @@ -251,17 +263,6 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  
->  #endif
->  #endif
-> -#endif /* __ASSEMBLY__ */
-> -
-> -#ifndef PHYS_OFFSET
-> -#ifdef PLAT_PHYS_OFFSET
-> -#define PHYS_OFFSET	PLAT_PHYS_OFFSET
-> -#else
-> -#define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
-> -#endif
-> -#endif
-> -
-> -#ifndef __ASSEMBLY__
->  
->  /*
->   * PFNs are used to describe any physical page; this means
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index 14235ba64a90..716249cc2ee1 100644
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -68,7 +68,7 @@ ENTRY(stext)
->  
->  #ifdef CONFIG_ARM_MPU
->  	/* Calculate the size of a region covering just the kernel */
-> -	ldr	r5, =PHYS_OFFSET		@ Region start: PHYS_OFFSET
-> +	ldr	r5, =PLAT_PHYS_OFFSET		@ Region start: PHYS_OFFSET
->  	ldr     r6, =(_end)			@ Cover whole kernel
->  	sub	r6, r6, r5			@ Minimum size of region to map
->  	clz	r6, r6				@ Region size must be 2^N...
-> @@ -213,7 +213,7 @@ ENTRY(__setup_mpu)
->  	set_region_nr r0, #MPU_RAM_REGION
->  	isb
->  	/* Full access from PL0, PL1, shared for CONFIG_SMP, cacheable */
-> -	ldr	r0, =PHYS_OFFSET		@ RAM starts at PHYS_OFFSET
-> +	ldr	r0, =PLAT_PHYS_OFFSET		@ RAM starts at PHYS_OFFSET
->  	ldr	r5,=(MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL)
->  
->  	setup_region r0, r5, r6, MPU_DATA_SIDE	@ PHYS_OFFSET, shared, enabled
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 11d59b32fb8d..32f317e5828a 100644
-> +++ b/arch/arm/kernel/head.S
-> @@ -110,7 +110,7 @@ ENTRY(stext)
->  	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
->  	add	r8, r8, r4			@ PHYS_OFFSET
->  #else
-> -	ldr	r8, =PHYS_OFFSET		@ always constant in this case
-> +	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
->  #endif
->  
->  	/*
->
+> Also, here: I had the naming that way until v3, then Kumar suggested to
+> use prefixed naming scheme. Maybe I got it wrong?
+> 
+> Are you suggesting to name the above back to:
+> berlin2[cd].dtsi,
+> berlin2-nsz-gs7.dts, and
+> berlin2cd-chromecast.dts?
+
+Personally I prefer something similar to the mach-directory name as prefix, so
+berlin-<soc number>.dts and then berlin-chromecast.dts, etc. But I'm not that
+picky, if you have something else you prefer then that's fine too.
+
+At some point we should restructure the dts directory into subdirectories,
+which will remove some of these requirements, but we're not there quite yet.
+
+
+-Olof
