@@ -1,68 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Dec 2013 10:36:33 -0600
-Subject: [PATCH v2 01/15] mfd: menelaus: Drop __exit section annotation
-In-Reply-To: <20131210085007.GO12675@lee--X1>
-References: <1386042188-12246-1-git-send-email-balbi@ti.com>
- <20131203095136.GF11828@lee--X1>
- <20131208190739.GA18977@saruman.home>
- <20131209093748.GA12675@lee--X1>
- <20131209161422.GC24047@saruman.home>
- <20131210085007.GO12675@lee--X1>
-Message-ID: <20131210163633.GI22750@saruman.home>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Tue, 10 Dec 2013 17:37:33 +0100
+Subject: [PATCH] ARM/KVM: inject data abort on unhandled memory access
+In-Reply-To: <CAFEAcA8tsdMjok8EQe-2ybuuCn_g7ZEYROwSPVcwr5A1VyrOVA@mail.gmail.com>
+References: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
+ <CAFEAcA8tsdMjok8EQe-2ybuuCn_g7ZEYROwSPVcwr5A1VyrOVA@mail.gmail.com>
+Message-ID: <52A7434D.609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/05/2013 04:15 PM, Peter Maydell wrote:
+> On 5 December 2013 15:10, Andre Przywara <andre.przywara@linaro.org> wrote:
+>> If a KVM guest accesses memory that is outside its memory map (so no
+>> MMIO and no RAM), KVM will return -ENOSYS to userland, causing QEMU
+>> to do an abort() and kill the whole guest. This happens while
+>> executing dmidecode on ARM, which mmaps /dev/mem and scans the first
+>> Megabyte of memory for a DMI BIOS signature (sic!).
+>> Of course this is silly, but in any case crashing the whole guest
+>> does not seems appropriate.
+>> So lets mimic native hardware's behavior in this case and inject a
+>> Data Abort exception into the guest. In the previous case this will
+>> crash dmidecode with SIGSEGV, but keeps the guest alive.
+>
+>> --- a/arch/arm/kvm/mmio.c
+>> +++ b/arch/arm/kvm/mmio.c
+>> @@ -183,7 +183,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>                          return ret;
+>>          } else {
+>>                  kvm_err("load/store instruction decoding not implemented\n");
+>> -               return -ENOSYS;
+>> +               kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+>> +               return 1;
+>>          }
+>
+> This seems like it's mixing two different error cases:
+>   (1) guest tries to access something with nothing backing it at all
+>   -> should definitely cause a guest Data Abort
+>   (2) guest tries to access something (whether at a valid device address
+>   or not) with a "complex" instruction like LDM/STM which we can't deal
+>   without emulating it
 
-On Tue, Dec 10, 2013 at 08:50:07AM +0000, Lee Jones wrote:
-> > > > > The code looks mostly fine, but the implementation of the commit logs
-> > > > > seems lazy. Please submit a v3 using coherent sentences with full
-> > > > > explanations and correct punctuation.
-> > > > 
-> > > > example ?
-> > > 
-> > > All of your commit messages.
-> > > 
-> > > > that macro just helps removing some extra
-> > > 
-> > >   ^- Sentences start with an uppercase character.
-> > > 
-> > > > line of code and hides ffs() calls.
-> > > > 
-> > > > while at that, also fix a variable shadowing
-> > > 
-> > >   ^- Sentences start with an uppercase character.
-> > > 
-> > > > bug where 'int irq' was being redeclared inside
-> > > > inner loop while it was also argument to interrupt
-> > > > handler.
-> > > 
-> > >   < ---------------   50 chars   ----------------- >
-> > > 
-> > > Please use the full 72 char (or there abouts) width of the buffer.
-> > 
-> > I don't see any mention of punctuation problems, however. Also, you're
-> > not complaining about the content at all, which tells me those sentences
-> > aren't as incoherent as you claimed before.
-> 
-> I didn't read them in any detail. I traversed through the patches and
+I see. But looking at the ARM ARM there is no easy way of telling the 
+two apart, right? Or can we check the address for sanity easily?
+Currently we cannot handle both cases anyway, so I'd like to refrain 
+from doing instruction decoding to see whether it was an instruction 
+involving a register writeback or the like.
 
-so you gave review comments without actually reviewing ? how rude...
+> The error message you've removed relates to (2). I think there's a reasonable
+> case to make for "log and reflect back into guest as a Data Abort"; silently
+> Data Aborting seems a bit cryptic.
 
-> saw that the formatting looked obscure on all of them. As I have come
-> to expect more of your submissions, I provided a generic reply
-> detailing how I expected the commit logs to be. I wasn't insinuated
-> that you failed to meet all of the criteria, but they definitely fell
-> short of the mark.
+Actually I didn't remove the message, I just removed the return.
+But I can adjust the message, to something like:
+vcpu_unimpl(vcpu, "guest data abort with invalid syndrome\n");
 
-in what way ?
+>
+> Of course if the guest tries to do a memcpy() on the device memory
+> (which IIRC is what is happening with dmidecode in this case) then it's
+> very likely to hit case (2).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/79c22df9/attachment.sig>
+Good point. dmidecode does mmap, then memcpy, so it's likely to use ldm 
+(if glibc provides this, the dmidecode binary does not use ldm directly).
+
+But in general this reminds me to push fixing dmidecode. Xen has a 
+similar fix now in queue ;-)
+
+> Or we could try to get the ldm/stm emulation code upstream :-)
+
+Sure, go ahead ;-)
+
+Regards,
+Andre.
