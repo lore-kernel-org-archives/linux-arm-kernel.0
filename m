@@ -1,176 +1,82 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 10 Dec 2013 11:04:25 -0500
-Subject: [PATCH v3 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <20131209162517.b259540cdd23bfacadc9d171@linux-foundation.org>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-9-git-send-email-santosh.shilimkar@ti.com>
- <20131209162517.b259540cdd23bfacadc9d171@linux-foundation.org>
-Message-ID: <52A73B89.9090501@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 10 Dec 2013 17:04:26 +0100
+Subject: [PATCH 2/7] pinctrl: exynos: add exynos5260 SoC specific data
+In-Reply-To: <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1548210.PeZ57k2d5L@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+Hi Young-Gun, Pankaj, Rahul, Arun,
 
-On Monday 09 December 2013 07:25 PM, Andrew Morton wrote:
-> On Mon, 9 Dec 2013 16:50:41 -0500 Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Please see my comments inline.
+
+On Friday 06 of December 2013 21:26:26 Rahul Sharma wrote:
+> From: Young-Gun Jang <yg1004.jang@samsung.com>
 > 
->> Introduce memblock memory allocation APIs which allow to support
->> PAE or LPAE extension on 32 bits archs where the physical memory
->> start address can be beyond 4GB. In such cases, existing bootmem
->> APIs which operate on 32 bit addresses won't work and needs
->> memblock layer which operates on 64 bit addresses.
->>
->> So we add equivalent APIs so that we can replace usage of bootmem
->> with memblock interfaces. Architectures already converted to
->> NO_BOOTMEM use these new memblock interfaces. The architectures
->> which are still not converted to NO_BOOTMEM continue to function
->> as is because we still maintain the fal lback option of bootmem
->> back-end supporting these new interfaces. So no functional change
->> as such.
->>
->> In long run, once all the architectures moves to NO_BOOTMEM, we
->> can get rid of bootmem layer completely. This is one step to remove
->> the core code dependency with bootmem and also gives path for
->> architectures to move away from bootmem.
->>
->> The proposed interface will became active if both
->> CONFIG_HAVE_MEMBLOCK and CONFIG_NO_BOOTMEM are specified by arch.
->> In case !CONFIG_NO_BOOTMEM, the memblock() wrappers will fallback
->> to the existing bootmem apis so that arch's not converted to
->> NO_BOOTMEM continue to work as is.
->>
->> The meaning of MEMBLOCK_ALLOC_ACCESSIBLE and MEMBLOCK_ALLOC_ANYWHERE
->> is kept same.
->>
+> Add Samsung Exynos5260 SoC specific data to enable pinctrl
+> support for all platforms based on EXYNOS5260.
+[snip]
+> diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+> index 155b1b3..9a93df6 100644
+> --- a/drivers/pinctrl/pinctrl-exynos.c
+> +++ b/drivers/pinctrl/pinctrl-exynos.c
+> @@ -1042,6 +1042,88 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+>  	},
+>  };
+>  
+> +/* pin banks of exynos5260 pin-controller 0 */
+> +static struct samsung_pin_bank exynos5260_pin_banks0[] = {
+> +	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpa0", 0x00),
+> +	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpa1", 0x04),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
+> +	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpb0", 0x0c),
+> +	EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpb1", 0x10),
+> +	EXYNOS_PIN_BANK_EINTG(5, 0x0A0, "gpb2", 0x14),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x0C0, "gpb3", 0x18),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x0E0, "gpb4", 0x1c),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpb5", 0x20),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd0", 0x24),
+> +	EXYNOS_PIN_BANK_EINTG(7, 0x140, "gpd1", 0x28),
+> +	EXYNOS_PIN_BANK_EINTG(5, 0x160, "gpd2", 0x2c),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpe0", 0x30),
+> +	EXYNOS_PIN_BANK_EINTG(5, 0x1A0, "gpe1", 0x34),
+> +	EXYNOS_PIN_BANK_EINTG(4, 0x1C0, "gpf0", 0x38),
+> +	EXYNOS_PIN_BANK_EINTG(8, 0x1E0, "gpf1", 0x3c),
+> +	EXYNOS_PIN_BANK_EINTG(2, 0x200, "gpk0", 0x40),
+> +	EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gpx0", 0x00),
+> +	EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gpx1", 0x04),
+> +	EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gpx2", 0x08),
+> +	EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gpx3", 0x0c),
 
-[..]
+nit: Please use lowercase hexadecimal characters. Despite of already
+existing code, lowercase is the preferred way.
 
->> +/**
->> + * memblock_virt_alloc_internal - allocate boot memory block
->> + * @size: size of memory block to be allocated in bytes
->> + * @align: alignment of the region and block's size
->> + * @min_addr: the lower bound of the memory region to allocate (phys address)
->> + * @max_addr: the upper bound of the memory region to allocate (phys address)
->> + * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
->> + *
->> + * The @min_addr limit is dropped if it can not be satisfied and the allocation
->> + * will fall back to memory below @min_addr. Also, allocation may fall back
->> + * to any node in the system if the specified node can not
->> + * hold the requested memory.
->> + *
->> + * The allocation is performed from memory region limited by
->> + * memblock.current_limit if @max_addr == %BOOTMEM_ALLOC_ACCESSIBLE.
->> + *
->> + * The memory block is aligned on SMP_CACHE_BYTES if @align == 0.
->> + *
->> + * The phys address of allocated boot memory block is converted to virtual and
->> + * allocated memory is reset to 0.
->> + *
->> + * In addition, function sets the min_count to 0 using kmemleak_alloc for
->> + * allocated boot memory block, so that it is never reported as leaks.
->> + *
->> + * RETURNS:
->> + * Virtual address of allocated memory block on success, NULL on failure.
->> + */
->> +static void * __init memblock_virt_alloc_internal(
->> +				phys_addr_t size, phys_addr_t align,
->> +				phys_addr_t min_addr, phys_addr_t max_addr,
->> +				int nid)
->> +{
->> +	phys_addr_t alloc;
->> +	void *ptr;
->> +
->> +	if (nid == MAX_NUMNODES)
->> +		pr_warn("%s: usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE\n",
->> +			__func__);
-> 
-> "deprecated".  I'll fix this (three places).
->
-Thanks for fixup.
- 
->> +	if (WARN_ON_ONCE(slab_is_available()))
->> +		return kzalloc_node(size, GFP_NOWAIT, nid);
-> 
-> I don't know why this generates a warning.  And I bet that if it
-> generates a warning for some other developer, they won't know either. 
-> Please send a patch to add a suitable code comment here.
-> 
-Ok. This check was actually present in nobootmem memblock wrappers
-so we just kept that here as well.
-(see mm/__nobootmem.c:	_alloc_bootmem_nopanic()). 
+> +};
+> +
+> +/* pin banks of exynos5260 pin-controller 1 */
+> +static struct samsung_pin_bank exynos5260_pin_banks1[] = {
+> +	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpc0", 0x00),
+> +	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpc1", 0x04),
+> +	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpc2", 0x08),
+> +	EXYNOS_PIN_BANK_EINTG(4, 0x060, "gpc3", 0x0c),
+> +	EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpc4", 0x10),
+> +};
+> +
+> +/* pin banks of exynos5260 pin-controller 2 */
+> +static struct samsung_pin_bank exynos5260_pin_banks2[] = {
+> +	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
+> +	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
+> +};
+> +
+> +/*
+> + * Samsung pinctrl driver data for Exynos5260 SoC. Exynos5420 SoC includes
+> + * four gpio/pin-mux/pinconfig controllers.
 
-Seems like a check is detect any accidental use of these APIs
-after slab is ready.
+Hmm, I can see only three of them below. Is there one left undefined?
 
->> +
->> +	/*
->> +	 * The min_count is set to 0 so that bootmem allocated blocks
->> +	 * are never reported as leaks.
->> +	 */
->> +	kmemleak_alloc(ptr, size, 0, 0);
-> 
-> This is not a good comment - it explains "what" (which is fairly
-> obvious) but it doesn't explain "why".  Unfreed bootmem can surely be
-> considered a leak in some situations so perhaps some people will want
-> them reported as such.  Please send a patch which updates this comment,
-> fully explaining the reasoning behind this decision.
->
-Same here. (see __alloc_memory_core_early() and alloc_bootmem_bdata()).
-looks like it was introduced by commit 008139d9 {kmemleak: Do not report
-alloc_bootmem blocks as leaks}.
+Otherwise, the patch looks fine.
 
-Looping Catalin who committed this change. From the commit log the
-reason seems to be bootmem allocated blocks are only referred via
-the physical address which is not looked up by kmemleak.
- 
->> +	return ptr;
->> +
->> +error:
->> +	return NULL;
->> +}
->> +
->> +/**
->> + * memblock_virt_alloc_try_nid_nopanic - allocate boot memory block
->> + * @size: size of memory block to be allocated in bytes
->> + * @align: alignment of the region and block's size
->> + * @min_addr: the lower bound of the memory region from where the allocation
->> + *	  is preferred (phys address)
->> + * @max_addr: the upper bound of the memory region from where the allocation
->> + *	      is preferred (phys address), or %BOOTMEM_ALLOC_ACCESSIBLE to
->> + *	      allocate only from memory limited by memblock.current_limit value
->> + * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
->> + *
->> + * Public version of _memblock_virt_alloc_try_nid_nopanic() which provides
->> + * additional debug information (including caller info), if enabled.
->> + *
->> + * RETURNS:
->> + * Virtual address of allocated memory block on success, NULL on failure.
->> + */
->> +void * __init memblock_virt_alloc_try_nid_nopanic(
->> +				phys_addr_t size, phys_addr_t align,
->> +				phys_addr_t min_addr, phys_addr_t max_addr,
->> +				int nid)
->> +{
->> +	memblock_dbg("%s: %llu bytes align=0x%llx nid=%d from=0x%llx max_addr=0x%llx %pF\n",
->> +		     __func__, (u64)size, (u64)align, nid, (u64)min_addr,
->> +		     (u64)max_addr, (void *)_RET_IP_);
-> 
-> Maybe we should teach vsprintf() how to print phys_addr_t's.  Similar
-> to
-> http://ozlabs.org/~akpm/mmots/broken-out/vsprintf-add-%25pad-extension-for-dma_addr_t-use.patch
-> 
-Thanks. We can update it using %pa format specifier in another patch.
-
-> Printing a single level of the call stack is often pretty useless. 
-> Have you been using memblock_dbg() and have you found this _RET_IP_
-> information to be sufficient?
->
-Yes. It is - the current API structure allow to see the caller name
-properly (at least on ARM)
-e.g
-memblock_virt_alloc_try_nid_nopanic: 4096 bytes align=0x0 nid=1
-from=0x0 max_addr=0x0 pcpu_alloc_alloc_info+0x5c/0xa4
-
-Regards,
-Santosh
- 
+Best regards,
+Tomasz
