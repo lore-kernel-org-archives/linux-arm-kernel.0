@@ -1,50 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Dec 2013 19:40:43 +0100
-Subject: [PATCH v2] net: allwinner: emac: Add missing free_irq
-Message-ID: <1386700849-8496-1-git-send-email-maxime.ripard@free-electrons.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 10 Dec 2013 18:45:59 +0000 (UTC)
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for
+ v3.14
+In-Reply-To: <pull-1386643347-596413>
+References: <pull-1386643347-596413>
+Message-ID: <alpine.DEB.2.02.1312101034360.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun4i-emac driver uses devm_request_irq at .ndo_open time, but relies on
-the managed device mechanism to actually free it. This causes an issue whenever
-someone wants to restart the interface, the interrupt still being held, and not
-yet released.
+On Mon, 9 Dec 2013, Tony Lindgren wrote:
 
-Fall back to using the regular request_irq at .ndo_open time, and introduce a
-free_irq during .ndo_stop.
+> The following changes since commit f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
+> 
+>   ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/omap3-board-removal-signed
+> 
+> for you to fetch changes up to 736e812636ea72be444b85fa7e92554967459069:
+> 
+>   ARM: OMAP2+: Remove unused platform init code and headers (2013-12-08 14:15:46 -0800)
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: stable at vger.kernel.org # 3.11+
+The description in Tony's pull request below alludes to what regressions 
+will occur when this is pulled.  But just to state it in terms of what 
+happened on the local testbed here when I tried it:
 
----
-Changes from v1:
-  - Fixed the wrapping of request_irq
+- CM-T3517 booting will break since there's no .dts file for it.  Are
+  there other boards that will be affected here too?
 
- drivers/net/ethernet/allwinner/sun4i-emac.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+- 2430SDP NFS root will hang during boot, presumably due to the lack 
+  of the smc91x patch that is mentioned below
 
-diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-index 50b853a..46dfb13 100644
---- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-@@ -717,8 +717,7 @@ static int emac_open(struct net_device *dev)
- 	if (netif_msg_ifup(db))
- 		dev_dbg(db->dev, "enabling %s\n", dev->name);
- 
--	if (devm_request_irq(db->dev, dev->irq, &emac_interrupt,
--			     0, dev->name, dev))
-+	if (request_irq(dev->irq, &emac_interrupt, 0, dev->name, dev))
- 		return -EAGAIN;
- 
- 	/* Initialize EMAC board */
-@@ -774,6 +773,8 @@ static int emac_stop(struct net_device *ndev)
- 
- 	emac_shutdown(ndev);
- 
-+	free_irq(ndev->irq, ndev);
-+
- 	return 0;
- }
- 
--- 
-1.8.4.2
+- Dynamic idle PM tests will fail, due to the lack of the first two 
+  patches that Tony mentioned.  (This is also a problem now for
+  37xxevm in v3.13-rc.)
+
+- The N800 isn't booting here with a concatenated uImage+dtb - but
+  maybe I'm doing something wrong with this one.
+
+Best if the pull request were to explicitly state the known 
+regressions with this series, in terms of specific boards and 
+configurations.  That way, people will know what to expect.
+
+
+> ----------------------------------------------------------------
+> We can now finally make mach-omap2 to boot with device tree only and get
+> rid of over 20k lines of platform init code that way.
+> 
+> Most basic devices already work using device tree based initialization
+> and the remaining devices can be initialized using platform data
+> with pdata-quirks.c.
+> 
+> So for most missing boards it's just a question of adding a .dts file
+> that should be fairly similar to one of the existing .dts files as
+> we've tried to cover all basic omap3 board types.
+> 
+> For people getting started updating their board files to for device
+> tree, there are some basic instructions in commit 8dc8b3ddf5d7
+> (ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
+> DT only for booting).
+> 
+> Please also note that there are also some related fixes making their way
+> into the mainline kernel that are needed for some use cases:
+> 
+> PM off-idle for omap3 and wake-up events need the following two patches:
+> 
+> [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+> http://lkml.org/lkml/2013/11/22/520
+> 
+> [PATCH] ARM: dts: Fix omap serial wake-up when booted with device tree
+> http://www.spinics.net/lists/devicetree/msg13374.html
+> 
+> EMAC Ethernet on am3517 boards needs:
+> 
+> [PATCH] net: davinci_emac: Fix platform data handling and make usable for am3517
+> http://patchwork.ozlabs.org/patch/296351/
+> 
+> Ethernet for boards using smc91x needs:
+> 
+> [PATCH v2] net: smc91x: Fix device tree based configuration so it's usable
+> http://www.spinics.net/lists/netdev/msg258913.html
+> 
+
+(snip)
+
+- Paul
