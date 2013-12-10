@@ -1,38 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 9 Dec 2013 22:47:28 -0600
-Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
-In-Reply-To: <1386627424-373-3-git-send-email-w-kwok2@ti.com>
-References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
- <1386627424-373-3-git-send-email-w-kwok2@ti.com>
-Message-ID: <20131210044728.GB28252@saruman.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Dec 2013 20:49:00 -0800
+Subject: [GIT PULL] wl1251 platform data changes for v3.14
+Message-ID: <pull-1386650940-122495>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+The following changes since commit 736e812636ea72be444b85fa7e92554967459069:
 
-On Mon, Dec 09, 2013 at 05:17:04PM -0500, WingMan Kwok wrote:
-> +static int keystone_usbphy_init(struct usb_phy *phy)
-> +{
-> +	struct keystone_usbphy *k_phy = dev_get_drvdata(phy->dev);
-> +	u32 val;
-> +
-> +	val  = keystone_usbphy_readl(k_phy->phy_ctrl, USB_PHY_CTL_CLOCK);
-> +	keystone_usbphy_writel(k_phy->phy_ctrl, USB_PHY_CTL_CLOCK,
-> +				val | PHY_REF_SSP_EN);
+  ARM: OMAP2+: Remove unused platform init code and headers (2013-12-08 14:15:46 -0800)
 
-you need to enable this device's clock to access its registers right ?
+are available in the git repository at:
 
-> +	udelay(20);
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/omap3-board-removal-wl1251
 
-why the magic 20 usecs ? Where does that come from ? Empirically found
-or is there a documentation reference ? At least add a comment there.
+for you to fetch changes up to ce226391aec803a49b39c22d3385057c9db02f30:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/7850247a/attachment-0001.sig>
+  Merge branch 'wl1251-pdata' into omap-for-v3.14/omap3-board-removal (2013-12-09 19:39:51 -0800)
+
+----------------------------------------------------------------
+
+Minimal changes for the wl151 platform data that would otherwise
+cause merge conflicts between the wireless tree and linux-omap
+tree. This was discussed on the mailing lists here:
+
+http://www.spinics.net/lists/linux-omap/msg99906.html
+
+----------------------------------------------------------------
+Luciano Coelho (1):
+      wl1251: split wl251 platform data to a separate structure
+
+Sebastian Reichel (1):
+      wl1251: move power GPIO handling into the driver
+
+Tony Lindgren (1):
+      Merge branch 'wl1251-pdata' into omap-for-v3.14/omap3-board-removal
+
+ drivers/net/wireless/ti/wilink_platform_data.c | 37 +++++++++++++++++++++-----
+ drivers/net/wireless/ti/wl1251/sdio.c          | 31 ++++++++++++++-------
+ drivers/net/wireless/ti/wl1251/spi.c           | 35 +++++++++++++++---------
+ drivers/net/wireless/ti/wl1251/wl1251.h        |  2 +-
+ include/linux/wl12xx.h                         | 24 +++++++++++++++--
+ 5 files changed, 97 insertions(+), 32 deletions(-)
