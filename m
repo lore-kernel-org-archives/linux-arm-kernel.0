@@ -1,45 +1,22 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 9 Dec 2013 16:11:34 -0800
-Subject: [PATCH v3 02/23] mm/memblock: debug: don't free reserved array
- if !ARCH_DISCARD_MEMBLOCK
-In-Reply-To: <1386625856-12942-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131209161134.e161ddfedf284f2052cad4a5@linux-foundation.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon,  9 Dec 2013 16:12:11 -0800
+Subject: [PATCH 0/3] CMA support for arm64
+Message-ID: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Dec 2013 16:50:35 -0500 Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Hi,
 
-> Now the Nobootmem allocator will always try to free memory allocated for
-> reserved memory regions (free_low_memory_core_early()) without taking
-> into to account current memblock debugging configuration
-> (CONFIG_ARCH_DISCARD_MEMBLOCK and CONFIG_DEBUG_FS state).
-> As result if:
->  - CONFIG_DEBUG_FS defined
->  - CONFIG_ARCH_DISCARD_MEMBLOCK not defined;
-> -  reserved memory regions array have been resized during boot
-> 
-> then:
-> - memory allocated for reserved memory regions array will be freed to
-> buddy allocator;
-> - debug_fs entry "sys/kernel/debug/memblock/reserved" will show garbage
-> instead of state of memory reservations. like:
->    0: 0x98393bc0..0x9a393bbf
->    1: 0xff120000..0xff11ffff
->    2: 0x00000000..0xffffffff
-> 
-> Hence, do not free memory allocated for reserved memory regions if
-> defined(CONFIG_DEBUG_FS) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK).
+This series adds support for CMA on arm64 based targets. Currently this ties
+in at the lib/swiotlb.c layer for allocation instead of
+arch/arm64/mm/dma-mapping.c
 
-Alternatives:
+ arch/arm64/Kconfig                      |    1 +
+ arch/arm64/include/asm/dma-contiguous.h |   29 ++++++++++
+ arch/arm64/mm/dma-mapping.c             |    2 +-
+ arch/arm64/mm/init.c                    |    3 +
+ lib/swiotlb.c                           |   92 +++++++++++++++++++++++++++++--
+ 5 files changed, 120 insertions(+), 7 deletions(-)
 
-- disable /proc/sys/kernel/debug/memblock/reserved in this case
-
-- disable defined(CONFIG_DEBUG_FS) &&
-  !defined(CONFIG_ARCH_DISCARD_MEMBLOCK) in Kconfig.
-
-How much memory are we talking about here?  If it's more than "very
-little" then I think either of these would be better - most users will
-value the extra memory over an accurate
-/proc/sys/kernel/debug/memblock/reserved?
+Thanks,
+Laura
