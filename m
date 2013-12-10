@@ -1,51 +1,34 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 10 Dec 2013 20:56:04 +0800
-Subject: [PATCH 2/6] mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for
- uSDHC
+Date: Tue, 10 Dec 2013 20:56:08 +0800
+Subject: [PATCH 6/6] mmc: sdhci-esdhc-imx: use actual_clock to calculate
+ timeout
 In-Reply-To: <1386680168-5227-1-git-send-email-b29396@freescale.com>
 References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
-Message-ID: <1386680168-5227-3-git-send-email-b29396@freescale.com>
+Message-ID: <1386680168-5227-7-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default sdhci code use the 1 << 27 as the max timeout counter to
-to calculate the max_discard_to, however it's not correct for uSDHC
-since its the max counter is 1 << 28.
-Implement esdhc_get_max_timeout to handle it correctly.
+The timeout clock for uSDHC is SDCLK, so it's reasonable to use
+the actual_clock to calculate the max timeout.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Reported-by: Ed Sutter <ed.sutter@alcatel-lucent.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 461a4c3..97b35e1 100644
+index c24cb23..83236d3 100644
 --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -859,6 +859,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- 	return esdhc_change_pinstate(host, uhs);
+@@ -865,7 +865,8 @@ unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+ 	u32 max_to = esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
+ 
+-	return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
++	return host->mmc->actual_clock ?
++			max_to / (host->mmc->actual_clock / 1000) : 0;
  }
  
-+unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	u32 max_to = esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
-+
-+	return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
-+}
-+
- static struct sdhci_ops sdhci_esdhc_ops = {
- 	.read_l = esdhc_readl_le,
- 	.read_w = esdhc_readw_le,
-@@ -871,6 +880,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- 	.get_ro = esdhc_pltfm_get_ro,
- 	.platform_bus_width = esdhc_pltfm_bus_width,
- 	.set_uhs_signaling = esdhc_set_uhs_signaling,
-+	.get_max_timeout = esdhc_get_max_timeout,
- };
- 
- static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+ void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 -- 
 1.7.2.rc3
