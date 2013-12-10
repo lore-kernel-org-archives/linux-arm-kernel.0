@@ -1,90 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 10 Dec 2013 12:35:19 +0000
-Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: introduce
- CONFIG_ACPI_REDUCED_HARDWARE to enable this ACPI mode
-In-Reply-To: <1386192127-28564-2-git-send-email-al.stone@linaro.org>
-References: <1386192127-28564-1-git-send-email-al.stone@linaro.org> <
- 1386192127-28564-2-git-send-email-al.stone@linaro.org>
-Message-ID: <20131210123519.B5F91C40A27@trevor.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Dec 2013 13:43:27 +0100
+Subject: [PATCH v2 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+References: <1385879185-22455-3-git-send-email-ynvich@gmail.com>
+ <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+Message-ID: <CACRpkdYVsGSyMS6sSTqqJ4XrE3GqpWkJsY7GDazi5ix7xjKQ=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  4 Dec 2013 14:22:03 -0700, al.stone at linaro.org wrote:
-> From: Al Stone <al.stone@linaro.org>
-> 
-> To enable the hardware reduced mode of ACPI on some platforms (such as
-> ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
-> to TRUE in the ACPICA source.
-> 
-> This can be done more resonably by introducing a kernel config item
-> to enable/disable ACPI_REDUCED_HARDWARE.  We can then change the kernel
-> config instead of having to modify the kernel source directly to enable
-> the reduced hardware mode of ACPI.
-> 
-> Lv Zheng suggested that this configuration item does not belong in ACPICA,
-> the upstream source for much of the ACPI internals, but rather to the
-> Linux kernel itself.  Hence, we introduce this flag so that we can make
-> ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
-> please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
-> 
-> Support for X86 in hardware reduced mode is also provided to make it
-> simpler to debug this mode, and to provide for probable use in such
-> products.  Hardware reduced mode, despite the name, exists primarily
-> to allow newer platforms to use a much simpler form of ACPI that does
-> not require supporting the legacy of previous versions of the specification,
-> and is likely to be used more often in the near future as a result.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> ---
->  drivers/acpi/Kconfig            | 8 ++++++++
->  include/acpi/platform/aclinux.h | 6 ++++++
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 5d92485..66e6bb2 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -343,6 +343,14 @@ config ACPI_BGRT
->  	  data from the firmware boot splash. It will appear under
->  	  /sys/firmware/acpi/bgrt/ .
->  
-> +config ACPI_REDUCED_HARDWARE
-> +	bool "Hardware-reduced ACPI support"
-> +	depends on X86 || ARM || ARM64
+On Fri, Dec 6, 2013 at 5:48 PM, Sergei Ianovich <ynvich@gmail.com> wrote:
 
-Why wouldn't this simply depend on ACPI?
+> ICP DAS calls LP-8x4x 'programmable automation controller'. It is
+> an industrial computer based on PXA270 SoC. They ship it with a 2.6.19
+> kernel and proprietary kernel module and userspace library to access
+> its industrial IO.
 
-> +	help
-> +	This config adds support for Hardware-reduced ACPI. When this option
-> +	is selected, will generate a specialized version of ACPICA that ONLY
-> +	supports the ACPI "reduced hardware".
+OK... so we only have device tree support for PXA3xx and noone is
+working on PXA2xx. And now we pile up some more legacy code.
+Such is life. But this:
+
+> +static unsigned long lp8x4x_pin_config[] = {
+> +       /* MMC */
+> +       GPIO32_MMC_CLK,
+> +       GPIO112_MMC_CMD,
+> +       GPIO92_MMC_DAT_0,
+> +       GPIO109_MMC_DAT_1,
+> +       GPIO110_MMC_DAT_2,
+> +       GPIO111_MMC_DAT_3,
 > +
->  source "drivers/acpi/apei/Kconfig"
->  
->  config ACPI_EXTLOG
-> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
-> index 28f4f4d..a33f502 100644
-> --- a/include/acpi/platform/aclinux.h
-> +++ b/include/acpi/platform/aclinux.h
-> @@ -52,6 +52,12 @@
->  
->  #ifdef __KERNEL__
->  
-> +/* Compile for reduced hardware mode if requested for this kernel config */
-> +
-> +#ifdef CONFIG_ACPI_REDUCED_HARDWARE
-> +#define ACPI_REDUCED_HARDWARE 1
-> +#endif
-> +
->  #include <linux/string.h>
->  #include <linux/kernel.h>
->  #include <linux/ctype.h>
-> -- 
-> 1.8.3.1
-> 
-> 
-> _______________________________________________
-> Linaro-acpi mailing list
-> Linaro-acpi at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-acpi
+> +       /* USB Host Port 1 */
+> +       GPIO88_USBH1_PWR,
+> +       GPIO89_USBH1_PEN,
+> +};
+
+(...)
+> +static void __init lp8x4x_init(void)
+> +{
+> +       pxa2xx_mfp_config(ARRAY_AND_SIZE(lp8x4x_pin_config));
+(...)
+
+Argh! Now you're adding another user for a legacy custom pin control
+implementation. But if noone is going to modernize PXA2xx what
+can we do :-/
+
+Yours,
+Linus Walleij
