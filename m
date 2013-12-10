@@ -1,69 +1,30 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Tue, 10 Dec 2013 15:11:36 -0600
-Subject: [PATCH v2 0/3] clk: bcm281xx: define Broadcom kona clocks
-In-Reply-To: <529F4B0F.2020801@linaro.org>
-References: <529F4B0F.2020801@linaro.org>
-Message-ID: <52A78388.90904@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Dec 2013 21:25:23 +0000
+Subject: [PATCH 1/2] mm/ARM: dma: fix conflicting types for
+ 'arm_dma_zone_size'
+In-Reply-To: <1386703798-26521-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1386703798-26521-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386703798-26521-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131210212523.GE4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2013 09:32 AM, Alex Elder wrote:
-> This series adds support for Kona clock control units (CCUs) and
-> clocks, used by Broadcom BCM281xx family SoCs.  Kona CCUs are
-> represented by nodes in the device tree, and the names of the clocks
-> provided by a CCU are included in its node.  Implementation details
-> of those clocks are defined in a C file separate from the code that
-> implements the functionality used by most of the common clock
-> framework.
+On Tue, Dec 10, 2013 at 02:29:57PM -0500, Santosh Shilimkar wrote:
+> diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+> index 58b8c6a..1439b80 100644
+> --- a/arch/arm/include/asm/dma.h
+> +++ b/arch/arm/include/asm/dma.h
+> @@ -8,7 +8,7 @@
+>  #define MAX_DMA_ADDRESS	0xffffffffUL
+>  #else
+>  #define MAX_DMA_ADDRESS	({ \
+> -	extern unsigned long arm_dma_zone_size; \
+> +	extern phys_addr_t arm_dma_zone_size; \
+>  	arm_dma_zone_size ? \
+>  		(PAGE_OFFSET + arm_dma_zone_size) : 0xffffffffUL; })
 
-Ping?
+This is wrong.  Take a moment to look at it more closely.  What does
+"PAGE_OFFSET" tell you about what its returning?
 
-If you need me to re-send the series as separate messages, say
-so and I'll gladly do it.
-
-Thank you.
-
-					-Alex
-
-> This series depends on:
->     "Update Kona drivers to use clocks"
->     https://lkml.org/lkml/2013/11/14/450
-> 
-> This series (along with a version of those prerequisite patches) is
-> available in the "review/bcm-kona-clocks-v2" branch of this git
-> repository:
->     git://git.linaro.org/people/elder/linux.git
-> 
-> Updates:
-> v2: - Address all issues raised by Mark Rutland.
-> 
-> 					-Alex
-> 
-> Alex Elder (3):
->   clk: bcm281xx: define kona clock binding
->   clk: bcm281xx: add initial clock framework support
->   ARM: dts: bcm281xx: define real clocks
-> 
->  .../devicetree/bindings/clock/bcm-kona-clock.txt   |   93 ++
->  arch/arm/boot/dts/bcm11351.dtsi                    |  240 +++--
->  drivers/clk/Kconfig                                |    1 +
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/bcm/Kconfig                            |    8 +
->  drivers/clk/bcm/Makefile                           |    3 +
->  drivers/clk/bcm/clk-bcm281xx.c                     |  416 ++++++++
->  drivers/clk/bcm/clk-kona-setup.c                   |  769 +++++++++++++++
->  drivers/clk/bcm/clk-kona.c                         | 1033
-> ++++++++++++++++++++
->  drivers/clk/bcm/clk-kona.h                         |  414 ++++++++
->  include/dt-bindings/clock/bcm281xx.h               |   65 ++
->  11 files changed, 2967 insertions(+), 76 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->  create mode 100644 drivers/clk/bcm/Kconfig
->  create mode 100644 drivers/clk/bcm/Makefile
->  create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
->  create mode 100644 drivers/clk/bcm/clk-kona-setup.c
->  create mode 100644 drivers/clk/bcm/clk-kona.c
->  create mode 100644 drivers/clk/bcm/clk-kona.h
->  create mode 100644 include/dt-bindings/clock/bcm281xx.h
-> 
+What happens if arm_dma_zone_size is greater than 1GB when PAGE_OFFSET
+is at the default setting of 3GB?
