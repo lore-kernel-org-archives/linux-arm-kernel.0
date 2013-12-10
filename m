@@ -1,82 +1,66 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 10 Dec 2013 11:41:36 -0300
-Subject: [PATCH v5 2/3] clocksource: orion: Use atomic access for shared
- registers
-In-Reply-To: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1386686497-20335-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Tue, 10 Dec 2013 11:41:34 -0300
+Subject: [PATCH v5 0/3] Introduce atomic MMIO register modify
+Message-ID: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the driver-specific thread-safe shared register API
-by the recently introduced atomic_io_clear_set().
+After this patchset stalled for several months, I'm picking where
+we left. The last conclusion [1] was that instead of doing the arch-generic
+from scratch, we'd start by implementing the API in ARM only.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
+In other words, this is basically a resend of v3, with some of the typos fixed
+and using raw spinlocks.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg271773.html
+
+The patch that adds the atomic-modify API is PATCH 1. The other two are sent
+as usage examples.
+
+Changes from v4:
+* Returned to the ARM-specific implementation for this API. The arch-generic
+  can be added later.
+
+Changes from v3:
+* Implemented an arch-generic atomic_io_modify(), as suggested by Baruch
+  and Catalin.
+
+* Add an ARM-specific variant, using relaxed R/W as Will suggested.
+
+* Replaced spin_locks by raw_spin_locks, to protect the registers
+  even on RT.
+
+* Fixed two stupid typos.
+
+Changes from v2:
+* As suggested by Will Deacon, dropped the iowmb() barrier
+  and use relaxed variants instead. See Will's explanation for
+  details: http://www.spinics.net/lists/arm-kernel/msg268775.html
+
+* Use spin_{}_irqsave/restore to allow irq-context usage
+  also suggested by Will Deacon.
+
+* Re-worked the API semantics as proposed by Russell King.
+
+Changes from v1:
+* Added an io barrier iowmb() as suggested by Will Deacon,
+  to ensure the writel gets completed before the spin_unlock().
+
+If nobody has objections, I'll add patch 1/3 to ARM's tracking system
+as usual.
+
+Thanks!
+
+Ezequiel Garcia (3):
+  ARM: Introduce atomic MMIO modify
+  clocksource: orion: Use atomic access for shared registers
+  watchdog: orion: Use atomic access for shared registers
+
+ arch/arm/include/asm/io.h        |  6 ++++++
+ arch/arm/kernel/io.c             | 35 +++++++++++++++++++++++++++++++++++
  drivers/clocksource/time-orion.c | 28 ++++++++++------------------
- 1 file changed, 10 insertions(+), 18 deletions(-)
+ drivers/watchdog/orion_wdt.c     |  8 ++------
+ 4 files changed, 53 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
-index 9c7f018..3f14e56 100644
---- a/drivers/clocksource/time-orion.c
-+++ b/drivers/clocksource/time-orion.c
-@@ -35,20 +35,6 @@
- #define ORION_ONESHOT_MAX	0xfffffffe
- 
- static void __iomem *timer_base;
--static DEFINE_SPINLOCK(timer_ctrl_lock);
--
--/*
-- * Thread-safe access to TIMER_CTRL register
-- * (shared with watchdog timer)
-- */
--void orion_timer_ctrl_clrset(u32 clr, u32 set)
--{
--	spin_lock(&timer_ctrl_lock);
--	writel((readl(timer_base + TIMER_CTRL) & ~clr) | set,
--		timer_base + TIMER_CTRL);
--	spin_unlock(&timer_ctrl_lock);
--}
--EXPORT_SYMBOL(orion_timer_ctrl_clrset);
- 
- /*
-  * Free-running clocksource handling.
-@@ -68,7 +54,8 @@ static int orion_clkevt_next_event(unsigned long delta,
- {
- 	/* setup and enable one-shot timer */
- 	writel(delta, timer_base + TIMER1_VAL);
--	orion_timer_ctrl_clrset(TIMER1_RELOAD_EN, TIMER1_EN);
-+	atomic_io_modify(timer_base + TIMER_CTRL,
-+		TIMER1_RELOAD_EN | TIMER1_EN, TIMER1_EN);
- 
- 	return 0;
- }
-@@ -80,10 +67,13 @@ static void orion_clkevt_mode(enum clock_event_mode mode,
- 		/* setup and enable periodic timer at 1/HZ intervals */
- 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
- 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
--		orion_timer_ctrl_clrset(0, TIMER1_RELOAD_EN | TIMER1_EN);
-+		atomic_io_modify(timer_base + TIMER_CTRL,
-+			TIMER1_RELOAD_EN | TIMER1_EN,
-+			TIMER1_RELOAD_EN | TIMER1_EN);
- 	} else {
- 		/* disable timer */
--		orion_timer_ctrl_clrset(TIMER1_RELOAD_EN | TIMER1_EN, 0);
-+		atomic_io_modify(timer_base + TIMER_CTRL,
-+			TIMER1_RELOAD_EN | TIMER1_EN, 0);
- 	}
- }
- 
-@@ -131,7 +121,9 @@ static void __init orion_timer_init(struct device_node *np)
- 	/* setup timer0 as free-running clocksource */
- 	writel(~0, timer_base + TIMER0_VAL);
- 	writel(~0, timer_base + TIMER0_RELOAD);
--	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
-+	atomic_io_modify(timer_base + TIMER_CTRL,
-+		TIMER0_RELOAD_EN | TIMER0_EN,
-+		TIMER0_RELOAD_EN | TIMER0_EN);
- 	clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
- 			      clk_get_rate(clk), 300, 32,
- 			      clocksource_mmio_readl_down);
 -- 
 1.8.1.5
