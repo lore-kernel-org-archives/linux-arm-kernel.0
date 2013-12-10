@@ -1,37 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Dec 2013 09:32:13 +0000
-Subject: [PATCH v3 03/15] mfd: menelaus: Convert to threaded irq
-In-Reply-To: <1386606085-26838-3-git-send-email-balbi@ti.com>
-References: <20131209161422.GC24047@saruman.home>
- <1386606085-26838-1-git-send-email-balbi@ti.com>
- <1386606085-26838-3-git-send-email-balbi@ti.com>
-Message-ID: <20131210093213.GV12675@lee--X1>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 10 Dec 2013 15:08:51 +0530
+Subject: [TRIVIAL PATCH 1/2] regulator: s5m8767: Define symbol for buck
+ control mask
+In-Reply-To: <1386667806.4008.2.camel@AMDC1943>
+References: <1386666583-3280-1-git-send-email-k.kozlowski@samsung.com>
+ <CAK9yfHwz0Swi=vBu_Wynsr5ZDMDfwnFxS1p2Sc6ofabiotEa1w@mail.gmail.com>
+ <1386667806.4008.2.camel@AMDC1943>
+Message-ID: <CAK9yfHyTHwC32aYsN9YQgeenY_EtrhVVDjndUyQO+ePk5xCTiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 09 Dec 2013, Felipe Balbi wrote:
+On 10 December 2013 15:00, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> On Tue, 2013-12-10 at 14:48 +0530, Sachin Kamat wrote:
+>> Hi Krzysztof,
+>>
+>> On 10 December 2013 14:39, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>>
+>> >  static int s5m8767_reg_disable(struct regulator_dev *rdev)
+>> >  {
+>> >         struct s5m8767_info *s5m8767 = rdev_get_drvdata(rdev);
+>> >         int ret, reg;
+>> > -       int  mask = 0xc0, enable_ctrl;
+>> > +       int mask = S5M8767_ENCTRL_MASK, enable_ctrl;
+>>
+>> Couldn't we get rid of this mask variable here too?
+>>
+>> Otherwise the patch looks good to me.
+>
+> Not in this patch because it leads to warning:
+>
+> drivers/regulator/s5m8767.c: In function ?s5m8767_reg_disable?:
+> drivers/regulator/s5m8767.c:259:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+> drivers/regulator/s5m8767.c:253:6: warning: unused variable ?mask? [-Wunused-variable]
 
-> We don't need that extra workqueue when we have generic threaded irq
-> handlers support. This patch just moves over to threaded irqs and
-> deletes the unnecessary workqueue.
-> 
-> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/mfd/menelaus.c | 29 ++++-------------------------
->  1 file changed, 4 insertions(+), 25 deletions(-)
+I see.
 
-<snip>
+>
+> I plan to remove the sec_reg_*() helpers because they are confusing
+> and error-prone (mixing u8 and unsigned int). After using standard regmap
+> API this "mask" variable could be removed.
 
-> -		err = request_irq(client->irq, menelaus_irq, 0,
-> -				  DRIVER_NAME, menelaus);
-> +		err = request_threaded_irq(client->irq, NULL, menelaus_irq,
-> +				IRQF_ONESHOT, DRIVER_NAME, menelaus);
+Sounds good.
 
-devm_* managed resources please.
+For the subject patch,
+Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+With warm regards,
+Sachin
