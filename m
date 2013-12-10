@@ -1,86 +1,82 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 10 Dec 2013 14:45:17 -0500
-Subject: [RESEND PATCH v2] arm/arm64: kvm: Use virt_to_idmap instead of
- virt_to_phys for idmap mappings
-In-Reply-To: <1384891152-15990-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1384891152-15990-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <52A76F4D.3030803@ti.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 10 Dec 2013 20:48:52 +0100
+Subject: [GIT PULL RESEND2] clocksource/clockevents fixes for 3.13
+In-Reply-To: <52A767CB.3010501@linaro.org>
+References: <52A767CB.3010501@linaro.org>
+Message-ID: <20131210194852.GB21814@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer,
 
-On Tuesday 19 November 2013 02:59 PM, Santosh Shilimkar wrote:
-> KVM initialisation fails on architectures implementing virt_to_idmap()
-> because virt_to_phys() on such architectures won't fetch you the correct
-> idmap page.
-> 
-> So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
-> Since the KVM code is shared between arm and arm64, we create
-> kvm_virt_to_phys() and handle the redirection in respective headers.
-> 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Update the earlier version as per Marc's suggestion
-> 
-Have you picked this up for 3.14 ?
+* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
->  arch/arm/include/asm/kvm_mmu.h   |    1 +
->  arch/arm/kvm/mmu.c               |    8 ++++----
->  arch/arm64/include/asm/kvm_mmu.h |    1 +
->  3 files changed, 6 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 77de4a4..2d122ad 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -140,6 +140,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
->  }
->  
->  #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-> +#define kvm_virt_to_phys(x)		virt_to_idmap((unsigned long)(x))
->  
->  #endif	/* !__ASSEMBLY__ */
->  
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 5809069..659db0e 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -916,9 +916,9 @@ int kvm_mmu_init(void)
->  {
->  	int err;
->  
-> -	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
-> -	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
-> -	hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
-> +	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
-> +	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
-> +	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
->  
->  	if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
->  		/*
-> @@ -945,7 +945,7 @@ int kvm_mmu_init(void)
->  		 */
->  		kvm_flush_dcache_to_poc(init_bounce_page, len);
->  
-> -		phys_base = virt_to_phys(init_bounce_page);
-> +		phys_base = kvm_virt_to_phys(init_bounce_page);
->  		hyp_idmap_vector += phys_base - hyp_idmap_start;
->  		hyp_idmap_start = phys_base;
->  		hyp_idmap_end = phys_base + len;
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 680f74e..7f1f940 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -136,6 +136,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
->  }
->  
->  #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-> +#define kvm_virt_to_phys(x)		__virt_to_phys((unsigned long)(x))
->  
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ARM64_KVM_MMU_H__ */
+> Hi Thomas, Ingo,
 > 
+> here are the fixes for 3.13 based on timers/urgent
+> 
+>  * Axel Lin added a missing dependency on CLKSRC_MMIO in the Kconfig
+> for the time-efm32
+> 
+>  * Dinh Nguyen fixed read_sched_clock to return the right value and
+> added the clksrc-of missing definition for the dw_apb_timer
+> 
+>  * Ezequiel Garcia registered the sched clock after the counter,
+> thus preventing time jump in the traces for the armada-370-xp
+> 
+>  * Marc Zyngier stopped the timer before enabling the irq in order
+> to prevent it to be fired before the clockevent is registered for
+> the sunxi
+> 
+>  * Thierry Reding removed a of_node_put in clksrc-of because the
+> reference is not held
+> 
+> Thanks
+>   -- Daniel
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 0e576acbc1d9600cf2d9b4a141a2554639959d50:
+> 
+>   nohz: Fix another inconsistency between CONFIG_NO_HZ=n and
+> nohz=off (2013-11-29 12:23:03 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/fixes
+> 
+> for you to fetch changes up to 9ab4727c1d41e50b67aecde4bf11879560a3ca78:
+> 
+>   clocksource: dw_apb_timer_of: Fix support for dts binding
+> "snps,dw-apb-timer" (2013-12-10 19:49:18 +0100)
+> 
+> ----------------------------------------------------------------
+> Axel Lin (1):
+>       clocksource: time-efm32: Select CLKSRC_MMIO
+> 
+> Dinh Nguyen (2):
+>       clocksource: dw_apb_timer_of: Fix read_sched_clock
+>       clocksource: dw_apb_timer_of: Fix support for dts binding
+> "snps,dw-apb-timer"
+> 
+> Ezequiel Garcia (1):
+>       clocksource: armada-370-xp: Register sched_clock after the
+> counter reset
+> 
+> Marc Zyngier (1):
+>       clocksource: sunxi: Stop timer from ticking before enabling
+> interrupts
+> 
+> Thierry Reding (1):
+>       clocksource: clksrc-of: Do not drop unheld reference on device node
+> 
+>  drivers/clocksource/Kconfig              |    1 +
+>  drivers/clocksource/clksrc-of.c          |    1 -
+>  drivers/clocksource/dw_apb_timer_of.c    |    7 ++++---
+>  drivers/clocksource/sun4i_timer.c        |    3 +++
+>  drivers/clocksource/time-armada-370-xp.c |   10 +++++-----
+>  5 files changed, 13 insertions(+), 9 deletions(-)
+
+Pulled into tip:timers/urgent, thanks a lot Daniel!
+
+	Ingo
