@@ -1,469 +1,252 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Dec 2013 22:36:53 +0800
-Subject: [PATCH v2] ARM: dts: vf610: make pinctrl nodes board specific
-In-Reply-To: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
-References: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1386686213-13801-1-git-send-email-shawn.guo@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 10 Dec 2013 20:10:03 +0530
+Subject: [PATCH v3 07/10] drivers: phy: usb3/pipe3: Adapt pipe3 driver
+ to Generic PHY Framework
+In-Reply-To: <52A1E0A7.80901@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1385373690-12170-8-git-send-email-kishon@ti.com> <52A1E0A7.80901@ti.com>
+Message-ID: <52A727C3.5020608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that
-boards that share the same pinctrl setting do not have to define it time
-and time again in <board>.dts.  However, along with the devices and use
-cases being added continuously, the pinctrl setting nodes under iomuxc
-becomes more than expected.  This bloats device tree blob for particular
-board unnecessarily since only a small subset of those pinctrl setting
-nodes will be used by the board.  It impacts not only the DTB file size
-but also the run-time device tree lookup efficiency.
+Hi,
 
-The patch provides a solution to avoid this device tree bloating problem
-while still keeping boards share the common pinctrl setting data by
-using DTC macro support.  It creates <soc>-pingrp.h and move all those
-pinctrl setting data into there as macro definitions.  The <board>.dts
-will instead define the pinctrl setting nodes that are necessary for the
-board by referring to the macros in <soc>-pingrp.h, so that only the
-pinctrl setting data that will be used by the board will get compiled
-into the DTB for the board.
+On Friday 06 December 2013 08:05 PM, Roger Quadros wrote:
+> Hi Kishon,
+> 
+> On 11/25/2013 12:01 PM, Kishon Vijay Abraham I wrote:
+>> Adapted omap-usb3 PHY driver to Generic PHY Framework and moved phy-omap-usb3
+>> driver in drivers/usb/phy to drivers/phy and also renamed the file to
+>> phy-ti-pipe3 since this same driver will be used for SATA PHY and
+>> PCIE PHY.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/phy/Kconfig                                |   11 +
+>>  drivers/phy/Makefile                               |    1 +
+>>  .../phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c}     |  232 ++++++++++++--------
+>>  drivers/usb/phy/Kconfig                            |   11 -
+>>  drivers/usb/phy/Makefile                           |    1 -
+>>  5 files changed, 149 insertions(+), 107 deletions(-)
+>>  rename drivers/{usb/phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c} (55%)
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index a344f3d..1abbfcc 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -33,6 +33,17 @@ config OMAP_USB2
+>>  	  The USB OTG controller communicates with the comparator using this
+>>  	  driver.
+>>  
+>> +config TI_PIPE3
+>> +	tristate "TI PIPE3 PHY Driver"
+>> +	depends on ARCH_OMAP2PLUS || COMPILE_TEST
+>> +	select GENERIC_PHY
+>> +	select OMAP_CONTROL_USB
+>> +	help
+>> +	  Enable this to support the PIPE3 PHY that is part of TI SOCs. This
+>> +	  driver takes care of all the PHY functionality apart from comparator.
+>> +	  This driver interacts with the "OMAP Control PHY Driver" to power
+>> +	  on/off the PHY.
+>> +
+>>  config TWL4030_USB
+>>  	tristate "TWL4030 USB Transceiver Driver"
+>>  	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
+>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>> index d0caae9..94a1a79 100644
+>> --- a/drivers/phy/Makefile
+>> +++ b/drivers/phy/Makefile
+>> @@ -6,4 +6,5 @@ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+>>  obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+>>  obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+>>  obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
+>> +obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
+>>  obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+>> diff --git a/drivers/usb/phy/phy-omap-usb3.c b/drivers/phy/phy-ti-pipe3.c
+>> similarity index 55%
+>> rename from drivers/usb/phy/phy-omap-usb3.c
+>> rename to drivers/phy/phy-ti-pipe3.c
+>> index 0c6ba29..410b286 100644
+>> --- a/drivers/usb/phy/phy-omap-usb3.c
+>> +++ b/drivers/phy/phy-ti-pipe3.c
+>> @@ -1,5 +1,5 @@
+>>  /*
+>> - * omap-usb3 - USB PHY, talking to dwc3 controller in OMAP.
+>> + * phy-ti-pipe3 - PIPE3 PHY driver.
+>>   *
+>>   * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
+>>   * This program is free software; you can redistribute it and/or modify
+>> @@ -19,10 +19,11 @@
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/slab.h>
+>> -#include <linux/usb/omap_usb.h>
+>> +#include <linux/phy/phy.h>
+>>  #include <linux/of.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/err.h>
+>> +#include <linux/io.h>
+>>  #include <linux/pm_runtime.h>
+>>  #include <linux/delay.h>
+>>  #include <linux/usb/omap_control_usb.h>
+>> @@ -52,17 +53,34 @@
+>>  
+>>  /*
+>>   * This is an Empirical value that works, need to confirm the actual
+>> - * value required for the USB3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+>> - * to be correctly reflected in the USB3PHY_PLL_STATUS register.
+>> + * value required for the PIPE3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+>> + * to be correctly reflected in the PIPE3PHY_PLL_STATUS register.
+>>   */
+>>  # define PLL_IDLE_TIME  100;
+>>  
+>> -struct usb_dpll_map {
+>> +struct pipe3_dpll_params {
+>> +	u16	m;
+>> +	u8	n;
+>> +	u8	freq:3;
+>> +	u8	sd;
+>> +	u32	mf;
+>> +};
+>> +
+>> +struct ti_pipe3 {
+>> +	void __iomem		*pll_ctrl_base;
+>> +	struct device		*dev;
+>> +	struct device		*control_dev;
+>> +	struct clk		*wkupclk;
+>> +	struct clk		*sys_clk;
+>> +	struct clk		*optclk;
+>> +};
+>> +
+>> +struct pipe3_dpll_map {
+>>  	unsigned long rate;
+>> -	struct usb_dpll_params params;
+>> +	struct pipe3_dpll_params params;
+>>  };
+>>  
+>> -static struct usb_dpll_map dpll_map[] = {
+>> +static struct pipe3_dpll_map dpll_map[] = {
+>>  	{12000000, {1250, 5, 4, 20, 0} },	/* 12 MHz */
+>>  	{16800000, {3125, 20, 4, 20, 0} },	/* 16.8 MHz */
+>>  	{19200000, {1172, 8, 4, 20, 65537} },	/* 19.2 MHz */
+>> @@ -71,7 +89,18 @@ static struct usb_dpll_map dpll_map[] = {
+>>  	{38400000, {3125, 47, 4, 20, 92843} },	/* 38.4 MHz */
+>>  };
+>>  
+>> -static struct usb_dpll_params *omap_usb3_get_dpll_params(unsigned long rate)
+>> +static inline u32 ti_pipe3_readl(void __iomem *addr, unsigned offset)
+>> +{
+>> +	return __raw_readl(addr + offset);
+>> +}
+>> +
+>> +static inline void ti_pipe3_writel(void __iomem *addr, unsigned offset,
+>> +	u32 data)
+>> +{
+>> +	__raw_writel(data, addr + offset);
+>> +}
+>> +
+>> +static struct pipe3_dpll_params *ti_pipe3_get_dpll_params(unsigned long rate)
+>>  {
+>>  	int i;
+>>  
+>> @@ -83,110 +112,113 @@ static struct usb_dpll_params *omap_usb3_get_dpll_params(unsigned long rate)
+>>  	return NULL;
+>>  }
+>>  
+>> -static int omap_usb3_suspend(struct usb_phy *x, int suspend)
+>> +static int ti_pipe3_power_off(struct phy *x)
+>>  {
+>> -	struct omap_usb *phy = phy_to_omapusb(x);
+>> -	int	val;
+>> +	struct ti_pipe3 *phy = phy_get_drvdata(x);
+>> +	int val;
+>>  	int timeout = PLL_IDLE_TIME;
+>>  
+>> -	if (suspend && !phy->is_suspended) {
+>> -		val = omap_usb_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+>> -		val |= PLL_IDLE;
+>> -		omap_usb_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+>> -
+>> -		do {
+>> -			val = omap_usb_readl(phy->pll_ctrl_base, PLL_STATUS);
+>> -			if (val & PLL_TICOPWDN)
+>> -				break;
+>> -			udelay(1);
+>> -		} while (--timeout);
+>> -
+>> -		omap_control_usb_phy_power(phy->control_dev, 0);
+>> -
+>> -		phy->is_suspended	= 1;
+>> -	} else if (!suspend && phy->is_suspended) {
+>> -		phy->is_suspended	= 0;
+>> -
+>> -		val = omap_usb_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+>> -		val &= ~PLL_IDLE;
+>> -		omap_usb_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+>> -
+>> -		do {
+>> -			val = omap_usb_readl(phy->pll_ctrl_base, PLL_STATUS);
+>> -			if (!(val & PLL_TICOPWDN))
+>> -				break;
+>> -			udelay(1);
+>> -		} while (--timeout);
+>> -	}
+>> +	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+>> +	val |= PLL_IDLE;
+>> +	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+>> +
+>> +	do {
+>> +		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+>> +		if (val & PLL_TICOPWDN)
+>> +			break;
+>> +		usleep_range(1, 5);
+> 
+> I had suggested to use sleep instead of udelay here but usleep for < 10 us might not be not optimal.
+> see Documentation/timers/timers-howto.txt
 
-With the changes, the pinctrl setting nodes becomes local to particular
-board, and it makes no sense to continue numbering the setting for
-given peripheral.  Thus, all the pinctrl phandler name gets updated to
-have only peripheral name in there.
+ok.
+> 
+> Why can't we just use msleep(1)?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Fugang Duan <B38611@freescale.com>
----
-Changes since v1:
- The vf610-pingrp.h was missed from the v1 patch, add it.
+isn't it too long?
+> 
+> Do we know approximately how much time it takes for the block to power down?
 
- arch/arm/boot/dts/vf610-cosmic.dts |   16 +++-
- arch/arm/boot/dts/vf610-pingrp.h   |  127 ++++++++++++++++++++++++++
- arch/arm/boot/dts/vf610-twr.dts    |   34 +++++--
- arch/arm/boot/dts/vf610.dtsi       |  172 +-----------------------------------
- 4 files changed, 171 insertions(+), 178 deletions(-)
- create mode 100644 arch/arm/boot/dts/vf610-pingrp.h
+I have to check that. But long time back for OMAP5 it used to vary from board
+to board.
+> 
+>> +	} while (--timeout);
+>> +
+> 
+> what if there was a timeout? you need to exit with return code and preferably print an error message.
 
-diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
-index c42e4f9..432960a 100644
---- a/arch/arm/boot/dts/vf610-cosmic.dts
-+++ b/arch/arm/boot/dts/vf610-cosmic.dts
-@@ -36,12 +36,24 @@
- &fec1 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_fec1_1>;
-+	pinctrl-0 = <&pinctrl_fec1>;
- 	status = "okay";
- };
- 
-+&iomuxc {
-+	vf610-cosmic {
-+		pinctrl_fec1: fec1grp {
-+			fsl,pins = <VF610_FEC1_PINGRP1>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <VF610_UART1_PINGRP1>;
-+		};
-+	};
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart1_1>;
-+	pinctrl-0 = <&pinctrl_uart1>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/vf610-pingrp.h b/arch/arm/boot/dts/vf610-pingrp.h
-new file mode 100644
-index 0000000..0858f4f
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-pingrp.h
-@@ -0,0 +1,127 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef __DTS_VF610_PINGRP_H
-+#define __DTS_VF610_PINGRP_H
-+
-+#include "vf610-pinfunc.h"
-+
-+#define VF610_DCU0_PINGRP1 \
-+	VF610_PAD_PTB8__GPIO_30			0x42 \
-+	VF610_PAD_PTE0__DCU0_HSYNC		0x42 \
-+	VF610_PAD_PTE1__DCU0_VSYNC		0x42 \
-+	VF610_PAD_PTE2__DCU0_PCLK		0x42 \
-+	VF610_PAD_PTE4__DCU0_DE			0x42 \
-+	VF610_PAD_PTE5__DCU0_R0			0x42 \
-+	VF610_PAD_PTE6__DCU0_R1			0x42 \
-+	VF610_PAD_PTE7__DCU0_R2			0x42 \
-+	VF610_PAD_PTE8__DCU0_R3			0x42 \
-+	VF610_PAD_PTE9__DCU0_R4			0x42 \
-+	VF610_PAD_PTE10__DCU0_R5		0x42 \
-+	VF610_PAD_PTE11__DCU0_R6		0x42 \
-+	VF610_PAD_PTE12__DCU0_R7		0x42 \
-+	VF610_PAD_PTE13__DCU0_G0		0x42 \
-+	VF610_PAD_PTE14__DCU0_G1		0x42 \
-+	VF610_PAD_PTE15__DCU0_G2		0x42 \
-+	VF610_PAD_PTE16__DCU0_G3		0x42 \
-+	VF610_PAD_PTE17__DCU0_G4		0x42 \
-+	VF610_PAD_PTE18__DCU0_G5		0x42 \
-+	VF610_PAD_PTE19__DCU0_G6		0x42 \
-+	VF610_PAD_PTE20__DCU0_G7		0x42 \
-+	VF610_PAD_PTE21__DCU0_B0		0x42 \
-+	VF610_PAD_PTE22__DCU0_B1		0x42 \
-+	VF610_PAD_PTE23__DCU0_B2		0x42 \
-+	VF610_PAD_PTE24__DCU0_B3		0x42 \
-+	VF610_PAD_PTE25__DCU0_B4		0x42 \
-+	VF610_PAD_PTE26__DCU0_B5		0x42 \
-+	VF610_PAD_PTE27__DCU0_B6		0x42 \
-+	VF610_PAD_PTE28__DCU0_B7		0x42
-+
-+#define VF610_DSPI0_PINGRP1 \
-+	VF610_PAD_PTB19__DSPI0_CS0		0x1182 \
-+	VF610_PAD_PTB20__DSPI0_SIN		0x1181 \
-+	VF610_PAD_PTB21__DSPI0_SOUT		0x1182 \
-+	VF610_PAD_PTB22__DSPI0_SCK		0x1182
-+
-+#define VF610_ESDHC1_PINGRP1 \
-+	VF610_PAD_PTA24__ESDHC1_CLK		0x31ef \
-+	VF610_PAD_PTA25__ESDHC1_CMD		0x31ef \
-+	VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef \
-+	VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef \
-+	VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef \
-+	VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef \
-+	VF610_PAD_PTA7__GPIO_134		0x219d
-+
-+#define VF610_FEC0_PINGRP1 \
-+	VF610_PAD_PTA6__RMII_CLKIN		0x30d1 \
-+	VF610_PAD_PTC0__ENET_RMII0_MDC		0x30d3 \
-+	VF610_PAD_PTC1__ENET_RMII0_MDIO		0x30d1 \
-+	VF610_PAD_PTC2__ENET_RMII0_CRS		0x30d1 \
-+	VF610_PAD_PTC3__ENET_RMII0_RXD1		0x30d1 \
-+	VF610_PAD_PTC4__ENET_RMII0_RXD0		0x30d1 \
-+	VF610_PAD_PTC5__ENET_RMII0_RXER		0x30d1 \
-+	VF610_PAD_PTC6__ENET_RMII0_TXD1		0x30d2 \
-+	VF610_PAD_PTC7__ENET_RMII0_TXD0		0x30d2 \
-+	VF610_PAD_PTC8__ENET_RMII0_TXEN		0x30d2
-+
-+#define VF610_FEC1_PINGRP1 \
-+	VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2 \
-+	VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3 \
-+	VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1 \
-+	VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1 \
-+	VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1 \
-+	VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1 \
-+	VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2 \
-+	VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2 \
-+	VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2 \
-+
-+#define VF610_I2C0_PINGRP1 \
-+	VF610_PAD_PTB14__I2C0_SCL		0x30d3 \
-+	VF610_PAD_PTB15__I2C0_SDA		0x30d3 \
-+
-+#define VF610_PWM0_PINGRP1 \
-+	VF610_PAD_PTB0__FTM0_CH0		0x1582 \
-+	VF610_PAD_PTB1__FTM0_CH1		0x1582 \
-+	VF610_PAD_PTB2__FTM0_CH2		0x1582 \
-+	VF610_PAD_PTB3__FTM0_CH3		0x1582 \
-+	VF610_PAD_PTB6__FTM0_CH6		0x1582 \
-+	VF610_PAD_PTB7__FTM0_CH7		0x1582
-+
-+#define VF610_QSPI0_PINGRP1 \
-+	VF610_PAD_PTD0__QSPI0_A_QSCK		0x307b \
-+	VF610_PAD_PTD1__QSPI0_A_CS0		0x307f \
-+	VF610_PAD_PTD2__QSPI0_A_DATA3		0x3073 \
-+	VF610_PAD_PTD3__QSPI0_A_DATA2		0x3073 \
-+	VF610_PAD_PTD4__QSPI0_A_DATA1		0x3073 \
-+	VF610_PAD_PTD5__QSPI0_A_DATA0		0x307b \
-+	VF610_PAD_PTD7__QSPI0_B_QSCK		0x307b \
-+	VF610_PAD_PTD8__QSPI0_B_CS0		0x307f \
-+	VF610_PAD_PTD9__QSPI0_B_DATA3		0x3073 \
-+	VF610_PAD_PTD10__QSPI0_B_DATA2		0x3073 \
-+	VF610_PAD_PTD11__QSPI0_B_DATA1		0x3073 \
-+	VF610_PAD_PTD12__QSPI0_B_DATA0		0x307b
-+
-+#define VF610_SAI2_PINGRP1 \
-+	VF610_PAD_PTA16__SAI2_TX_BCLK		0x02ed \
-+	VF610_PAD_PTA18__SAI2_TX_DATA		0x02ee \
-+	VF610_PAD_PTA19__SAI2_TX_SYNC		0x02ed \
-+	VF610_PAD_PTA21__SAI2_RX_BCLK		0x02ed \
-+	VF610_PAD_PTA22__SAI2_RX_DATA		0x02ed \
-+	VF610_PAD_PTA23__SAI2_RX_SYNC		0x02ed \
-+	VF610_PAD_PTB18__EXT_AUDIO_MCLK		0x02ed
-+
-+#define VF610_UART1_PINGRP1 \
-+	VF610_PAD_PTB4__UART1_TX		0x21a2 \
-+	VF610_PAD_PTB5__UART1_RX		0x21a1
-+
-+#define VF610_USBVBUS_PINGRP1 \
-+	VF610_PAD_PTA24__USB1_VBUS_EN		0x219c \
-+	VF610_PAD_PTA16__USB0_VBUS_EN		0x219c
-+
-+#endif /* __DTS_VF610_PINGRP_H */
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index c8047ca..80db14e 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -39,7 +39,7 @@
- &dspi0 {
- 	bus-num = <0>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_dspi0_1>;
-+	pinctrl-0 = <&pinctrl_dspi0>;
- 	status = "okay";
- 
- 	sflash: at26df081a at 0 {
-@@ -56,26 +56,50 @@
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_fec0_1>;
-+	pinctrl-0 = <&pinctrl_fec0>;
- 	status = "okay";
- };
- 
- &fec1 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_fec1_1>;
-+	pinctrl-0 = <&pinctrl_fec1>;
- 	status = "okay";
- };
- 
- &i2c0 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_i2c0_1>;
-+	pinctrl-0 = <&pinctrl_i2c0>;
- 	status = "okay";
- };
- 
-+&iomuxc {
-+	vf610-twr {
-+		pinctrl_dspi0: dspi0grp {
-+			fsl,pins = <VF610_DSPI0_PINGRP1>;
-+		};
-+
-+		pinctrl_fec0: fec0grp {
-+			fsl,pins = <VF610_FEC0_PINGRP1>;
-+		};
-+
-+		pinctrl_fec1: fec1grp {
-+			fsl,pins = <VF610_FEC1_PINGRP1>;
-+		};
-+
-+		pinctrl_i2c0: i2c0grp {
-+			fsl,pins = <VF610_I2C0_PINGRP1>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <VF610_UART1_PINGRP1>;
-+		};
-+	};
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart1_1>;
-+	pinctrl-0 = <&pinctrl_uart1>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index d31ce1b..ef8a0ee 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -8,7 +8,7 @@
-  */
- 
- #include "skeleton.dtsi"
--#include "vf610-pinfunc.h"
-+#include "vf610-pingrp.h"
- #include <dt-bindings/clock/vf610-clock.h>
- 
- / {
-@@ -175,176 +175,6 @@
- 				compatible = "fsl,vf610-iomuxc";
- 				reg = <0x40048000 0x1000>;
- 				#gpio-range-cells = <3>;
--
--				/* functions and groups pins */
--
--				dcu0 {
--					pinctrl_dcu0_1: dcu0grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTB8__GPIO_30		0x42
--						VF610_PAD_PTE0__DCU0_HSYNC	0x42
--						VF610_PAD_PTE1__DCU0_VSYNC	0x42
--						VF610_PAD_PTE2__DCU0_PCLK	0x42
--						VF610_PAD_PTE4__DCU0_DE		0x42
--						VF610_PAD_PTE5__DCU0_R0		0x42
--						VF610_PAD_PTE6__DCU0_R1		0x42
--						VF610_PAD_PTE7__DCU0_R2		0x42
--						VF610_PAD_PTE8__DCU0_R3		0x42
--						VF610_PAD_PTE9__DCU0_R4		0x42
--						VF610_PAD_PTE10__DCU0_R5	0x42
--						VF610_PAD_PTE11__DCU0_R6	0x42
--						VF610_PAD_PTE12__DCU0_R7	0x42
--						VF610_PAD_PTE13__DCU0_G0	0x42
--						VF610_PAD_PTE14__DCU0_G1	0x42
--						VF610_PAD_PTE15__DCU0_G2	0x42
--						VF610_PAD_PTE16__DCU0_G3	0x42
--						VF610_PAD_PTE17__DCU0_G4	0x42
--						VF610_PAD_PTE18__DCU0_G5	0x42
--						VF610_PAD_PTE19__DCU0_G6	0x42
--						VF610_PAD_PTE20__DCU0_G7	0x42
--						VF610_PAD_PTE21__DCU0_B0	0x42
--						VF610_PAD_PTE22__DCU0_B1	0x42
--						VF610_PAD_PTE23__DCU0_B2	0x42
--						VF610_PAD_PTE24__DCU0_B3	0x42
--						VF610_PAD_PTE25__DCU0_B4	0x42
--						VF610_PAD_PTE26__DCU0_B5	0x42
--						VF610_PAD_PTE27__DCU0_B6	0x42
--						VF610_PAD_PTE28__DCU0_B7	0x42
--						>;
--					};
--				};
--
--				dspi0 {
--					pinctrl_dspi0_1: dspi0grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTB19__DSPI0_CS0	0x1182
--						VF610_PAD_PTB20__DSPI0_SIN	0x1181
--						VF610_PAD_PTB21__DSPI0_SOUT	0x1182
--						VF610_PAD_PTB22__DSPI0_SCK	0x1182
--						>;
--					};
--				};
--
--				esdhc1 {
--					pinctrl_esdhc1_1: esdhc1grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
--						VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
--						VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
--						VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
--						VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
--						VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
--						VF610_PAD_PTA7__GPIO_134	0x219d
--						>;
--					};
--				};
--
--				fec0 {
--					pinctrl_fec0_1: fec0grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTA6__RMII_CLKIN	0x30d1
--						VF610_PAD_PTC0__ENET_RMII0_MDC	0x30d3
--						VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30d1
--						VF610_PAD_PTC2__ENET_RMII0_CRS	0x30d1
--						VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30d1
--						VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30d1
--						VF610_PAD_PTC5__ENET_RMII0_RXER	0x30d1
--						VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30d2
--						VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30d2
--						VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30d2
--						>;
--					};
--				};
--
--				fec1 {
--					pinctrl_fec1_1: fec1grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
--						VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
--						VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
--						VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
--						VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
--						VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
--						VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
--						VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
--						VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
--						>;
--					};
--				};
--
--				i2c0 {
--					pinctrl_i2c0_1: i2c0grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTB14__I2C0_SCL	0x30d3
--						VF610_PAD_PTB15__I2C0_SDA	0x30d3
--						>;
--					};
--				};
--
--				pwm0 {
--					pinctrl_pwm0_1: pwm0grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTB0__FTM0_CH0	0x1582
--						VF610_PAD_PTB1__FTM0_CH1	0x1582
--						VF610_PAD_PTB2__FTM0_CH2	0x1582
--						VF610_PAD_PTB3__FTM0_CH3	0x1582
--						VF610_PAD_PTB6__FTM0_CH6	0x1582
--						VF610_PAD_PTB7__FTM0_CH7	0x1582
--						>;
--					};
--				};
--
--				qspi0 {
--					pinctrl_qspi0_1: qspi0grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTD0__QSPI0_A_QSCK	0x307b
--						VF610_PAD_PTD1__QSPI0_A_CS0	0x307f
--						VF610_PAD_PTD2__QSPI0_A_DATA3	0x3073
--						VF610_PAD_PTD3__QSPI0_A_DATA2	0x3073
--						VF610_PAD_PTD4__QSPI0_A_DATA1	0x3073
--						VF610_PAD_PTD5__QSPI0_A_DATA0	0x307b
--						VF610_PAD_PTD7__QSPI0_B_QSCK	0x307b
--						VF610_PAD_PTD8__QSPI0_B_CS0	0x307f
--						VF610_PAD_PTD9__QSPI0_B_DATA3	0x3073
--						VF610_PAD_PTD10__QSPI0_B_DATA2	0x3073
--						VF610_PAD_PTD11__QSPI0_B_DATA1	0x3073
--						VF610_PAD_PTD12__QSPI0_B_DATA0	0x307b
--						>;
--					};
--				};
--
--				sai2 {
--					pinctrl_sai2_1: sai2grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTA16__SAI2_TX_BCLK	0x02ed
--						VF610_PAD_PTA18__SAI2_TX_DATA	0x02ee
--						VF610_PAD_PTA19__SAI2_TX_SYNC	0x02ed
--						VF610_PAD_PTA21__SAI2_RX_BCLK	0x02ed
--						VF610_PAD_PTA22__SAI2_RX_DATA	0x02ed
--						VF610_PAD_PTA23__SAI2_RX_SYNC	0x02ed
--						VF610_PAD_PTB18__EXT_AUDIO_MCLK	0x02ed
--						>;
--					};
--				};
--
--				uart1 {
--					pinctrl_uart1_1: uart1grp_1 {
--						fsl,pins = <
--						VF610_PAD_PTB4__UART1_TX	0x21a2
--						VF610_PAD_PTB5__UART1_RX	0x21a1
--						>;
--					};
--				};
--
--				usbvbus {
--					pinctrl_usbvbus_1: usbvbusgrp_1 {
--						fsl,pins = <
--						VF610_PAD_PTA24__USB1_VBUS_EN	0x219c
--						VF610_PAD_PTA16__USB0_VBUS_EN	0x219c
--						>;
--					};
--				};
--
- 			};
- 
- 			gpio1: gpio at 40049000 {
--- 
-1.7.9.5
+hmm.. yeah.
+> 
+>> +	omap_control_usb_phy_power(phy->control_dev, 0);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int ti_pipe3_power_on(struct phy *x)
+>> +{
+>> +	struct ti_pipe3 *phy = phy_get_drvdata(x);
+>> +	int val;
+>> +	int timeout = PLL_IDLE_TIME;
+>> +
+>> +	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+>> +	val &= ~PLL_IDLE;
+>> +	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+>> +
+>> +	do {
+>> +		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+>> +		if (!(val & PLL_TICOPWDN))
+>> +			break;
+>> +		usleep_range(1, 5);
+>> +	} while (--timeout);
+> 
+> here as well.
+
+ok.
+
+Thanks
+Kishon
