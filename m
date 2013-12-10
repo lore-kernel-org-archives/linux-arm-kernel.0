@@ -1,52 +1,107 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Dec 2013 14:25:11 -0600
-Subject: OMAP still fails - usb phy stuff
-In-Reply-To: <20131210202143.GD4360@n2100.arm.linux.org.uk>
-References: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
- <20131210183809.GL13171@atomide.com>
- <20131210192508.GB2464@saruman.home>
- <20131210201639.GD2464@saruman.home>
- <20131210202014.GE2464@saruman.home>
- <20131210202143.GD4360@n2100.arm.linux.org.uk>
-Message-ID: <20131210202511.GG2464@saruman.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 12:25:55 -0800
+Subject: [GIT PULL] make omap24xx boot in dt mode only,
+ prepare omap3 to drop legacy booting for v3.14
+Message-ID: <pull-1386707155-223559>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 08:21:44PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 10, 2013 at 02:20:14PM -0600, Felipe Balbi wrote:
-> > On Tue, Dec 10, 2013 at 02:16:40PM -0600, Felipe Balbi wrote:
-> > > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> > > index a344f3d..d8b1a9a 100644
-> > > --- a/drivers/phy/Kconfig
-> > > +++ b/drivers/phy/Kconfig
-> > > @@ -24,9 +24,9 @@ config PHY_EXYNOS_MIPI_VIDEO
-> > >  config OMAP_USB2
-> > >  	tristate "OMAP USB2 PHY Driver"
-> > >  	depends on ARCH_OMAP2PLUS
-> > > +	depends on OMAP_CONTROL_USB
-> > >  	select GENERIC_PHY
-> > >  	select USB_PHY
-> > > -	select OMAP_CONTROL_USB
-> > >  	help
-> > >  	  Enable this to support the transceiver that is part of SOC. This
-> > >  	  driver takes care of all the PHY functionality apart from comparator.
-> > > 
-> > > i'll send it as a proper patch now.
-> > 
-> > Russell, should I add your Reported-by ? If so, which email do you
-> > prefer to be used ?
-> 
-> I always prefer rmk+kernel at arm.linux.org.uk in git commits.  Thanks
-> for asking.
+The following changes since commit f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
 
-no problem, patch sent.
+  ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/c45367f9/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap 
+
+for you to fetch changes up to adfe9361b236154215d4b0fc8b6d79995394b15c:
+
+  ARM: dts: Add basic devices on am3517-evm (2013-12-08 14:15:46 -0800)
+
+----------------------------------------------------------------
+Make omap2420 and 2430 boot in device tree only mode and prepare things
+for removing omap3 legacy booting support.
+
+We can make omap2420 and 2430 boot in device tree only mode by keeping
+board-n8x0.c around until Menelaus has device tree and regulator support
+so devices still work. For the omap2430-sdp we have omap2430-sdp.dts,
+and there's also a minimal support for H4 in omap2420-h4.dts.
+
+For omap3, let's not drop the legacy platform booting quite yet so
+people have a little time to update their booting system.
+
+With the fixes going into v3.13, thing should behave pretty much the
+same way for legacy booting and device tree based booting for omap3.
+
+So people using omap3 based boards, please update your systems to
+boot in device tree mode as omap3 is the last SoC in mach-omap2
+that boots in the legacy mode.
+
+----------------------------------------------------------------
+Aaro Koskinen (1):
+      ARM: OMAP2+: dts: add n8x0 onenand
+
+Tony Lindgren (20):
+      mfd: twl-core: Fix passing of platform data in the device tree case
+      Merge branch 'dt-regressions' into omap-for-v3.13/fixes-take4
+      ARM: dts: Add basic device tree support for omap2430 sdp
+      ARM: dts: Add basic Nokia N8X0 support
+      ARM: dts: Add basic support for omap3 LDP zoom1 labrador
+      Merge branch 'omap-for-v3.13/fixes-take4' into omap-for-v3.14/board-removal
+      Merge branch 'omap-for-v3.14/dt' into omap-for-v3.14/board-removal
+      ARM: OMAP2+: Add support for board specific auxdata quirks
+      ARM: OMAP2+: Add device tree compatible revision checks for n8x0
+      ARM: OMAP2+: Make n8x0 behave better with device tree based booting
+      ARM: OMAP2+: Add quirks support for n8x0
+      ARM: OMAP2+: Remove legacy booting support for n8x0
+      ARM: OMAP2+: Remove board file for H4
+      ARM: OMAP2+: Remove legacy board file for 2430sdp
+      ARM: OMAP2+: Remove legacy mux code for omap2
+      ARM: OMAP2+: Remove legacy hwmod entries for omap2
+      Merge branch 'omap-for-v3.14/board-removal' into omap-for-v3.14/omap3-board-removal
+      ARM: OMAP2+: Add support for legacy auxdata for twl
+      ARM: OMAP2+: Use pdata quirks for emac on am3517
+      ARM: dts: Add basic devices on am3517-evm
+
+ arch/arm/boot/dts/Makefile                         |   5 +
+ arch/arm/boot/dts/am3517-evm.dts                   |  29 +
+ arch/arm/boot/dts/omap2420-n800.dts                |   8 +
+ arch/arm/boot/dts/omap2420-n810-wimax.dts          |   8 +
+ arch/arm/boot/dts/omap2420-n810.dts                |   8 +
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  99 +++
+ arch/arm/boot/dts/omap2430-sdp.dts                 |  49 ++
+ arch/arm/boot/dts/omap3-ldp.dts                    | 231 ++++++
+ arch/arm/mach-omap2/Kconfig                        |  13 -
+ arch/arm/mach-omap2/Makefile                       |   4 -
+ arch/arm/mach-omap2/board-2430sdp.c                | 273 -------
+ arch/arm/mach-omap2/board-h4.c                     | 365 ----------
+ arch/arm/mach-omap2/board-n8x0.c                   | 234 ++----
+ arch/arm/mach-omap2/common-board-devices.h         |   1 +
+ arch/arm/mach-omap2/common.h                       |   1 +
+ arch/arm/mach-omap2/msdi.c                         |  69 --
+ arch/arm/mach-omap2/mux.h                          |   2 -
+ arch/arm/mach-omap2/mux2420.c                      | 690 ------------------
+ arch/arm/mach-omap2/mux2420.h                      | 282 --------
+ arch/arm/mach-omap2/mux2430.c                      | 793 ---------------------
+ arch/arm/mach-omap2/mux2430.h                      | 370 ----------
+ arch/arm/mach-omap2/omap_device.c                  |   2 +
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         | 137 ----
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         | 266 -------
+ .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c | 165 +----
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  72 +-
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |   5 -
+ arch/arm/mach-omap2/pdata-quirks.c                 | 107 ++-
+ drivers/mfd/twl-core.c                             |  15 +-
+ 29 files changed, 609 insertions(+), 3694 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap2420-n800.dts
+ create mode 100644 arch/arm/boot/dts/omap2420-n810-wimax.dts
+ create mode 100644 arch/arm/boot/dts/omap2420-n810.dts
+ create mode 100644 arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap2430-sdp.dts
+ create mode 100644 arch/arm/boot/dts/omap3-ldp.dts
+ delete mode 100644 arch/arm/mach-omap2/board-2430sdp.c
+ delete mode 100644 arch/arm/mach-omap2/board-h4.c
+ delete mode 100644 arch/arm/mach-omap2/mux2420.c
+ delete mode 100644 arch/arm/mach-omap2/mux2420.h
+ delete mode 100644 arch/arm/mach-omap2/mux2430.c
+ delete mode 100644 arch/arm/mach-omap2/mux2430.h
