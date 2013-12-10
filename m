@@ -1,38 +1,60 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 10 Dec 2013 14:33:31 +0800
-Subject: questions of cpuidle
-In-Reply-To: <52A5D0E0.7050201@linaro.org>
-References: <52A5C846.30308@linaro.org> <52A5D0E0.7050201@linaro.org>
-Message-ID: <52A6B5BB.3060506@linaro.org>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 9 Dec 2013 23:07:30 -0800
+Subject: [PATCH 2/2] ARM: dts: bcm28155-ap: Enable all the i2c busses
+In-Reply-To: <1386373528-13045-3-git-send-email-tim.kryger@linaro.org>
+References: <1386373528-13045-1-git-send-email-tim.kryger@linaro.org>
+ <1386373528-13045-3-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYquqJ+y7+ZV12_uKnRq+XkoYZ7M7JNbsZBCPzVRGgGJ8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2013 10:17 PM, Daniel Lezcano wrote:
-> 
-> Concerning the wake up of the cpu: the cpu disabled the irq and goes to
-> sleep, it is up to the firmware to wake up the cpu when an interrupt
-> occurs. It will exits its sleep state, call clock_events_notify(EXIT),
-> by this way re-switching to the local timer, and then re-enabling the
-> local interrupt which leads to the interrupt handler.
-
-Thanks a lots for excellent article and detailed explains!
-
-So, if the firmware is in response to wake up cpu. that means there is a
-unit which control the firmware and it can not be power down. Do you
-know which unit running the firmware to wake up deep idle CPU.
-And does the wake up pass via GIC to CPU? If so, does the GIC need keep
-awake when all cpu idle? If not, how the firmware give the interrupt to
-CPU? And I am wondering if the deep idle cpu voltage get to near 0.
-How the cpu get the interrupt signal?
-
-> 
-> There are some more informations in the wiki page [1].
-> 
->   -- Daniel
-> 
-> [1] https://wiki.linaro.org/WorkingGroups/PowerManagement/Doc/WakeUpSources
+Applied to armsoc/for-3.14/dt
+ thanks,
+   csd
 
 
--- 
-Thanks
-    Alex
+On Fri, Dec 6, 2013 at 3:45 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> Enable all available i2c busses.
+>
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  arch/arm/boot/dts/bcm28155-ap.dts | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+> index 08e47c2..bab302d 100644
+> --- a/arch/arm/boot/dts/bcm28155-ap.dts
+> +++ b/arch/arm/boot/dts/bcm28155-ap.dts
+> @@ -27,6 +27,26 @@
+>                 status = "okay";
+>         };
+>
+> +       i2c at 3e016000 {
+> +               status="okay";
+> +               clock-frequency = <400000>;
+> +       };
+> +
+> +       i2c at 3e017000 {
+> +               status="okay";
+> +               clock-frequency = <400000>;
+> +       };
+> +
+> +       i2c at 3e018000 {
+> +               status="okay";
+> +               clock-frequency = <400000>;
+> +       };
+> +
+> +       i2c at 3500d000 {
+> +               status="okay";
+> +               clock-frequency = <400000>;
+> +       };
+> +
+>         sdio1: sdio at 3f180000 {
+>                 max-frequency = <48000000>;
+>                 status = "okay";
+> --
+> 1.8.0.1
+>
