@@ -1,62 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 10 Dec 2013 22:25:50 +0100
-Subject: oops broken on v7-M
-Message-ID: <20131210212550.GF18888@pengutronix.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 10 Dec 2013 13:36:10 -0800
+Subject: [GIT PULL] two Integrator devicetree patches
+In-Reply-To: <CACRpkdZcrEtHC+Q0YHOuL8yXQrMixL=n2Nagbk6NBAmdmnnXHw@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 10 Dec 2013 11:22:45 +0100")
+References: <CACRpkdZcrEtHC+Q0YHOuL8yXQrMixL=n2Nagbk6NBAmdmnnXHw@mail.gmail.com>
+Message-ID: <878uvs75it.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
++Mark Rutland
 
-__show_regs does among other things the following:
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-        printk("Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s  Segment %s\n",
-                buf, interrupts_enabled(regs) ? "n" : "ff",
-                fast_interrupts_enabled(regs) ? "n" : "ff",
-                processor_modes[processor_mode(regs)],
-                isa_modes[isa_mode(regs)],
-                get_fs() == get_ds() ? "kernel" : "user");
+> Hi ARM SoC folks,
+>
+> here are two patches targeted for v3.14 that I'd like includes
+> in ARM SoC for testing in -next.
+>
+> Please pull them in!
+>
+> Yours,
+> Linus Walleij
+>
+>
+> The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
+>
+>   Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/integrator-v3.14-1
+>
+> for you to fetch changes up to 307b96677c98bc444262e3d1a7d26c0ca8a1c6e0:
+>
+>   ARM: integrator: move EBI to the device tree (2013-12-04 16:22:31 +0100)
+>
+> ----------------------------------------------------------------
+> Two integrator device tree patches for v3.14:
+>
+> - Delete some static core module mappings.
+>
+> - Move EBI location to the device tree.
+>
+> ----------------------------------------------------------------
+> Linus Walleij (2):
+>       ARM: integrator: delete static core module mappings
+>       ARM: integrator: move EBI to the device tree
+>
+>  Documentation/devicetree/bindings/arm/arm-boards |  8 ++++
 
-with isa_mode being defined as follows:
+This change looks pretty straight forward to me, but it would be extra
+special nice to see an Ack from a DT maintainer on this change.  Seems
+you and Mark Rutland had some discussions on an earlier version of this
+change, so maybe he's the right one to bless this one?
 
-	#define isa_mode(regs) \
-		((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \ 
-		 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
-
-with
-
-	#define V4_PSR_T_BIT    0x00000020      /* >= V4T, but not V7M */
-	#define V7M_PSR_T_BIT   0x01000000
-	#if defined(__KERNEL__) && defined(CONFIG_CPU_V7M)
-	#define PSR_T_BIT       V7M_PSR_T_BIT
-	#else
-	/* for compatibility */
-	#define PSR_T_BIT       V4_PSR_T_BIT
-	#endif          
-	...
-	#define PSR_J_BIT       0x01000000      /* >= V5J, but not V7M */
-
-so on !CPU_V7M isa_mode maps nicely into [0 .. 3], on CPU_V7M however it
-maps to either 0x80000 or 0x80002 which both are bad values for indexing
-into isa_modes[].
-
-The possibilities to fix that are:
- 1) #define isa_mode(regs) to be 1
-    This makes all memory accesses fine, but still the other bits printed
-    are bogus (IRQs, FIQs, Mode) as before.
- 2) just do:
-    printk("xPSR: %08x\n", regs->ARM_cpsr);
-    instead of the printk above for CPU_V7M. This is informative, but an
-    expert output.
- 3) don't hardcode 23 and 5, but calculate these depending on PSR_J_BIT
-    and PSR_T_BIT.
-
-I think I will go for b) + c), but not today any more. What do you
-think?
-
-Best regards
-Uwe
+Kevin
 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>  arch/arm/boot/dts/integrator.dtsi                |  5 ++
+>  arch/arm/mach-integrator/integrator_ap.c         | 60 ++++++++++++------------
+>  arch/arm/mach-integrator/integrator_cp.c         | 14 ------
+>  4 files changed, 44 insertions(+), 43 deletions(-)
