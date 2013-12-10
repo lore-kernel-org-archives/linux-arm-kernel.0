@@ -1,60 +1,39 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 10 Dec 2013 14:11:35 +0100
-Subject: [PATCH v1 2/4] powerpc/512x: clk: enforce even SDHC divider values
-In-Reply-To: <1386681097-14126-1-git-send-email-gsi@denx.de>
-References: <1386681097-14126-1-git-send-email-gsi@denx.de>
-Message-ID: <1386681097-14126-3-git-send-email-gsi@denx.de>
+Date: Tue, 10 Dec 2013 14:20:09 +0100
+Subject: [PATCH v6 00/17] add COMMON_CLK support for PowerPC MPC512x
+In-Reply-To: <1385851897-23475-1-git-send-email-gsi@denx.de>
+References: <1385851897-23475-1-git-send-email-gsi@denx.de>
+Message-ID: <20131210132009.GR2982@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the SDHC clock is derived from CSB with a fractional divider which can
-address "quarters"; the implementation multiplies CSB by 4 and divides
-it by the (integer) divider value
+[ trimmed Cc: list to PowerPC and CCF ]
 
-a bug in the clock domain synchronisation requires that only even
-divider values get setup; we achieve this by
-- multiplying CSB by 2 only instead of 4
-- registering with CCF the divider's bit field without bit0
-- the divider's lowest bit remains clear as this is the reset value
-  and later operations won't touch it
+On Sat, Nov 30, 2013 at 23:51 +0100, Gerhard Sittig wrote:
+> 
+> this series introduces support for the common clock framework (CCF,
+> COMMON_CLK Kconfig option) in the PowerPC based MPC512x platform,
+> which brings device tree based clock lookup as well
 
-this change keeps fully utilizing common clock primitives (needs no
-additional support logic, and avoids an excessive divider table) and
-satisfies the hardware's constraint of only supporting even divider
-values
+For the record:  MPC5125 turned out to be quite different
+compared to MPC5121/5123 with regard to the set of peripherals
+and clock features, so I sent an update of this COMMON_CLK
+support motivated by MPC5125:
 
-Signed-off-by: Gerhard Sittig <gsi@denx.de>
----
- arch/powerpc/platforms/512x/clock-commonclk.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+  From: Gerhard Sittig <gsi@denx.de>
+  To: linuxppc-dev at lists.ozlabs.org, linux-arm-kernel at lists.infradead.org,
+    Anatolij Gustschin <agust@denx.de>, Mike Turquette <mturquette@linaro.org>,
+    Matteo Facchinetti <matteo.facchinetti@sirius-es.it>
+  Cc: Scott Wood <scottwood@freescale.com>, Detlev Zundel <dzu@denx.de>,
+    Gerhard Sittig <gsi@denx.de>
+  Subject: [PATCH v1 0/4] powerpc/512x: update COMMON_CLK support for MPC5125
+  Date: Tue, 10 Dec 2013 14:11:33 +0100
+  Message-Id: <1386681097-14126-1-git-send-email-gsi@denx.de>
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index 079eb1137260..b5190fcb81bb 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -560,9 +560,21 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
- 	/* now setup anything below SYS and CSB and IPS */
- 
- 	clks[MPC512x_CLK_DDR_UG] = mpc512x_clk_factor("ddr-ug", "sys", 1, 2);
--	clks[MPC512x_CLK_SDHC_x4] = mpc512x_clk_factor("sdhc-x4", "csb", 4, 1);
-+
-+	/*
-+	 * the Reference Manual discusses that for SDHC only even divide
-+	 * ratios are supported because clock domain synchronization
-+	 * between 'per' and 'ipg' is broken;
-+	 * keep the divider's bit 0 cleared (per reset value), and only
-+	 * allow to setup the divider's bits 7:1, which results in that
-+	 * only even divide ratios can get configured upon rate changes;
-+	 * keep the "x4" name because this bit shift hack is an internal
-+	 * implementation detail, the "fractional divider with quarters"
-+	 * semantics remains
-+	 */
-+	clks[MPC512x_CLK_SDHC_x4] = mpc512x_clk_factor("sdhc-x4", "csb", 2, 1);
- 	clks[MPC512x_CLK_SDHC_UG] = mpc512x_clk_divider("sdhc-ug", "sdhc-x4", 0,
--							&clkregs->scfr2, 0, 8,
-+							&clkregs->scfr2, 1, 7,
- 							CLK_DIVIDER_ONE_BASED);
- 	clks[MPC512x_CLK_DIU_x4] = mpc512x_clk_factor("diu-x4", "csb", 4, 1);
- 	clks[MPC512x_CLK_DIU_UG] = mpc512x_clk_divider("diu-ug", "diu-x4", 0,
+
+virtually yours
+Gerhard Sittig
 -- 
-1.7.10.4
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
