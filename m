@@ -1,48 +1,41 @@
-From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
-Date: Tue, 10 Dec 2013 21:49:51 +0530
-Subject: [PATCH V6] ARM : unwinder : Prevent data abort due to stack
- overflow
-In-Reply-To: <16479184.50751386647682015.JavaMail.weblogic@epv6ml09>
-References: <16479184.50751386647682015.JavaMail.weblogic@epv6ml09>
-Message-ID: <CAPoNrttdDbwstOMa8s23oLmzOc2KcJztfgmVB0A8mCWWR0DZZQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 10 Dec 2013 11:23:37 -0500
+Subject: [GIT PULL] clk: keystone: Couple of misc updates for 3.14
+Message-ID: <1386692618-28584-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>+               if (*vsp >= (unsigned long *)ctrl->sp_high)
->>+                       return -URC_FAILURE;
+Mike,
 
-I tested the same patch, by adding a printk statement in the above if condition.
-The print statement I added came a few times as a part of dmesg log.
+Please find a below small pull request for couple of keystone clock patches
+for 3.14. If you prefer to cherry pick and apply instead thats fine as well.
 
-I think this proves that such corner cases are being handled by the above code
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-Regards
-Anurag
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-On Tue, Dec 10, 2013 at 9:24 AM, Anurag Aggarwal <a.anurag@samsung.com> wrote:
->>Reviewed-by: Dave Martin <Dave.Martin@arm.com>
->>
->>I can confirm that the kernel "doesn't crash" with this applied, and
->>that backtracing at least partially works.  But this is not really
->>sufficient to demontrate that the now code works better than the old
->>code in corner cases (which is the point of the patch).
->>
->>Can you give details of what additional testing you have, or plan to
->>do?
->
-> We saw a data abort in unwinder for one of Samsung Project, during a
-> Samsung Automation test case.
-> After that I created the initial the patch, and the data abort has not been
-> seen till now.
->
-> Is it possible for you to give an idea on what other kind of additional testing
-> do you have in mind.
->
-> Regads
-> Anurag
->
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14/keystone-clk
 
+for you to fetch changes up to e0c223ec67a98f70770eec85e625015f5af69f10:
 
+  clk: keystone: gate: fix error handling on init (2013-12-10 11:08:20 -0500)
+
+----------------------------------------------------------------
+
+Grygorii Strashko (1):
+  clk: keystone: gate: fix error handling on init
+
+Murali Karicheri (1):
+  clk: keystone: use clkod register bits for postdiv
+
+ .../devicetree/bindings/clock/keystone-pll.txt     |    8 +++----
+ drivers/clk/keystone/gate.c                        |   12 ++++++----
+ drivers/clk/keystone/pll.c                         |   24 ++++++++++++++++----
+ 3 files changed, 32 insertions(+), 12 deletions(-)
+
+Regards,
+Santosh
 -- 
-Anurag Aggarwal
+1.7.9.5
