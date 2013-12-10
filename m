@@ -1,53 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Dec 2013 10:00:22 +0000
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131210082547.GC11489@norris.computersforpeace.net>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com> <529C5BBF.6000604@freescale.com>
- <529C6CBB.4000008@st.com> <529D7838.6030606@freescale.com>
- <20131203082343.GK31626@lee--X1>
- <20131210082547.GC11489@norris.computersforpeace.net>
-Message-ID: <20131210100022.GA2390@lee--X1>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Tue, 10 Dec 2013 15:35:08 +0530
+Subject: [PATCH V3 0/2] Exynos5250 SATA Support
+Message-ID: <1386669911-17319-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Dec 2013, Brian Norris wrote:
+This patch series enable the SATA support on Exynos5250 based boards.
+It incorporates the generic phy framework to deal with sata phy.
 
-> On Tue, Dec 03, 2013 at 08:23:43AM +0000, Lee Jones wrote:
-> > I would like to make a suggestion to Brian though. Even if the new
-> > framework is written within the next couple of months and the
-> > semantics do suit the FSM Controller driver, I'd still like the
-> > implementation that's currently on the list to be applied. That way
-> > we'd have a known good version of the driver which is almost identical
-> > to how ST's internal driver does now. The one that is present out in
-> > the wild (i.e. _real_ products).
-> 
-> I think this suggestion is feasible: that we might merge this driver
-> even if it doesn't try to fit to some (still vague) idea of what a "SPI
-> NOR framework" should be. However, I don't know if the latter argument
-> is valid; just because it's in real products doesn't mean we really want
-> it as-is.
+This patch depends on the below patches
+	[1]. drivers: phy: add generic PHY framework
+		by Kishon Vijay Abraham I<kishon@ti.com>
+	[2]. ata: ahci_platform: Manage SATA PHY
+		by Roger Quadros <rogerq@ti.com>
+	[3].ARM: dts: Add pmu sysreg node to exynos5250 and
+		exynos5420 dtsi files
+		by Leela Krishna Amudala <l.krishna@samsung.com>
+	[4]. i2c: s3c2410 : Add polling mode support
+		by Vasanth Ananthan <vasanth.a@samsung.com>
 
-True, it just makes things easier for us internally when we are due
-for a kernel version up-lift.
+Changes from V2:
+	1.Removed of_match_table
+	2.Moved to syscon interface for PMU handling.
 
-> But I think that in this case, the perfect may be the enemy of
-> the good -- the "good" driver now is better than the "perfect" driver
-> that never comes.
+Changes from V1:
+	1. Dropped the patch 
+	ahci: exynos: add ahci sata support on Exynos platform
 
-+1
+	2.Adapt to latest generic PHY framework available in 
+	git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
 
-> > I will subsequently volunteer to provide my utmost best efforts to
-> > port the driver over to the new framework as a new task once it has
-> > landed.
-> 
-> I'll hold you to that! Do we have any collateral for that guarantee? ;)
 
-My word is my bond Brian. Failing that, beer? :)
+Yuvaraj Kumar C D (2):
+  Phy: Exynos: Add Exynos5250 sata phy driver
+  ARM: dts: Enable ahci sata and sata phy
+
+ .../devicetree/bindings/ata/exynos-sata-phy.txt    |   19 +-
+ .../devicetree/bindings/ata/exynos-sata.txt        |   17 +-
+ .../devicetree/bindings/ata/exynos_sataphy_i2c.txt |   12 ++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    9 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    8 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   16 +-
+ drivers/phy/Kconfig                                |   11 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/exynos5250_phy_i2c.c                   |   44 ++++
+ drivers/phy/sata_phy_exynos5250.c                  |  219 ++++++++++++++++++++
+ drivers/phy/sata_phy_exynos5250.h                  |   35 ++++
+ 11 files changed, 370 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/exynos_sataphy_i2c.txt
+ create mode 100644 drivers/phy/exynos5250_phy_i2c.c
+ create mode 100644 drivers/phy/sata_phy_exynos5250.c
+ create mode 100644 drivers/phy/sata_phy_exynos5250.h
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
