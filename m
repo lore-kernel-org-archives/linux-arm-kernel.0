@@ -1,66 +1,76 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 10 Dec 2013 03:39:02 +0000 (UTC)
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <20131124212757.7D224C402A3@trevor.secretlab.ca>
-References: <20131123004334.GJ10023@atomide.com> <20131123005509.GJ16735@
- n2100.arm.linux.org.uk> <20131123010850.GN10023@atomide.com> <
- 20131123011515.GO10023@atomide.com> <20131123015034.GP10023@atomide.com>
- <20131124212757.7D224C402A3@trevor.secretlab.ca>
-Message-ID: <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
+From: benh@au1.ibm.com (Benjamin Herrenschmidt)
+Date: Tue, 10 Dec 2013 14:59:33 +1100
+Subject: [PATCH 1/9] PCI: Use dev_is_pci() to check whether it is pci
+ device
+In-Reply-To: <20131210000154.GE4699@google.com>
+References: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
+ <20131210000154.GE4699@google.com>
+Message-ID: <1386647973.32037.57.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Rob,
-
-On Sun, 24 Nov 2013, Grant Likely wrote:
-
-> On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
-> > > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
-> > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
-> > > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
-> > > > > > +		/* See of_device_resource_notify for populating interrupts */
-> > > > > > +		for (i = 0; i < num_irq; i++, res++) {
-> > > > > > +			res->flags = IORESOURCE_IRQ;
-> > > > > > +			res->start = -EPROBE_DEFER;
-> > > > > > +			res->end = -EPROBE_DEFER;
-> > > > > 
-> > > > > NAK.  Definitely a bad idea to start introducing magic values other into
-> > > > > resources.  Please don't do this.
-> > > > 
-> > > > Do you have any better ideas on how to sort out this issue then?
-> > > 
-> > > I guess we could allocate all the resources lazily here, I'll take a look
-> > > at that.
-> > 
-> > Here's a version that allocates the resources lazily with the notifier.
-> > Seems to boot, need to play with it a bit more though to make sure we're
-> > not overwriting resources for any legacy devices.
+On Mon, 2013-12-09 at 17:01 -0700, Bjorn Helgaas wrote:
+> [+cc arch lists]
 > 
-> Blurg. Using a notifier really feels like we don't have a good handle on
-> a reasonable solution yet. Basically it means we're hooking into the
-> driver core without /looking/ like we're hooking into the driver core. I
-> don't think this is any better, but I don't have a better suggestion at
-> the moment.   :-(
+> On Thu, Dec 05, 2013 at 07:52:53PM +0800, Yijing Wang wrote:
+> > Use dev_is_pci() instead of directly compare
+> > pci_bus_type to check whether it is pci device.
+> > 
+> > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> 
+> I applied all these to my pci/yijing-dev_is_pci branch for v3.14, thanks!
+> 
+> Browse them here: http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/yijing-dev_is_pci
 
-Unfortunately this patch, or something that accomplishes the same results, 
-is somewhat high-priority for us on OMAP.  OMAP37xx got prematurely 
-converted to DT booting, and now dynamic power management is broken:
+Ah ok. I also have the powerpc one in powerpc -next, no biggie though
 
-    http://marc.info/?l=linux-arm-kernel&m=138658294830408&w=2
+Cheers,
+Ben.
 
-Tony writes that this patch is one of the two patches needed to get things 
-working again:
-
-    http://marc.info/?l=linux-arm-kernel&m=138660942506846&w=2
-
-Is it possible to get this patch, or something similar, merged for 
-v3.13-rc?
-
-Once something like PM is broken, it's pretty easy for other broken 
-patches to make it into the tree, since it becomes very difficult to test 
-without turning into a maintainer denial-of-service attack.
-
-
-- Paul
+> This should be no functional change.
+> 
+>  arch/alpha/kernel/pci_iommu.c        |    2 +-
+>  arch/arm/common/it8152.c             |    4 ++--
+>  arch/arm/mach-ixp4xx/common-pci.c    |    6 +++---
+>  arch/ia64/hp/common/sba_iommu.c      |    2 +-
+>  arch/ia64/sn/pci/pci_dma.c           |   24 ++++++++++++------------
+>  arch/parisc/kernel/drivers.c         |   22 +++++-----------------
+>  arch/powerpc/sysdev/fsl_pci.c        |    2 +-
+>  arch/sparc/include/asm/dma-mapping.h |   10 ++++------
+>  arch/sparc/kernel/iommu.c            |    2 +-
+>  arch/sparc/kernel/ioport.c           |    4 +---
+>  arch/x86/kernel/acpi/boot.c          |    4 +---
+>  drivers/pci/pci-acpi.c               |    2 +-
+>  12 files changed, 33 insertions(+), 51 deletions(-)
+> 
+> Bjorn
+> 
+> > ---
+> >  drivers/pci/pci-acpi.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+> > index 577074e..e0431f1 100644
+> > --- a/drivers/pci/pci-acpi.c
+> > +++ b/drivers/pci/pci-acpi.c
+> > @@ -358,7 +358,7 @@ static void pci_acpi_cleanup(struct device *dev)
+> >  
+> >  static bool pci_acpi_bus_match(struct device *dev)
+> >  {
+> > -	return dev->bus == &pci_bus_type;
+> > +	return dev_is_pci(dev);
+> >  }
+> >  
+> >  static struct acpi_bus_type acpi_pci_bus = {
+> > -- 
+> > 1.7.1
+> > 
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> Linuxppc-dev mailing list
+> Linuxppc-dev at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/linuxppc-dev
