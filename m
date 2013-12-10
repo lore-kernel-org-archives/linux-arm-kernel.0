@@ -1,39 +1,50 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard)
-Date: Tue, 10 Dec 2013 21:10:22 +0100
-Subject: [linux-sunxi] Re: [PATCH 02/10] net: stmmac: Honor DT parameter
- to force DMA store and forward mode
-In-Reply-To: <CAGb2v64BMNjbbc7j2XesuPEXZV+RnjtP1sAPQ4icU=-wjh3YNQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 10 Dec 2013 21:14:28 +0100
+Subject: [linux-sunxi] Re: [PATCH 04/10] net: stmmac: sunxi platfrom
+ extensions for GMAC in Allwinner A20 SoC's
+In-Reply-To: <52A61435.6040803@redhat.com>
 References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <CAGb2v67ZNtbQm+ZW5v_3wNbz1=oLhXks6gbTSjLYa=Nnoz8w-A@mail.gmail.com>
- <20131207100737.GI24519@lukather> <2994980.boLDbkkER8@flatron>
- <CAGb2v64BMNjbbc7j2XesuPEXZV+RnjtP1sAPQ4icU=-wjh3YNQ@mail.gmail.com>
-Message-ID: <20131210201022.GE3651@lukather>
+ <1386350983-13281-5-git-send-email-wens@csie.org>
+ <52A5A52C.50605@st.com> <52A5ECF4.6030301@redhat.com>
+ <CAGb2v64LNxnz--vn0u9zwmt7MQJZ=uz2fs0H3zDSse_XDfdK4Q@mail.gmail.com>
+ <52A61435.6040803@redhat.com>
+Message-ID: <20131210201428.GF3651@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 10:59:38AM +0800, Chen-Yu Tsai wrote:
-> On Sat, Dec 7, 2013 at 7:06 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > On Saturday 07 of December 2013 11:07:37 maxime.ripard wrote:
-> >> On Sat, Dec 07, 2013 at 09:23:27AM +0800, Chen-Yu Tsai wrote:
-> >> > Point taken. The current implementation will override settings passed from
-> >> > platform data. ORing the two would be better.
-> >>
-> >> Platform_data and DT-based configuration are pretty unlikely to be
-> >> used together, so ORing it doesn't have much sense.
+On Mon, Dec 09, 2013 at 08:04:21PM +0100, Hans de Goede wrote:
+> >>Now reading this has also made me take a closer look at wens' patch
+> >>for this. Wens, I see that you directly modify registers in the ccm
+> >>that is a big no-no instead you should add a helper function to
+> >>sunxi-clk.c and use that, see ie:
+> >>https://bitbucket.org/emiliolopez/linux/commits/2b95847d9aa4aa13317dd7358ffcbd951dcb5eff?at=master
 > >
-> > In fact, the recommended way is to always use platform data alone if it is
-> > present or try to parse DT otherwise, so no mixing of data from these two
-> > sources should be done.
+> >Yes, this has been raised by Maxime. The odd "GMAC_IF_TYPE_RGMII" or
+> >"gmac interface type bit" has been bugging me.
+> >
+> >Additionally, the TX clock has 2 inputs (not counting MII [1]).
+> >The internal one is most likely controlled by the GMAC. The clock
+> >rate is set internally to match the link speed. The external clock
+> >source has controllable dividers to get the correct clock rate.
+> >This shouldn't be hard to model with CCF though.
+> >
+> >In hardware, this is probably a mux between the GMAC clock generator
+> >and the GMAC data transmit logic.
+> >
+> >My current plan is to choose MII when the clock is disabled,
+> >and choose either of the inputs when it is enabled. I will
+> >have to learn more about the CCF first.
 > 
-> Would binding platform data with compatibles, as I did so in this patch
-> series, be a bad idea then?
+> OK, in this case I would be tempted to just go with a custom sunxi
+> function in the sunx-clk mode like what we have for the mmc stuff,
+> but if you think you can model this with the regular clock stuff,
+> that is of course fine too :)
 
-What I meant was that you'll either be probed will pdev->dev.of_node
-or pdev->dev.platform_data filled, but not both at the same time, so
-ORing it isn't really sensible.
+Note that it's also ok to implement the clock driver out of
+drivers/clk if it makes more sense.
 
-But I don't see why you couldn't reuse the stmmac_platform_data
-structure in your patch.
+So, if it's more convenient for you to declare both drivers (clock and
+gmac), say in the glue file, I'm totally fine whith that.
 
 Maxime
 
@@ -47,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/43fc0e39/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/55df0249/attachment.sig>
