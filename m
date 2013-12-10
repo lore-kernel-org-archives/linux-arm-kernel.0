@@ -1,88 +1,168 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Dec 2013 20:56:54 +0800
-Subject: imx6 suspend/resume issue
-In-Reply-To: <52a7073b.c72b980a.2ec8.6fffSMTPIN_ADDED_MISSING@mx.google.com>
-References: <52a7073b.c72b980a.2ec8.6fffSMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20131210125652.GB26728@S2101-09.ap.freescale.net>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 10 Dec 2013 13:03:30 +0000
+Subject: [RFC part2 PATCH 4/9] ARM64 / ACPI: Use Parked Address in GIC
+ structure for spin table SMP initialisation
+In-Reply-To: <1385999094-3152-5-git-send-email-hanjun.guo@linaro.org>
+References: <1385999094-3152-1-git-send-email-hanjun.guo@linaro.org> <
+ 1385999094-3152-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20131210130330.65087C40A27@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 01:21:20PM +0100, Bj?rn Erik Nilsen wrote:
-> Hi,
+On Mon,  2 Dec 2013 23:44:49 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Parked Address in GIC structure can be used as cpu release address
+> for spin table SMP initialisation.
 > 
-> I have a nitrogen6x board (imx6q) from boundary devices and I've been
-> playing with power management on the 3.12 kernel.
+> This patch gets parked address from MADT and use it for SMP
+> initialisation when DT is not available.
 > 
-> There are issues related to suspend/resume. It looks like I can
-> successfully enter mem mode, however when I trigger one of the wakeup
-> sources I'm not able to resume successfully.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h      |    3 +++
+>  arch/arm64/kernel/smp_spin_table.c |   16 +++++++++---
+>  drivers/acpi/plat/arm-core.c       |   50 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 66 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 423a32c..180de4a 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -90,6 +90,9 @@ extern int boot_cpu_apic_id;
+>  
+>  extern void prefill_possible_map(void);
+>  
+> +extern int acpi_get_parked_address_with_gic_id(u32 gic_id,
+> +			u64 *parked_address);
+> +
+>  #else	/* !CONFIG_ACPI */
+>  #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
+>  #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */
+> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+> index 44c2280..7997873 100644
+> --- a/arch/arm64/kernel/smp_spin_table.c
+> +++ b/arch/arm64/kernel/smp_spin_table.c
+> @@ -25,6 +25,7 @@
+>  #include <asm/cpu_ops.h>
+>  #include <asm/cputype.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/acpi.h>
+>  
+>  extern void secondary_holding_pen(void);
+>  volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+> @@ -47,6 +48,11 @@ static void write_pen_release(u64 val)
+>  	__flush_dcache_area(start, size);
+>  }
+>  
+> +static int get_cpu_release_addr_acpi(unsigned int cpu, u64 *parked_address)
+> +{
+> +	return acpi_get_parked_address_with_gic_id(arm_cpu_to_apicid[cpu],
+> +						parked_address);
+> +}
+>  
+>  static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
+>  {
+> @@ -55,10 +61,14 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
+>  	 */
+>  	if (of_property_read_u64(dn, "cpu-release-addr",
+>  				 &cpu_release_addr[cpu])) {
+> -		pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
+> -		       cpu);
+>  
+> -		return -1;
+> +		/* try ACPI way */
+> +		if (get_cpu_release_addr_acpi(cpu, &cpu_release_addr[cpu])) {
+> +			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
+> +				cpu);
+> +
+> +			return -1;
+> +		}
+>  	}
+>  
+>  	return 0;
+> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+> index 8527ecc..c4c8c68 100644
+> --- a/drivers/acpi/plat/arm-core.c
+> +++ b/drivers/acpi/plat/arm-core.c
+> @@ -262,6 +262,56 @@ static int __init acpi_parse_madt_gic_entries(void)
+>  	return 0;
+>  }
+>  
+> +/* Parked Address in ACPI GIC structure can be used as cpu release addr */
+> +int acpi_get_parked_address_with_gic_id(u32 gic_id, u64 *parked_address)
+> +{
+> +	struct acpi_table_header *table_header = NULL;
+> +	struct acpi_subtable_header *entry;
+> +	int err = 0;
+> +	unsigned long table_end;
+> +	acpi_size tbl_size;
+> +	struct acpi_madt_generic_interrupt *processor = NULL;
+> +
+> +	if (!parked_address)
+> +		return -EINVAL;
+> +
+> +	acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table_header, &tbl_size);
+> +	if (!table_header) {
+> +		pr_warn(PREFIX "MADT table not present\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	table_end = (unsigned long)table_header + table_header->length;
+> +
+> +	/* Parse all entries looking for a match. */
+> +	entry = (struct acpi_subtable_header *)
+> +	    ((unsigned long)table_header + sizeof(struct acpi_table_madt));
+> +
+> +	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
+> +	       table_end) {
+> +		if (entry->type != ACPI_MADT_TYPE_GENERIC_INTERRUPT
+> +			|| BAD_MADT_ENTRY(entry, table_end))
+> +			continue;
+> +
+> +		processor = (struct acpi_madt_generic_interrupt *)entry;
+> +
+> +		if (processor->gic_id == gic_id) {
+> +			*parked_address = processor->parked_address;
+> +			goto out;
+> +		}
+> +
+> +		entry = (struct acpi_subtable_header *)
+> +		    ((unsigned long)entry + entry->length);
 
-It might be a nitrogen6x specific problem, as 3.12 kernel works fine on
-my board (imx6q-sabresd).
+All of the casting in this table looks suspicious. If you have to resort
+to casting, then the variable types are very likely wrong.
 
-root at arm:~# uname -a
-Linux arm 3.12.0 #3 SMP Tue Dec 10 20:45:32 CST 2013 armv7l GNU/Linux
-root at arm:~# echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-Freezing user space processes ... (elapsed 0.001 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-PM: Entering mem sleep
-PM: suspend of devices complete after 40.785 msecs
-PM: suspend devices took 0.040 seconds
-PM: late suspend of devices complete after 0.351 msecs
-PM: noirq suspend of devices complete after 0.521 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 0.271 msecs
-PM: early resume of devices complete after 0.336 msecs
-ata1: SATA link down (SStatus 0 SControl 300)
-PM: resume of devices complete after 355.835 msecs
-PM: resume devices took 0.360 seconds
-PM: Finishing wakeup.
-Restarting tasks ... done.
-root at arm:~#
+In the case immediately above, it seems that the entry size doesn't
+necessarily equal the acpi_subtable_header size, in which case you
+should cast the values to a void* instead of an unsigned long. That
+would mean you can do this:
 
-Shawn
+	entry = ((void*)entry) + entry->length;
 
-> 
-> #echo mem > /sys/power/state
-> 
-> PM: Syncing filesystems ... done.
-> PM: Preparing system for mem sleep
-> Freezing user space processes ... (elapsed 0.001 seconds) done.
-> Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-> PM: Entering mem sleep
-> PM: suspend of devices complete after 53.008 msecs
-> PM: suspend devices took 0.060 seconds
-> PM: late suspend of devices complete after 1.924 msecs
-> PM: noirq suspend of devices complete after 2.604 msecs
-> Disabling non-boot CPUs ...
-> CPU1: shutdown
-> CPU2: shutdown
-> CPU3: shutdown
-> 
-> <trigger wake-up source>
-> 
-> Enabling non-boot CPUs ...
-> CPU1: Booted secondary processor
-> CPU1 is up
-> CPU2: Booted secondary processor
-> CPU2 is up
-> CPU3: Booted secondary processor
-> CPU3 is up
-> 
-> And then the system hangs there. I have looked through recent patchwork
-> and I cannot find any obvious commits missing from my branch.
-> 
-> I'm thinking this must be a known issue and perhaps you can point me in
-> the right direction for what I should look for.
+In fact, if I were writing the code, I would have two variables; the
+iterator pointer as a void* and a header pointer as a struct
+acpi_subtable_header*. Like so:
+
+	void *entry, *table_end;
+	struct acpi_subtable_header *header;
+
+	entry = ((void*)table_header) + sizeof(struct acpi_table_madt);
+	table_end = ((void*)table_header) + table_header->length;
+	while (entry + sizeof(*header)) < table_end) {
+		header = entry;
+
+		if (header->type != ACPI_MADT_TYPE_GENERIC_INTERRUPT ||
+			BAD_MADT_ENTRY(entry, table_end))
+			continue;
+		processor = entry;
+
+		if (processor->gic_id == gic_id) {
+			*parked_address = processor->parked_address;
+			goto out;
+		}
+
+		entry += header->length;
+	}
+
+See? Much cleaner code.
+
+g.
