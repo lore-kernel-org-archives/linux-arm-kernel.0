@@ -1,130 +1,47 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 10:47:40 -0800
-Subject: [PATCH v3 01/36] mtd: st_spi_fsm: Allocate resources and
- register with MTD framework
-In-Reply-To: <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131210184740.GZ27149@ld-irv-0074.broadcom.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Dec 2013 18:42:16 +0000
+Subject: [PATCH v3 08/15] mfd: menelaus: Pass menelaus_chip pointer to
+ add/remove irq functions
+In-Reply-To: <20131210163249.GF22750@saruman.home>
+References: <20131209161422.GC24047@saruman.home>
+ <1386606085-26838-1-git-send-email-balbi@ti.com>
+ <1386606085-26838-8-git-send-email-balbi@ti.com>
+ <20131210090021.GQ12675@lee--X1>
+ <20131210163249.GF22750@saruman.home>
+Message-ID: <20131210184216.GD2390@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 12:18:50PM +0000, Lee Jones wrote:
-> --- /dev/null
-> +++ b/drivers/mtd/devices/st_spi_fsm.c
-> @@ -0,0 +1,111 @@
-> +/*
-> + * st_spi_fsm.c	Support for ST Serial Flash Controller
-> + *
-> + * Author: Angus Clark <angus.clark@st.com>
-> + *
-> + * Copyright (C) 2010-2013 STicroelectronics Limited
+On Tue, 10 Dec 2013, Felipe Balbi wrote:
 
-Should be STMicrolectronics? :)
+> On Tue, Dec 10, 2013 at 09:00:21AM +0000, Lee Jones wrote:
+> > On Mon, 09 Dec 2013, Felipe Balbi wrote:
+> > 
+> > > Those functions are static and can receive a menelaus_chip pointer very
+> > > easily.
+> > > 
+> > > Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > >  drivers/mfd/menelaus.c | 57 ++++++++++++++++++++++++++------------------------
+> > >  1 file changed, 30 insertions(+), 27 deletions(-)
+> > 
+> > Same here. I think this should be done in one fell swoop.
+> 
+> then it would become a much, much larger patch which would become a pain
+> to review.
 
-> + *
-> + * JEDEC probe based on drivers/mtd/devices/m25p80.c
-> + *
-> + * This code is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/sched.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +
-> +#include <asm/io.h>
-> +
-> +#include "st_spi_fsm.h"
+If the patch was doing lots of different things then I'd be inclined
+to agree, but although large, the changes here are pretty trivial.
 
-I agree with Srinivas. Unless you think this header can be used in
-another file, it should probably be part of this .c file. It also lends
-itself to some strange usage of 'static' functions declared (but not
-defined) in the header. But I'll comment when I get to those patches.
+I tend to break up patches based on; subsystem, file, device (for
+platform/dts adaptions) and functionality. Rather than just because
+the 'lines changed' count is large.
 
-> +
-> +static int stfsm_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct resource *res;
-> +	struct stfsm *fsm;
-> +
-> +	if (!np) {
-> +		dev_err(&pdev->dev, "No DT found\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	fsm = devm_kzalloc(&pdev->dev, sizeof(*fsm), GFP_KERNEL);
-> +	if (!fsm)
-> +		return -ENOMEM;
-> +
-> +	fsm->dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Resource not found\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	fsm->region = devm_request_mem_region(&pdev->dev, res->start,
-> +					      resource_size(res), pdev->name);
-> +	if (!fsm->region) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to reserve memory region [0x%08x-0x%08x]\n",
+Please squash them and I'll review it.
 
-Use the special %pr or %pR format specifier? See
-Documentation/printk-formats.txt
-
-> +			res->start, res->end);
-> +		return -EBUSY;
-> +	}
-> +
-> +	fsm->base = devm_ioremap_nocache(&pdev->dev,
-> +					 res->start, resource_size(res));
-> +	if (!fsm->base) {
-> +		dev_err(&pdev->dev, "Failed to ioremap [0x%08x]\n", res->start);
-
-Also %pr or %pR?
-
-> +		return -EINVAL;
-> +	}
-> +
-> +	mutex_init(&fsm->lock);
-> +
-> +	platform_set_drvdata(pdev, fsm);
-> +
-> +	fsm->mtd.dev.parent	= &pdev->dev;
-> +	fsm->mtd.type		= MTD_NORFLASH;
-> +	fsm->mtd.writesize	= 4;
-> +	fsm->mtd.writebufsize	= fsm->mtd.writesize;
-> +	fsm->mtd.flags		= MTD_CAP_NORFLASH;
-> +
-> +	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
-> +}
-> +
-> +static int stfsm_remove(struct platform_device *pdev)
-> +{
-> +	struct stfsm *fsm = platform_get_drvdata(pdev);
-> +	int err;
-> +
-> +	err = mtd_device_unregister(&fsm->mtd);
-> +	if (err)
-> +		return err;
-> +
-> +	return 0;
-
-Simplify to the following?
-
-	return mtd_device_unregister(&fsm->mtd);
-
-> +}
-
-[...]
-
-Brian
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
