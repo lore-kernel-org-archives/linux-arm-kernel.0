@@ -1,74 +1,70 @@
-From: tixy@linaro.org (Jon Medhurst)
-Date: Tue, 10 Dec 2013 10:18:58 +0000
-Subject: [PATCH 1/3] serial: amba-pl011: use port lock to guard control
- register access
-In-Reply-To: <1386670740-16914-1-git-send-email-tixy@linaro.org>
-References: <1386670740-16914-1-git-send-email-tixy@linaro.org>
-Message-ID: <1386670740-16914-2-git-send-email-tixy@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Dec 2013 10:19:59 +0000
+Subject: [RFCv2 endianess 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1386309134-1822-1-git-send-email-Li.Xiubo@freescale.com>
+ <1386309134-1822-2-git-send-email-Li.Xiubo@freescale.com>
+ <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the pl011 is being used for a console, pl011_console_write forces
-the control register (CR) to enable the UART for transmission and then
-restores this to the original value afterwards. It does this while
-holding the port lock.
+On Tue, Dec 10, 2013 at 05:10:01AM +0000, Li.Xiubo at freescale.com wrote:
+> Hi Mark, Therry,
+>
+> Is this series of patches ok about endianess fix?
+>
+> Here I add one boolen big-endian property.
 
-Unfortunately, when the uart is started or shutdown - say in response to
-userland using the serial device for a terminal - then this updates the
-control register without any locking.
+[...]
 
-This means we can have
+> > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > +             const void __iomem *addr)
+> > +{
+> > +     if (likely(fpc->big_endian))
+> > +             return ioread32be(addr);
+> > +     else
+> > +             return readl(addr);
+> > +}
 
-  pl011_console_write   Save CR
-  pl011_startup         Initialise CR, e.g. enable receive
-  pl011_console_write   Restore old CR with receive not enabled
+It looks a little odd to to have two different accessors here.
 
-this result is a serial port which doesn't respond to any input.
+Could these not be unified somehow?
 
-A similar race in reverse could happen when the device is shutdown.
+> > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
+> > +             u32 val, void __iomem *addr)
+> > +{
+> > +     if (likely(fpc->big_endian))
+> > +             iowrite32be(val, addr);
+> > +     else
+> > +             writel(val, addr);
+> > +}
 
-We can fix these problems by taking the port lock when updating CR.
+Likewise.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
- drivers/tty/serial/amba-pl011.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+[...]
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 7203864..a0dfb86 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1537,6 +1537,8 @@ static int pl011_startup(struct uart_port *port)
- 	/*
- 	 * Provoke TX FIFO interrupt into asserting.
- 	 */
-+	spin_lock_irq(&uap->port.lock);
-+
- 	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
- 	writew(cr, uap->port.membase + UART011_CR);
- 	writew(0, uap->port.membase + UART011_FBRD);
-@@ -1561,6 +1563,8 @@ static int pl011_startup(struct uart_port *port)
- 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
- 	writew(cr, uap->port.membase + UART011_CR);
- 
-+	spin_unlock_irq(&uap->port.lock);
-+
- 	/*
- 	 * initialise the old status of the modem signals
- 	 */
-@@ -1629,11 +1633,13 @@ static void pl011_shutdown(struct uart_port *port)
- 	 * it during startup().
- 	 */
- 	uap->autorts = false;
-+	spin_lock_irq(&uap->port.lock);
- 	cr = readw(uap->port.membase + UART011_CR);
- 	uap->old_cr = cr;
- 	cr &= UART011_CR_RTS | UART011_CR_DTR;
- 	cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
- 	writew(cr, uap->port.membase + UART011_CR);
-+	spin_unlock_irq(&uap->port.lock);
- 
- 	/*
- 	 * disable break condition and fifos
--- 
-1.7.10.4
+> > +static int fsl_pwm_probe(struct platform_device *pdev) {
+> > +     int ret;
+> > +     struct fsl_pwm_chip *fpc;
+> > +     struct resource *res;
+> > +     struct device_node *np = pdev->dev.of_node;
+> > +
+> > +     fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
+> > +     if (!fpc)
+> > +             return -ENOMEM;
+> > +
+> > +     mutex_init(&fpc->lock);
+> > +
+> > +     fpc->chip.dev = &pdev->dev;
+> > +
+> > +     if (of_get_property(np, "big-endian", NULL))
+> > +             fpc->big_endian = 1;
+
+You can use of_property_read_bool:
+
+fpc->big_endian = of_property_read_bool(np, "big-endian");
+
+Otherwise, the DT stuff looks fine.
+
+Mark.
