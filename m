@@ -1,34 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Dec 2013 21:05:29 +0100
-Subject: [PATCH 01/10] net: stmmac: Enable stmmac main clock when probing
- hardware
-In-Reply-To: <CAGb2v65YOSq_BMWSzSHX8w_hbo+0vwquBT2pnLuwNVZkWRfLvA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (maxime.ripard)
+Date: Tue, 10 Dec 2013 21:10:22 +0100
+Subject: [linux-sunxi] Re: [PATCH 02/10] net: stmmac: Honor DT parameter
+ to force DMA store and forward mode
+In-Reply-To: <CAGb2v64BMNjbbc7j2XesuPEXZV+RnjtP1sAPQ4icU=-wjh3YNQ@mail.gmail.com>
 References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-2-git-send-email-wens@csie.org>
- <20131207103335.GL24519@lukather>
- <CAGb2v65YOSq_BMWSzSHX8w_hbo+0vwquBT2pnLuwNVZkWRfLvA@mail.gmail.com>
-Message-ID: <20131210200529.GD3651@lukather>
+ <CAGb2v67ZNtbQm+ZW5v_3wNbz1=oLhXks6gbTSjLYa=Nnoz8w-A@mail.gmail.com>
+ <20131207100737.GI24519@lukather> <2994980.boLDbkkER8@flatron>
+ <CAGb2v64BMNjbbc7j2XesuPEXZV+RnjtP1sAPQ4icU=-wjh3YNQ@mail.gmail.com>
+Message-ID: <20131210201022.GE3651@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 09, 2013 at 10:43:29AM +0800, Chen-Yu Tsai wrote:
-> >> @@ -2759,15 +2760,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
-> >>               }
-> >>       }
+On Mon, Dec 09, 2013 at 10:59:38AM +0800, Chen-Yu Tsai wrote:
+> On Sat, Dec 7, 2013 at 7:06 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > On Saturday 07 of December 2013 11:07:37 maxime.ripard wrote:
+> >> On Sat, Dec 07, 2013 at 09:23:27AM +0800, Chen-Yu Tsai wrote:
+> >> > Point taken. The current implementation will override settings passed from
+> >> > platform data. ORing the two would be better.
 > >>
-> >> +     clk_disable_unprepare(priv->stmmac_clk);
-> >> +
+> >> Platform_data and DT-based configuration are pretty unlikely to be
+> >> used together, so ORing it doesn't have much sense.
 > >
-> > Hu? Why do you disable the clock? don't you need it afterwards?
+> > In fact, the recommended way is to always use platform data alone if it is
+> > present or try to parse DT otherwise, so no mixing of data from these two
+> > sources should be done.
 > 
-> The clock is enabled in *_open (when the network interface is used),
-> and disabled in *_close.
+> Would binding platform data with compatibles, as I did so in this patch
+> series, be a bad idea then?
 
-Maybe it is the real issue then.
+What I meant was that you'll either be probed will pdev->dev.of_node
+or pdev->dev.platform_data filled, but not both at the same time, so
+ORing it isn't really sensible.
 
-Why don't you move the clk_disable to _remove then?
+But I don't see why you couldn't reuse the stmmac_platform_data
+structure in your patch.
 
 Maxime
 
@@ -42,4 +47,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/6c85ba55/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/43fc0e39/attachment.sig>
