@@ -1,120 +1,39 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 10 Dec 2013 13:00:26 +0530
-Subject: [PATCH V7 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131209165003.GJ13908@mudshark.cambridge.arm.com>
-References: <1386151791-4881-1-git-send-email-vkale@apm.com>
- <1386151791-4881-3-git-send-email-vkale@apm.com>
- <20131209165003.GJ13908@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkfS9h_yoQMcrQDXpW_3FcSfiPz0aeNX+_gc=G4exSEVWg@mail.gmail.com>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 9 Dec 2013 23:39:17 -0800
+Subject: [RESEND PATCH] ARM: bcm_defconfig: Do not expect appended DTB
+In-Reply-To: <1386286255-4338-1-git-send-email-tim.kryger@linaro.org>
+References: <1386286255-4338-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYpQdS5yGEoYS0Yp16TL9Kj3hZr3tb16ZHzkWG+bW0Q4PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, Dec 5, 2013 at 3:30 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> The bootloaders used with Broadcom mobile SoCs are capable of handling
+> a device tree separately from the zImage so there is no need for this
+> option to be enabled.
+>
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  arch/arm/configs/bcm_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+> index 6e49310..b152367 100644
+> --- a/arch/arm/configs/bcm_defconfig
+> +++ b/arch/arm/configs/bcm_defconfig
+> @@ -35,7 +35,6 @@ CONFIG_AEABI=y
+>  # CONFIG_COMPACTION is not set
+>  CONFIG_ZBOOT_ROM_TEXT=0x0
+>  CONFIG_ZBOOT_ROM_BSS=0x0
+> -CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_CMDLINE="console=ttyS0,115200n8 mem=128M"
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_VFP=y
+> --
+> 1.8.0.1
+>
+Applied to armsoc/for-3.14/soc
 
-
-On Mon, Dec 9, 2013 at 10:20 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Vinayak,
->
-> On Wed, Dec 04, 2013 at 10:09:51AM +0000, Vinayak Kale wrote:
->> Add support for irq registration when pmu interrupt is percpu.
->
-> Getting closer...
->
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> ---
->>  arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
->>  1 file changed, 78 insertions(+), 30 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index cea1594..d8e6667 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -22,6 +22,7 @@
->>
->>  #include <linux/bitmap.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/irq.h>
->>  #include <linux/kernel.h>
->>  #include <linux/export.h>
->>  #include <linux/perf_event.h>
->> @@ -363,26 +364,52 @@ validate_group(struct perf_event *event)
->>  }
->>
->>  static void
->> +armpmu_disable_percpu_irq(void *data)
->> +{
->> +     disable_percpu_irq((long)data);
->> +}
->
-> Given that we wait for the CPUs to finish enabling/disabling the IRQ, I
-> actually meant pass the pointer to the IRQ, which removes the horrible
-> casts in the caller.
->
->> +     if (irq_is_percpu(irq)) {
->> +             cpumask_clear(&armpmu->active_irqs);
->
-> Thanks for moving the mask manipulation out. It now makes it obvious that we
-> don't care about the mask at all for PPIs, so that can be removed (the code
-> you have is racy against hotplug anyway).
->
-> I took the liberty of writing a fixup for you (see below). Can you test it
-> on your platform please?
-
-Below fixup works fine on APM platform.
-Do you want me to send this fixup as part of next revision of the
-patch or will you apply it yourself? (For later case, you have my ack)
-
->
-> Cheers,
->
-> Will
->
-> --->8
->
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 503c1eeedc1c..5b1cd792274a 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -366,7 +366,8 @@ validate_group(struct perf_event *event)
->  static void
->  armpmu_disable_percpu_irq(void *data)
->  {
-> -       disable_percpu_irq((long)data);
-> +       unsigned int irq = *(unsigned int *)data;
-> +       disable_percpu_irq(irq);
->  }
->
->  static void
-> @@ -385,8 +386,7 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->                 return;
->
->         if (irq_is_percpu(irq)) {
-> -               cpumask_clear(&armpmu->active_irqs);
-> -               on_each_cpu(armpmu_disable_percpu_irq, (void *)(long)irq, 1);
-> +               on_each_cpu(armpmu_disable_percpu_irq, &irq, 1);
->                 free_percpu_irq(irq, &cpu_hw_events);
->         } else {
->                 for (i = 0; i < irqs; ++i) {
-> @@ -402,7 +402,8 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->  static void
->  armpmu_enable_percpu_irq(void *data)
->  {
-> -       enable_percpu_irq((long)data, IRQ_TYPE_NONE);
-> +       unsigned int irq = *(unsigned int *)data;
-> +       enable_percpu_irq(irq, IRQ_TYPE_NONE);
->  }
->
->  static int
-> @@ -440,8 +441,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->                         return err;
->                 }
->
-> -               on_each_cpu(armpmu_enable_percpu_irq, (void *)(long)irq, 1);
-> -               cpumask_setall(&armpmu->active_irqs);
-> +               on_each_cpu(armpmu_enable_percpu_irq, &irq, 1);
->         } else {
->                 for (i = 0; i < irqs; ++i) {
->                         err = 0;
-
-Acked-by: Vinayak Kale <vkale@apm.com>
+ thanks,
+  csd
