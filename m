@@ -1,23 +1,37 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 10 Dec 2013 13:43:34 -0800
-Subject: [PATCHv3 0/2] CMA for arm64
-Message-ID: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
+Date: Tue, 10 Dec 2013 13:43:35 -0800
+Subject: [PATCHv3 1/2] arm64: Check for NULL device before getting the
+ coherent_dma_mask
+In-Reply-To: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
+References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1386711816-20270-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The device passed in to dma_alloc may be NULL. Check for this before
+trying to get the coherent_dma_mask.
 
-This adds support for CMA in arm64
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm64/mm/dma-mapping.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-v3: Fix a missed line to actually set the dma_handle correctly
-
-v2: Move the dma contiguous functions from swiotlb to arm64 directly
-
- arch/arm64/Kconfig                      |    1 +
- arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++++++
- arch/arm64/mm/dma-mapping.c             |   27 ++++++++++++++++++++++++---
- arch/arm64/mm/init.c                    |    3 +++
- 4 files changed, 57 insertions(+), 3 deletions(-)
-
-Thanks,
-Laura
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 4bd7579..4134212 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -33,7 +33,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
+ 					  dma_addr_t *dma_handle, gfp_t flags,
+ 					  struct dma_attrs *attrs)
+ {
+-	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
++	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
+ 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+ 		flags |= GFP_DMA32;
+ 	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
