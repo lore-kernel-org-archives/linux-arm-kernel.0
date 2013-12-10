@@ -1,76 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Dec 2013 22:57:33 +0100
-Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <1386706817.7152.254.camel@host5.omatika.ru>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <CACRpkdYF-O6Qgjue6x+R6fVuSXSyO4YHw1meusuyQhtSA9PnvQ@mail.gmail.com>
- <1386706817.7152.254.camel@host5.omatika.ru>
-Message-ID: <201312102257.33942.arnd@arndb.de>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Dec 2013 14:03:38 -0800
+Subject: [PATCH v3 09/36] mtd: st_spi_fsm: Provide device look-up table
+In-Reply-To: <1385727565-25794-10-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131210220338.GF27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 December 2013, Sergei Ianovich wrote:
-> On Tue, 2013-12-10 at 13:33 +0100, Linus Walleij wrote:
-> > On Fri, Dec 6, 2013 at 6:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Friday 06 December 2013, Sergei Ianovich wrote:
-> > >> On Fri, 2013-12-06 at 01:40 +0100, Arnd Bergmann wrote:
-> > >>
-> > >> > > +
-> > >> > > +static struct irq_chip lp8x4x_irq_chip = {
-> > >> > > +     .name                   = "FPGA",
-> > >> > > +     .irq_ack                = lp8x4x_ack_irq,
-> > >> > > +     .irq_mask               = lp8x4x_mask_irq,
-> > >> > > +     .irq_unmask             = lp8x4x_unmask_irq,
-> > >> > > +};
-> > >> >
-> > >> > Please try to move the irqchip code to drivers/irqchip/.
-> > >>
-> > >> CONFIG_IRQCHIP depends on CONFIG_OF_IRQ which in turn depends on Open
-> > >> Firmware.
-> > >
-> > > Hmm, I wonder if we should try to change Kconfig then. Let's leave it
-> > > alone for now, maybe Linus Walleij has some comments since he has
-> > > been looking into moving drivers out in the past.
-> > 
-> > I don't get this, if the subarch has deps in place for IRQCHIP and
-> > OF_IRQ just move the implementation to drivers/irqchip/foo.c
-> > edit drivers/irqchip/Makefile to compile the file for ARCH_FOO.
-> > What would the problem be? It's not like having the irqchip in the
-> > object is optional...
-> 
-> This chip is used only of one machine and only required for
-> machine-special devices. If those devices are not selected, the chip
-> will just waist memory.
+On Fri, Nov 29, 2013 at 12:18:58PM +0000, Lee Jones wrote:
+> --- a/drivers/mtd/devices/st_spi_fsm.h
+> +++ b/drivers/mtd/devices/st_spi_fsm.h
+> @@ -253,4 +253,141 @@ struct stfsm_seq {
+>  } __attribute__((__packed__, aligned(4)));
+>  #define STFSM_SEQ_SIZE sizeof(struct stfsm_seq)
+>  
+> +/* SPI Flash Device Table */
+> +struct flash_info {
+> +	char		*name;
+> +	/*
+> +	 * JEDEC id zero means "no ID" (most older chips); otherwise it has
+> +	 * a high byte of zero plus three data bytes: the manufacturer id,
+> +	 * then a two byte device id.
+> +	 */
+> +	u32		jedec_id;
+> +	u16             ext_id;
 
-It should be possible to make it a loadable module, with deferred
-probing etc. You wouldn't use IRQCHIP_DECLARE() for this though,
-but instead have a platform driver that sets up the irq domain.
+Will 5 bytes of ID be enough? I think we're running into a need for 6
+bytes of ID in m25p80.c right about now. Might make sense to start with
+the right number of bytes.
 
-It probably makes sense to have a single driver file for the
-FPGA device that does this, and only split out the other devices
-from it that consume the irqs.
+> +	/*
+> +	 * The size listed here is what works with FLASH_CMD_SE, which isn't
+> +	 * necessarily called a "sector" by the vendor.
+> +	 */
+> +	unsigned	sector_size;
+> +	u16		n_sectors;
+> +	u32		flags;
+> +	/*
+> +	 * Note, where FAST_READ is supported, freq_max specifies the
+> +	 * FAST_READ frequency, not the READ frequency.
+> +	 */
+> +	u32		max_freq;
+> +	int		(*config)(struct stfsm *);
 
-> > Another way is to create a separate Kconfig entry for it in
-> > drivers/irqchip/Kconfig if you want the set-up to be more
-> > distributed, but that is usually just done when the irqchip is
-> > used on more than one platform.
-> 
-> Please consult, how to approach this driver using device tree. If I
-> assign an "interrupts" property in the node, and the property will point
-> to pxa-gpio interrupt controller using a phandle, is there a guaranty
-> that my device will be probed later than pxa-gpio interrupt controller?
+Do you *really* need a configuration callback? Can the callback be
+represented as simply a flag for the special configuration behavior that
+is needed, then your driver calls the appropriate "callback" when it
+sees the flag?
 
-Yes, the interrupt controllers get probed in the right order based
-on their "interrupt-parent" properties, starting with the root
-controller.
+BTW, your later patches have to introduce static declarations in this
+header, which seems very ugly to me; you are entwining data with your
+driver's implementation.
 
-If you have a platform driver rather than IRQCHIP_DECLARE(), that gets
-initialized after all IRQCHIP_DECLARE() calls, so it's not a problem.
+So this callback field can only be used by your driver, and it is one of
+the main reasons that your table structure can't be used in other
+drivers.
 
-If both the gpio chip and the fpga are loadable modules, it's still
-fine, but the probe() function for the fpga needs to call
-irq_of_parse_and_map() to get the parent IRQ and bail out of
--EPROBE_DEFER if it gets this error while trying to map the
-gpio IRQ.
+> +};
+> +
+> +static struct flash_info flash_types[] = {
+> +	/*
+> +	 * ST Microelectronics/Numonyx --
+> +	 * (newer production versions may have feature updates
+> +	 * (eg faster operating frequency)
+> +	 */
+> +#define M25P_FLAG (FLASH_FLAG_READ_WRITE | FLASH_FLAG_READ_FAST)
 
-	Arnd
+Please don't define macros in the middle of your table like this. (You
+have several of these.)
+
+> +	{ "m25p40",  0x202013, 0,  64 * 1024,   8, M25P_FLAG, 25, NULL },
+> +	{ "m25p80",  0x202014, 0,  64 * 1024,  16, M25P_FLAG, 25, NULL },
+> +	{ "m25p16",  0x202015, 0,  64 * 1024,  32, M25P_FLAG, 25, NULL },
+> +	{ "m25p32",  0x202016, 0,  64 * 1024,  64, M25P_FLAG, 50, NULL },
+> +	{ "m25p64",  0x202017, 0,  64 * 1024, 128, M25P_FLAG, 50, NULL },
+> +	{ "m25p128", 0x202018, 0, 256 * 1024,  64, M25P_FLAG, 50, NULL },
+
+[snip]
+
+Brian
