@@ -1,117 +1,75 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Dec 2013 12:11:00 +0800
-Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
-In-Reply-To: <CAGVrzcaVJtoVhEfV+ZiMOkm3F8NBCf2YRcZSrZPMRfQfEr1u=g@mail.gmail.com>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-8-git-send-email-wens@csie.org>
- <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
- <CAGb2v64yFhkTXvdq=1VpemULhXew-5fvmSoTBzEb6iFDiSqy1Q@mail.gmail.com>
- <CAGVrzcaxV88dU3vEVGUiEQihUHLxq+QvQVQ6VvmOFVRsqbbX7w@mail.gmail.com>
- <CAGb2v675Cg6S512zfM1z4b+wqE_PesDGWdgcmpzWmPzyzXqbeA@mail.gmail.com>
- <CAGVrzcaVJtoVhEfV+ZiMOkm3F8NBCf2YRcZSrZPMRfQfEr1u=g@mail.gmail.com>
-Message-ID: <CAGb2v665xtY4m4uCTb_iMojG+ox0HvyCgz6p0P7oxJVvZ0SW9w@mail.gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Tue, 10 Dec 2013 09:53:22 +0530
+Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
+In-Reply-To: <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
+References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+ <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
+ <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
+Message-ID: <CAAhSdy3yApns95J0T=-OCmpNvf0ZTBV-USmsS=9h+JMuQ40YyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 1:48 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 2013/12/8 Chen-Yu Tsai <wens@csie.org>:
->> Florian, Giuseppe:
->>
->> On Sat, Dec 7, 2013 at 9:57 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>>> On Sat, Dec 7, 2013 at 5:09 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>>>>> The CubieTruck uses the GMAC with an RGMII phy.
->>>>>>
->>>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>>>> ---
->>>>>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
->>>>>>  1 file changed, 8 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>>> index 8a1009d..af212a2 100644
->>>>>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>>> @@ -33,6 +33,14 @@
->>>>>>                         pinctrl-0 = <&uart0_pins_a>;
->>>>>>                         status = "okay";
->>>>>>                 };
->>>>>> +
->>>>>> +               gmac: ethernet at 01c50000 {
->>>>>> +                       pinctrl-names = "default";
->>>>>> +                       pinctrl-0 = <&gmac_pins_rgmii>;
->>>>>> +                       snps,phy-addr = <1>;
->>>>>
->>>>> What is this snps,phy-addr property? Why is not a standard device tree
->>>>> node for an Ethernet PHY node used?
->>>>
->>>> This property is implemented by stmmac and documented in the DT
->>>> bindings. stmmac has not been updated to use Ethernet PHY nodes.
->>>
->>> This driver property should be removed and deprecated since there is
->>> an ePAPR standardized Ethernet PHY node. What I am worried here is the
->>> loss of information, the standard Ethernet DT node allows to specify
->>> much more information (clause, maximum speed, compatible string
->>> etc...).
->>
->> Giuseppe, any thoughts on this?
->>
->>>> Removing this property will not affect the function of the driver.
->>>> The driver probes its MDIO bus and selects the lowest available
->>>> address if not specified.
->>>
->>> So if this is just giving the driver a hint on where to  probe for a
->>> PHY on the MDIO bus, then let's drop it and use the standard DT node
->>> no?
->>
->> Sure. I will remove it from the DT.
->>
->> The stmmac driver does not have a seperate MDIO bus driver, nor
->> does it support Ethernet PHY node bindings. So I will not add
->> a phy node at this moment.
+On Tue, Dec 10, 2013 at 7:43 AM, Alexander Graf <agraf@suse.de> wrote:
 >
-> This will create needless churn in the DT if you do not do it now,
-> worse actually, we switch from a DT which specifically described
-> Ethernet PHY nodes properly to a version where it does, to ultimately
-> a newer version which does.
+> On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
 >
-> Considering that the absence of a "snps,phy-addr" property will still
-> result in the MDIO bus to be probed, keeping the existing Ethernet PHY
-> nodes, referencing them correclty with a "phy-handle" property, but
-> having no explicit support for these in the driver will not result in
-> a functional change, and will reduce the DT churn. Also, you could
-> still sneak a patch in this patchset which parses the standard
-> EThernet PHY node binding.
-
-I see. Adding the PHY node should be no trouble at all.
-Is there a requirement for a seperate mdio bus in the DT?
-I do not see it in the ePAPR. The stmmac mdio is not a seperate
-driver, as is for most network controllers I presume.
-Would attaching the PHY nodes directly under the ethernet controller
-suffice?
-
-We can then introduce PHY node support to the driver and
-remove the "snps,phy-addr" property at the same time.
-
-ChenYu
-
+>> Currently, we don't have an exit reason for VM reset emulation
+>> in user space hence this patch adds exit reason KVM_EXIT_RESET
+>> for this purpose.
 >>
->>>>>> +                       phy-mode = "rgmii";
->>>>>
->>>>> Especially since you use the relatively standard "phy-mode" property here?
->>>>
->>>> Used as specified in stmmac DT bindings.
->>>
->>> That one is kind of okay because of_get_phy_mode() knows about it,
->>> even though ePAPR states this should be "phy-connection-type", so I am
->>> okay with keeping that one because current practice and helpers are
->>> here.
+>> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
+>> in-kernel PSCI support to reset VMs.
 >>
->> It seems all ARM DTs currently use "phy-mode".
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> ---
+>> include/uapi/linux/kvm.h |    1 +
+>> 1 file changed, 1 insertion(+)
+>>
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 902f124..64a04cc 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+>> #define KVM_EXIT_WATCHDOG         21
+>> #define KVM_EXIT_S390_TSCH        22
+>> #define KVM_EXIT_EPR              23
+>> +#define KVM_EXIT_RESET            24
 >
-> Which is why I said "is kind of okay", but this is not what the
-> standard came up with, ARM is not exactly the best DT-citizen out
-> there as people are prone to making up new properties when the
-> standard already defines some, anyway....
-> --
-> Florian
+> I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
+
+The KVM_EXIT_RESET gets triggered when system level reset is
+initiated by VCPU. For arm/arm64, this is through SYSTEM_RESET
+PSCI call. In KVM x86 SVM/VMX, we have KVM_EXIT_SHUTDOWN
+being used for system shutdown which we have re-used for arm/arm64.
+
+>
+> I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
+>
+> Can we treat it as such? Could you please make this a common exit number that's called something like
+>
+>   KVM_EXIT_SYSTEM_EVENT
+>
+> with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
+>
+> That way it's obvious what's going on and people don't get confused.
+
+I don't foresee any system level operations other than SHUTDOWN
+and RESET to be handled from KVM in-kernel code but I might be
+wrong.
+
+May be we can rename KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET
+to KVM_EXIT_SYSTEM_SHUTDOWN and KVM_EXIT_SYSTEM_RESET ??
+
+--
+Anup
+
+>
+>
+> Alex
+>
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
