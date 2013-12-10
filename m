@@ -1,48 +1,54 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 10 Dec 2013 21:01:18 +0400
-Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
-In-Reply-To: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <52A748DE.8000508@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Dec 2013 17:02:23 +0000
+Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
+In-Reply-To: <CAC8NTUXVeSJMyG0H7PB_ms-vUpzk224XFmVq5JXQPzhJrgCdPw@mail.gmail.com>
+References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
+ <5295D1A5.5090403@arm.com>
+ <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
+ <5296330D.9010801@arm.com>
+ <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
+ <CAC8NTUUHiaB3m+zmoPPKXTzWq82veNhT4gCERSQiLvKhfMvRyQ@mail.gmail.com>
+ <20131205173036.GE17165@arm.com>
+ <CAC8NTUXVeSJMyG0H7PB_ms-vUpzk224XFmVq5JXQPzhJrgCdPw@mail.gmail.com>
+Message-ID: <20131210170223.GE2854@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Dec 10, 2013 at 04:53:24PM +0000, Radha Mohan wrote:
+> On Thu, Dec 5, 2013 at 11:00 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, Dec 05, 2013 at 02:35:52PM +0000, Radha Mohan wrote:
+> >> Before going for a next version of patch to fix breaking SMMU and KVM,
+> >> I would like to know  about the best possible implementation.
+> >> Should I go for a compile time option? I am not in favor of this. What
+> >> are options if in future there's 16KB page support in the kernel.
+> >
+> > As I said in the other email, separate the shifts definitions (primarily
+> > page size dependent) from the type definitions (dependent on the number
+> > of levels).
+> >
+> > Just to understand your requirements better. Does your platform have
+> > more than 256GB of RAM? With the current configuration, the VA space is
+> > 39-bit with 4K (which would allow 512GB minus some vmalloc and modules
+> > space) and 42-bit with 64K pages (2TB minus vmalloc/modules).
+> 
+> Sorry for the delay in responding.
+> More than 256GB DRAM is a likely possibility. But I am unsure of the
+> exact page size that would be used. That is the reason for expanding
+> the VA bits to full and have flexibility for customers. As Marc
+> mentioned this is a rare requirement for now in ARMv8 processors, but
+> would be nice to have a plan for long term. I would prefer a runtime
+> support for this i.e reading the ID_AA64MMFR0_EL1.PARange value but I
+> think this would be a major rework.
 
-On 10-12-2013 19:53, Ben Dooks wrote:
+Don't confuse the physical address range (given by PARange) with the
+virtual address range. On arm64 we don't have to use highmem to access
+the RAM, so if you have lots of RAM (maximum architecture limit with
+3-levels and 4K pages is 512GB) we need to expand the VA space to map
+it. But just having 48-bit PA space doesn't necessarily require the same
+VA space (unless for some weird reason all the RAM lives beyond bit 39
+which would require the idmap to have 4 levels, but even then we could
+do this just for a static idmap table).
 
-> If the system has been started in non-secure mode, then the ARM generic
-> timer is not configurable during the kernel initialisation. Currently
-> the only thing we can check for is if the timer has been correctly
-> configured during the boot process.
-
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
-> ---
->   arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 +++++++++++++-----
->   1 file changed, 13 insertions(+), 5 deletions(-)
-
-> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> index 5734c24..6b7b7f1 100644
-> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> @@ -78,12 +78,20 @@ void __init rcar_gen2_timer_init(void)
->   	/* Remap "armgcnt address map" space */
->   	base = ioremap(0xe6080000, PAGE_SIZE);
->
-> -	/* Update registers with correct frequency */
-> -	iowrite32(freq, base + CNTFID0);
-> -	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
-> +	/* Update the timer if it is either not running, or is not at the
-> +	 * right frequency. The timer is only configurable in secure mode
-> +	 * so this avoids an abort if the loader started the timer and
-> +	 * started the kernel in non-secure mode. */
-
-    The preferred style of the multi-line comments is this:
-
-/*
-  * bla
-  * bla
-  */
-
-WBR, Sergei
+-- 
+Catalin
