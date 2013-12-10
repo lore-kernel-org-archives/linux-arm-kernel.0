@@ -1,49 +1,50 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 09 Dec 2013 16:06:06 -0800
-Subject: [GIT PULL][v2] pull request for hisilicon soc
-In-Reply-To: <529EF3CB.5040505@gmail.com> (Haojian Zhuang's message of "Wed,
- 04 Dec 2013 17:20:11 +0800")
-References: <529EF3CB.5040505@gmail.com>
-Message-ID: <87fvq16041.fsf@linaro.org>
+Date: Mon, 09 Dec 2013 16:06:58 -0800
+Subject: [GIT PULL] two regression fixes and two more omap dt fixes
+ against v3.13-rc2
+In-Reply-To: <52a4fc3b.6494420a.5e2f.7338SMTPIN_ADDED_BROKEN@mx.google.com>
+ (Tony Lindgren's message of "Sun, 8 Dec 2013 15:09:40 -0800")
+References: <52a4fc3b.6494420a.5e2f.7338SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <87bo0p602l.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+Tony Lindgren <tony@atomide.com> writes:
 
-> Hi all,
+> The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
 >
-> Please help to merge this pull request.
->
-> I have to use gmail address since my GPG key is based on gmail.com.
->
-> Best Regards
-> Haojian
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>   Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
 >
 > are available in the git repository at:
 >
-> ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/hisilicon-basic
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/yet-more-dt-regressions-take2
+>
+> for you to fetch changes up to f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
+>
+>   ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
+>
+> ----------------------------------------------------------------
+> A rather big fix for a regression where we have dropped omap4 hwmod
+> data earlier but are not initializing it from device tree. In addition
+> to this fix we eventually also be fix the issues in the .dts files
+> and drivers, but that's too intrusive for the -rc cycle and must be
+> done later on.
+>
+> Also a fix for a regression where we now are wrongly trying to initialize
+> devices on secure omaps like n900 and n9* when booted using device tree.
+> We need to set aes, sham and timer12 to disabled mode for secure
+> devices as they are claimed by the firmware running in the secure mode.
+>
+> And two more legacy booting vs device tree based booting fixes for
+> am3517 that I did not notice earlier until Nishant Menon reported
+> these to me few days ago. With these we're good to go having v3.13
+> working both for legacy booting and device tree based booting, and we
+> can then go ahed and drop the legacy booting for mach-omap2 for v3.14.
+>
+> ----------------------------------------------------------------
 
-Please use git:// URLs instead of SSH URLs.
+Pulled into fixes,
 
-Also, does this replace the previous pull request from the pxa tree?
-
-I assume so since the original tag doesn't exist anymore, but it would
-be good for you to state explicitly that it superceeds a previous pull
-request or adds to it.
-
-Also, it's not easy to see what is different in this pull request from
-your v11.  There were a few comments on v11 that you responded to but
-never posted a v12.  Does that mean they were fixed in this pull
-request?  Again, I can check this manually but would much prefer it be
-described here, or have seen v12 with the issues addressed and a pull
-request based on that.
-
-Olof also suggested you attempt to collect some reviewed-by/acked-by
-tags.  Were you able to do that?
+Thanks,
 
 Kevin
