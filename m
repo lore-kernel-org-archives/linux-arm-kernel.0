@@ -1,63 +1,47 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 10 Dec 2013 08:39:25 +0530
-Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
-In-Reply-To: <1386627424-373-3-git-send-email-w-kwok2@ti.com>
-References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
- <1386627424-373-3-git-send-email-w-kwok2@ti.com>
-Message-ID: <52A685E5.9060604@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 10 Dec 2013 03:24:41 +0000 (UTC)
+Subject: [PATCH] ARM: omap1: clock: return 0 upon error from clk_round_rate()
+Message-ID: <alpine.DEB.2.02.1312100323010.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 03:47 AM, WingMan Kwok wrote:
-> Add Keystone platform USB PHY driver support. Current main purpose
-> of this driver is to enable the PHY reference clock gate on the
-> Keystone SoC. Otherwise it is a nop PHY.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> ---
->  drivers/usb/phy/Kconfig        |   10 +++
->  drivers/usb/phy/Makefile       |    1 +
->  drivers/usb/phy/phy-keystone.c |  142 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 153 insertions(+)
->  create mode 100644 drivers/usb/phy/phy-keystone.c
-> 
-> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> index 08e2f39..c6792f43 100644
-> --- a/drivers/usb/phy/Kconfig
-> +++ b/drivers/usb/phy/Kconfig
-> @@ -40,6 +40,16 @@ config ISP1301_OMAP
->  	  This driver can also be built as a module.  If so, the module
->  	  will be called isp1301_omap.
->  
-> +config KEYSTONE_USB_PHY
-> +	tristate "Keystone USB PHY Driver"
-> +	depends on ARCH_KEYSTONE
-> +	select USB_PHY
 
-NOP_USB_XCEIV selects USB_PHY so not necessary.
+clk_round_rate() should return 0 upon an error, rather than
+returning a negative error code.  This is because clk_round_rate() is
+being changed to return an unsigned return value rather than a signed
+value, since some clock sources can generate rates higher than
+(2^31)-1 Hz.
 
-> +	select NOP_USB_XCEIV
-> +	help
-> +	  Enable this to support Keystone USB phy. This driver provides
-> +	  interface to interact with USB 2.0 and USB 3.0 PHY that is part
-> +	  of the Keystone SOC.
-> +
->  config MV_U3D_PHY
->  	bool "Marvell USB 3.0 PHY controller Driver"
->  	depends on CPU_MMP3
-> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> index 022c1da..311b47b 100644
-> --- a/drivers/usb/phy/Makefile
-> +++ b/drivers/usb/phy/Makefile
-> @@ -30,3 +30,4 @@ obj-$(CONFIG_USB_RCAR_PHY)		+= phy-rcar-usb.o
->  obj-$(CONFIG_USB_RCAR_GEN2_PHY)		+= phy-rcar-gen2-usb.o
->  obj-$(CONFIG_USB_ULPI)			+= phy-ulpi.o
->  obj-$(CONFIG_USB_ULPI_VIEWPORT)		+= phy-ulpi-viewport.o
-> +obj-$(CONFIG_KEYSTONE_USB_PHY)		+= phy-keystone.o
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+Applies on v3.13-rc3.  See also:
 
-cheers,
--roger
+http://marc.info/?l=linux-arm-kernel&m=138542591313620&w=2
+
+ arch/arm/mach-omap1/clock.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index 4f5fd4a084c0..ad9b620a4f30 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -250,7 +250,7 @@ long omap1_clk_round_rate_ckctl_arm(struct clk *clk, unsigned long rate)
+ {
+ 	int dsor_exp = calc_dsor_exp(clk, rate);
+ 	if (dsor_exp < 0)
+-		return dsor_exp;
++		return 0;
+ 	if (dsor_exp > 3)
+ 		dsor_exp = 3;
+ 	return clk->parent->rate / (1 << dsor_exp);
+@@ -285,7 +285,7 @@ long omap1_round_to_table_rate(struct clk *clk, unsigned long rate)
+ 
+ 	ref_rate = ck_ref_p->rate;
+ 
+-	highest_rate = -EINVAL;
++	highest_rate = 0;
+ 
+ 	for (ptr = omap1_rate_table; ptr->rate; ptr++) {
+ 		if (!(ptr->flags & cpu_mask))
+-- 
+1.8.4.4
