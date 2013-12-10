@@ -1,144 +1,155 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 10 Dec 2013 13:43:36 -0800
-Subject: [PATCHv3 2/2] arm64: Enable CMA
-In-Reply-To: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
-References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1386711816-20270-3-git-send-email-lauraa@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Dec 2013 13:48:49 -0800
+Subject: [PATCH v3 08/36] mtd: devices: Provide header for shared
+ OPCODEs and SFDP commands
+In-Reply-To: <1385727565-25794-9-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131210214849.GE27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 bit targets need the features CMA provides. Add the appropriate
-hooks, header files, and Kconfig to allow this to happen.
+On Fri, Nov 29, 2013 at 12:18:57PM +0000, Lee Jones wrote:
+> JEDEC have helped to standardise a great deal of the commands which
+> can be issued to a Serial Flash devices. Many of the OPCODEs and all
+> of the Serial Flash Discoverable Parameters (SFDP) commands are
+> generic across devices. This patch provides a shared point where
+> these commands can be defined.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/Kconfig                      |    1 +
- arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++++++
- arch/arm64/mm/dma-mapping.c             |   25 +++++++++++++++++++++++--
- arch/arm64/mm/init.c                    |    3 +++
- 4 files changed, 56 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/dma-contiguous.h
+I think this is probably a good start for a shared header. In the near
+term, we need to settle on one header that can store commands, at least.
+I think both you and Huang are submitting patches that do similar opcode
+relocation. Let's make sure we get the separation right, so that this
+header contains exactly as much of the opcode-related stuff that can be
+easily shared and reused.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9737e97..26e4bef 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -22,6 +22,7 @@ config ARM64
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_ATTRS
-+	select HAVE_DMA_CONTIGUOUS
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_GENERIC_HARDIRQS
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
-new file mode 100644
-index 0000000..bc32516
---- /dev/null
-+++ b/arch/arm64/include/asm/dma-contiguous.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef ASMARM64_DMA_CONTIGUOUS_H
-+#define ASMARM64_DMA_CONTIGUOUS_H
-+
-+#ifdef __KERNEL__
-+#ifdef CONFIG_CMA
-+
-+#include <linux/types.h>
-+#include <asm-generic/dma-contiguous.h>
-+
-+static inline void
-+dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
-+
-+#endif
-+#endif
-+
-+#endif
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 4134212..29d10b9 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -21,6 +21,7 @@
- #include <linux/export.h>
- #include <linux/slab.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dma-contiguous.h>
- #include <linux/vmalloc.h>
- #include <linux/swiotlb.h>
- 
-@@ -36,14 +37,34 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
- 	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
- 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
- 		flags |= GFP_DMA32;
--	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-+	if (IS_ENABLED(CONFIG_DMA_CMA)) {
-+		struct page *page;
-+
-+		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
-+							get_order(size));
-+		if (!page)
-+			return NULL;
-+
-+		*dma_handle = phys_to_dma(dev, page_to_phys(page));
-+		return page_address(page);
-+	} else {
-+		return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-+	}
- }
- 
- static void arm64_swiotlb_free_coherent(struct device *dev, size_t size,
- 					void *vaddr, dma_addr_t dma_handle,
- 					struct dma_attrs *attrs)
- {
--	swiotlb_free_coherent(dev, size, vaddr, dma_handle);
-+	if (IS_ENABLED(CONFIG_DMA_CMA)) {
-+		phys_addr_t paddr = dma_to_phys(dev, dma_handle);
-+
-+		dma_release_from_contiguous(dev,
-+					phys_to_page(paddr),
-+					size >> PAGE_SHIFT);
-+	} else {
-+		swiotlb_free_coherent(dev, size, vaddr, dma_handle);
-+	}
- }
- 
- static struct dma_map_ops arm64_swiotlb_dma_ops = {
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 67e8d7c..74b7da1 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -30,6 +30,7 @@
- #include <linux/memblock.h>
- #include <linux/sort.h>
- #include <linux/of_fdt.h>
-+#include <linux/dma-contiguous.h>
- 
- #include <asm/prom.h>
- #include <asm/sections.h>
-@@ -173,6 +174,8 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(base, size);
- 	}
- 
-+	dma_contiguous_reserve(0);
-+
- 	memblock_allow_resize();
- 	memblock_dump_all();
- }
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> Suggested-by: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/devices/serial_flash_cmds.h | 91 +++++++++++++++++++++++++++++++++
+>  drivers/mtd/devices/st_spi_fsm.c        |  1 +
+>  drivers/mtd/devices/st_spi_fsm.h        |  2 +
+>  3 files changed, 94 insertions(+)
+>  create mode 100644 drivers/mtd/devices/serial_flash_cmds.h
+> 
+> diff --git a/drivers/mtd/devices/serial_flash_cmds.h b/drivers/mtd/devices/serial_flash_cmds.h
+> new file mode 100644
+> index 0000000..62aa420
+> --- /dev/null
+> +++ b/drivers/mtd/devices/serial_flash_cmds.h
+> @@ -0,0 +1,91 @@
+> +/*
+> + * Generic/SFDP Flash Commands and Device Capabilities
+> + *
+> + * Copyright (C) 2013 Lee Jones <lee.jones@lianro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+BTW, I think checkpatch.pl complains about putting the FSF address here.
+
+> +/* JEDEC Standard - Serial Flash Discoverable Parmeters (SFDP) Commands */
+> +#define FLASH_CMD_READ		0x03	/* READ */
+> +#define FLASH_CMD_READ_FAST	0x0b	/* FAST READ */
+> +#define FLASH_CMD_READ_1_1_2	0x3b	/* DUAL OUTPUT READ */
+> +#define FLASH_CMD_READ_1_2_2	0xbb	/* DUAL I/O READ */
+> +#define FLASH_CMD_READ_1_1_4	0x6b	/* QUAD OUTPUT READ */
+> +#define FLASH_CMD_READ_1_4_4	0xeb	/* QUAD I/O READ */
+
+All of these {1,2,4}_{1,2,4}_{1,2,4} suffixes are a little cryptic; I
+ended up referring to the SFDP spec to figure out what the first number
+meant. Can you document them briefly at the top of this SFDP list?
+
+> +#define FLASH_CMD_WRITE		0x02	/* PAGE PROGRAM */
+> +#define FLASH_CMD_WRITE_1_1_2	0xa2	/* DUAL INPUT PROGRAM */
+> +#define FLASH_CMD_WRITE_1_2_2	0xd2	/* DUAL INPUT EXT PROGRAM */
+> +#define FLASH_CMD_WRITE_1_1_4	0x32	/* QUAD INPUT PROGRAM */
+> +#define FLASH_CMD_WRITE_1_4_4	0x12	/* QUAD INPUT EXT PROGRAM */
+> +
+> +#define FLASH_CMD_EN4B_ADDR	0xb7	/* Enter 4-byte address mode */
+> +#define FLASH_CMD_EX4B_ADDR	0xe9	/* Exit 4-byte address mode */
+> +
+> +/* READ commands with 32-bit addressing */
+> +#define FLASH_CMD_READ4		0x13
+> +#define FLASH_CMD_READ4_FAST	0x0c
+> +#define FLASH_CMD_READ4_1_1_2	0x3c
+> +#define FLASH_CMD_READ4_1_2_2	0xbc
+> +#define FLASH_CMD_READ4_1_1_4	0x6c
+> +#define FLASH_CMD_READ4_1_4_4	0xec
+
+Since you list these, does SFDP even describe the 32-bit addressing
+commands? It seems like it assumes the device is switched (statefully)
+between 24-bit and 32-bit address modes (or kept permanently in one or
+the other).
+
+> +/* Configuration flags */
+> +#define FLASH_FLAG_SINGLE	0x000000ff
+> +#define FLASH_FLAG_READ_WRITE	0x00000001
+> +#define FLASH_FLAG_READ_FAST	0x00000002
+> +#define FLASH_FLAG_SE_4K	0x00000004
+> +#define FLASH_FLAG_SE_32K	0x00000008
+> +#define FLASH_FLAG_CE		0x00000010
+> +#define FLASH_FLAG_32BIT_ADDR	0x00000020
+> +#define FLASH_FLAG_RESET	0x00000040
+> +#define FLASH_FLAG_DYB_LOCKING	0x00000080
+> +
+> +#define FLASH_FLAG_DUAL		0x0000ff00
+> +#define FLASH_FLAG_READ_1_1_2	0x00000100
+> +#define FLASH_FLAG_READ_1_2_2	0x00000200
+> +#define FLASH_FLAG_READ_2_2_2	0x00000400
+> +#define FLASH_FLAG_WRITE_1_1_2	0x00001000
+> +#define FLASH_FLAG_WRITE_1_2_2	0x00002000
+> +#define FLASH_FLAG_WRITE_2_2_2	0x00004000
+> +
+> +#define FLASH_FLAG_QUAD		0x00ff0000
+> +#define FLASH_FLAG_READ_1_1_4	0x00010000
+> +#define FLASH_FLAG_READ_1_4_4	0x00020000
+> +#define FLASH_FLAG_READ_4_4_4	0x00040000
+> +#define FLASH_FLAG_WRITE_1_1_4	0x00100000
+> +#define FLASH_FLAG_WRITE_1_4_4	0x00200000
+> +#define FLASH_FLAG_WRITE_4_4_4	0x00400000
+
+It doesn't look to me like the dual/quad bitfields are laid out very
+usefully. Can't they be divided so that their bit position is more
+meaningful? Like reserve bits [8:23] for dual/quad descriptions, then
+give the following:
+
+ [8:11]  number of pins for the opcode (1=single; 2=dual; 4=quad)
+ [12:15] number of pins for the address (1=single; 2=dual; ...)
+ [16:19] number of pins for the data
+ [20]    read or write opcode (0=read; 1=write)
+
+(you could easily pack these differently, but you get the idea)
+
+Then:
+
+#define FLASH_FLAG_DUAL_MASK	0x00022200
+#define FLASH_FLAG_QUAD_MASK	0x00044400
+
+And we could do things like:
+
+#define FLASH_FLAG_OPCODE_PINS(x)	(((x) & 0x00000f00) >> 8)
+#define FLASH_FLAG_ADDR_PINS(x)		(((x) & 0x0000f000) >> 12)
+#define FLASH_FLAG_DATA_PINS(x)		(((x) & 0x000f0000) >> 16)
+
+(and maybe replace those mask/shifts with macro names)
+
+This could eliminate some redundancy in your tables, I think, so that
+you can extract (from this flag) the number of "addr_pads" and
+"data_pads" needed for the opcode. And I think this would be useful to
+other controllers eventually. For instance, my quad-read driver might
+support 4 data pins but it can't put the opcode or address out on more
+than 1 pin.
+
+Brian
