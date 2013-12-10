@@ -1,108 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 10 Dec 2013 09:23:48 -0800
-Subject: [PATCH 07/10] ARM: dts: sun7i: cubietruck: Enable the GMAC
-In-Reply-To: <CAGb2v665xtY4m4uCTb_iMojG+ox0HvyCgz6p0P7oxJVvZ0SW9w@mail.gmail.com>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-8-git-send-email-wens@csie.org>
- <CAGVrzcb_r9_p4urz4XkE2A-G85KAHJa4PJ=Gt9a4RPYQNJ6j0g@mail.gmail.com>
- <CAGb2v64yFhkTXvdq=1VpemULhXew-5fvmSoTBzEb6iFDiSqy1Q@mail.gmail.com>
- <CAGVrzcaxV88dU3vEVGUiEQihUHLxq+QvQVQ6VvmOFVRsqbbX7w@mail.gmail.com>
- <CAGb2v675Cg6S512zfM1z4b+wqE_PesDGWdgcmpzWmPzyzXqbeA@mail.gmail.com>
- <CAGVrzcaVJtoVhEfV+ZiMOkm3F8NBCf2YRcZSrZPMRfQfEr1u=g@mail.gmail.com>
- <CAGb2v665xtY4m4uCTb_iMojG+ox0HvyCgz6p0P7oxJVvZ0SW9w@mail.gmail.com>
-Message-ID: <CAGVrzca7v3FMg1QT+LFQkPOf-o33=U0zpv_t8tkBSrrY+L+6+g@mail.gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 10 Dec 2013 17:27:21 +0000
+Subject: [PATCH v2] ARM: add support for the Cortex-A12 processor
+In-Reply-To: <201312080322.57976.arnd@arndb.de>
+References: <1386342282-8769-1-git-send-email-jonathan.austin@arm.com>
+ <201312080322.57976.arnd@arndb.de>
+Message-ID: <52A74EF9.2090405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/9 Chen-Yu Tsai <wens@csie.org>:
-> On Tue, Dec 10, 2013 at 1:48 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> 2013/12/8 Chen-Yu Tsai <wens@csie.org>:
->>> Florian, Giuseppe:
->>>
->>> On Sat, Dec 7, 2013 at 9:57 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>>>> On Sat, Dec 7, 2013 at 5:09 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>>>> 2013/12/6 Chen-Yu Tsai <wens@csie.org>:
->>>>>>> The CubieTruck uses the GMAC with an RGMII phy.
->>>>>>>
->>>>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>>>>> ---
->>>>>>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 8 ++++++++
->>>>>>>  1 file changed, 8 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>>>> index 8a1009d..af212a2 100644
->>>>>>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>>>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>>>>> @@ -33,6 +33,14 @@
->>>>>>>                         pinctrl-0 = <&uart0_pins_a>;
->>>>>>>                         status = "okay";
->>>>>>>                 };
->>>>>>> +
->>>>>>> +               gmac: ethernet at 01c50000 {
->>>>>>> +                       pinctrl-names = "default";
->>>>>>> +                       pinctrl-0 = <&gmac_pins_rgmii>;
->>>>>>> +                       snps,phy-addr = <1>;
->>>>>>
->>>>>> What is this snps,phy-addr property? Why is not a standard device tree
->>>>>> node for an Ethernet PHY node used?
->>>>>
->>>>> This property is implemented by stmmac and documented in the DT
->>>>> bindings. stmmac has not been updated to use Ethernet PHY nodes.
->>>>
->>>> This driver property should be removed and deprecated since there is
->>>> an ePAPR standardized Ethernet PHY node. What I am worried here is the
->>>> loss of information, the standard Ethernet DT node allows to specify
->>>> much more information (clause, maximum speed, compatible string
->>>> etc...).
->>>
->>> Giuseppe, any thoughts on this?
->>>
->>>>> Removing this property will not affect the function of the driver.
->>>>> The driver probes its MDIO bus and selects the lowest available
->>>>> address if not specified.
->>>>
->>>> So if this is just giving the driver a hint on where to  probe for a
->>>> PHY on the MDIO bus, then let's drop it and use the standard DT node
->>>> no?
->>>
->>> Sure. I will remove it from the DT.
->>>
->>> The stmmac driver does not have a seperate MDIO bus driver, nor
->>> does it support Ethernet PHY node bindings. So I will not add
->>> a phy node at this moment.
+On 08/12/13 02:22, Arnd Bergmann wrote:
+> On Friday 06 December 2013, Jonathan Austin wrote:
+>> The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
+>> doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
 >>
->> This will create needless churn in the DT if you do not do it now,
->> worse actually, we switch from a DT which specifically described
->> Ethernet PHY nodes properly to a version where it does, to ultimately
->> a newer version which does.
+>> Note that as the ACTLR cannot (usually) be written from non-secure, it is the
+>> responsibility of the bootloader/firmware to set this bit per core - it is
+>> done here in Linux as last resort in case of bad firmware.
 >>
->> Considering that the absence of a "snps,phy-addr" property will still
->> result in the MDIO bus to be probed, keeping the existing Ethernet PHY
->> nodes, referencing them correclty with a "phy-handle" property, but
->> having no explicit support for these in the driver will not result in
->> a functional change, and will reduce the DT churn. Also, you could
->> still sneak a patch in this patchset which parses the standard
->> EThernet PHY node binding.
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Acked-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 >
-> I see. Adding the PHY node should be no trouble at all.
-> Is there a requirement for a seperate mdio bus in the DT?
-
-Not really no, in that case the MDIO bus is implicitely implemented as
-part of the Ethernet MAC controller, this is just fine.
-
-> I do not see it in the ePAPR. The stmmac mdio is not a seperate
-> driver, as is for most network controllers I presume.
-> Would attaching the PHY nodes directly under the ethernet controller
-> suffice?
-
-Sure, that is what most Ethernet driver do actually. They register
-their own MDIO bus and make sure PHYs get attached to it.
-
+> I guess this one qualifies for stable backports under the "new device ID"
+> rule, and I'm sure people will want to have it in some longterm release.
 >
-> We can then introduce PHY node support to the driver and
-> remove the "snps,phy-addr" property at the same time.
 
-Sure, sounds good, thanks!
--- 
-Florian
+Yes, I'd say this certainly makes sense for 3.10 - though even without 
+this things will basically work due to the catch-all for V7A.
+
+Happy to Cc: stable when I put this into the patch system, though
+
+Jonny
+
+> 	Arnd
+>
