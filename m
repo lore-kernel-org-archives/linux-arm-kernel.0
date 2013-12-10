@@ -1,86 +1,69 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 10 Dec 2013 16:57:23 +0100
-Subject: [PATCH 1/7] ARM: EXYNOS: initial board support for exynos5260 SoC
-In-Reply-To: <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <2452273.S9E2sU17uX@amdc1227>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 08:01:44 -0800
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
+In-Reply-To: <20131210143547.GA32243@n2100.arm.linux.org.uk>
+References: <pull-1386643347-596413>
+ <20131210143547.GA32243@n2100.arm.linux.org.uk>
+Message-ID: <20131210160144.GG13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj, Rahul, Arun,
-
-In addition to issues already pointed by Sachin, please also see my
-comments inline.
-
-On Friday 06 of December 2013 21:26:25 Rahul Sharma wrote:
-> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 06:37]:
+> On Mon, Dec 09, 2013 at 06:42:27PM -0800, Tony Lindgren wrote:
+> > We can now finally make mach-omap2 to boot with device tree only and get
+> > rid of over 20k lines of platform init code that way.
+> > 
+> > Most basic devices already work using device tree based initialization
+> > and the remaining devices can be initialized using platform data
+> > with pdata-quirks.c.
+> > 
+> > So for most missing boards it's just a question of adding a .dts file
+> > that should be fairly similar to one of the existing .dts files as
+> > we've tried to cover all basic omap3 board types.
+> > 
+> > For people getting started updating their board files to for device
+> > tree, there are some basic instructions in commit 8dc8b3ddf5d7
+> > (ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
+> > DT only for booting).
+> > 
+> > Please also note that there are also some related fixes making their way
+> > into the mainline kernel that are needed for some use cases:
+> > 
+> > PM off-idle for omap3 and wake-up events need the following two patches:
 > 
-> This patch add basic arch side support for exynos5260 SoC.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                 |    9 +++++++++
->  arch/arm/mach-exynos/common.c                |   19 ++++++++++++++++++-
->  arch/arm/mach-exynos/cpuidle.c               |    2 +-
->  arch/arm/mach-exynos/include/mach/map.h      |    1 +
->  arch/arm/mach-exynos/include/mach/regs-pmu.h |    4 ++++
->  arch/arm/mach-exynos/mach-exynos5-dt.c       |    1 +
->  arch/arm/plat-samsung/include/plat/cpu.h     |    8 ++++++++
->  arch/arm/plat-samsung/include/plat/map-s5p.h |    1 +
->  8 files changed, 43 insertions(+), 2 deletions(-)
-[snip]
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index ddbfe87..405c11a 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -120,7 +120,7 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
->  	cpu_suspend(0, idle_finisher);
->  
->  #ifdef CONFIG_SMP
-> -	if (!soc_is_exynos5250())
-> +	if (!soc_is_exynos5250() || soc_is_exynos5260())
+> While this is good, what seems to be happening is a complete switch
+> from one method of booting to a different method of booting with no
+> compatibility inbetween.  We're going from only supporting the ATAG
+> booting protocol for these platforms in v3.12 to only supporting the
+> DT booting protocol in v3.13.  There's no forward or backwards
+> compatibility - it's one or the other.
 
-The added OR condition doesn't affect the if condition in any way, because
-when running on Exynos5260, soc_is_exynos5250() will return false and make
-the whole condition evaluate to true.
+Hmm hey this is for v3.14, not for v3.13.
 
-Shouldn't it be
+The reason why I've been sending fixes all over the place is to have them
+out of the way for v3.13 so we have v3.13 work reasonably the same way
+with both legacy booting and device tree based booting. Of course some
+.dts files will not be there for v3.13 though.
 
-	if (!soc_is_exynos5250() && !soc_is_exynos5260())
+> This is bad: this is the kind of "flag day" change which Linus hates -
+> and I hate it because it means I need to update my build test system
+> at the same time that arm-soc merges this stuff.
 
-if Exynos5260 doesn't need scu_enable(), or left as is if it needs?
+Unfortunately there's no way around that unless we carry the legacy
+booting setup for longer. We can certainly postpone the flip over if
+if there's a real neeed to do it.
 
->  		scu_enable(S5P_VA_SCU);
->  #endif
->  	cpu_pm_exit();
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-> index 7b046b5..bd6fa02 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -29,6 +29,7 @@
->  #define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
->  #define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
->  #define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
-> +#define EXYNOS5260_PA_SYSRAM_NS		0x02073000
->  
->  #define EXYNOS_PA_CHIPID		0x10000000
->  
-> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-> index 2cdb63e..09ae29a 100644
-> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-> @@ -234,6 +234,10 @@
->  
->  #define EXYNOS5_SYS_WDTRESET					(1 << 20)
->  
-> +#define EXYNOS5260_A7_WDTRST					(1 << 24)
-> +#define EXYNOS5260_A15_WDTRST					(1 << 23)
-> +#define EXYNOS5260_SYS_WDTRESET	(EXYNOS5260_A7_WDTRST || EXYNOS5260_A15_WDTRST)
-> +
+But if the issue is just building an appended DTB image, I'd rather just
+get done with it as that problem we're always going to have no matter
+how much we delay the flip over.
 
-Are these definitions needed? I don't see any user in this patch.
+> This is utterly crap - it's crap not only from the point of view of the
+> user perspective, but also from the development methodology point of
+> view.
 
-Best regards,
-Tomasz
+The crappy part here is the fact that we need to build the kernel with
+appended DTB. Maybe there's something more we can do to make it easier.
+
+Regards,
+
+Tony
