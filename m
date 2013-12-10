@@ -1,50 +1,30 @@
-From: ben@datarespons.no (=?utf-8?B?QmrDuHJuIEVyaWsgTmlsc2Vu?=)
-Date: Tue, 10 Dec 2013 13:21:20 +0100
-Subject: imx6 suspend/resume issue
-Message-ID: <mailman.16.1386678432.1056.linux-arm-kernel@lists.infradead.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 10 Dec 2013 12:30:35 +0000
+Subject: [PATCH v3 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <CAHCPf3s_SXYXLRwvn7tzqTCQ-gB=emRMK_dXkEmw_HWigiD7Mw@mail.gmail.com>
+References: <1385656883-4420-1-git-send-email-leif.lindholm@linaro.org> <
+ 1385656883-4420-2-git-send-email-leif.lindholm@linaro.org> <
+ CAHCPf3t5dEzVWbYZ6DWcFCENNO2dbrx-YeZvKRk0MkEsJMTE3A@mail.gmail.com> <
+ 20131202210719.GQ24997@rocoto.smurfnet.nu> <
+ CAHCPf3tsWdV+dJGm6mX6N4Ou5EQoGukdLyRvsRX6VQFjtKgxtg@mail.gmail.com> <
+ 20131204224447.GA19265@srcf.ucam.org> <
+ CAHCPf3s_SXYXLRwvn7tzqTCQ-gB=emRMK_dXkEmw_HWigiD7Mw@mail.gmail.com>
+Message-ID: <20131210123035.D1586C40A27@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 6 Dec 2013 11:20:45 -0600, Matt Sealey <neko@bakuhatsu.net> wrote:
+> On Wed, Dec 4, 2013 at 4:44 PM, Matthew Garrett <mjg59@srcf.ucam.org> wrote:
+> > On Wed, Dec 04, 2013 at 03:06:47PM -0600, Matt Sealey wrote:
+> Grant suggested I should propose some patches; sure, if I'm not otherwise busy.
+> 
+> Maybe the Linaro guys can recommend a platform (real or emulated) that
+> would be best to test it on with the available UEFI?
 
-I have a nitrogen6x board (imx6q) from boundary devices and I've been
-playing with power management on the 3.12 kernel.
+Roy Franz (cc'd) has got UEFI running under QEMU. A few modifications
+were required to both stock UEFI and QEMU. I'm not sure what the status
+of mainlining those patches is. I think there are still a few things
+that Roy has to fix, but you should be able to get the current patches
+from him to get going.
 
-There are issues related to suspend/resume. It looks like I can
-successfully enter mem mode, however when I trigger one of the wakeup
-sources I'm not able to resume successfully.
-
-#echo mem > /sys/power/state
-
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-Freezing user space processes ... (elapsed 0.001 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-PM: Entering mem sleep
-PM: suspend of devices complete after 53.008 msecs
-PM: suspend devices took 0.060 seconds
-PM: late suspend of devices complete after 1.924 msecs
-PM: noirq suspend of devices complete after 2.604 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-
-<trigger wake-up source>
-
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-
-And then the system hangs there. I have looked through recent patchwork
-and I cannot find any obvious commits missing from my branch.
-
-I'm thinking this must be a known issue and perhaps you can point me in
-the right direction for what I should look for.
-
-Best regards,
-Bj?rn Erik Nilsen
+g.
