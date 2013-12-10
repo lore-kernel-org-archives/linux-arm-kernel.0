@@ -1,75 +1,34 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Tue, 10 Dec 2013 09:53:22 +0530
-Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
-In-Reply-To: <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
-References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
- <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
- <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
-Message-ID: <CAAhSdy3yApns95J0T=-OCmpNvf0ZTBV-USmsS=9h+JMuQ40YyQ@mail.gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Tue, 10 Dec 2013 08:25:21 +0400
+Subject: [PATCH 5/9] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <201312100125.18754.arnd@arndb.de>
+References: <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <52A59991.1060305@gmail.com> <1386590958.7152.135.camel@host5.omatika.ru>
+ <201312100125.18754.arnd@arndb.de>
+Message-ID: <1386649521.7152.196.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 7:43 AM, Alexander Graf <agraf@suse.de> wrote:
->
-> On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
->
->> Currently, we don't have an exit reason for VM reset emulation
->> in user space hence this patch adds exit reason KVM_EXIT_RESET
->> for this purpose.
->>
->> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
->> in-kernel PSCI support to reset VMs.
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->> include/uapi/linux/kvm.h |    1 +
->> 1 file changed, 1 insertion(+)
->>
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index 902f124..64a04cc 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->> #define KVM_EXIT_WATCHDOG         21
->> #define KVM_EXIT_S390_TSCH        22
->> #define KVM_EXIT_EPR              23
->> +#define KVM_EXIT_RESET            24
->
-> I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
+On Tue, 2013-12-10 at 01:25 +0100, Arnd Bergmann wrote:
+> We never intentionally break things that people are using, but there are
+> cases where doing blind changes is the best way forward. We should
+> always try to find people to test patches on real hardware if possible,
+> which is only possible if there are people around that have the hardware
+> and that are going to run new kernels on them.
+> 
+> In case of PXA dmaengine support, I think the benefits of applying the
+> series far outweigh the breakage potential. A lot of the drivers are
+> shared with MMP, which is going to be DT-only eventually and will require
+> the new dmaengine code. Some PXA drivers may be shared with SA1100,
+> which has also converted to dmaengine although there are no plans to
+> ever support DT on sa1100.
+> 
+> We certainly need to be extra careful if we want to move things over
+> at once and cannot test all the drivers. I'd be happier if it could
+> be done gradually by having some drivers use the new interface and
+> other drivers use the old one, but I don't see how that can be done
+> here.
 
-The KVM_EXIT_RESET gets triggered when system level reset is
-initiated by VCPU. For arm/arm64, this is through SYSTEM_RESET
-PSCI call. In KVM x86 SVM/VMX, we have KVM_EXIT_SHUTDOWN
-being used for system shutdown which we have re-used for arm/arm64.
-
->
-> I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
->
-> Can we treat it as such? Could you please make this a common exit number that's called something like
->
->   KVM_EXIT_SYSTEM_EVENT
->
-> with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
->
-> That way it's obvious what's going on and people don't get confused.
-
-I don't foresee any system level operations other than SHUTDOWN
-and RESET to be handled from KVM in-kernel code but I might be
-wrong.
-
-May be we can rename KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET
-to KVM_EXIT_SYSTEM_SHUTDOWN and KVM_EXIT_SYSTEM_RESET ??
-
---
-Anup
-
->
->
-> Alex
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Thanks for detailed explanation. I see there is strong support for the
+big change. Lets hope it'll be smooth. I'll strest test Daniel's changes
+and report the results.
