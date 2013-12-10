@@ -1,82 +1,69 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 10 Dec 2013 17:04:26 +0100
-Subject: [PATCH 2/7] pinctrl: exynos: add exynos5260 SoC specific data
-In-Reply-To: <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1548210.PeZ57k2d5L@amdc1227>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 11 Dec 2013 00:03:46 +0800
+Subject: [PATCH v6 0/7] Optimize jump label implementation for ARM64
+Message-ID: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Young-Gun, Pankaj, Rahul, Arun,
+This patchset tries to optimize arch specfic jump label implementation
+for ARM64 by dynamic kernel text patching.
 
-Please see my comments inline.
+To enable this feature, your toolchain must support "asm goto" extension
+and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
+"%c", and there's a patch for it now:
+http://gcc.gnu.org/ml/gcc-patches/2013-10/msg01314.html
 
-On Friday 06 of December 2013 21:26:26 Rahul Sharma wrote:
-> From: Young-Gun Jang <yg1004.jang@samsung.com>
-> 
-> Add Samsung Exynos5260 SoC specific data to enable pinctrl
-> support for all platforms based on EXYNOS5260.
-[snip]
-> diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-> index 155b1b3..9a93df6 100644
-> --- a/drivers/pinctrl/pinctrl-exynos.c
-> +++ b/drivers/pinctrl/pinctrl-exynos.c
-> @@ -1042,6 +1042,88 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
->  	},
->  };
->  
-> +/* pin banks of exynos5260 pin-controller 0 */
-> +static struct samsung_pin_bank exynos5260_pin_banks0[] = {
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpa0", 0x00),
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpa1", 0x04),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpb0", 0x0c),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpb1", 0x10),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x0A0, "gpb2", 0x14),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x0C0, "gpb3", 0x18),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x0E0, "gpb4", 0x1c),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpb5", 0x20),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd0", 0x24),
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x140, "gpd1", 0x28),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x160, "gpd2", 0x2c),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpe0", 0x30),
-> +	EXYNOS_PIN_BANK_EINTG(5, 0x1A0, "gpe1", 0x34),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x1C0, "gpf0", 0x38),
-> +	EXYNOS_PIN_BANK_EINTG(8, 0x1E0, "gpf1", 0x3c),
-> +	EXYNOS_PIN_BANK_EINTG(2, 0x200, "gpk0", 0x40),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gpx0", 0x00),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gpx1", 0x04),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gpx2", 0x08),
-> +	EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gpx3", 0x0c),
+It has been tested on ARM Fast mode and a real hardware platform.
 
-nit: Please use lowercase hexadecimal characters. Despite of already
-existing code, lowercase is the preferred way.
+Any comments are welcomed!
 
-> +};
-> +
-> +/* pin banks of exynos5260 pin-controller 1 */
-> +static struct samsung_pin_bank exynos5260_pin_banks1[] = {
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpc0", 0x00),
-> +	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpc1", 0x04),
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpc2", 0x08),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x060, "gpc3", 0x0c),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpc4", 0x10),
-> +};
-> +
-> +/* pin banks of exynos5260 pin-controller 2 */
-> +static struct samsung_pin_bank exynos5260_pin_banks2[] = {
-> +	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
-> +	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
-> +};
-> +
-> +/*
-> + * Samsung pinctrl driver data for Exynos5260 SoC. Exynos5420 SoC includes
-> + * four gpio/pin-mux/pinconfig controllers.
+V5->V6:
+1) optimize stop_machine() related code
+2) simplify aarch64_insn_patch_text_nosync() interface
+3) refine comments
 
-Hmm, I can see only three of them below. Is there one left undefined?
+V4->V5:
+1) rework the stop_machine() related code
+2) rework aarch64_insn_gen_nop()
 
-Otherwise, the patch looks fine.
+V3->V4:
+1) resolve a race condition in kernel text patching
+2) address other review comments
 
-Best regards,
-Tomasz
+V2->V3:
+1) fix a bug in comparing signed and unsigned values
+2) detect big endian by checking __AARCH64EB__
+
+V1->V2: address review comments of V1
+1) refine comments
+2) add a new interface to always synchronize with stop_machine()
+   when patching code
+3) handle endian issue when patching code
+
+Jiang Liu (7):
+  arm64: introduce basic aarch64 instruction decoding helpers
+  arm64: introduce interfaces to hotpatch kernel and module code
+  arm64: move encode_insn_immediate() from module.c to insn.c
+  arm64: introduce aarch64_insn_gen_{nop|branch_imm}() helper functions
+  arm64, jump label: detect %c support for ARM64
+  arm64, jump label: optimize jump label implementation
+  jump_label: use defined macros instead of hard-coding for better
+    readability
+
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/include/asm/insn.h       | 108 +++++++++++++
+ arch/arm64/include/asm/jump_label.h |  51 ++++++
+ arch/arm64/kernel/Makefile          |   3 +-
+ arch/arm64/kernel/insn.c            | 302 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/jump_label.c      |  59 +++++++
+ arch/arm64/kernel/module.c          | 157 ++++++-------------
+ include/linux/jump_label.h          |  15 +-
+ scripts/gcc-goto.sh                 |   2 +-
+ 9 files changed, 581 insertions(+), 117 deletions(-)
+ create mode 100644 arch/arm64/include/asm/insn.h
+ create mode 100644 arch/arm64/include/asm/jump_label.h
+ create mode 100644 arch/arm64/kernel/insn.c
+ create mode 100644 arch/arm64/kernel/jump_label.c
+
+-- 
+1.8.1.2
