@@ -1,37 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Dec 2013 19:02:20 +0100
-Subject: [PATCH 0/2] ARM: sunxi: Fix interrupt trigger types in the DT
-In-Reply-To: <201312071324.42353.arnd@arndb.de>
-References: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
- <201312071324.42353.arnd@arndb.de>
-Message-ID: <20131210180220.GB3651@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Dec 2013 18:09:40 +0000
+Subject: [PATCH 0/3] serial: amba-pl011: fix race conditions during
+ initialisation
+In-Reply-To: <1386670740-16914-1-git-send-email-tixy@linaro.org>
+References: <1386670740-16914-1-git-send-email-tixy@linaro.org>
+Message-ID: <20131210180940.GA19513@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Dec 10, 2013 at 10:18:57AM +0000, Jon Medhurst wrote:
 
-On Sat, Dec 07, 2013 at 01:24:42PM +0100, Arnd Bergmann wrote:
-> On Saturday 07 December 2013, Maxime Ripard wrote:
-> > It would be great if you could merge these two patches by the end of the 3.13
-> > release cycle.
+> When a UART that is being used for a kernel console is also opened
+> by user-side, e.g. for use as a terminal, then there are race conditions
+> which can lead to terminal input being disabled and console output being
+> corrupted. This small patch series fixes these.
 > 
-> I guess they should be marked for 'stable' backports as well, right?
+> Jon Medhurst (3):
+>       serial: amba-pl011: use port lock to guard control register access
+>       serial: amba-pl011: factor out code for writing LCR_H register
+>       serial: amba-pl011: preseserve hardware settings during initialisation
 
-Aah, right.
-
-I'll resend those patches Cc'ing stable.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Given that this seems relatively easy to trigger when you know how and
+renders the device non-functional perhaps this should be considered for
+stable too?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/b44696dc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/60ba34f5/attachment.sig>
