@@ -1,114 +1,22 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 11:01:00 -0800
-Subject: [PATCH v3 03/36] mtd: st_spi_fsm: Initialise and configure the
- FSM for normal working conditions
-In-Reply-To: <1385727565-25794-4-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131210190100.GA27149@ld-irv-0074.broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 11:08:42 -0800
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
+In-Reply-To: <20131210185902.GO13171@atomide.com>
+References: <pull-1386643347-596413>
+ <alpine.DEB.2.02.1312101034360.32309@utopia.booyaka.com>
+ <20131210185902.GO13171@atomide.com>
+Message-ID: <20131210190842.GP13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Fri, Nov 29, 2013 at 12:18:52PM +0000, Lee Jones wrote:
-> --- a/drivers/mtd/devices/st_spi_fsm.c
-> +++ b/drivers/mtd/devices/st_spi_fsm.c
-> @@ -25,11 +25,121 @@
+* Tony Lindgren <tony@atomide.com> [131210 11:00]:
+> * Paul Walmsley <paul@pwsan.com> [131210 10:47]:
 >  
->  #include "st_spi_fsm.h"
->  
-> +static inline uint32_t stfsm_fifo_available(struct stfsm *fsm)
-> +{
-> +	return (readl(fsm->base + SPI_FAST_SEQ_STA) >> 5) & 0x7f;
-> +}
-> +
-> +static void stfsm_clear_fifo(struct stfsm *fsm)
-> +{
-> +	uint32_t avail;
-> +
-> +	for (;;) {
-> +		avail = stfsm_fifo_available(fsm);
-> +		if (!avail)
-> +			break;
-> +
-> +		while (avail) {
-> +			readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
-> +			avail--;
-> +		}
-> +	}
-> +}
-> +
-> +static int stfsm_set_mode(struct stfsm *fsm, uint32_t mode)
-> +{
-> +	int ret, timeout = 10;
-> +
-> +	/* Wait for controller to accept mode change */
-> +	while(--timeout) {
+> > - The N800 isn't booting here with a concatenated uImage+dtb - but
+> >   maybe I'm doing something wrong with this one.
+> 
+> Hmm n800 works for me here for sure, I can n-uple check today.
 
-s/while(/while (/
+Yeah n800 boots just fine here. Will email you the dmesg.
 
-You should run your series through scripts/checkpatch.pl. There are a
-number of small things to fixup in a few of your patches.
-
-> +		ret = readl(fsm->base + SPI_STA_MODE_CHANGE);
-> +		if (ret & 0x1)
-> +			break;
-> +		udelay(1);
-> +	}
-> +
-> +	if (!timeout)
-> +		return -EBUSY;
-> +
-> +	writel(mode, fsm->base + SPI_MODESELECT);
-> +
-> +	return 0;
-> +}
-> +
-> +static void stfsm_set_freq(struct stfsm *fsm, uint32_t spi_freq)
-> +{
-> +	uint32_t emi_freq;
-> +	uint32_t clk_div;
-> +
-> +	/* TODO: Make this dynamic */
-> +	emi_freq = STFSM_DEFAULT_EMI_FREQ;
-> +
-> +	/*
-> +	 * Calculate clk_div - values between 2 and 128
-> +	 * Multiple of 2, rounded up
-> +	 */
-> +	clk_div = 2*((emi_freq + (2*spi_freq - 1))/(2*spi_freq));
-
-I think this can use the <linux/kerne.h> round_up() macro. Also, you're
-missing some spacing. Possibly:
-
-	clk_div = 2 * round_up(emi_freq, 2 * spi_freq);
-
-> +	if (clk_div < 2)
-> +		clk_div = 2;
-> +	else if (clk_div > 128)
-> +		clk_div = 128;
-> +
-> +	/*
-> +	 * Determine a suitable delay for the IP to complete a change of
-> +	 * direction of the FIFO. The required delay is related to the clock
-> +	 * divider used. The following heuristics are based on empirical tests,
-> +	 * using a 100MHz EMI clock.
-> +	 */
-> +	if (clk_div <= 4)
-> +		fsm->fifo_dir_delay = 0;
-> +	else if (clk_div <= 10)
-> +		fsm->fifo_dir_delay = 1;
-> +	else
-> +		fsm->fifo_dir_delay = (clk_div + 9) / 10;
-
-round_down()?
-
-> +
-> +	dev_dbg(fsm->dev, "emi_clk = %uHZ, spi_freq = %uHZ, clk_div = %u\n",
-> +		emi_freq, spi_freq, clk_div);
-> +
-> +	writel(clk_div, fsm->base + SPI_CLOCKDIV);
-> +}
-
-Brian
+Tony
