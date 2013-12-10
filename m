@@ -1,47 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Dec 2013 18:42:16 +0000
-Subject: [PATCH v3 08/15] mfd: menelaus: Pass menelaus_chip pointer to
- add/remove irq functions
-In-Reply-To: <20131210163249.GF22750@saruman.home>
-References: <20131209161422.GC24047@saruman.home>
- <1386606085-26838-1-git-send-email-balbi@ti.com>
- <1386606085-26838-8-git-send-email-balbi@ti.com>
- <20131210090021.GQ12675@lee--X1>
- <20131210163249.GF22750@saruman.home>
-Message-ID: <20131210184216.GD2390@lee--X1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 10 Dec 2013 19:45:15 +0100
+Subject: [PATCH 0/2] ARM: sunxi: Fix interrupt trigger types in the DT
+In-Reply-To: <201312101932.48915.arnd@arndb.de>
+References: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201312071324.42353.arnd@arndb.de> <20131210180220.GB3651@lukather>
+ <201312101932.48915.arnd@arndb.de>
+Message-ID: <20131210184515.GC3651@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Dec 2013, Felipe Balbi wrote:
-
-> On Tue, Dec 10, 2013 at 09:00:21AM +0000, Lee Jones wrote:
-> > On Mon, 09 Dec 2013, Felipe Balbi wrote:
-> > 
-> > > Those functions are static and can receive a menelaus_chip pointer very
-> > > easily.
+On Tue, Dec 10, 2013 at 07:32:48PM +0100, Arnd Bergmann wrote:
+> On Tuesday 10 December 2013, Maxime Ripard wrote:
+> > On Sat, Dec 07, 2013 at 01:24:42PM +0100, Arnd Bergmann wrote:
+> > > On Saturday 07 December 2013, Maxime Ripard wrote:
+> > > > It would be great if you could merge these two patches by the end of the 3.13
+> > > > release cycle.
 > > > 
-> > > Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  drivers/mfd/menelaus.c | 57 ++++++++++++++++++++++++++------------------------
-> > >  1 file changed, 30 insertions(+), 27 deletions(-)
+> > > I guess they should be marked for 'stable' backports as well, right?
 > > 
-> > Same here. I think this should be done in one fell swoop.
+> > Aah, right.
+> > 
+> > I'll resend those patches Cc'ing stable.
 > 
-> then it would become a much, much larger patch which would become a pain
-> to review.
+> Ok, just to clarify: there is actually no need to Cc stable in the
+> submission, we just need to make sure the Cc: stable is in the
+> changeset description as it gets merged.
 
-If the patch was doing lots of different things then I'd be inclined
-to agree, but although large, the changes here are pretty trivial.
+Hmmm, I guess I saw your mail a bit too late... :)
 
-I tend to break up patches based on; subsystem, file, device (for
-platform/dts adaptions) and functionality. Rather than just because
-the 'lines changed' count is large.
-
-Please squash them and I'll review it.
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/aded160f/attachment.sig>
