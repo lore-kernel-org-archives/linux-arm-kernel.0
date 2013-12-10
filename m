@@ -1,57 +1,57 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 14:23:08 -0800
-Subject: [PATCH v3 08/36] mtd: devices: Provide header for shared
- OPCODEs and SFDP commands
-In-Reply-To: <20131210214849.GE27149@ld-irv-0074.broadcom.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-9-git-send-email-lee.jones@linaro.org>
- <20131210214849.GE27149@ld-irv-0074.broadcom.com>
-Message-ID: <20131210222308.GG27149@ld-irv-0074.broadcom.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 10 Dec 2013 14:27:07 -0800
+Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
+In-Reply-To: <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
+References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+ <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
+ <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
+Message-ID: <20131210222707.GA2871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 01:48:49PM -0800, Brian Norris wrote:
-> It doesn't look to me like the dual/quad bitfields are laid out very
-> usefully. Can't they be divided so that their bit position is more
-> meaningful? Like reserve bits [8:23] for dual/quad descriptions, then
-> give the following:
+On Tue, Dec 10, 2013 at 03:13:34AM +0100, Alexander Graf wrote:
 > 
->  [8:11]  number of pins for the opcode (1=single; 2=dual; 4=quad)
->  [12:15] number of pins for the address (1=single; 2=dual; ...)
->  [16:19] number of pins for the data
->  [20]    read or write opcode (0=read; 1=write)
+> On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
 > 
-> (you could easily pack these differently, but you get the idea)
+> > Currently, we don't have an exit reason for VM reset emulation
+> > in user space hence this patch adds exit reason KVM_EXIT_RESET
+> > for this purpose.
+> > 
+> > This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
+> > in-kernel PSCI support to reset VMs.
+> > 
+> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> > ---
+> > include/uapi/linux/kvm.h |    1 +
+> > 1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> > index 902f124..64a04cc 100644
+> > --- a/include/uapi/linux/kvm.h
+> > +++ b/include/uapi/linux/kvm.h
+> > @@ -171,6 +171,7 @@ struct kvm_pit_config {
+> > #define KVM_EXIT_WATCHDOG         21
+> > #define KVM_EXIT_S390_TSCH        22
+> > #define KVM_EXIT_EPR              23
+> > +#define KVM_EXIT_RESET            24
 > 
-> Then:
+> I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
 > 
-> #define FLASH_FLAG_DUAL_MASK	0x00022200
-> #define FLASH_FLAG_QUAD_MASK	0x00044400
+> I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
 > 
-> And we could do things like:
+> Can we treat it as such? Could you please make this a common exit number that's called something like
 > 
-> #define FLASH_FLAG_OPCODE_PINS(x)	(((x) & 0x00000f00) >> 8)
-> #define FLASH_FLAG_ADDR_PINS(x)		(((x) & 0x0000f000) >> 12)
-> #define FLASH_FLAG_DATA_PINS(x)		(((x) & 0x000f0000) >> 16)
+>   KVM_EXIT_SYSTEM_EVENT
 > 
-> (and maybe replace those mask/shifts with macro names)
+> with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
+> 
+> That way it's obvious what's going on and people don't get confused.
+> 
+I didn't realize what the KVM_EXIT_SHUTDOWN really was, thanks for
+explaining that.  In that case, the SYSTEM_EVENT sounds good to me.
 
-I realized you are packing these tight because you're using them as
-combinable (bitwise OR) flags (hence the name FLASH_FLAG_*, duh!). So
-while my scheme is nicer for representing a single opcode w.r.t.
-controller requirements, it is not able to represent the exact opcodes
-supported by a particular flash. Hence, this is not the right place for
-it.
+How do you propose the parameter gets passed?  As a new struct to the
+untion in kvm_run ?
 
-But I don't want to imitate your flags in any generic framework; we need
-a method (that doesn't involve too many extra tables like in your
-driver; or that supports these tables generically, to share with other
-drivers) to map the "supported opcodes" flags to useful properties that
-the controller/driver can examine.
-
-Is it possible, for instance, to describe a range of opcodes supported
-using patterns? Like "this flash supports opcodes for 1-4 data pins and
-1-2 address pins"? Or am I being too idealistic, and most flash really
-support a totally arbitrary combination of opcodes?
-
-Brian
+-Christoffer
