@@ -1,60 +1,66 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 10 Dec 2013 11:34:35 +0800
-Subject: [GIT PULL][v2] pull request for hisilicon soc
-In-Reply-To: <87fvq16041.fsf@linaro.org>
-References: <529EF3CB.5040505@gmail.com> <87fvq16041.fsf@linaro.org>
-Message-ID: <52A68BCB.7070701@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 10 Dec 2013 03:39:02 +0000 (UTC)
+Subject: [PATCH] of/platform: Fix no irq domain found errors when
+ populating interrupts
+In-Reply-To: <20131124212757.7D224C402A3@trevor.secretlab.ca>
+References: <20131123004334.GJ10023@atomide.com> <20131123005509.GJ16735@
+ n2100.arm.linux.org.uk> <20131123010850.GN10023@atomide.com> <
+ 20131123011515.GO10023@atomide.com> <20131123015034.GP10023@atomide.com>
+ <20131124212757.7D224C402A3@trevor.secretlab.ca>
+Message-ID: <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 08:06 AM, Kevin Hilman wrote:
-> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
->
->> Hi all,
->>
->> Please help to merge this pull request.
->>
->> I have to use gmail address since my GPG key is based on gmail.com.
->>
->> Best Regards
->> Haojian
->>
->> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>
->>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>
->> are available in the git repository at:
->>
->> ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
->> tags/hisilicon-basic
->
-> Please use git:// URLs instead of SSH URLs.
->
-Sorry. I'll fix it.
+Hi Grant, Rob,
 
-> Also, does this replace the previous pull request from the pxa tree?
->
-Yes, it replaced the previous pull request.
+On Sun, 24 Nov 2013, Grant Likely wrote:
 
-> I assume so since the original tag doesn't exist anymore, but it would
-> be good for you to state explicitly that it superceeds a previous pull
-> request or adds to it.
-OK. I'll comment it in the followed pull request.
+> On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
+> > > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
+> > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
+> > > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
+> > > > > > +		/* See of_device_resource_notify for populating interrupts */
+> > > > > > +		for (i = 0; i < num_irq; i++, res++) {
+> > > > > > +			res->flags = IORESOURCE_IRQ;
+> > > > > > +			res->start = -EPROBE_DEFER;
+> > > > > > +			res->end = -EPROBE_DEFER;
+> > > > > 
+> > > > > NAK.  Definitely a bad idea to start introducing magic values other into
+> > > > > resources.  Please don't do this.
+> > > > 
+> > > > Do you have any better ideas on how to sort out this issue then?
+> > > 
+> > > I guess we could allocate all the resources lazily here, I'll take a look
+> > > at that.
+> > 
+> > Here's a version that allocates the resources lazily with the notifier.
+> > Seems to boot, need to play with it a bit more though to make sure we're
+> > not overwriting resources for any legacy devices.
+> 
+> Blurg. Using a notifier really feels like we don't have a good handle on
+> a reasonable solution yet. Basically it means we're hooking into the
+> driver core without /looking/ like we're hooking into the driver core. I
+> don't think this is any better, but I don't have a better suggestion at
+> the moment.   :-(
 
->
-> Also, it's not easy to see what is different in this pull request from
-> your v11.  There were a few comments on v11 that you responded to but
-> never posted a v12.  Does that mean they were fixed in this pull
-> request?  Again, I can check this manually but would much prefer it be
-> described here, or have seen v12 with the issues addressed and a pull
-> request based on that.
->
-OK. I'll send the v12 again.
+Unfortunately this patch, or something that accomplishes the same results, 
+is somewhat high-priority for us on OMAP.  OMAP37xx got prematurely 
+converted to DT booting, and now dynamic power management is broken:
 
-> Olof also suggested you attempt to collect some reviewed-by/acked-by
-> tags.  Were you able to do that?
->
-Nobody responses my email. So I have to blank it.
+    http://marc.info/?l=linux-arm-kernel&m=138658294830408&w=2
 
-Best Regards
-Haojian
+Tony writes that this patch is one of the two patches needed to get things 
+working again:
+
+    http://marc.info/?l=linux-arm-kernel&m=138660942506846&w=2
+
+Is it possible to get this patch, or something similar, merged for 
+v3.13-rc?
+
+Once something like PM is broken, it's pretty easy for other broken 
+patches to make it into the tree, since it becomes very difficult to test 
+without turning into a maintainer denial-of-service attack.
+
+
+- Paul
