@@ -1,51 +1,52 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Tue, 10 Dec 2013 14:29:20 +0800
-Subject: ARM: nommu: DEBUG_LOCKS_WARN_ON(!depth)
-In-Reply-To: <1385349629.21903.4.camel@phoenix>
-References: <1385349629.21903.4.camel@phoenix>
-Message-ID: <CAFRkauArs5iB_z2EF=Q4JZ+D86GB=vjR+Kt4pnYcnvGFf3bH4A@mail.gmail.com>
+From: ananaza@iki.fi (Antti Miettinen)
+Date: Tue, 10 Dec 2013 08:31:56 +0200
+Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
+ (Lorenzo Pieralisi's message of "Mon, 2 Dec 2013 16:20:05 +0000")
+References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <87lhztgqsj.fsf@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/25 Axel Lin <axel.lin@ingics.com>:
-> I'm testing on a nommu platform (arm7tdmi SoC).
-> Using current Linus' tree + out-of-tree patches for this SoC.
-> I got below hang while executing ls (busybox) after boot.
->
-> / # ls
-> [   51.036191] ------------[ cut here ]------------
-> [   51.042242] WARNING: CPU: 0 PID: 1 at kernel/locking/lockdep.c:3312 lock_set_class+0x5c8/0x660()
-> [   51.051426] DEBUG_LOCKS_WARN_ON(!depth)
-> [   51.055842] CPU: 0 PID: 1 Comm:  Not tainted 3.13.0-rc1-00100-g4b061f7-dirty #1917
-> [   51.065415] [<0000c430>] (unwind_backtrace+0x0/0xe0) from [<0000ae58>] (show_stack+0x10/0x14)
-> [   51.075781] [<0000ae58>] (show_stack+0x10/0x14) from [<0000f7b0>] (warn_slowpath_common+0x58/0x78)
-> [   51.086549] [<0000f7b0>] (warn_slowpath_common+0x58/0x78) from [<0000f814>] (warn_slowpath_fmt+0x2c/0x3c)
-> [   51.098162] [<0000f814>] (warn_slowpath_fmt+0x2c/0x3c) from [<00036d9c>] (lock_set_class+0x5c8/0x660)
-> [   50.934805] [<00036d9c>] (lock_set_class+0x5c8/0x660) from [<000367d4>] (lock_set_class+0x0/0x660)
-> [   50.945255] [<000367d4>] (lock_set_class+0x0/0x660) from [<00000000>] (  (null))
-> [   50.953242] ---[ end trace 7d1e4eb800000001 ]---
->
+Hi Lorenzo,
 
-Now test on top of linux-3.13-rc3.
-I found I can hit this lockdep warning only when CONFIG_PREEMPT_NONE=y
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> +	- latency
+> +		Usage: Required
+> +		Value type: <u32>
+> +		Definition: Worst case latency in microseconds required to
+> +			    enter and exit the C-state.
+> +
+> +	- min-residency
+> +		Usage: Required
+> +		Value type: <u32>
+> +		Definition: Time in microseconds required for the CPU to be in
+> +			    the C-state to make up for the dynamic power
+> +			    consumed to enter/exit the C-state in order to
+> +			    break even in terms of power consumption compared
+> +			    to C1 state (wfi).
+> +			    This parameter depends on the operating conditions
+> +			    (operating point, cache state) and must assume
+> +			    worst case scenario.
 
-1) With CONFIG_PREEMPT_NONE=y
-        executing ls (busybox) hang with above lockdep warning.
-2) With CONFIG_PREEMPT_VOLUNTARY=y:
-        have "[sched_delayed] sched: RT throttling activated" in boot message.
-        executing ls (busybox) hang silently.
-3) With CONFIG_PREEMPT=y:
-        executing ls (busybox) successfully and it's ok to execute other binary.
+I have a concern with these. I know it is not the fault of this patch as
+these parameters are what current cpuidle governor/driver interface
+uses, but..
 
-all the test with below configs:
-CONFIG_PREEMPT_COUNT=y
-CONFIG_DEBUG_SPINLOCK=y
-CONFIG_DEBUG_MUTEXES=y
-CONFIG_DEBUG_WW_MUTEX_SLOWPATH=y
-CONFIG_DEBUG_LOCK_ALLOC=y
-CONFIG_PROVE_LOCKING=y
-CONFIG_LOCKDEP=y
-CONFIG_DEBUG_ATOMIC_SLEEP=y
-CONFIG_TRACE_IRQFLAGS=y
-CONFIG_STACKTRACE=y
-CONFIG_DEBUG_BUGVERBOSE=y
+Power state entry/exit latencies can be vary quite a lot. Especially CPU
+and memory frequencies affect them as can e.g. PMIC properties. Also
+power level during entry/exit depends on clocks and voltages. Also the
+power level of a sleep state can be context dependent (clocks and
+voltages). These mean that also the minimum residency for energy break
+even varies. Defining a minimum residency against C1 is a bit
+arbitrary. There is no guarantee that the break even order of idle
+states remains constant over device context changes.
+
+I have not really properly thought through this but here's an idea.. how
+about an alternative interface between governor and driver? The cpuidle
+core would provide the expected wakeup time and currently enforced
+minimum latency to the driver and the driver would make the decision
+about the state to choose.
+
+	--Antti
