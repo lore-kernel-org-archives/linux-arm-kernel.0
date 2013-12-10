@@ -1,57 +1,29 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 10 Dec 2013 16:14:29 +0100
-Subject: [PATCH v4 0/7] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
- clock framework
-Message-ID: <201312101614.29781.heiko@sntech.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 10 Dec 2013 10:14:44 -0500
+Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
+In-Reply-To: <20131210025405.GB20090@saruman.home>
+References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
+ <1386627424-373-3-git-send-email-w-kwok2@ti.com>
+ <20131210025405.GB20090@saruman.home>
+Message-ID: <52A72FE4.4020105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Next try, this time with less time between submissions.
+On Monday 09 December 2013 09:54 PM, Balbi, Felipe wrote:
+> Hi,
+> 
+> On Mon, Dec 09, 2013 at 05:17:04PM -0500, WingMan Kwok wrote:
+>> +	ret = usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
+>> +	if (ret)
+>> +		return ret;
+>> +	k_phy->usb_phy_gen.phy.init = keystone_usbphy_init;
+>> +	k_phy->usb_phy_gen.phy.shutdown = keystone_usbphy_shutdown;
+> 
+> this *must* be initialized before adding the PHY to the subsystem. So
+> these two lines must be moved before usb_add_phy_dev().
+> 
+Make sense. Probably its good idea to repost the $subject patch with
+above as well as other delay related comment.
 
-Tested on both non-dt and dt s3c2416.
-
-Changes since v3:
-- address comments from Tomasz Figa (binding documentation, etc)
-- prevent conflicts with unconverted s3c24xx socs
-Changes since v2
-- address comments from Tomasz Figa
-- use new pll registration mechanism
-- use fixed-rate clocks for xti etc
-
-Heiko Stuebner (7):
-  clk: samsung: add pll_6552 variant for s3c2416
-  clk: samsung: add plls used by the s3c2443
-  dt-bindings: add binding for clock-controller of s3c2443 and following
-  clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
-  ARM: S3C24XX: prevent conflicts between ccf and non-ccf s3c24xx-socs
-  ARM: dt: add clock data for s3c2416
-  ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
-
- .../bindings/clock/samsung,s3c2443-clock.txt       |   56 ++
- arch/arm/boot/dts/s3c2416-smdk2416.dts             |   13 +
- arch/arm/boot/dts/s3c2416.dtsi                     |   42 ++
- arch/arm/mach-s3c24xx/Kconfig                      |   18 +-
- arch/arm/mach-s3c24xx/Makefile                     |    5 +-
- arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
- arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
- arch/arm/mach-s3c24xx/common-s3c2443.c             |  675 --------------------
- arch/arm/mach-s3c24xx/common.c                     |   18 +-
- arch/arm/mach-s3c24xx/common.h                     |    6 +
- arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
- arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
- arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
- drivers/clk/samsung/Makefile                       |    1 +
- drivers/clk/samsung/clk-pll.c                      |   84 ++-
- drivers/clk/samsung/clk-pll.h                      |    3 +
- drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
- include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
- 18 files changed, 756 insertions(+), 1114 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
- delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
- create mode 100644 drivers/clk/samsung/clk-s3c2443.c
- create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
-
--- 
-1.7.10.4
+Regards,
+Santosh
