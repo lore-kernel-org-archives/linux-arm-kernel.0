@@ -1,218 +1,111 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 11 Dec 2013 00:03:47 +0800
-Subject: [PATCH v6 1/7] arm64: introduce basic aarch64 instruction decoding
- helpers
-In-Reply-To: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
-References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1386691433-6827-2-git-send-email-liuj97@gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Tue, 10 Dec 2013 21:37:36 +0530
+Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
+In-Reply-To: <206A8D38-6E3D-44FE-83C4-E9B1923AF33B@suse.de>
+References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+ <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
+ <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
+ <CAAhSdy3yApns95J0T=-OCmpNvf0ZTBV-USmsS=9h+JMuQ40YyQ@mail.gmail.com>
+ <206A8D38-6E3D-44FE-83C4-E9B1923AF33B@suse.de>
+Message-ID: <CAAhSdy1voHH6aqG8PFf2-dH1OSKuTPMaDFibf+bP9whXSM3QWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce basic aarch64 instruction decoding helper
-aarch64_get_insn_class() and aarch64_insn_hotpatch_safe().
+On Tue, Dec 10, 2013 at 9:19 PM, Alexander Graf <agraf@suse.de> wrote:
+>
+> On 10.12.2013, at 05:23, Anup Patel <anup@brainfault.org> wrote:
+>
+>> On Tue, Dec 10, 2013 at 7:43 AM, Alexander Graf <agraf@suse.de> wrote:
+>>>
+>>> On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
+>>>
+>>>> Currently, we don't have an exit reason for VM reset emulation
+>>>> in user space hence this patch adds exit reason KVM_EXIT_RESET
+>>>> for this purpose.
+>>>>
+>>>> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
+>>>> in-kernel PSCI support to reset VMs.
+>>>>
+>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>>> ---
+>>>> include/uapi/linux/kvm.h |    1 +
+>>>> 1 file changed, 1 insertion(+)
+>>>>
+>>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>>>> index 902f124..64a04cc 100644
+>>>> --- a/include/uapi/linux/kvm.h
+>>>> +++ b/include/uapi/linux/kvm.h
+>>>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+>>>> #define KVM_EXIT_WATCHDOG         21
+>>>> #define KVM_EXIT_S390_TSCH        22
+>>>> #define KVM_EXIT_EPR              23
+>>>> +#define KVM_EXIT_RESET            24
+>>>
+>>> I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
+>>
+>> The KVM_EXIT_RESET gets triggered when system level reset is
+>> initiated by VCPU. For arm/arm64, this is through SYSTEM_RESET
+>> PSCI call. In KVM x86 SVM/VMX, we have KVM_EXIT_SHUTDOWN
+>> being used for system shutdown which we have re-used for arm/arm64.
+>
+> Yeah, that name already did mislead you once :).
+>
+> KVM_EXIT_SHUTDOWN happens on
+>
+>   * triple fault
+>   * CPU internal severe problems
+>
+> the latter is defined as:
+>
+> In contrast, an error that cannot be contained and is of such severity that it has compromised the continued operation of a processor core requires immediate action to terminate system processing and may result in a hardware-enforced shutdown. In the shutdown state, the execution of instructions by that processor core is halted. See Section 8.2.9 ?#DF?Double-Fault Exception (Vector 8)? on page 220 for a description of the shutdown processor state.
+>
+> Triple faults are used commonly in 286 code to switch from PG to real mode. So they _have_ to be emulated as core reset. Otherwise you break old guests.
+>
+> However, the scope of this exit is definitely vcpu wide. What you are looking for is a system wide notification. Commonly this happens through MMIO, but I can see why you wouldn't want that with PSCI interpreted in the kernel. That's why I asked you to create a completely new one to not add up the the confusion.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jiang Liu <liuj97@gmail.com>
----
- arch/arm64/include/asm/insn.h | 77 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile    |  2 +-
- arch/arm64/kernel/insn.c      | 91 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 169 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/insn.h
- create mode 100644 arch/arm64/kernel/insn.c
+Thanks for the info on the x86 part.
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-new file mode 100644
-index 0000000..1bdc44c
---- /dev/null
-+++ b/arch/arm64/include/asm/insn.h
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2013 Huawei Ltd.
-+ * Author: Jiang Liu <liuj97@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef	__ASM_INSN_H
-+#define	__ASM_INSN_H
-+#include <linux/types.h>
-+
-+/*
-+ * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-+ * Section C3.1 "A64 instruction index by encoding":
-+ * AArch64 main encoding table
-+ *  Bit position
-+ *   28 27 26 25	Encoding Group
-+ *   0  0  -  -		Unallocated
-+ *   1  0  0  -		Data processing, immediate
-+ *   1  0  1  -		Branch, exception generation and system instructions
-+ *   -  1  -  0		Loads and stores
-+ *   -  1  0  1		Data processing - register
-+ *   0  1  1  1		Data processing - SIMD and floating point
-+ *   1  1  1  1		Data processing - SIMD and floating point
-+ * "-" means "don't care"
-+ */
-+enum aarch64_insn_encoding_class {
-+	AARCH64_INSN_CLS_UNKNOWN,	/* UNALLOCATED */
-+	AARCH64_INSN_CLS_DP_IMM,	/* Data processing - immediate */
-+	AARCH64_INSN_CLS_DP_REG,	/* Data processing - register */
-+	AARCH64_INSN_CLS_DP_FPSIMD,	/* Data processing - SIMD and FP */
-+	AARCH64_INSN_CLS_LDST,		/* Loads and stores */
-+	AARCH64_INSN_CLS_BR_SYS,	/* Branch, exception generation and
-+					 * system instructions */
-+};
-+
-+enum aarch64_insn_hint_op {
-+	AARCH64_INSN_HINT_NOP	= 0x0 << 5,
-+	AARCH64_INSN_HINT_YIELD	= 0x1 << 5,
-+	AARCH64_INSN_HINT_WFE	= 0x2 << 5,
-+	AARCH64_INSN_HINT_WFI	= 0x3 << 5,
-+	AARCH64_INSN_HINT_SEV	= 0x4 << 5,
-+	AARCH64_INSN_HINT_SEVL	= 0x5 << 5,
-+};
-+
-+#define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
-+static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
-+{ return (code & (mask)) == (val); } \
-+static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
-+{ return (val); }
-+
-+__AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
-+__AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
-+__AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
-+__AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
-+__AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
-+__AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
-+__AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
-+
-+#undef	__AARCH64_INSN_FUNCS
-+
-+bool aarch64_insn_is_nop(u32 insn);
-+
-+enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-+
-+bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
-+
-+#endif	/* __ASM_INSN_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ba2fd4..cd95a25 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -9,7 +9,7 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o cpu_ops.o
-+			   hyp-stub.o psci.o cpu_ops.o insn.o
- 
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-new file mode 100644
-index 0000000..56a2498
---- /dev/null
-+++ b/arch/arm64/kernel/insn.c
-@@ -0,0 +1,91 @@
-+/*
-+ * Copyright (C) 2013 Huawei Ltd.
-+ * Author: Jiang Liu <liuj97@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/compiler.h>
-+#include <linux/kernel.h>
-+#include <asm/insn.h>
-+
-+static int aarch64_insn_encoding_class[] = {
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_REG,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_FPSIMD,
-+	AARCH64_INSN_CLS_DP_IMM,
-+	AARCH64_INSN_CLS_DP_IMM,
-+	AARCH64_INSN_CLS_BR_SYS,
-+	AARCH64_INSN_CLS_BR_SYS,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_REG,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_FPSIMD,
-+};
-+
-+enum aarch64_insn_encoding_class __kprobes aarch64_get_insn_class(u32 insn)
-+{
-+	return aarch64_insn_encoding_class[(insn >> 25) & 0xf];
-+}
-+
-+/* NOP is an alias of HINT */
-+bool __kprobes aarch64_insn_is_nop(u32 insn)
-+{
-+	if (!aarch64_insn_is_hint(insn))
-+		return false;
-+
-+	switch (insn & 0xFE0) {
-+	case AARCH64_INSN_HINT_YIELD:
-+	case AARCH64_INSN_HINT_WFE:
-+	case AARCH64_INSN_HINT_WFI:
-+	case AARCH64_INSN_HINT_SEV:
-+	case AARCH64_INSN_HINT_SEVL:
-+		return false;
-+	default:
-+		return true;
-+	}
-+}
-+
-+static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
-+{
-+	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
-+		return false;
-+
-+	return	aarch64_insn_is_b(insn) ||
-+		aarch64_insn_is_bl(insn) ||
-+		aarch64_insn_is_svc(insn) ||
-+		aarch64_insn_is_hvc(insn) ||
-+		aarch64_insn_is_smc(insn) ||
-+		aarch64_insn_is_brk(insn) ||
-+		aarch64_insn_is_nop(insn);
-+}
-+
-+/*
-+ * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-+ * Section B2.6.5 "Concurrent modification and execution of instructions":
-+ * Concurrent modification and execution of instructions can lead to the
-+ * resulting instruction performing any behavior that can be achieved by
-+ * executing any sequence of instructions that can be executed from the
-+ * same Exception level, except where the instruction before modification
-+ * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
-+ * or SMC instruction.
-+ */
-+bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
-+{
-+	return __aarch64_insn_hotpatch_safe(old_insn) &&
-+	       __aarch64_insn_hotpatch_safe(new_insn);
-+}
--- 
-1.8.1.2
+I think all this info should have been part of KVM api documentation
+for KVM_EXIT_SHUTDOWN.
+
+>
+>>
+>>>
+>>> I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
+>>>
+>>> Can we treat it as such? Could you please make this a common exit number that's called something like
+>>>
+>>>  KVM_EXIT_SYSTEM_EVENT
+>>>
+>>> with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
+>>>
+>>> That way it's obvious what's going on and people don't get confused.
+>>
+>> I don't foresee any system level operations other than SHUTDOWN
+>> and RESET to be handled from KVM in-kernel code but I might be
+>> wrong.
+>
+> The good but about the EXIT_SYSTEM_EVENT is that it's immediately obvious that we're not talking about a vcpu local event. But I'm open to better names.
+>
+>> May be we can rename KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET
+>> to KVM_EXIT_SYSTEM_SHUTDOWN and KVM_EXIT_SYSTEM_RESET ??
+>
+> You definitely can not rename KVM_EXIT_SHUTDOWN. It's part of the KVM API. In fact, I think it's a bad idea to even reuse the name as it clearly works on vcpu level.
+
+Sure, it makes sense to avoid use of KVM_EXIT_SHUTDOWN
+in arm/arm64.
+
+How about adding exit reasons KVM_EXIT_SYSTEM_RESET
+and KVM_EXIT_SYSTEM_SHUTDOWN ?
+
+These exit reasons will be used for arm/arm64 but can also be
+used by other architectures if they want.
+
+--
+Anup
+
+>
+>
+> Alex
+>
