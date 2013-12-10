@@ -1,46 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Dec 2013 19:22:17 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
- without PCI on ARM64
-In-Reply-To: <201312100428.52588.arnd@arndb.de>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312091735.05014.arnd@arndb.de>
- <20131209170617.GC30717@srcf.ucam.org>
- <201312100428.52588.arnd@arndb.de>
-Message-ID: <20131210192217.GI11468@sirena.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 10 Dec 2013 13:25:08 -0600
+Subject: OMAP still fails - usb phy stuff
+In-Reply-To: <20131210183809.GL13171@atomide.com>
+References: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
+ <20131210183809.GL13171@atomide.com>
+Message-ID: <20131210192508.GB2464@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 04:28:52AM +0100, Arnd Bergmann wrote:
-> On Monday 09 December 2013, Matthew Garrett wrote:
+On Tue, Dec 10, 2013 at 10:38:10AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 05:10]:
+> > I still see some OMAP randconfigs failing with this:
+> > 
+> > arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+> > dss-common.c:(.text+0x1396c): undefined reference to `usb_bind_phy'
+> > arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+> > dss-common.c:(.init.text+0x6c90): undefined reference to `usb_bind_phy'
+> > drivers/built-in.o: In function `omap_usb2_remove':
+> > powercap_sys.c:(.text+0x3520): undefined reference to `usb_remove_phy'
+> > drivers/built-in.o: In function `omap_usb_power_off':
+> > powercap_sys.c:(.text+0x3544): undefined reference to `omap_control_usb_phy_power'
+> > drivers/built-in.o: In function `omap_usb_power_on':
+> > powercap_sys.c:(.text+0x3568): undefined reference to `omap_control_usb_phy_power'
+> > drivers/built-in.o: In function `omap_usb2_probe':
+> > powercap_sys.c:(.text+0x3638): undefined reference to `omap_control_usb_phy_power'
+> > powercap_sys.c:(.text+0x36d4): undefined reference to `usb_add_phy_dev'
+> > drivers/built-in.o: In function `omap_usb2_suspend':
+> > powercap_sys.c:(.text+0x37d0): undefined reference to `omap_control_usb_phy_power'
+> > powercap_sys.c:(.text+0x37f4): undefined reference to `omap_control_usb_phy_power'
+> > drivers/built-in.o: In function `omap_usb2_set_comparator':
+> > powercap_sys.c:(.text+0x3844): undefined reference to `usb_get_phy'
+> > drivers/built-in.o: In function `isp1704_charger_remove':
+> > powercap_sys.c:(.text+0x48d5ec): undefined reference to `usb_put_phy'
+> > drivers/built-in.o: In function `isp1704_charger_probe':
+> > powercap_sys.c:(.text+0x48d64c): undefined reference to `usb_get_phy'
+> > powercap_sys.c:(.text+0x48d884): undefined reference to `usb_put_phy'
+> > drivers/built-in.o: In function `twl4030_bci_probe':
+> > powercap_sys.c:(.init.text+0x13fd4): undefined reference to `usb_get_phy'
+> > powercap_sys.c:(.init.text+0x14114): undefined reference to `usb_put_phy'
+> > 
+> > Probably caused by over-use of the damned select statement:
+> > 
+> > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+> > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+> > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+> > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+> > 
+> > You have to wonder why OMAP_USB2 can be enabled when USB_SUPPORT is
+> > disabled.
+> 
+> Yeah this causes constant randconfig errors. Felipe, I thought you
+> had some fixes lined up for these few weeks ago already when we
+> last talked about it?
 
-> > People are trying to deploy ACPI-based embedded x86, and most of the 
-> > ACPI/DT integration discussion seems to have been based on the idea that 
-> > this is a worthwhile thing to support. If we're not interested in doing 
-> > so then we should probably make that a whole kernel decision rather than 
-> > a per architecture one.
+For the warnings, yeah. Greg's pull request hasn't been appliet yet
+(need to check again, checked yesterday).
 
-> Well, except it's not an architecture independent decision. An embedded
-> x86 SoC will still be very much like a PC, just with a few things added
-> in and some other bits left out, and you can already describe it mostly
+For the build error, I'll send something today.
 
-It's not just the SoC, it's also the rest of the board.  The patches the
-Intel guys are submitting at the minute are mainly for the off-SoC
-devices at least as far as I noticed.  This'll impact anyone who ends up
-using ACPI, we need to at least pay attention to what's going on there.
-
-> with plain ACPI-5.0. Also, there are only a couple of different non-PC style
-> devices that Intel is integrating into their SoCs, so we're talking
-> about a few dozen device drivers here.
-
-It's going to be way more than that for the whole system, and you can't
-assume that all the system integrators are going to pay a blind bit of
-notice to the reference designs.  Some will just clone them but others
-will bin them and do their own thing.
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/fc53cb0f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/dfcbea7d/attachment.sig>
