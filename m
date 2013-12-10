@@ -1,37 +1,61 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 00:25:47 -0800
-Subject: [PATCH 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131203082343.GK31626@lee--X1>
-References: <1385447575-23773-1-git-send-email-b32955@freescale.com>
- <20131127043253.GA9468@ld-irv-0074.broadcom.com>
- <5298AA23.7080404@st.com> <529C5BBF.6000604@freescale.com>
- <529C6CBB.4000008@st.com> <529D7838.6030606@freescale.com>
- <20131203082343.GK31626@lee--X1>
-Message-ID: <20131210082547.GC11489@norris.computersforpeace.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Dec 2013 08:40:42 +0000
+Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
+In-Reply-To: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131210084042.GN12675@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 03, 2013 at 08:23:43AM +0000, Lee Jones wrote:
-> I would like to make a suggestion to Brian though. Even if the new
-> framework is written within the next couple of months and the
-> semantics do suit the FSM Controller driver, I'd still like the
-> implementation that's currently on the list to be applied. That way
-> we'd have a known good version of the driver which is almost identical
-> to how ST's internal driver does now. The one that is present out in
-> the wild (i.e. _real_ products).
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> mfd_add_device() assigns .of_node in the device objects it creates only
+> if the mfd_cell for the device has the .of_compatible field set and the
+> DT node for the top-level MFD device contains a child whose compatible
+> property matches the cell's .of_compatible field.
+> 
+> This leaves .of_node unset in many cases. When this happens, entries in
+> the DT /aliases property which refer to the top-level MFD DT node will
+> never match the MFD child devices, hence causing the requested alias not
+> to be honored.
+> 
+> Solve this by setting each MFD child device's .of_node equal to the top-
+> level MFD device's .of_node field in the cases where it would otherwise
+> remain unset.
 
-I think this suggestion is feasible: that we might merge this driver
-even if it doesn't try to fit to some (still vague) idea of what a "SPI
-NOR framework" should be. However, I don't know if the latter argument
-is valid; just because it's in real products doesn't mean we really want
-it as-is. But I think that in this case, the perfect may be the enemy of
-the good -- the "good" driver now is better than the "perfect" driver
-that never comes.
+How sure are you that this will be void of repercussions?
 
-> I will subsequently volunteer to provide my utmost best efforts to
-> port the driver over to the new framework as a new task once it has
-> landed.
+> The first use-case for this will be aliases for the TPS6586x's RTC
+> device.
 
-I'll hold you to that! Do we have any collateral for that guarantee? ;)
+Isn't it viable to supply the of_compatible strings for these nodes
+and search the parent for its alias property instead?
 
-Brian
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> The 3 patches in this series are all independent; they can be applied
+> to their respective subsystems in any order. I'm simply posting them as
+> a series to make the use-case more obvious.
+> ---
+>  drivers/mfd/mfd-core.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+> index 267649244737..32e8d47d9002 100644
+> --- a/drivers/mfd/mfd-core.c
+> +++ b/drivers/mfd/mfd-core.c
+> @@ -117,6 +117,8 @@ static int mfd_add_device(struct device *parent, int id,
+>  			}
+>  		}
+>  	}
+> +	if (!pdev->dev.of_node)
+> +		pdev->dev.of_node = parent->of_node;
+>  
+>  	if (cell->pdata_size) {
+>  		ret = platform_device_add_data(pdev,
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
