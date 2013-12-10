@@ -1,54 +1,36 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Dec 2013 15:14:43 -0800
-Subject: [PATCH] ARM: dts: msm: Fix gpio interrupt and reg length
-Message-ID: <1386717283-30227-1-git-send-email-sboyd@codeaurora.org>
+Date: Tue, 10 Dec 2013 15:19:04 -0800
+Subject: [PATCH 2/2] gpio: msm: Add module device table and mark table const
+In-Reply-To: <1386717544-478-1-git-send-email-sboyd@codeaurora.org>
+References: <1386717544-478-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1386717544-478-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The summary interrupt is #16 in the SPI space. Unfortunately,
-when this device was translated from board files to DT we forgot
-to subtract 16 from the interrupt number to translate it into a
-SPI interrupt. Also, the register space is larger than 4k, increase
-it appropriately so that the gpio driver doesn't try to access
-registers outside of its mapping.
+This allows the module to be loaded automatically.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8660-surf.dts | 4 ++--
- arch/arm/boot/dts/qcom-msm8960-cdp.dts  | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-msm-v2.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-index 8632991..12439f5 100644
---- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-@@ -30,11 +30,11 @@
+diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
+index 00a0978..a4dcbe4 100644
+--- a/drivers/gpio/gpio-msm-v2.c
++++ b/drivers/gpio/gpio-msm-v2.c
+@@ -430,10 +430,11 @@ static int msm_gpio_probe(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	msmgpio: gpio at 800000 {
- 		compatible = "qcom,msm-gpio";
--		reg = <0x00800000 0x1000>;
-+		reg = <0x00800000 0x4000>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpio = <173>;
--		interrupts = <0 32 0x4>;
-+		interrupts = <0 16 0x4>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 	};
-diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-index cf0956c..3a84c9a 100644
---- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-+++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-@@ -33,7 +33,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpio = <150>;
--		interrupts = <0 32 0x4>;
-+		interrupts = <0 16 0x4>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 		reg = <0x800000 0x4000>;
+-static struct of_device_id msm_gpio_of_match[] = {
++static const struct of_device_id msm_gpio_of_match[] = {
+ 	{ .compatible = "qcom,msm-gpio", },
+ 	{ },
+ };
++MODULE_DEVICE_TABLE(of, msm_gpio_of_match);
+ 
+ static int msm_gpio_remove(struct platform_device *dev)
+ {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
