@@ -1,94 +1,161 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon,  9 Dec 2013 16:12:13 -0800
-Subject: [PATCH 2/3] arm64: Enable CMA
+Date: Mon,  9 Dec 2013 16:12:14 -0800
+Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
 In-Reply-To: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
 References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1386634334-31139-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 bit targets need the features CMA provides. Add the appropriate
-hooks, header files, and Kconfig to allow this to happen.
+Some architectures may implement the CMA APIs to allow allocation
+of larger contiguous blocks of memory. Add support in the swiotlb
+alloc/free functions to allocate from the CMA APIs instead of the
+basic page allocator.
 
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/Kconfig                      |    1 +
- arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++++++
- arch/arm64/mm/init.c                    |    3 +++
- 3 files changed, 33 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/dma-contiguous.h
+ lib/swiotlb.c |   92 +++++++++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 files changed, 86 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 88c8b6c1..0dee133 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -24,6 +24,7 @@ config ARM64
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_ATTRS
-+	select HAVE_DMA_CONTIGUOUS
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
- 	select HAVE_MEMBLOCK
-diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
-new file mode 100644
-index 0000000..3d967f3
---- /dev/null
-+++ b/arch/arm64/include/asm/dma-contiguous.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef ASMARM64_DMA_CONTIGUOUS_H
-+#define ASMARM64_DMA_CONTIGUOUS_H
-+
-+#ifdef __KERNEL__
-+#ifdef CONFIG_DMA_CMA
-+
-+#include <linux/types.h>
-+#include <asm-generic/dma-contiguous.h>
-+
-+static inline void
-+dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
-+
-+#endif
-+#endif
-+
-+#endif
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 0cb8742..d0b4c2e 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -30,6 +30,7 @@
- #include <linux/memblock.h>
- #include <linux/sort.h>
- #include <linux/of_fdt.h>
+diff --git a/lib/swiotlb.c b/lib/swiotlb.c
+index e4399fa..77b4b17 100644
+--- a/lib/swiotlb.c
++++ b/lib/swiotlb.c
+@@ -29,6 +29,9 @@
+ #include <linux/ctype.h>
+ #include <linux/highmem.h>
+ #include <linux/gfp.h>
 +#include <linux/dma-contiguous.h>
++#include <linux/io.h>
++#include <linux/vmalloc.h>
  
- #include <asm/sections.h>
- #include <asm/setup.h>
-@@ -159,6 +160,8 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(base, size);
- 	}
- 
-+	dma_contiguous_reserve(0);
-+
- 	memblock_allow_resize();
- 	memblock_dump_all();
+ #include <asm/io.h>
+ #include <asm/dma.h>
+@@ -610,6 +613,66 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
  }
+ EXPORT_SYMBOL_GPL(swiotlb_tbl_sync_single);
+ 
++static void * __alloc_from_contiguous(struct device *hwdev, size_t size,
++					struct page **ret_page)
++{
++	unsigned long order = get_order(size);
++	size_t count = size >> PAGE_SHIFT;
++	struct page *page;
++	void *ptr = NULL;
++
++	page = dma_alloc_from_contiguous(hwdev, count, order);
++	if (!page)
++		return NULL;
++
++	if (PageHighMem(page)) {
++		struct vm_struct *area;
++		unsigned long addr;
++
++		/*
++		 * DMA allocation can be mapped to user space, so lets
++		 * set VM_USERMAP flags too.
++		 */
++		area = get_vm_area(size, VM_USERMAP);
++		if (!area)
++			goto err;
++		addr = (unsigned long)area->addr;
++		area->phys_addr = __pfn_to_phys(page_to_pfn(page));
++
++		if (ioremap_page_range(addr, addr + size, area->phys_addr,
++		    PAGE_KERNEL)) {
++			vunmap((void *)addr);
++			goto err;
++		}
++		ptr = area->addr;
++	} else {
++		ptr = page_address(page);
++	}
++
++	*ret_page = page;
++	return ptr;
++
++err:
++	dma_release_from_contiguous(hwdev, page, count);
++	return NULL;
++}
++
++static void __free_from_contiguous(struct device *hwdev, struct page *page,
++				void *cpu_addr, size_t size)
++{
++	if (PageHighMem(page)) {
++		struct vm_struct *area = find_vm_area(cpu_addr);
++		if (!area) {
++			WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
++			return;
++		}
++		unmap_kernel_range((unsigned long)cpu_addr, size);
++		vunmap(cpu_addr);
++	}
++	dma_release_from_contiguous(hwdev, page, size >> PAGE_SHIFT);
++}
++
++
+ void *
+ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
+ 		       dma_addr_t *dma_handle, gfp_t flags)
+@@ -618,18 +681,27 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
+ 	void *ret;
+ 	int order = get_order(size);
+ 	u64 dma_mask = DMA_BIT_MASK(32);
++	struct page *page;
+ 
+ 	if (hwdev && hwdev->coherent_dma_mask)
+ 		dma_mask = hwdev->coherent_dma_mask;
+ 
+-	ret = (void *)__get_free_pages(flags, order);
+-	if (ret) {
++	if (IS_ENABLED(CONFIG_DMA_CMA)) {
++		ret = __alloc_from_contiguous(hwdev, size, &page);
++		dev_addr = phys_to_dma(hwdev, page_to_phys(page));
++	} else {
++		ret = (void *)__get_free_pages(flags, order);
+ 		dev_addr = swiotlb_virt_to_bus(hwdev, ret);
++	}
++	if (ret) {
+ 		if (dev_addr + size - 1 > dma_mask) {
+ 			/*
+ 			 * The allocated memory isn't reachable by the device.
+ 			 */
+-			free_pages((unsigned long) ret, order);
++			if(IS_ENABLED(CONFIG_DMA_CMA))
++				__free_from_contiguous(hwdev, page, ret, size);
++			else
++				free_pages((unsigned long) ret, order);
+ 			ret = NULL;
+ 		}
+ 	}
+@@ -673,11 +745,19 @@ swiotlb_free_coherent(struct device *hwdev, size_t size, void *vaddr,
+ 	phys_addr_t paddr = dma_to_phys(hwdev, dev_addr);
+ 
+ 	WARN_ON(irqs_disabled());
+-	if (!is_swiotlb_buffer(paddr))
+-		free_pages((unsigned long)vaddr, get_order(size));
+-	else
++	if (!is_swiotlb_buffer(paddr)) {
++		if (IS_ENABLED(CONFIG_DMA_CMA)) {
++			__free_from_contiguous(hwdev,
++				pfn_to_page(paddr >> PAGE_SHIFT),
++				vaddr,
++				size);
++		} else {
++			free_pages((unsigned long)vaddr, get_order(size));
++		}
++	} else {
+ 		/* DMA_TO_DEVICE to avoid memcpy in swiotlb_tbl_unmap_single */
+ 		swiotlb_tbl_unmap_single(hwdev, paddr, size, DMA_TO_DEVICE);
++	}
+ }
+ EXPORT_SYMBOL(swiotlb_free_coherent);
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
