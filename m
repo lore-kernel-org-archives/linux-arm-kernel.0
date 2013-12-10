@@ -1,53 +1,278 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Dec 2013 09:54:21 -0700
-Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
-In-Reply-To: <20131210084042.GN12675@lee--X1>
-References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
- <20131210084042.GN12675@lee--X1>
-Message-ID: <52A7473D.5020109@wwwdotorg.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 10 Dec 2013 17:55:16 +0100
+Subject: [PATCH v5] ARM: new platform for Energy Micro's EFM32 Cortex-M3 SoCs
+Message-ID: <1386694516-5876-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 01:40 AM, Lee Jones wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> mfd_add_device() assigns .of_node in the device objects it creates only
->> if the mfd_cell for the device has the .of_compatible field set and the
->> DT node for the top-level MFD device contains a child whose compatible
->> property matches the cell's .of_compatible field.
->>
->> This leaves .of_node unset in many cases. When this happens, entries in
->> the DT /aliases property which refer to the top-level MFD DT node will
->> never match the MFD child devices, hence causing the requested alias not
->> to be honored.
->>
->> Solve this by setting each MFD child device's .of_node equal to the top-
->> level MFD device's .of_node field in the cases where it would otherwise
->> remain unset.
-> 
-> How sure are you that this will be void of repercussions?
+There are still some missing parts (e.g. board support, device trees),
+but with these bits added on top of this patch I can successfully boot a
+EFM32GG-DK3750 board that uses an EFM32GG990F1024.
 
-I'm simply hopeful:-) It doesn't seem likely that this would cause any
-issues, since presumably any devices that are being instantiated from DT
-either already work correctly, or wouldn't be affected by this change
-since they're manually searching whatever the appropriate DT node is.
-Are there any particular points you think I should look into?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
->> The first use-case for this will be aliases for the TPS6586x's RTC
->> device.
-> 
-> Isn't it viable to supply the of_compatible strings for these nodes
-> and search the parent for its alias property instead?
+I'd like to get this patch in for 3.14. The latest submission (v4,
+Message-Id:1383562853-17202-4-git-send-email-u.kleine-koenig at pengutronix.de)
+had some strict dependencies:
+ - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1
+   to be able to drop Makefile.boot, this is still in Status=Incoming in
+   rmk's patch tracker.
+ - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7890/1
+   to be able to drop the unused <mach/entry-macro.S>. This is already
+   applied by rmk in his for-next branch, so it's not stable yet.
+ - My series to drop <mach/timex.h> for !MULTI_PLATFORM. I'll send a
+   pull request for that soon.
+ - Patch "clocksource: time-efm32: Select CLKSRC_MMIO". This is part of
+   a pull request by Daniel Lezcano that is expected to hit Linus T.'s
+   tree for the next -rc. It currently sits as
+   4ff3774e451fefb1781638c76230b3cf9a206b92 in Daniel's tree at
+   git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/fixes
+   .
 
-I did think of that, but there are two reasons I chose not to do that
-initially:
+To make application a bit easier I added dummy files to drop the
+dependencies on the first three items of the list above.
 
-a) It requires that every single top-level MFD driver be edited to set
-the .of_compatible field in their mfd_cells array, whereas this patch
-automatically works for all drivers.
+So it would be great if you could apply this patch when 4ff3774e4 went
+in. (In case you want to apply it already now, this last dependency
+could be work arounded, too, by adding a "select CLKSRC_MMIO" to
+ARCH_EFM32.)
 
-b) The mfd_cells .of_compatible field is a single entry, whereas a
-top-level MFD driver could support an arbitrary number of DT compatible
-values. I suppose one could work around this by setting the mfd_cells
-.of_compatible field at run-time based on the actual compatible value of
-the top-level DT node, but that feels icky.
+Other than that the only change since v4 is that I mention the exact
+board/processor combo in the changelog now.
+
+Thanks for considering this patch, best regards
+Uwe
+
+ arch/arm/Kconfig                               |  19 ++++-
+ arch/arm/Makefile                              |   1 +
+ arch/arm/configs/efm32_defconfig               | 102 +++++++++++++++++++++++++
+ arch/arm/mach-efm32/Makefile                   |   1 +
+ arch/arm/mach-efm32/Makefile.boot              |   3 +
+ arch/arm/mach-efm32/dtmachine.c                |  15 ++++
+ arch/arm/mach-efm32/include/mach/entry-macro.S |   4 +
+ arch/arm/mach-efm32/include/mach/timex.h       |   3 +
+ 8 files changed, 147 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/configs/efm32_defconfig
+ create mode 100644 arch/arm/mach-efm32/Makefile
+ create mode 100644 arch/arm/mach-efm32/Makefile.boot
+ create mode 100644 arch/arm/mach-efm32/dtmachine.c
+ create mode 100644 arch/arm/mach-efm32/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-efm32/include/mach/timex.h
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..38ed5a9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -410,6 +410,23 @@ config ARCH_EBSA110
+ 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
+ 	  parallel port.
+ 
++config ARCH_EFM32
++	bool "Energy Micro efm32"
++	depends on !MMU
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_NVIC
++	select CLKSRC_OF
++	select COMMON_CLK
++	select CPU_V7M
++	select GENERIC_CLOCKEVENTS
++	select NO_DMA
++	select NO_IOPORT
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
++	  processors.
++
+ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+@@ -1799,7 +1816,7 @@ config FORCE_MAX_ZONEORDER
+ 	int "Maximum zone order" if ARCH_SHMOBILE
+ 	range 11 64 if ARCH_SHMOBILE
+ 	default "12" if SOC_AM33XX
+-	default "9" if SA1111
++	default "9" if SA1111 || ARCH_EFM32
+ 	default "11"
+ 	help
+ 	  The kernel memory allocator divides physically contiguous memory
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c99b108..6da9abb 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -153,6 +153,7 @@ machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
+ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
+ machine-$(CONFIG_ARCH_DOVE)		+= dove
+ machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
++machine-$(CONFIG_ARCH_EFM32)		+= efm32
+ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
+diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
+new file mode 100644
+index 0000000..f59fffb
+--- /dev/null
++++ b/arch/arm/configs/efm32_defconfig
+@@ -0,0 +1,102 @@
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=12
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++# CONFIG_UID16 is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_EFM32=y
++# CONFIG_KUSER_HELPERS is not set
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x88000000
++CONFIG_DRAM_SIZE=0x00400000
++CONFIG_FLASH_MEM_BASE=0x8c000000
++CONFIG_FLASH_SIZE=0x01000000
++CONFIG_PREEMPT=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_XIP_KERNEL=y
++CONFIG_XIP_PHYS_ADDR=0x8c000000
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_COREDUMP is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++CONFIG_MTD=y
++CONFIG_MTD_BLOCK_RO=y
++CONFIG_MTD_ROM=y
++CONFIG_MTD_UCLINUX=y
++CONFIG_PROC_DEVICETREE=y
++# CONFIG_BLK_DEV is not set
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++CONFIG_KS8851=y
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NONSTANDARD=y
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_EFM32_UART=y
++CONFIG_SERIAL_EFM32_UART_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_SPI=y
++CONFIG_SPI_EFM32=y
++CONFIG_GPIO_SYSFS=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SPI=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT2_FS=y
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_MTD=y
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
+diff --git a/arch/arm/mach-efm32/Makefile b/arch/arm/mach-efm32/Makefile
+new file mode 100644
+index 0000000..3a74af7
+--- /dev/null
++++ b/arch/arm/mach-efm32/Makefile
+@@ -0,0 +1 @@
++obj-y += dtmachine.o
+diff --git a/arch/arm/mach-efm32/Makefile.boot b/arch/arm/mach-efm32/Makefile.boot
+new file mode 100644
+index 0000000..eacfc3f
+--- /dev/null
++++ b/arch/arm/mach-efm32/Makefile.boot
+@@ -0,0 +1,3 @@
++# Empty file waiting for deletion once Makefile.boot isn't needed any more.
++# Patch waits for application at
++# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
+diff --git a/arch/arm/mach-efm32/dtmachine.c b/arch/arm/mach-efm32/dtmachine.c
+new file mode 100644
+index 0000000..2367495
+--- /dev/null
++++ b/arch/arm/mach-efm32/dtmachine.c
+@@ -0,0 +1,15 @@
++#include <linux/kernel.h>
++
++#include <asm/v7m.h>
++
++#include <asm/mach/arch.h>
++
++static const char *const efm32gg_compat[] __initconst = {
++	"efm32,dk3750",
++	NULL
++};
++
++DT_MACHINE_START(EFM32DT, "EFM32 (Device Tree Support)")
++	.dt_compat = efm32gg_compat,
++	.restart = armv7m_restart,
++MACHINE_END
+diff --git a/arch/arm/mach-efm32/include/mach/entry-macro.S b/arch/arm/mach-efm32/include/mach/entry-macro.S
+new file mode 100644
+index 0000000..322159d
+--- /dev/null
++++ b/arch/arm/mach-efm32/include/mach/entry-macro.S
+@@ -0,0 +1,4 @@
++/*
++ * Empty file waiting for deletion once <mach/entry-macro.S> isn't needed any
++ * more. Patch "ARM: v7-M: drop using mach/entry-macro.S" sitting in next.
++ */
+diff --git a/arch/arm/mach-efm32/include/mach/timex.h b/arch/arm/mach-efm32/include/mach/timex.h
+new file mode 100644
+index 0000000..7a8b26d
+--- /dev/null
++++ b/arch/arm/mach-efm32/include/mach/timex.h
+@@ -0,0 +1,3 @@
++/*
++ * Empty file waiting for deletion once <mach/timex.h> isn't needed any more.
++ */
+-- 
+1.8.4.4
