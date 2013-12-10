@@ -1,52 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Dec 2013 13:33:03 +0100
-Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <201312061814.15730.arnd@arndb.de>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <201312060140.10376.arnd@arndb.de>
- <1386347911.7152.70.camel@host5.omatika.ru>
- <201312061814.15730.arnd@arndb.de>
-Message-ID: <CACRpkdYF-O6Qgjue6x+R6fVuSXSyO4YHw1meusuyQhtSA9PnvQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 10 Dec 2013 12:40:19 +0000
+Subject: [Linaro-acpi] [PATCH v3 5/5] ACPI: do not map/unmap memory
+ regions for FADT entries in reduced HW mode
+In-Reply-To: <1386192127-28564-6-git-send-email-al.stone@linaro.org>
+References: <1386192127-28564-1-git-send-email-al.stone@linaro.org> <
+ 1386192127-28564-6-git-send-email-al.stone@linaro.org>
+Message-ID: <20131210124019.C14A5C40A27@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 6, 2013 at 6:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 06 December 2013, Sergei Ianovich wrote:
->> On Fri, 2013-12-06 at 01:40 +0100, Arnd Bergmann wrote:
->>
->> > > +
->> > > +static struct irq_chip lp8x4x_irq_chip = {
->> > > +     .name                   = "FPGA",
->> > > +     .irq_ack                = lp8x4x_ack_irq,
->> > > +     .irq_mask               = lp8x4x_mask_irq,
->> > > +     .irq_unmask             = lp8x4x_unmask_irq,
->> > > +};
->> >
->> > Please try to move the irqchip code to drivers/irqchip/.
->>
->> CONFIG_IRQCHIP depends on CONFIG_OF_IRQ which in turn depends on Open
->> Firmware.
->
-> Hmm, I wonder if we should try to change Kconfig then. Let's leave it
-> alone for now, maybe Linus Walleij has some comments since he has
-> been looking into moving drivers out in the past.
+On Wed,  4 Dec 2013 14:22:07 -0700, al.stone at linaro.org wrote:
+> From: Al Stone <al.stone@linaro.org>
+> 
+> Several of the FADT fields are normally kept in specific memory
+> regions.  Since these fields are to be ignored in hardware reduced
+> ACPI mode, do not map those addresses when in that mode, and of
+> course do not release the mappings that have not been made.
+> 
+> The function acpi_os_initialize() could become a stub in the header
+> file but is left here in case it can be of further use.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>  drivers/acpi/osl.c | 20 ++++++++++++--------
+>  1 file changed, 12 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+> index 613e4a1..3a0bb92 100644
+> --- a/drivers/acpi/osl.c
+> +++ b/drivers/acpi/osl.c
+> @@ -1776,10 +1776,12 @@ __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
+>  
+>  acpi_status __init acpi_os_initialize(void)
+>  {
+> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
+> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
+> +	if (!acpi_gbl_reduced_hardware) {
+> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
+> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
+> +	}
 
-I don't get this, if the subarch has deps in place for IRQCHIP and
-OF_IRQ just move the implementation to drivers/irqchip/foo.c
-edit drivers/irqchip/Makefile to compile the file for ARCH_FOO.
-What would the problem be? It's not like having the irqchip in the
-object is optional...
+So, I'm confused. This patch is making the hardware reduced decision at
+runtime (which is good), but the other patches are using #ifdef blocks
+to take the code right out. Why the discrepancy?
 
-I would prefer if you augment the code to use
-IRQCHIP_DECLARE() so you can get rid of all the criss-cross
-calls, but this init contains a comment saying that GPIO
-has to be up before you initialize the irq_chip, can you please
-explain why it's like that?
-
-Another way is to create a separate Kconfig entry for it in
-drivers/irqchip/Kconfig if you want the set-up to be more
-distributed, but that is usually just done when the irqchip is
-used on more than one platform.
-
-Yours,
-Linus Walleij
+g.
