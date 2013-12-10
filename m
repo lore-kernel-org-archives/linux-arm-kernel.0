@@ -1,112 +1,51 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 10 Dec 2013 17:45:31 +0100
-Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
-In-Reply-To: <CAAhSdy1voHH6aqG8PFf2-dH1OSKuTPMaDFibf+bP9whXSM3QWw@mail.gmail.com>
-References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
- <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
- <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
- <CAAhSdy3yApns95J0T=-OCmpNvf0ZTBV-USmsS=9h+JMuQ40YyQ@mail.gmail.com>
- <206A8D38-6E3D-44FE-83C4-E9B1923AF33B@suse.de>
- <CAAhSdy1voHH6aqG8PFf2-dH1OSKuTPMaDFibf+bP9whXSM3QWw@mail.gmail.com>
-Message-ID: <DF4E61FD-DBF8-43FA-A070-3ADA4E4874B4@suse.de>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 10 Dec 2013 10:45:38 -0600
+Subject: [RESEND PATCH] clk: socfpga: Remove socfpga_init_clocks
+Message-ID: <1386693938-29657-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dinh Nguyen <dinguyen@altera.com>
 
-On 10.12.2013, at 17:07, Anup Patel <anup@brainfault.org> wrote:
+The only thing that socfpga_init_clocks was doing setting up the smp_twd clock.
+Now that twd-timer's clock phandle is populated in the DTS, we can remove
+this function.
 
-> On Tue, Dec 10, 2013 at 9:19 PM, Alexander Graf <agraf@suse.de> wrote:
->> 
->> On 10.12.2013, at 05:23, Anup Patel <anup@brainfault.org> wrote:
->> 
->>> On Tue, Dec 10, 2013 at 7:43 AM, Alexander Graf <agraf@suse.de> wrote:
->>>> 
->>>> On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
->>>> 
->>>>> Currently, we don't have an exit reason for VM reset emulation
->>>>> in user space hence this patch adds exit reason KVM_EXIT_RESET
->>>>> for this purpose.
->>>>> 
->>>>> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
->>>>> in-kernel PSCI support to reset VMs.
->>>>> 
->>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>>> ---
->>>>> include/uapi/linux/kvm.h |    1 +
->>>>> 1 file changed, 1 insertion(+)
->>>>> 
->>>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->>>>> index 902f124..64a04cc 100644
->>>>> --- a/include/uapi/linux/kvm.h
->>>>> +++ b/include/uapi/linux/kvm.h
->>>>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->>>>> #define KVM_EXIT_WATCHDOG         21
->>>>> #define KVM_EXIT_S390_TSCH        22
->>>>> #define KVM_EXIT_EPR              23
->>>>> +#define KVM_EXIT_RESET            24
->>>> 
->>>> I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
->>> 
->>> The KVM_EXIT_RESET gets triggered when system level reset is
->>> initiated by VCPU. For arm/arm64, this is through SYSTEM_RESET
->>> PSCI call. In KVM x86 SVM/VMX, we have KVM_EXIT_SHUTDOWN
->>> being used for system shutdown which we have re-used for arm/arm64.
->> 
->> Yeah, that name already did mislead you once :).
->> 
->> KVM_EXIT_SHUTDOWN happens on
->> 
->>  * triple fault
->>  * CPU internal severe problems
->> 
->> the latter is defined as:
->> 
->> In contrast, an error that cannot be contained and is of such severity that it has compromised the continued operation of a processor core requires immediate action to terminate system processing and may result in a hardware-enforced shutdown. In the shutdown state, the execution of instructions by that processor core is halted. See Section 8.2.9 ?#DF?Double-Fault Exception (Vector 8)? on page 220 for a description of the shutdown processor state.
->> 
->> Triple faults are used commonly in 286 code to switch from PG to real mode. So they _have_ to be emulated as core reset. Otherwise you break old guests.
->> 
->> However, the scope of this exit is definitely vcpu wide. What you are looking for is a system wide notification. Commonly this happens through MMIO, but I can see why you wouldn't want that with PSCI interpreted in the kernel. That's why I asked you to create a completely new one to not add up the the confusion.
-> 
-> Thanks for the info on the x86 part.
-> 
-> I think all this info should have been part of KVM api documentation
-> for KVM_EXIT_SHUTDOWN.
-> 
->> 
->>> 
->>>> 
->>>> I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
->>>> 
->>>> Can we treat it as such? Could you please make this a common exit number that's called something like
->>>> 
->>>> KVM_EXIT_SYSTEM_EVENT
->>>> 
->>>> with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
->>>> 
->>>> That way it's obvious what's going on and people don't get confused.
->>> 
->>> I don't foresee any system level operations other than SHUTDOWN
->>> and RESET to be handled from KVM in-kernel code but I might be
->>> wrong.
->> 
->> The good but about the EXIT_SYSTEM_EVENT is that it's immediately obvious that we're not talking about a vcpu local event. But I'm open to better names.
->> 
->>> May be we can rename KVM_EXIT_SHUTDOWN and KVM_EXIT_RESET
->>> to KVM_EXIT_SYSTEM_SHUTDOWN and KVM_EXIT_SYSTEM_RESET ??
->> 
->> You definitely can not rename KVM_EXIT_SHUTDOWN. It's part of the KVM API. In fact, I think it's a bad idea to even reuse the name as it clearly works on vcpu level.
-> 
-> Sure, it makes sense to avoid use of KVM_EXIT_SHUTDOWN
-> in arm/arm64.
-> 
-> How about adding exit reasons KVM_EXIT_SYSTEM_RESET
-> and KVM_EXIT_SYSTEM_SHUTDOWN ?
-> 
-> These exit reasons will be used for arm/arm64 but can also be
-> used by other architectures if they want.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ arch/arm/mach-socfpga/socfpga.c |    1 -
+ drivers/clk/socfpga/clk.c       |   10 ----------
+ 2 files changed, 11 deletions(-)
 
-I don't think we'll be able to reuse anything for other archs. For hcall PPC for example, we want to keep the hcall number scheme as the same between guest <-> kvm and kvm <-> qemu. That makes the overall logic easier, as the hcall number space is already properly standardized.
-
-
-Alex
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index c43c281..d86231e 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -102,7 +102,6 @@ static void __init socfpga_cyclone5_init(void)
+ {
+ 	l2x0_of_init(0, ~0UL);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	socfpga_init_clocks();
+ }
+ 
+ static const char *altera_dt_match[] = {
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index d10dd4f..67ad200 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -348,13 +348,3 @@ static void __init socfpga_clkmgr_init(struct device_node *node)
+ }
+ CLK_OF_DECLARE(socfpga_mgr, "altr,clk-mgr", socfpga_clkmgr_init);
+ 
+-void __init socfpga_init_clocks(void)
+-{
+-	struct clk *clk;
+-	int ret;
+-
+-	clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
+-	ret = clk_register_clkdev(clk, NULL, "smp_twd");
+-	if (ret)
+-		pr_err("smp_twd alias not registered\n");
+-}
+-- 
+1.7.9.5
