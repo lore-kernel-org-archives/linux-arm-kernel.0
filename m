@@ -1,50 +1,45 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 09 Dec 2013 16:06:58 -0800
-Subject: [GIT PULL] two regression fixes and two more omap dt fixes
- against v3.13-rc2
-In-Reply-To: <52a4fc3b.6494420a.5e2f.7338SMTPIN_ADDED_BROKEN@mx.google.com>
- (Tony Lindgren's message of "Sun, 8 Dec 2013 15:09:40 -0800")
-References: <52a4fc3b.6494420a.5e2f.7338SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <87bo0p602l.fsf@linaro.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 9 Dec 2013 16:11:34 -0800
+Subject: [PATCH v3 02/23] mm/memblock: debug: don't free reserved array
+ if !ARCH_DISCARD_MEMBLOCK
+In-Reply-To: <1386625856-12942-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386625856-12942-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131209161134.e161ddfedf284f2052cad4a5@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Mon, 9 Dec 2013 16:50:35 -0500 Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-> The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
->
->   Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/yet-more-dt-regressions-take2
->
-> for you to fetch changes up to f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
->
->   ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
->
-> ----------------------------------------------------------------
-> A rather big fix for a regression where we have dropped omap4 hwmod
-> data earlier but are not initializing it from device tree. In addition
-> to this fix we eventually also be fix the issues in the .dts files
-> and drivers, but that's too intrusive for the -rc cycle and must be
-> done later on.
->
-> Also a fix for a regression where we now are wrongly trying to initialize
-> devices on secure omaps like n900 and n9* when booted using device tree.
-> We need to set aes, sham and timer12 to disabled mode for secure
-> devices as they are claimed by the firmware running in the secure mode.
->
-> And two more legacy booting vs device tree based booting fixes for
-> am3517 that I did not notice earlier until Nishant Menon reported
-> these to me few days ago. With these we're good to go having v3.13
-> working both for legacy booting and device tree based booting, and we
-> can then go ahed and drop the legacy booting for mach-omap2 for v3.14.
->
-> ----------------------------------------------------------------
+> Now the Nobootmem allocator will always try to free memory allocated for
+> reserved memory regions (free_low_memory_core_early()) without taking
+> into to account current memblock debugging configuration
+> (CONFIG_ARCH_DISCARD_MEMBLOCK and CONFIG_DEBUG_FS state).
+> As result if:
+>  - CONFIG_DEBUG_FS defined
+>  - CONFIG_ARCH_DISCARD_MEMBLOCK not defined;
+> -  reserved memory regions array have been resized during boot
+> 
+> then:
+> - memory allocated for reserved memory regions array will be freed to
+> buddy allocator;
+> - debug_fs entry "sys/kernel/debug/memblock/reserved" will show garbage
+> instead of state of memory reservations. like:
+>    0: 0x98393bc0..0x9a393bbf
+>    1: 0xff120000..0xff11ffff
+>    2: 0x00000000..0xffffffff
+> 
+> Hence, do not free memory allocated for reserved memory regions if
+> defined(CONFIG_DEBUG_FS) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK).
 
-Pulled into fixes,
+Alternatives:
 
-Thanks,
+- disable /proc/sys/kernel/debug/memblock/reserved in this case
 
-Kevin
+- disable defined(CONFIG_DEBUG_FS) &&
+  !defined(CONFIG_ARCH_DISCARD_MEMBLOCK) in Kconfig.
+
+How much memory are we talking about here?  If it's more than "very
+little" then I think either of these would be better - most users will
+value the extra memory over an accurate
+/proc/sys/kernel/debug/memblock/reserved?
