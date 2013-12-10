@@ -1,85 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Dec 2013 11:27:27 -0800
-Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
-In-Reply-To: <20131210185902.GO13171@atomide.com>
-References: <pull-1386643347-596413>
- <alpine.DEB.2.02.1312101034360.32309@utopia.booyaka.com>
- <20131210185902.GO13171@atomide.com>
-Message-ID: <20131210192726.GR13171@atomide.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 10 Dec 2013 11:27:59 -0800
+Subject: [GIT PULL] at91: dt for 3.14 #1
+In-Reply-To: <1386602585-1927-1-git-send-email-nicolas.ferre@atmel.com>
+ (Nicolas Ferre's message of "Mon, 9 Dec 2013 16:23:05 +0100")
+References: <1386602585-1927-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <87txeg7bgg.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131210 11:00]:
-> * Paul Walmsley <paul@pwsan.com> [131210 10:47]:
-> > On Mon, 9 Dec 2013, Tony Lindgren wrote:
-> > 
-> > > The following changes since commit f2e2c9d9b4087b74eb9e00d8dfac148354cb0b71:
-> > > 
-> > >   ARM: dts: Fix booting for secure omaps (2013-12-06 15:30:43 -0800)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/omap3-board-removal-signed
-> > > 
-> > > for you to fetch changes up to 736e812636ea72be444b85fa7e92554967459069:
-> > > 
-> > >   ARM: OMAP2+: Remove unused platform init code and headers (2013-12-08 14:15:46 -0800)
-> > 
-> > The description in Tony's pull request below alludes to what regressions 
-> > will occur when this is pulled.  But just to state it in terms of what 
-> > happened on the local testbed here when I tried it:
-> > 
-> > - CM-T3517 booting will break since there's no .dts file for it.  Are
-> >   there other boards that will be affected here too?
-> 
-> Yeah the cm-t3770 is on my todo list, but I've left it last as it's my
-> home router and has been behaving quite nicely.
-> 
-> That should then cover:
-> 
-> SBC-T3530
-> http://compulab.co.il/products/sbcs/sbc-t3530/
-> 
-> SBC-T3517
-> http://compulab.co.il/products/sbcs/sbc-t3517/
-> 
-> SBC-T3730
-> http://compulab.co.il/products/sbcs/sbc-t3730/
-> 
-> They all seem to have the same baseboard, and the CPU module is
-> different. So getting the 3530 and 3517 variants working should
-> be trivial. I don't have 3530 or 3517 variants, so somebody else
-> will need to do those two.
-> 
-> And Nishant just posted a .dts file for the 3517 craneboard.
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-And here's a list of other boards we don't have .dts file for if
-people have these:
+> Arnd, Olof, Kevin,
+>
+> First pull-request focusing on DT material for AT91 on 3.14. This one is also
+> based on the "cleanup" material already in arm-soc tree (at91/sama5-ccf) like
+> all other AT91 pull-requests for 3.14.
+>
+> Thanks, best regards,
+>
+> The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
+>
+>   ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
+>
+> are available in the git repository at:
+>
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>
+> for you to fetch changes up to ca594844e4a53f778811c06feef60bdf36bc5fec:
+>
+>   ARM: at91/at91rm9200ek.dts: rearrange nodes in address ascending order (2013-12-09 15:08:57 +0100)
+>
+> ----------------------------------------------------------------
+> First DT pull-request for 3.14
+> - many little corrections and documentation updates
+> - LCD FB Device Tree for at91sam9263 and at91sam9g45 boards
+> - crypto peripherals DT entries + DMA specification
+> - new Cosino board
+>
+> ----------------------------------------------------------------
 
-board-devkit8000.c		omap3-ldp.dts or omap3-beagle.dts is a good starting point
-board-omap3logic.c		omap3-ldp.dts or omap3-beagle.dts is a good starting point
-board-omap3pandora.c		omap3-ldp.dts or omap3-beagle.dts is a good starting point
-board-omap3stalker.c
-board-omap3touchbook.c
+Pulled into next/dt.
 
-For the ones above, omap3-ldp.dts or omap3-beagle.dts are good starting
-points. There's the DPI display pdata patch too, but it seems we want to
-wait to see if Tomi gets his display changes done before applying that.
+Thanks,
 
-I don't have any of the ones above, so people using those please
-do the .dts files ASAP.
-
-Or send me those boards with working boot loaders and I'll do them at
-a rate of one board per day or so.. And then you're stuck with my
-criteria of "usable" which is usually serial port and NFS root unless
-I really like the board, mhuwahuaaaahh!
-
-board-ti8168evm.c
-
-I doubt ti8168evm has even worked for a long time.. It's in pretty
-sorry state unfortunately with missing clock support and missing
-handle_irq entry in the board-ti8168evm.c.
-
-Regards,
-
-Tony
+Kevin
