@@ -1,56 +1,65 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Dec 2013 10:09:43 +0100
-Subject: [PATCH 2/2] regulator: s5m8767: Fix driver probe fail on BUCK7/8
- regulators
-In-Reply-To: <1386666583-3280-1-git-send-email-k.kozlowski@samsung.com>
-References: <1386666583-3280-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1386666583-3280-2-git-send-email-k.kozlowski@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Dec 2013 09:20:50 +0000
+Subject: [PATCH v3 11/15] mfd: menelaus: Start to use irqdomain
+In-Reply-To: <1386606085-26838-11-git-send-email-balbi@ti.com>
+References: <20131209161422.GC24047@saruman.home>
+ <1386606085-26838-1-git-send-email-balbi@ti.com>
+ <1386606085-26838-11-git-send-email-balbi@ti.com>
+Message-ID: <20131210092050.GT12675@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BUCK7 and BUCK8 were not supported by s5m8767 driver. If they were
-configured in DTS then the driver probing would fail with EINVAL:
-[    0.288474] VCC_SUB_1.35V: failed to apply 1350000uV constraint
-[    0.288671] s5m8767-pmic s5m8767-pmic: regulator init failed for 35
-[    0.294931] s5m8767-pmic: probe of s5m8767-pmic failed with error -22
+> Introduce an irq_chip and irq_domain for menelaus driver. Following
+> patches will convert uses to traditional request_threaded_irq().
+> 
+> While at that, some better error handling had to be added, so we could
+> free irq descs we allocated.
+> 
+> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/mfd/menelaus.c | 127 ++++++++++++++++++++++++++++++++++++++++++++++---
 
-This patch adds support for BUCK7 and BUCK8 regulators using standard
-regmap get/set voltage sel functions.
+<snip>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/regulator/s5m8767.c |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+> +	irq_domain_add_legacy(node, MENELAUS_NR_IRQS, irq_base, 0,
+> +			&irq_domain_simple_ops, m);
 
-diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
-index 58eb7a6c45e6..397917611ecd 100644
---- a/drivers/regulator/s5m8767.c
-+++ b/drivers/regulator/s5m8767.c
-@@ -120,8 +120,8 @@ static const struct sec_voltage_desc *reg_voltage_map[] = {
- 	[S5M8767_BUCK4] = &buck_voltage_val2,
- 	[S5M8767_BUCK5] = &buck_voltage_val1,
- 	[S5M8767_BUCK6] = &buck_voltage_val1,
--	[S5M8767_BUCK7] = NULL,
--	[S5M8767_BUCK8] = NULL,
-+	[S5M8767_BUCK7] = &buck_voltage_val3,
-+	[S5M8767_BUCK8] = &buck_voltage_val3,
- 	[S5M8767_BUCK9] = &buck_voltage_val3,
- };
- 
-@@ -418,9 +418,12 @@ static struct regulator_ops s5m8767_ops = {
- };
- 
- static struct regulator_ops s5m8767_buck78_ops = {
-+	.list_voltage		= regulator_list_voltage_linear,
- 	.is_enabled		= s5m8767_reg_is_enabled,
- 	.enable			= s5m8767_reg_enable,
- 	.disable		= s5m8767_reg_disable,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
- };
- 
- #define s5m8767_regulator_desc(_name) {		\
+When will this driver become DT compliant?
+
+I think you should use irq_domain_add_simple() to future proof
+yourself a little.
+
+> +	m->irq_base = irq_base;
+> +
+> +	for (i = irq_base; i < irq_base + MENELAUS_NR_IRQS; i++) {
+> +		irq_set_chip_data(i, m);
+> +		irq_set_chip_and_handler(i, &menelaus_irq_chip,
+> +				handle_simple_irq);
+> +		irq_set_nested_thread(i, 1);
+> +		set_irq_flags(i, IRQF_VALID);
+
+This assumes that this h/w only exists on ARM platforms. Is that true?
+
+> +	}
+
+This is usually completed in an *_irq_map() operation call-back.
+
+I can't see where you reverse this process either (usually *_irq_unmap())
+
+<snip>
+
+> -	mutex_init(&m->lock);
+> -
+
+This doesn't belong in this patch.
+
+It should have been removed with the final use of the lock was.
+
+<snip>
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
