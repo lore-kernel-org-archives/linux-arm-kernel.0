@@ -1,54 +1,52 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 10 Dec 2013 20:56:02 +0800
-Subject: [PATCH 0/6] mmc: sdhci: a few fixes on timeout and max_discard_to
-Message-ID: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+Date: Tue, 10 Dec 2013 20:56:06 +0800
+Subject: [PATCH 4/6] mmc: sdhci-esdhc-imx: set the correct max timeout value
+ for uSDHC
+In-Reply-To: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+Message-ID: <1386680168-5227-5-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
-1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
-while 3~4 fix setting the max timeout.
-Thus it introduces two new platform hook: get_max_timeout and set_timeout
-for those platform which have different timeout setting.
+The default sdhci driver write 0xE into timeout counter register to
+set the maximum timeout. The value is not correct for uSDHC since the
+max counter value for uSDHC is 0xF.
+Instead of using common timeout code in sdhci, we implement esdhc_set_timeout
+to handle the difference between eSDHC and uSDHC.
 
-This issue is firstly reported here by Ed Sutter:
-http://www.spinics.net/lists/linux-mmc/msg23375.html
-The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
-which cause the max_discard_bytes for eMMC is only 512, then the discard operation
-of mkfs.ext3 for an eMMC card is too slow, just like dead.
-With above patches, the issue can be fixed.
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-Patch 5~6 adds the capability to calcalute the max_discard_to dynamically
-for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
-
-Originally the max_discard_to for a high speed sdhc card may be:
-mmc1: new high speed SDHC card at address aaaa
-mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
-After fix:
-mmc1: new high speed SDHC card@address aaaa
-mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
-
-It also improves the card discard performance a lot due to max_discard_sectors
-increase a lot.
-
-There's also discussion about remove max_discard_to limit here:
-http://www.spinics.net/lists/linux-mmc/msg23395.html
-But it does not help for uSDHC since we can observe data timeout
-on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
-
-Dong Aisheng (6):
-  mmc: sdhci: add platfrom get_max_timeout hook
-  mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
-  mmc: sdhci: add platform set_timeout hook
-  mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
-  mmc: sdhci: calculate max_discard_to dynamically for
-    SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-  mmc: sdhci-esdhc-imx: use actual_clock to calculate timeout
-
- drivers/mmc/host/sdhci-esdhc-imx.c |   22 ++++++++++++++++++
- drivers/mmc/host/sdhci.c           |   43 +++++++++++++++++++++++++++++------
- drivers/mmc/host/sdhci.h           |    3 ++
- 3 files changed, 60 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 97b35e1..c24cb23 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -868,6 +868,16 @@ unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
+ 	return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
+ }
+ 
++void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++
++	/* use maximum timeout counter */
++	sdhci_writeb(host, esdhc_is_usdhc(imx_data) ? 0xF : 0xE,
++			SDHCI_TIMEOUT_CONTROL);
++}
++
+ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.read_l = esdhc_readl_le,
+ 	.read_w = esdhc_readw_le,
+@@ -881,6 +891,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.platform_bus_width = esdhc_pltfm_bus_width,
+ 	.set_uhs_signaling = esdhc_set_uhs_signaling,
+ 	.get_max_timeout = esdhc_get_max_timeout,
++	.set_timeout = esdhc_set_timeout,
+ };
+ 
+ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
 -- 
 1.7.2.rc3
