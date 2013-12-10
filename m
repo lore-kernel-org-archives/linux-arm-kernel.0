@@ -1,82 +1,39 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 10 Dec 2013 15:38:16 +0800
-Subject: [PATCH 1/9] PCI: Use dev_is_pci() to check whether it is pci
- device
-In-Reply-To: <20131210000154.GE4699@google.com>
-References: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
- <20131210000154.GE4699@google.com>
-Message-ID: <52A6C4E8.5030003@huawei.com>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 9 Dec 2013 23:43:46 -0800
+Subject: [PATCH 2/2] ARM: bcm_defconfig: Unset CONFIG_CRYPTO_ANSI_CPRNG
+In-Reply-To: <1386284438-11099-3-git-send-email-tim.kryger@linaro.org>
+References: <1386284438-11099-1-git-send-email-tim.kryger@linaro.org>
+ <1386284438-11099-3-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYrOvFWFbGjCBNHPPtN1y6hDHgoj4ocHst-9iapF3bocRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013/12/10 8:01, Bjorn Helgaas wrote:
-> [+cc arch lists]
-> 
-> On Thu, Dec 05, 2013 at 07:52:53PM +0800, Yijing Wang wrote:
->> Use dev_is_pci() instead of directly compare
->> pci_bus_type to check whether it is pci device.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> 
-> I applied all these to my pci/yijing-dev_is_pci branch for v3.14, thanks!
-> 
-> Browse them here: http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/yijing-dev_is_pci
+On Thu, Dec 5, 2013 at 3:00 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> Do not build the Pseudo Random Number Generation for Cryptographic
+> modules since it is not currently being used for this platform.
+>
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  arch/arm/configs/bcm_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+> index 574e046..ef03bba 100644
+> --- a/arch/arm/configs/bcm_defconfig
+> +++ b/arch/arm/configs/bcm_defconfig
+> @@ -119,6 +119,7 @@ CONFIG_DETECT_HUNG_TASK=y
+>  CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=110
+>  CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+>  # CONFIG_FTRACE is not set
+> +# CONFIG_CRYPTO_ANSI_CPRNG is not set
+>  CONFIG_CRC_CCITT=y
+>  CONFIG_CRC_T10DIF=y
+>  CONFIG_CRC_ITU_T=y
+> --
+> 1.8.0.1
+>
+Applied to armsoc/for-3.14/soc
 
-Thanks!
-Bjorn, I sent the "[patch v2 4/9] sparc/PCI: Use dev_is_pci() to identify PCI devices" to
-correct build error found by kbuild test, Because I have no sparc platform, I guess the build error was introduced
-by I remove the CONFIG_PCI #ifdef in that patch. Now I keep the CONFIG_PCI code and that patch should be no functional change.
-
-
-> 
-> This should be no functional change.
-> 
->  arch/alpha/kernel/pci_iommu.c        |    2 +-
->  arch/arm/common/it8152.c             |    4 ++--
->  arch/arm/mach-ixp4xx/common-pci.c    |    6 +++---
->  arch/ia64/hp/common/sba_iommu.c      |    2 +-
->  arch/ia64/sn/pci/pci_dma.c           |   24 ++++++++++++------------
->  arch/parisc/kernel/drivers.c         |   22 +++++-----------------
->  arch/powerpc/sysdev/fsl_pci.c        |    2 +-
->  arch/sparc/include/asm/dma-mapping.h |   10 ++++------
->  arch/sparc/kernel/iommu.c            |    2 +-
->  arch/sparc/kernel/ioport.c           |    4 +---
->  arch/x86/kernel/acpi/boot.c          |    4 +---
->  drivers/pci/pci-acpi.c               |    2 +-
->  12 files changed, 33 insertions(+), 51 deletions(-)
-> 
-> Bjorn
-> 
->> ---
->>  drivers/pci/pci-acpi.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
->> index 577074e..e0431f1 100644
->> --- a/drivers/pci/pci-acpi.c
->> +++ b/drivers/pci/pci-acpi.c
->> @@ -358,7 +358,7 @@ static void pci_acpi_cleanup(struct device *dev)
->>  
->>  static bool pci_acpi_bus_match(struct device *dev)
->>  {
->> -	return dev->bus == &pci_bus_type;
->> +	return dev_is_pci(dev);
->>  }
->>  
->>  static struct acpi_bus_type acpi_pci_bus = {
->> -- 
->> 1.7.1
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+ thanks
+  csd
