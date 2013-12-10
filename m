@@ -1,93 +1,100 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Dec 2013 14:16:40 -0600
-Subject: OMAP still fails - usb phy stuff
-In-Reply-To: <20131210192508.GB2464@saruman.home>
-References: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
- <20131210183809.GL13171@atomide.com>
- <20131210192508.GB2464@saruman.home>
-Message-ID: <20131210201639.GD2464@saruman.home>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Dec 2013 12:19:43 -0800
+Subject: [PATCH v3 04/36] mtd: st_spi_fsm: Supply framework for device
+ requests
+In-Reply-To: <1385727565-25794-5-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131210201943.GC27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Nov 29, 2013 at 12:18:53PM +0000, Lee Jones wrote:
+> --- a/drivers/mtd/devices/st_spi_fsm.c
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -46,6 +51,36 @@ static void stfsm_clear_fifo(struct stfsm *fsm)
+>  	}
+>  }
+>  
+> +static inline void stfsm_load_seq(struct stfsm *fsm,
+> +				  const struct stfsm_seq *seq)
+> +{
+> +	void __iomem *dst = fsm->base + SPI_FAST_SEQ_TRANSFER_SIZE;
+> +	const uint32_t *src = (const uint32_t *)seq;
+> +	int words = STFSM_SEQ_SIZE / sizeof(uint32_t);
 
-On Tue, Dec 10, 2013 at 01:25:08PM -0600, Felipe Balbi wrote:
-> On Tue, Dec 10, 2013 at 10:38:10AM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 05:10]:
-> > > I still see some OMAP randconfigs failing with this:
-> > > 
-> > > arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
-> > > dss-common.c:(.text+0x1396c): undefined reference to `usb_bind_phy'
-> > > arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
-> > > dss-common.c:(.init.text+0x6c90): undefined reference to `usb_bind_phy'
-> > > drivers/built-in.o: In function `omap_usb2_remove':
-> > > powercap_sys.c:(.text+0x3520): undefined reference to `usb_remove_phy'
-> > > drivers/built-in.o: In function `omap_usb_power_off':
-> > > powercap_sys.c:(.text+0x3544): undefined reference to `omap_control_usb_phy_power'
-> > > drivers/built-in.o: In function `omap_usb_power_on':
-> > > powercap_sys.c:(.text+0x3568): undefined reference to `omap_control_usb_phy_power'
-> > > drivers/built-in.o: In function `omap_usb2_probe':
-> > > powercap_sys.c:(.text+0x3638): undefined reference to `omap_control_usb_phy_power'
-> > > powercap_sys.c:(.text+0x36d4): undefined reference to `usb_add_phy_dev'
-> > > drivers/built-in.o: In function `omap_usb2_suspend':
-> > > powercap_sys.c:(.text+0x37d0): undefined reference to `omap_control_usb_phy_power'
-> > > powercap_sys.c:(.text+0x37f4): undefined reference to `omap_control_usb_phy_power'
-> > > drivers/built-in.o: In function `omap_usb2_set_comparator':
-> > > powercap_sys.c:(.text+0x3844): undefined reference to `usb_get_phy'
-> > > drivers/built-in.o: In function `isp1704_charger_remove':
-> > > powercap_sys.c:(.text+0x48d5ec): undefined reference to `usb_put_phy'
-> > > drivers/built-in.o: In function `isp1704_charger_probe':
-> > > powercap_sys.c:(.text+0x48d64c): undefined reference to `usb_get_phy'
-> > > powercap_sys.c:(.text+0x48d884): undefined reference to `usb_put_phy'
-> > > drivers/built-in.o: In function `twl4030_bci_probe':
-> > > powercap_sys.c:(.init.text+0x13fd4): undefined reference to `usb_get_phy'
-> > > powercap_sys.c:(.init.text+0x14114): undefined reference to `usb_put_phy'
-> > > 
-> > > Probably caused by over-use of the damned select statement:
-> > > 
-> > > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
-> > > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
-> > > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
-> > > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
-> > > 
-> > > You have to wonder why OMAP_USB2 can be enabled when USB_SUPPORT is
-> > > disabled.
-> > 
-> > Yeah this causes constant randconfig errors. Felipe, I thought you
-> > had some fixes lined up for these few weeks ago already when we
-> > last talked about it?
-> 
-> For the warnings, yeah. Greg's pull request hasn't been appliet yet
-> (need to check again, checked yesterday).
-> 
-> For the build error, I'll send something today.
+I think this is clearer as:
 
-this should fix it (checked with RMK's defconfig):
+	int words = sizeof(*seq) / sizeof(*src);
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index a344f3d..d8b1a9a 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -24,9 +24,9 @@ config PHY_EXYNOS_MIPI_VIDEO
- config OMAP_USB2
- 	tristate "OMAP USB2 PHY Driver"
- 	depends on ARCH_OMAP2PLUS
-+	depends on OMAP_CONTROL_USB
- 	select GENERIC_PHY
- 	select USB_PHY
--	select OMAP_CONTROL_USB
- 	help
- 	  Enable this to support the transceiver that is part of SOC. This
- 	  driver takes care of all the PHY functionality apart from comparator.
+> +
+> +	BUG_ON(!stfsm_is_idle(fsm));
+> +
+> +	while (words--) {
+> +		writel(*src, dst);
+> +		src++;
+> +		dst += 4;
+> +	}
+> +}
+> +
+> +static void stfsm_wait_seq(struct stfsm *fsm)
+> +{
+> +	unsigned long timeo = jiffies + HZ;
+> +
+> +	while (time_before(jiffies, timeo)) {
+> +		if (stfsm_is_idle(fsm))
+> +			return;
+> +
+> +		cond_resched();
+> +	}
+> +
+> +	dev_err(fsm->dev, "timeout on sequence completion\n");
 
-i'll send it as a proper patch now.
+I believe the timeout logic is incorrect. What if we wait a "long time"
+to call stfsm_wait_seq() (due to scheduling, or otherwise)? Then the
+while loop might not even run once (time_before(x, y) is false). Or what
+if cond_resched() waits for a long time...
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/a084c60b/attachment.sig>
+So you need an extra check of stfsm_is_idle() after the while loop,
+before you declare a timeout.
+
+> +}
+> +
+>  static int stfsm_set_mode(struct stfsm *fsm, uint32_t mode)
+>  {
+>  	int ret, timeout = 10;
+> diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
+> index 4e92e58..6164142 100644
+> --- a/drivers/mtd/devices/st_spi_fsm.h
+> +++ b/drivers/mtd/devices/st_spi_fsm.h
+> @@ -199,4 +199,18 @@ struct stfsm {
+>  	uint32_t		fifo_dir_delay;
+>  };
+>  
+> +struct stfsm_seq {
+> +	uint32_t data_size;
+> +	uint32_t addr1;
+> +	uint32_t addr2;
+> +	uint32_t addr_cfg;
+> +	uint32_t seq_opc[5];
+> +	uint32_t mode;
+> +	uint32_t dummy;
+> +	uint32_t status;
+> +	uint8_t  seq[16];
+> +	uint32_t seq_cfg;
+> +} __attribute__((__packed__, aligned(4)));
+
+I think checkpatch.pl prefers these attributes use the kernel macros:
+
+  struct stfsm_seq {
+  ...
+  } __packed __aligned(4);
+
+> +#define STFSM_SEQ_SIZE sizeof(struct stfsm_seq)
+
+If you agree with my earlier comment, you won't need this macro.
+
+> +
+>  #endif	/* ST_SPI_FSM_H */
+
+Brian
