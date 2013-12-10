@@ -1,46 +1,64 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 10 Dec 2013 11:27:59 -0800
-Subject: [GIT PULL] at91: dt for 3.14 #1
-In-Reply-To: <1386602585-1927-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Mon, 9 Dec 2013 16:23:05 +0100")
-References: <1386602585-1927-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <87txeg7bgg.fsf@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 10 Dec 2013 14:29:58 -0500
+Subject: [PATCH 2/2] mm/memblock: fix buld of "cris" arch
+In-Reply-To: <1386703798-26521-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1386703798-26521-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1386703798-26521-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-> Arnd, Olof, Kevin,
->
-> First pull-request focusing on DT material for AT91 on 3.14. This one is also
-> based on the "cleanup" material already in arm-soc tree (at91/sama5-ccf) like
-> all other AT91 pull-requests for 3.14.
->
-> Thanks, best regards,
->
-> The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
->
->   ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
->
-> are available in the git repository at:
->
->   git://github.com/at91linux/linux-at91.git tags/at91-dt
->
-> for you to fetch changes up to ca594844e4a53f778811c06feef60bdf36bc5fec:
->
->   ARM: at91/at91rm9200ek.dts: rearrange nodes in address ascending order (2013-12-09 15:08:57 +0100)
->
-> ----------------------------------------------------------------
-> First DT pull-request for 3.14
-> - many little corrections and documentation updates
-> - LCD FB Device Tree for at91sam9263 and at91sam9g45 boards
-> - crypto peripherals DT entries + DMA specification
-> - new Cosino board
->
-> ----------------------------------------------------------------
+The build of "criss" arch is broken after applying new memblock API
+series.
 
-Pulled into next/dt.
+In file included from arch/cris/mm/init.c:13:0:
+include/linux/bootmem.h: In function 'memblock_virt_alloc':
+include/linux/bootmem.h:229:55: error: 'KSEG_C' undeclared (first use in this function)
+include/linux/bootmem.h:229:55: note: each undeclared identifier is reported only once for each function it appears in
+include/linux/bootmem.h: In function 'memblock_virt_alloc_nopanic':
+include/linux/bootmem.h:237:63: error: 'KSEG_C' undeclared (first use in this function)
+include/linux/bootmem.h: In function 'memblock_virt_alloc_node':
+include/linux/bootmem.h:250:27: error: 'KSEG_C' undeclared (first use in this function)
+include/linux/bootmem.h: In function 'memblock_virt_alloc_node_nopanic':
+include/linux/bootmem.h:258:28: error: 'KSEG_C' undeclared (first use in this function)
 
-Thanks,
+In file included from mm/bootmem.c:14:0:
+include/linux/bootmem.h: In function 'memblock_virt_alloc':
+include/linux/bootmem.h:229:55: error: 'KSEG_C' undeclared (first use in this function)
+include/linux/bootmem.h:229:55: note: each undeclared identifier is reported only once for each function it appears in
+include/linux/bootmem.h: In function 'memblock_virt_alloc_nopanic':
+include/linux/bootmem.h:237:63: error: 'KSEG_C' undeclared (first use in this function)
+include/linux/bootmem.h: In function 'memblock_virt_alloc_node':
+include/linux/bootmem.h:250:27: error: 'KSEG_C' undeclared (first use in this function)
 
-Kevin
+The "cris" arch defines memory parameters in a different manner than other
+arch's and they are splitted between 2 headers: <asm/page.h> and <asm/mmu.h>
+
+As result, now build is failed if "bootmem.h" included before
+<asm/page.h> and <asm/mmu.h>. Hence, fix it by including additional
+header in bootmem.h.
+
+Cc: Yinghai Lu <yinghai@kernel.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ include/linux/bootmem.h |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/bootmem.h b/include/linux/bootmem.h
+index 1c9aa0e..2fae55d 100644
+--- a/include/linux/bootmem.h
++++ b/include/linux/bootmem.h
+@@ -5,6 +5,7 @@
+ #define _LINUX_BOOTMEM_H
+ 
+ #include <linux/mmzone.h>
++#include <linux/mm_types.h>
+ #include <asm/dma.h>
+ 
+ /*
+-- 
+1.7.9.5
