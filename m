@@ -1,65 +1,98 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 11 Dec 2013 00:20:17 +0400
-Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <CACRpkdYF-O6Qgjue6x+R6fVuSXSyO4YHw1meusuyQhtSA9PnvQ@mail.gmail.com>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <201312060140.10376.arnd@arndb.de>
- <1386347911.7152.70.camel@host5.omatika.ru>
- <201312061814.15730.arnd@arndb.de>
- <CACRpkdYF-O6Qgjue6x+R6fVuSXSyO4YHw1meusuyQhtSA9PnvQ@mail.gmail.com>
-Message-ID: <1386706817.7152.254.camel@host5.omatika.ru>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 10 Dec 2013 14:20:14 -0600
+Subject: OMAP still fails - usb phy stuff
+In-Reply-To: <20131210201639.GD2464@saruman.home>
+References: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
+ <20131210183809.GL13171@atomide.com>
+ <20131210192508.GB2464@saruman.home>
+ <20131210201639.GD2464@saruman.home>
+Message-ID: <20131210202014.GE2464@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-10 at 13:33 +0100, Linus Walleij wrote:
-> On Fri, Dec 6, 2013 at 6:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 06 December 2013, Sergei Ianovich wrote:
-> >> On Fri, 2013-12-06 at 01:40 +0100, Arnd Bergmann wrote:
-> >>
-> >> > > +
-> >> > > +static struct irq_chip lp8x4x_irq_chip = {
-> >> > > +     .name                   = "FPGA",
-> >> > > +     .irq_ack                = lp8x4x_ack_irq,
-> >> > > +     .irq_mask               = lp8x4x_mask_irq,
-> >> > > +     .irq_unmask             = lp8x4x_unmask_irq,
-> >> > > +};
-> >> >
-> >> > Please try to move the irqchip code to drivers/irqchip/.
-> >>
-> >> CONFIG_IRQCHIP depends on CONFIG_OF_IRQ which in turn depends on Open
-> >> Firmware.
-> >
-> > Hmm, I wonder if we should try to change Kconfig then. Let's leave it
-> > alone for now, maybe Linus Walleij has some comments since he has
-> > been looking into moving drivers out in the past.
+On Tue, Dec 10, 2013 at 02:16:40PM -0600, Felipe Balbi wrote:
+> Hi,
 > 
-> I don't get this, if the subarch has deps in place for IRQCHIP and
-> OF_IRQ just move the implementation to drivers/irqchip/foo.c
-> edit drivers/irqchip/Makefile to compile the file for ARCH_FOO.
-> What would the problem be? It's not like having the irqchip in the
-> object is optional...
+> On Tue, Dec 10, 2013 at 01:25:08PM -0600, Felipe Balbi wrote:
+> > On Tue, Dec 10, 2013 at 10:38:10AM -0800, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 05:10]:
+> > > > I still see some OMAP randconfigs failing with this:
+> > > > 
+> > > > arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+> > > > dss-common.c:(.text+0x1396c): undefined reference to `usb_bind_phy'
+> > > > arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+> > > > dss-common.c:(.init.text+0x6c90): undefined reference to `usb_bind_phy'
+> > > > drivers/built-in.o: In function `omap_usb2_remove':
+> > > > powercap_sys.c:(.text+0x3520): undefined reference to `usb_remove_phy'
+> > > > drivers/built-in.o: In function `omap_usb_power_off':
+> > > > powercap_sys.c:(.text+0x3544): undefined reference to `omap_control_usb_phy_power'
+> > > > drivers/built-in.o: In function `omap_usb_power_on':
+> > > > powercap_sys.c:(.text+0x3568): undefined reference to `omap_control_usb_phy_power'
+> > > > drivers/built-in.o: In function `omap_usb2_probe':
+> > > > powercap_sys.c:(.text+0x3638): undefined reference to `omap_control_usb_phy_power'
+> > > > powercap_sys.c:(.text+0x36d4): undefined reference to `usb_add_phy_dev'
+> > > > drivers/built-in.o: In function `omap_usb2_suspend':
+> > > > powercap_sys.c:(.text+0x37d0): undefined reference to `omap_control_usb_phy_power'
+> > > > powercap_sys.c:(.text+0x37f4): undefined reference to `omap_control_usb_phy_power'
+> > > > drivers/built-in.o: In function `omap_usb2_set_comparator':
+> > > > powercap_sys.c:(.text+0x3844): undefined reference to `usb_get_phy'
+> > > > drivers/built-in.o: In function `isp1704_charger_remove':
+> > > > powercap_sys.c:(.text+0x48d5ec): undefined reference to `usb_put_phy'
+> > > > drivers/built-in.o: In function `isp1704_charger_probe':
+> > > > powercap_sys.c:(.text+0x48d64c): undefined reference to `usb_get_phy'
+> > > > powercap_sys.c:(.text+0x48d884): undefined reference to `usb_put_phy'
+> > > > drivers/built-in.o: In function `twl4030_bci_probe':
+> > > > powercap_sys.c:(.init.text+0x13fd4): undefined reference to `usb_get_phy'
+> > > > powercap_sys.c:(.init.text+0x14114): undefined reference to `usb_put_phy'
+> > > > 
+> > > > Probably caused by over-use of the damned select statement:
+> > > > 
+> > > > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+> > > > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+> > > > warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+> > > > warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+> > > > 
+> > > > You have to wonder why OMAP_USB2 can be enabled when USB_SUPPORT is
+> > > > disabled.
+> > > 
+> > > Yeah this causes constant randconfig errors. Felipe, I thought you
+> > > had some fixes lined up for these few weeks ago already when we
+> > > last talked about it?
+> > 
+> > For the warnings, yeah. Greg's pull request hasn't been appliet yet
+> > (need to check again, checked yesterday).
+> > 
+> > For the build error, I'll send something today.
+> 
+> this should fix it (checked with RMK's defconfig):
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index a344f3d..d8b1a9a 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -24,9 +24,9 @@ config PHY_EXYNOS_MIPI_VIDEO
+>  config OMAP_USB2
+>  	tristate "OMAP USB2 PHY Driver"
+>  	depends on ARCH_OMAP2PLUS
+> +	depends on OMAP_CONTROL_USB
+>  	select GENERIC_PHY
+>  	select USB_PHY
+> -	select OMAP_CONTROL_USB
+>  	help
+>  	  Enable this to support the transceiver that is part of SOC. This
+>  	  driver takes care of all the PHY functionality apart from comparator.
+> 
+> i'll send it as a proper patch now.
 
-This chip is used only of one machine and only required for
-machine-special devices. If those devices are not selected, the chip
-will just waist memory.
+Russell, should I add your Reported-by ? If so, which email do you
+prefer to be used ?
 
-> I would prefer if you augment the code to use
-> IRQCHIP_DECLARE() so you can get rid of all the criss-cross
-> calls, but this init contains a comment saying that GPIO
-> has to be up before you initialize the irq_chip, can you please
-> explain why it's like that?
-
-This is a tertiary irq chip (primary is on CPU, secondary is GPIO). It
-triggers a GPIO interrupt if it detects one of its own.
-
-> Another way is to create a separate Kconfig entry for it in
-> drivers/irqchip/Kconfig if you want the set-up to be more
-> distributed, but that is usually just done when the irqchip is
-> used on more than one platform.
-
-Please consult, how to approach this driver using device tree. If I
-assign an "interrupts" property in the node, and the property will point
-to pxa-gpio interrupt controller using a phandle, is there a guaranty
-that my device will be probed later than pxa-gpio interrupt controller?
-
-Or how could that be achieved?
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/b511c6bf/attachment.sig>
