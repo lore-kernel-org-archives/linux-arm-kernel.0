@@ -1,70 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Dec 2013 18:52:05 +0100
-Subject: [PATCH] net: allwinner: emac: Add missing free_irq
-In-Reply-To: <52A35361.8090608@cogentembedded.com>
-References: <1386415902-32697-1-git-send-email-maxime.ripard@free-electrons.com>
- <52A35361.8090608@cogentembedded.com>
-Message-ID: <20131210175205.GA3651@lukather>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 10 Dec 2013 12:58:02 -0500
+Subject: [PATCH 3/3] arm64: add EFI runtime services
+In-Reply-To: <20131209135158.GH24997@rocoto.smurfnet.nu>
+References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
+ <1385762712-17043-4-git-send-email-msalter@redhat.com>
+ <20131209135158.GH24997@rocoto.smurfnet.nu>
+Message-ID: <1386698282.1979.44.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2013-12-09 at 14:52 +0100, Leif Lindholm wrote:
+> Apologies for late feedback.
+> 
+> On Fri, Nov 29, 2013 at 05:05:12PM -0500, Mark Salter wrote:
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > new file mode 100644
+> > index 0000000..1bad8a7
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -0,0 +1,507 @@
+> > +/*
+> > + * Extensible Firmware Interface
+> > + *
+> > + * Based on Extensible Firmware Interface Specification version 2.3.1
+> 
+> Actually, for arm64, we're relying on UEFI 2.4 or later.
 
-On Sat, Dec 07, 2013 at 08:57:05PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07-12-2013 15:31, Maxime Ripard wrote:
-> 
-> >The sun4i-emac driver uses devm_request_irq at .ndo_open time, but relies on
-> >the managed device mechanism to actually free it. This causes an issue whenever
-> >someone wants to restart the interface, the interrupt still being held, and not
-> >yet released.
-> 
-> >Fall back to using the regular request_irq at .ndo_open time, and introduce a
-> >free_irq during .ndo_stop.
-> 
-> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >---
-> >Hi David,
-> 
-> >It would be great if this patch would be applied to 3.13.
-> 
-> >Thanks,
-> >Maxime
-> 
-> 
-> >  drivers/net/ethernet/allwinner/sun4i-emac.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> >diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> >index 50b853a..38aba50 100644
-> >--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-> >+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> >@@ -717,8 +717,8 @@ static int emac_open(struct net_device *dev)
-> >  	if (netif_msg_ifup(db))
-> >  		dev_dbg(db->dev, "enabling %s\n", dev->name);
-> >
-> >-	if (devm_request_irq(db->dev, dev->irq, &emac_interrupt,
-> >-			     0, dev->name, dev))
-> >+	if (request_irq(dev->irq, &emac_interrupt,
-> >+			0, dev->name, dev))
-> 
->    Doesn't it fit into single line?
+You're right.
 
-Hmmm, yes, probably.
+> 
+> > + *
+> > + * Copyright (C) 2013 Linaro Ltd.
+> 
+> And I'd say you've easily done enough here to motivate adding Red Hat.
+> 
+> > + *
+> > + * Adapted for arm64 from arch/arm/kernel/efi.c code
+> > + */
+> > +
+> > +#include <linux/efi.h>
+> > +#include <linux/export.h>
+> > +#include <linux/memblock.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_fdt.h>
+> > +#include <linux/sched.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/bootmem.h>
+> > +
+> > +#include <asm/cacheflush.h>
+> > +#include <asm/efi.h>
+> > +#include <asm/tlbflush.h>
+> > +#include <asm/mmu_context.h>
+> > +
+> > +#define efi_early_remap(a, b) \
+> > +	((__force void *)early_ioremap((a), (b)))
+> 
+> Do we not want early_memremap() here, rather than early_ioremap()?
+> 
 
-I'll send a v2.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131210/5f75e001/attachment-0001.sig>
+Yes.
