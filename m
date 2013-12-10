@@ -1,31 +1,63 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 9 Dec 2013 20:54:05 -0600
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 10 Dec 2013 08:39:25 +0530
 Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
 In-Reply-To: <1386627424-373-3-git-send-email-w-kwok2@ti.com>
 References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
  <1386627424-373-3-git-send-email-w-kwok2@ti.com>
-Message-ID: <20131210025405.GB20090@saruman.home>
+Message-ID: <52A685E5.9060604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/10/2013 03:47 AM, WingMan Kwok wrote:
+> Add Keystone platform USB PHY driver support. Current main purpose
+> of this driver is to enable the PHY reference clock gate on the
+> Keystone SoC. Otherwise it is a nop PHY.
+> 
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> ---
+>  drivers/usb/phy/Kconfig        |   10 +++
+>  drivers/usb/phy/Makefile       |    1 +
+>  drivers/usb/phy/phy-keystone.c |  142 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 153 insertions(+)
+>  create mode 100644 drivers/usb/phy/phy-keystone.c
+> 
+> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> index 08e2f39..c6792f43 100644
+> --- a/drivers/usb/phy/Kconfig
+> +++ b/drivers/usb/phy/Kconfig
+> @@ -40,6 +40,16 @@ config ISP1301_OMAP
+>  	  This driver can also be built as a module.  If so, the module
+>  	  will be called isp1301_omap.
+>  
+> +config KEYSTONE_USB_PHY
+> +	tristate "Keystone USB PHY Driver"
+> +	depends on ARCH_KEYSTONE
+> +	select USB_PHY
 
-On Mon, Dec 09, 2013 at 05:17:04PM -0500, WingMan Kwok wrote:
-> +	ret = usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
-> +	if (ret)
-> +		return ret;
-> +	k_phy->usb_phy_gen.phy.init = keystone_usbphy_init;
-> +	k_phy->usb_phy_gen.phy.shutdown = keystone_usbphy_shutdown;
+NOP_USB_XCEIV selects USB_PHY so not necessary.
 
-this *must* be initialized before adding the PHY to the subsystem. So
-these two lines must be moved before usb_add_phy_dev().
+> +	select NOP_USB_XCEIV
+> +	help
+> +	  Enable this to support Keystone USB phy. This driver provides
+> +	  interface to interact with USB 2.0 and USB 3.0 PHY that is part
+> +	  of the Keystone SOC.
+> +
+>  config MV_U3D_PHY
+>  	bool "Marvell USB 3.0 PHY controller Driver"
+>  	depends on CPU_MMP3
+> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+> index 022c1da..311b47b 100644
+> --- a/drivers/usb/phy/Makefile
+> +++ b/drivers/usb/phy/Makefile
+> @@ -30,3 +30,4 @@ obj-$(CONFIG_USB_RCAR_PHY)		+= phy-rcar-usb.o
+>  obj-$(CONFIG_USB_RCAR_GEN2_PHY)		+= phy-rcar-gen2-usb.o
+>  obj-$(CONFIG_USB_ULPI)			+= phy-ulpi.o
+>  obj-$(CONFIG_USB_ULPI_VIEWPORT)		+= phy-ulpi-viewport.o
+> +obj-$(CONFIG_KEYSTONE_USB_PHY)		+= phy-keystone.o
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/ba92a459/attachment.sig>
+cheers,
+-roger
