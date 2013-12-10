@@ -1,65 +1,107 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 9 Dec 2013 17:01:54 -0700
-Subject: [PATCH 1/9] PCI: Use dev_is_pci() to check whether it is pci
- device
-In-Reply-To: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
-References: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <20131210000154.GE4699@google.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 9 Dec 2013 18:02:53 -0600
+Subject: [PATCHv2] clk: socfpga: Map the clk manager base address in the clock
+ driver
+Message-ID: <1386633773-11713-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc arch lists]
+From: Dinh Nguyen <dinguyen@altera.com>
 
-On Thu, Dec 05, 2013 at 07:52:53PM +0800, Yijing Wang wrote:
-> Use dev_is_pci() instead of directly compare
-> pci_bus_type to check whether it is pci device.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+The clk manager's base address was being mapped in SOCFPGA's arch code and
+being extern'ed out to the clock driver. This method is not correct, and the
+arch code was not really doing anything with that clk manager anyways.
 
-I applied all these to my pci/yijing-dev_is_pci branch for v3.14, thanks!
+This patch moves the mapping of the clk manager's base address in the clock
+driver itself. Cleans up CLK_OF_DECLARE() into a single registration of all
+the clocks.
 
-Browse them here: http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/yijing-dev_is_pci
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+v2: Use a static declaration for the clk_mgr_base_addr. Clean up the
+    CLK_OF_DECLARE() as suggested by Arnd.
+---
+ arch/arm/mach-socfpga/socfpga.c |    4 ----
+ drivers/clk/socfpga/clk.c       |   20 ++++++++++++++++----
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
-This should be no functional change.
-
- arch/alpha/kernel/pci_iommu.c        |    2 +-
- arch/arm/common/it8152.c             |    4 ++--
- arch/arm/mach-ixp4xx/common-pci.c    |    6 +++---
- arch/ia64/hp/common/sba_iommu.c      |    2 +-
- arch/ia64/sn/pci/pci_dma.c           |   24 ++++++++++++------------
- arch/parisc/kernel/drivers.c         |   22 +++++-----------------
- arch/powerpc/sysdev/fsl_pci.c        |    2 +-
- arch/sparc/include/asm/dma-mapping.h |   10 ++++------
- arch/sparc/kernel/iommu.c            |    2 +-
- arch/sparc/kernel/ioport.c           |    4 +---
- arch/x86/kernel/acpi/boot.c          |    4 +---
- drivers/pci/pci-acpi.c               |    2 +-
- 12 files changed, 33 insertions(+), 51 deletions(-)
-
-Bjorn
-
-> ---
->  drivers/pci/pci-acpi.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-> index 577074e..e0431f1 100644
-> --- a/drivers/pci/pci-acpi.c
-> +++ b/drivers/pci/pci-acpi.c
-> @@ -358,7 +358,7 @@ static void pci_acpi_cleanup(struct device *dev)
->  
->  static bool pci_acpi_bus_match(struct device *dev)
->  {
-> -	return dev->bus == &pci_bus_type;
-> +	return dev_is_pci(dev);
->  }
->  
->  static struct acpi_bus_type acpi_pci_bus = {
-> -- 
-> 1.7.1
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index dd0d49c..c43c281 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -29,7 +29,6 @@
+ void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
+ void __iomem *sys_manager_base_addr;
+ void __iomem *rst_manager_base_addr;
+-void __iomem *clk_mgr_base_addr;
+ unsigned long cpu1start_addr;
+ 
+ static struct map_desc scu_io_desc __initdata = {
+@@ -78,9 +77,6 @@ void __init socfpga_sysmgr_init(void)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+ 	rst_manager_base_addr = of_iomap(np, 0);
+-
+-	np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
+-	clk_mgr_base_addr = of_iomap(np, 0);
+ }
+ 
+ static void __init socfpga_init_irq(void)
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 60cb2f5..280c983 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -22,6 +22,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ 
+ /* Clock Manager offsets */
+ #define CLKMGR_CTRL	0x0
+@@ -55,7 +56,7 @@
+ #define div_mask(width)	((1 << (width)) - 1)
+ #define streq(a, b) (strcmp((a), (b)) == 0)
+ 
+-extern void __iomem *clk_mgr_base_addr;
++static void __iomem *clk_mgr_base_addr;
+ 
+ struct socfpga_clk {
+ 	struct clk_gate hw;
+@@ -320,19 +321,30 @@ static void __init socfpga_pll_init(struct device_node *node)
+ {
+ 	socfpga_clk_init(node, &clk_pll_ops);
+ }
+-CLK_OF_DECLARE(socfpga_pll, "altr,socfpga-pll-clock", socfpga_pll_init);
+ 
+ static void __init socfpga_periph_init(struct device_node *node)
+ {
+ 	socfpga_clk_init(node, &periclk_ops);
+ }
+-CLK_OF_DECLARE(socfpga_periph, "altr,socfpga-perip-clk", socfpga_periph_init);
+ 
+ static void __init socfpga_gate_init(struct device_node *node)
+ {
+ 	socfpga_gate_clk_init(node, &gateclk_ops);
+ }
+-CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
++
++static struct of_device_id socfpga_child_clocks[] = {
++	{ .compatible = "altr,socfpga-pll-clock", socfpga_pll_init, },
++	{ .compatible = "altr,socfpga-perip-clk", socfpga_periph_init, },
++	{ .compatible = "altr,socfpga-gate-clk", socfpga_gate_init, },
++	{},
++};
++
++static void __init socfpga_clkmgr_init(struct device_node *node)
++{
++	clk_mgr_base_addr = of_iomap(node, 0);
++	of_clk_init(socfpga_child_clocks);
++}
++CLK_OF_DECLARE(socfpga_mgr, "altr,clk-mgr", socfpga_clkmgr_init);
+ 
+ void __init socfpga_init_clocks(void)
+ {
+-- 
+1.7.9.5
