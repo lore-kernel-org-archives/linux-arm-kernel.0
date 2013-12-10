@@ -1,46 +1,85 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 10 Dec 2013 16:44:58 +0800
-Subject: questions of cpuidle
-In-Reply-To: <52A6C24B.3030800@linaro.org>
-References: <52A5C846.30308@linaro.org> <52A5D0E0.7050201@linaro.org>
- <52A6B5BB.3060506@linaro.org> <52A6C24B.3030800@linaro.org>
-Message-ID: <52A6D48A.4000507@linaro.org>
+From: jonas.bonn@gmail.com (Jonas Bonn)
+Date: Tue, 10 Dec 2013 09:48:34 +0100
+Subject: [PATCH v2 00/11] Consolidate asm/fixmap.h files
+In-Reply-To: <1385396045-15852-1-git-send-email-msalter@redhat.com>
+References: <1385396045-15852-1-git-send-email-msalter@redhat.com>
+Message-ID: <CACM3HyGCPMbw3t+DFFSySEytvDMnGGQMS6pVFpGbhkAoDzjhXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 03:27 PM, Daniel Lezcano wrote:
-> 
->> And does the wake up pass via GIC to CPU? If so, does the GIC need
->> keep awake when all cpu idle? If not, how the firmware give the
->> interrupt to CPU? And I am wondering if the deep idle cpu voltage get
->> to near 0. How the cpu get the interrupt signal?
-> 
-> If a deep idle state powers down the GIC, it is up to the PMU to proxy
-> the interrupts. When an interrupt occurs, the PMU powers up the logic,
-> including the GIC. The notifier call chain with cpu_suspend / cpu_resume
-> will save and restore the GIC registers.
-> 
-> But this is hardware specific and will depend on how the PMU is
-> implemented and how far it goes in the power management.
-> 
-> You have a good example in the drivers/cpuidle/cpuidle-ux500.c to
-> understand with the comments how the interrupts are handled through the
-> power management unit.
-> 
-> In the Xillinx documentation available on the web [1], the chapter 24.4
-> gives the information about one kind of PMU.
-> 
-> I believe the mechanism is pretty similar on all the hardware but it is
-> obfuscated by a generic power instruction like mwait.
-> 
->   -- Daniel
-> 
-> [1]
-> http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
-> 
+Hi Mark,
 
-Thanks a lot, Daniel. You are a expert of ARM cpu idle! :)
+Is there some reason you've excluded OpenRISC here?  Did you just miss
+it, or does the implementation diverage too much to be usable with
+your generic version?
+
+Regards,
+Jonas
+
+On 25 November 2013 17:13, Mark Salter <msalter@redhat.com> wrote:
+> Many architectures provide an asm/fixmap.h which defines support for
+> compile-time 'special' virtual mappings which need to be made before
+> paging_init() has run. This suport is also used for early ioremap
+> on x86. Much of this support is identical across the architectures.
+> This patch consolidates all of the common bits into asm-generic/fixmap.h
+> which is intended to be included from arch/*/include/asm/fixmap.h.
+>
+> This has been compiled on x86, arm, powerpc, and sh, but tested
+> on x86 only.
+>
+> This is version two of the patch series:
+>
+>    git://github.com/mosalter/linux.git#fixmap-v2
+>
+> Version 1 is here:
+>
+>    git://github.com/mosalter/linux.git#fixmap
+>
+> Changes from v1:
+>
+>   * Added acks from feedback.
+>   * Use BUILD_BUG_ON in fix_to_virt()
+>   * Fixed ARM patch to make FIXMAP_TOP inclusive of fixmap
+>     range as is the case in the other architectures.
+>
+> Mark Salter (11):
+>   Add generic fixmap.h
+>   x86: use generic fixmap.h
+>   arm: use generic fixmap.h
+>   hexagon: use generic fixmap.h
+>   metag: use generic fixmap.h
+>   microblaze: use generic fixmap.h
+>   mips: use generic fixmap.h
+>   powerpc: use generic fixmap.h
+>   sh: use generic fixmap.h
+>   tile: use generic fixmap.h
+>   um: use generic fixmap.h
+>
+>  arch/arm/include/asm/fixmap.h        | 29 +++--------
+>  arch/arm/mm/init.c                   |  2 +-
+>  arch/hexagon/include/asm/fixmap.h    | 40 +--------------
+>  arch/metag/include/asm/fixmap.h      | 32 +-----------
+>  arch/microblaze/include/asm/fixmap.h | 44 +---------------
+>  arch/mips/include/asm/fixmap.h       | 33 +-----------
+>  arch/powerpc/include/asm/fixmap.h    | 44 +---------------
+>  arch/sh/include/asm/fixmap.h         | 39 +--------------
+>  arch/tile/include/asm/fixmap.h       | 33 +-----------
+>  arch/um/include/asm/fixmap.h         | 40 +--------------
+>  arch/x86/include/asm/fixmap.h        | 59 +---------------------
+>  include/asm-generic/fixmap.h         | 97 ++++++++++++++++++++++++++++++++++++
+>  12 files changed, 118 insertions(+), 374 deletions(-)
+>  create mode 100644 include/asm-generic/fixmap.h
+>
+> --
+> 1.8.3.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arch" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
 
 -- 
-Thanks
-    Alex
+Jonas Bonn
+Stockholm, Sweden
