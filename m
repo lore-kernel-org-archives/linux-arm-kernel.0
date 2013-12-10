@@ -1,50 +1,44 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Dec 2013 14:37:42 +0100
-Subject: [PATCH V2 3/3] PM / Sleep: Add macro to define common late/early
- system PM callbacks
-In-Reply-To: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
-References: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1386682662-17633-4-git-send-email-ulf.hansson@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Dec 2013 21:40:05 +0800
+Subject: [PATCH] ARM i.MX5: fix obvious typo in ldb_di0_gate clk definition
+In-Reply-To: <1386670515-6017-1-git-send-email-LW@KARO-electronics.de>
+References: <1386670515-6017-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20131210134001.GA3875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use the same approach as for the existing SET_SYSTEM_SLEEP_PM_OPS,
-but for the late and early callbacks instead.
+On Tue, Dec 10, 2013 at 11:15:15AM +0100, Lothar Wa?mann wrote:
+> ldb_di0_gate is registerd with the clk index of IMX5_CLK_LDB_DI1_GATE,
+> thus the DI0 interface will be turned off inadvertently during boot.
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-The new SET_LATE_SYSTEM_SLEEP_PM_OPS, defined for CONFIG_PM_SLEEP, will
-point ->suspend_late, ->freeze_late and ->poweroff_late to the same
-function. Vice verse happens for ->resume_early, ->thaw_early and
-->restore_early.
+There should be a blank line between the commit log and your SoB.  I
+fixed it up and applied the patch.
 
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- include/linux/pm.h |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Shawn
 
-diff --git a/include/linux/pm.h b/include/linux/pm.h
-index 7a830a7..8c6583a 100644
---- a/include/linux/pm.h
-+++ b/include/linux/pm.h
-@@ -311,6 +311,18 @@ struct dev_pm_ops {
- #define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
- #endif
- 
-+#ifdef CONFIG_PM_SLEEP
-+#define SET_LATE_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
-+	.suspend_late = suspend_fn, \
-+	.resume_early = resume_fn, \
-+	.freeze_late = suspend_fn, \
-+	.thaw_early = resume_fn, \
-+	.poweroff_late = suspend_fn, \
-+	.restore_early = resume_fn,
-+#else
-+#define SET_LATE_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
-+#endif
-+
- #ifdef CONFIG_PM_RUNTIME
- #define SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
- 	.runtime_suspend = suspend_fn, \
--- 
-1.7.9.5
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index e349fd5..e063d93 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -514,7 +514,7 @@ static void __init mx53_clocks_init(struct device_node *np)
+>  	clk[IMX5_CLK_LDB_DI0_DIV]	= imx_clk_divider_flags("ldb_di0_div", "ldb_di0_div_3_5", MXC_CCM_CSCMR2, 10, 1, 0);
+>  	clk[IMX5_CLK_LDB_DI0_SEL]	= imx_clk_mux_flags("ldb_di0_sel", MXC_CCM_CSCMR2, 8, 1,
+>  						mx53_ldb_di0_sel, ARRAY_SIZE(mx53_ldb_di0_sel), CLK_SET_RATE_PARENT);
+> -	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
+> +	clk[IMX5_CLK_LDB_DI0_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
+>  	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di1_gate", "ldb_di1_div", MXC_CCM_CCGR6, 30);
+>  	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
+>  						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel));
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
