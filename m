@@ -1,38 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 10 Dec 2013 14:22:54 +0100
-Subject: [PATCH v3 2/3] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <52A64DCB.8000504@cogentembedded.com>
-References: <201312082348.17588.sergei.shtylyov@cogentembedded.com>
- <201312082352.45265.sergei.shtylyov@cogentembedded.com>
- <CAMuHMdWFmO4d4b77JDY0_Z5NuQFoP73-PVho2dwAOY4ES57Dug@mail.gmail.com>
- <52A62753.8060202@cogentembedded.com>
- <CAMuHMdXDHMRy2LTEa50omMs0dV9Vdf2woBsNAHzhkceXDfqyOg@mail.gmail.com>
- <52A64DCB.8000504@cogentembedded.com>
-Message-ID: <CAMuHMdV6RN4E7xez9xXLbcbp0Ga9zu09ndfa7b_YiobdQypc4w@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 10 Dec 2013 20:56:03 +0800
+Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
+In-Reply-To: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+Message-ID: <1386680168-5227-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 12:10 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->>>     You can try my simplistic 'sh_eth' driver patch:
->
->>> http://marc.info/?l=linux-sh&m=137911743723032
->
->> Thanks, that also fixes the problem!
->
->    Let's hope Florian's patches get queued for 3.14. You can also test them
-> meanwhile...
+Currently the max_discard_to is simply got by (1 << 27) / host->timeout_clk
+which is assumed to be the maximum timeout value, however, some platforms
+maximum timeout counter may not be 1 << 27, e.g. i.MX uSDHC is 1 << 28.
+Thus 1 << 27 may not be correct for such platforms.
 
-I applied the whole series "net: phy: consolidate PHY reset", and sh_eth
-now works fine on Koelsch.
+It is also possible that other platforms may have different problems.
+To be flexible, we add a get_max_timeout hook to get the correct
+maximum timeout value for these platforms.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Reported-by: Ed Sutter <ed.sutter@alcatel-lucent.com>
+---
+ drivers/mmc/host/sdhci.c |    5 ++++-
+ drivers/mmc/host/sdhci.h |    1 +
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index bd8a098..464d42c 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2930,7 +2930,10 @@ int sdhci_add_host(struct sdhci_host *host)
+ 	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
+ 		host->timeout_clk = mmc->f_max / 1000;
+ 
+-	mmc->max_discard_to = (1 << 27) / host->timeout_clk;
++	if (host->ops->get_max_timeout)
++		mmc->max_discard_to = host->ops->get_max_timeout(host);
++	else
++		mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+ 
+ 	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
+ 
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 0a3ed01..1591cbb 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -281,6 +281,7 @@ struct sdhci_ops {
+ 	unsigned int	(*get_max_clock)(struct sdhci_host *host);
+ 	unsigned int	(*get_min_clock)(struct sdhci_host *host);
+ 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
++	unsigned int	(*get_max_timeout)(struct sdhci_host *host);
+ 	int		(*platform_bus_width)(struct sdhci_host *host,
+ 					       int width);
+ 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
+-- 
+1.7.2.rc3
