@@ -1,44 +1,38 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  9 Dec 2013 16:34:46 -0800
-Subject: [PATCH 2/2] time: clockevents: Adjust timer interval when frequency
- changes
-In-Reply-To: <1386635686-15686-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <alpine.DEB.2.02.1312071151340.30673@ionos.tec.linutronix.de>
- <1386635686-15686-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1386635686-15686-3-git-send-email-soren.brinkmann@xilinx.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 09 Dec 2013 16:36:33 -0800
+Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
+In-Reply-To: <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
+References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
+ <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
+ <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
+Message-ID: <52A66211.6010707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To adjust the timer's interval in periodic mode, the clockevent device
-is put into periodic mode during clockevents_update_freq() in case the
-timer is in periodic mode.
+On 12/9/2013 4:29 PM, Konrad Rzeszutek Wilk wrote:
+> Laura Abbott <lauraa@codeaurora.org> wrote:
+>> Some architectures may implement the CMA APIs to allow allocation
+>> of larger contiguous blocks of memory. Add support in the swiotlb
+>> alloc/free functions to allocate from the CMA APIs instead of the
+>> basic page allocator.
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+...
+>>
+>
+> Can this be done in the platform dma_ops functions instead?
+>
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- kernel/time/clockevents.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+I suppose it could but that seems like it would result in lots of 
+duplicated code if every architecture that uses swiotlb wants to use CMA.
 
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 641d91003a45..f85e5fda9c66 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -443,10 +443,13 @@ int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
- {
- 	clockevents_config(dev, freq);
- 
--	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
--		return 0;
-+	if (dev->mode == CLOCK_EVT_MODE_ONESHOT)
-+		return clockevents_program_event(dev, dev->next_event, false);
-+
-+	if (dev->mode == CLOCK_EVT_MODE_PERIODIC)
-+		dev->set_mode(CLOCK_EVT_MODE_PERIODIC, dev);
- 
--	return clockevents_program_event(dev, dev->next_event, false);
-+	return 0;
- }
- 
- /**
+Thanks,
+Laura
+
 -- 
-1.8.5.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
