@@ -1,32 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Dec 2013 17:00:25 +0000
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20131210164907.GA11468@sirena.org.uk>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131210164907.GA11468@sirena.org.uk>
-Message-ID: <20131210170025.GA4360@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Dec 2013 21:01:18 +0400
+Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
+In-Reply-To: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <52A748DE.8000508@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 04:49:07PM +0000, Mark Brown wrote:
-> On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
-> 
-> > +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
-> > +{
-> > +	unsigned long flags;
-> > +	u32 value;
-> > +
-> > +	raw_spin_lock_irqsave(&__io_lock, flags);
-> > +	value = readl_relaxed(reg) & ~mask;
-> > +	value |= (set & mask);
-> > +	writel_relaxed(value, reg);
-> > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> > +}
-> > +EXPORT_SYMBOL(atomic_io_modify_relaxed);
-> 
-> This looks quite generic - why is it in architecture specific code?
+Hello.
 
-because the _relaxed IO operators don't exist on other architectures, and
-there's been some discussion around whether they should with no conclusions
-being reached.
+On 10-12-2013 19:53, Ben Dooks wrote:
+
+> If the system has been started in non-secure mode, then the ARM generic
+> timer is not configurable during the kernel initialisation. Currently
+> the only thing we can check for is if the timer has been correctly
+> configured during the boot process.
+
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+> ---
+>   arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 +++++++++++++-----
+>   1 file changed, 13 insertions(+), 5 deletions(-)
+
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> index 5734c24..6b7b7f1 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -78,12 +78,20 @@ void __init rcar_gen2_timer_init(void)
+>   	/* Remap "armgcnt address map" space */
+>   	base = ioremap(0xe6080000, PAGE_SIZE);
+>
+> -	/* Update registers with correct frequency */
+> -	iowrite32(freq, base + CNTFID0);
+> -	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+> +	/* Update the timer if it is either not running, or is not at the
+> +	 * right frequency. The timer is only configurable in secure mode
+> +	 * so this avoids an abort if the loader started the timer and
+> +	 * started the kernel in non-secure mode. */
+
+    The preferred style of the multi-line comments is this:
+
+/*
+  * bla
+  * bla
+  */
+
+WBR, Sergei
