@@ -1,40 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Dec 2013 11:14:49 +0000
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <20131210101331.GG29580@intel.com>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131128055706.GM8834@intel.com>
- <20131209235035.GA11632@n2100.arm.linux.org.uk>
- <20131210101331.GG29580@intel.com>
-Message-ID: <20131210111449.GY4360@n2100.arm.linux.org.uk>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 10 Dec 2013 12:16:26 +0100
+Subject: [PATCH] ARM i.MX5: fix obvious typo in ldb_di0_gate clk definition
+In-Reply-To: <1386670841.4096.6.camel@weser.hi.pengutronix.de>
+References: <1386670515-6017-1-git-send-email-LW@KARO-electronics.de>
+ <1386670841.4096.6.camel@weser.hi.pengutronix.de>
+Message-ID: <20131210121626.39b3e543@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 03:43:31PM +0530, Vinod Koul wrote:
-> On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
-> > > + Dan
-> > > 
-> > > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
-> > > > The following commit:
-> > > > 
-> > > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
-> > > > 
-> > > > removed the last caller to mv_desc_get_dest_addr(), creating the
-> > > > warning:
-> > > > 
-> > > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
-> > > >   but not used [-Wunused-function]
-> > > > 
-> > > > Remove it.
-> > > > 
-> > > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
-> > > 
-> > > This should go thru Dan's tree
-> > 
-> > So what's happening with this patch?  I don't see it in -rc yet.
-> Dan has applied this to his next. So this should show us in next rc1
+Hi,
 
-Wrong answer.  This is a compile regression introduced in the last merge
-window, it should be going into an -rc kernel.
+Lucas Stach wrote:
+> Adding Shawn to CC as likely he would be the one taking this patch.
+> 
+|M:      Shawn Guo <shawn.guo@linaro.org>
+|L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+|S:      Maintained
+|T:      git git://git.linaro.org/people/shawnguo/linux-2.6.git
+|F:      arch/arm/mach-imx/*imx6*
+
+shouldn't the MAINTAINERS entry be updated?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
