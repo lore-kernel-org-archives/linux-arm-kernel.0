@@ -1,48 +1,53 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Tue, 10 Dec 2013 22:23:24 +0530
-Subject: [RFC PATCH 0/2] arm64: Add support for 48-bit Physical Addresses
-In-Reply-To: <20131205173036.GE17165@arm.com>
-References: <1385537665-5909-1-git-send-email-mohun106@gmail.com>
- <5295D1A5.5090403@arm.com>
- <CAC8NTUXiMpjNh+GBTGcLDJ2hevskWnD6PE66ZaFxBAdUuy2nbg@mail.gmail.com>
- <5296330D.9010801@arm.com>
- <CAC8NTUVvLgNPdsSPY6Ms_D3JoyJR8AEFRH0=M7-kQEUegNVhKg@mail.gmail.com>
- <CAC8NTUUHiaB3m+zmoPPKXTzWq82veNhT4gCERSQiLvKhfMvRyQ@mail.gmail.com>
- <20131205173036.GE17165@arm.com>
-Message-ID: <CAC8NTUXVeSJMyG0H7PB_ms-vUpzk224XFmVq5JXQPzhJrgCdPw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 10 Dec 2013 09:54:21 -0700
+Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
+In-Reply-To: <20131210084042.GN12675@lee--X1>
+References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+ <20131210084042.GN12675@lee--X1>
+Message-ID: <52A7473D.5020109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 11:00 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Dec 05, 2013 at 02:35:52PM +0000, Radha Mohan wrote:
->> Before going for a next version of patch to fix breaking SMMU and KVM,
->> I would like to know  about the best possible implementation.
->> Should I go for a compile time option? I am not in favor of this. What
->> are options if in future there's 16KB page support in the kernel.
->
-> As I said in the other email, separate the shifts definitions (primarily
-> page size dependent) from the type definitions (dependent on the number
-> of levels).
->
-> Just to understand your requirements better. Does your platform have
-> more than 256GB of RAM? With the current configuration, the VA space is
-> 39-bit with 4K (which would allow 512GB minus some vmalloc and modules
-> space) and 42-bit with 64K pages (2TB minus vmalloc/modules).
+On 12/10/2013 01:40 AM, Lee Jones wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> mfd_add_device() assigns .of_node in the device objects it creates only
+>> if the mfd_cell for the device has the .of_compatible field set and the
+>> DT node for the top-level MFD device contains a child whose compatible
+>> property matches the cell's .of_compatible field.
+>>
+>> This leaves .of_node unset in many cases. When this happens, entries in
+>> the DT /aliases property which refer to the top-level MFD DT node will
+>> never match the MFD child devices, hence causing the requested alias not
+>> to be honored.
+>>
+>> Solve this by setting each MFD child device's .of_node equal to the top-
+>> level MFD device's .of_node field in the cases where it would otherwise
+>> remain unset.
+> 
+> How sure are you that this will be void of repercussions?
 
-Sorry for the delay in responding.
-More than 256GB DRAM is a likely possibility. But I am unsure of the
-exact page size that would be used. That is the reason for expanding
-the VA bits to full and have flexibility for customers. As Marc
-mentioned this is a rare requirement for now in ARMv8 processors, but
-would be nice to have a plan for long term. I would prefer a runtime
-support for this i.e reading the ID_AA64MMFR0_EL1.PARange value but I
-think this would be a major rework.
+I'm simply hopeful:-) It doesn't seem likely that this would cause any
+issues, since presumably any devices that are being instantiated from DT
+either already work correctly, or wouldn't be affected by this change
+since they're manually searching whatever the appropriate DT node is.
+Are there any particular points you think I should look into?
 
-At the least I plan to support this with current implementation i.e,
-3-levels(4K) / 2-levels(64K) itself. This way it would need minimal
-changes for a 48-bit PA.
+>> The first use-case for this will be aliases for the TPS6586x's RTC
+>> device.
+> 
+> Isn't it viable to supply the of_compatible strings for these nodes
+> and search the parent for its alias property instead?
 
->
-> --
-> Catalin
+I did think of that, but there are two reasons I chose not to do that
+initially:
+
+a) It requires that every single top-level MFD driver be edited to set
+the .of_compatible field in their mfd_cells array, whereas this patch
+automatically works for all drivers.
+
+b) The mfd_cells .of_compatible field is a single entry, whereas a
+top-level MFD driver could support an arbitrary number of DT compatible
+values. I suppose one could work around this by setting the mfd_cells
+.of_compatible field at run-time based on the actual compatible value of
+the top-level DT node, but that feels icky.
