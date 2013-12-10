@@ -1,41 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Dec 2013 13:17:24 +0100
-Subject: [PATCH 5/8] gpio: twl4030: Fix regression for twl gpio output
-In-Reply-To: <20131209171020.GB11433@atomide.com>
-References: <1384396537-3486-1-git-send-email-tony@atomide.com>
- <1384396537-3486-6-git-send-email-tony@atomide.com>
- <529DDCE3.5020902@ti.com>
- <CACRpkdb1XEJjykRD3MGmjHvTX40JtTZU7uDRAvpGLBdoREChmw@mail.gmail.com>
- <20131209171020.GB11433@atomide.com>
-Message-ID: <CACRpkdZ5-66BMTvRcMZYm-49=z5L_71DCoDm1u6jUpvTNpLFWQ@mail.gmail.com>
+From: ben@datarespons.no (=?utf-8?B?QmrDuHJuIEVyaWsgTmlsc2Vu?=)
+Date: Tue, 10 Dec 2013 13:21:20 +0100
+Subject: imx6 suspend/resume issue
+Message-ID: <mailman.16.1386678432.1056.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 9, 2013 at 6:10 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [131209 05:10]:
->> On Tue, Dec 3, 2013 at 2:30 PM, Roger Quadros <rogerq@ti.com> wrote:
->>
->> (...)
->> > This patch causes a regression with LED outputs (GPO) on twl4030 on 3.13-rc2.
->> > As one of the LED GPO is used for USB host on beagleboard, it will cause failure
->> > of USB host probe.
->> (...)
->> > Below is a proposed fix for this.
->>
->> Roger, Tony: what happened with this? Have you hashed this out?
->> I ACK Roger's fixup too if that needs to be merged into the OMAP
->> tree.
->
-> There's an updated version from Roger posted that I acked:
->
-> [PATCH v2 1/1] gpio: twl4030: Fix regression for twl gpio LED output
->
-> http://lkml.org/lkml/2013/12/5/65
->
-> I also commented on the dependencies there, but basically you can
-> pick it up unless you want me to. Should be cc stable as well.
+Hi,
 
-OK I have picked this now, I'll add a CC to stable.
+I have a nitrogen6x board (imx6q) from boundary devices and I've been
+playing with power management on the 3.12 kernel.
 
-Yours,
-Linus Walleij
+There are issues related to suspend/resume. It looks like I can
+successfully enter mem mode, however when I trigger one of the wakeup
+sources I'm not able to resume successfully.
+
+#echo mem > /sys/power/state
+
+PM: Syncing filesystems ... done.
+PM: Preparing system for mem sleep
+Freezing user space processes ... (elapsed 0.001 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+PM: Entering mem sleep
+PM: suspend of devices complete after 53.008 msecs
+PM: suspend devices took 0.060 seconds
+PM: late suspend of devices complete after 1.924 msecs
+PM: noirq suspend of devices complete after 2.604 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+
+<trigger wake-up source>
+
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+
+And then the system hangs there. I have looked through recent patchwork
+and I cannot find any obvious commits missing from my branch.
+
+I'm thinking this must be a known issue and perhaps you can point me in
+the right direction for what I should look for.
+
+Best regards,
+Bj?rn Erik Nilsen
