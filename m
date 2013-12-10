@@ -1,72 +1,119 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 10 Dec 2013 08:56:29 -0500
-Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
-In-Reply-To: <20131210135032.GB29700@mudshark.cambridge.arm.com>
-References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
- <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
- <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
- <52A66211.6010707@codeaurora.org>
- <83dd58eb-9a44-4b76-aa68-4669b26acab8@email.android.com>
- <20131210102555.GB2338@mudshark.cambridge.arm.com>
- <20131210104231.GB2521@darko.cambridge.arm.com>
- <20131210135032.GB29700@mudshark.cambridge.arm.com>
-Message-ID: <84aa3feb-93df-4417-a7bd-bfc74fa319b5@email.android.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 10 Dec 2013 08:08:44 -0600
+Subject: [PATCHv4 2/4] clk: socfpga: Add a hook for SD/MMC driver to
+ control CIU clock settings
+In-Reply-To: <201312052157.37538.arnd@arndb.de>
+References: <1386263677-7733-1-git-send-email-dinguyen@altera.com>
+ <1386263677-7733-3-git-send-email-dinguyen@altera.com>
+ <201312052157.37538.arnd@arndb.de>
+Message-ID: <52A7206C.4040500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> wrote:
->On Tue, Dec 10, 2013 at 10:42:31AM +0000, Catalin Marinas wrote:
->> On Tue, Dec 10, 2013 at 10:25:56AM +0000, Will Deacon wrote:
->> > On Tue, Dec 10, 2013 at 12:40:20AM +0000, Konrad Rzeszutek Wilk
->wrote:
->> > > Laura Abbott <lauraa@codeaurora.org> wrote:
->> > > >On 12/9/2013 4:29 PM, Konrad Rzeszutek Wilk wrote:
->> > > >> Can this be done in the platform dma_ops functions instead?
->> > > >
->> > > >I suppose it could but that seems like it would result in lots
->of 
->> > > >duplicated code if every architecture that uses swiotlb wants to
->use
->> > > >CMA.
->> > > >
->> > > 
->> > > Then let's do that it that way. Thank you.
->> > 
->> > Note that once arch/arm64 starts growing things like support for
->non-coherent
->> > DMA and IOMMU mappings, we'll probably want to factor out a bunch
->of the
->> > boilerplat from our dma-mapping.c file into places like
->lib/iommu-helper.c.
->> 
->> For coherency, we could build it on top of whatever dma (allocation)
->ops
->> are registered, whether swiotlb or iommu (see part of
->>
->https://git.kernel.org/cgit/linux/kernel/git/cmarinas/linux-aarch64.git/commit/?h=devel&id=c67fe405be6b55399c9e53dfeba5e2c6b930e429)
->> 
->> Regarding iommu, I don't think we need CMA on top, so it makes sense
->to
->> keep the CMA in the swiotlb code.
->
->I don't think it does; swiotlb doesn't care about things like remapping
->highmem pages returned from CMA, so inlining the code in there just
->implies
->that we should inline it in all of the dma_ops implementations that
->might
->want it (although agreed about IOMMU not needing it. I'm thinking about
->things like the non-coherent ops under arch/arm/).
->
->Instead, it should either be in a library that they can all use as they
->see
->fit, or in the code that deals with all of the dma_ops in the
->architecture
->backend.
->
->My reading of Konrad's reply was that he doesn't want this in the
->swiotlb
->code either...
->
->Will
 
-Having it in a library - such as iommu-helper would be better. We could rename the library to dma-helper to make it more obvious of its intended usage.
+On 12/5/13 2:57 PM, Arnd Bergmann wrote:
+> On Thursday 05 December 2013, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> Populate the .prepare function in the clk-ops for the "sdmmc_clk" that represents
+>> the "ciu" clock for the SD/MMC driver. The prepare function will handle setting
+>> the correct clock-phase for the CIU clock of the SD/MMC IP.
+>>
+>> Re-use the "rockchip,rk2928-dw-mshc" binding as it is already defined and
+>> appropriate for the SOCFPGA platform as well.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> I think with this series we're getting closer to where things should be, but
+> there are still a number of the same problems. Maybe I have misunderstood
+> a few things here in how the clocks fit together, but here is what still
+> looks wrong about this patch:
+>
+>> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+>> index 60cb2f5..01baf20 100644
+>> --- a/drivers/clk/socfpga/clk.c
+>> +++ b/drivers/clk/socfpga/clk.c
+>> @@ -55,7 +55,13 @@
+>>  #define div_mask(width)	((1 << (width)) - 1)
+>>  #define streq(a, b) (strcmp((a), (b)) == 0)
+>>  
+>> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET	0x108
+>> +/* SDMMC Group for System Manager defines */
+>> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
+>> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
+>> +
+>>  extern void __iomem *clk_mgr_base_addr;
+>> +extern void __iomem *sys_manager_base_addr;
+> As mentioned in yesterday's comments, you should not have the 'extern'
+> declaration for sys_manager_base_addr here. In fact, the existing
+> clk_mgr_base_addr declaration is just as wrong.
+Yes, will fix..
+>
+>> +static int sdmmc_ciuclk_prepare(struct clk_hw *hwclk)
+>> +{
+>> +	struct device_node *np;
+>> +	u32 timing[2];
+>> +	u32 hs_timing;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "rockchip,rk2928-dw-mshc");
+>> +	if (of_property_read_u32_array(np, "samsung,dw-mshc-sdr-timing", timing, 2)) {
+>> +		pr_err("SDMMC: cannot find samsung,dw-mshc-sdr-timing!\n");
+>> +		return -ENODATA;
+>> +	}
+>> +	hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[1], timing[0]);
+>> +	writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
+>> +	return 0;
+>> +}
+>> +
+> And in now way should the clock provider code look into the DT properties of the
+> clock consumer. From what I can tell, the dw-mshc code already interprets the
+> "samsung,dw-mshc-sdr-timing" property and uses the data to pass the correct
+> clock rate using 'clk_set_rate()'. The clock code should only use the data passed
+> in the argument to that function to set up the registers and not need to know
+> at all who is setting it.
+You're right, the dw-mshc code interprets "samsung,dw-mshc-sdr-timing",
+but it is
+currently doing it in the platform specific code(dw_mmc-exynos and
+dw_mmc-socfpga).
+I was thinking I can remove the platform specific for SOCFPGA. But
+perhaps now that
+patch "mmc: dw_mmc: Make the use of the hold reg generic" is
+progressing, and
+that patch reads "samsung,dw-mshc-sdr-timing" in the generic dw_mmc
+code, I can now
+pass it through the clk_set_rate call.
+
+My initial thought to read "samsung,dw-mshc-sdr-timing" in the socfpga clock
+driver's was that the SOCFPGA's sdmmc_clk only role in life is to feed
+the sdmmc block. So
+reading the phase shift bits that adjust this clock does seem weird, but
+a straightforward way
+of doing it. I stuck it in the function in .prepare function because the
+setting of the clock's phase
+shift also requires that CIU clock be turned off while the bits are
+toggled, so the prepare function
+seems to work perfectly. So I think you're only concern is that I should
+figure out a way to pass
+the values of "samsung,dw-mshc-sdr-timing" from the dw_mmc driver to the
+clock driver, correct?
+
+Yes, I can read the "samsung,dw-mshc-sdr-timing" in the dw_mmc code and
+pass it to the clock
+driver using clk_set_rate(), but this method seems more cumbersome, as
+this clk_set_rate does not
+have anything to do with setting the rate, but only the phase shift
+settings of the clock.
+>
+> I am a little confused though what the SYSMGR_SDMMCGRP_CTRL_OFFSET register actually
+> does. It looks like this is just a clock divider, which should be represented as
+> a separate clock node (as you had in v3) and compute the correct factor from the
+> requested clock rate and the parent clock rate.
+The SYSMGR_SDMMCGRP_CTRL_OFFSET is just putting the 2 values of
+"samsung,dw-mshc-sdr-timing"
+into a a single u32 value to be written to the register.
+"samsung,dw-mshc-sdr-timing" has 2 values that
+controls the phase shift of 2 clocks, the drive clock and the sample clock.
+
+Thanks,
+Dinh
+>
+> 	Arnd
