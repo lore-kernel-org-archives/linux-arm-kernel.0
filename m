@@ -1,89 +1,45 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 10 Dec 2013 13:05:21 +0000
-Subject: [RFC part2 PATCH 8/9] ACPI / ARM64: Update acpi_register_gsi to
- register with the core IRQ subsystem
-In-Reply-To: <1385999094-3152-9-git-send-email-hanjun.guo@linaro.org>
-References: <1385999094-3152-1-git-send-email-hanjun.guo@linaro.org> <
- 1385999094-3152-9-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20131210130521.3FE89C40A27@trevor.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Dec 2013 13:09:26 +0000
+Subject: OMAP still fails - usb phy stuff
+Message-ID: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  2 Dec 2013 23:44:53 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> This API is similar to DT based irq_of_parse_and_map but does link
-> parent/child IRQ controllers. This is tested for primary GIC PPI and GIC SPI
-> interrupts and not for secondary child irq controllers.
-> 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/plat/arm-core.c |   36 ++++++++++++++++++++++++++++++++++--
->  1 file changed, 34 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-> index 9cc0208..17c99e1 100644
-> --- a/drivers/acpi/plat/arm-core.c
-> +++ b/drivers/acpi/plat/arm-core.c
-> @@ -90,7 +90,7 @@ enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
->  
->  static unsigned int gsi_to_irq(unsigned int gsi)
->  {
-> -	int irq = irq_create_mapping(NULL, gsi);
-> +	int irq = irq_find_mapping(NULL, gsi);
+I still see some OMAP randconfigs failing with this:
 
-I suspect this will break FDT users that depend on the old behaviour.
+arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+dss-common.c:(.text+0x1396c): undefined reference to `usb_bind_phy'
+arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+dss-common.c:(.init.text+0x6c90): undefined reference to `usb_bind_phy'
+drivers/built-in.o: In function `omap_usb2_remove':
+powercap_sys.c:(.text+0x3520): undefined reference to `usb_remove_phy'
+drivers/built-in.o: In function `omap_usb_power_off':
+powercap_sys.c:(.text+0x3544): undefined reference to `omap_control_usb_phy_power'
+drivers/built-in.o: In function `omap_usb_power_on':
+powercap_sys.c:(.text+0x3568): undefined reference to `omap_control_usb_phy_power'
+drivers/built-in.o: In function `omap_usb2_probe':
+powercap_sys.c:(.text+0x3638): undefined reference to `omap_control_usb_phy_power'
+powercap_sys.c:(.text+0x36d4): undefined reference to `usb_add_phy_dev'
+drivers/built-in.o: In function `omap_usb2_suspend':
+powercap_sys.c:(.text+0x37d0): undefined reference to `omap_control_usb_phy_power'
+powercap_sys.c:(.text+0x37f4): undefined reference to `omap_control_usb_phy_power'
+drivers/built-in.o: In function `omap_usb2_set_comparator':
+powercap_sys.c:(.text+0x3844): undefined reference to `usb_get_phy'
+drivers/built-in.o: In function `isp1704_charger_remove':
+powercap_sys.c:(.text+0x48d5ec): undefined reference to `usb_put_phy'
+drivers/built-in.o: In function `isp1704_charger_probe':
+powercap_sys.c:(.text+0x48d64c): undefined reference to `usb_get_phy'
+powercap_sys.c:(.text+0x48d884): undefined reference to `usb_put_phy'
+drivers/built-in.o: In function `twl4030_bci_probe':
+powercap_sys.c:(.init.text+0x13fd4): undefined reference to `usb_get_phy'
+powercap_sys.c:(.init.text+0x14114): undefined reference to `usb_put_phy'
 
-g.
+Probably caused by over-use of the damned select statement:
 
->  
->  	return irq;
->  }
-> @@ -407,7 +407,39 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->   */
->  int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
->  {
-> -	return -1;
-> +	unsigned int irq;
-> +	unsigned int irq_type;
-> + 
-> +	/*
-> +	 * ACPI have no bindings to indicate SPI or PPI, so we
-> +	 * use different mappings from DT in ACPI.
-> +	 *
-> +	 * For FDT
-> +	 * PPI interrupt: in the range [0, 15];
-> +	 * SPI interrupt: in the range [0, 987];
-> +	 *
-> +	 * For ACPI, using identity mapping for hwirq:
-> +	 * PPI interrupt: in the range [16, 31];
-> +	 * SPI interrupt: in the range [32, 1019];
-> +	 */
-> +
-> +	if (trigger == ACPI_EDGE_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_LOW)
-> +		irq_type = IRQ_TYPE_EDGE_FALLING;
-> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_HIGH)
-> +		irq_type = IRQ_TYPE_EDGE_RISING;
-> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_LOW)
-> +		irq_type = IRQ_TYPE_LEVEL_LOW;
-> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_HIGH)
-> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
-> +	else
-> +		irq_type = IRQ_TYPE_NONE;
-> +
-> +	irq = irq_create_acpi_mapping(gsi, irq_type);
-> + 	return irq; 
->  }
->  EXPORT_SYMBOL_GPL(acpi_register_gsi);
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linaro-kernel mailing list
-> linaro-kernel at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-kernel
+warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+
+You have to wonder why OMAP_USB2 can be enabled when USB_SUPPORT is
+disabled.
