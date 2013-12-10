@@ -1,85 +1,137 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 10 Dec 2013 16:47:40 +1030
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CACVXFVPrTWrC443vGpVGy-eH_hDQMN1HxCeC_iJ2uJ3Y=rnBwA@mail.gmail.com>
-References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
- <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
- <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
- <87y54vzszo.fsf@rustcorp.com.au>
- <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
- <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
- <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
- <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
- <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
- <528110B1.4060402@arm.com> <20131111193236.GB16735@n2100.arm.linux.org.uk>
- <CACVXFVPQfUtrc4r4cS9J+6q5Z6hGZDgafH=M_6JfrzrAUGJOHw@mail.gmail.com>
- <CAFRkauACb7wPdisp-PEic_-ko5MhhnAyigcpg5gfjLEFUuJqGw@mail.gmail.com>
- <CACVXFVPPK-s8ToH0L06Rq0DY9cvfomyHpYKJ7ufbbVoJq69mnA@mail.gmail.com>
- <CAFRkauCFdBFM3L9DA2i7jGDRPe4V5AQA2o-ZsZB7HYA-zvzHAA@mail.gmail.com>
- <CACVXFVPrTWrC443vGpVGy-eH_hDQMN1HxCeC_iJ2uJ3Y=rnB
- wA@mail.gmail.com>
-Message-ID: <87iouxjkl7.fsf@rustcorp.com.au>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 9 Dec 2013 23:18:56 -0800
+Subject: [PATCH v4 1/8] ARM: dts: Declare clocks as fixed on bcm11351
+In-Reply-To: <1386271244-3927-2-git-send-email-tim.kryger@linaro.org>
+References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
+ <1386271244-3927-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYrw_owwBYEmmXO3=OG9pXrKPrJTwF+jPVm4+-Vvf0Xorw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
+Applied to armsoc/for-3.14/dt
 
-> Hi Axel,
+ thanks,
+   csd
+
+
+On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> Declare clocks that are enabled and configured by bootloaders as fixed
+> rate clocks in the DTS such that device drivers may use standard clock
+> function calls.
 >
-> I am fine to resend it to RMK's patch system, but I am not sure
-> if Russell would like to host it.
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> ---
+>  arch/arm/boot/dts/bcm11351.dtsi | 97 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 97 insertions(+)
 >
-> Maybe it is better to push it via Rusty's tree since the change is only
-> on scripts/, and it doesn't depend on the 1st one.
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> index b0c0610..eca6fbc 100644
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -142,4 +142,101 @@
+>                 status = "disabled";
+>         };
 >
-> Rusty, could you pick up the patch with title of
-> "scripts/link-vmlinux.sh: only filter kernel symbols for arm"?
-
-OK, and I added the correct Fixes: line so the stable people can track
-it properly:
-
-Cc: <stable@vger.kernel.org>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Fixes: f6537f2f0eba4eba3354e48dbe3047db6d8b6254
-Singed-off-by: Ming Lei <tom.leiming@gmail.com>
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
-
-BTW, you misspelled Signed-off-by :)
-
-Applied,
-Rusty.
-
-
->
-> Thanks,
+> +       clocks {
+> +               bsc1_clk: bsc1 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               bsc2_clk: bsc2 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               bsc3_clk: bsc3 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               pmu_bsc_clk: pmu_bsc {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               hub_timer_clk: hub_timer {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <32768>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               pwm_clk: pwm {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <26000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               sdio1_clk: sdio1 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <48000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               sdio2_clk: sdio2 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <48000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               sdio3_clk: sdio3 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <48000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               sdio4_clk: sdio4 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <48000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               tmon_1m_clk: tmon_1m {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <1000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               uartb_clk: uartb {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               uartb2_clk: uartb2 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               uartb3_clk: uartb3 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               uartb4_clk: uartb4 {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               usb_otg_ahb_clk: usb_otg_ahb {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <52000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +       };
+>  };
 > --
-> Ming Lei
+> 1.8.0.1
 >
-> On Mon, Dec 2, 2013 at 9:57 AM, Axel Lin <axel.lin@ingics.com> wrote:
->> 2013/11/13 Ming Lei <tom.leiming@gmail.com>:
->>> Hi Axel,
->>>
->>> On Wed, Nov 13, 2013 at 5:58 PM, Axel Lin <axel.lin@ingics.com> wrote:
->>>>
->>>> Hi Ming,
->>>> You missed "; then" in the end of if statement in your patch.
->>>>
->>>> So I got below error with your patch:
->>>> scripts/link-vmlinux.sh: line 87: syntax error near unexpected token `fi'
->>>> make: *** [vmlinuxclean] Error 2
->>>
->>> Thanks for your test, and I have fixed it and post a formal one for merge,
->>> and you can find these two patches on arm list, but forget to Cc you, sorry
->>> for that.
->>
->> Hi Ming,
->> Both your patch and Jonathan's patch are still not in linux-next.
->> Any chance to resend the patchs to RMK's patch system?
->>
->> Thanks,
->> Axel
->
->
->
-> -- 
-> Ming Lei
