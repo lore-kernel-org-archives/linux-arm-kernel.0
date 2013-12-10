@@ -1,7 +1,9 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 10 Dec 2013 13:24:33 +0400
+Date: Tue, 10 Dec 2013 13:27:37 +0400
 Subject: [PATCH 08/20] mmc: host: pxamci: switch over to dmaengine use
-Message-ID: <1386667473-26243-1-git-send-email-ynvich@gmail.com>
+In-Reply-To: <1375889649-14638-9-git-send-email-zonque>
+References: <1375889649-14638-9-git-send-email-zonque>
+Message-ID: <1386667657-26355-1-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
