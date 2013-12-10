@@ -1,21 +1,50 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 09 Dec 2013 21:02:41 -0500 (EST)
-Subject: [PATCH v2 1/2] net: emaclite: Remove unnecessary code that
- enables/disables interrupts on PONG buffers
-In-Reply-To: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
-References: <1386403849-3153-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <20131209.210241.1312012384456187129.davem@davemloft.net>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 10 Dec 2013 03:13:34 +0100
+Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
+In-Reply-To: <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
+References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
+ <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
+Message-ID: <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srikanth Thokala <sthokal@xilinx.com>
-Date: Sat,  7 Dec 2013 13:40:48 +0530
 
-> There are no specific interrupts for the PONG buffer on both
-> transmit and receive side, same interrupt is valid for both
-> buffers. So, this patch removes this code.
+On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
+
+> Currently, we don't have an exit reason for VM reset emulation
+> in user space hence this patch adds exit reason KVM_EXIT_RESET
+> for this purpose.
 > 
-> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-> Reviewed-by: Michal Simek <monstr@monstr.eu>
+> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
+> in-kernel PSCI support to reset VMs.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+> include/uapi/linux/kvm.h |    1 +
+> 1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 902f124..64a04cc 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+> #define KVM_EXIT_WATCHDOG         21
+> #define KVM_EXIT_S390_TSCH        22
+> #define KVM_EXIT_EPR              23
+> +#define KVM_EXIT_RESET            24
 
-Applied.
+I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
+
+I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
+
+Can we treat it as such? Could you please make this a common exit number that's called something like
+
+  KVM_EXIT_SYSTEM_EVENT
+
+with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
+
+That way it's obvious what's going on and people don't get confused.
+
+
+Alex
