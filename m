@@ -1,39 +1,69 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 10 Dec 2013 13:06:39 -0800
-Subject: [PATCHv2 2/2] arm64: Enable CMA
-In-Reply-To: <1386705132-7127-3-git-send-email-lauraa@codeaurora.org>
-References: <1386705132-7127-1-git-send-email-lauraa@codeaurora.org>
- <1386705132-7127-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <52A7825F.50306@codeaurora.org>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Tue, 10 Dec 2013 15:11:36 -0600
+Subject: [PATCH v2 0/3] clk: bcm281xx: define Broadcom kona clocks
+In-Reply-To: <529F4B0F.2020801@linaro.org>
+References: <529F4B0F.2020801@linaro.org>
+Message-ID: <52A78388.90904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 11:52 AM, Laura Abbott wrote:
+On 12/04/2013 09:32 AM, Alex Elder wrote:
+> This series adds support for Kona clock control units (CCUs) and
+> clocks, used by Broadcom BCM281xx family SoCs.  Kona CCUs are
+> represented by nodes in the device tree, and the names of the clocks
+> provided by a CCU are included in its node.  Implementation details
+> of those clocks are defined in a C file separate from the code that
+> implements the functionality used by most of the common clock
+> framework.
 
->
-> @@ -36,14 +37,33 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
->   	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
->   	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
->   		flags |= GFP_DMA32;
-> -	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-> +	if (IS_ENABLED(CONFIG_DMA_CMA)) {
-> +		struct page *page;
-> +
-> +		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
-> +							get_order(size));
-> +		if (!page)
-> +			return NULL;
-> +
-> +		return page_address(page);
-> +	} else {
-> +		return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-> +	}
->   }
+Ping?
 
-Whoops I manged to send out the incorrect version here where I never set 
-the dma_handle. Let me resend again...
+If you need me to re-send the series as separate messages, say
+so and I'll gladly do it.
 
+Thank you.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+					-Alex
+
+> This series depends on:
+>     "Update Kona drivers to use clocks"
+>     https://lkml.org/lkml/2013/11/14/450
+> 
+> This series (along with a version of those prerequisite patches) is
+> available in the "review/bcm-kona-clocks-v2" branch of this git
+> repository:
+>     git://git.linaro.org/people/elder/linux.git
+> 
+> Updates:
+> v2: - Address all issues raised by Mark Rutland.
+> 
+> 					-Alex
+> 
+> Alex Elder (3):
+>   clk: bcm281xx: define kona clock binding
+>   clk: bcm281xx: add initial clock framework support
+>   ARM: dts: bcm281xx: define real clocks
+> 
+>  .../devicetree/bindings/clock/bcm-kona-clock.txt   |   93 ++
+>  arch/arm/boot/dts/bcm11351.dtsi                    |  240 +++--
+>  drivers/clk/Kconfig                                |    1 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/bcm/Kconfig                            |    8 +
+>  drivers/clk/bcm/Makefile                           |    3 +
+>  drivers/clk/bcm/clk-bcm281xx.c                     |  416 ++++++++
+>  drivers/clk/bcm/clk-kona-setup.c                   |  769 +++++++++++++++
+>  drivers/clk/bcm/clk-kona.c                         | 1033
+> ++++++++++++++++++++
+>  drivers/clk/bcm/clk-kona.h                         |  414 ++++++++
+>  include/dt-bindings/clock/bcm281xx.h               |   65 ++
+>  11 files changed, 2967 insertions(+), 76 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
+>  create mode 100644 drivers/clk/bcm/Kconfig
+>  create mode 100644 drivers/clk/bcm/Makefile
+>  create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
+>  create mode 100644 drivers/clk/bcm/clk-kona-setup.c
+>  create mode 100644 drivers/clk/bcm/clk-kona.c
+>  create mode 100644 drivers/clk/bcm/clk-kona.h
+>  create mode 100644 include/dt-bindings/clock/bcm281xx.h
+> 
