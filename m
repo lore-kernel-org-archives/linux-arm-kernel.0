@@ -1,51 +1,39 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 11 Dec 2013 02:44:35 +0400
-Subject: [PATCH] ARM: debug: move StrongARM debug include to
- arch/arm/include/debug
-Message-ID: <1386715475-17966-1-git-send-email-dbaryshkov@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 14:46:59 -0800
+Subject: [PATCH 1/3] arm: omap2: Export devconf1 bypass and acbias.
+In-Reply-To: <CAAfyv36MaVqrmQxpqDu-ciO9GNJK3pJkFZohEvd1BOLOWWEOhw@mail.gmail.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <1381784555-18344-2-git-send-email-marek@goldelico.com>
+ <20131111164917.GN15154@atomide.com>
+ <CAAfyv37LRb_Q=UZVgtKdOAz_r6_qThewAU90W7nrqHdB5fDA_g@mail.gmail.com>
+ <20131111233152.GR15154@atomide.com>
+ <CAAfyv36MaVqrmQxpqDu-ciO9GNJK3pJkFZohEvd1BOLOWWEOhw@mail.gmail.com>
+Message-ID: <20131210224659.GY13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-StrongARM debug-macro.S is quite standalone thing, depending only on
-register mappings. Move it to proper place and add Kconfig entry.
+* Belisko Marek <marek.belisko@gmail.com> [131210 14:13]:
+> On Tue, Nov 12, 2013 at 12:31 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > It would be best to set it up as omap-ctrl.c driver under drivers
+> > somewhere with few functions exported for DSS and MMC drivers.
+>
+> I create small dummy driver based on phy-omap-control which can be
+> used but before sending patch (with more updates) I would like to get
+> some feedback if my direction is correct.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/Kconfig.debug                                           | 9 +++++++++
- .../include/mach/debug-macro.S => include/debug/sa1100.S}        | 0
- 2 files changed, 9 insertions(+)
- rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (100%)
+Cool thanks. Yeah what you have can easily be combined with the patches
+Balaji has posted to make HSMMC use drivers/mfd/syscon.c via regmap
+for the SCM register access. Maybe take a look at the work in progress
+patches in thread:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9762c84..55ae5cf 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -493,6 +493,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on PXA UART1.
- 
-+	config DEBUG_SA1100
-+		depends on ARCH_SA1100
-+		bool "Use SA1100 UARTs for low-level debug"
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SA-11x0 UART ports. The kernel will check for the first
-+		  enabled UART in a sequence 3-1-2.
-+
- 	config DEBUG_REALVIEW_STD_PORT
- 		bool "RealView Default UART"
- 		depends on ARCH_REALVIEW
-@@ -882,6 +890,7 @@ config DEBUG_STI_UART
- 
- config DEBUG_LL_INCLUDE
- 	string
-+	default "debug/sa1100.S" if DEBUG_SA1100
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
- 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
-diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/include/debug/sa1100.S
-similarity index 100%
-rename from arch/arm/mach-sa1100/include/mach/debug-macro.S
-rename to arch/arm/include/debug/sa1100.S
--- 
-1.8.4.3
+[PATCH v4 0/7] mmc: omap_hsmmc: pbias dt and cleanup
+
+And also see my comments regarding using the SCM GENERAL register area
+as base for the syscon.c driver. That should work for your driver too,
+right? And then you can access the SYSCON1 register that way from your
+consumer driver ;)
+
+Regards,
+
+Tony
