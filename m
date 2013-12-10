@@ -1,64 +1,46 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 10 Dec 2013 16:43:56 +0800
-Subject: [PATCH] ARM: pxa: prevent PXA270 occasional reboot freezes
-In-Reply-To: <1386650355-2503-1-git-send-email-ynvich@gmail.com>
-References: <1386650355-2503-1-git-send-email-ynvich@gmail.com>
-Message-ID: <52A6D44C.1010504@gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 10 Dec 2013 16:44:58 +0800
+Subject: questions of cpuidle
+In-Reply-To: <52A6C24B.3030800@linaro.org>
+References: <52A5C846.30308@linaro.org> <52A5D0E0.7050201@linaro.org>
+ <52A6B5BB.3060506@linaro.org> <52A6C24B.3030800@linaro.org>
+Message-ID: <52A6D48A.4000507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 12:39 PM, Sergei Ianovich wrote:
-> Erratum 71 of PXA270M Processor Family Specification Update
-> (April 19, 2010) explains that watchdog reset time is just
-> 8us insead of 10ms in EMTS.
->
-> If SDRAM is not reset, it causes memory bus congestion and
-> the device hangs. We put SDRAM in selfresh mode before watchdog
-> reset, removing potential freezes.
->
-> Without this patch PXA270-based ICP DAS LP-8x4x hangs after up to 40
-> reboots. With this patch it has successfully rebooted 500 times.
->
-> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> ---
->   arch/arm/mach-pxa/reset.c | 8 +++++++-
->   1 file changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
-> index 0d5dd64..263b152 100644
-> --- a/arch/arm/mach-pxa/reset.c
-> +++ b/arch/arm/mach-pxa/reset.c
-> @@ -13,6 +13,7 @@
->
->   #include <mach/regs-ost.h>
->   #include <mach/reset.h>
-> +#include <mach/smemc.h>
->
->   unsigned int reset_status;
->   EXPORT_SYMBOL(reset_status);
-> @@ -81,6 +82,12 @@ static void do_hw_reset(void)
->   	writel_relaxed(OSSR_M3, OSSR);
->   	/* ... in 100 ms */
->   	writel_relaxed(readl_relaxed(OSCR) + 368640, OSMR3);
-> +	/*
-> +	 * SDRAM hangs on watchdog reset on Marvell PXA270 (erratum 71)
-> +	 * we put SDRAM into self-refresh to prevent that
-> +	 */
-> +	while (1)
-> +		writel_relaxed(MDREFR_SLFRSH, MDREFR);
->   }
->
->   void pxa_restart(enum reboot_mode mode, const char *cmd)
-> @@ -104,4 +111,3 @@ void pxa_restart(enum reboot_mode mode, const char *cmd)
->   		break;
->   	}
->   }
-> -
->
+On 12/10/2013 03:27 PM, Daniel Lezcano wrote:
+> 
+>> And does the wake up pass via GIC to CPU? If so, does the GIC need
+>> keep awake when all cpu idle? If not, how the firmware give the
+>> interrupt to CPU? And I am wondering if the deep idle cpu voltage get
+>> to near 0. How the cpu get the interrupt signal?
+> 
+> If a deep idle state powers down the GIC, it is up to the PMU to proxy
+> the interrupts. When an interrupt occurs, the PMU powers up the logic,
+> including the GIC. The notifier call chain with cpu_suspend / cpu_resume
+> will save and restore the GIC registers.
+> 
+> But this is hardware specific and will depend on how the PMU is
+> implemented and how far it goes in the power management.
+> 
+> You have a good example in the drivers/cpuidle/cpuidle-ux500.c to
+> understand with the comments how the interrupts are handled through the
+> power management unit.
+> 
+> In the Xillinx documentation available on the web [1], the chapter 24.4
+> gives the information about one kind of PMU.
+> 
+> I believe the mechanism is pretty similar on all the hardware but it is
+> obfuscated by a generic power instruction like mwait.
+> 
+>   -- Daniel
+> 
+> [1]
+> http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
+> 
 
-Hi Daniel/Marek/Igor,
+Thanks a lot, Daniel. You are a expert of ARM cpu idle! :)
 
-Could you help to try this patch? I'm lack of PXA27x board.
-
-Best Regards
-Haojian
+-- 
+Thanks
+    Alex
