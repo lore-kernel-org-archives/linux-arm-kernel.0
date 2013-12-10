@@ -1,20 +1,29 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 10 Dec 2013 16:47:00 +0400
-Subject: [PATCH v2 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <CACRpkdYVsGSyMS6sSTqqJ4XrE3GqpWkJsY7GDazi5ix7xjKQ=Q@mail.gmail.com>
-References: <1385879185-22455-3-git-send-email-ynvich@gmail.com>
- <1386348542-9584-1-git-send-email-ynvich@gmail.com>
- <CACRpkdYVsGSyMS6sSTqqJ4XrE3GqpWkJsY7GDazi5ix7xjKQ=Q@mail.gmail.com>
-Message-ID: <1386679620.7152.226.camel@host5.omatika.ru>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Dec 2013 20:49:22 +0800
+Subject: [PATCHv8][ 2/5] ARM: dts: mbimxsd25: Add sound support.
+In-Reply-To: <1385567664-758-2-git-send-email-denis@eukrea.com>
+References: <1385567664-758-1-git-send-email-denis@eukrea.com>
+ <1385567664-758-2-git-send-email-denis@eukrea.com>
+Message-ID: <20131210124920.GA26728@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-10 at 13:43 +0100, Linus Walleij wrote:
-> Argh! Now you're adding another user for a legacy custom pin control
-> implementation. But if noone is going to modernize PXA2xx what
-> can we do :-/
+On Wed, Nov 27, 2013 at 04:54:21PM +0100, Denis Carikli wrote:
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Liam Girdwood <lgirdwood@gmail.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: alsa-devel at alsa-project.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-I've rewritten the device to use device tree and posted patch series for
-that.
+Applied this one and mbimxsd51 one, but not the other two, as I do not
+have imx35-eukrea-mbimxsd35-baseboard.dts and
+imx53-eukrea-mbimxsd53-baseboard.dts in my tree.
 
-I will also implement LP-8x4x custom irq controller in drivers/irqchip/
+Shawn
