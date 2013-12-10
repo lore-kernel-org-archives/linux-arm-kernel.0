@@ -1,92 +1,45 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 10 Dec 2013 11:41:35 -0300
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
+Date: Tue, 10 Dec 2013 11:41:37 -0300
+Subject: [PATCH v5 3/3] watchdog: orion: Use atomic access for shared registers
 In-Reply-To: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1386686497-20335-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoC have MMIO regions that are shared across orthogonal
-subsystems. This commit implements a possible solution for the
-thread-safe access of such regions through a spinlock-protected API.
-
-Concurrent access is protected with a single spinlock for the
-entire MMIO address space. While this protects shared-registers,
-it also serializes access to unrelated/unshared registers.
-
-We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
-respectively. The rationale for this is that some users may not require
-register write completion but only thread-safe access to a register.
+Since the timer control register is shared with the clocksource driver,
+use the recently introduced atomic_io_clear_set() to access such register.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/include/asm/io.h |  6 ++++++
- arch/arm/kernel/io.c      | 35 +++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
+ drivers/watchdog/orion_wdt.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 3c597c2..05722ac 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -38,6 +38,12 @@
- #define isa_bus_to_virt phys_to_virt
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 44edca6..adeb17f 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -73,9 +73,7 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
  
- /*
-+ * Atomic MMIO-wide IO modify
-+ */
-+extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
-+extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
-+
-+/*
-  * Generic IO read/write.  These perform native-endian accesses.  Note
-  * that some architectures will want to re-define __raw_{read,write}w.
-  */
-diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-index dcd5b4d..9203cf8 100644
---- a/arch/arm/kernel/io.c
-+++ b/arch/arm/kernel/io.c
-@@ -1,6 +1,41 @@
- #include <linux/export.h>
- #include <linux/types.h>
- #include <linux/io.h>
-+#include <linux/spinlock.h>
-+
-+static DEFINE_RAW_SPINLOCK(__io_lock);
-+
-+/*
-+ * Generic atomic MMIO modify.
-+ *
-+ * Allows thread-safe access to registers shared by unrelated subsystems.
-+ * The access is protected by a single MMIO-wide lock.
-+ */
-+void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
-+{
-+	unsigned long flags;
-+	u32 value;
-+
-+	raw_spin_lock_irqsave(&__io_lock, flags);
-+	value = readl_relaxed(reg) & ~mask;
-+	value |= (set & mask);
-+	writel_relaxed(value, reg);
-+	raw_spin_unlock_irqrestore(&__io_lock, flags);
-+}
-+EXPORT_SYMBOL(atomic_io_modify_relaxed);
-+
-+void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
-+{
-+	unsigned long flags;
-+	u32 value;
-+
-+	raw_spin_lock_irqsave(&__io_lock, flags);
-+	value = readl_relaxed(reg) & ~mask;
-+	value |= (set & mask);
-+	writel(value, reg);
-+	raw_spin_unlock_irqrestore(&__io_lock, flags);
-+}
-+EXPORT_SYMBOL(atomic_io_modify);
+ 	/* Enable watchdog timer */
+-	reg = readl(wdt_reg + TIMER_CTRL);
+-	reg |= WDT_EN;
+-	writel(reg, wdt_reg + TIMER_CTRL);
++	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
  
- /*
-  * Copy data from IO memory space to "real" memory space.
+ 	/* Enable reset on watchdog */
+ 	reg = readl(RSTOUTn_MASK);
+@@ -98,9 +96,7 @@ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ 	writel(reg, RSTOUTn_MASK);
+ 
+ 	/* Disable watchdog timer */
+-	reg = readl(wdt_reg + TIMER_CTRL);
+-	reg &= ~WDT_EN;
+-	writel(reg, wdt_reg + TIMER_CTRL);
++	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, 0);
+ 
+ 	spin_unlock(&wdt_lock);
+ 	return 0;
 -- 
 1.8.1.5
