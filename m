@@ -1,60 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Dec 2013 18:37:49 +0000
-Subject: [PATCH v3 11/15] mfd: menelaus: Start to use irqdomain
-In-Reply-To: <20131210163430.GG22750@saruman.home>
-References: <20131209161422.GC24047@saruman.home>
- <1386606085-26838-1-git-send-email-balbi@ti.com>
- <1386606085-26838-11-git-send-email-balbi@ti.com>
- <20131210092050.GT12675@lee--X1>
- <20131210163430.GG22750@saruman.home>
-Message-ID: <20131210183749.GC2390@lee--X1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Dec 2013 10:38:10 -0800
+Subject: OMAP still fails - usb phy stuff
+In-Reply-To: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
+References: <20131210130926.GZ4360@n2100.arm.linux.org.uk>
+Message-ID: <20131210183809.GL13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Introduce an irq_chip and irq_domain for menelaus driver. Following
-> > > patches will convert uses to traditional request_threaded_irq().
-> > > 
-> > > While at that, some better error handling had to be added, so we could
-> > > free irq descs we allocated.
-> > > 
-> > > Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  drivers/mfd/menelaus.c | 127 ++++++++++++++++++++++++++++++++++++++++++++++---
-> > 
-> > <snip>
-> > 
-> > > +	irq_domain_add_legacy(node, MENELAUS_NR_IRQS, irq_base, 0,
-> > > +			&irq_domain_simple_ops, m);
-> > 
-> > When will this driver become DT compliant?
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 05:10]:
+> I still see some OMAP randconfigs failing with this:
 > 
-> when OMAP2 becomes DT-compliant. It still boots with legacy board-file +
-> platform_data.
-
-Really? Tony, are there any plans to DT the platform?
-
-Felipe, what did you think about using irq_domain_add_simple()?
-
-> > > +	m->irq_base = irq_base;
-> > > +
-> > > +	for (i = irq_base; i < irq_base + MENELAUS_NR_IRQS; i++) {
-> > > +		irq_set_chip_data(i, m);
-> > > +		irq_set_chip_and_handler(i, &menelaus_irq_chip,
-> > > +				handle_simple_irq);
-> > > +		irq_set_nested_thread(i, 1);
-> > > +		set_irq_flags(i, IRQF_VALID);
-> > 
-> > This assumes that this h/w only exists on ARM platforms. Is that true?
+> arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+> dss-common.c:(.text+0x1396c): undefined reference to `usb_bind_phy'
+> arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+> dss-common.c:(.init.text+0x6c90): undefined reference to `usb_bind_phy'
+> drivers/built-in.o: In function `omap_usb2_remove':
+> powercap_sys.c:(.text+0x3520): undefined reference to `usb_remove_phy'
+> drivers/built-in.o: In function `omap_usb_power_off':
+> powercap_sys.c:(.text+0x3544): undefined reference to `omap_control_usb_phy_power'
+> drivers/built-in.o: In function `omap_usb_power_on':
+> powercap_sys.c:(.text+0x3568): undefined reference to `omap_control_usb_phy_power'
+> drivers/built-in.o: In function `omap_usb2_probe':
+> powercap_sys.c:(.text+0x3638): undefined reference to `omap_control_usb_phy_power'
+> powercap_sys.c:(.text+0x36d4): undefined reference to `usb_add_phy_dev'
+> drivers/built-in.o: In function `omap_usb2_suspend':
+> powercap_sys.c:(.text+0x37d0): undefined reference to `omap_control_usb_phy_power'
+> powercap_sys.c:(.text+0x37f4): undefined reference to `omap_control_usb_phy_power'
+> drivers/built-in.o: In function `omap_usb2_set_comparator':
+> powercap_sys.c:(.text+0x3844): undefined reference to `usb_get_phy'
+> drivers/built-in.o: In function `isp1704_charger_remove':
+> powercap_sys.c:(.text+0x48d5ec): undefined reference to `usb_put_phy'
+> drivers/built-in.o: In function `isp1704_charger_probe':
+> powercap_sys.c:(.text+0x48d64c): undefined reference to `usb_get_phy'
+> powercap_sys.c:(.text+0x48d884): undefined reference to `usb_put_phy'
+> drivers/built-in.o: In function `twl4030_bci_probe':
+> powercap_sys.c:(.init.text+0x13fd4): undefined reference to `usb_get_phy'
+> powercap_sys.c:(.init.text+0x14114): undefined reference to `usb_put_phy'
 > 
-> it was made *only* for Nokia to use on their ARM-only internet tablets.
+> Probably caused by over-use of the damned select statement:
+> 
+> warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+> warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+> warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet direct dependencies (USB_SUPPORT)
+> warning: (OMAP_USB2) selects OMAP_CONTROL_USB which has unmet direct dependencies (USB_SUPPORT && (ARCH_OMAP2PLUS || COMPILE_TEST))
+> 
+> You have to wonder why OMAP_USB2 can be enabled when USB_SUPPORT is
+> disabled.
 
-If the IP is genuinely not reusable, them I'm fine with it.
+Yeah this causes constant randconfig errors. Felipe, I thought you
+had some fixes lined up for these few weeks ago already when we
+last talked about it?
 
-I see that the Kconfig is setup in the correct way too, so we're good.
+Regards,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Tony
