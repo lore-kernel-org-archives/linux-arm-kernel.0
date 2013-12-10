@@ -1,66 +1,218 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Dec 2013 16:07:03 +0000
-Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
-In-Reply-To: <20131210160144.GG13171@atomide.com>
-References: <pull-1386643347-596413>
- <20131210143547.GA32243@n2100.arm.linux.org.uk>
- <20131210160144.GG13171@atomide.com>
-Message-ID: <20131210160703.GB32243@n2100.arm.linux.org.uk>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 11 Dec 2013 00:03:47 +0800
+Subject: [PATCH v6 1/7] arm64: introduce basic aarch64 instruction decoding
+ helpers
+In-Reply-To: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
+References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
+Message-ID: <1386691433-6827-2-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 08:01:44AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [131210 06:37]:
-> > On Mon, Dec 09, 2013 at 06:42:27PM -0800, Tony Lindgren wrote:
-> > > We can now finally make mach-omap2 to boot with device tree only and get
-> > > rid of over 20k lines of platform init code that way.
-> > > 
-> > > Most basic devices already work using device tree based initialization
-> > > and the remaining devices can be initialized using platform data
-> > > with pdata-quirks.c.
-> > > 
-> > > So for most missing boards it's just a question of adding a .dts file
-> > > that should be fairly similar to one of the existing .dts files as
-> > > we've tried to cover all basic omap3 board types.
-> > > 
-> > > For people getting started updating their board files to for device
-> > > tree, there are some basic instructions in commit 8dc8b3ddf5d7
-> > > (ARM: OMAP2+: Remove legacy omap3 board-*.c files and make mach-omap2
-> > > DT only for booting).
-> > > 
-> > > Please also note that there are also some related fixes making their way
-> > > into the mainline kernel that are needed for some use cases:
-> > > 
-> > > PM off-idle for omap3 and wake-up events need the following two patches:
-> > 
-> > While this is good, what seems to be happening is a complete switch
-> > from one method of booting to a different method of booting with no
-> > compatibility inbetween.  We're going from only supporting the ATAG
-> > booting protocol for these platforms in v3.12 to only supporting the
-> > DT booting protocol in v3.13.  There's no forward or backwards
-> > compatibility - it's one or the other.
-> 
-> Hmm hey this is for v3.14, not for v3.13.
+Introduce basic aarch64 instruction decoding helper
+aarch64_get_insn_class() and aarch64_insn_hotpatch_safe().
 
-Yes, I meant 3.14.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jiang Liu <liuj97@gmail.com>
+---
+ arch/arm64/include/asm/insn.h | 77 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/Makefile    |  2 +-
+ arch/arm64/kernel/insn.c      | 91 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 169 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/insn.h
+ create mode 100644 arch/arm64/kernel/insn.c
 
-> > This is bad: this is the kind of "flag day" change which Linus hates -
-> > and I hate it because it means I need to update my build test system
-> > at the same time that arm-soc merges this stuff.
-> 
-> Unfortunately there's no way around that unless we carry the legacy
-> booting setup for longer. We can certainly postpone the flip over if
-> if there's a real neeed to do it.
-> 
-> But if the issue is just building an appended DTB image, I'd rather just
-> get done with it as that problem we're always going to have no matter
-> how much we delay the flip over.
-
-Right, so I should just turn off building OMAP3 for the remainder of this
-cycle.
-
-What's the fscking point me running a build system, because if I switch
-it now, OMAP3 breaks.  If I don't switch it now and your pull request is
-merged, it breaks at that point.
-
-This is utterly insane.
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+new file mode 100644
+index 0000000..1bdc44c
+--- /dev/null
++++ b/arch/arm64/include/asm/insn.h
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (C) 2013 Huawei Ltd.
++ * Author: Jiang Liu <liuj97@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef	__ASM_INSN_H
++#define	__ASM_INSN_H
++#include <linux/types.h>
++
++/*
++ * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
++ * Section C3.1 "A64 instruction index by encoding":
++ * AArch64 main encoding table
++ *  Bit position
++ *   28 27 26 25	Encoding Group
++ *   0  0  -  -		Unallocated
++ *   1  0  0  -		Data processing, immediate
++ *   1  0  1  -		Branch, exception generation and system instructions
++ *   -  1  -  0		Loads and stores
++ *   -  1  0  1		Data processing - register
++ *   0  1  1  1		Data processing - SIMD and floating point
++ *   1  1  1  1		Data processing - SIMD and floating point
++ * "-" means "don't care"
++ */
++enum aarch64_insn_encoding_class {
++	AARCH64_INSN_CLS_UNKNOWN,	/* UNALLOCATED */
++	AARCH64_INSN_CLS_DP_IMM,	/* Data processing - immediate */
++	AARCH64_INSN_CLS_DP_REG,	/* Data processing - register */
++	AARCH64_INSN_CLS_DP_FPSIMD,	/* Data processing - SIMD and FP */
++	AARCH64_INSN_CLS_LDST,		/* Loads and stores */
++	AARCH64_INSN_CLS_BR_SYS,	/* Branch, exception generation and
++					 * system instructions */
++};
++
++enum aarch64_insn_hint_op {
++	AARCH64_INSN_HINT_NOP	= 0x0 << 5,
++	AARCH64_INSN_HINT_YIELD	= 0x1 << 5,
++	AARCH64_INSN_HINT_WFE	= 0x2 << 5,
++	AARCH64_INSN_HINT_WFI	= 0x3 << 5,
++	AARCH64_INSN_HINT_SEV	= 0x4 << 5,
++	AARCH64_INSN_HINT_SEVL	= 0x5 << 5,
++};
++
++#define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
++static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
++{ return (code & (mask)) == (val); } \
++static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
++{ return (val); }
++
++__AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
++__AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
++__AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
++__AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
++__AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
++__AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
++__AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
++
++#undef	__AARCH64_INSN_FUNCS
++
++bool aarch64_insn_is_nop(u32 insn);
++
++enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
++
++bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
++
++#endif	/* __ASM_INSN_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 5ba2fd4..cd95a25 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -9,7 +9,7 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+-			   hyp-stub.o psci.o cpu_ops.o
++			   hyp-stub.o psci.o cpu_ops.o insn.o
+ 
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+new file mode 100644
+index 0000000..56a2498
+--- /dev/null
++++ b/arch/arm64/kernel/insn.c
+@@ -0,0 +1,91 @@
++/*
++ * Copyright (C) 2013 Huawei Ltd.
++ * Author: Jiang Liu <liuj97@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/compiler.h>
++#include <linux/kernel.h>
++#include <asm/insn.h>
++
++static int aarch64_insn_encoding_class[] = {
++	AARCH64_INSN_CLS_UNKNOWN,
++	AARCH64_INSN_CLS_UNKNOWN,
++	AARCH64_INSN_CLS_UNKNOWN,
++	AARCH64_INSN_CLS_UNKNOWN,
++	AARCH64_INSN_CLS_LDST,
++	AARCH64_INSN_CLS_DP_REG,
++	AARCH64_INSN_CLS_LDST,
++	AARCH64_INSN_CLS_DP_FPSIMD,
++	AARCH64_INSN_CLS_DP_IMM,
++	AARCH64_INSN_CLS_DP_IMM,
++	AARCH64_INSN_CLS_BR_SYS,
++	AARCH64_INSN_CLS_BR_SYS,
++	AARCH64_INSN_CLS_LDST,
++	AARCH64_INSN_CLS_DP_REG,
++	AARCH64_INSN_CLS_LDST,
++	AARCH64_INSN_CLS_DP_FPSIMD,
++};
++
++enum aarch64_insn_encoding_class __kprobes aarch64_get_insn_class(u32 insn)
++{
++	return aarch64_insn_encoding_class[(insn >> 25) & 0xf];
++}
++
++/* NOP is an alias of HINT */
++bool __kprobes aarch64_insn_is_nop(u32 insn)
++{
++	if (!aarch64_insn_is_hint(insn))
++		return false;
++
++	switch (insn & 0xFE0) {
++	case AARCH64_INSN_HINT_YIELD:
++	case AARCH64_INSN_HINT_WFE:
++	case AARCH64_INSN_HINT_WFI:
++	case AARCH64_INSN_HINT_SEV:
++	case AARCH64_INSN_HINT_SEVL:
++		return false;
++	default:
++		return true;
++	}
++}
++
++static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
++{
++	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
++		return false;
++
++	return	aarch64_insn_is_b(insn) ||
++		aarch64_insn_is_bl(insn) ||
++		aarch64_insn_is_svc(insn) ||
++		aarch64_insn_is_hvc(insn) ||
++		aarch64_insn_is_smc(insn) ||
++		aarch64_insn_is_brk(insn) ||
++		aarch64_insn_is_nop(insn);
++}
++
++/*
++ * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
++ * Section B2.6.5 "Concurrent modification and execution of instructions":
++ * Concurrent modification and execution of instructions can lead to the
++ * resulting instruction performing any behavior that can be achieved by
++ * executing any sequence of instructions that can be executed from the
++ * same Exception level, except where the instruction before modification
++ * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
++ * or SMC instruction.
++ */
++bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
++{
++	return __aarch64_insn_hotpatch_safe(old_insn) &&
++	       __aarch64_insn_hotpatch_safe(new_insn);
++}
+-- 
+1.8.1.2
