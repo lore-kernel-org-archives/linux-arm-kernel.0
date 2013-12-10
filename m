@@ -1,137 +1,46 @@
 From: bcm@fixthebug.org (Christian Daudt)
-Date: Mon, 9 Dec 2013 23:18:56 -0800
-Subject: [PATCH v4 1/8] ARM: dts: Declare clocks as fixed on bcm11351
-In-Reply-To: <1386271244-3927-2-git-send-email-tim.kryger@linaro.org>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-2-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYrw_owwBYEmmXO3=OG9pXrKPrJTwF+jPVm4+-Vvf0Xorw@mail.gmail.com>
+Date: Mon, 9 Dec 2013 23:23:28 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable SDHCI_BCM_KONA and
+ MMC_BLOCK_MINORS=16
+In-Reply-To: <1386094909-4211-1-git-send-email-olof@lixom.net>
+References: <1386094909-4211-1-git-send-email-olof@lixom.net>
+Message-ID: <CAEPRUYqxy0b0mbscuoQNZHZwZJ2EZNoB8O8D+i6bwCb3qCq3-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applied to armsoc/for-3.14/dt
+On Tue, Dec 3, 2013 at 10:21 AM, Olof Johansson <olof@lixom.net> wrote:
+> Enable MMC/SD on the Broadcom mobile platforms, and increase the block
+> minors from the default 8 to 16 (since the Broadcom board by default
+> has root on the 8th partition).
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/configs/multi_v7_defconfig |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 4a5903e..7d3ab95 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -133,12 +133,14 @@ CONFIG_USB_GPIO_VBUS=y
+>  CONFIG_USB_ISP1301=y
+>  CONFIG_USB_MXS_PHY=y
+>  CONFIG_MMC=y
+> +CONFIG_MMC_BLOCK_MINORS=16
+>  CONFIG_MMC_ARMMMCI=y
+>  CONFIG_MMC_SDHCI=y
+>  CONFIG_MMC_SDHCI_PLTFM=y
+>  CONFIG_MMC_SDHCI_ESDHC_IMX=y
+>  CONFIG_MMC_SDHCI_TEGRA=y
+>  CONFIG_MMC_SDHCI_SPEAR=y
+> +CONFIG_MMC_SDHCI_BCM_KONA=y
+>  CONFIG_MMC_OMAP=y
+>  CONFIG_MMC_OMAP_HS=y
+>  CONFIG_EDAC=y
+> --
+> 1.7.10.4
+>
+Reviewed-by: Christian Daudt <bcm@fixthebug.org>
 
  thanks,
-   csd
-
-
-On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> Declare clocks that are enabled and configured by bootloaders as fixed
-> rate clocks in the DTS such that device drivers may use standard clock
-> function calls.
->
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  arch/arm/boot/dts/bcm11351.dtsi | 97 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 97 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index b0c0610..eca6fbc 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -142,4 +142,101 @@
->                 status = "disabled";
->         };
->
-> +       clocks {
-> +               bsc1_clk: bsc1 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               bsc2_clk: bsc2 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               bsc3_clk: bsc3 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               pmu_bsc_clk: pmu_bsc {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               hub_timer_clk: hub_timer {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <32768>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               pwm_clk: pwm {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <26000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               sdio1_clk: sdio1 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <48000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               sdio2_clk: sdio2 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <48000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               sdio3_clk: sdio3 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <48000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               sdio4_clk: sdio4 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <48000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               tmon_1m_clk: tmon_1m {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <1000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               uartb_clk: uartb {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               uartb2_clk: uartb2 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               uartb3_clk: uartb3 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               uartb4_clk: uartb4 {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
-> +               usb_otg_ahb_clk: usb_otg_ahb {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <52000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +       };
->  };
-> --
-> 1.8.0.1
->
+  csd
