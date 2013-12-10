@@ -1,75 +1,75 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 9 Dec 2013 20:51:11 -0600
-Subject: [PATCH v3 1/2] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <1386627424-373-2-git-send-email-w-kwok2@ti.com>
-References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
- <1386627424-373-2-git-send-email-w-kwok2@ti.com>
-Message-ID: <20131210025110.GA20090@saruman.home>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 10 Dec 2013 03:53:24 +0100
+Subject: [GIT PULL FOR v3.14] Renesas R-Car Gen 2 Common Clock Framework
+In-Reply-To: <3302362.MUz5Y8N3ER@avalon>
+References: <3302362.MUz5Y8N3ER@avalon>
+Message-ID: <4153474.4BkU3nU19I@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mike,
 
-On Mon, Dec 09, 2013 at 05:17:03PM -0500, WingMan Kwok wrote:
-> +static void kdwc3_enable_irqs(struct dwc3_keystone *kdwc)
-> +{
-> +	u32 val;
-> +
-> +	val = kdwc3_readl(kdwc->usbss, USBSS_IRQENABLE_SET_0);
-> +	val = USBSS_IRQ_COREIRQ_EN;
+On Wednesday 04 December 2013 22:29:07 Laurent Pinchart wrote:
+> Hi Mike,
+> 
+> As nobody replied to the last version of the patches I will assume that
+> either they're perfect, or I've managed to make all reviewers hibernate
+> from boredom. Both cases call for a pull request.
+> 
+> Could you please pull the following three patches for v3.14 ? They have no
+> extra compile-time or runtime dependency, but subsequent platform patches
+> will depend on them. Could you thus please provide a stable branch that
+> Simon can merge in his tree ?
 
-this misses the | in |=. I can fix it up while applying, this time only.
+Ping ? I'd like to get this and the patches that depend on it mainlined in 
+v3.14.
 
-> +static int kdwc3_probe(struct platform_device *pdev)
-> +{
-> +	struct device		*dev = &pdev->dev;
-> +	struct device_node	*node = pdev->dev.of_node;
-> +	struct dwc3_keystone	*kdwc;
-> +	struct resource		*res;
-> +	int			error, irq;
-> +
-> +	kdwc = devm_kzalloc(dev, sizeof(*kdwc), GFP_KERNEL);
-> +	if (!kdwc)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, kdwc);
-> +
-> +	kdwc->dev = dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(dev, "missing usbss resource\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	kdwc->usbss = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(kdwc->usbss))
-> +		return PTR_ERR(kdwc->usbss);
-> +
-> +	kdwc3_dma_mask = dma_get_mask(dev);
-> +	dev->dma_mask = &kdwc3_dma_mask;
-> +
-> +	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
-> +	if (IS_ERR_OR_NULL(kdwc->clk)) {
-
-clk_get() will never return NULL. This time, I'll fix it while applying.
-
-> +static int kdwc3_remove(struct platform_device *pdev)
-> +{
-> +	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
-> +
-> +	kdwc3_disable_irqs(kdwc);
-> +	clk_disable_unprepare(kdwc->clk);
-
-I hope the clock isn't shared between core and wrapper, otherwise you
-could run into some troubles here. Can you confirm ?
-
+> Changes compared to v4:
+> 
+> - Rebased on top of the latest clk-next branch
+> - Revert to ARCH_SHMOBILE_MULTI (as in v3) for drivers/clk/Makefile
+> 
+> The following changes since commit cdf64eeeb0d762585e2126f3024458d199c2635d:
+> 
+>   clk: exynos5420: fix cpll clock register offsets (2013-12-04 10:46:45
+> -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/rcar-gen2-mainline
+> 
+> for you to fetch changes up to 7135ea019305179dd6f6a99ea7c1e78773eca166:
+> 
+>   clk: shmobile: Add MSTP clock support (2013-12-04 22:18:36 +0100)
+> 
+> ----------------------------------------------------------------
+> Laurent Pinchart (3):
+>       clk: shmobile: Add R-Car Gen2 clocks support
+>       clk: shmobile: Add DIV6 clock support
+>       clk: shmobile: Add MSTP clock support
+> 
+>  .../bindings/clock/renesas,cpg-div6-clocks.txt          |  28 +++
+>  .../bindings/clock/renesas,cpg-mstp-clocks.txt          |  51 ++++
+>  .../bindings/clock/renesas,rcar-gen2-cpg-clocks.txt     |  32 +++
+>  drivers/clk/Makefile                                    |   1 +
+>  drivers/clk/shmobile/Makefile                           |   7 +
+>  drivers/clk/shmobile/clk-div6.c                         | 185 +++++++++++++
+>  drivers/clk/shmobile/clk-mstp.c                         | 229 +++++++++++++
+>  drivers/clk/shmobile/clk-rcar-gen2.c                    | 298 +++++++++++++
+>  include/linux/clk/shmobile.h                            |  19 ++
+>  9 files changed, 850 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/renesas,cpg-div6- clocks.txt
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/renesas,cpg-mstp- clocks.txt
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/renesas,rcar-gen2- cpg-clocks.txt
+>  create mode 100644 drivers/clk/shmobile/Makefile
+>  create mode 100644 drivers/clk/shmobile/clk-div6.c
+>  create mode 100644 drivers/clk/shmobile/clk-mstp.c
+>  create mode 100644 drivers/clk/shmobile/clk-rcar-gen2.c
+>  create mode 100644 include/linux/clk/shmobile.h
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131209/50050cfb/attachment.sig>
+Regards,
+
+Laurent Pinchart
