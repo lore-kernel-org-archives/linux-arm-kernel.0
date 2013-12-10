@@ -1,35 +1,100 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 Dec 2013 11:34:01 +0000
-Subject: Request inclusion of ARM v7 cache optimization patch into
- linux-next
-In-Reply-To: <20131126103343.bb5990829d3c0f2c0fc0723d@canb.auug.org.au>
-References: <20131125112318.GA4179@e102568-lin.cambridge.arm.com>
- <20131126103343.bb5990829d3c0f2c0fc0723d@canb.auug.org.au>
-Message-ID: <20131210113401.GA15543@e102568-lin.cambridge.arm.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Tue, 10 Dec 2013 11:37:12 +0000
+Subject: [RFCv2 endianess 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
+References: <1386309134-1822-1-git-send-email-Li.Xiubo@freescale.com>
+ <1386309134-1822-2-git-send-email-Li.Xiubo@freescale.com>
+ <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
+Message-ID: <e806828e7d4f488c88d7bd05bdd007d2@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-On Mon, Nov 25, 2013 at 11:33:43PM +0000, Stephen Rothwell wrote:
-> Hi Lorenzo,
+
+> > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > > +             const void __iomem *addr)
+> > > +{
+> > > +     if (likely(fpc->big_endian))
+> > > +             return ioread32be(addr);
+> > > +     else
+> > > +             return readl(addr);
+> > > +}
 > 
-> On Mon, 25 Nov 2013 11:23:18 +0000 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >
-> > can I ask you please to include the following branch into linux-next:
-> > 
-> > git://linux-arm.org/linux-2.6-lp.git v7-cache-opt
-> > 
-> > It contains a patch implementing cache optimizations for ARM 32-bit v7
-> > architectures, it was reviewed and tested but -next would give it wider
-> > test coverage before it gets merged in the coming cycle, so please
-> > include it as soon as you deem fit.
+> It looks a little odd to to have two different accessors here.
 > 
-> Included from today.  Please remember to ask me to remove it when it has
-> been merged upstream (since I assume it will no longer be necessary).
+> Could these not be unified somehow?
+> 
 
-You can remove the branch now, since the patch has been queued through
-the ARM tree and will reappear shortly as such.
+How about the following :
 
-Thank you very much for your help,
-Lorenzo
++static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
++			const void __iomem *addr)
++{
++	u32 val;
++
++	if (likely(fpc->big_endian))
++		val = be32_to_cpu(__raw_readl(addr));
++	else
++		val = le32_to_cpu(__raw_readl(addr));
++
++	rmb();
++
++	return val;
++}
++
++static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
++			u32 val, void __iomem *addr)
++{
++	wmb();
++
++	if (likely(fpc->big_endian))
++		__raw_writel(cpu_to_be32(val), addr);
++	else
++		__raw_writel(cpu_to_le32(val), addr);
++}
++
+
+
+> > > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
+> > > +             u32 val, void __iomem *addr)
+> > > +{
+> > > +     if (likely(fpc->big_endian))
+> > > +             iowrite32be(val, addr);
+> > > +     else
+> > > +             writel(val, addr);
+> > > +}
+> 
+> Likewise.
+> 
+> [...]
+> 
+> > > +static int fsl_pwm_probe(struct platform_device *pdev) {
+> > > +     int ret;
+> > > +     struct fsl_pwm_chip *fpc;
+> > > +     struct resource *res;
+> > > +     struct device_node *np = pdev->dev.of_node;
+> > > +
+> > > +     fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
+> > > +     if (!fpc)
+> > > +             return -ENOMEM;
+> > > +
+> > > +     mutex_init(&fpc->lock);
+> > > +
+> > > +     fpc->chip.dev = &pdev->dev;
+> > > +
+> > > +     if (of_get_property(np, "big-endian", NULL))
+> > > +             fpc->big_endian = 1;
+> 
+> You can use of_property_read_bool:
+> 
+> fpc->big_endian = of_property_read_bool(np, "big-endian");
+> 
+> Otherwise, the DT stuff looks fine.
+> 
+
+That sounds good.
+
+
+--
+Xiubo,
