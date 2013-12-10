@@ -1,80 +1,181 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 10 Dec 2013 14:11:34 +0100
-Subject: [PATCH v1 1/4] powerpc/512x: clk: minor comment updates
+Date: Tue, 10 Dec 2013 14:11:37 +0100
+Subject: [PATCH v1 4/4] powerpc/512x: dts: add MPC5125 clock specs
 In-Reply-To: <1386681097-14126-1-git-send-email-gsi@denx.de>
 References: <1386681097-14126-1-git-send-email-gsi@denx.de>
-Message-ID: <1386681097-14126-2-git-send-email-gsi@denx.de>
+Message-ID: <1386681097-14126-5-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adjust (expand on or move) a few comments,
-add markers for easier navigation around helpers
+add clock related specs to the MPC5125 "tower" board DTS
+- add clock providers (crystal/oscillator, clock control module)
+- add consumers (the CAN, SDHC, I2C, DIU, FEC, USB, PSC peripherals)
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- arch/powerpc/platforms/512x/clock-commonclk.c |   14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ arch/powerpc/boot/dts/mpc5125twr.dts |   53 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 1 deletion(-)
 
-diff --git a/arch/powerpc/platforms/512x/clock-commonclk.c b/arch/powerpc/platforms/512x/clock-commonclk.c
-index 189be4a4cb42..079eb1137260 100644
---- a/arch/powerpc/platforms/512x/clock-commonclk.c
-+++ b/arch/powerpc/platforms/512x/clock-commonclk.c
-@@ -76,6 +76,8 @@ static struct clk_onecell_data clk_data;
- static struct mpc512x_ccm __iomem *clkregs;
- static DEFINE_SPINLOCK(clklock);
- 
-+/* common clk API wrappers {{{ */
-+
- /* convenience wrappers around the common clk API */
- static inline struct clk *mpc512x_clk_fixed(const char *name, int rate)
- {
-@@ -139,6 +141,8 @@ static inline struct clk *mpc512x_clk_muxed(const char *name,
- 				reg, pos, len, muxflags, &clklock);
- }
- 
-+/* }}} common clk API wrappers */
-+
- /* helper to isolate a bit field from a register */
- static inline int get_bit_field(uint32_t __iomem *reg, uint8_t pos, uint8_t len)
- {
-@@ -308,6 +312,8 @@ static void mpc512x_clk_setup_ref_clock(struct device_node *np, int bus_freq,
- 	}
- }
- 
-+/* MCLK helpers {{{ */
-+
- /*
-  * helper code for the MCLK subtree setup
-  *
-@@ -338,8 +344,8 @@ static void mpc512x_clk_setup_ref_clock(struct device_node *np, int bus_freq,
- 
- /*
-  * note that this declaration raises a checkpatch warning, but
-- * it's the very data type which <linux/clk-provider.h> expects,
-- * making this declaration pass checkpatch will break compilation
-+ * it's the very data type dictated by <linux/clk-provider.h>,
-+ * "fixing" this warning will break compilation
+diff --git a/arch/powerpc/boot/dts/mpc5125twr.dts b/arch/powerpc/boot/dts/mpc5125twr.dts
+index 0a0fe92216ae..806479ffc607 100644
+--- a/arch/powerpc/boot/dts/mpc5125twr.dts
++++ b/arch/powerpc/boot/dts/mpc5125twr.dts
+@@ -12,6 +12,8 @@
+  * option) any later version.
   */
- static const char *parent_names_mux0[] = {
- 	"sys", "ref", "psc-mclk-in", "spdif-tx",
-@@ -512,6 +518,8 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry, size_t idx)
- 	}
- }
  
-+/* }}} MCLK helpers */
++#include <dt-bindings/clock/mpc512x-clock.h>
 +
- static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
- {
- 	int sys_mul, sys_div, ips_div;
-@@ -549,8 +557,8 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
- 	clks[MPC512x_CLK_IPS] = mpc512x_clk_divtable("ips", "csb",
- 						     &clkregs->scfr1, 23, 3,
- 						     divtab_2346);
--
- 	/* now setup anything below SYS and CSB and IPS */
+ /dts-v1/;
+ 
+ / {
+@@ -54,6 +56,17 @@
+ 		reg = <0x30000000 0x08000>;		// 32K at 0x30000000
+ 	};
+ 
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
- 	clks[MPC512x_CLK_DDR_UG] = mpc512x_clk_factor("ddr-ug", "sys", 1, 2);
- 	clks[MPC512x_CLK_SDHC_x4] = mpc512x_clk_factor("sdhc-x4", "csb", 4, 1);
- 	clks[MPC512x_CLK_SDHC_UG] = mpc512x_clk_divider("sdhc-ug", "sdhc-x4", 0,
++		osc: osc {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <33000000>;
++		};
++	};
++
+ 	soc at 80000000 {
+ 		compatible = "fsl,mpc5121-immr";
+ 		#address-cells = <1>;
+@@ -87,9 +100,12 @@
+ 			reg = <0xe00 0x100>;
+ 		};
+ 
+-		clock at f00 {	// Clock control
++		clks: clock at f00 {	// Clock control
+ 			compatible = "fsl,mpc5121-clock";
+ 			reg = <0xf00 0x100>;
++			#clock-cells = <1>;
++			clocks = <&osc>;
++			clock-names = "osc";
+ 		};
+ 
+ 		pmc at 1000{  // Power Management Controller
+@@ -114,18 +130,33 @@
+ 			compatible = "fsl,mpc5121-mscan";
+ 			interrupts = <12 0x8>;
+ 			reg = <0x1300 0x80>;
++			clocks = <&clks MPC512x_CLK_BDLC>,
++				 <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN0_MCLK>;
++			clock-names = "ipg", "ips", "sys", "ref", "mclk";
+ 		};
+ 
+ 		can at 1380 {
+ 			compatible = "fsl,mpc5121-mscan";
+ 			interrupts = <13 0x8>;
+ 			reg = <0x1380 0x80>;
++			clocks = <&clks MPC512x_CLK_BDLC>,
++				 <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SYS>,
++				 <&clks MPC512x_CLK_REF>,
++				 <&clks MPC512x_CLK_MSCAN1_MCLK>;
++			clock-names = "ipg", "ips", "sys", "ref", "mclk";
+ 		};
+ 
+ 		sdhc at 1500 {
+ 			compatible = "fsl,mpc5121-sdhc";
+ 			interrupts = <8 0x8>;
+ 			reg = <0x1500 0x100>;
++			clocks = <&clks MPC512x_CLK_IPS>,
++				 <&clks MPC512x_CLK_SDHC>;
++			clock-names = "ipg", "per";
+ 		};
+ 
+ 		i2c at 1700 {
+@@ -134,6 +165,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1700 0x20>;
+ 			interrupts = <0x9 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "ipg";
+ 		};
+ 
+ 		i2c at 1720 {
+@@ -142,6 +175,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1720 0x20>;
+ 			interrupts = <0xa 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "ipg";
+ 		};
+ 
+ 		i2c at 1740 {
+@@ -150,6 +185,8 @@
+ 			compatible = "fsl,mpc5121-i2c", "fsl-i2c";
+ 			reg = <0x1740 0x20>;
+ 			interrupts = <0xb 0x8>;
++			clocks = <&clks MPC512x_CLK_I2C>;
++			clock-names = "ipg";
+ 		};
+ 
+ 		i2ccontrol at 1760 {
+@@ -161,6 +198,8 @@
+ 			compatible = "fsl,mpc5121-diu";
+ 			reg = <0x2100 0x100>;
+ 			interrupts = <64 0x8>;
++			clocks = <&clks MPC512x_CLK_DIU>;
++			clock-names = "ipg";
+ 		};
+ 
+ 		mdio at 2800 {
+@@ -180,6 +219,8 @@
+ 			interrupts = <4 0x8>;
+ 			phy-handle = < &phy0 >;
+ 			phy-connection-type = "rmii";
++			clocks = <&clks MPC512x_CLK_FEC>;
++			clock-names = "per";
+ 		};
+ 
+ 		// IO control
+@@ -196,6 +237,8 @@
+ 			interrupts = <43 0x8>;
+ 			dr_mode = "host";
+ 			phy_type = "ulpi";
++			clocks = <&clks MPC512x_CLK_USB1>;
++			clock-names = "ipg";
+ 		};
+ 
+ 		// 5125 PSCs are not 52xx or 5121 PSC compatible
+@@ -206,6 +249,9 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC1>,
++				 <&clks MPC512x_CLK_PSC1_MCLK>;
++			clock-names = "ipg", "mclk";
+ 		};
+ 
+ 		// PSC9 uart1 aka ttyPSC1
+@@ -215,12 +261,17 @@
+ 			interrupts = <40 0x8>;
+ 			fsl,rx-fifo-size = <16>;
+ 			fsl,tx-fifo-size = <16>;
++			clocks = <&clks MPC512x_CLK_PSC9>,
++				 <&clks MPC512x_CLK_PSC9_MCLK>;
++			clock-names = "ipg", "mclk";
+ 		};
+ 
+ 		pscfifo at 11f00 {
+ 			compatible = "fsl,mpc5121-psc-fifo";
+ 			reg = <0x11f00 0x100>;
+ 			interrupts = <40 0x8>;
++			clocks = <&clks MPC512x_CLK_PSC_FIFO>;
++			clock-names = "ipg";
+ 		};
+ 
+ 		dma at 14000 {
 -- 
 1.7.10.4
