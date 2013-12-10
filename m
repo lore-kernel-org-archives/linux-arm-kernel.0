@@ -1,25 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Dec 2013 20:33:00 +0100
-Subject: [PATCH v4 0/9] ARM: Initial support for Marvell Berlin SoCs
-In-Reply-To: <20131210191653.GA10105@quad.lixom.net>
-References: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <52A674F1.7000104@gmail.com> <20131210191653.GA10105@quad.lixom.net>
-Message-ID: <201312102033.00953.arnd@arndb.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 10 Dec 2013 11:34:45 -0800
+Subject: [GIT PULL] at91: soc updates for 3.14 #1
+In-Reply-To: <1386583059-22281-1-git-send-email-nicolas.ferre@atmel.com>
+ (Nicolas Ferre's message of "Mon, 9 Dec 2013 10:57:39 +0100")
+References: <1386583059-22281-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <87k3fc7b56.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 December 2013, Olof Johansson wrote:
-> > I started with mach-mvebu in the first RFC, but Berlin SoCs are from a
-> > different business unit at Marvell and are more PXA compatible than
-> > Orion/Kirkwood/Armada 370/XP. Most notably, they lack the "mbus" and
-> > IP is either from PXA/MMP or Synopsys DW. Thomas Petazzoni and also
-> > Jisheng Zhang from Marvell suggested to not put it into mvebu but
-> > have a different mach folder instead.
-> 
-> Hmm, ok. Well, maybe later on we can look at aggregating them more again. It'd
-> be nice to get fewer top-level platform directories per vendor.
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-I possibly a lot of directories just become empty in the long run and
-we remove them once all all code has been subsystemized and drivered.
+> Arnd, Olof, Kevin,
+>
+> This pull-request is for addition of sama5d36 and its Evaluation Kit. The
+> patches are stacked on the "cleanup" material already in arm-soc tree
+> (at91/sama5-ccf) like all other AT91 pull-requests for 3.14.
+>
+> Thanks, best regards,
+>
+> The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
+>
+>   ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
+>
+> are available in the git repository at:
+>
+>   git://github.com/at91linux/linux-at91.git tags/at91-soc
+>
+> for you to fetch changes up to 0a72922b8dab2a1ce9cc977e9b1850556b48b4aa:
+>
+>   ARM: at91: sama5d3/dt: add sama5d36ek dts files (2013-12-09 09:50:53 +0100)
+>
+> ----------------------------------------------------------------
+> First soc pull-request for 3.14
+> Addition of the sama5d36 SoC as a member of the sama5d3 family
+> - SoC code and Device Tree file
+> - Evaluation Kit (EK board) Device Tree file
+>
+> ----------------------------------------------------------------
+> Josh Wu (2):
+>       ARM: at91: sama5d3: add support for sama5d36 chip
 
-	Arnd
+I cherry-picked this one into next/soc.
+
+>       ARM: at91: sama5d3/dt: add sama5d36ek dts files
+
+And this one into next/dt because it's just the DT data.  
+
+Due to the dependencies on the cleanup branch (thanks for pointing them
+out in the pull request!), the cleanup branch was also merged intot
+next/dt.
+
+Kevin
