@@ -1,63 +1,48 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 11 Dec 2013 00:03:53 +0800
-Subject: [PATCH v6 7/7] jump_label: use defined macros instead of hard-coding
- for better readability
-In-Reply-To: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
-References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1386691433-6827-8-git-send-email-liuj97@gmail.com>
+From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
+Date: Tue, 10 Dec 2013 21:49:51 +0530
+Subject: [PATCH V6] ARM : unwinder : Prevent data abort due to stack
+ overflow
+In-Reply-To: <16479184.50751386647682015.JavaMail.weblogic@epv6ml09>
+References: <16479184.50751386647682015.JavaMail.weblogic@epv6ml09>
+Message-ID: <CAPoNrttdDbwstOMa8s23oLmzOc2KcJztfgmVB0A8mCWWR0DZZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
-readability.
+>>+               if (*vsp >= (unsigned long *)ctrl->sp_high)
+>>+                       return -URC_FAILURE;
 
-Signed-off-by: Jiang Liu <liuj97@gmail.com>
----
- include/linux/jump_label.h | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+I tested the same patch, by adding a printk statement in the above if condition.
+The print statement I added came a few times as a part of dmesg log.
 
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index 3999977..192ccba 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -81,18 +81,21 @@ struct module;
- #include <linux/atomic.h>
- #ifdef HAVE_JUMP_LABEL
- 
--#define JUMP_LABEL_TRUE_BRANCH 1UL
-+#define JUMP_LABEL_TYPE_FALSE_BRANCH	0UL
-+#define JUMP_LABEL_TYPE_TRUE_BRANCH	1UL
-+#define JUMP_LABEL_TYPE_MASK		1UL
- 
- static
- inline struct jump_entry *jump_label_get_entries(struct static_key *key)
- {
- 	return (struct jump_entry *)((unsigned long)key->entries
--						& ~JUMP_LABEL_TRUE_BRANCH);
-+						& ~JUMP_LABEL_TYPE_MASK);
- }
- 
- static inline bool jump_label_get_branch_default(struct static_key *key)
- {
--	if ((unsigned long)key->entries & JUMP_LABEL_TRUE_BRANCH)
-+	if (((unsigned long)key->entries & JUMP_LABEL_TYPE_MASK) ==
-+	    JUMP_LABEL_TYPE_TRUE_BRANCH)
- 		return true;
- 	return false;
- }
-@@ -123,9 +126,11 @@ extern void static_key_slow_dec(struct static_key *key);
- extern void jump_label_apply_nops(struct module *mod);
- 
- #define STATIC_KEY_INIT_TRUE ((struct static_key) \
--	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
-+	{ .enabled = ATOMIC_INIT(1), \
-+	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
- #define STATIC_KEY_INIT_FALSE ((struct static_key) \
--	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
-+	{ .enabled = ATOMIC_INIT(0), \
-+	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
- 
- #else  /* !HAVE_JUMP_LABEL */
- 
+I think this proves that such corner cases are being handled by the above code
+
+Regards
+Anurag
+
+On Tue, Dec 10, 2013 at 9:24 AM, Anurag Aggarwal <a.anurag@samsung.com> wrote:
+>>Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>>
+>>I can confirm that the kernel "doesn't crash" with this applied, and
+>>that backtracing at least partially works.  But this is not really
+>>sufficient to demontrate that the now code works better than the old
+>>code in corner cases (which is the point of the patch).
+>>
+>>Can you give details of what additional testing you have, or plan to
+>>do?
+>
+> We saw a data abort in unwinder for one of Samsung Project, during a
+> Samsung Automation test case.
+> After that I created the initial the patch, and the data abort has not been
+> seen till now.
+>
+> Is it possible for you to give an idea on what other kind of additional testing
+> do you have in mind.
+>
+> Regads
+> Anurag
+>
+
+
+
 -- 
-1.8.1.2
+Anurag Aggarwal
