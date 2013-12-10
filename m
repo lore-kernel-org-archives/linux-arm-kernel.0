@@ -1,52 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Dec 2013 18:32:14 +0000
-Subject: [PATCH v3 15/15] mfd: menelaus: Use devm_request_threaded_irq()
-In-Reply-To: <20131210163446.GH22750@saruman.home>
-References: <20131209161422.GC24047@saruman.home>
- <1386606085-26838-1-git-send-email-balbi@ti.com>
- <1386606085-26838-15-git-send-email-balbi@ti.com>
- <20131210093042.GU12675@lee--X1>
- <20131210163446.GH22750@saruman.home>
-Message-ID: <20131210183214.GB2390@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Dec 2013 19:32:48 +0100
+Subject: [PATCH 0/2] ARM: sunxi: Fix interrupt trigger types in the DT
+In-Reply-To: <20131210180220.GB3651@lukather>
+References: <1386416313-703-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201312071324.42353.arnd@arndb.de> <20131210180220.GB3651@lukather>
+Message-ID: <201312101932.48915.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Dec 2013, Felipe Balbi wrote:
-
-> On Tue, Dec 10, 2013 at 09:30:42AM +0000, Lee Jones wrote:
-> > On Mon, 09 Dec 2013, Felipe Balbi wrote:
+On Tuesday 10 December 2013, Maxime Ripard wrote:
+> On Sat, Dec 07, 2013 at 01:24:42PM +0100, Arnd Bergmann wrote:
+> > On Saturday 07 December 2013, Maxime Ripard wrote:
+> > > It would be great if you could merge these two patches by the end of the 3.13
+> > > release cycle.
 > > 
-> > > By using devm_request_threaded_irq() we can drop a few extra lines of
-> > > code and rely on device managed resources layer to free our IRQ for us.
-> > > 
-> > > Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  drivers/mfd/menelaus.c | 11 ++++-------
-> > >  1 file changed, 4 insertions(+), 7 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> > > index bffe978..b87c2bd 100644
-> > > --- a/drivers/mfd/menelaus.c
-> > > +++ b/drivers/mfd/menelaus.c
-> > > @@ -1271,8 +1271,8 @@ static int menelaus_probe(struct i2c_client *client,
-> > >  	/* Set output buffer strengths */
-> > >  	menelaus_write_reg(m, MENELAUS_MCT_CTRL1, 0x73);
-> > >  
-> > > -	err = request_threaded_irq(client->irq, NULL, menelaus_irq,
-> > > -			IRQF_ONESHOT, DRIVER_NAME, m);
-> > > +	err = devm_request_threaded_irq(&client->dev, client->irq,
-> > > +			NULL, menelaus_irq, IRQF_ONESHOT, DRIVER_NAME, m);
-> > 
-> > No need for a separate patch here. Convert straight from request_irq()
-> > to devm_request_threaded_irq() in patch 3.
+> > I guess they should be marked for 'stable' backports as well, right?
 > 
-> that would be 2 changes in a single patch.
+> Aah, right.
+> 
+> I'll resend those patches Cc'ing stable.
 
-I think it's the right thing to do.
+Ok, just to clarify: there is actually no need to Cc stable in the
+submission, we just need to make sure the Cc: stable is in the
+changeset description as it gets merged.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
