@@ -1,39 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Dec 2013 14:46:59 -0800
-Subject: [PATCH 1/3] arm: omap2: Export devconf1 bypass and acbias.
-In-Reply-To: <CAAfyv36MaVqrmQxpqDu-ciO9GNJK3pJkFZohEvd1BOLOWWEOhw@mail.gmail.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <1381784555-18344-2-git-send-email-marek@goldelico.com>
- <20131111164917.GN15154@atomide.com>
- <CAAfyv37LRb_Q=UZVgtKdOAz_r6_qThewAU90W7nrqHdB5fDA_g@mail.gmail.com>
- <20131111233152.GR15154@atomide.com>
- <CAAfyv36MaVqrmQxpqDu-ciO9GNJK3pJkFZohEvd1BOLOWWEOhw@mail.gmail.com>
-Message-ID: <20131210224659.GY13171@atomide.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 11 Dec 2013 02:47:16 +0400
+Subject: [PATCH] gpio-charger: support wakeup events
+Message-ID: <1386715636-18134-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Belisko Marek <marek.belisko@gmail.com> [131210 14:13]:
-> On Tue, Nov 12, 2013 at 12:31 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > It would be best to set it up as omap-ctrl.c driver under drivers
-> > somewhere with few functions exported for DSS and MMC drivers.
->
-> I create small dummy driver based on phy-omap-control which can be
-> used but before sending patch (with more updates) I would like to get
-> some feedback if my direction is correct.
+Add support for using gpio-charger IRQ as a wakeup event.
 
-Cool thanks. Yeah what you have can easily be combined with the patches
-Balaji has posted to make HSMMC use drivers/mfd/syscon.c via regmap
-for the SCM register access. Maybe take a look at the work in progress
-patches in thread:
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/power/gpio-charger.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-[PATCH v4 0/7] mmc: omap_hsmmc: pbias dt and cleanup
-
-And also see my comments regarding using the SCM GENERAL register area
-as base for the syscon.c driver. That should work for your driver too,
-right? And then you can access the SYSCON1 register that way from your
-consumer driver ;)
-
-Regards,
-
-Tony
+diff --git a/drivers/power/gpio-charger.c b/drivers/power/gpio-charger.c
+index 4e858a2..a0024b2 100644
+--- a/drivers/power/gpio-charger.c
++++ b/drivers/power/gpio-charger.c
+@@ -28,6 +28,7 @@
+ struct gpio_charger {
+ 	const struct gpio_charger_platform_data *pdata;
+ 	unsigned int irq;
++	bool wakeup_enabled;
+ 
+ 	struct power_supply charger;
+ };
+@@ -136,6 +137,8 @@ static int gpio_charger_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, gpio_charger);
+ 
++	device_init_wakeup(&pdev->dev, 1);
++
+ 	return 0;
+ 
+ err_gpio_free:
+@@ -159,18 +162,32 @@ static int gpio_charger_remove(struct platform_device *pdev)
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
++static int gpio_charger_suspend(struct device *dev)
++{
++	struct gpio_charger *gpio_charger = dev_get_drvdata(dev);
++
++	if (device_may_wakeup(dev))
++		gpio_charger->wakeup_enabled =
++			enable_irq_wake(gpio_charger->irq);
++
++	return 0;
++}
++
+ static int gpio_charger_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct gpio_charger *gpio_charger = platform_get_drvdata(pdev);
+ 
++	if (gpio_charger->wakeup_enabled)
++		disable_irq_wake(gpio_charger->irq);
+ 	power_supply_changed(&gpio_charger->charger);
+ 
+ 	return 0;
+ }
+ #endif
+ 
+-static SIMPLE_DEV_PM_OPS(gpio_charger_pm_ops, NULL, gpio_charger_resume);
++static SIMPLE_DEV_PM_OPS(gpio_charger_pm_ops,
++		gpio_charger_suspend, gpio_charger_resume);
+ 
+ static struct platform_driver gpio_charger_driver = {
+ 	.probe = gpio_charger_probe,
+-- 
+1.8.4.3
