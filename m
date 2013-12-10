@@ -1,28 +1,54 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 10 Dec 2013 10:28:01 -0700
-Subject: [PATCH 1/9] PCI: Use dev_is_pci() to check whether it is pci
- device
-In-Reply-To: <1386647973.32037.57.camel@pasglop>
-References: <1386244373-35796-1-git-send-email-wangyijing@huawei.com>
- <20131210000154.GE4699@google.com> <1386647973.32037.57.camel@pasglop>
-Message-ID: <CAErSpo67ZB_GUrKpLbkfZs4qLe3S0eYy=oLTKg9=MSxZL2h+yw@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 10 Dec 2013 09:41:28 -0800
+Subject: [PATCH] ARM: OMAP2+: omap_device: add fail hook for runtime_pm
+ when bad data is detected
+In-Reply-To: <20131210173033.GJ13171@atomide.com> (Tony Lindgren's message of
+ "Tue, 10 Dec 2013 09:30:34 -0800")
+References: <1386121153-32351-1-git-send-email-nm@ti.com>
+ <20131205190343.GI26766@atomide.com> <87mwka80vu.fsf@linaro.org>
+ <20131210173033.GJ13171@atomide.com>
+Message-ID: <871u1k8uyf.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 9, 2013 at 8:59 PM, Benjamin Herrenschmidt <benh@au1.ibm.com> wrote:
-> On Mon, 2013-12-09 at 17:01 -0700, Bjorn Helgaas wrote:
->> [+cc arch lists]
->>
->> On Thu, Dec 05, 2013 at 07:52:53PM +0800, Yijing Wang wrote:
->> > Use dev_is_pci() instead of directly compare
->> > pci_bus_type to check whether it is pci device.
->> >
->> > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->>
->> I applied all these to my pci/yijing-dev_is_pci branch for v3.14, thanks!
->>
->> Browse them here: http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/yijing-dev_is_pci
->
-> Ah ok. I also have the powerpc one in powerpc -next, no biggie though
+Tony Lindgren <tony@atomide.com> writes:
 
-I'll drop the powerpc one.
+> * Kevin Hilman <khilman@linaro.org> [131209 08:07]:
+>> Tony Lindgren <tony@atomide.com> writes:
+>> 
+>> > * Nishanth Menon <nm@ti.com> [131203 17:40]:
+>> >> Due to the cross dependencies between hwmod for automanaged device
+>> >> information for OMAP and dts node definitions, we can run into scenarios
+>> >> where the dts node is defined, however it's hwmod entry is yet to be
+>> >> added. In these cases:
+>> >> a) omap_device does not register a pm_domain (since it cannot find
+>> >>    hwmod entry).
+>> >> b) driver does not know about (a), does a pm_runtime_get_sync which
+>> >>    never fails
+>> >> c) It then tries to do some operation on the device (such as read the
+>> >>   revision register (as part of probe) without clock or adequate OMAP
+>> >>   generic PM operation performed for enabling the module.
+>> >> 
+>> >> This causes a crash such as that reported in:
+>> >> https://bugzilla.kernel.org/show_bug.cgi?id=66441
+>> >> 
+>> >> When 'ti,hwmod' is provided in dt node, it is expected that the device
+>> >> will not function without the OMAP's power automanagement. Hence, when
+>> >> we hit a fail condition (due to hwmod entries not present or other
+>> >> similar scenario), fail at pm_domain level due to lack of data, provide
+>> >> enough information for it to be fixed, however, it allows for the driver
+>> >> to take appropriate measures to prevent crash.
+>> >
+>> > Kevin, any comments on this one?
+>> 
+>> Looks like a good approach to catch these corner cases.
+>> 
+>> Acked-by: Kevin Hilman <khilman@linaro.org>
+>
+> Kevin, care to apply this directly?
+>
+> Acked-by: Tony Lindgren <tony@atomide.com> 
+
+Applied.
+
+Kevin
