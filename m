@@ -1,82 +1,53 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 14:03:38 -0800
-Subject: [PATCH v3 09/36] mtd: st_spi_fsm: Provide device look-up table
-In-Reply-To: <1385727565-25794-10-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131210220338.GF27149@ld-irv-0074.broadcom.com>
+From: ananaza@iki.fi (Antti Miettinen)
+Date: Wed, 11 Dec 2013 00:04:27 +0200
+Subject: [PATCH RFC 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <20131210132719.GC15543@e102568-lin.cambridge.arm.com> (Lorenzo
+ Pieralisi's message of "Tue, 10 Dec 2013 13:27:19 +0000")
+References: <1386001205-11978-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1386001205-11978-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <87lhztgqsj.fsf@iki.fi>
+ <20131210132719.GC15543@e102568-lin.cambridge.arm.com>
+Message-ID: <87haaggy6s.fsf@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 12:18:58PM +0000, Lee Jones wrote:
-> --- a/drivers/mtd/devices/st_spi_fsm.h
-> +++ b/drivers/mtd/devices/st_spi_fsm.h
-> @@ -253,4 +253,141 @@ struct stfsm_seq {
->  } __attribute__((__packed__, aligned(4)));
->  #define STFSM_SEQ_SIZE sizeof(struct stfsm_seq)
->  
-> +/* SPI Flash Device Table */
-> +struct flash_info {
-> +	char		*name;
-> +	/*
-> +	 * JEDEC id zero means "no ID" (most older chips); otherwise it has
-> +	 * a high byte of zero plus three data bytes: the manufacturer id,
-> +	 * then a two byte device id.
-> +	 */
-> +	u32		jedec_id;
-> +	u16             ext_id;
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> I do not think we should think about how the kernel uses this data.
+> We should strive to make DT data representative of HW C-states and
+> that's very complex, as you mentioned (it depends at what granularity
+> we want these bits of info).
+>
+> When we are happy with the bindings we can then code the kernel accordingly.
+>
+> Please let me know how you would like to have these bindings extended
+> (eg adding operating points), getting feedback is the main reason why
+> I posted them in the first place.
 
-Will 5 bytes of ID be enough? I think we're running into a need for 6
-bytes of ID in m25p80.c right about now. Might make sense to start with
-the right number of bytes.
+Hmm.. I'd like to challenge that a bit. I guess we are not defining DT
+bindings just for the joy of modelling the hardware? We should care
+whether kernel needs the data and have some idea of how the data will be
+used.
 
-> +	/*
-> +	 * The size listed here is what works with FLASH_CMD_SE, which isn't
-> +	 * necessarily called a "sector" by the vendor.
-> +	 */
-> +	unsigned	sector_size;
-> +	u16		n_sectors;
-> +	u32		flags;
-> +	/*
-> +	 * Note, where FAST_READ is supported, freq_max specifies the
-> +	 * FAST_READ frequency, not the READ frequency.
-> +	 */
-> +	u32		max_freq;
-> +	int		(*config)(struct stfsm *);
+As you say, modelling C state details is not trivial. It might be
+possible to construct an approximate formula for e.g. entry/exit latency
+that takes CPU frequency, memory frequency and PMIC ramp rates as
+input. Also, in principle we could estimate power based on clocks,
+voltages, temperature etc. As we probably do not want to put function
+definitions to DT, the DT would contain e.g. coefficients for functions
+that would need to be platform neutral.
 
-Do you *really* need a configuration callback? Can the callback be
-represented as simply a flag for the special configuration behavior that
-is needed, then your driver calls the appropriate "callback" when it
-sees the flag?
+Is this what you'd like to see? There has been some research in
+estimating power without actually measuring it, e.g. the google
+powertutor people have written some papers about this. The latencies
+could be measured to some extend with instrumentation in the kernel and
+the measurement results could be used to tune some parameters.
 
-BTW, your later patches have to introduce static declarations in this
-header, which seems very ugly to me; you are entwining data with your
-driver's implementation.
+Or would you rather have tables, which specify latencies and power
+levels and the tables would be indexed with frequencies and voltages?
 
-So this callback field can only be used by your driver, and it is one of
-the main reasons that your table structure can't be used in other
-drivers.
+Anyway, I would really like to see the option of having the state choice
+in the driver. One possible way to achieve this would be to allow for
+the driver to export an optional "choose" method. If that exists the
+governor would offload the decision to the driver.
 
-> +};
-> +
-> +static struct flash_info flash_types[] = {
-> +	/*
-> +	 * ST Microelectronics/Numonyx --
-> +	 * (newer production versions may have feature updates
-> +	 * (eg faster operating frequency)
-> +	 */
-> +#define M25P_FLAG (FLASH_FLAG_READ_WRITE | FLASH_FLAG_READ_FAST)
-
-Please don't define macros in the middle of your table like this. (You
-have several of these.)
-
-> +	{ "m25p40",  0x202013, 0,  64 * 1024,   8, M25P_FLAG, 25, NULL },
-> +	{ "m25p80",  0x202014, 0,  64 * 1024,  16, M25P_FLAG, 25, NULL },
-> +	{ "m25p16",  0x202015, 0,  64 * 1024,  32, M25P_FLAG, 25, NULL },
-> +	{ "m25p32",  0x202016, 0,  64 * 1024,  64, M25P_FLAG, 50, NULL },
-> +	{ "m25p64",  0x202017, 0,  64 * 1024, 128, M25P_FLAG, 50, NULL },
-> +	{ "m25p128", 0x202018, 0, 256 * 1024,  64, M25P_FLAG, 50, NULL },
-
-[snip]
-
-Brian
+	--Antti
