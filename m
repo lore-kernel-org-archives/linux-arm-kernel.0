@@ -1,52 +1,52 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 10 Dec 2013 12:38:31 +0000
-Subject: [Linaro-acpi] [PATCH v3 2/5] ACPI: bus master reload not
- supported in reduced HW mode
-In-Reply-To: <1386192127-28564-3-git-send-email-al.stone@linaro.org>
-References: <1386192127-28564-1-git-send-email-al.stone@linaro.org> <
- 1386192127-28564-3-git-send-email-al.stone@linaro.org>
-Message-ID: <20131210123831.AEFACC40A27@trevor.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Dec 2013 13:33:03 +0100
+Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <201312061814.15730.arnd@arndb.de>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <201312060140.10376.arnd@arndb.de>
+ <1386347911.7152.70.camel@host5.omatika.ru>
+ <201312061814.15730.arnd@arndb.de>
+Message-ID: <CACRpkdYF-O6Qgjue6x+R6fVuSXSyO4YHw1meusuyQhtSA9PnvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  4 Dec 2013 14:22:04 -0700, al.stone at linaro.org wrote:
-> From: Al Stone <al.stone@linaro.org>
-> 
-> Remove the saving and restoring of bus master reload registers in
-> suspend/resume when in reduced HW mode; according to the spec, no
-> such registers should exist
-> 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> ---
->  drivers/acpi/processor_idle.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
-> index 597cdab..8b48c08 100644
-> --- a/drivers/acpi/processor_idle.c
-> +++ b/drivers/acpi/processor_idle.c
-> @@ -202,7 +202,7 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
->  
->  #endif
->  
-> -#ifdef CONFIG_PM_SLEEP
-> +#if (IS_ENABLED(CONFIG_PM_SLEEP) && !IS_ENABLED(CONFIG_ACPI_REDUCED_HARDWARE))
->  static u32 saved_bm_rld;
->  
->  static int acpi_processor_suspend(void)
-> @@ -236,7 +236,10 @@ void acpi_processor_syscore_exit(void)
->  {
->  	unregister_syscore_ops(&acpi_processor_syscore_ops);
->  }
-> -#endif /* CONFIG_PM_SLEEP */
-> +#else
-> +void acpi_processor_syscore_init(void) { return; }
-> +void acpi_processor_syscore_exit(void) { return; }
-> +#endif
+On Fri, Dec 6, 2013 at 6:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 06 December 2013, Sergei Ianovich wrote:
+>> On Fri, 2013-12-06 at 01:40 +0100, Arnd Bergmann wrote:
+>>
+>> > > +
+>> > > +static struct irq_chip lp8x4x_irq_chip = {
+>> > > +     .name                   = "FPGA",
+>> > > +     .irq_ack                = lp8x4x_ack_irq,
+>> > > +     .irq_mask               = lp8x4x_mask_irq,
+>> > > +     .irq_unmask             = lp8x4x_unmask_irq,
+>> > > +};
+>> >
+>> > Please try to move the irqchip code to drivers/irqchip/.
+>>
+>> CONFIG_IRQCHIP depends on CONFIG_OF_IRQ which in turn depends on Open
+>> Firmware.
+>
+> Hmm, I wonder if we should try to change Kconfig then. Let's leave it
+> alone for now, maybe Linus Walleij has some comments since he has
+> been looking into moving drivers out in the past.
 
-Ditto comment on this patch. This breaks normal ACPI on x86 if hardware
-reduced is enabled. That is bad form. It is fine to compile it out if
-normal ACPI is explicitly /disabled/, but it must be possible for normal
-and hardware reduced to co-exist.
+I don't get this, if the subarch has deps in place for IRQCHIP and
+OF_IRQ just move the implementation to drivers/irqchip/foo.c
+edit drivers/irqchip/Makefile to compile the file for ARCH_FOO.
+What would the problem be? It's not like having the irqchip in the
+object is optional...
 
-g.
+I would prefer if you augment the code to use
+IRQCHIP_DECLARE() so you can get rid of all the criss-cross
+calls, but this init contains a comment saying that GPIO
+has to be up before you initialize the irq_chip, can you please
+explain why it's like that?
+
+Another way is to create a separate Kconfig entry for it in
+drivers/irqchip/Kconfig if you want the set-up to be more
+distributed, but that is usually just done when the irqchip is
+used on more than one platform.
+
+Yours,
+Linus Walleij
