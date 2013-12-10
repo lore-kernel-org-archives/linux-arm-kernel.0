@@ -1,59 +1,34 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 10 Dec 2013 09:11:55 -0300
-Subject: [PATCH v2] serial: 8250_dw: Improve unwritable LCR workaround
-In-Reply-To: <CAAYSxhraDF6T9URw0CpEig2VpnuTBNdZYL9uuw6vdPn0=X4zGA@mail.gmail.com>
-References: <1380647888-32473-1-git-send-email-tim.kryger@linaro.org>
- <5548535.pYirbknue4@radagast>
- <CAAYSxhpR664Od7AaWZrX0rE=iDUHo0h+4=uY=gvkFps4Hz4aew@mail.gmail.com>
- <3010367.6CxxZ6Dpea@radagast>
- <CAAYSxhraDF6T9URw0CpEig2VpnuTBNdZYL9uuw6vdPn0=X4zGA@mail.gmail.com>
-Message-ID: <20131210121154.GA16238@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Dec 2013 13:16:38 +0100
+Subject: [PATCH v2 1/1] gpio: twl4030: Fix regression for twl gpio LED
+ output
+In-Reply-To: <1386235415-27670-1-git-send-email-rogerq@ti.com>
+References: <1386156871-7639-2-git-send-email-rogerq@ti.com>
+ <1386235415-27670-1-git-send-email-rogerq@ti.com>
+Message-ID: <CACRpkdb3viraX6yQhUHokSVfN2qXxcc5cd1YpjPGfeDMy64p+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim, James:
+On Thu, Dec 5, 2013 at 10:23 AM, Roger Quadros <rogerq@ti.com> wrote:
 
-On Mon, Dec 09, 2013 at 04:42:23PM -0800, Tim Kryger wrote:
-> On Fri, Dec 6, 2013 at 4:59 PM, James Hogan <james.hogan@imgtec.com> wrote:
-> 
-[..]
-> diff --git a/drivers/tty/serial/8250/8250_dw.c
-> b/drivers/tty/serial/8250/8250_dw.c
-> index 4658e3e..5f096c7 100644
-> --- a/drivers/tty/serial/8250/8250_dw.c
-> +++ b/drivers/tty/serial/8250/8250_dw.c
-> @@ -96,7 +96,8 @@ static void dw8250_serial_out(struct uart_port *p,
-> int offset, int value)
->         if (offset == UART_LCR) {
->                 int tries = 1000;
->                 while (tries--) {
-> -                       if (value == p->serial_in(p, UART_LCR))
-> +                       unsigned int lcr = p->serial_in(p, UART_LCR);
-> +                       if ((value & ~UART_LCR_SPAR) == (lcr & ~UART_LCR_SPAR))
->                                 return;
->                         dw8250_force_idle(p);
->                         writeb(value, p->membase + (UART_LCR << p->regshift));
-> @@ -132,7 +133,8 @@ static void dw8250_serial_out32(struct uart_port
-> *p, int offset, int value)
->         if (offset == UART_LCR) {
->                 int tries = 1000;
->                 while (tries--) {
-> -                       if (value == p->serial_in(p, UART_LCR))
-> +                       unsigned int lcr = p->serial_in(p, UART_LCR);
-> +                       if ((value & ~UART_LCR_SPAR) == (lcr & ~UART_LCR_SPAR))
->                                 return;
->                         dw8250_force_idle(p);
->                         writel(value, p->membase + (UART_LCR << p->regshift));
-> 
-> 
-> Would you mind posting this for proper review so we can get the fix in?
-> 
+> Commit 0b2aa8be introduced a regression that causes failure
+> in setting LED GPO direction to OUT.
+>
+> This causes USB host probe failures for Beagleboard C4.
+>
+> [    2.075469] platform usb_phy_gen_xceiv.2: Driver usb_phy_gen_xceiv requests probe deferral
+> [    2.090454] hsusb2_vcc: Failed to request enable GPIO510: -22
+> [    2.100982] reg-fixed-voltage reg-fixed-voltage.0.auto: Failed to register regulator: -22
+> [    2.109954] reg-fixed-voltage: probe of reg-fixed-voltage.0.auto failed with error -22
+>
+> direction_out/direction_in must return 0 if the operation succeeded.
+>
+> Also, don't update direction flag and output data if twl4030_set_gpio_direction()
+> failed inside twl_direction_out();
+>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-Applying this change fixes all the problems I reported (just did a quick test on
-the board I have currently on my desk).
+Patch applied for fixes with Tony's ACK.
 
-Nice work!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Thanks!
+Linus Walleij
