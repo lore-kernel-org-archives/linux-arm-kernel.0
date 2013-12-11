@@ -1,40 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Dec 2013 11:02:43 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
- without PCI on ARM64
-In-Reply-To: <201312110407.27848.arnd@arndb.de>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312102100.20570.arnd@arndb.de>
- <20131210202323.GJ11468@sirena.org.uk>
- <201312110407.27848.arnd@arndb.de>
-Message-ID: <20131211110243.GM11468@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Dec 2013 11:06:18 +0000
+Subject: [PATCH] arm64: Correct virt_addr_valid
+In-Reply-To: <20131211104429.GE26730@mudshark.cambridge.arm.com>
+References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
+ <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104429.GE26730@mudshark.cambridge.arm.com>
+Message-ID: <20131211110618.GG4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 04:07:27AM +0100, Arnd Bergmann wrote:
-> On Tuesday 10 December 2013, Mark Brown wrote:
+On Wed, Dec 11, 2013 at 10:44:29AM +0000, Will Deacon wrote:
+> Hmm, this is pretty expensive on both arm and arm64, since we end up doing a
+> binary search through all of the memblocks.
 
-> > That's not my experience especially once you get into phone type
-> > hardware - there's not much complexity difference when gluing things
-> > into the system and the fact that it's connected by the board increases
-> > the amount of flexibility that has to be coped with.
+People say "binary search == expensive" almost as a knee jerk
+reaction, because classical thinking is that binary searches are
+expensive for systems with caches.  Have you considered how many
+memblocks you end up with on a normal system?
 
-> Yes, that is probably right. The only argument that one can make about
-> the mobile phone case is that these devices are so complex that nobody
-> even bothers any more running upstream kernels on them on any CPU
-> architecture. If the kernel code is kept out of the mainline tree,
-> it doesn't matter to us what they use, and the developers don't gain
-> much by following any of the available firmware models either.
+How expensive is a binary search across one element?  Two elements?
+Four elements?  In the very very rare case (there's only one platform)
+eight elements?
 
-It's more of a commercial thing than a complexity thing (complexity adds
-a barrier but it's not fundamental) - the designs for phones aren't
-meaningfully different to those for tablets, and looking at both things
-like the ARM Chromeboos and what the low power Haswell stuff is doing
-laptops are looking an awful lot like tablets these days.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/92133644/attachment.sig>
+For one element, it's the same as a linear search - we only have to
+look at one element and confirm whether the pointer is within range.
+Same for two - we check one and check the other.  As memblock is array
+based, both blocks share the same cache line.
+
+For four, it means we look at most three elements, at least two of
+which share a cache line.  In terms of cache line loading, it's no
+more expensive than a linear search.  In terms of CPU cycles, it's
+a win because we don't need to expend cycles looking at the fourth
+element.
+
+For eight (which is starting to get into the "rare" territory, and
+three cache lines, four elements vs a linear search which can be up
+to four cache lines and obviously eight elements.
+
+Now, bear in mind that the normal case is one, there's a number with
+two, four starts to become rare, and eight is almost non-existent...
