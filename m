@@ -1,60 +1,96 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 11 Dec 2013 14:24:31 +0800
-Subject: [PATCH V2 2/4] mtd: spi-nor: add the basic data structures
-In-Reply-To: <201312101407.59958.marex@denx.de>
-References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
- <1386318764-15882-3-git-send-email-b32955@freescale.com>
- <201312101407.59958.marex@denx.de>
-Message-ID: <20131211062428.GA25147@shlinux2.ap.freescale.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 11 Dec 2013 15:02:45 +0800
+Subject: [RFC part2 PATCH 4/9] ARM64 / ACPI: Use Parked Address in GIC
+ structure for spin table SMP initialisation
+In-Reply-To: <20131210130330.65087C40A27@trevor.secretlab.ca>
+References: <1385999094-3152-1-git-send-email-hanjun.guo@linaro.org> <
+ 1385999094-3152-5-git-send-email-hanjun.guo@linaro.org>
+ <20131210130330.65087C40A27@trevor.secretlab.ca>
+Message-ID: <52A80E15.50404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 02:07:59PM +0100, Marek Vasut wrote:
-> On Friday, December 06, 2013 at 09:32:42 AM, Huang Shijie wrote:
-> > The spi_nor{} is cloned from the m25p{}.
-> > +	struct spi_nor_xfer_cfg	cfg;
-> > +
-> > +	/* for write_reg */
-> > +	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
-> > +
-> > +	/* the two fundamental primitives */
-> > +	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
-> > +			 u8 *buf, size_t len);
-> > +	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
-> > +			  u8 *buf, size_t len);
-> > +
-> > +	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
-> > +	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
-> > +			int write_enable);
+On 2013-12-10 21:03, Grant Likely wrote:
+[...]
+>> +/* Parked Address in ACPI GIC structure can be used as cpu release addr */
+>> +int acpi_get_parked_address_with_gic_id(u32 gic_id, u64 *parked_address)
+>> +{
+>> +	struct acpi_table_header *table_header = NULL;
+>> +	struct acpi_subtable_header *entry;
+>> +	int err = 0;
+>> +	unsigned long table_end;
+>> +	acpi_size tbl_size;
+>> +	struct acpi_madt_generic_interrupt *processor = NULL;
+>> +
+>> +	if (!parked_address)
+>> +		return -EINVAL;
+>> +
+>> +	acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table_header, &tbl_size);
+>> +	if (!table_header) {
+>> +		pr_warn(PREFIX "MADT table not present\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	table_end = (unsigned long)table_header + table_header->length;
+>> +
+>> +	/* Parse all entries looking for a match. */
+>> +	entry = (struct acpi_subtable_header *)
+>> +	    ((unsigned long)table_header + sizeof(struct acpi_table_madt));
+>> +
+>> +	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
+>> +	       table_end) {
+>> +		if (entry->type != ACPI_MADT_TYPE_GENERIC_INTERRUPT
+>> +			|| BAD_MADT_ENTRY(entry, table_end))
+>> +			continue;
+>> +
+>> +		processor = (struct acpi_madt_generic_interrupt *)entry;
+>> +
+>> +		if (processor->gic_id == gic_id) {
+>> +			*parked_address = processor->parked_address;
+>> +			goto out;
+>> +		}
+>> +
+>> +		entry = (struct acpi_subtable_header *)
+>> +		    ((unsigned long)entry + entry->length);
 > 
-> Does the vybrid really support accelerated SPI NOR register IO or does it 
-The vybrid does not support the accelerated SPI NOR register IO.
-these hooks are for Lee's driver.
-> emulate it with read/write or read_xfer/write_xfer accessors ? If the later, 
-> just drop this stuff for now.
-
-What is the "stuff" mean? the "write_enable" ?
-
+> All of the casting in this table looks suspicious. If you have to resort
+> to casting, then the variable types are very likely wrong.
 > 
-> > +	const struct spi_device_id *(*read_id)(struct spi_nor *nor);
-> > +	int (*wait_till_ready)(struct spi_nor *nor);
-> > +
-> > +	/* write */
-> > +	void (*write)(struct spi_nor *nor, loff_t to,
-> > +			size_t len, size_t *retlen, const u_char *buf);
-> > +	/* read */
-> > +	int (*read)(struct spi_nor *nor, loff_t from,
-> > +			size_t len, size_t *retlen, u_char *buf);
-> > +	/* erase */
-> > +	int (*erase)(struct spi_nor *nor, loff_t offs);
+> In the case immediately above, it seems that the entry size doesn't
+> necessarily equal the acpi_subtable_header size, in which case you
+> should cast the values to a void* instead of an unsigned long. That
+> would mean you can do this:
 > 
-> How do you specify what to erase (sub-sector, sector, whole chip) here ?
-I use a write_reg(OPCODE_ERASE_CHIP) to erase the whole chip.
-Please read the patch 3.
+> 	entry = ((void*)entry) + entry->length;
+> 
+> In fact, if I were writing the code, I would have two variables; the
+> iterator pointer as a void* and a header pointer as a struct
+> acpi_subtable_header*. Like so:
+> 
+> 	void *entry, *table_end;
+> 	struct acpi_subtable_header *header;
+> 
+> 	entry = ((void*)table_header) + sizeof(struct acpi_table_madt);
+> 	table_end = ((void*)table_header) + table_header->length;
+> 	while (entry + sizeof(*header)) < table_end) {
+> 		header = entry;
+> 
+> 		if (header->type != ACPI_MADT_TYPE_GENERIC_INTERRUPT ||
+> 			BAD_MADT_ENTRY(entry, table_end))
+> 			continue;
+> 		processor = entry;
+> 
+> 		if (processor->gic_id == gic_id) {
+> 			*parked_address = processor->parked_address;
+> 			goto out;
+> 		}
+> 
+> 		entry += header->length;
+> 	}
+> 
+> See? Much cleaner code.
 
-This hook is used to erase a sector.
+Aha, much much cleaner, thanks for the guidance, will rework my patch
+and test it.
 
-Btw, what is the sub-sector mean? which opcodes for the sub-sector?
-
-thanks
-Huang Shijie
+Hanjun
