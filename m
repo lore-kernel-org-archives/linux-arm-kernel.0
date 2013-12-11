@@ -1,34 +1,94 @@
 From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Wed, 11 Dec 2013 13:47:16 +0800
+Date: Wed, 11 Dec 2013 13:55:10 +0800
 Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <001f01cef1c2$6bd0ab70$43720250$%jun@samsung.com>
+In-Reply-To: <CAL_Jsq+r0QBHdx1XLRJ6SmppWFKe9qELtjMgjcQFSrU_F_RwHA@mail.gmail.com>
 References: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
  <1383889128-12540-3-git-send-email-zhangfei.gao@linaro.org>
- <001f01cef1c2$6bd0ab70$43720250$%jun@samsung.com>
-Message-ID: <CAMj5Bkgwzq5+aewF2vOJq3aDMk0yy8WVQOzdboCmMtrx1vi4nQ@mail.gmail.com>
+ <CAL_Jsq+r0QBHdx1XLRJ6SmppWFKe9qELtjMgjcQFSrU_F_RwHA@mail.gmail.com>
+Message-ID: <CAMj5BkjO0A=eC6vnjq4cTPHT2-J8=2h9B2+dqL=4VYnC7H2GGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Seungwon
+Dear Rob
 
-On Thu, Dec 5, 2013 at 10:00 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+On Thu, Dec 5, 2013 at 10:29 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Thu, Nov 7, 2013 at 11:38 PM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
 
->> +static DEFINE_SPINLOCK(mmc_tuning_lock);
-> Can the above variables be involved in dw_mci_k3_priv_data instead of global declaration?
+>> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+>> @@ -0,0 +1,83 @@
+>> +* Hisilicon specific extensions to the Synopsys Designware Mobile
+>> +  Storage Host Controller
+>> +
+>> +Read synopsis-dw-mshc.txt for more details
+>> +The Synopsys designware mobile storage host controller is used to interface
+>> +a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
+>> +differences between the core Synopsys dw mshc controller properties described
+>> +by synopsis-dw-mshc.txt and the properties used by the Hisilicon specific
+>> +extensions to the Synopsys Designware Mobile Storage Host Controller.
+>> +
+>> +Required Properties:
+>> +
+>> +* compatible: should be
+>> +       - "hisilicon,hi4511-dw-mshc": for controllers with hi4511
+>> +         specific extentions.
+>> +* reg: should be address and size of mmc controller
 >
-Unfortunately, this can be be put in priv_data, which is different
-instance for different controller.
-Here need protect register shared by different controllers
+> This should be covered by the base binding.
+Yes, got it.
 
+>
+>> +* vmmc-supply: should be vmmc used in dwmmc
+>> +* fifo-depth: should be provided if register can not provide correct value
+>> +* tuning-table: should be array to tune mmc controller, including clock rate
+>> +       to be set and values for setting optional register.
+>
+> Please define the size and what the values mean.
+>
+>> +
+>> +Optional properties:
+>> +
+>> +/* These registers from pctrl node used for tuning mmc controller if required */
+>> +* clken-reg: should be clock enable register and offset bit
+>> +* drv-sel-reg: should be driver delay select register, start bit and bits numbers
+>> +* sam-sel-reg: should be sample delay select register, start bit and bits numbers
+>> +* div-reg: should be divider register, start bit and bits numbers
+>
+> Do these really vary on different boards or versions of the IP? If
+> not, then put this information in the kernel.
+>
+> Otherwise, these need better description such as number of words and
+> order of values.
 
->> +static int dw_mci_k3_setup_clock(struct dw_mci *host)
->> +{
->> +     dw_mci_k3_tun(host, MMC_TIMING_LEGACY);
-> Is it necessary here?
-> When card-init, MMC_TIMING_LEGACY will be passed via dw_mci_k3_set_ios().
+Double checked these registers are not used in newer version.
+Will follow Arnd's suggestion to abstract in clock.
 
-Read register will fail if not set these register earlier, and set_ios
-is too late.
-Same reason for resume.
+>> +
+>> +       /* Board portion */
+>> +       dwmmc0 at fcd03000 {
+>> +               num-slots = <1>;
+>> +               vmmc-supply = <&ldo12>;
+>> +               fifo-depth = <0x100>;
+>> +               supports-highspeed;
+>
+> Please reference that the binding uses standard SD properties (state
+> which binding document).
+Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt is used for
+base doc describing supports-highspeed.
+
+>
+>> +               pinctrl-names = "default";
+>> +               pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
+>> +               slot at 0 {
+>> +                       reg = <0>;
+>> +                       bus-width = <4>;
+>> +                       disable-wp;
+>> +                       cd-gpios = <&gpio10 3 0>;
+>> +               };
+>> +       };
+>> +
+>> +PCTRL: Peripheral misc control register
+>
+> Is this only MMC control bits? Seems like this belongs in its own doc.
+OK, will move out.
 
 Thanks
