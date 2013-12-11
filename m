@@ -1,57 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 11 Dec 2013 22:01:53 +0400
-Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <52A8A891.40302@cogentembedded.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 11 Dec 2013 20:00:30 +0200
+Subject: [PATCH 3/3] arm: dts: keystone: add keystone timer entry
+In-Reply-To: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1386784830-15863-4-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Add keystone timer entry to keystone device tree.
+This 64-bit timer is used as backup clock event device.
 
-On 27-11-2013 5:18, Laurent Pinchart wrote:
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ arch/arm/boot/dts/keystone-clocks.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/keystone.dtsi        |    7 +++++++
+ 2 files changed, 17 insertions(+)
 
-> This helps increasing build testing coverage.
-
-> The driver doesn't compile on (at least) x86 due (possibly among others)
-> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
-> or ARM.
-
-> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
-> controller or is Renesas-specific is unknown and impossible to test as
-> we have no current or planned TMIO DMA users other than SUPERH and
-> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
-> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
-> list would extend this to multiarch kernels, but would break the driver
-> for non-shmobile platforms if the register is Renesas-specific. We can
-> thus get rid of the conditional compilation completely without
-> introducing any further issue, and let future non-Renesas users deal
-> with the situation if it turns out to be a the problem.
-
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Ian Molton <ian@mnementh.co.uk>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Acked-by: Simon Horman <horms@verge.net.au>
-> ---
->   drivers/mmc/host/Kconfig | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..ca1315e 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -479,7 +479,8 @@ config MMC_TMIO
->
->   config MMC_SDHI
->   	tristate "SH-Mobile SDHI SD/SDIO controller support"
-> -	depends on SUPERH || ARCH_SHMOBILE
-> +	depends on SUPERH || ARM
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-
-    Hm, why 2 "depends" lines with SUPERH in both?
-
-WBR, Sergei
+diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+index 2363593..16d2aba 100644
+--- a/arch/arm/boot/dts/keystone-clocks.dtsi
++++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+@@ -737,6 +737,16 @@ clocks {
+ 		domain-id = <0>;
+ 	};
+ 
++	clktimer15: clktimer15 {
++		#clock-cells = <0>;
++		compatible = "ti,keystone,psc-clock";
++		clocks = <&clkmodrst0>;
++		clock-output-names = "timer15";
++		reg = <0x02350000 0xb00>, <0x02350000 0x400>;
++		reg-names = "control", "domain";
++		domain-id = <0>;
++	};
++
+ 	clkuart0: clkuart0 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index f6d6d9e..3f05c07 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -181,5 +181,12 @@
+ 			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&clkspi>;
+ 		};
++
++		clock_event: timer at 22f0000 {
++			compatible = "ti,keystone-timer";
++			reg = <0x022f0000 0x80>;
++			interrupts = <GIC_SPI 110 IRQ_TYPE_EDGE_RISING>;
++			clocks = <&clktimer15>;
++		};
+ 	};
+ };
+-- 
+1.7.9.5
