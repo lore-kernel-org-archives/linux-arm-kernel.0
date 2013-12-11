@@ -1,60 +1,121 @@
 From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Wed, 11 Dec 2013 14:07:34 +0100
-Subject: [PATCH 3/8] device tree blob must be 4-bytes alingned
+Date: Wed, 11 Dec 2013 14:07:38 +0100
+Subject: [PATCH 7/8] serial: add Exynos specific serial driver
 In-Reply-To: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
 References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
-Message-ID: <1386767259-15693-4-git-send-email-p.wilczek@samsung.com>
+Message-ID: <1386767259-15693-8-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each appended device tree blob must be 4-bytes aligned.
-This patch modifies append_dtbs script to append bytes to each device tree
-file so the size is multiple of 4.
-When finding dtb the addres of next dtb is also aligned to 4-bytes.
-
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Piotr Wilczek <p.wilczek@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- append_dtbs.sh |   11 +++++++++++
- dtbs.c         |    4 ++++
- 2 files changed, 15 insertions(+)
+ Makefile        |    1 +
+ serial-exynos.c |   84 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+)
+ create mode 100644 serial-exynos.c
 
-diff --git a/append_dtbs.sh b/append_dtbs.sh
-index 82bb463..a8a7cda 100755
---- a/append_dtbs.sh
-+++ b/append_dtbs.sh
-@@ -4,5 +4,16 @@ OUT="$1"
- shift
- DTBS="$*"
+diff --git a/Makefile b/Makefile
+index 6074106..78684b7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -8,6 +8,7 @@ include Makefile.config
  
-+while [ -n "$*" ]
-+do
-+	SIZE=`stat $1 -c %s`
-+	MOD=`expr $SIZE % 4`
-+	if [ $MOD -ne 0 ]; then
-+		PADDING=`expr 4 - $MOD`
-+		dd if=/dev/zero count=$PADDING bs=1 >> $1 2> /dev/null
-+	fi
-+	shift
-+done
-+
- cat $DTBS >>$OUT
- dd if=/dev/zero of=$OUT oflag=append conv=notrunc bs=1 count=8 #sentinel
-diff --git a/dtbs.c b/dtbs.c
-index 812c2ef..26e3b83 100644
---- a/dtbs.c
-+++ b/dtbs.c
-@@ -30,6 +30,10 @@ void *find_dtb(void *dtbs, const char *compat)
- 			return d;
+ CFLAGS+=-DUART_BASE=$(UART_BASE)
+ CFLAGS+=-DNR_BANKS=$(NR_BANKS)
++CFLAGS+=-DUART_PORT=$(UART_PORT)
  
- 		d = (struct fdt_header *)((char *)d + be_to_cpu(d->totalsize));
+ BOARD_OBJ = board-$(MFG).o
+ UART_OBJ = serial-$(UART).o
+diff --git a/serial-exynos.c b/serial-exynos.c
+new file mode 100644
+index 0000000..3ba4fc9
+--- /dev/null
++++ b/serial-exynos.c
+@@ -0,0 +1,84 @@
++#include "types.h"
++#include "register.h"
++#include "serial.h"
 +
-+		/* align to 4-bytes */
-+		d = (struct fdt_header *)((((unsigned int)d + 0x3) & ~0x3));
++#define EXYNOS_BASE_UART	0x13800000
++#define TX_FIFO_FULL_MASK	(1 << 24)
 +
- 	}
- 
- 	return NULL;
++#define UART_BAUDRATE_115200	115200
++
++union br_rest {
++	unsigned short	slot;		/* udivslot */
++	unsigned char	value;		/* ufracval */
++};
++
++struct s5p_uart {
++	unsigned int	ulcon;
++	unsigned int	ucon;
++	unsigned int	ufcon;
++	unsigned int	umcon;
++	unsigned int	utrstat;
++	unsigned int	uerstat;
++	unsigned int	ufstat;
++	unsigned int	umstat;
++	unsigned char	utxh;
++	unsigned char	res1[3];
++	unsigned char	urxh;
++	unsigned char	res2[3];
++	unsigned int	ubrdiv;
++	union br_rest	rest;
++	unsigned char	res3[0xffd0];
++};
++
++static inline struct s5p_uart *s5p_get_base_uart(int dev_index)
++{
++	u32 offset = dev_index * sizeof(struct s5p_uart);
++	return (struct s5p_uart *)(EXYNOS_BASE_UART + offset);
++}
++
++static inline int s5p_uart_divslot(void)
++{
++	return 0;
++}
++
++static int serial_err_check(const int dev_index, int op)
++{
++	struct s5p_uart *const uart = s5p_get_base_uart(dev_index);
++	unsigned int mask;
++
++	/*
++	 * UERSTAT
++	 * Break Detect	[3]
++	 * Frame Err	[2] : receive operation
++	 * Parity Err	[1] : receive operation
++	 * Overrun Err	[0] : receive operation
++	 */
++	if (op)
++		mask = 0x8;
++	else
++		mask = 0xf;
++
++	return readl((unsigned int)&uart->uerstat) & mask;
++}
++
++/*
++ * Output a single byte to the serial port.
++ */
++void __putch(char c)
++{
++	const int dev_index = UART_PORT;
++
++	struct s5p_uart *const uart = s5p_get_base_uart(dev_index);
++
++	/* wait for room in the tx FIFO */
++	while ((readl((unsigned int)&uart->ufstat) & TX_FIFO_FULL_MASK)) {
++		if (serial_err_check(dev_index, 1))
++			return;
++	}
++
++	writeb(c, (unsigned int)&uart->utxh);
++
++	/* If \n, also do \r */
++	if (c == '\n')
++		__putch('\r');
++}
 -- 
 1.7.9.5
