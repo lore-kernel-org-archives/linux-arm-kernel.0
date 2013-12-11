@@ -1,391 +1,60 @@
-From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
-Date: Wed, 11 Dec 2013 14:24:42 +0800
-Subject: [PATCH 6/6] arm64: lib: Implement optimized string length routines
-In-Reply-To: <1386743082-5231-1-git-send-email-zhichang.yuan@linaro.org>
-References: <1386743082-5231-1-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <1386743082-5231-7-git-send-email-zhichang.yuan@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 11 Dec 2013 14:24:31 +0800
+Subject: [PATCH V2 2/4] mtd: spi-nor: add the basic data structures
+In-Reply-To: <201312101407.59958.marex@denx.de>
+References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
+ <1386318764-15882-3-git-send-email-b32955@freescale.com>
+ <201312101407.59958.marex@denx.de>
+Message-ID: <20131211062428.GA25147@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+On Tue, Dec 10, 2013 at 02:07:59PM +0100, Marek Vasut wrote:
+> On Friday, December 06, 2013 at 09:32:42 AM, Huang Shijie wrote:
+> > The spi_nor{} is cloned from the m25p{}.
+> > +	struct spi_nor_xfer_cfg	cfg;
+> > +
+> > +	/* for write_reg */
+> > +	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+> > +
+> > +	/* the two fundamental primitives */
+> > +	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > +			 u8 *buf, size_t len);
+> > +	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > +			  u8 *buf, size_t len);
+> > +
+> > +	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
+> > +	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
+> > +			int write_enable);
+> 
+> Does the vybrid really support accelerated SPI NOR register IO or does it 
+The vybrid does not support the accelerated SPI NOR register IO.
+these hooks are for Lee's driver.
+> emulate it with read/write or read_xfer/write_xfer accessors ? If the later, 
+> just drop this stuff for now.
 
-This patch, based on Linaro's Cortex Strings library, adds
-an assembly optimized strlen() and strnlen() functions.
+What is the "stuff" mean? the "write_enable" ?
 
-Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
----
- arch/arm64/include/asm/string.h |    6 ++
- arch/arm64/kernel/arm64ksyms.c  |    2 +
- arch/arm64/lib/Makefile         |    3 +-
- arch/arm64/lib/strlen.S         |  131 ++++++++++++++++++++++++++++
- arch/arm64/lib/strnlen.S        |  179 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 320 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/strlen.S
- create mode 100644 arch/arm64/lib/strnlen.S
+> 
+> > +	const struct spi_device_id *(*read_id)(struct spi_nor *nor);
+> > +	int (*wait_till_ready)(struct spi_nor *nor);
+> > +
+> > +	/* write */
+> > +	void (*write)(struct spi_nor *nor, loff_t to,
+> > +			size_t len, size_t *retlen, const u_char *buf);
+> > +	/* read */
+> > +	int (*read)(struct spi_nor *nor, loff_t from,
+> > +			size_t len, size_t *retlen, u_char *buf);
+> > +	/* erase */
+> > +	int (*erase)(struct spi_nor *nor, loff_t offs);
+> 
+> How do you specify what to erase (sub-sector, sector, whole chip) here ?
+I use a write_reg(OPCODE_ERASE_CHIP) to erase the whole chip.
+Please read the patch 3.
 
-diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
-index 6133f49..64d2d48 100644
---- a/arch/arm64/include/asm/string.h
-+++ b/arch/arm64/include/asm/string.h
-@@ -28,6 +28,12 @@ extern int strcmp(const char *, const char *);
- #define __HAVE_ARCH_STRNCMP
- extern int strncmp(const char *, const char *, __kernel_size_t);
- 
-+#define __HAVE_ARCH_STRLEN
-+extern __kernel_size_t strlen(const char *);
-+
-+#define __HAVE_ARCH_STRNLEN
-+extern __kernel_size_t strnlen(const char *, __kernel_size_t);
-+
- #define __HAVE_ARCH_MEMCPY
- extern void *memcpy(void *, const void *, __kernel_size_t);
- 
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index d61fa39..c71b435 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -49,6 +49,8 @@ EXPORT_SYMBOL(strchr);
- EXPORT_SYMBOL(strrchr);
- EXPORT_SYMBOL(strcmp);
- EXPORT_SYMBOL(strncmp);
-+EXPORT_SYMBOL(strlen);
-+EXPORT_SYMBOL(strnlen);
- EXPORT_SYMBOL(memset);
- EXPORT_SYMBOL(memcpy);
- EXPORT_SYMBOL(memmove);
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 5ded21f..e64a94c 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -3,4 +3,5 @@ lib-y		:= bitops.o delay.o					\
- 		   copy_from_user.o copy_to_user.o copy_in_user.o	\
- 		   copy_page.o clear_page.o				\
- 		   memchr.o memcpy.o memmove.o memset.o memcmp.o	\
--		   strchr.o strrchr.o strcmp.o strncmp.o
-+		   strchr.o strrchr.o strcmp.o strncmp.o		\
-+		   strlen.o strnlen.o
-diff --git a/arch/arm64/lib/strlen.S b/arch/arm64/lib/strlen.S
-new file mode 100644
-index 0000000..302f6dd
---- /dev/null
-+++ b/arch/arm64/lib/strlen.S
-@@ -0,0 +1,131 @@
-+/*
-+ * Copyright (C) 2013 ARM Ltd.
-+ * Copyright (C) 2013 Linaro.
-+ *
-+ * This code is based on glibc cortex strings work originally authored by Linaro
-+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
-+ * be found @
-+ *
-+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
-+ * files/head:/src/aarch64/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * calculate the length of a string
-+ *
-+ * Parameters:
-+ *	x0 - const string pointer
-+ * Returns:
-+ *	x0 - the return length of specific string
-+ */
-+
-+/* Arguments and results.  */
-+#define srcin		x0
-+#define len		x0
-+
-+/* Locals and temporaries.  */
-+#define src		x1
-+#define data1		x2
-+#define data2		x3
-+#define data2a		x4
-+#define has_nul1	x5
-+#define has_nul2	x6
-+#define tmp1		x7
-+#define tmp2		x8
-+#define tmp3		x9
-+#define tmp4		x10
-+#define zeroones	x11
-+#define pos		x12
-+
-+#define REP8_01 0x0101010101010101
-+#define REP8_7f 0x7f7f7f7f7f7f7f7f
-+#define REP8_80 0x8080808080808080
-+
-+ENTRY(strlen)
-+	mov	zeroones, #REP8_01
-+	bic	src, srcin, #15
-+	ands	tmp1, srcin, #15
-+	b.ne	.Lmisaligned
-+	/*
-+	* NUL detection works on the principle that (X - 1) & (~X) & 0x80
-+	* (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
-+	* can be done in parallel across the entire word.
-+	*/
-+	/*
-+	* The inner loop deals with two Dwords at a time. This has a
-+	* slightly higher start-up cost, but we should win quite quickly,
-+	* especially on cores with a high number of issue slots per
-+	* cycle, as we get much better parallelism out of the operations.
-+	*/
-+.Lloop:
-+	ldp	data1, data2, [src], #16
-+.Lrealigned:
-+	sub	tmp1, data1, zeroones
-+	orr	tmp2, data1, #REP8_7f
-+	sub	tmp3, data2, zeroones
-+	orr	tmp4, data2, #REP8_7f
-+	bic	has_nul1, tmp1, tmp2
-+	bics	has_nul2, tmp3, tmp4
-+	ccmp	has_nul1, #0, #0, eq	/* NZCV = 0000  */
-+	b.eq	.Lloop
-+
-+	sub	len, src, srcin
-+	cbz	has_nul1, .Lnul_in_data2
-+#ifdef __ARM64EB__
-+	mov	data2, data1
-+#endif
-+	sub	len, len, #8
-+	mov	has_nul2, has_nul1
-+.Lnul_in_data2:
-+#ifdef __ARM64EB__
-+	/*
-+	* For big-endian, carry propagation (if the final byte in the
-+	* string is 0x01) means we cannot use has_nul directly.  The
-+	* easiest way to get the correct byte is to byte-swap the data
-+	* and calculate the syndrome a second time.
-+	*/
-+	rev	data2, data2
-+	sub	tmp1, data2, zeroones
-+	orr	tmp2, data2, #REP8_7f
-+	bic	has_nul2, tmp1, tmp2
-+#endif
-+	sub	len, len, #8
-+	rev	has_nul2, has_nul2
-+	clz	pos, has_nul2
-+	add	len, len, pos, lsr #3		/* Bits to bytes.  */
-+	ret
-+
-+.Lmisaligned:
-+	cmp	tmp1, #8
-+	neg	tmp1, tmp1
-+	ldp	data1, data2, [src], #16
-+	lsl	tmp1, tmp1, #3		/* Bytes beyond alignment -> bits.  */
-+	mov	tmp2, #~0
-+#ifdef __ARM64EB__
-+	/* Big-endian.  Early bytes are at MSB.  */
-+	lsl	tmp2, tmp2, tmp1	/* Shift (tmp1 & 63).  */
-+#else
-+	/* Little-endian.  Early bytes are at LSB.  */
-+	lsr	tmp2, tmp2, tmp1	/* Shift (tmp1 & 63).  */
-+#endif
-+	orr	data1, data1, tmp2
-+	orr	data2a, data2, tmp2
-+	csinv	data1, data1, xzr, le
-+	csel	data2, data2, data2a, le
-+	b	.Lrealigned
-+ENDPROC(strlen)
-diff --git a/arch/arm64/lib/strnlen.S b/arch/arm64/lib/strnlen.S
-new file mode 100644
-index 0000000..2293f7b
---- /dev/null
-+++ b/arch/arm64/lib/strnlen.S
-@@ -0,0 +1,179 @@
-+/*
-+ * Copyright (C) 2013 ARM Ltd.
-+ * Copyright (C) 2013 Linaro.
-+ *
-+ * This code is based on glibc cortex strings work originally authored by Linaro
-+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
-+ * be found @
-+ *
-+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
-+ * files/head:/src/aarch64/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * determine the length of a fixed-size string
-+ *
-+ * Parameters:
-+ *	x0 - const string pointer
-+ *	x1 - maximal string length
-+ * Returns:
-+ *	x0 - the return length of specific string
-+ */
-+
-+/* Arguments and results.  */
-+#define srcin		x0
-+#define len		x0
-+#define limit		x1
-+
-+/* Locals and temporaries.  */
-+#define src		x2
-+#define data1		x3
-+#define data2		x4
-+#define data2a		x5
-+#define has_nul1	x6
-+#define has_nul2	x7
-+#define tmp1		x8
-+#define tmp2		x9
-+#define tmp3		x10
-+#define tmp4		x11
-+#define zeroones	x12
-+#define pos		x13
-+#define limit_wd	x14
-+
-+#define REP8_01 0x0101010101010101
-+#define REP8_7f 0x7f7f7f7f7f7f7f7f
-+#define REP8_80 0x8080808080808080
-+
-+ENTRY(strnlen)
-+	cbz	limit, .Lhit_limit
-+	mov	zeroones, #REP8_01
-+	bic	src, srcin, #15
-+	ands	tmp1, srcin, #15
-+	b.ne	.Lmisaligned
-+	/* Calculate the number of full and partial words -1.  */
-+	sub	limit_wd, limit, #1 /* Limit != 0, so no underflow.  */
-+	lsr	limit_wd, limit_wd, #4  /* Convert to Qwords.  */
-+
-+	/*
-+	* NUL detection works on the principle that (X - 1) & (~X) & 0x80
-+	* (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
-+	* can be done in parallel across the entire word.
-+	*/
-+	/*
-+	* The inner loop deals with two Dwords at a time.  This has a
-+	* slightly higher start-up cost, but we should win quite quickly,
-+	* especially on cores with a high number of issue slots per
-+	* cycle, as we get much better parallelism out of the operations.
-+	*/
-+.Lloop:
-+	ldp	data1, data2, [src], #16
-+.Lrealigned:
-+	sub	tmp1, data1, zeroones
-+	orr	tmp2, data1, #REP8_7f
-+	sub	tmp3, data2, zeroones
-+	orr	tmp4, data2, #REP8_7f
-+	bic	has_nul1, tmp1, tmp2
-+	bic	has_nul2, tmp3, tmp4
-+	subs	limit_wd, limit_wd, #1
-+	orr	tmp1, has_nul1, has_nul2
-+	ccmp	tmp1, #0, #0, pl    /* NZCV = 0000  */
-+	b.eq	.Lloop
-+
-+	cbz	tmp1, .Lhit_limit   /* No null in final Qword.  */
-+
-+	/*
-+	* We know there's a null in the final Qword. The easiest thing
-+	* to do now is work out the length of the string and return
-+	* MIN (len, limit).
-+	*/
-+	sub	len, src, srcin
-+	cbz	has_nul1, .Lnul_in_data2
-+#ifdef __ARM64EB__
-+	mov	data2, data1
-+#endif
-+	sub	len, len, #8
-+	mov	has_nul2, has_nul1
-+.Lnul_in_data2:
-+#ifdef __ARM64EB__
-+	/*
-+	* For big-endian, carry propagation (if the final byte in the
-+	* string is 0x01) means we cannot use has_nul directly.  The
-+	* easiest way to get the correct byte is to byte-swap the data
-+	* and calculate the syndrome a second time.
-+	*/
-+	rev	data2, data2
-+	sub	tmp1, data2, zeroones
-+	orr	tmp2, data2, #REP8_7f
-+	bic	has_nul2, tmp1, tmp2
-+#endif
-+	sub	len, len, #8
-+	rev	has_nul2, has_nul2
-+	clz	pos, has_nul2
-+	add	len, len, pos, lsr #3       /* Bits to bytes.  */
-+	cmp	len, limit
-+	csel	len, len, limit, ls     /* Return the lower value.  */
-+	ret
-+
-+.Lmisaligned:
-+	/*
-+	* Deal with a partial first word.
-+	* We're doing two things in parallel here;
-+	* 1) Calculate the number of words (but avoiding overflow if
-+	* limit is near ULONG_MAX) - to do this we need to work out
-+	* limit + tmp1 - 1 as a 65-bit value before shifting it;
-+	* 2) Load and mask the initial data words - we force the bytes
-+	* before the ones we are interested in to 0xff - this ensures
-+	* early bytes will not hit any zero detection.
-+	*/
-+	/*
-+	* this operation need some cycles,
-+	* some other independent instructions can following it.
-+	*/
-+	ldp	data1, data2, [src], #16
-+
-+	sub	limit_wd, limit, #1
-+	and	tmp3, limit_wd, #15
-+	lsr	limit_wd, limit_wd, #4
-+
-+	add	tmp3, tmp3, tmp1
-+	add	limit_wd, limit_wd, tmp3, lsr #4
-+
-+	neg	tmp4, tmp1
-+	lsl	tmp4, tmp4, #3  /* Bytes beyond alignment -> bits.  */
-+
-+	mov	tmp2, #~0
-+#ifdef __ARM64EB__
-+	/* Big-endian.  Early bytes are at MSB.  */
-+	lsl	tmp2, tmp2, tmp4	/* Shift (tmp1 & 63).  */
-+#else
-+	/* Little-endian.  Early bytes are at LSB.  */
-+	lsr	tmp2, tmp2, tmp4	/* Shift (tmp1 & 63).  */
-+#endif
-+	cmp	tmp1, #8
-+
-+	orr	data1, data1, tmp2
-+	orr	data2a, data2, tmp2
-+
-+	csinv	data1, data1, xzr, le
-+	csel	data2, data2, data2a, le
-+	b	.Lrealigned
-+
-+.Lhit_limit:
-+	mov	len, limit
-+	ret
-+ENDPROC(strnlen)
--- 
-1.7.9.5
+This hook is used to erase a sector.
+
+Btw, what is the sub-sector mean? which opcodes for the sub-sector?
+
+thanks
+Huang Shijie
