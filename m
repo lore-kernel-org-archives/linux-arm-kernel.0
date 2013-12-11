@@ -1,16 +1,15 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Wed, 11 Dec 2013 15:08:27 +0530
-Subject: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to header file
+Date: Wed, 11 Dec 2013 15:08:30 +0530
+Subject: [PATCH 05/12] clk: SPEAr13xx: Fix pcie clock name
 In-Reply-To: <cover.1386752447.git.mohit.kumar@st.com>
 References: <cover.1386752447.git.mohit.kumar@st.com>
-Message-ID: <9ae7b152da13c094b024c54d27187aab96e439b3.1386752447.git.mohit.kumar@st.com>
+Message-ID: <aeeefe3537089f0d0a2f8f5662d50dfca2aadf29.1386752447.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-Move SPEAr1340 definitions to header files so that theese can be used by
-other code too.
+Follow dt clock naming convention for PCIe clocks.
 
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
 Cc: Mohit Kumar <mohit.kumar@st.com>
@@ -18,140 +17,49 @@ Cc: Viresh Kumar <viresh.linux@gmail.com>
 Cc: spear-devel at list.st.com
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/mach-spear/include/mach/spear.h |   55 ++++++++++++++++++++++++++++++
- arch/arm/mach-spear/spear1340.c          |   54 -----------------------------
- 2 files changed, 55 insertions(+), 54 deletions(-)
+ drivers/clk/spear/spear1310_clock.c |    6 +++---
+ drivers/clk/spear/spear1340_clock.c |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-index 5cdc53d..4526f75 100644
---- a/arch/arm/mach-spear/include/mach/spear.h
-+++ b/arch/arm/mach-spear/include/mach/spear.h
-@@ -86,6 +86,61 @@
- /* Debug uart for linux, will be used for debug and uncompress messages */
- #define SPEAR_DBG_UART_BASE			UART_BASE
+diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
+index 65894f7..4daa597 100644
+--- a/drivers/clk/spear/spear1310_clock.c
++++ b/drivers/clk/spear/spear1310_clock.c
+@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.0");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
  
-+/* PCIe/SATA Base addresses */
-+#define SPEAR1340_SATA_BASE			UL(0xB1000000)
-+#define SPEAR1340_PCIE_BASE			UL(0xB1000000)
-+
-+/* Power Management Registers */
-+#define SPEAR1340_PCM_CFG			(VA_MISC_BASE + 0x100)
-+#define SPEAR1340_PCM_WKUP_CFG			(VA_MISC_BASE + 0x104)
-+#define SPEAR1340_SWITCH_CTR			(VA_MISC_BASE + 0x108)
-+
-+#define SPEAR1340_PERIP1_SW_RST			(VA_MISC_BASE + 0x318)
-+#define SPEAR1340_PERIP2_SW_RST			(VA_MISC_BASE + 0x31C)
-+#define SPEAR1340_PERIP3_SW_RST			(VA_MISC_BASE + 0x320)
-+
-+/* PCIE - SATA configuration registers */
-+#define SPEAR1340_PCIE_SATA_CFG			(VA_MISC_BASE + 0x424)
-+	/* PCIE CFG MASks */
-+	#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	(1 << 11)
-+	#define SPEAR1340_PCIE_CFG_POWERUP_RESET	(1 << 10)
-+	#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		(1 << 9)
-+	#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		(1 << 8)
-+	#define SPEAR1340_SATA_CFG_TX_CLK_EN		(1 << 4)
-+	#define SPEAR1340_SATA_CFG_RX_CLK_EN		(1 << 3)
-+	#define SPEAR1340_SATA_CFG_POWERUP_RESET	(1 << 2)
-+	#define SPEAR1340_SATA_CFG_PM_CLK_EN		(1 << 1)
-+	#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
-+	#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
-+	#define SPEAR1340_SATA_PCIE_CFG_MASK		0xF1F
-+	#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
-+			SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
-+			SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
-+			SPEAR1340_PCIE_CFG_POWERUP_RESET | \
-+			SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
-+	#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
-+			SPEAR1340_SATA_CFG_PM_CLK_EN | \
-+			SPEAR1340_SATA_CFG_POWERUP_RESET | \
-+			SPEAR1340_SATA_CFG_RX_CLK_EN | \
-+			SPEAR1340_SATA_CFG_TX_CLK_EN)
-+
-+#define SPEAR1340_PCIE_MIPHY_CFG		(VA_MISC_BASE + 0x428)
-+	#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		(1 << 31)
-+	#define SPEAR1340_MIPHY_CLK_REF_DIV2		(1 << 27)
-+	#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
-+	#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
-+	#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
-+	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
-+			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
-+			SPEAR1340_MIPHY_CLK_REF_DIV2 | \
-+			SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
-+	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
-+			(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
-+	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
-+			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
-+			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
-+
-+
- #endif /* SPEAR13XX */
+ 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.1");
++	clk_register_clkdev(clk, NULL, "b1800000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
  
- #endif /* __MACH_SPEAR_H */
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index 3fb6834..1b47609 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -22,60 +22,6 @@
- #include <mach/spear.h>
+ 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.2");
++	clk_register_clkdev(clk, NULL, "b4000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
  
- /* FIXME: Move SATA PHY code into a standalone driver */
--
--/* Base addresses */
--#define SPEAR1340_SATA_BASE			UL(0xB1000000)
--
--/* Power Management Registers */
--#define SPEAR1340_PCM_CFG			(VA_MISC_BASE + 0x100)
--#define SPEAR1340_PCM_WKUP_CFG			(VA_MISC_BASE + 0x104)
--#define SPEAR1340_SWITCH_CTR			(VA_MISC_BASE + 0x108)
--
--#define SPEAR1340_PERIP1_SW_RST			(VA_MISC_BASE + 0x318)
--#define SPEAR1340_PERIP2_SW_RST			(VA_MISC_BASE + 0x31C)
--#define SPEAR1340_PERIP3_SW_RST			(VA_MISC_BASE + 0x320)
--
--/* PCIE - SATA configuration registers */
--#define SPEAR1340_PCIE_SATA_CFG			(VA_MISC_BASE + 0x424)
--	/* PCIE CFG MASks */
--	#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	(1 << 11)
--	#define SPEAR1340_PCIE_CFG_POWERUP_RESET	(1 << 10)
--	#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		(1 << 9)
--	#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		(1 << 8)
--	#define SPEAR1340_SATA_CFG_TX_CLK_EN		(1 << 4)
--	#define SPEAR1340_SATA_CFG_RX_CLK_EN		(1 << 3)
--	#define SPEAR1340_SATA_CFG_POWERUP_RESET	(1 << 2)
--	#define SPEAR1340_SATA_CFG_PM_CLK_EN		(1 << 1)
--	#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
--	#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
--	#define SPEAR1340_SATA_PCIE_CFG_MASK		0xF1F
--	#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
--			SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
--			SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
--			SPEAR1340_PCIE_CFG_POWERUP_RESET | \
--			SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
--	#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
--			SPEAR1340_SATA_CFG_PM_CLK_EN | \
--			SPEAR1340_SATA_CFG_POWERUP_RESET | \
--			SPEAR1340_SATA_CFG_RX_CLK_EN | \
--			SPEAR1340_SATA_CFG_TX_CLK_EN)
--
--#define SPEAR1340_PCIE_MIPHY_CFG		(VA_MISC_BASE + 0x428)
--	#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		(1 << 31)
--	#define SPEAR1340_MIPHY_CLK_REF_DIV2		(1 << 27)
--	#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
--	#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
--	#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
--	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
--			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
--			SPEAR1340_MIPHY_CLK_REF_DIV2 | \
--			SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
--	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
--			(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
--	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
--			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
--			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
--
- /* SATA device registration */
- static int sata_miphy_init(struct device *dev, void __iomem *addr)
- {
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+index fe835c1..5a5c664 100644
+--- a/drivers/clk/spear/spear1340_clock.c
++++ b/drivers/clk/spear/spear1340_clock.c
+@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
+ 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
 -- 
 1.7.0.1
