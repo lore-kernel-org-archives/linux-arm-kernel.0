@@ -1,68 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Dec 2013 17:32:51 -0800
-Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
-In-Reply-To: <20131211005106.GL11468@sirena.org.uk>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
- <20131210235000.GK11468@sirena.org.uk> <52A7AE1B.3040201@codeaurora.org>
- <20131211005106.GL11468@sirena.org.uk>
-Message-ID: <52A7C0C3.2070805@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Dec 2013 17:37:47 -0800
+Subject: [PATCH v3 22/36] mtd: st_spi_fsm: Provide the default
+ read/write configurations
+In-Reply-To: <1385727565-25794-23-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131211013747.GJ27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/13 16:51, Mark Brown wrote:
-> On Tue, Dec 10, 2013 at 04:13:15PM -0800, Stephen Boyd wrote:
->> increment reg by 1 every time through this loop. Or should we just have
->> use_single_rw == true?
-> No, it doesn't - it increments the address of reg by the size of a
-> register value each time.  Using use_single_rw might make sense, or if
-> you can't do bulk I/O at all then hooking in via reg_read() and
-> reg_write() in the config rather than trying to parse out the buffers
-> might be even better (you can still make helpers to set that up).
+On Fri, Nov 29, 2013 at 12:19:11PM +0000, Lee Jones wrote:
+> --- a/drivers/mtd/devices/st_spi_fsm.c
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -28,6 +28,33 @@
+...
+> +/* Default WRITE configurations */
+> +static struct seq_rw_config default_write_configs[] = {
+> +	{FLASH_FLAG_WRITE_1_4_4, FLASH_CMD_WRITE_1_4_4, 1, 4, 4, 0x00, 0, 0},
+> +	{FLASH_FLAG_WRITE_1_1_4, FLASH_CMD_WRITE_1_1_4, 1, 1, 4, 0x00, 0, 0},
+> +	{FLASH_FLAG_WRITE_1_2_2, FLASH_CMD_WRITE_1_2_2, 1, 2, 2, 0x00, 0, 0},
+> +	{FLASH_FLAG_WRITE_1_1_2, FLASH_CMD_WRITE_1_1_2, 1, 1, 2, 0x00, 0, 0},
+> +	{FLASH_FLAG_READ_WRITE,  FLASH_CMD_WRITE,       1, 1, 1, 0x00, 0, 0},
+> +	{0x00,			 0,			 0, 0, 0, 0x00, 0, 0},
 
+^^^ This line has an extra space in it, that throws off the table
+alignment.
 
-Are you suggesting we implement the reg_read/reg_write as global helpers
-that the config points to and then call regmap_init()? At a quick glance
-it looks like we lose out on regmap_bulk_read() if we do that. There is
-one driver that will use regmap_bulk_read(), but I suppose we can just
-loop on regmap_read() and do our own increment? If we use use_single_rw
-everything works and we can simplify this code to just pass the reg and
-val buffers directly to ssbi_read/write.
+> +};
 
-This is what I have now.
-
-static int regmap_ssbi_read(void *context,
-                            const void *regp, size_t reg_size,
-                            void *val, size_t val_size)
-{
-        int ret;
-        u16 reg;
-
-        BUG_ON(reg_size != 2);
-
-        reg = *(u16 *)regp;
-        while (val_size) {
-                ret = ssbi_read(context, reg, val, 1);
-                if (ret)
-                        return ret;
-                reg++;
-                val += sizeof(u8);
-                val_size -= sizeof(u8);
-        }
-
-        return 0;
-}
-
-With use_single_rw I think it can be this.
-
-static int regmap_ssbi_read(void *context,
-                            const void *reg, size_t reg_size,
-                            void *val, size_t val_size)
-{
-        BUG_ON(reg_size != 2);  
-        return ssbi_read(context, *(u16 *)reg, val, 1);
-}
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Brian
