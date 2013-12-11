@@ -1,63 +1,41 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 13:51:18 +0100
-Subject: [PATCH 13/15] fbdev: sh-mobile-lcdcfb: Enable driver compilation
- with COMPILE_TEST
-In-Reply-To: <1385515117-23664-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Wed, 11 Dec 2013 13:52:31 +0100
+Subject: [PATCH 15/15] sh: intc: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1542726.dq1lpTml5f@avalon>
+ <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <3670569.dVXQxeaJBM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe and Tomi,
+Hi Magnus,
 
-Could you please pick this patch up for v3.14 ?
+Could you tell me who is responsible for merging drivers/sh patches ? If 
+that's one of you, could you please pick this patch up for v3.14 ?
 
-On Wednesday 27 November 2013 02:18:35 Laurent Pinchart wrote:
+On Wednesday 27 November 2013 02:18:37 Laurent Pinchart wrote:
 > This helps increasing build testing coverage.
 > 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: linux-fbdev at vger.kernel.org
+> Cc: Magnus Damm <magnus.damm@gmail.com>
 > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Acked-by: Simon Horman <horms@verge.net.au>
 > ---
->  drivers/video/Kconfig | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
+>  drivers/sh/intc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index 4f2e1b3..2aceb08 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -10,7 +10,8 @@ config HAVE_FB_ATMEL
+> diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
+> index a305731..f7d9061 100644
+> --- a/drivers/sh/intc/Kconfig
+> +++ b/drivers/sh/intc/Kconfig
+> @@ -6,7 +6,7 @@ comment "Interrupt controller options"
 > 
->  config SH_MIPI_DSI
->  	tristate
-> -	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-> +	depends on HAVE_CLK
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-> 
->  config SH_LCD_MIPI_DSI
->  	bool
-> @@ -1997,7 +1998,8 @@ config FB_W100
-> 
->  config FB_SH_MOBILE_LCDC
->  	tristate "SuperH Mobile LCDC framebuffer support"
-> -	depends on FB && (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-> +	depends on FB && HAVE_CLK
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
->  	select FB_SYS_FILLRECT
->  	select FB_SYS_COPYAREA
->  	select FB_SYS_IMAGEBLIT
-> @@ -2484,7 +2486,7 @@ endif
-> 
->  config FB_SH_MOBILE_MERAM
->  	tristate "SuperH Mobile MERAM read ahead support"
-> -	depends on (SUPERH || ARCH_SHMOBILE)
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
->  	select GENERIC_ALLOCATOR
->  	---help---
->  	  Enable MERAM support for the SuperH controller.
+>  config INTC_USERIMASK
+>  	bool "Userspace interrupt masking support"
+> -	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
+> +	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A) || COMPILE_TEST
+>  	help
+>  	  This enables support for hardware-assisted userspace hardirq
+>  	  masking.
 -- 
 Regards,
 
