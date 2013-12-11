@@ -1,41 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Dec 2013 23:51:24 +0100
-Subject: [PATCH 03/12] SPEAr13xx: Add SPEAr1310 PCIe register definitions
-In-Reply-To: <3a008bd5223b1da9f17ceac745b3fc08b6b842e3.1386752447.git.mohit.kumar@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <3a008bd5223b1da9f17ceac745b3fc08b6b842e3.1386752447.git.mohit.kumar@st.com>
-Message-ID: <201312112351.24603.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Dec 2013 22:51:16 +0000
+Subject: [PATCH 2/2] regulator: s5m8767: Fix driver probe fail on BUCK7/8
+ regulators
+In-Reply-To: <1386666583-3280-2-git-send-email-k.kozlowski@samsung.com>
+References: <1386666583-3280-1-git-send-email-k.kozlowski@samsung.com>
+ <1386666583-3280-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20131211225116.GC11044@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 December 2013, Mohit Kumar wrote:
-> diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-> index 4526f75..c236cef 100644
-> --- a/arch/arm/mach-spear/include/mach/spear.h
-> +++ b/arch/arm/mach-spear/include/mach/spear.h
-> @@ -140,6 +140,79 @@
->                         (SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
->                         SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
->  
-> +#define VA_SPEAR1310_PCIE_SATA_CFG             (VA_MISC_BASE + 0x3A4)
-> +       #define SPEAR1310_PCIE_SATA2_SEL_PCIE           (0 << 31)
-> +       #define SPEAR1310_PCIE_SATA1_SEL_PCIE           (0 << 30)
-> +       #define SPEAR1310_PCIE_SATA0_SEL_PCIE           (0 << 29)
-> +       #define SPEAR1310_PCIE_SATA2_SEL_SATA           (1 << 31)
-> +       #define SPEAR1310_PCIE_SATA1_SEL_SATA           (1 << 30)
-> +       #define SPEAR1310_PCIE_SATA0_SEL_SATA           (1 << 29)
+On Tue, Dec 10, 2013 at 10:09:43AM +0100, Krzysztof Kozlowski wrote:
+> The BUCK7 and BUCK8 were not supported by s5m8767 driver. If they were
+> configured in DTS then the driver probing would fail with EINVAL:
+> [    0.288474] VCC_SUB_1.35V: failed to apply 1350000uV constraint
+> [    0.288671] s5m8767-pmic s5m8767-pmic: regulator init failed for 35
+> [    0.294931] s5m8767-pmic: probe of s5m8767-pmic failed with error -22
 
-These should definitely be part of the PHY driver.
+> This patch adds support for BUCK7 and BUCK8 regulators using standard
+> regmap get/set voltage sel functions.
 
-Regarding style, don't use a hardcoded VA_MISC_BASE constant here,
-but find the right address in the driver, and instead of shifting
-bits, just use hexadecimal notation:
-
-#define SPEAR1310_PCIE_SATA2_SEL_PCIE           0x80000000
-#define SPEAR1310_PCIE_SATA1_SEL_PCIE           0x40000000
-...
-
-However, if you have a "reset" driver, you can use #reset-cells=<1>
-and pass the bit as the reset specifier.
-
-	Arnd
+I've applied these but this changelog doesn't entirely add up so I
+rewrote it a bit.  The patch is implementing the get and set voltage
+operations, the regulators were actually supported.  The errors were
+being caused by the DT attempting to set the voltage for a fixed voltage
+regulator which obviously won't work - I suspect that the DTs might not
+be ideal, it seems common to overspecify voltages in DTs for some
+reason.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/858fb28c/attachment.sig>
