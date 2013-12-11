@@ -1,48 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Dec 2013 08:04:40 -0800
-Subject: [PATCH 1/2] net: smc91x: Read hardware behavior flags from
- device tree
-In-Reply-To: <1386757305-12545-2-git-send-email-nm@ti.com>
-References: <1386757305-12545-1-git-send-email-nm@ti.com>
- <1386757305-12545-2-git-send-email-nm@ti.com>
-Message-ID: <20131211160440.GA13171@atomide.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 11 Dec 2013 16:08:53 +0000
+Subject: [PATCH 3/6] arm64: dts: Add a devicetree for the ARMv8 4xA53
+ 4xA57 FVP
+In-Reply-To: <20131211150433.GD17681@e106331-lin.cambridge.arm.com>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <1386767606-6391-3-git-send-email-broonie@kernel.org>
+ <20131211135536.GC17681@e106331-lin.cambridge.arm.com>
+ <20131211141148.GV11468@sirena.org.uk>
+ <20131211150433.GD17681@e106331-lin.cambridge.arm.com>
+Message-ID: <1386778133.3447.6.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [131211 02:23]:
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/smsc91x.txt
-> @@ -0,0 +1,45 @@
-> +* Smart Mixed-Signal Connectivity (SMSC) LAN91c94/91c111 Controller
-> +
-> +Required properties:
-> +- compatible : Should be one of:
-> +	"smsc,lan91c94"
-> +	"smsc,lan91c111"
-> +- reg : Address and length of the io space for SMSC LAN
-> +- interrupts : Should contain SMSC LAN interrupt line
-> +- interrupt-parent : Should be the phandle for the interrupt controller
-> +  that services interrupts for this device
-> +
-> +Optional properties:
-> +- reg-shift : Specify the quantity to shift the register offsets by
-> +- reg-io-width : Specify the size (in bytes) of the IO accesses that
-> +  should be performed on the device.  Valid value for SMSC LAN is
-> +  1, 2 or 4.
+On Wed, 2013-12-11 at 15:04 +0000, Mark Rutland wrote:
+> On Wed, Dec 11, 2013 at 02:11:48PM +0000, Mark Brown wrote:
+> > On Wed, Dec 11, 2013 at 01:55:36PM +0000, Mark Rutland wrote:
+> > > On Wed, Dec 11, 2013 at 01:13:23PM +0000, Mark Brown wrote:
+[...]
+> > 
+> > > > +/ {
+> > > > +	model = "FVP Base";
+> > 
+> > > FVP Base (is as the name implies) a base upon which particular model
+> > > instances are built. This name should be clarified (e.g. "FVP Base A57x4
+> > > A53x4").
+> > 
+> > > That also applies to the filename.
+> > 
+> > I can update these, though they do seem to come from what you guys are
+> > releasing - you might want to follow up on this internally (this applies
+> > to almost all of your review comments, sorry).  It's probably going to
+> > be a bit confusing for users to have the filename change but ho hum :/
+> 
+> I'll try to chase up the issues, thanks for making me aware.
+> 
+> I don't see the name issue as a big problem. This DT has never been part
+> of the kernel tree, so there's no filename compatibility issue to deal
+> with. Existing users of the DT will already have to be modified to get
+> the DTs from a new source.
+> 
+> There should be nothing hanging off the compatible string for the
+> platform yet -- we have no board files or platform blobs in the arm64
+> port. If the model name is being used as anything other than a handy
+> indicator to users, then that's broken anyway.
 
-I posted a minimal regression fix for this a few weeks ago that we
-should merge to the v3.13-rc cycle:
+I believe Android uses model names to determine the filenames of init
+scripts to run. That's not a kernel problem, but thought I would point
+out one 'broken' use that I have first hand experience of, having been
+tripped up before by ARM's twice yearly lets-rename-everything-again
+exercise ;-)
 
-http://www.spinics.net/lists/netdev/msg258913.html
-
-Care to ack that one? Then if that works for you, maybe rebase these on
-that one for the upcoming merge window?
-
-Note that for the -rc cycle we don't need these extra properties as we
-can get the interrupts from the struct resource after fix
-4a43d686fe336c (of/irq: Pass trigger type in IRQ resource flags)
-got merged.
-
-Regards,
-
-Tony
+-- 
+Tixy
