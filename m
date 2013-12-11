@@ -1,32 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Dec 2013 16:02:25 +0000
-Subject: regulator-core has_full_constraints set too late for dt using
- boards ?
-In-Reply-To: <52A88805.1080704@redhat.com>
-References: <52A88805.1080704@redhat.com>
-Message-ID: <20131211160225.GB11468@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Dec 2013 08:04:40 -0800
+Subject: [PATCH 1/2] net: smc91x: Read hardware behavior flags from
+ device tree
+In-Reply-To: <1386757305-12545-2-git-send-email-nm@ti.com>
+References: <1386757305-12545-1-git-send-email-nm@ti.com>
+ <1386757305-12545-2-git-send-email-nm@ti.com>
+Message-ID: <20131211160440.GA13171@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 04:43:01PM +0100, Hans de Goede wrote:
+* Nishanth Menon <nm@ti.com> [131211 02:23]:
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/smsc91x.txt
+> @@ -0,0 +1,45 @@
+> +* Smart Mixed-Signal Connectivity (SMSC) LAN91c94/91c111 Controller
+> +
+> +Required properties:
+> +- compatible : Should be one of:
+> +	"smsc,lan91c94"
+> +	"smsc,lan91c111"
+> +- reg : Address and length of the io space for SMSC LAN
+> +- interrupts : Should contain SMSC LAN interrupt line
+> +- interrupt-parent : Should be the phandle for the interrupt controller
+> +  that services interrupts for this device
+> +
+> +Optional properties:
+> +- reg-shift : Specify the quantity to shift the register offsets by
+> +- reg-io-width : Specify the size (in bytes) of the IO accesses that
+> +  should be performed on the device.  Valid value for SMSC LAN is
+> +  1, 2 or 4.
 
-> While looking into making regulator_get_optional not print
-> an error when no regulator is found, I've noticed that
-> for dt enabled boards, has_full_constraints is not set
-> until regulator_init_complete() runs, which is a
-> late_initcall.
+I posted a minimal regression fix for this a few weeks ago that we
+should merge to the v3.13-rc cycle:
 
-> This means that it gets set after it has already been checked
-> from calls like regulator_get which are likely done by init
-> functions running earlier.
+http://www.spinics.net/lists/netdev/msg258913.html
 
-> This seems wrong ...
+Care to ack that one? Then if that works for you, maybe rebase these on
+that one for the upcoming merge window?
 
-Please look at the current code, that's not how this works any more.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/55f674c2/attachment.sig>
+Note that for the -rc cycle we don't need these extra properties as we
+can get the interrupts from the struct resource after fix
+4a43d686fe336c (of/irq: Pass trigger type in IRQ resource flags)
+got merged.
+
+Regards,
+
+Tony
