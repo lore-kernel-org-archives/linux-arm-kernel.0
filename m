@@ -1,55 +1,33 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 11 Dec 2013 10:07:42 +0000
-Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
-In-Reply-To: <1386756462-26033-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1386756462-26033-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1386756462-26033-2-git-send-email-ben.dooks@codethink.co.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 11 Dec 2013 11:16:39 +0100
+Subject: [PATCH] phy: Add exynos-phy driver
+In-Reply-To: <52A8364B.5020204@ti.com>
+References: <1385558788-10880-1-git-send-email-t.stanislaws@samsung.com>
+ <52A8364B.5020204@ti.com>
+Message-ID: <52A83B87.205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the system has been started in non-secure mode, then the ARM generic
-timer is not configurable during the kernel initialisation. Currently
-the only thing we can check for is if the timer has been correctly
-configured during the boot process.
+On 11/12/13 10:54, Kishon Vijay Abraham I wrote:
+> On Wednesday 27 November 2013 06:56 PM, Tomasz Stanislawski wrote:
+>> > Hello everyone,
+>> > The Samsung SoCs from Exynos family are enhanced with a bunch of switches
+>> > dedicated for IP blocks. Those switches are called PHYs in Exynos
+>> > specification. They are usually controlled by a single bit in a single
+>> > one-word-long register.
+>
+> So only enabling this switch is enough for the controller or some other actual
+> PHY IP is needed along with this switch?
+> 
+> However I'm not sure if the switch should be modelled as PHY as it is not a PHY
+> in the real sense.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
----
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+These are ordinary PHY devices embedded in an SoC. I wouldn't really call
+them "switches", as they indeed provide the physical layer functionality 
+for various interfaces, like USB, HDMI, MIPI CSI/DSI, etc. Their control 
+interface is often very simple - usually only an enable and a reset 
+control bit. But that can't change the fact they are real PHY devices,
+so let's not call them switches, that's just untrue.
 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 5734c24..b6275ab 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -78,12 +78,23 @@ void __init rcar_gen2_timer_init(void)
- 	/* Remap "armgcnt address map" space */
- 	base = ioremap(0xe6080000, PAGE_SIZE);
- 
--	/* Update registers with correct frequency */
--	iowrite32(freq, base + CNTFID0);
--	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
-+	/*
-+	 * Update the timer if it is either not running, or is not at the
-+	 * right frequency. The timer is only configurable in secure mode
-+	 * so this avoids an abort if the loader started the timer and
-+	 * entered the kernel in non-secure mode.
-+	 */
-+
-+	if ((ioread32(base + CNTCR) & 1) == 0 ||
-+	    ioread32(base + CNTFID0) != freq) {
-+		/* Update registers with correct frequency */
-+		iowrite32(freq, base + CNTFID0);
-+		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
-+
-+		/* make sure arch timer is started by setting bit 0 of CNTCR */
-+		iowrite32(1, base + CNTCR);
-+	}
- 
--	/* make sure arch timer is started by setting bit 0 of CNTCR */
--	iowrite32(1, base + CNTCR);
- 	iounmap(base);
- #endif /* CONFIG_ARM_ARCH_TIMER */
- 
--- 
-1.8.5.1
+Regards,
+Sylwester
