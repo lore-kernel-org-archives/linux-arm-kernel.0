@@ -1,121 +1,123 @@
 From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Wed, 11 Dec 2013 14:07:38 +0100
-Subject: [PATCH 7/8] serial: add Exynos specific serial driver
+Date: Wed, 11 Dec 2013 14:07:39 +0100
+Subject: [PATCH 8/8] board: add Samsung specific board support
 In-Reply-To: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
 References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
-Message-ID: <1386767259-15693-8-git-send-email-p.wilczek@samsung.com>
+Message-ID: <1386767259-15693-9-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Piotr Wilczek <p.wilczek@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- Makefile        |    1 +
- serial-exynos.c |   84 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
- create mode 100644 serial-exynos.c
+ board-exynos.c                 |   77 ++++++++++++++++++++++++++++++++++++++++
+ configs/Makefile.config.exynos |   13 +++++++
+ 2 files changed, 90 insertions(+)
+ create mode 100644 board-exynos.c
+ create mode 100644 configs/Makefile.config.exynos
 
-diff --git a/Makefile b/Makefile
-index 6074106..78684b7 100644
---- a/Makefile
-+++ b/Makefile
-@@ -8,6 +8,7 @@ include Makefile.config
- 
- CFLAGS+=-DUART_BASE=$(UART_BASE)
- CFLAGS+=-DNR_BANKS=$(NR_BANKS)
-+CFLAGS+=-DUART_PORT=$(UART_PORT)
- 
- BOARD_OBJ = board-$(MFG).o
- UART_OBJ = serial-$(UART).o
-diff --git a/serial-exynos.c b/serial-exynos.c
+diff --git a/board-exynos.c b/board-exynos.c
 new file mode 100644
-index 0000000..3ba4fc9
+index 0000000..2769a5f
 --- /dev/null
-+++ b/serial-exynos.c
-@@ -0,0 +1,84 @@
-+#include "types.h"
++++ b/board-exynos.c
+@@ -0,0 +1,77 @@
++#include "atags.h"
++#include "board.h"
++#include "dtbs.h"
++#include "print.h"
 +#include "register.h"
-+#include "serial.h"
++#include "types.h"
 +
-+#define EXYNOS_BASE_UART	0x13800000
-+#define TX_FIFO_FULL_MASK	(1 << 24)
++extern u32 _binary_input_zImage_start;
++extern u32 _binary_dtbs_bin_start;
 +
-+#define UART_BAUDRATE_115200	115200
++struct board board;
 +
-+union br_rest {
-+	unsigned short	slot;		/* udivslot */
-+	unsigned char	value;		/* ufracval */
++#define EXYNOS_PRO_ID		0x10000000
++#define EXYNOS_PRO_ID_SHIFT	12
++
++struct exynos_board {
++	u32		proid;
++	u32		system_rev;
++	const char	*compatible;
 +};
 +
-+struct s5p_uart {
-+	unsigned int	ulcon;
-+	unsigned int	ucon;
-+	unsigned int	ufcon;
-+	unsigned int	umcon;
-+	unsigned int	utrstat;
-+	unsigned int	uerstat;
-+	unsigned int	ufstat;
-+	unsigned int	umstat;
-+	unsigned char	utxh;
-+	unsigned char	res1[3];
-+	unsigned char	urxh;
-+	unsigned char	res2[3];
-+	unsigned int	ubrdiv;
-+	union br_rest	rest;
-+	unsigned char	res3[0xffd0];
++static struct exynos_board exboards[] = {
++	/* Controller */
++	{
++		.proid		= 0xe4412,
++		.system_rev	= 0,
++		.compatible	= "samsung,trats2",
++	},
++	{
++		.proid		= 0x43210,
++		.system_rev	= 0,
++		.compatible	= "samsung,trats",
++	},
++	{ 0, 0, NULL }	/* sentinel */
 +};
 +
-+static inline struct s5p_uart *s5p_get_base_uart(int dev_index)
++static void panic(void)
 +{
-+	u32 offset = dev_index * sizeof(struct s5p_uart);
-+	return (struct s5p_uart *)(EXYNOS_BASE_UART + offset);
++	while (1)
++		;
 +}
 +
-+static inline int s5p_uart_divslot(void)
++static u32 get_proid()
 +{
-+	return 0;
++	return readl(EXYNOS_PRO_ID) >> EXYNOS_PRO_ID_SHIFT;
 +}
 +
-+static int serial_err_check(const int dev_index, int op)
++struct board *match_board(u32 machid, const struct tag *tags)
 +{
-+	struct s5p_uart *const uart = s5p_get_base_uart(dev_index);
-+	unsigned int mask;
++	struct exynos_board *exboard;
++	u32 proid;
 +
-+	/*
-+	 * UERSTAT
-+	 * Break Detect	[3]
-+	 * Frame Err	[2] : receive operation
-+	 * Parity Err	[1] : receive operation
-+	 * Overrun Err	[0] : receive operation
-+	 */
-+	if (op)
-+		mask = 0x8;
-+	else
-+		mask = 0xf;
++	proid = get_proid();
 +
-+	return readl((unsigned int)&uart->uerstat) & mask;
-+}
-+
-+/*
-+ * Output a single byte to the serial port.
-+ */
-+void __putch(char c)
-+{
-+	const int dev_index = UART_PORT;
-+
-+	struct s5p_uart *const uart = s5p_get_base_uart(dev_index);
-+
-+	/* wait for room in the tx FIFO */
-+	while ((readl((unsigned int)&uart->ufstat) & TX_FIFO_FULL_MASK)) {
-+		if (serial_err_check(dev_index, 1))
-+			return;
++	for (exboard = exboards; exboard->proid; exboard++) {
++		if (exboard->proid == proid)
++			break;
 +	}
 +
-+	writeb(c, (unsigned int)&uart->utxh);
++	if (exboard->compatible == NULL) {
++		putstr("ERROR MATCHING BOARD!\n");
++		panic(); /* doesn't return */
++	}
 +
-+	/* If \n, also do \r */
-+	if (c == '\n')
-+		__putch('\r');
++	board.kernel = &_binary_input_zImage_start;
++	board.compatible = exboard->compatible;
++	board.dtb = find_dtb(&_binary_dtbs_bin_start, exboard->compatible);
++
++	if (board.dtb == NULL) {
++		putstr("NO DTB BLOB FOUND FOR ");
++		putstr(exboard->compatible);
++		putstr("\n");
++		panic(); /* doesn't return */
++	}
++
++	return &board;
 +}
+diff --git a/configs/Makefile.config.exynos b/configs/Makefile.config.exynos
+new file mode 100644
+index 0000000..af5ae53
+--- /dev/null
++++ b/configs/Makefile.config.exynos
+@@ -0,0 +1,13 @@
++# config for Exynos boards
++
++CROSS_COMPILE=arm-linux-gnueabi-
++MFG=exynos
++UART=exynos
++UART_PORT=2
++BINFMT=elf32-littlearm
++LOADADDR=0x41008000
++UART_BASE=0x40100000
++APPEND_KERNEL=input/zImage
++APPEND_DTBS=input/exynos4210-trats.dtb input/exynos4412-trats2.dtb
++
++NR_BANKS=8
+\ No newline at end of file
 -- 
 1.7.9.5
