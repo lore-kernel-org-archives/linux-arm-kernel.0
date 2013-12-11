@@ -1,53 +1,59 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 11 Dec 2013 12:48:10 -0600
-Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <201312110445.54336.arnd@arndb.de>
-References: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
- <201312060239.14832.arnd@arndb.de>
- <CAMj5BkhyiJ7Uc-GiRZP3TNMq3NvHW-MVuPT6t+7FN8KBWAJR5A@mail.gmail.com>
- <201312110445.54336.arnd@arndb.de>
-Message-ID: <1386787690.20516.10.camel@linux-builds1>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 11 Dec 2013 13:54:45 -0500
+Subject: [REGRESSION,BISECTED] DMA mask issue on ReadyNAS 102 w/ 3.13.0-rc3
+In-Reply-To: <87eh5ow7m0.fsf@natisbad.org>
+References: <87haakfene.fsf@natisbad.org>
+ <20131207231958.GS4360@n2100.arm.linux.org.uk>
+ <87eh5ow7m0.fsf@natisbad.org>
+Message-ID: <20131211185445.GC10053@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-11 at 04:45 +0100, Arnd Bergmann wrote:
-> On Wednesday 11 December 2013, Zhangfei Gao wrote:
-> > Thanks for the good suggestion, it can be abstracted to clock.
-> > 
-> > The issue for this version's ip is there are some registers need to be
-> > set, including fixed factor and phase, which may be required to be
-> > tuned, however it can be hide in clock.
-> > 
-> > Double checked next version's ip, it is more intelligent and only
-> > fixed factor is required, more like a clock, and all these register
-> > accessing are NOT required.
-> > 
-> > Will update new version to abstract these chip depended registers to clock.
+Russell,
+
+On Sun, Dec 08, 2013 at 12:42:47AM +0100, Arnaud Ebalard wrote:
+> Hi Russell,
 > 
-> Ok, please stay in contact with Dinh Nguyen over this, since his side
-> is work-in-progress and we are still evaluating how to best encode
-> the phase setting in DT in a generic form.
-
-Will the bindings "samsung,dw-mshc-sdr-timing" and
-"samsung,dw-mshc-ddr-timing" also work for the k3 platform as well? I
-think they should work, but just wanted to verify.
-
-Heiko, on the rockchip platform, can you check to see if you have these
-cclk_in_drv and cclk_sample settings for the phase shift of the clocks?
-The SD/MMC IP version(2.40a) on Rockchip is the same version that is on
-SOCFPGA, so I think these settings are there. They can be located in
-some other "system" register block like SOCFPGA. The possible reason
-that you have not need to set them in the Rockchip code could be that
-the bootloader/firmware has already set them if you are booting from the
-SD/MMC source. You may need to set the clock phase settings if you boot
-from a non-SD source.
-
-I think the reading of the "samsung,dw-mshc-ddr-timing" and
-"samsung,dw-msh-sdr-timing" bindings can also be moved into the generic
-dw_mmc driver if the above 2 conditions are correct.
-
-Thanks,
-Din
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> 	Arnd
+> > On Sun, Dec 08, 2013 at 12:02:45AM +0100, Arnaud Ebalard wrote:
+> >> 3.13.0-rc2 worked just fine so I decided to git-bisect the issue and
+> >> ended up on 11a5aa32562e (ARM: dma-mapping: check DMA mask against
+> >> available memory).
+> >> 
+> >> If it has already been reported and fixed, sorry for the noise.
+> >
+> > Please try this patch, thanks:
+> >
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index f6b6bfa88ecf..c143a7bb681b 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -185,7 +185,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
+> >  		 */
+> >  		if (sizeof(mask) != sizeof(dma_addr_t) &&
+> >  		    mask > (dma_addr_t)~0 &&
+> > -		    dma_to_pfn(dev, ~0) > max_dma_pfn) {
+> > +		    dma_to_pfn(dev, ~0) < max_dma_pfn) {
+> >  			dev_warn(dev, "Coherent DMA mask %#llx is larger than dma_addr_t allows\n",
+> >  				 mask);
+> >  			dev_warn(dev, "Driver did not use or check the return value from dma_set_coherent_mask()?\n");
+> > @@ -1041,7 +1041,7 @@ int dma_supported(struct device *dev, u64 mask)
+> >  	 */
+> >  	if (sizeof(mask) != sizeof(dma_addr_t) &&
+> >  	    mask > (dma_addr_t)~0 &&
+> > -	    dma_to_pfn(dev, ~0) > arm_dma_pfn_limit)
+> > +	    dma_to_pfn(dev, ~0) < min(max_pfn, arm_dma_pfn_limit))
+> >  		return 0;
+> >  
+> >  	/*
+> >
 > 
+> With that applied, 3.13.0-rc3 boots again on my RN102 w/o any error.
+
+I don't see this in any of your branches.  Is there anything else you
+need from us to get this merged?
+
+thx,
+
+Jason.
