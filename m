@@ -1,89 +1,53 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Dec 2013 11:43:21 -0700
-Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI
- host maintainers
-In-Reply-To: <20131211183237.GI4699@google.com>
-References: <20131211183237.GI4699@google.com>
-Message-ID: <20131211184321.GJ4699@google.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 11 Dec 2013 12:48:10 -0600
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <201312110445.54336.arnd@arndb.de>
+References: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
+ <201312060239.14832.arnd@arndb.de>
+ <CAMj5BkhyiJ7Uc-GiRZP3TNMq3NvHW-MVuPT6t+7FN8KBWAJR5A@mail.gmail.com>
+ <201312110445.54336.arnd@arndb.de>
+Message-ID: <1386787690.20516.10.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Mohit]
-
-On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
-> If this looks reasonable, I'll merge it via the PCI tree for v3.13.
-
-And I see Mohit's patch [1] to update the DesignWare entry:
-
-+PCIE DRIVER FOR SYNOPSIS DESIGNWARE CONTROLLER
-+M:	Mohit Kumar <mohit.kumar@st.com>
-+M:	Jingoo Han <jg1.han@samsung.com>
-+L:	linux-pci at vger.kernel.org
-+S:	Maintained
-+F:	drivers/pci/host/pcie-designware.c
-
-I can fold in that update too if Jingoo acks it.
-
-[1] http://patchwork.ozlabs.org/patch/299905/
-
-> MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI host maintainers
+On Wed, 2013-12-11 at 04:45 +0100, Arnd Bergmann wrote:
+> On Wednesday 11 December 2013, Zhangfei Gao wrote:
+> > Thanks for the good suggestion, it can be abstracted to clock.
+> > 
+> > The issue for this version's ip is there are some registers need to be
+> > set, including fixed factor and phase, which may be required to be
+> > tuned, however it can be hide in clock.
+> > 
+> > Double checked next version's ip, it is more intelligent and only
+> > fixed factor is required, more like a clock, and all these register
+> > accessing are NOT required.
+> > 
+> > Will update new version to abstract these chip depended registers to clock.
 > 
-> Add entries for PCI host controller drivers in drivers/pci/host/.
+> Ok, please stay in contact with Dinh Nguyen over this, since his side
+> is work-in-progress and we are still evaluating how to best encode
+> the phase setting in DT in a generic form.
+
+Will the bindings "samsung,dw-mshc-sdr-timing" and
+"samsung,dw-mshc-ddr-timing" also work for the k3 platform as well? I
+think they should work, but just wanted to verify.
+
+Heiko, on the rockchip platform, can you check to see if you have these
+cclk_in_drv and cclk_sample settings for the phase shift of the clocks?
+The SD/MMC IP version(2.40a) on Rockchip is the same version that is on
+SOCFPGA, so I think these settings are there. They can be located in
+some other "system" register block like SOCFPGA. The possible reason
+that you have not need to set them in the Rockchip code could be that
+the bootloader/firmware has already set them if you are booting from the
+SD/MMC source. You may need to set the clock phase settings if you boot
+from a non-SD source.
+
+I think the reading of the "samsung,dw-mshc-ddr-timing" and
+"samsung,dw-msh-sdr-timing" bindings can also be moved into the generic
+dw_mmc driver if the above 2 conditions are correct.
+
+Thanks,
+Din
 > 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  MAINTAINERS |   31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+> 	Arnd
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8285ed4676b6..826c722d92ba 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6449,16 +6449,47 @@ F:	drivers/pci/
->  F:	include/linux/pci*
->  F:	arch/x86/pci/
->  
-> +PCI DRIVER FOR DESIGNWARE
-> +M:	Jingoo Han <jg1.han@samsung.com>
-> +L:	linux-pci at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pci/host/*designware*
-> +
-> +PCI DRIVER FOR IMX6
-> +M:	Shawn Guo <shawn.guo@linaro.org>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pci/host/*imx6*
-> +
-> +PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
-> +M:	Jason Cooper <jason@lakedaemon.net>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pci/host/*mvebu*
-> +
->  PCI DRIVER FOR NVIDIA TEGRA
->  M:	Thierry Reding <thierry.reding@gmail.com>
->  L:	linux-tegra at vger.kernel.org
-> +L:	linux-pci at vger.kernel.org
->  S:	Supported
->  F:	Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
->  F:	drivers/pci/host/pci-tegra.c
->  
-> +PCI DRIVER FOR RENESAS R-CAR
-> +M:	Simon Horman <horms@verge.net.au>
-> +M:	Magnus Damm <magnus.damm@gmail.com>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-sh at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pci/host/*rcar*
-> +
->  PCI DRIVER FOR SAMSUNG EXYNOS
->  M:	Jingoo Han <jg1.han@samsung.com>
->  L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	drivers/pci/host/pci-exynos.c
->  
