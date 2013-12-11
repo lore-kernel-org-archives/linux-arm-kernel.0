@@ -1,70 +1,77 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 18:13:11 -0800
-Subject: [PATCH v3 28/36] mtd: st_spi_fsm: Supply a busy wait for
- post-write status
-In-Reply-To: <1385727565-25794-29-git-send-email-lee.jones@linaro.org>
+Date: Tue, 10 Dec 2013 18:19:36 -0800
+Subject: [PATCH v3 30/36] mtd: st_spi_fsm: Erase partly or as a whole a
+ Serial Flash device
+In-Reply-To: <1385727565-25794-31-git-send-email-lee.jones@linaro.org>
 References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-29-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131211021311.GM27149@ld-irv-0074.broadcom.com>
+ <1385727565-25794-31-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131211021936.GN27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 12:19:17PM +0000, Lee Jones wrote:
+On Fri, Nov 29, 2013 at 12:19:19PM +0000, Lee Jones wrote:
+> When an erase is requested by userspace the MFD framework calls back
+
+s/MFD/MTD/
+
+;)
+
+> into the driver to conduct the actual command issue. Here we provide the
+> routines which do exactly that. We can choose to either do an entire chip
+> erase or by sector.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/devices/st_spi_fsm.c | 118 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 117 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+> index 9b35e15..ecb001d 100644
 > --- a/drivers/mtd/devices/st_spi_fsm.c
 > +++ b/drivers/mtd/devices/st_spi_fsm.c
-> @@ -292,6 +308,42 @@ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
->  	return 0;
+> @@ -861,6 +923,60 @@ out1:
+>  	return ret;
 >  }
 >  
-> +static uint8_t stfsm_wait_busy(struct stfsm *fsm)
+> +/*
+> + * Erase an address range on the flash chip. The address range may extend
+> + * one or more erase sectors.  Return an error is there is a problem erasing.
+> + */
+> +static int stfsm_mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 > +{
-> +	struct stfsm_seq *seq = &stfsm_seq_read_status_fifo;
-> +	unsigned long deadline;
-> +	uint32_t status;
+> +	struct stfsm *fsm = dev_get_drvdata(mtd->dev.parent);
+> +	u32 addr, len;
+> +	int ret;
 > +
-> +	/* Use RDRS1 */
-> +	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
-> +			   SEQ_OPC_CYCLES(8) |
-> +			   SEQ_OPC_OPCODE(FLASH_CMD_RDSR));
+> +	dev_dbg(fsm->dev, "%s at 0x%llx, len %lld\n", __func__,
+> +		(long long)instr->addr, (long long)instr->len);
 > +
-> +	/* Load read_status sequence */
-> +	stfsm_load_seq(fsm, seq);
-> +
-> +	/* Repeat until busy bit is deasserted, or timeout */
-> +	deadline = jiffies + FLASH_MAX_BUSY_WAIT;
-> +	do {
-> +		cond_resched();
-> +
-> +		stfsm_wait_seq(fsm);
-> +
-> +		stfsm_read_fifo(fsm, &status, 4);
-> +
-> +		if ((status & FLASH_STATUS_BUSY) == 0)
-> +			return 0;
-> +
-> +		/* Restart */
-> +		writel(seq->seq_cfg, fsm->base + SPI_FAST_SEQ_CFG);
-> +
-> +	} while (!time_after_eq(jiffies, deadline));
+> +	if (instr->addr + instr->len > mtd->size)
+> +		return -EINVAL;
 
-You have a timeout problem here, similar to the one I mentioned earlier,
-except that in this one, your do/while at least ensures that you always
-run the loop at least once... but still, what if "a long time" elapses
-between stfsm_read_fifo() and checking time_after_eq()?
+Duplicated from mtd_read(). Kill this.
 
-I think you want something like this after the while():
-
-	stfsm_read_fifo(fsm, &status, 4);
-	if ((status & FLASH_STATUS_BUSY) == 0)
-		return 0;
-
-> +	dev_err(fsm->dev, "timeout on wait_busy\n");
 > +
-> +	return -EIO;
-> +}
-> +
->  static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
->  {
->  	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
+> +	if (instr->len & (mtd->erasesize - 1))
+> +		return -EINVAL;
+
+...
+
+> @@ -1131,7 +1247,7 @@ static int stfsm_probe(struct platform_device *pdev)
+>  
+>  	fsm->mtd._read  = stfsm_mtd_read;
+>  	fsm->mtd._write = stfsm_mtd_write;
+> -
+> +	fsm->mtd._erase = stfsm_mtd_erase;
+
+Can you leave the blank line between assigning fsm->mtd.xxx callbacks
+and the dev_err()?
+
+>  	dev_err(&pdev->dev,
+>  		"Found serial flash device: %s\n"
+>  		" size = %llx (%lldMiB) erasesize = 0x%08x (%uKiB)\n",
+
+(BTW, why is this dev_err()?? It's just information, so you want
+dev_info().)
 
 Brian
