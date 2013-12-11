@@ -1,128 +1,94 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 18:09:02 -0800
-Subject: [PATCH v3 26/36] mtd: st_spi_fsm: Add the ability to read from
- a Serial Flash device
-In-Reply-To: <1385727565-25794-27-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-27-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131211020902.GL27149@ld-irv-0074.broadcom.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Dec 2013 10:16:48 +0800
+Subject: [PATCH 3/6] mmc: sdhci: add platform set_timeout hook
+In-Reply-To: <1386680168-5227-4-git-send-email-b29396@freescale.com>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+ <1386680168-5227-4-git-send-email-b29396@freescale.com>
+Message-ID: <20131211021646.GC18380@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 12:19:15PM +0000, Lee Jones wrote:
-> When a read is issued by userspace the MFD framework calls back into
-> the driver to conduct the actual command issue and data extraction.
-> Here we provide the routines which do exactly that.
+On Tue, Dec 10, 2013 at 08:56:05PM +0800, Dong Aisheng wrote:
+> Currently the common code assume 0xE is the maximum timeout counter
+> value and use it to write into the timeout counter register.
+> However, it's fairly possible that the different SoCs may have
+> different register layout on the timeout counter register.
+> That means 0xE may not be the correct maximum timeout value, then
+> the 0xE becomes meaningless.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> To be flexible, this patch provides another approach for platforms
+> to set the correct timeout on their way.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > ---
->  drivers/mtd/devices/st_spi_fsm.c | 110 +++++++++++++++++++++++++++++++++++++++
->  drivers/mtd/devices/st_spi_fsm.h |   3 ++
->  2 files changed, 113 insertions(+)
+>  drivers/mmc/host/sdhci.c |   19 ++++++++++++++-----
+>  drivers/mmc/host/sdhci.h |    2 ++
+>  2 files changed, 16 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-> index ad277f1..c76510e 100644
-> --- a/drivers/mtd/devices/st_spi_fsm.c
-> +++ b/drivers/mtd/devices/st_spi_fsm.c
-> @@ -538,6 +538,114 @@ static int stfsm_n25q_config(struct stfsm *fsm)
->  	return 0;
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 464d42c..4cc3bd6 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -726,19 +726,28 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
+>  		sdhci_clear_set_irqs(host, dma_irqs, pio_irqs);
 >  }
 >  
-> +static int stfsm_read(struct stfsm *fsm, uint8_t *const buf,
-
-Did you really mean uint8_t *const buf? This means that buf will always
-hold the same address (which is fine). But we don't often enshrine that
-in the function definition.
-
-> +		      const uint32_t size, const uint32_t offset)
-
-Similar. Is it really important to mark size and offset const?
-
-I won't argue, if you think this is deserving, but I don't want to
-encourage this practice everywhere, since it doesn't buy us much.
-(Declaring a pointer argument as, e.g., 'const int *var' is useful in an
-API, because it helps a developer understand externally that the routine
-will not (in the absence of unsafe casts) modify the buffer contents.
-But declaring 'int *const var' is less helpful, as it is only useful for
-local reasoning.)
-
-> +{
-
-...
-
-> +}
-> +
-> +/*
-> + * Read an address range from the flash chip. The address range
-> + * may be any size provided it is within the physical boundaries.
-> + */
-> +static int stfsm_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
-> +			  size_t *retlen, u_char *buf)
-> +{
-> +	struct stfsm *fsm = dev_get_drvdata(mtd->dev.parent);
-> +	uint32_t bytes;
-> +
-> +	dev_dbg(fsm->dev, "%s from 0x%08x, len %zd\n",
-> +		__func__, (u32)from, len);
-> +
-> +	/* Initialise read length */
-> +	if (retlen)
-> +		*retlen = 0;
-
-You're repeating the common code in mtd_read(). Kill this
-initialization.
-
-> +
-> +	if (!len) {
-> +		dev_warn(fsm->dev, "Zero byte read requested\n");
-> +		return 0;
-> +	}
-
-Similar. You're duplicating the checks in mtd_read().
-
-> +
-> +	if (from + len > mtd->size) {
-> +		dev_err(fsm->dev, "Can't read past end of chip\n");
-> +		return -EINVAL;
-> +	}
-
-Ditto.
-
-> +
-> +	mutex_lock(&fsm->lock);
-> +
-> +	while (len > 0) {
-> +		bytes = min(len, (size_t)FLASH_PAGESIZE);
-> +
-> +		stfsm_read(fsm, buf, bytes, from);
-> +
-> +		buf += bytes;
-> +		from += bytes;
-> +		len -= bytes;
-> +
-> +		if (retlen)
-> +			*retlen += bytes;
-> +	}
-> +
-> +	mutex_unlock(&fsm->lock);
-> +
-> +	return 0;
-> +}
-> +
->  static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+> -static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
+> +static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 >  {
->  	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
-> diff --git a/drivers/mtd/devices/st_spi_fsm.h b/drivers/mtd/devices/st_spi_fsm.h
-> index b5ce07d..e168296 100644
-> --- a/drivers/mtd/devices/st_spi_fsm.h
-> +++ b/drivers/mtd/devices/st_spi_fsm.h
-> @@ -229,6 +229,9 @@
->  #define FLASH_CMD_READ4_1_1_4	0x6c
->  #define FLASH_CMD_READ4_1_4_4	0xec
+>  	u8 count;
+> +
+> +	if (host->ops->set_timeout) {
+> +		host->ops->set_timeout(host, cmd);
+> +	} else {
+> +		count = sdhci_calc_timeout(host, cmd);
+> +		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
+> +	}
+> +}
+> +
+> +static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
+> +{
+>  	u8 ctrl;
+>  	struct mmc_data *data = cmd->data;
+>  	int ret;
 >  
-> +#define FLASH_PAGESIZE		256			/* In Bytes    */
-> +#define FLASH_PAGESIZE_32	FLASH_PAGESIZE / 4	/* In uint32_t */
+>  	WARN_ON(host->data);
+>  
+> -	if (data || (cmd->flags & MMC_RSP_BUSY)) {
+> -		count = sdhci_calc_timeout(host, cmd);
 
-checkpatch.pl warns that you need parentheses around FLASH_PAGESIZE / 4.
+>From what I read the commit log, I think it might be more appropriate to
+patch sdhci_calc_timeout() like the following?
 
-Brian
+	if (host->quirks & SDHCI_QUIRK_BROKEN_TIMEOUT_VAL)
+		if (host->ops->get_max_timeout)
+			return host->ops->get_max_timeout(host);
+		else
+			return 0xE;
+
+Shawn
+
+> -		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
+> -	}
+> +	if (data || (cmd->flags & MMC_RSP_BUSY))
+> +		sdhci_set_timeout(host, cmd);
+>  
+>  	if (!data)
+>  		return;
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 1591cbb..a4851a0 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -282,6 +282,8 @@ struct sdhci_ops {
+>  	unsigned int	(*get_min_clock)(struct sdhci_host *host);
+>  	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
+>  	unsigned int	(*get_max_timeout)(struct sdhci_host *host);
+> +	void		(*set_timeout)(struct sdhci_host *host,
+> +						struct mmc_command *cmd);
+>  	int		(*platform_bus_width)(struct sdhci_host *host,
+>  					       int width);
+>  	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
+> -- 
+> 1.7.2.rc3
+> 
+> 
