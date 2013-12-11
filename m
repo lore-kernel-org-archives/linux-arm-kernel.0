@@ -1,60 +1,64 @@
-From: mohit.kumar@st.com (Mohit Kumar)
-Date: Wed, 11 Dec 2013 15:08:29 +0530
-Subject: [PATCH 04/12] SPEAr13xx: Fix static mapping table
-In-Reply-To: <cover.1386752447.git.mohit.kumar@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
-Message-ID: <cbb98a14a9cdbf5d65b4b7462dd5da24cd0db3f2.1386752447.git.mohit.kumar@st.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 11 Dec 2013 17:39:42 +0800
+Subject: [PATCH] ARM: pxa: fix USB gadget driver compilation regression
+In-Reply-To: <1386751738-13563-1-git-send-email-linus.walleij@linaro.org>
+References: <1386751738-13563-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <52A832DE.6050105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+On 12/11/2013 04:48 PM, Linus Walleij wrote:
+> After commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
+> "ARM: pxa: delete the custom GPIO header" a compilation
+> error was introduced in the PXA25x gadget driver.
+> An attempt to fix the problem was made in
+> commit b144e4ab1ef130e8bf30bcd3e529b7f35112c503
+> "usb: gadget: fix pxa25x compilation problems"
+> by explictly stating the driver needs the <mach/hardware.h>
+> header, which solved the compilation for a few boards,
+> such as the pxa255-idp and its defconfig.
+>
+> However the Lubbock board has this special clause in
+> drivers/usb/gadget/pxa25x_udc.c:
+>
+> This include file has an implicit dependency on
+> <mach/irqs.h> having been included before <mach/lubbock.h>
+> was included.
+>
+> Before commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
+> "ARM: pxa: delete the custom GPIO header" this implicit
+> dependency for the pxa25x_udc compile on the Lubbock was
+> satisfied by <linux/gpio.h> implicitly including
+> <mach/gpio.h> which was in turn including <mach/irqs.h>,
+> apart from the earlier added <mach/hardware.h>.
+>
+> Fix this by having the PXA25x <mach/lubbock.h> explicitly
+> include <mach/irqs.h>.
+>
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Greg Kroah-Hartmann <gregkh@linuxfoundation.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>   arch/arm/mach-pxa/include/mach/lubbock.h | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/lubbock.h b/arch/arm/mach-pxa/include/mach/lubbock.h
+> index 2a086e8373eb..958cd6af9384 100644
+> --- a/arch/arm/mach-pxa/include/mach/lubbock.h
+> +++ b/arch/arm/mach-pxa/include/mach/lubbock.h
+> @@ -10,6 +10,8 @@
+>    * published by the Free Software Foundation.
+>    */
+>
+> +#include <mach/irqs.h>
+> +
+>   #define LUBBOCK_ETH_PHYS	PXA_CS3_PHYS
+>
+>   #define LUBBOCK_FPGA_PHYS	PXA_CS2_PHYS
+>
 
-SPEAr13xx was using virtual address space 0xFE000000 to map physical address
-space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
-change 0xFE000000 to 0xF9000000.
+Applied.
 
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Cc: Mohit Kumar <mohit.kumar@st.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/mach-spear/include/mach/spear.h |    4 ++--
- arch/arm/mach-spear/spear13xx.c          |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-index c236cef..e7ba122 100644
---- a/arch/arm/mach-spear/include/mach/spear.h
-+++ b/arch/arm/mach-spear/include/mach/spear.h
-@@ -52,10 +52,10 @@
- #ifdef CONFIG_ARCH_SPEAR13XX
- 
- #define PERIP_GRP2_BASE				UL(0xB3000000)
--#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
-+#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
- #define MCIF_SDHCI_BASE				UL(0xB3000000)
- #define SYSRAM0_BASE				UL(0xB3800000)
--#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
-+#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
- #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
- 
- #define PERIP_GRP1_BASE				UL(0xE0000000)
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index 7aa6e8c..20ce885 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -52,10 +52,10 @@ void __init spear13xx_l2x0_init(void)
- /*
-  * Following will create 16MB static virtual/physical mappings
-  * PHYSICAL		VIRTUAL
-- * 0xB3000000		0xFE000000
-  * 0xE0000000		0xFD000000
-  * 0xEC000000		0xFC000000
-  * 0xED000000		0xFB000000
-+ * 0xB3000000		0xF9000000
-  */
- struct map_desc spear13xx_io_desc[] __initdata = {
- 	{
--- 
-1.7.0.1
+Thanks
+Haojian
