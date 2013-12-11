@@ -1,461 +1,1490 @@
 From: syin@broadcom.com (Sherman Yin)
-Date: Wed, 11 Dec 2013 10:37:19 -0800
-Subject: [PATCH v3 4/6] pinctrl: Add pinctrl binding for Broadcom Capri SoCs
+Date: Wed, 11 Dec 2013 10:37:20 -0800
+Subject: [PATCH v3 5/6] ARM: pinctrl: Add Broadcom Capri pinctrl driver
 In-Reply-To: <1386787041-6035-1-git-send-email-syin@broadcom.com>
 References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
  <1386787041-6035-1-git-send-email-syin@broadcom.com>
-Message-ID: <1386787041-6035-5-git-send-email-syin@broadcom.com>
+Message-ID: <1386787041-6035-6-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds pinctrl driver devicetree binding for Broadcom Capri (BCM281xx) SoCs.
+Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
 
 Signed-off-by: Sherman Yin <syin@broadcom.com>
 Reviewed-by: Christian Daudt <bcm@fixthebug.org>
 Reviewed-by: Matt Porter <matt.porter@linaro.org>
 ---
-v3: Use generic pin config properties instead of brcm-specific ones.  Clarified
-    pin types (standard, i2c, hdmi).
+v3: Re-work driver to be based on generic pin config. Moved config selection
+    from Kconfig to bcm_defconfig.
 v2: Use hyphens instead of underscore in DT property names.
 ---
- .../bindings/pinctrl/brcm,capri-pinctrl.txt        |  429 ++++++++++++++++++++
- 1 file changed, 429 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
+ arch/arm/configs/bcm_defconfig  |    5 +
+ drivers/pinctrl/Kconfig         |   11 +
+ drivers/pinctrl/Makefile        |    1 +
+ drivers/pinctrl/pinctrl-capri.c | 1408 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 1425 insertions(+)
+ create mode 100644 drivers/pinctrl/pinctrl-capri.c
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 287ac1d..6b94987 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -126,3 +126,8 @@ CONFIG_CRC_ITU_T=y
+ CONFIG_CRC7=y
+ CONFIG_XZ_DEC=y
+ CONFIG_AVERAGE=y
++CONFIG_PINCTRL=y
++CONFIG_PINMUX=y
++CONFIG_PINCONF=y
++CONFIG_GENERIC_PINCONF=y
++CONFIG_PINCTRL_CAPRI=y
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index a921ff1..664c8e6 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -104,6 +104,17 @@ config PINCTRL_BCM2835
+ 	select PINMUX
+ 	select PINCONF
+ 
++config PINCTRL_CAPRI
++	bool "Broadcom Capri pinctrl driver"
++	select PINMUX
++	select PINCONF
++	select GENERIC_PINCONF
++	help
++	  Say Y here to support Broadcom Capri pinctrl driver, which is used for
++	  the BCM281xx SoC family, including BCM11130, BCM11140, BCM11351,
++	  BCM28145, and BCM28155 SoCs.  This driver requires the pinctrl
++	  framework.  GPIO is provided by a separate GPIO driver.
++
+ config PINCTRL_IMX
+ 	bool
+ 	select PINMUX
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 4f7be29..86cac40 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -21,6 +21,7 @@ obj-$(CONFIG_PINCTRL_BF60x)	+= pinctrl-adi2-bf60x.o
+ obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+ obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+ obj-$(CONFIG_PINCTRL_BAYTRAIL)	+= pinctrl-baytrail.o
++obj-$(CONFIG_PINCTRL_CAPRI)	+= pinctrl-capri.o
+ obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
+ obj-$(CONFIG_PINCTRL_IMX1_CORE)	+= pinctrl-imx1-core.o
+ obj-$(CONFIG_PINCTRL_IMX27)	+= pinctrl-imx27.o
+diff --git a/drivers/pinctrl/pinctrl-capri.c b/drivers/pinctrl/pinctrl-capri.c
 new file mode 100644
-index 0000000..7973cbd
+index 0000000..d468de6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
-@@ -0,0 +1,429 @@
-+Broadcom Capri Pin Controller
++++ b/drivers/pinctrl/pinctrl-capri.c
+@@ -0,0 +1,1408 @@
++/*
++ * Copyright (C) 2013 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/pinctrl/pinconf.h>
++#include <linux/pinctrl/pinconf-generic.h>
++#include <linux/slab.h>
++#include "core.h"
++#include "pinctrl-utils.h"
 +
-+This is a pin controller for the Broadcom BCM281xx SoC family, which includes
-+BCM11130, BCM11140, BCM11351, BCM28145, and BCM28155 SoCs.
++/* Capri Pin Control Registers Definitions */
 +
-+=== Pin Controller Node ===
++/* Function Select bits are the same for all pin control registers */
++#define CAPRI_PIN_REG_F_SEL_MASK		0x0700
++#define CAPRI_PIN_REG_F_SEL_SHIFT		8
 +
-+Required Properties:
++/* Standard pin register */
++#define CAPRI_STD_PIN_REG_DRV_STR_MASK		0x0007
++#define CAPRI_STD_PIN_REG_DRV_STR_SHIFT		0
++#define CAPRI_STD_PIN_REG_INPUT_DIS_MASK	0x0008
++#define CAPRI_STD_PIN_REG_INPUT_DIS_SHIFT	3
++#define CAPRI_STD_PIN_REG_SLEW_MASK		0x0010
++#define CAPRI_STD_PIN_REG_SLEW_SHIFT		4
++#define CAPRI_STD_PIN_REG_PULL_UP_MASK		0x0020
++#define CAPRI_STD_PIN_REG_PULL_UP_SHIFT		5
++#define CAPRI_STD_PIN_REG_PULL_DN_MASK		0x0040
++#define CAPRI_STD_PIN_REG_PULL_DN_SHIFT		6
++#define CAPRI_STD_PIN_REG_HYST_MASK		0x0080
++#define CAPRI_STD_PIN_REG_HYST_SHIFT		7
 +
-+- compatible:	Must be "brcm,capri-pinctrl".
-+- reg:		Base address of the PAD Controller register block and the size
-+		of the block.
++/* I2C pin register */
++#define CAPRI_I2C_PIN_REG_INPUT_DIS_MASK	0x0004
++#define CAPRI_I2C_PIN_REG_INPUT_DIS_SHIFT	2
++#define CAPRI_I2C_PIN_REG_SLEW_MASK		0x0008
++#define CAPRI_I2C_PIN_REG_SLEW_SHIFT		3
++#define CAPRI_I2C_PIN_REG_PULL_UP_STR_MASK	0x0070
++#define CAPRI_I2C_PIN_REG_PULL_UP_STR_SHIFT	4
 +
-+For example, the following is the bare minimum node:
++/* HDMI pin register */
++#define CAPRI_HDMI_PIN_REG_INPUT_DIS_MASK	0x0008
++#define CAPRI_HDMI_PIN_REG_INPUT_DIS_SHIFT	3
++#define CAPRI_HDMI_PIN_REG_MODE_MASK		0x0010
++#define CAPRI_HDMI_PIN_REG_MODE_SHIFT		4
 +
-+	pinctrl at 35004800 {
-+		compatible = "brcm,capri-pinctrl";
-+		reg = <0x35004800 0x430>;
-+	};
-+
-+As a pin controller device, in addition to the required properties, this node
-+should also contain the pin configuration nodes that client devices reference,
-+if any.
-+
-+=== Pin Configuration Node ===
-+
-+Each pin configuration node is a sub-node of the pin controller node and is a
-+container of an arbitrary number of subnodes, called pin group nodes in this
-+document.
-+
-+Please refer to the pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices, including the definition of a
-+"pin configuration node".
-+
-+=== Pin Group Node ===
-+
-+A pin group node specifies the desired pin mux and/or pin configuration for an
-+arbitrary number of pins.  The name of the pin group node is optional and not
-+used.
-+
-+A pin group node only affects the properties specified in the node, and has no
-+effect on any properties that are omitted.
-+
-+The pin group node accepts a subset of the generic pin config properties. For
-+details generic pin config properties, please refer to pinctrl-bindings.txt
-+and <include/linux/pinctrl/pinconfig-generic.h>.
-+
-+Each pin controlled by this pin controller belong to one of three types:
-+Standard, I2C, and HDMI.  Each type accepts a different set of pin config
-+properties.  A list of pins and their types is provided below.
-+
-+Required Properties (applicable to all pins):
-+
-+- pins:		Multiple strings.  Specifies the name(s) of one or more pins to
-+		be configured by this node.
-+
-+Optional Properties (for standard pins):
-+
-+- function:			String. Specifies the pin mux selection. Values
-+				must be one of: "alt1", "alt2", "alt3", "alt4"
-+- input-schmitt-enable:		No arguments. Enable schmitt-trigger mode.
-+- input-schmitt-disable:	No arguments. Disable schmitt-trigger mode.
-+- bias-pull-up:			No arguments. Pull up on pin.
-+- bias-pull-down:		No arguments. Pull down on pin.
-+- bias-disable:			No arguments. Disable pin bias.
-+- slew-rate:			Integer. Meaning depends on configured pin mux:
-+				*_SCL or *_SDA:
-+					0: Standard(100kbps)& Fast(400kbps) mode
-+					1: Highspeed (3.4Mbps) mode
-+				IC_DM or IC_DP:
-+					0: normal slew rate
-+					1: fast slew rate
-+				Otherwise:
-+					0: fast slew rate
-+					1: normal slew rate
-+- input-enable:			No arguements. Enable input (does not affect
-+				output.)
-+- input-disable:		No arguements. Disable input (does not affect
-+				output.)
-+- drive-strength:		Integer. Drive strength in mA.  Valid values are
-+				2, 4, 6, 8, 10, 12, 14, 16 mA.
-+
-+Optional Properties (for I2C pins):
-+
-+- function:			String. Specifies the pin mux selection. Values
-+				must be one of: "alt1", "alt2", "alt3", "alt4"
-+- bias-pull-up:			Integer. Pull up strength in Ohm:
-+					1: 1.2 kOhm
-+					2: 1.8 kOhm
-+					3: 720 Ohm
-+					4: 2.7 kOhm
-+					5: 831 Ohm
-+					6: 1.08 kOhm
-+					7: 568 Ohm
-+- bias-disable:			No arguments. Disable pin bias.
-+- slew-rate:			Integer. Meaning depends on configured pin mux:
-+				*_SCL or *_SDA:
-+					0: Standard(100kbps)& Fast(400kbps) mode
-+					1: Highspeed (3.4Mbps) mode
-+				IC_DM or IC_DP:
-+					0: normal slew rate
-+					1: fast slew rate
-+				Otherwise:
-+					0: fast slew rate
-+					1: normal slew rate
-+- input-enable:			No arguements. Enable input (does not affect
-+				output.)
-+- input-disable:		No arguements. Disable input (does not affect
-+				output.)
-+
-+Optional Properties (for HDMI pins):
-+
-+- function:			String. Specifies the pin mux selection. Values
-+				must be one of: "alt1", "alt2", "alt3", "alt4"
-+- slew-rate:			Integer. Controls slew rate.
-+					0: Standard(100kbps)& Fast(400kbps) mode
-+					1: Highspeed (3.4Mbps) mode
-+- input-enable:			No arguements. Enable input (does not affect
-+				output.)
-+- input-disable:		No arguements. Disable input (does not affect
-+				output.)
-+
-+Example:
-+// pin controller node
-+pinctrl at 35004800 {
-+	compatible = "brcm,capri-pinctrl";
-+	reg = <0x35004800 0x430>;
-+
-+	// pin configuration node
-+	dev_a_default: dev_a_active {
-+		//group node
-+		grp_1 {
-+			pins		= "pin1", "pin2", "pin3";
-+			function	= "alt1";
-+			drive-strength	= <4>;
-+			slew-rate	= <1>;
-+		};
-+
-+		grp_2 {
-+			...
-+		};
-+
-+		// other pin group nodes
-+		...
-+	};
-+
-+	// other pin configuration nodes
-+	...
++/**
++ * capri_pin_type - types of pin register
++ */
++enum capri_pin_type {
++	CAPRI_PIN_TYPE_UNKNOWN = 0,
++	CAPRI_PIN_TYPE_STD,
++	CAPRI_PIN_TYPE_I2C,
++	CAPRI_PIN_TYPE_HDMI,
 +};
 +
-+In the example above, "dev_a_active" is a pin configuration node with a number
-+of sub-nodes.  In the pin group node "grp_1", 3 pins are defined in the
-+"pins" property.  Thus, the remaining properties in the "grp_1" node applies to
-+these 3 pins, including setting the pinmux to "alt1", setting the drive strength
-+to 4 mA, and seting the slew rate to normal.  No other properties are sepcified,
-+implying no changes to any other parameters for these pins.
++static enum capri_pin_type std_pin = CAPRI_PIN_TYPE_STD;
++static enum capri_pin_type i2c_pin = CAPRI_PIN_TYPE_I2C;
++static enum capri_pin_type hdmi_pin = CAPRI_PIN_TYPE_HDMI;
 +
-+=== Pin Names and Type ===
++/**
++ * capri_pin_function- define pin function
++ */
++struct capri_pin_function {
++	const char *name;
++	const char * const *groups;
++	const unsigned ngroups;
++};
 +
-+The following are valid pin names and their pin types:
++/**
++ * capri_pinctrl_data - Broadcom-specific pinctrl data
++ * @reg_base - base of pinctrl registers
++ */
++struct capri_pinctrl_data {
++	void __iomem *reg_base;
 +
-+	"adcsync",		Standard
-+	"bat_rm",		Standard
-+	"bsc1_scl",		I2C
-+	"bsc1_sda",		I2C
-+	"bsc2_scl",		I2C
-+	"bsc2_sda",		I2C
-+	"classgpwr",		Standard
-+	"clk_cx8",		Standard
-+	"clkout_0",		Standard
-+	"clkout_1",		Standard
-+	"clkout_2",		Standard
-+	"clkout_3",		Standard
-+	"clkreq_in_0",		Standard
-+	"clkreq_in_1",		Standard
-+	"cws_sys_req1",		Standard
-+	"cws_sys_req2",		Standard
-+	"cws_sys_req3",		Standard
-+	"digmic1_clk",		Standard
-+	"digmic1_dq",		Standard
-+	"digmic2_clk",		Standard
-+	"digmic2_dq",		Standard
-+	"gpen13",		Standard
-+	"gpen14",		Standard
-+	"gpen15",		Standard
-+	"gpio00",		Standard
-+	"gpio01",		Standard
-+	"gpio02",		Standard
-+	"gpio03",		Standard
-+	"gpio04",		Standard
-+	"gpio05",		Standard
-+	"gpio06",		Standard
-+	"gpio07",		Standard
-+	"gpio08",		Standard
-+	"gpio09",		Standard
-+	"gpio10",		Standard
-+	"gpio11",		Standard
-+	"gpio12",		Standard
-+	"gpio13",		Standard
-+	"gpio14",		Standard
-+	"gps_pablank",		Standard
-+	"gps_tmark",		Standard
-+	"hdmi_scl",		HDMI
-+	"hdmi_sda",		HDMI
-+	"ic_dm",		Standard
-+	"ic_dp",		Standard
-+	"kp_col_ip_0",		Standard
-+	"kp_col_ip_1",		Standard
-+	"kp_col_ip_2",		Standard
-+	"kp_col_ip_3",		Standard
-+	"kp_row_op_0",		Standard
-+	"kp_row_op_1",		Standard
-+	"kp_row_op_2",		Standard
-+	"kp_row_op_3",		Standard
-+	"lcd_b_0",		Standard
-+	"lcd_b_1",		Standard
-+	"lcd_b_2",		Standard
-+	"lcd_b_3",		Standard
-+	"lcd_b_4",		Standard
-+	"lcd_b_5",		Standard
-+	"lcd_b_6",		Standard
-+	"lcd_b_7",		Standard
-+	"lcd_g_0",		Standard
-+	"lcd_g_1",		Standard
-+	"lcd_g_2",		Standard
-+	"lcd_g_3",		Standard
-+	"lcd_g_4",		Standard
-+	"lcd_g_5",		Standard
-+	"lcd_g_6",		Standard
-+	"lcd_g_7",		Standard
-+	"lcd_hsync",		Standard
-+	"lcd_oe",		Standard
-+	"lcd_pclk",		Standard
-+	"lcd_r_0",		Standard
-+	"lcd_r_1",		Standard
-+	"lcd_r_2",		Standard
-+	"lcd_r_3",		Standard
-+	"lcd_r_4",		Standard
-+	"lcd_r_5",		Standard
-+	"lcd_r_6",		Standard
-+	"lcd_r_7",		Standard
-+	"lcd_vsync",		Standard
-+	"mdmgpio0",		Standard
-+	"mdmgpio1",		Standard
-+	"mdmgpio2",		Standard
-+	"mdmgpio3",		Standard
-+	"mdmgpio4",		Standard
-+	"mdmgpio5",		Standard
-+	"mdmgpio6",		Standard
-+	"mdmgpio7",		Standard
-+	"mdmgpio8",		Standard
-+	"mphi_data_0",		Standard
-+	"mphi_data_1",		Standard
-+	"mphi_data_2",		Standard
-+	"mphi_data_3",		Standard
-+	"mphi_data_4",		Standard
-+	"mphi_data_5",		Standard
-+	"mphi_data_6",		Standard
-+	"mphi_data_7",		Standard
-+	"mphi_data_8",		Standard
-+	"mphi_data_9",		Standard
-+	"mphi_data_10",		Standard
-+	"mphi_data_11",		Standard
-+	"mphi_data_12",		Standard
-+	"mphi_data_13",		Standard
-+	"mphi_data_14",		Standard
-+	"mphi_data_15",		Standard
-+	"mphi_ha0",		Standard
-+	"mphi_hat0",		Standard
-+	"mphi_hat1",		Standard
-+	"mphi_hce0_n",		Standard
-+	"mphi_hce1_n",		Standard
-+	"mphi_hrd_n",		Standard
-+	"mphi_hwr_n",		Standard
-+	"mphi_run0",		Standard
-+	"mphi_run1",		Standard
-+	"mtx_scan_clk",		Standard
-+	"mtx_scan_data",	Standard
-+	"nand_ad_0",		Standard
-+	"nand_ad_1",		Standard
-+	"nand_ad_2",		Standard
-+	"nand_ad_3",		Standard
-+	"nand_ad_4",		Standard
-+	"nand_ad_5",		Standard
-+	"nand_ad_6",		Standard
-+	"nand_ad_7",		Standard
-+	"nand_ale",		Standard
-+	"nand_cen_0",		Standard
-+	"nand_cen_1",		Standard
-+	"nand_cle",		Standard
-+	"nand_oen",		Standard
-+	"nand_rdy_0",		Standard
-+	"nand_rdy_1",		Standard
-+	"nand_wen",		Standard
-+	"nand_wp",		Standard
-+	"pc1",			Standard
-+	"pc2",			Standard
-+	"pmu_int",		Standard
-+	"pmu_scl",		I2C
-+	"pmu_sda",		I2C
-+	"rfst2g_mtsloten3g",	Standard
-+	"rgmii_0_rx_ctl",	Standard
-+	"rgmii_0_rxc",		Standard
-+	"rgmii_0_rxd_0",	Standard
-+	"rgmii_0_rxd_1",	Standard
-+	"rgmii_0_rxd_2",	Standard
-+	"rgmii_0_rxd_3",	Standard
-+	"rgmii_0_tx_ctl",	Standard
-+	"rgmii_0_txc",		Standard
-+	"rgmii_0_txd_0",	Standard
-+	"rgmii_0_txd_1",	Standard
-+	"rgmii_0_txd_2",	Standard
-+	"rgmii_0_txd_3",	Standard
-+	"rgmii_1_rx_ctl",	Standard
-+	"rgmii_1_rxc",		Standard
-+	"rgmii_1_rxd_0",	Standard
-+	"rgmii_1_rxd_1",	Standard
-+	"rgmii_1_rxd_2",	Standard
-+	"rgmii_1_rxd_3",	Standard
-+	"rgmii_1_tx_ctl",	Standard
-+	"rgmii_1_txc",		Standard
-+	"rgmii_1_txd_0",	Standard
-+	"rgmii_1_txd_1",	Standard
-+	"rgmii_1_txd_2",	Standard
-+	"rgmii_1_txd_3",	Standard
-+	"rgmii_gpio_0",		Standard
-+	"rgmii_gpio_1",		Standard
-+	"rgmii_gpio_2",		Standard
-+	"rgmii_gpio_3",		Standard
-+	"rtxdata2g_txdata3g1",	Standard
-+	"rtxen2g_txdata3g2",	Standard
-+	"rxdata3g0",		Standard
-+	"rxdata3g1",		Standard
-+	"rxdata3g2",		Standard
-+	"sdio1_clk",		Standard
-+	"sdio1_cmd",		Standard
-+	"sdio1_data_0",		Standard
-+	"sdio1_data_1",		Standard
-+	"sdio1_data_2",		Standard
-+	"sdio1_data_3",		Standard
-+	"sdio4_clk",		Standard
-+	"sdio4_cmd",		Standard
-+	"sdio4_data_0",		Standard
-+	"sdio4_data_1",		Standard
-+	"sdio4_data_2",		Standard
-+	"sdio4_data_3",		Standard
-+	"sim_clk",		Standard
-+	"sim_data",		Standard
-+	"sim_det",		Standard
-+	"sim_resetn",		Standard
-+	"sim2_clk",		Standard
-+	"sim2_data",		Standard
-+	"sim2_det",		Standard
-+	"sim2_resetn",		Standard
-+	"sri_c",		Standard
-+	"sri_d",		Standard
-+	"sri_e",		Standard
-+	"ssp_extclk",		Standard
-+	"ssp0_clk",		Standard
-+	"ssp0_fs",		Standard
-+	"ssp0_rxd",		Standard
-+	"ssp0_txd",		Standard
-+	"ssp2_clk",		Standard
-+	"ssp2_fs_0",		Standard
-+	"ssp2_fs_1",		Standard
-+	"ssp2_fs_2",		Standard
-+	"ssp2_fs_3",		Standard
-+	"ssp2_rxd_0",		Standard
-+	"ssp2_rxd_1",		Standard
-+	"ssp2_txd_0",		Standard
-+	"ssp2_txd_1",		Standard
-+	"ssp3_clk",		Standard
-+	"ssp3_fs",		Standard
-+	"ssp3_rxd",		Standard
-+	"ssp3_txd",		Standard
-+	"ssp4_clk",		Standard
-+	"ssp4_fs",		Standard
-+	"ssp4_rxd",		Standard
-+	"ssp4_txd",		Standard
-+	"ssp5_clk",		Standard
-+	"ssp5_fs",		Standard
-+	"ssp5_rxd",		Standard
-+	"ssp5_txd",		Standard
-+	"ssp6_clk",		Standard
-+	"ssp6_fs",		Standard
-+	"ssp6_rxd",		Standard
-+	"ssp6_txd",		Standard
-+	"stat_1",		Standard
-+	"stat_2",		Standard
-+	"sysclken",		Standard
-+	"traceclk",		Standard
-+	"tracedt00",		Standard
-+	"tracedt01",		Standard
-+	"tracedt02",		Standard
-+	"tracedt03",		Standard
-+	"tracedt04",		Standard
-+	"tracedt05",		Standard
-+	"tracedt06",		Standard
-+	"tracedt07",		Standard
-+	"tracedt08",		Standard
-+	"tracedt09",		Standard
-+	"tracedt10",		Standard
-+	"tracedt11",		Standard
-+	"tracedt12",		Standard
-+	"tracedt13",		Standard
-+	"tracedt14",		Standard
-+	"tracedt15",		Standard
-+	"txdata3g0",		Standard
-+	"txpwrind",		Standard
-+	"uartb1_ucts",		Standard
-+	"uartb1_urts",		Standard
-+	"uartb1_urxd",		Standard
-+	"uartb1_utxd",		Standard
-+	"uartb2_urxd",		Standard
-+	"uartb2_utxd",		Standard
-+	"uartb3_ucts",		Standard
-+	"uartb3_urts",		Standard
-+	"uartb3_urxd",		Standard
-+	"uartb3_utxd",		Standard
-+	"uartb4_ucts",		Standard
-+	"uartb4_urts",		Standard
-+	"uartb4_urxd",		Standard
-+	"uartb4_utxd",		Standard
-+	"vc_cam1_scl",		I2C
-+	"vc_cam1_sda",		I2C
-+	"vc_cam2_scl",		I2C
-+	"vc_cam2_sda",		I2C
-+	"vc_cam3_scl",		I2C
-+	"vc_cam3_sda",		I2C
++	/* List of all pins */
++	const struct pinctrl_pin_desc *pins;
++	const unsigned npins;
++
++	const struct capri_pin_function *functions;
++	const unsigned nfunctions;
++};
++
++/*
++ * Pin number definition.  The order here must be the same as defined in the
++ * PADCTRLREG block in the RDB.
++ */
++#define CAPRI_PIN_ADCSYNC		0
++#define CAPRI_PIN_BAT_RM		1
++#define CAPRI_PIN_BSC1_SCL		2
++#define CAPRI_PIN_BSC1_SDA		3
++#define CAPRI_PIN_BSC2_SCL		4
++#define CAPRI_PIN_BSC2_SDA		5
++#define CAPRI_PIN_CLASSGPWR		6
++#define CAPRI_PIN_CLK_CX8		7
++#define CAPRI_PIN_CLKOUT_0		8
++#define CAPRI_PIN_CLKOUT_1		9
++#define CAPRI_PIN_CLKOUT_2		10
++#define CAPRI_PIN_CLKOUT_3		11
++#define CAPRI_PIN_CLKREQ_IN_0		12
++#define CAPRI_PIN_CLKREQ_IN_1		13
++#define CAPRI_PIN_CWS_SYS_REQ1		14
++#define CAPRI_PIN_CWS_SYS_REQ2		15
++#define CAPRI_PIN_CWS_SYS_REQ3		16
++#define CAPRI_PIN_DIGMIC1_CLK		17
++#define CAPRI_PIN_DIGMIC1_DQ		18
++#define CAPRI_PIN_DIGMIC2_CLK		19
++#define CAPRI_PIN_DIGMIC2_DQ		20
++#define CAPRI_PIN_GPEN13		21
++#define CAPRI_PIN_GPEN14		22
++#define CAPRI_PIN_GPEN15		23
++#define CAPRI_PIN_GPIO00		24
++#define CAPRI_PIN_GPIO01		25
++#define CAPRI_PIN_GPIO02		26
++#define CAPRI_PIN_GPIO03		27
++#define CAPRI_PIN_GPIO04		28
++#define CAPRI_PIN_GPIO05		29
++#define CAPRI_PIN_GPIO06		30
++#define CAPRI_PIN_GPIO07		31
++#define CAPRI_PIN_GPIO08		32
++#define CAPRI_PIN_GPIO09		33
++#define CAPRI_PIN_GPIO10		34
++#define CAPRI_PIN_GPIO11		35
++#define CAPRI_PIN_GPIO12		36
++#define CAPRI_PIN_GPIO13		37
++#define CAPRI_PIN_GPIO14		38
++#define CAPRI_PIN_GPS_PABLANK		39
++#define CAPRI_PIN_GPS_TMARK		40
++#define CAPRI_PIN_HDMI_SCL		41
++#define CAPRI_PIN_HDMI_SDA		42
++#define CAPRI_PIN_IC_DM			43
++#define CAPRI_PIN_IC_DP			44
++#define CAPRI_PIN_KP_COL_IP_0		45
++#define CAPRI_PIN_KP_COL_IP_1		46
++#define CAPRI_PIN_KP_COL_IP_2		47
++#define CAPRI_PIN_KP_COL_IP_3		48
++#define CAPRI_PIN_KP_ROW_OP_0		49
++#define CAPRI_PIN_KP_ROW_OP_1		50
++#define CAPRI_PIN_KP_ROW_OP_2		51
++#define CAPRI_PIN_KP_ROW_OP_3		52
++#define CAPRI_PIN_LCD_B_0		53
++#define CAPRI_PIN_LCD_B_1		54
++#define CAPRI_PIN_LCD_B_2		55
++#define CAPRI_PIN_LCD_B_3		56
++#define CAPRI_PIN_LCD_B_4		57
++#define CAPRI_PIN_LCD_B_5		58
++#define CAPRI_PIN_LCD_B_6		59
++#define CAPRI_PIN_LCD_B_7		60
++#define CAPRI_PIN_LCD_G_0		61
++#define CAPRI_PIN_LCD_G_1		62
++#define CAPRI_PIN_LCD_G_2		63
++#define CAPRI_PIN_LCD_G_3		64
++#define CAPRI_PIN_LCD_G_4		65
++#define CAPRI_PIN_LCD_G_5		66
++#define CAPRI_PIN_LCD_G_6		67
++#define CAPRI_PIN_LCD_G_7		68
++#define CAPRI_PIN_LCD_HSYNC		69
++#define CAPRI_PIN_LCD_OE		70
++#define CAPRI_PIN_LCD_PCLK		71
++#define CAPRI_PIN_LCD_R_0		72
++#define CAPRI_PIN_LCD_R_1		73
++#define CAPRI_PIN_LCD_R_2		74
++#define CAPRI_PIN_LCD_R_3		75
++#define CAPRI_PIN_LCD_R_4		76
++#define CAPRI_PIN_LCD_R_5		77
++#define CAPRI_PIN_LCD_R_6		78
++#define CAPRI_PIN_LCD_R_7		79
++#define CAPRI_PIN_LCD_VSYNC		80
++#define CAPRI_PIN_MDMGPIO0		81
++#define CAPRI_PIN_MDMGPIO1		82
++#define CAPRI_PIN_MDMGPIO2		83
++#define CAPRI_PIN_MDMGPIO3		84
++#define CAPRI_PIN_MDMGPIO4		85
++#define CAPRI_PIN_MDMGPIO5		86
++#define CAPRI_PIN_MDMGPIO6		87
++#define CAPRI_PIN_MDMGPIO7		88
++#define CAPRI_PIN_MDMGPIO8		89
++#define CAPRI_PIN_MPHI_DATA_0		90
++#define CAPRI_PIN_MPHI_DATA_1		91
++#define CAPRI_PIN_MPHI_DATA_2		92
++#define CAPRI_PIN_MPHI_DATA_3		93
++#define CAPRI_PIN_MPHI_DATA_4		94
++#define CAPRI_PIN_MPHI_DATA_5		95
++#define CAPRI_PIN_MPHI_DATA_6		96
++#define CAPRI_PIN_MPHI_DATA_7		97
++#define CAPRI_PIN_MPHI_DATA_8		98
++#define CAPRI_PIN_MPHI_DATA_9		99
++#define CAPRI_PIN_MPHI_DATA_10		100
++#define CAPRI_PIN_MPHI_DATA_11		101
++#define CAPRI_PIN_MPHI_DATA_12		102
++#define CAPRI_PIN_MPHI_DATA_13		103
++#define CAPRI_PIN_MPHI_DATA_14		104
++#define CAPRI_PIN_MPHI_DATA_15		105
++#define CAPRI_PIN_MPHI_HA0		106
++#define CAPRI_PIN_MPHI_HAT0		107
++#define CAPRI_PIN_MPHI_HAT1		108
++#define CAPRI_PIN_MPHI_HCE0_N		109
++#define CAPRI_PIN_MPHI_HCE1_N		110
++#define CAPRI_PIN_MPHI_HRD_N		111
++#define CAPRI_PIN_MPHI_HWR_N		112
++#define CAPRI_PIN_MPHI_RUN0		113
++#define CAPRI_PIN_MPHI_RUN1		114
++#define CAPRI_PIN_MTX_SCAN_CLK		115
++#define CAPRI_PIN_MTX_SCAN_DATA		116
++#define CAPRI_PIN_NAND_AD_0		117
++#define CAPRI_PIN_NAND_AD_1		118
++#define CAPRI_PIN_NAND_AD_2		119
++#define CAPRI_PIN_NAND_AD_3		120
++#define CAPRI_PIN_NAND_AD_4		121
++#define CAPRI_PIN_NAND_AD_5		122
++#define CAPRI_PIN_NAND_AD_6		123
++#define CAPRI_PIN_NAND_AD_7		124
++#define CAPRI_PIN_NAND_ALE		125
++#define CAPRI_PIN_NAND_CEN_0		126
++#define CAPRI_PIN_NAND_CEN_1		127
++#define CAPRI_PIN_NAND_CLE		128
++#define CAPRI_PIN_NAND_OEN		129
++#define CAPRI_PIN_NAND_RDY_0		130
++#define CAPRI_PIN_NAND_RDY_1		131
++#define CAPRI_PIN_NAND_WEN		132
++#define CAPRI_PIN_NAND_WP		133
++#define CAPRI_PIN_PC1			134
++#define CAPRI_PIN_PC2			135
++#define CAPRI_PIN_PMU_INT		136
++#define CAPRI_PIN_PMU_SCL		137
++#define CAPRI_PIN_PMU_SDA		138
++#define CAPRI_PIN_RFST2G_MTSLOTEN3G	139
++#define CAPRI_PIN_RGMII_0_RX_CTL	140
++#define CAPRI_PIN_RGMII_0_RXC		141
++#define CAPRI_PIN_RGMII_0_RXD_0		142
++#define CAPRI_PIN_RGMII_0_RXD_1		143
++#define CAPRI_PIN_RGMII_0_RXD_2		144
++#define CAPRI_PIN_RGMII_0_RXD_3		145
++#define CAPRI_PIN_RGMII_0_TX_CTL	146
++#define CAPRI_PIN_RGMII_0_TXC		147
++#define CAPRI_PIN_RGMII_0_TXD_0		148
++#define CAPRI_PIN_RGMII_0_TXD_1		149
++#define CAPRI_PIN_RGMII_0_TXD_2		150
++#define CAPRI_PIN_RGMII_0_TXD_3		151
++#define CAPRI_PIN_RGMII_1_RX_CTL	152
++#define CAPRI_PIN_RGMII_1_RXC		153
++#define CAPRI_PIN_RGMII_1_RXD_0		154
++#define CAPRI_PIN_RGMII_1_RXD_1		155
++#define CAPRI_PIN_RGMII_1_RXD_2		156
++#define CAPRI_PIN_RGMII_1_RXD_3		157
++#define CAPRI_PIN_RGMII_1_TX_CTL	158
++#define CAPRI_PIN_RGMII_1_TXC		159
++#define CAPRI_PIN_RGMII_1_TXD_0		160
++#define CAPRI_PIN_RGMII_1_TXD_1		161
++#define CAPRI_PIN_RGMII_1_TXD_2		162
++#define CAPRI_PIN_RGMII_1_TXD_3		163
++#define CAPRI_PIN_RGMII_GPIO_0		164
++#define CAPRI_PIN_RGMII_GPIO_1		165
++#define CAPRI_PIN_RGMII_GPIO_2		166
++#define CAPRI_PIN_RGMII_GPIO_3		167
++#define CAPRI_PIN_RTXDATA2G_TXDATA3G1	168
++#define CAPRI_PIN_RTXEN2G_TXDATA3G2	169
++#define CAPRI_PIN_RXDATA3G0		170
++#define CAPRI_PIN_RXDATA3G1		171
++#define CAPRI_PIN_RXDATA3G2		172
++#define CAPRI_PIN_SDIO1_CLK		173
++#define CAPRI_PIN_SDIO1_CMD		174
++#define CAPRI_PIN_SDIO1_DATA_0		175
++#define CAPRI_PIN_SDIO1_DATA_1		176
++#define CAPRI_PIN_SDIO1_DATA_2		177
++#define CAPRI_PIN_SDIO1_DATA_3		178
++#define CAPRI_PIN_SDIO4_CLK		179
++#define CAPRI_PIN_SDIO4_CMD		180
++#define CAPRI_PIN_SDIO4_DATA_0		181
++#define CAPRI_PIN_SDIO4_DATA_1		182
++#define CAPRI_PIN_SDIO4_DATA_2		183
++#define CAPRI_PIN_SDIO4_DATA_3		184
++#define CAPRI_PIN_SIM_CLK		185
++#define CAPRI_PIN_SIM_DATA		186
++#define CAPRI_PIN_SIM_DET		187
++#define CAPRI_PIN_SIM_RESETN		188
++#define CAPRI_PIN_SIM2_CLK		189
++#define CAPRI_PIN_SIM2_DATA		190
++#define CAPRI_PIN_SIM2_DET		191
++#define CAPRI_PIN_SIM2_RESETN		192
++#define CAPRI_PIN_SRI_C			193
++#define CAPRI_PIN_SRI_D			194
++#define CAPRI_PIN_SRI_E			195
++#define CAPRI_PIN_SSP_EXTCLK		196
++#define CAPRI_PIN_SSP0_CLK		197
++#define CAPRI_PIN_SSP0_FS		198
++#define CAPRI_PIN_SSP0_RXD		199
++#define CAPRI_PIN_SSP0_TXD		200
++#define CAPRI_PIN_SSP2_CLK		201
++#define CAPRI_PIN_SSP2_FS_0		202
++#define CAPRI_PIN_SSP2_FS_1		203
++#define CAPRI_PIN_SSP2_FS_2		204
++#define CAPRI_PIN_SSP2_FS_3		205
++#define CAPRI_PIN_SSP2_RXD_0		206
++#define CAPRI_PIN_SSP2_RXD_1		207
++#define CAPRI_PIN_SSP2_TXD_0		208
++#define CAPRI_PIN_SSP2_TXD_1		209
++#define CAPRI_PIN_SSP3_CLK		210
++#define CAPRI_PIN_SSP3_FS		211
++#define CAPRI_PIN_SSP3_RXD		212
++#define CAPRI_PIN_SSP3_TXD		213
++#define CAPRI_PIN_SSP4_CLK		214
++#define CAPRI_PIN_SSP4_FS		215
++#define CAPRI_PIN_SSP4_RXD		216
++#define CAPRI_PIN_SSP4_TXD		217
++#define CAPRI_PIN_SSP5_CLK		218
++#define CAPRI_PIN_SSP5_FS		219
++#define CAPRI_PIN_SSP5_RXD		220
++#define CAPRI_PIN_SSP5_TXD		221
++#define CAPRI_PIN_SSP6_CLK		222
++#define CAPRI_PIN_SSP6_FS		223
++#define CAPRI_PIN_SSP6_RXD		224
++#define CAPRI_PIN_SSP6_TXD		225
++#define CAPRI_PIN_STAT_1		226
++#define CAPRI_PIN_STAT_2		227
++#define CAPRI_PIN_SYSCLKEN		228
++#define CAPRI_PIN_TRACECLK		229
++#define CAPRI_PIN_TRACEDT00		230
++#define CAPRI_PIN_TRACEDT01		231
++#define CAPRI_PIN_TRACEDT02		232
++#define CAPRI_PIN_TRACEDT03		233
++#define CAPRI_PIN_TRACEDT04		234
++#define CAPRI_PIN_TRACEDT05		235
++#define CAPRI_PIN_TRACEDT06		236
++#define CAPRI_PIN_TRACEDT07		237
++#define CAPRI_PIN_TRACEDT08		238
++#define CAPRI_PIN_TRACEDT09		239
++#define CAPRI_PIN_TRACEDT10		240
++#define CAPRI_PIN_TRACEDT11		241
++#define CAPRI_PIN_TRACEDT12		242
++#define CAPRI_PIN_TRACEDT13		243
++#define CAPRI_PIN_TRACEDT14		244
++#define CAPRI_PIN_TRACEDT15		245
++#define CAPRI_PIN_TXDATA3G0		246
++#define CAPRI_PIN_TXPWRIND		247
++#define CAPRI_PIN_UARTB1_UCTS		248
++#define CAPRI_PIN_UARTB1_URTS		249
++#define CAPRI_PIN_UARTB1_URXD		250
++#define CAPRI_PIN_UARTB1_UTXD		251
++#define CAPRI_PIN_UARTB2_URXD		252
++#define CAPRI_PIN_UARTB2_UTXD		253
++#define CAPRI_PIN_UARTB3_UCTS		254
++#define CAPRI_PIN_UARTB3_URTS		255
++#define CAPRI_PIN_UARTB3_URXD		256
++#define CAPRI_PIN_UARTB3_UTXD		257
++#define CAPRI_PIN_UARTB4_UCTS		258
++#define CAPRI_PIN_UARTB4_URTS		259
++#define CAPRI_PIN_UARTB4_URXD		260
++#define CAPRI_PIN_UARTB4_UTXD		261
++#define CAPRI_PIN_VC_CAM1_SCL		262
++#define CAPRI_PIN_VC_CAM1_SDA		263
++#define CAPRI_PIN_VC_CAM2_SCL		264
++#define CAPRI_PIN_VC_CAM2_SDA		265
++#define CAPRI_PIN_VC_CAM3_SCL		266
++#define CAPRI_PIN_VC_CAM3_SDA		267
++
++#define CAPRI_PIN_DESC(a, b, c) \
++	{ .number = a, .name = b, .drv_data = &c##_pin }
++
++/*
++ * Pin description definition.  The order here must be the same as defined in
++ * the PADCTRLREG block in the RDB, since the pin number is used as an index
++ * into this array.
++ */
++static const struct pinctrl_pin_desc capri_pinctrl_pins[] = {
++	CAPRI_PIN_DESC(CAPRI_PIN_ADCSYNC, "adcsync", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_BAT_RM, "bat_rm", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_BSC1_SCL, "bsc1_scl", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_BSC1_SDA, "bsc1_sda", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_BSC2_SCL, "bsc2_scl", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_BSC2_SDA, "bsc2_sda", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLASSGPWR, "classgpwr", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLK_CX8, "clk_cx8", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLKOUT_0, "clkout_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLKOUT_1, "clkout_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLKOUT_2, "clkout_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLKOUT_3, "clkout_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLKREQ_IN_0, "clkreq_in_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CLKREQ_IN_1, "clkreq_in_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CWS_SYS_REQ1, "cws_sys_req1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CWS_SYS_REQ2, "cws_sys_req2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_CWS_SYS_REQ3, "cws_sys_req3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_DIGMIC1_CLK, "digmic1_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_DIGMIC1_DQ, "digmic1_dq", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_DIGMIC2_CLK, "digmic2_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_DIGMIC2_DQ, "digmic2_dq", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPEN13, "gpen13", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPEN14, "gpen14", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPEN15, "gpen15", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO00, "gpio00", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO01, "gpio01", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO02, "gpio02", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO03, "gpio03", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO04, "gpio04", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO05, "gpio05", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO06, "gpio06", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO07, "gpio07", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO08, "gpio08", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO09, "gpio09", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO10, "gpio10", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO11, "gpio11", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO12, "gpio12", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO13, "gpio13", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPIO14, "gpio14", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPS_PABLANK, "gps_pablank", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_GPS_TMARK, "gps_tmark", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_HDMI_SCL, "hdmi_scl", hdmi),
++	CAPRI_PIN_DESC(CAPRI_PIN_HDMI_SDA, "hdmi_sda", hdmi),
++	CAPRI_PIN_DESC(CAPRI_PIN_IC_DM, "ic_dm", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_IC_DP, "ic_dp", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_COL_IP_0, "kp_col_ip_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_COL_IP_1, "kp_col_ip_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_COL_IP_2, "kp_col_ip_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_COL_IP_3, "kp_col_ip_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_ROW_OP_0, "kp_row_op_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_ROW_OP_1, "kp_row_op_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_ROW_OP_2, "kp_row_op_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_KP_ROW_OP_3, "kp_row_op_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_0, "lcd_b_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_1, "lcd_b_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_2, "lcd_b_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_3, "lcd_b_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_4, "lcd_b_4", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_5, "lcd_b_5", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_6, "lcd_b_6", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_B_7, "lcd_b_7", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_0, "lcd_g_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_1, "lcd_g_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_2, "lcd_g_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_3, "lcd_g_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_4, "lcd_g_4", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_5, "lcd_g_5", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_6, "lcd_g_6", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_G_7, "lcd_g_7", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_HSYNC, "lcd_hsync", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_OE, "lcd_oe", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_PCLK, "lcd_pclk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_0, "lcd_r_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_1, "lcd_r_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_2, "lcd_r_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_3, "lcd_r_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_4, "lcd_r_4", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_5, "lcd_r_5", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_6, "lcd_r_6", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_R_7, "lcd_r_7", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_LCD_VSYNC, "lcd_vsync", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO0, "mdmgpio0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO1, "mdmgpio1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO2, "mdmgpio2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO3, "mdmgpio3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO4, "mdmgpio4", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO5, "mdmgpio5", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO6, "mdmgpio6", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO7, "mdmgpio7", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MDMGPIO8, "mdmgpio8", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_0, "mphi_data_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_1, "mphi_data_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_2, "mphi_data_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_3, "mphi_data_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_4, "mphi_data_4", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_5, "mphi_data_5", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_6, "mphi_data_6", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_7, "mphi_data_7", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_8, "mphi_data_8", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_9, "mphi_data_9", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_10, "mphi_data_10", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_11, "mphi_data_11", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_12, "mphi_data_12", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_13, "mphi_data_13", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_14, "mphi_data_14", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_DATA_15, "mphi_data_15", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HA0, "mphi_ha0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HAT0, "mphi_hat0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HAT1, "mphi_hat1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HCE0_N, "mphi_hce0_n", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HCE1_N, "mphi_hce1_n", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HRD_N, "mphi_hrd_n", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_HWR_N, "mphi_hwr_n", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_RUN0, "mphi_run0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MPHI_RUN1, "mphi_run1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MTX_SCAN_CLK, "mtx_scan_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_MTX_SCAN_DATA, "mtx_scan_data", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_0, "nand_ad_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_1, "nand_ad_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_2, "nand_ad_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_3, "nand_ad_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_4, "nand_ad_4", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_5, "nand_ad_5", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_6, "nand_ad_6", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_AD_7, "nand_ad_7", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_ALE, "nand_ale", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_CEN_0, "nand_cen_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_CEN_1, "nand_cen_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_CLE, "nand_cle", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_OEN, "nand_oen", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_RDY_0, "nand_rdy_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_RDY_1, "nand_rdy_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_WEN, "nand_wen", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_NAND_WP, "nand_wp", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_PC1, "pc1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_PC2, "pc2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_PMU_INT, "pmu_int", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_PMU_SCL, "pmu_scl", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_PMU_SDA, "pmu_sda", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_RFST2G_MTSLOTEN3G, "rfst2g_mtsloten3g", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_RX_CTL, "rgmii_0_rx_ctl", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_RXC, "rgmii_0_rxc", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_RXD_0, "rgmii_0_rxd_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_RXD_1, "rgmii_0_rxd_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_RXD_2, "rgmii_0_rxd_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_RXD_3, "rgmii_0_rxd_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_TX_CTL, "rgmii_0_tx_ctl", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_TXC, "rgmii_0_txc", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_TXD_0, "rgmii_0_txd_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_TXD_1, "rgmii_0_txd_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_TXD_2, "rgmii_0_txd_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_0_TXD_3, "rgmii_0_txd_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_RX_CTL, "rgmii_1_rx_ctl", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_RXC, "rgmii_1_rxc", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_RXD_0, "rgmii_1_rxd_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_RXD_1, "rgmii_1_rxd_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_RXD_2, "rgmii_1_rxd_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_RXD_3, "rgmii_1_rxd_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_TX_CTL, "rgmii_1_tx_ctl", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_TXC, "rgmii_1_txc", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_TXD_0, "rgmii_1_txd_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_TXD_1, "rgmii_1_txd_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_TXD_2, "rgmii_1_txd_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_1_TXD_3, "rgmii_1_txd_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_GPIO_0, "rgmii_gpio_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_GPIO_1, "rgmii_gpio_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_GPIO_2, "rgmii_gpio_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RGMII_GPIO_3, "rgmii_gpio_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RTXDATA2G_TXDATA3G1, "rtxdata2g_txdata3g1",
++		std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RTXEN2G_TXDATA3G2, "rtxen2g_txdata3g2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RXDATA3G0, "rxdata3g0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RXDATA3G1, "rxdata3g1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_RXDATA3G2, "rxdata3g2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO1_CLK, "sdio1_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO1_CMD, "sdio1_cmd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO1_DATA_0, "sdio1_data_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO1_DATA_1, "sdio1_data_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO1_DATA_2, "sdio1_data_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO1_DATA_3, "sdio1_data_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO4_CLK, "sdio4_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO4_CMD, "sdio4_cmd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO4_DATA_0, "sdio4_data_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO4_DATA_1, "sdio4_data_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO4_DATA_2, "sdio4_data_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SDIO4_DATA_3, "sdio4_data_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM_CLK, "sim_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM_DATA, "sim_data", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM_DET, "sim_det", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM_RESETN, "sim_resetn", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM2_CLK, "sim2_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM2_DATA, "sim2_data", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM2_DET, "sim2_det", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SIM2_RESETN, "sim2_resetn", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SRI_C, "sri_c", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SRI_D, "sri_d", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SRI_E, "sri_e", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP_EXTCLK, "ssp_extclk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP0_CLK, "ssp0_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP0_FS, "ssp0_fs", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP0_RXD, "ssp0_rxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP0_TXD, "ssp0_txd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_CLK, "ssp2_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_FS_0, "ssp2_fs_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_FS_1, "ssp2_fs_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_FS_2, "ssp2_fs_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_FS_3, "ssp2_fs_3", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_RXD_0, "ssp2_rxd_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_RXD_1, "ssp2_rxd_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_TXD_0, "ssp2_txd_0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP2_TXD_1, "ssp2_txd_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP3_CLK, "ssp3_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP3_FS, "ssp3_fs", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP3_RXD, "ssp3_rxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP3_TXD, "ssp3_txd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP4_CLK, "ssp4_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP4_FS, "ssp4_fs", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP4_RXD, "ssp4_rxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP4_TXD, "ssp4_txd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP5_CLK, "ssp5_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP5_FS, "ssp5_fs", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP5_RXD, "ssp5_rxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP5_TXD, "ssp5_txd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP6_CLK, "ssp6_clk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP6_FS, "ssp6_fs", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP6_RXD, "ssp6_rxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SSP6_TXD, "ssp6_txd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_STAT_1, "stat_1", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_STAT_2, "stat_2", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_SYSCLKEN, "sysclken", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACECLK, "traceclk", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT00, "tracedt00", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT01, "tracedt01", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT02, "tracedt02", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT03, "tracedt03", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT04, "tracedt04", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT05, "tracedt05", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT06, "tracedt06", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT07, "tracedt07", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT08, "tracedt08", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT09, "tracedt09", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT10, "tracedt10", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT11, "tracedt11", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT12, "tracedt12", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT13, "tracedt13", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT14, "tracedt14", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TRACEDT15, "tracedt15", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TXDATA3G0, "txdata3g0", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_TXPWRIND, "txpwrind", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB1_UCTS, "uartb1_ucts", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB1_URTS, "uartb1_urts", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB1_URXD, "uartb1_urxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB1_UTXD, "uartb1_utxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB2_URXD, "uartb2_urxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB2_UTXD, "uartb2_utxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB3_UCTS, "uartb3_ucts", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB3_URTS, "uartb3_urts", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB3_URXD, "uartb3_urxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB3_UTXD, "uartb3_utxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB4_UCTS, "uartb4_ucts", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB4_URTS, "uartb4_urts", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB4_URXD, "uartb4_urxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_UARTB4_UTXD, "uartb4_utxd", std),
++	CAPRI_PIN_DESC(CAPRI_PIN_VC_CAM1_SCL, "vc_cam1_scl", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_VC_CAM1_SDA, "vc_cam1_sda", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_VC_CAM2_SCL, "vc_cam2_scl", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_VC_CAM2_SDA, "vc_cam2_sda", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_VC_CAM3_SCL, "vc_cam3_scl", i2c),
++	CAPRI_PIN_DESC(CAPRI_PIN_VC_CAM3_SDA, "vc_cam3_sda", i2c),
++};
++
++static const char * const capri_alt_groups[] = {
++	"adcsync",
++	"bat_rm",
++	"bsc1_scl",
++	"bsc1_sda",
++	"bsc2_scl",
++	"bsc2_sda",
++	"classgpwr",
++	"clk_cx8",
++	"clkout_0",
++	"clkout_1",
++	"clkout_2",
++	"clkout_3",
++	"clkreq_in_0",
++	"clkreq_in_1",
++	"cws_sys_req1",
++	"cws_sys_req2",
++	"cws_sys_req3",
++	"digmic1_clk",
++	"digmic1_dq",
++	"digmic2_clk",
++	"digmic2_dq",
++	"gpen13",
++	"gpen14",
++	"gpen15",
++	"gpio00",
++	"gpio01",
++	"gpio02",
++	"gpio03",
++	"gpio04",
++	"gpio05",
++	"gpio06",
++	"gpio07",
++	"gpio08",
++	"gpio09",
++	"gpio10",
++	"gpio11",
++	"gpio12",
++	"gpio13",
++	"gpio14",
++	"gps_pablank",
++	"gps_tmark",
++	"hdmi_scl",
++	"hdmi_sda",
++	"ic_dm",
++	"ic_dp",
++	"kp_col_ip_0",
++	"kp_col_ip_1",
++	"kp_col_ip_2",
++	"kp_col_ip_3",
++	"kp_row_op_0",
++	"kp_row_op_1",
++	"kp_row_op_2",
++	"kp_row_op_3",
++	"lcd_b_0",
++	"lcd_b_1",
++	"lcd_b_2",
++	"lcd_b_3",
++	"lcd_b_4",
++	"lcd_b_5",
++	"lcd_b_6",
++	"lcd_b_7",
++	"lcd_g_0",
++	"lcd_g_1",
++	"lcd_g_2",
++	"lcd_g_3",
++	"lcd_g_4",
++	"lcd_g_5",
++	"lcd_g_6",
++	"lcd_g_7",
++	"lcd_hsync",
++	"lcd_oe",
++	"lcd_pclk",
++	"lcd_r_0",
++	"lcd_r_1",
++	"lcd_r_2",
++	"lcd_r_3",
++	"lcd_r_4",
++	"lcd_r_5",
++	"lcd_r_6",
++	"lcd_r_7",
++	"lcd_vsync",
++	"mdmgpio0",
++	"mdmgpio1",
++	"mdmgpio2",
++	"mdmgpio3",
++	"mdmgpio4",
++	"mdmgpio5",
++	"mdmgpio6",
++	"mdmgpio7",
++	"mdmgpio8",
++	"mphi_data_0",
++	"mphi_data_1",
++	"mphi_data_2",
++	"mphi_data_3",
++	"mphi_data_4",
++	"mphi_data_5",
++	"mphi_data_6",
++	"mphi_data_7",
++	"mphi_data_8",
++	"mphi_data_9",
++	"mphi_data_10",
++	"mphi_data_11",
++	"mphi_data_12",
++	"mphi_data_13",
++	"mphi_data_14",
++	"mphi_data_15",
++	"mphi_ha0",
++	"mphi_hat0",
++	"mphi_hat1",
++	"mphi_hce0_n",
++	"mphi_hce1_n",
++	"mphi_hrd_n",
++	"mphi_hwr_n",
++	"mphi_run0",
++	"mphi_run1",
++	"mtx_scan_clk",
++	"mtx_scan_data",
++	"nand_ad_0",
++	"nand_ad_1",
++	"nand_ad_2",
++	"nand_ad_3",
++	"nand_ad_4",
++	"nand_ad_5",
++	"nand_ad_6",
++	"nand_ad_7",
++	"nand_ale",
++	"nand_cen_0",
++	"nand_cen_1",
++	"nand_cle",
++	"nand_oen",
++	"nand_rdy_0",
++	"nand_rdy_1",
++	"nand_wen",
++	"nand_wp",
++	"pc1",
++	"pc2",
++	"pmu_int",
++	"pmu_scl",
++	"pmu_sda",
++	"rfst2g_mtsloten3g",
++	"rgmii_0_rx_ctl",
++	"rgmii_0_rxc",
++	"rgmii_0_rxd_0",
++	"rgmii_0_rxd_1",
++	"rgmii_0_rxd_2",
++	"rgmii_0_rxd_3",
++	"rgmii_0_tx_ctl",
++	"rgmii_0_txc",
++	"rgmii_0_txd_0",
++	"rgmii_0_txd_1",
++	"rgmii_0_txd_2",
++	"rgmii_0_txd_3",
++	"rgmii_1_rx_ctl",
++	"rgmii_1_rxc",
++	"rgmii_1_rxd_0",
++	"rgmii_1_rxd_1",
++	"rgmii_1_rxd_2",
++	"rgmii_1_rxd_3",
++	"rgmii_1_tx_ctl",
++	"rgmii_1_txc",
++	"rgmii_1_txd_0",
++	"rgmii_1_txd_1",
++	"rgmii_1_txd_2",
++	"rgmii_1_txd_3",
++	"rgmii_gpio_0",
++	"rgmii_gpio_1",
++	"rgmii_gpio_2",
++	"rgmii_gpio_3",
++	"rtxdata2g_txdata3g1",
++	"rtxen2g_txdata3g2",
++	"rxdata3g0",
++	"rxdata3g1",
++	"rxdata3g2",
++	"sdio1_clk",
++	"sdio1_cmd",
++	"sdio1_data_0",
++	"sdio1_data_1",
++	"sdio1_data_2",
++	"sdio1_data_3",
++	"sdio4_clk",
++	"sdio4_cmd",
++	"sdio4_data_0",
++	"sdio4_data_1",
++	"sdio4_data_2",
++	"sdio4_data_3",
++	"sim_clk",
++	"sim_data",
++	"sim_det",
++	"sim_resetn",
++	"sim2_clk",
++	"sim2_data",
++	"sim2_det",
++	"sim2_resetn",
++	"sri_c",
++	"sri_d",
++	"sri_e",
++	"ssp_extclk",
++	"ssp0_clk",
++	"ssp0_fs",
++	"ssp0_rxd",
++	"ssp0_txd",
++	"ssp2_clk",
++	"ssp2_fs_0",
++	"ssp2_fs_1",
++	"ssp2_fs_2",
++	"ssp2_fs_3",
++	"ssp2_rxd_0",
++	"ssp2_rxd_1",
++	"ssp2_txd_0",
++	"ssp2_txd_1",
++	"ssp3_clk",
++	"ssp3_fs",
++	"ssp3_rxd",
++	"ssp3_txd",
++	"ssp4_clk",
++	"ssp4_fs",
++	"ssp4_rxd",
++	"ssp4_txd",
++	"ssp5_clk",
++	"ssp5_fs",
++	"ssp5_rxd",
++	"ssp5_txd",
++	"ssp6_clk",
++	"ssp6_fs",
++	"ssp6_rxd",
++	"ssp6_txd",
++	"stat_1",
++	"stat_2",
++	"sysclken",
++	"traceclk",
++	"tracedt00",
++	"tracedt01",
++	"tracedt02",
++	"tracedt03",
++	"tracedt04",
++	"tracedt05",
++	"tracedt06",
++	"tracedt07",
++	"tracedt08",
++	"tracedt09",
++	"tracedt10",
++	"tracedt11",
++	"tracedt12",
++	"tracedt13",
++	"tracedt14",
++	"tracedt15",
++	"txdata3g0",
++	"txpwrind",
++	"uartb1_ucts",
++	"uartb1_urts",
++	"uartb1_urxd",
++	"uartb1_utxd",
++	"uartb2_urxd",
++	"uartb2_utxd",
++	"uartb3_ucts",
++	"uartb3_urts",
++	"uartb3_urxd",
++	"uartb3_utxd",
++	"uartb4_ucts",
++	"uartb4_urts",
++	"uartb4_urxd",
++	"uartb4_utxd",
++	"vc_cam1_scl",
++	"vc_cam1_sda",
++	"vc_cam2_scl",
++	"vc_cam2_sda",
++	"vc_cam3_scl",
++	"vc_cam3_sda",
++};
++
++/* Every pin can implement all ALT1-ALT4 functions */
++#define CAPRI_PIN_FUNCTION(fcn_name)			\
++{							\
++	.name = #fcn_name,				\
++	.groups = capri_alt_groups,			\
++	.ngroups = ARRAY_SIZE(capri_alt_groups),	\
++}
++
++static const struct capri_pin_function capri_functions[] = {
++	CAPRI_PIN_FUNCTION(alt1),
++	CAPRI_PIN_FUNCTION(alt2),
++	CAPRI_PIN_FUNCTION(alt3),
++	CAPRI_PIN_FUNCTION(alt4),
++};
++
++static struct capri_pinctrl_data capri_pinctrl = {
++	.pins = capri_pinctrl_pins,
++	.npins = ARRAY_SIZE(capri_pinctrl_pins),
++	.functions = capri_functions,
++	.nfunctions = ARRAY_SIZE(capri_functions),
++};
++
++static inline enum capri_pin_type pin_type_get(struct pinctrl_dev *pctldev,
++					       unsigned pin)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	if (pin >= pdata->npins)
++		return CAPRI_PIN_TYPE_UNKNOWN;
++
++	return *(enum capri_pin_type *)(pdata->pins[pin].drv_data);
++}
++
++#define CAPRI_PIN_SHIFT(type, param) \
++	(CAPRI_ ## type ## _PIN_REG_ ## param ## _SHIFT)
++
++#define CAPRI_PIN_MASK(type, param) \
++	(CAPRI_ ## type ## _PIN_REG_ ## param ## _MASK)
++
++/* Macro to update reg with new pin config param */
++#define CAPRI_PIN_UPDATE(reg, type, param, val)				\
++	(((reg) & ~CAPRI_PIN_MASK(type, param)) |			\
++	(((val) << CAPRI_PIN_SHIFT(type, param)) & CAPRI_PIN_MASK(type, param)))
++
++/*
++ * Write to the register using the value and mask if current value is different
++ */
++static void capri_reg_write(struct pinctrl_dev *pctldev,
++			    void __iomem *reg,
++			    u32 val,
++			    u32 mask)
++{
++	u32 old_val;
++	u32 new_val;
++
++	old_val = readl(reg);
++	new_val = (old_val & ~mask) | (val & mask);
++
++	if (new_val == old_val) {
++		dev_dbg(pctldev->dev,
++			"Reg 0x%p=0x%x (no change)\n",
++			reg, old_val);
++		return;
++	}
++
++	dev_dbg(pctldev->dev,
++		"Reg 0x%p change from 0x%x to 0x%x\n",
++		reg, old_val, new_val);
++	writel(new_val, reg);
++}
++
++static int capri_pinctrl_get_groups_count(struct pinctrl_dev *pctldev)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	return pdata->npins;
++}
++
++static const char *capri_pinctrl_get_group_name(struct pinctrl_dev *pctldev,
++						unsigned group)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	return pdata->pins[group].name;
++}
++
++static int capri_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
++					unsigned group,
++					const unsigned **pins,
++					unsigned *num_pins)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	*pins = &pdata->pins[group].number;
++	*num_pins = 1;
++
++	return 0;
++}
++
++static void capri_pinctrl_pin_dbg_show(struct pinctrl_dev *pctldev,
++				       struct seq_file *s,
++				       unsigned offset)
++{
++	seq_printf(s, " %s", dev_name(pctldev->dev));
++}
++
++static struct pinctrl_ops capri_pinctrl_ops = {
++	.get_groups_count = capri_pinctrl_get_groups_count,
++	.get_group_name = capri_pinctrl_get_group_name,
++	.get_group_pins = capri_pinctrl_get_group_pins,
++	.pin_dbg_show = capri_pinctrl_pin_dbg_show,
++	.dt_node_to_map = pinconf_generic_dt_node_to_map_pin,
++	.dt_free_map = pinctrl_utils_dt_free_map,
++};
++
++static int capri_pinctrl_get_fcns_count(struct pinctrl_dev *pctldev)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	return pdata->nfunctions;
++}
++
++static const char *capri_pinctrl_get_fcn_name(struct pinctrl_dev *pctldev,
++					      unsigned function)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	return pdata->functions[function].name;
++}
++
++static int capri_pinctrl_get_fcn_groups(struct pinctrl_dev *pctldev,
++					unsigned function,
++					const char * const **groups,
++					unsigned * const num_groups)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++
++	*groups = pdata->functions[function].groups;
++	*num_groups = pdata->functions[function].ngroups;
++
++	return 0;
++}
++
++static int capri_pinmux_enable(struct pinctrl_dev *pctldev,
++			       unsigned function,
++			       unsigned group)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++	const struct capri_pin_function *f = &pdata->functions[function];
++	void __iomem *reg = pdata->reg_base + (4 * pdata->pins[group].number);
++
++	dev_dbg(pctldev->dev,
++		"%s(): Enable function %s (%d) of pin %s (%d) @reg 0x%p.\n",
++		__func__, f->name, function, pdata->pins[group].name,
++		pdata->pins[group].number, reg);
++
++	capri_reg_write(pctldev, reg, function << CAPRI_PIN_REG_F_SEL_SHIFT,
++		CAPRI_PIN_REG_F_SEL_MASK);
++
++	return 0;
++}
++
++static struct pinmux_ops capri_pinctrl_pinmux_ops = {
++	.get_functions_count = capri_pinctrl_get_fcns_count,
++	.get_function_name = capri_pinctrl_get_fcn_name,
++	.get_function_groups = capri_pinctrl_get_fcn_groups,
++	.enable = capri_pinmux_enable,
++};
++
++static int capri_pinctrl_pin_config_get(struct pinctrl_dev *pctldev,
++					unsigned pin,
++					unsigned long *config)
++{
++	return -ENOTSUPP;
++}
++
++
++/* Goes through the configs and update register val/mask */
++static int capri_std_pin_update(struct pinctrl_dev *pctldev,
++				unsigned pin,
++				unsigned long *configs,
++				unsigned num_configs,
++				u32 *val,
++				u32 *mask)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++	int i;
++	enum pin_config_param param;
++	u16 arg;
++
++	for (i = 0; i < num_configs; i++) {
++		param = pinconf_to_config_param(configs[i]);
++		arg = pinconf_to_config_argument(configs[i]);
++
++		switch (param) {
++		case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
++			arg = (arg >= 1 ? 1 : 0);
++			*val = CAPRI_PIN_UPDATE(*val, STD, HYST, arg);
++			*mask |= CAPRI_STD_PIN_REG_HYST_MASK;
++			break;
++		/*
++		 * The pin bias can only be one of pull-up, pull-down, or
++		 * disable.  The user does not need to specify a value for the
++		 * property, and the default value from pinconf-generic is
++		 * ignored.
++		 */
++		case PIN_CONFIG_BIAS_DISABLE:
++			*val = CAPRI_PIN_UPDATE(*val, STD, PULL_UP, 0);
++			*val = CAPRI_PIN_UPDATE(*val, STD, PULL_DN, 0);
++			*mask |= CAPRI_STD_PIN_REG_PULL_UP_MASK;
++			*mask |= CAPRI_STD_PIN_REG_PULL_DN_MASK;
++			break;
++
++		case PIN_CONFIG_BIAS_PULL_UP:
++			*val = CAPRI_PIN_UPDATE(*val, STD, PULL_UP, 1);
++			*val = CAPRI_PIN_UPDATE(*val, STD, PULL_DN, 0);
++			*mask |= CAPRI_STD_PIN_REG_PULL_UP_MASK;
++			*mask |= CAPRI_STD_PIN_REG_PULL_DN_MASK;
++			break;
++
++		case PIN_CONFIG_BIAS_PULL_DOWN:
++			*val = CAPRI_PIN_UPDATE(*val, STD, PULL_UP, 0);
++			*val = CAPRI_PIN_UPDATE(*val, STD, PULL_DN, 1);
++			*mask |= CAPRI_STD_PIN_REG_PULL_UP_MASK;
++			*mask |= CAPRI_STD_PIN_REG_PULL_DN_MASK;
++			break;
++
++		case PIN_CONFIG_SLEW_RATE:
++			arg = (arg >= 1 ? 1 : 0);
++			*val = CAPRI_PIN_UPDATE(*val, STD, SLEW, arg);
++			*mask |= CAPRI_STD_PIN_REG_SLEW_MASK;
++			break;
++
++		case PIN_CONFIG_INPUT_ENABLE:
++			/* inversed since register is for input _disable_ */
++			arg = (arg >= 1 ? 0 : 1);
++			*val = CAPRI_PIN_UPDATE(*val, STD, INPUT_DIS, arg);
++			*mask |= CAPRI_STD_PIN_REG_INPUT_DIS_MASK;
++			break;
++
++		case PIN_CONFIG_DRIVE_STRENGTH:
++			/* Valid range is 2-16 mA, even numbers only */
++			if ((arg < 2) || (arg > 16) || (arg % 2)) {
++				dev_err(pctldev->dev,
++					"Invalid Drive Strength value (%d) for "
++					"pin %s (%d). Valid values are "
++					"(2..16) mA, even numbers only.\n",
++					arg, pdata->pins[pin].name, pin);
++				return -EINVAL;
++			}
++			*val = CAPRI_PIN_UPDATE(*val, STD, DRV_STR, (arg/2)-1);
++			*mask |= CAPRI_STD_PIN_REG_DRV_STR_MASK;
++			break;
++
++		default:
++			dev_err(pctldev->dev,
++				"Unrecognized pin config %d for pin %s (%d).\n",
++				param, pdata->pins[pin].name, pin);
++			return -EINVAL;
++
++		} /* switch config */
++	} /* for each config */
++
++	return 0;
++}
++
++/* Goes through the configs and update register val/mask */
++static int capri_i2c_pin_update(struct pinctrl_dev *pctldev,
++				unsigned pin,
++				unsigned long *configs,
++				unsigned num_configs,
++				u32 *val,
++				u32 *mask)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++	int i;
++	enum pin_config_param param;
++	u16 arg;
++
++	for (i = 0; i < num_configs; i++) {
++		param = pinconf_to_config_param(configs[i]);
++		arg = pinconf_to_config_argument(configs[i]);
++
++		switch (param) {
++		case PIN_CONFIG_BIAS_PULL_UP:
++			if ((arg < 1) || (arg > 7)) {
++				dev_err(pctldev->dev,
++					"Invalid Pull Up value (%d) for pin %s "
++					"(%d). Valid values are (1..7).\n",
++					arg, pdata->pins[pin].name, pin);
++				return -EINVAL;
++			}
++			*val = CAPRI_PIN_UPDATE(*val, I2C, PULL_UP_STR, arg);
++			*mask |= CAPRI_I2C_PIN_REG_PULL_UP_STR_MASK;
++			break;
++
++		case PIN_CONFIG_BIAS_DISABLE:
++			*val = CAPRI_PIN_UPDATE(*val, I2C, PULL_UP_STR, 0);
++			*mask |= CAPRI_I2C_PIN_REG_PULL_UP_STR_MASK;
++			break;
++
++		case PIN_CONFIG_SLEW_RATE:
++			arg = (arg >= 1 ? 1 : 0);
++			*val = CAPRI_PIN_UPDATE(*val, I2C, SLEW, arg);
++			*mask |= CAPRI_I2C_PIN_REG_SLEW_MASK;
++			break;
++
++		case PIN_CONFIG_INPUT_ENABLE:
++			/* inversed since register is for input _disable_ */
++			arg = (arg >= 1 ? 0 : 1);
++			*val = CAPRI_PIN_UPDATE(*val, I2C, INPUT_DIS, arg);
++			*mask |= CAPRI_I2C_PIN_REG_INPUT_DIS_MASK;
++			break;
++
++		default:
++			dev_err(pctldev->dev,
++				"Unrecognized pin config %d for pin %s (%d).\n",
++				param, pdata->pins[pin].name, pin);
++			return -EINVAL;
++
++		} /* switch config */
++	} /* for each config */
++
++	return 0;
++}
++
++/* Goes through the configs and update register val/mask */
++static int capri_hdmi_pin_update(struct pinctrl_dev *pctldev,
++				 unsigned pin,
++				 unsigned long *configs,
++				 unsigned num_configs,
++				 u32 *val,
++				 u32 *mask)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++	int i;
++	enum pin_config_param param;
++	u16 arg;
++
++	for (i = 0; i < num_configs; i++) {
++		param = pinconf_to_config_param(configs[i]);
++		arg = pinconf_to_config_argument(configs[i]);
++
++		switch (param) {
++		case PIN_CONFIG_SLEW_RATE:
++			arg = (arg >= 1 ? 1 : 0);
++			*val = CAPRI_PIN_UPDATE(*val, HDMI, MODE, arg);
++			*mask |= CAPRI_HDMI_PIN_REG_MODE_MASK;
++			break;
++
++		case PIN_CONFIG_INPUT_ENABLE:
++			/* inversed since register is for input _disable_ */
++			arg = (arg >= 1 ? 0 : 1);
++			*val = CAPRI_PIN_UPDATE(*val, HDMI, INPUT_DIS, arg);
++			*mask |= CAPRI_HDMI_PIN_REG_INPUT_DIS_MASK;
++			break;
++
++		default:
++			dev_err(pctldev->dev,
++				"Unrecognized pin config %d for pin %s (%d).\n",
++				param, pdata->pins[pin].name, pin);
++			return -EINVAL;
++
++		} /* switch config */
++	} /* for each config */
++
++	return 0;
++}
++
++static int capri_pinctrl_pin_config_set(struct pinctrl_dev *pctldev,
++					unsigned pin,
++					unsigned long *configs,
++					unsigned num_configs)
++{
++	struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
++	enum capri_pin_type pin_type;
++	void __iomem *reg = pdata->reg_base + (4 * pin);
++	u32 cfg_val, cfg_mask;
++	int rc;
++
++	cfg_val = 0;
++	cfg_mask = 0;
++	pin_type = pin_type_get(pctldev, pin);
++
++	/* Different pins have different configuration options */
++	switch (pin_type) {
++	case CAPRI_PIN_TYPE_STD:
++		rc = capri_std_pin_update(pctldev, pin, configs, num_configs,
++			&cfg_val, &cfg_mask);
++		break;
++
++	case CAPRI_PIN_TYPE_I2C:
++		rc = capri_i2c_pin_update(pctldev, pin, configs, num_configs,
++			&cfg_val, &cfg_mask);
++		break;
++
++	case CAPRI_PIN_TYPE_HDMI:
++		rc = capri_hdmi_pin_update(pctldev, pin, configs, num_configs,
++			&cfg_val, &cfg_mask);
++		break;
++
++	default:
++		dev_err(pctldev->dev, "Unknown pin type.\n");
++		return -EINVAL;
++
++	} /* switch pin type */
++
++	if (rc)
++		return rc;
++
++	dev_dbg(pctldev->dev,
++		"%s(): Set pin %s (%d) with config 0x%x, mask 0x%x\n",
++		__func__, pdata->pins[pin].name, pin, cfg_val, cfg_mask);
++
++	capri_reg_write(pctldev, reg, cfg_val, cfg_mask);
++
++	return 0;
++}
++
++static struct pinconf_ops capri_pinctrl_pinconf_ops = {
++	.pin_config_get = capri_pinctrl_pin_config_get,
++	.pin_config_set = capri_pinctrl_pin_config_set,
++};
++
++static struct pinctrl_desc capri_pinctrl_desc = {
++	/* name, pins, npins members initialized in probe function */
++	.pctlops = &capri_pinctrl_ops,
++	.pmxops = &capri_pinctrl_pinmux_ops,
++	.confops = &capri_pinctrl_pinconf_ops,
++	.owner = THIS_MODULE,
++};
++
++int __init capri_pinctrl_probe(struct platform_device *pdev)
++{
++	struct capri_pinctrl_data *pdata = &capri_pinctrl;
++	struct resource *res;
++	struct pinctrl_dev *pctl;
++
++	/* So far We can assume there is only 1 bank of registers */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "Missing MEM resource\n");
++		return -ENODEV;
++	}
++
++	pdata->reg_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pdata->reg_base)) {
++		dev_err(&pdev->dev, "Failed to ioremap MEM resource\n");
++		return -ENODEV;
++	}
++
++	/* Initialize the dynamic part of pinctrl_desc */
++	capri_pinctrl_desc.name = dev_name(&pdev->dev);
++	capri_pinctrl_desc.pins = capri_pinctrl.pins;
++	capri_pinctrl_desc.npins = capri_pinctrl.npins;
++
++	pctl = pinctrl_register(&capri_pinctrl_desc,
++				&pdev->dev,
++				pdata);
++	if (!pctl) {
++		dev_err(&pdev->dev, "Failed to register pinctrl\n");
++		return -ENODEV;
++	}
++
++	platform_set_drvdata(pdev, pdata);
++
++	return 0;
++}
++
++static struct of_device_id capri_pinctrl_of_match[] = {
++	{ .compatible = "brcm,capri-pinctrl", },
++	{ },
++};
++
++static struct platform_driver capri_pinctrl_driver = {
++	.driver = {
++		.name = "bcm-capri-pinctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = capri_pinctrl_of_match,
++	},
++};
++
++module_platform_driver_probe(capri_pinctrl_driver, capri_pinctrl_probe);
++
++MODULE_AUTHOR("Sherman Yin <syin@broadcom.com>");
++MODULE_DESCRIPTION("Broadcom Capri pinctrl driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.5
