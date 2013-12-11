@@ -1,56 +1,62 @@
-From: t.dakhran@samsung.com (Tarek Dakhran)
-Date: Wed, 11 Dec 2013 13:56:25 +0400
-Subject: [PATCH v5 0/3] Exynos 5410 support
-In-Reply-To: <87ppp48xrs.fsf@linaro.org>
-References: <1386685599-31536-1-git-send-email-v.tyrtov@samsung.com>
- <87ppp48xrs.fsf@linaro.org>
-Message-ID: <52A836C9.9020405@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Dec 2013 09:59:43 +0000
+Subject: [GIT PULL] two Integrator devicetree patches
+In-Reply-To: <878uvs75it.fsf@linaro.org>
+References: <CACRpkdZcrEtHC+Q0YHOuL8yXQrMixL=n2Nagbk6NBAmdmnnXHw@mail.gmail.com>
+ <878uvs75it.fsf@linaro.org>
+Message-ID: <20131211095943.GB17681@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 08:40 PM, Kevin Hilman wrote:
-> Vyacheslav Tyrtov <v.tyrtov@samsung.com> writes:
->
->> The series of patches represent support of Exynos 5410 SoC
->>
->> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
->>
->> Patches add new platform description, support of clock controller and device
->> tree for Exynos 5410.
->>
->> Dual cluster support for Exynos 5410 (EDCS) has been removed from this series
->> This patches is activating only the big cluster (all A15 cores)
-> Testing this series on top of v3.13-rc3, plus a couple of other
-> necessary changes (which should've probably been noted in the changelog):
->
-> 1) change CONFIG_NR_CPUS=8 in .config
-> 2) add the exynos combiner patch from Chander:
->     [PATCH v2] irqchip: exynos-combiner: remove hard-coded irq_base value
->
-> I'm still only seeing 2 out of 4 cores come up on my odroid-xu:
->
-> [    0.045000] CPU: Testing write buffer coherency: ok
-> [    0.045000] CPU0: update cpu_power 1024
-> [    0.045000] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.045000] Setting up static identity map for 0x403717d8 - 0x40371830
-> [    0.045000] CPU1: Booted secondary processor
-> [    0.065000] CPU1: update cpu_power 1024
-> [    0.065000] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-> [    1.075000] CPU2: failed to boot: -38
-> [    2.075000] CPU3: failed to boot: -38
-> [    2.075000] Brought up 2 CPUs
-> [    2.075000] SMP: Total of 2 processors activated.
-> [    2.075000] CPU: All CPU(s) started in SVC mode.
->
-Hi Kevin,
+On Tue, Dec 10, 2013 at 09:36:10PM +0000, Kevin Hilman wrote:
+> +Mark Rutland
+> 
+> Linus Walleij <linus.walleij@linaro.org> writes:
+> 
+> > Hi ARM SoC folks,
+> >
+> > here are two patches targeted for v3.14 that I'd like includes
+> > in ARM SoC for testing in -next.
+> >
+> > Please pull them in!
+> >
+> > Yours,
+> > Linus Walleij
+> >
+> >
+> > The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
+> >
+> >   Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> > tags/integrator-v3.14-1
+> >
+> > for you to fetch changes up to 307b96677c98bc444262e3d1a7d26c0ca8a1c6e0:
+> >
+> >   ARM: integrator: move EBI to the device tree (2013-12-04 16:22:31 +0100)
+> >
+> > ----------------------------------------------------------------
+> > Two integrator device tree patches for v3.14:
+> >
+> > - Delete some static core module mappings.
+> >
+> > - Move EBI location to the device tree.
+> >
+> > ----------------------------------------------------------------
+> > Linus Walleij (2):
+> >       ARM: integrator: delete static core module mappings
+> >       ARM: integrator: move EBI to the device tree
+> >
+> >  Documentation/devicetree/bindings/arm/arm-boards |  8 ++++
+> 
+> This change looks pretty straight forward to me, but it would be extra
+> special nice to see an Ack from a DT maintainer on this change.  Seems
+> you and Mark Rutland had some discussions on an earlier version of this
+> change, so maybe he's the right one to bless this one?
 
-EDCS(exynos dual cluster support) moved to separate patch now.
-This patches introduce only base SoC support  (2xA15).
+I have no issues with this. Feel free to add my ACK.
 
-Patches tested on samsung smdk5410 board.
-
-Next version of EDCS patches will be available soon.
-They allow power on and boot all 8 cores.
-
-Best regards,
-     Tarek Dakhran.
+Thanks,
+Mark.
