@@ -1,54 +1,74 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Dec 2013 17:49:47 -0800
-Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
-In-Reply-To: <20131210084140.GF11990@sonymobile.com>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
- <52A24E08.706@codeaurora.org> <20131210084140.GF11990@sonymobile.com>
-Message-ID: <52A7C4BB.6000701@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Dec 2013 09:56:43 +0800
+Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
+In-Reply-To: <1386680168-5227-2-git-send-email-b29396@freescale.com>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+ <1386680168-5227-2-git-send-email-b29396@freescale.com>
+Message-ID: <20131211015640.GA18380@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/13 00:41, Bjorn Andersson wrote:
-> On Fri 06 Dec 14:22 PST 2013, Stephen Boyd wrote:
->
->>> +config PINCTRL_MSM8X74
->>> +	bool "Qualcomm 8x74 pin controller driver"
->>> +	select PINCTRL_MSM
->> No help?
->>
-> I could write something up, although I guess someone will add a
-> select PINCTRL_MSM8X74 in the mach-msm Kconfig and then we're done
-> with it.
+On Tue, Dec 10, 2013 at 08:56:03PM +0800, Dong Aisheng wrote:
+> Currently the max_discard_to is simply got by (1 << 27) / host->timeout_clk
+> which is assumed to be the maximum timeout value, however, some platforms
+> maximum timeout counter may not be 1 << 27, e.g. i.MX uSDHC is 1 << 28.
+> Thus 1 << 27 may not be correct for such platforms.
+> 
+> It is also possible that other platforms may have different problems.
+> To be flexible, we add a get_max_timeout hook to get the correct
+> maximum timeout value for these platforms.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Reported-by: Ed Sutter <ed.sutter@alcatel-lucent.com>
+> ---
+>  drivers/mmc/host/sdhci.c |    5 ++++-
+>  drivers/mmc/host/sdhci.h |    1 +
+>  2 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index bd8a098..464d42c 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -2930,7 +2930,10 @@ int sdhci_add_host(struct sdhci_host *host)
+>  	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
+>  		host->timeout_clk = mmc->f_max / 1000;
+>  
+> -	mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+> +	if (host->ops->get_max_timeout)
+> +		mmc->max_discard_to = host->ops->get_max_timeout(host);
 
-I hope nobody selects the PINCTRL_MSM8X74 config. It's certainly not
-necessary to boot into a ramdisk. I thought checkpatch complained about
-missing help for visible options.
+Does "timeout" conceptually equals to "discard_to"?  If not, we might
+want to write it in the either form below to avoid messing these two
+concepts.
 
->
->> Also, do we ever plan to have anything more than the gpio pins and the
->> sdc pins? It seems like we spend a lot of space describing exactly the
->> same thing in these structs for each of the 146 gpio pins when we could
->> just know that range 0 to 146 is gpio pins and have different code for
->> that part vs the 6 or something sd pins.
->>
-> We have to have a pingroup list, so I did look at having that list
-> referencing a common object with the gpio/sdc specific data.
->
-> But just having it in one large blob is the way that other pinctrl
-> drivers does it and hence a common problem to pinctrl and multi-platform
-> arm support.
+	mmc->max_discard_to = host->ops->get_max_timeout(host) / host->timeout_clk;
 
-I don't follow what Linus is recommending. How could
-.gpio_request_enable()/.gpio_disable_free() help us here?
+or
 
->
-> I have not seen any code in the open referencing the other pins, so I
-> left them out for now.
->
->
+	mmc->max_discard_to = host->ops->get_max_discard_to(host);
 
+I guess you may want to go for the second one.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Shawn
+
+> +	else
+> +		mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+>  
+>  	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
+>  
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 0a3ed01..1591cbb 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -281,6 +281,7 @@ struct sdhci_ops {
+>  	unsigned int	(*get_max_clock)(struct sdhci_host *host);
+>  	unsigned int	(*get_min_clock)(struct sdhci_host *host);
+>  	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
+> +	unsigned int	(*get_max_timeout)(struct sdhci_host *host);
+>  	int		(*platform_bus_width)(struct sdhci_host *host,
+>  					       int width);
+>  	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
+> -- 
+> 1.7.2.rc3
+> 
+> 
