@@ -1,64 +1,69 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 11 Dec 2013 20:00:29 +0200
-Subject: [PATCH 2/3] clocksource: keystone: add bindings for keystone timer
-In-Reply-To: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1386784830-15863-3-git-send-email-ivan.khoronzhuk@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 11 Dec 2013 19:06:07 +0100
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <52A8A891.40302@cogentembedded.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <52A8A891.40302@cogentembedded.com>
+Message-ID: <1488247.0AdahCZr3G@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides bindings for the 64-bit timer in the KeyStone
-architecture devices. The timer can be configured as a general-purpose 64-bit
-timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
-timers, each half can operate in conjunction (chain mode) or independently
-(unchained mode) of each other.
+On Wednesday 11 December 2013 22:01:53 Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 27-11-2013 5:18, Laurent Pinchart wrote:
+> > This helps increasing build testing coverage.
+> > 
+> > The driver doesn't compile on (at least) x86 due (possibly among others)
+> > to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
+> > or ARM.
+> > 
+> > Whether the CTL_DMA_ENABLE register is part of the standard TMIO
+> > controller or is Renesas-specific is unknown and impossible to test as
+> > we have no current or planned TMIO DMA users other than SUPERH and
+> > ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
+> > for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
+> > list would extend this to multiarch kernels, but would break the driver
+> > for non-shmobile platforms if the register is Renesas-specific. We can
+> > thus get rid of the conditional compilation completely without
+> > introducing any further issue, and let future non-Renesas users deal
+> > with the situation if it turns out to be a the problem.
+> > 
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Cc: Ian Molton <ian@mnementh.co.uk>
+> > Cc: linux-mmc at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Acked-by: Simon Horman <horms@verge.net.au>
+> > ---
+> > 
+> >   drivers/mmc/host/Kconfig | 3 ++-
+> >   1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> > index 7fc5099..ca1315e 100644
+> > --- a/drivers/mmc/host/Kconfig
+> > +++ b/drivers/mmc/host/Kconfig
+> > @@ -479,7 +479,8 @@ config MMC_TMIO
+> > 
+> >   config MMC_SDHI
+> >   
+> >   	tristate "SH-Mobile SDHI SD/SDIO controller support"
+> > 
+> > -	depends on SUPERH || ARCH_SHMOBILE
+> > +	depends on SUPERH || ARM
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> 
+>     Hm, why 2 "depends" lines with SUPERH in both?
 
-It is global timer is a free running up-counter and can generate interrupt
-when the counter reaches preset counter values.
+The first line means "this driver requires SUPERH || ARM to be compiled", 
+while the second line means "devices supported by this driver are only found 
+on SUPERH || ARCH_SHMOBILE platforms".
 
-Documentation:
-http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
-
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- .../bindings/timer/ti,keystone-timer.txt           |   29 ++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/ti,keystone-timer.txt
-
-diff --git a/Documentation/devicetree/bindings/timer/ti,keystone-timer.txt b/Documentation/devicetree/bindings/timer/ti,keystone-timer.txt
-new file mode 100644
-index 0000000..5fbe361
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/ti,keystone-timer.txt
-@@ -0,0 +1,29 @@
-+* Device tree bindings for Texas instruments Keystone timer
-+
-+This document provides bindings for the 64-bit timer in the KeyStone
-+architecture devices. The timer can be configured as a general-purpose 64-bit
-+timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
-+timers, each half can operate in conjunction (chain mode) or independently
-+(unchained mode) of each other.
-+
-+It is global timer is a free running up-counter and can generate interrupt
-+when the counter reaches preset counter values.
-+
-+Documentation:
-+http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
-+
-+Required properties:
-+
-+- compatible : should be "ti,keystone-timer".
-+- reg : specifies base physical address and count of the registers.
-+- interrupts : interrupt generated by the timer.
-+- clocks : the clock feeding the timer clock.
-+
-+Example:
-+
-+timer at 22f0000 {
-+	compatible = "ti,keystone-timer";
-+	reg = <0x022f0000 0x80>;
-+	interrupts = <GIC_SPI 110 IRQ_TYPE_EDGE_RISING>;
-+	clocks = <&clktimer15>;
-+};
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
