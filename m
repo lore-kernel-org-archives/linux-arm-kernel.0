@@ -1,47 +1,36 @@
 From: syin@broadcom.com (Sherman Yin)
-Date: Wed, 11 Dec 2013 10:37:15 -0800
-Subject: [PATCH v3 0/6] Add Broadcom Capri pinctrl driver
-In-Reply-To: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+Date: Wed, 11 Dec 2013 10:37:18 -0800
+Subject: [PATCH v3 3/6] pinctrl: Make PINCTRL selectable by
+ defconfig/menuconfig
+In-Reply-To: <1386787041-6035-1-git-send-email-syin@broadcom.com>
 References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
-Message-ID: <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-1-git-send-email-syin@broadcom.com>
+Message-ID: <1386787041-6035-4-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches adds a pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
-The first patch, adding the void * to pinctrl_pin_desc, has been previously
-discussed with LinusW.  See this thread:
+Adds a string to the PINCTRL config option so that 1) CONFIG_PINCTRL=y would
+not be erased by make config, and 2) PINCTRL option would show up in menuconfig.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/165880.html
+Signed-off-by: Sherman Yin <syin@broadcom.com>
 ---
-v3: Re-worked driver to be based on generic pinconfig, addressed review
-    comments and other supporting changes:
-    - moved config selection from Kconfig to defconfig
-    - added slew-rate, input enable, input disable properties for generic
-      pinconfig
-    - added a description for PINCTRL config
-v2: Use hyphens instead of underscore in DT property names.
+v3: added to patchset
 
-Sherman Yin (6):
-  pinctrl: Add void * to pinctrl_pin_desc
-  pinctrl: Adds slew-rate, input-enable/disable
-  pinctrl: Make PINCTRL selectable by defconfig/menuconfig
-  pinctrl: Add pinctrl binding for Broadcom Capri SoCs
-  ARM: pinctrl: Add Broadcom Capri pinctrl driver
-  pinctrl: Enable pinctrl for Broadcom Capri SoCs
+ drivers/pinctrl/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- .../bindings/pinctrl/brcm,capri-pinctrl.txt        |  429 ++++++
- .../bindings/pinctrl/pinctrl-bindings.txt          |    3 +
- arch/arm/boot/dts/bcm11351.dtsi                    |    4 +
- arch/arm/configs/bcm_defconfig                     |    5 +
- drivers/pinctrl/Kconfig                            |   13 +-
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinconf-generic.c                  |    4 +
- drivers/pinctrl/pinctrl-capri.c                    | 1408 ++++++++++++++++++++
- include/linux/pinctrl/pinconf-generic.h            |    4 +
- include/linux/pinctrl/pinctrl.h                    |    2 +
- 10 files changed, 1872 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
- create mode 100644 drivers/pinctrl/pinctrl-capri.c
-
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 33f9dc1..a921ff1 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -3,7 +3,7 @@
+ #
+ 
+ config PINCTRL
+-	bool
++	bool "Enable the pinctrl framework"
+ 
+ if PINCTRL
+ 
 -- 
 1.7.9.5
