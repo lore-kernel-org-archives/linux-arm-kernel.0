@@ -1,73 +1,113 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 11 Dec 2013 11:30:17 +0100
-Subject: [PATCH 6/7] PCI: imx6: Fix bugs in PCIe startup code
-In-Reply-To: <1386757818-5154-1-git-send-email-marex@denx.de>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
-Message-ID: <1386757818-5154-6-git-send-email-marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Dec 2013 10:40:05 +0000
+Subject: [PATCHv3 2/2] arm64: Enable CMA
+In-Reply-To: <1386711816-20270-3-git-send-email-lauraa@codeaurora.org>
+References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
+ <1386711816-20270-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20131211104005.GC26730@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhu <r65037@freescale.com>
+Hi Laura,
 
-- LTSSM shouldn't be set once in assert_core_reset
-- Move peripheral reset just before LTSSM start
+Couple of really minor comments...
 
-From: Richard Zhu <r65037@freescale.com>
-Signed-off-by: Richard Zhu <r65037@freescale.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Frank Li <lznuaa@gmail.com>
-Cc: Harro Haan <hrhaan@gmail.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-Cc: Pratyush Anand <pratyush.anand@st.com>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Sean Cross <xobs@kosagi.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-Cc: Tim Harvey <tharvey@gateworks.com>
-Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-Cc: Yinghai Lu <yinghai@kernel.org>
----
- drivers/pci/host/pci-imx6.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+On Tue, Dec 10, 2013 at 09:43:36PM +0000, Laura Abbott wrote:
+> arm64 bit targets need the features CMA provides. Add the appropriate
+> hooks, header files, and Kconfig to allow this to happen.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm64/Kconfig                      |    1 +
+>  arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++++++
+>  arch/arm64/mm/dma-mapping.c             |   25 +++++++++++++++++++++++--
+>  arch/arm64/mm/init.c                    |    3 +++
+>  4 files changed, 56 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/dma-contiguous.h
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9737e97..26e4bef 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -22,6 +22,7 @@ config ARM64
+>  	select HAVE_DEBUG_KMEMLEAK
+>  	select HAVE_DMA_API_DEBUG
+>  	select HAVE_DMA_ATTRS
+> +	select HAVE_DMA_CONTIGUOUS
+>  	select HAVE_GENERIC_DMA_COHERENT
+>  	select HAVE_GENERIC_HARDIRQS
+>  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+> diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
+> new file mode 100644
+> index 0000000..bc32516
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/dma-contiguous.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef ASMARM64_DMA_CONTIGUOUS_H
+> +#define ASMARM64_DMA_CONTIGUOUS_H
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 3028f2c..38df103 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -220,18 +220,9 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
- 
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
- 			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
--	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
--			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
- 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
- 
--	/* Some boards don't have PCIe reset GPIO. */
--	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
--		gpio_set_value(imx6_pcie->reset_gpio, 0);
--		msleep(100);
--		gpio_set_value(imx6_pcie->reset_gpio, 1);
--	}
--
- 	return 0;
- }
- 
-@@ -275,6 +266,12 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 	/* allow the clocks to stabilize */
- 	usleep_range(200, 500);
- 
-+	/* Some boards don't have PCIe reset GPIO. */
-+	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-+		gpio_set_value(imx6_pcie->reset_gpio, 0);
-+		msleep(100);
-+		gpio_set_value(imx6_pcie->reset_gpio, 1);
-+	}
- 	return 0;
- 
- err_pcie_axi:
--- 
-1.8.4.3
+We've tried to keep these guards consistent for the arm64 headers, so this
+would be: __ASM_DMA_CONTIGUOUS_H.
+
+> +
+> +#ifdef __KERNEL__
+> +#ifdef CONFIG_CMA
+
+Why is this not CONFIG_DMA_CMA?
+
+> +#include <linux/types.h>
+> +#include <asm-generic/dma-contiguous.h>
+> +
+> +static inline void
+> +dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
+> +
+> +#endif
+> +#endif
+> +
+> +#endif
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 4134212..29d10b9 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/export.h>
+>  #include <linux/slab.h>
+>  #include <linux/dma-mapping.h>
+> +#include <linux/dma-contiguous.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/swiotlb.h>
+>  
+> @@ -36,14 +37,34 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
+>  	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
+>  	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+>  		flags |= GFP_DMA32;
+> -	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+> +	if (IS_ENABLED(CONFIG_DMA_CMA)) {
+> +		struct page *page;
+> +
+> +		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
+> +							get_order(size));
+> +		if (!page)
+> +			return NULL;
+
+Seems a shame to fail the allocation if CMA can't manage it. Is there a good
+reason not to fall back to swiotlb (other than complicating the freeing
+paths)?
+
+Will
