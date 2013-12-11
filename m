@@ -1,78 +1,77 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 11 Dec 2013 10:00:36 +0530
-Subject: [PATCH 1/2] KVM: Add KVM_EXIT_RESET to user space API header
-In-Reply-To: <05BE7CC4-C9CD-4E6A-9735-BB32CD3C9D0A@suse.de>
-References: <1385394599-15439-1-git-send-email-anup.patel@linaro.org>
- <1385394599-15439-2-git-send-email-anup.patel@linaro.org>
- <B781AC83-E85A-45E5-BD8C-3979D1E74D34@suse.de>
- <20131210222707.GA2871@cbox>
- <05BE7CC4-C9CD-4E6A-9735-BB32CD3C9D0A@suse.de>
-Message-ID: <CAAhSdy0CW8qoWFCT0HqS3b9035OT3F2xnVEjm0tq+YeSbRbNUQ@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 11 Dec 2013 12:59:55 +0800
+Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
+In-Reply-To: <20131211035654.GI18380@S2101-09.ap.freescale.net>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+ <1386680168-5227-2-git-send-email-b29396@freescale.com>
+ <20131211015640.GA18380@S2101-09.ap.freescale.net>
+ <CAA+hA=ST0fAa2__PaeJqxj2yDWUAr6iaNO4Dj7ABiEWqnYp6Vw@mail.gmail.com>
+ <20131211031254.GF18380@S2101-09.ap.freescale.net>
+ <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
+ <20131211035654.GI18380@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=TjhLKmLucm9R3fkiDQGCxTf_5WCMKbgyBXuuqC6Q0-RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 4:06 AM, Alexander Graf <agraf@suse.de> wrote:
+On Wed, Dec 11, 2013 at 11:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Dec 11, 2013 at 11:20:59AM +0800, Dong Aisheng wrote:
+>> No, the max_to is the max timeout counter value, you need to divide it
+>> by the timeout clock
+>> to get the timeout time.
+>> The defined of this API is return the max timeout value in
+>> miliseconds, so you need to
+>> divide the clock by 1000.
+>> None of these handles the detail bout discard_to.
 >
-> On 10.12.2013, at 23:27, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> Let me start it over again.  Here is basically what your patch does.
 >
->> On Tue, Dec 10, 2013 at 03:13:34AM +0100, Alexander Graf wrote:
->>>
->>> On 25.11.2013, at 16:49, Anup Patel <anup.patel@linaro.org> wrote:
->>>
->>>> Currently, we don't have an exit reason for VM reset emulation
->>>> in user space hence this patch adds exit reason KVM_EXIT_RESET
->>>> for this purpose.
->>>>
->>>> This newly added KVM_EXIT_RESET will be used by KVM arm/arm64
->>>> in-kernel PSCI support to reset VMs.
->>>>
->>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>> ---
->>>> include/uapi/linux/kvm.h |    1 +
->>>> 1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->>>> index 902f124..64a04cc 100644
->>>> --- a/include/uapi/linux/kvm.h
->>>> +++ b/include/uapi/linux/kvm.h
->>>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->>>> #define KVM_EXIT_WATCHDOG         21
->>>> #define KVM_EXIT_S390_TSCH        22
->>>> #define KVM_EXIT_EPR              23
->>>> +#define KVM_EXIT_RESET            24
->>>
->>> I have to admit that I'm not particularly happy with the exit name. It's not obvious from the name under which circumstances it gets triggered. Does it get triggered when a core level reset happens? Does it get triggered when a system level reset happened? When the guest requests one?
->>>
->>> I know what it does, but I find the name too generic for what it is. What you're really doing is introduce a new communication channel in parallel to MMIO / PIO / HCALL which is only used for system level reset / shutdown today.
->>>
->>> Can we treat it as such? Could you please make this a common exit number that's called something like
->>>
->>>  KVM_EXIT_SYSTEM_EVENT
->>>
->>> with a parameter that can either be TRIGGER_SHUTDOWN or TRIGGER_RESET.
->>>
->>> That way it's obvious what's going on and people don't get confused.
->>>
->> I didn't realize what the KVM_EXIT_SHUTDOWN really was, thanks for
->> explaining that.  In that case, the SYSTEM_EVENT sounds good to me.
->>
->> How do you propose the parameter gets passed?  As a new struct to the
->> untion in kvm_run ?
+> -     mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+> +     if (host->ops->get_max_timeout)
+> +             mmc->max_discard_to = host->ops->get_max_timeout(host);
 >
-> Yup, that's how we usually pass information along with an exit reason. Make sure to add a flags field so it can be extended if we need to pass in more later for future unknown events. PPC for example has fun system wide hypercalls like "enable little endian mode on all virtual cpus". I don't even want to start imagining what people will come up with next.
+> The only thing that does not work for you in the existing code is the
+> (1 << 27) part, right?
+>
+> If so, why not just create a platform hook to return the correct thing
+> for you platform, i.e. (1 << 28)?
+>
+>         if (host->ops->get_max_timeout)
+>                 mmc->max_discard_to = host->ops->hook_foo(host);
+>
+> unsigned int esdhc_hook_foo(struct sdhci_host *host)
+> {
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>         struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>
+>         return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
+> }
+>
+> Such patch will be ease to be understood and less offensive to the
+> existing code, no?
+>
 
-Sure, I will add KVM_EXIT_SYSTEM_EVENT exit reason and related documentation.
+The example you give is not correct here.
+The max timeout counter returned by esdhc_hook_foo can not be simpled assigned
+to max_discard_to which is timeout in miliseconds.
 
---
-Anup
+Actually what i did is like the way you said:
+-       mmc->max_discard_to = (1 << 27) / host->timeout_clk;
++       if (host->ops->get_max_timeout)
++               mmc->max_discard_to = host->ops->get_max_timeout(host);
++       else
++               mmc->max_discard_to = (1 << 27) / host->timeout_clk;
 
++unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
++{
++       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++       struct pltfm_imx_data *imx_data = pltfm_host->priv;
++       u32 max_to = esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
++
++       return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
++}
+
+Regards
+Dong Aisheng
+
+> Shawn
 >
->
-> Alex
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
