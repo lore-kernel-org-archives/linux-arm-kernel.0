@@ -1,34 +1,42 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 11 Dec 2013 17:22:22 -0300
-Subject: [PATCH] Partially revert "mtd: nand: pxa3xx: Introduce
- 'marvell,armada370-nand' compatible string"
-In-Reply-To: <20131209214035.GP10053@titan.lakedaemon.net>
-References: <1386624986-404-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131209214035.GP10053@titan.lakedaemon.net>
-Message-ID: <20131211202221.GC5461@localhost>
+Date: Wed, 11 Dec 2013 17:49:43 -0300
+Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20131210170025.GA4360@n2100.arm.linux.org.uk>
+References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131210164907.GA11468@sirena.org.uk>
+ <20131210170025.GA4360@n2100.arm.linux.org.uk>
+Message-ID: <20131211204942.GF5461@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 04:40:35PM -0500, Jason Cooper wrote:
-> On Mon, Dec 09, 2013 at 06:36:26PM -0300, Ezequiel Garcia wrote:
-> > This reverts c0f3b8643a6fa2461d70760ec49d21d2b031d611.
+On Tue, Dec 10, 2013 at 05:00:25PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 10, 2013 at 04:49:07PM +0000, Mark Brown wrote:
+> > On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
 > > 
-> > The "armada370-nand" compatible support is not complete, and it was mistake
-> > to add it. Revert it and pospone the support until the infrastructure is
-> > in place.
+> > > +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
+> > > +{
+> > > +	unsigned long flags;
+> > > +	u32 value;
+> > > +
+> > > +	raw_spin_lock_irqsave(&__io_lock, flags);
+> > > +	value = readl_relaxed(reg) & ~mask;
+> > > +	value |= (set & mask);
+> > > +	writel_relaxed(value, reg);
+> > > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> > > +}
+> > > +EXPORT_SYMBOL(atomic_io_modify_relaxed);
 > > 
-> > Cc: stable at vger.kernel.org
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > This looks quite generic - why is it in architecture specific code?
 > 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
+> because the _relaxed IO operators don't exist on other architectures, and
+> there's been some discussion around whether they should with no conclusions
+> being reached.
 
-Brian:
+Exactly.
 
-What are your plans regarding this? Where will you be merging it?
+Will? Catalin? Any comments on this?
 
-As soon as you take this somewhere, I'll send another one adding the
-compatible back, for v3.14.
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
