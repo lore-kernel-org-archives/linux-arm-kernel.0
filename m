@@ -1,30 +1,41 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Dec 2013 17:27:48 -0800
-Subject: [PATCH v3 15/36] mtd: st_spi_fsm: Fetch boot-device from mode pins
-In-Reply-To: <1385727565-25794-16-git-send-email-lee.jones@linaro.org>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-16-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131211012748.GI27149@ld-irv-0074.broadcom.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 11 Dec 2013 09:29:07 +0800
+Subject: [PATCH] clk: divider: read before write for HIWORD mask
+Message-ID: <1386725347-14480-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 29, 2013 at 12:19:04PM +0000, Lee Jones wrote:
-> --- a/drivers/mtd/devices/st_spi_fsm.c
-> +++ b/drivers/mtd/devices/st_spi_fsm.c
-> @@ -346,9 +348,48 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
-...
-> +	/* Use device size to determine address width */
+When multiple dividers share one register, we need to read & mask
+register fist. Then we set the right value.
 
-Since you're splitting this patch series up so much, shouldn't this
-comment go in when you add the two lines below?
+For example, there're two mmc clock dividers shared in one registers.
+The clock register is HIWORD type.
 
->  	if (info->sector_size * info->n_sectors > 0xFFFFFF)
->  		info->flags |= FLASH_FLAG_32BIT_ADDR;
-...
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ drivers/clk/clk-divider.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-BTW, even though it doesn't exactly make for the best (runtime)
-bisectability (since your driver is not functional yet), this approach
-to splitting your driver introduction into logical chunks does make it a
-little easier to review. So thanks.
-
-Brian
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 8d3009e..e1ea289 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -227,12 +227,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (divider->lock)
+ 		spin_lock_irqsave(divider->lock, flags);
+ 
+-	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+-		val = div_mask(divider) << (divider->shift + 16);
+-	} else {
+-		val = clk_readl(divider->reg);
+-		val &= ~(div_mask(divider) << divider->shift);
+-	}
++	val = clk_readl(divider->reg);
++	val &= ~(div_mask(divider) << divider->shift);
++	if (divider->flags & CLK_DIVIDER_HIWORD_MASK)
++		val |= div_mask(divider) << (divider->shift + 16);
+ 	val |= value << divider->shift;
+ 	clk_writel(val, divider->reg);
+ 
+-- 
+1.8.3.2
