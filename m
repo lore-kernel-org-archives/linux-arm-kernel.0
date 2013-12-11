@@ -1,50 +1,48 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Dec 2013 11:56:56 +0800
-Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
-In-Reply-To: <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
+Date: Wed, 11 Dec 2013 12:05:12 +0800
+Subject: [PATCH 5/6] mmc: sdhci: calculate max_discard_to dynamically for
+ SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+In-Reply-To: <1386680168-5227-6-git-send-email-b29396@freescale.com>
 References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
- <1386680168-5227-2-git-send-email-b29396@freescale.com>
- <20131211015640.GA18380@S2101-09.ap.freescale.net>
- <CAA+hA=ST0fAa2__PaeJqxj2yDWUAr6iaNO4Dj7ABiEWqnYp6Vw@mail.gmail.com>
- <20131211031254.GF18380@S2101-09.ap.freescale.net>
- <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
-Message-ID: <20131211035654.GI18380@S2101-09.ap.freescale.net>
+ <1386680168-5227-6-git-send-email-b29396@freescale.com>
+Message-ID: <20131211040511.GJ18380@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 11:20:59AM +0800, Dong Aisheng wrote:
-> No, the max_to is the max timeout counter value, you need to divide it
-> by the timeout clock
-> to get the timeout time.
-> The defined of this API is return the max timeout value in
-> miliseconds, so you need to
-> divide the clock by 1000.
-> None of these handles the detail bout discard_to.
+On Tue, Dec 10, 2013 at 08:56:07PM +0800, Dong Aisheng wrote:
+>  static inline void sdhci_update_clock(struct sdhci_host *host)
+> @@ -2939,10 +2952,12 @@ int sdhci_add_host(struct sdhci_host *host)
+>  	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
+>  		host->timeout_clk = mmc->f_max / 1000;
 
-Let me start it over again.  Here is basically what your patch does.
+Since max_discard_to calculation below will not happen for
+SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK case, does it still make sense to
+keep the above code?
 
--     mmc->max_discard_to = (1 << 27) / host->timeout_clk;
-+     if (host->ops->get_max_timeout)
-+             mmc->max_discard_to = host->ops->get_max_timeout(host);
+Or put it in the other way, if we keep the above code and do not make
+the change below, will there be any problem besides the max_discard_to
+initialization plays for nothing?
 
-The only thing that does not work for you in the existing code is the
-(1 << 27) part, right?
-
-If so, why not just create a platform hook to return the correct thing
-for you platform, i.e. (1 << 28)?
-
-	if (host->ops->get_max_timeout)
-		mmc->max_discard_to = host->ops->hook_foo(host);
-
-unsigned int esdhc_hook_foo(struct sdhci_host *host)
-{
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-
-	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
-}
-
-Such patch will be ease to be understood and less offensive to the
-existing code, no?
+All in all, I'm just confused why we keep the above code and make the
+change below at the same time.
 
 Shawn
+
+>  
+> -	if (host->ops->get_max_timeout)
+> -		mmc->max_discard_to = host->ops->get_max_timeout(host);
+> -	else
+> -		mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+> +	if (!(host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)) {
+> +		if (host->ops->get_max_timeout)
+> +			mmc->max_discard_to = host->ops->get_max_timeout(host);
+> +		else
+> +			mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+> +	}
+>  
+>  	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
+>  
+> -- 
+> 1.7.2.rc3
+> 
+> 
