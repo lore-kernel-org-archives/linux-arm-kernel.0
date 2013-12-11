@@ -1,47 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 Dec 2013 14:49:24 +0000
-Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20131211143018.GZ11468@sirena.org.uk>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <20131211141224.GG26730@mudshark.cambridge.arm.com>
- <20131211141503.GX11468@sirena.org.uk>
- <20131211142431.GD596@darko.cambridge.arm.com>
- <20131211143018.GZ11468@sirena.org.uk>
-Message-ID: <20131211144924.GG596@darko.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Dec 2013 15:49:13 +0100
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <1386770541-15056-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1386770541-15056-1-git-send-email-zhangfei.gao@linaro.org>
+ <1386770541-15056-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <201312111549.14017.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 02:30:18PM +0000, Mark Brown wrote:
-> On Wed, Dec 11, 2013 at 02:24:32PM +0000, Catalin Marinas wrote:
-> > On Wed, Dec 11, 2013 at 02:15:03PM +0000, Mark Brown wrote:
+On Wednesday 11 December 2013, Zhangfei Gao wrote:
+> Add dw_mmc-k3.c for k3v2, support sd/emmc
 > 
-> > > He said he hadn't had time to work on the actual implementation which is
-> > > why I picked this up - as far as I'm aware we only have the (already
-> > > merged) binding for this.
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Tested-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
+> ---
+>  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   51 ++++++++
+>  drivers/mmc/host/Kconfig                           |   10 ++
+>  drivers/mmc/host/Makefile                          |    1 +
+>  drivers/mmc/host/dw_mmc-k3.c                       |  136 ++++++++++++++++++++
+>  4 files changed, 198 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+>  create mode 100644 drivers/mmc/host/dw_mmc-k3.c
 > 
-> > Lorenzo (on holiday now) pushed the DT topology bindings but there are
-> > no patches yet for reading them. I would much prefer to only describe
-> > the topology via DT rather than MPIDR (because hardware people sometimes
-> > have strange ideas).
-> 
-> Right, that was my understanding too.  
-> 
-> For clarity the current code only uses DT information, the MPIDR values
-> it uses are those in the CPU nodes in the DT which are used by the SMP
-> code and are not read from the hardware.
+> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> new file mode 100644
+> index 000000000000..d816b89c386a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> @@ -0,0 +1,51 @@
+> +* Hisilicon specific extensions to the Synopsys Designware Mobile
+> +  Storage Host Controller
+> +
+> +Read synopsys-dw-mshc.txt for more details
+> +
+> +The Synopsys designware mobile storage host controller is used to interface
+> +a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
+> +differences between the core Synopsys dw mshc controller properties described
+> +by synopsys-dw-mshc.txt and the properties used by the Hisilicon specific
+> +extensions to the Synopsys Designware Mobile Storage Host Controller.
+> +
+> +Required Properties:
+> +
+> +* compatible: should be one of the following.
+> +  - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extentions.
+> +* clk-table-num: should be number of clks in clk-table required by each mmc timing
+> +* clk-table: should clock list required by each mmc timing
 
-But these must match the hardware MPIDR to be useful on SMP. So whether
-you read them from hardware or DT, they are still the same.
+I have not seen "clk-table" and "clk-table-num" before. Are these standard
+properties? What are the units that are used here, what does the index mean?
 
-> We can drop that bit of code
-> easily enough but it seemed useful for getting the scaffolding in place
-> separately to the binding parsing and for general robustness, perhaps
-> adding a patch at the end of the series to drop the code handling MPIDR
-> would deal with the application issues?
-
-Can we have the topology infrastructure with a flat initial topology and
-the actual building in a separate patch?
-
--- 
-Catalin
+	Arnd
