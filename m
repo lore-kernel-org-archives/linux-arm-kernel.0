@@ -1,41 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Dec 2013 11:06:18 +0000
-Subject: [PATCH] arm64: Correct virt_addr_valid
-In-Reply-To: <20131211104429.GE26730@mudshark.cambridge.arm.com>
-References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
- <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
- <20131211104429.GE26730@mudshark.cambridge.arm.com>
-Message-ID: <20131211110618.GG4360@n2100.arm.linux.org.uk>
+From: rajeev-dlh.kumar@st.com (Rajeev kumar)
+Date: Wed, 11 Dec 2013 16:39:05 +0530
+Subject: [PATCH 01/12] SPEAr13xx: Correct dt field name for stmmac phy-addr
+In-Reply-To: <1078549fa412fb34ab2c95a6232096570abee12d.1386752447.git.mohit.kumar@st.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <1078549fa412fb34ab2c95a6232096570abee12d.1386752447.git.mohit.kumar@st.com>
+Message-ID: <52A847D1.5000409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 10:44:29AM +0000, Will Deacon wrote:
-> Hmm, this is pretty expensive on both arm and arm64, since we end up doing a
-> binary search through all of the memblocks.
+On 12/11/2013 3:08 PM, Mohit KUMAR wrote:
+> DT field name for the phy address changed since kernel 3.10. Set the
+> snps,phy-addr to 0xffffffff so that the driver probes for the phy.
+>
+> Signed-off-by: Mohit Kumar<mohit.kumar@st.com>
+> Cc: Pratyush Anand<pratyush.anand@st.com>
+> Cc: Viresh Kumar<viresh.linux@gmail.com>
+> Cc: spear-devel at list.st.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> ---
+>   arch/arm/boot/dts/spear13xx.dtsi |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+> index 4382547..3518803 100644
+> --- a/arch/arm/boot/dts/spear13xx.dtsi
+> +++ b/arch/arm/boot/dts/spear13xx.dtsi
+> @@ -155,6 +155,7 @@
+>
+>   		gmac0: eth at e2000000 {
+>   			compatible = "st,spear600-gmac";
+> +			snps,phy-addr =<0xffffffff>;
 
-People say "binary search == expensive" almost as a knee jerk
-reaction, because classical thinking is that binary searches are
-expensive for systems with caches.  Have you considered how many
-memblocks you end up with on a normal system?
+Don't you think it should be st,phy-addr =<0xffffffff>, as the 
+manufacturer is 'st' as the compatible suggest
 
-How expensive is a binary search across one element?  Two elements?
-Four elements?  In the very very rare case (there's only one platform)
-eight elements?
+~Rajeev
 
-For one element, it's the same as a linear search - we only have to
-look at one element and confirm whether the pointer is within range.
-Same for two - we check one and check the other.  As memblock is array
-based, both blocks share the same cache line.
 
-For four, it means we look at most three elements, at least two of
-which share a cache line.  In terms of cache line loading, it's no
-more expensive than a linear search.  In terms of CPU cycles, it's
-a win because we don't need to expend cycles looking at the fourth
-element.
-
-For eight (which is starting to get into the "rare" territory, and
-three cache lines, four elements vs a linear search which can be up
-to four cache lines and obviously eight elements.
-
-Now, bear in mind that the normal case is one, there's a number with
-two, four starts to become rare, and eight is almost non-existent...
+>   			reg =<0xe2000000 0x8000>;
+>   			interrupts =<0 33 0x4
+>   				      0 34 0x4>;
