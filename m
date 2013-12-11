@@ -1,35 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Dec 2013 22:51:16 +0000
-Subject: [PATCH 2/2] regulator: s5m8767: Fix driver probe fail on BUCK7/8
- regulators
-In-Reply-To: <1386666583-3280-2-git-send-email-k.kozlowski@samsung.com>
-References: <1386666583-3280-1-git-send-email-k.kozlowski@samsung.com>
- <1386666583-3280-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20131211225116.GC11044@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Dec 2013 00:00:53 +0100
+Subject: [PATCH 09/12] pcie: SPEAr13xx: Add designware pcie support
+In-Reply-To: <f5c9cbbd116d462c428afc2e8afefd95aad8c6ec.1386752447.git.mohit.kumar@st.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <f5c9cbbd116d462c428afc2e8afefd95aad8c6ec.1386752447.git.mohit.kumar@st.com>
+Message-ID: <201312120000.54545.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 10:09:43AM +0100, Krzysztof Kozlowski wrote:
-> The BUCK7 and BUCK8 were not supported by s5m8767 driver. If they were
-> configured in DTS then the driver probing would fail with EINVAL:
-> [    0.288474] VCC_SUB_1.35V: failed to apply 1350000uV constraint
-> [    0.288671] s5m8767-pmic s5m8767-pmic: regulator init failed for 35
-> [    0.294931] s5m8767-pmic: probe of s5m8767-pmic failed with error -22
+On Wednesday 11 December 2013, Mohit Kumar wrote:
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/resource.h>
+> +#include <mach/spear.h>
 
-> This patch adds support for BUCK7 and BUCK8 regulators using standard
-> regmap get/set voltage sel functions.
+This won't actually build: you cannot access mach/*.h header files
+from outside of mach-spear!
 
-I've applied these but this changelog doesn't entirely add up so I
-rewrote it a bit.  The patch is implementing the get and set voltage
-operations, the regulators were actually supported.  The errors were
-being caused by the DT attempting to set the voltage for a fixed voltage
-regulator which obviously won't work - I suspect that the DTs might not
-be ideal, it seems common to overspecify voltages in DTs for some
-reason.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/858fb28c/attachment.sig>
+> +struct spear13xx_pcie {
+> +	void __iomem		*phy_base;
+> +	void __iomem		*app_base;
+> +	struct clk		*clk;
+> +	struct pcie_port	pp;
+> +	int			id;
+> +	int			is_gen1;
+> +};
+
+The pcie driver shouldn't have direct access to the phy registers,
+use a phy driver for that.
+
+> +static int workaround_linkup_spear1340(struct spear13xx_pcie *spear13xx_pcie)
+> +{
+> 
+> +}
+> +
+> +static int spear13xx_pcie_establish_link(struct pcie_port *pp)
+> +{
+
+These should move into the phy driver.
+
+> +	/* txdetectrx workaround for SPEAr1310 */
+> +	if (of_machine_is_compatible("st,spear1310"))
+> +		writeb(0x00, spear13xx_pcie->phy_base + 0x16);
+
+Don't use of_machine_is_compatible() to test for features or bugs of a
+particular device. Instead use a binary property in the specific
+device node, or key it off of the device's "compatible" value if
+there are a lot of differences. You seem to have a couple of these
+to test for one or the other PHY implementation, those will
+go away when you have a proper driver for them.
+
+	Arnd
