@@ -1,54 +1,49 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 11 Dec 2013 16:08:53 +0000
-Subject: [PATCH 3/6] arm64: dts: Add a devicetree for the ARMv8 4xA53
- 4xA57 FVP
-In-Reply-To: <20131211150433.GD17681@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Dec 2013 16:13:52 +0000
+Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131211144924.GG596@darko.cambridge.arm.com>
 References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-3-git-send-email-broonie@kernel.org>
- <20131211135536.GC17681@e106331-lin.cambridge.arm.com>
- <20131211141148.GV11468@sirena.org.uk>
- <20131211150433.GD17681@e106331-lin.cambridge.arm.com>
-Message-ID: <1386778133.3447.6.camel@linaro1.home>
+ <1386767606-6391-4-git-send-email-broonie@kernel.org>
+ <20131211141224.GG26730@mudshark.cambridge.arm.com>
+ <20131211141503.GX11468@sirena.org.uk>
+ <20131211142431.GD596@darko.cambridge.arm.com>
+ <20131211143018.GZ11468@sirena.org.uk>
+ <20131211144924.GG596@darko.cambridge.arm.com>
+Message-ID: <20131211161352.GC11468@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-11 at 15:04 +0000, Mark Rutland wrote:
-> On Wed, Dec 11, 2013 at 02:11:48PM +0000, Mark Brown wrote:
-> > On Wed, Dec 11, 2013 at 01:55:36PM +0000, Mark Rutland wrote:
-> > > On Wed, Dec 11, 2013 at 01:13:23PM +0000, Mark Brown wrote:
-[...]
-> > 
-> > > > +/ {
-> > > > +	model = "FVP Base";
-> > 
-> > > FVP Base (is as the name implies) a base upon which particular model
-> > > instances are built. This name should be clarified (e.g. "FVP Base A57x4
-> > > A53x4").
-> > 
-> > > That also applies to the filename.
-> > 
-> > I can update these, though they do seem to come from what you guys are
-> > releasing - you might want to follow up on this internally (this applies
-> > to almost all of your review comments, sorry).  It's probably going to
-> > be a bit confusing for users to have the filename change but ho hum :/
-> 
-> I'll try to chase up the issues, thanks for making me aware.
-> 
-> I don't see the name issue as a big problem. This DT has never been part
-> of the kernel tree, so there's no filename compatibility issue to deal
-> with. Existing users of the DT will already have to be modified to get
-> the DTs from a new source.
-> 
-> There should be nothing hanging off the compatible string for the
-> platform yet -- we have no board files or platform blobs in the arm64
-> port. If the model name is being used as anything other than a handy
-> indicator to users, then that's broken anyway.
+On Wed, Dec 11, 2013 at 02:49:24PM +0000, Catalin Marinas wrote:
+> On Wed, Dec 11, 2013 at 02:30:18PM +0000, Mark Brown wrote:
 
-I believe Android uses model names to determine the filenames of init
-scripts to run. That's not a kernel problem, but thought I would point
-out one 'broken' use that I have first hand experience of, having been
-tripped up before by ARM's twice yearly lets-rename-everything-again
-exercise ;-)
+> > For clarity the current code only uses DT information, the MPIDR values
+> > it uses are those in the CPU nodes in the DT which are used by the SMP
+> > code and are not read from the hardware.
 
--- 
-Tixy
+> But these must match the hardware MPIDR to be useful on SMP. So whether
+> you read them from hardware or DT, they are still the same.
+
+OK.  To be honest it does seem a bit unehelpful to just ignore the
+values; systems with bogus MPIDRs can always use the topology binding to
+set something sensible so we end up making work for people who did the
+right thing.  That said...
+
+> > We can drop that bit of code
+> > easily enough but it seemed useful for getting the scaffolding in place
+> > separately to the binding parsing and for general robustness, perhaps
+> > adding a patch at the end of the series to drop the code handling MPIDR
+> > would deal with the application issues?
+
+> Can we have the topology infrastructure with a flat initial topology and
+> the actual building in a separate patch?
+
+That would be the effect of just dropping that hunk completely, the
+default values we initialise if we don't do anything have that effect.
+I'll do that when I repost.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/85cf2894/attachment.sig>
