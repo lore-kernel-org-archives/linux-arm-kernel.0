@@ -1,34 +1,28 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 11 Dec 2013 10:48:27 -0500 (EST)
-Subject: [PATCH 0/8] Impedance matcher for Samsung boards
-In-Reply-To: <52A88286.2030401@gmail.com>
-References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
- <005d01cef679$be770570$3b651050$%wilczek@samsung.com>
- <52A8725F.2020403@gmail.com> <1837099.JIoGixjT73@amdc1227>
- <52A88286.2030401@gmail.com>
-Message-ID: <alpine.LFD.2.10.1312111040240.15948@knanqh.ubzr>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 11 Dec 2013 19:50:16 +0400
+Subject: [PATCH 0/2] serial: clps711x: UART driver refactor
+Message-ID: <1386777016-24750-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Dec 2013, Daniel Mack wrote:
+This is a complex patch for refactoring CLPS711X serial driver.
+Major changes:
+- Eliminate <mach/hardware.h> usage.
+- Devicetree support.
 
-> On 12/11/2013 03:28 PM, Tomasz Figa wrote:
-> > There are some parameters that bootloaders normally pass with ATAGS
-> > and can't be hardcoded in DT, such as initrd location in memory, serial
-> > number, board revision, command line and in some cases even memory,
-> > as on some boards it might vary between units.
-> 
-> Ok, that was my question :) Sure, if you have units that differ in
-> hardware details, but are indistinguishable by their machine ID or board
-> revision number, there's not much that we can do but modify the FDT at
-> runtime. Serial numbers are also something that can't be solved in a
-> nicer way.
-> 
-> What bugs me, though, is that it blows up the code base so massively.
+Patch created for adding in tty tree, but this changes need attention
+from ARM and DT maintainers, so "ACK" will be useful here.
 
-You could investigate gcc's -ffunction-sections argument.  This won't 
-help with the code size, but it does help for discarding unreferenced 
-functions from the final lbinary.
+Alexander Shiyan (2):
+  serial: clps711x: Driver refactor
+  serial: clps711x: dts: Add bindings documentation for the CLPS711X
+    UART
 
+ .../bindings/serial/cirrus,clps711x-uart.txt       |  29 ++
+ arch/arm/mach-clps711x/devices.c                   |  21 +
+ drivers/tty/serial/clps711x.c                      | 448 ++++++++++++---------
+ 3 files changed, 304 insertions(+), 194 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
 
-Nicolas
+-- 
+1.8.3.2
