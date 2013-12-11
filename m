@@ -1,36 +1,31 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 11 Dec 2013 04:21:45 -0600
-Subject: [PATCH 2/2] ARM: dts: omap2430-sdp: add flags for ethernet
- functionality
-In-Reply-To: <1386757305-12545-1-git-send-email-nm@ti.com>
-References: <1386757305-12545-1-git-send-email-nm@ti.com>
-Message-ID: <1386757305-12545-3-git-send-email-nm@ti.com>
+Date: Wed, 11 Dec 2013 04:21:43 -0600
+Subject: [PATCH 0/2] net: smc91x: add DT flags for legacy platforms
+Message-ID: <1386757305-12545-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ethernet transition from board file to dts missed the required pdata
-conversion. So fix the same.
+Hi,
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/omap2430-sdp.dts |    5 +++++
- 1 file changed, 5 insertions(+)
+SMC91x driver has been converted to device tree, however users of
+older lan91c94 based platform need description provided previously by
+platform_data. Without this, ethernet fails to function on these platforms.
 
-diff --git a/arch/arm/boot/dts/omap2430-sdp.dts b/arch/arm/boot/dts/omap2430-sdp.dts
-index 2c90d29..ec9263a 100644
---- a/arch/arm/boot/dts/omap2430-sdp.dts
-+++ b/arch/arm/boot/dts/omap2430-sdp.dts
-@@ -39,6 +39,11 @@
- 	ranges = <5 0 0x08000000 0x01000000>;
- 	ethernet at gpmc {
- 		compatible = "smsc,lan91c94";
-+		reg-io-width = <2>;
-+		smsc,nowait;
-+		smsc,leda = "100_10";
-+		smsc,ledb = "TX_RX";
-+
- 		interrupt-parent = <&gpio5>;
- 		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;	/* gpio149 */
- 		reg = <5 0x300 0xf>;
+For example, on SDP2430:
+Before: http://pastebin.mozilla.org/3753793
+After: http://pastebin.mozilla.org/3753792
+
+Nishanth Menon (2):
+  net: smc91x: Read hardware behavior flags from device tree
+  ARM: dts: omap2430-sdp: add flags for ethernet functionality
+
+ Documentation/devicetree/bindings/net/smsc91x.txt |   45 +++++++++
+ arch/arm/boot/dts/omap2430-sdp.dts                |    5 +
+ drivers/net/ethernet/smsc/smc91x.c                |  106 ++++++++++++++++++++-
+ 3 files changed, 155 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/net/smsc91x.txt
+
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
