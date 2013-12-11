@@ -1,45 +1,61 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Dec 2013 08:34:30 +0900
-Subject: [PATCH 08/12] pcie: designware: Fix IO transfers
-In-Reply-To: <6b4282b9e793ec89ba0c20f3362d41f6133a8132.1386752447.git.mohit.kumar@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <6b4282b9e793ec89ba0c20f3362d41f6133a8132.1386752447.git.mohit.kumar@st.com>
-Message-ID: <001601cef6c9$89d65eb0$9d831c10$%han@samsung.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Thu, 12 Dec 2013 00:40:58 +0100
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <1386787690.20516.10.camel@linux-builds1>
+References: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
+ <201312110445.54336.arnd@arndb.de> <1386787690.20516.10.camel@linux-builds1>
+Message-ID: <201312120040.59345.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 11, 2013 6:39 PM, Mohit Kumar wrote:
-> From: Pratyush Anand <pratyush.anand@st.com>
+Am Mittwoch, 11. Dezember 2013, 19:48:10 schrieb Dinh Nguyen:
+> On Wed, 2013-12-11 at 04:45 +0100, Arnd Bergmann wrote:
+> > On Wednesday 11 December 2013, Zhangfei Gao wrote:
+> > > Thanks for the good suggestion, it can be abstracted to clock.
+> > > 
+> > > The issue for this version's ip is there are some registers need to be
+> > > set, including fixed factor and phase, which may be required to be
+> > > tuned, however it can be hide in clock.
+> > > 
+> > > Double checked next version's ip, it is more intelligent and only
+> > > fixed factor is required, more like a clock, and all these register
+> > > accessing are NOT required.
+> > > 
+> > > Will update new version to abstract these chip depended registers to
+> > > clock.
+> > 
+> > Ok, please stay in contact with Dinh Nguyen over this, since his side
+> > is work-in-progress and we are still evaluating how to best encode
+> > the phase setting in DT in a generic form.
 > 
-> pp->io_base which is the input of the outbound IO address translation
-> unit should be the cpu address, it was programmed wrongly to realio
-> address.
+> Will the bindings "samsung,dw-mshc-sdr-timing" and
+> "samsung,dw-mshc-ddr-timing" also work for the k3 platform as well? I
+> think they should work, but just wanted to verify.
 > 
-> We should pass global_io_offset rather than sys->io_offset to
-> pci_ioremap_io, so we map the new window into the first available spot
-> in the Linux view of the I/O space.
+> Heiko, on the rockchip platform, can you check to see if you have these
+> cclk_in_drv and cclk_sample settings for the phase shift of the clocks?
+> The SD/MMC IP version(2.40a) on Rockchip is the same version that is on
+> SOCFPGA, so I think these settings are there. They can be located in
+> some other "system" register block like SOCFPGA. The possible reason
+> that you have not need to set them in the Rockchip code could be that
+> the bootloader/firmware has already set them if you are booting from the
+> SD/MMC source. You may need to set the clock phase settings if you boot
+> from a non-SD source.
 > 
-> We must also pass cpu address instead  of realio address to
-> pci_ioremap_io.
-> 
-> This patch fixes above issue. It has been tested with Lecroy PTC in AIC
-> mode and Pericom PI7C9X2G303EL PCIe switch, which does not work
-> otherwise.
-> 
-> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> Tested-by: Mohit Kumar <mohit.kumar@st.com>
-> Tested-by: Tim Harvey <tharvey@gateworks.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: spear-devel at list.st.com
+> I think the reading of the "samsung,dw-mshc-ddr-timing" and
+> "samsung,dw-msh-sdr-timing" bindings can also be moved into the generic
+> dw_mmc driver if the above 2 conditions are correct.
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+The mmc-controller part of the rk-manual that is flying around the net, 
+mentions these cclk_in_drv and cclk_in_sample as coming from somewhere, but 
+sadly never where to get/set/access them.
 
-Best regards,
-Jingoo Han
+The doc of the USE_HOLD_REG bit also mention the required settings of these 
+cclk_in_* but nowhere is a word about the where to be found.
 
-> ---
->  drivers/pci/host/pcie-designware.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+And the manual is notable for lacking all information related to the clock 
+controller. And I also wasn't able to find any other indication where this 
+might be set.
+
+
+Heiko
