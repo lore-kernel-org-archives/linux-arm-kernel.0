@@ -1,48 +1,39 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Dec 2013 15:55:32 -0800
-Subject: [PATCH 1/5] clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag
- for the sysreg clock
-In-Reply-To: <1386763029-8516-2-git-send-email-a.kesavan@samsung.com>
+Date: Wed, 11 Dec 2013 15:57:15 -0800
+Subject: [PATCH 5/5] ARM: dts: Setup the interrupt parent for max77686
+In-Reply-To: <1386763029-8516-6-git-send-email-a.kesavan@samsung.com>
 References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
- <1386763029-8516-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CAD=FV=WK-zgcNvF6qtnsRky3RbEvBOW+1uNiUR-fyp2257gPPw@mail.gmail.com>
+ <1386763029-8516-6-git-send-email-a.kesavan@samsung.com>
+Message-ID: <CAD=FV=Vkobnvk1tic5eLkoXzniqRYFM4BhWkW+_7AL25Hd9iwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash,
+Abhliash,
 
 On Wed, Dec 11, 2013 at 3:57 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> The sysreg (system register) generates control signals for various blocks
-> like disp1blk, i2c, mipi etc. However, it gets disabled as an unused clock
-> at boot-up.
+> Fix the following warning message:
+> [ 2921.671238] WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:399 irq_create_mapping+0xe4/0xfc()
+> [ 2921.679907] irq_create_mapping(, b) called with NULL domain
+> [ 2921.685462] Modules linked in:
+> [ 2921.688498] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0-rc1-00026-g36cc776 #67
+> [ 2921.696154] [<c0013c80>] (unwind_backtrace+0x0/0xf8) from [<c00110cc>] (show_stack+0x10/0x14)
+> [ 2921.704654] [<c00110cc>] (show_stack+0x10/0x14) from [<c03779fc>] (dump_stack+0x64/0xa4)
+> [ 2921.712725] [<c03779fc>] (dump_stack+0x64/0xa4) from [<c001c830>] (warn_slowpath_common+0x64/0x84)
+> [ 2921.721663] [<c001c830>] (warn_slowpath_common+0x64/0x84) from [<c001c8e4>] (warn_slowpath_fmt+0x30/0x40)
+> [ 2921.731210] [<c001c8e4>] (warn_slowpath_fmt+0x30/0x40) from [<c005a564>] (irq_create_mapping+0xe4/0xfc)
+> [ 2921.740590] [<c005a564>] (irq_create_mapping+0xe4/0xfc) from [<c029c85c>] (max77686_rtc_probe+0x110/0x21c)
+> [ 2921.750221] [<c029c85c>] (max77686_rtc_probe+0x110/0x21c) from [<c02253a8>] (platform_drv_probe+0x18/0x48)
+>
+> Also setup the default state of the max77686 irq line.
 >
 > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 > ---
->  drivers/clk/samsung/clk-exynos5250.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index adf3234..0833501 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -406,7 +406,8 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
->         GATE(hsi2c2, "hsi2c2", "aclk66", GATE_IP_PERIC, 30, 0, 0),
->         GATE(hsi2c3, "hsi2c3", "aclk66", GATE_IP_PERIC, 31, 0, 0),
->         GATE(chipid, "chipid", "aclk66", GATE_IP_PERIS, 0, 0, 0),
-> -       GATE(sysreg, "sysreg", "aclk66", GATE_IP_PERIS, 1, 0, 0),
-> +       GATE(sysreg, "sysreg", "aclk66",
-> +                       GATE_IP_PERIS, 1, CLK_IGNORE_UNUSED, 0),
->         GATE(pmu, "pmu", "aclk66", GATE_IP_PERIS, 2, CLK_IGNORE_UNUSED, 0),
->         GATE(tzpc0, "tzpc0", "aclk66", GATE_IP_PERIS, 6, 0, 0),
->         GATE(tzpc1, "tzpc1", "aclk66", GATE_IP_PERIS, 7, 0, 0),
+>  arch/arm/boot/dts/cros5250-common.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
 
-This does match what's done in exynos4 and exynos5420 and it's not
-terrible.  I'm always a fan of actually specifying clocks properly and
-that's more possible now using the syscon stuff (see Leela Krishna's
-watchdog patches).  You'd have to extend that to add a clock, but that
-wouldn't be too hard.
+Thank you for sending stuff upstream, but I'm afraid this patch has
+already landed:
 
-That being said, I'd personally be OK with this solution for now (to
-match the other exynos products), so:
+c61248a ARM: dts: Add max77686 RTC interrupt to cros5250-common
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+My patch matches yours but also includes the "wakeup-source" property.
