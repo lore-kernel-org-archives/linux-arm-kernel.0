@@ -1,16 +1,14 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 11 Dec 2013 11:30:13 +0100
-Subject: [PATCH 2/7] PCI: imx6: Fix waiting for link up
+Date: Wed, 11 Dec 2013 11:30:14 +0100
+Subject: [PATCH V2 3/7] PCI: imx6: Split away the PHY reset
 In-Reply-To: <1386757818-5154-1-git-send-email-marex@denx.de>
 References: <1386757818-5154-1-git-send-email-marex@denx.de>
-Message-ID: <1386757818-5154-2-git-send-email-marex@denx.de>
+Message-ID: <1386757818-5154-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While waiting for the PHY to report the PCIe link is up, we might
-hit a situation where the link training is still in progress, while
-the PHY already reports the link is up. Add additional check for
-this condition.
+Split the PCIe PHY reset from the link up function to make
+the code a little more structured.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -29,43 +27,65 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ drivers/pci/host/pci-imx6.c | 35 +++++++++++++++++++----------------
+ 1 file changed, 19 insertions(+), 16 deletions(-)
+
+V2: Drop unused 'temp' variable.
 
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 52027ad..4d5be4e 100644
+index 4d5be4e..478e87e 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -48,6 +48,8 @@ struct imx6_pcie {
- #define PL_OFFSET 0x700
- #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
- #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
-+#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
-+#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
+@@ -336,9 +336,26 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 	return;
+ }
  
- #define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
- #define PCIE_PHY_CTRL_DATA_LOC 0
-@@ -338,10 +340,17 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
++static void imx6_pcie_reset_phy(struct pcie_port *pp)
++{
++	uint32_t temp;
++
++	pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
++	temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN |
++		 PHY_RX_OVRD_IN_LO_RX_PLL_EN);
++	pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
++
++	usleep_range(2000, 3000);
++
++	pcie_phy_read(pp->dbi_base, PHY_RX_OVRD_IN_LO, &temp);
++	temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN |
++		  PHY_RX_OVRD_IN_LO_RX_PLL_EN);
++	pcie_phy_write(pp->dbi_base, PHY_RX_OVRD_IN_LO, temp);
++}
++
+ static int imx6_pcie_link_up(struct pcie_port *pp)
  {
- 	u32 rc, ltssm, rx_valid, temp;
- 
--	/* link is debug bit 36, debug register 1 starts@bit 32 */
--	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1) & (0x1 << (36 - 32));
--	if (rc)
--		return -EAGAIN;
-+	/*
-+	 * Test if the PHY reports that the link is up and also that
-+	 * the link training finished. It might happen that the PHY
-+	 * reports the link is already up, but the link training bit
-+	 * is still set, so make sure to check the training is done
-+	 * as well here.
-+	 */
-+	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-+	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
-+	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
-+		return 1;
+-	u32 rc, ltssm, rx_valid, temp;
++	u32 rc, ltssm, rx_valid;
  
  	/*
- 	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+ 	 * Test if the PHY reports that the link is up and also that
+@@ -370,21 +387,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+ 
+ 	dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
+ 
+-	pcie_phy_read(pp->dbi_base,
+-		PHY_RX_OVRD_IN_LO, &temp);
+-	temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN
+-		| PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+-	pcie_phy_write(pp->dbi_base,
+-		PHY_RX_OVRD_IN_LO, temp);
+-
+-	usleep_range(2000, 3000);
+-
+-	pcie_phy_read(pp->dbi_base,
+-		PHY_RX_OVRD_IN_LO, &temp);
+-	temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN
+-		| PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+-	pcie_phy_write(pp->dbi_base,
+-		PHY_RX_OVRD_IN_LO, temp);
++	imx6_pcie_reset_phy(pp);
+ 
+ 	return 0;
+ }
 -- 
 1.8.4.3
