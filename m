@@ -1,188 +1,60 @@
 From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Wed, 11 Dec 2013 14:07:36 +0100
-Subject: [PATCH 5/8] add memory operations
+Date: Wed, 11 Dec 2013 14:07:34 +0100
+Subject: [PATCH 3/8] device tree blob must be 4-bytes alingned
 In-Reply-To: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
 References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
-Message-ID: <1386767259-15693-6-git-send-email-p.wilczek@samsung.com>
+Message-ID: <1386767259-15693-4-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This code is from Kernel 3.10.
+Each appended device tree blob must be 4-bytes aligned.
+This patch modifies append_dtbs script to append bytes to each device tree
+file so the size is multiple of 4.
+When finding dtb the addres of next dtb is also aligned to 4-bytes.
 
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Piotr Wilczek <p.wilczek@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- string.c |  117 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- string.h |   10 ++++++
- types.h  |    3 ++
- 3 files changed, 129 insertions(+), 1 deletion(-)
+ append_dtbs.sh |   11 +++++++++++
+ dtbs.c         |    4 ++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/string.c b/string.c
-index ced25c8..ec66b27 100644
---- a/string.c
-+++ b/string.c
-@@ -1,4 +1,3 @@
--#include "types.h"
- #include "string.h"
+diff --git a/append_dtbs.sh b/append_dtbs.sh
+index 82bb463..a8a7cda 100755
+--- a/append_dtbs.sh
++++ b/append_dtbs.sh
+@@ -4,5 +4,16 @@ OUT="$1"
+ shift
+ DTBS="$*"
  
- int hexlut[1 + 'F' - '0'] = {
-@@ -97,3 +96,119 @@ int getaddrs(void **k, void **d, const char *str)
++while [ -n "$*" ]
++do
++	SIZE=`stat $1 -c %s`
++	MOD=`expr $SIZE % 4`
++	if [ $MOD -ne 0 ]; then
++		PADDING=`expr 4 - $MOD`
++		dd if=/dev/zero count=$PADDING bs=1 >> $1 2> /dev/null
++	fi
++	shift
++done
++
+ cat $DTBS >>$OUT
+ dd if=/dev/zero of=$OUT oflag=append conv=notrunc bs=1 count=8 #sentinel
+diff --git a/dtbs.c b/dtbs.c
+index 812c2ef..26e3b83 100644
+--- a/dtbs.c
++++ b/dtbs.c
+@@ -30,6 +30,10 @@ void *find_dtb(void *dtbs, const char *compat)
+ 			return d;
  
- 	return 0;
- }
+ 		d = (struct fdt_header *)((char *)d + be_to_cpu(d->totalsize));
 +
-+/**
-+ * memchr - Find a character in an area of memory.
-+ * @s: The memory area
-+ * @c: The byte to search for
-+ * @n: The size of the area.
-+ *
-+ * returns the address of the first occurrence of @c, or %NULL
-+ * if @c is not found
-+ */
-+void *memchr(const void *s, int c, size_t n)
-+{
-+	const unsigned char *p = s;
-+	while (n-- != 0) {
-+		if ((unsigned char)c == *p++) {
-+			return (void *)(p - 1);
-+		}
-+	}
-+	return NULL;
-+}
++		/* align to 4-bytes */
++		d = (struct fdt_header *)((((unsigned int)d + 0x3) & ~0x3));
 +
-+/**
-+ * strchr - Find the first occurrence of a character in a string
-+ * @s: The string to be searched
-+ * @c: The character to search for
-+ */
-+char *strchr(const char *s, int c)
-+{
-+	for (; *s != (char)c; ++s)
-+		if (*s == '\0')
-+			return NULL;
-+	return (char *)s;
-+}
-+
-+/**
-+ * memset - Fill a region of memory with the given value
-+ * @s: Pointer to the start of the area.
-+ * @c: The byte to fill the area with
-+ * @count: The size of the area.
-+ *
-+ * Do not use memset() to access IO space, use memset_io() instead.
-+ */
-+void *memset(void *s, int c, size_t count)
-+{
-+	char *xs = s;
-+
-+	while (count--)
-+		*xs++ = c;
-+	return s;
-+}
-+
-+/**
-+ * memcpy - Copy one area of memory to another
-+ * @dest: Where to copy to
-+ * @src: Where to copy from
-+ * @count: The size of the area.
-+ *
-+ * You should not use this function to access IO space, use memcpy_toio()
-+ * or memcpy_fromio() instead.
-+ */
-+void *memcpy(void *dest, const void *src, size_t count)
-+{
-+	char *tmp = dest;
-+	const char *s = src;
-+
-+	while (count--)
-+		*tmp++ = *s++;
-+	return dest;
-+}
-+
-+/**
-+ * memmove - Copy one area of memory to another
-+ * @dest: Where to copy to
-+ * @src: Where to copy from
-+ * @count: The size of the area.
-+ *
-+ * Unlike memcpy(), memmove() copes with overlapping areas.
-+ */
-+void *memmove(void *dest, const void *src, size_t count)
-+{
-+	char *tmp;
-+	const char *s;
-+
-+	if (dest <= src) {
-+		tmp = dest;
-+		s = src;
-+		while (count--)
-+			*tmp++ = *s++;
-+	} else {
-+		tmp = dest;
-+		tmp += count;
-+		s = src;
-+		s += count;
-+		while (count--)
-+			*--tmp = *--s;
-+	}
-+	return dest;
-+}
-+
-+/**
-+ * memcmp - Compare two areas of memory
-+ * @cs: One area of memory
-+ * @ct: Another area of memory
-+ * @count: The size of the area.
-+ */
-+#undef memcmp
-+int memcmp(const void *cs, const void *ct, size_t count)
-+{
-+	const unsigned char *su1, *su2;
-+	int res = 0;
-+
-+	for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
-+		if ((res = *su1 - *su2) != 0)
-+			break;
-+	return res;
-+}
-diff --git a/string.h b/string.h
-index 0b99785..41ddd3a 100644
---- a/string.h
-+++ b/string.h
-@@ -1,9 +1,19 @@
- #ifndef _STRING_H
- #define _STRING_H
+ 	}
  
-+#include "types.h"
-+
- int strlen(const char *);
- int strncmp(const char *, const char *, int);
- void *gethexaddr(const char *, const char **);
- int getaddrs(void **, void **, const char *);
- 
-+void *memchr(const void *s, int c, size_t n);
-+char *strchr(const char *s, int c);
-+
-+void *memset(void *s, int c, size_t count);
-+void *memcpy(void *dest, const void *src, size_t count);
-+void *memmove(void *dest, const void *src, size_t count);
-+int memcmp(const void *cs, const void *ct, size_t count);
-+
- #endif
-diff --git a/types.h b/types.h
-index 636f95b..b8b4a95 100644
---- a/types.h
-+++ b/types.h
-@@ -4,6 +4,9 @@
- typedef unsigned char u8;
- typedef unsigned int u32;
- typedef unsigned long long u64;
-+
-+typedef unsigned long size_t;
-+
- #define NULL	((void *) 0)
- 
- #endif /* _TYPES_H */
+ 	return NULL;
 -- 
 1.7.9.5
