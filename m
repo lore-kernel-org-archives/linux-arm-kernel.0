@@ -1,41 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 Dec 2013 14:27:05 +0000
-Subject: [PATCH 1/6] arm64: Add asm/cpu.h
-In-Reply-To: <20131211142308.GY11468@sirena.org.uk>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <20131211141018.GC596@darko.cambridge.arm.com>
- <20131211142308.GY11468@sirena.org.uk>
-Message-ID: <20131211142705.GE596@darko.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 11 Dec 2013 15:28:25 +0100
+Subject: [PATCH 0/8] Impedance matcher for Samsung boards
+In-Reply-To: <52A8725F.2020403@gmail.com>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+ <005d01cef679$be770570$3b651050$%wilczek@samsung.com>
+ <52A8725F.2020403@gmail.com>
+Message-ID: <1837099.JIoGixjT73@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 02:23:08PM +0000, Mark Brown wrote:
-> On Wed, Dec 11, 2013 at 02:10:19PM +0000, Catalin Marinas wrote:
-> > On Wed, Dec 11, 2013 at 01:13:21PM +0000, Mark Brown wrote:
-> 
-> > > +struct cpuinfo_arm {
-> > > +	struct cpu	cpu;
-> > > +	u64		cpuid;
-> > > +#ifdef CONFIG_SMP
-> > > +	unsigned int	loops_per_jiffy;
-> > > +#endif
-> > > +};
-> 
-> > How is this structure used? I haven't seen the ACPI code doing anything
-> > with struct cpu (though I haven't dug deep enough). Also loops_per_jiffy
-> > is useless, that's related to the delay loop based on the generic timer.
-> 
-> Now I look again we can probably drop this for the toplogy work - it had
-> been pulled in as part of pulling things in from pre-v8 and the cpuid
-> was used in the code while I was working on it but isn't any more unless
-> I'm misreading the code.  
-> 
-> I don't know what the ACPI guys are doing wtih it, I just saw they added
-> the same thing.
+Hi Daniel,
 
-It looked to me that for ACPI and empty asm/cpu.h file would do for now.
-There are a couple of prototypes for CPU hotplug I think but haven't
-seen the structure used (not even the x86_cpu one).
+On Wednesday 11 of December 2013 15:10:39 Daniel Mack wrote:
+> On 12/11/2013 03:03 PM, Piotr Wilczek wrote:
+> > Hi,
+> > 
+> >> -----Original Message----- From: Daniel Mack
+> >> [mailto:zonque at gmail.com] Sent: Wednesday, December 11, 2013 2:17
+> >> PM To: Piotr Wilczek; devicetree-discuss at lists.ozlabs.org;
+> >> linux-arm- kernel at lists.infradead.org Cc: Jason Cooper; Nicolas
+> >> Pitre Subject: Re: [PATCH 0/8] Impedance matcher for Samsung
+> >> boards
+> >> 
+> >> On 12/11/2013 02:07 PM, Piotr Wilczek wrote:
+> >>> This patchset implements the impedance-matcher for Samsung
+> >>> Exynos boards and does the following: - fix strncmp function; -
+> >>> ensure each DT blob is 4-byte aligned; - port 'atags_to_fdt' form
+> >>> Kernel; - add Exynos specific serial driver; - add support for
+> >>> Samsung boards, Trats and Trats2;
+> >>> 
+> >>> This patch set is based on: 
+> >>> https://github.com/zonque/pxa-impedance-matcher.git
+> >> 
+> >> Thanks for the patches!
+> >> 
+> >> I'm considering merging most of them, but I have my problems with
+> >> the inclusion of the libfdt library.
+> >> 
+> >> Could you explain what you need this for, exactly? Why can't you
+> >> just fix the device tree blob that you include instead of modifying
+> >> it at runtime?
+> > When bootloader needs to pass some information in ATAGS and
+> > CONFIG_ARM_APPENDED_DTB is turned off in kernel, then it has to be
+> > added to the device tree blob at runtime.
+> 
+> The question is: can't you just provide a dtb for each of your machines,
+> and distinguish them via their machine ID? Or do you really have
+> machines that come up with the same machine ID but differ in details
+> only stored in ATAGs?
+> 
+> After all, adding libfdt makes the code grow by more than factor 4.
 
--- 
-Catalin
+There are some parameters that bootloaders normally pass with ATAGS
+and can't be hardcoded in DT, such as initrd location in memory, serial
+number, board revision, command line and in some cases even memory,
+as on some boards it might vary between units.
+
+Since impedance matches can't forward the ATAGs to the kernel, when the
+kernel doesn't boot in appended DTB mode, there is a need to inject these
+data into DT in the matches itself, based on ATAGs it gets from the
+firmware.
+
+Best regards,
+Tomasz
