@@ -1,183 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Dec 2013 15:04:33 +0000
-Subject: [PATCH 3/6] arm64: dts: Add a devicetree for the ARMv8 4xA53
- 4xA57 FVP
-In-Reply-To: <20131211141148.GV11468@sirena.org.uk>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-3-git-send-email-broonie@kernel.org>
- <20131211135536.GC17681@e106331-lin.cambridge.arm.com>
- <20131211141148.GV11468@sirena.org.uk>
-Message-ID: <20131211150433.GD17681@e106331-lin.cambridge.arm.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 11 Dec 2013 16:09:06 +0100
+Subject: [PATCH v5 4/5] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <20131210161138.GO29580@intel.com>
+References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
+ <1377086938-29145-5-git-send-email-zonque@gmail.com>
+ <20130825163337.GD2748@intel.com> <522F3ECB.3070307@gmail.com>
+ <20130913045135.GI17188@intel.com> <52A61363.7060500@gmail.com>
+ <20131210161138.GO29580@intel.com>
+Message-ID: <52A88012.6070107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 02:11:48PM +0000, Mark Brown wrote:
-> On Wed, Dec 11, 2013 at 01:55:36PM +0000, Mark Rutland wrote:
-> > On Wed, Dec 11, 2013 at 01:13:23PM +0000, Mark Brown wrote:
-> 
-> > > +/dts-v1/;
-> 
-> > > +/memreserve/ 0x80000000 0x00010000;
-> 
-> > While we are admittedly missing them elsewhere, it would be nice to have
-> > a comment stating what the memreserve is for. With a proper PSCI
-> > implementation, I don't see why this should be necessary.
-> 
-> Could you tell me what it's there for?  Like you say everyone else has
-> it with no comments and the source doesn't either...
+Hi,
 
-When using the bootwrapper, the bootwrapper itself takes up a portion of
-memory (along with the spin-table) which would otherwise be available to
-the kernel. This is also true with my bootwrapper PSCI implementation.
-The memreserve tells the kernel not to stomp over this memory (though it
-will map it in).
+On 12/10/2013 05:11 PM, Vinod Koul wrote:
+> On Mon, Dec 09, 2013 at 08:00:51PM +0100, Daniel Mack wrote:
 
-With a proper firmware, I'd expect the PSCI implementation to be outside
-of the memory exposed to non-secure software, and thus there shouldn't
-be anything to reserve.
+>> I looked into your idea and implemented it, but I really feel having an
+>> explicit chain pointer for each descriptor is redundant information.
+>>
+>> Hence, let me summarize again how the driver currently works:
+>>
+>> * Any of the prep_* function will allocate a number of descriptors to
+>> accommodate the payload, and link them all together via the 'node'
+>> list_head, forming a transaction.
+>>
+>> * The last descriptor in a transaction has the DCMD_ENDIRQEN flag set.
+>>
+>> * When tx_submit() is called, each descriptor in the linked list will be
+>> assigned a cookie, and then entire list of the transaction is appended
+>> to the chain_pending list. At this point, the information of where a
+>> transaction ends is no longer visible in the 'node' list head.
+>>
+>> * start_pending_queue() moves the chain_pending entries to chain_running.
+>>
+>> When determining the channel's residue, we need to find the transaction
+>> currently in progress, and then count upwards until we reach the end of
+>> the transaction chain.
+> ah here is the catch! You dont get reside for a channel. You get for the
+> respetive transaction represented by the descriptor!
 
-It's possible that there is a reason for the reservation, but I'd rather
-we understood it than we propagated and codified a misunderstanding.
+Yes, exactly. I think part of the reason why we're not on the same page
+is a misleading wording on my side. Let me try and explain.
 
+> So lets establish few rules:
+> - Assume you have transactions A, B, C and D in a list
+> - on sumbmit (assume serial), you get descriptor 1, 2, 3 and 4 respectively
+
+You're referring to dma_async_tx_descriptor, while I was talking about
+mmp_pdma_desc_sw. IOW: what's handed out by the driver from any of its
+prep_* functions are dma_async_tx_descriptors, which consist of N
+chained mmp_pdma_desc_sw descriptors internally.
+
+Another specialty of this particular driver is that each
+mmp_pdma_desc_sw is assigned a dma_cookie_t, but only the last one in a
+chained list is handed out to the user.
+
+Following your example, the transaction-cookie matching could look like
+this, for example:
+
+  A:  1, 2, 3, 4
+  B:  5
+  C:  6, 7, 8
+  D:  9, 10
+
+So the only cookies the user 'knows' about and query the residue for,
+are 4, 5, 8 and 10.
+
+> - Now residue is for a descriptor, not a series of descriptors!, so
+>   - If DMA is started and currently 1 is being transferred, then
+>     - residue on 1 will give remaining bytes of 1
+>     - residue on 2 will give full length
 > 
-> > > +/ {
-> > > +	model = "FVP Base";
-> 
-> > FVP Base (is as the name implies) a base upon which particular model
-> > instances are built. This name should be clarified (e.g. "FVP Base A57x4
-> > A53x4").
-> 
-> > That also applies to the filename.
-> 
-> I can update these, though they do seem to come from what you guys are
-> releasing - you might want to follow up on this internally (this applies
-> to almost all of your review comments, sorry).  It's probably going to
-> be a bit confusing for users to have the filename change but ho hum :/
+> At client, you can sum up and decide how much is remianing for your point of
+> interest.
 
-I'll try to chase up the issues, thanks for making me aware.
+Absolutely. I understand that concept :)
 
-I don't see the name issue as a big problem. This DT has never been part
-of the kernel tree, so there's no filename compatibility issue to deal
-with. Existing users of the DT will already have to be modified to get
-the DTs from a new source.
+In this driver, however, I have to deal with multiple mmp_pdma_desc_sw
+descriptors that are all chained up in the channel's running list.
+Hence, my implementation goes as follows:
 
-There should be nothing hanging off the compatible string for the
-platform yet -- we have no board files or platform blobs in the arm64
-port. If the model name is being used as anything other than a handy
-indicator to users, then that's broken anyway.
+ * Walk the list of all mmp_pdma_desc_sw until we find the end of a
+transaction chain; IOW: find the end of one dma_async_tx_descriptor.
+This end entry has the DCMD_ENDIRQEN flag set.
 
-> 
-> > As the FVP is not a vexpress (though it is similar), we should probably
-> > have "arm,fvp-base" as the fallback and drop the "arm,vexpress" entry.
-> 
-> Is it not intended to be a software emulation of a vexpress and hence
-> supposed to be broadly compatible with one?
+ * Check if that mmp_pdma_desc_sw corresponds with the cookie the user
+wants to know the residue for, and if it does, return the residue that
+was calculated during the iteration.
 
-As I understand it, "Base" is a base platform that's somewhat like
-vexpress, but is not intended to be an emulation of vexpress. It may be
-broadly equivalent, but to limit confusion I'd rather treat them
-separately.
+ * Otherwise, reset the internal state and carry on.
 
-Regardless, top-level compatible strings aren't used for anything at the
-moment (and hopefully never will be), so nothing should be relying on
-"arm,vexpress" being present and we can remove it.
+>> I rebased the residue patch on top of Joe's cleanup work, and I can
+>> resubmit if you want me to. Maybe that serves as a better foundation for
+>> the ongoing discussion :)
+> Sure pls do post...
 
-> 
-> > > +	psci {
-> > > +		compatible = "arm,psci";
-> > > +		method = "smc";
-> > > +		cpu_suspend = <0xc4000001>;
-> > > +		cpu_off = <0x84000002>;
-> > > +		cpu_on = <0xc4000003>;
-> > > +	};
-> 
-> > Are these IDs right? One of these IDs is a different width than the
-> > others.
-> 
-> I have no idea, I have no documentation for any of this stuff other than
-> the DT you guys release on github - it's just copied verbatim from
-> there.
+Will do.
 
-So this goes with the trusted firmware?
-
-> 
-> > Which firmware/bootloader does this correspond to?
-> 
-> I'm testing using the Linaro 13.11 release.
-
-Release of what? I'm not familiar with the entire stack Linaro manage.
-
-I guess the trusted firmware is being used, as mentioned above?
-
-> 
-> > > +		big0: cpu at 0 {
-> > > +			device_type = "cpu";
-> > > +			compatible = "arm,cortex-a57", "arm,armv8";
-> > > +			reg = <0x0 0x0>;
-> > > +			enable-method = "psci";
-> > > +			clock-frequency = <1000000>;
-> 
-> > Is clock-frequency used anywhere? Is it a useful thing to have
-> > (regardless of whether ePAPR defines it)?
-> 
-> The topology code for ARMv7 (which I'm following for ARMv8) uses this in
-> conjunction with the compatible to provide information to the scheduler
-> about the relative performance of the cores.  
-
-Ok. While I have concerns regarding the topology code, I'm not averse to
-describing the clock-frequency here.
-
-However I worry about how configurable clocks are going to be handled
-here. On the 32-bit side I see some platforms with clock-frequency and
-others with clocks. We should figure out what the expected way to handle
-configurable clocks before we add the code for handling a fixed rate
-clock here, or we're going to back ourselves into a corner where this
-support can only work on a subset of systems.
-
-> 
-> > > +	timer {
-> > > +		compatible = "arm,armv8-timer";
-> > > +		interrupts = <1 13 0xff01>,
-> > > +			     <1 14 0xff01>,
-> > > +			     <1 11 0xff01>,
-> > > +			     <1 10 0xff01>;
-> > > +		clock-frequency = <100000000>;
-> 
-> > A clock-frequency property in a timer is an indicator that the
-> > bootloader/firmware is broken and should be fixed. Is this actually
-> > necessary, or does the firmware/loader program CNTFRQ correctly on all
-> > CPUs?
-> 
-> I can try to see what happens if I remove it - I doubt anyone has tested
-> without it...
-
-I would very much hope it's unnecessary. If it's needed, then bugs
-should be filed and the firmware fixed. The system initialisation code
-_must_ set CNTFRQ on all CPUs or it's fundamentally broken.
-
-> 
-> > > +	pmu {
-> > > +		compatible = "arm,armv8-pmuv3";
-> > > +		interrupts = <0 60 4>,
-> > > +			     <0 61 4>,
-> > > +			     <0 62 4>,
-> > > +			     <0 63 4>;
-> > > +	};
-> 
-> > I assume this is just the A57 cores? That should probably be noted for
-> > now. In future we'll need to define the relationship between interrupts
-> > and CPUs, and describe the A53 cores.
-> 
-> Again I don't know, this is just copied verbatim from what you guys
-> release - I have no additional documentation.
-
-Given that the DTs on the github page don't mention specific CPUs, these
-interrupts might not be correct for specific implementations.
-
-I'd rather that the elements we are unsure about were dropped from the
-DT for the timebeing rather than being present but incorrect. There's
-less room for something to blow up that way, and it makes it clearer
-where the deficiencies are.
 
 Thanks,
-Mark.
+Daniel
