@@ -1,39 +1,57 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Dec 2013 10:01:03 -0800
-Subject: [PATCH v3 01/36] mtd: st_spi_fsm: Allocate resources and
- register with MTD framework
-In-Reply-To: <52A83258.5070506@st.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
- <20131210204635.GD27149@ld-irv-0074.broadcom.com>
- <20131211084856.GF2390@lee--X1> <52A83258.5070506@st.com>
-Message-ID: <20131211180103.GQ27149@ld-irv-0074.broadcom.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 11 Dec 2013 22:01:53 +0400
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <52A8A891.40302@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Angus,
+Hello.
 
-On Wed, Dec 11, 2013 at 09:37:28AM +0000, Angus Clark wrote:
-> At some stage, I would expect some of the device probing code in
-> st_spi_fsm, particularly the configuration of read/write/erase operations based
-> on capabilities, to be pulled into the 'spi-nor' framework.
+On 27-11-2013 5:18, Laurent Pinchart wrote:
 
-Yes, I think this driver's device probing is starting to improve the ID
-table approach that we currently have, which is why I directed a few
-comments at it. I don't think it goes far enough to being useful to
-others yet, though. It employs a few hacks that tie it very closely to
-its own implementation, and I think this can be improved now, before its
-methods are entrenched too much.
+> This helps increasing build testing coverage.
 
-> I do not see this
-> an an obstacle to st_spi_fsm being integrated earlier though; it's presence in
-> the kernel would provide another example of a H/W Controller that 'spi-nor'
-> needs to accommodate.
+> The driver doesn't compile on (at least) x86 due (possibly among others)
+> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
+> or ARM.
 
-No, I don't think a generally-useful framework will pop up overnight,
-but I think this driver can be one piece of the puzzle.
+> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
+> controller or is Renesas-specific is unknown and impossible to test as
+> we have no current or planned TMIO DMA users other than SUPERH and
+> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
+> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
+> list would extend this to multiarch kernels, but would break the driver
+> for non-shmobile platforms if the register is Renesas-specific. We can
+> thus get rid of the conditional compilation completely without
+> introducing any further issue, and let future non-Renesas users deal
+> with the situation if it turns out to be a the problem.
 
-I await your further responses.
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Ian Molton <ian@mnementh.co.uk>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Acked-by: Simon Horman <horms@verge.net.au>
+> ---
+>   drivers/mmc/host/Kconfig | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
 
-Thanks,
-Brian
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 7fc5099..ca1315e 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -479,7 +479,8 @@ config MMC_TMIO
+>
+>   config MMC_SDHI
+>   	tristate "SH-Mobile SDHI SD/SDIO controller support"
+> -	depends on SUPERH || ARCH_SHMOBILE
+> +	depends on SUPERH || ARM
+> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+
+    Hm, why 2 "depends" lines with SUPERH in both?
+
+WBR, Sergei
