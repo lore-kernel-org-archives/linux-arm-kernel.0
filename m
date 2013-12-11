@@ -1,59 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Dec 2013 00:00:53 +0100
-Subject: [PATCH 09/12] pcie: SPEAr13xx: Add designware pcie support
-In-Reply-To: <f5c9cbbd116d462c428afc2e8afefd95aad8c6ec.1386752447.git.mohit.kumar@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <f5c9cbbd116d462c428afc2e8afefd95aad8c6ec.1386752447.git.mohit.kumar@st.com>
-Message-ID: <201312120000.54545.arnd@arndb.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 12 Dec 2013 00:05:36 +0100
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <52A8AD5B.70601@cogentembedded.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1488247.0AdahCZr3G@avalon> <52A8AD5B.70601@cogentembedded.com>
+Message-ID: <13209501.ngs8HJ5G2p@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 December 2013, Mohit Kumar wrote:
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/pci.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/resource.h>
-> +#include <mach/spear.h>
+Hi Sergei,
 
-This won't actually build: you cannot access mach/*.h header files
-from outside of mach-spear!
-
-> +struct spear13xx_pcie {
-> +	void __iomem		*phy_base;
-> +	void __iomem		*app_base;
-> +	struct clk		*clk;
-> +	struct pcie_port	pp;
-> +	int			id;
-> +	int			is_gen1;
-> +};
-
-The pcie driver shouldn't have direct access to the phy registers,
-use a phy driver for that.
-
-> +static int workaround_linkup_spear1340(struct spear13xx_pcie *spear13xx_pcie)
-> +{
+On Wednesday 11 December 2013 22:22:19 Sergei Shtylyov wrote:
+> On 11-12-2013 22:06, Laurent Pinchart wrote:
+> >>> This helps increasing build testing coverage.
+> >>> 
+> >>> The driver doesn't compile on (at least) x86 due (possibly among others)
+> >>> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
+> >>> or ARM.
+> >>> 
+> >>> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
+> >>> controller or is Renesas-specific is unknown and impossible to test as
+> >>> we have no current or planned TMIO DMA users other than SUPERH and
+> >>> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
+> >>> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
+> >>> list would extend this to multiarch kernels, but would break the driver
+> >>> for non-shmobile platforms if the register is Renesas-specific. We can
+> >>> thus get rid of the conditional compilation completely without
+> >>> introducing any further issue, and let future non-Renesas users deal
+> >>> with the situation if it turns out to be a the problem.
+> >>> 
+> >>> Cc: Chris Ball <cjb@laptop.org>
+> >>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> >>> Cc: Ian Molton <ian@mnementh.co.uk>
+> >>> Cc: linux-mmc at vger.kernel.org
+> >>> Signed-off-by: Laurent Pinchart
+> >>> <laurent.pinchart+renesas@ideasonboard.com>
+> >>> Acked-by: Simon Horman <horms@verge.net.au>
 > 
-> +}
-> +
-> +static int spear13xx_pcie_establish_link(struct pcie_port *pp)
-> +{
+> [...]
+> 
+> >>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> >>> index 7fc5099..ca1315e 100644
+> >>> --- a/drivers/mmc/host/Kconfig
+> >>> +++ b/drivers/mmc/host/Kconfig
+> >>> @@ -479,7 +479,8 @@ config MMC_TMIO
+> >>> 
+> >>>    config MMC_SDHI
+> >>>    	tristate "SH-Mobile SDHI SD/SDIO controller support"
+> >>> -	depends on SUPERH || ARCH_SHMOBILE
+> >>> +	depends on SUPERH || ARM
+> >>> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> >>> 
+> >>      Hm, why 2 "depends" lines with SUPERH in both?
+> > 
+> > The first line means "this driver requires SUPERH || ARM to be compiled",
+> 
+>     Then COMPILE_TEST should be there, no?
 
-These should move into the phy driver.
+No, because the first line says that the driver is known *not* to compile on 
+platforms other than ARM and SUPERH. Adding || COMPILE_TEST there would break 
+compilation with allyesconfig and randconfig on those other platforms.
 
-> +	/* txdetectrx workaround for SPEAr1310 */
-> +	if (of_machine_is_compatible("st,spear1310"))
-> +		writeb(0x00, spear13xx_pcie->phy_base + 0x16);
+Stated differently, the first line restricts the driver from being compiled on 
+architectures where it doesn't compile, regardless of COMPILE_TEST, and the 
+second line restricts it to platform where hardware is known to exists, with 
+COMPILE_TEST to optionally extend build coverage.
 
-Don't use of_machine_is_compatible() to test for features or bugs of a
-particular device. Instead use a binary property in the specific
-device node, or key it off of the device's "compatible" value if
-there are a lot of differences. You seem to have a couple of these
-to test for one or the other PHY implementation, those will
-go away when you have a proper driver for them.
+> > while the second line means "devices supported by this driver are only
+> > found on SUPERH || ARCH_SHMOBILE platforms".
 
-	Arnd
+-- 
+Regards,
+
+Laurent Pinchart
