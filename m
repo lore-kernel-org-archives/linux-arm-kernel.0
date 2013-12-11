@@ -1,52 +1,44 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 13:44:54 +0100
-Subject: [PATCH 03/15] serial: sh-sci: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <20131128073711.GF24146@verge.net.au>
+Date: Wed, 11 Dec 2013 13:46:38 +0100
+Subject: [PATCH 06/15] v4l: sh_vou: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1385515117-23664-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131128073711.GF24146@verge.net.au>
-Message-ID: <1644962.Fmr1aLVkXP@avalon>
+ <1385515117-23664-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1658704.CLqRDCzrbM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Mauro,
 
-Could you please add this patch to your tree with the "[PATCH 00/47] sh-sci 
-updates for v3.14" series ?
+Could you please pick this patch up for v3.14 ?
 
-On Thursday 28 November 2013 16:37:11 Simon Horman wrote:
-> On Wed, Nov 27, 2013 at 02:18:25AM +0100, Laurent Pinchart wrote:
-> > Hardware supported by the driver is only found on SUPERH or
-> > ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
-> > 
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-serial at vger.kernel.org
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
+On Wednesday 27 November 2013 02:18:28 Laurent Pinchart wrote:
+> This helps increasing build testing coverage.
 > 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> Cc: linux-media at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Acked-by: Simon Horman <horms@verge.net.au>
+> ---
+>  drivers/media/platform/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> > ---
-> > 
-> >  drivers/tty/serial/Kconfig | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> > index a3817ab..a640d0b 100644
-> > --- a/drivers/tty/serial/Kconfig
-> > +++ b/drivers/tty/serial/Kconfig
-> > @@ -709,7 +709,8 @@ config SERIAL_IP22_ZILOG_CONSOLE
-> > 
-> >  config SERIAL_SH_SCI
-> >  	tristate "SuperH SCI(F) serial port support"
-> > -	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
-> > +	depends on HAVE_CLK
-> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-> >  	select SERIAL_CORE
-> >  
-> >  config SERIAL_SH_SCI_NR_UARTS
-
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index d7f0249..7f6ea65 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -36,7 +36,8 @@ source "drivers/media/platform/blackfin/Kconfig"
+>  config VIDEO_SH_VOU
+>  	tristate "SuperH VOU video output driver"
+>  	depends on MEDIA_CAMERA_SUPPORT
+> -	depends on VIDEO_DEV && ARCH_SHMOBILE && I2C
+> +	depends on VIDEO_DEV && I2C
+> +	depends on ARCH_SHMOBILE || COMPILE_TEST
+>  	select VIDEOBUF_DMA_CONTIG
+>  	help
+>  	  Support for the Video Output Unit (VOU) on SuperH SoCs.
 -- 
 Regards,
 
