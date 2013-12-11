@@ -1,40 +1,30 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 10 Dec 2013 17:23:01 -0800
-Subject: [PATCH] arm: Correct virt_addr_valid
-Message-ID: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Dec 2013 17:27:48 -0800
+Subject: [PATCH v3 15/36] mtd: st_spi_fsm: Fetch boot-device from mode pins
+In-Reply-To: <1385727565-25794-16-git-send-email-lee.jones@linaro.org>
+References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
+ <1385727565-25794-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <20131211012748.GI27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of virt_addr_valid is that virt_addr_valid should
-return true if and only if virt_to_page returns a valid pointer.
-The current definition of virt_addr_valid only checks against the
-virtual address range. There's no guarantee that just because a
-virtual address falls bewteen PAGE_OFFSET and high_memory the
-associated physical memory has a valid backing struct page. Follow
-the example of other architectures and convert to pfn_valid to
-verify that the virtual address is actually valid.
+On Fri, Nov 29, 2013 at 12:19:04PM +0000, Lee Jones wrote:
+> --- a/drivers/mtd/devices/st_spi_fsm.c
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -346,9 +348,48 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+...
+> +	/* Use device size to determine address width */
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/include/asm/memory.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Since you're splitting this patch series up so much, shouldn't this
+comment go in when you add the two lines below?
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 9ecccc8..0e84427 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -350,7 +350,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
- 
- #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
--#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
-+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
- 
- #endif
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+>  	if (info->sector_size * info->n_sectors > 0xFFFFFF)
+>  		info->flags |= FLASH_FLAG_32BIT_ADDR;
+...
+
+BTW, even though it doesn't exactly make for the best (runtime)
+bisectability (since your driver is not functional yet), this approach
+to splitting your driver introduction into logical chunks does make it a
+little easier to review. So thanks.
+
+Brian
