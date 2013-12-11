@@ -1,223 +1,276 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Dec 2013 13:13:25 +0000
-Subject: [PATCH 5/6] arm64: topology: Tell the scheduler about the relative
- power of cores
+Date: Wed, 11 Dec 2013 13:13:23 +0000
+Subject: [PATCH 3/6] arm64: dts: Add a devicetree for the ARMv8 4xA53 4xA57 FVP
 In-Reply-To: <1386767606-6391-1-git-send-email-broonie@kernel.org>
 References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
-Message-ID: <1386767606-6391-5-git-send-email-broonie@kernel.org>
+Message-ID: <1386767606-6391-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-In non-heterogeneous systems like big.LITTLE systems the scheduler will be
-able to make better use of the available cores if we provide power numbers
-to it. Do this by parsing the CPU nodes in the DT.
-
-The power numbers are the same as for ARMv7 since it seems that the
-expected differential between the big and little cores is very similar on
-both ARMv7 and ARMv8.
+Add a dts file for ARMv8 fixed virtual platform which models a
+big.LITTLE configuration for the architecture.  This is based on the
+DT shipped by ARM but has been modified for mainline, removing features
+not present in mainline and updating the CPU bindings for mainline.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm64/kernel/topology.c | 164 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 164 insertions(+)
+ arch/arm64/boot/dts/Makefile                |   4 +-
+ arch/arm64/boot/dts/fvp-base-gicv2-psci.dts | 233 ++++++++++++++++++++++++++++
+ 2 files changed, 236 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/fvp-base-gicv2-psci.dts
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index e0b40f48b448..f08bb2306cd4 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -18,6 +18,7 @@
- #include <linux/percpu.h>
- #include <linux/node.h>
- #include <linux/nodemask.h>
-+#include <linux/of.h>
- #include <linux/sched.h>
- #include <linux/slab.h>
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index c52bdb051f66..2d16cdbe5d47 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,4 +1,6 @@
+-dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
++dtb-$(CONFIG_ARCH_VEXPRESS) += 	rtsm_ve-aemv8a.dtb \
++				foundation-v8.dtb \
++				fvp-base-gicv2-psci.dtb
+ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
  
-@@ -26,6 +27,163 @@
- #include <asm/topology.h>
- 
- /*
-+ * cpu power scale management
-+ */
-+
+ targets += dtbs
+diff --git a/arch/arm64/boot/dts/fvp-base-gicv2-psci.dts b/arch/arm64/boot/dts/fvp-base-gicv2-psci.dts
+new file mode 100644
+index 000000000000..736f546123bb
+--- /dev/null
++++ b/arch/arm64/boot/dts/fvp-base-gicv2-psci.dts
+@@ -0,0 +1,233 @@
 +/*
-+ * cpu power table
-+ * This per cpu data structure describes the relative capacity of each core.
-+ * On a heteregenous system, cores don't have the same computation capacity
-+ * and we reflect that difference in the cpu_power field so the scheduler can
-+ * take this difference into account during load balance. A per cpu structure
-+ * is preferred because each CPU updates its own cpu_power field during the
-+ * load balance except for idle cores. One idle core is selected to run the
-+ * rebalance_domains for all idle cores and the cpu_power can be updated
-+ * during this sequence.
++ * Copyright (c) 2013, ARM Limited. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * Redistributions of source code must retain the above copyright notice, this
++ * list of conditions and the following disclaimer.
++ *
++ * Redistributions in binary form must reproduce the above copyright notice,
++ * this list of conditions and the following disclaimer in the documentation
++ * and/or other materials provided with the distribution.
++ *
++ * Neither the name of ARM nor the names of its contributors may be used
++ * to endorse or promote products derived from this software without specific
++ * prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
 + */
-+static DEFINE_PER_CPU(unsigned long, cpu_scale);
 +
-+unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
-+{
-+	return per_cpu(cpu_scale, cpu);
-+}
++/dts-v1/;
 +
-+static void set_power_scale(unsigned int cpu, unsigned long power)
-+{
-+	per_cpu(cpu_scale, cpu) = power;
-+}
++/memreserve/ 0x80000000 0x00010000;
 +
-+#ifdef CONFIG_OF
-+struct cpu_efficiency {
-+	const char *compatible;
-+	unsigned long efficiency;
++/ {
 +};
 +
-+/*
-+ * Table of relative efficiency of each processors
-+ * The efficiency value must fit in 20bit and the final
-+ * cpu_scale value must be in the range
-+ *   0 < cpu_scale < 3*SCHED_POWER_SCALE/2
-+ * in order to return@most 1 when DIV_ROUND_CLOSEST
-+ * is used to compute the capacity of a CPU.
-+ * Processors that are not defined in the table,
-+ * use the default SCHED_POWER_SCALE value for cpu_scale.
-+ */
-+static const struct cpu_efficiency table_efficiency[] = {
-+	{ "arm,cortex-a57", 3891 },
-+	{ "arm,cortex-a53", 2048 },
-+	{ NULL, },
++/ {
++	model = "FVP Base";
++	compatible = "arm,vfp-base", "arm,vexpress";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen { };
++
++	aliases {
++		serial0 = &v2m_serial0;
++		serial1 = &v2m_serial1;
++		serial2 = &v2m_serial2;
++		serial3 = &v2m_serial3;
++	};
++
++	psci {
++		compatible = "arm,psci";
++		method = "smc";
++		cpu_suspend = <0xc4000001>;
++		cpu_off = <0x84000002>;
++		cpu_on = <0xc4000003>;
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		big0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		big1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		big2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		big3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		little0: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		little1: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x101>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		little2: cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x102>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++		little3: cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x103>;
++			enable-method = "psci";
++			clock-frequency = <1000000>;
++		};
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0 0x80000000>,
++		      <0x00000008 0x80000000 0 0x80000000>;
++	};
++
++	gic: interrupt-controller at 2f000000 {
++		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x0 0x2f000000 0 0x10000>,
++		      <0x0 0x2c000000 0 0x2000>,
++		      <0x0 0x2c010000 0 0x2000>,
++		      <0x0 0x2c02F000 0 0x2000>;
++		interrupts = <1 9 0xf04>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 0xff01>,
++			     <1 14 0xff01>,
++			     <1 11 0xff01>,
++			     <1 10 0xff01>;
++		clock-frequency = <100000000>;
++	};
++
++	timer at 2a810000 {
++			compatible = "arm,armv7-timer-mem";
++			reg = <0x0 0x2a810000 0x0 0x10000>;
++			clock-frequency = <100000000>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++			frame at 2a820000 {
++				frame-number = <0>;
++				interrupts = <0 25 4>;
++				reg = <0x0 0x2a820000 0x0 0x10000>;
++			};
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 60 4>,
++			     <0 61 4>,
++			     <0 62 4>,
++			     <0 63 4>;
++	};
++
++	smb {
++		compatible = "simple-bus";
++
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0x08000000 0x04000000>,
++			 <1 0 0 0x14000000 0x04000000>,
++			 <2 0 0 0x18000000 0x04000000>,
++			 <3 0 0 0x1c000000 0x04000000>,
++			 <4 0 0 0x0c000000 0x04000000>,
++			 <5 0 0 0x10000000 0x04000000>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 63>;
++		interrupt-map = <0 0  0 &gic 0  0 4>,
++				<0 0  1 &gic 0  1 4>,
++				<0 0  2 &gic 0  2 4>,
++				<0 0  3 &gic 0  3 4>,
++				<0 0  4 &gic 0  4 4>,
++				<0 0  5 &gic 0  5 4>,
++				<0 0  6 &gic 0  6 4>,
++				<0 0  7 &gic 0  7 4>,
++				<0 0  8 &gic 0  8 4>,
++				<0 0  9 &gic 0  9 4>,
++				<0 0 10 &gic 0 10 4>,
++				<0 0 11 &gic 0 11 4>,
++				<0 0 12 &gic 0 12 4>,
++				<0 0 13 &gic 0 13 4>,
++				<0 0 14 &gic 0 14 4>,
++				<0 0 15 &gic 0 15 4>,
++				<0 0 16 &gic 0 16 4>,
++				<0 0 17 &gic 0 17 4>,
++				<0 0 18 &gic 0 18 4>,
++				<0 0 19 &gic 0 19 4>,
++				<0 0 20 &gic 0 20 4>,
++				<0 0 21 &gic 0 21 4>,
++				<0 0 22 &gic 0 22 4>,
++				<0 0 23 &gic 0 23 4>,
++				<0 0 24 &gic 0 24 4>,
++				<0 0 25 &gic 0 25 4>,
++				<0 0 26 &gic 0 26 4>,
++				<0 0 27 &gic 0 27 4>,
++				<0 0 28 &gic 0 28 4>,
++				<0 0 29 &gic 0 29 4>,
++				<0 0 30 &gic 0 30 4>,
++				<0 0 31 &gic 0 31 4>,
++				<0 0 32 &gic 0 32 4>,
++				<0 0 33 &gic 0 33 4>,
++				<0 0 34 &gic 0 34 4>,
++				<0 0 35 &gic 0 35 4>,
++				<0 0 36 &gic 0 36 4>,
++				<0 0 37 &gic 0 37 4>,
++				<0 0 38 &gic 0 38 4>,
++				<0 0 39 &gic 0 39 4>,
++				<0 0 40 &gic 0 40 4>,
++				<0 0 41 &gic 0 41 4>,
++				<0 0 42 &gic 0 42 4>;
++
++		/include/ "rtsm_ve-motherboard.dtsi"
++	};
 +};
-+
-+static unsigned long *__cpu_capacity;
-+#define cpu_capacity(cpu)	__cpu_capacity[cpu]
-+
-+static unsigned long middle_capacity = 1;
-+
-+/*
-+ * Iterate all CPUs' descriptor in DT and compute the efficiency
-+ * (as per table_efficiency). Also calculate a middle efficiency
-+ * as close as possible to  (max{eff_i} - min{eff_i}) / 2
-+ * This is later used to scale the cpu_power field such that an
-+ * 'average' CPU is of middle power. Also see the comments near
-+ * table_efficiency[] and update_cpu_power().
-+ */
-+static void __init parse_dt_topology(void)
-+{
-+	const struct cpu_efficiency *cpu_eff;
-+	struct device_node *cn = NULL;
-+	unsigned long min_capacity = (unsigned long)(-1);
-+	unsigned long max_capacity = 0;
-+	unsigned long capacity = 0;
-+	int alloc_size, cpu;
-+
-+	alloc_size = nr_cpu_ids * sizeof(*__cpu_capacity);
-+	__cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
-+
-+	for_each_possible_cpu(cpu) {
-+		const u32 *rate;
-+		int len;
-+
-+		/* Too early to use cpu->of_node */
-+		cn = of_get_cpu_node(cpu, NULL);
-+		if (!cn) {
-+			pr_err("Missing device node for CPU %d\n", cpu);
-+			continue;
-+		}
-+
-+		/* check if the cpu is marked as "disabled", if so ignore */
-+		if (!of_device_is_available(cn))
-+			continue;
-+
-+		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
-+			if (of_device_is_compatible(cn, cpu_eff->compatible))
-+				break;
-+
-+		if (cpu_eff->compatible == NULL) {
-+			pr_warn("%s: Unknown CPU type\n", cn->full_name);
-+			continue;
-+		}
-+
-+		rate = of_get_property(cn, "clock-frequency", &len);
-+		if (!rate || len != 4) {
-+			pr_err("%s: Missing clock-frequency property\n",
-+				cn->full_name);
-+			continue;
-+		}
-+
-+		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
-+
-+		/* Save min capacity of the system */
-+		if (capacity < min_capacity)
-+			min_capacity = capacity;
-+
-+		/* Save max capacity of the system */
-+		if (capacity > max_capacity)
-+			max_capacity = capacity;
-+
-+		cpu_capacity(cpu) = capacity;
-+	}
-+
-+	/* If min and max capacities are equal we bypass the update of the
-+	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
-+	 * compute a middle_capacity factor that will ensure that the capacity
-+	 * of an 'average' CPU of the system will be as close as possible to
-+	 * SCHED_POWER_SCALE, which is the default value, but with the
-+	 * constraint explained near table_efficiency[].
-+	 */
-+	if (min_capacity == max_capacity)
-+		return;
-+	else if (4 * max_capacity < (3 * (max_capacity + min_capacity)))
-+		middle_capacity = (min_capacity + max_capacity)
-+				>> (SCHED_POWER_SHIFT+1);
-+	else
-+		middle_capacity = ((max_capacity / 3)
-+				>> (SCHED_POWER_SHIFT-1)) + 1;
-+
-+}
-+
-+/*
-+ * Look for a customed capacity of a CPU in the cpu_topo_data table during the
-+ * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
-+ * function returns directly for SMP system.
-+ */
-+static void update_cpu_power(unsigned int cpu, unsigned long hwid)
-+{
-+	if (!cpu_capacity(cpu))
-+		return;
-+
-+	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
-+
-+	pr_info("CPU%u: update cpu_power %lu\n",
-+		cpu, arch_scale_freq_power(NULL, cpu));
-+}
-+
-+#else
-+static inline void parse_dt_topology(void) {}
-+static inline void update_cpu_power(unsigned int cpuid, unsigned int mpidr) {}
-+#endif
-+
-+/*
-  * cpu topology table
-  */
- struct cputopo_arm cpu_topology[NR_CPUS];
-@@ -88,6 +246,8 @@ void store_cpu_topology(unsigned int cpuid)
- 
- 	update_siblings_masks(cpuid);
- 
-+	update_cpu_power(cpuid, mpidr & MPIDR_HWID_BITMASK);
-+
- 	pr_info("CPU%u: cpu %d, socket %d mapped using MPIDR %llx\n",
- 		cpuid, cpu_topology[cpuid].core_id,
- 		cpu_topology[cpuid].socket_id, mpidr);
-@@ -138,6 +298,10 @@ void __init init_cpu_topology(void)
- 		cpu_topo->socket_id = -1;
- 		cpumask_clear(&cpu_topo->core_sibling);
- 		cpumask_clear(&cpu_topo->thread_sibling);
-+
-+		set_power_scale(cpu, SCHED_POWER_SCALE);
- 	}
- 	smp_wmb();
-+
-+	parse_dt_topology();
- }
 -- 
 1.8.5.1
