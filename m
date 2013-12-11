@@ -1,86 +1,49 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 11 Dec 2013 17:10:26 +0800
-Subject: [GIT PULL v3][for 3.14] pull request for hisilicon soc
-Message-ID: <52A82C02.5050609@gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 11 Dec 2013 01:10:27 -0800
+Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
+In-Reply-To: <20131210111449.GY4360@n2100.arm.linux.org.uk>
+References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+ <20131128055706.GM8834@intel.com>
+ <20131209235035.GA11632@n2100.arm.linux.org.uk>
+ <20131210101331.GG29580@intel.com>
+ <20131210111449.GY4360@n2100.arm.linux.org.uk>
+Message-ID: <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Dec 10, 2013 at 3:14 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 10, 2013 at 03:43:31PM +0530, Vinod Koul wrote:
+>> On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
+>> > On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
+>> > > + Dan
+>> > >
+>> > > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
+>> > > > The following commit:
+>> > > >
+>> > > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
+>> > > >
+>> > > > removed the last caller to mv_desc_get_dest_addr(), creating the
+>> > > > warning:
+>> > > >
+>> > > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
+>> > > >   but not used [-Wunused-function]
+>> > > >
+>> > > > Remove it.
+>> > > >
+>> > > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+>> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
+>> > >
+>> > > This should go thru Dan's tree
+>> >
+>> > So what's happening with this patch?  I don't see it in -rc yet.
+>> Dan has applied this to his next. So this should show us in next rc1
+>
+> Wrong answer.  This is a compile regression introduced in the last merge
+> window, it should be going into an -rc kernel.
 
-Please help to merge pull request for hisilicon soc. This pull request 
-is used to replace all previous request for hisilicon. The changes is in 
-below.
+Vinod, if your fixes branch is ready I'll take it along with the rest
+of the regression fixes to Linus.
 
-    1. Update the git repository address from ssh:// to git://.
-    2. Add clock binding in DTS file. This patch is contained in v11 & 
-v12 patch sets, and everybody like this binding.
-    3. Add the GPIOLIB selection by default.
-
-Best Regards
-Haojian
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git 
-tags/hisilicon-basic
-
-for you to fetch changes up to be05bfccdbe65915da4a7d0e4713ad3489fd5f37:
-
-   ARM: hi3xxx: select GPIO in Kconfig (2013-12-11 17:01:45 +0800)
-
-----------------------------------------------------------------
-warn: You locally have hisilicon-for-3.14 but it does not (yet)
-warn: appear to be at 
-git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-warn: Do you want to push it there, perhaps?
-hisilicon-for-3.14
-
-----------------------------------------------------------------
-Haojian Zhuang (6):
-       ARM: hi3xxx: add board support with device tree
-       ARM: dts: enable hi4511 with device tree
-       ARM: config: enable hi3xxx in multi_v7_defconfig
-       ARM: config: add defconfig for Hi3xxx
-       ARM: dts: enable clock binding on Hi3620
-       ARM: hi3xxx: select GPIO in Kconfig
-
-Zhangfei Gao (2):
-       ARM: hi3xxx: add smp support
-       ARM: hi3xxx: add hotplug support
-
-  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  32 ++++
-  arch/arm/Kconfig                                              |   2 +
-  arch/arm/Makefile                                             |   1 +
-  arch/arm/boot/dts/Makefile                                    |   1 +
-  arch/arm/boot/dts/hi3620.dtsi                                 | 565 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/boot/dts/hi4511.dts                                  | 649 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/configs/hi3xxx_defconfig                             |  56 
-+++++++
-  arch/arm/configs/multi_v7_defconfig                           |   1 +
-  arch/arm/mach-hi3xxx/Kconfig                                  |  16 ++
-  arch/arm/mach-hi3xxx/Makefile                                 |   7 +
-  arch/arm/mach-hi3xxx/core.h                                   |  15 ++
-  arch/arm/mach-hi3xxx/hi3xxx.c                                 |  94 
-++++++++++++
-  arch/arm/mach-hi3xxx/hotplug.c                                | 200 
-+++++++++++++++++++++++++
-  arch/arm/mach-hi3xxx/platsmp.c                                |  89 
-+++++++++++
-  14 files changed, 1728 insertions(+)
-  create mode 100644 
-Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
-  create mode 100644 arch/arm/boot/dts/hi4511.dts
-  create mode 100644 arch/arm/configs/hi3xxx_defconfig
-  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
-  create mode 100644 arch/arm/mach-hi3xxx/Makefile
-  create mode 100644 arch/arm/mach-hi3xxx/core.h
-  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
-  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
-  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+--
+Dan
