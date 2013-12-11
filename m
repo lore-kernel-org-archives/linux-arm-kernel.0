@@ -1,41 +1,61 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 13:52:31 +0100
-Subject: [PATCH 15/15] sh: intc: Enable driver compilation with
+Date: Wed, 11 Dec 2013 13:53:21 +0100
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
  COMPILE_TEST
-In-Reply-To: <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+In-Reply-To: <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <3670569.dVXQxeaJBM@avalon>
+ <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <2090378.13zHUAnprd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Hi Chris,
 
-Could you tell me who is responsible for merging drivers/sh patches ? If 
-that's one of you, could you please pick this patch up for v3.14 ?
+Could you please pick this patch (and patch 08/15 in the same series) up for 
+v3.14 ?
 
-On Wednesday 27 November 2013 02:18:37 Laurent Pinchart wrote:
+On Wednesday 27 November 2013 02:18:29 Laurent Pinchart wrote:
 > This helps increasing build testing coverage.
 > 
-> Cc: Magnus Damm <magnus.damm@gmail.com>
+> The driver doesn't compile on (at least) x86 due (possibly among others)
+> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
+> or ARM.
+> 
+> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
+> controller or is Renesas-specific is unknown and impossible to test as
+> we have no current or planned TMIO DMA users other than SUPERH and
+> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
+> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
+> list would extend this to multiarch kernels, but would break the driver
+> for non-shmobile platforms if the register is Renesas-specific. We can
+> thus get rid of the conditional compilation completely without
+> introducing any further issue, and let future non-Renesas users deal
+> with the situation if it turns out to be a the problem.
+> 
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Ian Molton <ian@mnementh.co.uk>
+> Cc: linux-mmc at vger.kernel.org
 > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Acked-by: Simon Horman <horms@verge.net.au>
 > ---
->  drivers/sh/intc/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mmc/host/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
-> index a305731..f7d9061 100644
-> --- a/drivers/sh/intc/Kconfig
-> +++ b/drivers/sh/intc/Kconfig
-> @@ -6,7 +6,7 @@ comment "Interrupt controller options"
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 7fc5099..ca1315e 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -479,7 +479,8 @@ config MMC_TMIO
 > 
->  config INTC_USERIMASK
->  	bool "Userspace interrupt masking support"
-> -	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
-> +	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A) || COMPILE_TEST
+>  config MMC_SDHI
+>  	tristate "SH-Mobile SDHI SD/SDIO controller support"
+> -	depends on SUPERH || ARCH_SHMOBILE
+> +	depends on SUPERH || ARM
+> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+>  	select MMC_TMIO_CORE
 >  	help
->  	  This enables support for hardware-assisted userspace hardirq
->  	  masking.
+>  	  This provides support for the SDHI SD/SDIO controller found in
 -- 
 Regards,
 
