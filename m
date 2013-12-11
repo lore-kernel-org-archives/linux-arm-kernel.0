@@ -1,37 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Dec 2013 04:07:27 +0100
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
- without PCI on ARM64
-In-Reply-To: <20131210202323.GJ11468@sirena.org.uk>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312102100.20570.arnd@arndb.de> <20131210202323.GJ11468@sirena.org.uk>
-Message-ID: <201312110407.27848.arnd@arndb.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 11 Dec 2013 11:08:46 +0800
+Subject: [PATCH 4/6] mmc: sdhci-esdhc-imx: set the correct max timeout
+ value for uSDHC
+In-Reply-To: <20131211021715.GD18380@S2101-09.ap.freescale.net>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+ <1386680168-5227-5-git-send-email-b29396@freescale.com>
+ <20131211021715.GD18380@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=TU+73qY1wHTfTYvKUzQpu8xOSbC+MJJsOYT5RE4Wdz0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 December 2013, Mark Brown wrote:
-> On Tue, Dec 10, 2013 at 09:00:20PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 10 December 2013, Mark Brown wrote:
-> 
-> > > It's not just the SoC, it's also the rest of the board.  The patches the
-> > > Intel guys are submitting at the minute are mainly for the off-SoC
-> > > devices at least as far as I noticed.  This'll impact anyone who ends up
-> > > using ACPI, we need to at least pay attention to what's going on there.
-> 
-> > Yes, but I'm not that worried about off-soc stuff, which tends to be
-> > off the much simpler variety: a few MMIO or PIO registers, IRQs,
-> > GPIOs or (with ACPI-5.0) devices on i2c and spi buses.
-> 
-> That's not my experience especially once you get into phone type
-> hardware - there's not much complexity difference when gluing things
-> into the system and the fact that it's connected by the board increases
-> the amount of flexibility that has to be coped with.
+On Wed, Dec 11, 2013 at 10:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Dec 10, 2013 at 08:56:06PM +0800, Dong Aisheng wrote:
+>> The default sdhci driver write 0xE into timeout counter register to
+>> set the maximum timeout. The value is not correct for uSDHC since the
+>> max counter value for uSDHC is 0xF.
+>> Instead of using common timeout code in sdhci, we implement esdhc_set_timeout
+>> to handle the difference between eSDHC and uSDHC.
+>>
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> ---
+>>  drivers/mmc/host/sdhci-esdhc-imx.c |   11 +++++++++++
+>>  1 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+>> index 97b35e1..c24cb23 100644
+>> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+>> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+>> @@ -868,6 +868,16 @@ unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
+>>       return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
+>>  }
+>>
+>> +void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>
+> static?
+>
 
-Yes, that is probably right. The only argument that one can make about
-the mobile phone case is that these devices are so complex that nobody
-even bothers any more running upstream kernels on them on any CPU
-architecture. If the kernel code is kept out of the mainline tree,
-it doesn't matter to us what they use, and the developers don't gain
-much by following any of the available firmware models either.
+Sorry, i missed it when do copy&paste.
+Will update it in v2 with another same issue you pointed.
 
-	Arnd
+Regards
+Dong Aisheng
+
+> Shawn
+>
+>> +{
+>> +     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +     struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>> +
+>> +     /* use maximum timeout counter */
+>> +     sdhci_writeb(host, esdhc_is_usdhc(imx_data) ? 0xF : 0xE,
+>> +                     SDHCI_TIMEOUT_CONTROL);
+>> +}
+>> +
+>>  static struct sdhci_ops sdhci_esdhc_ops = {
+>>       .read_l = esdhc_readl_le,
+>>       .read_w = esdhc_readw_le,
+>> @@ -881,6 +891,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+>>       .platform_bus_width = esdhc_pltfm_bus_width,
+>>       .set_uhs_signaling = esdhc_set_uhs_signaling,
+>>       .get_max_timeout = esdhc_get_max_timeout,
+>> +     .set_timeout = esdhc_set_timeout,
+>>  };
+>>
+>>  static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+>> --
+>> 1.7.2.rc3
+>>
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
