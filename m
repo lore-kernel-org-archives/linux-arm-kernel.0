@@ -1,336 +1,366 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 11 Dec 2013 15:54:54 +0800
-Subject: [PATCH v12 05/08] ARM: hi3xxx: add smp support
+Date: Wed, 11 Dec 2013 15:54:56 +0800
+Subject: [PATCH v12 07/08] ARM: dts: enable clock binding on Hi3620
 In-Reply-To: <1386748497-11290-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1386748497-11290-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1386748497-11290-6-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1386748497-11290-8-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhangfei Gao <zhangfei.gao@linaro.org>
+Enable clock binding for Hi3620 common clock driver.
 
-Enable SMP support on hi3xxx platform
-
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-Tested-by: Li Xin <li.xin@linaro.org>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- .../bindings/arm/hisilicon/hisilicon.txt           | 26 +++++++
- arch/arm/boot/dts/hi3620.dtsi                      | 38 ++++++++++
- arch/arm/mach-hi3xxx/Kconfig                       |  4 ++
- arch/arm/mach-hi3xxx/Makefile                      |  1 +
- arch/arm/mach-hi3xxx/core.h                        | 11 +++
- arch/arm/mach-hi3xxx/hi3xxx.c                      | 41 ++++++++++-
- arch/arm/mach-hi3xxx/platsmp.c                     | 84 ++++++++++++++++++++++
- 7 files changed, 203 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-hi3xxx/core.h
- create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+ arch/arm/boot/dts/hi3620.dtsi | 79 ++++++++++++++++++++++++-------------------
+ arch/arm/boot/dts/hi4511.dts  |  3 +-
+ 2 files changed, 46 insertions(+), 36 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 21a7336..8c7a465 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,3 +4,29 @@ Hisilicon Platforms Device Tree Bindings
- Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
-+
-+Hisilicon system controller
-+
-+Required properties:
-+- compatible : "hisilicon,sysctrl"
-+- reg : Register address and size
-+
-+Optional properties:
-+- smp-offset : offset in sysctrl for notifying slave cpu booting
-+		cpu 1, reg;
-+		cpu 2, reg + 0x4;
-+		cpu 3, reg + 0x8;
-+		If reg value is not zero, cpun exit wfi and go
-+- resume-offset : offset in sysctrl for notifying cpu0 when resume
-+- reboot-offset : offset in sysctrl for system reboot
-+
-+Example:
-+
-+	/* for Hi3620 */
-+	sysctrl: system-controller at fc802000 {
-+		compatible = "hisilicon,sysctrl";
-+		reg = <0xfc802000 0x1000>;
-+		smp-offset = <0x31c>;
-+		resume-offset = <0x308>;
-+		reboot-offset = <0x4>;
-+	};
 diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
-index b9d8679..e311937 100644
+index e311937..ab1116d 100644
 --- a/arch/arm/boot/dts/hi3620.dtsi
 +++ b/arch/arm/boot/dts/hi3620.dtsi
-@@ -39,6 +39,27 @@
- 			reg = <0x0>;
- 			next-level-cache = <&L2>;
- 		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <2>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <3>;
-+			next-level-cache = <&L2>;
-+		};
+@@ -11,7 +11,8 @@
+  * publishhed by the Free Software Foundation.
+  */
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/hi3620-clock.h>
+ 
+ / {
+ 	aliases {
+@@ -63,6 +64,7 @@
  	};
  
  	amba {
-@@ -65,6 +86,17 @@
- 			reg = <0x1000 0x1000>, <0x100 0x100>;
++
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "arm,amba-bus";
+@@ -88,13 +90,20 @@
+ 
+ 		sysctrl: system-controller at 802000 {
+ 			compatible = "hisilicon,sysctrl";
+-			reg = <0x802000 0x1000>;
+ 			#address-cells = <1>;
+-			#size-cells = <0>;
++			#size-cells = <1>;
++			ranges = <0 0x802000 0x1000>;
++			reg = <0x802000 0x1000>;
+ 
+ 			smp-offset = <0x31c>;
+ 			resume-offset = <0x308>;
+ 			reboot-offset = <0x4>;
++
++			clock: clock at 0 {
++				compatible = "hisilicon,hi3620-clock";
++				reg = <0 0x10000>;
++				#clock-cells = <1>;
++			};
  		};
  
-+		sysctrl: system-controller at 802000 {
-+			compatible = "hisilicon,sysctrl";
-+			reg = <0x802000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			smp-offset = <0x31c>;
-+			resume-offset = <0x308>;
-+			reboot-offset = <0x4>;
-+		};
-+
  		dual_timer0: dual_timer at 800000 {
- 			compatible = "arm,sp804", "arm,primecell";
+@@ -102,7 +111,7 @@
  			reg = <0x800000 0x1000>;
-@@ -115,6 +147,12 @@
+ 			/* timer00 & timer01 */
+ 			interrupts = <0 0 4>, <0 1 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_TIMER0_MUX>, <&clock HI3620_TIMER1_MUX>;
+ 			clock-names = "apb_pclk";
  			status = "disabled";
  		};
- 
-+		timer5: timer at 600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x600 0x20>;
-+			interrupts = <1 13 0xf01>;
-+		};
-+
- 		uart0: uart at b00000 {
+@@ -112,7 +121,7 @@
+ 			reg = <0x801000 0x1000>;
+ 			/* timer10 & timer11 */
+ 			interrupts = <0 2 4>, <0 3 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_TIMER2_MUX>, <&clock HI3620_TIMER3_MUX>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -122,7 +131,7 @@
+ 			reg = <0xa01000 0x1000>;
+ 			/* timer20 & timer21 */
+ 			interrupts = <0 4 4>, <0 5 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_TIMER4_MUX>, <&clock HI3620_TIMER5_MUX>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -132,7 +141,7 @@
+ 			reg = <0xa02000 0x1000>;
+ 			/* timer30 & timer31 */
+ 			interrupts = <0 6 4>, <0 7 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_TIMER6_MUX>, <&clock HI3620_TIMER7_MUX>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -142,7 +151,7 @@
+ 			reg = <0xa03000 0x1000>;
+ 			/* timer40 & timer41 */
+ 			interrupts = <0 96 4>, <0 97 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_TIMER8_MUX>, <&clock HI3620_TIMER9_MUX>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -157,7 +166,7 @@
  			compatible = "arm,pl011", "arm,primecell";
  			reg = <0xb00000 0x1000>;
-diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
-index 68bd26c..4007ecf 100644
---- a/arch/arm/mach-hi3xxx/Kconfig
-+++ b/arch/arm/mach-hi3xxx/Kconfig
-@@ -6,7 +6,11 @@ config ARCH_HI3xxx
- 	select CACHE_L2X0
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SCU
-+	select HAVE_ARM_TWD
-+	select HAVE_SMP
- 	select PINCTRL
- 	select PINCTRL_SINGLE
-+	select SMP
- 	help
- 	  Support for Hisilicon Hi36xx/Hi37xx processor family
-diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-index d68ebb3..7a869a7 100644
---- a/arch/arm/mach-hi3xxx/Makefile
-+++ b/arch/arm/mach-hi3xxx/Makefile
-@@ -3,3 +3,4 @@
- #
+ 			interrupts = <0 20 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_UARTCLK0>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -166,7 +175,7 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xb01000 0x1000>;
+ 			interrupts = <0 21 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_UARTCLK1>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -175,7 +184,7 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xb02000 0x1000>;
+ 			interrupts = <0 22 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_UARTCLK2>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -184,7 +193,7 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xb03000 0x1000>;
+ 			interrupts = <0 23 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_UARTCLK3>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -193,7 +202,7 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xb04000 0x1000>;
+ 			interrupts = <0 24 4>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_UARTCLK4>;
+ 			clock-names = "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -208,7 +217,7 @@
+ 					&pmx0 5 0 1 &pmx0 6 1 1 &pmx0 7 2 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK0>;
+ 			clock-names = "apb_pclk";
+ 		};
  
- obj-y	+= hi3xxx.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
-diff --git a/arch/arm/mach-hi3xxx/core.h b/arch/arm/mach-hi3xxx/core.h
-new file mode 100644
-index 0000000..226f020
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/core.h
-@@ -0,0 +1,11 @@
-+#ifndef __HISILICON_CORE_H
-+#define __HISILICON_CORE_H
-+
-+#include <linux/reboot.h>
-+
-+extern void hi3xxx_set_cpu_jump(int cpu, void *jump_addr);
-+extern int hi3xxx_get_cpu_jump(int cpu);
-+extern void secondary_startup(void);
-+extern struct smp_operations hi3xxx_smp_ops;
-+
-+#endif
-diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-index 925af13..2d4429c 100644
---- a/arch/arm/mach-hi3xxx/hi3xxx.c
-+++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-@@ -14,11 +14,19 @@
- #include <linux/clk-provider.h>
- #include <linux/clocksource.h>
- #include <linux/irqchip.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
+@@ -223,7 +232,7 @@
+ 					&pmx0 6 5 1 &pmx0 7 6 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK1>;
+ 			clock-names = "apb_pclk";
+ 		};
  
-+#include <asm/proc-fns.h>
-+
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+@@ -238,7 +247,7 @@
+ 					&pmx0 6 3 1 &pmx0 7 3 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK2>;
+ 			clock-names = "apb_pclk";
+ 		};
  
-+#include "core.h"
-+
-+#define HI3620_SYSCTRL_PHYS_BASE		0xfc802000
-+#define HI3620_SYSCTRL_VIRT_BASE		0xfe802000
-+
- /*
-  * This table is only for optimization. Since ioremap() could always share
-  * the same mapping if it's defined as static IO mapping.
-@@ -29,8 +37,9 @@
+@@ -253,7 +262,7 @@
+ 					&pmx0 6 11 1 &pmx0 7 11 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK3>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -268,7 +277,7 @@
+ 					&pmx0 6 13 1 &pmx0 7 13 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK4>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -283,7 +292,7 @@
+ 					&pmx0 6 16 1 &pmx0 7 16 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK5>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -298,7 +307,7 @@
+ 					&pmx0 6 18 1 &pmx0 7 19 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK6>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -313,7 +322,7 @@
+ 					&pmx0 6 25 1 &pmx0 7 26 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK7>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -328,7 +337,7 @@
+ 					&pmx0 6 33 1 &pmx0 7 34 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK8>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -343,7 +352,7 @@
+ 					&pmx0 6 41 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK9>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -357,7 +366,7 @@
+ 					&pmx0 5 45 1 &pmx0 6 46 1 &pmx0 7 46 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK10>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -372,7 +381,7 @@
+ 					&pmx0 6 49 1 &pmx0 7 49 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK11>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -387,7 +396,7 @@
+ 					&pmx0 6 51 1 &pmx0 7 52 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK12>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -402,7 +411,7 @@
+ 					&pmx0 6 55 1 &pmx0 7 56 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK13>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -417,7 +426,7 @@
+ 					&pmx0 6 60 1 &pmx0 7 61 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK14>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -432,7 +441,7 @@
+ 					&pmx0 6 64 1 &pmx0 7 65 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK15>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -447,7 +456,7 @@
+ 					&pmx0 6 72 1 &pmx0 7 73 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK16>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -462,7 +471,7 @@
+ 					&pmx0 6 80 1 &pmx0 7 81 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK17>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -477,7 +486,7 @@
+ 					&pmx0 6 86 1 &pmx0 7 87 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK18>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -491,7 +500,7 @@
+ 					&pmx0 3 88 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK19>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -505,7 +514,7 @@
+ 					&pmx0 3 90 1 &pmx0 4 91 1 &pmx0 5 92 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK20>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+@@ -518,7 +527,7 @@
+ 			gpio-ranges = <	&pmx0 3 94 1 &pmx0 7 96 1>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+-			clocks = <&pclk>;
++			clocks = <&clock HI3620_GPIOCLK21>;
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/hi4511.dts b/arch/arm/boot/dts/hi4511.dts
+index 96e69ab..fe62392 100644
+--- a/arch/arm/boot/dts/hi4511.dts
++++ b/arch/arm/boot/dts/hi4511.dts
+@@ -8,7 +8,8 @@
   */
- static struct map_desc hi3620_io_desc[] __initdata = {
- 	{
--		.pfn		= __phys_to_pfn(0xfc802000),
--		.virtual	= 0xfe802000,
-+		/* sysctrl */
-+		.pfn		= __phys_to_pfn(HI3620_SYSCTRL_PHYS_BASE),
-+		.virtual	= HI3620_SYSCTRL_VIRT_BASE,
- 		.length		= 0x1000,
- 		.type		= MT_DEVICE,
- 	},
-@@ -48,6 +57,32 @@ static void __init hi3xxx_timer_init(void)
- 	clocksource_of_init();
- }
  
-+static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+	int offset;
+ /dts-v1/;
+-/include/ "hi3620.dtsi"
 +
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+	if (!np) {
-+		pr_err("failed to find hisilicon,sysctrl node\n");
-+		return;
-+	}
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("failed to map address in hisilicon,sysctrl node\n");
-+		return;
-+	}
-+	if (of_property_read_u32(np, "reboot-offset", &offset) < 0) {
-+		pr_err("failed to find reboot-offset property\n");
-+		return;
-+	}
-+	writel_relaxed(0xdeadbeef, base + offset);
-+
-+	while (1)
-+		cpu_do_idle();
-+}
-+
- static const char *hi3xxx_compat[] __initdata = {
- 	"hisilicon,hi3620-hi4511",
- 	NULL,
-@@ -57,4 +92,6 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
- 	.map_io		= hi3620_map_io,
- 	.init_time	= hi3xxx_timer_init,
- 	.dt_compat	= hi3xxx_compat,
-+	.smp		= smp_ops(hi3xxx_smp_ops),
-+	.restart	= hi3xxx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-hi3xxx/platsmp.c b/arch/arm/mach-hi3xxx/platsmp.c
-new file mode 100644
-index 0000000..e532c69
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/platsmp.c
-@@ -0,0 +1,84 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ * Based on arch/arm/mach-vexpress/platsmp.c, Copyright (C) 2002 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
-+
-+#include "core.h"
-+
-+static void __iomem *ctrl_base = NULL;
-+
-+void hi3xxx_set_cpu_jump(int cpu, void *jump_addr)
-+{
-+	cpu = cpu_logical_map(cpu);
-+	if (!cpu || !ctrl_base)
-+		return;
-+	writel_relaxed(virt_to_phys(jump_addr), ctrl_base + ((cpu - 1) << 2));
-+}
-+
-+int hi3xxx_get_cpu_jump(int cpu)
-+{
-+	cpu = cpu_logical_map(cpu);
-+	if (!cpu || !ctrl_base)
-+		return 0;
-+	return readl_relaxed(ctrl_base + ((cpu - 1 ) << 2));
-+}
-+
-+static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np = NULL;
-+	unsigned long base = 0;
-+	u32 offset = 0;
-+	void __iomem *scu_base = NULL;
-+
-+	if (scu_a9_has_base()) {
-+		base = scu_a9_get_base();
-+		scu_base = ioremap(base, SZ_4K);
-+		if (!scu_base) {
-+			pr_err("ioremap(scu_base) failed\n");
-+			return;
-+		}
-+		scu_enable(scu_base);
-+		iounmap(scu_base);
-+	}
-+	if (!ctrl_base) {
-+		np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+		if (!np) {
-+			pr_err("failed to find hisilicon,sysctrl node\n");
-+			return;
-+		}
-+		ctrl_base = of_iomap(np, 0);
-+		if (!ctrl_base) {
-+			pr_err("failed to map address\n");
-+			return;
-+		}
-+		if (of_property_read_u32(np, "smp-offset", &offset) < 0) {
-+			pr_err("failed to find smp-offset property\n");
-+			return;
-+		}
-+		ctrl_base += offset;
-+	}
-+}
-+
-+static int hi3xxx_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	hi3xxx_set_cpu_jump(cpu, secondary_startup);
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+	return 0;
-+}
-+
-+struct smp_operations hi3xxx_smp_ops __initdata = {
-+	.smp_prepare_cpus	= hi3xxx_smp_prepare_cpus,
-+	.smp_boot_secondary	= hi3xxx_boot_secondary,
-+};
++#include "hi3620.dtsi"
+ 
+ / {
+ 	model = "Hisilicon Hi4511 Development Board";
 -- 
 1.8.3.2
