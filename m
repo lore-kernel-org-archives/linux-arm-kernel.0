@@ -1,48 +1,35 @@
-From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Wed, 11 Dec 2013 15:03:17 +0100
-Subject: [PATCH 0/8] Impedance matcher for Samsung boards
-In-Reply-To: <52A865B1.9070908@gmail.com>
-References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
- <52A865B1.9070908@gmail.com>
-Message-ID: <005d01cef679$be770570$3b651050$%wilczek@samsung.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 11 Dec 2013 15:05:03 +0100
+Subject: [GIT PULL RESEND2] clocksource/clockevents fixes for 3.13
+In-Reply-To: <52A87077.1030800@linaro.org>
+References: <52A767CB.3010501@linaro.org> <20131210194852.GB21814@gmail.com>
+ <52A87077.1030800@linaro.org>
+Message-ID: <20131211140503.GA3846@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-> -----Original Message-----
-> From: Daniel Mack [mailto:zonque at gmail.com]
-> Sent: Wednesday, December 11, 2013 2:17 PM
-> To: Piotr Wilczek; devicetree-discuss at lists.ozlabs.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Jason Cooper; Nicolas Pitre
-> Subject: Re: [PATCH 0/8] Impedance matcher for Samsung boards
+* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+
+> On 12/10/2013 08:48 PM, Ingo Molnar wrote:
 > 
-> On 12/11/2013 02:07 PM, Piotr Wilczek wrote:
-> > This patchset implements the impedance-matcher for Samsung Exynos
-> > boards and does the following:
-> >  - fix strncmp function;
-> >  - ensure each DT blob is 4-byte aligned;
-> >  - port 'atags_to_fdt' form Kernel;
-> >  - add Exynos specific serial driver;
-> >  - add support for Samsung boards, Trats and Trats2;
+> [ ... ]
+> 
+> >>
+> >>  drivers/clocksource/Kconfig              |    1 +
+> >>  drivers/clocksource/clksrc-of.c          |    1 -
+> >>  drivers/clocksource/dw_apb_timer_of.c    |    7 ++++---
+> >>  drivers/clocksource/sun4i_timer.c        |    3 +++
+> >>  drivers/clocksource/time-armada-370-xp.c |   10 +++++-----
+> >>  5 files changed, 13 insertions(+), 9 deletions(-)
 > >
-> > This patch set is based on:
-> > https://github.com/zonque/pxa-impedance-matcher.git
+> >Pulled into tip:timers/urgent, thanks a lot Daniel!
 > 
-> Thanks for the patches!
-> 
-> I'm considering merging most of them, but I have my problems with the
-> inclusion of the libfdt library.
-> 
-> Could you explain what you need this for, exactly? Why can't you just
-> fix the device tree blob that you include instead of modifying it at
-> runtime?
-When bootloader needs to pass some information in ATAGS and CONFIG_ARM_APPENDED_DTB is turned off in kernel, then it has to be added to the device tree blob at runtime.
+> Thanks to you for helping me to be a better maintainer. All you
+> comments and advices were very valuable.
 
-> 
-> 
-> Daniel
+You are welcome!
 
-Best regards,
-Piotr Wilczek
+Thanks,
+
+	Ingo
