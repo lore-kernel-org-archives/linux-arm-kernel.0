@@ -1,87 +1,48 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 12 Dec 2013 08:51:35 +0900
-Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI
- host maintainers
-In-Reply-To: <20131211183237.GI4699@google.com>
-References: <20131211183237.GI4699@google.com>
-Message-ID: <20131211235135.GA11671@verge.net.au>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 11 Dec 2013 15:55:32 -0800
+Subject: [PATCH 1/5] clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag
+ for the sysreg clock
+In-Reply-To: <1386763029-8516-2-git-send-email-a.kesavan@samsung.com>
+References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
+ <1386763029-8516-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <CAD=FV=WK-zgcNvF6qtnsRky3RbEvBOW+1uNiUR-fyp2257gPPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
-> If this looks reasonable, I'll merge it via the PCI tree for v3.13.
-> 
-> Bjorn
-> 
-> 
-> MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI host maintainers
-> 
-> Add entries for PCI host controller drivers in drivers/pci/host/.
-> 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Abhilash,
 
-Renesas R-Car potion:
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
+On Wed, Dec 11, 2013 at 3:57 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> The sysreg (system register) generates control signals for various blocks
+> like disp1blk, i2c, mipi etc. However, it gets disabled as an unused clock
+> at boot-up.
+>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 > ---
->  MAINTAINERS |   31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8285ed4676b6..826c722d92ba 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6449,16 +6449,47 @@ F:	drivers/pci/
->  F:	include/linux/pci*
->  F:	arch/x86/pci/
->  
-> +PCI DRIVER FOR DESIGNWARE
-> +M:	Jingoo Han <jg1.han@samsung.com>
-> +L:	linux-pci at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pci/host/*designware*
-> +
-> +PCI DRIVER FOR IMX6
-> +M:	Shawn Guo <shawn.guo@linaro.org>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pci/host/*imx6*
-> +
-> +PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
-> +M:	Jason Cooper <jason@lakedaemon.net>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pci/host/*mvebu*
-> +
->  PCI DRIVER FOR NVIDIA TEGRA
->  M:	Thierry Reding <thierry.reding@gmail.com>
->  L:	linux-tegra at vger.kernel.org
-> +L:	linux-pci at vger.kernel.org
->  S:	Supported
->  F:	Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
->  F:	drivers/pci/host/pci-tegra.c
->  
-> +PCI DRIVER FOR RENESAS R-CAR
-> +M:	Simon Horman <horms@verge.net.au>
-> +M:	Magnus Damm <magnus.damm@gmail.com>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-sh at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pci/host/*rcar*
-> +
->  PCI DRIVER FOR SAMSUNG EXYNOS
->  M:	Jingoo Han <jg1.han@samsung.com>
->  L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	drivers/pci/host/pci-exynos.c
->  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>  drivers/clk/samsung/clk-exynos5250.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index adf3234..0833501 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -406,7 +406,8 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
+>         GATE(hsi2c2, "hsi2c2", "aclk66", GATE_IP_PERIC, 30, 0, 0),
+>         GATE(hsi2c3, "hsi2c3", "aclk66", GATE_IP_PERIC, 31, 0, 0),
+>         GATE(chipid, "chipid", "aclk66", GATE_IP_PERIS, 0, 0, 0),
+> -       GATE(sysreg, "sysreg", "aclk66", GATE_IP_PERIS, 1, 0, 0),
+> +       GATE(sysreg, "sysreg", "aclk66",
+> +                       GATE_IP_PERIS, 1, CLK_IGNORE_UNUSED, 0),
+>         GATE(pmu, "pmu", "aclk66", GATE_IP_PERIS, 2, CLK_IGNORE_UNUSED, 0),
+>         GATE(tzpc0, "tzpc0", "aclk66", GATE_IP_PERIS, 6, 0, 0),
+>         GATE(tzpc1, "tzpc1", "aclk66", GATE_IP_PERIS, 7, 0, 0),
+
+This does match what's done in exynos4 and exynos5420 and it's not
+terrible.  I'm always a fan of actually specifying clocks properly and
+that's more possible now using the syscon stuff (see Leela Krishna's
+watchdog patches).  You'd have to extend that to add a clock, but that
+wouldn't be too hard.
+
+That being said, I'd personally be OK with this solution for now (to
+match the other exynos products), so:
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
