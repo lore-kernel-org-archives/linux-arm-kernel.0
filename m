@@ -1,48 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Dec 2013 12:05:12 +0800
-Subject: [PATCH 5/6] mmc: sdhci: calculate max_discard_to dynamically for
- SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-In-Reply-To: <1386680168-5227-6-git-send-email-b29396@freescale.com>
-References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
- <1386680168-5227-6-git-send-email-b29396@freescale.com>
-Message-ID: <20131211040511.GJ18380@S2101-09.ap.freescale.net>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Wed, 11 Dec 2013 08:30:15 +0400
+Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <201312102257.33942.arnd@arndb.de>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <CACRpkdYF-O6Qgjue6x+R6fVuSXSyO4YHw1meusuyQhtSA9PnvQ@mail.gmail.com>
+ <1386706817.7152.254.camel@host5.omatika.ru>
+ <201312102257.33942.arnd@arndb.de>
+Message-ID: <1386736215.7152.259.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 08:56:07PM +0800, Dong Aisheng wrote:
->  static inline void sdhci_update_clock(struct sdhci_host *host)
-> @@ -2939,10 +2952,12 @@ int sdhci_add_host(struct sdhci_host *host)
->  	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
->  		host->timeout_clk = mmc->f_max / 1000;
+On Tue, 2013-12-10 at 22:57 +0100, Arnd Bergmann wrote:
+> It should be possible to make it a loadable module, with deferred
+> probing etc. You wouldn't use IRQCHIP_DECLARE() for this though,
+> but instead have a platform driver that sets up the irq domain.
 
-Since max_discard_to calculation below will not happen for
-SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK case, does it still make sense to
-keep the above code?
+Thanks for explaning.
 
-Or put it in the other way, if we keep the above code and do not make
-the change below, will there be any problem besides the max_discard_to
-initialization plays for nothing?
+> It probably makes sense to have a single driver file for the
+> FPGA device that does this, and only split out the other devices
+> from it that consume the irqs.
 
-All in all, I'm just confused why we keep the above code and make the
-change below at the same time.
+Is drivers/irqchip/ the right place this driver?
 
-Shawn
-
->  
-> -	if (host->ops->get_max_timeout)
-> -		mmc->max_discard_to = host->ops->get_max_timeout(host);
-> -	else
-> -		mmc->max_discard_to = (1 << 27) / host->timeout_clk;
-> +	if (!(host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)) {
-> +		if (host->ops->get_max_timeout)
-> +			mmc->max_discard_to = host->ops->get_max_timeout(host);
-> +		else
-> +			mmc->max_discard_to = (1 << 27) / host->timeout_clk;
-> +	}
->  
->  	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
->  
-> -- 
-> 1.7.2.rc3
-> 
-> 
+I am asking because there is no tristate config options in
+drivers/irqchip/Kconfig at the moment.
