@@ -1,60 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Dec 2013 09:58:25 +0800
-Subject: [PATCH 2/6] mmc: sdhci-esdhc-imx: fix incorrect max_discard_to
- for uSDHC
-In-Reply-To: <1386680168-5227-3-git-send-email-b29396@freescale.com>
-References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
- <1386680168-5227-3-git-send-email-b29396@freescale.com>
-Message-ID: <20131211015823.GB18380@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 10 Dec 2013 20:06:08 -0600
+Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: introduce
+ CONFIG_ACPI_REDUCED_HARDWARE to enable this ACPI mode
+In-Reply-To: <20131210224912.996FCC40CE1@trevor.secretlab.ca>
+References: <1386192127-28564-1-git-send-email-al.stone@linaro.org>
+ <52A72D9F.1070004@linaro.org>
+ <20131210224912.996FCC40CE1@trevor.secretlab.ca>
+Message-ID: <CAL_JsqK1EJbNud2Pxojso=Vjo9ePEuwi3OUcwoCiwCpKH24LgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 08:56:04PM +0800, Dong Aisheng wrote:
-> The default sdhci code use the 1 << 27 as the max timeout counter to
-> to calculate the max_discard_to, however it's not correct for uSDHC
-> since its the max counter is 1 << 28.
-> Implement esdhc_get_max_timeout to handle it correctly.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Reported-by: Ed Sutter <ed.sutter@alcatel-lucent.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 461a4c3..97b35e1 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -859,6 +859,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
->  	return esdhc_change_pinstate(host, uhs);
->  }
->  
-> +unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
+On Tue, Dec 10, 2013 at 4:49 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> Hi Hanjun,
+>
+> Okay, so after talking with Al and Graeme on IRC, I think I understand
+> what is going on. The fact that ACPICA doesn't allow for both normal and
+> hardware reduced support in the same build is a very big problem.
+> However, it isn't a problem for ARM since we'll never support
+> non-hardware reduced mode. The x86 folks need to work that out when/if
+> they ever add support for hardware reduced mode.
 
-static?
+I believe SMBIOS/DMI tables are only part of full ACPI, so there is a
+need on ARM for more than hardware reduced mode.
 
-Shawn
-
-> +{
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> +	u32 max_to = esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
-> +
-> +	return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
-> +}
-> +
->  static struct sdhci_ops sdhci_esdhc_ops = {
->  	.read_l = esdhc_readl_le,
->  	.read_w = esdhc_readw_le,
-> @@ -871,6 +880,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
->  	.get_ro = esdhc_pltfm_get_ro,
->  	.platform_bus_width = esdhc_pltfm_bus_width,
->  	.set_uhs_signaling = esdhc_set_uhs_signaling,
-> +	.get_max_timeout = esdhc_get_max_timeout,
->  };
->  
->  static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
-> -- 
-> 1.7.2.rc3
-> 
-> 
+Rob
