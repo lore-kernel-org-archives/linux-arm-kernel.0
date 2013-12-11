@@ -1,72 +1,67 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 04:26:21 +0100
-Subject: [PATCH 01/10] sh-pfc: Turn unsigned indices into unsigned int
-In-Reply-To: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1386732390-31724-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Wed, 11 Dec 2013 04:26:20 +0100
+Subject: [PATCH 00/10] sh-pfc: Fix GPIO to IRQ mapping
+Message-ID: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some indices take positive values only, make them unsigned.
+Hello,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/pinctrl/sh-pfc/core.c | 8 ++++----
- drivers/pinctrl/sh-pfc/gpio.c | 2 +-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+This patch set fixes conversion from a GPIO number to an IRQ number in the
+sh-pfc driver in the device tree case.
 
-diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
-index d77ece5..06e648b 100644
---- a/drivers/pinctrl/sh-pfc/core.c
-+++ b/drivers/pinctrl/sh-pfc/core.c
-@@ -29,7 +29,7 @@
- static int sh_pfc_ioremap(struct sh_pfc *pfc, struct platform_device *pdev)
- {
- 	struct resource *res;
--	int k;
-+	unsigned int k;
- 
- 	if (pdev->num_resources == 0)
- 		return -EINVAL;
-@@ -147,7 +147,7 @@ static void sh_pfc_config_reg_helper(struct sh_pfc *pfc,
- 				     unsigned long *maskp,
- 				     unsigned long *posp)
- {
--	int k;
-+	unsigned int k;
- 
- 	*mapped_regp = sh_pfc_phys_to_virt(pfc, crp->reg);
- 
-@@ -196,7 +196,7 @@ static int sh_pfc_get_config_reg(struct sh_pfc *pfc, u16 enum_id,
- {
- 	const struct pinmux_cfg_reg *config_reg;
- 	unsigned long r_width, f_width, curr_width, ncomb;
--	int k, m, n, pos, bit_pos;
-+	unsigned int k, m, n, pos, bit_pos;
- 
- 	k = 0;
- 	while (1) {
-@@ -238,7 +238,7 @@ static int sh_pfc_mark_to_enum(struct sh_pfc *pfc, u16 mark, int pos,
- 			      u16 *enum_idp)
- {
- 	const u16 *data = pfc->info->gpio_data;
--	int k;
-+	unsigned int k;
- 
- 	if (pos) {
- 		*enum_idp = data[pos + 1];
-diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-index 04bf52b..3d30e6e 100644
---- a/drivers/pinctrl/sh-pfc/gpio.c
-+++ b/drivers/pinctrl/sh-pfc/gpio.c
-@@ -204,7 +204,7 @@ static void gpio_pin_set(struct gpio_chip *gc, unsigned offset, int value)
- static int gpio_pin_to_irq(struct gpio_chip *gc, unsigned offset)
- {
- 	struct sh_pfc *pfc = gpio_to_pfc(gc);
--	int i, k;
-+	unsigned int i, k;
- 
- 	for (i = 0; i < pfc->info->gpio_irq_size; i++) {
- 		unsigned short *gpios = pfc->info->gpio_irq[i].gpios;
+Patches 01/10 to 05/10 clean up the driver to prepare it for the core fix in
+patch 06/10. As explained in patch 06/10 commit message, on non-DT platforms
+IRQ controllers associated with the GPIOs have a fixed IRQ base value known at
+compile time. The sh-pfc driver translates GPIO number to IRQ numbers using a
+hardcoded table. This mechanism breaks on DT platforms, as the IRQ base values
+are dynamic in that case.
+
+The patch set fixes this by specifying IRQs associated with GPIOs in IRQ
+resources, populated automatically from the device tree. When IRQ resources
+are specified the driver requires one IRQ resource per GPIO able to generate
+an interrupt, and uses the translation table to compute the IRQ resource
+offset instead of the IRQ number.
+
+Patches 07/10 to 09/10 then add PFC interrupts in DT for the SH73A0, R8A73A4
+and R9A7740 SoCs. The only missing platform here is SH7372 due to its very
+uncomplete DT support. All other Renesas ARM platforms use a standaline GPIO
+driver and are thus not affected.
+
+Patch 10/10 finally adds a gpio-keys device to the Armadillo board DTS,
+allowing the whole patch set to the tested.
+
+The sh-pfc changes need to be merged first. Linus, could you please provide a
+stable branch with the first 6 patches when you will apply them to your tree ?
+
+Laurent Pinchart (10):
+  sh-pfc: Turn unsigned indices into unsigned int
+  sh-pfc: Terminate gpios array by -1
+  sh-pfc: sh73a0: Add missing IRQ15
+  sh-pfc: sh73a0: Sort IRQ entries by IRQ number
+  sh-pfc: Rename sh_pfc window field to windows
+  sh-pfc: Support GPIO to IRQ mapping specified IRQ resources
+  ARM: shmobile: r8a73a4: Specify PFC interrupts in DT
+  ARM: shmobile: r8a7740: Specify PFC interrupts in DT
+  ARM: shmobile: sh73a0: Specify PFC interrupts in DT
+  ARM: shmobile: armadillo: dts: Add gpio-keys device
+
+ .../bindings/pinctrl/renesas,pfc-pinctrl.txt       | 14 ++++
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 16 +++++
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts | 29 +++++++++
+ arch/arm/boot/dts/r8a7740.dtsi                     |  9 +++
+ arch/arm/boot/dts/sh73a0.dtsi                      |  9 +++
+ drivers/pinctrl/sh-pfc/core.c                      | 76 ++++++++++++++++------
+ drivers/pinctrl/sh-pfc/core.h                      |  4 +-
+ drivers/pinctrl/sh-pfc/gpio.c                      | 24 +++++--
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c               |  4 +-
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c               |  2 +-
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c                |  2 +-
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c                | 54 +++++++--------
+ drivers/pinctrl/sh-pfc/sh_pfc.h                    |  4 +-
+ 13 files changed, 188 insertions(+), 59 deletions(-)
+
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
