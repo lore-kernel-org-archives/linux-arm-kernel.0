@@ -1,33 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Dec 2013 06:11:46 +0100
-Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <1386736215.7152.259.camel@host5.omatika.ru>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <201312102257.33942.arnd@arndb.de>
- <1386736215.7152.259.camel@host5.omatika.ru>
-Message-ID: <201312110611.46443.arnd@arndb.de>
+Date: Wed, 11 Dec 2013 06:23:04 +0100
+Subject: [RFC part2 PATCH 8/9] ACPI / ARM64: Update acpi_register_gsi to
+ register with the core IRQ subsystem
+In-Reply-To: <20131210130521.3FE89C40A27@trevor.secretlab.ca>
+References: <1385999094-3152-1-git-send-email-hanjun.guo@linaro.org> <
+ 1385999094-3152-9-git-send-email-hanjun.guo@linaro.org>
+ <20131210130521.3FE89C40A27@trevor.secretlab.ca>
+Message-ID: <201312110623.04341.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 December 2013, Sergei Ianovich wrote:
-> > It probably makes sense to have a single driver file for the
-> > FPGA device that does this, and only split out the other devices
-> > from it that consume the irqs.
+On Tuesday 10 December 2013, Grant Likely wrote:
+> > --- a/drivers/acpi/plat/arm-core.c
+> > +++ b/drivers/acpi/plat/arm-core.c
+> > @@ -90,7 +90,7 @@ enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+> >  
+> >  static unsigned int gsi_to_irq(unsigned int gsi)
+> >  {
+> > -     int irq = irq_create_mapping(NULL, gsi);
+> > +     int irq = irq_find_mapping(NULL, gsi);
 > 
-> Is drivers/irqchip/ the right place this driver?
-> 
-> I am asking because there is no tristate config options in
-> drivers/irqchip/Kconfig at the moment.
-> 
+> I suspect this will break FDT users that depend on the old behaviour.
 
-It depends: if the driver is for the entire FPGA and does
-the irqchip stuff in addition, it should probably live
-in drivers/mfd. If it's a pure irqchip driver, drivers/irqchip
-is better. You have to be careful in the second case though
-because devices pointing to this irqchip in DT won't get
-an IRQ resource assigned automatically but have to use
-irq_of_parse_and_map instead. This may have been fixed since
-I last looked though, I would consider that behavior a
-bug in the of_platform handling.
+I think not, given this is only in drivers/acpi and gets added in one
+of the prior patches of the same series.
 
 	Arnd
