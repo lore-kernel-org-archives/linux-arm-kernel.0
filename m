@@ -1,62 +1,64 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 11 Dec 2013 10:10:59 -0800
-Subject: [PATCHv3 1/2] arm64: Check for NULL device before getting the
- coherent_dma_mask
-In-Reply-To: <20131211175134.GL26730@mudshark.cambridge.arm.com>
-References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
- <1386711816-20270-2-git-send-email-lauraa@codeaurora.org>
- <20131211104239.GD26730@mudshark.cambridge.arm.com>
- <52A8A55A.9060709@codeaurora.org>
- <20131211175134.GL26730@mudshark.cambridge.arm.com>
-Message-ID: <52A8AAB3.8050500@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 11 Dec 2013 22:22:19 +0400
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1488247.0AdahCZr3G@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <52A8A891.40302@cogentembedded.com> <1488247.0AdahCZr3G@avalon>
+Message-ID: <52A8AD5B.70601@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2013 9:51 AM, Will Deacon wrote:
-> On Wed, Dec 11, 2013 at 05:48:10PM +0000, Laura Abbott wrote:
->> On 12/11/2013 2:42 AM, Will Deacon wrote:
->>> On Tue, Dec 10, 2013 at 09:43:35PM +0000, Laura Abbott wrote:
->>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>>> index 4bd7579..4134212 100644
->>>> --- a/arch/arm64/mm/dma-mapping.c
->>>> +++ b/arch/arm64/mm/dma-mapping.c
->>>> @@ -33,7 +33,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
->>>>    					  dma_addr_t *dma_handle, gfp_t flags,
->>>>    					  struct dma_attrs *attrs)
->>>>    {
->>>> -	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
->>>> +	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
->>>>    	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
->>>>    		flags |= GFP_DMA32;
->>>>    	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+On 11-12-2013 22:06, Laurent Pinchart wrote:
+
+>>> This helps increasing build testing coverage.
+
+>>> The driver doesn't compile on (at least) x86 due (possibly among others)
+>>> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
+>>> or ARM.
+
+>>> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
+>>> controller or is Renesas-specific is unknown and impossible to test as
+>>> we have no current or planned TMIO DMA users other than SUPERH and
+>>> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
+>>> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
+>>> list would extend this to multiarch kernels, but would break the driver
+>>> for non-shmobile platforms if the register is Renesas-specific. We can
+>>> thus get rid of the conditional compilation completely without
+>>> introducing any further issue, and let future non-Renesas users deal
+>>> with the situation if it turns out to be a the problem.
+
+>>> Cc: Chris Ball <cjb@laptop.org>
+>>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>>> Cc: Ian Molton <ian@mnementh.co.uk>
+>>> Cc: linux-mmc at vger.kernel.org
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>> Acked-by: Simon Horman <horms@verge.net.au>
+[...]
+
+>>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>>> index 7fc5099..ca1315e 100644
+>>> --- a/drivers/mmc/host/Kconfig
+>>> +++ b/drivers/mmc/host/Kconfig
+>>> @@ -479,7 +479,8 @@ config MMC_TMIO
 >>>
->>> Unless I'm misreading the code, it looks like there are paths through
->>> swiotlb_alloc_coherent that will dereference the dev parameter without a
->>> NULL check. Are you sure we should allow for NULL devices here?
+>>>    config MMC_SDHI
 >>>
->>
->> The current ARM code allows for NULL devices so that would be a
->> difference in behavior between arm and arm64. We're also relying on this
->> behavior in some code. Where exactly in swiotlb_alloc_coherent does this
->> dereference happen? The only one I see is checked with 'if (hwdev &&
->> hwdev->coherent_dma_mask)'
->
-> phys_to_dma could, but doesn't. The one I spotted was buried down in:
->
->    map_single -> swiotlb_tbl_map_single -> dma_get_seg_boundary
->
+>>>    	tristate "SH-Mobile SDHI SD/SDIO controller support"
+>>>
+>>> -	depends on SUPERH || ARCH_SHMOBILE
+>>> +	depends on SUPERH || ARM
+>>> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
 
-Ah yes I see that now.
+>>      Hm, why 2 "depends" lines with SUPERH in both?
 
-I guess the question still stands though, should we fixup the parts of 
-the code to fully support the NULL devices or do we tell clients to fix 
-their code and fail the allocation with a warning not to pass NULL?
+> The first line means "this driver requires SUPERH || ARM to be compiled",
 
-> Will
->
+    Then COMPILE_TEST should be there, no?
 
-Laura
+> while the second line means "devices supported by this driver are only found
+> on SUPERH || ARCH_SHMOBILE platforms".
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+WBR, Sergei
