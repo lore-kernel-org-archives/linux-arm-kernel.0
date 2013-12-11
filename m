@@ -1,54 +1,57 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 11 Dec 2013 19:52:35 +0400
-Subject: [PATCH 2/2] serial: clps711x: dts: Add bindings documentation for the
- CLPS711X UART
-Message-ID: <1386777155-24851-1-git-send-email-shc_work@mail.ru>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 11 Dec 2013 23:53:13 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52A8868A.3000105@linaro.org>
+References: <1386770541-15056-1-git-send-email-zhangfei.gao@linaro.org>
+ <1386770541-15056-3-git-send-email-zhangfei.gao@linaro.org>
+ <201312111549.14017.arnd@arndb.de> <52A8868A.3000105@linaro.org>
+Message-ID: <52A88A69.6040102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the devicetree documentation for the Cirrus Logic
-CLPS711X UART.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- .../bindings/serial/cirrus,clps711x-uart.txt       | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
 
-diff --git a/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt b/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
-new file mode 100644
-index 0000000..8bbdd21
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
-@@ -0,0 +1,29 @@
-+* Cirrus Logic CLPS711X Universal Asynchronous Receiver/Transmitter (UART)
-+
-+Required properties:
-+- compatible: Should be "cirrus,clps711x-uart".
-+- reg: Address and length of the register set for the device.
-+- interrupts: Should contain UART TX and RX interrupt.
-+- clocks: Should contain UART core clock number.
-+- syscon: Phandle to SYSCON node, which contain UART control bits.
-+
-+Optional properties:
-+- uart-use-ms: Indicate the UART has modem signal (DCD, DSR, CTS).
-+- uart-use-irda: Indicate the UART use IRDA mode.
-+
-+Note: Each UART port should have an alias correctly numbered
-+in "aliases" node.
-+
-+Example:
-+	aliases {
-+		serial0 = &uart1;
-+	};
-+
-+	uart1: uart at 80000480 {
-+		compatible = "cirrus,clps711x-uart";
-+		reg = <0x80000480 0x80>;
-+		interrupts = <12 13>;
-+		clocks = <&clks 11>;
-+		syscon = <&syscon1>;
-+		uart-use-ms;
-+	};
--- 
-1.8.3.2
+On 12/11/2013 11:36 PM, zhangfei wrote:
+>
+>
+> On 12/11/2013 10:49 PM, Arnd Bergmann wrote:
+>> On Wednesday 11 December 2013, Zhangfei Gao wrote:
+>
+>>> +Required Properties:
+>>> +
+>>> +* compatible: should be one of the following.
+>>> +  - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific
+>>> extentions.
+>>> +* clk-table-num: should be number of clks in clk-table required by
+>>> each mmc timing
+>>> +* clk-table: should clock list required by each mmc timing
+>>
+>> I have not seen "clk-table" and "clk-table-num" before. Are these
+>> standard
+>> properties? What are the units that are used here, what does the index
+>> mean?
+>>
+>
+> "clk-table" and "clk-table-num" are private properties.
+> Instead simply on/off, the ip need different ciu clock for each timing
+> mode.
+> Take emmc as example,
+> clk-table-num = <8>;
+> clk-table =
+
+My bad, this is for sd.
+> <13000000 50000000 0 0 13000000 50000000 0 100000000>;
+
+<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
+> MMC_TIMING_LEGACY mode, 25M should be set with parent clock 180M,
+> MMC_TIMING_MMC_HS mode, 50M is required with parent clock 360M
+>
+> "clk-table" list all clocks to be set in all supported timing one by one.
+> "clk-table-num" is the table number, since not find function getting
+> table number.
+> For example, next version will support MMC_TIMING_MMC_HS200 mode, the
+> clk-table-num = <9> with 9 clocks in the "clk-table"
+>
+> Thanks
+>
+>
