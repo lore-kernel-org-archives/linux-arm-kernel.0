@@ -1,30 +1,41 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Dec 2013 07:48:56 +0900
-Subject: [PATCH 06/12] pcie: designware: Move register definition to the
- header file
-In-Reply-To: <201312112231.36039.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Dec 2013 23:51:24 +0100
+Subject: [PATCH 03/12] SPEAr13xx: Add SPEAr1310 PCIe register definitions
+In-Reply-To: <3a008bd5223b1da9f17ceac745b3fc08b6b842e3.1386752447.git.mohit.kumar@st.com>
 References: <cover.1386752447.git.mohit.kumar@st.com>
- <CAD6G_RTrETj9p+YNPjRMEFsO7Ggf3LfnuaPOSwO2brUcusNUJw@mail.gmail.com>
- <2CC2A0A4A178534D93D5159BF3BCB66189F95F6311@EAPEX1MAIL1.st.com>
- <201312112231.36039.arnd@arndb.de>
-Message-ID: <001001cef6c3$2c5a3cd0$850eb670$%han@samsung.com>
+ <3a008bd5223b1da9f17ceac745b3fc08b6b842e3.1386752447.git.mohit.kumar@st.com>
+Message-ID: <201312112351.24603.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 12, 2013 6:32 AM, Arnd Bergmann wrote:
-> On Wednesday 11 December 2013, Mohit KUMAR DCG wrote:
-> > >
-> > > Seems like none were using these headers except pcie-designware.c - if ie
-> > > the case better to place it same place as before.
-> >
-> > - We have include these and used few like ' PCIE_LINK_WIDTH_SPEED_CONTROL '  for SPEAr13xx platform,
-> > so move these to the separate header  file.
-> 
-> I think it's better not to touch any of the registers from a platform-specific
-> driver. Better make a high-level function in the common code that the
-> spear driver can call to change this register.
+On Wednesday 11 December 2013, Mohit Kumar wrote:
+> diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
+> index 4526f75..c236cef 100644
+> --- a/arch/arm/mach-spear/include/mach/spear.h
+> +++ b/arch/arm/mach-spear/include/mach/spear.h
+> @@ -140,6 +140,79 @@
+>                         (SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
+>                         SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
+>  
+> +#define VA_SPEAR1310_PCIE_SATA_CFG             (VA_MISC_BASE + 0x3A4)
+> +       #define SPEAR1310_PCIE_SATA2_SEL_PCIE           (0 << 31)
+> +       #define SPEAR1310_PCIE_SATA1_SEL_PCIE           (0 << 30)
+> +       #define SPEAR1310_PCIE_SATA0_SEL_PCIE           (0 << 29)
+> +       #define SPEAR1310_PCIE_SATA2_SEL_SATA           (1 << 31)
+> +       #define SPEAR1310_PCIE_SATA1_SEL_SATA           (1 << 30)
+> +       #define SPEAR1310_PCIE_SATA0_SEL_SATA           (1 << 29)
 
-I also agree with Arnd's opinion.
+These should definitely be part of the PHY driver.
 
-Best regards,
-Jingoo Han
+Regarding style, don't use a hardcoded VA_MISC_BASE constant here,
+but find the right address in the driver, and instead of shifting
+bits, just use hexadecimal notation:
+
+#define SPEAR1310_PCIE_SATA2_SEL_PCIE           0x80000000
+#define SPEAR1310_PCIE_SATA1_SEL_PCIE           0x40000000
+...
+
+However, if you have a "reset" driver, you can use #reset-cells=<1>
+and pass the bit as the reset specifier.
+
+	Arnd
