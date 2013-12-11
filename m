@@ -1,53 +1,34 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 11 Dec 2013 11:14:45 +0530
-Subject: [PATCH] phy: omap_usb2: fix module dependency
-In-Reply-To: <1386707097-25650-1-git-send-email-balbi@ti.com>
-References: <1386707097-25650-1-git-send-email-balbi@ti.com>
-Message-ID: <52A7FBCD.4030101@ti.com>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Wed, 11 Dec 2013 13:47:16 +0800
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <001f01cef1c2$6bd0ab70$43720250$%jun@samsung.com>
+References: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
+ <1383889128-12540-3-git-send-email-zhangfei.gao@linaro.org>
+ <001f01cef1c2$6bd0ab70$43720250$%jun@samsung.com>
+Message-ID: <CAMj5Bkgwzq5+aewF2vOJq3aDMk0yy8WVQOzdboCmMtrx1vi4nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Dear Seungwon
 
-On Wednesday 11 December 2013 01:54 AM, Felipe Balbi wrote:
-> Due to over-use of select statements, we could
-> fall into a situation where CONFIG_USB_PHY would
-> be enabled while CONFIG_USB_SUPPORT wouldn't.
-> 
-> This would generate a situation where usb_bind_phy()
-> would not be defined and kernel build for some
-> OMAP2PLUS platforms would fail.
-> 
-> Fix this by replacing a 'select' with a more proper
-> 'depends on'.
+On Thu, Dec 5, 2013 at 10:00 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
 
-last week I sent a patch changing it to depends on USB_PHY and Greg has merged
-it yesterday so it should come in -rc4. Do you think this patch will also be
-needed?
+>> +static DEFINE_SPINLOCK(mmc_tuning_lock);
+> Can the above variables be involved in dw_mci_k3_priv_data instead of global declaration?
+>
+Unfortunately, this can be be put in priv_data, which is different
+instance for different controller.
+Here need protect register shared by different controllers
+
+
+>> +static int dw_mci_k3_setup_clock(struct dw_mci *host)
+>> +{
+>> +     dw_mci_k3_tun(host, MMC_TIMING_LEGACY);
+> Is it necessary here?
+> When card-init, MMC_TIMING_LEGACY will be passed via dw_mci_k3_set_ios().
+
+Read register will fail if not set these register earlier, and set_ios
+is too late.
+Same reason for resume.
 
 Thanks
-Kishon
-
-> 
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/phy/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index a344f3d..d8b1a9a 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -24,9 +24,9 @@ config PHY_EXYNOS_MIPI_VIDEO
->  config OMAP_USB2
->  	tristate "OMAP USB2 PHY Driver"
->  	depends on ARCH_OMAP2PLUS
-> +	depends on OMAP_CONTROL_USB
->  	select GENERIC_PHY
->  	select USB_PHY
-> -	select OMAP_CONTROL_USB
->  	help
->  	  Enable this to support the transceiver that is part of SOC. This
->  	  driver takes care of all the PHY functionality apart from comparator.
-> 
