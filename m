@@ -1,76 +1,84 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 12 Dec 2013 00:05:36 +0100
-Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <52A8AD5B.70601@cogentembedded.com>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1488247.0AdahCZr3G@avalon> <52A8AD5B.70601@cogentembedded.com>
-Message-ID: <13209501.ngs8HJ5G2p@avalon>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 11 Dec 2013 18:15:20 -0500
+Subject: [PATCH v2 03/11] arm: use generic fixmap.h
+In-Reply-To: <1385396045-15852-4-git-send-email-msalter@redhat.com>
+References: <1385396045-15852-1-git-send-email-msalter@redhat.com>
+ <1385396045-15852-4-git-send-email-msalter@redhat.com>
+Message-ID: <1386803720.1979.116.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Wednesday 11 December 2013 22:22:19 Sergei Shtylyov wrote:
-> On 11-12-2013 22:06, Laurent Pinchart wrote:
-> >>> This helps increasing build testing coverage.
-> >>> 
-> >>> The driver doesn't compile on (at least) x86 due (possibly among others)
-> >>> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
-> >>> or ARM.
-> >>> 
-> >>> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
-> >>> controller or is Renesas-specific is unknown and impossible to test as
-> >>> we have no current or planned TMIO DMA users other than SUPERH and
-> >>> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
-> >>> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
-> >>> list would extend this to multiarch kernels, but would break the driver
-> >>> for non-shmobile platforms if the register is Renesas-specific. We can
-> >>> thus get rid of the conditional compilation completely without
-> >>> introducing any further issue, and let future non-Renesas users deal
-> >>> with the situation if it turns out to be a the problem.
-> >>> 
-> >>> Cc: Chris Ball <cjb@laptop.org>
-> >>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> >>> Cc: Ian Molton <ian@mnementh.co.uk>
-> >>> Cc: linux-mmc at vger.kernel.org
-> >>> Signed-off-by: Laurent Pinchart
-> >>> <laurent.pinchart+renesas@ideasonboard.com>
-> >>> Acked-by: Simon Horman <horms@verge.net.au>
+On Mon, 2013-11-25 at 11:13 -0500, Mark Salter wrote:
+> ARM is different from other architectures in that fixmap pages are
+> indexed with a positive offset from FIXADDR_START. Other architectures
+> index with a negative offset from FIXADDR_TOP. In order to use the
+> generic fixmap.h definitions, this patch redefines FIXADDR_TOP to be
+> inclusive of the useable range. That is, FIXADDR_TOP is the virtual
+> address of the topmost fixed page. The newly defined FIXADDR_END is
+> the first virtual address past the fixed mappings.
 > 
-> [...]
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: linux-arm-kernel at lists.infradead.org
+> ---
+
+Ping. Any concerns about this?
+
+>  arch/arm/include/asm/fixmap.h | 29 ++++++++---------------------
+>  arch/arm/mm/init.c            |  2 +-
+>  2 files changed, 9 insertions(+), 22 deletions(-)
 > 
-> >>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> >>> index 7fc5099..ca1315e 100644
-> >>> --- a/drivers/mmc/host/Kconfig
-> >>> +++ b/drivers/mmc/host/Kconfig
-> >>> @@ -479,7 +479,8 @@ config MMC_TMIO
-> >>> 
-> >>>    config MMC_SDHI
-> >>>    	tristate "SH-Mobile SDHI SD/SDIO controller support"
-> >>> -	depends on SUPERH || ARCH_SHMOBILE
-> >>> +	depends on SUPERH || ARM
-> >>> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-> >>> 
-> >>      Hm, why 2 "depends" lines with SUPERH in both?
-> > 
-> > The first line means "this driver requires SUPERH || ARM to be compiled",
-> 
->     Then COMPILE_TEST should be there, no?
-
-No, because the first line says that the driver is known *not* to compile on 
-platforms other than ARM and SUPERH. Adding || COMPILE_TEST there would break 
-compilation with allyesconfig and randconfig on those other platforms.
-
-Stated differently, the first line restricts the driver from being compiled on 
-architectures where it doesn't compile, regardless of COMPILE_TEST, and the 
-second line restricts it to platform where hardware is known to exists, with 
-COMPILE_TEST to optionally extend build coverage.
-
-> > while the second line means "devices supported by this driver are only
-> > found on SUPERH || ARCH_SHMOBILE platforms".
-
--- 
-Regards,
-
-Laurent Pinchart
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index bbae919..68ea615 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -14,28 +14,15 @@
+>   */
+>  
+>  #define FIXADDR_START		0xfff00000UL
+> -#define FIXADDR_TOP		0xfffe0000UL
+> -#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
+> +#define FIXADDR_END		0xfffe0000UL
+> +#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+>  
+> -#define FIX_KMAP_BEGIN		0
+> -#define FIX_KMAP_END		(FIXADDR_SIZE >> PAGE_SHIFT)
+> +enum fixed_addresses {
+> +	FIX_KMAP_BEGIN,
+> +	FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+> +	__end_of_fixed_addresses
+> +};
+>  
+> -#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
+> -#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
+> -
+> -extern void __this_fixmap_does_not_exist(void);
+> -
+> -static inline unsigned long fix_to_virt(const unsigned int idx)
+> -{
+> -	if (idx >= FIX_KMAP_END)
+> -		__this_fixmap_does_not_exist();
+> -	return __fix_to_virt(idx);
+> -}
+> -
+> -static inline unsigned int virt_to_fix(const unsigned long vaddr)
+> -{
+> -	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+> -	return __virt_to_fix(vaddr);
+> -}
+> +#include <asm-generic/fixmap.h>
+>  
+>  #endif
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index ca907f8..fb61c29 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -632,7 +632,7 @@ void __init mem_init(void)
+>  			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+>  			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
+>  #endif
+> -			MLK(FIXADDR_START, FIXADDR_TOP),
+> +			MLK(FIXADDR_START, FIXADDR_END),
+>  			MLM(VMALLOC_START, VMALLOC_END),
+>  			MLM(PAGE_OFFSET, (unsigned long)high_memory),
+>  #ifdef CONFIG_HIGHMEM
