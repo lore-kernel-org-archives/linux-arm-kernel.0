@@ -1,41 +1,68 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 11 Dec 2013 09:29:07 +0800
-Subject: [PATCH] clk: divider: read before write for HIWORD mask
-Message-ID: <1386725347-14480-1-git-send-email-haojian.zhuang@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Dec 2013 17:32:51 -0800
+Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
+In-Reply-To: <20131211005106.GL11468@sirena.org.uk>
+References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+ <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
+ <20131210235000.GK11468@sirena.org.uk> <52A7AE1B.3040201@codeaurora.org>
+ <20131211005106.GL11468@sirena.org.uk>
+Message-ID: <52A7C0C3.2070805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When multiple dividers share one register, we need to read & mask
-register fist. Then we set the right value.
+On 12/10/13 16:51, Mark Brown wrote:
+> On Tue, Dec 10, 2013 at 04:13:15PM -0800, Stephen Boyd wrote:
+>> increment reg by 1 every time through this loop. Or should we just have
+>> use_single_rw == true?
+> No, it doesn't - it increments the address of reg by the size of a
+> register value each time.  Using use_single_rw might make sense, or if
+> you can't do bulk I/O at all then hooking in via reg_read() and
+> reg_write() in the config rather than trying to parse out the buffers
+> might be even better (you can still make helpers to set that up).
 
-For example, there're two mmc clock dividers shared in one registers.
-The clock register is HIWORD type.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/clk/clk-divider.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+Are you suggesting we implement the reg_read/reg_write as global helpers
+that the config points to and then call regmap_init()? At a quick glance
+it looks like we lose out on regmap_bulk_read() if we do that. There is
+one driver that will use regmap_bulk_read(), but I suppose we can just
+loop on regmap_read() and do our own increment? If we use use_single_rw
+everything works and we can simplify this code to just pass the reg and
+val buffers directly to ssbi_read/write.
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 8d3009e..e1ea289 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -227,12 +227,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (divider->lock)
- 		spin_lock_irqsave(divider->lock, flags);
- 
--	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
--		val = div_mask(divider) << (divider->shift + 16);
--	} else {
--		val = clk_readl(divider->reg);
--		val &= ~(div_mask(divider) << divider->shift);
--	}
-+	val = clk_readl(divider->reg);
-+	val &= ~(div_mask(divider) << divider->shift);
-+	if (divider->flags & CLK_DIVIDER_HIWORD_MASK)
-+		val |= div_mask(divider) << (divider->shift + 16);
- 	val |= value << divider->shift;
- 	clk_writel(val, divider->reg);
- 
+This is what I have now.
+
+static int regmap_ssbi_read(void *context,
+                            const void *regp, size_t reg_size,
+                            void *val, size_t val_size)
+{
+        int ret;
+        u16 reg;
+
+        BUG_ON(reg_size != 2);
+
+        reg = *(u16 *)regp;
+        while (val_size) {
+                ret = ssbi_read(context, reg, val, 1);
+                if (ret)
+                        return ret;
+                reg++;
+                val += sizeof(u8);
+                val_size -= sizeof(u8);
+        }
+
+        return 0;
+}
+
+With use_single_rw I think it can be this.
+
+static int regmap_ssbi_read(void *context,
+                            const void *reg, size_t reg_size,
+                            void *val, size_t val_size)
+{
+        BUG_ON(reg_size != 2);  
+        return ssbi_read(context, *(u16 *)reg, val, 1);
+}
+
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
