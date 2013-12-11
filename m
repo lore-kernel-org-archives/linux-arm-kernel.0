@@ -1,35 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 11 Dec 2013 08:48:56 +0000
-Subject: [PATCH v3 01/36] mtd: st_spi_fsm: Allocate resources and
- register with MTD framework
-In-Reply-To: <20131210204635.GD27149@ld-irv-0074.broadcom.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-2-git-send-email-lee.jones@linaro.org>
- <20131210204635.GD27149@ld-irv-0074.broadcom.com>
-Message-ID: <20131211084856.GF2390@lee--X1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Dec 2013 09:48:58 +0100
+Subject: [PATCH] ARM: pxa: fix USB gadget driver compilation regression
+Message-ID: <1386751738-13563-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+After commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
+"ARM: pxa: delete the custom GPIO header" a compilation
+error was introduced in the PXA25x gadget driver.
+An attempt to fix the problem was made in
+commit b144e4ab1ef130e8bf30bcd3e529b7f35112c503
+"usb: gadget: fix pxa25x compilation problems"
+by explictly stating the driver needs the <mach/hardware.h>
+header, which solved the compilation for a few boards,
+such as the pxa255-idp and its defconfig.
 
-Thank you for taking the time to review, it's very much appreciated.
-You bought out some interesting points that I'm happy to go away and
-rectify. Firstly however, as I inherited this code I'd like to give
-Angus a chance to comment before we go off on our own tangent and
-rework some of the good code which perhaps should remain unchanged.
+However the Lubbock board has this special clause in
+drivers/usb/gadget/pxa25x_udc.c:
 
-Angus, do you have enough time to go through Brian's review comments
-and perhaps reply to the ones that you feel would benefit from your
-expert knowledge. To be frank, some of the questions that were asked I
-wouldn't be able to answer without your guidance in any case.
+This include file has an implicit dependency on
+<mach/irqs.h> having been included before <mach/lubbock.h>
+was included.
 
-Thanks both.
+Before commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
+"ARM: pxa: delete the custom GPIO header" this implicit
+dependency for the pxa25x_udc compile on the Lubbock was
+satisfied by <linux/gpio.h> implicitly including
+<mach/gpio.h> which was in turn including <mach/irqs.h>,
+apart from the earlier added <mach/hardware.h>.
 
-Kind regards,
-Lee
+Fix this by having the PXA25x <mach/lubbock.h> explicitly
+include <mach/irqs.h>.
 
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Greg Kroah-Hartmann <gregkh@linuxfoundation.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-pxa/include/mach/lubbock.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-pxa/include/mach/lubbock.h b/arch/arm/mach-pxa/include/mach/lubbock.h
+index 2a086e8373eb..958cd6af9384 100644
+--- a/arch/arm/mach-pxa/include/mach/lubbock.h
++++ b/arch/arm/mach-pxa/include/mach/lubbock.h
+@@ -10,6 +10,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <mach/irqs.h>
++
+ #define LUBBOCK_ETH_PHYS	PXA_CS3_PHYS
+ 
+ #define LUBBOCK_FPGA_PHYS	PXA_CS2_PHYS
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.1
