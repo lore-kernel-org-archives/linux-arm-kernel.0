@@ -1,90 +1,227 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 11 Dec 2013 14:27:09 -0500 (EST)
-Subject: [PATCH 5/6] arm64: topology: Tell the scheduler about the relative
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Dec 2013 20:00:28 +0000
+Subject: [PATCH 2/3] arm64: topology: Tell the scheduler about the relative
  power of cores
-In-Reply-To: <20131211173142.GD11468@sirena.org.uk>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-5-git-send-email-broonie@kernel.org>
- <20131211144755.GF596@darko.cambridge.arm.com>
- <20131211173142.GD11468@sirena.org.uk>
-Message-ID: <alpine.LFD.2.10.1312111414500.15948@knanqh.ubzr>
+In-Reply-To: <1386792029-23148-1-git-send-email-broonie@kernel.org>
+References: <1386792029-23148-1-git-send-email-broonie@kernel.org>
+Message-ID: <1386792029-23148-2-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Dec 2013, Mark Brown wrote:
+From: Mark Brown <broonie@linaro.org>
 
-> On Wed, Dec 11, 2013 at 02:47:55PM +0000, Catalin Marinas wrote:
-> > On Wed, Dec 11, 2013 at 01:13:25PM +0000, Mark Brown wrote:
-> 
-> > > The power numbers are the same as for ARMv7 since it seems that the
-> > > expected differential between the big and little cores is very similar on
-> > > both ARMv7 and ARMv8.
-> 
-> > I have no idea ;). We don't have real silicon yet, so that's just a wild
-> > guess.
-> 
-> I was going on some typical DMIPS/MHz numbers that I'd found so
-> hopefully it's not a complete guess, though it will vary and that's just
-> one benchmark with all the realism problems that entails.  The ratio
-> seemed to be about the same as the equivalent for the ARMv7 cores so
-> given that it's a finger in the air thing it didn't seem worth drilling
-> down much further.
-> 
-> > > +static const struct cpu_efficiency table_efficiency[] = {
-> > > +	{ "arm,cortex-a57", 3891 },
-> > > +	{ "arm,cortex-a53", 2048 },
-> > > +	{ NULL, },
-> > > +};
-> 
-> > I also don't think we can just have absolute numbers here. I'm pretty
-> > sure these were generated on TC2 but other platforms may have different
-> > max CPU frequencies, memory subsystem, level and size of caches. The
-> > "average" efficiency and difference will be different.
-> 
-> The CPU frequencies at least are taken care of already, these numbers
-> get scaled for each core.  Once we're talking about things like the
-> memory I'd also start worrying about application specific effects.
-> There's also going to be stuff like thermal management which get fed in
-> here and which varies during runtime.
-> 
-> I don't know where the numbers came from for v7.
-> 
-> > Can we define this via DT? It's a bit strange since that's a constant
-> > used by the Linux scheduler but highly related to hardware.
-> 
-> I really don't think that's a good idea at this point, it seems better
-> for the DT to stick to factual descriptions of what's present rather
-> than putting tuning numbers in there.  If the wild guesses are in the
-> kernel source it's fairly easy to improve them, if they're baked into
-> system DTs that becomes harder.
+In non-heterogeneous systems like big.LITTLE systems the scheduler will be
+able to make better use of the available cores if we provide power numbers
+to it indicating their relative performance. Do this by parsing the CPU
+nodes in the DT.
 
-I really think putting such things into DT is wrong.
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8. These numbers are just an initial and basic
+approximation for use with the current scheduler, it is likely that both
+experience with silicon and ongoing work on improving the scheduler will
+lead to further tuning.
 
-If those numbers were derived from benchmark results, then it is most 
-probably best to try to come up with some kind of equivalent benchmark 
-in the kernel to qualify CPUs at run time.  After all this is what 
-actually matters i.e. how CPUs perform relative to each other, and that 
-may vary with many factors that people will forget to update when 
-copying a DT content to enable a new board.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 164 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 164 insertions(+)
 
-And that wouldn't be the first time some benchmark is used at boot time.  
-Different crypto/RAID algorithms are tested to determine the best one to 
-use, etc.
-
-> I'm also worried about putting numbers into the DT now with all the
-> scheduler work going on, this time next year we may well have a
-> completely different idea of what we want to tell the scheduler.  It may
-> be that we end up being able to explicitly tell the scheduler about
-> things like the memory architecture, or that the scheduler just gets
-> smarter and can estimate all this stuff at runtime.  
-
-Exactly.  Which is why the kernel better be self-sufficient to determine 
-such params.  Dt should be used only for things that may not be probed 
-at run time.  The relative performance of a CPU certainly can be probed 
-at run time.
-
-Obviously the specifics of the actual benchmark might be debated, but 
-the same can be said about static numbers.
-
-
-Nicolas
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index aae9d4d72328..c88970b1b863 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -18,6 +18,7 @@
+ #include <linux/percpu.h>
+ #include <linux/node.h>
+ #include <linux/nodemask.h>
++#include <linux/of.h>
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+ 
+@@ -26,6 +27,163 @@
+ #include <asm/topology.h>
+ 
+ /*
++ * cpu power scale management
++ */
++
++/*
++ * cpu power table
++ * This per cpu data structure describes the relative capacity of each core.
++ * On a heteregenous system, cores don't have the same computation capacity
++ * and we reflect that difference in the cpu_power field so the scheduler can
++ * take this difference into account during load balance. A per cpu structure
++ * is preferred because each CPU updates its own cpu_power field during the
++ * load balance except for idle cores. One idle core is selected to run the
++ * rebalance_domains for all idle cores and the cpu_power can be updated
++ * during this sequence.
++ */
++static DEFINE_PER_CPU(unsigned long, cpu_scale);
++
++unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
++{
++	return per_cpu(cpu_scale, cpu);
++}
++
++static void set_power_scale(unsigned int cpu, unsigned long power)
++{
++	per_cpu(cpu_scale, cpu) = power;
++}
++
++#ifdef CONFIG_OF
++struct cpu_efficiency {
++	const char *compatible;
++	unsigned long efficiency;
++};
++
++/*
++ * Table of relative efficiency of each processors
++ * The efficiency value must fit in 20bit and the final
++ * cpu_scale value must be in the range
++ *   0 < cpu_scale < 3*SCHED_POWER_SCALE/2
++ * in order to return@most 1 when DIV_ROUND_CLOSEST
++ * is used to compute the capacity of a CPU.
++ * Processors that are not defined in the table,
++ * use the default SCHED_POWER_SCALE value for cpu_scale.
++ */
++static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
++	{ NULL, },
++};
++
++static unsigned long *__cpu_capacity;
++#define cpu_capacity(cpu)	__cpu_capacity[cpu]
++
++static unsigned long middle_capacity = 1;
++
++/*
++ * Iterate all CPUs' descriptor in DT and compute the efficiency
++ * (as per table_efficiency). Also calculate a middle efficiency
++ * as close as possible to  (max{eff_i} - min{eff_i}) / 2
++ * This is later used to scale the cpu_power field such that an
++ * 'average' CPU is of middle power. Also see the comments near
++ * table_efficiency[] and update_cpu_power().
++ */
++static void __init parse_dt_topology(void)
++{
++	const struct cpu_efficiency *cpu_eff;
++	struct device_node *cn = NULL;
++	unsigned long min_capacity = (unsigned long)(-1);
++	unsigned long max_capacity = 0;
++	unsigned long capacity = 0;
++	int alloc_size, cpu;
++
++	alloc_size = nr_cpu_ids * sizeof(*__cpu_capacity);
++	__cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
++
++	for_each_possible_cpu(cpu) {
++		const u32 *rate;
++		int len;
++
++		/* Too early to use cpu->of_node */
++		cn = of_get_cpu_node(cpu, NULL);
++		if (!cn) {
++			pr_err("Missing device node for CPU %d\n", cpu);
++			continue;
++		}
++
++		/* check if the cpu is marked as "disabled", if so ignore */
++		if (!of_device_is_available(cn))
++			continue;
++
++		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
++			if (of_device_is_compatible(cn, cpu_eff->compatible))
++				break;
++
++		if (cpu_eff->compatible == NULL) {
++			pr_warn("%s: Unknown CPU type\n", cn->full_name);
++			continue;
++		}
++
++		rate = of_get_property(cn, "clock-frequency", &len);
++		if (!rate || len != 4) {
++			pr_err("%s: Missing clock-frequency property\n",
++				cn->full_name);
++			continue;
++		}
++
++		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
++
++		/* Save min capacity of the system */
++		if (capacity < min_capacity)
++			min_capacity = capacity;
++
++		/* Save max capacity of the system */
++		if (capacity > max_capacity)
++			max_capacity = capacity;
++
++		cpu_capacity(cpu) = capacity;
++	}
++
++	/* If min and max capacities are equal we bypass the update of the
++	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
++	 * compute a middle_capacity factor that will ensure that the capacity
++	 * of an 'average' CPU of the system will be as close as possible to
++	 * SCHED_POWER_SCALE, which is the default value, but with the
++	 * constraint explained near table_efficiency[].
++	 */
++	if (min_capacity == max_capacity)
++		return;
++	else if (4 * max_capacity < (3 * (max_capacity + min_capacity)))
++		middle_capacity = (min_capacity + max_capacity)
++				>> (SCHED_POWER_SHIFT+1);
++	else
++		middle_capacity = ((max_capacity / 3)
++				>> (SCHED_POWER_SHIFT-1)) + 1;
++
++}
++
++/*
++ * Look for a customed capacity of a CPU in the cpu_topo_data table during the
++ * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
++ * function returns directly for SMP system.
++ */
++static void update_cpu_power(unsigned int cpu)
++{
++	if (!cpu_capacity(cpu))
++		return;
++
++	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
++
++	pr_info("CPU%u: update cpu_power %lu\n",
++		cpu, arch_scale_freq_power(NULL, cpu));
++}
++
++#else
++static inline void parse_dt_topology(void) {}
++static inline void update_cpu_power(unsigned int cpuid) {}
++#endif
++
++/*
+  * cpu topology table
+  */
+ struct cputopo_arm cpu_topology[NR_CPUS];
+@@ -71,6 +229,8 @@ void store_cpu_topology(unsigned int cpuid)
+ 		pr_info("CPU%u: No topology information configured\n", cpuid);
+ 	else
+ 		update_siblings_masks(cpuid);
++
++	update_cpu_power(cpuid);
+ }
+ 
+ 
+@@ -119,6 +279,10 @@ void __init init_cpu_topology(void)
+ 		cpu_topo->socket_id = -1;
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
++
++		set_power_scale(cpu, SCHED_POWER_SCALE);
+ 	}
+ 	smp_wmb();
++
++	parse_dt_topology();
+ }
+-- 
+1.8.5.1
