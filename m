@@ -1,77 +1,61 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 11 Dec 2013 12:59:55 +0800
-Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
-In-Reply-To: <20131211035654.GI18380@S2101-09.ap.freescale.net>
-References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
- <1386680168-5227-2-git-send-email-b29396@freescale.com>
- <20131211015640.GA18380@S2101-09.ap.freescale.net>
- <CAA+hA=ST0fAa2__PaeJqxj2yDWUAr6iaNO4Dj7ABiEWqnYp6Vw@mail.gmail.com>
- <20131211031254.GF18380@S2101-09.ap.freescale.net>
- <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
- <20131211035654.GI18380@S2101-09.ap.freescale.net>
-Message-ID: <CAA+hA=TjhLKmLucm9R3fkiDQGCxTf_5WCMKbgyBXuuqC6Q0-RQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 11 Dec 2013 07:00:12 +0200
+Subject: [PATCH 6/6] clocksource: dw_apb_timer_of: Fix support for dts
+ binding "snps, dw-apb-timer"
+In-Reply-To: <1386702972-25565-6-git-send-email-daniel.lezcano@linaro.org>
+References: <52A767CB.3010501@linaro.org>
+ <1386702972-25565-1-git-send-email-daniel.lezcano@linaro.org>
+ <1386702972-25565-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20131211050012.GB1217@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 11:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Dec 11, 2013 at 11:20:59AM +0800, Dong Aisheng wrote:
->> No, the max_to is the max timeout counter value, you need to divide it
->> by the timeout clock
->> to get the timeout time.
->> The defined of this API is return the max timeout value in
->> miliseconds, so you need to
->> divide the clock by 1000.
->> None of these handles the detail bout discard_to.
->
-> Let me start it over again.  Here is basically what your patch does.
->
-> -     mmc->max_discard_to = (1 << 27) / host->timeout_clk;
-> +     if (host->ops->get_max_timeout)
-> +             mmc->max_discard_to = host->ops->get_max_timeout(host);
->
-> The only thing that does not work for you in the existing code is the
-> (1 << 27) part, right?
->
-> If so, why not just create a platform hook to return the correct thing
-> for you platform, i.e. (1 << 28)?
->
->         if (host->ops->get_max_timeout)
->                 mmc->max_discard_to = host->ops->hook_foo(host);
->
-> unsigned int esdhc_hook_foo(struct sdhci_host *host)
-> {
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->         struct pltfm_imx_data *imx_data = pltfm_host->priv;
->
->         return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
-> }
->
-> Such patch will be ease to be understood and less offensive to the
-> existing code, no?
->
+Hi Daniel, Dinh,
 
-The example you give is not correct here.
-The max timeout counter returned by esdhc_hook_foo can not be simpled assigned
-to max_discard_to which is timeout in miliseconds.
+On Tue, Dec 10, 2013 at 08:16:12PM +0100, Daniel Lezcano wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> In commit 620f5e1cbf (dts: Rename DW APB timer compatible strings), both
+> "snps,dw-apb-timer-sp" and "snps,dw-apb-timer-osc" were deprecated in place
+> of "snps,dw-apb-timer". But the driver also needs to be udpated in order to
+> support this new binding "snps,dw-apb-timer".
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
 
-Actually what i did is like the way you said:
--       mmc->max_discard_to = (1 << 27) / host->timeout_clk;
-+       if (host->ops->get_max_timeout)
-+               mmc->max_discard_to = host->ops->get_max_timeout(host);
-+       else
-+               mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+I guess this (and the previous one) should also be pushed to v3.12-stable, 
+isn't it?
 
-+unsigned int esdhc_get_max_timeout(struct sdhci_host *host)
-+{
-+       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+       struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+       u32 max_to = esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
-+
-+       return max_to / (esdhc_pltfm_get_max_clock(host) / 1000);
-+}
+baruch
 
-Regards
-Dong Aisheng
+>  drivers/clocksource/dw_apb_timer_of.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+> index b29d7cd..2a2ea27 100644
+> --- a/drivers/clocksource/dw_apb_timer_of.c
+> +++ b/drivers/clocksource/dw_apb_timer_of.c
+> @@ -113,7 +113,6 @@ static u64 read_sched_clock(void)
+>  
+>  static const struct of_device_id sptimer_ids[] __initconst = {
+>  	{ .compatible = "picochip,pc3x2-rtc" },
+> -	{ .compatible = "snps,dw-apb-timer-sp" },
+>  	{ /* Sentinel */ },
+>  };
+>  
+> @@ -151,4 +150,6 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+>  	num_called++;
+>  }
+>  CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+> -CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
+> -- 
+> 1.7.9.5
 
-> Shawn
->
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
