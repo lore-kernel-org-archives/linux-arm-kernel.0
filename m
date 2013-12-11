@@ -1,62 +1,66 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 13:53:21 +0100
-Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <2090378.13zHUAnprd@avalon>
+From: p.wilczek@samsung.com (Piotr Wilczek)
+Date: Wed, 11 Dec 2013 14:07:31 +0100
+Subject: [PATCH 0/8] Impedance matcher for Samsung boards
+Message-ID: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+This patchset implements the impedance-matcher for Samsung Exynos boards
+and does the following:
+ - fix strncmp function;
+ - ensure each DT blob is 4-byte aligned;
+ - port 'atags_to_fdt' form Kernel;
+ - add Exynos specific serial driver;
+ - add support for Samsung boards, Trats and Trats2;
 
-Could you please pick this patch (and patch 08/15 in the same series) up for 
-v3.14 ?
+This patch set is based on:
+https://github.com/zonque/pxa-impedance-matcher.git
 
-On Wednesday 27 November 2013 02:18:29 Laurent Pinchart wrote:
-> This helps increasing build testing coverage.
-> 
-> The driver doesn't compile on (at least) x86 due (possibly among others)
-> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
-> or ARM.
-> 
-> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
-> controller or is Renesas-specific is unknown and impossible to test as
-> we have no current or planned TMIO DMA users other than SUPERH and
-> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
-> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
-> list would extend this to multiarch kernels, but would break the driver
-> for non-shmobile platforms if the register is Renesas-specific. We can
-> thus get rid of the conditional compilation completely without
-> introducing any further issue, and let future non-Renesas users deal
-> with the situation if it turns out to be a the problem.
-> 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Ian Molton <ian@mnementh.co.uk>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Acked-by: Simon Horman <horms@verge.net.au>
-> ---
->  drivers/mmc/host/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..ca1315e 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -479,7 +479,8 @@ config MMC_TMIO
-> 
->  config MMC_SDHI
->  	tristate "SH-Mobile SDHI SD/SDIO controller support"
-> -	depends on SUPERH || ARCH_SHMOBILE
-> +	depends on SUPERH || ARM
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
->  	select MMC_TMIO_CORE
->  	help
->  	  This provides support for the SDHI SD/SDIO controller found in
+Piotr Wilczek (8):
+  registers: add write u8 type
+  string: fix strncmp function
+  device tree blob must be 4-bytes alingned
+  Makefile: disable generating Thumb code
+  add memory operations
+  add support to supplement atags to device tree
+  serial: add Exynos specific serial driver
+  board: add Samsung specific board support
+
+ Makefile                       |   12 +-
+ append_dtbs.sh                 |   11 +
+ atags.h                        |    2 +
+ atags_to_fdt.c                 |  197 ++++++
+ board-exynos.c                 |   77 +++
+ configs/Makefile.config.exynos |   13 +
+ dtbs.c                         |    4 +
+ fdt.c                          |  224 ++++++
+ fdt_ro.c                       |  576 ++++++++++++++++
+ fdt_rw.c                       |  494 ++++++++++++++
+ fdt_wip.c                      |  120 ++++
+ libfdt.h                       | 1478 ++++++++++++++++++++++++++++++++++++++++
+ libfdt_env.h                   |   13 +
+ libfdt_internal.h              |   95 +++
+ main.c                         |    4 +
+ register.c                     |   10 +
+ register.h                     |    3 +
+ serial-exynos.c                |   84 +++
+ setup.h                        |  187 +++++
+ string.c                       |  119 +++-
+ string.h                       |   10 +
+ types.h                        |   32 +
+ 22 files changed, 3761 insertions(+), 4 deletions(-)
+ create mode 100644 atags_to_fdt.c
+ create mode 100644 board-exynos.c
+ create mode 100644 configs/Makefile.config.exynos
+ create mode 100644 fdt.c
+ create mode 100644 fdt_ro.c
+ create mode 100644 fdt_rw.c
+ create mode 100644 fdt_wip.c
+ create mode 100644 libfdt.h
+ create mode 100644 libfdt_env.h
+ create mode 100644 libfdt_internal.h
+ create mode 100644 serial-exynos.c
+ create mode 100644 setup.h
+
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
