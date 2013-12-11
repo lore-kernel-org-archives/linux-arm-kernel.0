@@ -1,57 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Dec 2013 09:48:58 +0100
-Subject: [PATCH] ARM: pxa: fix USB gadget driver compilation regression
-Message-ID: <1386751738-13563-1-git-send-email-linus.walleij@linaro.org>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Wed, 11 Dec 2013 10:53:20 +0200
+Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
+ platform doesn't have PHY
+In-Reply-To: <20131209092604.GC5231@xps8300>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1385373690-12170-5-git-send-email-kishon@ti.com>
+ <20131204144027.GB21055@xps8300> <52A01E86.50406@ti.com>
+ <20131205075828.GA32583@xps8300> <52A56DA1.1010808@ti.com>
+ <20131209092604.GC5231@xps8300>
+Message-ID: <20131211085320.GD28456@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
-"ARM: pxa: delete the custom GPIO header" a compilation
-error was introduced in the PXA25x gadget driver.
-An attempt to fix the problem was made in
-commit b144e4ab1ef130e8bf30bcd3e529b7f35112c503
-"usb: gadget: fix pxa25x compilation problems"
-by explictly stating the driver needs the <mach/hardware.h>
-header, which solved the compilation for a few boards,
-such as the pxa255-idp and its defconfig.
+Hi,
 
-However the Lubbock board has this special clause in
-drivers/usb/gadget/pxa25x_udc.c:
+On Mon, Dec 09, 2013 at 11:26:04AM +0200, Heikki Krogerus wrote:
+> > >>>Can you guys explain why is something like this needed? Like with
+> > >>>clocks and gpios, the device drivers shouldn't need to care any more
+> > >>>if the platform has the phys or not. -ENODEV tells you your platform
+> > >>
+> > >>Shouldn't we report if a particular platform needs a PHY and not able to get
+> > >>it. How will a user know if a particular controller is not working because it's
+> > >>not able to get and initialize the PHYs? Don't you think in such cases it's
+> > >>better to fail (and return from probe) because the controller will not work
+> > >>anyway without the PHY?
+> > >
+> > >My point is that you do not need to separately tell this to the driver
+> > >like you do with the quirks (if you did, then you would need to fix
+> > >your framework and not hack the drivers).
+> > >
+> > >Like I said, ENODEV tells you that there is no phy on this platform
+> > >for you, allowing you to safely continue. If your phy driver is not
+> > >loaded, the framework already returns EPROBE_DEFER, right. Any other
+> > 
+> > right. but that doesn't consider broken dt data. With quirks we'll
+> > able to tell if a controller in a particular platform has PHY or not
+> > without depending on the dt data.
+> 
+> Broken dt data? What kind of scenario are you thinking here? Do you
+> mean case where the dt does not describe the phy on a platform that
+> depends on it? Shouldn't that problem be fixed in the dt and not
+> hacked in the drivers? Or are you thinking about something else?
+> 
+> Is there a case where something like that is actually happening?
 
-This include file has an implicit dependency on
-<mach/irqs.h> having been included before <mach/lubbock.h>
-was included.
+I'm guessing I'm not getting an answer to this one.
 
-Before commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
-"ARM: pxa: delete the custom GPIO header" this implicit
-dependency for the pxa25x_udc compile on the Lubbock was
-satisfied by <linux/gpio.h> implicitly including
-<mach/gpio.h> which was in turn including <mach/irqs.h>,
-apart from the earlier added <mach/hardware.h>.
+Look, this patch will not work with ACPI enumerated devices. We will
+have a platform providing a single ACPI id, but there is a whole bunch
+of boards based on it and we have no way of telling which of them
+need/have phys to deal with and which ones don't.
 
-Fix this by having the PXA25x <mach/lubbock.h> explicitly
-include <mach/irqs.h>.
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Greg Kroah-Hartmann <gregkh@linuxfoundation.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-pxa/include/mach/lubbock.h | 2 ++
- 1 file changed, 2 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/mach-pxa/include/mach/lubbock.h b/arch/arm/mach-pxa/include/mach/lubbock.h
-index 2a086e8373eb..958cd6af9384 100644
---- a/arch/arm/mach-pxa/include/mach/lubbock.h
-+++ b/arch/arm/mach-pxa/include/mach/lubbock.h
-@@ -10,6 +10,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <mach/irqs.h>
-+
- #define LUBBOCK_ETH_PHYS	PXA_CS3_PHYS
- 
- #define LUBBOCK_FPGA_PHYS	PXA_CS2_PHYS
 -- 
-1.8.3.1
+heikki
