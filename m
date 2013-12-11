@@ -1,15 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 11 Dec 2013 11:30:15 +0100
-Subject: [PATCH 4/7] PCI: imx6: Split away the link up wait loop
+Date: Wed, 11 Dec 2013 11:30:13 +0100
+Subject: [PATCH 2/7] PCI: imx6: Fix waiting for link up
 In-Reply-To: <1386757818-5154-1-git-send-email-marex@denx.de>
 References: <1386757818-5154-1-git-send-email-marex@denx.de>
-Message-ID: <1386757818-5154-4-git-send-email-marex@denx.de>
+Message-ID: <1386757818-5154-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the function that waits for the PCIe link to come up from the
-rest if the host init function. We will find this change useful in
-the subsequent patch, since this will be called twice then.
+While waiting for the PHY to report the PCIe link is up, we might
+hit a situation where the link training is still in progress, while
+the PHY already reports the link is up. Add additional check for
+this condition.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -28,58 +29,43 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 32 ++++++++++++++++++++------------
- 1 file changed, 20 insertions(+), 12 deletions(-)
+ drivers/pci/host/pci-imx6.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 478e87e..4d6f6fe 100644
+index 52027ad..4d5be4e 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -304,6 +304,25 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
- 			IMX6Q_GPR8_TX_SWING_LOW, 127 << 25);
- }
+@@ -48,6 +48,8 @@ struct imx6_pcie {
+ #define PL_OFFSET 0x700
+ #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+ #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
++#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
++#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
  
-+static int imx6_pcie_wait_for_link(struct pcie_port *pp)
-+{
-+	int count = 200;
-+
-+	while (!dw_pcie_link_up(pp)) {
-+		usleep_range(100, 1000);
-+		if (--count)
-+			continue;
-+
-+		dev_err(pp->dev, "phy link never came up\n");
-+		dev_dbg(pp->dev, "DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
-+			readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
-+			readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static void imx6_pcie_host_init(struct pcie_port *pp)
+ #define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
+ #define PCIE_PHY_CTRL_DATA_LOC 0
+@@ -338,10 +340,17 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
  {
- 	int count = 0;
-@@ -320,18 +339,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
- 			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+ 	u32 rc, ltssm, rx_valid, temp;
  
--	while (!dw_pcie_link_up(pp)) {
--		usleep_range(100, 1000);
--		count++;
--		if (count >= 200) {
--			dev_err(pp->dev, "phy link never came up\n");
--			dev_dbg(pp->dev,
--				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
--				readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
--				readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
--			break;
--		}
--	}
-+	imx6_pcie_wait_for_link(pp);
+-	/* link is debug bit 36, debug register 1 starts@bit 32 */
+-	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1) & (0x1 << (36 - 32));
+-	if (rc)
+-		return -EAGAIN;
++	/*
++	 * Test if the PHY reports that the link is up and also that
++	 * the link training finished. It might happen that the PHY
++	 * reports the link is already up, but the link training bit
++	 * is still set, so make sure to check the training is done
++	 * as well here.
++	 */
++	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
++	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
++	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
++		return 1;
  
- 	return;
- }
+ 	/*
+ 	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
 -- 
 1.8.4.3
