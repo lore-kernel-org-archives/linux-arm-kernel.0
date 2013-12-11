@@ -1,68 +1,33 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 11 Dec 2013 13:06:41 +0800
-Subject: [PATCH 5/6] mmc: sdhci: calculate max_discard_to dynamically for
- SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-In-Reply-To: <20131211040511.GJ18380@S2101-09.ap.freescale.net>
-References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
- <1386680168-5227-6-git-send-email-b29396@freescale.com>
- <20131211040511.GJ18380@S2101-09.ap.freescale.net>
-Message-ID: <CAA+hA=R1K3g+h-0FWprRjqJ_wtsF=DyV4pY3coxocanfaOwWig@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Dec 2013 06:11:46 +0100
+Subject: [PATCH 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <1386736215.7152.259.camel@host5.omatika.ru>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <201312102257.33942.arnd@arndb.de>
+ <1386736215.7152.259.camel@host5.omatika.ru>
+Message-ID: <201312110611.46443.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 12:05 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Dec 10, 2013 at 08:56:07PM +0800, Dong Aisheng wrote:
->>  static inline void sdhci_update_clock(struct sdhci_host *host)
->> @@ -2939,10 +2952,12 @@ int sdhci_add_host(struct sdhci_host *host)
->>       if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
->>               host->timeout_clk = mmc->f_max / 1000;
->
-> Since max_discard_to calculation below will not happen for
-> SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK case, does it still make sense to
-> keep the above code?
->
+On Wednesday 11 December 2013, Sergei Ianovich wrote:
+> > It probably makes sense to have a single driver file for the
+> > FPGA device that does this, and only split out the other devices
+> > from it that consume the irqs.
+> 
+> Is drivers/irqchip/ the right place this driver?
+> 
+> I am asking because there is no tristate config options in
+> drivers/irqchip/Kconfig at the moment.
+> 
 
-Right, i missed to remove it.
-Will update in v2.
+It depends: if the driver is for the entire FPGA and does
+the irqchip stuff in addition, it should probably live
+in drivers/mfd. If it's a pure irqchip driver, drivers/irqchip
+is better. You have to be careful in the second case though
+because devices pointing to this irqchip in DT won't get
+an IRQ resource assigned automatically but have to use
+irq_of_parse_and_map instead. This may have been fixed since
+I last looked though, I would consider that behavior a
+bug in the of_platform handling.
 
-> Or put it in the other way, if we keep the above code and do not make
-> the change below, will there be any problem besides the max_discard_to
-> initialization plays for nothing?
->
-> All in all, I'm just confused why we keep the above code and make the
-> change below at the same time.
->
-
-THe max_discard_to should be dynamically updated for
-SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-when changing the clock, so we can remove above lines.
-
-Regards
-Dong Aisheng
-
-> Shawn
->
->>
->> -     if (host->ops->get_max_timeout)
->> -             mmc->max_discard_to = host->ops->get_max_timeout(host);
->> -     else
->> -             mmc->max_discard_to = (1 << 27) / host->timeout_clk;
->> +     if (!(host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)) {
->> +             if (host->ops->get_max_timeout)
->> +                     mmc->max_discard_to = host->ops->get_max_timeout(host);
->> +             else
->> +                     mmc->max_discard_to = (1 << 27) / host->timeout_clk;
->> +     }
->>
->>       mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
->>
->> --
->> 1.7.2.rc3
->>
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
