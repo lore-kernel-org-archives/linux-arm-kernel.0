@@ -1,48 +1,53 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 11 Dec 2013 13:41:48 +0100
-Subject: [PATCH 0/5] Power Related Fixes for Exynos5250
-In-Reply-To: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
-References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1474895.cu1U1Gy5We@amdc1227>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 11 Dec 2013 13:44:54 +0100
+Subject: [PATCH 03/15] serial: sh-sci: Restrict non-COMPILE_TEST
+ compilation
+In-Reply-To: <20131128073711.GF24146@verge.net.au>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131128073711.GF24146@verge.net.au>
+Message-ID: <1644962.Fmr1aLVkXP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
+Hi Simon,
 
-On Wednesday 11 of December 2013 17:27:04 Abhilash Kesavan wrote:
-> Patch 1 prevents the gating of sysreg clock on Exynos5250.
-> Patch 2 is a re-send of an earlier patch.
-> (http://www.spinics.net/lists/linux-samsung-soc/msg15485.html)
-> Patches 3 and 4 are fixes for MAX77686 on Exynos5250 based Snow
-> board (boot-up issues).
-> Patch 5 implements a power-off call-back for Exynos5250 that can
-> be re-used for Exynos5420.
-> 
-> The patches have been tested on an SMDK5250 based Chromebook.
-> 
-> Abhilash Kesavan (4):
->   clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag for the sysreg
->     clock
->   ARM: EXYNOS5: Fix PMU register configuration for local power blocks
->   clk: max77686: Replace is_enabled() with is_prepared call-back
->   ARM: dts: Setup the interrupt parent for max77686
-> 
-> Olof Johansson (1):
->   ARM: EXYNOS5250: Implement pm_power_off
-> 
->  arch/arm/boot/dts/cros5250-common.dtsi       |   11 ++++
->  arch/arm/mach-exynos/include/mach/regs-pmu.h |    3 +
->  arch/arm/mach-exynos/pmu.c                   |   86 ++++++++++++++++++++------
->  drivers/clk/clk-max77686.c                   |    4 +-
->  drivers/clk/samsung/clk-exynos5250.c         |    3 +-
->  5 files changed, 86 insertions(+), 21 deletions(-)
+Could you please add this patch to your tree with the "[PATCH 00/47] sh-sci 
+updates for v3.14" series ?
 
-You used the old and now invalid address of DT mailing list.
+On Thursday 28 November 2013 16:37:11 Simon Horman wrote:
+> On Wed, Nov 27, 2013 at 02:18:25AM +0100, Laurent Pinchart wrote:
+> > Hardware supported by the driver is only found on SUPERH or
+> > ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
+> > 
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: linux-serial at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> > ---
+> > 
+> >  drivers/tty/serial/Kconfig | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> > index a3817ab..a640d0b 100644
+> > --- a/drivers/tty/serial/Kconfig
+> > +++ b/drivers/tty/serial/Kconfig
+> > @@ -709,7 +709,8 @@ config SERIAL_IP22_ZILOG_CONSOLE
+> > 
+> >  config SERIAL_SH_SCI
+> >  	tristate "SuperH SCI(F) serial port support"
+> > -	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
+> > +	depends on HAVE_CLK
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> >  	select SERIAL_CORE
+> >  
+> >  config SERIAL_SH_SCI_NR_UARTS
 
-Anyway, there is no need to send patches for .dts* files to DT mailing
-list anymore. Just changes in drivers that affect how they handle data
-from DT and binding documentation (Documentation/devicetree/.*). So
-please drop the DT mailing list in next iteration of the series.
+-- 
+Regards,
 
-Best regards,
-Tomasz
+Laurent Pinchart
