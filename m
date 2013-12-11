@@ -1,45 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 Dec 2013 14:47:55 +0000
-Subject: [PATCH 5/6] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <1386767606-6391-5-git-send-email-broonie@kernel.org>
+Date: Wed, 11 Dec 2013 14:49:24 +0000
+Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131211143018.GZ11468@sirena.org.uk>
 References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-5-git-send-email-broonie@kernel.org>
-Message-ID: <20131211144755.GF596@darko.cambridge.arm.com>
+ <1386767606-6391-4-git-send-email-broonie@kernel.org>
+ <20131211141224.GG26730@mudshark.cambridge.arm.com>
+ <20131211141503.GX11468@sirena.org.uk>
+ <20131211142431.GD596@darko.cambridge.arm.com>
+ <20131211143018.GZ11468@sirena.org.uk>
+Message-ID: <20131211144924.GG596@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 01:13:25PM +0000, Mark Brown wrote:
-> The power numbers are the same as for ARMv7 since it seems that the
-> expected differential between the big and little cores is very similar on
-> both ARMv7 and ARMv8.
+On Wed, Dec 11, 2013 at 02:30:18PM +0000, Mark Brown wrote:
+> On Wed, Dec 11, 2013 at 02:24:32PM +0000, Catalin Marinas wrote:
+> > On Wed, Dec 11, 2013 at 02:15:03PM +0000, Mark Brown wrote:
+> 
+> > > He said he hadn't had time to work on the actual implementation which is
+> > > why I picked this up - as far as I'm aware we only have the (already
+> > > merged) binding for this.
+> 
+> > Lorenzo (on holiday now) pushed the DT topology bindings but there are
+> > no patches yet for reading them. I would much prefer to only describe
+> > the topology via DT rather than MPIDR (because hardware people sometimes
+> > have strange ideas).
+> 
+> Right, that was my understanding too.  
+> 
+> For clarity the current code only uses DT information, the MPIDR values
+> it uses are those in the CPU nodes in the DT which are used by the SMP
+> code and are not read from the hardware.
 
-I have no idea ;). We don't have real silicon yet, so that's just a wild
-guess.
+But these must match the hardware MPIDR to be useful on SMP. So whether
+you read them from hardware or DT, they are still the same.
 
-> +/*
-> + * Table of relative efficiency of each processors
-> + * The efficiency value must fit in 20bit and the final
-> + * cpu_scale value must be in the range
-> + *   0 < cpu_scale < 3*SCHED_POWER_SCALE/2
-> + * in order to return at most 1 when DIV_ROUND_CLOSEST
-> + * is used to compute the capacity of a CPU.
-> + * Processors that are not defined in the table,
-> + * use the default SCHED_POWER_SCALE value for cpu_scale.
-> + */
-> +static const struct cpu_efficiency table_efficiency[] = {
-> +	{ "arm,cortex-a57", 3891 },
-> +	{ "arm,cortex-a53", 2048 },
-> +	{ NULL, },
-> +};
+> We can drop that bit of code
+> easily enough but it seemed useful for getting the scaffolding in place
+> separately to the binding parsing and for general robustness, perhaps
+> adding a patch at the end of the series to drop the code handling MPIDR
+> would deal with the application issues?
 
-I also don't think we can just have absolute numbers here. I'm pretty
-sure these were generated on TC2 but other platforms may have different
-max CPU frequencies, memory subsystem, level and size of caches. The
-"average" efficiency and difference will be different.
-
-Can we define this via DT? It's a bit strange since that's a constant
-used by the Linux scheduler but highly related to hardware.
+Can we have the topology infrastructure with a flat initial topology and
+the actual building in a separate patch?
 
 -- 
 Catalin
