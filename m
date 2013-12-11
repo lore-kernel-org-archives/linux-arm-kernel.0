@@ -1,44 +1,60 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 13:46:38 +0100
-Subject: [PATCH 06/15] v4l: sh_vou: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <1385515117-23664-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Wed, 11 Dec 2013 13:47:34 +0100
+Subject: [PATCH 01/15] i2c: shmobile/rcar: Restrict non-COMPILE_TEST
+ compilation
+In-Reply-To: <20131128073621.GC24146@verge.net.au>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1658704.CLqRDCzrbM@avalon>
+ <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131128073621.GC24146@verge.net.au>
+Message-ID: <1786644.MDElX0sS53@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Hi Wolfram,
 
 Could you please pick this patch up for v3.14 ?
 
-On Wednesday 27 November 2013 02:18:28 Laurent Pinchart wrote:
-> This helps increasing build testing coverage.
+On Thursday 28 November 2013 16:36:21 Simon Horman wrote:
+> On Wed, Nov 27, 2013 at 02:18:23AM +0100, Laurent Pinchart wrote:
+> > Hardware supported by the i2c sh_mobile and rcar drivers is only found
+> > on SUPERH or ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST
+> > compilation to them.
+> > 
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: linux-i2c at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> Cc: linux-media at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Acked-by: Simon Horman <horms@verge.net.au>
-> ---
->  drivers/media/platform/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index d7f0249..7f6ea65 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -36,7 +36,8 @@ source "drivers/media/platform/blackfin/Kconfig"
->  config VIDEO_SH_VOU
->  	tristate "SuperH VOU video output driver"
->  	depends on MEDIA_CAMERA_SUPPORT
-> -	depends on VIDEO_DEV && ARCH_SHMOBILE && I2C
-> +	depends on VIDEO_DEV && I2C
-> +	depends on ARCH_SHMOBILE || COMPILE_TEST
->  	select VIDEOBUF_DMA_CONTIG
->  	help
->  	  Support for the Video Output Unit (VOU) on SuperH SoCs.
+> > ---
+> > 
+> >  drivers/i2c/busses/Kconfig | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> > index 3b26129..92bdcf9 100644
+> > --- a/drivers/i2c/busses/Kconfig
+> > +++ b/drivers/i2c/busses/Kconfig
+> > @@ -683,7 +683,7 @@ config I2C_SH7760
+> > 
+> >  config I2C_SH_MOBILE
+> >  	tristate "SuperH Mobile I2C Controller"
+> > -	depends on SUPERH || ARM || COMPILE_TEST
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> >  	help
+> >  	  If you say yes to this option, support will be included for the
+> >  	  built-in I2C interface on the Renesas SH-Mobile processor.
+> > @@ -796,7 +796,7 @@ config I2C_XLR
+> > 
+> >  config I2C_RCAR
+> >  	tristate "Renesas R-Car I2C Controller"
+> > -	depends on ARM || COMPILE_TEST
+> > +	depends on ARCH_SHMOBILE || COMPILE_TEST
+> >  	help
+> >  	  If you say yes to this option, support will be included for the
+> >  	  R-Car I2C controller.
+
 -- 
 Regards,
 
