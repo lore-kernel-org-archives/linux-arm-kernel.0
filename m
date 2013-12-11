@@ -1,66 +1,65 @@
 From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Wed, 11 Dec 2013 14:07:31 +0100
-Subject: [PATCH 0/8] Impedance matcher for Samsung boards
-Message-ID: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+Date: Wed, 11 Dec 2013 14:07:32 +0100
+Subject: [PATCH 1/8] registers: add write u8 type
+In-Reply-To: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+Message-ID: <1386767259-15693-2-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset implements the impedance-matcher for Samsung Exynos boards
-and does the following:
- - fix strncmp function;
- - ensure each DT blob is 4-byte aligned;
- - port 'atags_to_fdt' form Kernel;
- - add Exynos specific serial driver;
- - add support for Samsung boards, Trats and Trats2;
+Signed-off-by: Piotr Wilczek <p.wilczek@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ register.c |   10 ++++++++++
+ register.h |    3 +++
+ types.h    |    1 +
+ 3 files changed, 14 insertions(+)
 
-This patch set is based on:
-https://github.com/zonque/pxa-impedance-matcher.git
-
-Piotr Wilczek (8):
-  registers: add write u8 type
-  string: fix strncmp function
-  device tree blob must be 4-bytes alingned
-  Makefile: disable generating Thumb code
-  add memory operations
-  add support to supplement atags to device tree
-  serial: add Exynos specific serial driver
-  board: add Samsung specific board support
-
- Makefile                       |   12 +-
- append_dtbs.sh                 |   11 +
- atags.h                        |    2 +
- atags_to_fdt.c                 |  197 ++++++
- board-exynos.c                 |   77 +++
- configs/Makefile.config.exynos |   13 +
- dtbs.c                         |    4 +
- fdt.c                          |  224 ++++++
- fdt_ro.c                       |  576 ++++++++++++++++
- fdt_rw.c                       |  494 ++++++++++++++
- fdt_wip.c                      |  120 ++++
- libfdt.h                       | 1478 ++++++++++++++++++++++++++++++++++++++++
- libfdt_env.h                   |   13 +
- libfdt_internal.h              |   95 +++
- main.c                         |    4 +
- register.c                     |   10 +
- register.h                     |    3 +
- serial-exynos.c                |   84 +++
- setup.h                        |  187 +++++
- string.c                       |  119 +++-
- string.h                       |   10 +
- types.h                        |   32 +
- 22 files changed, 3761 insertions(+), 4 deletions(-)
- create mode 100644 atags_to_fdt.c
- create mode 100644 board-exynos.c
- create mode 100644 configs/Makefile.config.exynos
- create mode 100644 fdt.c
- create mode 100644 fdt_ro.c
- create mode 100644 fdt_rw.c
- create mode 100644 fdt_wip.c
- create mode 100644 libfdt.h
- create mode 100644 libfdt_env.h
- create mode 100644 libfdt_internal.h
- create mode 100644 serial-exynos.c
- create mode 100644 setup.h
-
+diff --git a/register.c b/register.c
+index dfbe145..af992ec 100644
+--- a/register.c
++++ b/register.c
+@@ -1,5 +1,15 @@
+ #include "types.h"
+ 
++inline void writeb(u8 val, u32 addr)
++{
++	*(volatile u32 *)addr = val;
++}
++
++inline u8 readb(u32 addr)
++{
++	return *(volatile u32 *)addr;
++}
++
+ inline void writel(u32 val, u32 addr)
+ {
+ 	*(volatile u32 *) addr = val;
+diff --git a/register.h b/register.h
+index b7831eb..5a89802 100644
+--- a/register.h
++++ b/register.h
+@@ -3,6 +3,9 @@
+ 
+ #include "types.h"
+ 
++void writeb(u8, u32);
++u8 readb(u32);
++
+ void writel(u32, u32);
+ u32 readl(u32);
+ 
+diff --git a/types.h b/types.h
+index 1e6c56a..636f95b 100644
+--- a/types.h
++++ b/types.h
+@@ -1,6 +1,7 @@
+ #ifndef _TYPES_H
+ #define _TYPES_H
+ 
++typedef unsigned char u8;
+ typedef unsigned int u32;
+ typedef unsigned long long u64;
+ #define NULL	((void *) 0)
 -- 
 1.7.9.5
