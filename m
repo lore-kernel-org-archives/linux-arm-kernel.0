@@ -1,62 +1,54 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 11 Dec 2013 12:09:04 -0800
-Subject: [PATCH 1/2] time: Serialize calls to 'clockevents_update_freq'
- in the timing core
-In-Reply-To: <52A87799.8010300@linaro.org>
-References: <alpine.DEB.2.02.1312071151340.30673@ionos.tec.linutronix.de>
- <1386635686-15686-1-git-send-email-soren.brinkmann@xilinx.com>
- <1386635686-15686-2-git-send-email-soren.brinkmann@xilinx.com>
- <52A87799.8010300@linaro.org>
-Message-ID: <ba4dce4a-1332-4fd8-80de-41347bb5b7b2@TX2EHSMHS005.ehs.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Dec 2013 21:12:52 +0100
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52A8868A.3000105@linaro.org>
+References: <1386770541-15056-1-git-send-email-zhangfei.gao@linaro.org>
+ <201312111549.14017.arnd@arndb.de> <52A8868A.3000105@linaro.org>
+Message-ID: <201312112112.52746.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Wed, Dec 11, 2013 at 03:32:57PM +0100, Daniel Lezcano wrote:
-> On 12/10/2013 01:34 AM, Soren Brinkmann wrote:
-> >From: Thomas Gleixner <tglx@linutronix.de>
+On Wednesday 11 December 2013, zhangfei wrote:
 > >
-> >We can identify the broadcast device in the core and serialize all
-> >callers including interrupts on a different CPU against the update.
-> >Also, disabling interrupts is moved into the core allowing callers to
-> >leave interrutps enabled when calling clockevents_update_freq().
+> > I have not seen "clk-table" and "clk-table-num" before. Are these standard
+> > properties? What are the units that are used here, what does the index mean?
 > >
-> >Cc: Thomas Gleixner <tglx@linutronix.de>
-> >Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >---
-> >  kernel/time/clockevents.c    | 29 ++++++++++++++++++++++-------
-> >  kernel/time/tick-broadcast.c | 25 +++++++++++++++++++------
-> >  kernel/time/tick-internal.h  |  4 ++++
-> >  3 files changed, 45 insertions(+), 13 deletions(-)
-> >
-> >diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> >index 086ad6043bcb..641d91003a45 100644
-> >--- a/kernel/time/clockevents.c
-> >+++ b/kernel/time/clockevents.c
-> >@@ -439,6 +439,16 @@ void clockevents_config_and_register(struct clock_event_device *dev,
-> >  }
-> >  EXPORT_SYMBOL_GPL(clockevents_config_and_register);
-> >
-> >+int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
-> >+{
-> >+	clockevents_config(dev, freq);
-> >+
-> >+	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-> >+		return 0;
-> >+
-> >+	return clockevents_program_event(dev, dev->next_event, false);
-> >+}
-> >+
 > 
-> ./arch/arm/kernel/smp_twd.c should be modified to call
-> __clockevents_update_freq instead of clockevents_update_freq, no ?
+> "clk-table" and "clk-table-num" are private properties.
+> Instead simply on/off, the ip need different ciu clock for each timing mode.
 
-IIUC, the __-version is only for timer core internal usage and not an
-exported interface. Doesn't the non-__ version work for the twd?
-I don't see issues on my Zynq platform with these patches.
+But aren't the times fixed for each mode? Why do you need to specify them in
+the DT? I would expect that the clock rates for each mode are set in the
+MMC and SD specifications. When you call clk_set_rate(), it should normally
+be enough to ask for the clock you actually want and let the clk subsystem
+figure out how to set up the parents and multipliers on the way.
 
-Another side note regarding the twd: Shouldn't we set the
-CLOCK_EVT_FEAT_PERCPU flag we introduced recently for that timer?
+> Take emmc as example,
+> clk-table-num = <8>;
+> clk-table =
+> <13000000 50000000 0 0 13000000 50000000 0 100000000>;
+> MMC_TIMING_LEGACY mode, 25M should be set with parent clock 180M,
+> MMC_TIMING_MMC_HS mode, 50M is required with parent clock 360M
+> 
+> "clk-table" list all clocks to be set in all supported timing one by one.
+> "clk-table-num" is the table number, since not find function getting 
+> table number.
+> For example, next version will support MMC_TIMING_MMC_HS200 mode, the 
+> clk-table-num = <9> with 9 clocks in the "clk-table"
 
-	S?ren
+If you have a property with an array, you can use of_find_property()
+to get to the 'struct property' and then read the 'length' member
+of that struct, or you can use of_property_for_each_u32() to iterate
+through each value.
+
+While I still hope that you don't even need this array as per the reasoning
+above, if you actually need it, you should specify exactly what each
+value means, such as
+
+1. CIU clock rate in HZ for 20MHz SPI mode operation 
+2. CIU clock rate in HZ for 25MHz SD card operation
+3. CIU clock rate in HZ for 26MHz MMC card operation
+4. CIU clock rate in HZ for 50MHz SD card operation
+...
+
+	Arnd
