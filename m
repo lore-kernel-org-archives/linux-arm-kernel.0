@@ -1,42 +1,42 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 11 Dec 2013 13:48:50 +0100
-Subject: [PATCH 09/15] mtd: sh_flctl: Enable driver compilation with
+Date: Wed, 11 Dec 2013 13:49:15 +0100
+Subject: [PATCH 10/15] irda: sh_irda: Enable driver compilation with
  COMPILE_TEST
-In-Reply-To: <1385515117-23664-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+In-Reply-To: <1385515117-23664-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <3651259.U0RP9jvU5Q@avalon>
+ <1385515117-23664-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <2434798.8bvsZzgdNb@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Samuel,
 
 Could you please pick this patch up for v3.14 ?
 
-On Wednesday 27 November 2013 02:18:31 Laurent Pinchart wrote:
+On Wednesday 27 November 2013 02:18:32 Laurent Pinchart wrote:
 > This helps increasing build testing coverage.
 > 
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: linux-mtd at lists.infradead.org
+> Cc: Samuel Ortiz <samuel@sortiz.org>
+> Cc: netdev at vger.kernel.org
 > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > Acked-by: Simon Horman <horms@verge.net.au>
 > ---
->  drivers/mtd/nand/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/net/irda/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index 93ae6a6..cb1f2ec 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -458,7 +458,7 @@ config MTD_NAND_MXC
+> diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
+> index 2a30193..cae5ee2 100644
+> --- a/drivers/net/irda/Kconfig
+> +++ b/drivers/net/irda/Kconfig
+> @@ -403,7 +403,8 @@ config MCS_FIR
 > 
->  config MTD_NAND_SH_FLCTL
->  	tristate "Support for NAND on Renesas SuperH FLCTL"
-> -	depends on SUPERH || ARCH_SHMOBILE
-> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+>  config SH_IRDA
+>  	tristate "SuperH IrDA driver"
+> -	depends on IRDA && ARCH_SHMOBILE
+> +	depends on IRDA
+> +	depends on ARCH_SHMOBILE || COMPILE_TEST
 >  	help
->  	  Several Renesas SuperH CPU has FLCTL. This option enables support
->  	  for NAND Flash using FLCTL.
+>  	  Say Y here if your want to enable SuperH IrDA devices.
 -- 
 Regards,
 
