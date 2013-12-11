@@ -1,80 +1,141 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Wed, 11 Dec 2013 15:08:35 +0530
-Subject: [PATCH 10/12] SPEAr13xx: defconfig: Update
+Date: Wed, 11 Dec 2013 15:08:32 +0530
+Subject: [PATCH 07/12] pcie: designware: add dw_pcie prefix before
+ cfg_read/write
 In-Reply-To: <cover.1386752447.git.mohit.kumar@st.com>
 References: <cover.1386752447.git.mohit.kumar@st.com>
-Message-ID: <3bc935718da3e0118c57ebee80c1363aac4a48a5.1386752447.git.mohit.kumar@st.com>
+Message-ID: <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable EABI, OEABI, VFP and NFS configs in default configuration file for
-SPEAr13xx.
+From: Pratyush Anand <pratyush.anand@st.com>
 
-Enable PCIe support for SPEAr13xx.
+cfg_read/write function are designware pcie specific. Add dw_pcie prefix
+to avoid collision in global name space.
 
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
 Cc: Mohit Kumar <mohit.kumar@st.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
 Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-pci at vger.kernel.org
 ---
- arch/arm/configs/spear13xx_defconfig |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/pci/host/pci-exynos.c      |    5 +++--
+ drivers/pci/host/pcie-designware.c |   23 ++++++++++++++---------
+ drivers/pci/host/pcie-designware.h |    4 ++--
+ 3 files changed, 19 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-index 82eaa55..83882c0 100644
---- a/arch/arm/configs/spear13xx_defconfig
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -11,13 +11,24 @@ CONFIG_ARCH_SPEAR13XX=y
- CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI_MSI=y
-+CONFIG_PCIE_SPEAR13XX=y
- CONFIG_SMP=y
- # CONFIG_SMP_ON_UP is not set
- # CONFIG_ARM_CPU_TOPOLOGY is not set
-+CONFIG_AEABI=y
-+CONFIG_OABI_COMPAT=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_VFP=y
- CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+CONFIG_NET_IPIP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
- CONFIG_MTD_OF_PARTS=y
-@@ -27,6 +38,7 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- # CONFIG_SATA_PMP is not set
- CONFIG_SATA_AHCI_PLATFORM=y
-@@ -66,6 +78,7 @@ CONFIG_USB=y
- # CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_SPEAR=y
-@@ -84,6 +97,8 @@ CONFIG_VFAT_FS=m
- CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
+diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+index 24beed3..3de6bfb 100644
+--- a/drivers/pci/host/pci-exynos.c
++++ b/drivers/pci/host/pci-exynos.c
+@@ -468,7 +468,7 @@ static int exynos_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
+ 	int ret;
+ 
+ 	exynos_pcie_sideband_dbi_r_mode(pp, true);
+-	ret = cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
++	ret = dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
+ 	exynos_pcie_sideband_dbi_r_mode(pp, false);
+ 	return ret;
+ }
+@@ -479,7 +479,8 @@ static int exynos_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
+ 	int ret;
+ 
+ 	exynos_pcie_sideband_dbi_w_mode(pp, true);
+-	ret = cfg_write(pp->dbi_base + (where & ~0x3), where, size, val);
++	ret = dw_pcie_cfg_write(pp->dbi_base + (where & ~0x3),
++			where, size, val);
+ 	exynos_pcie_sideband_dbi_w_mode(pp, false);
+ 	return ret;
+ }
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 73aa13c..be6ce30 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -32,7 +32,7 @@ static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+ 	return sys->private_data;
+ }
+ 
+-int cfg_read(void __iomem *addr, int where, int size, u32 *val)
++int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+ {
+ 	*val = readl(addr);
+ 
+@@ -46,7 +46,7 @@ int cfg_read(void __iomem *addr, int where, int size, u32 *val)
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+ 
+-int cfg_write(void __iomem *addr, int where, int size, u32 val)
++int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
+ {
+ 	if (size == 4)
+ 		writel(val, addr);
+@@ -84,7 +84,8 @@ static int dw_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
+ 	if (pp->ops->rd_own_conf)
+ 		ret = pp->ops->rd_own_conf(pp, where, size, val);
+ 	else
+-		ret = cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
++		ret = dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where,
++				size, val);
+ 
+ 	return ret;
+ }
+@@ -97,8 +98,8 @@ static int dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
+ 	if (pp->ops->wr_own_conf)
+ 		ret = pp->ops->wr_own_conf(pp, where, size, val);
+ 	else
+-		ret = cfg_write(pp->dbi_base + (where & ~0x3), where, size,
+-				val);
++		ret = dw_pcie_cfg_write(pp->dbi_base + (where & ~0x3), where,
++				size, val);
+ 
+ 	return ret;
+ }
+@@ -534,11 +535,13 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 
+ 	if (bus->parent->number == pp->root_bus_nr) {
+ 		dw_pcie_prog_viewport_cfg0(pp, busdev);
+-		ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
++		ret = dw_pcie_cfg_read(pp->va_cfg0_base + address, where, size,
++				val);
+ 		dw_pcie_prog_viewport_mem_outbound(pp);
+ 	} else {
+ 		dw_pcie_prog_viewport_cfg1(pp, busdev);
+-		ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
++		ret = dw_pcie_cfg_read(pp->va_cfg1_base + address, where, size,
++				val);
+ 		dw_pcie_prog_viewport_io_outbound(pp);
+ 	}
+ 
+@@ -557,11 +560,13 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 
+ 	if (bus->parent->number == pp->root_bus_nr) {
+ 		dw_pcie_prog_viewport_cfg0(pp, busdev);
+-		ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
++		ret = dw_pcie_cfg_write(pp->va_cfg0_base + address, where, size,
++				val);
+ 		dw_pcie_prog_viewport_mem_outbound(pp);
+ 	} else {
+ 		dw_pcie_prog_viewport_cfg1(pp, busdev);
+-		ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
++		ret = dw_pcie_cfg_write(pp->va_cfg1_base + address, where, size,
++				val);
+ 		dw_pcie_prog_viewport_io_outbound(pp);
+ 	}
+ 
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index da1ed35..afb1734 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -66,8 +66,8 @@ struct pcie_host_ops {
+ 	void (*host_init)(struct pcie_port *pp);
+ };
+ 
+-int cfg_read(void __iomem *addr, int where, int size, u32 *val);
+-int cfg_write(void __iomem *addr, int where, int size, u32 val);
++int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
++int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
+ void dw_handle_msi_irq(struct pcie_port *pp);
+ void dw_pcie_msi_init(struct pcie_port *pp);
+ int dw_pcie_link_up(struct pcie_port *pp);
 -- 
 1.7.0.1
