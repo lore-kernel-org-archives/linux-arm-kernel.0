@@ -1,48 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Dec 2013 13:27:29 +0000
-Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
-In-Reply-To: <52A7C0C3.2070805@codeaurora.org>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
- <20131210235000.GK11468@sirena.org.uk>
- <52A7AE1B.3040201@codeaurora.org>
- <20131211005106.GL11468@sirena.org.uk>
- <52A7C0C3.2070805@codeaurora.org>
-Message-ID: <20131211132729.GT11468@sirena.org.uk>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 11 Dec 2013 13:27:28 +0000
+Subject: [PATCHv6+ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <20131121.191720.1487772262083864095.hdoyu@nvidia.com>
+References: <1385041249-7705-1-git-send-email-hdoyu@nvidia.com><
+ 1385041249-7705-2-git-send-email-hdoyu@nvidia.com> <20131121.191720.
+ 1487772262083864095.hdoyu@nvidia.com>
+Message-ID: <20131211132729.0857CC4061A@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 05:32:51PM -0800, Stephen Boyd wrote:
+On Thu, 21 Nov 2013 18:17:20 +0100, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Iterating over a property containing a list of phandles with arguments
+> is a common operation for device drivers. This patch adds a new
+> of_property_for_each_phandle_with_args() macro to make the iteration
+> simpler.
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-> Are you suggesting we implement the reg_read/reg_write as global helpers
-> that the config points to and then call regmap_init()? At a quick glance
+This patch can be merged with the rest of the series.
 
-Yes, assuming your bus really is limited in the way it seems from the
-code.
+g.
 
-> it looks like we lose out on regmap_bulk_read() if we do that. There is
-> one driver that will use regmap_bulk_read(), but I suppose we can just
-
-bulk_read() should decay to individual reads if there isn't a block
-operaton and it's not like the hardware actually supports bulk reads
-anyway.
-
-> With use_single_rw I think it can be this.
-
-> static int regmap_ssbi_read(void *context,
->                             const void *reg, size_t reg_size,
->                             void *val, size_t val_size)
-> {
->         BUG_ON(reg_size != 2);  
->         return ssbi_read(context, *(u16 *)reg, val, 1);
-> }
-
-Right, which is a lot simpler.  Though I'm still not sure the
-ssbi_read() interface is the best.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/440aae0b/attachment.sig>
+> ---
+> v6+:
+> Use the description, which Grant Likely proposed, to be full enough
+> that a future reader can figure out why a patch was written.
+>   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007062.html
+> 
+> v5:
+> New patch for v5.
+> ---
+>  include/linux/of.h | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 276c546..131fef5 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -613,6 +613,9 @@ static inline int of_property_read_u32(const struct device_node *np,
+>  		s;						\
+>  		s = of_prop_next_string(prop, s))
+>  
+> +#define of_property_for_each_phandle_with_args(np, list, cells, i, args) \
+> +	for (i = 0; !of_parse_phandle_with_args(np, list, cells, i, args); i++)
+> +
+>  #if defined(CONFIG_PROC_FS) && defined(CONFIG_PROC_DEVICETREE)
+>  extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
+>  extern void proc_device_tree_add_prop(struct proc_dir_entry *pde, struct property *prop);
+> -- 
+> 1.8.1.5
