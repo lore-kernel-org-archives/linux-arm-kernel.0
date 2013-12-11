@@ -1,141 +1,70 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 11 Dec 2013 20:46:31 +0530
-Subject: [PATCH V2 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <1386318764-15882-1-git-send-email-b32955@freescale.com>
-References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
-Message-ID: <52A881CF.4020001@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 11 Dec 2013 16:19:34 +0100
+Subject: [PATCH 0/8] Impedance matcher for Samsung boards
+In-Reply-To: <1837099.JIoGixjT73@amdc1227>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+ <005d01cef679$be770570$3b651050$%wilczek@samsung.com>
+ <52A8725F.2020403@gmail.com> <1837099.JIoGixjT73@amdc1227>
+Message-ID: <52A88286.2030401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
-On Friday 06 December 2013 02:02 PM, Huang Shijie wrote:
-> 1.) Why add a new framework for SPI NOR?
->    The SPI-NOR controller such as Freescale's Quadspi controller is working
->    in a different way from the SPI bus. It should knows the NOR commands to
->    find the right LUT sequence. Unfortunately, the current code can not meet
->    this requirement.
->
-> 2.) How does this patch set do?
->     This patch set adds a new spi-nor layer.
->     Before this patch, the layer is like:
->
->                     MTD
->           ------------------------
->                    m25p80
->           ------------------------
-> 	       spi bus driver
->           ------------------------
-> 	        SPI NOR chip
->
->     After this patch, the layer is like:
->                     MTD
->           ------------------------
->                    spi-nor
->           ------------------------
->                    m25p80
->           ------------------------
-> 	       spi bus driver
->           ------------------------
-> 	       SPI NOR chip
->
->    With the spi-nor controller driver(Freescale Quadspi), it looks like:
->                     MTD
->           ------------------------
->                    spi-nor
->           ------------------------
->                  fsl-quadspi
->           ------------------------
-> 	       SPI NOR chip
->
-> 3.) more details
->      This patch set adds a new data structrue spi_nor{}, clones most the common
->    code to spi-nor.c. Add spi_nor_xfer_cfg {} for the fundamental primitives:
->    read_xfer/write_xfer.
->
->      Make the m25p80.c use the new APIs.
->
->      Let's discuss the SPI nor framework in the new thread. :)
->
->
-> 4.) TODO list:
->     3.1) add the new spi_nor_device{} for the spi-nor controller's device.
->     3.2) add the Freescale Quadspi driver.
->
-> v1 -->  v2:
-> 	[1] follow Angus's advice, add more hooks and data structrures.
-> 	[2] others.
->
-> Huang Shijie (4):
->    mtd: spi-nor: copy the SPI NOR commands to a new header file
->    mtd: spi-nor: add the basic data structures
->    mtd: spi-nor: add the framework for SPI NOR
->    mtd: m25p80: use the SPI nor framework
->
->   drivers/mtd/Kconfig           |    2 +
->   drivers/mtd/Makefile          |    1 +
->   drivers/mtd/devices/Kconfig   |    2 +-
->   drivers/mtd/devices/m25p80.c  | 1261 +++--------------------------------------
->   drivers/mtd/spi-nor/Kconfig   |    6 +
->   drivers/mtd/spi-nor/Makefile  |    1 +
->   drivers/mtd/spi-nor/spi-nor.c | 1042 ++++++++++++++++++++++++++++++++++
->   include/linux/mtd/spi-nor.h   |  132 +++++
->   8 files changed, 1277 insertions(+), 1170 deletions(-)
->   create mode 100644 drivers/mtd/spi-nor/Kconfig
->   create mode 100644 drivers/mtd/spi-nor/Makefile
->   create mode 100644 drivers/mtd/spi-nor/spi-nor.c
->   create mode 100644 include/linux/mtd/spi-nor.h
->
-I have a requirement for a memory mapped operation for my spi flash driver.
+On 12/11/2013 03:28 PM, Tomasz Figa wrote:
+> On Wednesday 11 of December 2013 15:10:39 Daniel Mack wrote:
+>> On 12/11/2013 03:03 PM, Piotr Wilczek wrote:
+>>> Hi,
+>>>
+>>>> -----Original Message----- From: Daniel Mack
+>>>> [mailto:zonque at gmail.com] Sent: Wednesday, December 11, 2013 2:17
+>>>> PM To: Piotr Wilczek; devicetree-discuss at lists.ozlabs.org;
+>>>> linux-arm- kernel at lists.infradead.org Cc: Jason Cooper; Nicolas
+>>>> Pitre Subject: Re: [PATCH 0/8] Impedance matcher for Samsung
+>>>> boards
+>>>>
+>>>> On 12/11/2013 02:07 PM, Piotr Wilczek wrote:
+>>>>> This patchset implements the impedance-matcher for Samsung
+>>>>> Exynos boards and does the following: - fix strncmp function; -
+>>>>> ensure each DT blob is 4-byte aligned; - port 'atags_to_fdt' form
+>>>>> Kernel; - add Exynos specific serial driver; - add support for
+>>>>> Samsung boards, Trats and Trats2;
+>>>>>
+>>>>> This patch set is based on: 
+>>>>> https://github.com/zonque/pxa-impedance-matcher.git
+>>>>
+>>>> Thanks for the patches!
+>>>>
+>>>> I'm considering merging most of them, but I have my problems with
+>>>> the inclusion of the libfdt library.
+>>>>
+>>>> Could you explain what you need this for, exactly? Why can't you
+>>>> just fix the device tree blob that you include instead of modifying
+>>>> it at runtime?
+>>> When bootloader needs to pass some information in ATAGS and
+>>> CONFIG_ARM_APPENDED_DTB is turned off in kernel, then it has to be
+>>> added to the device tree blob at runtime.
+>>
+>> The question is: can't you just provide a dtb for each of your machines,
+>> and distinguish them via their machine ID? Or do you really have
+>> machines that come up with the same machine ID but differ in details
+>> only stored in ATAGs?
+>>
+>> After all, adding libfdt makes the code grow by more than factor 4.
+> 
+> There are some parameters that bootloaders normally pass with ATAGS
+> and can't be hardcoded in DT, such as initrd location in memory, serial
+> number, board revision, command line and in some cases even memory,
+> as on some boards it might vary between units.
 
-A brief explanation about the requirement is here..
+Ok, that was my question :) Sure, if you have units that differ in
+hardware details, but are indistinguishable by their machine ID or board
+revision number, there's not much that we can do but modify the FDT at
+runtime. Serial numbers are also something that can't be solved in a
+nicer way.
 
-ti qspi supports two modes of operation, one is SPI mode(normal), other is
-the memory mapped read mode.
+What bugs me, though, is that it blows up the code base so massively.
 
-For SPI mode, the state machine remains the same as it is with other spi 
-controller
-available.
-
-For memory mapped, there is something more which we need to do around ..
-
-1. There is a qspi "set up" register available, which needs to be filled 
-with
-      information like flash opcode, dummy bytes etc. In short, flash 
-specific
-      details.
-2   if the above register is configured with the required opcodes, then 
-whenever
-      we need to use memory mapped operations, we need to do is to 
-switch our
-      qspi controller to memory mapped mode.
-     Switching of this mode to memory mapped needs
-      a )  write to a particular qspi register
-      b)   write to control module(optional based on SOC).
-
-3. Once the above steps are configured, then the flash data will be 
-mapped to a
-     particular memory address(SOC specific) from where the flash data  
-can be read.
-
-The series 
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg98691.html
-tries to work on the above features, and tries to add a support for the 
-same in the
-spi framework and m25p80 code.
-
-As you see in my patches, once we take care of the above points and add 
-support
-for memory mapped in m25p80 and qspi, then while doing a read in m25p80 
-we can
-do memcpy at the beginning of m25p80_read and can bypass the entire SPI
-framework for memory mapped read operation. Throughput almost gets 
-doubles with this,
-as compared to normal SPI operations.
-
-So, my intention of reviving this here is to add one more feature set, 
-which I suppose
-spi nor framework should handle and to see what needs to be added more 
-for this feature.
+So I'm about to merge this. Jason, and final thoughts?
 
 
-Please get back, if you need more info on this concept.
+Thanks,
+Daniel
