@@ -1,17 +1,17 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Wed, 11 Dec 2013 15:08:32 +0530
-Subject: [PATCH 07/12] pcie: designware: add dw_pcie prefix before
- cfg_read/write
+Date: Wed, 11 Dec 2013 15:08:31 +0530
+Subject: [PATCH 06/12] pcie: designware: Move register definition to the
+ header file
 In-Reply-To: <cover.1386752447.git.mohit.kumar@st.com>
 References: <cover.1386752447.git.mohit.kumar@st.com>
-Message-ID: <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
+Message-ID: <7bce26f60d847a136f748b5eeac15dc79a7d662e.1386752447.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-cfg_read/write function are designware pcie specific. Add dw_pcie prefix
-to avoid collision in global name space.
+Move synopsis specific register definition from source file to header
+file, so that they can be re-used by other files if needed.
 
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
 Cc: Mohit Kumar <mohit.kumar@st.com>
@@ -19,123 +19,113 @@ Cc: Jingoo Han <jg1.han@samsung.com>
 Cc: spear-devel at list.st.com
 Cc: linux-pci at vger.kernel.org
 ---
- drivers/pci/host/pci-exynos.c      |    5 +++--
- drivers/pci/host/pcie-designware.c |   23 ++++++++++++++---------
- drivers/pci/host/pcie-designware.h |    4 ++--
- 3 files changed, 19 insertions(+), 13 deletions(-)
+ drivers/pci/host/pcie-designware.c |   42 ------------------------------------
+ drivers/pci/host/pcie-designware.h |   42 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-index 24beed3..3de6bfb 100644
---- a/drivers/pci/host/pci-exynos.c
-+++ b/drivers/pci/host/pci-exynos.c
-@@ -468,7 +468,7 @@ static int exynos_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
- 	int ret;
- 
- 	exynos_pcie_sideband_dbi_r_mode(pp, true);
--	ret = cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
-+	ret = dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
- 	exynos_pcie_sideband_dbi_r_mode(pp, false);
- 	return ret;
- }
-@@ -479,7 +479,8 @@ static int exynos_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
- 	int ret;
- 
- 	exynos_pcie_sideband_dbi_w_mode(pp, true);
--	ret = cfg_write(pp->dbi_base + (where & ~0x3), where, size, val);
-+	ret = dw_pcie_cfg_write(pp->dbi_base + (where & ~0x3),
-+			where, size, val);
- 	exynos_pcie_sideband_dbi_w_mode(pp, false);
- 	return ret;
- }
 diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 73aa13c..be6ce30 100644
+index 212b8b6..73aa13c 100644
 --- a/drivers/pci/host/pcie-designware.c
 +++ b/drivers/pci/host/pcie-designware.c
-@@ -32,7 +32,7 @@ static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
- 	return sys->private_data;
- }
+@@ -23,48 +23,6 @@
  
--int cfg_read(void __iomem *addr, int where, int size, u32 *val)
-+int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
- {
- 	*val = readl(addr);
+ #include "pcie-designware.h"
  
-@@ -46,7 +46,7 @@ int cfg_read(void __iomem *addr, int where, int size, u32 *val)
- 	return PCIBIOS_SUCCESSFUL;
- }
+-/* Synopsis specific PCIE configuration registers */
+-#define PCIE_PORT_LINK_CONTROL		0x710
+-#define PORT_LINK_MODE_MASK		(0x3f << 16)
+-#define PORT_LINK_MODE_1_LANES		(0x1 << 16)
+-#define PORT_LINK_MODE_2_LANES		(0x3 << 16)
+-#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
+-
+-#define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
+-#define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
+-#define PORT_LOGIC_LINK_WIDTH_MASK	(0x1ff << 8)
+-#define PORT_LOGIC_LINK_WIDTH_1_LANES	(0x1 << 8)
+-#define PORT_LOGIC_LINK_WIDTH_2_LANES	(0x2 << 8)
+-#define PORT_LOGIC_LINK_WIDTH_4_LANES	(0x4 << 8)
+-
+-#define PCIE_MSI_ADDR_LO		0x820
+-#define PCIE_MSI_ADDR_HI		0x824
+-#define PCIE_MSI_INTR0_ENABLE		0x828
+-#define PCIE_MSI_INTR0_MASK		0x82C
+-#define PCIE_MSI_INTR0_STATUS		0x830
+-
+-#define PCIE_ATU_VIEWPORT		0x900
+-#define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
+-#define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
+-#define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
+-#define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
+-#define PCIE_ATU_CR1			0x904
+-#define PCIE_ATU_TYPE_MEM		(0x0 << 0)
+-#define PCIE_ATU_TYPE_IO		(0x2 << 0)
+-#define PCIE_ATU_TYPE_CFG0		(0x4 << 0)
+-#define PCIE_ATU_TYPE_CFG1		(0x5 << 0)
+-#define PCIE_ATU_CR2			0x908
+-#define PCIE_ATU_ENABLE			(0x1 << 31)
+-#define PCIE_ATU_BAR_MODE_ENABLE	(0x1 << 30)
+-#define PCIE_ATU_LOWER_BASE		0x90C
+-#define PCIE_ATU_UPPER_BASE		0x910
+-#define PCIE_ATU_LIMIT			0x914
+-#define PCIE_ATU_LOWER_TARGET		0x918
+-#define PCIE_ATU_BUS(x)			(((x) & 0xff) << 24)
+-#define PCIE_ATU_DEV(x)			(((x) & 0x1f) << 19)
+-#define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+-#define PCIE_ATU_UPPER_TARGET		0x91C
+-
+ static struct hw_pci dw_pci;
  
--int cfg_write(void __iomem *addr, int where, int size, u32 val)
-+int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
- {
- 	if (size == 4)
- 		writel(val, addr);
-@@ -84,7 +84,8 @@ static int dw_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
- 	if (pp->ops->rd_own_conf)
- 		ret = pp->ops->rd_own_conf(pp, where, size, val);
- 	else
--		ret = cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
-+		ret = dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where,
-+				size, val);
- 
- 	return ret;
- }
-@@ -97,8 +98,8 @@ static int dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
- 	if (pp->ops->wr_own_conf)
- 		ret = pp->ops->wr_own_conf(pp, where, size, val);
- 	else
--		ret = cfg_write(pp->dbi_base + (where & ~0x3), where, size,
--				val);
-+		ret = dw_pcie_cfg_write(pp->dbi_base + (where & ~0x3), where,
-+				size, val);
- 
- 	return ret;
- }
-@@ -534,11 +535,13 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 
- 	if (bus->parent->number == pp->root_bus_nr) {
- 		dw_pcie_prog_viewport_cfg0(pp, busdev);
--		ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
-+		ret = dw_pcie_cfg_read(pp->va_cfg0_base + address, where, size,
-+				val);
- 		dw_pcie_prog_viewport_mem_outbound(pp);
- 	} else {
- 		dw_pcie_prog_viewport_cfg1(pp, busdev);
--		ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
-+		ret = dw_pcie_cfg_read(pp->va_cfg1_base + address, where, size,
-+				val);
- 		dw_pcie_prog_viewport_io_outbound(pp);
- 	}
- 
-@@ -557,11 +560,13 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 
- 	if (bus->parent->number == pp->root_bus_nr) {
- 		dw_pcie_prog_viewport_cfg0(pp, busdev);
--		ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
-+		ret = dw_pcie_cfg_write(pp->va_cfg0_base + address, where, size,
-+				val);
- 		dw_pcie_prog_viewport_mem_outbound(pp);
- 	} else {
- 		dw_pcie_prog_viewport_cfg1(pp, busdev);
--		ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
-+		ret = dw_pcie_cfg_write(pp->va_cfg1_base + address, where, size,
-+				val);
- 		dw_pcie_prog_viewport_io_outbound(pp);
- 	}
- 
+ static unsigned long global_io_offset;
 diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index da1ed35..afb1734 100644
+index c15379b..da1ed35 100644
 --- a/drivers/pci/host/pcie-designware.h
 +++ b/drivers/pci/host/pcie-designware.h
-@@ -66,8 +66,8 @@ struct pcie_host_ops {
- 	void (*host_init)(struct pcie_port *pp);
- };
+@@ -74,4 +74,46 @@ int dw_pcie_link_up(struct pcie_port *pp);
+ void dw_pcie_setup_rc(struct pcie_port *pp);
+ int dw_pcie_host_init(struct pcie_port *pp);
  
--int cfg_read(void __iomem *addr, int where, int size, u32 *val);
--int cfg_write(void __iomem *addr, int where, int size, u32 val);
-+int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
-+int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
- void dw_handle_msi_irq(struct pcie_port *pp);
- void dw_pcie_msi_init(struct pcie_port *pp);
- int dw_pcie_link_up(struct pcie_port *pp);
++/* Synopsis specific PCIE configuration registers */
++#define PCIE_PORT_LINK_CONTROL		0x710
++#define PORT_LINK_MODE_MASK		(0x3f << 16)
++#define PORT_LINK_MODE_1_LANES		(0x1 << 16)
++#define PORT_LINK_MODE_2_LANES		(0x3 << 16)
++#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
++
++#define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
++#define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
++#define PORT_LOGIC_LINK_WIDTH_MASK	(0x1ff << 8)
++#define PORT_LOGIC_LINK_WIDTH_1_LANES	(0x1 << 8)
++#define PORT_LOGIC_LINK_WIDTH_2_LANES	(0x2 << 8)
++#define PORT_LOGIC_LINK_WIDTH_4_LANES	(0x4 << 8)
++
++#define PCIE_MSI_ADDR_LO		0x820
++#define PCIE_MSI_ADDR_HI		0x824
++#define PCIE_MSI_INTR0_ENABLE		0x828
++#define PCIE_MSI_INTR0_MASK		0x82C
++#define PCIE_MSI_INTR0_STATUS		0x830
++
++#define PCIE_ATU_VIEWPORT		0x900
++#define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
++#define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
++#define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
++#define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
++#define PCIE_ATU_CR1			0x904
++#define PCIE_ATU_TYPE_MEM		(0x0 << 0)
++#define PCIE_ATU_TYPE_IO		(0x2 << 0)
++#define PCIE_ATU_TYPE_CFG0		(0x4 << 0)
++#define PCIE_ATU_TYPE_CFG1		(0x5 << 0)
++#define PCIE_ATU_CR2			0x908
++#define PCIE_ATU_ENABLE			(0x1 << 31)
++#define PCIE_ATU_BAR_MODE_ENABLE	(0x1 << 30)
++#define PCIE_ATU_LOWER_BASE		0x90C
++#define PCIE_ATU_UPPER_BASE		0x910
++#define PCIE_ATU_LIMIT			0x914
++#define PCIE_ATU_LOWER_TARGET		0x918
++#define PCIE_ATU_BUS(x)			(((x) & 0xff) << 24)
++#define PCIE_ATU_DEV(x)			(((x) & 0x1f) << 19)
++#define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
++#define PCIE_ATU_UPPER_TARGET		0x91C
++
+ #endif /* _PCIE_DESIGNWARE_H */
 -- 
 1.7.0.1
