@@ -1,58 +1,86 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 11 Dec 2013 14:37:16 +0530
-Subject: [PATCH v3 04/10] usb: dwc3: use quirks to know if a particualr
- platform doesn't have PHY
-In-Reply-To: <20131211085320.GD28456@xps8300>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1385373690-12170-5-git-send-email-kishon@ti.com>
- <20131204144027.GB21055@xps8300> <52A01E86.50406@ti.com>
- <20131205075828.GA32583@xps8300> <52A56DA1.1010808@ti.com>
- <20131209092604.GC5231@xps8300> <20131211085320.GD28456@xps8300>
-Message-ID: <52A82B44.10408@ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 11 Dec 2013 17:10:26 +0800
+Subject: [GIT PULL v3][for 3.14] pull request for hisilicon soc
+Message-ID: <52A82C02.5050609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 December 2013 02:23 PM, Heikki Krogerus wrote:
-> Hi,
-> 
-> On Mon, Dec 09, 2013 at 11:26:04AM +0200, Heikki Krogerus wrote:
->>>>>> Can you guys explain why is something like this needed? Like with
->>>>>> clocks and gpios, the device drivers shouldn't need to care any more
->>>>>> if the platform has the phys or not. -ENODEV tells you your platform
->>>>>
->>>>> Shouldn't we report if a particular platform needs a PHY and not able to get
->>>>> it. How will a user know if a particular controller is not working because it's
->>>>> not able to get and initialize the PHYs? Don't you think in such cases it's
->>>>> better to fail (and return from probe) because the controller will not work
->>>>> anyway without the PHY?
->>>>
->>>> My point is that you do not need to separately tell this to the driver
->>>> like you do with the quirks (if you did, then you would need to fix
->>>> your framework and not hack the drivers).
->>>>
->>>> Like I said, ENODEV tells you that there is no phy on this platform
->>>> for you, allowing you to safely continue. If your phy driver is not
->>>> loaded, the framework already returns EPROBE_DEFER, right. Any other
->>>
->>> right. but that doesn't consider broken dt data. With quirks we'll
->>> able to tell if a controller in a particular platform has PHY or not
->>> without depending on the dt data.
->>
->> Broken dt data? What kind of scenario are you thinking here? Do you
->> mean case where the dt does not describe the phy on a platform that
->> depends on it? Shouldn't that problem be fixed in the dt and not
->> hacked in the drivers? Or are you thinking about something else?
->>
->> Is there a case where something like that is actually happening?
-> 
-> I'm guessing I'm not getting an answer to this one.
-> 
-> Look, this patch will not work with ACPI enumerated devices. We will
-> have a platform providing a single ACPI id, but there is a whole bunch
-> of boards based on it and we have no way of telling which of them
-> need/have phys to deal with and which ones don't.
+Hi all,
 
-Alright.. I'll drop this patch then.
+Please help to merge pull request for hisilicon soc. This pull request 
+is used to replace all previous request for hisilicon. The changes is in 
+below.
 
-Thanks
-Kishon
+    1. Update the git repository address from ssh:// to git://.
+    2. Add clock binding in DTS file. This patch is contained in v11 & 
+v12 patch sets, and everybody like this binding.
+    3. Add the GPIOLIB selection by default.
+
+Best Regards
+Haojian
+
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git 
+tags/hisilicon-basic
+
+for you to fetch changes up to be05bfccdbe65915da4a7d0e4713ad3489fd5f37:
+
+   ARM: hi3xxx: select GPIO in Kconfig (2013-12-11 17:01:45 +0800)
+
+----------------------------------------------------------------
+warn: You locally have hisilicon-for-3.14 but it does not (yet)
+warn: appear to be at 
+git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+warn: Do you want to push it there, perhaps?
+hisilicon-for-3.14
+
+----------------------------------------------------------------
+Haojian Zhuang (6):
+       ARM: hi3xxx: add board support with device tree
+       ARM: dts: enable hi4511 with device tree
+       ARM: config: enable hi3xxx in multi_v7_defconfig
+       ARM: config: add defconfig for Hi3xxx
+       ARM: dts: enable clock binding on Hi3620
+       ARM: hi3xxx: select GPIO in Kconfig
+
+Zhangfei Gao (2):
+       ARM: hi3xxx: add smp support
+       ARM: hi3xxx: add hotplug support
+
+  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  32 ++++
+  arch/arm/Kconfig                                              |   2 +
+  arch/arm/Makefile                                             |   1 +
+  arch/arm/boot/dts/Makefile                                    |   1 +
+  arch/arm/boot/dts/hi3620.dtsi                                 | 565 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/boot/dts/hi4511.dts                                  | 649 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/configs/hi3xxx_defconfig                             |  56 
++++++++
+  arch/arm/configs/multi_v7_defconfig                           |   1 +
+  arch/arm/mach-hi3xxx/Kconfig                                  |  16 ++
+  arch/arm/mach-hi3xxx/Makefile                                 |   7 +
+  arch/arm/mach-hi3xxx/core.h                                   |  15 ++
+  arch/arm/mach-hi3xxx/hi3xxx.c                                 |  94 
+++++++++++++
+  arch/arm/mach-hi3xxx/hotplug.c                                | 200 
++++++++++++++++++++++++++
+  arch/arm/mach-hi3xxx/platsmp.c                                |  89 
++++++++++++
+  14 files changed, 1728 insertions(+)
+  create mode 100644 
+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+  create mode 100644 arch/arm/boot/dts/hi4511.dts
+  create mode 100644 arch/arm/configs/hi3xxx_defconfig
+  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+  create mode 100644 arch/arm/mach-hi3xxx/Makefile
+  create mode 100644 arch/arm/mach-hi3xxx/core.h
+  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
+  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
