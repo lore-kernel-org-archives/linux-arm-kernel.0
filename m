@@ -1,73 +1,47 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 10 Dec 2013 16:38:30 -0800
-Subject: [PATCH] ARM/KVM: inject data abort on unhandled memory access
-In-Reply-To: <52A0C4CD.9030106@arm.com>
-References: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
- <52A0C4CD.9030106@arm.com>
-Message-ID: <20131211003830.GE2871@cbox>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Dec 2013 00:51:06 +0000
+Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
+In-Reply-To: <52A7AE1B.3040201@codeaurora.org>
+References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+ <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
+ <20131210235000.GK11468@sirena.org.uk>
+ <52A7AE1B.3040201@codeaurora.org>
+Message-ID: <20131211005106.GL11468@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 06:24:13PM +0000, Marc Zyngier wrote:
-> Hi Andre,
-> 
-> On 05/12/13 15:10, Andre Przywara wrote:
-> > If a KVM guest accesses memory that is outside its memory map (so no
-> > MMIO and no RAM), KVM will return -ENOSYS to userland, causing QEMU
-> > to do an abort() and kill the whole guest. This happens while
-> > executing dmidecode on ARM, which mmaps /dev/mem and scans the first
-> > Megabyte of memory for a DMI BIOS signature (sic!).
-> 
-> Arghhh. And of course, I expect they do that using instructions we can't
-> use for IOs.
-> 
-> Bummer.
-> 
-> > Of course this is silly, but in any case crashing the whole guest
-> > does not seems appropriate.
-> > So lets mimic native hardware's behavior in this case and inject a
-> > Data Abort exception into the guest. In the previous case this will
-> > crash dmidecode with SIGSEGV, but keeps the guest alive.
-> > 
-> > I am not sure if this too coarse grained, but I just wanted to start
-> > discussion on this.
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-> > ---
-> >  arch/arm/kvm/mmio.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> > index 4cb5a93..04a105e 100644
-> > --- a/arch/arm/kvm/mmio.c
-> > +++ b/arch/arm/kvm/mmio.c
-> > @@ -183,7 +183,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> >  			return ret;
-> >  	} else {
-> >  		kvm_err("load/store instruction decoding not implemented\n");
-> > -		return -ENOSYS;
-> > +		kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-> > +		return 1;
-> >  	}
-> >  
-> >  	rt = vcpu->arch.mmio_decode.rt;
-> > 
-> 
-> I agree that killing the whole VM is not the nicest thing in the world.
-> How about:
-> - keeping some form of warning
-> - rate-limit it so we don't flood the host
-> - inject the data-abort
-> 
-> That should give us a saner behaviour (I agree with you that the current
-> one is not very good), and yet annoy the luser enough so that they
-> either fix their software or start merging the emulation code...
-> 
-I think this is quite reasonable - the guest does something completely
-valid, but happens to hit an unimplemented part of KVM.  It's really up
-to user space to deal with this accordingly.  Injecting a data abort is
-wrong, IMHO, because it is not remotely what hardware would do.
+On Tue, Dec 10, 2013 at 04:13:15PM -0800, Stephen Boyd wrote:
+> On 12/10/13 15:50, Mark Brown wrote:
+> > On Tue, Dec 10, 2013 at 03:35:18PM -0800, Stephen Boyd wrote:
 
-The proper fix is to add the necessary instruction emulation...
+> >> +		reg += sizeof(u16);
 
--Christoffer
+> > I'd expect this to generate out of bounds accesses and bad interactions
+> > on the bus if we go through the loop more than once since it appears to
+> > incrementing the address of reg for every register.  I'm also having a
+
+> ssbi_read() just reads the same register x number of times and doesn't
+> do any sort of incrementing of address. My understanding was that
+> regmap_bulk_read() will read incrementing addresses and then call down
+> into this code with the sequential addresses formatted into the reg
+> buffer. That was the flaw. Instead we need to take reg and then
+
+That's possibly not the ideal decision for the underlying API, if
+nothing else it's confusing naming given what a read function would
+normally do.
+
+> increment reg by 1 every time through this loop. Or should we just have
+> use_single_rw == true?
+
+No, it doesn't - it increments the address of reg by the size of a
+register value each time.  Using use_single_rw might make sense, or if
+you can't do bulk I/O at all then hooking in via reg_read() and
+reg_write() in the config rather than trying to parse out the buffers
+might be even better (you can still make helpers to set that up).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/f07b25f5/attachment.sig>
