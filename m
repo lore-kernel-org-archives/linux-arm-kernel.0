@@ -1,55 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 11 Dec 2013 12:50:37 -0500
-Subject: [GIT PULL] irqchip: dove: drivers for v3.14
-In-Reply-To: <20131201172914.GV2879@titan.lakedaemon.net>
-References: <20131201172914.GV2879@titan.lakedaemon.net>
-Message-ID: <20131211175037.GY10053@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Dec 2013 17:50:45 +0000
+Subject: [PATCH 3/6] arm64: dts: Add a devicetree for the ARMv8 4xA53
+ 4xA57 FVP
+In-Reply-To: <20131211170903.GF17681@e106331-lin.cambridge.arm.com>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <1386767606-6391-3-git-send-email-broonie@kernel.org>
+ <20131211135536.GC17681@e106331-lin.cambridge.arm.com>
+ <20131211141148.GV11468@sirena.org.uk>
+ <20131211150433.GD17681@e106331-lin.cambridge.arm.com>
+ <1386778133.3447.6.camel@linaro1.home>
+ <CAD0U-hJABMzEXrjN1r1EuynwSGX+K=KdVRcj8gXkdZrXeMmx-w@mail.gmail.com>
+ <20131211170903.GF17681@e106331-lin.cambridge.arm.com>
+Message-ID: <20131211175045.GE11468@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Wed, Dec 11, 2013 at 05:09:03PM +0000, Mark Rutland wrote:
+> On Wed, Dec 11, 2013 at 04:41:32PM +0000, Ryan Harkin wrote:
 
-On Sun, Dec 01, 2013 at 12:29:14PM -0500, Jason Cooper wrote:
-> Thomas,
-> 
-> Here's an mvebu driver we've had on the ML for a while, and it's been in
-> -next for 5 days.
+> > But as Mark Brown says, ARM have originated this file and personally
+> > I'd rather it was changed in the ARM Trusted Firmware repo first and
+> > propagated here.
 
-Just checking to make sure this hasn't slipped off of your plate.
+> I completely agree that the DTs in the Trusted Firmware repo should be
+> corrected. I will try to get them fixed.
 
-thx,
-
-Jason.
-
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-irqchip-3.14
-> 
-> for you to fetch changes up to 40b367d95fb3d60fc1edb9ba8f6ef52272e48936:
-> 
->   irqchip: irq-dove: Add PMU interrupt controller. (2013-11-26 15:04:53 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu irqchip changes for v3.14
-> 
->  - add Dove PMU interrupt controller
-> 
-> ----------------------------------------------------------------
-> Andrew Lunn (1):
->       irqchip: irq-dove: Add PMU interrupt controller.
-> 
->  .../interrupt-controller/marvell,dove-pmu-intc.txt |  17 +++
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-dove.c                         | 126 +++++++++++++++++++++
->  3 files changed, 144 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
->  create mode 100644 drivers/irqchip/irq-dove.c
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+And mainlined?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/fb9afc37/attachment.sig>
