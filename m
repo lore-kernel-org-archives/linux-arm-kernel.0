@@ -1,183 +1,80 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 11 Dec 2013 12:15:47 +0100
-Subject: [PATCH 4/7] clk/samsung: add support for multuple clock providers
-In-Reply-To: <1386345391-23482-5-git-send-email-rahul.sharma@samsung.com>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-5-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <11276764.MQ2Wg9nEER@amdc1227>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 11 Dec 2013 11:02:18 +0100
+Subject: [PATCH V2 2/4] mtd: spi-nor: add the basic data structures
+In-Reply-To: <20131211062428.GA25147@shlinux2.ap.freescale.net>
+References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
+ <201312101407.59958.marex@denx.de>
+ <20131211062428.GA25147@shlinux2.ap.freescale.net>
+Message-ID: <201312111102.18554.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-Please see my comments inline.
-
-On Friday 06 of December 2013 21:26:28 Rahul Sharma wrote:
-> Samsung CCF helper functions do not provide support to
-> register multiple Clock Providers for a given SoC. Due to
-> this limitation SoC platforms are not able to use these
-> helpers for registering mulitple clock providers and are
-> forced to bypass this layer.
+On Wednesday, December 11, 2013 at 07:24:31 AM, Huang Shijie wrote:
+> On Tue, Dec 10, 2013 at 02:07:59PM +0100, Marek Vasut wrote:
+> > On Friday, December 06, 2013 at 09:32:42 AM, Huang Shijie wrote:
+> > > The spi_nor{} is cloned from the m25p{}.
+> > > +	struct spi_nor_xfer_cfg	cfg;
+> > > +
+> > > +	/* for write_reg */
+> > > +	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+> > > +
+> > > +	/* the two fundamental primitives */
+> > > +	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > > +			 u8 *buf, size_t len);
+> > > +	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > > +			  u8 *buf, size_t len);
+> > > +
+> > > +	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
+> > > +	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
+> > > +			int write_enable);
+> > 
+> > Does the vybrid really support accelerated SPI NOR register IO or does it
 > 
-> This layer is modified acordingly to enable the support.
+> The vybrid does not support the accelerated SPI NOR register IO.
+> these hooks are for Lee's driver.
+
+Which one please?
+
+> > emulate it with read/write or read_xfer/write_xfer accessors ? If the
+> > later, just drop this stuff for now.
 > 
-> Clockfile for exynos4, exynos5250, exynos5420, exynos5440
-> and S3c64xx are also modified as per changed helper functions.
-[snip]
-> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> index 91bec3e..20de446 100644
-> --- a/drivers/clk/samsung/clk.c
-> +++ b/drivers/clk/samsung/clk.c
-> @@ -15,11 +15,6 @@
->  #include "clk.h"
->  
->  static DEFINE_SPINLOCK(lock);
+> What is the "stuff" mean? the "write_enable" ?
 
-IMHO you can also move the spinlock into samsung_clk_provider struct, to
-have more fine grained locking, as you shouldn't need to lock between
-particular providers, just multiple requests for one.
+This stuff -- I mean 'read SPI NOR register' and 'write SPI NOR register'. I 
+would love to see an API which grows as needed, not an API which is bloated by 
+unused function right from the start.
 
-> -static struct clk **clk_table;
-> -static void __iomem *reg_base;
-> -#ifdef CONFIG_OF
-> -static struct clk_onecell_data clk_data;
-> -#endif
->  
->  void samsung_clk_save(void __iomem *base,
->  				    struct samsung_clk_reg_dump *rd,
-> @@ -55,40 +50,53 @@ struct samsung_clk_reg_dump *samsung_clk_alloc_reg_dump(
->  }
->  
->  /* setup the essentials required to support clock lookup using ccf */
-> -void __init samsung_clk_init(struct device_node *np, void __iomem *base,
-> -			     unsigned long nr_clks)
-> +struct samsung_clk_provider *__init samsung_clk_init(struct device_node *np,
-> +			void __iomem *base, unsigned long nr_clks)
->  {
-> -	reg_base = base;
-> +	struct samsung_clk_provider *ctx;
-> +	struct clk **clk_table;
-> +	int ret;
-> +
-> +	if (!np)
-> +		return NULL;
+> > > +	const struct spi_device_id *(*read_id)(struct spi_nor *nor);
+> > > +	int (*wait_till_ready)(struct spi_nor *nor);
+> > > +
+> > > +	/* write */
+> > > +	void (*write)(struct spi_nor *nor, loff_t to,
+> > > +			size_t len, size_t *retlen, const u_char *buf);
+> > > +	/* read */
+> > > +	int (*read)(struct spi_nor *nor, loff_t from,
+> > > +			size_t len, size_t *retlen, u_char *buf);
+> > > +	/* erase */
+> > > +	int (*erase)(struct spi_nor *nor, loff_t offs);
+> > 
+> > How do you specify what to erase (sub-sector, sector, whole chip) here ?
+> 
+> I use a write_reg(OPCODE_ERASE_CHIP) to erase the whole chip.
+> Please read the patch 3.
+> 
+> This hook is used to erase a sector.
 
-This check is incorrect. It's completely correct to call this function
-with NULL np, when booted without DT and this was handled correctly
-before this patch. Please keep the same behavior.
+I suspect we might need a much better documentation for this structure, it is 
+hardly clear which function does what ;-)
 
-> +
-> +	ctx = kzalloc(sizeof(struct samsung_clk_provider), GFP_KERNEL);
-> +	if (!ctx)
-> +		panic("could not allocate clock provider context.\n");
->  
->  	clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
->  	if (!clk_table)
->  		panic("could not allocate clock lookup table\n");
->  
-> -	if (!np)
-> -		return;
-> +	ctx->reg_base = base;
-> +	ctx->clk_data.clks = clk_table;
-> +	ctx->clk_data.clk_num = nr_clks;
->  
-> -#ifdef CONFIG_OF
-> -	clk_data.clks = clk_table;
-> -	clk_data.clk_num = nr_clks;
-> -	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> -#endif
-> +	ret = of_clk_add_provider(np, of_clk_src_onecell_get,
-> +			&ctx->clk_data);
-> +	if (ret)
-> +		panic("could not register clock provide\n");
-> +
-> +	return ctx;
->  }
-[snip]
-> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-> index c7141ba..433bab3 100644
-> --- a/drivers/clk/samsung/clk.h
-> +++ b/drivers/clk/samsung/clk.h
-> @@ -21,6 +21,17 @@
->  #include <linux/of_address.h>
->  #include "clk-pll.h"
->  
-> +/* Context node which holds information about the clock provider. */
-> +/**
-> + * struct samsung_clk_provider: information about clock plovider
+> Btw, what is the sub-sector mean? which opcodes for the sub-sector?
 
-typo: s/plovider/provider/
+On large chips with for example 64K big sectors, you can erase a sub-sector 
+area, usually a 4K one. This reduces the wear of the chip. See these defines in 
+m25p80.c :
 
-> + * @reg_base: virtual address for the register base.
-> + * @clk_data: holds clock related data like clk* and number of clocks.
-> + */
-
-Why two comments? The kerneldoc one should be enough.
-
-> +struct samsung_clk_provider {
-> +	void __iomem *reg_base;
-> +	struct clk_onecell_data clk_data;
-> +};
-> +
->  /**
->   * struct samsung_clock_alias: information about mux clock
->   * @id: platform specific id of the clock.
-> @@ -312,29 +323,40 @@ struct samsung_pll_clock {
->  	__PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE,	\
->  		_lock, _con, _rtable, _alias)
->  
-> -extern void __init samsung_clk_init(struct device_node *np, void __iomem *base,
-> -				    unsigned long nr_clks);
-> +extern struct samsung_clk_provider *__init samsung_clk_init(
-> +			struct device_node *np, void __iomem *base,
-> +			unsigned long nr_clks);
->  extern void __init samsung_clk_of_register_fixed_ext(
-> +		struct samsung_clk_provider *ctx,
->  		struct samsung_fixed_rate_clock *fixed_rate_clk,
->  		unsigned int nr_fixed_rate_clk,
->  		struct of_device_id *clk_matches);
->  
-> -extern void samsung_clk_add_lookup(struct clk *clk, unsigned int id);
-> +extern void samsung_clk_add_lookup(struct samsung_clk_provider *ctx,
-> +			struct clk *clk, unsigned int id);
->  
-> -extern void samsung_clk_register_alias(struct samsung_clock_alias *list,
-> -		unsigned int nr_clk);
-> +extern void samsung_clk_register_alias(struct samsung_clk_provider *ctx,
-> +			struct samsung_clock_alias *list,
-> +			unsigned int nr_clk);
->  extern void __init samsung_clk_register_fixed_rate(
-> -		struct samsung_fixed_rate_clock *clk_list, unsigned int nr_clk);
-> +			struct samsung_clk_provider *ctx,
-> +			struct samsung_fixed_rate_clock *clk_list,
-> +			unsigned int nr_clk);
->  extern void __init samsung_clk_register_fixed_factor(
-> -		struct samsung_fixed_factor_clock *list, unsigned int nr_clk);
-> -extern void __init samsung_clk_register_mux(struct samsung_mux_clock *clk_list,
-> +			struct samsung_clk_provider *ctx,
-> +			struct samsung_fixed_factor_clock *list,
-> +			unsigned int nr_clk);
-> +extern void __init samsung_clk_register_mux(struct samsung_clk_provider *ctx,
-> +		struct samsung_mux_clock *clk_list,
->  		unsigned int nr_clk);
-> -extern void __init samsung_clk_register_div(struct samsung_div_clock *clk_list,
-> +extern void __init samsung_clk_register_div(struct samsung_clk_provider *ctx,
-> +		struct samsung_div_clock *clk_list,
->  		unsigned int nr_clk);
-> -extern void __init samsung_clk_register_gate(
-> +extern void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
->  		struct samsung_gate_clock *clk_list, unsigned int nr_clk);
-> -extern void __init samsung_clk_register_pll(struct samsung_pll_clock *pll_list,
-> -		unsigned int nr_clk, void __iomem *base);
-> +extern void __init samsung_clk_register_pll(struct samsung_clk_provider *ctx,
-> +			struct samsung_pll_clock *pll_list,
-> +			unsigned int nr_clk, void __iomem *base);
->  
->  extern unsigned long _get_rate(const char *clk_name);
->  
-
-nit: Please keep the indentation consistent in all the function prototypes
-above.
+  46 #define OPCODE_BE_4K            0x20    /* Erase 4KiB block */
+  48 #define OPCODE_BE_32K           0x52    /* Erase 32KiB block */
+  49 #define OPCODE_CHIP_ERASE       0xc7    /* Erase whole flash chip */
 
 Best regards,
-Tomasz
+Marek Vasut
