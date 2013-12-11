@@ -1,56 +1,59 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Dec 2013 16:21:20 +0100
-Subject: [PATCH v8 1/2] PWM: atmel-pwm: add PWM controller driver
-In-Reply-To: <52A67A71.6020404@atmel.com>
-References: <1384766002-2852-1-git-send-email-voice.shen@atmel.com>
- <20131202105957.GD18060@ulmo.nvidia.com>
- <529D4B58.9020700@atmel.com> <52A67A71.6020404@atmel.com>
-Message-ID: <20131211152119.GD31617@ulmo.nvidia.com>
+Date: Wed, 11 Dec 2013 16:30:51 +0100
+Subject: [PATCH 2/3] leds/pwm: Don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <20131205212641.GC4707@pengutronix.de>
+References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1385412225-29740-3-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131202123318.GC12793@ulmo.nvidia.com>
+ <20131202131807.GC29721@pengutronix.de>
+ <20131205212641.GC4707@pengutronix.de>
+Message-ID: <20131211153050.GE31617@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 10:20:33AM +0800, Bo Shen wrote:
-> Hi Thierry,
+On Thu, Dec 05, 2013 at 10:26:41PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Thierry,
 > 
-> On 12/03/2013 11:09 AM, Bo Shen wrote:
-> >>>+        atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-> >>>+        atmel_pwm->chip.of_pwm_n_cells = 3;
-> >>>+        atmel_pwm->chip.base = -1;
-> >>>+    } else {
-> >>>+        atmel_pwm->chip.base = pdev->id;
-> >>
-> >>That's not correct. The chip cannot be tied to pdev->id, because that ID
-> >>is the instance number of the device. So typically you would have
-> >>devices name like this:
-> >>
-> >>    atmel-pwm.0
-> >>    atmel-pwm.1
-> >>    ...
-> >>
-> >>Now, if you have that, then you won't be able to register the second
-> >>instance because the first instance will already have requested PWMs
-> >>0-3, and setting .base to 1 will cause PWMs 1-4 to be requested, which
-> >>intersects with the range of the first instance.
-> >>
-> >>The same applies of course if you have other PWM controllers in the
-> >>system which have similar instance names.
-> >>
-> >>So the right thing to do here is to provide that number via platform
-> >>data so that platform code can define it, knowing in advance all ranges
-> >>for all other PWM controllers and thereby make sure there's no
-> >>intersection.
-> >
-> >OK, I will fix this.
-> 
-> After read deeply of PWM framework, for non device tree, I think we'd better
-> let the PWM core to choose chip.base as device tree, while not pass a number
-> through platform data to it. Or else, it will confuse the user to set the
-> chip.base, must set it in correct value to avoid intersection. And, actually
-> we won't use chip.base in driver itself.
+> On Mon, Dec 02, 2013 at 02:18:07PM +0100, Uwe Kleine-K?nig wrote:
+> > On Mon, Dec 02, 2013 at 01:33:19PM +0100, Thierry Reding wrote:
+> > > On Mon, Nov 25, 2013 at 09:43:44PM +0100, Uwe Kleine-K?nig wrote:
+> > > > This fixes disabling the LED on i.MX28. The PWM hardware delays using
+> > > > the newly set pwm-config until the beginning of a new period. It's very
+> > > > likely that pwm_disable is called before the current period ends. In
+> > > > case the LED was on brightness=max before the LED stays on because in
+> > > > the disabled PWM block the period never ends.
+> > > > 
+> > > > Also only call pwm_enable only once in the probe call back and the
+> > > > matching pwm_disable in .remove(). Moreover the pwm is explicitly
+> > > > initialized to off.
+> > > 
+> > > While I do understand the reasoning behind this, if this is really the
+> > > behaviour that we need then there's no use in having pwm_enable() and
+> > > pwm_disable() at all. They can just be folded into pwm_get() and
+> > > pwm_put(), respectively.
+> > So after the first pwm_get the pwm starts with an unspecified duty
+> > cycle? That's not that nice, is it?
+> How can we come forward here? After all it's a real bug being fixed.
 
-Yes, that should work as well, if you make sure that every user actually
-has the PWM lookup table and doesn't rely on a fixed global index to
-retrieve the PWM channel.
+I've thought about this some more, and this isn't actually fixing a bug.
+Rather it's working around some quirk of the hardware in your setup. So
+in the long run I think the best option would have to be to define the
+behaviour of the PWM subsystem, and then make sure in drivers that they
+behave accordingly. So if we define, or rather keep with the existing
+implied behaviour, that the configuration is active when pwm_config()
+returns, we can easily write generic client drivers because it means
+they can rely on said behaviour. If a driver doesn't behave accordingly
+it needs to be fixed.
+
+If that means that a particular PWM controller applies the configuration
+only after the current period has expired, then that's something only
+the driver can now and therefore the driver should handle this by only
+returning from pwm_config() when that's actually happened.
+
+That seems to me the only reasonable approach. Otherwise we'll have to
+keep changing API whenever some new controller comes around that behaves
+slightly differently.
 
 Thierry
 -------------- next part --------------
@@ -59,4 +62,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/68d9a67b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/c365de3c/attachment.sig>
