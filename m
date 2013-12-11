@@ -1,13 +1,19 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 11 Dec 2013 11:30:18 +0100
-Subject: [PATCH 7/7] ARM: dts: imx6q-sabrelite: Enable PCI express
+Date: Wed, 11 Dec 2013 11:30:17 +0100
+Subject: [PATCH 6/7] PCI: imx6: Fix bugs in PCIe startup code
 In-Reply-To: <1386757818-5154-1-git-send-email-marex@denx.de>
 References: <1386757818-5154-1-git-send-email-marex@denx.de>
-Message-ID: <1386757818-5154-7-git-send-email-marex@denx.de>
+Message-ID: <1386757818-5154-6-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marex@denx.de>
+From: Richard Zhu <r65037@freescale.com>
+
+- LTSSM shouldn't be set once in assert_core_reset
+- Move peripheral reset just before LTSSM start
+
+From: Richard Zhu <r65037@freescale.com>
+Signed-off-by: Richard Zhu <r65037@freescale.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Frank Li <lznuaa@gmail.com>
 Cc: Harro Haan <hrhaan@gmail.com>
@@ -24,23 +30,44 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pci/host/pci-imx6.c | 15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index fca8f220..f570ad5 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -190,6 +190,10 @@
- 	};
- };
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 3028f2c..38df103 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -220,18 +220,9 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
  
-+&pcie {
-+	status = "okay";
-+};
-+
- &sata {
- 	status = "okay";
- };
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+-	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+ 
+-	/* Some boards don't have PCIe reset GPIO. */
+-	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		gpio_set_value(imx6_pcie->reset_gpio, 0);
+-		msleep(100);
+-		gpio_set_value(imx6_pcie->reset_gpio, 1);
+-	}
+-
+ 	return 0;
+ }
+ 
+@@ -275,6 +266,12 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	/* allow the clocks to stabilize */
+ 	usleep_range(200, 500);
+ 
++	/* Some boards don't have PCIe reset GPIO. */
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		gpio_set_value(imx6_pcie->reset_gpio, 0);
++		msleep(100);
++		gpio_set_value(imx6_pcie->reset_gpio, 1);
++	}
+ 	return 0;
+ 
+ err_pcie_axi:
 -- 
 1.8.4.3
