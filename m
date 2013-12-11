@@ -1,32 +1,48 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 11 Dec 2013 14:16:33 +0100
-Subject: [PATCH 0/8] Impedance matcher for Samsung boards
-In-Reply-To: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
-References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
-Message-ID: <52A865B1.9070908@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Dec 2013 13:27:29 +0000
+Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
+In-Reply-To: <52A7C0C3.2070805@codeaurora.org>
+References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+ <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
+ <20131210235000.GK11468@sirena.org.uk>
+ <52A7AE1B.3040201@codeaurora.org>
+ <20131211005106.GL11468@sirena.org.uk>
+ <52A7C0C3.2070805@codeaurora.org>
+Message-ID: <20131211132729.GT11468@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2013 02:07 PM, Piotr Wilczek wrote:
-> This patchset implements the impedance-matcher for Samsung Exynos boards
-> and does the following:
->  - fix strncmp function;
->  - ensure each DT blob is 4-byte aligned;
->  - port 'atags_to_fdt' form Kernel;
->  - add Exynos specific serial driver;
->  - add support for Samsung boards, Trats and Trats2;
-> 
-> This patch set is based on:
-> https://github.com/zonque/pxa-impedance-matcher.git
+On Tue, Dec 10, 2013 at 05:32:51PM -0800, Stephen Boyd wrote:
 
-Thanks for the patches!
+> Are you suggesting we implement the reg_read/reg_write as global helpers
+> that the config points to and then call regmap_init()? At a quick glance
 
-I'm considering merging most of them, but I have my problems with the
-inclusion of the libfdt library.
+Yes, assuming your bus really is limited in the way it seems from the
+code.
 
-Could you explain what you need this for, exactly? Why can't you just
-fix the device tree blob that you include instead of modifying it at
-runtime?
+> it looks like we lose out on regmap_bulk_read() if we do that. There is
+> one driver that will use regmap_bulk_read(), but I suppose we can just
 
+bulk_read() should decay to individual reads if there isn't a block
+operaton and it's not like the hardware actually supports bulk reads
+anyway.
 
-Daniel
+> With use_single_rw I think it can be this.
+
+> static int regmap_ssbi_read(void *context,
+>                             const void *reg, size_t reg_size,
+>                             void *val, size_t val_size)
+> {
+>         BUG_ON(reg_size != 2);  
+>         return ssbi_read(context, *(u16 *)reg, val, 1);
+> }
+
+Right, which is a lot simpler.  Though I'm still not sure the
+ssbi_read() interface is the best.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/440aae0b/attachment.sig>
