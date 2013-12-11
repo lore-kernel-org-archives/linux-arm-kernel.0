@@ -1,64 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 11 Dec 2013 22:22:19 +0400
-Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <1488247.0AdahCZr3G@avalon>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <52A8A891.40302@cogentembedded.com> <1488247.0AdahCZr3G@avalon>
-Message-ID: <52A8AD5B.70601@cogentembedded.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 11 Dec 2013 12:27:55 -0600
+Subject: [PATCH 1/2] net: smc91x: Read hardware behavior flags from device
+ tree
+In-Reply-To: <20131211160440.GA13171@atomide.com>
+References: <1386757305-12545-1-git-send-email-nm@ti.com>
+ <1386757305-12545-2-git-send-email-nm@ti.com>
+ <20131211160440.GA13171@atomide.com>
+Message-ID: <CAGo_u6oHPJSfDF=9WVTb2ukmwxDoasho=4L7qJmnYng6-84N0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-12-2013 22:06, Laurent Pinchart wrote:
+On Wed, Dec 11, 2013 at 10:04 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Nishanth Menon <nm@ti.com> [131211 02:23]:
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/smsc91x.txt
+>> @@ -0,0 +1,45 @@
+>> +* Smart Mixed-Signal Connectivity (SMSC) LAN91c94/91c111 Controller
+>> +
+>> +Required properties:
+>> +- compatible : Should be one of:
+>> +     "smsc,lan91c94"
+>> +     "smsc,lan91c111"
+>> +- reg : Address and length of the io space for SMSC LAN
+>> +- interrupts : Should contain SMSC LAN interrupt line
+>> +- interrupt-parent : Should be the phandle for the interrupt controller
+>> +  that services interrupts for this device
+>> +
+>> +Optional properties:
+>> +- reg-shift : Specify the quantity to shift the register offsets by
+>> +- reg-io-width : Specify the size (in bytes) of the IO accesses that
+>> +  should be performed on the device.  Valid value for SMSC LAN is
+>> +  1, 2 or 4.
+>
+> I posted a minimal regression fix for this a few weeks ago that we
+> should merge to the v3.13-rc cycle:
+>
+> http://www.spinics.net/lists/netdev/msg258913.html
+>
+> Care to ack that one?
+Done.
 
->>> This helps increasing build testing coverage.
+> Then if that works for you, maybe rebase these on
+> that one for the upcoming merge window?
+it seems like omap is the only folks who are currently using this
+driver in dt form, I kinda proposed to do these as add on changes to
+your patch, lets see if anyone cares about it.
 
->>> The driver doesn't compile on (at least) x86 due (possibly among others)
->>> to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
->>> or ARM.
+but I agree to drop my series at this point,
 
->>> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
->>> controller or is Renesas-specific is unknown and impossible to test as
->>> we have no current or planned TMIO DMA users other than SUPERH and
->>> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
->>> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
->>> list would extend this to multiarch kernels, but would break the driver
->>> for non-shmobile platforms if the register is Renesas-specific. We can
->>> thus get rid of the conditional compilation completely without
->>> introducing any further issue, and let future non-Renesas users deal
->>> with the situation if it turns out to be a the problem.
-
->>> Cc: Chris Ball <cjb@laptop.org>
->>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->>> Cc: Ian Molton <ian@mnementh.co.uk>
->>> Cc: linux-mmc at vger.kernel.org
->>> Signed-off-by: Laurent Pinchart
->>> <laurent.pinchart+renesas@ideasonboard.com>
->>> Acked-by: Simon Horman <horms@verge.net.au>
-[...]
-
->>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
->>> index 7fc5099..ca1315e 100644
->>> --- a/drivers/mmc/host/Kconfig
->>> +++ b/drivers/mmc/host/Kconfig
->>> @@ -479,7 +479,8 @@ config MMC_TMIO
->>>
->>>    config MMC_SDHI
->>>
->>>    	tristate "SH-Mobile SDHI SD/SDIO controller support"
->>>
->>> -	depends on SUPERH || ARCH_SHMOBILE
->>> +	depends on SUPERH || ARM
->>> +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-
->>      Hm, why 2 "depends" lines with SUPERH in both?
-
-> The first line means "this driver requires SUPERH || ARM to be compiled",
-
-    Then COMPILE_TEST should be there, no?
-
-> while the second line means "devices supported by this driver are only found
-> on SUPERH || ARCH_SHMOBILE platforms".
-
-WBR, Sergei
+Regards,
+Nishanth Menon
