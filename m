@@ -1,24 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 11 Dec 2013 10:48:38 +0100
-Subject: [PATCH v3 01/15] mfd: menelaus: Drop __exit section annotation
-In-Reply-To: <1386606085-26838-1-git-send-email-balbi@ti.com>
-References: <20131209161422.GC24047@saruman.home>
- <1386606085-26838-1-git-send-email-balbi@ti.com>
-Message-ID: <20131211094838.GH18888@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 11 Dec 2013 09:48:39 +0000
+Subject: [PATCH 6/8] mfd: pm8921: Update for genirq changes
+In-Reply-To: <1386718523-2587-7-git-send-email-sboyd@codeaurora.org>
+References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
+ <1386718523-2587-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131211094839.GH16780@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 10:21:11AM -0600, Felipe Balbi wrote:
-> We could build that driver as a dynamically-linked module.
-ups, only saw now the v3 after I commented on v2. So you addressed a
-part of my comment already. Still building that driver as a module also
-works without this patch, right? So this is only about hotplugging
-(which usually doesn't work on i2c, so only via /sys/bus/i2c) and driver
-unloading.
+> Since this code has been marked broken for some time a few genirq
+> tree wide changes weren't made. set_irq_wake() was renamed to
+> irq_set_irq_wake() in commit a0cd9ca2b (genirq: Namespace
+> cleanup, 2011-02-10) and commit 10a8c383 (irq: introduce entry
+> and exit functions for chained handlers) introduced the chained
+> irq functions but this driver wasn't updated to use them. Fix
+> these problems and remove the BROKEN marking on this driver.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/mfd/Kconfig       | 1 -
+>  drivers/mfd/pm8921-core.c | 7 +++++--
+>  2 files changed, 5 insertions(+), 3 deletions(-)
 
-Best regards
-Uwe
+This driver was marked as BROKEN due to compilation failures only, so
+as long as it now compiles cleanly (which I'm sure you've tested) I'm
+happy with this patch.
+
+It doesn't apply, without your 5th patch, so for now I'll just Ack
+it. Please remember to apply my Ack when you resubmit, as it will act
+as a reminder and I won't have to re-review.
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
