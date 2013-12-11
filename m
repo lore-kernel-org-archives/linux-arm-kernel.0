@@ -1,160 +1,44 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Wed, 11 Dec 2013 17:10:08 +0530
-Subject: [PATCH 07/12] pcie: designware: add dw_pcie prefix before
- cfg_read/write
-In-Reply-To: <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
-Message-ID: <CAD6G_RTiswApVUz_A3V8A++tQcWaWi2rRtVCuCAFE1eWY6d0CQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 11 Dec 2013 11:53:45 +0000
+Subject: [PATCH V2 2/4] mtd: spi-nor: add the basic data structures
+In-Reply-To: <201312111102.18554.marex@denx.de>
+References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
+ <201312101407.59958.marex@denx.de>
+ <20131211062428.GA25147@shlinux2.ap.freescale.net>
+ <201312111102.18554.marex@denx.de>
+Message-ID: <20131211115345.GL16780@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 3:08 PM, Mohit Kumar <mohit.kumar@st.com> wrote:
-> From: Pratyush Anand <pratyush.anand@st.com>
->
-> cfg_read/write function are designware pcie specific. Add dw_pcie prefix
-> to avoid collision in global name space.
->
-> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: spear-devel at list.st.com
-> Cc: linux-pci at vger.kernel.org
-> ---
->  drivers/pci/host/pci-exynos.c      |    5 +++--
->  drivers/pci/host/pcie-designware.c |   23 ++++++++++++++---------
->  drivers/pci/host/pcie-designware.h |    4 ++--
->  3 files changed, 19 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-> index 24beed3..3de6bfb 100644
-> --- a/drivers/pci/host/pci-exynos.c
-> +++ b/drivers/pci/host/pci-exynos.c
-> @@ -468,7 +468,7 @@ static int exynos_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
->         int ret;
->
->         exynos_pcie_sideband_dbi_r_mode(pp, true);
-> -       ret = cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
-> +       ret = dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
->         exynos_pcie_sideband_dbi_r_mode(pp, false);
->         return ret;
->  }
-> @@ -479,7 +479,8 @@ static int exynos_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
->         int ret;
->
->         exynos_pcie_sideband_dbi_w_mode(pp, true);
-> -       ret = cfg_write(pp->dbi_base + (where & ~0x3), where, size, val);
-> +       ret = dw_pcie_cfg_write(pp->dbi_base + (where & ~0x3),
-> +                       where, size, val);
->         exynos_pcie_sideband_dbi_w_mode(pp, false);
->         return ret;
->  }
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 73aa13c..be6ce30 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -32,7 +32,7 @@ static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
->         return sys->private_data;
->  }
->
-> -int cfg_read(void __iomem *addr, int where, int size, u32 *val)
-> +int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
->  {
->         *val = readl(addr);
->
-> @@ -46,7 +46,7 @@ int cfg_read(void __iomem *addr, int where, int size, u32 *val)
->         return PCIBIOS_SUCCESSFUL;
->  }
->
-> -int cfg_write(void __iomem *addr, int where, int size, u32 val)
-> +int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
->  {
->         if (size == 4)
->                 writel(val, addr);
-> @@ -84,7 +84,8 @@ static int dw_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
->         if (pp->ops->rd_own_conf)
->                 ret = pp->ops->rd_own_conf(pp, where, size, val);
->         else
-> -               ret = cfg_read(pp->dbi_base + (where & ~0x3), where, size, val);
-> +               ret = dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where,
-> +                               size, val);
->
->         return ret;
->  }
-> @@ -97,8 +98,8 @@ static int dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
->         if (pp->ops->wr_own_conf)
->                 ret = pp->ops->wr_own_conf(pp, where, size, val);
->         else
-> -               ret = cfg_write(pp->dbi_base + (where & ~0x3), where, size,
-> -                               val);
-> +               ret = dw_pcie_cfg_write(pp->dbi_base + (where & ~0x3), where,
-> +                               size, val);
->
->         return ret;
->  }
-> @@ -534,11 +535,13 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
->
->         if (bus->parent->number == pp->root_bus_nr) {
->                 dw_pcie_prog_viewport_cfg0(pp, busdev);
-> -               ret = cfg_read(pp->va_cfg0_base + address, where, size, val);
-> +               ret = dw_pcie_cfg_read(pp->va_cfg0_base + address, where, size,
-> +                               val);
->                 dw_pcie_prog_viewport_mem_outbound(pp);
->         } else {
->                 dw_pcie_prog_viewport_cfg1(pp, busdev);
-> -               ret = cfg_read(pp->va_cfg1_base + address, where, size, val);
-> +               ret = dw_pcie_cfg_read(pp->va_cfg1_base + address, where, size,
-> +                               val);
->                 dw_pcie_prog_viewport_io_outbound(pp);
->         }
->
-> @@ -557,11 +560,13 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
->
->         if (bus->parent->number == pp->root_bus_nr) {
->                 dw_pcie_prog_viewport_cfg0(pp, busdev);
-> -               ret = cfg_write(pp->va_cfg0_base + address, where, size, val);
-> +               ret = dw_pcie_cfg_write(pp->va_cfg0_base + address, where, size,
-> +                               val);
->                 dw_pcie_prog_viewport_mem_outbound(pp);
->         } else {
->                 dw_pcie_prog_viewport_cfg1(pp, busdev);
-> -               ret = cfg_write(pp->va_cfg1_base + address, where, size, val);
-> +               ret = dw_pcie_cfg_write(pp->va_cfg1_base + address, where, size,
-> +                               val);
->                 dw_pcie_prog_viewport_io_outbound(pp);
->         }
->
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index da1ed35..afb1734 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -66,8 +66,8 @@ struct pcie_host_ops {
->         void (*host_init)(struct pcie_port *pp);
->  };
->
-> -int cfg_read(void __iomem *addr, int where, int size, u32 *val);
-> -int cfg_write(void __iomem *addr, int where, int size, u32 val);
-> +int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
-> +int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
->  void dw_handle_msi_irq(struct pcie_port *pp);
->  void dw_pcie_msi_init(struct pcie_port *pp);
->  int dw_pcie_link_up(struct pcie_port *pp);
-> --
-> 1.7.0.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > > The spi_nor{} is cloned from the m25p{}.
+> > > > +	struct spi_nor_xfer_cfg	cfg;
+> > > > +
+> > > > +	/* for write_reg */
+> > > > +	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+> > > > +
+> > > > +	/* the two fundamental primitives */
+> > > > +	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > > > +			 u8 *buf, size_t len);
+> > > > +	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > > > +			  u8 *buf, size_t len);
+> > > > +
+> > > > +	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
+> > > > +	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
+> > > > +			int write_enable);
+> > > 
+> > > Does the vybrid really support accelerated SPI NOR register IO or does it
+> > 
+> > The vybrid does not support the accelerated SPI NOR register IO.
+> > these hooks are for Lee's driver.
+> 
+> Which one please?
 
-Acked-by: Jagannadha Sutradharudu Teki <jagannadh.teki@gmail.com>
+It's not in Mainline yet, but the patches are on the list.
+
+If you search for st_spi_fsm, you'll find them.
 
 -- 
-Thanks,
-Jagan.
---------
-Jagannadha Sutradharudu Teki,
-E: jagannadh.teki at gmail.com, P: +91-9676773388
-Engineer - System Software Hacker
-U-boot - SPI Custodian and Zynq APSOC
-Ln: http://www.linkedin.com/in/jaganteki
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
