@@ -1,52 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Dec 2013 17:26:35 +0000
-Subject: [PATCH] arm64: Correct virt_addr_valid
-In-Reply-To: <20131211110618.GG4360@n2100.arm.linux.org.uk>
-References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
- <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
- <20131211104429.GE26730@mudshark.cambridge.arm.com>
- <20131211110618.GG4360@n2100.arm.linux.org.uk>
-Message-ID: <20131211172635.GJ26730@mudshark.cambridge.arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 11 Dec 2013 12:28:15 -0500 (EST)
+Subject: [PATCH v1 1/6] net: mv643xx_eth: properly start/stop phy device
+In-Reply-To: <52A80EFC.8070806@gmail.com>
+References: <20131210.215253.2121948728095674632.davem@davemloft.net>
+ <20131210.215654.1165181423931409066.davem@davemloft.net>
+ <52A80EFC.8070806@gmail.com>
+Message-ID: <20131211.122815.155153567731141533.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 11:06:18AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 11, 2013 at 10:44:29AM +0000, Will Deacon wrote:
-> > Hmm, this is pretty expensive on both arm and arm64, since we end up doing a
-> > binary search through all of the memblocks.
-> 
-> People say "binary search == expensive" almost as a knee jerk
-> reaction, because classical thinking is that binary searches are
-> expensive for systems with caches.  Have you considered how many
-> memblocks you end up with on a normal system?
-> 
-> How expensive is a binary search across one element?  Two elements?
-> Four elements?  In the very very rare case (there's only one platform)
-> eight elements?
-> 
-> For one element, it's the same as a linear search - we only have to
-> look at one element and confirm whether the pointer is within range.
-> Same for two - we check one and check the other.  As memblock is array
-> based, both blocks share the same cache line.
-> 
-> For four, it means we look at most three elements, at least two of
-> which share a cache line.  In terms of cache line loading, it's no
-> more expensive than a linear search.  In terms of CPU cycles, it's
-> a win because we don't need to expend cycles looking at the fourth
-> element.
-> 
-> For eight (which is starting to get into the "rare" territory, and
-> three cache lines, four elements vs a linear search which can be up
-> to four cache lines and obviously eight elements.
-> 
-> Now, bear in mind that the normal case is one, there's a number with
-> two, four starts to become rare, and eight is almost non-existent...
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Wed, 11 Dec 2013 08:06:36 +0100
 
-Sure, but it's going to be notably more expensive than what we currently
-have. The question then is: does this code occur frequently (i.e. in a loop)
-on some hot path?
+> On 12/11/2013 03:56 AM, David Miller wrote:
+>> From: David Miller <davem@davemloft.net>
+>> Date: Tue, 10 Dec 2013 21:52:53 -0500 (EST)
+>>
+>>>
+>>> This series looks good, applied to net-next, thanks.
+>>
+>> Actually, I had to revert.
+>>
+>> You cannot use late_initcall_sync() from code that is potentially
+>> built modular, this caused my build to fail at the mdio_bus code.
+>>
+>> drivers/net/phy/mdio_bus.c:344:1: warning: data definition has no type
+>> or storage class [enabled by default]
+>> drivers/net/phy/mdio_bus.c:344:1: error: type defaults to ?int? in
+>> declaration of ?late_initcall_sync? [-Werror=implicit-int]
+>> drivers/net/phy/mdio_bus.c:344:1: warning: parameter names (without
+>> types) in function declaration [enabled by default]
+>> drivers/net/phy/mdio_bus.c:339:12: warning:
+>> ?mdio_bus_class_suspend_unused? defined but not used
+>> [-Wunused-function]
+>>
+> 
+> Hmm, I see. What about you drop patch 5 ("net: phy: suspend unused
+> PHYs
+> on mdio_bus in late_initcall"), take the rest, and I'll have look at
+> suspending unused PHYs later?
 
-Turning to grep, the answer seems to be "no", so I'll stop complaining about
-a problem that we don't have :)
+What about you resubmit the series that you want me to apply?
 
-Will
+Thanks.
