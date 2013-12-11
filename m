@@ -1,43 +1,45 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 11 Dec 2013 17:49:43 -0300
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20131210170025.GA4360@n2100.arm.linux.org.uk>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131210164907.GA11468@sirena.org.uk>
- <20131210170025.GA4360@n2100.arm.linux.org.uk>
-Message-ID: <20131211204942.GF5461@localhost>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 Dec 2013 12:52:07 -0800
+Subject: [RESEND PATCH v2] arm/arm64: kvm: Use virt_to_idmap instead of
+ virt_to_phys for idmap mappings
+In-Reply-To: <52A83809.4080206@arm.com>
+References: <1384891152-15990-1-git-send-email-santosh.shilimkar@ti.com>
+ <52A76F4D.3030803@ti.com> <20131211002301.GD2871@cbox>
+ <52A83809.4080206@arm.com>
+Message-ID: <20131211205207.GG2871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 05:00:25PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 10, 2013 at 04:49:07PM +0000, Mark Brown wrote:
-> > On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
+On Wed, Dec 11, 2013 at 10:01:45AM +0000, Marc Zyngier wrote:
+> On 11/12/13 00:23, Christoffer Dall wrote:
+> > On Tue, Dec 10, 2013 at 02:45:17PM -0500, Santosh Shilimkar wrote:
+> >> Christoffer,
+> >>
+> >> On Tuesday 19 November 2013 02:59 PM, Santosh Shilimkar wrote:
+> >>> KVM initialisation fails on architectures implementing virt_to_idmap()
+> >>> because virt_to_phys() on such architectures won't fetch you the correct
+> >>> idmap page.
+> >>>
+> >>> So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
+> >>> Since the KVM code is shared between arm and arm64, we create
+> >>> kvm_virt_to_phys() and handle the redirection in respective headers.
+> >>>
+> >>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>> ---
+> >>> Update the earlier version as per Marc's suggestion
+> >>>
+> >> Have you picked this up for 3.14 ?
+> >>
 > > 
-> > > +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
-> > > +{
-> > > +	unsigned long flags;
-> > > +	u32 value;
-> > > +
-> > > +	raw_spin_lock_irqsave(&__io_lock, flags);
-> > > +	value = readl_relaxed(reg) & ~mask;
-> > > +	value |= (set & mask);
-> > > +	writel_relaxed(value, reg);
-> > > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> > > +}
-> > > +EXPORT_SYMBOL(atomic_io_modify_relaxed);
-> > 
-> > This looks quite generic - why is it in architecture specific code?
+> > Actually, I was waiting for Marc to ack this one.  Marc?
 > 
-> because the _relaxed IO operators don't exist on other architectures, and
-> there's been some discussion around whether they should with no conclusions
-> being reached.
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> 	M.
 
-Exactly.
+Thanks, applied.
 
-Will? Catalin? Any comments on this?
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+-Christoffer
