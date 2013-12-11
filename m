@@ -1,103 +1,132 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 11 Dec 2013 16:09:06 +0100
-Subject: [PATCH v5 4/5] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <20131210161138.GO29580@intel.com>
-References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
- <1377086938-29145-5-git-send-email-zonque@gmail.com>
- <20130825163337.GD2748@intel.com> <522F3ECB.3070307@gmail.com>
- <20130913045135.GI17188@intel.com> <52A61363.7060500@gmail.com>
- <20131210161138.GO29580@intel.com>
-Message-ID: <52A88012.6070107@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 11 Dec 2013 16:12:00 +0100
+Subject: [PATCH] of/platform: Fix no irq domain found errors when
+ populating interrupts
+In-Reply-To: <20131211134553.2E967C4061A@trevor.secretlab.ca>
+References: <20131123004334.GJ10023@atomide.com>
+ <20131124213651.59750C402C3@trevor.secretlab.ca>
+ <20131125092549.GD22043@ulmo.nvidia.com>
+ <20131125094954.GF22043@ulmo.nvidia.com>
+ <20131127155629.DB612C404EC@trevor.secretlab.ca>
+ <20131128154622.GB23201@ulmo.nvidia.com>
+ <20131211134553.2E967C4061A@trevor.secretlab.ca>
+Message-ID: <20131211151159.GA31617@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12/10/2013 05:11 PM, Vinod Koul wrote:
-> On Mon, Dec 09, 2013 at 08:00:51PM +0100, Daniel Mack wrote:
-
->> I looked into your idea and implemented it, but I really feel having an
->> explicit chain pointer for each descriptor is redundant information.
->>
->> Hence, let me summarize again how the driver currently works:
->>
->> * Any of the prep_* function will allocate a number of descriptors to
->> accommodate the payload, and link them all together via the 'node'
->> list_head, forming a transaction.
->>
->> * The last descriptor in a transaction has the DCMD_ENDIRQEN flag set.
->>
->> * When tx_submit() is called, each descriptor in the linked list will be
->> assigned a cookie, and then entire list of the transaction is appended
->> to the chain_pending list. At this point, the information of where a
->> transaction ends is no longer visible in the 'node' list head.
->>
->> * start_pending_queue() moves the chain_pending entries to chain_running.
->>
->> When determining the channel's residue, we need to find the transaction
->> currently in progress, and then count upwards until we reach the end of
->> the transaction chain.
-> ah here is the catch! You dont get reside for a channel. You get for the
-> respetive transaction represented by the descriptor!
-
-Yes, exactly. I think part of the reason why we're not on the same page
-is a misleading wording on my side. Let me try and explain.
-
-> So lets establish few rules:
-> - Assume you have transactions A, B, C and D in a list
-> - on sumbmit (assume serial), you get descriptor 1, 2, 3 and 4 respectively
-
-You're referring to dma_async_tx_descriptor, while I was talking about
-mmp_pdma_desc_sw. IOW: what's handed out by the driver from any of its
-prep_* functions are dma_async_tx_descriptors, which consist of N
-chained mmp_pdma_desc_sw descriptors internally.
-
-Another specialty of this particular driver is that each
-mmp_pdma_desc_sw is assigned a dma_cookie_t, but only the last one in a
-chained list is handed out to the user.
-
-Following your example, the transaction-cookie matching could look like
-this, for example:
-
-  A:  1, 2, 3, 4
-  B:  5
-  C:  6, 7, 8
-  D:  9, 10
-
-So the only cookies the user 'knows' about and query the residue for,
-are 4, 5, 8 and 10.
-
-> - Now residue is for a descriptor, not a series of descriptors!, so
->   - If DMA is started and currently 1 is being transferred, then
->     - residue on 1 will give remaining bytes of 1
->     - residue on 2 will give full length
+On Wed, Dec 11, 2013 at 01:45:53PM +0000, Grant Likely wrote:
+> On Thu, 28 Nov 2013 16:46:23 +0100, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > On Wed, Nov 27, 2013 at 03:56:29PM +0000, Grant Likely wrote:
+> > > On Mon, 25 Nov 2013 10:49:55 +0100, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > 
+> > > > I should maybe add: one issue that was raised during review of my
+> > > > initial patch series was that we'll also need to cope with situations
+> > > > like the following:
+> > > > 
+> > > > 	1) device's interrupt parent is probed (assigned IRQ base X)
+> > > > 	2) device is probed (interrupt parent there, therefore gets
+> > > > 	   assigned IRQ (X + z)
+> > > > 	3) device in removed
+> > > > 	4) device's interrupt parent is removed
+> > > > 	5) device is probed (deferred because interrupt parent isn't
+> > > > 	   there)
+> > > > 	6) device's interrupt parent is probed (assigned IRQ base Y)
+> > > > 	7) device is probed, gets assigned IRQ (Y + z)
+> > > > 
+> > > > So not only do we have to track which resources are interrupt resources,
+> > > > but we also need to have them reassigned everytime the device is probed,
+> > > > therefore interrupt mappings need to be properly disposed and the values
+> > > > invalidated when probing is deferred or the device removed.
+> > > 
+> > > Yes, that is a problem, but the only way to handle that is to always
+> > > recalcuate all resource references at probe time. I don't feel good
+> > > about handling that in the core. I'd rather move drivers away from
+> > > referencing the resources table directly and instead use an API. Then
+> > > the resources table could be missing entirely.
+> > 
+> > Are you suggesting something like this?
+> > 
+> > ---
+> > 
+> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> > index 3a94b799f166..c894d1af3a5e 100644
+> > --- a/drivers/base/platform.c
+> > +++ b/drivers/base/platform.c
+> > @@ -13,6 +13,7 @@
+> >  #include <linux/string.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/of_device.h>
+> > +#include <linux/of_irq.h>
+> >  #include <linux/module.h>
+> >  #include <linux/init.h>
+> >  #include <linux/dma-mapping.h>
+> > @@ -87,7 +88,12 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+> >                 return -ENXIO;
+> >         return dev->archdata.irqs[num];
+> >  #else
+> > -       struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> > +       struct resource *r;
+> > +
+> > +       if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node)
+> > +               return irq_of_parse_and_map(dev->dev.of_node, num);
+> > +
+> > +       r = platform_get_resource(dev, IORESOURCE_IRQ, num);
 > 
-> At client, you can sum up and decide how much is remianing for your point of
-> interest.
+> Yes. Or even more generically we could have a device_get_irq() function:
+> 
+> int device_get_irq(struct device *dev, unsigned int num)
+> {
+> 	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
+> 		return irq_of_parse_and_map(dev->of_node, num);
+> 	/* An ACPI hook could go here */
+> 	return 0
+> }
+> 
+> It would be callable by any device driver, and platform_get_irq() could
+> call it too.
 
-Absolutely. I understand that concept :)
+So how about we make the platform_get_irq() modification for starters,
+so that the OMAP issues can be resolved and then turn our attention to
+coming up with a more generic approach. If indeed we end up with what
+you're proposing we can easily switch platform_get_irq() to use it.
 
-In this driver, however, I have to deal with multiple mmp_pdma_desc_sw
-descriptors that are all chained up in the channel's running list.
-Hence, my implementation goes as follows:
+One of the things I'm not so sure about is how to handle other types of
+resources, since they'll be somewhat more specific to the type of
+device. That's true also for devices other than platform devices. Let's
+look at I2C devices for instance. The way to get at the IRQ number is
+via the i2c_client->irq member.
 
- * Walk the list of all mmp_pdma_desc_sw until we find the end of a
-transaction chain; IOW: find the end of one dma_async_tx_descriptor.
-This end entry has the DCMD_ENDIRQEN flag set.
+device_get_irq() breaks down at that point because unless you want to
+add special cases for all sorts of devices you have no way of getting at
+the data if it hasn't been instantiated from DT (or ACPI). Actually, all
+devices instantiated from platform data will suffer from this if I'm not
+mistaken.
 
- * Check if that mmp_pdma_desc_sw corresponds with the cookie the user
-wants to know the residue for, and if it does, return the residue that
-was calculated during the iteration.
+If you're saying that the device_get_irq() API should only cover cases
+where some sort of firmware interface exists such as DT or ACPI, then I
+suppose it could be made to work and drivers could rely on the subsystem
+specific locations as fallback. I guess for I2C drivers you'd have to do
+something like this:
 
- * Otherwise, reset the internal state and carry on.
+	err = device_get_irq(&client->dev, 0);
+	if (err >= 0)
+		client->irq = err;
 
->> I rebased the residue patch on top of Joe's cleanup work, and I can
->> resubmit if you want me to. Maybe that serves as a better foundation for
->> the ongoing discussion :)
-> Sure pls do post...
+And then continue to use client->irq as usual. That obviously has the
+side-effect of having to do this for every single driver, whereas the
+original patches were meant to solve this in the core.
 
-Will do.
+Given enough time we could probably migrate everyone to the new
+interfaces, but it certainly is a lot of churn. Perhaps another
+alternative would be to unify this some more by making each subsystem
+provide special hooks that device_get_irq() and friends can call for
+fallback when none of the "firmware" functions were successful.
 
-
-Thanks,
-Daniel
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131211/cb4c6144/attachment-0001.sig>
