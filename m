@@ -1,52 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 11 Dec 2013 21:20:02 +0400
-Subject: [PATCH] ARM: rcar-gen2: Do not attempt to re-setup timer if
- running correctly
-In-Reply-To: <52A89DC7.4070909@codethink.co.uk>
-References: <1386753916-25648-1-git-send-email-ben.dooks@codethink.co.uk>
- <52A89D6A.3030707@cogentembedded.com> <52A89DC7.4070909@codethink.co.uk>
-Message-ID: <52A89EC2.4040203@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Dec 2013 17:26:35 +0000
+Subject: [PATCH] arm64: Correct virt_addr_valid
+In-Reply-To: <20131211110618.GG4360@n2100.arm.linux.org.uk>
+References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
+ <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104429.GE26730@mudshark.cambridge.arm.com>
+ <20131211110618.GG4360@n2100.arm.linux.org.uk>
+Message-ID: <20131211172635.GJ26730@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Dec 11, 2013 at 11:06:18AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 11, 2013 at 10:44:29AM +0000, Will Deacon wrote:
+> > Hmm, this is pretty expensive on both arm and arm64, since we end up doing a
+> > binary search through all of the memblocks.
+> 
+> People say "binary search == expensive" almost as a knee jerk
+> reaction, because classical thinking is that binary searches are
+> expensive for systems with caches.  Have you considered how many
+> memblocks you end up with on a normal system?
+> 
+> How expensive is a binary search across one element?  Two elements?
+> Four elements?  In the very very rare case (there's only one platform)
+> eight elements?
+> 
+> For one element, it's the same as a linear search - we only have to
+> look at one element and confirm whether the pointer is within range.
+> Same for two - we check one and check the other.  As memblock is array
+> based, both blocks share the same cache line.
+> 
+> For four, it means we look at most three elements, at least two of
+> which share a cache line.  In terms of cache line loading, it's no
+> more expensive than a linear search.  In terms of CPU cycles, it's
+> a win because we don't need to expend cycles looking at the fourth
+> element.
+> 
+> For eight (which is starting to get into the "rare" territory, and
+> three cache lines, four elements vs a linear search which can be up
+> to four cache lines and obviously eight elements.
+> 
+> Now, bear in mind that the normal case is one, there's a number with
+> two, four starts to become rare, and eight is almost non-existent...
 
-On 11-12-2013 21:15, Ben Dooks wrote:
+Sure, but it's going to be notably more expensive than what we currently
+have. The question then is: does this code occur frequently (i.e. in a loop)
+on some hot path?
 
->>> If the system has been started in non-secure mode, then the ARM generic
->>> timer is not configurable during the kernel initialisation. Currently
->>> the only thing we can check for is if the timer has been correctly
->>> configured during the boot process.
+Turning to grep, the answer seems to be "no", so I'll stop complaining about
+a problem that we don't have :)
 
->>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
->>> ---
->>>   arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 +++++++++++++-----
->>>   1 file changed, 13 insertions(+), 5 deletions(-)
-
->>> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c
->>> b/arch/arm/mach-shmobile/setup-rcar-gen2.c
->>> index 5734c24..6b7b7f1 100644
->>> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
->>> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
->>> @@ -78,12 +78,20 @@ void __init rcar_gen2_timer_init(void)
->>>       /* Remap "armgcnt address map" space */
->>>       base = ioremap(0xe6080000, PAGE_SIZE);
->>>
->>> -    /* Update registers with correct frequency */
->>> -    iowrite32(freq, base + CNTFID0);
->>> -    asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
->>> +    /* Update the timer if it is either not running, or is not at the
->>> +     * right frequency. The timer is only configurable in secure mode
->>> +     * so this avoids an abort if the loader started the timer and
->>> +     * started the kernel in non-secure mode. */
-
->>     You said you've fixed the comment style but you haven't as I see.
-
-> I also said I reposted the previous patch by accident this morning
-> and posted the corrected one after it.
-
-    Sorry, I've only read that after sending my comment. I thought that was an 
-intended repost with a slightly corrected subject.
-
-WBR, Sergei
+Will
