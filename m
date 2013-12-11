@@ -1,97 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 10 Dec 2013 16:23:01 -0800
-Subject: [RESEND PATCH v2] arm/arm64: kvm: Use virt_to_idmap instead of
- virt_to_phys for idmap mappings
-In-Reply-To: <52A76F4D.3030803@ti.com>
-References: <1384891152-15990-1-git-send-email-santosh.shilimkar@ti.com>
- <52A76F4D.3030803@ti.com>
-Message-ID: <20131211002301.GD2871@cbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 11 Dec 2013 09:41:11 +0900
+Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
+In-Reply-To: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1386690813-15070-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20131211004111.GB19992@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 02:45:17PM -0500, Santosh Shilimkar wrote:
-> Christoffer,
+On Tue, Dec 10, 2013 at 03:53:33PM +0000, Ben Dooks wrote:
+> If the system has been started in non-secure mode, then the ARM generic
+> timer is not configurable during the kernel initialisation. Currently
+> the only thing we can check for is if the timer has been correctly
+> configured during the boot process.
 > 
-> On Tuesday 19 November 2013 02:59 PM, Santosh Shilimkar wrote:
-> > KVM initialisation fails on architectures implementing virt_to_idmap()
-> > because virt_to_phys() on such architectures won't fetch you the correct
-> > idmap page.
-> > 
-> > So update the KVM ARM code to use the virt_to_idmap() to fix the issue.
-> > Since the KVM code is shared between arm and arm64, we create
-> > kvm_virt_to_phys() and handle the redirection in respective headers.
-> > 
-> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > ---
-> > Update the earlier version as per Marc's suggestion
-> > 
-> Have you picked this up for 3.14 ?
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+
+Magnus, could you please review this?
+
+> ---
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
 > 
-
-Actually, I was waiting for Marc to ack this one.  Marc?
-
--Christoffer
-
-> >  arch/arm/include/asm/kvm_mmu.h   |    1 +
-> >  arch/arm/kvm/mmu.c               |    8 ++++----
-> >  arch/arm64/include/asm/kvm_mmu.h |    1 +
-> >  3 files changed, 6 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> > index 77de4a4..2d122ad 100644
-> > --- a/arch/arm/include/asm/kvm_mmu.h
-> > +++ b/arch/arm/include/asm/kvm_mmu.h
-> > @@ -140,6 +140,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
-> >  }
-> >  
-> >  #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-> > +#define kvm_virt_to_phys(x)		virt_to_idmap((unsigned long)(x))
-> >  
-> >  #endif	/* !__ASSEMBLY__ */
-> >  
-> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> > index 5809069..659db0e 100644
-> > --- a/arch/arm/kvm/mmu.c
-> > +++ b/arch/arm/kvm/mmu.c
-> > @@ -916,9 +916,9 @@ int kvm_mmu_init(void)
-> >  {
-> >  	int err;
-> >  
-> > -	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
-> > -	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
-> > -	hyp_idmap_vector = virt_to_phys(__kvm_hyp_init);
-> > +	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
-> > +	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
-> > +	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
-> >  
-> >  	if ((hyp_idmap_start ^ hyp_idmap_end) & PAGE_MASK) {
-> >  		/*
-> > @@ -945,7 +945,7 @@ int kvm_mmu_init(void)
-> >  		 */
-> >  		kvm_flush_dcache_to_poc(init_bounce_page, len);
-> >  
-> > -		phys_base = virt_to_phys(init_bounce_page);
-> > +		phys_base = kvm_virt_to_phys(init_bounce_page);
-> >  		hyp_idmap_vector += phys_base - hyp_idmap_start;
-> >  		hyp_idmap_start = phys_base;
-> >  		hyp_idmap_end = phys_base + len;
-> > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> > index 680f74e..7f1f940 100644
-> > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > @@ -136,6 +136,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
-> >  }
-> >  
-> >  #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-> > +#define kvm_virt_to_phys(x)		__virt_to_phys((unsigned long)(x))
-> >  
-> >  #endif /* __ASSEMBLY__ */
-> >  #endif /* __ARM64_KVM_MMU_H__ */
-> > 
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> index 5734c24..6b7b7f1 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -78,12 +78,20 @@ void __init rcar_gen2_timer_init(void)
+>  	/* Remap "armgcnt address map" space */
+>  	base = ioremap(0xe6080000, PAGE_SIZE);
+>  
+> -	/* Update registers with correct frequency */
+> -	iowrite32(freq, base + CNTFID0);
+> -	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+> +	/* Update the timer if it is either not running, or is not at the
+> +	 * right frequency. The timer is only configurable in secure mode
+> +	 * so this avoids an abort if the loader started the timer and
+> +	 * started the kernel in non-secure mode. */
+> +	if ((ioread32(base + CNTCR) & 1) == 0 ||
+> +	    ioread32(base + CNTFID0) != freq) {
+> +		/* Update registers with correct frequency */
+> +		iowrite32(freq, base + CNTFID0);
+> +		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+> +
+> +		/* make sure arch timer is started by setting bit 0 of CNTCR */
+> +		iowrite32(1, base + CNTCR);
+> +	}
+>  
+> -	/* make sure arch timer is started by setting bit 0 of CNTCR */
+> -	iowrite32(1, base + CNTCR);
+>  	iounmap(base);
+>  #endif /* CONFIG_ARM_ARCH_TIMER */
+>  
+> -- 
+> 1.8.5.1
 > 
-
--- 
-Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
