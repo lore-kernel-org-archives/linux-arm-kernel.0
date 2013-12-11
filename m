@@ -1,283 +1,173 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Dec 2013 20:00:27 +0000
-Subject: [PATCH 1/3] arm64: topology: Implement basic CPU topology support
-Message-ID: <1386792029-23148-1-git-send-email-broonie@kernel.org>
+Date: Wed, 11 Dec 2013 20:00:29 +0000
+Subject: [PATCH 3/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <1386792029-23148-1-git-send-email-broonie@kernel.org>
+References: <1386792029-23148-1-git-send-email-broonie@kernel.org>
+Message-ID: <1386792029-23148-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-Add basic CPU topology support to arm64, based on the existing pre-v8
-code and some work done by Mark Hambleton.  This patch does not
-implement any topology discovery support since that should be based on
-information from firmware, it merely implements the scaffolding for
-integration of topology support in the architecture.
+Add support for parsing the explicit topology bindings to discover the
+topology of the system.
 
-The goal is to separate the architecture hookup for providing topology
-information from the DT parsing in order to ease review and avoid
-blocking the architecture code (which will be built on by other work)
-with the DT code review by providing something something simple
-and basic.
-
-A following patch will implement support for parsing the DT topology
-bindings for ARM, similar patches will be needed for ACPI.
+Since it is not currently clear how to map multi-level clusters for the
+scheduler all leaf clusters are presented to the scheduler at the same
+level. This should be enough to provide good support for current systems.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm64/Kconfig                |   8 +++
- arch/arm64/include/asm/topology.h |  42 +++++++++++++
- arch/arm64/kernel/Makefile        |   1 +
- arch/arm64/kernel/smp.c           |  12 ++++
- arch/arm64/kernel/topology.c      | 124 ++++++++++++++++++++++++++++++++++++++
- 5 files changed, 187 insertions(+)
- create mode 100644 arch/arm64/include/asm/topology.h
- create mode 100644 arch/arm64/kernel/topology.c
+ arch/arm64/kernel/topology.c | 130 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 130 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6d4dd22ee4b7..c0975fea9bfe 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -154,6 +154,14 @@ config SMP
- 
- 	  If you don't know what to do here, say N.
- 
-+config ARM_CPU_TOPOLOGY
-+	bool "Support CPU topology definition"
-+	depends on SMP
-+	default y
-+	help
-+	  Support CPU topology definition, based on configuration
-+	  provided by the firmware.
-+
- config NR_CPUS
- 	int "Maximum number of CPUs (2-32)"
- 	range 2 32
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-new file mode 100644
-index 000000000000..611edefaeaf1
---- /dev/null
-+++ b/arch/arm64/include/asm/topology.h
-@@ -0,0 +1,42 @@
-+#ifndef _ASM_ARM_TOPOLOGY_H
-+#define _ASM_ARM_TOPOLOGY_H
-+
-+#ifdef CONFIG_ARM_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cputopo_arm {
-+	int thread_id;
-+	int core_id;
-+	int socket_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
-+};
-+
-+extern struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
-+#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-+
-+#define mc_capable()	(cpu_topology[0].socket_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(int cpu);
-+int cluster_to_logical_mask(unsigned int socket_id, cpumask_t *cluster_mask);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { }
-+static inline void store_cpu_topology(unsigned int cpuid) { }
-+static inline int cluster_to_logical_mask(unsigned int socket_id,
-+	cpumask_t *cluster_mask) { return -EINVAL; }
-+
-+#endif
-+
-+#include <asm-generic/topology.h>
-+
-+#endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ba2fd43a75b..2d145e38ad49 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-+arm64-obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index a0c2ca602cf8..0271fbde5363 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -113,6 +113,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
- }
- 
-+static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
-+{
-+	store_cpu_topology(cpuid);
-+}
-+
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -150,6 +155,8 @@ asmlinkage void secondary_start_kernel(void)
- 	 */
- 	notify_cpu_starting(cpu);
- 
-+	smp_store_cpu_info(cpu);
-+
- 	/*
- 	 * OK, now it's safe to let the boot CPU continue.  Wait for
- 	 * the CPU migration code to notice that the CPU is online
-@@ -388,6 +395,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	int err;
- 	unsigned int cpu, ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
-+	smp_store_cpu_info(smp_processor_id());
-+
-+
- 	/*
- 	 * are we trying to boot more cores than exist?
- 	 */
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-new file mode 100644
-index 000000000000..aae9d4d72328
---- /dev/null
+index c88970b1b863..83d6919d4e0a 100644
+--- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -0,0 +1,124 @@
-+/*
-+ * arch/arm64/kernel/topology.c
-+ *
-+ * Copyright (C) 2011,2013 Linaro Limited.
-+ * Written by: Vincent Guittot
-+ *
-+ * based on arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
+@@ -79,6 +79,121 @@ static unsigned long *__cpu_capacity;
+ #define cpu_capacity(cpu)	__cpu_capacity[cpu]
+ 
+ static unsigned long middle_capacity = 1;
++static int cluster_id;
 +
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/export.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/smp_plat.h>
-+#include <asm/topology.h>
-+
-+/*
-+ * cpu topology table
-+ */
-+struct cputopo_arm cpu_topology[NR_CPUS];
-+EXPORT_SYMBOL_GPL(cpu_topology);
-+
-+const struct cpumask *cpu_coregroup_mask(int cpu)
++static int __init get_cpu_for_node(struct device_node *node)
 +{
-+	return &cpu_topology[cpu].core_sibling;
-+}
-+
-+static void update_siblings_masks(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
++	struct device_node *cpu_node;
 +	int cpu;
 +
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		cpu_topo = &cpu_topology[cpu];
-+
-+		if (cpuid_topo->socket_id != cpu_topo->socket_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
-+
-+		if (cpuid_topo->core_id != cpu_topo->core_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
++	cpu_node = of_parse_phandle(node, "cpu", 0);
++	if (!cpu_node) {
++		pr_crit("%s: Unable to parse CPU phandle\n", node->full_name);
++		return -1;
 +	}
-+	smp_wmb();
++
++	for_each_possible_cpu(cpu) {
++		if (of_get_cpu_node(cpu, NULL) == cpu_node)
++			return cpu;
++	}
++
++	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
++	return -1;
 +}
 +
-+void store_cpu_topology(unsigned int cpuid)
++static void __init parse_core(struct device_node *core, int core_id)
 +{
-+	struct cputopo_arm *cpuid_topo = &cpu_topology[cpuid];
++	char name[10];
++	bool leaf = true;
++	int i, cpu;
++	struct device_node *t;
 +
-+	/* DT should have been parsed by the time we get here */
-+	if (cpuid_topo->core_id == -1)
-+		pr_info("CPU%u: No topology information configured\n", cpuid);
-+	else
-+		update_siblings_masks(cpuid);
-+}
-+
-+
-+/*
-+ * cluster_to_logical_mask - return cpu logical mask of CPUs in a cluster
-+ * @socket_id:		cluster HW identifier
-+ * @cluster_mask:	the cpumask location to be initialized, modified by the
-+ *			function only if return value == 0
-+ *
-+ * Return:
-+ *
-+ * 0 on success
-+ * -EINVAL if cluster_mask is NULL or there is no record matching socket_id
-+ */
-+int cluster_to_logical_mask(unsigned int socket_id, cpumask_t *cluster_mask)
-+{
-+	int cpu;
-+
-+	if (!cluster_mask)
-+		return -EINVAL;
-+
-+	for_each_online_cpu(cpu) {
-+		if (socket_id == topology_physical_package_id(cpu)) {
-+			cpumask_copy(cluster_mask, topology_core_cpumask(cpu));
-+			return 0;
++	i = 0;
++	do {
++		snprintf(name, sizeof(name), "thread%d", i);
++		t = of_get_child_by_name(core, name);
++		if (t) {
++			leaf = false;
++			cpu = get_cpu_for_node(t);
++			if (cpu) {
++				pr_info("CPU%d: socket %d core %d thread %d\n",
++					cpu, cluster_id, core_id, i);
++				cpu_topology[cpu].socket_id = cluster_id;
++				cpu_topology[cpu].core_id = core_id;
++				cpu_topology[cpu].thread_id = i;
++			} else {
++				pr_err("%s: Can't get CPU for thread\n",
++				       t->full_name);
++			}
 +		}
-+	}
++		i++;
++	} while (t);
 +
-+	return -EINVAL;
++	cpu = get_cpu_for_node(core);
++	if (cpu >= 0) {
++		if (!leaf) {
++			pr_err("%s: Core has both threads and CPU\n",
++			       core->full_name);
++			return;
++		}
++
++		pr_info("CPU%d: socket %d core %d\n",
++			cpu, cluster_id, core_id);
++		cpu_topology[cpu].socket_id = cluster_id;
++		cpu_topology[cpu].core_id = core_id;
++	} else if (leaf) {
++		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
++	}
 +}
 +
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void __init init_cpu_topology(void)
++static void __init parse_cluster(struct device_node *cluster)
 +{
-+	unsigned int cpu;
++	char name[10];
++	bool leaf = true;
++	bool has_cores = false;
++	struct device_node *c;
++	int core_id = 0;
++	int i;
 +
-+	/* init core mask and power*/
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
++	/*
++	 * First check for child clusters; we currently ignore any
++	 * information about the nesting of clusters and present the
++	 * scheduler with a flat list of them.
++	 */
++	i = 0;
++	do {
++		snprintf(name, sizeof(name), "cluster%d", i);
++		c = of_get_child_by_name(cluster, name);
++		if (c) {
++			parse_cluster(c);
++			leaf = false;
++		}
++		i++;
++	} while (c);
 +
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->socket_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+	smp_wmb();
++	/* Now check for cores */
++	i = 0;
++	do {
++		snprintf(name, sizeof(name), "core%d", i);
++		c = of_get_child_by_name(cluster, name);
++		if (c) {
++			has_cores = true;
++
++			if (leaf)
++				parse_core(c, core_id++);
++			else
++				pr_err("%s: Non-leaf cluster with core %s\n",
++				       cluster->full_name, name);
++		}
++		i++;
++	} while (c);
++
++	if (leaf && !has_cores)
++		pr_warn("%s: empty cluster\n", cluster->full_name);
++
++	if (leaf)
++		cluster_id++;
 +}
+ 
+ /*
+  * Iterate all CPUs' descriptor in DT and compute the efficiency
+@@ -100,6 +215,21 @@ static void __init parse_dt_topology(void)
+ 	alloc_size = nr_cpu_ids * sizeof(*__cpu_capacity);
+ 	__cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
+ 
++	cn = of_find_node_by_path("/cpus");
++	if (!cn) {
++		pr_err("No CPU information found in DT\n");
++		return;
++	}
++
++	/*
++	 * If topology is provided as a cpu-map it is essentially a
++	 * root cluster.
++	 */
++	cn = of_find_node_by_name(cn, "cpu-map");
++	if (!cn)
++		return;
++	parse_cluster(cn);
++
+ 	for_each_possible_cpu(cpu) {
+ 		const u32 *rate;
+ 		int len;
 -- 
 1.8.5.1
