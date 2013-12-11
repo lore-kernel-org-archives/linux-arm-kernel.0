@@ -1,186 +1,76 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 11 Dec 2013 15:32:57 +0100
-Subject: [PATCH 1/2] time: Serialize calls to 'clockevents_update_freq'
- in the timing core
-In-Reply-To: <1386635686-15686-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <alpine.DEB.2.02.1312071151340.30673@ionos.tec.linutronix.de>
- <1386635686-15686-1-git-send-email-soren.brinkmann@xilinx.com>
- <1386635686-15686-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52A87799.8010300@linaro.org>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Wed, 11 Dec 2013 22:33:58 +0800
+Subject: [PATCH V2 2/4] mtd: spi-nor: add the basic data structures
+In-Reply-To: <201312111102.18554.marex@denx.de>
+References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
+ <201312101407.59958.marex@denx.de>
+ <20131211062428.GA25147@shlinux2.ap.freescale.net>
+ <201312111102.18554.marex@denx.de>
+Message-ID: <20131211143356.GA1719@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 01:34 AM, Soren Brinkmann wrote:
-> From: Thomas Gleixner <tglx@linutronix.de>
->
-> We can identify the broadcast device in the core and serialize all
-> callers including interrupts on a different CPU against the update.
-> Also, disabling interrupts is moved into the core allowing callers to
-> leave interrutps enabled when calling clockevents_update_freq().
->
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->   kernel/time/clockevents.c    | 29 ++++++++++++++++++++++-------
->   kernel/time/tick-broadcast.c | 25 +++++++++++++++++++------
->   kernel/time/tick-internal.h  |  4 ++++
->   3 files changed, 45 insertions(+), 13 deletions(-)
->
-> diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> index 086ad6043bcb..641d91003a45 100644
-> --- a/kernel/time/clockevents.c
-> +++ b/kernel/time/clockevents.c
-> @@ -439,6 +439,16 @@ void clockevents_config_and_register(struct clock_event_device *dev,
->   }
->   EXPORT_SYMBOL_GPL(clockevents_config_and_register);
->
-> +int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
-> +{
-> +	clockevents_config(dev, freq);
-> +
-> +	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-> +		return 0;
-> +
-> +	return clockevents_program_event(dev, dev->next_event, false);
-> +}
-> +
+On Wed, Dec 11, 2013 at 11:02:18AM +0100, Marek Vasut wrote:
+> > > > +
+> > > > +	/* the two fundamental primitives */
+> > > > +	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > > > +			 u8 *buf, size_t len);
+> > > > +	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+> > > > +			  u8 *buf, size_t len);
+> > > > +
+> > > > +	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
+> > > > +	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
+> > > > +			int write_enable);
+> This stuff -- I mean 'read SPI NOR register' and 'write SPI NOR register'. I 
+> would love to see an API which grows as needed, not an API which is bloated by 
+> unused function right from the start.
+I should send out my fsl-quadspi driver in the next version.
 
-./arch/arm/kernel/smp_twd.c should be modified to call 
-__clockevents_update_freq instead of clockevents_update_freq, no ?
+The read_reg/write_reg are implemented by the m25p80 and fsl-quadspi
+now.
 
->   /**
->    * clockevents_update_freq - Update frequency and reprogram a clock event device.
->    * @dev:	device to modify
-> @@ -446,17 +456,22 @@ EXPORT_SYMBOL_GPL(clockevents_config_and_register);
->    *
->    * Reconfigure and reprogram a clock event device in oneshot
->    * mode. Must be called on the cpu for which the device delivers per
-> - * cpu timer events with interrupts disabled!  Returns 0 on success,
-> - * -ETIME when the event is in the past.
-> + * cpu timer events. If called for the broadcast device the core takes
-> + * care of serialization.
-> + *
-> + * Returns 0 on success, -ETIME when the event is in the past.
->    */
->   int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
->   {
-> -	clockevents_config(dev, freq);
-> -
-> -	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-> -		return 0;
-> +	unsigned long flags;
-> +	int ret;
->
-> -	return clockevents_program_event(dev, dev->next_event, false);
-> +	local_irq_save(flags);
-> +	ret = tick_broadcast_update_freq(dev, freq);
-> +	if (ret == -ENODEV)
-> +		ret = __clockevents_update_freq(dev, freq);
-> +	local_irq_restore(flags);
-> +	return ret;
->   }
->
->   /*
-> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-> index 9532690daaa9..63a33b33fc4e 100644
-> --- a/kernel/time/tick-broadcast.c
-> +++ b/kernel/time/tick-broadcast.c
-> @@ -120,6 +120,19 @@ int tick_is_broadcast_device(struct clock_event_device *dev)
->   	return (dev && tick_broadcast_device.evtdev == dev);
->   }
->
-> +int tick_broadcast_update_freq(struct clock_event_device *dev, u32 freq)
-> +{
-> +	int ret = -ENODEV;
-> +
-> +	if (tick_is_broadcast_device(dev)) {
-> +		raw_spin_lock(&tick_broadcast_lock);
-> +		ret = __clockevents_update_freq(dev, freq);
-> +		raw_spin_unlock(&tick_broadcast_lock);
-> +	}
-> +	return ret;
-> +}
-> +
-> +
->   static void err_broadcast(const struct cpumask *mask)
->   {
->   	pr_crit_once("Failed to broadcast timer tick. Some CPUs may be unresponsive.\n");
-> @@ -272,12 +285,8 @@ static void tick_do_broadcast(struct cpumask *mask)
->    */
->   static void tick_do_periodic_broadcast(void)
->   {
-> -	raw_spin_lock(&tick_broadcast_lock);
-> -
->   	cpumask_and(tmpmask, cpu_online_mask, tick_broadcast_mask);
->   	tick_do_broadcast(tmpmask);
-> -
-> -	raw_spin_unlock(&tick_broadcast_lock);
->   }
->
->   /*
-> @@ -287,13 +296,15 @@ static void tick_handle_periodic_broadcast(struct clock_event_device *dev)
->   {
->   	ktime_t next;
->
-> +	raw_spin_lock(&tick_broadcast_lock);
-> +
->   	tick_do_periodic_broadcast();
->
->   	/*
->   	 * The device is in periodic mode. No reprogramming necessary:
->   	 */
->   	if (dev->mode == CLOCK_EVT_MODE_PERIODIC)
-> -		return;
-> +		goto unlock;
->
->   	/*
->   	 * Setup the next period for devices, which do not have
-> @@ -306,9 +317,11 @@ static void tick_handle_periodic_broadcast(struct clock_event_device *dev)
->   		next = ktime_add(next, tick_period);
->
->   		if (!clockevents_program_event(dev, next, false))
-> -			return;
-> +			goto unlock;
->   		tick_do_periodic_broadcast();
->   	}
-> +unlock:
-> +	raw_spin_unlock(&tick_broadcast_lock);
->   }
->
->   /*
-> diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-> index 18e71f7fbc2a..22fd431a02eb 100644
-> --- a/kernel/time/tick-internal.h
-> +++ b/kernel/time/tick-internal.h
-> @@ -111,6 +111,7 @@ extern int tick_resume_broadcast(void);
->   extern void tick_broadcast_init(void);
->   extern void
->   tick_set_periodic_handler(struct clock_event_device *dev, int broadcast);
-> +int tick_broadcast_update_freq(struct clock_event_device *dev, u32 freq);
->
->   #else /* !BROADCAST */
->
-> @@ -133,6 +134,8 @@ static inline void tick_shutdown_broadcast(unsigned int *cpup) { }
->   static inline void tick_suspend_broadcast(void) { }
->   static inline int tick_resume_broadcast(void) { return 0; }
->   static inline void tick_broadcast_init(void) { }
-> +static inline int tick_broadcast_update_freq(struct clock_event_device *dev,
-> +					     u32 freq) { return -ENODEV; }
->
->   /*
->    * Set the periodic handler in non broadcast mode
-> @@ -154,4 +157,5 @@ static inline int tick_device_is_functional(struct clock_event_device *dev)
->
->   #endif
->
-> +int __clockevents_update_freq(struct clock_event_device *dev, u32 freq);
->   extern void do_timer(unsigned long ticks);
->
+I think Lee's driver can implemente the read_xfer/write_xfer.
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
+> > > > +	const struct spi_device_id *(*read_id)(struct spi_nor *nor);
+> > > > +	int (*wait_till_ready)(struct spi_nor *nor);
+> > > > +
+> > > > +	/* write */
+> > > > +	void (*write)(struct spi_nor *nor, loff_t to,
+> > > > +			size_t len, size_t *retlen, const u_char *buf);
+> > > > +	/* read */
+> > > > +	int (*read)(struct spi_nor *nor, loff_t from,
+> > > > +			size_t len, size_t *retlen, u_char *buf);
+> > > > +	/* erase */
+> > > > +	int (*erase)(struct spi_nor *nor, loff_t offs);
+> > > 
+> > > How do you specify what to erase (sub-sector, sector, whole chip) here ?
+> > 
+> > I use a write_reg(OPCODE_ERASE_CHIP) to erase the whole chip.
+> > Please read the patch 3.
+> > 
+> > This hook is used to erase a sector.
+> 
+> I suspect we might need a much better documentation for this structure, it is 
+> hardly clear which function does what ;-)
+
+sorry, i will add more comment in the next version.
+
+> 
+> > Btw, what is the sub-sector mean? which opcodes for the sub-sector?
+> 
+> On large chips with for example 64K big sectors, you can erase a sub-sector 
+> area, usually a 4K one. This reduces the wear of the chip. See these defines in 
+> m25p80.c :
+> 
+>   46 #define OPCODE_BE_4K            0x20    /* Erase 4KiB block */
+>   48 #define OPCODE_BE_32K           0x52    /* Erase 32KiB block */
+>   49 #define OPCODE_CHIP_ERASE       0xc7    /* Erase whole flash chip */
+ok.
+
+the @erase hook can be used for sub-sector too.
+
+thanks
+Huang Shijie
