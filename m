@@ -1,39 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 11 Dec 2013 09:48:39 +0000
-Subject: [PATCH 6/8] mfd: pm8921: Update for genirq changes
-In-Reply-To: <1386718523-2587-7-git-send-email-sboyd@codeaurora.org>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-7-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20131211094839.GH16780@lee--X1>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 11 Dec 2013 18:50:42 +0900
+Subject: [PATCH 00/10] sh-pfc: Fix GPIO to IRQ mapping
+In-Reply-To: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CANqRtoRR+rz+VYr-SrZHGg9fcy4exC0L6m_=5HWcRqLBbxxcig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Since this code has been marked broken for some time a few genirq
-> tree wide changes weren't made. set_irq_wake() was renamed to
-> irq_set_irq_wake() in commit a0cd9ca2b (genirq: Namespace
-> cleanup, 2011-02-10) and commit 10a8c383 (irq: introduce entry
-> and exit functions for chained handlers) introduced the chained
-> irq functions but this driver wasn't updated to use them. Fix
-> these problems and remove the BROKEN marking on this driver.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/mfd/Kconfig       | 1 -
->  drivers/mfd/pm8921-core.c | 7 +++++--
->  2 files changed, 5 insertions(+), 3 deletions(-)
+On Wed, Dec 11, 2013 at 12:26 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> Hello,
+>
+> This patch set fixes conversion from a GPIO number to an IRQ number in the
+> sh-pfc driver in the device tree case.
+>
+> Patches 01/10 to 05/10 clean up the driver to prepare it for the core fix in
+> patch 06/10. As explained in patch 06/10 commit message, on non-DT platforms
+> IRQ controllers associated with the GPIOs have a fixed IRQ base value known at
+> compile time. The sh-pfc driver translates GPIO number to IRQ numbers using a
+> hardcoded table. This mechanism breaks on DT platforms, as the IRQ base values
+> are dynamic in that case.
+>
+> The patch set fixes this by specifying IRQs associated with GPIOs in IRQ
+> resources, populated automatically from the device tree. When IRQ resources
+> are specified the driver requires one IRQ resource per GPIO able to generate
+> an interrupt, and uses the translation table to compute the IRQ resource
+> offset instead of the IRQ number.
+>
+> Patches 07/10 to 09/10 then add PFC interrupts in DT for the SH73A0, R8A73A4
+> and R9A7740 SoCs. The only missing platform here is SH7372 due to its very
+> uncomplete DT support. All other Renesas ARM platforms use a standaline GPIO
+> driver and are thus not affected.
+>
+> Patch 10/10 finally adds a gpio-keys device to the Armadillo board DTS,
+> allowing the whole patch set to the tested.
+>
+> The sh-pfc changes need to be merged first. Linus, could you please provide a
+> stable branch with the first 6 patches when you will apply them to your tree ?
+>
+> Laurent Pinchart (10):
+>   sh-pfc: Turn unsigned indices into unsigned int
+>   sh-pfc: Terminate gpios array by -1
+>   sh-pfc: sh73a0: Add missing IRQ15
+>   sh-pfc: sh73a0: Sort IRQ entries by IRQ number
+>   sh-pfc: Rename sh_pfc window field to windows
+>   sh-pfc: Support GPIO to IRQ mapping specified IRQ resources
+>   ARM: shmobile: r8a73a4: Specify PFC interrupts in DT
+>   ARM: shmobile: r8a7740: Specify PFC interrupts in DT
+>   ARM: shmobile: sh73a0: Specify PFC interrupts in DT
+>   ARM: shmobile: armadillo: dts: Add gpio-keys device
 
-This driver was marked as BROKEN due to compilation failures only, so
-as long as it now compiles cleanly (which I'm sure you've tested) I'm
-happy with this patch.
+Looking great, nice to see that this is getting resolved! For the entire series:
 
-It doesn't apply, without your 5th patch, so for now I'll just Ack
-it. Please remember to apply my Ack when you resubmit, as it will act
-as a reminder and I won't have to re-review.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Magnus Damm <damm@opensource.se>
