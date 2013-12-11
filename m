@@ -1,27 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 11 Dec 2013 09:55:00 +0000
-Subject: [PATCH 8/8] mfd: pm8921: Use ssbi regmap
-In-Reply-To: <1386718523-2587-9-git-send-email-sboyd@codeaurora.org>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20131211095500.GJ16780@lee--X1>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Wed, 11 Dec 2013 13:56:25 +0400
+Subject: [PATCH v5 0/3] Exynos 5410 support
+In-Reply-To: <87ppp48xrs.fsf@linaro.org>
+References: <1386685599-31536-1-git-send-email-v.tyrtov@samsung.com>
+ <87ppp48xrs.fsf@linaro.org>
+Message-ID: <52A836C9.9020405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Use a regmap so that the pm8xxx read/write APIs can be removed
-> once all consumer drivers are converted.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/mfd/Kconfig       |  1 +
->  drivers/mfd/pm8921-core.c | 70 +++++++++++++++++++++++++----------------------
->  2 files changed, 39 insertions(+), 32 deletions(-)
+On 12/10/2013 08:40 PM, Kevin Hilman wrote:
+> Vyacheslav Tyrtov <v.tyrtov@samsung.com> writes:
+>
+>> The series of patches represent support of Exynos 5410 SoC
+>>
+>> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
+>>
+>> Patches add new platform description, support of clock controller and device
+>> tree for Exynos 5410.
+>>
+>> Dual cluster support for Exynos 5410 (EDCS) has been removed from this series
+>> This patches is activating only the big cluster (all A15 cores)
+> Testing this series on top of v3.13-rc3, plus a couple of other
+> necessary changes (which should've probably been noted in the changelog):
+>
+> 1) change CONFIG_NR_CPUS=8 in .config
+> 2) add the exynos combiner patch from Chander:
+>     [PATCH v2] irqchip: exynos-combiner: remove hard-coded irq_base value
+>
+> I'm still only seeing 2 out of 4 cores come up on my odroid-xu:
+>
+> [    0.045000] CPU: Testing write buffer coherency: ok
+> [    0.045000] CPU0: update cpu_power 1024
+> [    0.045000] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.045000] Setting up static identity map for 0x403717d8 - 0x40371830
+> [    0.045000] CPU1: Booted secondary processor
+> [    0.065000] CPU1: update cpu_power 1024
+> [    0.065000] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+> [    1.075000] CPU2: failed to boot: -38
+> [    2.075000] CPU3: failed to boot: -38
+> [    2.075000] Brought up 2 CPUs
+> [    2.075000] SMP: Total of 2 processors activated.
+> [    2.075000] CPU: All CPU(s) started in SVC mode.
+>
+Hi Kevin,
 
-As this is regmap related, don't forget to CC Mark Brown when you
-resubmit this patchset.
+EDCS(exynos dual cluster support) moved to separate patch now.
+This patches introduce only base SoC support  (2xA15).
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Patches tested on samsung smdk5410 board.
+
+Next version of EDCS patches will be available soon.
+They allow power on and boot all 8 cores.
+
+Best regards,
+     Tarek Dakhran.
