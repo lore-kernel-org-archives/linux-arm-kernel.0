@@ -1,46 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Dec 2013 10:44:29 +0000
-Subject: [PATCH] arm64: Correct virt_addr_valid
-In-Reply-To: <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
-References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
- <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20131211104429.GE26730@mudshark.cambridge.arm.com>
+From: rajeev-dlh.kumar@st.com (Rajeev kumar)
+Date: Wed, 11 Dec 2013 16:17:03 +0530
+Subject: [PATCH 10/12] SPEAr13xx: defconfig: Update
+In-Reply-To: <3bc935718da3e0118c57ebee80c1363aac4a48a5.1386752447.git.mohit.kumar@st.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <3bc935718da3e0118c57ebee80c1363aac4a48a5.1386752447.git.mohit.kumar@st.com>
+Message-ID: <52A842A7.1030605@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 01:23:02AM +0000, Laura Abbott wrote:
-> The definition of virt_addr_valid is that virt_addr_valid should
-> return true if and only if virt_to_page returns a valid pointer.
-> The current definition of virt_addr_valid only checks against the
-> virtual address range. There's no guarantee that just because a
-> virtual address falls bewteen PAGE_OFFSET and high_memory the
-> associated physical memory has a valid backing struct page. Follow
-> the example of other architectures and convert to pfn_valid to
-> verify that the virtual address is actually valid.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+On 12/11/2013 3:08 PM, Mohit KUMAR wrote:
+> Enable EABI, OEABI, VFP and NFS configs in default configuration file for
+> SPEAr13xx.
+>
+> Enable PCIe support for SPEAr13xx.
+>
+> Signed-off-by: Pratyush Anand<pratyush.anand@st.com>
+> Signed-off-by: Mohit Kumar<mohit.kumar@st.com>
+> Cc: Mohit Kumar<mohit.kumar@st.com>
+> Cc: Viresh Kumar<viresh.linux@gmail.com>
+> Cc: spear-devel at list.st.com
+> Cc: linux-arm-kernel at lists.infradead.org
 > ---
->  arch/arm64/include/asm/memory.h |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 3776217..9dc5dc3 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -146,8 +146,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
->  
->  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
-> -#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
-> -				 ((void *)(kaddr) < (void *)high_memory))
-> +#define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+>   arch/arm/configs/spear13xx_defconfig |   15 +++++++++++++++
+>   1 files changed, 15 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+> index 82eaa55..83882c0 100644
+> --- a/arch/arm/configs/spear13xx_defconfig
+> +++ b/arch/arm/configs/spear13xx_defconfig
+> @@ -11,13 +11,24 @@ CONFIG_ARCH_SPEAR13XX=y
+>   CONFIG_MACH_SPEAR1310=y
+>   CONFIG_MACH_SPEAR1340=y
+>   # CONFIG_SWP_EMULATE is not set
+> +CONFIG_PCI_MSI=y
+> +CONFIG_PCIE_SPEAR13XX=y
+>   CONFIG_SMP=y
+>   # CONFIG_SMP_ON_UP is not set
+>   # CONFIG_ARM_CPU_TOPOLOGY is not set
+> +CONFIG_AEABI=y
+> +CONFIG_OABI_COMPAT=y
+>   CONFIG_ARM_APPENDED_DTB=y
+>   CONFIG_ARM_ATAG_DTB_COMPAT=y
+> +CONFIG_VFP=y
+>   CONFIG_BINFMT_MISC=y
+>   CONFIG_NET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +CONFIG_IP_PNP_BOOTP=y
+> +CONFIG_NET_IPIP=y
+>   CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>   CONFIG_MTD=y
+>   CONFIG_MTD_OF_PARTS=y
+> @@ -27,6 +38,7 @@ CONFIG_MTD_NAND=y
+>   CONFIG_MTD_NAND_FSMC=y
+>   CONFIG_BLK_DEV_RAM=y
+>   CONFIG_BLK_DEV_RAM_SIZE=16384
+> +CONFIG_BLK_DEV_SD=y
+>   CONFIG_ATA=y
+>   # CONFIG_SATA_PMP is not set
+>   CONFIG_SATA_AHCI_PLATFORM=y
+> @@ -66,6 +78,7 @@ CONFIG_USB=y
+>   # CONFIG_USB_DEVICE_CLASS is not set
+>   CONFIG_USB_EHCI_HCD=y
+>   CONFIG_USB_OHCI_HCD=y
+> +CONFIG_USB_STORAGE=y
+>   CONFIG_MMC=y
+>   CONFIG_MMC_SDHCI=y
+>   CONFIG_MMC_SDHCI_SPEAR=y
+> @@ -84,6 +97,8 @@ CONFIG_VFAT_FS=m
+>   CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+>   CONFIG_TMPFS=y
+>   CONFIG_JFFS2_FS=y
+> +CONFIG_NFS_FS=y
+> +CONFIG_ROOT_NFS=y
 
-Hmm, this is pretty expensive on both arm and arm64, since we end up doing a
-binary search through all of the memblocks.
+Its better to enable CONFIG_FUSE_FS also in case you want to work with 
+fully functional NFS in userspace.
 
-Are you seeing real problems with the current code?
+~Rajeev
 
-Will
+>   CONFIG_NLS_DEFAULT="utf8"
+>   CONFIG_NLS_CODEPAGE_437=y
+>   CONFIG_NLS_ASCII=m
