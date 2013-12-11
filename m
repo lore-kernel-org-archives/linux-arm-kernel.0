@@ -1,39 +1,50 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Dec 2013 11:48:26 +0800
-Subject: [PATCH 3/6] mmc: sdhci: add platform set_timeout hook
-In-Reply-To: <CAA+hA=STB-M5H9VsFjx4bqgbdPAAzgbChVY4JrsGdBKqYnmGkA@mail.gmail.com>
+Date: Wed, 11 Dec 2013 11:56:56 +0800
+Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
+In-Reply-To: <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
 References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
- <1386680168-5227-4-git-send-email-b29396@freescale.com>
- <20131211021646.GC18380@S2101-09.ap.freescale.net>
- <CAA+hA=T6WN93=RgNUKkjJjMj6WpGbk0pnTpZvYLEUtOgMGv7Kg@mail.gmail.com>
- <20131211031853.GG18380@S2101-09.ap.freescale.net>
- <CAA+hA=STB-M5H9VsFjx4bqgbdPAAzgbChVY4JrsGdBKqYnmGkA@mail.gmail.com>
-Message-ID: <20131211034824.GH18380@S2101-09.ap.freescale.net>
+ <1386680168-5227-2-git-send-email-b29396@freescale.com>
+ <20131211015640.GA18380@S2101-09.ap.freescale.net>
+ <CAA+hA=ST0fAa2__PaeJqxj2yDWUAr6iaNO4Dj7ABiEWqnYp6Vw@mail.gmail.com>
+ <20131211031254.GF18380@S2101-09.ap.freescale.net>
+ <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
+Message-ID: <20131211035654.GI18380@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 11:35:17AM +0800, Dong Aisheng wrote:
-> This actually is the register value, not the max timeout counter value.
-> Then you may want define the API as:
-> unsigned int    (*get_max_timeout_val)(struct sdhci_host *host);
+On Wed, Dec 11, 2013 at 11:20:59AM +0800, Dong Aisheng wrote:
+> No, the max_to is the max timeout counter value, you need to divide it
+> by the timeout clock
+> to get the timeout time.
+> The defined of this API is return the max timeout value in
+> miliseconds, so you need to
+> divide the clock by 1000.
+> None of these handles the detail bout discard_to.
 
-Yes, something like that.
+Let me start it over again.  Here is basically what your patch does.
 
-> But i don't think it's necessary to do the max timeout setting in two steps.
-> First, deinfe a API to get the max timeout counter val,
-> Second, write this val into register.
-> Why not simply implement .set_timeout and handle the details in
-> platform specific
-> host driver respectively?
+-     mmc->max_discard_to = (1 << 27) / host->timeout_clk;
++     if (host->ops->get_max_timeout)
++             mmc->max_discard_to = host->ops->get_max_timeout(host);
 
-Well, that's how sdhci host driver is structured.  Doing so leaves the
-least details to platform driver, and calling sdhci_writeb() to access
-SDHCI_TIMEOUT_CONTROL in sdhci-esdhc-imx seems a layer violation to me.
+The only thing that does not work for you in the existing code is the
+(1 << 27) part, right?
 
-> 
-> Furthermore, this API does not  help for the patch#1 issue.
+If so, why not just create a platform hook to return the correct thing
+for you platform, i.e. (1 << 28)?
 
-Oh, they two different issues, and should be addressed by different
-hooks.
+	if (host->ops->get_max_timeout)
+		mmc->max_discard_to = host->ops->hook_foo(host);
+
+unsigned int esdhc_hook_foo(struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+
+	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
+}
+
+Such patch will be ease to be understood and less offensive to the
+existing code, no?
 
 Shawn
