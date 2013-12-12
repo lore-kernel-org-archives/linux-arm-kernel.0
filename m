@@ -1,37 +1,127 @@
-From: mbizon@freebox.fr (Maxime Bizon)
+From: hdoyu@nvidia.com (Hiroshi Doyu)
 Date: Thu, 12 Dec 2013 13:14:04 +0100
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-Message-ID: <1386850444.22947.46.camel@sakura.staff.proxad.net>
+Subject: [PATCHv6+ 01/13] of: introduce
+ of_property_for_earch_phandle_with_args()
+In-Reply-To: <20131212113417.BDCD0C40637@trevor.secretlab.ca>
+References: <20131211132845.5461FC4061A@trevor.secretlab.ca><20131211.153338.2186623380643957232.hdoyu@nvidia.com><20131212113417.BDCD0C40637@trevor.secretlab.ca>
+Message-ID: <20131212.141404.684884000513445038.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Grant Likely <grant.likely@linaro.org> wrote @ Thu, 12 Dec 2013 12:34:17 +0100:
 
-Hello,
+> On Wed, 11 Dec 2013 14:33:38 +0100, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> > Hi Grant,
+> >
+> > Grant Likely <grant.likely@linaro.org> wrote @ Wed, 11 Dec 2013 14:28:45 +0100:
+> >
+> > > On Thu, 21 Nov 2013 11:57:00 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > > > On 11/21/2013 10:17 AM, Hiroshi Doyu wrote:
+> > > > > Iterating over a property containing a list of phandles with arguments
+> > > > > is a common operation for device drivers. This patch adds a new
+> > > > > of_property_for_each_phandle_with_args() macro to make the iteration
+> > > > > simpler.
+> > > > >
+> > > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > > > ---
+> > > > > v6+:
+> > > > > Use the description, which Grant Likely proposed, to be full enough
+> > > > > that a future reader can figure out why a patch was written.
+> > > > >   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007062.html
+> > ...
+> >
+> > > That's right, I forgot I said that. Yes please fix the implementation.
+> >
+> > Here's the latest. I'll include this with the next v7 series.
+> >
+> > Can I get your Acked-by with this?
+> >
+> > --8<----
+> >
+> > From 8f7c0404aa68f0e8dbe0babc240590f6528ecc1f Mon Sep 17 00:00:00 2001
+> > From: Hiroshi Doyu <hdoyu@nvidia.com>
+> > Date: Fri, 15 Nov 2013 10:52:53 +0200
+> > Subject: [PATCH] of: introduce of_property_for_each_phandle_with_args()
+> >
+> > Iterating over a property containing a list of phandles with arguments
+> > is a common operation for device drivers. This patch adds a new
+> > of_property_for_each_phandle_with_args() macro to make the iteration
+> > simpler.
+> >
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > Cc: Rob Herring <robherring2@gmail.com>
+> > ---
+> > v7:
+> > Fixed some minors pointed by Rob and Stephen.
+> >
+> > v6++++:
+> > Iterate without intrducing a new struct.
+> >
+> > v6+++:
+> > Introduced a new struct "of_phandle_iter" to keep the state when
+> > iterating over the list.
+> >
+> > v6++:
+> > Optimized to avoid O(n^2), suggested by Stephen Warren.
+> > http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007066.html
+> >
+> > I didn't introduce any struct to hold params and state here.
+> >
+> > v6+:
+> > Use the description, which Grant Likely proposed, to be full enough
+> > that a future reader can figure out why a patch was written.
+> >
+> > v5:
+> > New patch for v5.
+> >
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  drivers/of/base.c  | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/of.h | 32 ++++++++++++++++++++++++++++++++
+> >  2 files changed, 78 insertions(+)
+> >
+> > diff --git a/drivers/of/base.c b/drivers/of/base.c
+> > index f807d0e..cd4ab05 100644
+> > --- a/drivers/of/base.c
+> > +++ b/drivers/of/base.c
+> > @@ -1201,6 +1201,52 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
+> >       printk("\n");
+> >  }
+> >
+> > +const __be32 *of_phandle_iter_next(const char *cells_name, int cell_count,
+> > +                                const __be32 *cur, const __be32 *end,
+> > +                                struct of_phandle_args *out_args)
+> 
+> Having to pass in cells_name, cell_count, cur and end each time seems a
+> little odd. Can a state structure be used instead?
+> 
+> struct of_phandle_iter_state {
+>         const char *cells_name;
+>         int cells_count;
+>         const __be32 *cur;
+>         const __be32 *end;
+>         struct of_phandle_args out_args;
+> }
+> 
+> Make the caller provide one of those and fill it in with the init
+> function.
 
-I tried using csum_tcpudp_magic() like this:
+I rewrote this a few times and so now I have a few version of this
+implementations :-) The above proposal is similar to the version v6+++
+mentioned in the above patch note:
 
-csum_tcpudp_magic(src, dst, ntohs(udph->len), IPPROTO_UDP, csum);
+> > v6+++:
+> > Introduced a new struct "of_phandle_iter" to keep the state when
+> > iterating over the list.
 
-instead of the more common:
+which is:
 
-len = ntohs(udhp->len);
-[...]
-csum_tcpudp_magic(src, dst, len, IPPROTO_UDP, csum);
+  [RFC][PATCHv6+++ 01/13] of: introduce of_property_for_earch_phandle_with_args()
+    http://lists.linuxfoundation.org/pipermail/iommu/2013-November/007087.html
 
-the first one gives a bad checksum while the second one is ok.
+Stephen seemed to prefer the version without state struct. I like the
+idea to not pass the same arguments repeatly. Instead, wrapping them
+in a struct with state may look better.
 
-
-I've tracked down the problem to csum_tcpudp_nofold(), which uses inline
-asm and an unsigned short for len.
-
-If the len value is say 0x3412, and I pass ntohs(len), then the assigned
-register for len contains 0x00341234 instead of the expected 0x1234.
-
-The ntohs() expand to a dumb swab16 on my arch, and gcc does the swap
-but does not clear the high nibble, I guess it expects the assembly code
-to only use the low 16 bits.
-
-Is there a missing constraint or gcc is doing something wrong here ?
-
--- 
-Maxime
+So if Stephen agrees, I'll rewrite the version with state struct
+again.
