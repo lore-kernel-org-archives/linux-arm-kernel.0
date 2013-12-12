@@ -1,56 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Dec 2013 19:19:08 +0000
-Subject: [PATCH 1/3] arm: omap2: Export devconf1 bypass and acbias.
-In-Reply-To: <CAAfyv35wKAK2PNjcXcNan9GC0x-MmH5k4xmzj_vKKhPeztHV-A@mail.gmail.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <1381784555-18344-2-git-send-email-marek@goldelico.com>
- <20131111164917.GN15154@atomide.com>
- <CAAfyv37LRb_Q=UZVgtKdOAz_r6_qThewAU90W7nrqHdB5fDA_g@mail.gmail.com>
- <20131111233152.GR15154@atomide.com>
- <CAAfyv36MaVqrmQxpqDu-ciO9GNJK3pJkFZohEvd1BOLOWWEOhw@mail.gmail.com>
- <20131210224659.GY13171@atomide.com>
- <CAAfyv35wKAK2PNjcXcNan9GC0x-MmH5k4xmzj_vKKhPeztHV-A@mail.gmail.com>
-Message-ID: <20131212191908.GA29072@muru.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Dec 2013 11:24:13 -0800
+Subject: [PATCH v4] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <52A9EF38.3000909@arm.com>
+References: <1386672625-8060-1-git-send-email-andre.przywara@linaro.org>
+ <20131212022822.GI2871@cbox>
+ <CAFEAcA_F3T1+YsKKq3h8P139OX085N-PPPPZo5dvwgwcuGoXHg@mail.gmail.com>
+ <52A982BB.4030901@linaro.org>
+ <CAFEAcA8bgy7Gi6aKKiS3d20Jh+_X2AComWTH-+Bwv_gV_zU5-g@mail.gmail.com>
+ <52A9EF38.3000909@arm.com>
+Message-ID: <20131212192413.GQ2871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 09:31:02AM +0100, Belisko Marek wrote:
-> Hi Tony,
+On Thu, Dec 12, 2013 at 05:15:36PM +0000, Marc Zyngier wrote:
+> On 12/12/13 11:36, Peter Maydell wrote:
+> > On 12 December 2013 09:32, Andre Przywara <andre.przywara@linaro.org> wrote:
+> >> On 12/12/2013 10:23 AM, Peter Maydell wrote:
+> >>> What does it mean to say that a system register for AArch64
+> >>> is "32 bits" given that MRS/MSR always operate on a 64 bit
+> >>> register?
+> > 
+> >> But ARMv8 ARM still defines these registers as 32-bit:
+> >> D8.5.14: CNTV_CTL_EL0
+> >> Attributes
+> >>            CNTV_CTL_EL0 is a 32-bit register.
+> >> But indeed the MSR/MRS instruction references a Xt register, and the
+> >> documentation does not seem to tell how this is handled, so I assume this is
+> >> zero-extended.
+> > 
+> > I checked, and for AArch64 registers, "32 bits" is just
+> > a shorthand for "64 bit register where the top 32 bits are
+> > RAZ/WI" (and I suspect it's not totally impossible that some
+> > future architecture revision might define new bits in the
+> > top half).
 > 
-> On Tue, Dec 10, 2013 at 11:46 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Belisko Marek <marek.belisko@gmail.com> [131210 14:13]:
-> >> On Tue, Nov 12, 2013 at 12:31 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> >
-> >> > It would be best to set it up as omap-ctrl.c driver under drivers
-> >> > somewhere with few functions exported for DSS and MMC drivers.
-> >>
-> >> I create small dummy driver based on phy-omap-control which can be
-> >> used but before sending patch (with more updates) I would like to get
-> >> some feedback if my direction is correct.
-> >
-> > Cool thanks. Yeah what you have can easily be combined with the patches
-> > Balaji has posted to make HSMMC use drivers/mfd/syscon.c via regmap
-> > for the SCM register access. Maybe take a look at the work in progress
-> > patches in thread:
-> >
-> > [PATCH v4 0/7] mmc: omap_hsmmc: pbias dt and cleanup
-> >
-> > And also see my comments regarding using the SCM GENERAL register area
-> > as base for the syscon.c driver. That should work for your driver too,
-> > right? And then you can access the SYSCON1 register that way from your
-> > consumer driver ;)
->
-> If I understand correclty I can use syscon driver (it will have in
-> range also devconf1 register) ad get rid of my custom driver
-> and then get regmap from syscon and update bits that I need for venc, right?
+> Indeed. Actually, there isn't an instruction to access these 32bit
+> registers with a 'W' register. You really have to use a 'X'.
+> 
+> > So I would suggest that we should make the KVM user<->kernel
+> > interface just consistently make all the sysregs 64 bit.
+> > 
+> > (There is actually precedent of a sort here in that the
+> > kernel claims the PSTATE register is 64 bits wide despite
+> > it really being a 32 bit SPSR format value under the hood.)
+> 
+> I definitely agree with Peter here. I'd like to keep the ABI 64bit for
+> the sysregs. It makes the whole thing much nicer.
+> 
+OK, makes perfect sense, so we just need to change the patch to export
+the system registers as 64 bit in size, and then actually export them on
+arm64.
 
-Yeah something like that. Or since the sysconf1 register is shared, it might
-be best to still provide specific functions to access it if we cannot map
-just specific bits of it separately for drivers using regmap.
-
-But anyways this should for most part remove the need for a custom driver(s)
-unless the register is a regulator or a clock.
-
-Regards,
-
-Tony
+-Christoffer
