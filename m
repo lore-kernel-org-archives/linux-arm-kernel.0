@@ -1,98 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 12 Dec 2013 10:36:09 +0000
-Subject: [PATCH 1/6] arm64: Add asm/cpu.h
-In-Reply-To: <52A95CB3.2030805@linaro.org>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <20131211141018.GC596@darko.cambridge.arm.com>
- <20131211142308.GY11468@sirena.org.uk>
- <20131211142705.GE596@darko.cambridge.arm.com>
- <52A95CB3.2030805@linaro.org>
-Message-ID: <20131212103608.GA12106@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Dec 2013 10:42:08 +0000
+Subject: regulator-core has_full_constraints set too late for dt using
+ boards ?
+In-Reply-To: <52A98C72.2040203@redhat.com>
+References: <52A88805.1080704@redhat.com>
+ <20131211160225.GB11468@sirena.org.uk>
+ <52A98C72.2040203@redhat.com>
+Message-ID: <20131212104208.GG11044@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 06:50:27AM +0000, Hanjun Guo wrote:
-> On 2013-12-11 22:27, Catalin Marinas wrote:
-> > On Wed, Dec 11, 2013 at 02:23:08PM +0000, Mark Brown wrote:
-> >> On Wed, Dec 11, 2013 at 02:10:19PM +0000, Catalin Marinas wrote:
-> >>> On Wed, Dec 11, 2013 at 01:13:21PM +0000, Mark Brown wrote:
-> >>
-> >>>> +struct cpuinfo_arm {
-> >>>> +	struct cpu	cpu;
-> >>>> +	u64		cpuid;
-> >>>> +#ifdef CONFIG_SMP
-> >>>> +	unsigned int	loops_per_jiffy;
-> >>>> +#endif
-> >>>> +};
-> >>
-> >>> How is this structure used? I haven't seen the ACPI code doing anything
-> >>> with struct cpu (though I haven't dug deep enough). Also loops_per_jiffy
-> >>> is useless, that's related to the delay loop based on the generic timer.
-> >>
-> >> Now I look again we can probably drop this for the toplogy work - it had
-> >> been pulled in as part of pulling things in from pre-v8 and the cpuid
-> >> was used in the code while I was working on it but isn't any more unless
-> >> I'm misreading the code.  
-> >>
-> >> I don't know what the ACPI guys are doing wtih it, I just saw they added
-> >> the same thing.
-> > 
-> > It looked to me that for ACPI and empty asm/cpu.h file would do for now.
-> > There are a couple of prototypes for CPU hotplug I think but haven't
-> > seen the structure used (not even the x86_cpu one).
-> 
-> In ACPI code, only struct cpu is used for ACPI based CPU hotplug, here
-> is the code will send to upstream when the ACPI core for ARM is ready.
-> 
-> ---
->  arch/arm64/include/asm/cpu.h |    5 +++++
->  arch/arm64/kernel/topology.c |   26 ++++++++++++++++++++++++++
->  2 files changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-> index dbeb98d..5613e09 100644
-> --- a/arch/arm64/include/asm/cpu.h
-> +++ b/arch/arm64/include/asm/cpu.h
-> @@ -20,6 +20,11 @@ struct cpuinfo_arm {
->  #endif
->  };
-> 
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +extern int arch_register_cpu(int cpu);
-> +extern void arch_unregister_cpu(int cpu);
-> +#endif
-> +
->  DECLARE_PER_CPU(struct cpuinfo_arm, cpu_data);
-> 
->  #endif
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index cb548f1..5c8e69c 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -18,3 +18,29 @@ void arch_fix_phys_package_id(int num, u32 slot)
->  }
->  EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
-> 
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +int __ref arch_register_cpu(int cpu)
-> +{
-> +       struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
-> +
-> +       /* BSP cann't be taken down on arm */
-> +       if (cpu)
-> +               cpuinfo->cpu.hotpluggable = 1;
+On Thu, Dec 12, 2013 at 11:14:10AM +0100, Hans de Goede wrote:
+> On 12/11/2013 05:02 PM, Mark Brown wrote:
 
-_why_ does the ACPI standard prohibit hotplugging the boot CPU?
+> >Please look at the current code, that's not how this works any more.
 
-In non-ACPI systems we can hotplug out the boot CPU (we can do so under
-KVM using PSCI).
+> More current then 3.13-rc3 ? Because that is what I've been looking at.
 
-I note that the x86 arch_register_cpu allows CPU0 to be hotpluggable on
-Intel systems as long as there are no dependencies on CPU0 being
-active. Surely we can test for something more fine-grained rather than
-disallowing CPU0 hotplug outright?
+Yes, -next.  It'll be going to Linus probably this week.
 
-How does this interact with the existing arm64 hotplug code?
+> I could be completely wrong of course. Either way could you give a few
+> hints as to how my interpretation of how this works is wrong ?
 
-Thanks,
-Mark.
+It's correct for the code you've been looking at but has since been
+changed.  Please look at the changes in -next, you should generally
+check -next for the current state of things.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/b8104725/attachment-0001.sig>
