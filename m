@@ -1,17 +1,18 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 12 Dec 2013 20:39:45 +0000
-Subject: [PATCH 1/5] arm64: Fix __data_loc value
+Date: Thu, 12 Dec 2013 20:39:46 +0000
+Subject: [PATCH 3/5] arm64: Fix include header order in vmlinux.lds.S
 In-Reply-To: <cover.1386879684.git.geoff@infradead.org>
 References: <cover.1386879684.git.geoff@infradead.org>
-Message-ID: <35a937043d1b3eae1b1ea547efc25f75b5f43f67.1386879684.git.geoff@infradead.org>
+Message-ID: <735546830af2105db3cbaccc0099a269a842de4e.1386879684.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __data_loc variable should be set to the VMA of the data section, not
-the LMA.
+asm-generic/vmlinux.lds.h should be included after the arch
+specific headers so that the arch headers can override the
+generic macro defs in asm-generic/vmlinux.lds.h.
 
-At present LOAD_OFFSET is not set and defaults to zero, so this bug
-does not cause any problems.
+Fixes preprosessor redefined warnings when adding arch specific
+macros.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
 ---
@@ -19,17 +20,20 @@ Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 5161ad9..3072c41 100644
+index 3072c41..6563b64 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -99,7 +99,7 @@ SECTIONS
+@@ -4,10 +4,10 @@
+  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
+  */
  
- 	. = ALIGN(PAGE_SIZE);
- 	_data = .;
--	__data_loc = _data - LOAD_OFFSET;
-+	__data_loc = _data;
- 	_sdata = .;
- 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
- 	_edata = .;
+-#include <asm-generic/vmlinux.lds.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
++#include <asm-generic/vmlinux.lds.h>
+ 
+ #define ARM_EXIT_KEEP(x)
+ #define ARM_EXIT_DISCARD(x)	x
 -- 
 1.8.1.2
