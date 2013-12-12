@@ -1,44 +1,46 @@
-From: gpkulkarni@gmail.com (Ganapat Rao P Kulkarni)
-Date: Thu, 12 Dec 2013 18:42:43 +0530
-Subject: ARM64: Domain Equivalent support in ARMv8
-In-Reply-To: <20131212115555.GA3382@arm.com>
-References: <CAFpQJXXpO7NmtHJoU0uHYQ_BPQqS+qn3ZgZcQkckWDv1ZjBtTQ@mail.gmail.com>
- <CAFpQJXVsuT2XU4F9FmQbqYm-82Qbs-yVCD+N+Qc7eY-z-h1NJQ@mail.gmail.com>
- <20131212115555.GA3382@arm.com>
-Message-ID: <CAFpQJXWYRysrAPP-rXCnrVoCBX6UOa7HjzNvNBQ_5-5Y5iSTPQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Dec 2013 14:14:29 +0100
+Subject: [PATCH] dt-bindings: fix example of allwinner interrupt controller
+In-Reply-To: <bce591494e52baf5571db0c9a5a26d33d018fe49.1386765193.git.baruch@tkos.co.il>
+References: <bce591494e52baf5571db0c9a5a26d33d018fe49.1386765193.git.baruch@tkos.co.il>
+Message-ID: <20131212131429.GT3651@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks.
+Hi Baruch,
 
-On Thu, Dec 12, 2013 at 5:25 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Dec 12, 2013 at 07:48:19AM +0000, Ganapat Rao P Kulkarni wrote:
->> On Tue, Dec 10, 2013 at 1:17 PM, Ganapat Rao P Kulkarni
->> <gpkulkarni@gmail.com> wrote:
->> > I want to make kernel code ( all sections/blocks mapped to kernel
->> > code) as RO and change to R/W,  when ever hot-patch of kernel code is
->> > required.
->> > Also, R/W access changes should be available/visible to the core which
->> > sets R/W and all other cores continue to have RO access.
->> >
->> > This was easily done using Domain feature(by making Kernel Domain as
->> > Manager, using DACR) on ARMv7.
->> > However, on ARMv8, i see there is no domain support(in AARCH64) and
->> > not able to find the alternative optimal way.
->
-> Note that even on ARMv7, if you use LPAE domains are no longer
-> available.
->
-> So I'm not aware of any way other than creating a temporary mapping in a
-> per-CPU pgd. You could use a low address and TTBR0 so that it doesn't
-> interfere with the real kernel mapping.
->
-> --
-> Catalin
+On Wed, Dec 11, 2013 at 02:33:13PM +0200, Baruch Siach wrote:
+> The documented value of #interrupt-cells is 1.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  .../devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt     | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+> index 3d3b2b9..32cec4b 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+> @@ -14,5 +14,5 @@ intc: interrupt-controller {
+>  	compatible = "allwinner,sun4i-ic";
+>  	reg = <0x01c20400 0x400>;
+>  	interrupt-controller;
+> -	#interrupt-cells = <2>;
+> +	#interrupt-cells = <1>;
+>  };
 
+Nice catch, applied, thanks!
 
+Maxime
 
 -- 
-regards,
-Ganapat
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/637a0db9/attachment.sig>
