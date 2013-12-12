@@ -1,24 +1,35 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Dec 2013 14:07:54 -0700
-Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <201312121925.27591.marex@denx.de>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
- <201312121122.33746.marex@denx.de>
- <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
- <201312121925.27591.marex@denx.de>
-Message-ID: <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Dec 2013 22:09:22 +0100
+Subject: [PATCH v4 2/4] Documentation: Add APM X-Gene SoC 15Gbps
+ Multi-purpose PHY driver binding documentation
+In-Reply-To: <1386867353.5985.7.camel@dabdike>
+References: <1386833435-30498-1-git-send-email-lho@apm.com>
+ <52A9C8C5.8030809@interlog.com> <1386867353.5985.7.camel@dabdike>
+Message-ID: <201312122209.22742.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 11:25 AM, Marek Vasut <marex@denx.de> wrote:
-> Bjorn, would you mind picking 2/7...6/7 of this series so we are done with
-> those? I will re-post 1/7 as a self-standing patch afterwards, it has no impact
-> on the rest of the series.
+On Thursday 12 December 2013, James Bottomley wrote:
+> > > I'm completely confused by this description. Can you rephrase this?
+> > > It sounds like the only possible values are <1 3 7> for this property.
+> > 
+> > Most likely Gen1, Gen2 and Gen3 are SATA-speak corresponding to SAS's
+> > G1, G2 and G3:
+> > 
+> > G1   Gen1     1.5 Gbps
+> > G2   Gen2     3 Gbps
+> > G3   Gen3     6 Gbps
+> > G4   -        12 Gbps
+> > G5   -        24 Gbps
+>
+> Electrically, SAS phys and SATA phys are identical.  We already have a
+> SAS phy abstraction in libsas ... when looking at a separable phy
+> implementation, shouldn't we be doing something that works for both
+> instead of just SATA?
 
-Sure.  I can't really evaluate these myself, so I'm looking for acks
-from Richard or Shawn.
+This PHY is also used for ethernet and for PCIe, even though the driver
+handles only the SATA case so far. Can the SAS abstraction deal with this?
 
-I noticed Pratyush, Tim, and Harro had some questions the first time
-around, and I don't know whether they got resolved.
+How do you describe a SAS PHY in DT?
 
-Bjorn
+	Arnd
