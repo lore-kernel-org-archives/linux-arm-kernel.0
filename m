@@ -1,152 +1,166 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Dec 2013 15:38:41 -0600
-Subject: [PATCH 3/7] usb: dwc3: pci: add pm_runtime support
+Date: Thu, 12 Dec 2013 15:38:39 -0600
+Subject: [PATCH 1/7] usb: dwc3: keystone: add basic PM support
 In-Reply-To: <1386884325-11440-1-git-send-email-balbi@ti.com>
 References: <1386884325-11440-1-git-send-email-balbi@ti.com>
-Message-ID: <1386884325-11440-4-git-send-email-balbi@ti.com>
+Message-ID: <1386884325-11440-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-teach the PCI glue about pm_runtime so that
-it's easier to teach dwc3 core about it
-later.
+A bare-minimum PM implementation which will
+server as building block for more complex
+PM implementation in the future.
 
-No functional changes otherwise.
+At the least will not leave clocks on unnecessarily
+when e.g.  a user write mem to /sys/power/state.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/dwc3/dwc3-pci.c | 66 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 51 insertions(+), 15 deletions(-)
+ drivers/usb/dwc3/dwc3-keystone.c | 97 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 94 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/dwc3/dwc3-pci.c b/drivers/usb/dwc3/dwc3-pci.c
-index 665686e..78cd0b0 100644
---- a/drivers/usb/dwc3/dwc3-pci.c
-+++ b/drivers/usb/dwc3/dwc3-pci.c
-@@ -109,18 +109,17 @@ static int dwc3_pci_probe(struct pci_dev *pci,
+diff --git a/drivers/usb/dwc3/dwc3-keystone.c b/drivers/usb/dwc3/dwc3-keystone.c
+index 1fad161..361437f 100644
+--- a/drivers/usb/dwc3/dwc3-keystone.c
++++ b/drivers/usb/dwc3/dwc3-keystone.c
+@@ -21,6 +21,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/pm_runtime.h>
+ #include <linux/io.h>
+ #include <linux/of_platform.h>
  
- 	glue->dev = dev;
+@@ -118,13 +119,23 @@ static int kdwc3_probe(struct platform_device *pdev)
  
--	ret = pci_enable_device(pci);
+ 	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
+ 
+-	error = clk_prepare_enable(kdwc->clk);
++	error = clk_prepare(kdwc->clk);
+ 	if (error < 0) {
+ 		dev_dbg(kdwc->dev, "unable to enable usb clock, err %d\n",
+ 			error);
+ 		return error;
+ 	}
+ 
 +	pm_runtime_enable(dev);
-+	ret = pm_runtime_get_sync(dev);
- 	if (ret) {
- 		dev_err(dev, "failed to enable pci device\n");
- 		return -ENODEV;
- 	}
++
++	error = pm_runtime_get_sync(dev);
++	if (error < 0) {
++		dev_dbg(dev, "unable to pm_runtime_get_sync(), err %d\n",
++				error);
++		pm_runtime_put_sync(dev);
++		goto err_runtime_get;
++	}
++
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "missing irq\n");
+@@ -151,8 +162,13 @@ static int kdwc3_probe(struct platform_device *pdev)
  
--	pci_set_master(pci);
--
- 	ret = dwc3_pci_register_phys(glue);
- 	if (ret) {
- 		dev_err(dev, "couldn't register PHYs\n");
--		return ret;
-+		goto err1;
- 	}
- 
- 	dwc3 = platform_device_alloc("dwc3", PLATFORM_DEVID_AUTO);
-@@ -167,7 +166,8 @@ static int dwc3_pci_probe(struct pci_dev *pci,
- err3:
- 	platform_device_put(dwc3);
- err1:
--	pci_disable_device(pci);
+ err_core:
+ 	kdwc3_disable_irqs(kdwc);
++
+ err_irq:
+-	clk_disable_unprepare(kdwc->clk);
 +	pm_runtime_put_sync(dev);
++
++err_runtime_get:
 +	pm_runtime_disable(dev);
++	clk_unprepare(kdwc->clk);
  
- 	return ret;
+ 	return error;
  }
-@@ -175,11 +175,13 @@ err1:
- static void dwc3_pci_remove(struct pci_dev *pci)
- {
- 	struct dwc3_pci	*glue = pci_get_drvdata(pci);
-+	struct device *dev = &pci->dev;
+@@ -172,7 +188,9 @@ static int kdwc3_remove(struct platform_device *pdev)
  
- 	platform_device_unregister(glue->dwc3);
- 	platform_device_unregister(glue->usb2_phy);
- 	platform_device_unregister(glue->usb3_phy);
--	pci_disable_device(pci);
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
- }
+ 	kdwc3_disable_irqs(kdwc);
+ 	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
+-	clk_disable_unprepare(kdwc->clk);
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++	clk_unprepare(kdwc->clk);
+ 	platform_set_drvdata(pdev, NULL);
  
- static const struct pci_device_id dwc3_pci_id_table[] = {
-@@ -193,24 +195,20 @@ static const struct pci_device_id dwc3_pci_id_table[] = {
+ 	return 0;
+@@ -184,6 +202,79 @@ static const struct of_device_id kdwc3_of_match[] = {
  };
- MODULE_DEVICE_TABLE(pci, dwc3_pci_id_table);
+ MODULE_DEVICE_TABLE(of, kdwc3_of_match);
  
--#ifdef CONFIG_PM_SLEEP
--static int dwc3_pci_suspend(struct device *dev)
-+static int __dwc3_pci_suspend(struct pci_dev *pci)
- {
--	struct pci_dev	*pci = to_pci_dev(dev);
--
- 	pci_disable_device(pci);
- 
- 	return 0;
- }
- 
--static int dwc3_pci_resume(struct device *dev)
-+static int __dwc3_pci_resume(struct pci_dev *pci)
- {
--	struct pci_dev	*pci = to_pci_dev(dev);
--	int		ret;
-+	int ret;
- 
- 	ret = pci_enable_device(pci);
- 	if (ret) {
--		dev_err(dev, "can't re-enable device --> %d\n", ret);
-+		dev_err(&pci->dev, "can't re-enable device --> %d\n", ret);
- 		return ret;
- 	}
- 
-@@ -218,10 +216,48 @@ static int dwc3_pci_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif /* CONFIG_PM_SLEEP */
-+
-+static int dwc3_pci_suspend(struct device *dev)
++static int __kdwc3_suspend(struct dwc3_keystone *kdwc)
 +{
-+	struct pci_dev	*pci = to_pci_dev(dev);
++	clk_disable(kdwc->clk);
 +
-+	return __dwc3_pci_suspend(pci);
++	return 0;
 +}
 +
-+static int dwc3_pci_resume(struct device *dev)
++static int __kdwc3_resume(struct dwc3_keystone *kdwc)
 +{
-+	struct pci_dev	*pci = to_pci_dev(dev);
-+	int		ret;
++	return clk_enable(kdwc->clk);
++}
 +
-+	ret = __dwc3_pci_resume(pci);
++static int kdwc3_prepare(struct device *dev)
++{
++	struct dwc3_keystone	*kdwc = dev_get_drvdata(dev);
++
++	kdwc3_disable_irqs(kdwc);
++
++	return 0;
++}
++
++static void kdwc3_complete(struct device *dev)
++{
++	struct dwc3_keystone	*kdwc = dev_get_drvdata(dev);
++
++	kdwc3_enable_irqs(kdwc);
++}
++
++static int kdwc3_suspend(struct device *dev)
++{
++	struct dwc3_keystone	*kdwc = dev_get_drvdata(dev);
++
++	return __kdwc3_suspend(kdwc);
++}
++
++static int kdwc3_resume(struct device *dev)
++{
++	struct dwc3_keystone	*kdwc = dev_get_drvdata(dev);
++	int			ret;
++
++	ret = __kdwc3_resume(kdwc);
 +	if (ret)
 +		return ret;
 +
 +	pm_runtime_disable(dev);
 +	pm_runtime_set_active(dev);
-+	pm_runtime_disable(dev);
++	pm_runtime_enable(dev);
 +
 +	return 0;
 +}
 +
-+static int dwc3_pci_runtime_suspend(struct device *dev)
++static int kdwc3_runtime_suspend(struct device *dev)
 +{
-+	struct pci_dev	*pci = to_pci_dev(dev);
++	struct dwc3_keystone *kdwc = dev_get_drvdata(dev);
 +
-+	return __dwc3_pci_suspend(pci);
++	return __kdwc3_suspend(kdwc);
 +}
 +
-+static int dwc3_pci_runtime_resume(struct device *dev)
++static int kdwc3_runtime_resume(struct device *dev)
 +{
-+	struct pci_dev	*pci = to_pci_dev(dev);
++	struct dwc3_keystone *kdwc = dev_get_drvdata(dev);
 +
-+	return __dwc3_pci_resume(pci);
++	return __kdwc3_resume(kdwc);
 +}
- 
- static const struct dev_pm_ops dwc3_pci_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(dwc3_pci_suspend, dwc3_pci_resume)
-+	SET_RUNTIME_PM_OPS(dwc3_pci_runtime_suspend, dwc3_pci_runtime_resume,
-+			NULL)
- };
- 
- static struct pci_driver dwc3_pci_driver = {
++
++static const struct dev_pm_ops kdwc3_dev_pm_ops = {
++	.prepare	= kdwc3_prepare,
++	.complete	= kdwc3_complete,
++
++	SET_SYSTEM_SLEEP_PM_OPS(kdwc3_suspend, kdwc3_resume)
++	SET_RUNTIME_PM_OPS(kdwc3_runtime_suspend, kdwc3_runtime_resume, NULL)
++};
++
+ static struct platform_driver kdwc3_driver = {
+ 	.probe		= kdwc3_probe,
+ 	.remove		= kdwc3_remove,
 -- 
 1.8.4.GIT
