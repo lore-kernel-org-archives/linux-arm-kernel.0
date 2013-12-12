@@ -1,60 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Dec 2013 17:39:12 +0000
-Subject: [PATCH 2/3] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <20131212133643.GE28621@e103034-lin>
-References: <1386792029-23148-1-git-send-email-broonie@kernel.org>
- <1386792029-23148-2-git-send-email-broonie@kernel.org>
- <20131212113512.GC28621@e103034-lin>
- <20131212120649.GB5367@sirena.org.uk>
- <20131212133643.GE28621@e103034-lin>
-Message-ID: <20131212173912.GF3382@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Dec 2013 11:47:41 -0600
+Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
+In-Reply-To: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C5F1@DFLE11.ent.ti.com>
+References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
+ <1386627424-373-3-git-send-email-w-kwok2@ti.com>
+ <20131210025405.GB20090@saruman.home> <52A72FE4.4020105@ti.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E0415C5F1@DFLE11.ent.ti.com>
+Message-ID: <20131212174741.GD1939@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 01:36:43PM +0000, Morten Rasmussen wrote:
-> On Thu, Dec 12, 2013 at 12:06:49PM +0000, Mark Brown wrote:
-> > On Thu, Dec 12, 2013 at 11:35:12AM +0000, Morten Rasmussen wrote:
+On Thu, Dec 12, 2013 at 11:20:54AM -0600, Kwok, WingMan wrote:
+> > -----Original Message-----
+> > From: Shilimkar, Santosh
+> > Sent: Tuesday, December 10, 2013 10:15 AM
+> > To: Balbi, Felipe
+> > Cc: Kwok, WingMan; linux-usb at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; Greg Kroah-Hartman
+> > Subject: Re: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
 > > 
-> > > I know that this is how it is currently done for ARMv7 and one could
-> > > argue that we should do the same for ARMv8 until we have a better
-> > > solution. I just want to highlight that setting cpu_power this way is
-> > > not generally the right thing to do for big.LITTLE. It will have to be
-> > > fixed eventually.
-> > 
-> > Right, there's a good solid reason for all the work on the scheduler.  I
-> > definitely think we ought to be following the same approach on both
-> > ARMv7 and ARMv8 to avoid confusion between people based on the platform
-> > they're working on.
-[...]
-> > If you're saying that the current ARMv7 code is always worse than doing
-> > nothing then clearly we ought to be removing that code from ARMv7 rather
-> > than hurting performance.  I'd been under the impression that what we
-> > had there was not ideal but better than nothing in mainline rather than
-> > actively harmful.
+> > On Monday 09 December 2013 09:54 PM, Balbi, Felipe wrote:
+> > > Hi,
+> > >
+> > > On Mon, Dec 09, 2013 at 05:17:04PM -0500, WingMan Kwok wrote:
+> > >> +	ret = usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
+> > >> +	if (ret)
+> > >> +		return ret;
+> > >> +	k_phy->usb_phy_gen.phy.init = keystone_usbphy_init;
+> > >> +	k_phy->usb_phy_gen.phy.shutdown = keystone_usbphy_shutdown;
+> > >
+> > > this *must* be initialized before adding the PHY to the subsystem. So
+> > > these two lines must be moved before usb_add_phy_dev().
+> > >
+> > Make sense. Probably its good idea to repost the $subject patch with above
+> > as well as other delay related comment.
 > 
-> For some scenarios it might be better to set cpu_power to reflect the
-> relative performance, for others it is worse due to the way cpu_power
-> is currently used in the scheduler.
-> 
-> Setting cpu_power as it is done for v7 may bias the scheduler to put
-> heavier tasks on big cpus and will generally put more task on big cpus,
-> which is a good thing for some scenarios. However, if you have parallel
-> workloads that spawn a worker thread for each cpu and does dynamic work
-> distribution in user-space (OpenMP applications for example), then
-> setting cpu_power will put two worker threads on some big cpus and leave
-> some little cpus idle resulting in slower completion time. It happens on
-> TC2.
-> 
-> We need the code (or something very similar) later when the scheduler
-> has been fixed. For v7 it has been left in waiting for that fix, it
-> doesn't harm when using the reference big.LITTLE patches. We can do the
-> same for v8 to avoid confusion.
+> Thanks.  I have updated my patch accordingly.  Please note that the same issue
+> exists on drivers/usb/phy/phy-am335x.c also.  If you want, I can send a fix for that.
 
-If we can't really guarantee the effect of this patch, I would rather
-keep it in the LSK kernel only until the scheduler is fixed (can this be
-treated as a performance issue independent of the power-aware
-scheduling? We could get it merged quicker).
+Will do, thanks for notifying me :-)
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/99d347fa/attachment.sig>
