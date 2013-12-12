@@ -1,50 +1,21 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 11 Dec 2013 17:29:28 -0800
-Subject: [GIT PULL][for 3.14] pull request from pxa
-In-Reply-To: <52A823E4.6070208@gmail.com>
-References: <52A823E4.6070208@gmail.com>
-Message-ID: <20131212012928.GA22922@quad.lixom.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 11 Dec 2013 20:39:36 -0500
+Subject: mmc: mxs: Use mmc_of_parse
+In-Reply-To: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de> (Sascha
+ Hauer's message of "Thu, 5 Dec 2013 14:34:45 +0100")
+References: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <87y53q6e5j.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 04:35:48PM +0800, Haojian Zhuang wrote:
-> Hi Arnd/Olof/Kevin,
-> 
-> Please help to merge the pull request for pxa.
-> 
-> 
-> Best Regards
-> Haojian
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/pxa-for-3.14
-> 
-> for you to fetch changes up to 8a53a1194f1cc870de0ab9db1728b1ecab770925:
-> 
->   ARM: pxa: remove IRQF_DISABLED (2013-12-11 15:36:24 +0800)
-> 
-> ----------------------------------------------------------------
-> Dmitry Eremin-Solenikov (1):
->       arm: pxa: tosa: fix keys mapping
-> 
-> Michael Opdenacker (1):
->       ARM: pxa: remove IRQF_DISABLED
+Hi Sascha,
 
-This patch doesn't even build:
+On Thu, Dec 05 2013, Sascha Hauer wrote:
+> We have a generic mmc_of_parse function. Use it in the mxs-mmc driver
+> to make the code simpler and to parse some new devicetree propeties.
 
-arch/arm/mach-pxa/pcm990-baseboard.c:331:9: error: too few arguments to
-function 'request_irq'
+Great, thanks for doing this; all six patches pushed to mmc-next for 3.14.
 
-Why the !@%@# are you sending me code for your platform that you didn't
-even bother building to check for errors?
-
-I've fixed it up, but you really have to do better than this.
-
-
--Olof
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
