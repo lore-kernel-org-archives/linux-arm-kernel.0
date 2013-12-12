@@ -1,109 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 12 Dec 2013 11:22:33 +0100
-Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <CAJ+vNU38oofeUjJ2s1J-2JNC+UM0MsET3EaGvDaGF9URS_efTA@mail.gmail.com>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
- <CAJ+vNU38oofeUjJ2s1J-2JNC+UM0MsET3EaGvDaGF9URS_efTA@mail.gmail.com>
-Message-ID: <201312121122.33746.marex@denx.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Dec 2013 12:23:47 +0000
+Subject: regulator-core has_full_constraints set too late for dt using
+ boards ?
+In-Reply-To: <52A9A9DB.5050102@redhat.com>
+References: <52A88805.1080704@redhat.com>
+ <20131211160225.GB11468@sirena.org.uk>
+ <52A98C72.2040203@redhat.com>
+ <20131212104208.GG11044@sirena.org.uk>
+ <52A9A9DB.5050102@redhat.com>
+Message-ID: <20131212122347.GK11044@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 12, 2013 at 06:10:31 AM, Tim Harvey wrote:
-> On Wed, Dec 11, 2013 at 2:30 AM, Marek Vasut <marex@denx.de> wrote:
-> > Some boards do not have a PCIe reset GPIO. To avoid probe
-> > failure on these boards, make the reset GPIO optional as
-> > well.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Frank Li <lznuaa@gmail.com>
-> > Cc: Harro Haan <hrhaan@gmail.com>
-> > Cc: Jingoo Han <jg1.han@samsung.com>
-> > Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> > Cc: Pratyush Anand <pratyush.anand@st.com>
-> > Cc: Richard Zhu <r65037@freescale.com>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Sean Cross <xobs@kosagi.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> > Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> > Cc: Tim Harvey <tharvey@gateworks.com>
-> > Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> > Cc: Yinghai Lu <yinghai@kernel.org>
-> > ---
-> > 
-> >  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
-> >  drivers/pci/host/pci-imx6.c                        | 29
-> >  +++++++++++----------- 2 files changed, 16 insertions(+), 15
-> >  deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > b/Documentation/devicetree/bindings/pci/designware-pcie.txt index
-> > d5d26d4..b7a2279 100644
-> > --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > 
-> > @@ -19,9 +19,9 @@ Required properties:
-> >         to define the mapping of the PCIe interface to interrupt
-> >         numbers.
-> >  
-> >  - num-lanes: number of lanes to use
-> > 
-> > -- reset-gpio: gpio pin number of power good signal
-> > 
-> >  Optional properties for fsl,imx6q-pcie
-> > 
-> > +- reset-gpio: gpio pin number of power good signal
-> > 
-> >  - power-on-gpio: gpio pin number of power-enable signal
-> >  - wake-up-gpio: gpio pin number of incoming wakeup signal
-> >  - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable
-> >  signal
-> > 
-> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> > index bd70af8..52027ad 100644
-> > --- a/drivers/pci/host/pci-imx6.c
-> > +++ b/drivers/pci/host/pci-imx6.c
-> > @@ -214,9 +214,12 @@ static int imx6_pcie_assert_core_reset(struct
-> > pcie_port *pp)
-> > 
-> >         regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-> >         
-> >                         IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-> > 
-> > -       gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > -       msleep(100);
-> > -       gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > +       /* Some boards don't have PCIe reset GPIO. */
-> > +       if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > +               gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > +               msleep(100);
-> > +               gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > +       }
-> > 
-> >         return 0;
-> >  
-> >  }
-> 
-> Marek,
-> 
-> Though not the fault of your patch, I noticed while looking at this
-> that the PCI Express specification is not being properly met with
-> regards to PERST# and the reference clock.  The spec states that
-> PERST# must be kept asserted until after the reference clock is stable
-> (I'm not entirely clear how long of a delay is needed for the clock to
-> become stable but I think the value is typically the 100ms).  I see in
-> the current pci-imx6.c code that imx6_pcie_host_init calls
-> imx6_pcie_assert_core_reset first, then imx6_pcie_init_phy, followed
-> by imx6_pcie_deassert_core_reset.  Despite the function names,
-> imx6_pcie_assert_core_reset as shown above asserts then de-asserts
-> PERST# before the clock is enabled in imx6_pcie_deassert_core_reset.
-> This seems to me to be a violation of the spec and I believe the
-> msleep(100) and de-assertion of the option reset_gpio should be done
-> in imx6_pcie_deassert_core reset after the clock is brought up.
-> 
-> If you agree with my assessment, would you mind resolving this issue
-> at the same time?  If not, I'm happy to follow-up with a patch to
-> resolve it after your patch is accepted.
+On Thu, Dec 12, 2013 at 01:19:39PM +0100, Hans de Goede wrote:
 
-Is this not resolved by patch 0006 in this series please?
+> Note my patch to not do a dev_err when no regulator is found for
+> regulator_get_optional still is needed in -next.
+
+It's sitting in my review queue, it's not very well described so it's
+not clear that you've selected the correct criteria and I need to find
+time to actually look at it properly.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/c792fad9/attachment.sig>
