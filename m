@@ -1,51 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 12 Dec 2013 15:12:02 -0700
-Subject: [PATCH V2] ARM: tegra: fix pinctrl misconfiguration on Venic2
-Message-ID: <1386886322-2700-1-git-send-email-swarren@wwwdotorg.org>
+From: hrhaan@gmail.com (Harro Haan)
+Date: Thu, 12 Dec 2013 23:12:13 +0100
+Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
+References: <1386757818-5154-1-git-send-email-marex@denx.de>
+ <201312121122.33746.marex@denx.de>
+ <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
+ <201312121925.27591.marex@denx.de>
+ <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
+Message-ID: <CAB5oZtBUTnA3FdO9_YyORfUx7Joqy96NF55o1-XQkFPXsWLoig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 12 December 2013 22:07, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Thu, Dec 12, 2013 at 11:25 AM, Marek Vasut <marex@denx.de> wrote:
+>> Bjorn, would you mind picking 2/7...6/7 of this series so we are done with
+>> those? I will re-post 1/7 as a self-standing patch afterwards, it has no impact
+>> on the rest of the series.
+>
+> Sure.  I can't really evaluate these myself, so I'm looking for acks
+> from Richard or Shawn.
+>
+> I noticed Pratyush, Tim, and Harro had some questions the first time
+> around, and I don't know whether they got resolved.
 
-Other boards use PULL_NONE for their debug UART pins, and without this
-change, the board doesn't accept any serial input.
-
-Don't set the I2S port pins to tristate mode, or no audio signal will
-be sent out.
-
-Fixes: 605ae5804385 ("ARM: tegra: add default pinctrl nodes for Venice2")
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: Added fix for I2S port.
-
-Laxman, can you please go through the whole pinctrl configuration for
-Venice2 and make sure it's correct. Perhaps the best approach would be
-to compare it against our downstream kernels for this board.
----
- arch/arm/boot/dts/tegra124-venice2.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-index 616759c3c7e5..b31e18798be7 100644
---- a/arch/arm/boot/dts/tegra124-venice2.dts
-+++ b/arch/arm/boot/dts/tegra124-venice2.dts
-@@ -40,7 +40,7 @@
- 				nvidia,function = "i2s1";
- 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
- 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
- 			};
- 			dvfs_pwm_px0 {
- 				nvidia,pins = "dvfs_pwm_px0";
-@@ -250,7 +250,7 @@
- 					      "pu3";
- 				nvidia,function = "uarta";
- 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
--				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
- 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
- 			};
- 			uart2_cts_n_pj5 {
--- 
-1.8.1.5
+Yes, Marek resolved the build warning comment in [PATCH V2 3/7]. Regards, Harro
