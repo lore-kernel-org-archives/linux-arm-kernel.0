@@ -1,34 +1,82 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 12 Dec 2013 10:38:31 -0800
-Subject: [PATCH] ARM: at91: remove AT91_PROGRAMMABLE_CLOCKS configuration
- option
-In-Reply-To: <1386864045-25198-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Thu, 12 Dec 2013 17:00:45 +0100")
-References: <52A9C81B.7050007@atmel.com>
- <1386864045-25198-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <87sitx6hjs.fsf@linaro.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 12 Dec 2013 11:00:45 -0800
+Subject: [PATCHv3 1/2] arm64: Check for NULL device before getting the
+ coherent_dma_mask
+In-Reply-To: <20131212121839.GC12617@mudshark.cambridge.arm.com>
+References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
+ <1386711816-20270-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104239.GD26730@mudshark.cambridge.arm.com>
+ <52A8A55A.9060709@codeaurora.org>
+ <20131211175134.GL26730@mudshark.cambridge.arm.com>
+ <52A8AAB3.8050500@codeaurora.org>
+ <20131212121839.GC12617@mudshark.cambridge.arm.com>
+Message-ID: <52AA07DD.8010405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
-
-> This AT91 specific Kconfig option removed the code that dealt with
-> programmable clocks. Each AT91 SoC embeds programmable clocks and
-> there is little gain to remove this code in case that such a clock
-> is not used.
-> If this option is not selected, it causes certain drivers to fail
-> to build. We simply remove this option instead of adding code just
-> to build a workaround.
+On 12/12/2013 4:18 AM, Will Deacon wrote:
+> On Wed, Dec 11, 2013 at 06:10:59PM +0000, Laura Abbott wrote:
+>> On 12/11/2013 9:51 AM, Will Deacon wrote:
+>>> On Wed, Dec 11, 2013 at 05:48:10PM +0000, Laura Abbott wrote:
+>>>> On 12/11/2013 2:42 AM, Will Deacon wrote:
+>>>>> On Tue, Dec 10, 2013 at 09:43:35PM +0000, Laura Abbott wrote:
+>>>>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>>>>>> index 4bd7579..4134212 100644
+>>>>>> --- a/arch/arm64/mm/dma-mapping.c
+>>>>>> +++ b/arch/arm64/mm/dma-mapping.c
+>>>>>> @@ -33,7 +33,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
+>>>>>>     					  dma_addr_t *dma_handle, gfp_t flags,
+>>>>>>     					  struct dma_attrs *attrs)
+>>>>>>     {
+>>>>>> -	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
+>>>>>> +	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
+>>>>>>     	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+>>>>>>     		flags |= GFP_DMA32;
+>>>>>>     	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+>>>>>
+>>>>> Unless I'm misreading the code, it looks like there are paths through
+>>>>> swiotlb_alloc_coherent that will dereference the dev parameter without a
+>>>>> NULL check. Are you sure we should allow for NULL devices here?
+>>>>>
+>>>>
+>>>> The current ARM code allows for NULL devices so that would be a
+>>>> difference in behavior between arm and arm64. We're also relying on this
+>>>> behavior in some code. Where exactly in swiotlb_alloc_coherent does this
+>>>> dereference happen? The only one I see is checked with 'if (hwdev &&
+>>>> hwdev->coherent_dma_mask)'
+>>>
+>>> phys_to_dma could, but doesn't. The one I spotted was buried down in:
+>>>
+>>>     map_single -> swiotlb_tbl_map_single -> dma_get_seg_boundary
+>>>
+>>
+>> Ah yes I see that now.
+>>
+>> I guess the question still stands though, should we fixup the parts of
+>> the code to fully support the NULL devices or do we tell clients to fix
+>> their code and fail the allocation with a warning not to pass NULL?
 >
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Olof, Kevin,
->
-> This patch goes on top of the AT91 "cleanup" branch.
+> Assuming it's always possible to pass in a non-NULL device, I'd be tempted
+> to fix the callers. Can you think of a valid use-case where the caller
+> doesn't have a device handle to pass in?
 >
 
-Applied to next/cleanup.
+Depends on your definition of 'valid' ;)
 
-Thanks,
+The only cases we've been able to come up with are places where we've 
+been abusing the DMA APIs slightly to get chunks of contiguous memory 
+through CMA for miscellaneous debugging/testing purposes. I only 
+stumbled across this problem at all while writing a quick test case for 
+CMA. I'd argue that if there is a real use case for non-device large 
+contiguous allocations there should be a new dedicated API that doesn't 
+break the dma abstraction.
 
-Kevin
+I suggest for now we add a big WARN when a NULL device is passed in and 
+see how many people complain.
+
+Laura
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
