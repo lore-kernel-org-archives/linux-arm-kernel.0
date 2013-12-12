@@ -1,40 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Dec 2013 12:40:15 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <1386850444.22947.46.camel@sakura.staff.proxad.net>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
-Message-ID: <20131212124015.GL4360@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 12 Dec 2013 21:49:22 +0900
+Subject: [PATCH v3 0/3] Add Ether support for R8A7791/Koelsch board
+In-Reply-To: <201312082348.17588.sergei.shtylyov@cogentembedded.com>
+References: <201312082348.17588.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20131212124922.GA30624@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 01:14:04PM +0100, Maxime Bizon wrote:
+On Sun, Dec 08, 2013 at 11:48:17PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Hello,
+>    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-v3.13-rc2-20131205' tag. Here we add the Ether support to the
+> R8A7791/Koelsch board. The patchset requires the 'sh_eth' driver R8A7791
+> support patch posted earlier in order to work.
 > 
-> I tried using csum_tcpudp_magic() like this:
-> 
-> csum_tcpudp_magic(src, dst, ntohs(udph->len), IPPROTO_UDP, csum);
-> 
-> instead of the more common:
-> 
-> len = ntohs(udhp->len);
-> [...]
-> csum_tcpudp_magic(src, dst, len, IPPROTO_UDP, csum);
-> 
-> the first one gives a bad checksum while the second one is ok.
-> 
-> 
-> I've tracked down the problem to csum_tcpudp_nofold(), which uses inline
-> asm and an unsigned short for len.
-> 
-> If the len value is say 0x3412, and I pass ntohs(len), then the assigned
-> register for len contains 0x00341234 instead of the expected 0x1234.
-> 
-> The ntohs() expand to a dumb swab16 on my arch, and gcc does the swap
-> but does not clear the high nibble, I guess it expects the assembly code
-> to only use the low 16 bits.
-> 
-> Is there a missing constraint or gcc is doing something wrong here ?
+> [1/3] ARM: shmobile: r8a7791: add Ether clock
+> [2/3] ARM: shmobile: Koelsch: add Ether support
+> [3/3] ARM: shmobile: Koelsch: enable Ether in defconfig
 
-Depends which swab16 you mean by "dumb swab16".  If it is a gcc bug then
-you need to submit a bug report to gcc people.
+Thanks, I will queue these up.
