@@ -1,42 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 12 Dec 2013 08:32:11 -0500
-Subject: [REGRESSION,BISECTED] DMA mask issue on ReadyNAS 102 w/ 3.13.0-rc3
-In-Reply-To: <20131212124154.GM4360@n2100.arm.linux.org.uk>
-References: <87haakfene.fsf@natisbad.org>
- <20131207231958.GS4360@n2100.arm.linux.org.uk>
- <87eh5ow7m0.fsf@natisbad.org>
- <20131211185445.GC10053@titan.lakedaemon.net>
- <20131211205724.GH4360@n2100.arm.linux.org.uk>
- <20131212123422.GF10053@titan.lakedaemon.net>
- <20131212124154.GM4360@n2100.arm.linux.org.uk>
-Message-ID: <20131212133211.GJ10053@titan.lakedaemon.net>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 12 Dec 2013 19:01:03 +0530
+Subject: [PATCH 1/2] ARM: tegra: enable ams AS3722 drivers
+Message-ID: <1386855064-10993-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 12:41:54PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 12, 2013 at 07:34:22AM -0500, Jason Cooper wrote:
-> > On Wed, Dec 11, 2013 at 08:57:24PM +0000, Russell King - ARM Linux wrote:
-> > > On Wed, Dec 11, 2013 at 01:54:45PM -0500, Jason Cooper wrote:
-> > > > I don't see this in any of your branches.  Is there anything else you
-> > > > need from us to get this merged?
-> > > 
-> > > Where are you looking?
-> > 
-> > I looked in for-linus-dma-masks, unstable/dma-masks, and fixes branches
-> > at:
-> > 
-> >   http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git
-> > 
-> > That was yesterday, and I just did another quick check this morning.
-> > Nothing jumps out at me.  Did I miss something obvious?
-> 
-> Yes.  9f28cde0bc643186d32744ce69d12222e8588fe7, which is definitely in
-> the fixes branch.
+ams AS3722 is the system power manager module IC for the Tegra124 based
+Venice2 platform. Enable configs for gpio, pincontrol, rtc, regulator
+support from this device.
 
-Ahhh, yes, I saw that one.  I dismissed it as a candidate be cause the
-diffstats weren't even close.  Thanks for clearing that up and sorry for
-the noise.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-thx,
-
-Jason.
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 4461185..5cf4a48 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -137,6 +137,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_TEGRA114=y
+ CONFIG_SPI_TEGRA20_SFLASH=y
+ CONFIG_SPI_TEGRA20_SLINK=y
++CONFIG_PINCTRL_AS3722=y
+ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+@@ -149,6 +150,7 @@ CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_SENSORS_LM90=y
++CONFIG_MFD_AS3722=y
+ CONFIG_MFD_MAX8907=y
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65090=y
+@@ -157,6 +159,7 @@ CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
++CONFIG_REGULATOR_AS3722=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
+@@ -218,6 +221,7 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_LEDS_TRIGGER_TRANSIENT=y
+ CONFIG_LEDS_TRIGGER_CAMERA=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_AS3722=y
+ CONFIG_RTC_DRV_MAX8907=y
+ CONFIG_RTC_DRV_PALMAS=y
+ CONFIG_RTC_DRV_TPS6586X=y
+-- 
+1.7.1.1
