@@ -1,46 +1,53 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Dec 2013 10:12:49 +0900
-Subject: [PATCH 07/12] pcie: designware: add dw_pcie prefix before
- cfg_read/write
-In-Reply-To: <CAD6G_RTiswApVUz_A3V8A++tQcWaWi2rRtVCuCAFE1eWY6d0CQ@mail.gmail.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
- <CAD6G_RTiswApVUz_A3V8A++tQcWaWi2rRtVCuCAFE1eWY6d0CQ@mail.gmail.com>
-Message-ID: <002301cef6d7$462451f0$d26cf5d0$%han@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 11 Dec 2013 17:12:16 -0800
+Subject: [PATCH] MAINTAINERS: merge IMX6 entry into IMX
+In-Reply-To: <20131211073445.GZ24559@pengutronix.de>
+References: <20131210121626.39b3e543@ipc1.ka-ro>
+ <1386685161-12758-1-git-send-email-shawn.guo@linaro.org>
+ <20131211073445.GZ24559@pengutronix.de>
+Message-ID: <20131212011216.GC21856@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 11, 2013 8:40 PM, Jagan Teki wrote:
-> On Wed, Dec 11, 2013 at 3:08 PM, Mohit Kumar <mohit.kumar@st.com> wrote:
-> > From: Pratyush Anand <pratyush.anand@st.com>
-> >
-> > cfg_read/write function are designware pcie specific. Add dw_pcie prefix
-> > to avoid collision in global name space.
-> >
-> > Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> > Cc: Mohit Kumar <mohit.kumar@st.com>
-> > Cc: Jingoo Han <jg1.han@samsung.com>
-> > Cc: spear-devel at list.st.com
-> > Cc: linux-pci at vger.kernel.org
+On Wed, Dec 11, 2013 at 08:34:47AM +0100, Sascha Hauer wrote:
+> On Tue, Dec 10, 2013 at 10:19:21PM +0800, Shawn Guo wrote:
+> > I have been co-maintaining IMX sub-architecture for a couple of years,
+> > and collecting IMX sub-architecture patches rather than IMX6 only ones
+> > for a few release cycles.  It makes sense to officially add myself as
+> > the co-maintainer for IMX sub-architecture now.  Consequently, IMX6
+> > entry can just be merged into IMX.
+> > 
+> > While at it, add a 'F:' entry for IMX DTS files.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
 > > ---
-> >  drivers/pci/host/pci-exynos.c      |    5 +++--
-> >  drivers/pci/host/pcie-designware.c |   23 ++++++++++++++---------
-> >  drivers/pci/host/pcie-designware.h |    4 ++--
+> >  MAINTAINERS |   11 +++--------
+> >  1 file changed, 3 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 13c15c8..c0cad90 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -894,18 +894,13 @@ F:	arch/arm/mach-footbridge/
+> >  
+> >  ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> >  M:	Sascha Hauer <kernel@pengutronix.de>
+> > -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > -S:	Maintained
+> > -T:	git git://git.pengutronix.de/git/imx/linux-2.6.git
+> > -F:	arch/arm/mach-imx/
+> > -F:	arch/arm/configs/imx*_defconfig
+> > -
+> > -ARM/FREESCALE IMX6
+> >  M:	Shawn Guo <shawn.guo@linaro.org>
+> 
+> Put yourself ontop since you're doing way more for i.MX than I do.
+> Otherwise:
+> 
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-[....]
+Applied to fixes for 3.13 (switching the two M: lines as you proposed).
 
-> Acked-by: Jagannadha Sutradharudu Teki <jagannadh.teki@gmail.com>
 
-Please use ' Reviewed-by', instead of 'Acked-by'.
-It will apply to other patches, too.
-
-According to the ./Documentation/SubmittingPatches,
-
-Acked-by: is often used by the maintainer of the affected code when that
-maintainer neither contributed to nor forwarded the patch.
-
-Reviewed-by:, instead, indicates that the patch has been reviewed and found
-acceptable according to the Reviewer's Statement:
-
-Best regards,
-Jingoo Han
+-Olof
