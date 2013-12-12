@@ -1,11 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 12 Dec 2013 22:50:04 +0100
-Subject: [PATCH 7/7] ARM: dts: imx6q-sabrelite: Enable PCI express
+Date: Thu, 12 Dec 2013 22:50:02 +0100
+Subject: [PATCH V2 5/7] PCI: imx6: Fix link start operation
 In-Reply-To: <1386885004-10252-1-git-send-email-marex@denx.de>
 References: <1386885004-10252-1-git-send-email-marex@denx.de>
-Message-ID: <1386885004-10252-7-git-send-email-marex@denx.de>
+Message-ID: <1386885004-10252-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch first forces the link into Gen1 mode before starting up
+the link and only after the link is up requests the link to start
+negotiating possible Gen2 mode operation. This is because without
+such sequence, some PCIe switches are not detected at all.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -24,23 +29,124 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pci/host/pci-imx6.c | 78 +++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 72 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index f004913..0806ce7 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -154,6 +154,10 @@
- 	};
+V2: Change the link speed reporting from dev_err() to dev_dbg() so it doesn't
+    polute the kernel output.
+
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index e9e580a..a945e74 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -44,6 +44,12 @@ struct imx6_pcie {
+ 	void __iomem		*mem_base;
  };
  
-+&pcie {
-+	status = "okay";
-+};
++/* PCIe Root Complex registers (memory-mapped) */
++#define PCIE_RC_LCR				0x7c
++#define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
++#define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
++#define PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK	0xf
 +
- &sata {
- 	status = "okay";
- };
+ /* PCIe Port Logic registers (memory-mapped) */
+ #define PL_OFFSET 0x700
+ #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+@@ -61,6 +67,9 @@ struct imx6_pcie {
+ #define PCIE_PHY_STAT (PL_OFFSET + 0x110)
+ #define PCIE_PHY_STAT_ACK_LOC 16
+ 
++#define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
++#define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
++
+ /* PHY registers (not memory-mapped) */
+ #define PCIE_PHY_RX_ASIC_OUT 0x100D
+ 
+@@ -323,11 +332,71 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
+ 	return 0;
+ }
+ 
+-static void imx6_pcie_host_init(struct pcie_port *pp)
++static int imx6_pcie_start_link(struct pcie_port *pp)
+ {
+-	int count = 0;
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
++	uint32_t tmp;
++	int ret, count;
++
++	/*
++	 * Force Gen1 operation when starting the link. In case the link is
++	 * started in Gen2 mode, there is a possibility the devices on the
++	 * bus will not be detected@all. This happens with PCIe switches.
++	 */
++	tmp = readl(pp->dbi_base + PCIE_RC_LCR);
++	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
++	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
++	writel(tmp, pp->dbi_base + PCIE_RC_LCR);
++
++	/* Start LTSSM. */
++	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
++
++	ret = imx6_pcie_wait_for_link(pp);
++	if (ret)
++		return ret;
++
++	/* Allow Gen2 mode after the link is up. */
++	tmp = readl(pp->dbi_base + PCIE_RC_LCR);
++	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
++	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
++	writel(tmp, pp->dbi_base + PCIE_RC_LCR);
++
++	/*
++	 * Start Directed Speed Change so the best possible speed both link
++	 * partners support can be negotiated.
++	 */
++	tmp = readl(pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
++	tmp |= PORT_LOGIC_SPEED_CHANGE;
++	writel(tmp, pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
++
++	count = 200;
++	while (count--) {
++		tmp = readl(pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
++		/* Test if the speed change finished. */
++		if (!(tmp & PORT_LOGIC_SPEED_CHANGE))
++			break;
++		usleep_range(100, 1000);
++	}
++
++	/* Make sure link training is finished as well! */
++	if (count)
++		ret = imx6_pcie_wait_for_link(pp);
++	else
++		ret = -EINVAL;
+ 
++	if (ret) {
++		dev_err(pp->dev, "Failed to bring link up!\n");
++	} else {
++		tmp = readl(pp->dbi_base + 0x80);
++		dev_dbg(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
++	}
++
++	return ret;
++}
++
++static void imx6_pcie_host_init(struct pcie_port *pp)
++{
+ 	imx6_pcie_assert_core_reset(pp);
+ 
+ 	imx6_pcie_init_phy(pp);
+@@ -336,10 +405,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 
+ 	dw_pcie_setup_rc(pp);
+ 
+-	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+-
+-	imx6_pcie_wait_for_link(pp);
++	imx6_pcie_start_link(pp);
+ 
+ 	return;
+ }
 -- 
 1.8.4.3
