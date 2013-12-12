@@ -1,55 +1,43 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Thu, 12 Dec 2013 06:18:31 -0500
-Subject: [PATCH v4 3/9] usb: gadget: s3c-hsotg: enable build for other
- platforms
+Date: Thu, 12 Dec 2013 06:18:33 -0500
+Subject: [PATCH v4 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
 In-Reply-To: <1386847117-21240-1-git-send-email-mporter@linaro.org>
 References: <1386847117-21240-1-git-send-email-mporter@linaro.org>
-Message-ID: <1386847117-21240-4-git-send-email-mporter@linaro.org>
+Message-ID: <1386847117-21240-6-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused Samsung-specific machine include and Kconfig
-dependency on S3C.
+If a generic phy is present, call phy_init()/phy_exit(). This supports
+generic phys that must be soft reset before power on.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 ---
- drivers/usb/gadget/Kconfig     | 7 +++----
- drivers/usb/gadget/s3c-hsotg.c | 2 --
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index a91e642..970bd1a 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -294,11 +294,10 @@ config USB_PXA27X
- 	   gadget drivers to also be dynamically linked.
- 
- config USB_S3C_HSOTG
--	tristate "S3C HS/OtG USB Device controller"
--	depends on S3C_DEV_USB_HSOTG
-+	tristate "Designware/S3C HS/OtG USB Device controller"
- 	help
--	  The Samsung S3C64XX USB2.0 high-speed gadget controller
--	  integrated into the S3C64XX series SoC.
-+	  The Designware USB2.0 high-speed gadget controller
-+	  integrated into the S3C64XX and BCM281xx series SoC.
- 
- config USB_S3C2410
- 	tristate "S3C2410 USB Device Controller"
 diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 33eb690..8ceb5ef 100644
+index 7c5d8bd..e9683c2 100644
 --- a/drivers/usb/gadget/s3c-hsotg.c
 +++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -37,8 +37,6 @@
- #include <linux/usb/phy.h>
- #include <linux/platform_data/s3c-hsotg.h>
+@@ -3621,6 +3621,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+ 		goto err_supplies;
+ 	}
  
--#include <mach/map.h>
--
- #include "s3c-hsotg.h"
++	if (hsotg->phy)
++		phy_init(hsotg->phy);
++
+ 	/* usb phy enable */
+ 	s3c_hsotg_phy_enable(hsotg);
  
- static const char * const s3c_hsotg_supply_names[] = {
+@@ -3714,6 +3717,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+ 	}
+ 
+ 	s3c_hsotg_phy_disable(hsotg);
++	if (hsotg->phy)
++		phy_exit(hsotg->phy);
+ 	clk_disable_unprepare(hsotg->clk);
+ 
+ 	return 0;
 -- 
 1.8.4
