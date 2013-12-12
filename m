@@ -1,40 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Dec 2013 18:06:26 +0000
-Subject: [PATCH 2/3] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <20131212173912.GF3382@arm.com>
-References: <1386792029-23148-1-git-send-email-broonie@kernel.org>
- <1386792029-23148-2-git-send-email-broonie@kernel.org>
- <20131212113512.GC28621@e103034-lin>
- <20131212120649.GB5367@sirena.org.uk>
- <20131212133643.GE28621@e103034-lin>
- <20131212173912.GF3382@arm.com>
-Message-ID: <20131212180626.GQ11044@sirena.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 12 Dec 2013 13:07:58 -0500 (EST)
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+In-Reply-To: <20131212172049.GU4360@n2100.arm.linux.org.uk>
+References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
+ <20131212124015.GL4360@n2100.arm.linux.org.uk>
+ <1386855390.22947.68.camel@sakura.staff.proxad.net>
+ <20131212144853.GO4360@n2100.arm.linux.org.uk>
+ <1386860657.25449.3.camel@sakura.staff.proxad.net>
+ <20131212154110.GQ4360@n2100.arm.linux.org.uk> <20131212160426.GD31816@1wt.eu>
+ <20131212164748.GS4360@n2100.arm.linux.org.uk> <20131212171108.GA2337@1wt.eu>
+ <20131212172049.GU4360@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.10.1312121305240.15948@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 05:39:12PM +0000, Catalin Marinas wrote:
+On Thu, 12 Dec 2013, Russell King - ARM Linux wrote:
 
-> If we can't really guarantee the effect of this patch, I would rather
-> keep it in the LSK kernel only until the scheduler is fixed (can this be
-> treated as a performance issue independent of the power-aware
-> scheduling? We could get it merged quicker).
+> static inline __sum16 csum_fold(__wsum sum)
+> {
+>         __asm__(
+>         "add    %0, %1, %1, ror #16     @ csum_fold"
+>         : "=r" (sum)
+>         : "r" (sum)
+>         : "cc");
+>         return (__force __sum16)(~(__force u32)sum >> 16);
+> }
 
-My understanding is that the behaviour is reasonably well understood,
-it's just not great in all situations (hence all the energy aware
-scheduler work) but then the default scheduler behaviour isn't that good
-either and possibly worse (hence all the energy aware scheduler work).
+There is no longer any flag updates so you should remove "cc" from the 
+clobber list as well.
 
-I think if we're that worried about problems that might be caused by
-doing this we should remove the equivalent ARMv7 code to keep the two in
-parity in terms of behaviour - it's going to be enough work getting
-big.LITTLE working well without introducing software only differences
-between ARMv7 and ARMv8 big.LITTLE.  If you're dead set on that then I
-can do patches for that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/dc55693b/attachment-0001.sig>
+
+Nicolas
