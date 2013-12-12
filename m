@@ -1,60 +1,94 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Thu, 12 Dec 2013 08:12:50 +0530
-Subject: [PATCH 0/5] Power Related Fixes for Exynos5250
-In-Reply-To: <1474895.cu1U1Gy5We@amdc1227>
-References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
- <1474895.cu1U1Gy5We@amdc1227>
-Message-ID: <CAM4voa=Vxy72EzRTNmraRgPz7WeJX1QSU6dC2bLjHi=5t9arHw@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Thu, 12 Dec 2013 02:43:14 +0000
+Subject: [RFCv2 endianess 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <e806828e7d4f488c88d7bd05bdd007d2@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1386309134-1822-1-git-send-email-Li.Xiubo@freescale.com>
+ <1386309134-1822-2-git-send-email-Li.Xiubo@freescale.com>
+ <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
+ <e806828e7d4f488c88d7bd05bdd007d2@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <d6985022e8aa4e21b618205ddf521d9f@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Mark,
 
-On Wed, Dec 11, 2013 at 6:11 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Abhilash,
->
-> On Wednesday 11 of December 2013 17:27:04 Abhilash Kesavan wrote:
->> Patch 1 prevents the gating of sysreg clock on Exynos5250.
->> Patch 2 is a re-send of an earlier patch.
->> (http://www.spinics.net/lists/linux-samsung-soc/msg15485.html)
->> Patches 3 and 4 are fixes for MAX77686 on Exynos5250 based Snow
->> board (boot-up issues).
->> Patch 5 implements a power-off call-back for Exynos5250 that can
->> be re-used for Exynos5420.
->>
->> The patches have been tested on an SMDK5250 based Chromebook.
->>
->> Abhilash Kesavan (4):
->>   clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag for the sysreg
->>     clock
->>   ARM: EXYNOS5: Fix PMU register configuration for local power blocks
->>   clk: max77686: Replace is_enabled() with is_prepared call-back
->>   ARM: dts: Setup the interrupt parent for max77686
->>
->> Olof Johansson (1):
->>   ARM: EXYNOS5250: Implement pm_power_off
->>
->>  arch/arm/boot/dts/cros5250-common.dtsi       |   11 ++++
->>  arch/arm/mach-exynos/include/mach/regs-pmu.h |    3 +
->>  arch/arm/mach-exynos/pmu.c                   |   86 ++++++++++++++++++++------
->>  drivers/clk/clk-max77686.c                   |    4 +-
->>  drivers/clk/samsung/clk-exynos5250.c         |    3 +-
->>  5 files changed, 86 insertions(+), 21 deletions(-)
->
-> You used the old and now invalid address of DT mailing list.
->
-> Anyway, there is no need to send patches for .dts* files to DT mailing
-> list anymore. Just changes in drivers that affect how they handle data
-> from DT and binding documentation (Documentation/devicetree/.*). So
-> please drop the DT mailing list in next iteration of the series.
 
-Thanks for the pointer. I'll take care in the future.
->
-> Best regards,
-> Tomasz
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > > > +             const void __iomem *addr)
+> > > > +{
+> > > > +     if (likely(fpc->big_endian))
+> > > > +             return ioread32be(addr);
+> > > > +     else
+> > > > +             return readl(addr);
+> > > > +}
+> >
+> > It looks a little odd to to have two different accessors here.
+> >
+> > Could these not be unified somehow?
+> >
+> 
+> How about the following :
+> 
+> +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> +			const void __iomem *addr)
+> +{
+> +	u32 val;
+> +
+> +	if (likely(fpc->big_endian))
+> +		val = be32_to_cpu(__raw_readl(addr));
+> +	else
+> +		val = le32_to_cpu(__raw_readl(addr));
+> +
+> +	rmb();
+> +
+> +	return val;
+> +}
+> +
+> +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
+> +			u32 val, void __iomem *addr)
+> +{
+> +	wmb();
+> +
+> +	if (likely(fpc->big_endian))
+> +		__raw_writel(cpu_to_be32(val), addr);
+> +	else
+> +		__raw_writel(cpu_to_le32(val), addr);
+> +}
+> +
+> 
+> 
+
+Or, will these be much better ?
++++++++++++
++static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
++		const void __iomem *addr)
++{
++	u32 val;
++
++	if (likely(fpc->big_endian))
++		val = be32_to_cpu((__force __be32)__raw_readl(addr));
++	else
++		val = le32_to_cpu((__force __le32)__raw_readl(addr));
++
++	rmb();
++
++	return val;
++}
++
++static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
++		u32 val, void __iomem *addr)
++{
++	wmb();
++
++	if (likely(fpc->big_endian))
++		__raw_writel((__force u32)cpu_to_be32(val), addr);
++	else
++		__raw_writel((__force u32)cpu_to_le32(val), addr); }
++
+-----------
+
+
+Thanks,
+--
+Xiubo
