@@ -1,41 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 12 Dec 2013 00:53:00 -0800
-Subject: [PATCH] net: eth: 8390: remove section warning in etherh.c
-In-Reply-To: <CAP8WD_aJEmBYbM0BmQodGJsOPqZ+vqk9B15n297q_+aCorR=VQ@mail.gmail.com>
-References: <1386837577-15130-1-git-send-email-olof@lixom.net>
- <CAP8WD_aJEmBYbM0BmQodGJsOPqZ+vqk9B15n297q_+aCorR=VQ@mail.gmail.com>
-Message-ID: <CAOesGMj_0m-Y8TvrZF=zgT33RuDtismjY=k6pbfm+MFmp2p=_w@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 12 Dec 2013 09:53:13 +0100
+Subject: [PATCH v2 1/9] arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
+In-Reply-To: <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <52A97979.1030205@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 12:46 AM, tedheadster <tedheadster@gmail.com> wrote:
-> On Thu, Dec 12, 2013 at 3:39 AM, Olof Johansson <olof@lixom.net> wrote:
->>
->> Commit c45f812f0280 ('8390 : Replace ei_debug with msg_enable/NETIF_MSG_*
->> feature') ended up moving the printout of version[] from something that
->> will be compiled out due to defines, to something that is now evaluated
->> at runtime.
->>
->> That means that what always used to be an access to an __initdata string
->> from non-__init code started showing up as a section mismatch when it
->> didn't before.
->>
->> All other 8390 versions skip __initdata on the version string, and
->> starting to annotate the whole chain of callers with __init seems like
->> more churn than it's worth on this driver, so remove it from etherh.c as
->> well.
->>
->
-> Olof,
->   should you also remove the __init tag from etherh_banner() since it is
-> called from etherh_probe(), which does not have an __init tag?
+On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
+> The bindings for the TTC changed in commit 'arm: zynq: Use standard
+> timer binding' (e932900a3279b5dbb6d8f43c7b369003620e137c). That change
+> removed possible subnodes from this driver rendering the 'clock-ranges'
+> property invalid for this node.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
 
-Hmm.
+I think this is completely unrelated to cpufreq and should just go
+directly via arm-soc tree.
+If yes, I will add 1/9 and 2/9 to zynq/dt branch.
 
-The section warning functionality is clever enough to not trigger when
-a function is named _probe() and references __initdata, and discarding
-etherh_banner() should be just fine so I don't see a need to remove
-it.
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
 
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/10c9cf34/attachment.sig>
