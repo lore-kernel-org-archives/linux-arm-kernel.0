@@ -1,64 +1,111 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Dec 2013 11:55:39 -0800
-Subject: [PATCH 00/10] Support VGIC save/restore using device control API
-Message-ID: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+Date: Thu, 12 Dec 2013 11:55:40 -0800
+Subject: [PATCH 01/10] ARM: KVM: Allow creating the VGIC after VCPUs
+In-Reply-To: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1386878149-13397-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement save/restore of the VGIC state using the newer KVM Device
-Control API.  This requries some number of changes to existing code in
-addition to actually supporting save/restore of the necessary state.
+Rework the VGIC initialization slightly to allow initialization of the
+vgic cpu-specific state even if the irqchip (the VGIC) hasn't been
+created by user space yet.  This is safe, because the vgic data
+structures are already allocated when the CPU is allocated if VGIC
+support is compiled into the kernel.  Further, the init process does not
+depend on any other information and the sacrifice is a slight
+performance degradation for creating VMs in the no-VGIC case.
 
-The first patches (01-03) support creating the VGIC using the Device
-Control API.  This change is necessary because there are no other
-suitable KVM APIs that we can leverage to access the VGIC state from
-user space and the device control API was crafted exactly for this
-purpose.
+The reason is that the new device control API doesn't mandate creating
+the VGIC before creating the VCPU and it is unreasonable to require user
+space to create the VGIC before creating the VCPUs.
 
-Subsequent patches add the missing infrastructure and user space API
-pieces necessary to actually save and restore the VGIC state.  The GIC
-v2.0 architecture specification already specifies registers that can be
-used to save and restore the complete VGIC state for suspend/resume
-purposes on real hardware, and we can reuse this interface for the
-VGIC.  The API is therefore based on the memory-mapped register accesses
-defined in the specs.  See the individual patches for details.
+At the same time move the irqchip_in_kernel check out of
+kvm_vcpu_first_run_init and into the init function to make the per-vcpu
+and global init functions symmetric and add comments on the exported
+functions making it a bit easier to understand the init flow by only
+looking at vgic.c.
 
-The patches are based on kvm-arm-next with the arch timers save/restore
-patches applied:
-git://git.linaro.org/people/cdall/linux-kvm-arm.git timer-migrate-v4
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/kvm/arm.c  |  7 ++++---
+ virt/kvm/arm/vgic.c | 22 +++++++++++++++++++---
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
-This patch series based on the above can be cloned from:
-git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v4
-
-User space patches for QEMU have also been posted on the list, but an
-updated version is underway.  Tested on Versatile Express TC2.
-
-Changelogs in the individual patches.
-
-Christoffer Dall (10):
-  ARM: KVM: Allow creating the VGIC after VCPUs
-  KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
-  KVM: arm-vgic: Set base addr through device API
-  irqchip: arm-gic: Define additional MMIO offsets and masks
-  KVM: arm-vgic: Make vgic mmio functions more generic
-  arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
-  KVM: arm-vgic: Add vgic reg access from dev attr
-  KVM: arm-vgic: Support unqueueing of LRs to the dist
-  KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
-  KVM: arm-vgic: Support CPU interface reg access
-
- Documentation/virtual/kvm/api.txt              |   7 +-
- Documentation/virtual/kvm/devices/arm-vgic.txt |  73 ++++
- arch/arm/include/uapi/asm/kvm.h                |   8 +
- arch/arm/kvm/arm.c                             |  17 +-
- include/kvm/arm_vgic.h                         |   2 +-
- include/linux/irqchip/arm-gic.h                |  12 +
- include/linux/kvm_host.h                       |   1 +
- include/uapi/linux/kvm.h                       |   1 +
- virt/kvm/arm/vgic.c                            | 581 +++++++++++++++++++++++--
- virt/kvm/kvm_main.c                            |   6 +-
- 10 files changed, 670 insertions(+), 38 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 13205bd..c9fe9d7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -464,6 +464,8 @@ static void update_vttbr(struct kvm *kvm)
+ 
+ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ {
++	int ret;
++
+ 	if (likely(vcpu->arch.has_run_once))
+ 		return 0;
+ 
+@@ -473,9 +475,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * Initialize the VGIC before running a vcpu the first time on
+ 	 * this VM.
+ 	 */
+-	if (irqchip_in_kernel(vcpu->kvm) &&
+-	    unlikely(!vgic_initialized(vcpu->kvm))) {
+-		int ret = kvm_vgic_init(vcpu->kvm);
++	if (unlikely(!vgic_initialized(vcpu->kvm))) {
++		ret = kvm_vgic_init(vcpu->kvm);
+ 		if (ret)
+ 			return ret;
+ 	}
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 81e9481..5e9df47 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1243,15 +1243,19 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
++/**
++ * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
++ * @vcpu: pointer to the vcpu struct
++ *
++ * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
++ * this vcpu and enable the VGIC for this VCPU
++ */
+ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int i;
+ 
+-	if (!irqchip_in_kernel(vcpu->kvm))
+-		return 0;
+-
+ 	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
+ 		return -EBUSY;
+ 
+@@ -1383,10 +1387,22 @@ out:
+ 	return ret;
+ }
+ 
++/**
++ * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
++ * @kvm: pointer to the kvm struct
++ *
++ * Map the virtual CPU interface into the VM before running any VCPUs.  We
++ * can't do this at creation time, because user space must first set the
++ * virtual CPU interface address in the guest physical address space.  Also
++ * initialize the ITARGETSRn regs to 0 on the emulated distributor.
++ */
+ int kvm_vgic_init(struct kvm *kvm)
+ {
+ 	int ret = 0, i;
+ 
++	if (!irqchip_in_kernel(kvm))
++		return 0;
++
+ 	mutex_lock(&kvm->lock);
+ 
+ 	if (vgic_initialized(kvm))
 -- 
 1.8.4.3
