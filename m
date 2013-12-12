@@ -1,61 +1,52 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Dec 2013 16:30:26 -0800
-Subject: [PATCH 1/5] clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag
- for the sysreg clock
-In-Reply-To: <CA+Ln22EQnpLfjcCOAY7U-tpc--XFy=dnwUr7K577x_ker4KuHw@mail.gmail.com>
-References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
- <1386763029-8516-2-git-send-email-a.kesavan@samsung.com>
- <CAD=FV=WK-zgcNvF6qtnsRky3RbEvBOW+1uNiUR-fyp2257gPPw@mail.gmail.com>
- <CA+Ln22EQnpLfjcCOAY7U-tpc--XFy=dnwUr7K577x_ker4KuHw@mail.gmail.com>
-Message-ID: <CAD=FV=XG+5n+SW_bDiFtQB7ieViAxVAO5E12+y-DgY34maT6DQ@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 12 Dec 2013 09:39:07 +0900
+Subject: [PATCH 01/12] SPEAr13xx: Correct dt field name for stmmac phy-addr
+In-Reply-To: <52A847D1.5000409@st.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <1078549fa412fb34ab2c95a6232096570abee12d.1386752447.git.mohit.kumar@st.com>
+ <52A847D1.5000409@st.com>
+Message-ID: <001b01cef6d2$9104f7b0$b30ee710$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Wednesday, December 11, 2013 8:09 PM, Rajeev kumar wrote:
+> On 12/11/2013 3:08 PM, Mohit KUMAR wrote:
+> > DT field name for the phy address changed since kernel 3.10. Set the
+> > snps,phy-addr to 0xffffffff so that the driver probes for the phy.
+> >
+> > Signed-off-by: Mohit Kumar<mohit.kumar@st.com>
+> > Cc: Pratyush Anand<pratyush.anand@st.com>
+> > Cc: Viresh Kumar<viresh.linux@gmail.com>
+> > Cc: spear-devel at list.st.com
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: devicetree at vger.kernel.org
+> > ---
+> >   arch/arm/boot/dts/spear13xx.dtsi |    1 +
+> >   1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+> > index 4382547..3518803 100644
+> > --- a/arch/arm/boot/dts/spear13xx.dtsi
+> > +++ b/arch/arm/boot/dts/spear13xx.dtsi
+> > @@ -155,6 +155,7 @@
+> >
+> >   		gmac0: eth at e2000000 {
+> >   			compatible = "st,spear600-gmac";
+> > +			snps,phy-addr =<0xffffffff>;
+> 
+> Don't you think it should be st,phy-addr =<0xffffffff>, as the
+> manufacturer is 'st' as the compatible suggest
 
-On Wed, Dec 11, 2013 at 4:13 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> 2013/12/12 Doug Anderson <dianders@chromium.org>:
->> This does match what's done in exynos4 and exynos5420 and it's not
->> terrible.  I'm always a fan of actually specifying clocks properly and
->> that's more possible now using the syscon stuff (see Leela Krishna's
->> watchdog patches).  You'd have to extend that to add a clock, but that
->> wouldn't be too hard.
->
-> Leela's patches are about PMU, not sysreg, but that's not an issue, I guess,
-> as it's about adding a clock to the generic syscon driver.
+Hi Rajeev Kumar,
 
-Right.  I was proposing doing something similar to his, but for the
-separate "sysreg" address range.  ...then adding a clock to the
-generic syscon driver.
+According to the Documentation, it guides to use 'snps' prefix.
 
-I _think_ the syscon clock doesn't really need to be always on--it
-only needs to be on during the access of these registers, right?  I
-make this statement based on the fact that exynos5250 boards currently
-bootup and are very functional, but this clock is currently off.
+In my humble opinion,
+'gmac' is a Synopsys based IP. Thus, if 'snps,phy-addr' is
+not ST specific, 'snps' prefix can be used.
 
+./Documentation/devicetree/bindings/net/stmmac.txt
+- snps,phy-addr         phy address to connect to.
 
-> Still, I discussed about such cases as this with Sylwester a bit today and
-> maybe a bit different approach would be better. There is a number of clocks
-> that need to be always on, such as PMU (but also a lot of currently undefined
-> ones). IMHO it would be nice to make sure they are enabled at boot time
-> and do one of following:
-> 1) claim and enable them directly from the clock controller driver
-> 2) define them with CLK_IGNORE_UNUSED flag and enable them directly from
->    the clock controller driver (without increasing the refcount, so users could
->    possibly disable them later),
-> 3) add a generic flag, such as CLK_BOOT_ENABLE (or something), that would
->    make the CCF enable such clock at bootup (in addition to implying
->    CLK_IGNORE_UNUSED).
->
-> For me, the most sensible option would be 2) as it doesn't bloat the CCF with
-> yet another flag and doesn't encourage people to leave clocks always on
-> just because of laziness stopping them from implementing proper clock
-> support in drivers.
-
-Right, we're using #2 for this now, but one problem is that it's
-possible that the firmware may turn off one of these misc-type clocks.
- On exynos5250-snow we ran into this.  The firmware actually gates the
-clock needed for accessing the chip_id, though perhaps that's not one
-of the clocks that needs to be on all the time.
-
--Doug
+Best regards,
+Jingoo Han
