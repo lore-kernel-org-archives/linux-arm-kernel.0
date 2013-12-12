@@ -1,66 +1,37 @@
-From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Thu, 12 Dec 2013 13:09:59 +0100
-Subject: [PATCH 6/8] add support to supplement atags to device tree
-In-Reply-To: <20131211190052.GD10053@titan.lakedaemon.net>
-References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
- <1386767259-15693-7-git-send-email-p.wilczek@samsung.com>
- <20131211190052.GD10053@titan.lakedaemon.net>
-Message-ID: <008201cef733$15a2b2e0$40e818a0$%wilczek@samsung.com>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Thu, 12 Dec 2013 13:14:04 +0100
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+Message-ID: <1386850444.22947.46.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
 
-> -----Original Message-----
-> From: Jason Cooper [mailto:jason at lakedaemon.net]
-> Sent: Wednesday, December 11, 2013 8:01 PM
-> To: Piotr Wilczek
-> Cc: devicetree-discuss at lists.ozlabs.org; linux-arm-
-> kernel at lists.infradead.org; Daniel Mack; Nicolas Pitre; Kyungmin Park
-> Subject: Re: [PATCH 6/8] add support to supplement atags to device tree
-> 
-> Piotr,
-> 
-> First, thanks for the patch series!
-> 
-> On Wed, Dec 11, 2013 at 02:07:37PM +0100, Piotr Wilczek wrote:
-> > Signed-off-by: Piotr Wilczek <p.wilczek@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  Makefile          |    9 +-
-> >  atags.h           |    2 +
-> >  atags_to_fdt.c    |  197 +++++++
-> >  fdt.c             |  224 ++++++++
-> >  fdt_ro.c          |  576 +++++++++++++++++++++
-> >  fdt_rw.c          |  494 ++++++++++++++++++
-> >  fdt_wip.c         |  120 +++++
-> >  libfdt.h          | 1478
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  libfdt_env.h      |   13 +
-> >  libfdt_internal.h |   95 ++++
-> >  main.c            |    4 +
-> >  setup.h           |  187 +++++++
-> >  types.h           |   28 +
-> >  13 files changed, 3426 insertions(+), 1 deletion(-)  create mode
-> > 100644 atags_to_fdt.c  create mode 100644 fdt.c  create mode 100644
-> > fdt_ro.c  create mode 100644 fdt_rw.c  create mode 100644 fdt_wip.c
-> > create mode 100644 libfdt.h  create mode 100644 libfdt_env.h  create
-> > mode 100644 libfdt_internal.h  create mode 100644 setup.h
-> 
-> I was actually working on this, but you beat me to it :)
-Sorry, I didn't know.
+Hello,
 
-> 
-> Could you copy the libfdt directory out of dtc and use it as is?
-> That'll make upgrading in the future easier. iow, place these files in
-> libfdt/.
-> 
-I will move it to the libfdt directory.
+I tried using csum_tcpudp_magic() like this:
 
-> 
-> thx,
-> 
-> Jason.
+csum_tcpudp_magic(src, dst, ntohs(udph->len), IPPROTO_UDP, csum);
 
-Best regards,
-Piotr
+instead of the more common:
+
+len = ntohs(udhp->len);
+[...]
+csum_tcpudp_magic(src, dst, len, IPPROTO_UDP, csum);
+
+the first one gives a bad checksum while the second one is ok.
+
+
+I've tracked down the problem to csum_tcpudp_nofold(), which uses inline
+asm and an unsigned short for len.
+
+If the len value is say 0x3412, and I pass ntohs(len), then the assigned
+register for len contains 0x00341234 instead of the expected 0x1234.
+
+The ntohs() expand to a dumb swab16 on my arch, and gcc does the swap
+but does not clear the high nibble, I guess it expects the assembly code
+to only use the low 16 bits.
+
+Is there a missing constraint or gcc is doing something wrong here ?
+
+-- 
+Maxime
