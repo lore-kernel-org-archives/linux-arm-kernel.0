@@ -1,39 +1,50 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Dec 2013 15:57:15 -0800
-Subject: [PATCH 5/5] ARM: dts: Setup the interrupt parent for max77686
-In-Reply-To: <1386763029-8516-6-git-send-email-a.kesavan@samsung.com>
-References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
- <1386763029-8516-6-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CAD=FV=Vkobnvk1tic5eLkoXzniqRYFM4BhWkW+_7AL25Hd9iwQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 11 Dec 2013 17:11:44 -0700
+Subject: [PATCH 00/31] ARM: tegra: use common reset and DMA bindings
+In-Reply-To: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+References: <1384548866-13141-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <52A8FF40.6000809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhliash,
+On 11/15/2013 01:53 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> This series implements a common reset framework driver for Tegra, and
+> updates all relevant Tegra drivers to use it. It also removes the custom
+> DMA bindings and replaced them with the standard DMA DT bindings.
+> 
+> Historically, the Tegra clock driver has exported a custom API for module
+> reset. This series removes that API, and transitions DT and drivers to
+> the new reset framework.
+> 
+> The custom API used a "struct clk" to identify which module to reset, and
+> consequently some DT bindings and drivers required clocks to be provided
+> where they really needed just a reset identifier instead. Due to this
+> known deficiency, I have always considered most Tegra bindings to be
+> unstable. This series removes this excuse for instability, although I
+> still consider some Tegra bindings unstable due to the need to convert to
+> the common DMA bindings.
+> 
+> Historically, Tegra DMA channels have been represented in DT using a
+> custom nvidia,dma-request-selector property. Now that standard DMA DT
+> bindings exist, convert all Tegra bindings, DTs, and drivers to use the
+> standard instead.
+> 
+> This series makes a DT-ABI-incompatible change to:
+> - Require reset specifiers in DT where relevant.
+> - Require standard DMA specifiers.
+> - Remove clock specifiers from DT where they were only needed for reset.
+> - Remove legacy DMA specifier properties.
+> 
+> I anticipate merging this whole series into the Tegra and arm-soc trees
+> as its own branch, due to internal dependencies. This branch will be
+> stable and can then be merged into any other subsystem trees should any
+> conflicts arise.
+> 
+> This series depends on Peter's Tegra clock driver rework, available at
+> git://nv-tegra.nvidia.com/user/pdeschrijver/linux tegra-clk-tegra124-0
+> (or whatever version of that gets included in 3.14)
 
-On Wed, Dec 11, 2013 at 3:57 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> Fix the following warning message:
-> [ 2921.671238] WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:399 irq_create_mapping+0xe4/0xfc()
-> [ 2921.679907] irq_create_mapping(, b) called with NULL domain
-> [ 2921.685462] Modules linked in:
-> [ 2921.688498] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0-rc1-00026-g36cc776 #67
-> [ 2921.696154] [<c0013c80>] (unwind_backtrace+0x0/0xf8) from [<c00110cc>] (show_stack+0x10/0x14)
-> [ 2921.704654] [<c00110cc>] (show_stack+0x10/0x14) from [<c03779fc>] (dump_stack+0x64/0xa4)
-> [ 2921.712725] [<c03779fc>] (dump_stack+0x64/0xa4) from [<c001c830>] (warn_slowpath_common+0x64/0x84)
-> [ 2921.721663] [<c001c830>] (warn_slowpath_common+0x64/0x84) from [<c001c8e4>] (warn_slowpath_fmt+0x30/0x40)
-> [ 2921.731210] [<c001c8e4>] (warn_slowpath_fmt+0x30/0x40) from [<c005a564>] (irq_create_mapping+0xe4/0xfc)
-> [ 2921.740590] [<c005a564>] (irq_create_mapping+0xe4/0xfc) from [<c029c85c>] (max77686_rtc_probe+0x110/0x21c)
-> [ 2921.750221] [<c029c85c>] (max77686_rtc_probe+0x110/0x21c) from [<c02253a8>] (platform_drv_probe+0x18/0x48)
->
-> Also setup the default state of the max77686 irq line.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/boot/dts/cros5250-common.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-
-Thank you for sending stuff upstream, but I'm afraid this patch has
-already landed:
-
-c61248a ARM: dts: Add max77686 RTC interrupt to cros5250-common
-
-My patch matches yours but also includes the "wakeup-source" property.
+I've applied this series (and pulled in the DMA/ASoC/clk dependencies
+required) to Tegra's for-3.14/dmas-resets-rework branch.
