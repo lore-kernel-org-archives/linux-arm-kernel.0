@@ -1,52 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Dec 2013 17:15:36 +0000
-Subject: [PATCH v4] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <CAFEAcA8bgy7Gi6aKKiS3d20Jh+_X2AComWTH-+Bwv_gV_zU5-g@mail.gmail.com>
-References: <1386672625-8060-1-git-send-email-andre.przywara@linaro.org>
- <20131212022822.GI2871@cbox>
- <CAFEAcA_F3T1+YsKKq3h8P139OX085N-PPPPZo5dvwgwcuGoXHg@mail.gmail.com>
- <52A982BB.4030901@linaro.org>
- <CAFEAcA8bgy7Gi6aKKiS3d20Jh+_X2AComWTH-+Bwv_gV_zU5-g@mail.gmail.com>
-Message-ID: <52A9EF38.3000909@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 12 Dec 2013 20:12:51 +0200
+Subject: [PATCH 0/2] gpio: davinci: reuse for keystone arch
+Message-ID: <1386871973-26762-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/13 11:36, Peter Maydell wrote:
-> On 12 December 2013 09:32, Andre Przywara <andre.przywara@linaro.org> wrote:
->> On 12/12/2013 10:23 AM, Peter Maydell wrote:
->>> What does it mean to say that a system register for AArch64
->>> is "32 bits" given that MRS/MSR always operate on a 64 bit
->>> register?
-> 
->> But ARMv8 ARM still defines these registers as 32-bit:
->> D8.5.14: CNTV_CTL_EL0
->> Attributes
->>            CNTV_CTL_EL0 is a 32-bit register.
->> But indeed the MSR/MRS instruction references a Xt register, and the
->> documentation does not seem to tell how this is handled, so I assume this is
->> zero-extended.
-> 
-> I checked, and for AArch64 registers, "32 bits" is just
-> a shorthand for "64 bit register where the top 32 bits are
-> RAZ/WI" (and I suspect it's not totally impossible that some
-> future architecture revision might define new bits in the
-> top half).
+This series is intended to update Davinci GPIO driver and reuse
+it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
+Keystone GPIO IP: supports:
+- up to 32 GPIO lines;
+- only unbanked irqs;
 
-Indeed. Actually, there isn't an instruction to access these 32bit
-registers with a 'W' register. You really have to use a 'X'.
+See Documentation:
+Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
 
-> So I would suggest that we should make the KVM user<->kernel
-> interface just consistently make all the sysregs 64 bit.
-> 
-> (There is actually precedent of a sort here in that the
-> kernel claims the PSTATE register is 64 bits wide despite
-> it really being a 32 bit SPSR format value under the hood.)
+This series depends on:
+[1] "[PATCH 1/2] gpio: davinci: Fix a check for unbanked gpio"
+https://lkml.org/lkml/2013/11/8/22
+[2] "[PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement"
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg05970.html
+[3] "gpio: davinci: get rid of DAVINCI_N_GPIO"
+https://lkml.org/lkml/2013/11/26/405
+[4] "gpio: introduce GPIO_DAVINCI kconfig option"
+https://lkml.org/lkml/2013/11/26/435
+[5] "gpio: davinci: use chained_irq_enter/chained_irq_exit API"
+https://lkml.org/lkml/2013/11/26/428
 
-I definitely agree with Peter here. I'd like to keep the ABI 64bit for
-the sysregs. It makes the whole thing much nicer.
+To handle all dependencies, I've created a branch where I collected all 
+"ready to merge" patches (all acks added in patches) and this series:
+- https://github.com/grygoriyS/linux.git
+- branch: keystone-master-gpio-for-next
 
-Thanks,
+The "keystone-master-gpio-for-next" based on:
+ https://git.kernel.org/cgit/linux/kernel/git/ssantosh/linux-keystone.git
+ branch: keystone/master
 
-	M.
++ where I've merged in:
+ https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git
+ branch: fixes
+
+List of commits:
+ 6fb66de gpio: davinci: reuse for Keystone SoC
+ c0c5422 gpio: davinci: don't create irq_domain in case of unbanked irqs
+ df9f7bc gpio: davinci: use chained_irq_enter/chained_irq_exit API
+ 6230c92 gpio: davinci: introduce GPIO_DAVINCI kconfig option
+ 8b0c1a8 gpio: davinci: get rid of DAVINCI_N_GPIO
+ 5eb07f7 gpio: davinci: add OF support
+ df3e59d gpio: davinci: remove unused variable intc_irq_num
+ 38804b6 gpio: davinci: converts to use irqdomain
+ 94eac24 gpio: davinci: use {readl|writel}_relaxed() instead of __raw_*
+
+CC: Linus Walleij <linus.walleij@linaro.org>
+CC: Sekhar Nori <nsekhar@ti.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Grygorii Strashko (2):
+  gpio: davinci: don't create irq_domain in case of unbanked irqs
+  gpio: davinci: reuse for Keystone SoC
+
+ .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+ drivers/gpio/gpio-davinci.c                        |   83 ++++++++++++++------
+ 2 files changed, 59 insertions(+), 28 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.5
