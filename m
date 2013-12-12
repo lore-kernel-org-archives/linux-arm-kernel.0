@@ -1,37 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Dec 2013 10:27:57 +0000
-Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <52A95EE8.2060209@linaro.org>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <20131211141224.GG26730@mudshark.cambridge.arm.com>
- <20131211141503.GX11468@sirena.org.uk>
- <20131211142431.GD596@darko.cambridge.arm.com>
- <52A95EE8.2060209@linaro.org>
-Message-ID: <20131212102757.GF11044@sirena.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Dec 2013 18:31:43 +0800
+Subject: [PATCH 04/10] net: stmmac: sunxi platfrom extensions for GMAC in
+ Allwinner A20 SoC's
+In-Reply-To: <20131212090415.GQ3651@lukather>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A52C.50605@st.com>
+ <CAGb2v67WiCaMpJEzA_X6o7uOu6i3w3FCEz7=N5HY0amQb01SZA@mail.gmail.com>
+ <52A72C6D.60100@st.com>
+ <CAGb2v64qQvqJSicA6MTAxeh1sGjWY=Pk=vDq=9J3pTQW+wkXrA@mail.gmail.com>
+ <52A87A74.8040807@st.com> <20131212090415.GQ3651@lukather>
+Message-ID: <CAGb2v655_83b76PTmgkDmNGCADWwTjTwW13sOgM5HFmCVkeu=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 02:59:52PM +0800, Hanjun Guo wrote:
-> On 2013-12-11 22:24, Catalin Marinas wrote:
+Hi,
 
-> > Lorenzo (on holiday now) pushed the DT topology bindings but there are
-> > no patches yet for reading them. I would much prefer to only describe
-> > the topology via DT rather than MPIDR (because hardware people sometimes
-> > have strange ideas).
+On Thu, Dec 12, 2013 at 5:04 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Dec 11, 2013 at 02:45:08PM +0000, srinivas kandagatla wrote:
+>> >>> 1. .tx_coe
+>> >>>    This is not exported in the DT bindings.
+>> >>>    Looking at stmmac code, not setting this seems to disable all
+>> >>>    checksum offloading.
+>> >>
+>> >> Why cant this go via DT as well?
+>> >
+>> > If you and Giuseppe are OK with this, why not?
+>> Am Ok with it.
+>
+> Please note that I'm opposed to this until someone explain why putting
+> it in the DT is relevant (and not just convenient).
 
-> Topology code for ARM32 is based on MPIDR now, should we update it too with
-> describing the topology via DT?
+Checksum offloading is an optional feature[1], implemented starting
+from version 3.20a. It is not tied to a specific IP version. As such,
+using a "snps,dwmac-<version>" compatible isn't a good fit here.
 
-Yes, the binding is supposed to apply to both so it'd be good to support
-it on pre-v8.  However using MPIDR should continue to be supported on
-pre-v8 as existing systems don't use the topology binding and so
-presumably have accurate MPIDRs, requiring the binding would be a
-regression for them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/d51be8f5/attachment.sig>
+stmmac does auto-detection for optional features on MAC version > 3.50a.
+This is what Srinivas was referring to.
+
+Unfortunately, our MAC is < 3.50a. No auto-detection. We could add a
+"snps,dwmac-tx-coe" compatible for this, or the seperate DT property.
+
+The other way would be to pass the flags in the initial .data with the
+SoC specific compatible. Other SoCs with the same feature won't be
+able to reuse the same compatible though.
+
+
+ChenYu
+
+[1] http://www.synopsys.com/dw/dwtb.php?a=ethernet_mac
