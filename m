@@ -1,97 +1,72 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Thu, 12 Dec 2013 08:13:23 +0530
-Subject: [PATCH 2/5] ARM: EXYNOS5: Fix PMU register configuration for
- local power blocks
-In-Reply-To: <1555673.59jhB0RKpX@amdc1227>
-References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
- <1386763029-8516-3-git-send-email-a.kesavan@samsung.com>
- <1555673.59jhB0RKpX@amdc1227>
-Message-ID: <CAM4voamk2j1XEt6Pbt1DtNcY+UrFcK4XsAW2OwYgaXLSpLDOnw@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 12 Dec 2013 11:46:21 +0900
+Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <1386757818-5154-1-git-send-email-marex@denx.de>
+References: <1386757818-5154-1-git-send-email-marex@denx.de>
+Message-ID: <002a01cef6e4$57583ce0$0608b6a0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Wednesday, December 11, 2013 7:30 PM, Marek Vasut wrote:
+> 
+> Some boards do not have a PCIe reset GPIO. To avoid probe
+> failure on these boards, make the reset GPIO optional as
+> well.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Frank Li <lznuaa@gmail.com>
+> Cc: Harro Haan <hrhaan@gmail.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> Cc: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Sean Cross <xobs@kosagi.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> Cc: Tim Harvey <tharvey@gateworks.com>
+> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> Cc: Yinghai Lu <yinghai@kernel.org>
+> ---
+>  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+>  drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
+>  2 files changed, 16 insertions(+), 15 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> index d5d26d4..b7a2279 100644
+> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> @@ -19,9 +19,9 @@ Required properties:
+>  	to define the mapping of the PCIe interface to interrupt
+>  	numbers.
+>  - num-lanes: number of lanes to use
+> -- reset-gpio: gpio pin number of power good signal
+> 
+>  Optional properties for fsl,imx6q-pcie
+> +- reset-gpio: gpio pin number of power good signal
 
-On Wed, Dec 11, 2013 at 5:59 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Abhilash,
->
-> [dropping invalid address of DT mailing list]
->
-> Please see my comments inline.
->
-> On Wednesday 11 of December 2013 17:27:06 Abhilash Kesavan wrote:
->> For the six local power blocks - MFC, DISP1, GSC, MAU, G3D and ISP
->> the respective CMU_RESET, CMU_SYSCLK and CMU_CLKSTOP registers need
->> to be low initially for normal mode on Exynos5250.
->> Also fix the corresponding AFTR and LPA configurations.
->>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pmu.c |   66 ++++++++++++++++++++++++++++++++------------
->>  1 file changed, 48 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
->> index 97d6885..5f4d26b 100644
->> --- a/arch/arm/mach-exynos/pmu.c
->> +++ b/arch/arm/mach-exynos/pmu.c
->> @@ -296,24 +296,24 @@ static struct exynos_pmu_conf exynos5250_pmu_config[] = {
->>       { EXYNOS5_G3D_SYS_PWR_REG,                      { 0x7, 0x0, 0x0} },
->>       { EXYNOS5_DISP1_SYS_PWR_REG,                    { 0x7, 0x0, 0x0} },
->>       { EXYNOS5_MAU_SYS_PWR_REG,                      { 0x7, 0x7, 0x0} },
->> -     { EXYNOS5_CMU_CLKSTOP_GSCL_SYS_PWR_REG,         { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_CLKSTOP_ISP_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_CLKSTOP_MFC_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_CLKSTOP_G3D_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_CLKSTOP_DISP1_SYS_PWR_REG,        { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_CLKSTOP_MAU_SYS_PWR_REG,          { 0x1, 0x1, 0x0} },
->> -     { EXYNOS5_CMU_SYSCLK_GSCL_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_SYSCLK_ISP_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_SYSCLK_MFC_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_SYSCLK_G3D_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_SYSCLK_DISP1_SYS_PWR_REG,         { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_SYSCLK_MAU_SYS_PWR_REG,           { 0x1, 0x1, 0x0} },
->> -     { EXYNOS5_CMU_RESET_GSCL_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_RESET_ISP_SYS_PWR_REG,            { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_RESET_MFC_SYS_PWR_REG,            { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_RESET_G3D_SYS_PWR_REG,            { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_RESET_DISP1_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
->> -     { EXYNOS5_CMU_RESET_MAU_SYS_PWR_REG,            { 0x1, 0x1, 0x0} },
->> +     { EXYNOS5_CMU_CLKSTOP_GSCL_SYS_PWR_REG,         { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_CLKSTOP_ISP_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_CLKSTOP_MFC_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_CLKSTOP_G3D_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_CLKSTOP_DISP1_SYS_PWR_REG,        { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_CLKSTOP_MAU_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_SYSCLK_GSCL_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_SYSCLK_ISP_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_SYSCLK_MFC_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_SYSCLK_G3D_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_SYSCLK_DISP1_SYS_PWR_REG,         { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_SYSCLK_MAU_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_RESET_GSCL_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_RESET_ISP_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_RESET_MFC_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_RESET_G3D_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_RESET_DISP1_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
->> +     { EXYNOS5_CMU_RESET_MAU_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
->>       { PMU_TABLE_END,},
->>  };
->>
->> @@ -337,6 +337,27 @@ static void __iomem *exynos5_list_diable_wfi_wfe[] = {
->>       EXYNOS5_ISP_ARM_OPTION,
->>  };
->>
->> +void __iomem *exynos5_list_disable_pmu_reg[] = {
->
-> static void __iomem * const exynos5_list_disable_pmu_reg[] = {
+(+cc Kishon Vijay Abraham I)
 
-Will fix and re-post.
->
-> Best regards,
-> Tomasz
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+As I said earlier,
+'reset-gpio' property can be used for 'samsung,exynos5440-pcie'.
+Thus, it is not specific for 'fsl,imx6q-pcie'.
+
+Please, modify it as below:
+
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -19,6 +19,8 @@ Required properties:
+        to define the mapping of the PCIe interface to interrupt
+        numbers.
+ - num-lanes: number of lanes to use
++
++Optional properties
+ - reset-gpio: gpio pin number of power good signal
+
+ Optional properties for fsl,imx6q-pcie
+
+Best regards,
+Jingoo Han
