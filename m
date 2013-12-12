@@ -1,45 +1,74 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 12 Dec 2013 15:28:24 +0100
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212141926.GA31816@1wt.eu>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
- <1386857410.22947.78.camel@sakura.staff.proxad.net>
- <20131212141926.GA31816@1wt.eu>
-Message-ID: <1386858504.22947.85.camel@sakura.staff.proxad.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Dec 2013 15:28:43 +0100
+Subject: [PATCH v2 0/5] net: macb updates
+In-Reply-To: <CAOesGMjcmeiBfc=EOvWazebg-9vnMuQtRC0aeHJy7Q=02RdRPA@mail.gmail.com>
+References: <1386720443-24100-1-git-send-email-soren.brinkmann@xilinx.com>
+ <CAOesGMjcmeiBfc=EOvWazebg-9vnMuQtRC0aeHJy7Q=02RdRPA@mail.gmail.com>
+Message-ID: <52A9C81B.7050007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/12/2013 08:00, Olof Johansson :
+> Hi Soren,
+>
+> On Tue, Dec 10, 2013 at 4:07 PM, Soren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+>
+>> Soren Brinkmann (5):
+>>    net: macb: Adjust tx_clk when link speed changes
+>
+> This patch causes build issues on some at91 platforms, namely
+> at91sam9263 that lacks programmable clocks. So it doesn't implement
+> clk_set_rate() and clk_round_rate().
+>
+> I don't know if there's any reasonable config option to check for
+> (that wouldn't add at91-specific stuff to the driver which we don't
+> want). So I suspect the best way would be to implement dummy versions
+> for at91 when CONFIG_AT91_PROGRAMMABLE_CLOCKS isn't set.
+>
+> Nicolas, you OK with that? It'd be something like the below
+> (copy-paste, whitespace damage, just RFC):
 
-On Thu, 2013-12-12 at 15:19 +0100, Willy Tarreau wrote:
+Well, in fact I am thinking about simply removing this 
+AT91_PROGRAMMABLE_CLOCKS option out of the AT91 Kconfig.
 
-> I disagree here, since gcc may decide by itself to inline or not, it must
-> not impact the validity of the emitted code. Inline functions have input
-> and output types for a reason!
+After all, when not specified, it only removes a few lines of code... 
+and that's it! For a so little benefit, I suspect it is sensible to 
+remove this option.
+I continue to discuss with AT91 active developers and write a patch soon.
 
-but the code emitted is completely different for an inlined "occurence"
-of the function and the non-inlined case.
+Thanks for the heads-up on this issue Olof.
 
-if a function does not use one of its argument, and it is inlined, then
-in the resulting code you see no trace of it
+Bye,
 
-> Hmmm aren't you passing a 16-bit register directly to the ASM for being used
-> as a 32-bit one ? This seems hasardous to me since nowhere you tell gcc how
-> you're going to use the register.
 
-this is exactly what I'm complaining about, the arm code for
-csum_tcpudp_nofold() in the kernel does exactly that.
+> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> index 6b2630a..17c52a7 100644
+> --- a/arch/arm/mach-at91/clock.c
+> +++ b/arch/arm/mach-at91/clock.c
+> @@ -459,6 +459,22 @@ static void __init init_programmable_clock(struct clk *clk)
+>          clk->rate_hz = parent->rate_hz / pmc_prescaler_divider(pckr);
+>   }
+>
+> +#else  /* CONFIG_AT91_PROGRAMMABLE_CLOCKS */
+> +
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +       if (rate == clk_get_rate(clk))
+> +               return 0;
+> +
+> +       return -EINVAL;
+> +}
+> +
+> +long clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +       /* There's really nothing sane to return here. */
+> +       return clk_get_rate(clk);
+> +}
+> +
+>   #endif /* CONFIG_AT91_PROGRAMMABLE_CLOCKS */
+>
 
-> Could you check if that fixes it :
-> 
->  static inline uint32_t asm_add(uint16_t len, uint32_t sum)
->  {
->          uint32_t len32 = len;
-
-or change the asm_add() proto to take an "uint32_t len" instead, and yes
-of course that fixes it.
 
 -- 
-Maxime
+Nicolas Ferre
