@@ -1,21 +1,26 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Dec 2013 16:33:37 +0100
-Subject: [PATCH 2/3] pinctrl: at91: initialize config parameter to 0
-In-Reply-To: <CACRpkdbxq-w8KquMjQVSbkEZcsMLsSRc3BqfuLLDM7c1P3UOxw@mail.gmail.com>
-References: <1386421734-10240-1-git-send-email-alexandre.belloni@free-electrons.com>	<1386421734-10240-2-git-send-email-alexandre.belloni@free-electrons.com>	<52A57E55.40808@atmel.com>	<52A5938E.40201@free-electrons.com>
- <CACRpkdbxq-w8KquMjQVSbkEZcsMLsSRc3BqfuLLDM7c1P3UOxw@mail.gmail.com>
-Message-ID: <52A9D751.9080804@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Dec 2013 15:43:09 +0000
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+In-Reply-To: <20131212152849.GC31816@1wt.eu>
+References: <20131212124015.GL4360@n2100.arm.linux.org.uk>
+ <1386855390.22947.68.camel@sakura.staff.proxad.net>
+ <yw1xppp2ji38.fsf@unicorn.mansr.com>
+ <1386857410.22947.78.camel@sakura.staff.proxad.net>
+ <20131212141926.GA31816@1wt.eu>
+ <1386858504.22947.85.camel@sakura.staff.proxad.net>
+ <yw1xd2l2jflc.fsf@unicorn.mansr.com> <20131212150745.GB31816@1wt.eu>
+ <yw1xsityhzd1.fsf@unicorn.mansr.com> <20131212152849.GC31816@1wt.eu>
+Message-ID: <20131212154309.GR4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 15:40, Linus Walleij wrote:
-> Mail it out with a [CFT: ] "call for testing" prefix.
->
+On Thu, Dec 12, 2013 at 04:28:49PM +0100, Willy Tarreau wrote:
+> On Thu, Dec 12, 2013 at 03:18:18PM +0000, M?ns Rullg?rd wrote:
+> > The ABI for function calls sign/zero-extends all arguments prior to the
+> > call.
+> 
+> OK then that's pretty clear, there's no ambiguity, thanks for the precision.
 
-I actually already sent it but without the CFT. Do you want me to resend ?
-Regards,
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Let's be clear about this: there is no GCC bug here - the kernel code
+unfortunately what is buggy.  asm() input arguments are not subject to
+this promotion irrespective of the ABI.
