@@ -1,66 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 12 Dec 2013 22:00:45 +0900
-Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
-In-Reply-To: <1386756462-26033-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1386756462-26033-1-git-send-email-ben.dooks@codethink.co.uk>
- <1386756462-26033-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20131212130045.GC30624@verge.net.au>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 12 Dec 2013 14:05:14 +0100
+Subject: regulator-core has_full_constraints set too late for dt using
+ boards ?
+In-Reply-To: <20131212122347.GK11044@sirena.org.uk>
+References: <52A88805.1080704@redhat.com>
+ <20131211160225.GB11468@sirena.org.uk> <52A98C72.2040203@redhat.com>
+ <20131212104208.GG11044@sirena.org.uk> <52A9A9DB.5050102@redhat.com>
+ <20131212122347.GK11044@sirena.org.uk>
+Message-ID: <52A9B48A.8040601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 10:07:42AM +0000, Ben Dooks wrote:
-> If the system has been started in non-secure mode, then the ARM generic
-> timer is not configurable during the kernel initialisation. Currently
-> the only thing we can check for is if the timer has been correctly
-> configured during the boot process.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+Hi,
 
-Thanks, I will queue this up.
+On 12/12/2013 01:23 PM, Mark Brown wrote:
+> On Thu, Dec 12, 2013 at 01:19:39PM +0100, Hans de Goede wrote:
+>
+>> Note my patch to not do a dev_err when no regulator is found for
+>> regulator_get_optional still is needed in -next.
+>
+> It's sitting in my review queue, it's not very well described so it's
+> not clear that you've selected the correct criteria and I need to find
+> time to actually look at it properly.
 
-> ---
->  arch/arm/mach-shmobile/setup-rcar-gen2.c | 21 ++++++++++++++++-----
->  1 file changed, 16 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> index 5734c24..b6275ab 100644
-> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> @@ -78,12 +78,23 @@ void __init rcar_gen2_timer_init(void)
->  	/* Remap "armgcnt address map" space */
->  	base = ioremap(0xe6080000, PAGE_SIZE);
->  
-> -	/* Update registers with correct frequency */
-> -	iowrite32(freq, base + CNTFID0);
-> -	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
-> +	/*
-> +	 * Update the timer if it is either not running, or is not at the
-> +	 * right frequency. The timer is only configurable in secure mode
-> +	 * so this avoids an abort if the loader started the timer and
-> +	 * entered the kernel in non-secure mode.
-> +	 */
-> +
-> +	if ((ioread32(base + CNTCR) & 1) == 0 ||
-> +	    ioread32(base + CNTFID0) != freq) {
-> +		/* Update registers with correct frequency */
-> +		iowrite32(freq, base + CNTFID0);
-> +		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
-> +
-> +		/* make sure arch timer is started by setting bit 0 of CNTCR */
-> +		iowrite32(1, base + CNTCR);
-> +	}
->  
-> -	/* make sure arch timer is started by setting bit 0 of CNTCR */
-> -	iowrite32(1, base + CNTCR);
->  	iounmap(base);
->  #endif /* CONFIG_ARM_ARCH_TIMER */
->  
-> -- 
-> 1.8.5.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I did not want to add a third boolean parameter to indicate
+_regulator_get() was being called from regulator_get_optional.
+
+Since regulator_get_optional is the only one calling
+_regulator_get() with both allow_dummy and exclusive set to
+false I've added the following condition to printing the
+error:
+
+	if (!(!allow_dummy && !exclusive))
+
+Simplified to:
+
+	if (allow_dummy || exclusive)
+
+Which means that it will get printed in all cases it would
+get printed previously, except when called from
+regulator_get_optional.
+
+Alternatively a third "optional" boolean parameter could
+get added to _regulator_get() and the test for printing the
+error could become:
+
+	if (!optional)
+
+Let me know if you would prefer doing things that way and
+I'll respin the patch.
+
+Thanks & Regards,
+
+Hans
