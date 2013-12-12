@@ -1,15 +1,15 @@
-From: m.mann@arkona-technologies.de (Matthias Mann)
-Date: Thu, 12 Dec 2013 20:29:54 +0100
-Subject: [PATCH] pci: designware: fix missing msi irqs
-In-Reply-To: <20131212182903.409515738@gmail.com>
-References: <20131212182903.409515738@gmail.com>
-Message-ID: <52AA0EB2.2070701@arkona-technologies.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Dec 2013 12:35:37 -0700
+Subject: [PATCH] ARM: tegra: add clock properties for devices of Tegra124
+In-Reply-To: <1381218460-23123-1-git-send-email-josephl@nvidia.com>
+References: <1381218460-23123-1-git-send-email-josephl@nvidia.com>
+Message-ID: <52AA1009.70706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.12.2013 19:29, schrieb Harro Haan:
-> The interrupts were cleared after the irq handler was called.
-> This means that new interrupts that occur after the handler handled
-> the previous irq but before the interrupt is cleared will be missed.
+On 10/08/2013 01:47 AM, Joseph Lo wrote:
+> This patch adds clock properties for devices in the DT for basic support
+> of Tegra124 SoC.
 
-I discovered the same issue today. I'll test that patch tomorrow.
+I've applied this to Tegra's for-3.14/dt branch, with one minor fixup to
+add a unit address to /clocks/clock in tegra124-venice2.dts.
