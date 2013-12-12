@@ -1,53 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 18:52:19 +0100
-Subject: [PATCH 5/9] ARM: at91/dt: add mmc0 slot0 support to at91rm9200ek
- board
-In-Reply-To: <52A59C9A.6000306@overkiz.com>
-References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
- <1377687995-10758-1-git-send-email-b.brezillon@overkiz.com>
- <20131120145926.GE14627@ns203013.ovh.net>
- <528CDFFB.1020601@overkiz.com>
- <CACRpkdboBg4YOnMNiar0DDBVnoky=zNky+Pzyp1=P_POtH15qQ@mail.gmail.com>
- <528DE1C4.6060900@overkiz.com>
- <CACRpkdZdweyWJefttiuiYAJ9qhahLbnj7eHUiLV_83UA41X_uQ@mail.gmail.com>
- <5294D64D.7000100@overkiz.com>
- <CACRpkdZoAjuWVpWZfvPgOAd7qB1ZBtC+45nD3SYay3SrMhqwVA@mail.gmail.com>
- <52986CA8.3010601@overkiz.com>
- <CACRpkdag5=QYsWe81ocpkMp2APaoBAOOn2r0iAVdf9DHTKrSXA@mail.gmail.com>
- <52A59C9A.6000306@overkiz.com>
-Message-ID: <CACRpkdavA+wPoms2mxxQPStH7yMATyqL6HiS8HVi9bPEXL2Sqw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 Dec 2013 17:57:54 +0000
+Subject: [PATCH] arm64: Correct virt_addr_valid
+In-Reply-To: <20131211211333.GI4360@n2100.arm.linux.org.uk>
+References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
+ <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104429.GE26730@mudshark.cambridge.arm.com>
+ <20131211110618.GG4360@n2100.arm.linux.org.uk>
+ <20131211172635.GJ26730@mudshark.cambridge.arm.com>
+ <20131211211333.GI4360@n2100.arm.linux.org.uk>
+Message-ID: <20131212175753.GG3382@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 9, 2013 at 11:34 AM, boris brezillon
-<b.brezillon@overkiz.com> wrote:
-> [Me]
->> This has been suggested under the name "GPIO hogs" in the past.
->>
->> It would work similar to how pinctrl hogs work by associating the
->> GPIO line the controller itself, using some specific string
->> like gpio-input-hogs = <...> / gpio-output-hogs = <...>;
->>
->> The gpiolib core will then grab and set up these before
->> returning from the registration call so noone ever gets a chance
->> to use them.
->
-> One more question, and I'm done :).
->
-> In which case should we use output-high or output-low config
-> instead of gpio-output-hogs ?
+On Wed, Dec 11, 2013 at 09:13:33PM +0000, Russell King - ARM Linux wrote:
+> There is actually a concern here, and that's if the v:p translation isn't
+> linear, could it return false results?
+> 
+> According to my grep skills, we have one platform where this is true -
+> Realview:
+> 
+>  * 256MB @ 0x00000000 -> PAGE_OFFSET
+>  * 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
+>  * 256MB @ 0x80000000 -> PAGE_OFFSET + 0x30000000
+> 
+> The v:p translation is done via:
+> 
+>          ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 : \
+>           (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 : \
+>           (virt) - PAGE_OFFSET)
+> 
+> Now the questions - what do values below PAGE_OFFSET give us?  Very
+> large numbers, which pfn_valid() should return false for.  What about
+> values > PAGE_OFFSET2 + 256MB?  The same.
+> 
+> So this all _looks_ fine.  Wait a moment, what about highmem?  Let's say
+> that the last 256MB is only available as highmem, and let's go back to
+> Laura's patch:
+> 
+> old:
+> #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
+> 				 ((void *)(kaddr) < (void *)high_memory))
+> new:
+> #define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+> 
+> The former _excludes_ highmem, but the latter _includes_ it.
+> 
+> virt_addr_valid(v) should only ever return _true_ for the lowmem area,
+> never anywhere else - that's part of its point.  It's there to answer
+> the question "is this a valid virtual pointer which I can dereference".
+> 
+> So... We actually need a combination of both of these tests.
 
-This is specified in Documentation/pinctrl.txt under the
-heading "GPIO mode pitfalls".
+Just to avoid any confusion, on arm64 we don't have non-linear v:p
+translation as there is plenty of VA space to live with holes. So the
+original patch is fine.
 
-Basically: the generic pinconfig output-high/output-low are
-for the case where this is a valid state for a Linux device
-driver driving a piece of hardware, like an IP-block, which
-is making use of these pins and during that usecase passes
-through states the data sheet may call "GPIO mode",
-but which are actually a way which the *device* uses
-the pins, not independent GPIO lines, like, just some
-1-bit line.
+On 32-bit, it could be a problem if you have holes in the VA space, so
+it needs both high_memory and pfn_valid checks.
 
-Yours,
-Linus Walleij
+-- 
+Catalin
