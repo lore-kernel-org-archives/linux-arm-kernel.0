@@ -1,284 +1,262 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 12 Dec 2013 16:51:20 +0100
-Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52A9DB78.1040805@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Dec 2013 17:00:45 +0100
+Subject: [PATCH] ARM: at91: remove AT91_PROGRAMMABLE_CLOCKS configuration
+ option
+In-Reply-To: <52A9C81B.7050007@atmel.com>
+References: <52A9C81B.7050007@atmel.com>
+Message-ID: <1386864045-25198-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2013 07:00 PM, Ivan Khoronzhuk wrote:
-> Add broadcast clock-event device for the Keystone arch.
->
-> The timer can be configured as a general-purpose 64-bit timer,
-> dual general-purpose 32-bit timers. When configured as dual 32-bit
-> timers, each half can operate in conjunction (chain mode) or
-> independently (unchained mode) of each other.
->
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->   drivers/clocksource/Makefile         |    1 +
->   drivers/clocksource/timer-keystone.c |  223 ++++++++++++++++++++++++++++++++++
->   2 files changed, 224 insertions(+)
->   create mode 100644 drivers/clocksource/timer-keystone.c
->
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 33621ef..2acf3fc 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -36,3 +36,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
->   obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
->   obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
->   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-> +obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-> diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-> new file mode 100644
-> index 0000000..4a8083a
-> --- /dev/null
-> +++ b/drivers/clocksource/timer-keystone.c
-> @@ -0,0 +1,223 @@
-> +/*
-> + * Keystone broadcast clock-event
-> + *
-> + * Copyright 2013 Texas Instruments, Inc.
-> + *
-> + * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
-> +#define TIMER_NAME			"timer64-event"
-> +
-> +/* Timer register offsets */
-> +#define TIM12				0x10
-> +#define TIM34				0x14
-> +#define PRD12				0x18
-> +#define PRD34				0x1c
-> +#define TCR				0x20
-> +#define TGCR				0x24
-> +#define INTCTLSTAT			0x44
-> +
-> +/* Timer register bitfields */
-> +#define TCR_ENAMODE_MASK		0xC0
-> +#define TCR_ENAMODE_ONESHOT_MASK	0x40
-> +#define TCR_ENAMODE_PERIODIC_MASK	0x80
-> +
-> +#define TGCR_TIM_UNRESET_MASK		0x03
-> +#define INTCTLSTAT_ENINT_MASK		0x01
-> +
-> +/**
-> + * struct keystone_timer: holds timer's data
-> + * @base: timer memory base address
-> + * @clk_rate: source clock rate
-> + * @irqacrion: interrupt action descriptor
-> + * @event_dev: event device based on timer
-> + */
-> +static struct keystone_timer {
-> +	void __iomem *base;
-> +	unsigned long clk_rate;
-> +	struct irqaction irqaction;
-> +	struct clock_event_device event_dev;
-> +} timer;
-> +
-> +static inline u32 keystone_timer_readl(unsigned long rg)
-> +{
-> +	return readl(timer.base + rg);
-> +}
-> +
-> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
-> +{
-> +	writel(val, timer.base + rg);
-> +}
-> +
-> +/**
-> + * keystone_timer_config: configures timer to work in oneshot/periodic modes, in
-> + * other cases disables timer.
-> + * @ mode: mode to configure
-> + * @ period: cycles number to configure for
-> + */
-> +static int keystone_timer_config(u64 period, enum clock_event_mode mode)
-> +{
-> +	u32 tcr;
-> +
-> +	tcr = keystone_timer_readl(TCR);
-> +
-> +	/* disable timer */
-> +	tcr &= ~(TCR_ENAMODE_MASK);
-> +	keystone_timer_writel(tcr, TCR);
+This AT91 specific Kconfig option removed the code that dealt with
+programmable clocks. Each AT91 SoC embeds programmable clocks and
+there is little gain to remove this code in case that such a clock
+is not used.
+If this option is not selected, it causes certain drivers to fail
+to build. We simply remove this option instead of adding code just
+to build a workaround.
 
-Please move this write after the switch (cf. linked comment below)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Olof, Kevin,
 
-> +	/* set enable mode or leave disabled timer */
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_ONESHOT:
-> +		tcr |= TCR_ENAMODE_ONESHOT_MASK;
-> +		break;
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		tcr |= TCR_ENAMODE_PERIODIC_MASK;
-> +		break;
-> +	default:
-> +		return 0;
+This patch goes on top of the AT91 "cleanup" branch.
 
-Shouldn't you return an error ?
-
-> +	}
-> +
-> +	/* reset counter to zero, set new period */
-> +	keystone_timer_writel(0, TIM12);
-> +	keystone_timer_writel(0, TIM34);
-> +	keystone_timer_writel(period & 0xffffffff, PRD12);
-> +	keystone_timer_writel(period >> 32, PRD34);
-> +
-> +	/* enable timer */
-> +	keystone_timer_writel(tcr, TCR);
-> +	return 0;
-> +}
-> +
-> +static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
-> +{
-> +	struct clock_event_device *evt = &timer.event_dev;
-> +
-> +	evt->event_handler(evt);
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int keystone_set_next_event(unsigned long cycles,
-> +				  struct clock_event_device *evt)
-> +{
-> +	return keystone_timer_config(cycles, evt->mode);
-> +}
-> +
-> +static void keystone_set_mode(enum clock_event_mode mode,
-> +			     struct clock_event_device *evt)
-> +{
-> +	u64 period;
-> +
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		period = timer.clk_rate / (HZ);
-> +		keystone_timer_config(period, CLOCK_EVT_MODE_PERIODIC);
-> +		break;
-> +	case CLOCK_EVT_MODE_UNUSED:
-> +	case CLOCK_EVT_MODE_SHUTDOWN:
-> +	case CLOCK_EVT_MODE_ONESHOT:
-> +		keystone_timer_config(0, CLOCK_EVT_MODE_SHUTDOWN);
-
-I don't really this code assuming the side effect of specifying a 
-unsupported mode will disable the timer.
-
-> +	default:
-> +		break;
-> +	}
-> +}
-> +
-> +static void __init keystone_timer_init(struct device_node *np)
-> +{
-> +	struct clock_event_device *event_dev = &timer.event_dev;
-> +	struct irqaction *irqaction = &timer.irqaction;
-> +	unsigned long rate;
-> +	struct clk *clk;
-> +	int irq, error;
-> +	u32 tgcr;
-> +
-> +	irq  = irq_of_parse_and_map(np, 0);
-> +	if (irq == NO_IRQ) {
-> +		pr_err("%s: failed to map interrupts\n", __func__);
-> +		return;
-> +	}
-> +
-> +	timer.base = of_iomap(np, 0);
-> +	if (!timer.base) {
-> +		pr_err("%s: failed to map registers\n", __func__);
-> +		return;
-> +	}
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (!clk) {
-> +		pr_err("%s: failed to get clock\n", __func__);
-> +		iounmap(timer.base);
-> +		return;
-> +	}
-> +
-> +	error = clk_prepare_enable(clk);
-> +	if (error) {
-> +		pr_err("%s: failed to enable clock\n", __func__);
-> +		goto err;
-> +	}
-> +
-> +	rate = clk_get_rate(clk);
-> +
-> +	/* disable, use internal clock source */
-> +	keystone_timer_writel(0, TCR);
-> +
-> +	/* reset timer as 64-bit, no pre-scaler, plus features are disabled */
-> +	tgcr = 0;
-> +	keystone_timer_writel(0, TGCR);
-> +
-> +	/* unreset timer */
-> +	tgcr |= TGCR_TIM_UNRESET_MASK;
-> +	keystone_timer_writel(tgcr, TGCR);
-> +
-> +	/* init counter to zero */
-> +	keystone_timer_writel(0, TIM12);
-> +	keystone_timer_writel(0, TIM34);
-> +
-> +	timer.clk_rate = rate;
-> +
-> +	/* enable timer interrupts */
-> +	keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
-> +
-> +	keystone_timer_config(0, CLOCK_EVT_MODE_UNUSED);
-
-Same comment here.
-
-> +	/* init irqaction */
-> +	irqaction->flags = IRQF_TIMER;
-> +	irqaction->handler = keystone_timer_interrupt;
-> +	irqaction->name = TIMER_NAME;
-> +	irqaction->dev_id = (void *)&timer;
-> +	error = setup_irq(irq, irqaction);
-> +	if (error) {
-> +		pr_err("%s: failed to setup irq\n", __func__);
-> +		goto err;
-> +	}
-> +
-> +	/* setup clockevent */
-> +	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> +	event_dev->set_next_event = keystone_set_next_event;
-> +	event_dev->set_mode = keystone_set_mode;
-> +	event_dev->cpumask = cpu_all_mask;
-> +	event_dev->owner = THIS_MODULE;
-> +	event_dev->name = TIMER_NAME;
-> +
-> +	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
-> +
-> +	pr_info("keystone timer clock @%lu Hz\n", rate);
-> +	return;
-> +err:
-> +	clk_put(clk);
-> +	iounmap(timer.base);
-> +}
-> +
-> +CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
-> +					keystone_timer_init);
->
+Bye,
 
 
+ arch/arm/configs/at91_dt_defconfig          | 1 -
+ arch/arm/configs/at91rm9200_defconfig       | 1 -
+ arch/arm/configs/at91sam9260_9g20_defconfig | 1 -
+ arch/arm/configs/at91sam9261_9g10_defconfig | 1 -
+ arch/arm/configs/at91sam9g45_defconfig      | 1 -
+ arch/arm/configs/at91sam9rl_defconfig       | 1 -
+ arch/arm/configs/sama5_defconfig            | 1 -
+ arch/arm/mach-at91/Kconfig                  | 6 ------
+ arch/arm/mach-at91/clock.c                  | 6 ------
+ arch/arm/mach-at91/pm.c                     | 3 ---
+ drivers/clk/at91/Makefile                   | 3 +--
+ drivers/clk/at91/pmc.c                      | 2 --
+ drivers/clk/at91/pmc.h                      | 2 --
+ sound/soc/atmel/Kconfig                     | 2 +-
+ 14 files changed, 2 insertions(+), 29 deletions(-)
+
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 690e89273230..0b4e9b5210d8 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -22,7 +22,6 @@ CONFIG_SOC_AT91SAM9X5=y
+ CONFIG_SOC_AT91SAM9N12=y
+ CONFIG_MACH_AT91RM9200_DT=y
+ CONFIG_MACH_AT91SAM9_DT=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_TIMER_HZ=128
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+diff --git a/arch/arm/configs/at91rm9200_defconfig b/arch/arm/configs/at91rm9200_defconfig
+index 75502c4d222c..bf057719dab0 100644
+--- a/arch/arm/configs/at91rm9200_defconfig
++++ b/arch/arm/configs/at91rm9200_defconfig
+@@ -31,7 +31,6 @@ CONFIG_MACH_YL9200=y
+ CONFIG_MACH_CPUAT91=y
+ CONFIG_MACH_ECO920=y
+ CONFIG_MTD_AT91_DATAFLASH_CARD=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_TIMER_HZ=100
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_PCCARD=y
+diff --git a/arch/arm/configs/at91sam9260_9g20_defconfig b/arch/arm/configs/at91sam9260_9g20_defconfig
+index 69b6928d3d9d..955dc480f3ee 100644
+--- a/arch/arm/configs/at91sam9260_9g20_defconfig
++++ b/arch/arm/configs/at91sam9260_9g20_defconfig
+@@ -28,7 +28,6 @@ CONFIG_MACH_PCONTROL_G20=y
+ CONFIG_MACH_GSIA18S=y
+ CONFIG_MACH_SNAPPER_9260=y
+ CONFIG_MACH_AT91SAM9_DT=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_SLOW_CLOCK=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_AEABI=y
+diff --git a/arch/arm/configs/at91sam9261_9g10_defconfig b/arch/arm/configs/at91sam9261_9g10_defconfig
+index 9d35cd81c611..f80e993b04ce 100644
+--- a/arch/arm/configs/at91sam9261_9g10_defconfig
++++ b/arch/arm/configs/at91sam9261_9g10_defconfig
+@@ -18,7 +18,6 @@ CONFIG_ARCH_AT91=y
+ CONFIG_ARCH_AT91SAM9261=y
+ CONFIG_MACH_AT91SAM9261EK=y
+ CONFIG_MACH_AT91SAM9G10EK=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
+index 08166cd4e7d6..e181a50fd65a 100644
+--- a/arch/arm/configs/at91sam9g45_defconfig
++++ b/arch/arm/configs/at91sam9g45_defconfig
+@@ -18,7 +18,6 @@ CONFIG_ARCH_AT91=y
+ CONFIG_ARCH_AT91SAM9G45=y
+ CONFIG_MACH_AT91SAM9M10G45EK=y
+ CONFIG_MACH_AT91SAM9_DT=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_SLOW_CLOCK=y
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+diff --git a/arch/arm/configs/at91sam9rl_defconfig b/arch/arm/configs/at91sam9rl_defconfig
+index 7cf87856d63c..7b6f131cecd6 100644
+--- a/arch/arm/configs/at91sam9rl_defconfig
++++ b/arch/arm/configs/at91sam9rl_defconfig
+@@ -13,7 +13,6 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_ARCH_AT91=y
+ CONFIG_ARCH_AT91SAM9RL=y
+ CONFIG_MACH_AT91SAM9RLEK=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index f6e78f83c3c3..dc3881e07630 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -20,7 +20,6 @@ CONFIG_ARCH_AT91=y
+ CONFIG_SOC_SAM_V7=y
+ CONFIG_SOC_SAMA5D3=y
+ CONFIG_MACH_SAMA5_DT=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+ CONFIG_UACCESS_WITH_MEMCPY=y
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index aac7814db4f9..f1bf952da747 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -214,12 +214,6 @@ config MACH_SAMA5_DT
+ 
+ comment "AT91 Feature Selections"
+ 
+-config AT91_PROGRAMMABLE_CLOCKS
+-	bool "Programmable Clocks"
+-	help
+-	  Select this if you need to program one or more of the PCK0..PCK3
+-	  programmable clock outputs.
+-
+ config AT91_SLOW_CLOCK
+ 	bool "Suspend-to-RAM disables main oscillator"
+ 	depends on SUSPEND
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 72b257944733..034529d801b2 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -330,8 +330,6 @@ EXPORT_SYMBOL(clk_get_rate);
+ 
+ /*------------------------------------------------------------------------*/
+ 
+-#ifdef CONFIG_AT91_PROGRAMMABLE_CLOCKS
+-
+ /*
+  * For now, only the programmable clocks support reparenting (MCK could
+  * do this too, with care) or rate changing (the PLLs could do this too,
+@@ -459,8 +457,6 @@ static void __init init_programmable_clock(struct clk *clk)
+ 	clk->rate_hz = parent->rate_hz / pmc_prescaler_divider(pckr);
+ }
+ 
+-#endif	/* CONFIG_AT91_PROGRAMMABLE_CLOCKS */
+-
+ /*------------------------------------------------------------------------*/
+ 
+ #ifdef CONFIG_DEBUG_FS
+@@ -577,12 +573,10 @@ int __init clk_register(struct clk *clk)
+ 		clk->parent = &mck;
+ 		clk->mode = pmc_sys_mode;
+ 	}
+-#ifdef CONFIG_AT91_PROGRAMMABLE_CLOCKS
+ 	else if (clk_is_programmable(clk)) {
+ 		clk->mode = pmc_sys_mode;
+ 		init_programmable_clock(clk);
+ 	}
+-#endif
+ 
+ 	at91_clk_add(clk);
+ 
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index d43b79f56e94..590b52dea9f7 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -155,9 +155,6 @@ static int at91_pm_verify_clocks(void)
+ 		}
+ 	}
+ 
+-	if (!IS_ENABLED(CONFIG_AT91_PROGRAMMABLE_CLOCKS))
+-		return 1;
+-
+ 	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
+ 	for (i = 0; i < 4; i++) {
+ 		u32 css;
+diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+index 0e92b716f934..46c1d3d0d66b 100644
+--- a/drivers/clk/at91/Makefile
++++ b/drivers/clk/at91/Makefile
+@@ -4,9 +4,8 @@
+ 
+ obj-y += pmc.o
+ obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
+-obj-y += clk-system.o clk-peripheral.o
++obj-y += clk-system.o clk-peripheral.o clk-programmable.o
+ 
+-obj-$(CONFIG_AT91_PROGRAMMABLE_CLOCKS)	+= clk-programmable.o
+ obj-$(CONFIG_HAVE_AT91_UTMI)		+= clk-utmi.o
+ obj-$(CONFIG_HAVE_AT91_USB_CLK)		+= clk-usb.o
+ obj-$(CONFIG_HAVE_AT91_SMD)		+= clk-smd.o
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 7b9db603b936..11fceff8d9f1 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -279,7 +279,6 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
+ 		.data = of_at91sam9x5_clk_periph_setup,
+ 	},
+ 	/* Programmable clocks */
+-#if defined(CONFIG_AT91_PROGRAMMABLE_CLOCKS)
+ 	{
+ 		.compatible = "atmel,at91rm9200-clk-programmable",
+ 		.data = of_at91rm9200_clk_prog_setup,
+@@ -292,7 +291,6 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
+ 		.compatible = "atmel,at91sam9x5-clk-programmable",
+ 		.data = of_at91sam9x5_clk_prog_setup,
+ 	},
+-#endif
+ 	/* UTMI clock */
+ #if defined(CONFIG_HAVE_AT91_UTMI)
+ 	{
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index ba8d14233f80..441350983ccb 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -85,14 +85,12 @@ extern void __init of_at91rm9200_clk_periph_setup(struct device_node *np,
+ extern void __init of_at91sam9x5_clk_periph_setup(struct device_node *np,
+ 						  struct at91_pmc *pmc);
+ 
+-#if defined(CONFIG_AT91_PROGRAMMABLE_CLOCKS)
+ extern void __init of_at91rm9200_clk_prog_setup(struct device_node *np,
+ 						struct at91_pmc *pmc);
+ extern void __init of_at91sam9g45_clk_prog_setup(struct device_node *np,
+ 						 struct at91_pmc *pmc);
+ extern void __init of_at91sam9x5_clk_prog_setup(struct device_node *np,
+ 						struct at91_pmc *pmc);
+-#endif
+ 
+ #if defined(CONFIG_HAVE_AT91_UTMI)
+ extern void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np,
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index e48d38a1b95c..e634eb78ed03 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -25,7 +25,7 @@ config SND_ATMEL_SOC_SSC
+ 
+ config SND_AT91_SOC_SAM9G20_WM8731
+ 	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
+-	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC && AT91_PROGRAMMABLE_CLOCKS
++	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC
+ 	select SND_ATMEL_SOC_PDC
+ 	select SND_ATMEL_SOC_SSC
+ 	select SND_SOC_WM8731
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.2.2
