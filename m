@@ -1,96 +1,24 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 12 Dec 2013 15:10:10 +0100
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <yw1xppp2ji38.fsf@unicorn.mansr.com>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
-Message-ID: <1386857410.22947.78.camel@sakura.staff.proxad.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Dec 2013 09:11:42 -0500
+Subject: [PATCH] ARM: mvebu: config: Enable NAND support
+In-Reply-To: <1386800920-7096-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1386800920-7096-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1386800920-7096-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131212141142.GQ10053@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 11, 2013 at 07:28:40PM -0300, Ezequiel Garcia wrote:
+> Enable the pxa3xx-nand driver, which now supports the NAND controller
+> in Armada 370/XP SoC.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/configs/mvebu_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-On Thu, 2013-12-12 at 13:48 +0000, M?ns Rullg?rd wrote:
+Applied to mvebu/defconfig
 
-> In the code above, the outer (uint16_t) cast should clear the top half,
-> as should passing the value to a function (inline doesn't alter the
-> semantics) as a 16-bit type, so there's something fishy here.
+thx,
 
-using __attribute__((noinline)), or putting the function in another file
-makes the bug disappear
-
-But I'm not convinced inline doesn't change the semantic, since gcc is
-merging the function inside another one the rules of calling convention
-should not matter anymore.
-
-I attached a second test case without a separate function that has the
-same bug.
-
-> Which gcc versions did you try?
-
-4.3.2, 4.6.0, 4.7.2, 4.8-2013 (linaro)
-
-Here is a simple userspace test case.
-
-
-#include <stdint.h>
-#include <stdio.h>
-
-static inline uint32_t asm_add(uint16_t len, uint32_t sum)
-{
-        __asm__(
-        "add    %0, %1, %2 \n"
-        : "=&r"(sum)
-        : "r" (sum), "r" (len)
-        );
-        return sum;
-}
-
-#define local_swab16(x) ((uint16_t)(                                    \
-        (((uint16_t)(x) & (uint16_t)0x00ffU) << 8) |                  \
-        (((uint16_t)(x) & (uint16_t)0xff00U) >> 8)))
-
-int main(int argc, char *argv[])
-{
-        uint16_t foo;
-
-        foo = strtoul(argv[1], NULL, 0);
-        printf("%08x\n", asm_add(local_swab16(foo), 0));
-        return 0;
-}
-
-without optimization, or with noinline:
-
-# ./a.out 0x3412
-00001234
-
-
-with optimization:
-
-# ./a.out 0x3412
-00341234
-
-
-And the second test case without the inline function.
-
-int main(int argc, char *argv[])
-{
-        uint32_t sum = 0;
-        uint16_t foo;
-
-        foo = strtoul(argv[1], NULL, 0);
-
-        __asm__ (
-        "add    %0, %1, %2 \n"
-        : "=&r"(sum)
-        : "r" (sum), "r" (local_swab16(foo))
-        );
-
-        printf("%08x\n", sum);
-        return 0;
-}
-
-
--- 
-Maxime
+Jason.
