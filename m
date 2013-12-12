@@ -1,62 +1,53 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 12 Dec 2013 10:01:44 -0400
-Subject: [PATCH 12/15] thermal: rcar-thermal: Enable driver compilation
- with COMPILE_TEST
-In-Reply-To: <5903007.OehDdPcG2U@avalon>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <5903007.OehDdPcG2U@avalon>
-Message-ID: <52A9C1C8.2030907@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Dec 2013 09:02:53 -0500
+Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20131212135819.GH12617@mudshark.cambridge.arm.com>
+References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131210164907.GA11468@sirena.org.uk>
+ <20131210170025.GA4360@n2100.arm.linux.org.uk>
+ <20131211204942.GF5461@localhost>
+ <20131212135819.GH12617@mudshark.cambridge.arm.com>
+Message-ID: <20131212140253.GO10053@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-12-2013 08:50, Laurent Pinchart wrote:
-> Hi Zhang and Eduardo,
+On Thu, Dec 12, 2013 at 01:58:19PM +0000, Will Deacon wrote:
+> On Wed, Dec 11, 2013 at 08:49:43PM +0000, Ezequiel Garcia wrote:
+> > On Tue, Dec 10, 2013 at 05:00:25PM +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Dec 10, 2013 at 04:49:07PM +0000, Mark Brown wrote:
+> > > > On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
+> > > > 
+> > > > > +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
+> > > > > +{
+> > > > > +	unsigned long flags;
+> > > > > +	u32 value;
+> > > > > +
+> > > > > +	raw_spin_lock_irqsave(&__io_lock, flags);
+> > > > > +	value = readl_relaxed(reg) & ~mask;
+> > > > > +	value |= (set & mask);
+> > > > > +	writel_relaxed(value, reg);
+> > > > > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> > > > > +}
+> > > > > +EXPORT_SYMBOL(atomic_io_modify_relaxed);
+> > > > 
+> > > > This looks quite generic - why is it in architecture specific code?
+> > > 
+> > > because the _relaxed IO operators don't exist on other architectures, and
+> > > there's been some discussion around whether they should with no conclusions
+> > > being reached.
+> > 
+> > Exactly.
+> > 
+> > Will? Catalin? Any comments on this?
 > 
-> Could you please pick this patch up for v3.14 ?
+> Yes: BenH and I managed to come up with an agreement on the relaxed I/O
+> accessors during kernel summit which I need to write up and send out again.
+> This would allow for a generic definition of the accessors, then this could
+> potentially be done in core code.
 
-Yes Laurent, I can pick it.
+Do you prefer this series to wait then?
 
-> 
-> On Wednesday 27 November 2013 02:18:34 Laurent Pinchart wrote:
->> This helps increasing build testing coverage.
->>
->> Cc: Zhang Rui <rui.zhang@intel.com>
->> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
->> Cc: linux-pm at vger.kernel.org
->> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->> Acked-by: Simon Horman <horms@verge.net.au>
+thx,
 
-Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
-
->> ---
->>  drivers/thermal/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->> index f35a1f7..661cafc 100644
->> --- a/drivers/thermal/Kconfig
->> +++ b/drivers/thermal/Kconfig
->> @@ -121,7 +121,7 @@ config SPEAR_THERMAL
->>
->>  config RCAR_THERMAL
->>  	tristate "Renesas R-Car thermal driver"
->> -	depends on ARCH_SHMOBILE
->> +	depends on ARCH_SHMOBILE || COMPILE_TEST
->>  	help
->>  	  Enable this to plug the R-Car thermal sensor driver into the Linux
->>  	  thermal framework.
-
-
--- 
-You have got to be excited about what you are doing. (L. Lamport)
-
-Eduardo Valentin
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/d2cc23db/attachment-0001.sig>
+Jason.
