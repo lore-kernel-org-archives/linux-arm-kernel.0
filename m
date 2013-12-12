@@ -1,27 +1,66 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Thu, 12 Dec 2013 18:22:42 +0530
-Subject: [PATCH V7 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131212114610.GA23971@mudshark.cambridge.arm.com>
-References: <1386151791-4881-1-git-send-email-vkale@apm.com>
- <1386151791-4881-3-git-send-email-vkale@apm.com>
- <20131209165003.GJ13908@mudshark.cambridge.arm.com>
- <CAPrCYkfS9h_yoQMcrQDXpW_3FcSfiPz0aeNX+_gc=G4exSEVWg@mail.gmail.com>
- <CAPrCYkct6XePhYEEC=x0yNQoS-z=fcp2_WKxU1Zk0eO=9+ZaLA@mail.gmail.com>
- <20131212114610.GA23971@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkdy6uMmxGUkMfeMD65YCjrMYVRCzJoHt6uSOyCNoS0Zaw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 12 Dec 2013 22:00:45 +0900
+Subject: [PATCH] ARM: rcar-gen2: Do not setup timer in non-secure mode
+In-Reply-To: <1386756462-26033-2-git-send-email-ben.dooks@codethink.co.uk>
+References: <1386756462-26033-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1386756462-26033-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20131212130045.GC30624@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 5:16 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Dec 12, 2013 at 06:33:59AM +0000, Vinayak Kale wrote:
->> > Below fixup works fine on APM platform.
->> > Do you want me to send this fixup as part of next revision of the
->> > patch or will you apply it yourself? (For later case, you have my ack)
->>
->> Any comments? Do I need to send the fix-up in next revision of patch?
->
-> Looks fine to me; I've folded in my changes and applied it to my aarch64
-> branch. I'll queue it for 3.14 when Catalin and I start putting that
-> together.
+On Wed, Dec 11, 2013 at 10:07:42AM +0000, Ben Dooks wrote:
+> If the system has been started in non-secure mode, then the ARM generic
+> timer is not configurable during the kernel initialisation. Currently
+> the only thing we can check for is if the timer has been correctly
+> configured during the boot process.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
 
-Okay. Thanks :-)
+Thanks, I will queue this up.
+
+> ---
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 21 ++++++++++++++++-----
+>  1 file changed, 16 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> index 5734c24..b6275ab 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -78,12 +78,23 @@ void __init rcar_gen2_timer_init(void)
+>  	/* Remap "armgcnt address map" space */
+>  	base = ioremap(0xe6080000, PAGE_SIZE);
+>  
+> -	/* Update registers with correct frequency */
+> -	iowrite32(freq, base + CNTFID0);
+> -	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+> +	/*
+> +	 * Update the timer if it is either not running, or is not at the
+> +	 * right frequency. The timer is only configurable in secure mode
+> +	 * so this avoids an abort if the loader started the timer and
+> +	 * entered the kernel in non-secure mode.
+> +	 */
+> +
+> +	if ((ioread32(base + CNTCR) & 1) == 0 ||
+> +	    ioread32(base + CNTFID0) != freq) {
+> +		/* Update registers with correct frequency */
+> +		iowrite32(freq, base + CNTFID0);
+> +		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+> +
+> +		/* make sure arch timer is started by setting bit 0 of CNTCR */
+> +		iowrite32(1, base + CNTCR);
+> +	}
+>  
+> -	/* make sure arch timer is started by setting bit 0 of CNTCR */
+> -	iowrite32(1, base + CNTCR);
+>  	iounmap(base);
+>  #endif /* CONFIG_ARM_ARCH_TIMER */
+>  
+> -- 
+> 1.8.5.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
