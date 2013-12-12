@@ -1,37 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Dec 2013 11:35:54 -0600
-Subject: [PATCH v4 1/2] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <1386869130-2993-2-git-send-email-w-kwok2@ti.com>
-References: <1386869130-2993-1-git-send-email-w-kwok2@ti.com>
- <1386869130-2993-2-git-send-email-w-kwok2@ti.com>
-Message-ID: <20131212173554.GC1939@saruman.home>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 12 Dec 2013 18:35:37 +0100
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+In-Reply-To: <20131212172049.GU4360@n2100.arm.linux.org.uk>
+References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
+ <20131212124015.GL4360@n2100.arm.linux.org.uk>
+ <1386855390.22947.68.camel@sakura.staff.proxad.net>
+ <20131212144853.GO4360@n2100.arm.linux.org.uk>
+ <1386860657.25449.3.camel@sakura.staff.proxad.net>
+ <20131212154110.GQ4360@n2100.arm.linux.org.uk>
+ <20131212160426.GD31816@1wt.eu>
+ <20131212164748.GS4360@n2100.arm.linux.org.uk> <20131212171108.GA2337@1wt.eu>
+ <20131212172049.GU4360@n2100.arm.linux.org.uk>
+Message-ID: <20131212173537.GB2337@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 12, 2013 at 05:20:49PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 12, 2013 at 06:11:08PM +0100, Willy Tarreau wrote:
+> > Another thing that can be done to improve the folding of the 16-bit
+> > checksum is to swap the values to be added, sum them and only keep
+> > the high half integer which already contains the carry. At least on
+> > x86 I save some cycles doing this :
+> > 
+> >               31:24  23:16  15:8  7:0
+> >      sum32 =    D      C      B    A
+> > 
+> >      To fold this into 16-bit at a time, I just do this :
+> > 
+> >                    31:24     23:16          15:8  7:0
+> >      sum32           D         C              B    A
+> >   +  sum32swapped    B         A              D    C
+> >   =                 A+B  C+A+carry(B+D/C+A)  B+D  C+A
+> > 
+> > so just take the upper result and you get the final 16-bit word at
+> > once.
+> > 
+> > In C it does :
+> > 
+> >        fold16 = (((sum32 >> 16) | (sum32 << 16)) + sum32) >> 16
+> > 
+> > When the CPU has a rotate instruction, it's fast :-)
+> 
+> Indeed - and if your CPU can do the rotate and add at the same time,
+> it's just a singe instruction, and it ends up looking remarkably
+> similar to this:
+> 
+> static inline __sum16 csum_fold(__wsum sum)
+> {
+>         __asm__(
+>         "add    %0, %1, %1, ror #16     @ csum_fold"
+>         : "=r" (sum)
+>         : "r" (sum)
+>         : "cc");
+>         return (__force __sum16)(~(__force u32)sum >> 16);
+> }
 
-On Thu, Dec 12, 2013 at 12:25:29PM -0500, WingMan Kwok wrote:
-> +static int kdwc3_remove(struct platform_device *pdev)
-> +{
-> +	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
-> +
-> +	kdwc3_disable_irqs(kdwc);
-> +	clk_disable_unprepare(kdwc->clk);
+Marvelous :-)
 
-isn't this same clock feeding dwc3 core ?
-
-> +	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
-
-if it is, you should disable the clock only *after* removing the core,
-provided core will access registers during remove.
-
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/3302c8f3/attachment.sig>
+Willy
