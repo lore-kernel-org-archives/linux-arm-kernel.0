@@ -1,55 +1,41 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 12 Dec 2013 09:48:56 +0100
-Subject: [PATCH] ARM: zynq: add gem support
-In-Reply-To: <1386782989-2720-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1386782989-2720-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52A97878.7050503@monstr.eu>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 12 Dec 2013 00:53:00 -0800
+Subject: [PATCH] net: eth: 8390: remove section warning in etherh.c
+In-Reply-To: <CAP8WD_aJEmBYbM0BmQodGJsOPqZ+vqk9B15n297q_+aCorR=VQ@mail.gmail.com>
+References: <1386837577-15130-1-git-send-email-olof@lixom.net>
+ <CAP8WD_aJEmBYbM0BmQodGJsOPqZ+vqk9B15n297q_+aCorR=VQ@mail.gmail.com>
+Message-ID: <CAOesGMj_0m-Y8TvrZF=zgT33RuDtismjY=k6pbfm+MFmp2p=_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2013 06:29 PM, Soren Brinkmann wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> The zynq includes a Cadence GEM IP core. This is compatible with the macb driver.
-> Add it to the zynq-7000 DT.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: Josh Cartwright <josh.cartwright@ni.com>
-> [soren: rebased to current Linus tree, added zc706 + zed support, moved phy-mode property to board level dtses]
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> This has a soft dependency on the net-next tree which has some patches for the
-> macb driver which are required for full functionality. But adding this patch to
-> any tree without net-next shouldn't do any harm, network might be
-> non-operational at the worst - I think.
-> 
-> 	S?ren
-> 
->  arch/arm/boot/dts/zynq-7000.dtsi | 18 ++++++++++++++++++
->  arch/arm/boot/dts/zynq-zc702.dts |  5 +++++
->  arch/arm/boot/dts/zynq-zc706.dts |  5 +++++
->  arch/arm/boot/dts/zynq-zed.dts   |  5 +++++
->  4 files changed, 33 insertions(+)
+On Thu, Dec 12, 2013 at 12:46 AM, tedheadster <tedheadster@gmail.com> wrote:
+> On Thu, Dec 12, 2013 at 3:39 AM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> Commit c45f812f0280 ('8390 : Replace ei_debug with msg_enable/NETIF_MSG_*
+>> feature') ended up moving the printout of version[] from something that
+>> will be compiled out due to defines, to something that is now evaluated
+>> at runtime.
+>>
+>> That means that what always used to be an access to an __initdata string
+>> from non-__init code started showing up as a section mismatch when it
+>> didn't before.
+>>
+>> All other 8390 versions skip __initdata on the version string, and
+>> starting to annotate the whole chain of callers with __init seems like
+>> more churn than it's worth on this driver, so remove it from etherh.c as
+>> well.
+>>
+>
+> Olof,
+>   should you also remove the __init tag from etherh_banner() since it is
+> called from etherh_probe(), which does not have an __init tag?
 
-Applied to zynq/dt branch.
+Hmm.
 
-Thanks,
-Michal
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+The section warning functionality is clever enough to not trigger when
+a function is named _probe() and references __initdata, and discarding
+etherh_banner() should be just fine so I don't see a need to remove
+it.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/e6b01d6e/attachment.sig>
+-Olof
