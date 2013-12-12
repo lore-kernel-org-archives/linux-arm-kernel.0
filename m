@@ -1,37 +1,43 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 12 Dec 2013 12:14:27 +0800
-Subject: [PATCH V2 0/4] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <52A881CF.4020001@ti.com>
-References: <1386318764-15882-1-git-send-email-b32955@freescale.com>
- <52A881CF.4020001@ti.com>
-Message-ID: <20131212041425.GA1460@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Dec 2013 12:31:53 +0800
+Subject: [PATCH 01/10] net: stmmac: Enable stmmac main clock when probing
+ hardware
+In-Reply-To: <20131210200529.GD3651@lukather>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-2-git-send-email-wens@csie.org>
+ <20131207103335.GL24519@lukather>
+ <CAGb2v65YOSq_BMWSzSHX8w_hbo+0vwquBT2pnLuwNVZkWRfLvA@mail.gmail.com>
+ <20131210200529.GD3651@lukather>
+Message-ID: <CAGb2v67TkxcMSrFsMtAy8TaMG_VZWt73xZZcuqkJ71VO4y=7_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 08:46:31PM +0530, Sourav Poddar wrote:
-> As you see in my patches, once we take care of the above points and
-> add support
-> for memory mapped in m25p80 and qspi, then while doing a read in
-> m25p80 we can
-> do memcpy at the beginning of m25p80_read and can bypass the entire SPI
-> framework for memory mapped read operation. Throughput almost gets
-> doubles with this,
-> as compared to normal SPI operations.
-> 
-> So, my intention of reviving this here is to add one more feature
-> set, which I suppose
-> spi nor framework should handle and to see what needs to be added
-> more for this feature.
+Hi,
 
-I already read your patch.
+On Wed, Dec 11, 2013 at 4:05 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Mon, Dec 09, 2013 at 10:43:29AM +0800, Chen-Yu Tsai wrote:
+>> >> @@ -2759,15 +2760,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+>> >>               }
+>> >>       }
+>> >>
+>> >> +     clk_disable_unprepare(priv->stmmac_clk);
+>> >> +
+>> >
+>> > Hu? Why do you disable the clock? don't you need it afterwards?
+>>
+>> The clock is enabled in *_open (when the network interface is used),
+>> and disabled in *_close.
+>
+> Maybe it is the real issue then.
+>
+> Why don't you move the clk_disable to _remove then?
 
-My quadspi driver also uses the memory map mode.
-The memory map mode is the default mode for the quadspi driver's read.
+I wasn't sure this was the proper way. However, looking around, it
+seems other drivers enable the clock in, _probe, and disable it in
+_remove. I will modify stmmac to do so as well.
 
 
-You can setup the registers for memory map in the probe() or some other
-places.  And use the spi_nor->read() hook to do the memcpy in your driver.
-
-
-thanks
-Huang Shijie
+ChenYu
