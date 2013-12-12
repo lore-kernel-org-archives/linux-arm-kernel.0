@@ -1,30 +1,33 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 12 Dec 2013 23:11:55 +0200
-Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
-Message-ID: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 22:13:26 +0100
+Subject: [PATCH 1/3] pinctrl: at91: correct a few typos
+In-Reply-To: <1553057.pNIrIqAFlL@avalon>
+References: <1386421734-10240-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CACRpkdZi-7VrdeN349VAR+qTL0Oeb=E9YDhXh3L=EiGLhr59rg@mail.gmail.com>
+ <1553057.pNIrIqAFlL@avalon>
+Message-ID: <CACRpkdZ1X1ekPP1jgAS8=PdyVr871Ee8KWgk5mqoGdqG9+n+rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the non-DT channel add path fails, the kernel will crash as the
-channel is not set to NULL and it will try to release the channel using
-the error value. Fix that.
+On Thu, Dec 12, 2013 at 3:47 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Linus,
+>
+> On Thursday 12 December 2013 15:42:28 Linus Walleij wrote:
+>> On Sat, Dec 7, 2013 at 2:08 PM, Alexandre Belloni wrote:
+>> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>
+>> Patch applied.
+>>
+>> Please include Laurent Pinchart on the To: line on AT91 pin control
+>> patches.
+>
+> I understand that you would like patch to have a wide review coverage, but why
+> me ? :-)
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- drivers/dma/mv_xor.c | 1 +
- 1 file changed, 1 insertion(+)
+Bah nevermind, too much in my head, I confused AT91 for
+SH mobile nothing else... Nicolas and Jean-Christophe is on the
+list and all is well.
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 7807f0ef4e20..2cb35a62c7f0 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -1227,6 +1227,7 @@ static int mv_xor_probe(struct platform_device *pdev)
- 						   cd->cap_mask, irq);
- 			if (IS_ERR(xordev->channels[i])) {
- 				ret = PTR_ERR(xordev->channels[i]);
-+				xordev->channels[i] = NULL;
- 				goto err_channel_add;
- 			}
- 		}
--- 
-1.8.5.1
+Yours,
+Linus Walleij
