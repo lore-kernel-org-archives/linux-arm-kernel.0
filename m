@@ -1,42 +1,31 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 12 Dec 2013 20:39:46 +0000
-Subject: [PATCH 2/5] arm64: Fix the soft_restart routine
-In-Reply-To: <cover.1386879684.git.geoff@infradead.org>
-References: <cover.1386879684.git.geoff@infradead.org>
-Message-ID: <fbf47d394de6bd7332b00bc706a9f38cd7a68327.1386879684.git.geoff@infradead.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 21:39:34 +0100
+Subject: [PATCH v3 3/6] pinctrl: Make PINCTRL selectable by
+ defconfig/menuconfig
+In-Reply-To: <1386787041-6035-4-git-send-email-syin@broadcom.com>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-4-git-send-email-syin@broadcom.com>
+Message-ID: <CACRpkdauqYNiby-ta3c_he2ovG__0e6ubmzZ8Bx1cP_OzK4=LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the soft_restart() routine to call cpu_reset() at its identity mapped
-physical address.
+On Wed, Dec 11, 2013 at 7:37 PM, Sherman Yin <syin@broadcom.com> wrote:
 
-The cpu_reset() routine must be called at its identity mapped physical address
-so that when the MMU is turned off the instruction pointer will be at the correct
-location in physical memory.
+> Adds a string to the PINCTRL config option so that 1) CONFIG_PINCTRL=y would
+> not be erased by make config, and 2) PINCTRL option would show up in menuconfig.
+>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> ---
+> v3: added to patchset
 
-Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
----
- arch/arm64/kernel/process.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+NAK. The pin control subsystem has been designed so that
+you should select the pin controller through select statements
+from the SoC using it.
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index de17c89..985eb42 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -72,7 +72,13 @@ static void setup_restart(void)
- void soft_restart(unsigned long addr)
- {
- 	setup_restart();
--	cpu_reset(addr);
-+
-+	/*
-+	 * cpu_reset turns the MMU off, so must be called at its identity
-+	 * mapped physical address.
-+	 */
-+
-+	(*(void(*)(unsigned long))virt_to_phys(cpu_reset))(addr);
- }
- 
- /*
--- 
-1.8.1.2
+This was requested at one time by Linus (Torvalds).
+
+You need to convince me that this is really needed.
+
+Yours,
+Linus Walleij
