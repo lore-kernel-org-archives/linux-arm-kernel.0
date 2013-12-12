@@ -1,43 +1,42 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Dec 2013 17:07:16 +0100
-Subject: [PATCH v2 3/8] clk: max77686: Refactor successful exit of probe
- function
-In-Reply-To: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1386864441-19561-4-git-send-email-t.figa@samsung.com>
+Date: Thu, 12 Dec 2013 17:07:13 +0100
+Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
+Message-ID: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function can simply return 0, without jumping to a separate label,
-which does exactly the same. This patch does not introduce any
-functional change, just a clean-up.
+This series intends to improve clock provider impementation of max77686
+PMIC driver. First two patches are simple fixes of current implementation
+to allow correct control of provided clocks. Further patches refactor
+the driver to make the code cleaner and prepare for further patches. Then
+last two patches add registration of OF clock provider and adjust device
+tree nodes of boards containing max77686 chip to contain properties
+required by clock provider.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/clk/clk-max77686.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Tested on Exynos4412-based Trats2 board, with additional patches adding
+driver being a consumer of one of max77686 clocks.
 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index e40ecdb..5d78460 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -178,7 +178,7 @@ static int max77686_clk_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, max77686_clks);
- 
--	goto out;
-+	return 0;
- 
- err_clk_pmic:
- 	clkdev_drop(max77686_clks[MAX77686_CLK_CP]->lookup);
-@@ -187,7 +187,6 @@ err_clk_cp:
- 	clkdev_drop(max77686_clks[MAX77686_CLK_AP]->lookup);
- 	kfree(max77686_clks[MAX77686_CLK_AP]->hw.clk);
- err_clk_ap:
--out:
- 	return ret;
- }
- 
+Changes since v1:
+ - rebased on top of current clk-next (no functional changes)
+
+Tomasz Figa (8):
+  clk: max77686: Correct callback used for checking clock status
+  clk: max77686: Provide .recalc_rate() operation
+  clk: max77686: Refactor successful exit of probe function
+  clk: max77686: Make max77686_clk_register() return struct clk *
+  clk: max77686: Fix clean-up in error and remove paths
+  clk: max77686: Refactor driver data handling
+  clk: max77686: Register OF clock provider
+  ARM: dts: Add clock provider specific properties to max77686 node
+
+ .../devicetree/bindings/clock/maxim,max77686.txt   | 38 +++++++++
+ Documentation/devicetree/bindings/mfd/max77686.txt |  3 +
+ arch/arm/boot/dts/cros5250-common.dtsi             |  1 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |  1 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |  1 +
+ drivers/clk/clk-max77686.c                         | 97 +++++++++++++---------
+ 6 files changed, 104 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77686.txt
+
 -- 
 1.8.4.3
