@@ -1,53 +1,98 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Dec 2013 18:31:43 +0800
-Subject: [PATCH 04/10] net: stmmac: sunxi platfrom extensions for GMAC in
- Allwinner A20 SoC's
-In-Reply-To: <20131212090415.GQ3651@lukather>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A52C.50605@st.com>
- <CAGb2v67WiCaMpJEzA_X6o7uOu6i3w3FCEz7=N5HY0amQb01SZA@mail.gmail.com>
- <52A72C6D.60100@st.com>
- <CAGb2v64qQvqJSicA6MTAxeh1sGjWY=Pk=vDq=9J3pTQW+wkXrA@mail.gmail.com>
- <52A87A74.8040807@st.com> <20131212090415.GQ3651@lukather>
-Message-ID: <CAGb2v655_83b76PTmgkDmNGCADWwTjTwW13sOgM5HFmCVkeu=w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Dec 2013 10:36:09 +0000
+Subject: [PATCH 1/6] arm64: Add asm/cpu.h
+In-Reply-To: <52A95CB3.2030805@linaro.org>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <20131211141018.GC596@darko.cambridge.arm.com>
+ <20131211142308.GY11468@sirena.org.uk>
+ <20131211142705.GE596@darko.cambridge.arm.com>
+ <52A95CB3.2030805@linaro.org>
+Message-ID: <20131212103608.GA12106@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 12, 2013 at 06:50:27AM +0000, Hanjun Guo wrote:
+> On 2013-12-11 22:27, Catalin Marinas wrote:
+> > On Wed, Dec 11, 2013 at 02:23:08PM +0000, Mark Brown wrote:
+> >> On Wed, Dec 11, 2013 at 02:10:19PM +0000, Catalin Marinas wrote:
+> >>> On Wed, Dec 11, 2013 at 01:13:21PM +0000, Mark Brown wrote:
+> >>
+> >>>> +struct cpuinfo_arm {
+> >>>> +	struct cpu	cpu;
+> >>>> +	u64		cpuid;
+> >>>> +#ifdef CONFIG_SMP
+> >>>> +	unsigned int	loops_per_jiffy;
+> >>>> +#endif
+> >>>> +};
+> >>
+> >>> How is this structure used? I haven't seen the ACPI code doing anything
+> >>> with struct cpu (though I haven't dug deep enough). Also loops_per_jiffy
+> >>> is useless, that's related to the delay loop based on the generic timer.
+> >>
+> >> Now I look again we can probably drop this for the toplogy work - it had
+> >> been pulled in as part of pulling things in from pre-v8 and the cpuid
+> >> was used in the code while I was working on it but isn't any more unless
+> >> I'm misreading the code.  
+> >>
+> >> I don't know what the ACPI guys are doing wtih it, I just saw they added
+> >> the same thing.
+> > 
+> > It looked to me that for ACPI and empty asm/cpu.h file would do for now.
+> > There are a couple of prototypes for CPU hotplug I think but haven't
+> > seen the structure used (not even the x86_cpu one).
+> 
+> In ACPI code, only struct cpu is used for ACPI based CPU hotplug, here
+> is the code will send to upstream when the ACPI core for ARM is ready.
+> 
+> ---
+>  arch/arm64/include/asm/cpu.h |    5 +++++
+>  arch/arm64/kernel/topology.c |   26 ++++++++++++++++++++++++++
+>  2 files changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+> index dbeb98d..5613e09 100644
+> --- a/arch/arm64/include/asm/cpu.h
+> +++ b/arch/arm64/include/asm/cpu.h
+> @@ -20,6 +20,11 @@ struct cpuinfo_arm {
+>  #endif
+>  };
+> 
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +extern int arch_register_cpu(int cpu);
+> +extern void arch_unregister_cpu(int cpu);
+> +#endif
+> +
+>  DECLARE_PER_CPU(struct cpuinfo_arm, cpu_data);
+> 
+>  #endif
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index cb548f1..5c8e69c 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -18,3 +18,29 @@ void arch_fix_phys_package_id(int num, u32 slot)
+>  }
+>  EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+> 
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +int __ref arch_register_cpu(int cpu)
+> +{
+> +       struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+> +
+> +       /* BSP cann't be taken down on arm */
+> +       if (cpu)
+> +               cpuinfo->cpu.hotpluggable = 1;
 
-On Thu, Dec 12, 2013 at 5:04 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Wed, Dec 11, 2013 at 02:45:08PM +0000, srinivas kandagatla wrote:
->> >>> 1. .tx_coe
->> >>>    This is not exported in the DT bindings.
->> >>>    Looking at stmmac code, not setting this seems to disable all
->> >>>    checksum offloading.
->> >>
->> >> Why cant this go via DT as well?
->> >
->> > If you and Giuseppe are OK with this, why not?
->> Am Ok with it.
->
-> Please note that I'm opposed to this until someone explain why putting
-> it in the DT is relevant (and not just convenient).
+_why_ does the ACPI standard prohibit hotplugging the boot CPU?
 
-Checksum offloading is an optional feature[1], implemented starting
-from version 3.20a. It is not tied to a specific IP version. As such,
-using a "snps,dwmac-<version>" compatible isn't a good fit here.
+In non-ACPI systems we can hotplug out the boot CPU (we can do so under
+KVM using PSCI).
 
-stmmac does auto-detection for optional features on MAC version > 3.50a.
-This is what Srinivas was referring to.
+I note that the x86 arch_register_cpu allows CPU0 to be hotpluggable on
+Intel systems as long as there are no dependencies on CPU0 being
+active. Surely we can test for something more fine-grained rather than
+disallowing CPU0 hotplug outright?
 
-Unfortunately, our MAC is < 3.50a. No auto-detection. We could add a
-"snps,dwmac-tx-coe" compatible for this, or the seperate DT property.
+How does this interact with the existing arm64 hotplug code?
 
-The other way would be to pass the flags in the initial .data with the
-SoC specific compatible. Other SoCs with the same feature won't be
-able to reuse the same compatible though.
-
-
-ChenYu
-
-[1] http://www.synopsys.com/dw/dwtb.php?a=ethernet_mac
+Thanks,
+Mark.
