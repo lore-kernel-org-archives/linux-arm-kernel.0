@@ -1,44 +1,38 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 12 Dec 2013 15:40:34 +0530
-Subject: [PATCH] ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
-In-Reply-To: <1386841969-765-1-git-send-email-rnayak@ti.com>
-References: <1386841969-765-1-git-send-email-rnayak@ti.com>
-Message-ID: <52A98B9A.4080804@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 12 Dec 2013 11:14:10 +0100
+Subject: regulator-core has_full_constraints set too late for dt using
+ boards ?
+In-Reply-To: <20131211160225.GB11468@sirena.org.uk>
+References: <52A88805.1080704@redhat.com>
+ <20131211160225.GB11468@sirena.org.uk>
+Message-ID: <52A98C72.2040203@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
-On Thursday 12 December 2013 03:22 PM, Rajendra Nayak wrote:
-> With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with
->  DEBUG_LL' we moved from parsing cmdline to identify uart used for earlycon
-> to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
-> 
-> On DRA7 though, we seem to be missing this flag, and atleast on the DRA7 EVM
-> where we use uart1 for console, boot fails with DEBUG_LL enabled.
-> 
-> Reported-by: Lokesh Vutla <lokeshvutla@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Tested on DRA7 evm using Tero's V10 clock series.
+Hi,
 
-Tested-by:  Lokesh Vutla <lokeshvutla@ti.com>
+On 12/11/2013 05:02 PM, Mark Brown wrote:
+> On Wed, Dec 11, 2013 at 04:43:01PM +0100, Hans de Goede wrote:
+>
+>> While looking into making regulator_get_optional not print
+>> an error when no regulator is found, I've noticed that
+>> for dt enabled boards, has_full_constraints is not set
+>> until regulator_init_complete() runs, which is a
+>> late_initcall.
+>
+>> This means that it gets set after it has already been checked
+>> from calls like regulator_get which are likely done by init
+>> functions running earlier.
+>
+>> This seems wrong ...
+>
+> Please look at the current code, that's not how this works any more.
 
-Thanks and regards,
-Lokesh 
-> ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index db32d53..18f333c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -1637,7 +1637,7 @@ static struct omap_hwmod dra7xx_uart1_hwmod = {
->  	.class		= &dra7xx_uart_hwmod_class,
->  	.clkdm_name	= "l4per_clkdm",
->  	.main_clk	= "uart1_gfclk_mux",
-> -	.flags		= HWMOD_SWSUP_SIDLE_ACT,
-> +	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP2UART1_FLAGS,
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs = DRA7XX_CM_L4PER_UART1_CLKCTRL_OFFSET,
-> 
+More current then 3.13-rc3 ? Because that is what I've been looking at.
+
+I could be completely wrong of course. Either way could you give a few
+hints as to how my interpretation of how this works is wrong ?
+
+Thanks & Regards,
+
+Hans
