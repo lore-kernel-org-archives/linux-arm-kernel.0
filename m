@@ -1,40 +1,54 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Thu, 12 Dec 2013 17:20:54 +0000
-Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
-In-Reply-To: <52A72FE4.4020105@ti.com>
-References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
- <1386627424-373-3-git-send-email-w-kwok2@ti.com>
- <20131210025405.GB20090@saruman.home> <52A72FE4.4020105@ti.com>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C5F1@DFLE11.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Dec 2013 17:20:49 +0000
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+In-Reply-To: <20131212171108.GA2337@1wt.eu>
+References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
+ <20131212124015.GL4360@n2100.arm.linux.org.uk>
+ <1386855390.22947.68.camel@sakura.staff.proxad.net>
+ <20131212144853.GO4360@n2100.arm.linux.org.uk>
+ <1386860657.25449.3.camel@sakura.staff.proxad.net>
+ <20131212154110.GQ4360@n2100.arm.linux.org.uk>
+ <20131212160426.GD31816@1wt.eu>
+ <20131212164748.GS4360@n2100.arm.linux.org.uk> <20131212171108.GA2337@1wt.eu>
+Message-ID: <20131212172049.GU4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shilimkar, Santosh
-> Sent: Tuesday, December 10, 2013 10:15 AM
-> To: Balbi, Felipe
-> Cc: Kwok, WingMan; linux-usb at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Greg Kroah-Hartman
-> Subject: Re: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
+On Thu, Dec 12, 2013 at 06:11:08PM +0100, Willy Tarreau wrote:
+> Another thing that can be done to improve the folding of the 16-bit
+> checksum is to swap the values to be added, sum them and only keep
+> the high half integer which already contains the carry. At least on
+> x86 I save some cycles doing this :
 > 
-> On Monday 09 December 2013 09:54 PM, Balbi, Felipe wrote:
-> > Hi,
-> >
-> > On Mon, Dec 09, 2013 at 05:17:04PM -0500, WingMan Kwok wrote:
-> >> +	ret = usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
-> >> +	if (ret)
-> >> +		return ret;
-> >> +	k_phy->usb_phy_gen.phy.init = keystone_usbphy_init;
-> >> +	k_phy->usb_phy_gen.phy.shutdown = keystone_usbphy_shutdown;
-> >
-> > this *must* be initialized before adding the PHY to the subsystem. So
-> > these two lines must be moved before usb_add_phy_dev().
-> >
-> Make sense. Probably its good idea to repost the $subject patch with above
-> as well as other delay related comment.
+>               31:24  23:16  15:8  7:0
+>      sum32 =    D      C      B    A
+> 
+>      To fold this into 16-bit at a time, I just do this :
+> 
+>                    31:24     23:16          15:8  7:0
+>      sum32           D         C              B    A
+>   +  sum32swapped    B         A              D    C
+>   =                 A+B  C+A+carry(B+D/C+A)  B+D  C+A
+> 
+> so just take the upper result and you get the final 16-bit word at
+> once.
+> 
+> In C it does :
+> 
+>        fold16 = (((sum32 >> 16) | (sum32 << 16)) + sum32) >> 16
+> 
+> When the CPU has a rotate instruction, it's fast :-)
 
-Thanks.  I have updated my patch accordingly.  Please note that the same issue
-exists on drivers/usb/phy/phy-am335x.c also.  If you want, I can send a fix for that.
+Indeed - and if your CPU can do the rotate and add at the same time,
+it's just a singe instruction, and it ends up looking remarkably
+similar to this:
 
-Regards
-WingMan
+static inline __sum16 csum_fold(__wsum sum)
+{
+        __asm__(
+        "add    %0, %1, %1, ror #16     @ csum_fold"
+        : "=r" (sum)
+        : "r" (sum)
+        : "cc");
+        return (__force __sum16)(~(__force u32)sum >> 16);
+}
