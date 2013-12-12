@@ -1,105 +1,144 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Dec 2013 13:46:10 -0700
-Subject: [PATCH v2] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI
- host maintainers
-In-Reply-To: <20131211183237.GI4699@google.com>
-References: <20131211183237.GI4699@google.com>
-Message-ID: <20131212204610.GK4699@google.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 21:54:50 +0100
+Subject: [PATCH v3 5/6] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <1386787041-6035-6-git-send-email-syin@broadcom.com>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-6-git-send-email-syin@broadcom.com>
+Message-ID: <CACRpkdaeZCodKv6R+4ZS3o-5u=QQuV3JidEp7uaLsN9aYG7bqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Thomas]
+On Wed, Dec 11, 2013 at 7:37 PM, Sherman Yin <syin@broadcom.com> wrote:
 
-On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
-> If this looks reasonable, I'll merge it via the PCI tree for v3.13.
+> Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
+>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> ---
+> v3: Re-work driver to be based on generic pin config. Moved config selection
+>     from Kconfig to bcm_defconfig.
 
-OK, here's another try.  I'm not actually trying to nominate anybody; I
-just tried to write down the list we came up with in an earlier discussion [1].
+(...)
 
-I'd like confirmation from the following people that they approve of being
-listed here:
+> +#define CAPRI_PIN_SHIFT(type, param) \
+> +       (CAPRI_ ## type ## _PIN_REG_ ## param ## _SHIFT)
+> +
+> +#define CAPRI_PIN_MASK(type, param) \
+> +       (CAPRI_ ## type ## _PIN_REG_ ## param ## _MASK)
+> +
+> +/* Macro to update reg with new pin config param */
+> +#define CAPRI_PIN_UPDATE(reg, type, param, val)                                \
+> +       (((reg) & ~CAPRI_PIN_MASK(type, param)) |                       \
+> +       (((val) << CAPRI_PIN_SHIFT(type, param)) & CAPRI_PIN_MASK(type, param)))
 
-  Richard Zhu (IMX6)
-  Thomas Petazzoni (MVEBU)
-  Magnus Damm (R-CAR)
+Yuck! Are you sure you cannot convert these to static inlines and
+make them much simpler in the process?
 
-I think everybody else listed has already said they approve.
+We do have an optimizing compiler, you don't need to do
+everything on one line... besides we're not on the hotpath.
 
-[1] http://lkml.kernel.org/r/CAErSpo5tN==4nSv2u3SUBe_L4VsWn4P7TN+LtrC172Qj1vhtog at mail.gmail.com
+> +/*
+> + * Write to the register using the value and mask if current value is different
+> + */
+> +static void capri_reg_write(struct pinctrl_dev *pctldev,
+> +                           void __iomem *reg,
+> +                           u32 val,
+> +                           u32 mask)
+> +{
+> +       u32 old_val;
+> +       u32 new_val;
+> +
+> +       old_val = readl(reg);
+> +       new_val = (old_val & ~mask) | (val & mask);
+> +
+> +       if (new_val == old_val) {
+> +               dev_dbg(pctldev->dev,
+> +                       "Reg 0x%p=0x%x (no change)\n",
+> +                       reg, old_val);
+> +               return;
+> +       }
+> +
+> +       dev_dbg(pctldev->dev,
+> +               "Reg 0x%p change from 0x%x to 0x%x\n",
+> +               reg, old_val, new_val);
+> +       writel(new_val, reg);
+> +}
 
+This is a reimplementation of regmap for MMIO.
+See drivers/base/regmap/regmap-mmio.c
+Notice how regmap_update_bits() is used throughout the
+kernel.
 
-MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI host maintainers
+If you want to do this, use regmap.
 
-From: Bjorn Helgaas <bhelgaas@google.com>
+> +               case PIN_CONFIG_DRIVE_STRENGTH:
+> +                       /* Valid range is 2-16 mA, even numbers only */
+> +                       if ((arg < 2) || (arg > 16) || (arg % 2)) {
+> +                               dev_err(pctldev->dev,
+> +                                       "Invalid Drive Strength value (%d) for "
+> +                                       "pin %s (%d). Valid values are "
+> +                                       "(2..16) mA, even numbers only.\n",
+> +                                       arg, pdata->pins[pin].name, pin);
+> +                               return -EINVAL;
+> +                       }
+> +                       *val = CAPRI_PIN_UPDATE(*val, STD, DRV_STR, (arg/2)-1);
+> +                       *mask |= CAPRI_STD_PIN_REG_DRV_STR_MASK;
+> +                       break;
 
-Add entries for PCI host controller drivers in drivers/pci/host/.
+Hm rather nice integer math...
 
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>		(DesignWare)
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>	(DesignWare)
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>	(R-CAR)
-Acked-by: Jason Cooper <jason@lakedaemon.net>		(MVEBU)
-Acked-by: Jingoo Han <jg1.han@samsung.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
----
- MAINTAINERS |   34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+> +/* Goes through the configs and update register val/mask */
+> +static int capri_i2c_pin_update(struct pinctrl_dev *pctldev,
+> +                               unsigned pin,
+> +                               unsigned long *configs,
+> +                               unsigned num_configs,
+> +                               u32 *val,
+> +                               u32 *mask)
+> +{
+> +       struct capri_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
+> +       int i;
+> +       enum pin_config_param param;
+> +       u16 arg;
+> +
+> +       for (i = 0; i < num_configs; i++) {
+> +               param = pinconf_to_config_param(configs[i]);
+> +               arg = pinconf_to_config_argument(configs[i]);
+> +
+> +               switch (param) {
+> +               case PIN_CONFIG_BIAS_PULL_UP:
+> +                       if ((arg < 1) || (arg > 7)) {
+> +                               dev_err(pctldev->dev,
+> +                                       "Invalid Pull Up value (%d) for pin %s "
+> +                                       "(%d). Valid values are (1..7).\n",
+> +                                       arg, pdata->pins[pin].name, pin);
+> +                               return -EINVAL;
+> +                       }
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8285ed4676b6..1c5dc36ec522 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6449,19 +6449,53 @@ F:	drivers/pci/
- F:	include/linux/pci*
- F:	arch/x86/pci/
- 
-+PCI DRIVER FOR IMX6
-+M:	Richard Zhu <r65037@freescale.com>
-+M:	Shawn Guo <shawn.guo@linaro.org>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/pci/host/*imx6*
-+
-+PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
-+M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+M:	Jason Cooper <jason@lakedaemon.net>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/pci/host/*mvebu*
-+
- PCI DRIVER FOR NVIDIA TEGRA
- M:	Thierry Reding <thierry.reding@gmail.com>
- L:	linux-tegra at vger.kernel.org
-+L:	linux-pci at vger.kernel.org
- S:	Supported
- F:	Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
- F:	drivers/pci/host/pci-tegra.c
- 
-+PCI DRIVER FOR RENESAS R-CAR
-+M:	Simon Horman <horms@verge.net.au>
-+M:	Magnus Damm <magnus.damm@gmail.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-sh at vger.kernel.org
-+S:	Maintained
-+F:	drivers/pci/host/*rcar*
-+
- PCI DRIVER FOR SAMSUNG EXYNOS
- M:	Jingoo Han <jg1.han@samsung.com>
- L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- S:	Maintained
- F:	drivers/pci/host/pci-exynos.c
- 
-+PCI DRIVER FOR SYNOPSIS DESIGNWARE
-+M:	Mohit Kumar <mohit.kumar@st.com>
-+M:	Jingoo Han <jg1.han@samsung.com>
-+L:	linux-pci at vger.kernel.org
-+S:	Maintained
-+F:	drivers/pci/host/*designware*
-+
- PCMCIA SUBSYSTEM
- P:	Linux PCMCIA Team
- L:	linux-pcmcia at lists.infradead.org
+No don't do that as mentioned in the other patch. Pass pull up strength
+in Ohms.
+
+Then have a translation table here, and do some best-effort fuzzy match.
+
+> +       /* Different pins have different configuration options */
+> +       switch (pin_type) {
+> +       case CAPRI_PIN_TYPE_STD:
+> +               rc = capri_std_pin_update(pctldev, pin, configs, num_configs,
+> +                       &cfg_val, &cfg_mask);
+> +               break;
+> +
+> +       case CAPRI_PIN_TYPE_I2C:
+> +               rc = capri_i2c_pin_update(pctldev, pin, configs, num_configs,
+> +                       &cfg_val, &cfg_mask);
+> +               break;
+> +
+> +       case CAPRI_PIN_TYPE_HDMI:
+> +               rc = capri_hdmi_pin_update(pctldev, pin, configs, num_configs,
+> +                       &cfg_val, &cfg_mask);
+> +               break;
+
+This is really nice and elegant.
+
+Yours,
+Linus Walleij
