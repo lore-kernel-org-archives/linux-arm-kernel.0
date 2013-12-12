@@ -1,38 +1,33 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Dec 2013 19:47:02 +0900
-Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada,
- R-Car PCI host maintainers
-In-Reply-To: <20131212070045.GO18380@S2101-09.ap.freescale.net>
-References: <20131211183237.GI4699@google.com>
- <20131212070045.GO18380@S2101-09.ap.freescale.net>
-Message-ID: <000001cef727$7da93730$78fba590$%han@samsung.com>
+From: panchaxari.prasannamurthy@linaro.org (Panchaxari Prasannamurthy Tumkur)
+Date: Thu, 12 Dec 2013 16:33:46 +0530
+Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
+ AUTO_ZRELADDR by default
+In-Reply-To: <26167386.hX5eWUjT6T@flatron>
+References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <26167386.hX5eWUjT6T@flatron>
+Message-ID: <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 12, 2013 4:01 PM, Shawn Guo wrote:
-> On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
-> > +PCI DRIVER FOR IMX6
-> > +M:	Shawn Guo <shawn.guo@linaro.org>
-> 
-> Thanks for the nomination.  But I think a better person for this
-> position would be Richard Zhu <r65037@freescale.com> (copied).  He knows
-> the driver and controller much better than myself, and most importantly
-> he is the driver owner for Freescale kernel and he has the contact to
-> Freescale PCIe hardware people.
+Hi Tomasz
 
-I agree with Shawn Guo's opinion. :-)
+> Could you explain the purpose of this change on S5P64x0?
+>
+> This is actually quite a poor platform choice. As of today, the kernel
+> is stuck with supporting just SMDK6440/6450 boards, which are proprietary
+> development boards and it doesn't look like any further boards will show
+> up in future. Kukjin has actually proposed removing support for this
+> platform at all and I consider this reasonable.
+>
+> Kukjin, should we proceed with removal?
 
-Richard Zhu has been maintaining i.MX6 PCIe driver. Also he can contact
-Freescale PCIe hardware engineers. Thus, he is the appropriate person
-for the Maintainer of i.MX PCIe.
+The purpose of this patch is with the greater intent of consolidating
+ARM-32 kernel. Which means a generic kernel for ARM-32 processors.
 
-Best regards,
-Jingoo Han
+Hence these platform supported configs are introduced as default for
+that particular platform.
 
-> 
-> Shawn
-> 
-> > +L:	linux-pci at vger.kernel.org
-> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> > +S:	Maintained
-> > +F:	drivers/pci/host/*imx6*
+I hope i answered your question. Else please mail me with further queries.
+
+thanks
+Panchaxari
