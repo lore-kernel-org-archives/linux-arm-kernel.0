@@ -1,38 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Dec 2013 22:48:51 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <1386888245.25449.51.camel@sakura.staff.proxad.net>
-References: <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <20131212144853.GO4360@n2100.arm.linux.org.uk>
- <1386860657.25449.3.camel@sakura.staff.proxad.net>
- <20131212154110.GQ4360@n2100.arm.linux.org.uk>
- <20131212160426.GD31816@1wt.eu>
- <20131212164748.GS4360@n2100.arm.linux.org.uk>
- <1386887402.25449.48.camel@sakura.staff.proxad.net>
- <20131212223626.GW4360@n2100.arm.linux.org.uk>
- <1386888245.25449.51.camel@sakura.staff.proxad.net>
-Message-ID: <20131212224851.GY4360@n2100.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 13 Dec 2013 00:05:46 +0100
+Subject: [PATCHv2] pinctrl: pinconf: remove checks on ops->pin_config_get
+Message-ID: <1386889546-4333-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 11:44:05PM +0100, Maxime Bizon wrote:
-> 
-> On Thu, 2013-12-12 at 22:36 +0000, Russell King - ARM Linux wrote:
-> 
-> > Does this bug show up in existing unmodified mainline kernels?
-> 
-> not for me, I found this while writing new code.
-> 
-> though all possible kernel callers are not enabled in my .config.
+ops->pin_config_get() is only used in one specific path that will only be taken
+for generic pinconf drivers (ops->is_generic == true) when dumping the pinconf
+by using debugfs.
 
-Okay, as we have no reports so far of this affecting anything in any
-mainline kernel, I think I'm going to queue the fix up for v3.14 and
-not -rc - we know that although the assembly is not correct in the IP
-code, we know that it's completely harmless there because the overflowed
-byte is always zero.
+By removing the check in pinconf_check_ops(), let's stop pressuring people to
+write a pin_config_get() function that will never be used and so will probably
+never be tested.
 
-So... I'll queue it for v3.14.  If anyone does find it affects existing
-kernels, we can always apply it for -rc and stable kernels.
+Removing the check in pinconf_pins_show() allows driver to not implement
+pin_config_get() but still get a dump of the pinconf in debugfs by implementing
+pin_config_dbg_show().
 
-Thanks for your patience Maxime.
+Finally, not implementing pin_config_get() now results in returning -ENOTSUPP
+instead of -EINVAL. While this doesn't have any real impact for now, this feels
+more right.
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+
+Changes in v2:
+ - fix the unused variable 'ops' warnings
+
+ drivers/pinctrl/pinconf.c | 22 ++++------------------
+ 1 file changed, 4 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+index b8fcc38c0d11..8bfa0643e5dc 100644
+--- a/drivers/pinctrl/pinconf.c
++++ b/drivers/pinctrl/pinconf.c
+@@ -28,12 +28,6 @@ int pinconf_check_ops(struct pinctrl_dev *pctldev)
+ {
+ 	const struct pinconf_ops *ops = pctldev->desc->confops;
+ 
+-	/* We must be able to read out pin status */
+-	if (!ops->pin_config_get && !ops->pin_config_group_get) {
+-		dev_err(pctldev->dev,
+-			"pinconf must be able to read out pin status\n");
+-		return -EINVAL;
+-	}
+ 	/* We have to be able to config the pins in SOME way */
+ 	if (!ops->pin_config_set && !ops->pin_config_group_set) {
+ 		dev_err(pctldev->dev,
+@@ -67,9 +61,9 @@ int pin_config_get_for_pin(struct pinctrl_dev *pctldev, unsigned pin,
+ 	const struct pinconf_ops *ops = pctldev->desc->confops;
+ 
+ 	if (!ops || !ops->pin_config_get) {
+-		dev_err(pctldev->dev, "cannot get pin configuration, missing "
++		dev_dbg(pctldev->dev, "cannot get pin configuration, missing "
+ 			"pin_config_get() function in driver\n");
+-		return -EINVAL;
++		return -ENOTSUPP;
+ 	}
+ 
+ 	return ops->pin_config_get(pctldev, pin, config);
+@@ -93,10 +87,10 @@ int pin_config_group_get(const char *dev_name, const char *pin_group,
+ 	ops = pctldev->desc->confops;
+ 
+ 	if (!ops || !ops->pin_config_group_get) {
+-		dev_err(pctldev->dev, "cannot get configuration for pin "
++		dev_dbg(pctldev->dev, "cannot get configuration for pin "
+ 			"group, missing group config get function in "
+ 			"driver\n");
+-		ret = -EINVAL;
++		ret = -ENOTSUPP;
+ 		goto unlock;
+ 	}
+ 
+@@ -302,12 +296,8 @@ static void pinconf_dump_pin(struct pinctrl_dev *pctldev,
+ static int pinconf_pins_show(struct seq_file *s, void *what)
+ {
+ 	struct pinctrl_dev *pctldev = s->private;
+-	const struct pinconf_ops *ops = pctldev->desc->confops;
+ 	unsigned i, pin;
+ 
+-	if (!ops || !ops->pin_config_get)
+-		return 0;
+-
+ 	seq_puts(s, "Pin config settings per pin\n");
+ 	seq_puts(s, "Format: pin (name): configs\n");
+ 
+@@ -352,13 +342,9 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
+ {
+ 	struct pinctrl_dev *pctldev = s->private;
+ 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
+-	const struct pinconf_ops *ops = pctldev->desc->confops;
+ 	unsigned ngroups = pctlops->get_groups_count(pctldev);
+ 	unsigned selector = 0;
+ 
+-	if (!ops || !ops->pin_config_group_get)
+-		return 0;
+-
+ 	seq_puts(s, "Pin config settings per pin group\n");
+ 	seq_puts(s, "Format: group (name): configs\n");
+ 
+-- 
+1.8.3.2
