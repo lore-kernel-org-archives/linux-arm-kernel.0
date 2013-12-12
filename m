@@ -1,103 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Dec 2013 00:05:46 +0100
-Subject: [PATCHv2] pinctrl: pinconf: remove checks on ops->pin_config_get
-Message-ID: <1386889546-4333-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 12 Dec 2013 15:07:15 -0800
+Subject: [PATCH] Partially revert "mtd: nand: pxa3xx: Introduce
+ 'marvell,armada370-nand' compatible string"
+In-Reply-To: <1386624986-404-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1386624986-404-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131212230715.GX27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ops->pin_config_get() is only used in one specific path that will only be taken
-for generic pinconf drivers (ops->is_generic == true) when dumping the pinconf
-by using debugfs.
+On Mon, Dec 09, 2013 at 06:36:26PM -0300, Ezequiel Garcia wrote:
+> This reverts c0f3b8643a6fa2461d70760ec49d21d2b031d611.
 
-By removing the check in pinconf_check_ops(), let's stop pressuring people to
-write a pin_config_get() function that will never be used and so will probably
-never be tested.
+Modified to say "partially reverts".
 
-Removing the check in pinconf_pins_show() allows driver to not implement
-pin_config_get() but still get a dump of the pinconf in debugfs by implementing
-pin_config_dbg_show().
+> 
+> The "armada370-nand" compatible support is not complete, and it was mistake
+> to add it. Revert it and pospone the support until the infrastructure is
+> in place.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> Note this won't apply to v3.12 as it is, although fixing it should be easy.
 
-Finally, not implementing pin_config_get() now results in returning -ENOTSUPP
-instead of -EINVAL. While this doesn't have any real impact for now, this feels
-more right.
+Pushed this patch to linux-mtd.git, noting -stable for 3.12+.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
+Ezequiel,
 
-Changes in v2:
- - fix the unused variable 'ops' warnings
+Please double-check linux-mtd.git to ensure it fits your liking.
 
- drivers/pinctrl/pinconf.c | 22 ++++------------------
- 1 file changed, 4 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-index b8fcc38c0d11..8bfa0643e5dc 100644
---- a/drivers/pinctrl/pinconf.c
-+++ b/drivers/pinctrl/pinconf.c
-@@ -28,12 +28,6 @@ int pinconf_check_ops(struct pinctrl_dev *pctldev)
- {
- 	const struct pinconf_ops *ops = pctldev->desc->confops;
- 
--	/* We must be able to read out pin status */
--	if (!ops->pin_config_get && !ops->pin_config_group_get) {
--		dev_err(pctldev->dev,
--			"pinconf must be able to read out pin status\n");
--		return -EINVAL;
--	}
- 	/* We have to be able to config the pins in SOME way */
- 	if (!ops->pin_config_set && !ops->pin_config_group_set) {
- 		dev_err(pctldev->dev,
-@@ -67,9 +61,9 @@ int pin_config_get_for_pin(struct pinctrl_dev *pctldev, unsigned pin,
- 	const struct pinconf_ops *ops = pctldev->desc->confops;
- 
- 	if (!ops || !ops->pin_config_get) {
--		dev_err(pctldev->dev, "cannot get pin configuration, missing "
-+		dev_dbg(pctldev->dev, "cannot get pin configuration, missing "
- 			"pin_config_get() function in driver\n");
--		return -EINVAL;
-+		return -ENOTSUPP;
- 	}
- 
- 	return ops->pin_config_get(pctldev, pin, config);
-@@ -93,10 +87,10 @@ int pin_config_group_get(const char *dev_name, const char *pin_group,
- 	ops = pctldev->desc->confops;
- 
- 	if (!ops || !ops->pin_config_group_get) {
--		dev_err(pctldev->dev, "cannot get configuration for pin "
-+		dev_dbg(pctldev->dev, "cannot get configuration for pin "
- 			"group, missing group config get function in "
- 			"driver\n");
--		ret = -EINVAL;
-+		ret = -ENOTSUPP;
- 		goto unlock;
- 	}
- 
-@@ -302,12 +296,8 @@ static void pinconf_dump_pin(struct pinctrl_dev *pctldev,
- static int pinconf_pins_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
--	const struct pinconf_ops *ops = pctldev->desc->confops;
- 	unsigned i, pin;
- 
--	if (!ops || !ops->pin_config_get)
--		return 0;
--
- 	seq_puts(s, "Pin config settings per pin\n");
- 	seq_puts(s, "Format: pin (name): configs\n");
- 
-@@ -352,13 +342,9 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
- 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
--	const struct pinconf_ops *ops = pctldev->desc->confops;
- 	unsigned ngroups = pctlops->get_groups_count(pctldev);
- 	unsigned selector = 0;
- 
--	if (!ops || !ops->pin_config_group_get)
--		return 0;
--
- 	seq_puts(s, "Pin config settings per pin group\n");
- 	seq_puts(s, "Format: group (name): configs\n");
- 
--- 
-1.8.3.2
+Brian
