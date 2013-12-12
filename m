@@ -1,134 +1,162 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Dec 2013 11:55:48 -0800
-Subject: [PATCH 09/10] KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR
- handlers
+Date: Thu, 12 Dec 2013 11:55:49 -0800
+Subject: [PATCH 10/10] KVM: arm-vgic: Support CPU interface reg access
 In-Reply-To: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
 References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1386878149-13397-10-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1386878149-13397-11-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle MMIO accesses to the two registers which should support both the
-case where the VMs want to read/write either of these registers and the
-case where user space reads/writes these registers to do save/restore of
-the VGIC state.
+Implement support for the CPU interface register access driven by MMIO
+address offsets from the CPU interface base address.  Useful for user
+space to support save/restore of the VGIC state.
 
-Note that the added complexity compared to simple set/clear enable
-registers stems from the bookkeping of source cpu ids.  It may be
-possible to change the underlying data structure to simplify the
-complexity, but since this is not in the critical path at all, this will
-do.
-
-Also note that reading this register from a live guest will not be
-accurate compared to on hardware, because some state may be living on
-the CPU LRs and the only way to give a consistent read would be to force
-stop all the VCPUs and request them to unqueu the LR state onto the
-distributor.  Until we have an actual user of live reading this
-register, we can live with the difference.
+This commit adds support only for the same logic as the current VGIC
+support, and no more.  For example, the active priority registers are
+handled as RAZ/WI, just like setting priorities on the emulated
+distributor.
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changelog[v3]:
- - Renamed read/write SGI set/clear functions
- - Rely on unqueuing of interrupts from LRs instead of reading LRs
-   directly
- - Deduplicate code
-
-Changelog[v2]:
- - Use struct kvm_exit_mmio accessors for ->data field.
-
- virt/kvm/arm/vgic.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 66 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 73 insertions(+), 8 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8067e76..752f76c 100644
+index 752f76c..977f479 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -661,18 +661,80 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
- 	}
- }
+@@ -71,6 +71,10 @@
+ #define VGIC_ADDR_UNDEF		(-1)
+ #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
  
--static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
--				  struct kvm_exit_mmio *mmio,
--				  phys_addr_t offset)
-+/* Handle reads of GICD_CPENDSGIRn and GICD_SPENDSGIRn */
-+static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
-+					struct kvm_exit_mmio *mmio,
-+					phys_addr_t offset)
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++#define GICC_ARCH_VERSION_V2	0x2
++
+ /* Physical address of vgic virtual cpu interface */
+ static phys_addr_t vgic_vcpu_base;
+ 
+@@ -312,7 +316,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 	u32 word_offset = offset & 3;
+ 
+ 	switch (offset & ~3) {
+-	case 0:			/* CTLR */
++	case 0:			/* GICD_CTLR */
+ 		reg = vcpu->kvm->arch.vgic.enabled;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+@@ -323,15 +327,15 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 		}
+ 		break;
+ 
+-	case 4:			/* TYPER */
++	case 4:			/* GICD_TYPER */
+ 		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+ 		reg |= (VGIC_NR_IRQS >> 5) - 1;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+ 
+-	case 8:			/* IIDR */
+-		reg = 0x4B00043B;
++	case 8:			/* GICD_IIDR */
++		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+@@ -1714,9 +1718,70 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
+ 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
  {
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int sgi;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 reg = 0;
-+
-+	/* Copy source SGIs from distributor side */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		int shift = 8 * (sgi - min_sgi);
-+		reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
-+	}
-+
-+	mmio_data_write(mmio, ~0, reg);
- 	return false;
- }
- 
-+static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
-+					 struct kvm_exit_mmio *mmio,
-+					 phys_addr_t offset, bool set)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int sgi;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 reg;
+-	return true;
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	u32 reg, mask = 0, shift = 0;
 +	bool updated = false;
 +
-+	reg = mmio_data_read(mmio, ~0);
-+
-+	/* Clear pending SGIs on the distributor */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		u8 mask = reg >> (8 * (sgi - min_sgi));
-+		if (set) {
-+			if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
-+				updated = true;
-+			dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
-+		} else {
-+			if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
-+				updated = true;
-+			dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
-+		}
++	switch (offset & ~0x3) {
++	case GIC_CPU_CTRL:
++		mask = GICH_VMCR_CTRL_MASK;
++		shift = GICH_VMCR_CTRL_SHIFT;
++		break;
++	case GIC_CPU_PRIMASK:
++		mask = GICH_VMCR_PRIMASK_MASK;
++		shift = GICH_VMCR_PRIMASK_SHIFT;
++		break;
++	case GIC_CPU_BINPOINT:
++		mask = GICH_VMCR_BINPOINT_MASK;
++		shift = GICH_VMCR_BINPOINT_SHIFT;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
++		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
++		break;
 +	}
 +
-+	if (updated)
-+		vgic_update_state(vcpu->kvm);
-+
++	if (!mmio->is_write) {
++		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
++		mmio_data_write(mmio, ~0, reg);
++	} else {
++		reg = mmio_data_read(mmio, ~0);
++		reg = (reg << shift) & mask;
++		if (reg != (vgic_cpu->vgic_vmcr & mask))
++			updated = true;
++		vgic_cpu->vgic_vmcr &= ~mask;
++		vgic_cpu->vgic_vmcr |= reg;
++	}
 +	return updated;
 +}
 +
- static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
- 				struct kvm_exit_mmio *mmio,
- 				phys_addr_t offset)
- {
--	return false;
-+	if (!mmio->is_write)
-+		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-+	else
-+		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, true);
-+}
-+
-+static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
++static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
++			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
++{
++	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
+ }
+ 
++static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
 +				  struct kvm_exit_mmio *mmio,
 +				  phys_addr_t offset)
 +{
-+	if (!mmio->is_write)
-+		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-+	else
-+		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, false);
- }
++	u32 reg;
++
++	if (mmio->is_write)
++		return false;
++
++	/* GICC_IIDR */
++	reg = (PRODUCT_ID_KVM << 20) |
++	      (GICC_ARCH_VERSION_V2 << 16) |
++	      (IMPLEMENTER_ARM << 0);
++	mmio_data_write(mmio, ~0, reg);
++	return false;
++}
++
++/*
++ * CPU Interface Register accesses - these are not accessed by the VM, but by
++ * user space for saving and restoring VGIC state.
++ */
+ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_CTRL,
+@@ -1726,17 +1791,17 @@ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_ALIAS_BINPOINT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_abpr,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_ACTIVEPRIO,
+ 		.len		= 16,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_IDENT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_cpu_mmio_ident,
+ 	},
+ };
  
- /*
 -- 
 1.8.4.3
