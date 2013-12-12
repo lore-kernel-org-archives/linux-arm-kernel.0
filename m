@@ -1,39 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 22:14:27 +0100
-Subject: [PATCH 3/3] pinctrl: at91: implement at91_pinconf_dbg_show
-In-Reply-To: <6277163.cTcj4OY5rk@avalon>
-References: <1386421734-10240-1-git-send-email-alexandre.belloni@free-electrons.com>
- <CACRpkdbAmPxVdQ_hVQSQpgVu324Jg9D6FYj-OyfsorPP2zzdLw@mail.gmail.com>
- <52A9DB3C.7070107@free-electrons.com> <6277163.cTcj4OY5rk@avalon>
-Message-ID: <CACRpkdbP71CbMuuxQkL1hQ_TawmiFZr4-9Z5X3xanWdeC8URsA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Dec 2013 16:15:30 -0500
+Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
+In-Reply-To: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20131212211530.GB2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 5:04 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Thursday 12 December 2013 16:50:20 Alexandre Belloni wrote:
->> On 12/12/2013 15:45, Linus Walleij wrote:
->> > On Sat, Dec 7, 2013 at 2:08 PM, Alexandre Belloni
->> >
->> > <alexandre.belloni@free-electrons.com> wrote:
->> >> This allows to get the pin configuration by using debugfs. On my system:
->> >>  # cat /sys/kernel/debug/pinctrl/pinctrl.3/pinconf-pins
->> >>
->> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> >
->> > This is a more invasive patch so I prefer if Laurent ACK this before
->> > I apply it.
->>
->> Hum, just to be clear, this is an Atmel chip and the Atmel maintainers
->> were already in copy. I believe Laurent already has a lot on his plate
->> with CDF ;)
->
-> Not to mention the rest. I'd love to help with at91 pinctrl, but I think I
-> have to draw the line somewhere. I hope it won't come as a shock that I can't
-> review the whole kernel :-D
+On Thu, Dec 12, 2013 at 11:11:55PM +0200, Aaro Koskinen wrote:
+> If the non-DT channel add path fails, the kernel will crash as the
+> channel is not set to NULL and it will try to release the channel using
+> the error value. Fix that.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> ---
+>  drivers/dma/mv_xor.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Sorry about this mess, forget about it, I don't know what is wrong
-we me today, probably trying to process too many patches :-)
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Yours,
-Linus Walleij
+thx,
+
+Jason.
