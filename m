@@ -1,103 +1,36 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 12 Dec 2013 08:55:53 -0800
-Subject: [PATCH v4 2/4] Documentation: Add APM X-Gene SoC 15Gbps
- Multi-purpose PHY driver binding documentation
-In-Reply-To: <52A9C8C5.8030809@interlog.com>
-References: <1386833435-30498-1-git-send-email-lho@apm.com>
- <1386833435-30498-2-git-send-email-lho@apm.com>
- <1386833435-30498-3-git-send-email-lho@apm.com>
- <201312121427.20040.arnd@arndb.de> <52A9C8C5.8030809@interlog.com>
-Message-ID: <1386867353.5985.7.camel@dabdike>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 12 Dec 2013 09:01:18 -0800
+Subject: [PATCH v2 1/9] arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
+In-Reply-To: <52A97979.1030205@monstr.eu>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
+ <52A97979.1030205@monstr.eu>
+Message-ID: <552285d2-8d57-4509-a014-d97065232376@DB8EHSMHS004.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-12 at 15:31 +0100, Douglas Gilbert wrote:
-> On 13-12-12 02:27 PM, Arnd Bergmann wrote:
-> > On Thursday 12 December 2013, Loc Ho wrote:
-> >> +- reg                  : First PHY memory resource is the SDS PHY access
-> >> +                         resource.
-> >> +                         Second PHY memory resoruce is the clock and reset
-> >> +                         resources.
-> >> +                         Third PHY memory resource is the SDS PHY access
-> >> +                         resource outside of the IP if it is type
-> >> +                         "apm,xgene-phy-ext".
-> >
-> > Why do the "clock and reset" resources not use a clock driver and a reset
-> > driver?
-> >
-> > I would expect these to get replaced with
-> >
-> > 	clocks		: Reference to external clock input
-> > 	resets		: Reference to reset controller input
-> >
-> >> +Optional properties:
-> >> +- status		: Shall be "ok" if enabled or "disabled" if disabled.
-> >> +			  Default is "ok".
-> >> +- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
-> >> +			  bit lines from the automatic calibrated position.
-> >> +			  Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
-> >> +			  Range from 0 to 0x7f in unit of one bit period.
-> >> +			  Default is 0xa.
-> >
-> > What does gen1, gen2 and gen3 refer to? Is this PCIe, SATA or serdes generations
-> > or all of them?
-> >
-> > Why are there two sets?
-> >
-> > Will this have to change if you add PCIe support?
-> >
-> > I would suggest using decimal notation here instead of hexadecimal since you
-> > are dealing with numbers couting things. Same for the others.
-> >
-> >> +- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
-> >> +			  data earlier than the nominal sampling point. 1 means
-> >> +			  sample data later than the nominal sampling point.
-> >> +			  Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
-> >> +			  Default is 0x0.
-> >> +
-> >> +- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
-> >> +			  gain control. Two set of 3-tuple setting for Gen1,
-> >> +			  Gen2, and Gen3. Range is between 0 to 0x1f in unit
-> >> +			  of dB. Default is 0x3.
-> >> +
-> >> +- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
-> >> +			  Gen1, Gen2, and Gen3. Range is between 0 to 0xf in
-> >> +			  unit of 13.3mV. Default is 0xf.
-> >
-> > Units of 13.3mV don't seem to be useful as a generic measurement. I'd
-> > recommend using milivolts or microvolts.
-> >
-> >> +- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
-> >> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-> >> +			  between 0 to 0xf in unit of 18.2mV. Default is 0x0.
-> >> +- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
-> >> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-> >> +			  between 0 to 0x7 in unit of 18.2mV. Default is 0x0.
-> >> +- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
-> >> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-> >> +			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
-> >
-> > Same here.
-> >
-> >> +- apm,tx-speed		: Tx operating speed. One set of 3-tuple for
-> >> +			  Gen1 (0x1), Gen2 (0x3), and Gen3 (0x7). Default is
-> >> +			  0x7.
-> >
-> > I'm completely confused by this description. Can you rephrase this?
-> > It sounds like the only possible values are <1 3 7> for this property.
-> 
-> Most likely Gen1, Gen2 and Gen3 are SATA-speak corresponding to SAS's
-> G1, G2 and G3:
-> 
-> G1   Gen1     1.5 Gbps
-> G2   Gen2     3 Gbps
-> G3   Gen3     6 Gbps
-> G4   -        12 Gbps
-> G5   -        24 Gbps
+Hi Michal,
 
-Electrically, SAS phys and SATA phys are identical.  We already have a
-SAS phy abstraction in libsas ... when looking at a separable phy
-implementation, shouldn't we be doing something that works for both
-instead of just SATA?
+On Thu, Dec 12, 2013 at 09:53:13AM +0100, Michal Simek wrote:
+> On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
+> > The bindings for the TTC changed in commit 'arm: zynq: Use standard
+> > timer binding' (e932900a3279b5dbb6d8f43c7b369003620e137c). That change
+> > removed possible subnodes from this driver rendering the 'clock-ranges'
+> > property invalid for this node.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi | 2 --
+> >  1 file changed, 2 deletions(-)
+> 
+> I think this is completely unrelated to cpufreq and should just go
+> directly via arm-soc tree.
+> If yes, I will add 1/9 and 2/9 to zynq/dt branch.
 
-James
+I agree. This is just clean up that I found during this work. The second
+patch could go in as well I think. cpufreq will need the CPU nodes
+later, but I think there is no real reason to not add them now.
+
+	S?ren
