@@ -1,46 +1,125 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 12 Dec 2013 11:35:12 +0000
-Subject: [PATCH 2/3] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <1386792029-23148-2-git-send-email-broonie@kernel.org>
-References: <1386792029-23148-1-git-send-email-broonie@kernel.org>
- <1386792029-23148-2-git-send-email-broonie@kernel.org>
-Message-ID: <20131212113512.GC28621@e103034-lin>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Thu, 12 Dec 2013 20:36:13 +0900
+Subject: [RESEND] [PATCH V3] ARM: dts: Add DMA controller node info on
+ Exynos5420.
+In-Reply-To: <086601cedf98$2cb9f310$862dd930$@org>
+References: <1381137944-30503-1-git-send-email-l.krishna@samsung.com>
+ <086601cedf98$2cb9f310$862dd930$@org>
+Message-ID: <CAL1wa8d4TebPjfSw1Q3XMzTmUchO=jCbeUbX+STVEq4TG33kzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 08:00:28PM +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> In non-heterogeneous systems like big.LITTLE systems the scheduler will be
-> able to make better use of the available cores if we provide power numbers
-> to it indicating their relative performance. Do this by parsing the CPU
-> nodes in the DT.
+Hi Kukjin,
 
-Setting the relative performance through cpu_power in it current form
-eads to sub-optimal scheduling on big.LITTLE in common scenarios.
+Even though you said it is applied, I didn't see this patch in any of
+your trees.
+Can you kindly look into this patch and take necessary action..?
 
-I know that this is how it is currently done for ARMv7 and one could
-argue that we should do the same for ARMv8 until we have a better
-solution. I just want to highlight that setting cpu_power this way is
-not generally the right thing to do for big.LITTLE. It will have to be
-fixed eventually.
+Best Wishes,
+Leela Krishna.
 
-I fully agree that we need to pass relative performance information to
-the scheduler, but it isn't really ready for it yet.
-
-It doesn't harm when using the ARM big.LITTLE reference patches as they
-ignore cpu_power for load-balancing. However, it leads to
-under-utilization of little cpus with the mainline scheduler.
-
-> 
-> The power numbers are the same as for ARMv7 since it seems that the
-> expected differential between the big and little cores is very similar on
-> both ARMv7 and ARMv8. These numbers are just an initial and basic
-> approximation for use with the current scheduler, it is likely that both
-> experience with silicon and ongoing work on improving the scheduler will
-> lead to further tuning.
-
-As said above, it needs to be fixed in the scheduler.
-
-Morten
+On Tue, Nov 12, 2013 at 8:13 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> Leela Krishna Amudala wrote:
+>>
+> + dt ml.
+>
+>> From: Padmavathi Venna <padma.v@samsung.com>
+>>
+>> This patch adds dma controller node info on Exynos5420.
+>> Exynos5420 has adma for audio IPs. As adma clk is dependent
+>> on audss clk provider that will be added later.
+>>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+>> ---
+>> Change since V2:
+>>       - Removed adma node as adma clock is dependent audss clock provider.
+>>
+>> Changes since V1:
+>>         - In V1, dma node common stuff was added in common exynos5.dtsi
+> file.
+>>           This was removed as per Kukjin comment and added in
+>> exynos5420.dtsi.
+>>
+>>  arch/arm/boot/dts/exynos5420.dtsi |   52
+>> +++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 52 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+>> b/arch/arm/boot/dts/exynos5420.dtsi
+>> index d537cd7..15465f8 100644
+>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> @@ -186,6 +186,58 @@
+>>               status = "okay";
+>>       };
+>>
+>> +     amba {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             compatible = "arm,amba-bus";
+>> +             interrupt-parent = <&gic>;
+>> +             ranges;
+>> +
+>> +             pdma0: pdma at 121A0000 {
+>> +                     compatible = "arm,pl330", "arm,primecell";
+>> +                     reg = <0x121A0000 0x1000>;
+>> +                     interrupts = <0 34 0>;
+>> +                     clocks = <&clock 362>;
+>> +                     clock-names = "apb_pclk";
+>> +                     #dma-cells = <1>;
+>> +                     #dma-channels = <8>;
+>> +                     #dma-requests = <32>;
+>> +             };
+>> +
+>> +             pdma1: pdma at 121B0000 {
+>> +                     compatible = "arm,pl330", "arm,primecell";
+>> +                     reg = <0x121B0000 0x1000>;
+>> +                     interrupts = <0 35 0>;
+>> +                     clocks = <&clock 363>;
+>> +                     clock-names = "apb_pclk";
+>> +                     #dma-cells = <1>;
+>> +                     #dma-channels = <8>;
+>> +                     #dma-requests = <32>;
+>> +             };
+>> +
+>> +             mdma0: mdma at 10800000 {
+>> +                     compatible = "arm,pl330", "arm,primecell";
+>> +                     reg = <0x10800000 0x1000>;
+>> +                     interrupts = <0 33 0>;
+>> +                     clocks = <&clock 473>;
+>> +                     clock-names = "apb_pclk";
+>> +                     #dma-cells = <1>;
+>> +                     #dma-channels = <8>;
+>> +                     #dma-requests = <1>;
+>> +             };
+>> +
+>> +             mdma1: mdma at 11C10000 {
+>> +                     compatible = "arm,pl330", "arm,primecell";
+>> +                     reg = <0x11C10000 0x1000>;
+>> +                     interrupts = <0 124 0>;
+>> +                     clocks = <&clock 442>;
+>> +                     clock-names = "apb_pclk";
+>> +                     #dma-cells = <1>;
+>> +                     #dma-channels = <8>;
+>> +                     #dma-requests = <1>;
+>> +             };
+>> +     };
+>> +
+>>       serial at 12C00000 {
+>>               clocks = <&clock 257>, <&clock 128>;
+>>               clock-names = "uart", "clk_uart_baud0";
+>> --
+>> 1.7.10.4
+>
+> Sorry for late response.
+>
+> Looks OK to me, many properties for dma are same with 5250 though...
+>
+> Applied, thanks.
+> - Kukjin
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
