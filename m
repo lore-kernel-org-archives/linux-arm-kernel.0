@@ -1,41 +1,84 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 12 Dec 2013 11:36:42 +0000
-Subject: [PATCH v4] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <52A982BB.4030901@linaro.org>
-References: <1386672625-8060-1-git-send-email-andre.przywara@linaro.org>
- <20131212022822.GI2871@cbox>
- <CAFEAcA_F3T1+YsKKq3h8P139OX085N-PPPPZo5dvwgwcuGoXHg@mail.gmail.com>
- <52A982BB.4030901@linaro.org>
-Message-ID: <CAFEAcA8bgy7Gi6aKKiS3d20Jh+_X2AComWTH-+Bwv_gV_zU5-g@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 12 Dec 2013 17:08:27 +0530
+Subject: [PATCH v2 1/3] ARM: OMAP2+: Add support to parse 'main_clk' info from
+ DT
+In-Reply-To: <1386848309-14076-1-git-send-email-rnayak@ti.com>
+References: <1386848309-14076-1-git-send-email-rnayak@ti.com>
+Message-ID: <1386848309-14076-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2013 09:32, Andre Przywara <andre.przywara@linaro.org> wrote:
-> On 12/12/2013 10:23 AM, Peter Maydell wrote:
->> What does it mean to say that a system register for AArch64
->> is "32 bits" given that MRS/MSR always operate on a 64 bit
->> register?
+With clocks for OMAP moving to DT, its now possible to pass the 'main_clk'
+data for each device from DT instead of having it in hwmod.
 
-> But ARMv8 ARM still defines these registers as 32-bit:
-> D8.5.14: CNTV_CTL_EL0
-> Attributes
->            CNTV_CTL_EL0 is a 32-bit register.
-> But indeed the MSR/MRS instruction references a Xt register, and the
-> documentation does not seem to tell how this is handled, so I assume this is
-> zero-extended.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
-I checked, and for AArch64 registers, "32 bits" is just
-a shorthand for "64 bit register where the top 32 bits are
-RAZ/WI" (and I suspect it's not totally impossible that some
-future architecture revision might define new bits in the
-top half).
-
-So I would suggest that we should make the KVM user<->kernel
-interface just consistently make all the sysregs 64 bit.
-
-(There is actually precedent of a sort here in that the
-kernel claims the PSTATE register is 64 bits wide despite
-it really being a 32 bit SPSR format value under the hood.)
-
-thanks
--- PMM
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index dfa878b..f22bbbb 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -730,14 +730,18 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+  * functional clock pointer) if a main_clk is present.  Returns 0 on
+  * success or -EINVAL on error.
+  */
+-static int _init_main_clk(struct omap_hwmod *oh)
++static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
+ {
+ 	int ret = 0;
+ 
+-	if (!oh->main_clk)
++	if (!oh->main_clk && !of_get_property(np, "clocks", NULL))
+ 		return 0;
+ 
+-	oh->_clk = clk_get(NULL, oh->main_clk);
++	if (oh->main_clk)
++		oh->_clk = clk_get(NULL, oh->main_clk);
++	else
++		oh->_clk = of_clk_get_by_name(np, "fck");
++
+ 	if (IS_ERR(oh->_clk)) {
+ 		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+ 			   oh->name, oh->main_clk);
+@@ -1565,19 +1569,26 @@ static int _init_clkdm(struct omap_hwmod *oh)
+  * Resolves all clock names embedded in the hwmod.  Returns 0 on
+  * success, or a negative error code on failure.
+  */
+-static int _init_clocks(struct omap_hwmod *oh, void *data)
++static int _init_clocks(struct omap_hwmod *oh, void *data,
++			int index, struct device_node *np)
+ {
+ 	int ret = 0;
+ 
+ 	if (oh->_state != _HWMOD_STATE_REGISTERED)
+ 		return 0;
+ 
++	if (index) {
++		pr_warn("omap_hwmod: %s unable to parse clock data from %s\n",
++				oh->name, np->name);
++		np = NULL;
++	}
++
+ 	pr_debug("omap_hwmod: %s: looking up clocks\n", oh->name);
+ 
+ 	if (soc_ops.init_clkdm)
+ 		ret |= soc_ops.init_clkdm(oh);
+ 
+-	ret |= _init_main_clk(oh);
++	ret |= _init_main_clk(oh, np);
+ 	ret |= _init_interface_clks(oh);
+ 	ret |= _init_opt_clks(oh);
+ 
+@@ -2500,7 +2511,7 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 		}
+ 	}
+ 
+-	r = _init_clocks(oh, NULL);
++	r = _init_clocks(oh, NULL, index, np);
+ 	if (r < 0) {
+ 		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh->name);
+ 		return -EINVAL;
+-- 
+1.7.9.5
