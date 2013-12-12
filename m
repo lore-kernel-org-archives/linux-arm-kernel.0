@@ -1,86 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Dec 2013 14:27:19 +0100
-Subject: [PATCH v4 2/4] Documentation: Add APM X-Gene SoC 15Gbps
- Multi-purpose PHY driver binding documentation
-In-Reply-To: <1386833435-30498-3-git-send-email-lho@apm.com>
-References: <1386833435-30498-1-git-send-email-lho@apm.com>
- <1386833435-30498-2-git-send-email-lho@apm.com>
- <1386833435-30498-3-git-send-email-lho@apm.com>
-Message-ID: <201312121427.20040.arnd@arndb.de>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Thu, 12 Dec 2013 21:27:16 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <201312112112.52746.arnd@arndb.de>
+References: <1386770541-15056-1-git-send-email-zhangfei.gao@linaro.org>
+ <201312111549.14017.arnd@arndb.de> <52A8868A.3000105@linaro.org>
+ <201312112112.52746.arnd@arndb.de>
+Message-ID: <52A9B9B4.3080105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013, Loc Ho wrote:
-> +- reg                  : First PHY memory resource is the SDS PHY access
-> +                         resource.
-> +                         Second PHY memory resoruce is the clock and reset
-> +                         resources.
-> +                         Third PHY memory resource is the SDS PHY access
-> +                         resource outside of the IP if it is type
-> +                         "apm,xgene-phy-ext".
+Dear Arnd
 
-Why do the "clock and reset" resources not use a clock driver and a reset
-driver?
+On 12/12/2013 04:12 AM, Arnd Bergmann wrote:
+> On Wednesday 11 December 2013, zhangfei wrote:
+>>>
+>>> I have not seen "clk-table" and "clk-table-num" before. Are these standard
+>>> properties? What are the units that are used here, what does the index mean?
+>>>
+>>
+>> "clk-table" and "clk-table-num" are private properties.
+>> Instead simply on/off, the ip need different ciu clock for each timing mode.
+>
+> But aren't the times fixed for each mode? Why do you need to specify them in
+> the DT? I would expect that the clock rates for each mode are set in the
+> MMC and SD specifications. When you call clk_set_rate(), it should normally
+> be enough to ask for the clock you actually want and let the clk subsystem
+> figure out how to set up the parents and multipliers on the way.
 
-I would expect these to get replaced with
+Yes. that's will be perfect.
 
-	clocks		: Reference to external clock input
-	resets		: Reference to reset controller input
+However, currently this ip still has no such capability.
+1. Input rate for init are diferent for different controller, not the 
+init 400K, some are 13M, others are 25M, since different clock source.
+This can be easily solved by clock-freq-init = <25000000>
+2. There is maxmum limit, also can be easily solved by define CLK_MAX.
+3. However some mode can not use the max speed from ios->clock
+for example UHS_SDR104_MAX_DTR 208000000 can not be used, only half may 
+be reached, at least currently.
 
-> +Optional properties:
-> +- status		: Shall be "ok" if enabled or "disabled" if disabled.
-> +			  Default is "ok".
-> +- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
-> +			  bit lines from the automatic calibrated position.
-> +			  Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
-> +			  Range from 0 to 0x7f in unit of one bit period.
-> +			  Default is 0xa.
+>
+>> Take emmc as example,
+>> clk-table-num = <8>;
+>> clk-table =
+>> <13000000 50000000 0 0 13000000 50000000 0 100000000>;
+>> MMC_TIMING_LEGACY mode, 25M should be set with parent clock 180M,
+>> MMC_TIMING_MMC_HS mode, 50M is required with parent clock 360M
+>>
+>> "clk-table" list all clocks to be set in all supported timing one by one.
+>> "clk-table-num" is the table number, since not find function getting
+>> table number.
+>> For example, next version will support MMC_TIMING_MMC_HS200 mode, the
+>> clk-table-num = <9> with 9 clocks in the "clk-table"
+>
+> If you have a property with an array, you can use of_find_property()
+> to get to the 'struct property' and then read the 'length' member
+> of that struct, or you can use of_property_for_each_u32() to iterate
+> through each value.
 
-What does gen1, gen2 and gen3 refer to? Is this PCIe, SATA or serdes generations
-or all of them?
+Great, this works.
 
-Why are there two sets?
+>
+> While I still hope that you don't even need this array as per the reasoning
+> above, if you actually need it, you should specify exactly what each
+> value means, such as
+>
+> 1. CIU clock rate in HZ for 20MHz SPI mode operation
+> 2. CIU clock rate in HZ for 25MHz SD card operation
+> 3. CIU clock rate in HZ for 26MHz MMC card operation
+> 4. CIU clock rate in HZ for 50MHz SD card operation
+> ...
 
-Will this have to change if you add PCIe support?
+How about this desc
 
-I would suggest using decimal notation here instead of hexadecimal since you
-are dealing with numbers couting things. Same for the others.
+* clock-freq-table: should be the frequency (in Hz) array of the ciu 
+clock
+         in each supported timing. 
 
-> +- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
-> +			  data earlier than the nominal sampling point. 1 means
-> +			  sample data later than the nominal sampling point.
-> +			  Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
-> +			  Default is 0x0.
-> +
-> +- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
-> +			  gain control. Two set of 3-tuple setting for Gen1,
-> +			  Gen2, and Gen3. Range is between 0 to 0x1f in unit
-> +			  of dB. Default is 0x3.
-> +
-> +- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
-> +			  Gen1, Gen2, and Gen3. Range is between 0 to 0xf in
-> +			  unit of 13.3mV. Default is 0xf.
+         1. CIU clock rate in HZ for MMC_TIMING_LEGACY mode 
 
-Units of 13.3mV don't seem to be useful as a generic measurement. I'd
-recommend using milivolts or microvolts.
+         2. CIU clock rate in HZ for MMC_TIMING_MMC_HS mode
+         3. CIU clock rate in HZ for MMC_TIMING_SD_HS mode
+         4. CIU clock rate in HZ for MMC_TIMING_UHS_SDR12 mode 
 
-> +- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
-> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-> +			  between 0 to 0xf in unit of 18.2mV. Default is 0x0.
-> +- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
-> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-> +			  between 0 to 0x7 in unit of 18.2mV. Default is 0x0.
-> +- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
-> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-> +			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
+         5. CIU clock rate in HZ for MMC_TIMING_UHS_SDR25 mode 
 
-Same here.
+         6. CIU clock rate in HZ for MMC_TIMING_UHS_SDR50 mode 
 
-> +- apm,tx-speed		: Tx operating speed. One set of 3-tuple for
-> +			  Gen1 (0x1), Gen2 (0x3), and Gen3 (0x7). Default is
-> +			  0x7.
+         7. CIU clock rate in HZ for MMC_TIMING_UHS_SDR104 mode 
 
-I'm completely confused by this description. Can you rephrase this?
-It sounds like the only possible values are <1 3 7> for this property.
+         8. CIU clock rate in HZ for MMC_TIMING_SD_HS mode 
 
-	Arnd
+         9. CIU clock rate in HZ for MMC_TIMING_MMC_HS200 mode 
+
+
+Thanks
