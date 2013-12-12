@@ -1,36 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 12 Dec 2013 22:38:28 +0100
-Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <CAErSpo682q3TkjsZvtR4Qhvvwfmx7FUB2QZTfQV+3Q+nK0C-7w@mail.gmail.com>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
- <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
- <CAErSpo682q3TkjsZvtR4Qhvvwfmx7FUB2QZTfQV+3Q+nK0C-7w@mail.gmail.com>
-Message-ID: <201312122238.28413.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Dec 2013 14:51:13 -0700
+Subject: [PATCH 1/2] ARM: tegra: enable ams AS3722 drivers
+In-Reply-To: <52AA2891.2020502@wwwdotorg.org>
+References: <1386855064-10993-1-git-send-email-ldewangan@nvidia.com>
+ <52AA2891.2020502@wwwdotorg.org>
+Message-ID: <52AA2FD1.3020000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 12, 2013 at 10:20:30 PM, Bjorn Helgaas wrote:
-> On Thu, Dec 12, 2013 at 2:07 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> > On Thu, Dec 12, 2013 at 11:25 AM, Marek Vasut <marex@denx.de> wrote:
-> >> Bjorn, would you mind picking 2/7...6/7 of this series so we are done
-> >> with those? I will re-post 1/7 as a self-standing patch afterwards, it
-> >> has no impact on the rest of the series.
-> > 
-> > Sure.  I can't really evaluate these myself, so I'm looking for acks
-> > from Richard or Shawn.
-> > 
-> > I noticed Pratyush, Tim, and Harro had some questions the first time
-> > around, and I don't know whether they got resolved.
+On 12/12/2013 02:20 PM, Stephen Warren wrote:
+> On 12/12/2013 06:31 AM, Laxman Dewangan wrote:
+>> ams AS3722 is the system power manager module IC for the Tegra124 based
+>> Venice2 platform. Enable configs for gpio, pincontrol, rtc, regulator
+>> support from this device.
 > 
-> By the way, I tried to apply patches 2-6 to my pci/host-imx6 branch,
-> but patch 6 ("PCI: imx6: Fix bugs in PCIe startup code") didn't apply
-> cleanly.
+> I've squashed patch 1/2 into Tegra's for-3.14/defconfig branch.
 > 
-> I pushed the branch to
-> http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host
-> -imx6 if you want to try it yourself.
+> I've applied patch 2/2 to Tegra's for-3.14/dt branch.
 
-That's because of Fabio's patch. I will rebase and repost, thanks.
+Actually, I'm dropping patch 2/2 since it causes a whole bunch of error
+spew during boot:
 
-Best regards,
-Marek Vasut
+> [    0.628315] tegra124-pinctrl 70000868.pinmux: invalid group "dap2_dout_pp2" for function "rsvd4"
+> [    0.635309] tegra124-pinctrl 70000868.pinmux: does not have pin group dap2_dout_pp2
+> [    0.642999] tegra124-pinctrl 70000868.pinmux: could not map group config for "dap2_dout_pp2"
+
+> [    0.731176] as3722-pinctrl as3722-pinctrl: pin gpio0 already requested by as3722-pinctrl; cannot claim for as3722-regulator
+> [    0.742312] as3722-pinctrl as3722-pinctrl: pin-0 (as3722-regulator) status -22
+> [    0.749526] as3722-pinctrl as3722-pinctrl: could not request pin 0 (gpio0) from group gpio0  on device as3722-pinctrl
+> [    0.760133] as3722-regulator as3722-regulator: Error applying setting, reverse things back
+
+> [    0.835838] as3722-regulator as3722-regulator: Failed to find supply vin-ldo1-6
+> [    0.843312] as3722-regulator as3722-regulator: regulator 8 register failed -517
+> [    0.852263] platform as3722-regulator: Driver as3722-regulator requests probe deferral
+
+> [    0.984920] as3722-pinctrl as3722-pinctrl: pin gpio0 already requested by as3722-pinctrl; cannot claim for as3722-rtc
+> [    0.995537] as3722-pinctrl as3722-pinctrl: pin-0 (as3722-rtc) status -22
+> [    1.002244] as3722-pinctrl as3722-pinctrl: could not request pin 0 (gpio0) from group gpio0  on device as3722-pinctrl
+> [    1.012848] as3722-rtc as3722-rtc: Error applying setting, reverse things back
