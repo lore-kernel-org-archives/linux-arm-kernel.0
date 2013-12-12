@@ -1,94 +1,97 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 12 Dec 2013 02:43:14 +0000
-Subject: [RFCv2 endianess 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <e806828e7d4f488c88d7bd05bdd007d2@BY2PR03MB505.namprd03.prod.outlook.com>
-References: <1386309134-1822-1-git-send-email-Li.Xiubo@freescale.com>
- <1386309134-1822-2-git-send-email-Li.Xiubo@freescale.com>
- <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
- <e806828e7d4f488c88d7bd05bdd007d2@BY2PR03MB505.namprd03.prod.outlook.com>
-Message-ID: <d6985022e8aa4e21b618205ddf521d9f@BY2PR03MB505.namprd03.prod.outlook.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Thu, 12 Dec 2013 08:13:23 +0530
+Subject: [PATCH 2/5] ARM: EXYNOS5: Fix PMU register configuration for
+ local power blocks
+In-Reply-To: <1555673.59jhB0RKpX@amdc1227>
+References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
+ <1386763029-8516-3-git-send-email-a.kesavan@samsung.com>
+ <1555673.59jhB0RKpX@amdc1227>
+Message-ID: <CAM4voamk2j1XEt6Pbt1DtNcY+UrFcK4XsAW2OwYgaXLSpLDOnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Tomasz,
 
+On Wed, Dec 11, 2013 at 5:59 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Abhilash,
+>
+> [dropping invalid address of DT mailing list]
+>
+> Please see my comments inline.
+>
+> On Wednesday 11 of December 2013 17:27:06 Abhilash Kesavan wrote:
+>> For the six local power blocks - MFC, DISP1, GSC, MAU, G3D and ISP
+>> the respective CMU_RESET, CMU_SYSCLK and CMU_CLKSTOP registers need
+>> to be low initially for normal mode on Exynos5250.
+>> Also fix the corresponding AFTR and LPA configurations.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/pmu.c |   66 ++++++++++++++++++++++++++++++++------------
+>>  1 file changed, 48 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+>> index 97d6885..5f4d26b 100644
+>> --- a/arch/arm/mach-exynos/pmu.c
+>> +++ b/arch/arm/mach-exynos/pmu.c
+>> @@ -296,24 +296,24 @@ static struct exynos_pmu_conf exynos5250_pmu_config[] = {
+>>       { EXYNOS5_G3D_SYS_PWR_REG,                      { 0x7, 0x0, 0x0} },
+>>       { EXYNOS5_DISP1_SYS_PWR_REG,                    { 0x7, 0x0, 0x0} },
+>>       { EXYNOS5_MAU_SYS_PWR_REG,                      { 0x7, 0x7, 0x0} },
+>> -     { EXYNOS5_CMU_CLKSTOP_GSCL_SYS_PWR_REG,         { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_CLKSTOP_ISP_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_CLKSTOP_MFC_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_CLKSTOP_G3D_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_CLKSTOP_DISP1_SYS_PWR_REG,        { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_CLKSTOP_MAU_SYS_PWR_REG,          { 0x1, 0x1, 0x0} },
+>> -     { EXYNOS5_CMU_SYSCLK_GSCL_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_SYSCLK_ISP_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_SYSCLK_MFC_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_SYSCLK_G3D_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_SYSCLK_DISP1_SYS_PWR_REG,         { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_SYSCLK_MAU_SYS_PWR_REG,           { 0x1, 0x1, 0x0} },
+>> -     { EXYNOS5_CMU_RESET_GSCL_SYS_PWR_REG,           { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_RESET_ISP_SYS_PWR_REG,            { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_RESET_MFC_SYS_PWR_REG,            { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_RESET_G3D_SYS_PWR_REG,            { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_RESET_DISP1_SYS_PWR_REG,          { 0x1, 0x0, 0x0} },
+>> -     { EXYNOS5_CMU_RESET_MAU_SYS_PWR_REG,            { 0x1, 0x1, 0x0} },
+>> +     { EXYNOS5_CMU_CLKSTOP_GSCL_SYS_PWR_REG,         { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_CLKSTOP_ISP_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_CLKSTOP_MFC_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_CLKSTOP_G3D_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_CLKSTOP_DISP1_SYS_PWR_REG,        { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_CLKSTOP_MAU_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_SYSCLK_GSCL_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_SYSCLK_ISP_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_SYSCLK_MFC_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_SYSCLK_G3D_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_SYSCLK_DISP1_SYS_PWR_REG,         { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_SYSCLK_MAU_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_RESET_GSCL_SYS_PWR_REG,           { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_RESET_ISP_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_RESET_MFC_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_RESET_G3D_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_RESET_DISP1_SYS_PWR_REG,          { 0x0, 0x0, 0x0} },
+>> +     { EXYNOS5_CMU_RESET_MAU_SYS_PWR_REG,            { 0x0, 0x0, 0x0} },
+>>       { PMU_TABLE_END,},
+>>  };
+>>
+>> @@ -337,6 +337,27 @@ static void __iomem *exynos5_list_diable_wfi_wfe[] = {
+>>       EXYNOS5_ISP_ARM_OPTION,
+>>  };
+>>
+>> +void __iomem *exynos5_list_disable_pmu_reg[] = {
+>
+> static void __iomem * const exynos5_list_disable_pmu_reg[] = {
 
-> > > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> > > > +             const void __iomem *addr)
-> > > > +{
-> > > > +     if (likely(fpc->big_endian))
-> > > > +             return ioread32be(addr);
-> > > > +     else
-> > > > +             return readl(addr);
-> > > > +}
-> >
-> > It looks a little odd to to have two different accessors here.
-> >
-> > Could these not be unified somehow?
-> >
-> 
-> How about the following :
-> 
-> +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> +			const void __iomem *addr)
-> +{
-> +	u32 val;
-> +
-> +	if (likely(fpc->big_endian))
-> +		val = be32_to_cpu(__raw_readl(addr));
-> +	else
-> +		val = le32_to_cpu(__raw_readl(addr));
-> +
-> +	rmb();
-> +
-> +	return val;
-> +}
-> +
-> +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
-> +			u32 val, void __iomem *addr)
-> +{
-> +	wmb();
-> +
-> +	if (likely(fpc->big_endian))
-> +		__raw_writel(cpu_to_be32(val), addr);
-> +	else
-> +		__raw_writel(cpu_to_le32(val), addr);
-> +}
-> +
-> 
-> 
-
-Or, will these be much better ?
-+++++++++++
-+static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-+		const void __iomem *addr)
-+{
-+	u32 val;
-+
-+	if (likely(fpc->big_endian))
-+		val = be32_to_cpu((__force __be32)__raw_readl(addr));
-+	else
-+		val = le32_to_cpu((__force __le32)__raw_readl(addr));
-+
-+	rmb();
-+
-+	return val;
-+}
-+
-+static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
-+		u32 val, void __iomem *addr)
-+{
-+	wmb();
-+
-+	if (likely(fpc->big_endian))
-+		__raw_writel((__force u32)cpu_to_be32(val), addr);
-+	else
-+		__raw_writel((__force u32)cpu_to_le32(val), addr); }
-+
------------
-
-
-Thanks,
---
-Xiubo
+Will fix and re-post.
+>
+> Best regards,
+> Tomasz
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
