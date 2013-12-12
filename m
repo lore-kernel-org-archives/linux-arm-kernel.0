@@ -1,25 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 22:11:31 +0100
-Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
- AUTO_ZRELADDR by default
-In-Reply-To: <26167386.hX5eWUjT6T@flatron>
-References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
- <26167386.hX5eWUjT6T@flatron>
-Message-ID: <CACRpkdbGSXA8oT8L-0fzJx7esXn7GWQA+Wi7WCQKX9eiy-fYCQ@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 12 Dec 2013 23:11:55 +0200
+Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
+Message-ID: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 10:47 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+If the non-DT channel add path fails, the kernel will crash as the
+channel is not set to NULL and it will try to release the channel using
+the error value. Fix that.
 
-> This is actually quite a poor platform choice. As of today, the kernel
-> is stuck with supporting just SMDK6440/6450 boards, which are proprietary
-> development boards and it doesn't look like any further boards will show
-> up in future. Kukjin has actually proposed removing support for this
-> platform at all and I consider this reasonable.
->
-> Kukjin, should we proceed with removal?
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ drivers/dma/mv_xor.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Isn't Mark Brown using that platform for some various stuff?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 7807f0ef4e20..2cb35a62c7f0 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -1227,6 +1227,7 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 						   cd->cap_mask, irq);
+ 			if (IS_ERR(xordev->channels[i])) {
+ 				ret = PTR_ERR(xordev->channels[i]);
++				xordev->channels[i] = NULL;
+ 				goto err_channel_add;
+ 			}
+ 		}
+-- 
+1.8.5.1
