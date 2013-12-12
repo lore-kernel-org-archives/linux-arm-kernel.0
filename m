@@ -1,52 +1,78 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Dec 2013 09:39:07 +0900
-Subject: [PATCH 01/12] SPEAr13xx: Correct dt field name for stmmac phy-addr
-In-Reply-To: <52A847D1.5000409@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <1078549fa412fb34ab2c95a6232096570abee12d.1386752447.git.mohit.kumar@st.com>
- <52A847D1.5000409@st.com>
-Message-ID: <001b01cef6d2$9104f7b0$b30ee710$%han@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 11 Dec 2013 16:42:03 -0800
+Subject: [GIT PULL][for 3.14] pull request from pxa
+In-Reply-To: <52A823E4.6070208@gmail.com>
+References: <52A823E4.6070208@gmail.com>
+Message-ID: <20131212004203.GD21531@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 11, 2013 8:09 PM, Rajeev kumar wrote:
-> On 12/11/2013 3:08 PM, Mohit KUMAR wrote:
-> > DT field name for the phy address changed since kernel 3.10. Set the
-> > snps,phy-addr to 0xffffffff so that the driver probes for the phy.
-> >
-> > Signed-off-by: Mohit Kumar<mohit.kumar@st.com>
-> > Cc: Pratyush Anand<pratyush.anand@st.com>
-> > Cc: Viresh Kumar<viresh.linux@gmail.com>
-> > Cc: spear-devel at list.st.com
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: devicetree at vger.kernel.org
-> > ---
-> >   arch/arm/boot/dts/spear13xx.dtsi |    1 +
-> >   1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
-> > index 4382547..3518803 100644
-> > --- a/arch/arm/boot/dts/spear13xx.dtsi
-> > +++ b/arch/arm/boot/dts/spear13xx.dtsi
-> > @@ -155,6 +155,7 @@
-> >
-> >   		gmac0: eth at e2000000 {
-> >   			compatible = "st,spear600-gmac";
-> > +			snps,phy-addr =<0xffffffff>;
+Hi,
+
+On Wed, Dec 11, 2013 at 04:35:48PM +0800, Haojian Zhuang wrote:
+> Hi Arnd/Olof/Kevin,
 > 
-> Don't you think it should be st,phy-addr =<0xffffffff>, as the
-> manufacturer is 'st' as the compatible suggest
+> Please help to merge the pull request for pxa.
+> 
+> 
+> Best Regards
+> Haojian
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+> tags/pxa-for-3.14
 
-Hi Rajeev Kumar,
+These patches are a bit all over the place. I'll take some of them and
+cherry-pick them instead of merging the branch as it is. Since your tree
+is not in linux-next, that shouldn't cause any problems.
 
-According to the Documentation, it guides to use 'snps' prefix.
+> 
+> for you to fetch changes up to 8a53a1194f1cc870de0ab9db1728b1ecab770925:
+> 
+>   ARM: pxa: remove IRQF_DISABLED (2013-12-11 15:36:24 +0800)
+> 
+> ----------------------------------------------------------------
+> Dmitry Eremin-Solenikov (1):
+>       arm: pxa: tosa: fix keys mapping
 
-In my humble opinion,
-'gmac' is a Synopsys based IP. Thus, if 'snps,phy-addr' is
-not ST specific, 'snps' prefix can be used.
+Ok, that's a fix. Applying to fixes for 3.13 and marking for stable.
 
-./Documentation/devicetree/bindings/net/stmmac.txt
-- snps,phy-addr         phy address to connect to.
+Also, please start referring to which commit introduced the breakage, to make
+it easier for people to tell if they need the fix or not. Looks like it's been
+broken since 2010?!
 
-Best regards,
-Jingoo Han
+> 
+> Michael Opdenacker (1):
+>       ARM: pxa: remove IRQF_DISABLED
+
+A cleanup, goes into next/cleanup.
+
+> 
+> Mike Dunn (2):
+>       PWM: PXA: add device tree support to PWM driver
+
+This patch should go to the PWM maintainer, not to us. Or at least be acked by
+them (but it might as well be merged since there are no dependencies).
+
+>       PXA: add PWM nodes to pxa27x.dtsi
+
+I'll add this to next/dt. Fixed up the patch subject to be ARM: pxa though
+
+> 
+> Sergei Ianovich (1):
+>       ARM: pxa: prevent PXA270 occasional reboot freezes
+
+fixes for 3.13. I'll also mark it for stable.
+
+> Thierry Reding (1):
+>       ARM: pxa: Remove unused variables
+
+Added into next/cleanup.
+
+
+-Olof
