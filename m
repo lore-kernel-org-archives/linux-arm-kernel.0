@@ -1,47 +1,68 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Dec 2013 10:55:00 +0900
-Subject: [PATCH 11/12] MAINTAINERS: Add ST SPEAr13xx PCIe driver maintainer
-In-Reply-To: <0f924b2ad771dd5c3486c81ed524a3f6e7d813b9.1386752447.git.mohit.kumar@st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <0f924b2ad771dd5c3486c81ed524a3f6e7d813b9.1386752447.git.mohit.kumar@st.com>
-Message-ID: <002601cef6dd$2adbdb60$80939220$%han@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 12 Dec 2013 10:08:38 +0800
+Subject: [GIT PULL][for 3.14] pull request from pxa
+In-Reply-To: <20131212004203.GD21531@quad.lixom.net>
+References: <52A823E4.6070208@gmail.com>
+ <20131212004203.GD21531@quad.lixom.net>
+Message-ID: <52A91AA6.8040700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 11, 2013 6:39 PM, Mohit Kumar wrote:
-> 
-> Add Mohit Kumar as maintainer for ST SPEAr13xx PCIe driver.
-> 
-> Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
-> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: linux-pci at vger.kernel.org
+On 12/12/2013 08:42 AM, Olof Johansson wrote:
+> Hi,
+>
+> On Wed, Dec 11, 2013 at 04:35:48PM +0800, Haojian Zhuang wrote:
+>> Hi Arnd/Olof/Kevin,
+>>
+>> Please help to merge the pull request for pxa.
+>>
+>>
+>> Best Regards
+>> Haojian
+>>
+>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>
+>>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+>> tags/pxa-for-3.14
+>
+> These patches are a bit all over the place. I'll take some of them and
+> cherry-pick them instead of merging the branch as it is. Since your tree
+> is not in linux-next, that shouldn't cause any problems.
+>
+>>
+>> for you to fetch changes up to 8a53a1194f1cc870de0ab9db1728b1ecab770925:
+>>
+>>    ARM: pxa: remove IRQF_DISABLED (2013-12-11 15:36:24 +0800)
+>>
+>> ----------------------------------------------------------------
+>> Dmitry Eremin-Solenikov (1):
+>>        arm: pxa: tosa: fix keys mapping
+>
+> Ok, that's a fix. Applying to fixes for 3.13 and marking for stable.
+>
+> Also, please start referring to which commit introduced the breakage, to make
+> it easier for people to tell if they need the fix or not. Looks like it's been
+> broken since 2010?!
+>
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+This commit exists from v2.6.34.
 
-Best regards,
-Jingoo Han
+>>
+>> Mike Dunn (2):
+>>        PWM: PXA: add device tree support to PWM driver
+>
+> This patch should go to the PWM maintainer, not to us. Or at least be acked by
+> them (but it might as well be merged since there are no dependencies).
 
-> ---
->  MAINTAINERS |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8285ed4..fd03da6 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6462,6 +6462,12 @@ L:	linux-pci at vger.kernel.org
->  S:	Maintained
->  F:	drivers/pci/host/pci-exynos.c
-> 
-> +PCIE DRIVER FOR ST SPEAR13XX
-> +M:	Mohit Kumar <mohit.kumar@st.com>
-> +L:	linux-pci at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pci/host/pcie-spear13xx.c
-> +
->  PCMCIA SUBSYSTEM
->  P:	Linux PCMCIA Team
->  L:	linux-pcmcia at lists.infradead.org
-> --
-> 1.7.0.1
+Thierry,
+
+I remember that you ask this patch to be merged into armsoc. Please give 
+an Ack. Then I could resend the pull request.
+
+
+Best Regards
+Haojian
