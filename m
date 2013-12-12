@@ -1,32 +1,36 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 12 Dec 2013 19:58:46 -0800
-Subject: [PATCH 1/2] gpio: msm: Fix irq mask/unmask by writing bits
- instead of numbers
-In-Reply-To: <CACRpkdY8W8tGVH-Os5neeFfHWjojdB5fBbjgWcsWkiMyJj=YAA@mail.gmail.com>
-References: <1386717544-478-1-git-send-email-sboyd@codeaurora.org>
- <CACRpkdY8W8tGVH-Os5neeFfHWjojdB5fBbjgWcsWkiMyJj=YAA@mail.gmail.com>
-Message-ID: <20131213035845.GK11990@sonymobile.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 21:07:13 +0100
+Subject: [PATCH v2 02/11] arm: pxa27x: support ICP DAS LP-8x4x
+In-Reply-To: <CA+E=qVc4pNU_e5YjUZX7hG21FzS3omdd1XvgwFcHQy2z_Mnm8A@mail.gmail.com>
+References: <1385879185-22455-3-git-send-email-ynvich@gmail.com>
+ <1386348542-9584-1-git-send-email-ynvich@gmail.com>
+ <CACRpkdYVsGSyMS6sSTqqJ4XrE3GqpWkJsY7GDazi5ix7xjKQ=Q@mail.gmail.com>
+ <CA+E=qVc4pNU_e5YjUZX7hG21FzS3omdd1XvgwFcHQy2z_Mnm8A@mail.gmail.com>
+Message-ID: <CACRpkdZpwPhscWG_j-BM9bRZL-J7dRoX4=Q+Eo5Td9We6qvH0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 12 Dec 11:02 PST 2013, Linus Walleij wrote:
+On Tue, Dec 10, 2013 at 1:54 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> On Tue, Dec 10, 2013 at 3:43 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> On Wed, Dec 11, 2013 at 12:19 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > We should be writing bits here but instead we're writing the
-> > numbers that correspond to the bits we want to write. Fix it by
-> > wrapping the numbers in the BIT() macro. This fixes gpios acting
-> > as interrupts.
-> >
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> I've applied this for fixes and tagged for stable.
-> Bj?rn, Rohit: OK?
+>> Argh! Now you're adding another user for a legacy custom pin control
+>> implementation. But if noone is going to modernize PXA2xx what
+>> can we do :-/
+>
+> I tried a ~year ago, but it's not so trivial. PXA2xx has no separate
+> pin control module, it's
+> highly integrated into GPIO controller. I've asked the maillist what
+> should I do for that case, but AFAIR no one answered.
 
-This looks good.
+It is very common for pin controllers and GPIO blocks to
+be integrated.
 
-JFYI; the pinctrl-msm is written with gpio-msm-v2 in mind as well, so replacing
-it with pinctrl is on my todo list...
+The usual solution is to make a combined driver that registers
+both pinctrl and GPIO interfaces and put that into
+drivers/pinctrl.
 
-Regards,
-Bjorn
+Here is a recent example that can be used as inspiration:
+http://marc.info/?l=linux-doc&m=138629591206248&w=2
+
+Yours,
+Linus Walleij
