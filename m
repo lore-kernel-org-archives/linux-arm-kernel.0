@@ -1,76 +1,74 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Thu, 12 Dec 2013 17:07:26 -0500
-Subject: [PATCH v5 3/9] usb: gadget: s3c-hsotg: enable build for other
- platforms
-In-Reply-To: <52AA2FE3.3060200@gmail.com>
-References: <1386854770-2173-1-git-send-email-mporter@linaro.org>
- <1386854770-2173-4-git-send-email-mporter@linaro.org>
- <52AA2FE3.3060200@gmail.com>
-Message-ID: <20131212220726.GA4205@beef>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 12 Dec 2013 14:09:05 -0800
+Subject: [PATCH] arm64: Correct virt_addr_valid
+In-Reply-To: <20131212180249.GV4360@n2100.arm.linux.org.uk>
+References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
+ <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104429.GE26730@mudshark.cambridge.arm.com>
+ <20131211110618.GG4360@n2100.arm.linux.org.uk>
+ <20131211172635.GJ26730@mudshark.cambridge.arm.com>
+ <20131211211333.GI4360@n2100.arm.linux.org.uk>
+ <20131212175753.GG3382@arm.com>
+ <20131212180249.GV4360@n2100.arm.linux.org.uk>
+Message-ID: <52AA3401.3000004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 03:51:31PM -0600, Dinh Nguyen wrote:
-> Hi Matt,
-> 
-> On 12/12/13 7:26 AM, Matt Porter wrote:
-> > Remove unused Samsung-specific machine include and Kconfig
-> > dependency on S3C.
-> >
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> > ---
-> >  drivers/usb/gadget/Kconfig     | 7 +++----
-> >  drivers/usb/gadget/s3c-hsotg.c | 2 --
-> >  2 files changed, 3 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-> > index a91e642..970bd1a 100644
-> > --- a/drivers/usb/gadget/Kconfig
-> > +++ b/drivers/usb/gadget/Kconfig
-> > @@ -294,11 +294,10 @@ config USB_PXA27X
-> >  	   gadget drivers to also be dynamically linked.
-> >  
-> >  config USB_S3C_HSOTG
-> > -	tristate "S3C HS/OtG USB Device controller"
-> > -	depends on S3C_DEV_USB_HSOTG
-> > +	tristate "Designware/S3C HS/OtG USB Device controller"
-> >  	help
-> > -	  The Samsung S3C64XX USB2.0 high-speed gadget controller
-> > -	  integrated into the S3C64XX series SoC.
-> > +	  The Designware USB2.0 high-speed gadget controller
-> > +	  integrated into the S3C64XX and BCM281xx series SoC.
-> Thanks for doing this. The SOCFPGA platform is also using this driver.
-> So perhaps a
-> more generic message here?
+On 12/12/2013 10:02 AM, Russell King - ARM Linux wrote:
+> On Thu, Dec 12, 2013 at 05:57:54PM +0000, Catalin Marinas wrote:
+>> On Wed, Dec 11, 2013 at 09:13:33PM +0000, Russell King - ARM Linux wrote:
+>>> There is actually a concern here, and that's if the v:p translation isn't
+>>> linear, could it return false results?
+>>>
+>>> According to my grep skills, we have one platform where this is true -
+>>> Realview:
+>>>
+>>>   * 256MB @ 0x00000000 -> PAGE_OFFSET
+>>>   * 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
+>>>   * 256MB @ 0x80000000 -> PAGE_OFFSET + 0x30000000
+>>>
+>>> The v:p translation is done via:
+>>>
+>>>           ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 : \
+>>>            (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 : \
+>>>            (virt) - PAGE_OFFSET)
+>>>
+>>> Now the questions - what do values below PAGE_OFFSET give us?  Very
+>>> large numbers, which pfn_valid() should return false for.  What about
+>>> values > PAGE_OFFSET2 + 256MB?  The same.
+>>>
+>>> So this all _looks_ fine.  Wait a moment, what about highmem?  Let's say
+>>> that the last 256MB is only available as highmem, and let's go back to
+>>> Laura's patch:
+>>>
+>>> old:
+>>> #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
+>>> 				 ((void *)(kaddr) < (void *)high_memory))
+>>> new:
+>>> #define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+>>>
+>>> The former _excludes_ highmem, but the latter _includes_ it.
+>>>
+>>> virt_addr_valid(v) should only ever return _true_ for the lowmem area,
+>>> never anywhere else - that's part of its point.  It's there to answer
+>>> the question "is this a valid virtual pointer which I can dereference".
+>>>
+>>> So... We actually need a combination of both of these tests.
+>>
+>> Just to avoid any confusion, on arm64 we don't have non-linear v:p
+>> translation as there is plenty of VA space to live with holes. So the
+>> original patch is fine.
+>
+> The point I make above actually has nothing to do with non-linear v:p
+> translations.
+>
 
-Ok, I wasn't aware since I didn't see anybody else try to fix this
-driver in mainline. How about this?
+Yes, I believe the point was that if we call virt_addr_valid on a 
+not-direct-mapped address it should return false. We still need the 
+range check on arm64 systems as well to ensure this.
 
-	The Designware USB2.0 high-speed gadget controller
-	integrated into many SoCS.
+Laura
 
-If that looks better to you I'll plan to add it in an update. I would
-like to see if we can gather a couple acks at this point or if there are
-any additional DT comments before sending another update.
-
--Matt
-
-> >  
-> >  config USB_S3C2410
-> >  	tristate "S3C2410 USB Device Controller"
-> > diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> > index 33eb690..8ceb5ef 100644
-> > --- a/drivers/usb/gadget/s3c-hsotg.c
-> > +++ b/drivers/usb/gadget/s3c-hsotg.c
-> > @@ -37,8 +37,6 @@
-> >  #include <linux/usb/phy.h>
-> >  #include <linux/platform_data/s3c-hsotg.h>
-> >  
-> > -#include <mach/map.h>
-> > -
-> >  #include "s3c-hsotg.h"
-> >  
-> >  static const char * const s3c_hsotg_supply_names[] = {
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
