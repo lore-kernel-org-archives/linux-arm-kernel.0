@@ -1,74 +1,61 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 12 Dec 2013 13:15:38 +0100
-Subject: [PATCH v2 5/9] clocksource/cadence_ttc: Adjust interval in clock
- notifier
-In-Reply-To: <1385514296-26702-6-git-send-email-soren.brinkmann@xilinx.com>
-References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
- <1385514296-26702-6-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52A9A8EA.3080609@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Dec 2013 12:18:39 +0000
+Subject: [PATCHv3 1/2] arm64: Check for NULL device before getting the
+ coherent_dma_mask
+In-Reply-To: <52A8AAB3.8050500@codeaurora.org>
+References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
+ <1386711816-20270-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104239.GD26730@mudshark.cambridge.arm.com>
+ <52A8A55A.9060709@codeaurora.org>
+ <20131211175134.GL26730@mudshark.cambridge.arm.com>
+ <52A8AAB3.8050500@codeaurora.org>
+Message-ID: <20131212121839.GC12617@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
-> The clockevent has to be reprogrammed if the timer's input
-> clock frequency changes and the timer is in periodic mode, in order to
-> maintain the correct timer interval.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> v2:
->   - adjust the timer interval while the timer interrupt is disabled
-> ---
->   drivers/clocksource/cadence_ttc_timer.c | 12 +++++++++---
->   1 file changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-> index 246d018d1e63..77517675653e 100644
-> --- a/drivers/clocksource/cadence_ttc_timer.c
-> +++ b/drivers/clocksource/cadence_ttc_timer.c
-> @@ -322,6 +322,9 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
->   	switch (event) {
->   	case POST_RATE_CHANGE:
->   	{
-> +		/* update cached frequency */
-> +		ttc->freq = ndata->new_rate;
-> +
->   		/*
->   		 * clockevents_update_freq should be called with IRQ disabled on
->   		 * the CPU the timer provides events for. The timer we use is
-> @@ -329,12 +332,15 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
->   		 * cores.
->   		 */
->   		disable_irq(ttcce->ce.irq);
-> +
->   		clockevents_update_freq(&ttcce->ce,
->   				ndata->new_rate / PRESCALE);
-> -		enable_irq(ttcce->ce.irq);
->
-> -		/* update cached frequency */
-> -		ttc->freq = ndata->new_rate;
-> +		if (ttcce->ce.mode == CLOCK_EVT_MODE_PERIODIC)
-> +			ttc_set_interval(ttc, DIV_ROUND_CLOSEST(ttc->freq,
-> +						PRESCALE * HZ));
-> +
-> +		enable_irq(ttcce->ce.irq);
->
->   		/* fall through */
->   	}
+On Wed, Dec 11, 2013 at 06:10:59PM +0000, Laura Abbott wrote:
+> On 12/11/2013 9:51 AM, Will Deacon wrote:
+> > On Wed, Dec 11, 2013 at 05:48:10PM +0000, Laura Abbott wrote:
+> >> On 12/11/2013 2:42 AM, Will Deacon wrote:
+> >>> On Tue, Dec 10, 2013 at 09:43:35PM +0000, Laura Abbott wrote:
+> >>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> >>>> index 4bd7579..4134212 100644
+> >>>> --- a/arch/arm64/mm/dma-mapping.c
+> >>>> +++ b/arch/arm64/mm/dma-mapping.c
+> >>>> @@ -33,7 +33,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
+> >>>>    					  dma_addr_t *dma_handle, gfp_t flags,
+> >>>>    					  struct dma_attrs *attrs)
+> >>>>    {
+> >>>> -	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
+> >>>> +	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
+> >>>>    	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+> >>>>    		flags |= GFP_DMA32;
+> >>>>    	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+> >>>
+> >>> Unless I'm misreading the code, it looks like there are paths through
+> >>> swiotlb_alloc_coherent that will dereference the dev parameter without a
+> >>> NULL check. Are you sure we should allow for NULL devices here?
+> >>>
+> >>
+> >> The current ARM code allows for NULL devices so that would be a
+> >> difference in behavior between arm and arm64. We're also relying on this
+> >> behavior in some code. Where exactly in swiotlb_alloc_coherent does this
+> >> dereference happen? The only one I see is checked with 'if (hwdev &&
+> >> hwdev->coherent_dma_mask)'
+> >
+> > phys_to_dma could, but doesn't. The one I spotted was buried down in:
+> >
+> >    map_single -> swiotlb_tbl_map_single -> dma_get_seg_boundary
+> >
+> 
+> Ah yes I see that now.
+> 
+> I guess the question still stands though, should we fixup the parts of 
+> the code to fully support the NULL devices or do we tell clients to fix 
+> their code and fail the allocation with a warning not to pass NULL?
 
-When looking at the smp_twd.c, there is a similar need.
+Assuming it's always possible to pass in a non-NULL device, I'd be tempted
+to fix the callers. Can you think of a valid use-case where the caller
+doesn't have a device handle to pass in?
 
-There are a couple of notifier used on for cpufreq and one for clock 
-rate change.
-
-Wouldn't make sense to add the notifier calls and registration in the 
-time framework and add the callbacks in the dev ops ? The switch would 
-be in the timer framework and perhaps the irq disabling may be easier to 
-deal with ?
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
