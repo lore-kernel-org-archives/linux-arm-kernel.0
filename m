@@ -1,106 +1,37 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 12 Dec 2013 11:56:40 +0000
-Subject: [PATCH 5/6] arm64: topology: Tell the scheduler about the
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Dec 2013 12:06:49 +0000
+Subject: [PATCH 2/3] arm64: topology: Tell the scheduler about the
  relative power of cores
-In-Reply-To: <alpine.LFD.2.10.1312111414500.15948@knanqh.ubzr>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-5-git-send-email-broonie@kernel.org>
- <20131211144755.GF596@darko.cambridge.arm.com>
- <20131211173142.GD11468@sirena.org.uk>
- <alpine.LFD.2.10.1312111414500.15948@knanqh.ubzr>
-Message-ID: <20131212115639.GD28621@e103034-lin>
+In-Reply-To: <20131212113512.GC28621@e103034-lin>
+References: <1386792029-23148-1-git-send-email-broonie@kernel.org>
+ <1386792029-23148-2-git-send-email-broonie@kernel.org>
+ <20131212113512.GC28621@e103034-lin>
+Message-ID: <20131212120649.GB5367@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 07:27:09PM +0000, Nicolas Pitre wrote:
-> On Wed, 11 Dec 2013, Mark Brown wrote:
-> 
-> > On Wed, Dec 11, 2013 at 02:47:55PM +0000, Catalin Marinas wrote:
-> > > On Wed, Dec 11, 2013 at 01:13:25PM +0000, Mark Brown wrote:
-> > 
-> > > > The power numbers are the same as for ARMv7 since it seems that the
-> > > > expected differential between the big and little cores is very similar on
-> > > > both ARMv7 and ARMv8.
-> > 
-> > > I have no idea ;). We don't have real silicon yet, so that's just a wild
-> > > guess.
-> > 
-> > I was going on some typical DMIPS/MHz numbers that I'd found so
-> > hopefully it's not a complete guess, though it will vary and that's just
-> > one benchmark with all the realism problems that entails.  The ratio
-> > seemed to be about the same as the equivalent for the ARMv7 cores so
-> > given that it's a finger in the air thing it didn't seem worth drilling
-> > down much further.
-> > 
-> > > > +static const struct cpu_efficiency table_efficiency[] = {
-> > > > +	{ "arm,cortex-a57", 3891 },
-> > > > +	{ "arm,cortex-a53", 2048 },
-> > > > +	{ NULL, },
-> > > > +};
-> > 
-> > > I also don't think we can just have absolute numbers here. I'm pretty
-> > > sure these were generated on TC2 but other platforms may have different
-> > > max CPU frequencies, memory subsystem, level and size of caches. The
-> > > "average" efficiency and difference will be different.
-> > 
-> > The CPU frequencies at least are taken care of already, these numbers
-> > get scaled for each core.  Once we're talking about things like the
-> > memory I'd also start worrying about application specific effects.
-> > There's also going to be stuff like thermal management which get fed in
-> > here and which varies during runtime.
-> > 
-> > I don't know where the numbers came from for v7.
+On Thu, Dec 12, 2013 at 11:35:12AM +0000, Morten Rasmussen wrote:
 
-I'm fairly sure that they are guestimates based on TC2. Vincent should
-know. I wouldn't consider them accurate in any way as the relative
-performance varies wildly depending on the workload. However, they are
-better than having no information at all.
+> I know that this is how it is currently done for ARMv7 and one could
+> argue that we should do the same for ARMv8 until we have a better
+> solution. I just want to highlight that setting cpu_power this way is
+> not generally the right thing to do for big.LITTLE. It will have to be
+> fixed eventually.
 
-> > 
-> > > Can we define this via DT? It's a bit strange since that's a constant
-> > > used by the Linux scheduler but highly related to hardware.
-> > 
-> > I really don't think that's a good idea at this point, it seems better
-> > for the DT to stick to factual descriptions of what's present rather
-> > than putting tuning numbers in there.  If the wild guesses are in the
-> > kernel source it's fairly easy to improve them, if they're baked into
-> > system DTs that becomes harder.
-> 
-> I really think putting such things into DT is wrong.
-> 
-> If those numbers were derived from benchmark results, then it is most 
-> probably best to try to come up with some kind of equivalent benchmark 
-> in the kernel to qualify CPUs at run time.  After all this is what 
-> actually matters i.e. how CPUs perform relative to each other, and that 
-> may vary with many factors that people will forget to update when 
-> copying a DT content to enable a new board.
-> 
-> And that wouldn't be the first time some benchmark is used at boot time.  
-> Different crypto/RAID algorithms are tested to determine the best one to 
-> use, etc.
-> 
-> > I'm also worried about putting numbers into the DT now with all the
-> > scheduler work going on, this time next year we may well have a
-> > completely different idea of what we want to tell the scheduler.  It may
-> > be that we end up being able to explicitly tell the scheduler about
-> > things like the memory architecture, or that the scheduler just gets
-> > smarter and can estimate all this stuff at runtime.  
+Right, there's a good solid reason for all the work on the scheduler.  I
+definitely think we ought to be following the same approach on both
+ARMv7 and ARMv8 to avoid confusion between people based on the platform
+they're working on.
 
-I agree. We need to sort the scheduler side out first before we commit
-to anything. If we are worried about including code into v8 that we are
-going to change later, then it is probably better to leave this part
-out. See my response to Mark's patch subset with the same patch for
-details (I didn't see this thread until afterwardsi - sorry).
-
-> 
-> Exactly.  Which is why the kernel better be self-sufficient to determine 
-> such params.  Dt should be used only for things that may not be probed 
-> at run time.  The relative performance of a CPU certainly can be probed 
-> at run time.
-> 
-> Obviously the specifics of the actual benchmark might be debated, but 
-> the same can be said about static numbers.
-
-Indeed.
-
-Morten
+If you're saying that the current ARMv7 code is always worse than doing
+nothing then clearly we ought to be removing that code from ARMv7 rather
+than hurting performance.  I'd been under the impression that what we
+had there was not ideal but better than nothing in mainline rather than
+actively harmful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/853b289e/attachment.sig>
