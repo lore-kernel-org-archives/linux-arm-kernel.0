@@ -1,41 +1,38 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 12 Dec 2013 14:37:59 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212141926.GA31816@1wt.eu> (Willy Tarreau's message of "Thu,
- 12 Dec 2013 15:19:26 +0100")
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
- <1386857410.22947.78.camel@sakura.staff.proxad.net>
- <20131212141926.GA31816@1wt.eu>
-Message-ID: <yw1xhaaejfso.fsf@unicorn.mansr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 15:40:32 +0100
+Subject: [PATCH 2/3] pinctrl: at91: initialize config parameter to 0
+In-Reply-To: <52A5938E.40201@free-electrons.com>
+References: <1386421734-10240-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1386421734-10240-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <52A57E55.40808@atmel.com> <52A5938E.40201@free-electrons.com>
+Message-ID: <CACRpkdbxq-w8KquMjQVSbkEZcsMLsSRc3BqfuLLDM7c1P3UOxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Willy Tarreau <w@1wt.eu> writes:
+On Mon, Dec 9, 2013 at 10:55 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
 
->> #include <stdint.h>
->> #include <stdio.h>
->> 
->> static inline uint32_t asm_add(uint16_t len, uint32_t sum)
->> {
->>         __asm__(
->>         "add    %0, %1, %2 \n"
->>         : "=&r"(sum)
->>         : "r" (sum), "r" (len)
->>         );
->>         return sum;
->> }
+> I'm actually wondering if the checks for the ops->pin_config_get are not
+> a bit overkill. We check for that function in:
+>  - pinconf_check_ops()
+>  - before calling it in pin_config_get_for_pin() which is only used
+> once, in the same path : dump using debugfs and having ops->is_generic
+> == true
+>  - in pinconf_pins_show() which is the function calling also in the same
+> path
 >
-> Hmmm aren't you passing a 16-bit register directly to the ASM for being used
-> as a 32-bit one ? This seems hasardous to me since nowhere you tell gcc how
-> you're going to use the register.
+> What I would do is:
+>  - remove all the checks in pinconf_check_ops() and pinconf_pins_show()
+> so that people are not pressured to implement a function that is simply
+> never used.
+>  - modify pin_config_get_for_pin() by removing the dev_err() call and
+> returning -ENOTSUPP instead of -EINVAL (it doesn't change the behaviour
+> but I feel -ENOTSUPP is more appropriate)
+>
+> I have a patch ready but I can't test it as I don't own any of the
+> is_generic platforms.
 
-There is no such thing as a 16-bit register on ARM.  What this code does
-is ask the compiler to take the 16-bit value 'len' and put it in a register
-for use in the asm code.  All registers are 32-bit, so there is no ambiguity.
+Mail it out with a [CFT: ] "call for testing" prefix.
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Yours,
+Linus Walleij
