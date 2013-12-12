@@ -1,59 +1,36 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Thu, 12 Dec 2013 17:24:31 +0000
-Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
-In-Reply-To: <52A685E5.9060604@ti.com>
-References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
- <1386627424-373-3-git-send-email-w-kwok2@ti.com> <52A685E5.9060604@ti.com>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C603@DFLE11.ent.ti.com>
+From: w-kwok2@ti.com (WingMan Kwok)
+Date: Thu, 12 Dec 2013 12:25:28 -0500
+Subject: [PATCH v4 0/2] Kesytone II USB host and PHY drivers
+Message-ID: <1386869130-2993-1-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Resending the series with suggested minor updates from v3 [1].
 
+Series adds USB host support for Keystone SOCs. Keystone SOCs
+uses dwc3 hardware IP implementation.  On Keystone II platforms,
+we use no-op phy driver.
 
-> -----Original Message-----
-> From: Quadros, Roger
-> Sent: Monday, December 09, 2013 10:09 PM
-> To: Kwok, WingMan; linux-usb at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; Shilimkar, Santosh; Balbi, Felipe;
-> Greg Kroah-Hartman
-> Subject: Re: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
-> 
-> On 12/10/2013 03:47 AM, WingMan Kwok wrote:
-> > Add Keystone platform USB PHY driver support. Current main purpose of
-> > this driver is to enable the PHY reference clock gate on the Keystone
-> > SoC. Otherwise it is a nop PHY.
-> >
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> > ---
-> >  drivers/usb/phy/Kconfig        |   10 +++
-> >  drivers/usb/phy/Makefile       |    1 +
-> >  drivers/usb/phy/phy-keystone.c |  142
-> > ++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 153 insertions(+)
-> >  create mode 100644 drivers/usb/phy/phy-keystone.c
-> >
-> > diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig index
-> > 08e2f39..c6792f43 100644
-> > --- a/drivers/usb/phy/Kconfig
-> > +++ b/drivers/usb/phy/Kconfig
-> > @@ -40,6 +40,16 @@ config ISP1301_OMAP
-> >  	  This driver can also be built as a module.  If so, the module
-> >  	  will be called isp1301_omap.
-> >
-> > +config KEYSTONE_USB_PHY
-> > +	tristate "Keystone USB PHY Driver"
-> > +	depends on ARCH_KEYSTONE
-> > +	select USB_PHY
-> 
-> NOP_USB_XCEIV selects USB_PHY so not necessary.
-> 
+Patchset are tested on Keystone II EVM with USB2.0 and USB3.0
+flash drives along with dts changes.
 
-Yes I have fixed it and updated patch which I'll post.
-" config AM335X_PHY_USB" needs to be fixed as well.
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Regards
-WingMan
+WingMan Kwok (2):
+  usb: dwc3: Add Keystone specific glue layer
+  usb: phy: Add keystone usb phy driver
+
+ drivers/usb/dwc3/Kconfig         |    7 ++
+ drivers/usb/dwc3/Makefile        |    1 +
+ drivers/usb/dwc3/dwc3-keystone.c |  201 ++++++++++++++++++++++++++++++++++++++
+ drivers/usb/phy/Kconfig          |    9 ++
+ drivers/usb/phy/Makefile         |    1 +
+ drivers/usb/phy/phy-keystone.c   |  142 +++++++++++++++++++++++++++
+ 6 files changed, 361 insertions(+)
+ create mode 100644 drivers/usb/dwc3/dwc3-keystone.c
+ create mode 100644 drivers/usb/phy/phy-keystone.c
+
+[1] http://www.spinics.net/lists/linux-usb/msg99178.html
+-- 
+1.7.9.5
