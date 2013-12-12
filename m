@@ -1,26 +1,88 @@
-From: hrhaan@gmail.com (Harro Haan)
-Date: Thu, 12 Dec 2013 23:12:13 +0100
-Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
- <201312121122.33746.marex@denx.de>
- <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
- <201312121925.27591.marex@denx.de>
- <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
-Message-ID: <CAB5oZtBUTnA3FdO9_YyORfUx7Joqy96NF55o1-XQkFPXsWLoig@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 12 Dec 2013 23:23:27 +0100
+Subject: [PATCH 1/4] irqchip: armada-370-xp: fix IPI race condition
+In-Reply-To: <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131212232327.01f4aaff@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2013 22:07, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Thu, Dec 12, 2013 at 11:25 AM, Marek Vasut <marex@denx.de> wrote:
->> Bjorn, would you mind picking 2/7...6/7 of this series so we are done with
->> those? I will re-post 1/7 as a self-standing patch afterwards, it has no impact
->> on the rest of the series.
->
-> Sure.  I can't really evaluate these myself, so I'm looking for acks
-> from Richard or Shawn.
->
-> I noticed Pratyush, Tim, and Harro had some questions the first time
-> around, and I don't know whether they got resolved.
+Hello Thomas,
 
-Yes, Marek resolved the build warning comment in [PATCH V2 3/7]. Regards, Harro
+As the irqchip maintainer, this patch, as well as the following patch
+"irqchip: armada-370-xp: fix MSI race condition" should go through your
+tree.
+
+They have been sent for quite some time now. Is there any reason you
+haven't picked them up? I realized I only Cc'ed you when sending them
+originally, while you should have been the main recipient, maybe that
+explains why I didn't get any feedback.
+
+Would it be possible to merge them for 3.13 ? Notice that the below
+patch should also be backported into stable kernel all the way to 3.8.
+
+Thanks a lot!
+
+Thomas
+
+On Mon, 25 Nov 2013 17:26:44 +0100, Thomas Petazzoni wrote:
+> From: Lior Amsalem <alior@marvell.com>
+> 
+> In the Armada 370/XP driver, when we receive an IRQ 0, we read the
+> list of doorbells that caused the interrupt from register
+> ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS. This gives the list of IPIs that
+> were generated. However, instead of acknowledging only the IPIs that
+> were generated, we acknowledge *all* the IPIs, by writing
+> ~IPI_DOORBELL_MASK in the ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS register.
+> 
+> This creates a race condition: if a new IPI that isn't part of the
+> ones read into the temporary "ipimask" variable is fired before we
+> acknowledge all IPIs, then we will simply loose it. This is causing
+> scheduling hangs on SMP intensive workloads.
+> 
+> It is important to mention that this ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS
+> register has the following behavior: "A CPU write of 0 clears the bits
+> in this field. A CPU write of 1 has no effect". This is what allows us
+> to simply write ~ipimask to acknoledge the handled IPIs.
+> 
+> Notice that the same problem is present in the MSI implementation, but
+> it will be fixed as a separate patch, so that this IPI fix can be
+> pushed to older stable versions as appropriate (all the way to 3.8),
+> while the MSI code only appeared in 3.13.
+> 
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: stable at vger.kernel.org
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+> The problem has been present since 344e873e5657e8dc0 ('arm: mvebu: Add
+> IPI support via doorbells'), that is since v3.8. However, notice that
+> the IRQ driver was moved from arch/arm/mach-mvebu/ to drivers/irqchip
+> in the process, and also that the very line being changed was slightly
+> modified in 5ec69017cc944f3ed8 ('irqchip: armada-370-xp: slightly
+> cleanup irq controller driver').
+> ---
+>  drivers/irqchip/irq-armada-370-xp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index 433cc85..f5e49a2 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -407,7 +407,7 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+>  						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
+>  				& IPI_DOORBELL_MASK;
+>  
+> -			writel(~IPI_DOORBELL_MASK, per_cpu_int_base +
+> +			writel(~ipimask, per_cpu_int_base +
+>  				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
+>  
+>  			/* Handle all pending doorbells */
+
+
+
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
