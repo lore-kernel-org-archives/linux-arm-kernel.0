@@ -1,38 +1,79 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 12 Dec 2013 12:17:45 +0100
-Subject: [GIT PULL][for 3.14] pull request from pxa
-In-Reply-To: <52A91AA6.8040700@gmail.com>
-References: <52A823E4.6070208@gmail.com>
- <20131212004203.GD21531@quad.lixom.net>
- <52A91AA6.8040700@gmail.com>
-Message-ID: <20131212111743.GC11524@ulmo.nvidia.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Thu, 12 Dec 2013 06:18:34 -0500
+Subject: [PATCH v4 6/9] usb: gadget: s3c-hsotg: get phy bus width from phy
+ subsystem
+In-Reply-To: <1386847117-21240-1-git-send-email-mporter@linaro.org>
+References: <1386847117-21240-1-git-send-email-mporter@linaro.org>
+Message-ID: <1386847117-21240-7-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 10:08:38AM +0800, Haojian Zhuang wrote:
-> On 12/12/2013 08:42 AM, Olof Johansson wrote:
-> > On Wed, Dec 11, 2013 at 04:35:48PM +0800, Haojian Zhuang wrote:
-[...]
-> > >Mike Dunn (2):
-> > >       PWM: PXA: add device tree support to PWM driver
-> >
-> > This patch should go to the PWM maintainer, not to us. Or at least be acked by
-> > them (but it might as well be merged since there are no dependencies).
-> 
-> Thierry,
-> 
-> I remember that you ask this patch to be merged into armsoc. Please give an
-> Ack. Then I could resend the pull request.
+Adds support for querying the phy bus width from the generic phy
+subsystem. Configure UTMI bus width in GUSBCFG based on this value.
 
-I think what I said was to merge patch 2/2 (the DTS changes) via arm-soc
-but not the PWM driver changes. As a matter of fact I've already applied
-Mike's patch to my for-next branch.
+Signed-off-by: Matt Porter <mporter@linaro.org>
+---
+ drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
+ drivers/usb/gadget/s3c-hsotg.h |  1 +
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/ed031673/attachment-0001.sig>
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index e9683c2..168aaa9 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -144,6 +144,7 @@ struct s3c_hsotg_ep {
+  * @regs: The memory area mapped for accessing registers.
+  * @irq: The IRQ number we are using
+  * @supplies: Definition of USB power supplies
++ * @phyif: PHY interface width
+  * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
+  * @num_of_eps: Number of available EPs (excluding EP0)
+  * @debug_root: root directrory for debugfs.
+@@ -171,6 +172,7 @@ struct s3c_hsotg {
+ 
+ 	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
+ 
++	u32			phyif;
+ 	unsigned int		dedicated_fifos:1;
+ 	unsigned char           num_of_eps;
+ 
+@@ -2276,7 +2278,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
+ 	 */
+ 
+ 	/* set the PLL on, remove the HNP/SRP and set the PHY */
+-	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
++	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
+ 	       (0x5 << 10), hsotg->regs + GUSBCFG);
+ 
+ 	s3c_hsotg_init_fifo(hsotg);
+@@ -3621,6 +3623,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+ 		goto err_supplies;
+ 	}
+ 
++	/* Set default UTMI width */
++	hsotg->phyif = GUSBCFG_PHYIf16;
++
++	/*
++	 * If using the generic PHY framework, check if the PHY bus
++	 * width is 8-bit and set the phyif appropriately.
++	 */
++	if (hsotg->phy && (phy_get_bus_width(phy) == 8))
++		hsotg->phyif = GUSBCFG_PHYIf8;
++
+ 	if (hsotg->phy)
+ 		phy_init(hsotg->phy);
+ 
+diff --git a/drivers/usb/gadget/s3c-hsotg.h b/drivers/usb/gadget/s3c-hsotg.h
+index d650b12..85f549f 100644
+--- a/drivers/usb/gadget/s3c-hsotg.h
++++ b/drivers/usb/gadget/s3c-hsotg.h
+@@ -55,6 +55,7 @@
+ #define GUSBCFG_HNPCap				(1 << 9)
+ #define GUSBCFG_SRPCap				(1 << 8)
+ #define GUSBCFG_PHYIf16			(1 << 3)
++#define GUSBCFG_PHYIf8				(0 << 3)
+ #define GUSBCFG_TOutCal_MASK			(0x7 << 0)
+ #define GUSBCFG_TOutCal_SHIFT			(0)
+ #define GUSBCFG_TOutCal_LIMIT			(0x7)
+-- 
+1.8.4
