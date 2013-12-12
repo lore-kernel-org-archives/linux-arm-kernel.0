@@ -1,63 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Dec 2013 18:26:03 +0000
-Subject: [PATCH 3/3] ARM: mm: flesh out and fix the comments in the ASID
- allocator
-In-Reply-To: <1386872763-14845-1-git-send-email-will.deacon@arm.com>
-References: <1386872763-14845-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1386872763-14845-3-git-send-email-will.deacon@arm.com>
+Date: Thu, 12 Dec 2013 18:26:01 +0000
+Subject: [PATCH 1/3] ARM: mm: don't bother with reserved ttbr0 when running
+ with LPAE
+Message-ID: <1386872763-14845-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ASID allocator has to deal with some pretty horrible behaviours by
-the CPU, so expand on some of the comments in there so I remember why
-we can never allocate ASID zero to a userspace task.
+With the new ASID allocation algorithm, active ASIDs at the time of a
+rollover event will be marked as reserved, so active mm_structs can
+continue to operate with the same ASID as before. This in turn means
+that we don't need to worry about allocating a new ASID to an mm that
+is currently active (installed in TTBR0).
+
+Since updating the pgd and ASID is atomic on LPAE systems (by virtue of
+the two being fields in the same hardware register), we can dispose of
+the reserved TTBR0 and rely on whatever tables we currently have live.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/context.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/mm/context.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 52e6f13ac9c7..6eb97b3a7481 100644
+index 84e6f772e204..3ad0fdaa5cc1 100644
 --- a/arch/arm/mm/context.c
 +++ b/arch/arm/mm/context.c
-@@ -36,8 +36,8 @@
-  * The context ID is used by debuggers and trace logic, and
-  * should be unique within all running processes.
-  *
-- * In big endian operation, the two 32 bit words are swapped if accesed by
-- * non 64-bit operations.
-+ * In big endian operation, the two 32 bit words are swapped if accessed
-+ * by non-64-bit operations.
-  */
- #define ASID_FIRST_VERSION	(1ULL << ASID_BITS)
- #define NUM_USER_ASIDS		ASID_FIRST_VERSION
-@@ -195,8 +195,11 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 		 * Allocate a free ASID. If we can't find one, take a
- 		 * note of the currently active ASIDs and mark the TLBs
- 		 * as requiring flushes. We always count from ASID #1,
--		 * as we reserve ASID #0 to switch via TTBR0 and indicate
--		 * rollover events.
-+		 * as we reserve ASID #0 to switch via TTBR0 and to
-+		 * avoid speculative page table walks from hitting in
-+		 * any partial walk caches, which could be populated
-+		 * from overlapping level-1 descriptors used to map both
-+		 * the module area and the userspace stack.
- 		 */
- 		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
- 		if (asid == NUM_USER_ASIDS) {
-@@ -224,8 +227,9 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
- 		__check_vmalloc_seq(mm);
+@@ -78,20 +78,21 @@ void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
+ #endif
  
- 	/*
--	 * Required during context switch to avoid speculative page table
--	 * walking with the wrong TTBR.
-+	 * We cannot update the pgd and the ASID atomicly with classic
-+	 * MMU, so switch exclusively to global mappings to avoid
-+	 * speculative page table walking with the wrong TTBR.
- 	 */
- 	cpu_set_reserved_ttbr0();
- 
+ #ifdef CONFIG_ARM_LPAE
+-static void cpu_set_reserved_ttbr0(void)
+-{
+-	/*
+-	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
+-	 * ASID is set to 0.
+-	 */
+-	cpu_set_ttbr(0, __pa(swapper_pg_dir));
+-	isb();
+-}
++/*
++ * With LPAE, the ASID and page tables are updated atomicly, so there is
++ * no need for a reserved set of tables (the active ASID tracking prevents
++ * any issues across a rollover).
++ */
++#define cpu_set_reserved_ttbr0()
+ #else
+ static void cpu_set_reserved_ttbr0(void)
+ {
+ 	u32 ttb;
+-	/* Copy TTBR1 into TTBR0 */
++	/*
++	 * Copy TTBR1 into TTBR0.
++	 * This points at swapper_pg_dir, which contains only global
++	 * entries so any speculative walks are perfectly safe.
++	 */
+ 	asm volatile(
+ 	"	mrc	p15, 0, %0, c2, c0, 1		@ read TTBR1\n"
+ 	"	mcr	p15, 0, %0, c2, c0, 0		@ set TTBR0\n"
 -- 
 1.8.2.2
