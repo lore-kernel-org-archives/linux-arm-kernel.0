@@ -1,88 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 12 Dec 2013 23:23:27 +0100
-Subject: [PATCH 1/4] irqchip: armada-370-xp: fix IPI race condition
-In-Reply-To: <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131212232327.01f4aaff@skate>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Thu, 12 Dec 2013 23:30:02 +0100
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+In-Reply-To: <20131212164748.GS4360@n2100.arm.linux.org.uk>
+References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
+ <20131212124015.GL4360@n2100.arm.linux.org.uk>
+ <1386855390.22947.68.camel@sakura.staff.proxad.net>
+ <20131212144853.GO4360@n2100.arm.linux.org.uk>
+ <1386860657.25449.3.camel@sakura.staff.proxad.net>
+ <20131212154110.GQ4360@n2100.arm.linux.org.uk>
+ <20131212160426.GD31816@1wt.eu>
+ <20131212164748.GS4360@n2100.arm.linux.org.uk>
+Message-ID: <1386887402.25449.48.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
 
-As the irqchip maintainer, this patch, as well as the following patch
-"irqchip: armada-370-xp: fix MSI race condition" should go through your
-tree.
-
-They have been sent for quite some time now. Is there any reason you
-haven't picked them up? I realized I only Cc'ed you when sending them
-originally, while you should have been the main recipient, maybe that
-explains why I didn't get any feedback.
-
-Would it be possible to merge them for 3.13 ? Notice that the below
-patch should also be backported into stable kernel all the way to 3.8.
-
-Thanks a lot!
-
-Thomas
-
-On Mon, 25 Nov 2013 17:26:44 +0100, Thomas Petazzoni wrote:
-> From: Lior Amsalem <alior@marvell.com>
+On Thu, 2013-12-12 at 16:47 +0000, Russell King - ARM Linux wrote:
 > 
-> In the Armada 370/XP driver, when we receive an IRQ 0, we read the
-> list of doorbells that caused the interrupt from register
-> ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS. This gives the list of IPIs that
-> were generated. However, instead of acknowledging only the IPIs that
-> were generated, we acknowledge *all* the IPIs, by writing
-> ~IPI_DOORBELL_MASK in the ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS register.
-> 
-> This creates a race condition: if a new IPI that isn't part of the
-> ones read into the temporary "ipimask" variable is fired before we
-> acknowledge all IPIs, then we will simply loose it. This is causing
-> scheduling hangs on SMP intensive workloads.
-> 
-> It is important to mention that this ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS
-> register has the following behavior: "A CPU write of 0 clears the bits
-> in this field. A CPU write of 1 has no effect". This is what allows us
-> to simply write ~ipimask to acknoledge the handled IPIs.
-> 
-> Notice that the same problem is present in the MSI implementation, but
-> it will be fixed as a separate patch, so that this IPI fix can be
-> pushed to older stable versions as appropriate (all the way to 3.8),
-> while the MSI code only appeared in 3.13.
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: stable at vger.kernel.org
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
-> The problem has been present since 344e873e5657e8dc0 ('arm: mvebu: Add
-> IPI support via doorbells'), that is since v3.8. However, notice that
-> the IRQ driver was moved from arch/arm/mach-mvebu/ to drivers/irqchip
-> in the process, and also that the very line being changed was slightly
-> modified in 5ec69017cc944f3ed8 ('irqchip: armada-370-xp: slightly
-> cleanup irq controller driver').
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 433cc85..f5e49a2 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -407,7 +407,7 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
->  						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
->  				& IPI_DOORBELL_MASK;
->  
-> -			writel(~IPI_DOORBELL_MASK, per_cpu_int_base +
-> +			writel(~ipimask, per_cpu_int_base +
->  				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
->  
->  			/* Handle all pending doorbells */
+> So here's a patch for Maxime to try - I've not run it yet but it seems
+> to do the right thing by code inspection. 
 
+Kernel built with this patch seems to work fine. Also I called it
+manually with a few test patterns and the results are correct.
 
+Tested-by: Maxime Bizon <mbizon@freebox.fr>
+
+Thanks Russell,
 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Maxime
