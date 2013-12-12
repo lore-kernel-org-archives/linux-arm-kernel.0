@@ -1,86 +1,85 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 12 Dec 2013 09:57:06 +0200
-Subject: [PATCHv7 05/12] iommu/core: add ops->{bound,unbind}_driver()
+Date: Thu, 12 Dec 2013 09:57:04 +0200
+Subject: [PATCHv7 03/12] iommu/of: check if dependee iommu is ready or not
 In-Reply-To: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
 References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1386835033-4701-6-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1386835033-4701-4-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ops->{bound,unbind}_driver() functions are called at
-BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
+IOMMU devices on the bus need to be poplulated first, then iommu
+master devices are done later.
 
-This is necessary to control the device population order. IOMMU master
-devices depend on an IOMMU device instanciation. IOMMU master devices
-can be registered to an IOMMU only after it's successfully
-populated. This IOMMU registration is done via
-ops->bound_driver(). Currently this population can be deferred if
-depending IOMMU device hasn't yet been populated in driver core. This
-cannot be done via ops->add_device() since after add_device() device's
-population/instanciation can be still deferred via probe().
+With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
+whether a device can be an iommu msater or not. If a device can, we'll
+defer to populate that device till an depending iommu device is
+populated.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
 v6:
-New for v6.
+Spinned off only of_iommu part from:
+  [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+
+v5:
+Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
+
+v4:
+This is newly added, and the successor of the following RFC:
+  [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
+  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- drivers/iommu/iommu.c | 13 +++++++++++--
- include/linux/iommu.h |  4 ++++
- 2 files changed, 15 insertions(+), 2 deletions(-)
+ drivers/iommu/of_iommu.c | 14 ++++++++++++++
+ include/linux/of_iommu.h |  6 ++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index e5555fc..5469d36 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -540,14 +540,23 @@ static int iommu_bus_notifier(struct notifier_block *nb,
- 	 * ADD/DEL call into iommu driver ops if provided, which may
- 	 * result in ADD/DEL notifiers to group->notifier
- 	 */
--	if (action == BUS_NOTIFY_ADD_DEVICE) {
-+	switch (action) {
-+	case BUS_NOTIFY_ADD_DEVICE:
- 		if (ops->add_device)
- 			return ops->add_device(dev);
--	} else if (action == BUS_NOTIFY_DEL_DEVICE) {
-+	case BUS_NOTIFY_DEL_DEVICE:
- 		if (ops->remove_device && dev->iommu_group) {
- 			ops->remove_device(dev);
- 			return 0;
- 		}
-+	case BUS_NOTIFY_BOUND_DRIVER:
-+		if (ops->bound_driver)
-+			ops->bound_driver(dev);
-+		break;
-+	case BUS_NOTIFY_UNBIND_DRIVER:
-+		if (ops->unbind_driver)
-+			ops->unbind_driver(dev);
-+		break;
- 	}
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 5d1aeb9..557c0c8 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -125,3 +125,17 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
++
++int of_iommu_attach(struct device *dev)
++{
++	const __be32 *cur, *end;
++	struct of_phandle_args args;
++
++	of_property_for_each_phandle_with_args(dev->of_node, "iommus",
++				       "#iommu-cells", 0, args, cur, end) {
++		if (!of_find_iommu_by_node(args.np))
++			return -EPROBE_DEFER;
++	}
++
++	return 0;
++}
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index a0aa9d4..14c9a5c 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -14,6 +14,7 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
  
- 	/*
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a444c79..a0e92be 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -96,6 +96,8 @@ enum iommu_attr {
-  * @domain_has_cap: domain capabilities query
-  * @add_device: add device to iommu grouping
-  * @remove_device: remove device from iommu grouping
-+ * @bound_driver: called at BUS_NOTIFY_BOUND_DRIVER
-+ * @unbind_driver: called at BUS_NOTIFY_UNBIND_DRIVER
-  * @domain_get_attr: Query domain attributes
-  * @domain_set_attr: Change domain attributes
-  * @pgsize_bitmap: bitmap of supported page sizes
-@@ -114,6 +116,8 @@ struct iommu_ops {
- 			      unsigned long cap);
- 	int (*add_device)(struct device *dev);
- 	void (*remove_device)(struct device *dev);
-+	int (*bound_driver)(struct device *dev);
-+	void (*unbind_driver)(struct device *dev);
- 	int (*device_group)(struct device *dev, unsigned int *groupid);
- 	int (*domain_get_attr)(struct iommu_domain *domain,
- 			       enum iommu_attr attr, void *data);
+ extern void iommu_add(struct iommu *iommu);
+ extern void iommu_del(struct iommu *iommu);
++extern int of_iommu_attach(struct device *dev);
+ 
+ #else
+ 
+@@ -32,6 +33,11 @@ static inline void iommu_del(struct iommu *iommu)
+ {
+ }
+ 
++static inline int of_iommu_attach(struct device *dev)
++{
++	return 0;
++}
++
+ #endif	/* CONFIG_OF_IOMMU */
+ 
+ #endif /* __OF_IOMMU_H */
 -- 
 1.8.1.5
