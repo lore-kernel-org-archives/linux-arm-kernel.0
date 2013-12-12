@@ -1,61 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Dec 2013 12:18:39 +0000
-Subject: [PATCHv3 1/2] arm64: Check for NULL device before getting the
- coherent_dma_mask
-In-Reply-To: <52A8AAB3.8050500@codeaurora.org>
-References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
- <1386711816-20270-2-git-send-email-lauraa@codeaurora.org>
- <20131211104239.GD26730@mudshark.cambridge.arm.com>
- <52A8A55A.9060709@codeaurora.org>
- <20131211175134.GL26730@mudshark.cambridge.arm.com>
- <52A8AAB3.8050500@codeaurora.org>
-Message-ID: <20131212121839.GC12617@mudshark.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 12 Dec 2013 13:19:39 +0100
+Subject: regulator-core has_full_constraints set too late for dt using
+ boards ?
+In-Reply-To: <20131212104208.GG11044@sirena.org.uk>
+References: <52A88805.1080704@redhat.com>
+ <20131211160225.GB11468@sirena.org.uk> <52A98C72.2040203@redhat.com>
+ <20131212104208.GG11044@sirena.org.uk>
+Message-ID: <52A9A9DB.5050102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 06:10:59PM +0000, Laura Abbott wrote:
-> On 12/11/2013 9:51 AM, Will Deacon wrote:
-> > On Wed, Dec 11, 2013 at 05:48:10PM +0000, Laura Abbott wrote:
-> >> On 12/11/2013 2:42 AM, Will Deacon wrote:
-> >>> On Tue, Dec 10, 2013 at 09:43:35PM +0000, Laura Abbott wrote:
-> >>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> >>>> index 4bd7579..4134212 100644
-> >>>> --- a/arch/arm64/mm/dma-mapping.c
-> >>>> +++ b/arch/arm64/mm/dma-mapping.c
-> >>>> @@ -33,7 +33,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
-> >>>>    					  dma_addr_t *dma_handle, gfp_t flags,
-> >>>>    					  struct dma_attrs *attrs)
-> >>>>    {
-> >>>> -	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
-> >>>> +	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
-> >>>>    	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
-> >>>>    		flags |= GFP_DMA32;
-> >>>>    	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-> >>>
-> >>> Unless I'm misreading the code, it looks like there are paths through
-> >>> swiotlb_alloc_coherent that will dereference the dev parameter without a
-> >>> NULL check. Are you sure we should allow for NULL devices here?
-> >>>
-> >>
-> >> The current ARM code allows for NULL devices so that would be a
-> >> difference in behavior between arm and arm64. We're also relying on this
-> >> behavior in some code. Where exactly in swiotlb_alloc_coherent does this
-> >> dereference happen? The only one I see is checked with 'if (hwdev &&
-> >> hwdev->coherent_dma_mask)'
-> >
-> > phys_to_dma could, but doesn't. The one I spotted was buried down in:
-> >
-> >    map_single -> swiotlb_tbl_map_single -> dma_get_seg_boundary
-> >
-> 
-> Ah yes I see that now.
-> 
-> I guess the question still stands though, should we fixup the parts of 
-> the code to fully support the NULL devices or do we tell clients to fix 
-> their code and fail the allocation with a warning not to pass NULL?
+Hi,
 
-Assuming it's always possible to pass in a non-NULL device, I'd be tempted
-to fix the callers. Can you think of a valid use-case where the caller
-doesn't have a device handle to pass in?
+On 12/12/2013 11:42 AM, Mark Brown wrote:
+> On Thu, Dec 12, 2013 at 11:14:10AM +0100, Hans de Goede wrote:
+>> On 12/11/2013 05:02 PM, Mark Brown wrote:
+>
+>>> Please look at the current code, that's not how this works any more.
+>
+>> More current then 3.13-rc3 ? Because that is what I've been looking at.
+>
+> Yes, -next.  It'll be going to Linus probably this week.
+>
+>> I could be completely wrong of course. Either way could you give a few
+>> hints as to how my interpretation of how this works is wrong ?
+>
+> It's correct for the code you've been looking at but has since been
+> changed.  Please look at the changes in -next, you should generally
+> check -next for the current state of things.
 
-Will
+Ah yes, I see, thanks for clarifying this.
+
+Note my patch to not do a dev_err when no regulator is found for
+regulator_get_optional still is needed in -next.
+
+Thanks & Regards,
+
+Hans
