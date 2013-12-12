@@ -1,79 +1,28 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 12 Dec 2013 15:19:26 +0100
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <1386857410.22947.78.camel@sakura.staff.proxad.net>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
- <1386857410.22947.78.camel@sakura.staff.proxad.net>
-Message-ID: <20131212141926.GA31816@1wt.eu>
+From: panchaxari.prasannamurthy@linaro.org (Panchaxari Prasannamurthy Tumkur)
+Date: Thu, 12 Dec 2013 19:55:27 +0530
+Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
+ AUTO_ZRELADDR by default
+In-Reply-To: <3126277.U19MiHChc4@amdc1227>
+References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <26167386.hX5eWUjT6T@flatron>
+ <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
+ <3126277.U19MiHChc4@amdc1227>
+Message-ID: <CAAunhUJiTNW0HxCpMtwf7yPrBrrRwZ0T6odtj-yTw0rowPU2Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+> OK. So do you have plans to send similar patches for other, more active
+> (and closer to having multiplatform support) platforms, such as s3c64xx,
+> s5pv210 and exynos?
+>
+> In case of s5p64x0 probably the only person capable of testing it is
+> Kukjin, as we don't have any other active people with boards based on
+> these SoCs.
 
-On Thu, Dec 12, 2013 at 03:10:10PM +0100, Maxime Bizon wrote:
-> 
-> On Thu, 2013-12-12 at 13:48 +0000, M?ns Rullg?rd wrote:
-> 
-> > In the code above, the outer (uint16_t) cast should clear the top half,
-> > as should passing the value to a function (inline doesn't alter the
-> > semantics) as a 16-bit type, so there's something fishy here.
-> 
-> using __attribute__((noinline)), or putting the function in another file
-> makes the bug disappear
-> 
-> But I'm not convinced inline doesn't change the semantic, since gcc is
-> merging the function inside another one the rules of calling convention
-> should not matter anymore.
+Yes I have, Exynos is already sent, s3c64xx and s5pv210 are in pipeline.
+I shall send them shortly.
 
-I disagree here, since gcc may decide by itself to inline or not, it must
-not impact the validity of the emitted code. Inline functions have input
-and output types for a reason!
+thanks for your guidance.
 
-(...)
-> #include <stdint.h>
-> #include <stdio.h>
-> 
-> static inline uint32_t asm_add(uint16_t len, uint32_t sum)
-> {
->         __asm__(
->         "add    %0, %1, %2 \n"
->         : "=&r"(sum)
->         : "r" (sum), "r" (len)
->         );
->         return sum;
-> }
-
-Hmmm aren't you passing a 16-bit register directly to the ASM for being used
-as a 32-bit one ? This seems hasardous to me since nowhere you tell gcc how
-you're going to use the register.
-
-Could you check if that fixes it :
-
- static inline uint32_t asm_add(uint16_t len, uint32_t sum)
- {
-         uint32_t len32 = len;
-
-         __asm__(
-         "add    %0, %1, %2 \n"
-         : "=&r"(sum)
-         : "r" (sum), "r" (len32)
-         );
-         return sum;
- }
-
-Or maybe simply :
-
- static inline uint32_t asm_add(uint16_t len, uint32_t sum)
- {
-         __asm__(
-         "add    %0, %1, %2 \n"
-         : "=&r"(sum)
-         : "r" (sum), "r" (uint32_t)(len)
-         );
-         return sum;
- }
-
-Willy
+regards
+pancham
