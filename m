@@ -1,116 +1,38 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 12 Dec 2013 10:18:14 +0100 (CET)
-Subject: [PATCH] serial: pl011: also enable DMA Rx polling with no platform
- data
-In-Reply-To: <Pine.LNX.4.64.1312091229550.30018@axis700.grange>
-References: <1385631664-32607-1-git-send-email-linus.walleij@linaro.org>
- <Pine.LNX.4.64.1312091229550.30018@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1312120923160.32185@axis700.grange>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 12 Dec 2013 09:23:01 +0000
+Subject: [PATCH v4] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <20131212022822.GI2871@cbox>
+References: <1386672625-8060-1-git-send-email-andre.przywara@linaro.org>
+ <20131212022822.GI2871@cbox>
+Message-ID: <CAFEAcA_F3T1+YsKKq3h8P139OX085N-PPPPZo5dvwgwcuGoXHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An addendum to this patch, that might well lead to dropping it and, 
-possibly, doing the opposite - removing the DMA Rx polling completely. 
-This patch was a logical continuation of the referenced below patch from 
-Linus W. It doesn't make matters worse on its own, it just unifies the two 
-cases - with platform data and with DT. However, after fixing other issues 
-with my set up, it has been identified, that this polling is actually 
-causing problems, rather than fixing any. In our set up we don't use the 
-"single character DMA transfer request line," but the burst DMA request 
-line, which means, a DMA request is only activated, when a watermark is 
-reached. And as soon as DMA picks up data from the FIFO to drop below the 
-threshold, the request line is deactivated again. This means, if less than 
-a complete DMA buffer of data is received, "threshold - 1" (15 in our 
-case) bytes will stay in UART FIFO, causing an Rx timeout interrupt, which 
-will pick those 15 bytes up and deliver the data to the tty layer. All 
-works beautifully.
+On 12 December 2013 02:28, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index a30035d..9565e6a 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -1889,9 +1889,12 @@ value in the kvm_regs structure seen as a 32bit array.
+>  arm64 CCSIDR registers are demultiplexed by CSSELR value:
+>    0x6020 0000 0011 00 <csselr:8>
+>
+> -arm64 system registers have the following id bit patterns:
+> +arm64 64-bit system registers have the following id bit patterns:
+>    0x6030 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
+>
+> +arm64 32-bit system registers have the following id bit patterns:
+> +  0x6020 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
 
-Whereas with polling we get data loss and corruption. This isn't my top 
-priority at the moment to investigate and fix this. Please, feel free to 
-decide whether to take this patch to unify driver's behaviour with and 
-without DT, or to drop it to at least give some configurations a chance to 
-work correctly, or maybe someone has an idea what exactly can be going 
-wrong and how to fix it.
+What does it mean to say that a system register for AArch64
+is "32 bits" given that MRS/MSR always operate on a 64 bit
+register? We have the distinction in AArch32 because the
+instructions (and whether the input/output is in one register
+or a register pair) are different, but I can't see the need for
+AArch64.
 
-To help a bit with looking for a fix, in one of the tests the first 4144 
-bytes have been received correctly, which = 4096 (DMA buffer size) + 32 
-(UART FIFO size) + 16 (half UART FIFO size). Then 45 bytes went lost (3 * 
-15?), then reception resumed correctly.
+(The code I've just written for QEMU to handle sysregs says
+"they're all 64 bit"...)
 
-Thanks
-Guennadi
-
-On Mon, 9 Dec 2013, Guennadi Liakhovetski wrote:
-
-> An earlier patch "serial: pl011: use DMA RX polling by default" enabled
-> DMA Rx polling on PL011 only in configurations, using platform data. A
-> simple extension of that patch also enables DMA Rx polling when no
-> platform data is used, e.g. in Device Tree configurations. In such cases
-> a default poll timeout and an automatically calculated poll rate will be
-> used.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  drivers/tty/serial/amba-pl011.c |   39 ++++++++++++++++++---------------------
->  1 files changed, 18 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index e593f8d..baecdfa 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -327,28 +327,25 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
->  		dmaengine_slave_config(chan, &rx_conf);
->  		uap->dmarx.chan = chan;
->  
-> -		if (plat) {
-> -			/* Set poll rate if specified. */
-> -			if (plat->dma_rx_poll_rate) {
-> -				uap->dmarx.auto_poll_rate = false;
-> -				uap->dmarx.poll_rate = plat->dma_rx_poll_rate;
-> -			} else {
-> -				/*
-> -				 * 100 ms defaults to poll rate if not
-> -				 * specified. This will be adjusted with
-> -				 * the baud rate at set_termios.
-> -				 */
-> -				uap->dmarx.auto_poll_rate = true;
-> -				uap->dmarx.poll_rate =  100;
-> -			}
-> -			/* 3 secs defaults poll_timeout if not specified. */
-> -			if (plat->dma_rx_poll_timeout)
-> -				uap->dmarx.poll_timeout =
-> -					plat->dma_rx_poll_timeout;
-> -			else
-> -				uap->dmarx.poll_timeout = 3000;
-> -		} else
-> +		/* Set poll rate if specified. */
-> +		if (plat && plat->dma_rx_poll_rate) {
->  			uap->dmarx.auto_poll_rate = false;
-> +			uap->dmarx.poll_rate = plat->dma_rx_poll_rate;
-> +		} else {
-> +			/*
-> +			 * 100 ms defaults to poll rate if not
-> +			 * specified. This will be adjusted with
-> +			 * the baud rate at set_termios.
-> +			 */
-> +			uap->dmarx.auto_poll_rate = true;
-> +			uap->dmarx.poll_rate =  100;
-> +		}
-> +		/* 3 secs defaults poll_timeout if not specified. */
-> +		if (plat && plat->dma_rx_poll_timeout)
-> +			uap->dmarx.poll_timeout =
-> +				plat->dma_rx_poll_timeout;
-> +		else
-> +			uap->dmarx.poll_timeout = 3000;
->  
->  		dev_info(uap->port.dev, "DMA channel RX %s\n",
->  			 dma_chan_name(uap->dmarx.chan));
-> -- 
-> 1.7.2.5
-> 
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+thanks
+-- PMM
