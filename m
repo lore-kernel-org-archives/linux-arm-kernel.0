@@ -1,34 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Dec 2013 10:42:08 +0000
-Subject: regulator-core has_full_constraints set too late for dt using
- boards ?
-In-Reply-To: <52A98C72.2040203@redhat.com>
-References: <52A88805.1080704@redhat.com>
- <20131211160225.GB11468@sirena.org.uk>
- <52A98C72.2040203@redhat.com>
-Message-ID: <20131212104208.GG11044@sirena.org.uk>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 12 Dec 2013 19:47:02 +0900
+Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada,
+ R-Car PCI host maintainers
+In-Reply-To: <20131212070045.GO18380@S2101-09.ap.freescale.net>
+References: <20131211183237.GI4699@google.com>
+ <20131212070045.GO18380@S2101-09.ap.freescale.net>
+Message-ID: <000001cef727$7da93730$78fba590$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 11:14:10AM +0100, Hans de Goede wrote:
-> On 12/11/2013 05:02 PM, Mark Brown wrote:
+On Thursday, December 12, 2013 4:01 PM, Shawn Guo wrote:
+> On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
+> > +PCI DRIVER FOR IMX6
+> > +M:	Shawn Guo <shawn.guo@linaro.org>
+> 
+> Thanks for the nomination.  But I think a better person for this
+> position would be Richard Zhu <r65037@freescale.com> (copied).  He knows
+> the driver and controller much better than myself, and most importantly
+> he is the driver owner for Freescale kernel and he has the contact to
+> Freescale PCIe hardware people.
 
-> >Please look at the current code, that's not how this works any more.
+I agree with Shawn Guo's opinion. :-)
 
-> More current then 3.13-rc3 ? Because that is what I've been looking at.
+Richard Zhu has been maintaining i.MX6 PCIe driver. Also he can contact
+Freescale PCIe hardware engineers. Thus, he is the appropriate person
+for the Maintainer of i.MX PCIe.
 
-Yes, -next.  It'll be going to Linus probably this week.
+Best regards,
+Jingoo Han
 
-> I could be completely wrong of course. Either way could you give a few
-> hints as to how my interpretation of how this works is wrong ?
-
-It's correct for the code you've been looking at but has since been
-changed.  Please look at the changes in -next, you should generally
-check -next for the current state of things.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/b8104725/attachment-0001.sig>
+> 
+> Shawn
+> 
+> > +L:	linux-pci at vger.kernel.org
+> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +S:	Maintained
+> > +F:	drivers/pci/host/*imx6*
