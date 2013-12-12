@@ -1,71 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 12 Dec 2013 08:40:39 +0100
-Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI
- host maintainers
-In-Reply-To: <20131211183237.GI4699@google.com>
-References: <20131211183237.GI4699@google.com>
-Message-ID: <52A96877.90902@free-electrons.com>
+From: gpkulkarni@gmail.com (Ganapat Rao P Kulkarni)
+Date: Thu, 12 Dec 2013 13:18:19 +0530
+Subject: ARM64: Domain Equivalent support in ARMv8
+In-Reply-To: <CAFpQJXXpO7NmtHJoU0uHYQ_BPQqS+qn3ZgZcQkckWDv1ZjBtTQ@mail.gmail.com>
+References: <CAFpQJXXpO7NmtHJoU0uHYQ_BPQqS+qn3ZgZcQkckWDv1ZjBtTQ@mail.gmail.com>
+Message-ID: <CAFpQJXVsuT2XU4F9FmQbqYm-82Qbs-yVCD+N+Qc7eY-z-h1NJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, ,
+Hi Will/Catalin,
 
-On 11/12/2013 19:32, Bjorn Helgaas wrote:
-> If this looks reasonable, I'll merge it via the PCI tree for v3.13.
-> 
-> Bjorn
-> 
-> 
-> MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI host maintainers
-> 
-> Add entries for PCI host controller drivers in drivers/pci/host/.
-> 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  MAINTAINERS |   31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8285ed4676b6..826c722d92ba 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6449,16 +6449,47 @@ F:	drivers/pci/
->  F:	include/linux/pci*
->  F:	arch/x86/pci/
->  
-> +PCI DRIVER FOR DESIGNWARE
-> +M:	Jingoo Han <jg1.han@samsung.com>
-> +L:	linux-pci at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pci/host/*designware*
-> +
-> +PCI DRIVER FOR IMX6
-> +M:	Shawn Guo <shawn.guo@linaro.org>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pci/host/*imx6*
-> +
-> +PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
-> +M:	Jason Cooper <jason@lakedaemon.net>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pci/host/*mvebu*
+The requirement what i posted is doable on ARMv8?
+If yes, can you please suggest the way to do it!
 
-I think that Thomas Petazzoni would be more appropriate, he worked
-on the mvebu PCIe since 6 moths and now know very well the
-subject. Until now all the mvebu PCIe related questions were
-managed by Thomas.
+regards
+Ganapat
 
-Regards,
-
-Gregory
+On Tue, Dec 10, 2013 at 1:17 PM, Ganapat Rao P Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Hi,
+>
+> I want to make kernel code ( all sections/blocks mapped to kernel
+> code) as RO and change to R/W,  when ever hot-patch of kernel code is
+> required.
+> Also, R/W access changes should be available/visible to the core which
+> sets R/W and all other cores continue to have RO access.
+>
+> This was easily done using Domain feature(by making Kernel Domain as
+> Manager, using DACR) on ARMv7.
+> However, on ARMv8, i see there is no domain support(in AARCH64) and
+> not able to find the alternative optimal way.
+>
+> please suggest/share, if you have any ideas to do so.
+>
+> regards,
+> Ganapat
 
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+regards,
+Ganapat
