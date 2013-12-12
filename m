@@ -1,983 +1,408 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 15:06:50 +0100
-Subject: [PATCH 1/2] ARM: s3c24xx: get rid of custom <mach/gpio.h>
-Message-ID: <1386857210-4944-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 12 Dec 2013 15:07:06 +0100
+Subject: [PATCH 2/2] ARM: s3c64xx: get rid of custom <mach/gpio.h>
+Message-ID: <1386857226-4992-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This isolates the custom S3C24xx GPIO definition table to
-<linux/platform_data/gpio-samsung-s3x24xx.h> as this is
+This isolates the custom S3C64xx GPIO definition table to
+<linux/platform_data/gpio-samsung-s3x64xx.h> as this is
 used in a few different places in the kernel, removing the
 need to depend on the implicit inclusion of <mach/gpio.h>
 from <linux/gpio.h> and thus getting rid of a few nasty
 cross-dependencies.
 
-We also delete the nifty CONFIG_S3C24XX_GPIO_EXTRA stuff.
-The biggest this can ever be for the S3C24XX is
-CONFIG_S3C24XX_GPIO_EXTRA = 128, and then for CPU_S3C2443 or
-CPU_S3C2416 32*12 GPIOs are added, so 32*12+128 = 512
-is the absolute roof value on this platform. So we set
-the size of ARCH_NR_GPIO to this and the GPIOs array will
-fit any S3C24XX platform, as per pattern from other archs.
+Also delete the CONFIG_SAMSUNG_GPIO_EXTRA stuff. Instead
+roof the number of GPIOs for this platform:
+First sum up all the GPIO banks from A to Q: 187 GPIOs.
+Add the 16 "board GPIOs" and the roof for SAMSUNG_GPIO_EXTRA,
+128, so in total maximum 187+16+128 = 331 GPIOs, so let's
+take the same roof as for S3C24XX: 512. This way we can do
+away with the GPIO calculation macros for GPIO_BOARD_START,
+BOARD_NR_GPIOS and the definition of ARCH_NR_GPIOS.
 
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v1->v2:
-- Added an #ifdef ARCH_S3C24XX around the header inclusion
-  in drivers/gpio/gpio-samsung.c as we would otherwise
-  have colliding definitions when compiling S3C64XX.
-- Rename inclusion guard in the header file.
+This patch depends on
+"ARM: s3c24xx: get rid of custom <mach/gpio.h>"
 
 If one of the maintainers give me an ACK for this I will
 take it through the GPIO tree.
 ---
- arch/arm/Kconfig                                   |   3 +-
- arch/arm/mach-s3c24xx/Kconfig                      |  21 ----
- arch/arm/mach-s3c24xx/common-smdk.c                |   2 +-
- arch/arm/mach-s3c24xx/h1940-bluetooth.c            |   1 +
- arch/arm/mach-s3c24xx/include/mach/gpio.h          | 114 ---------------------
- arch/arm/mach-s3c24xx/mach-amlm5900.c              |   1 +
- arch/arm/mach-s3c24xx/mach-anubis.c                |   1 +
- arch/arm/mach-s3c24xx/mach-at2440evb.c             |   1 +
- arch/arm/mach-s3c24xx/mach-bast.c                  |   1 +
- arch/arm/mach-s3c24xx/mach-gta02.c                 |   1 +
- arch/arm/mach-s3c24xx/mach-h1940.c                 |   1 +
- arch/arm/mach-s3c24xx/mach-jive.c                  |   1 +
- arch/arm/mach-s3c24xx/mach-mini2440.c              |   1 +
- arch/arm/mach-s3c24xx/mach-n30.c                   |   1 +
- arch/arm/mach-s3c24xx/mach-nexcoder.c              |   1 +
- arch/arm/mach-s3c24xx/mach-osiris.c                |   1 +
- arch/arm/mach-s3c24xx/mach-qt2410.c                |   1 +
- arch/arm/mach-s3c24xx/mach-rx1950.c                |   1 +
- arch/arm/mach-s3c24xx/mach-rx3715.c                |   1 +
- arch/arm/mach-s3c24xx/mach-smdk2413.c              |   1 +
- arch/arm/mach-s3c24xx/mach-smdk2416.c              |   1 +
- arch/arm/mach-s3c24xx/mach-vr1000.c                |   1 +
- arch/arm/mach-s3c24xx/pm-s3c2410.c                 |   1 +
- arch/arm/mach-s3c24xx/pm.c                         |   1 +
- arch/arm/mach-s3c24xx/s3c2410.c                    |   1 +
- arch/arm/mach-s3c24xx/s3c2416.c                    |   1 +
- arch/arm/mach-s3c24xx/s3c2440.c                    |   1 +
- arch/arm/mach-s3c24xx/s3c2442.c                    |   1 +
- arch/arm/mach-s3c24xx/s3c2443.c                    |   1 +
- arch/arm/mach-s3c24xx/setup-i2c.c                  |   1 +
- arch/arm/mach-s3c24xx/setup-sdhci-gpio.c           |   1 +
- arch/arm/mach-s3c24xx/setup-ts.c                   |   1 +
- arch/arm/mach-s3c24xx/simtec-usb.c                 |   1 +
- arch/arm/mach-s3c64xx/include/mach/gpio.h          |  93 -----------------
- arch/arm/plat-samsung/pm-gpio.c                    |   3 +
- arch/arm/plat-samsung/setup-camif.c                |   1 +
- drivers/gpio/gpio-samsung.c                        |   3 +
- drivers/mmc/host/s3cmci.c                          |   1 +
- include/linux/platform_data/gpio-samsung-s3c24xx.h | 106 +++++++++++++++++++
- include/linux/platform_data/gpio-samsung-s3c64xx.h |  93 +++++++++++++++++
- 40 files changed, 238 insertions(+), 231 deletions(-)
- delete mode 100644 arch/arm/mach-s3c24xx/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio.h
- create mode 100644 include/linux/platform_data/gpio-samsung-s3c24xx.h
- create mode 100644 include/linux/platform_data/gpio-samsung-s3c64xx.h
+ arch/arm/Kconfig                                   | 3 +--
+ arch/arm/mach-s3c64xx/Kconfig                      | 3 ---
+ arch/arm/mach-s3c64xx/common.c                     | 1 +
+ arch/arm/mach-s3c64xx/crag6410.h                   | 2 +-
+ arch/arm/mach-s3c64xx/dev-audio.c                  | 1 +
+ arch/arm/mach-s3c64xx/mach-anw6410.c               | 1 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c              | 1 +
+ arch/arm/mach-s3c64xx/mach-hmt.c                   | 1 +
+ arch/arm/mach-s3c64xx/mach-mini6410.c              | 1 +
+ arch/arm/mach-s3c64xx/mach-real6410.c              | 1 +
+ arch/arm/mach-s3c64xx/mach-smartq.c                | 1 +
+ arch/arm/mach-s3c64xx/mach-smartq5.c               | 1 +
+ arch/arm/mach-s3c64xx/mach-smartq7.c               | 1 +
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              | 1 +
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              | 1 +
+ arch/arm/mach-s3c64xx/pm.c                         | 1 +
+ arch/arm/mach-s3c64xx/setup-fb-24bpp.c             | 1 +
+ arch/arm/mach-s3c64xx/setup-i2c0.c                 | 1 +
+ arch/arm/mach-s3c64xx/setup-i2c1.c                 | 1 +
+ arch/arm/mach-s3c64xx/setup-ide.c                  | 1 +
+ arch/arm/mach-s3c64xx/setup-keypad.c               | 1 +
+ arch/arm/mach-s3c64xx/setup-sdhci-gpio.c           | 1 +
+ arch/arm/mach-s3c64xx/setup-spi.c                  | 1 +
+ drivers/gpio/gpio-samsung.c                        | 3 +++
+ include/linux/platform_data/gpio-samsung-s3c64xx.h | 9 +++++----
+ 25 files changed, 30 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7eee953..6a26bcb3a63a 100644
+index 6a26bcb3a63a..103437986684 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -710,7 +710,6 @@ config ARCH_S3C24XX
+@@ -732,7 +732,6 @@ config ARCH_S3C64XX
+ 	select HAVE_S3C2410_I2C if I2C
  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	select MULTI_IRQ_HANDLER
+ 	select HAVE_TCM
 -	select NEED_MACH_GPIO_H
- 	select NEED_MACH_IO_H
- 	select SAMSUNG_ATAGS
- 	help
-@@ -1593,7 +1592,7 @@ config ARM_PSCI
+ 	select NO_IOPORT
+ 	select PLAT_SAMSUNG
+ 	select PM_GENERIC_DOMAINS
+@@ -1592,7 +1591,7 @@ config ARM_PSCI
  config ARCH_NR_GPIO
  	int
  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
--	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || SOC_DRA7XX
-+	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || SOC_DRA7XX || ARCH_S3C24XX
+-	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || SOC_DRA7XX || ARCH_S3C24XX
++	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX
  	default 392 if ARCH_U8500
  	default 352 if ARCH_VT8500
  	default 288 if ARCH_SUNXI
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 8f1d327e0cd1..d876431d64c0 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -180,27 +180,6 @@ config CPU_LLSERIAL_S3C2440
- 	  Selected if there is an S3C2440 (or register compatible) serial
- 	  low-level implementation needed
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 2cb8dc55b50e..175f01501129 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -192,7 +192,6 @@ config SMDK6410_WM1190_EV1
+ 	select MFD_WM8350_I2C
+ 	select REGULATOR
+ 	select REGULATOR_WM8350
+-	select SAMSUNG_GPIO_EXTRA64
+ 	help
+ 	  The Wolfson Microelectronics 1190-EV1 is a WM835x based PMIC
+ 	  and audio daughtercard for the Samsung SMDK6410 reference
+@@ -208,7 +207,6 @@ config SMDK6410_WM1192_EV1
+ 	select MFD_WM831X_I2C
+ 	select REGULATOR
+ 	select REGULATOR_WM831X
+-	select SAMSUNG_GPIO_EXTRA64
+ 	help
+ 	  The Wolfson Microelectronics 1192-EV1 is a WM831x based PMIC
+ 	  daughtercard for the Samsung SMDK6410 reference platform.
+@@ -294,7 +292,6 @@ config MACH_WLF_CRAGG_6410
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_KEYPAD
+ 	select SAMSUNG_DEV_PWM
+-	select SAMSUNG_GPIO_EXTRA128
+ 	help
+ 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
  
--# gpio configurations
--
--config S3C24XX_GPIO_EXTRA
--	int
--	default 128 if S3C24XX_GPIO_EXTRA128
--	default 64 if S3C24XX_GPIO_EXTRA64
--	default 16 if ARCH_H1940
--	default 0
--
--config S3C24XX_GPIO_EXTRA64
--	bool
--	help
--	  Add an extra 64 gpio numbers to the available GPIO pool. This is
--	  available for boards that need extra gpios for external devices.
--
--config S3C24XX_GPIO_EXTRA128
--	bool
--	help
--	  Add an extra 128 gpio numbers to the available GPIO pool. This is
--	  available for boards that need extra gpios for external devices.
--
- config S3C24XX_PLL
- 	bool "Support CPUfreq changing of PLL frequency (EXPERIMENTAL)"
- 	depends on ARM_S3C24XX_CPUFREQ
-diff --git a/arch/arm/mach-s3c24xx/common-smdk.c b/arch/arm/mach-s3c24xx/common-smdk.c
-index 404444dd3840..0a84a9c9f429 100644
---- a/arch/arm/mach-s3c24xx/common-smdk.c
-+++ b/arch/arm/mach-s3c24xx/common-smdk.c
-@@ -38,7 +38,7 @@
+diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
+index 7a3ce4c39e5f..64edda37bde3 100644
+--- a/arch/arm/mach-s3c64xx/common.c
++++ b/arch/arm/mach-s3c64xx/common.c
+@@ -32,6 +32,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
+ #include <linux/irqchip/arm-vic.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <clocksource/samsung_pwm.h>
  
- #include <mach/regs-gpio.h>
- #include <linux/platform_data/leds-s3c24xx.h>
--
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-s3c64xx/crag6410.h b/arch/arm/mach-s3c64xx/crag6410.h
+index 4c3c9994fc2c..9ef20b8fd36f 100644
+--- a/arch/arm/mach-s3c64xx/crag6410.h
++++ b/arch/arm/mach-s3c64xx/crag6410.h
+@@ -11,7 +11,7 @@
+ #ifndef MACH_CRAG6410_H
+ #define MACH_CRAG6410_H
+ 
+-#include <linux/gpio.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ 
+ #define GLENFARCLAS_PMIC_IRQ_BASE	IRQ_BOARD_START
+ 
+diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+index e367e87bbc29..6f58c80235dc 100644
+--- a/arch/arm/mach-s3c64xx/dev-audio.c
++++ b/arch/arm/mach-s3c64xx/dev-audio.c
+@@ -21,6 +21,7 @@
+ 
+ #include <plat/devs.h>
+ #include <linux/platform_data/asoc-s3c.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/gpio-cfg.h>
+ 
+ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
+index d266dd5f7060..546f45b59ea1 100644
+--- a/arch/arm/mach-s3c64xx/mach-anw6410.c
++++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
+@@ -43,6 +43,7 @@
+ 
+ #include <plat/regs-serial.h>
+ #include <linux/platform_data/i2c-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/fb.h>
+ 
+ #include <plat/clock.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 758e31b26550..7b913595e4ee 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -32,6 +32,7 @@
+ 
+ #include <linux/platform_data/pca953x.h>
+ #include <linux/platform_data/s3c-hsotg.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ 
+ #include <video/platform_lcd.h>
+ 
+diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
+index 614a03a92cf7..009b19525cbf 100644
+--- a/arch/arm/mach-s3c64xx/mach-hmt.c
++++ b/arch/arm/mach-s3c64xx/mach-hmt.c
+@@ -35,6 +35,7 @@
+ 
+ #include <plat/regs-serial.h>
+ #include <linux/platform_data/i2c-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/fb.h>
  #include <linux/platform_data/mtd-nand-s3c2410.h>
  
- #include <plat/gpio-cfg.h>
-diff --git a/arch/arm/mach-s3c24xx/h1940-bluetooth.c b/arch/arm/mach-s3c24xx/h1940-bluetooth.c
-index 5b98bfd1df43..f2b859f4c894 100644
---- a/arch/arm/mach-s3c24xx/h1940-bluetooth.c
-+++ b/arch/arm/mach-s3c24xx/h1940-bluetooth.c
-@@ -18,6 +18,7 @@
+diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+index 58d46a3d7b78..14c96ee5a3fe 100644
+--- a/arch/arm/mach-s3c64xx/mach-mini6410.c
++++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+@@ -38,6 +38,7 @@
+ #include <linux/platform_data/mtd-nand-s3c2410.h>
+ #include <plat/regs-serial.h>
+ #include <linux/platform_data/touchscreen-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ 
+ #include <video/platform_lcd.h>
+ #include <video/samsung_fimd.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+index 8bed37b3d5ac..af45149a96b3 100644
+--- a/arch/arm/mach-s3c64xx/mach-real6410.c
++++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+@@ -39,6 +39,7 @@
+ #include <linux/platform_data/mtd-nand-s3c2410.h>
+ #include <plat/regs-serial.h>
+ #include <linux/platform_data/touchscreen-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ 
+ #include <video/platform_lcd.h>
+ #include <video/samsung_fimd.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index a6b338fd0470..0271b3a191e5 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -36,6 +36,7 @@
+ #include <linux/platform_data/usb-ohci-s3c2410.h>
+ #include <plat/sdhci.h>
+ #include <linux/platform_data/touchscreen-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ 
+ #include <video/platform_lcd.h>
+ #include <plat/samsung-time.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq5.c b/arch/arm/mach-s3c64xx/mach-smartq5.c
+index 8aca5daf3d05..15b6c2f98086 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq5.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq5.c
+@@ -16,6 +16,7 @@
+ #include <linux/input.h>
  #include <linux/leds.h>
- #include <linux/gpio.h>
- #include <linux/rfkill.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+ #include <linux/platform_device.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  
- #include <mach/hardware.h>
- #include <mach/regs-gpio.h>
-diff --git a/arch/arm/mach-s3c24xx/include/mach/gpio.h b/arch/arm/mach-s3c24xx/include/mach/gpio.h
-deleted file mode 100644
-index 14591563ca70..000000000000
---- a/arch/arm/mach-s3c24xx/include/mach/gpio.h
-+++ /dev/null
-@@ -1,114 +0,0 @@
--/*
-- * Copyright (c) 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C2410 - GPIO lib support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/* some boards require extra gpio capacity to support external
-- * devices that need GPIO.
-- */
--
--#ifndef __MACH_GPIO_H
--#define __MACH_GPIO_H __FILE__
--
--#ifdef CONFIG_CPU_S3C244X
--#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
--#elif defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
--#define ARCH_NR_GPIOS	(32 * 12 + CONFIG_S3C24XX_GPIO_EXTRA)
--#else
--#define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
--#endif
--
--/*
-- * GPIO sizes for various SoCs:
-- *
-- *   2410 2412 2440 2443 2416
-- *             2442
-- *   ---- ---- ---- ---- ----
-- * A  23   22   25   16   25
-- * B  11   11   11   11   9
-- * C  16   15   16   16   16
-- * D  16   16   16   16   16
-- * E  16   16   16   16   16
-- * F  8    8    8    8    8
-- * G  16   16   16   16   8
-- * H  11   11   9    15   15
-- * J  --   --   13   16   --
-- * K  --   --   --   --   16
-- * L  --   --   --   15   7
-- * M  --   --   --   2    2
-- */
--
--/* GPIO bank sizes */
--
--#define S3C2410_GPIO_A_NR	(32)
--#define S3C2410_GPIO_B_NR	(32)
--#define S3C2410_GPIO_C_NR	(32)
--#define S3C2410_GPIO_D_NR	(32)
--#define S3C2410_GPIO_E_NR	(32)
--#define S3C2410_GPIO_F_NR	(32)
--#define S3C2410_GPIO_G_NR	(32)
--#define S3C2410_GPIO_H_NR	(32)
--#define S3C2410_GPIO_J_NR	(32)	/* technically 16. */
--#define S3C2410_GPIO_K_NR	(32)	/* technically 16. */
--#define S3C2410_GPIO_L_NR	(32)	/* technically 15. */
--#define S3C2410_GPIO_M_NR	(32)	/* technically 2. */
--
--#if CONFIG_S3C_GPIO_SPACE != 0
--#error CONFIG_S3C_GPIO_SPACE cannot be nonzero at the moment
--#endif
--
--#define S3C2410_GPIO_NEXT(__gpio) \
--	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 0)
--
--#ifndef __ASSEMBLY__
--
--enum s3c_gpio_number {
--	S3C2410_GPIO_A_START = 0,
--	S3C2410_GPIO_B_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_A),
--	S3C2410_GPIO_C_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_B),
--	S3C2410_GPIO_D_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_C),
--	S3C2410_GPIO_E_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_D),
--	S3C2410_GPIO_F_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_E),
--	S3C2410_GPIO_G_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_F),
--	S3C2410_GPIO_H_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_G),
--	S3C2410_GPIO_J_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_H),
--	S3C2410_GPIO_K_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_J),
--	S3C2410_GPIO_L_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_K),
--	S3C2410_GPIO_M_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_L),
--};
--
--#endif /* __ASSEMBLY__ */
--
--/* S3C2410 GPIO number definitions. */
--
--#define S3C2410_GPA(_nr)	(S3C2410_GPIO_A_START + (_nr))
--#define S3C2410_GPB(_nr)	(S3C2410_GPIO_B_START + (_nr))
--#define S3C2410_GPC(_nr)	(S3C2410_GPIO_C_START + (_nr))
--#define S3C2410_GPD(_nr)	(S3C2410_GPIO_D_START + (_nr))
--#define S3C2410_GPE(_nr)	(S3C2410_GPIO_E_START + (_nr))
--#define S3C2410_GPF(_nr)	(S3C2410_GPIO_F_START + (_nr))
--#define S3C2410_GPG(_nr)	(S3C2410_GPIO_G_START + (_nr))
--#define S3C2410_GPH(_nr)	(S3C2410_GPIO_H_START + (_nr))
--#define S3C2410_GPJ(_nr)	(S3C2410_GPIO_J_START + (_nr))
--#define S3C2410_GPK(_nr)	(S3C2410_GPIO_K_START + (_nr))
--#define S3C2410_GPL(_nr)	(S3C2410_GPIO_L_START + (_nr))
--#define S3C2410_GPM(_nr)	(S3C2410_GPIO_M_START + (_nr))
--
--#include <plat/gpio-cfg.h>
--
--#ifdef CONFIG_CPU_S3C244X
--#define S3C_GPIO_END	(S3C2410_GPJ(0) + 32)
--#elif defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
--#define S3C_GPIO_END	(S3C2410_GPM(0) + 32)
--#else
--#define S3C_GPIO_END	(S3C2410_GPH(0) + 32)
--#endif
--
--#endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/mach-s3c24xx/mach-amlm5900.c b/arch/arm/mach-s3c24xx/mach-amlm5900.c
-index e27b5c91b3db..530e9a624466 100644
---- a/arch/arm/mach-s3c24xx/mach-amlm5900.c
-+++ b/arch/arm/mach-s3c24xx/mach-amlm5900.c
-@@ -54,6 +54,7 @@
- #include <mach/regs-gpio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq7.c b/arch/arm/mach-s3c64xx/mach-smartq7.c
+index a052e107c0b4..e3b58942ee68 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq7.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq7.c
+@@ -16,6 +16,7 @@
+ #include <linux/input.h>
+ #include <linux/leds.h>
+ #include <linux/platform_device.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6400.c b/arch/arm/mach-s3c64xx/mach-smdk6400.c
+index 27381cfcabbe..bdbbddb803d5 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6400.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6400.c
+@@ -35,6 +35,7 @@
  #include <plat/devs.h>
  #include <plat/cpu.h>
- #include <plat/gpio-cfg.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-anubis.c b/arch/arm/mach-s3c24xx/mach-anubis.c
-index c1fb6c37867f..b60a248c033a 100644
---- a/arch/arm/mach-s3c24xx/mach-anubis.c
-+++ b/arch/arm/mach-s3c24xx/mach-anubis.c
-@@ -37,6 +37,7 @@
- #include <mach/regs-lcd.h>
- #include <linux/platform_data/mtd-nand-s3c2410.h>
  #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/samsung-time.h>
  
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-at2440evb.c b/arch/arm/mach-s3c24xx/mach-at2440evb.c
-index 6dfeeb7ef469..74401196b429 100644
---- a/arch/arm/mach-s3c24xx/mach-at2440evb.c
-+++ b/arch/arm/mach-s3c24xx/mach-at2440evb.c
-@@ -38,6 +38,7 @@
- #include <mach/regs-lcd.h>
- #include <linux/platform_data/mtd-nand-s3c2410.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+ #include "common.h"
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index d5ea938cc9a1..a8977da87eb1 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -31,6 +31,7 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/platform_data/s3c-hsotg.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-bast.c b/arch/arm/mach-s3c24xx/mach-bast.c
-index 22d6ae926d91..47fe7af87129 100644
---- a/arch/arm/mach-s3c24xx/mach-bast.c
-+++ b/arch/arm/mach-s3c24xx/mach-bast.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_data/hwmon-s3c.h>
- #include <linux/platform_data/i2c-s3c2410.h>
- #include <linux/platform_data/mtd-nand-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <net/ax88796.h>
- 
-diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
-index 13d8d073675a..c2c2ac78cea8 100644
---- a/arch/arm/mach-s3c24xx/mach-gta02.c
-+++ b/arch/arm/mach-s3c24xx/mach-gta02.c
-@@ -70,6 +70,7 @@
- #include <linux/platform_data/touchscreen-s3c2410.h>
- #include <linux/platform_data/usb-ohci-s3c2410.h>
- #include <linux/platform_data/usb-s3c2410_udc.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <mach/fb.h>
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-index 952b6a040d1f..d25d8b18512c 100644
---- a/arch/arm/mach-s3c24xx/mach-h1940.c
-+++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-@@ -46,6 +46,7 @@
- #include <linux/platform_data/mmc-s3cmci.h>
- #include <linux/platform_data/touchscreen-s3c2410.h>
- #include <linux/platform_data/usb-s3c2410_udc.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <sound/uda1380.h>
- 
-diff --git a/arch/arm/mach-s3c24xx/mach-jive.c b/arch/arm/mach-s3c24xx/mach-jive.c
-index 43c23e220f5b..434dbf231773 100644
---- a/arch/arm/mach-s3c24xx/mach-jive.c
-+++ b/arch/arm/mach-s3c24xx/mach-jive.c
-@@ -34,6 +34,7 @@
- #include <plat/regs-serial.h>
- #include <linux/platform_data/mtd-nand-s3c2410.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <mach/regs-gpio.h>
- #include <mach/regs-lcd.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index 4a18d49a63e0..48af11fc15fd 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -46,6 +46,7 @@
- #include <linux/platform_data/i2c-s3c2410.h>
- #include <linux/platform_data/mmc-s3cmci.h>
- #include <linux/platform_data/usb-s3c2410_udc.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-n30.c b/arch/arm/mach-s3c24xx/mach-n30.c
-index 2cb46c37c920..7fcb887f5289 100644
---- a/arch/arm/mach-s3c24xx/mach-n30.c
-+++ b/arch/arm/mach-s3c24xx/mach-n30.c
-@@ -42,6 +42,7 @@
- #include <asm/mach/map.h>
- 
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- #include <plat/regs-serial.h>
- 
- #include <plat/clock.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-nexcoder.c b/arch/arm/mach-s3c24xx/mach-nexcoder.c
-index 01f4354206f9..0f27ac44db09 100644
---- a/arch/arm/mach-s3c24xx/mach-nexcoder.c
-+++ b/arch/arm/mach-s3c24xx/mach-nexcoder.c
-@@ -39,6 +39,7 @@
- #include <mach/regs-gpio.h>
- #include <plat/regs-serial.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <plat/gpio-cfg.h>
- #include <plat/clock.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-s3c24xx/mach-osiris.c
-index 58d6fbe5bf1f..040b16aff93d 100644
---- a/arch/arm/mach-s3c24xx/mach-osiris.c
-+++ b/arch/arm/mach-s3c24xx/mach-osiris.c
-@@ -33,6 +33,7 @@
- 
- #include <linux/platform_data/mtd-nand-s3c2410.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-qt2410.c b/arch/arm/mach-s3c24xx/mach-qt2410.c
-index f8feaeadb55a..96c3bc858710 100644
---- a/arch/arm/mach-s3c24xx/mach-qt2410.c
-+++ b/arch/arm/mach-s3c24xx/mach-qt2410.c
-@@ -54,6 +54,7 @@
- #include <linux/platform_data/mtd-nand-s3c2410.h>
- #include <linux/platform_data/usb-s3c2410_udc.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <plat/gpio-cfg.h>
- #include <plat/devs.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 034b7fe45c49..d492fb938bbb 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -45,6 +45,7 @@
- #include <linux/platform_data/mtd-nand-s3c2410.h>
- #include <linux/platform_data/touchscreen-s3c2410.h>
- #include <linux/platform_data/usb-s3c2410_udc.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <sound/uda1380.h>
- 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx3715.c b/arch/arm/mach-s3c24xx/mach-rx3715.c
-index 3bc6231d0a1f..319ed8033475 100644
---- a/arch/arm/mach-s3c24xx/mach-rx3715.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx3715.c
-@@ -35,6 +35,7 @@
- #include <asm/mach/map.h>
- 
- #include <linux/platform_data/mtd-nand-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <asm/irq.h>
- #include <asm/mach-types.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-smdk2413.c b/arch/arm/mach-s3c24xx/mach-smdk2413.c
-index c9d31ef28dd1..86e25012b0c1 100644
---- a/arch/arm/mach-s3c24xx/mach-smdk2413.c
-+++ b/arch/arm/mach-s3c24xx/mach-smdk2413.c
-@@ -39,6 +39,7 @@
- 
- #include <linux/platform_data/usb-s3c2410_udc.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- #include <mach/fb.h>
- 
- #include <plat/clock.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-smdk2416.c b/arch/arm/mach-s3c24xx/mach-smdk2416.c
-index f88e672ad1e4..0cc691d01d60 100644
---- a/arch/arm/mach-s3c24xx/mach-smdk2416.c
-+++ b/arch/arm/mach-s3c24xx/mach-smdk2416.c
-@@ -41,6 +41,7 @@
- 
- #include <linux/platform_data/leds-s3c24xx.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <plat/gpio-cfg.h>
- #include <plat/clock.h>
-diff --git a/arch/arm/mach-s3c24xx/mach-vr1000.c b/arch/arm/mach-s3c24xx/mach-vr1000.c
-index 42e7187fed60..86e7ffdca33f 100644
---- a/arch/arm/mach-s3c24xx/mach-vr1000.c
-+++ b/arch/arm/mach-s3c24xx/mach-vr1000.c
-@@ -37,6 +37,7 @@
- #include <linux/platform_data/leds-s3c24xx.h>
- #include <linux/platform_data/i2c-s3c2410.h>
- #include <linux/platform_data/asoc-s3c24xx_simtec.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <mach/hardware.h>
- #include <mach/regs-gpio.h>
-diff --git a/arch/arm/mach-s3c24xx/pm-s3c2410.c b/arch/arm/mach-s3c24xx/pm-s3c2410.c
-index 2d82c4f116cd..e4cd56e8b90b 100644
---- a/arch/arm/mach-s3c24xx/pm-s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/pm-s3c2410.c
-@@ -28,6 +28,7 @@
- #include <linux/syscore_ops.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <asm/mach-types.h>
- 
-diff --git a/arch/arm/mach-s3c24xx/pm.c b/arch/arm/mach-s3c24xx/pm.c
-index caa5b7211380..2baa887b28d2 100644
---- a/arch/arm/mach-s3c24xx/pm.c
-+++ b/arch/arm/mach-s3c24xx/pm.c
-@@ -34,6 +34,7 @@
- #include <linux/interrupt.h>
- #include <linux/serial_core.h>
- #include <linux/io.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <plat/regs-serial.h>
- #include <mach/regs-clock.h>
-diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
-index 34676d1d5fec..db22f748ce8d 100644
---- a/arch/arm/mach-s3c24xx/s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/s3c2410.c
-@@ -24,6 +24,7 @@
- #include <linux/platform_device.h>
- #include <linux/reboot.h>
- #include <linux/io.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-s3c24xx/s3c2416.c b/arch/arm/mach-s3c24xx/s3c2416.c
-index 9ef3ccfbe196..cb77880029f7 100644
---- a/arch/arm/mach-s3c24xx/s3c2416.c
-+++ b/arch/arm/mach-s3c24xx/s3c2416.c
-@@ -36,6 +36,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/reboot.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-s3c24xx/s3c2440.c b/arch/arm/mach-s3c24xx/s3c2440.c
-index 5f9d6569475d..22e5dbdcbe8d 100644
---- a/arch/arm/mach-s3c24xx/s3c2440.c
-+++ b/arch/arm/mach-s3c24xx/s3c2440.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-s3c24xx/s3c2442.c b/arch/arm/mach-s3c24xx/s3c2442.c
-index 6819961f6b19..4ba093b4e495 100644
---- a/arch/arm/mach-s3c24xx/s3c2442.c
-+++ b/arch/arm/mach-s3c24xx/s3c2442.c
-@@ -35,6 +35,7 @@
- #include <linux/gpio.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <mach/hardware.h>
- #include <linux/atomic.h>
-diff --git a/arch/arm/mach-s3c24xx/s3c2443.c b/arch/arm/mach-s3c24xx/s3c2443.c
-index b6c71918b25c..faa1086924c4 100644
---- a/arch/arm/mach-s3c24xx/s3c2443.c
-+++ b/arch/arm/mach-s3c24xx/s3c2443.c
-@@ -23,6 +23,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/reboot.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-s3c24xx/setup-i2c.c b/arch/arm/mach-s3c24xx/setup-i2c.c
-index 7b4f33332d19..3d1fd5ce24e5 100644
---- a/arch/arm/mach-s3c24xx/setup-i2c.c
-+++ b/arch/arm/mach-s3c24xx/setup-i2c.c
-@@ -17,6 +17,7 @@ struct platform_device;
- 
- #include <plat/gpio-cfg.h>
- #include <linux/platform_data/i2c-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- #include <mach/hardware.h>
- #include <mach/regs-gpio.h>
- 
-diff --git a/arch/arm/mach-s3c24xx/setup-sdhci-gpio.c b/arch/arm/mach-s3c24xx/setup-sdhci-gpio.c
-index f65cb3ef16ce..2835241f732a 100644
---- a/arch/arm/mach-s3c24xx/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-s3c24xx/setup-sdhci-gpio.c
+ #ifdef CONFIG_SMDK6410_WM1190_EV1
+ #include <linux/mfd/wm8350/core.h>
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 8cdb824a3b43..99c778eecab6 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
 @@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
  #include <linux/io.h>
  #include <linux/gpio.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+ #include <linux/pm_domain.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  
- #include <mach/regs-gpio.h>
- #include <plat/gpio-cfg.h>
-diff --git a/arch/arm/mach-s3c24xx/setup-ts.c b/arch/arm/mach-s3c24xx/setup-ts.c
-index 4e11affce3a8..1ea4056f6fdc 100644
---- a/arch/arm/mach-s3c24xx/setup-ts.c
-+++ b/arch/arm/mach-s3c24xx/setup-ts.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/kernel.h>
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-s3c64xx/setup-fb-24bpp.c b/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
+index 2cf80026c58d..222792691b41 100644
+--- a/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
++++ b/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
+@@ -16,6 +16,7 @@
+ #include <linux/types.h>
+ #include <linux/fb.h>
  #include <linux/gpio.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  
+ #include <plat/fb.h>
+ #include <plat/gpio-cfg.h>
+diff --git a/arch/arm/mach-s3c64xx/setup-i2c0.c b/arch/arm/mach-s3c64xx/setup-i2c0.c
+index 40666ba8d607..f269dabc9593 100644
+--- a/arch/arm/mach-s3c64xx/setup-i2c0.c
++++ b/arch/arm/mach-s3c64xx/setup-i2c0.c
+@@ -19,6 +19,7 @@
  struct platform_device; /* don't need the contents */
  
-diff --git a/arch/arm/mach-s3c24xx/simtec-usb.c b/arch/arm/mach-s3c24xx/simtec-usb.c
-index 2ed2e32430dc..a007e5f16583 100644
---- a/arch/arm/mach-s3c24xx/simtec-usb.c
-+++ b/arch/arm/mach-s3c24xx/simtec-usb.c
-@@ -32,6 +32,7 @@
- #include <asm/irq.h>
+ #include <linux/platform_data/i2c-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/gpio-cfg.h>
  
- #include <linux/platform_data/usb-ohci-s3c2410.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- #include <plat/devs.h>
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+diff --git a/arch/arm/mach-s3c64xx/setup-i2c1.c b/arch/arm/mach-s3c64xx/setup-i2c1.c
+index 3fdb24c4e62a..aa2bfcd5e818 100644
+--- a/arch/arm/mach-s3c64xx/setup-i2c1.c
++++ b/arch/arm/mach-s3c64xx/setup-i2c1.c
+@@ -19,6 +19,7 @@
+ struct platform_device; /* don't need the contents */
  
- #include "bast.h"
-diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio.h b/arch/arm/mach-s3c64xx/include/mach/gpio.h
-deleted file mode 100644
-index 8b540c42d5dd..000000000000
---- a/arch/arm/mach-s3c64xx/include/mach/gpio.h
-+++ /dev/null
-@@ -1,93 +0,0 @@
--/* arch/arm/mach-s3c6400/include/mach/gpio.h
-- *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C6400 - GPIO lib support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/* GPIO bank sizes */
--#define S3C64XX_GPIO_A_NR	(8)
--#define S3C64XX_GPIO_B_NR	(7)
--#define S3C64XX_GPIO_C_NR	(8)
--#define S3C64XX_GPIO_D_NR	(5)
--#define S3C64XX_GPIO_E_NR	(5)
--#define S3C64XX_GPIO_F_NR	(16)
--#define S3C64XX_GPIO_G_NR	(7)
--#define S3C64XX_GPIO_H_NR	(10)
--#define S3C64XX_GPIO_I_NR	(16)
--#define S3C64XX_GPIO_J_NR	(12)
--#define S3C64XX_GPIO_K_NR	(16)
--#define S3C64XX_GPIO_L_NR	(15)
--#define S3C64XX_GPIO_M_NR	(6)
--#define S3C64XX_GPIO_N_NR	(16)
--#define S3C64XX_GPIO_O_NR	(16)
--#define S3C64XX_GPIO_P_NR	(15)
--#define S3C64XX_GPIO_Q_NR	(9)
--
--/* GPIO bank numbes */
--
--/* CONFIG_S3C_GPIO_SPACE allows the user to select extra
-- * space for debugging purposes so that any accidental
-- * change from one gpio bank to another can be caught.
--*/
--
--#define S3C64XX_GPIO_NEXT(__gpio) \
--	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
--
--enum s3c_gpio_number {
--	S3C64XX_GPIO_A_START = 0,
--	S3C64XX_GPIO_B_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_A),
--	S3C64XX_GPIO_C_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_B),
--	S3C64XX_GPIO_D_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_C),
--	S3C64XX_GPIO_E_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_D),
--	S3C64XX_GPIO_F_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_E),
--	S3C64XX_GPIO_G_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_F),
--	S3C64XX_GPIO_H_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_G),
--	S3C64XX_GPIO_I_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_H),
--	S3C64XX_GPIO_J_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_I),
--	S3C64XX_GPIO_K_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_J),
--	S3C64XX_GPIO_L_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_K),
--	S3C64XX_GPIO_M_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_L),
--	S3C64XX_GPIO_N_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_M),
--	S3C64XX_GPIO_O_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_N),
--	S3C64XX_GPIO_P_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_O),
--	S3C64XX_GPIO_Q_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_P),
--};
--
--/* S3C64XX GPIO number definitions. */
--
--#define S3C64XX_GPA(_nr)	(S3C64XX_GPIO_A_START + (_nr))
--#define S3C64XX_GPB(_nr)	(S3C64XX_GPIO_B_START + (_nr))
--#define S3C64XX_GPC(_nr)	(S3C64XX_GPIO_C_START + (_nr))
--#define S3C64XX_GPD(_nr)	(S3C64XX_GPIO_D_START + (_nr))
--#define S3C64XX_GPE(_nr)	(S3C64XX_GPIO_E_START + (_nr))
--#define S3C64XX_GPF(_nr)	(S3C64XX_GPIO_F_START + (_nr))
--#define S3C64XX_GPG(_nr)	(S3C64XX_GPIO_G_START + (_nr))
--#define S3C64XX_GPH(_nr)	(S3C64XX_GPIO_H_START + (_nr))
--#define S3C64XX_GPI(_nr)	(S3C64XX_GPIO_I_START + (_nr))
--#define S3C64XX_GPJ(_nr)	(S3C64XX_GPIO_J_START + (_nr))
--#define S3C64XX_GPK(_nr)	(S3C64XX_GPIO_K_START + (_nr))
--#define S3C64XX_GPL(_nr)	(S3C64XX_GPIO_L_START + (_nr))
--#define S3C64XX_GPM(_nr)	(S3C64XX_GPIO_M_START + (_nr))
--#define S3C64XX_GPN(_nr)	(S3C64XX_GPIO_N_START + (_nr))
--#define S3C64XX_GPO(_nr)	(S3C64XX_GPIO_O_START + (_nr))
--#define S3C64XX_GPP(_nr)	(S3C64XX_GPIO_P_START + (_nr))
--#define S3C64XX_GPQ(_nr)	(S3C64XX_GPIO_Q_START + (_nr))
--
--/* the end of the S3C64XX specific gpios */
--#define S3C64XX_GPIO_END	(S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
--#define S3C_GPIO_END		S3C64XX_GPIO_END
--
--/* define the number of gpios we need to the one after the GPQ() range */
--#define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
--
--#define BOARD_NR_GPIOS	(16 + CONFIG_SAMSUNG_GPIO_EXTRA)
--
--#define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
-diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
-index a8de3cfe2ee1..41fef6980230 100644
---- a/arch/arm/plat-samsung/pm-gpio.c
-+++ b/arch/arm/plat-samsung/pm-gpio.c
-@@ -19,6 +19,9 @@
+ #include <linux/platform_data/i2c-s3c2410.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/gpio-cfg.h>
+ 
+ void s3c_i2c1_cfg_gpio(struct platform_device *dev)
+diff --git a/arch/arm/mach-s3c64xx/setup-ide.c b/arch/arm/mach-s3c64xx/setup-ide.c
+index 648d8b85bf6b..81dcebeaeb53 100644
+--- a/arch/arm/mach-s3c64xx/setup-ide.c
++++ b/arch/arm/mach-s3c64xx/setup-ide.c
+@@ -18,6 +18,7 @@
+ #include <mach/regs-clock.h>
+ #include <plat/gpio-cfg.h>
+ #include <linux/platform_data/ata-samsung_cf.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ 
+ void s3c64xx_ide_setup_gpio(void)
+ {
+diff --git a/arch/arm/mach-s3c64xx/setup-keypad.c b/arch/arm/mach-s3c64xx/setup-keypad.c
+index 1d4d0ee9e870..e236f40c9053 100644
+--- a/arch/arm/mach-s3c64xx/setup-keypad.c
++++ b/arch/arm/mach-s3c64xx/setup-keypad.c
+@@ -11,6 +11,7 @@
+ */
+ 
+ #include <linux/gpio.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/keypad.h>
+ 
+diff --git a/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c b/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c
+index 6eac071afae2..79192b7217df 100644
+--- a/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c
+@@ -17,6 +17,7 @@
+ #include <linux/platform_device.h>
  #include <linux/io.h>
  #include <linux/gpio.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  
-+#ifdef CONFIG_ARCH_S3C24XX
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
-+#endif
- #include <plat/gpio-core.h>
- #include <plat/pm.h>
- 
-diff --git a/arch/arm/plat-samsung/setup-camif.c b/arch/arm/plat-samsung/setup-camif.c
-index e01bf760af2c..70cf503c9a6b 100644
---- a/arch/arm/plat-samsung/setup-camif.c
-+++ b/arch/arm/plat-samsung/setup-camif.c
+ #include <plat/gpio-cfg.h>
+ #include <plat/sdhci.h>
+diff --git a/arch/arm/mach-s3c64xx/setup-spi.c b/arch/arm/mach-s3c64xx/setup-spi.c
+index 4dc53450d715..dad4728ccb52 100644
+--- a/arch/arm/mach-s3c64xx/setup-spi.c
++++ b/arch/arm/mach-s3c64xx/setup-spi.c
 @@ -9,6 +9,7 @@
   */
  
  #include <linux/gpio.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
  #include <plat/gpio-cfg.h>
  
- /* Number of camera port pins, without FIELD */
+ #ifdef CONFIG_S3C64XX_DEV_SPI0
 diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 76e02b9460e6..268214c57799 100644
+index 268214c57799..be7b0bd4eed4 100644
 --- a/drivers/gpio/gpio-samsung.c
 +++ b/drivers/gpio/gpio-samsung.c
-@@ -27,6 +27,9 @@
- #include <linux/of.h>
- #include <linux/slab.h>
- #include <linux/of_address.h>
-+#ifdef CONFIG_ARCH_S3C24XX
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+@@ -30,6 +30,9 @@
+ #ifdef CONFIG_ARCH_S3C24XX
+ #include <linux/platform_data/gpio-samsung-s3c24xx.h>
+ #endif
++#ifdef CONFIG_ARCH_S3C64XX
++#include <linux/platform_data/gpio-samsung-s3c64xx.h>
 +#endif
  
  #include <asm/irq.h>
  
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 2fce5ea5eb39..11ba3cbb0951 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -26,6 +26,7 @@
- #include <mach/dma.h>
- 
- #include <linux/platform_data/mmc-s3cmci.h>
-+#include <linux/platform_data/gpio-samsung-s3c24xx.h>
- 
- #include "s3cmci.h"
- 
-diff --git a/include/linux/platform_data/gpio-samsung-s3c24xx.h b/include/linux/platform_data/gpio-samsung-s3c24xx.h
-new file mode 100644
-index 000000000000..5ce750c84a14
---- /dev/null
-+++ b/include/linux/platform_data/gpio-samsung-s3c24xx.h
-@@ -0,0 +1,106 @@
-+/*
-+ * Copyright (c) 2008 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * S3C2410 - GPIO lib support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/* some boards require extra gpio capacity to support external
-+ * devices that need GPIO.
-+ */
-+
-+#ifndef GPIO_SAMSUNG_S3C24XX_H
-+#define GPIO_SAMSUNG_S3C24XX_H
-+
-+/*
-+ * GPIO sizes for various SoCs:
-+ *
-+ *   2410 2412 2440 2443 2416
-+ *             2442
-+ *   ---- ---- ---- ---- ----
-+ * A  23   22   25   16   25
-+ * B  11   11   11   11   9
-+ * C  16   15   16   16   16
-+ * D  16   16   16   16   16
-+ * E  16   16   16   16   16
-+ * F  8    8    8    8    8
-+ * G  16   16   16   16   8
-+ * H  11   11   9    15   15
-+ * J  --   --   13   16   --
-+ * K  --   --   --   --   16
-+ * L  --   --   --   15   7
-+ * M  --   --   --   2    2
-+ */
-+
-+/* GPIO bank sizes */
-+
-+#define S3C2410_GPIO_A_NR	(32)
-+#define S3C2410_GPIO_B_NR	(32)
-+#define S3C2410_GPIO_C_NR	(32)
-+#define S3C2410_GPIO_D_NR	(32)
-+#define S3C2410_GPIO_E_NR	(32)
-+#define S3C2410_GPIO_F_NR	(32)
-+#define S3C2410_GPIO_G_NR	(32)
-+#define S3C2410_GPIO_H_NR	(32)
-+#define S3C2410_GPIO_J_NR	(32)	/* technically 16. */
-+#define S3C2410_GPIO_K_NR	(32)	/* technically 16. */
-+#define S3C2410_GPIO_L_NR	(32)	/* technically 15. */
-+#define S3C2410_GPIO_M_NR	(32)	/* technically 2. */
-+
-+#if CONFIG_S3C_GPIO_SPACE != 0
-+#error CONFIG_S3C_GPIO_SPACE cannot be nonzero at the moment
-+#endif
-+
-+#define S3C2410_GPIO_NEXT(__gpio) \
-+	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 0)
-+
-+#ifndef __ASSEMBLY__
-+
-+enum s3c_gpio_number {
-+	S3C2410_GPIO_A_START = 0,
-+	S3C2410_GPIO_B_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_A),
-+	S3C2410_GPIO_C_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_B),
-+	S3C2410_GPIO_D_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_C),
-+	S3C2410_GPIO_E_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_D),
-+	S3C2410_GPIO_F_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_E),
-+	S3C2410_GPIO_G_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_F),
-+	S3C2410_GPIO_H_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_G),
-+	S3C2410_GPIO_J_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_H),
-+	S3C2410_GPIO_K_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_J),
-+	S3C2410_GPIO_L_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_K),
-+	S3C2410_GPIO_M_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_L),
-+};
-+
-+#endif /* __ASSEMBLY__ */
-+
-+/* S3C2410 GPIO number definitions. */
-+
-+#define S3C2410_GPA(_nr)	(S3C2410_GPIO_A_START + (_nr))
-+#define S3C2410_GPB(_nr)	(S3C2410_GPIO_B_START + (_nr))
-+#define S3C2410_GPC(_nr)	(S3C2410_GPIO_C_START + (_nr))
-+#define S3C2410_GPD(_nr)	(S3C2410_GPIO_D_START + (_nr))
-+#define S3C2410_GPE(_nr)	(S3C2410_GPIO_E_START + (_nr))
-+#define S3C2410_GPF(_nr)	(S3C2410_GPIO_F_START + (_nr))
-+#define S3C2410_GPG(_nr)	(S3C2410_GPIO_G_START + (_nr))
-+#define S3C2410_GPH(_nr)	(S3C2410_GPIO_H_START + (_nr))
-+#define S3C2410_GPJ(_nr)	(S3C2410_GPIO_J_START + (_nr))
-+#define S3C2410_GPK(_nr)	(S3C2410_GPIO_K_START + (_nr))
-+#define S3C2410_GPL(_nr)	(S3C2410_GPIO_L_START + (_nr))
-+#define S3C2410_GPM(_nr)	(S3C2410_GPIO_M_START + (_nr))
-+
-+#include <plat/gpio-cfg.h>
-+
-+#ifdef CONFIG_CPU_S3C244X
-+#define S3C_GPIO_END	(S3C2410_GPJ(0) + 32)
-+#elif defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
-+#define S3C_GPIO_END	(S3C2410_GPM(0) + 32)
-+#else
-+#define S3C_GPIO_END	(S3C2410_GPH(0) + 32)
-+#endif
-+
-+#endif /* GPIO_SAMSUNG_S3C24XX_H */
 diff --git a/include/linux/platform_data/gpio-samsung-s3c64xx.h b/include/linux/platform_data/gpio-samsung-s3c64xx.h
-new file mode 100644
-index 000000000000..8b540c42d5dd
---- /dev/null
+index 8b540c42d5dd..9c81fac3b2d5 100644
+--- a/include/linux/platform_data/gpio-samsung-s3c64xx.h
 +++ b/include/linux/platform_data/gpio-samsung-s3c64xx.h
-@@ -0,0 +1,93 @@
-+/* arch/arm/mach-s3c6400/include/mach/gpio.h
-+ *
-+ * Copyright 2008 Openmoko, Inc.
-+ * Copyright 2008 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * S3C6400 - GPIO lib support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+@@ -1,5 +1,4 @@
+-/* arch/arm/mach-s3c6400/include/mach/gpio.h
+- *
++/*
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+@@ -12,6 +11,9 @@
+  * published by the Free Software Foundation.
+ */
+ 
++#ifndef GPIO_SAMSUNG_S3C64XX_H
++#define GPIO_SAMSUNG_S3C64XX_H
 +
-+/* GPIO bank sizes */
-+#define S3C64XX_GPIO_A_NR	(8)
-+#define S3C64XX_GPIO_B_NR	(7)
-+#define S3C64XX_GPIO_C_NR	(8)
-+#define S3C64XX_GPIO_D_NR	(5)
-+#define S3C64XX_GPIO_E_NR	(5)
-+#define S3C64XX_GPIO_F_NR	(16)
-+#define S3C64XX_GPIO_G_NR	(7)
-+#define S3C64XX_GPIO_H_NR	(10)
-+#define S3C64XX_GPIO_I_NR	(16)
-+#define S3C64XX_GPIO_J_NR	(12)
-+#define S3C64XX_GPIO_K_NR	(16)
-+#define S3C64XX_GPIO_L_NR	(15)
-+#define S3C64XX_GPIO_M_NR	(6)
-+#define S3C64XX_GPIO_N_NR	(16)
-+#define S3C64XX_GPIO_O_NR	(16)
-+#define S3C64XX_GPIO_P_NR	(15)
-+#define S3C64XX_GPIO_Q_NR	(9)
-+
-+/* GPIO bank numbes */
-+
-+/* CONFIG_S3C_GPIO_SPACE allows the user to select extra
-+ * space for debugging purposes so that any accidental
-+ * change from one gpio bank to another can be caught.
-+*/
-+
-+#define S3C64XX_GPIO_NEXT(__gpio) \
-+	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
-+
-+enum s3c_gpio_number {
-+	S3C64XX_GPIO_A_START = 0,
-+	S3C64XX_GPIO_B_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_A),
-+	S3C64XX_GPIO_C_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_B),
-+	S3C64XX_GPIO_D_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_C),
-+	S3C64XX_GPIO_E_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_D),
-+	S3C64XX_GPIO_F_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_E),
-+	S3C64XX_GPIO_G_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_F),
-+	S3C64XX_GPIO_H_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_G),
-+	S3C64XX_GPIO_I_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_H),
-+	S3C64XX_GPIO_J_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_I),
-+	S3C64XX_GPIO_K_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_J),
-+	S3C64XX_GPIO_L_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_K),
-+	S3C64XX_GPIO_M_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_L),
-+	S3C64XX_GPIO_N_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_M),
-+	S3C64XX_GPIO_O_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_N),
-+	S3C64XX_GPIO_P_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_O),
-+	S3C64XX_GPIO_Q_START = S3C64XX_GPIO_NEXT(S3C64XX_GPIO_P),
-+};
-+
-+/* S3C64XX GPIO number definitions. */
-+
-+#define S3C64XX_GPA(_nr)	(S3C64XX_GPIO_A_START + (_nr))
-+#define S3C64XX_GPB(_nr)	(S3C64XX_GPIO_B_START + (_nr))
-+#define S3C64XX_GPC(_nr)	(S3C64XX_GPIO_C_START + (_nr))
-+#define S3C64XX_GPD(_nr)	(S3C64XX_GPIO_D_START + (_nr))
-+#define S3C64XX_GPE(_nr)	(S3C64XX_GPIO_E_START + (_nr))
-+#define S3C64XX_GPF(_nr)	(S3C64XX_GPIO_F_START + (_nr))
-+#define S3C64XX_GPG(_nr)	(S3C64XX_GPIO_G_START + (_nr))
-+#define S3C64XX_GPH(_nr)	(S3C64XX_GPIO_H_START + (_nr))
-+#define S3C64XX_GPI(_nr)	(S3C64XX_GPIO_I_START + (_nr))
-+#define S3C64XX_GPJ(_nr)	(S3C64XX_GPIO_J_START + (_nr))
-+#define S3C64XX_GPK(_nr)	(S3C64XX_GPIO_K_START + (_nr))
-+#define S3C64XX_GPL(_nr)	(S3C64XX_GPIO_L_START + (_nr))
-+#define S3C64XX_GPM(_nr)	(S3C64XX_GPIO_M_START + (_nr))
-+#define S3C64XX_GPN(_nr)	(S3C64XX_GPIO_N_START + (_nr))
-+#define S3C64XX_GPO(_nr)	(S3C64XX_GPIO_O_START + (_nr))
-+#define S3C64XX_GPP(_nr)	(S3C64XX_GPIO_P_START + (_nr))
-+#define S3C64XX_GPQ(_nr)	(S3C64XX_GPIO_Q_START + (_nr))
-+
-+/* the end of the S3C64XX specific gpios */
-+#define S3C64XX_GPIO_END	(S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
-+#define S3C_GPIO_END		S3C64XX_GPIO_END
-+
-+/* define the number of gpios we need to the one after the GPQ() range */
-+#define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
-+
-+#define BOARD_NR_GPIOS	(16 + CONFIG_SAMSUNG_GPIO_EXTRA)
-+
-+#define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
+ /* GPIO bank sizes */
+ #define S3C64XX_GPIO_A_NR	(8)
+ #define S3C64XX_GPIO_B_NR	(7)
+@@ -88,6 +90,5 @@ enum s3c_gpio_number {
+ /* define the number of gpios we need to the one after the GPQ() range */
+ #define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
+ 
+-#define BOARD_NR_GPIOS	(16 + CONFIG_SAMSUNG_GPIO_EXTRA)
++#endif /* GPIO_SAMSUNG_S3C64XX_H */
+ 
+-#define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
 -- 
 1.8.3.1
