@@ -1,256 +1,398 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 12 Dec 2013 22:13:11 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <52A9B9B4.3080105@linaro.org>
-References: <52A9B9B4.3080105@linaro.org>
-Message-ID: <1386857591-22507-1-git-send-email-zhangfei.gao@linaro.org>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 12 Dec 2013 14:19:20 +0000
+Subject: [Xen-devel] [PATCH v2] xen/block: Correctly define structures
+ in public headers on ARM32 and ARM64
+In-Reply-To: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
+References: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <1386857960.11201.57.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dw_mmc-k3.c for k3v2, support sd/emmc
+On Tue, 2013-12-03 at 15:40 +0000, Julien Grall wrote:
+> On ARM (32 bits and 64 bits), the double-word is 8-bytes aligned. This will
+> result on different structure from Xen and Linux repositories.
+> 
+> As Linux is using __packed__ attribute, it must have a 4-bytes padding before
+> each "id" field.
+> 
+> This change breaks guest block support with older kernel. IMHO, it's acceptable
+> because Xen on ARM is still on Tech Preview and the hypercall ABI is not yet
+> freezed.
+> 
+> Only one architecture (x86_32) doesn't have 64-bit ABI for the block interface.
+> Don't add padding if Linux is compiled for this architecture.
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
----
- .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   59 +++++++++
- drivers/mmc/host/Kconfig                           |   10 ++
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/dw_mmc-k3.c                       |  128 ++++++++++++++++++++
- 4 files changed, 198 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
- create mode 100644 drivers/mmc/host/dw_mmc-k3.c
+Konrad asked for confirmation that this didn't change x86.
 
-diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-new file mode 100644
-index 000000000000..5501c7c1138f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-@@ -0,0 +1,59 @@
-+* Hisilicon specific extensions to the Synopsys Designware Mobile
-+  Storage Host Controller
-+
-+Read synopsys-dw-mshc.txt for more details
-+
-+The Synopsys designware mobile storage host controller is used to interface
-+a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
-+differences between the core Synopsys dw mshc controller properties described
-+by synopsys-dw-mshc.txt and the properties used by the Hisilicon specific
-+extensions to the Synopsys Designware Mobile Storage Host Controller.
-+
-+Required Properties:
-+
-+* compatible: should be one of the following.
-+  - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extentions.
-+* clock-freq-table: should be the frequency (in Hz) array of the ciu clock
-+	in each	supported timing mode.
-+	1. CIU clock rate in HZ for MMC_TIMING_LEGACY mode
-+	2. CIU clock rate in HZ for MMC_TIMING_MMC_HS mode
-+	3. CIU clock rate in HZ for MMC_TIMING_SD_HS mode
-+	4. CIU clock rate in HZ for MMC_TIMING_UHS_SDR12 mode
-+	5. CIU clock rate in HZ for MMC_TIMING_UHS_SDR25 mode
-+	6. CIU clock rate in HZ for MMC_TIMING_UHS_SDR50 mode
-+	7. CIU clock rate in HZ for MMC_TIMING_UHS_SDR104 mode
-+	8. CIU clock rate in HZ for MMC_TIMING_SD_HS mode
-+	9. CIU clock rate in HZ for MMC_TIMING_MMC_HS200 mode
-+
-+Example:
-+
-+	/* for Hi3620 */
-+
-+	/* SoC portion */
-+	dwmmc_0: dwmmc0 at fcd03000 {
-+		compatible = "hisilicon,hi4511-dw-mshc";
-+		reg = <0xfcd03000 0x1000>;
-+		interrupts = <0 16 4>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
-+		clock-names = "ciu", "biu";
-+		clk-table =
-+		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
-+	};
-+
-+	/* Board portion */
-+	dwmmc0 at fcd03000 {
-+		num-slots = <1>;
-+		vmmc-supply = <&ldo12>;
-+		fifo-depth = <0x100>;
-+		supports-highspeed;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			disable-wp;
-+			cd-gpios = <&gpio10 3 0>;
-+		};
-+	};
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 7fc5099e44b2..45aaa2de0f58 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -575,6 +575,16 @@ config MMC_DW_SOCFPGA
- 	  This selects support for Altera SoCFPGA specific extensions to the
- 	  Synopsys DesignWare Memory Card Interface driver.
- 
-+config MMC_DW_K3
-+	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
-+	depends on MMC_DW
-+	select MMC_DW_PLTFM
-+	select MMC_DW_IDMAC
-+	help
-+	  This selects support for Hisilicon K3 SoC specific extensions to the
-+	  Synopsys DesignWare Memory Card Interface driver. Select this option
-+	  for platforms based on Hisilicon K3 SoC's.
-+
- config MMC_DW_PCI
- 	tristate "Synopsys Designware MCI support on PCI bus"
- 	depends on MMC_DW && PCI
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index c41d0c364509..64f5f8d35839 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_MMC_DW)		+= dw_mmc.o
- obj-$(CONFIG_MMC_DW_PLTFM)	+= dw_mmc-pltfm.o
- obj-$(CONFIG_MMC_DW_EXYNOS)	+= dw_mmc-exynos.o
- obj-$(CONFIG_MMC_DW_SOCFPGA)	+= dw_mmc-socfpga.o
-+obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
- obj-$(CONFIG_MMC_DW_PCI)	+= dw_mmc-pci.o
- obj-$(CONFIG_MMC_SH_MMCIF)	+= sh_mmcif.o
- obj-$(CONFIG_MMC_JZ4740)	+= jz4740_mmc.o
-diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
-new file mode 100644
-index 000000000000..54b2503b211f
---- /dev/null
-+++ b/drivers/mmc/host/dw_mmc-k3.c
-@@ -0,0 +1,128 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/dw_mmc.h>
-+#include <linux/of_address.h>
-+
-+#include "dw_mmc.h"
-+#include "dw_mmc-pltfm.h"
-+
-+#define MAX_NUMS	10
-+struct dw_mci_k3_priv_data {
-+	u32	clk_table[MAX_NUMS];
-+};
-+
-+static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-+{
-+	struct dw_mci_k3_priv_data *priv = host->priv;
-+
-+	clk_set_rate(host->ciu_clk, priv->clk_table[ios->timing]);
-+	host->bus_hz = clk_get_rate(host->ciu_clk);
-+}
-+
-+static int dw_mci_k3_parse_dt(struct dw_mci *host)
-+{
-+	struct dw_mci_k3_priv_data *priv;
-+	struct device_node *node = host->dev->of_node;
-+	struct property *prop;
-+	const __be32 *cur;
-+	u32 val, num = 0;
-+
-+	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		dev_err(host->dev, "mem alloc failed for private data\n");
-+		return -ENOMEM;
-+	}
-+	host->priv = priv;
-+
-+	of_property_for_each_u32(node, "clock-freq-table", prop, cur, val) {
-+		if (num >= MAX_NUMS)
-+			break;
-+		priv->clk_table[num++] = val;
-+	}
-+	return 0;
-+}
-+
-+static unsigned long k3_dwmmc_caps[4] = {
-+	MMC_CAP_4_BIT_DATA | MMC_CAP_SD_HIGHSPEED,
-+	MMC_CAP_8_BIT_DATA | MMC_CAP_MMC_HIGHSPEED,
-+	0,
-+	0,
-+};
-+
-+static const struct dw_mci_drv_data k3_drv_data = {
-+	.caps			= k3_dwmmc_caps,
-+	.set_ios		= dw_mci_k3_set_ios,
-+	.parse_dt		= dw_mci_k3_parse_dt,
-+};
-+
-+static const struct of_device_id dw_mci_k3_match[] = {
-+	{ .compatible = "hisilicon,hi4511-dw-mshc",
-+			.data = &k3_drv_data, },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, dw_mci_k3_match);
-+
-+static int dw_mci_k3_probe(struct platform_device *pdev)
-+{
-+	const struct dw_mci_drv_data *drv_data;
-+	const struct of_device_id *match;
-+
-+	match = of_match_node(dw_mci_k3_match, pdev->dev.of_node);
-+	drv_data = match->data;
-+
-+	return dw_mci_pltfm_register(pdev, drv_data);
-+}
-+
-+static int dw_mci_k3_suspend(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+
-+	if (!IS_ERR(host->ciu_clk))
-+		clk_disable_unprepare(host->ciu_clk);
-+
-+	return dw_mci_suspend(host);
-+}
-+
-+static int dw_mci_k3_resume(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	ret = clk_prepare_enable(host->ciu_clk);
-+	if (ret) {
-+		dev_err(host->dev, "failed to enable ciu clock\n");
-+		return ret;
-+	}
-+
-+	return dw_mci_resume(host);
-+}
-+
-+SIMPLE_DEV_PM_OPS(dw_mci_k3_pmops, dw_mci_k3_suspend, dw_mci_k3_resume);
-+
-+static struct platform_driver dw_mci_k3_pltfm_driver = {
-+	.probe		= dw_mci_k3_probe,
-+	.remove		= dw_mci_pltfm_remove,
-+	.driver		= {
-+		.name		= "dwmmc_k3",
-+		.of_match_table	= dw_mci_k3_match,
-+		.pm		= &dw_mci_k3_pmops,
-+	},
-+};
-+
-+module_platform_driver(dw_mci_k3_pltfm_driver);
-+
-+MODULE_DESCRIPTION("K3 Specific DW-MSHC Driver Extension");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:dwmmc-k3");
--- 
-1.7.9.5
+Using
+http://stackoverflow.com/questions/9788679/how-to-get-the-relative-adress-of-a-field-in-a-structure-dump-c
+
+I created offsets.py as described there then for i386, amd64, arm, arm64
+before and after I built with CONFIG_DEBUG_INFO but not
+CONFIG_DEBUG_INFO_REDUCED then:
+
+        $ cat script
+        python
+        sys.path.insert(0, '')
+        import offsets
+        end
+        
+        offsets-of "struct blkif_request"
+        offsets-of "struct blkif_request_rw"
+        offsets-of "struct blkif_request_discard"
+        offsets-of "struct blkif_request_other"
+        offsets-of "struct blkif_request_indirect"
+        $ gdb -x script --batch drivers/block/xen-blkfront.o
+        struct blkif_request {
+            operation => 0
+            u => 1
+        }
+        struct blkif_request_rw {
+            nr_segments => 0
+            handle => 1
+            _pad1 => 3
+            id => 7
+            sector_number => 15
+            seg => 23
+        }
+        struct blkif_request_discard {
+            flag => 0
+            _pad1 => 1
+            _pad2 => 3
+            id => 7
+            sector_number => 15
+            nr_sectors => 23
+            _pad3 => 31
+        }
+        struct blkif_request_other {
+            _pad1 => 0
+            _pad2 => 1
+            _pad3 => 3
+            id => 7
+        }
+        struct blkif_request_indirect {
+            indirect_op => 0
+            nr_segments => 1
+            _pad1 => 3
+            id => 7
+            sector_number => 15
+            handle => 23
+            _pad2 => 25
+            indirect_grefs => 27
+            _pad3 => 59
+        }
+
+There is no difference to either x86 arch:
+        $ diff -q x86_32.{before,after} && echo same
+        same
+        $ diff -q x86_64.{before,after} && echo same
+        same
+        $
+And crucially:
+        $ diff -q arm.after arm64.after && echo same
+        same
+        $ diff -q arm.after x86_64.after && echo same
+        same
+        $
+
+Full results attached.
+
+Ian.
+
+
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    seg => 23
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    _pad2 => 3
+    id => 7
+    sector_number => 15
+    nr_sectors => 23
+    _pad3 => 31
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    _pad3 => 3
+    id => 7
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    handle => 23
+    _pad2 => 25
+    indirect_grefs => 27
+    _pad3 => 59
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    id => 3
+    sector_number => 11
+    seg => 19
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    id => 3
+    sector_number => 11
+    nr_sectors => 19
+    _pad3 => 27
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    id => 3
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    id => 3
+    sector_number => 11
+    handle => 19
+    _pad2 => 21
+    indirect_grefs => 23
+    _pad3 => 55
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    seg => 23
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    _pad2 => 3
+    id => 7
+    sector_number => 15
+    nr_sectors => 23
+    _pad3 => 31
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    _pad3 => 3
+    id => 7
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    handle => 23
+    _pad2 => 25
+    indirect_grefs => 27
+    _pad3 => 59
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    id => 3
+    sector_number => 11
+    seg => 19
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    id => 3
+    sector_number => 11
+    nr_sectors => 19
+    _pad3 => 27
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    id => 3
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    id => 3
+    sector_number => 11
+    handle => 19
+    _pad2 => 21
+    indirect_grefs => 23
+    _pad3 => 55
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    id => 3
+    sector_number => 11
+    seg => 19
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    id => 3
+    sector_number => 11
+    nr_sectors => 19
+    _pad3 => 27
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    id => 3
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    id => 3
+    sector_number => 11
+    handle => 19
+    _pad2 => 21
+    indirect_grefs => 23
+    _pad3 => 55
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    id => 3
+    sector_number => 11
+    seg => 19
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    id => 3
+    sector_number => 11
+    nr_sectors => 19
+    _pad3 => 27
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    id => 3
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    id => 3
+    sector_number => 11
+    handle => 19
+    _pad2 => 21
+    indirect_grefs => 23
+    _pad3 => 55
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    seg => 23
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    _pad2 => 3
+    id => 7
+    sector_number => 15
+    nr_sectors => 23
+    _pad3 => 31
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    _pad3 => 3
+    id => 7
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    handle => 23
+    _pad2 => 25
+    indirect_grefs => 27
+    _pad3 => 59
+}
+-------------- next part --------------
+struct blkif_request {
+    operation => 0
+    u => 1
+}
+struct blkif_request_rw {
+    nr_segments => 0
+    handle => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    seg => 23
+}
+struct blkif_request_discard {
+    flag => 0
+    _pad1 => 1
+    _pad2 => 3
+    id => 7
+    sector_number => 15
+    nr_sectors => 23
+    _pad3 => 31
+}
+struct blkif_request_other {
+    _pad1 => 0
+    _pad2 => 1
+    _pad3 => 3
+    id => 7
+}
+struct blkif_request_indirect {
+    indirect_op => 0
+    nr_segments => 1
+    _pad1 => 3
+    id => 7
+    sector_number => 15
+    handle => 23
+    _pad2 => 25
+    indirect_grefs => 27
+    _pad3 => 59
+}
