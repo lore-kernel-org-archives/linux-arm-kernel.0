@@ -1,54 +1,43 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Dec 2013 11:05:20 -0800
-Subject: [PATCH 7/8] mfd: pm8921: Migrate to irqdomains
-In-Reply-To: <20131211213003.GC15223@sonymobile.com>
+Date: Thu, 12 Dec 2013 11:06:18 -0800
+Subject: [PATCH 5/8] mfd: Move pm8xxx-irq.c contents into only driver
+ that uses it
+In-Reply-To: <20131211093552.GG16780@lee--X1>
 References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-8-git-send-email-sboyd@codeaurora.org>
- <20131211213003.GC15223@sonymobile.com>
-Message-ID: <52AA08F0.2000308@codeaurora.org>
+ <1386718523-2587-6-git-send-email-sboyd@codeaurora.org>
+ <20131211093552.GG16780@lee--X1>
+Message-ID: <52AA092A.3040605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/13 13:30, Courtney Cavin wrote:
-> On Wed, Dec 11, 2013 at 12:35:22AM +0100, Stephen Boyd wrote:
->> @@ -282,17 +278,14 @@ static struct irq_chip pm8xxx_irq_chip = {
->>   * RETURNS:
->>   * an int indicating the value read on that line
->>   */
->> -int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
->> +static int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
->>  {
->>         int pmirq, rc;
->>         u8  block, bits, bit;
->>         unsigned long flags;
->> +       struct irq_data *irq_data = irq_get_irq_data(irq);
->>
->> -       if (chip == NULL || irq < chip->irq_base ||
->> -                       irq >= chip->irq_base + chip->num_irqs)
->> -               return -EINVAL;
->> -
->> -       pmirq = irq - chip->irq_base;
->> +       pmirq = irq_data->hwirq;
->>
->>         block = pmirq / 8;
->>         bit = pmirq % 8;
->> @@ -322,64 +315,55 @@ bail_out:
->>  }
->>  EXPORT_SYMBOL_GPL(pm8xxx_get_irq_stat);
-> Surely this isn't needed anymore, since the function is now static.
-
-Sure. Deleted.
-
+On 12/11/13 01:35, Lee Jones wrote:
+> On Tue, 10 Dec 2013, Stephen Boyd wrote:
 >
-> [...]
->> +static int pm8xxx_irq_init(struct platform_device *pdev, unsigned int irq,
->> +                          unsigned int nirqs)
-> 'nirqs' seems to always be 256.  Is there a benefit to keeping this
-> dynamic?
+>> The pm8xxx-irq.c code is practically mandatory given that the
+>> pm8921-core driver will WARN about it missing and the Kconfig
+>> marks it as default y when a PM8xxx chips is enabled. The only
+>> reason the file was split out was because we planned to support
+>> other pm8xxx chips with different pm8xxx-core.c files. Now that
+>> we have DT on ARM this isn't necessary because we should be able
+>> to support all the ssbi based PM8xxx chips in one driver and one
+>> file with no data bloat. Let's move this code into the only
+>> driver that uses it right now (pm8921) so that it's always compiled when
+>> needed. In the future we can rename pm8921-core.c to something
+>> more generic.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  drivers/mfd/Kconfig       |  10 --
+>>  drivers/mfd/pm8921-core.c | 349 +++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/mfd/pm8xxx-irq.c  | 371 ----------------------------------------------
+> If you're going to take this approach (which I'm fine with unless
+> there are likely to be anymore incarnations of pm8xxx chips?), I think
+> you should also clean-up the header in this patch.
+>
+>   include/linux/mfd/pm8xxx/irq.h
+>
 
-I was future coding. Some pmics have less than 256 interrupts. I'll just
-hardcode it for now and if/when we support the other pmics we can make
-it a parameter.
+Thanks. I'll remove the header and resend.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
