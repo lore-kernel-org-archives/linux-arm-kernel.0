@@ -1,84 +1,37 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 12 Dec 2013 14:15:35 +0100
-Subject: [PATCH 00/10] sh-pfc: Fix GPIO to IRQ mapping
-In-Reply-To: <20131212131139.GE30624@verge.net.au>
-References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131212131139.GE30624@verge.net.au>
-Message-ID: <1537589.LVeLx3Dqtn@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Dec 2013 13:16:54 +0000
+Subject: regulator-core has_full_constraints set too late for dt using
+ boards ?
+In-Reply-To: <52A9B48A.8040601@redhat.com>
+References: <52A88805.1080704@redhat.com>
+ <20131211160225.GB11468@sirena.org.uk>
+ <52A98C72.2040203@redhat.com>
+ <20131212104208.GG11044@sirena.org.uk>
+ <52A9A9DB.5050102@redhat.com>
+ <20131212122347.GK11044@sirena.org.uk>
+ <52A9B48A.8040601@redhat.com>
+Message-ID: <20131212131654.GL11044@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thu, Dec 12, 2013 at 02:05:14PM +0100, Hans de Goede wrote:
+> On 12/12/2013 01:23 PM, Mark Brown wrote:
 
-On Thursday 12 December 2013 22:11:39 Simon Horman wrote:
-> On Wed, Dec 11, 2013 at 04:26:20AM +0100, Laurent Pinchart wrote:
-> > Hello,
-> > 
-> > This patch set fixes conversion from a GPIO number to an IRQ number in the
-> > sh-pfc driver in the device tree case.
-> > 
-> > Patches 01/10 to 05/10 clean up the driver to prepare it for the core fix
-> > in patch 06/10. As explained in patch 06/10 commit message, on non-DT
-> > platforms IRQ controllers associated with the GPIOs have a fixed IRQ base
-> > value known at compile time. The sh-pfc driver translates GPIO number to
-> > IRQ numbers using a hardcoded table. This mechanism breaks on DT
-> > platforms, as the IRQ base values are dynamic in that case.
-> > 
-> > The patch set fixes this by specifying IRQs associated with GPIOs in IRQ
-> > resources, populated automatically from the device tree. When IRQ
-> > resources
-> > are specified the driver requires one IRQ resource per GPIO able to
-> > generate an interrupt, and uses the translation table to compute the IRQ
-> > resource offset instead of the IRQ number.
-> > 
-> > Patches 07/10 to 09/10 then add PFC interrupts in DT for the SH73A0,
-> > R8A73A4 and R9A7740 SoCs. The only missing platform here is SH7372 due to
-> > its very uncomplete DT support. All other Renesas ARM platforms use a
-> > standaline GPIO driver and are thus not affected.
-> 
-> s/uncomplete/incomplete/
-> 
-> > Patch 10/10 finally adds a gpio-keys device to the Armadillo board DTS,
-> > allowing the whole patch set to the tested.
-> > 
-> > The sh-pfc changes need to be merged first. Linus, could you please
-> > provide a stable branch with the first 6 patches when you will apply them
-> > to your tree ?
->
-> It seems to me that if Linus applies the pfc changes the
-> shmobile changes could be applied independently. Am I missing
-> and do the shmobile patches have build-dependencies on the pfc patches?
+> >It's sitting in my review queue, it's not very well described so it's
+> >not clear that you've selected the correct criteria and I need to find
+> >time to actually look at it properly.
 
-The DTS patches will result in the PFC platform device having IRQ resources. 
-The sh-pfc driver currently supports MEM resources only and will crash.
+> Since regulator_get_optional is the only one calling
+> _regulator_get() with both allow_dummy and exclusive set to
+> false I've added the following condition to printing the
+> error:
 
-> > Laurent Pinchart (10):
-> >   sh-pfc: Turn unsigned indices into unsigned int
-> >   sh-pfc: Terminate gpios array by -1
-> >   sh-pfc: sh73a0: Add missing IRQ15
-> >   sh-pfc: sh73a0: Sort IRQ entries by IRQ number
-> >   sh-pfc: Rename sh_pfc window field to windows
-> >   sh-pfc: Support GPIO to IRQ mapping specified IRQ resources
-> >   ARM: shmobile: r8a73a4: Specify PFC interrupts in DT
-> >   ARM: shmobile: r8a7740: Specify PFC interrupts in DT
-> >   ARM: shmobile: sh73a0: Specify PFC interrupts in DT
-> >   ARM: shmobile: armadillo: dts: Add gpio-keys device
-> >  
-> >  .../bindings/pinctrl/renesas,pfc-pinctrl.txt       | 14 ++++
-> >  arch/arm/boot/dts/r8a73a4.dtsi                     | 16 +++++
-> >  .../boot/dts/r8a7740-armadillo800eva-reference.dts | 29 +++++++++
-> >  arch/arm/boot/dts/r8a7740.dtsi                     |  9 +++
-> >  arch/arm/boot/dts/sh73a0.dtsi                      |  9 +++
-> >  drivers/pinctrl/sh-pfc/core.c                      | 76 +++++++++++------
-> >  drivers/pinctrl/sh-pfc/core.h                      |  4 +-
-> >  drivers/pinctrl/sh-pfc/gpio.c                      | 24 +++++--
-> >  drivers/pinctrl/sh-pfc/pfc-r8a73a4.c               |  4 +-
-> >  drivers/pinctrl/sh-pfc/pfc-r8a7740.c               |  2 +-
-> >  drivers/pinctrl/sh-pfc/pfc-sh7372.c                |  2 +-
-> >  drivers/pinctrl/sh-pfc/pfc-sh73a0.c                | 54 +++++++--------
-> >  drivers/pinctrl/sh-pfc/sh_pfc.h                    |  4 +-
-> >  13 files changed, 188 insertions(+), 59 deletions(-)
--- 
-Regards,
-
-Laurent Pinchart
+Put some of this analysis in the commit message and perhaps a comment in
+the code please...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/a3e93479/attachment.sig>
