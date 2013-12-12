@@ -1,98 +1,52 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 12 Dec 2013 18:11:08 +0100
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212164748.GS4360@n2100.arm.linux.org.uk>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <20131212144853.GO4360@n2100.arm.linux.org.uk>
- <1386860657.25449.3.camel@sakura.staff.proxad.net>
- <20131212154110.GQ4360@n2100.arm.linux.org.uk>
- <20131212160426.GD31816@1wt.eu>
- <20131212164748.GS4360@n2100.arm.linux.org.uk>
-Message-ID: <20131212171108.GA2337@1wt.eu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Dec 2013 17:15:36 +0000
+Subject: [PATCH v4] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <CAFEAcA8bgy7Gi6aKKiS3d20Jh+_X2AComWTH-+Bwv_gV_zU5-g@mail.gmail.com>
+References: <1386672625-8060-1-git-send-email-andre.przywara@linaro.org>
+ <20131212022822.GI2871@cbox>
+ <CAFEAcA_F3T1+YsKKq3h8P139OX085N-PPPPZo5dvwgwcuGoXHg@mail.gmail.com>
+ <52A982BB.4030901@linaro.org>
+ <CAFEAcA8bgy7Gi6aKKiS3d20Jh+_X2AComWTH-+Bwv_gV_zU5-g@mail.gmail.com>
+Message-ID: <52A9EF38.3000909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 04:47:48PM +0000, Russell King - ARM Linux wrote:
-> > Then changing the type of the function argument would probably be safer!
+On 12/12/13 11:36, Peter Maydell wrote:
+> On 12 December 2013 09:32, Andre Przywara <andre.przywara@linaro.org> wrote:
+>> On 12/12/2013 10:23 AM, Peter Maydell wrote:
+>>> What does it mean to say that a system register for AArch64
+>>> is "32 bits" given that MRS/MSR always operate on a 64 bit
+>>> register?
 > 
-> Actually, I think we can do a bit better with this code.  We really don't
-> need much of this messing around here, we can combine some of these steps.
+>> But ARMv8 ARM still defines these registers as 32-bit:
+>> D8.5.14: CNTV_CTL_EL0
+>> Attributes
+>>            CNTV_CTL_EL0 is a 32-bit register.
+>> But indeed the MSR/MRS instruction references a Xt register, and the
+>> documentation does not seem to tell how this is handled, so I assume this is
+>> zero-extended.
 > 
-> We have:
-> 
-> 16-bit protocol in host endian
-> 16-bit length in host endian
-> 
-> and we need to combine them into a 32-bit checksum which is then
-> subsequently folded down to 16-bits by adding the top and bottom halves.
-> 
-> Now, what we can do is this:
-> 
-> 1. Construct a combined 32-bit protocol and length:
-> 
-> 	unsigned lenproto = len | proto << 16;
-> 
-> 2. Pass this into the assembly thusly:
-> 
->                 __asm__(
->                 "adds   %0, %1, %2      @ csum_tcpudp_nofold    \n\t"
->                 "adcs   %0, %0, %3                              \n\t"
-> #ifdef __ARMEB__
->                 "adcs   %0, %0, %4                              \n\t"
-> #else
->                 "adcs   %0, %0, %4, ror #8                      \n\t"
-> #endif
->                 "adc    %0, %0, #0"
->                 : "=&r"(sum)
->                 : "r" (sum), "r" (daddr), "r" (saddr), "r" (lenprot)
->                 : "cc");
-> 
-> with no swabbing at this stage.  Well, where do we get the endian
-> conversion?  See that ror #8 - that a 32 bit rotate by 8 bits.  As
-> these are two 16-bit quantities, we end up with this:
-> 
-> original:
-> 	31..24	23..16	15..8	7..0
-> 	len_h	len_l	pro_h	pro_l
-> 
-> accumulated:
-> 	31..24	23..16	15..8	7..0
-> 	pro_l	len_h	len_l	pro_h
-> 
-> And now when we fold it down to 16-bit:
-> 
-> 			15..8	7..0
-> 			len_l	pro_h
-> 			pro_l	len_h
+> I checked, and for AArch64 registers, "32 bits" is just
+> a shorthand for "64 bit register where the top 32 bits are
+> RAZ/WI" (and I suspect it's not totally impossible that some
+> future architecture revision might define new bits in the
+> top half).
 
-Amusing, I've used the same optimization yesterday when computing a
-TCP pseudo-header checksum.
+Indeed. Actually, there isn't an instruction to access these 32bit
+registers with a 'W' register. You really have to use a 'X'.
 
-Another thing that can be done to improve the folding of the 16-bit
-checksum is to swap the values to be added, sum them and only keep
-the high half integer which already contains the carry. At least on
-x86 I save some cycles doing this :
+> So I would suggest that we should make the KVM user<->kernel
+> interface just consistently make all the sysregs 64 bit.
+> 
+> (There is actually precedent of a sort here in that the
+> kernel claims the PSTATE register is 64 bits wide despite
+> it really being a 32 bit SPSR format value under the hood.)
 
-              31:24  23:16  15:8  7:0
-     sum32 =    D      C      B    A
+I definitely agree with Peter here. I'd like to keep the ABI 64bit for
+the sysregs. It makes the whole thing much nicer.
 
-     To fold this into 16-bit at a time, I just do this :
+Thanks,
 
-                   31:24     23:16          15:8  7:0
-     sum32           D         C              B    A
-  +  sum32swapped    B         A              D    C
-  =                 A+B  C+A+carry(B+D/C+A)  B+D  C+A
-
-so just take the upper result and you get the final 16-bit word at
-once.
-
-In C it does :
-
-       fold16 = (((sum32 >> 16) | (sum32 << 16)) + sum32) >> 16
-
-When the CPU has a rotate instruction, it's fast :-)
-
-Cheers,
-Willy
+	M.
+-- 
+Jazz is not dead. It just smells funny...
