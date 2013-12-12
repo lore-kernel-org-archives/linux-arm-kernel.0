@@ -1,39 +1,24 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 12 Dec 2013 14:31:16 +0100
-Subject: [PATCH v2] regulator_get_optional: don't print an error when no
- regulator is found
-Message-ID: <1386855076-5242-1-git-send-email-hdegoede@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 12 Dec 2013 14:31:35 +0100
+Subject: [PATCH 0/3] ARM: ux500: Fixup signal voltage regulator for SD card
+Message-ID: <1386855098-14272-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since regulator_get_optional is the only one calling _regulator_get() with
-both allow_dummy and exclusive set to false this patch adds the following
-test for calling dev_err:
+The SD card signal voltage regulator are configured from DT as a gpio regulator.
+Some configurations were missing and some were wrong, so let's fix it.
 
-    if (!(!allow_dummy && !exclusive))
+Ulf Hansson (3):
+  ARM: ux500: Refactor common DT configs for sdi[n] devices
+  ARM: ux500: Configure regulator for I/O voltage for SD-card slot
+  ARM: ux500: regulators: Remove dead code for SD-card regulator
 
-Simplified to the much easier on the eyes:
+ arch/arm/boot/dts/ste-href.dtsi               |    2 --
+ arch/arm/boot/dts/ste-hrefprev60.dtsi         |    7 +++--
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi        |   40 ++-----------------------
+ arch/arm/boot/dts/ste-snowball.dts            |    6 ++--
+ arch/arm/mach-ux500/board-mop500-regulators.c |   14 ---------
+ 5 files changed, 10 insertions(+), 59 deletions(-)
 
-    if (allow_dummy || exclusive)
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/regulator/core.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 3fe1313..a1d4ddc 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1346,7 +1346,8 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
- 
- 		rdev = dummy_regulator_rdev;
- 		goto found;
--	} else {
-+	/* Don't log an error when called from regulator_get_optional() */
-+	} else if (allow_dummy || exclusive) {
- 		dev_err(dev, "dummy supplies not allowed\n");
- 	}
- 
 -- 
-1.8.4.2
+1.7.9.5
