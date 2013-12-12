@@ -1,63 +1,33 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 12 Dec 2013 19:20:03 +0800
-Subject: [PATCH 1/6] arm64: Add asm/cpu.h
-In-Reply-To: <20131212103608.GA12106@e106331-lin.cambridge.arm.com>
+Date: Thu, 12 Dec 2013 19:22:42 +0800
+Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131212102757.GF11044@sirena.org.uk>
 References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <20131211141018.GC596@darko.cambridge.arm.com>
- <20131211142308.GY11468@sirena.org.uk>
- <20131211142705.GE596@darko.cambridge.arm.com> <52A95CB3.2030805@linaro.org>
- <20131212103608.GA12106@e106331-lin.cambridge.arm.com>
-Message-ID: <52A99BE3.9050906@linaro.org>
+ <1386767606-6391-4-git-send-email-broonie@kernel.org>
+ <20131211141224.GG26730@mudshark.cambridge.arm.com>
+ <20131211141503.GX11468@sirena.org.uk>
+ <20131211142431.GD596@darko.cambridge.arm.com> <52A95EE8.2060209@linaro.org>
+ <20131212102757.GF11044@sirena.org.uk>
+Message-ID: <52A99C82.6060704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-12-12 18:36, Mark Rutland wrote:
-> On Thu, Dec 12, 2013 at 06:50:27AM +0000, Hanjun Guo wrote:
-[...]
->>  #endif
->> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->> index cb548f1..5c8e69c 100644
->> --- a/arch/arm64/kernel/topology.c
->> +++ b/arch/arm64/kernel/topology.c
->> @@ -18,3 +18,29 @@ void arch_fix_phys_package_id(int num, u32 slot)
->>  }
->>  EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
->>
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +int __ref arch_register_cpu(int cpu)
->> +{
->> +       struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
->> +
->> +       /* BSP cann't be taken down on arm */
->> +       if (cpu)
->> +               cpuinfo->cpu.hotpluggable = 1;
+On 2013-12-12 18:27, Mark Brown wrote:
+> On Thu, Dec 12, 2013 at 02:59:52PM +0800, Hanjun Guo wrote:
+>> On 2013-12-11 22:24, Catalin Marinas wrote:
 > 
-> _why_ does the ACPI standard prohibit hotplugging the boot CPU?
-
-ACPI spec has not limitations to hotplug the boot CPU, it depends
-on the arch.
-
+>>> Lorenzo (on holiday now) pushed the DT topology bindings but there are
+>>> no patches yet for reading them. I would much prefer to only describe
+>>> the topology via DT rather than MPIDR (because hardware people sometimes
+>>> have strange ideas).
 > 
-> In non-ACPI systems we can hotplug out the boot CPU (we can do so under
-> KVM using PSCI).
-
-If all the things (interrupts and etc) running on CPU0 can be migrated to
-other CPUs when offline a CPU, it can be hotplugable in ACPI way too.
-
+>> Topology code for ARM32 is based on MPIDR now, should we update it too with
+>> describing the topology via DT?
 > 
-> I note that the x86 arch_register_cpu allows CPU0 to be hotpluggable on
-> Intel systems as long as there are no dependencies on CPU0 being
-> active. Surely we can test for something more fine-grained rather than
-> disallowing CPU0 hotplug outright?
+> Yes, the binding is supposed to apply to both so it'd be good to support
+> it on pre-v8.  However using MPIDR should continue to be supported on
+> pre-v8 as existing systems don't use the topology binding and so
+> presumably have accurate MPIDRs, requiring the binding would be a
+> regression for them.
 
-Ok, will update it when I formally send this patch out.
-
-> 
-> How does this interact with the existing arm64 hotplug code?
-
-Some other patches are needed for ACPI based CPU hotplug,will send
-out when the ACPI core for ARM is ready, I will cc you and then
-you will know what's going on :)
-
-Thanks
-Hanjun
+Ah, that makes sense :)
