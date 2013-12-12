@@ -1,62 +1,21 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Thu, 12 Dec 2013 14:32:28 -0500
-Subject: [PATCH v2] ARM: dts: vf610: make pinctrl nodes board specific
-In-Reply-To: <1386686213-13801-1-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Tue, 10 Dec 2013 22:36:53 +0800")
-References: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
- <1386686213-13801-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <87mwk5eugj.fsf@nbsps.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 20:39:25 +0100
+Subject: [PATCH 05/10] sh-pfc: Rename sh_pfc window field to windows
+In-Reply-To: <1386732390-31724-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1386732390-31724-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkda1e=JP8ONCFbXRWHcgUHHgpqaccnpjdjrzwSm7d1+74Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Dec 2013, shawn.guo at linaro.org wrote:
+On Wed, Dec 11, 2013 at 4:26 AM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
 
-> Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that
-> boards that share the same pinctrl setting do not have to define it time
-> and time again in <board>.dts.  However, along with the devices and use
-> cases being added continuously, the pinctrl setting nodes under iomuxc
-> becomes more than expected.  This bloats device tree blob for particular
-> board unnecessarily since only a small subset of those pinctrl setting
-> nodes will be used by the board.  It impacts not only the DTB file size
-> but also the run-time device tree lookup efficiency.
+> There's more than one window, name the field windows.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-> arch/arm/boot/dts/vf610-pingrp.h   |  127 ++++++++++++++++++++++++++
+Patch applied.
 
-Thanks for including this file.  I was looking a NAND flash and the
-common configuration are 8/16 bit.  This solution is better as,
-
-   #define VF610_NFC_PINGRP_8BIT \
-     ...
-
-   #define VF610_NFC_PINGRP_16BIT \
-     VF610_NFC_PINGRP_8BIT        \
-     VF610_PAD_PTD31__NF_IO15	0x28df \
-     VF610_PAD_PTD30__NF_IO14	0x28df \
-     VF610_PAD_PTD29__NF_IO13	0x28df \
-     ...
-
-It makes the board file look more straight forward,
-
-   &nfc {  /* 16 bit with group in group */
-           /* ... */
-           pinctrl-names = "default";
-           pinctrl-0 = <&pinctrl_nfc_16bit>;
-   };
-
-Versus,
-
-   &nfc {  /* old way _OR_ separate groups */
-           /* ... */
-           pinctrl-names = "default";
-           pinctrl-0 = <&pinctrl_nfc_8bit>; /* 8-bit */
-           pinctrl-1 = <&pinctrl_nfc_16_bit>; /* 16-bit extras */
-   };
-
-Although for a 'multi-machine' configuration, the sharing maybe
-appropriate?  But I guess that is your point; it is not helpful.  
-
-Is a group within a group appropriate in vf610-pingrp.h?  Maybe a
-comment?
-
-Regards,
-Bill Pringlemeir.
+Yours,
+Linus Walleij
