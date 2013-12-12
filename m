@@ -1,62 +1,84 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 12 Dec 2013 15:18:18 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212150745.GB31816@1wt.eu> (Willy Tarreau's message of "Thu,
- 12 Dec 2013 16:07:45 +0100")
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
- <1386857410.22947.78.camel@sakura.staff.proxad.net>
- <20131212141926.GA31816@1wt.eu>
- <1386858504.22947.85.camel@sakura.staff.proxad.net>
- <yw1xd2l2jflc.fsf@unicorn.mansr.com> <20131212150745.GB31816@1wt.eu>
-Message-ID: <yw1xsityhzd1.fsf@unicorn.mansr.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Dec 2013 15:25:15 +0000
+Subject: [PATCH 0/4] ARM: mvebu: sort DT nodes by reg address
+In-Reply-To: <20130816061500.GE7035@quad.lixom.net>
+References: <20130816061500.GE7035@quad.lixom.net>
+Message-ID: <cover.1386861599.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Willy Tarreau <w@1wt.eu> writes:
+Olof, all,
 
->> >> Hmmm aren't you passing a 16-bit register directly to the ASM for
->> >> being used as a 32-bit one ? This seems hasardous to me since
->> >> nowhere you tell gcc how you're going to use the register.
->> >
->> > this is exactly what I'm complaining about, the arm code for
->> > csum_tcpudp_nofold() in the kernel does exactly that.
->> >
->> >> Could you check if that fixes it :
->> >> 
->> >>  static inline uint32_t asm_add(uint16_t len, uint32_t sum)
->> >>  {
->> >>          uint32_t len32 = len;
->> >
->> > or change the asm_add() proto to take an "uint32_t len" instead, and yes
->> > of course that fixes it.
->> 
->> It's a bug.  Please report it to the gcc developers.
->
-> Here I don't agree with the generalization (and believe me I swear all the
-> day about gcc's bugs). It's a matter of ABI and availability or not of 16
-> bit registers or not. If the ASM supports 16-bit regs and the compiler is
-> allowed to emit 16-bit regs, then gcc will have no way to know whether it
-> must zero-extend the value first. If it's specified that "r" is necessarily
-> a 32-bit register then it should.
+I love December!  I'm getting around to some of the items on my -onice folder.
+Namely, this one:
 
-ARM has *only* 32-bit registers.
+On Thu, Aug 15, 2013 at 11:15:00PM -0700, Olof Johansson wrote:
+> On Wed, Aug 14, 2013 at 02:59:45PM -0400, Jason Cooper wrote:
+...
+> > diff --cc arch/arm/boot/dts/kirkwood.dtsi
+> > index 70f414d,1d6921d..6489b98
+> > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > @@@ -47,11 -30,30 +40,35 @@@
+> >             #address-cells = <1>;
+> >             #size-cells = <1>;
+> >   
+> > +           timer: timer at 20300 {
+> > +                   compatible = "marvell,orion-timer";
+> > +                   reg = <0x20300 0x20>;
+> > +                   interrupt-parent = <&bridge_intc>;
+> > +                   interrupts = <1>, <2>;
+> > +                   clocks = <&core_clk 0>;
+> > +           };
+> > + 
+> > +           intc: main-interrupt-ctrl at 20200 {
+> > +                   compatible = "marvell,orion-intc";
+> > +                   interrupt-controller;
+> > +                   #interrupt-cells = <1>;
+> > +                   reg = <0x20200 0x10>, <0x20210 0x10>;
+> > +           };
+> > + 
+> > +           bridge_intc: bridge-interrupt-ctrl at 20110 {
+> > +                   compatible = "marvell,orion-bridge-intc";
+> > +                   interrupt-controller;
+> > +                   #interrupt-cells = <1>;
+> > +                   reg = <0x20110 0x8>;
+> > +                   interrupts = <1>;
+> > +                   marvell,#interrupts = <6>;
+> > +           };
+> > + 
+> >  +          mbusc: mbus-controller at 20000 {
+> >  +                  compatible = "marvell,mbus-controller";
+> >  +                  reg = <0x20000 0x80>, <0x1500 0x20>;
+> >  +          };
+> >  +
+> >             core_clk: core-clocks at 10030 {
+> >                     compatible = "marvell,kirkwood-core-clock";
+> >                     reg = <0x10030 0x4>;
+> 
+> This file is a real mess. :( Nothing is sorted properly under the ocp/ bus.
+> It's common to sort by memory address. Or I'd even take alphabetically if
+> there was a good reason to do so. Just some order of some kind.
 
-> Maybe the issue is in the ABI itself, I don't know if 16-bit values
-> are supposed to be zero-extended only when they're converted to 32-bit
-> or also when they're passed as arguments. The fact that it works
-> without inline may simply be a side effect of the different code (eg:
-> 16 lower bits of the register copied into another one).
->
-> So one needs to look at the specs of the ABI to know where the 16-bit value
-> is supposed to be converted to 32-bit, then the faulty component must be
-> fixed (gcc or kernel code).
+Done.
 
-The ABI for function calls sign/zero-extends all arguments prior to the
-call.
+thx,
+
+Jason.
+
+Jason Cooper (4):
+  ARM: kirkwood: sort dt nodes by address
+  ARM: dove: sort DT nodes by address
+  ARM: orion5x: sort DT nodes by address
+  ARM: mvebu: sort DT nodes by address
+
+ arch/arm/boot/dts/armada-370-xp.dtsi | 176 ++++++-------
+ arch/arm/boot/dts/armada-370.dtsi    |  74 +++---
+ arch/arm/boot/dts/armada-xp.dtsi     | 100 +++----
+ arch/arm/boot/dts/dove.dtsi          | 496 +++++++++++++++++------------------
+ arch/arm/boot/dts/kirkwood.dtsi      | 140 +++++-----
+ arch/arm/boot/dts/orion5x.dtsi       | 106 ++++----
+ 6 files changed, 546 insertions(+), 546 deletions(-)
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+1.8.5.1
