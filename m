@@ -1,96 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Dec 2013 15:00:27 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <1386859963.22947.95.camel@sakura.staff.proxad.net>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
- <1386857410.22947.78.camel@sakura.staff.proxad.net>
- <20131212141926.GA31816@1wt.eu>
- <1386858504.22947.85.camel@sakura.staff.proxad.net>
- <yw1xd2l2jflc.fsf@unicorn.mansr.com>
- <1386859963.22947.95.camel@sakura.staff.proxad.net>
-Message-ID: <20131212150027.GP4360@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 12 Dec 2013 12:07:58 -0300
+Subject: [PATCH v5 0/3] Introduce atomic MMIO register modify
+In-Reply-To: <20131212135221.GL10053@titan.lakedaemon.net>
+References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131212135221.GL10053@titan.lakedaemon.net>
+Message-ID: <20131212150757.GB1617@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 03:52:43PM +0100, Maxime Bizon wrote:
-> 
-> On Thu, 2013-12-12 at 14:42 +0000, M?ns Rullg?rd wrote:
+On Thu, Dec 12, 2013 at 08:52:21AM -0500, Jason Cooper wrote:
+> On Tue, Dec 10, 2013 at 11:41:34AM -0300, Ezequiel Garcia wrote:
+> > After this patchset stalled for several months, I'm picking where
+> > we left. The last conclusion [1] was that instead of doing the arch-generic
+> > from scratch, we'd start by implementing the API in ARM only.
 > > 
-> > Again, that's an optimisation that does not alter the semantics of the
-> > code. Although the generated code looks very different, it does the
-> > same thing.
+> > In other words, this is basically a resend of v3, with some of the typos fixed
+> > and using raw spinlocks.
 > > 
-> It cannot do the same thing as there are possibly nothing to do after
-> inline.
+> > [1] http://www.spinics.net/lists/arm-kernel/msg271773.html
+> ...
+> > If nobody has objections, I'll add patch 1/3 to ARM's tracking system
+> > as usual.
 > 
+> It looks like everyone's ok with that.  We can submit the drivers for
+> v3.15 unless Russell's willing to set up a topic branch for patches 2
+> and 3 to depend upon.
 > 
-> static __attribute__((noinline)) unsigned int do_nothing(unsigned char foo)                                 
-> {
->         foo += 42;
->         return 0;
-> }
-> 
-> int func(int a)
-> {
->         return do_nothing(a);
-> }
-> 
-> 00000000 <do_nothing>:
->    0:	e3a00000 	mov	r0, #0
->    4:	e12fff1e 	bx	lr
-> 
-> 00000008 <func>:
->    8:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
->    c:	e24dd004 	sub	sp, sp, #4
->   10:	e20000ff 	and	r0, r0, #255	; 0xff
->   14:	ebfffff9 	bl	0 <do_nothing>
->   18:	e28dd004 	add	sp, sp, #4
->   1c:	e8bd8000 	ldmfd	sp!, {pc}
-> 
-> 
-> static inline unsigned int do_nothing(unsigned char foo)                                 
-> {
->         foo += 42;
->         return 0;
-> }
-> 
-> int func(int a)
-> {
->         return do_nothing(a);
-> }
-> 
-> 
-> 00000000 <func>:
->    0:	e3a00000 	mov	r0, #0
->    4:	e12fff1e 	bx	lr
-> 
-> 
-> In the first case, the compiler narrows "int a" to char and call the
-> uninlined function.
-> 
-> In the second case, there is absolutely no generated code to push any
-> arguments as the function that does nothing is inlined into func().
 
-This is different - the compiler has recognised in both cases that the
-addition od 42 to foo is useless as the result is not used, and therefore
-has optimised the addition away.  In the second case, it has realised that
-the narrowing cast used to then add 42 to is also not used, and it has
-also optimised that away.
-
-A better test case would be do to do this:
-
-	foo += 42;
-	return foo;
-
-so that "foo" is actually used.  Or, if you don't feel happy with that:
-
-extern void use_result(unsigned int);
-
-	foo += 42;
-	use_result(foo);
-	return 0;
-
-so that the compiler can't decide that 'foo' is never used.
+IMO, v3.15 is perfectly fine, there's no rush on the drivers.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
