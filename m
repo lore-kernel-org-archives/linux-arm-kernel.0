@@ -1,51 +1,64 @@
-From: santosh.shilimkar@TI.COM (Santosh Shilimkar)
-Date: Thu, 12 Dec 2013 14:52:03 -0500
-Subject: [PATCH v3 1/2] usb: dwc3: Add Keystone specific glue layer
-In-Reply-To: <20131212194152.GQ1939@saruman.home>
-References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
- <1386627424-373-2-git-send-email-w-kwok2@ti.com>
- <20131210025110.GA20090@saruman.home> <52A72F28.10909@ti.com>
- <20131212174838.GE1939@saruman.home> <52AA1021.2010505@ti.com>
- <20131212194152.GQ1939@saruman.home>
-Message-ID: <52AA13E3.9000501@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Dec 2013 11:55:39 -0800
+Subject: [PATCH 00/10] Support VGIC save/restore using device control API
+Message-ID: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013 02:41 PM, Felipe Balbi wrote:
-> On Thu, Dec 12, 2013 at 02:36:01PM -0500, Santosh Shilimkar wrote:
->> On Thursday 12 December 2013 12:48 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Tue, Dec 10, 2013 at 10:11:36AM -0500, Santosh Shilimkar wrote:
->>>>>> +static int kdwc3_remove(struct platform_device *pdev)
->>>>>> +{
->>>>>> +	struct dwc3_keystone *kdwc = platform_get_drvdata(pdev);
->>>>>> +
->>>>>> +	kdwc3_disable_irqs(kdwc);
->>>>>> +	clk_disable_unprepare(kdwc->clk);
->>>>>
->>>>> I hope the clock isn't shared between core and wrapper, otherwise you
->>>>> could run into some troubles here. Can you confirm ?
->>>>>
->>>> Yes. the clock isn't shared. Thanks for taking care of other parts.
->>>
->>> so clock for core is always running too ?
->>>
->> I take that back. The clock is actually common so we should disable
->> it after removing the  kdwc3_remove_core() as you suggested.
->>
->> You won't see issue since the  kdwc3_remove_core() not doing
->> any register access but moving the clock disable after
->> the core remove is right thing to do.
-> 
-> the problem is not kdwc3_remove_core() accessing registers, but
-> dwc3_remove() _does_ access registers during remove. If you just
-> mopdrobe -r dwc3-keystone without removing dwc3.ko first, then
-> kdwc3_remove_core() will cause dwc3.ko to be removed (because of
-> platform_driver_unregister()) and, since clocks have already been
-> disabled, then we'd die :-)
-> 
-Oh yes, you are right. I see Wingman already posted the updated patch.
+Implement save/restore of the VGIC state using the newer KVM Device
+Control API.  This requries some number of changes to existing code in
+addition to actually supporting save/restore of the necessary state.
 
-Regards,
-Santosh
+The first patches (01-03) support creating the VGIC using the Device
+Control API.  This change is necessary because there are no other
+suitable KVM APIs that we can leverage to access the VGIC state from
+user space and the device control API was crafted exactly for this
+purpose.
+
+Subsequent patches add the missing infrastructure and user space API
+pieces necessary to actually save and restore the VGIC state.  The GIC
+v2.0 architecture specification already specifies registers that can be
+used to save and restore the complete VGIC state for suspend/resume
+purposes on real hardware, and we can reuse this interface for the
+VGIC.  The API is therefore based on the memory-mapped register accesses
+defined in the specs.  See the individual patches for details.
+
+The patches are based on kvm-arm-next with the arch timers save/restore
+patches applied:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git timer-migrate-v4
+
+This patch series based on the above can be cloned from:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v4
+
+User space patches for QEMU have also been posted on the list, but an
+updated version is underway.  Tested on Versatile Express TC2.
+
+Changelogs in the individual patches.
+
+Christoffer Dall (10):
+  ARM: KVM: Allow creating the VGIC after VCPUs
+  KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
+  KVM: arm-vgic: Set base addr through device API
+  irqchip: arm-gic: Define additional MMIO offsets and masks
+  KVM: arm-vgic: Make vgic mmio functions more generic
+  arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
+  KVM: arm-vgic: Add vgic reg access from dev attr
+  KVM: arm-vgic: Support unqueueing of LRs to the dist
+  KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
+  KVM: arm-vgic: Support CPU interface reg access
+
+ Documentation/virtual/kvm/api.txt              |   7 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  73 ++++
+ arch/arm/include/uapi/asm/kvm.h                |   8 +
+ arch/arm/kvm/arm.c                             |  17 +-
+ include/kvm/arm_vgic.h                         |   2 +-
+ include/linux/irqchip/arm-gic.h                |  12 +
+ include/linux/kvm_host.h                       |   1 +
+ include/uapi/linux/kvm.h                       |   1 +
+ virt/kvm/arm/vgic.c                            | 581 +++++++++++++++++++++++--
+ virt/kvm/kvm_main.c                            |   6 +-
+ 10 files changed, 670 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
+
+-- 
+1.8.4.3
