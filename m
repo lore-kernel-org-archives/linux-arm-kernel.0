@@ -1,30 +1,17 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 22:16:12 +0100
-Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
-In-Reply-To: <CACRpkdY9Z71VcS6ERiaDbg9P7qPEK_jCVXLvoCDx6YztYCnR2Q@mail.gmail.com>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
- <52A24E08.706@codeaurora.org>
- <20131210084140.GF11990@sonymobile.com>
- <52A7C4BB.6000701@codeaurora.org>
- <CACRpkdY9Z71VcS6ERiaDbg9P7qPEK_jCVXLvoCDx6YztYCnR2Q@mail.gmail.com>
-Message-ID: <CACRpkdZedEataWivqxL4vN4Xy+KtZDuZyH7AoqXUhNxHKBKdrQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Dec 2013 14:20:17 -0700
+Subject: [PATCH 1/2] ARM: tegra: enable ams AS3722 drivers
+In-Reply-To: <1386855064-10993-1-git-send-email-ldewangan@nvidia.com>
+References: <1386855064-10993-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <52AA2891.2020502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 8:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On 12/12/2013 06:31 AM, Laxman Dewangan wrote:
+> ams AS3722 is the system power manager module IC for the Tegra124 based
+> Venice2 platform. Enable configs for gpio, pincontrol, rtc, regulator
+> support from this device.
 
-> On a related key I guess drivers/gpio/gpio-msm-v2.c needs
-> to be patched to call pinctrl_request_gpio()/
-> pinctrl_free_gpio()/pinctrl_gpio_direction_input()/
-> pinctrl_gpio_direction_output() before the GPIO back-end
-> works at all so there is still time to change this (plus it is
-> not part of the DT binding or anything so it can be changed
-> at any time).
+I've squashed patch 1/2 into Tegra's for-3.14/defconfig branch.
 
-I think Bj?rn answered this in his other mail - so the new
-pin control driver replaces the GPIO drivers' functionality
-and that's just fine.
-
-Yours,
-Linus Walleij
+I've applied patch 2/2 to Tegra's for-3.14/dt branch.
