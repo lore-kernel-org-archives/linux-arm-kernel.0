@@ -1,45 +1,45 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 12 Dec 2013 09:53:13 +0100
-Subject: [PATCH v2 1/9] arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
-In-Reply-To: <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
- <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52A97979.1030205@monstr.eu>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Dec 2013 10:04:15 +0100
+Subject: [PATCH 04/10] net: stmmac: sunxi platfrom extensions for GMAC in
+ Allwinner A20 SoC's
+In-Reply-To: <52A87A74.8040807@st.com>
+References: <1386350983-13281-1-git-send-email-wens@csie.org>
+ <1386350983-13281-5-git-send-email-wens@csie.org>
+ <52A5A52C.50605@st.com>
+ <CAGb2v67WiCaMpJEzA_X6o7uOu6i3w3FCEz7=N5HY0amQb01SZA@mail.gmail.com>
+ <52A72C6D.60100@st.com>
+ <CAGb2v64qQvqJSicA6MTAxeh1sGjWY=Pk=vDq=9J3pTQW+wkXrA@mail.gmail.com>
+ <52A87A74.8040807@st.com>
+Message-ID: <20131212090415.GQ3651@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
-> The bindings for the TTC changed in commit 'arm: zynq: Use standard
-> timer binding' (e932900a3279b5dbb6d8f43c7b369003620e137c). That change
-> removed possible subnodes from this driver rendering the 'clock-ranges'
-> property invalid for this node.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 2 --
->  1 file changed, 2 deletions(-)
+Hi,
 
-I think this is completely unrelated to cpufreq and should just go
-directly via arm-soc tree.
-If yes, I will add 1/9 and 2/9 to zynq/dt branch.
+On Wed, Dec 11, 2013 at 02:45:08PM +0000, srinivas kandagatla wrote:
+> >>> 1. .tx_coe
+> >>>    This is not exported in the DT bindings.
+> >>>    Looking at stmmac code, not setting this seems to disable all
+> >>>    checksum offloading.
+> >>
+> >> Why cant this go via DT as well?
+> > 
+> > If you and Giuseppe are OK with this, why not?
+> Am Ok with it.
 
-Thanks,
-Michal
+Please note that I'm opposed to this until someone explain why putting
+it in the DT is relevant (and not just convenient).
+
+Maxime
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/10c9cf34/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/016cd67e/attachment.sig>
