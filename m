@@ -1,42 +1,83 @@
-From: gpkulkarni@gmail.com (Ganapat Rao P Kulkarni)
-Date: Thu, 12 Dec 2013 13:18:19 +0530
-Subject: ARM64: Domain Equivalent support in ARMv8
-In-Reply-To: <CAFpQJXXpO7NmtHJoU0uHYQ_BPQqS+qn3ZgZcQkckWDv1ZjBtTQ@mail.gmail.com>
-References: <CAFpQJXXpO7NmtHJoU0uHYQ_BPQqS+qn3ZgZcQkckWDv1ZjBtTQ@mail.gmail.com>
-Message-ID: <CAFpQJXVsuT2XU4F9FmQbqYm-82Qbs-yVCD+N+Qc7eY-z-h1NJQ@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 12 Dec 2013 00:55:36 -0700
+Subject: [PATCH v6 0/4] ata: Add APM X-Gene SoC SATA host controller support
+Message-ID: <1386834940-30875-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will/Catalin,
+This patch adds support for the APM X-Gene SoC SATA host controller. In
+order for the host controller to work, the corresponding PHY driver
+musts also be available.
 
-The requirement what i posted is doable on ARMv8?
-If yes, can you please suggest the way to do it!
+v6:
+ * Update binding documentation
+ * Change select PHY_XGENE_SATA to PHY_XGENE
+ * Add ULL to constants
+ * Change indentation and comments
+ * Clean up the probe functions a bit more
+ * Remove xgene_ahci_remove function
+ * Add the flush register to DTS
+ * Remove the interrupt-parent from DTS
 
-regards
-Ganapat
+v5:
+ * Sync up to v3 of the PHY driver
+ * Remove MSLIM wrapper functions
+ * Change the memory shutdown loop to use usleep_range
+ * Use devm_ioremap_resource instead devm_ioremap
+ * Remove suspend/resume functions as not needed
 
-On Tue, Dec 10, 2013 at 1:17 PM, Ganapat Rao P Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> Hi,
->
-> I want to make kernel code ( all sections/blocks mapped to kernel
-> code) as RO and change to R/W,  when ever hot-patch of kernel code is
-> required.
-> Also, R/W access changes should be available/visible to the core which
-> sets R/W and all other cores continue to have RO access.
->
-> This was easily done using Domain feature(by making Kernel Domain as
-> Manager, using DACR) on ARMv7.
-> However, on ARMv8, i see there is no domain support(in AARCH64) and
-> not able to find the alternative optimal way.
->
-> please suggest/share, if you have any ideas to do so.
->
-> regards,
-> Ganapat
+v4:
+ * Remove the ID property in DT
+ * Remove the temporary PHY direct function call and use PHY function
+ * Change printk to pr_debug
+ * Move the IOB flush addresses into the DT
+ * Remove the parameters retrieval function as no longer needed
+ * Remove the header file as no longer needed
+ * Require v2 patch of the SATA PHY driver. Require slightly modification
+   in the Kconfig as it is moved to folder driver/phy and use Kconfig
+   PHY_XGENE_SATA instead SATA_XGENE_PHY.
 
+v3:
+ * Move out the SATA PHY to another driver
+ * Remove the clock-cells entry from DTS
+ * Remove debug wrapper
+ * Remove delay functions wrapper
+ * Clean up resource and IRQ query
+ * Remove query clock name
+ * Switch to use dma_set_mask/dma_coherent_mask
+ * Remove un-necessary devm_kfree
+ * Update GPL license header to v2
+ * Spilt up function xgene_ahci_hardreset
+ * Spilt up function xgene_ahci_probe
+ * Remove all reference of CONFIG_ARCH_MSLIM
+ * Clean up chip revision code
 
+v2:
+ * Clean up file sata_xgene.c with Lindent and etc
+ * Clean up file sata_xgene_serdes.c with Lindent and etc
+ * Add description to each patch
 
--- 
-regards,
-Ganapat
+v1:
+ * inital version
+
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+Loc Ho (4):
+  ata: Export required functions by APM X-Gene SATA driver
+  Documentation: Add documentation for APM X-Gene SoC SATA host
+    controller DTS binding
+  ata: Add APM X-Gene SoC SATA host controller driver
+  arm64: Add APM X-Gene SoC SATA host controller DTS entries
+
+ .../devicetree/bindings/ata/apm-xgene.txt          |   68 ++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   84 ++
+ drivers/ata/Kconfig                                |    8 +
+ drivers/ata/Makefile                               |    1 +
+ drivers/ata/ahci.h                                 |    9 +
+ drivers/ata/libahci.c                              |   16 +-
+ drivers/ata/sata_xgene.c                           | 1068 ++++++++++++++++++++
+ 7 files changed, 1248 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+ create mode 100644 drivers/ata/sata_xgene.c
