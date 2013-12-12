@@ -1,73 +1,38 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 12 Dec 2013 11:39:20 +0000
-Subject: [PATCHv7 04/12] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <1386835033-4701-5-git-send-email-hdoyu@nvidia.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com> <
- 1386835033-4701-5-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20131212113920.70E8BC40637@trevor.secretlab.ca>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 12 Dec 2013 12:40:59 +0100
+Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
+ AUTO_ZRELADDR by default
+In-Reply-To: <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
+References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <26167386.hX5eWUjT6T@flatron>
+ <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
+Message-ID: <3126277.U19MiHChc4@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Dec 2013 09:57:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> IOMMU devices on the bus need to be poplulated first, then iommu
-> master devices are done later.
+On Thursday 12 of December 2013 16:33:46 Panchaxari Prasannamurthy Tumkur wrote:
+> Hi Tomasz
 > 
-> With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
-> whether a device can be an iommu msater or not. If a device can, we'll
-> defer to populate that device till an iommu device is populated. Then,
-> those deferred iommu master devices are populated and configured with
-> help of the already populated iommu device.
+> > Could you explain the purpose of this change on S5P64x0?
+> >
+> > This is actually quite a poor platform choice. As of today, the kernel
+> > is stuck with supporting just SMDK6440/6450 boards, which are proprietary
+> > development boards and it doesn't look like any further boards will show
+> > up in future. Kukjin has actually proposed removing support for this
+> > platform at all and I consider this reasonable.
+> >
+> > Kukjin, should we proceed with removal?
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
-> This is related to the following discussion:
->   [RFC PATCH] Documentation: devicetree: add description for generic bus properties
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215042.html
-> 
-> v6:
-> Spinned off only driver core part from:
->   [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-> 
-> v5:
-> Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
-> 
-> v4:
-> This is newly added, and the successor of the following RFC:
->   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
->   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  drivers/base/dd.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 0605176..0605f52 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -25,6 +25,7 @@
->  #include <linux/async.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pinctrl/devinfo.h>
-> +#include <linux/of_iommu.h>
->  
->  #include "base.h"
->  #include "power/power.h"
-> @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  
->  	dev->driver = drv;
->  
-> +	ret = of_iommu_attach(dev);
-> +	if (ret)
-> +		goto probe_failed;
-> +
+> The purpose of this patch is with the greater intent of consolidating
+> ARM-32 kernel. Which means a generic kernel for ARM-32 processors.
 
-As discussed before, I really don't think hooking in to dd.c is the
-right thing to do here, and certainly not as a device tree specific
-function. ACPI or PCI described devices may have the same constraints
-and those won't have DT descriptions.
+OK. So do you have plans to send similar patches for other, more active
+(and closer to having multiplatform support) platforms, such as s3c64xx,
+s5pv210 and exynos?
 
-I don't think we've got a good solution yet for this problem. :-(
+In case of s5p64x0 probably the only person capable of testing it is
+Kukjin, as we don't have any other active people with boards based on
+these SoCs.
 
-g.
+Best regards,
+Tomasz
