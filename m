@@ -1,111 +1,195 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 12 Dec 2013 14:30:41 -0600
-Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR timing
- through clock framework
+Date: Thu, 12 Dec 2013 14:30:44 -0600
+Subject: [PATCHv6 4/5] mmc: dw_mmc-socfpga: Remove the SOCFPGA specific
+ platform for dw_mmc
 In-Reply-To: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
 References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1386880245-10192-2-git-send-email-dinguyen@altera.com>
+Message-ID: <1386880245-10192-5-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-All implementations of the Synopsys DW SD/MMC IP have settings to control
-the phase shift of the CIU clk. These phase shift settings are necessary for
-the SD/MMC to correctly clock the card. All variants of the dw_mmc will need
-these settings, but how they are implemented can vastly vary.
-
-This patch enables the setting for the SDR and/or DDR settings through the
-common clock framework.
-
-Depends on the patch "mmc: dw_mmc: Enable the hold reg for certain speed modes",
-that is already reading the "samsung,dw-mshc-sdr-timing" and
-"samsung,dw-mshc-ddr-timing" bindings, this patch saves those values into a
-u32 bitmask that can be passed to the clock framework to use.
+It turns now that the only really platform specific code that is needed for
+SOCFPGA is using the SDMMC_CMD_USE_HOLD_REG in the prepare_command function.
+Since the Rockchip already has this functionality, re-use the code that is
+already in dw_mmc-pltfm.c.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 ---
-v6: Add this patch
+v6: none
 v5: none
-v4: none
+v4: Remove dw_mmc-socfpga platform specific code
 v3: none
 v2: none
 ---
- drivers/mmc/host/dw_mmc.c  |   23 +++++++++++++++++++++++
- include/linux/mmc/dw_mmc.h |    6 ++++++
- 2 files changed, 29 insertions(+)
+ drivers/mmc/host/Kconfig          |    8 ---
+ drivers/mmc/host/dw_mmc-socfpga.c |  138 -------------------------------------
+ 2 files changed, 146 deletions(-)
+ delete mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 480dafe..1fb5cff 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2431,6 +2431,8 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
- 	if ((sdr_timing[1] == 0) || (ddr_timing[1] == 0))
- 		pdata->cclk_in_drv = 0;
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 7fc5099..6737a4f 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -567,14 +567,6 @@ config MMC_DW_EXYNOS
+ 	  Synopsys DesignWare Memory Card Interface driver. Select this option
+ 	  for platforms based on Exynos4 and Exynos5 SoC's.
  
-+	pdata->sdr_timing = (sdr_timing[1] | (sdr_timing[0] << 4));
-+	pdata->ddr_timing = (ddr_timing[1] | (ddr_timing[0] << 4));
- 	return pdata;
- }
- 
-@@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
- 		dev_dbg(host->dev, "ciu clock not available\n");
- 		host->bus_hz = host->pdata->bus_hz;
- 	} else {
-+		/* If the CIU clk is available, we check for SDR and DDR
-+		 * timing phase shift settings. But not all platforms
-+		 * may have populated these settings, the driver will not fail
-+		 * if these settings are not specified.
-+		 */
-+		if (host->pdata->sdr_timing) {
-+			host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
-+			if (IS_ERR(host->sdr_clk))
-+				dev_dbg(host->dev, "sdr_mmc clock not available\n");
-+			else
-+				clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
-+		}
-+
-+		if (host->pdata->ddr_timing) {
-+			host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
-+			if (IS_ERR(host->ddr_clk))
-+				dev_dbg(host->dev, "ddr_mmc clock not available\n");
-+			else
-+				clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
-+		}
-+
- 		ret = clk_prepare_enable(host->ciu_clk);
- 		if (ret) {
- 			dev_err(host->dev, "failed to enable ciu clock\n");
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 2b5b8bf..ad90ad1 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -83,6 +83,8 @@ struct mmc_data;
-  * @priv: Implementation defined private data.
-  * @biu_clk: Pointer to bus interface unit clock instance.
-  * @ciu_clk: Pointer to card interface unit clock instance.
-+ * @sdr_clk: Pointer to the SDR clock instance.
-+ * @ddr_clk: Pointer to the DDR clock instance.
-  * @slot: Slots sharing this MMC controller.
-  * @fifo_depth: depth of FIFO.
-  * @data_shift: log2 of FIFO item size.
-@@ -170,6 +172,8 @@ struct dw_mci {
- 	void			*priv;
- 	struct clk		*biu_clk;
- 	struct clk		*ciu_clk;
-+	struct clk		*sdr_clk;
-+	struct clk		*ddr_clk;
- 	struct dw_mci_slot	*slot[MAX_MCI_SLOTS];
- 
- 	/* FIFO push and pull */
-@@ -241,6 +245,8 @@ struct dw_mci_board {
- 	u32 caps2;	/* More capabilities */
- 	u32 pm_caps;	/* PM capabilities */
- 	u32 cclk_in_drv;	/*cclk_in_drv phase shift */
-+	u32 sdr_timing;	/* Single data rate timing setting. */
-+	u32 ddr_timing;	/* Double data rate timing setting. */
- 	/*
- 	 * Override fifo depth. If 0, autodetect it from the FIFOTH register,
- 	 * but note that this may not be reliable after a bootloader has used
+-config MMC_DW_SOCFPGA
+-	tristate "SOCFPGA specific extensions for Synopsys DW Memory Card Interface"
+-	depends on MMC_DW && MFD_SYSCON
+-	select MMC_DW_PLTFM
+-	help
+-	  This selects support for Altera SoCFPGA specific extensions to the
+-	  Synopsys DesignWare Memory Card Interface driver.
+-
+ config MMC_DW_PCI
+ 	tristate "Synopsys Designware MCI support on PCI bus"
+ 	depends on MMC_DW && PCI
+diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
+deleted file mode 100644
+index 3e8e53a..0000000
+--- a/drivers/mmc/host/dw_mmc-socfpga.c
++++ /dev/null
+@@ -1,138 +0,0 @@
+-/*
+- * Altera SoCFPGA Specific Extensions for Synopsys DW Multimedia Card Interface
+- * driver
+- *
+- *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
+- *  Copyright (C) 2013 Altera Corporation
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * Taken from dw_mmc-exynos.c
+- */
+-#include <linux/clk.h>
+-#include <linux/mfd/syscon.h>
+-#include <linux/mmc/host.h>
+-#include <linux/mmc/dw_mmc.h>
+-#include <linux/module.h>
+-#include <linux/of.h>
+-#include <linux/platform_device.h>
+-#include <linux/regmap.h>
+-
+-#include "dw_mmc.h"
+-#include "dw_mmc-pltfm.h"
+-
+-#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
+-#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
+-#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
+-	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
+-
+-/* SOCFPGA implementation specific driver private data */
+-struct dw_mci_socfpga_priv_data {
+-	u8	ciu_div; /* card interface unit divisor */
+-	u32	hs_timing; /* bitmask for CIU clock phase shift */
+-	struct regmap   *sysreg; /* regmap for system manager register */
+-};
+-
+-static int dw_mci_socfpga_priv_init(struct dw_mci *host)
+-{
+-	return 0;
+-}
+-
+-static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
+-{
+-	struct dw_mci_socfpga_priv_data *priv = host->priv;
+-
+-	clk_disable_unprepare(host->ciu_clk);
+-	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET,
+-		priv->hs_timing);
+-	clk_prepare_enable(host->ciu_clk);
+-
+-	host->bus_hz /= (priv->ciu_div + 1);
+-	return 0;
+-}
+-
+-static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
+-{
+-	struct dw_mci_socfpga_priv_data *priv = host->priv;
+-
+-	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
+-		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
+-}
+-
+-static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
+-{
+-	struct dw_mci_socfpga_priv_data *priv;
+-	struct device_node *np = host->dev->of_node;
+-	u32 timing[2];
+-	u32 div = 0;
+-	int ret;
+-
+-	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
+-	if (!priv) {
+-		dev_err(host->dev, "mem alloc failed for private data\n");
+-		return -ENOMEM;
+-	}
+-
+-	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
+-	if (IS_ERR(priv->sysreg)) {
+-		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
+-		return PTR_ERR(priv->sysreg);
+-	}
+-
+-	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
+-	if (ret)
+-		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
+-	priv->ciu_div = div;
+-
+-	ret = of_property_read_u32_array(np,
+-			"altr,dw-mshc-sdr-timing", timing, 2);
+-	if (ret)
+-		return ret;
+-
+-	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
+-	host->priv = priv;
+-	return 0;
+-}
+-
+-static const struct dw_mci_drv_data socfpga_drv_data = {
+-	.init			= dw_mci_socfpga_priv_init,
+-	.setup_clock		= dw_mci_socfpga_setup_clock,
+-	.prepare_command	= dw_mci_socfpga_prepare_command,
+-	.parse_dt		= dw_mci_socfpga_parse_dt,
+-};
+-
+-static const struct of_device_id dw_mci_socfpga_match[] = {
+-	{ .compatible = "altr,socfpga-dw-mshc",
+-			.data = &socfpga_drv_data, },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, dw_mci_socfpga_match);
+-
+-static int dw_mci_socfpga_probe(struct platform_device *pdev)
+-{
+-	const struct dw_mci_drv_data *drv_data;
+-	const struct of_device_id *match;
+-
+-	match = of_match_node(dw_mci_socfpga_match, pdev->dev.of_node);
+-	drv_data = match->data;
+-	return dw_mci_pltfm_register(pdev, drv_data);
+-}
+-
+-static struct platform_driver dw_mci_socfpga_pltfm_driver = {
+-	.probe		= dw_mci_socfpga_probe,
+-	.remove		= __exit_p(dw_mci_pltfm_remove),
+-	.driver		= {
+-		.name		= "dwmmc_socfpga",
+-		.of_match_table	= dw_mci_socfpga_match,
+-		.pm		= &dw_mci_pltfm_pmops,
+-	},
+-};
+-
+-module_platform_driver(dw_mci_socfpga_pltfm_driver);
+-
+-MODULE_DESCRIPTION("Altera SOCFPGA Specific DW-MSHC Driver Extension");
+-MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:dwmmc-socfpga");
 -- 
 1.7.9.5
