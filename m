@@ -1,22 +1,14 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 20:44:34 +0100
-Subject: [PATCH 07/10] ARM: shmobile: r8a73a4: Specify PFC interrupts in DT
-In-Reply-To: <1386732390-31724-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1386732390-31724-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdZ_AyJnDHaVCcjy7weJyutUf76MqS_xUuPs4mQARXLxvQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Dec 2013 12:44:38 -0700
+Subject: [PATCH 1/4] ARM: tegra: add I2C controllers to Tegra124 DT
+In-Reply-To: <1386196016-25128-1-git-send-email-swarren@wwwdotorg.org>
+References: <1386196016-25128-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <52AA1226.4000705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 4:26 AM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+On 12/04/2013 03:26 PM, Stephen Warren wrote:
+> Tegra124 has 6 I2C controllers. The first 5 have identical configuration
+> to Tegra114, but the sixth obviously has different interrupt/... IDs.
 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-for patches 7 thru 10.
-
-I expect these to go in through the shmobile tree.
-
-Yours,
-Linus Walleij
+I've applied this series to Tegra's for-3.14/dt branch.
