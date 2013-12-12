@@ -1,62 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Dec 2013 18:26:01 +0000
-Subject: [PATCH 1/3] ARM: mm: don't bother with reserved ttbr0 when running
- with LPAE
-Message-ID: <1386872763-14845-1-git-send-email-will.deacon@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Dec 2013 12:27:21 -0600
+Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
+ indicates the presence of PHY's
+In-Reply-To: <20131209085245.GB5231@xps8300>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-2-git-send-email-kishon@ti.com>
+ <525E8E93.9010503@ti.com> <525E9046.3090209@ti.com>
+ <525E943E.3080706@ti.com> <20131017145425.GE11611@gimli>
+ <20131203103950.GB26423@xps8300>
+ <20131206201530.GA21086@saruman.home>
+ <20131209085245.GB5231@xps8300>
+Message-ID: <20131212182721.GL1939@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new ASID allocation algorithm, active ASIDs at the time of a
-rollover event will be marked as reserved, so active mm_structs can
-continue to operate with the same ASID as before. This in turn means
-that we don't need to worry about allocating a new ASID to an mm that
-is currently active (installed in TTBR0).
+On Mon, Dec 09, 2013 at 10:52:45AM +0200, Heikki Krogerus wrote:
+> Hi,
+> 
+> On Fri, Dec 06, 2013 at 02:15:30PM -0600, Felipe Balbi wrote:
+> > On Tue, Dec 03, 2013 at 12:39:50PM +0200, Heikki Krogerus wrote:
+> > > On Thu, Oct 17, 2013 at 09:54:26AM -0500, Felipe Balbi wrote:
+> > > > On Wed, Oct 16, 2013 at 04:27:26PM +0300, Roger Quadros wrote:
+> > > > > On 10/16/2013 04:10 PM, Kishon Vijay Abraham I wrote:
+> > > > > Do you know if there are users of dwc3 other than exynos5250 and omap5?
+> > > > > If not, we should get rid of the old USB PHY altogether.
+> > > > 
+> > > > Intel's Baytrail, at least. But they don't use DT.
+> > > 
+> > > I don't see any use for the generic-phy when the device is enumerated
+> > > from PCI. If dwc3 can live without phys, there should not be any
+> > > problem dropping the old USB PHY support.
+> > 
+> > yeah, I don't want to drop PHY support, I want to require everybody to
+> > provide a PHY, otherwise we have too many options to handle and that's
+> > never clean.
+> 
+> I have to clarify in case there was a misunderstanding. When I said
+> generic-phy I meant drivers/usb/phy/phy-generic.c and I was not
+> talking about Kishon's new generic PHY framework.
+> 
+> So I was only saying that if the dwc3-pci.c is the only thing that
+> needs the old usb phy support, then there should not be any problem
+> dropping the support for it.
 
-Since updating the pgd and ASID is atomic on LPAE systems (by virtue of
-the two being fields in the same hardware register), we can dispose of
-the reserved TTBR0 and rely on whatever tables we currently have live.
+oh, ok. Got it now, thanks.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/context.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 84e6f772e204..3ad0fdaa5cc1 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -78,20 +78,21 @@ void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
- #endif
- 
- #ifdef CONFIG_ARM_LPAE
--static void cpu_set_reserved_ttbr0(void)
--{
--	/*
--	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
--	 * ASID is set to 0.
--	 */
--	cpu_set_ttbr(0, __pa(swapper_pg_dir));
--	isb();
--}
-+/*
-+ * With LPAE, the ASID and page tables are updated atomicly, so there is
-+ * no need for a reserved set of tables (the active ASID tracking prevents
-+ * any issues across a rollover).
-+ */
-+#define cpu_set_reserved_ttbr0()
- #else
- static void cpu_set_reserved_ttbr0(void)
- {
- 	u32 ttb;
--	/* Copy TTBR1 into TTBR0 */
-+	/*
-+	 * Copy TTBR1 into TTBR0.
-+	 * This points at swapper_pg_dir, which contains only global
-+	 * entries so any speculative walks are perfectly safe.
-+	 */
- 	asm volatile(
- 	"	mrc	p15, 0, %0, c2, c0, 1		@ read TTBR1\n"
- 	"	mcr	p15, 0, %0, c2, c0, 0		@ set TTBR0\n"
 -- 
-1.8.2.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/f4014618/attachment.sig>
