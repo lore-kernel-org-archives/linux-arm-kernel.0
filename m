@@ -1,45 +1,77 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Dec 2013 17:07:14 +0100
-Subject: [PATCH v2 1/8] clk: max77686: Correct callback used for checking clock
- status
+Date: Thu, 12 Dec 2013 17:07:17 +0100
+Subject: [PATCH v2 4/8] clk: max77686: Make max77686_clk_register() return
+ struct clk *
 In-Reply-To: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
 References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1386864441-19561-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1386864441-19561-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing status of clock gates in max77686 requires i2c transfers, which
-can sleep, so this is done in prepare and unprepare callbacks. Due to
-this, checking whether whether the clock is ungated must be done
-in is_prepared() callback as well, for consistency.
+As a preparation for further patches, this patch modifies the clock
+registration helper function to return a pointer to the newly registered
+clock. No functional change is done to the driver.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/clk-max77686.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/clk-max77686.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 9f57bc3..e39d463 100644
+index 5d78460..2e6ba0e 100644
 --- a/drivers/clk/clk-max77686.c
 +++ b/drivers/clk/clk-max77686.c
-@@ -66,7 +66,7 @@ static void max77686_clk_unprepare(struct clk_hw *hw)
- 		MAX77686_REG_32KHZ, max77686->mask, ~max77686->mask);
- }
- 
--static int max77686_clk_is_enabled(struct clk_hw *hw)
-+static int max77686_clk_is_prepared(struct clk_hw *hw)
- {
- 	struct max77686_clk *max77686 = to_max77686_clk(hw);
- 	int ret;
-@@ -84,7 +84,7 @@ static int max77686_clk_is_enabled(struct clk_hw *hw)
- static struct clk_ops max77686_clk_ops = {
- 	.prepare	= max77686_clk_prepare,
- 	.unprepare	= max77686_clk_unprepare,
--	.is_enabled	= max77686_clk_is_enabled,
-+	.is_prepared	= max77686_clk_is_prepared,
+@@ -112,27 +112,26 @@ static struct clk_init_data max77686_clks_init[MAX77686_CLKS_NUM] = {
+ 	},
  };
  
- static struct clk_init_data max77686_clks_init[MAX77686_CLKS_NUM] = {
+-static int max77686_clk_register(struct device *dev,
++static struct clk *max77686_clk_register(struct device *dev,
+ 				struct max77686_clk *max77686)
+ {
+ 	struct clk *clk;
+ 	struct clk_hw *hw = &max77686->hw;
+ 
+ 	clk = clk_register(dev, hw);
+-
+ 	if (IS_ERR(clk))
+-		return -ENOMEM;
++		return clk;
+ 
+ 	max77686->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+ 	if (!max77686->lookup)
+-		return -ENOMEM;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	max77686->lookup->con_id = hw->init->name;
+ 	max77686->lookup->clk = clk;
+ 
+ 	clkdev_add(max77686->lookup);
+ 
+-	return 0;
++	return clk;
+ }
+ 
+ static int max77686_clk_probe(struct platform_device *pdev)
+@@ -154,12 +153,16 @@ static int max77686_clk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
++		struct clk *clk;
++
+ 		max77686_clks[i]->iodev = iodev;
+ 		max77686_clks[i]->mask = 1 << i;
+ 		max77686_clks[i]->hw.init = &max77686_clks_init[i];
+ 
+-		ret = max77686_clk_register(&pdev->dev, max77686_clks[i]);
+-		if (ret) {
++		clk = max77686_clk_register(&pdev->dev, max77686_clks[i]);
++		if (IS_ERR(clk)) {
++			ret = PTR_ERR(clk);
++
+ 			switch (i) {
+ 			case MAX77686_CLK_AP:
+ 				dev_err(&pdev->dev, "Fail to register CLK_AP\n");
 -- 
 1.8.4.3
