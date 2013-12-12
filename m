@@ -1,82 +1,44 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 12 Dec 2013 11:00:45 -0800
-Subject: [PATCHv3 1/2] arm64: Check for NULL device before getting the
- coherent_dma_mask
-In-Reply-To: <20131212121839.GC12617@mudshark.cambridge.arm.com>
-References: <1386711816-20270-1-git-send-email-lauraa@codeaurora.org>
- <1386711816-20270-2-git-send-email-lauraa@codeaurora.org>
- <20131211104239.GD26730@mudshark.cambridge.arm.com>
- <52A8A55A.9060709@codeaurora.org>
- <20131211175134.GL26730@mudshark.cambridge.arm.com>
- <52A8AAB3.8050500@codeaurora.org>
- <20131212121839.GC12617@mudshark.cambridge.arm.com>
-Message-ID: <52AA07DD.8010405@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 12 Dec 2013 14:02:41 -0500 (EST)
+Subject: [PATCH] net: eth: 8390: remove section warning in etherh.c
+In-Reply-To: <CAOesGMj_0m-Y8TvrZF=zgT33RuDtismjY=k6pbfm+MFmp2p=_w@mail.gmail.com>
+References: <1386837577-15130-1-git-send-email-olof@lixom.net>
+ <CAP8WD_aJEmBYbM0BmQodGJsOPqZ+vqk9B15n297q_+aCorR=VQ@mail.gmail.com>
+ <CAOesGMj_0m-Y8TvrZF=zgT33RuDtismjY=k6pbfm+MFmp2p=_w@mail.gmail.com>
+Message-ID: <20131212.140241.899891225639224762.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 4:18 AM, Will Deacon wrote:
-> On Wed, Dec 11, 2013 at 06:10:59PM +0000, Laura Abbott wrote:
->> On 12/11/2013 9:51 AM, Will Deacon wrote:
->>> On Wed, Dec 11, 2013 at 05:48:10PM +0000, Laura Abbott wrote:
->>>> On 12/11/2013 2:42 AM, Will Deacon wrote:
->>>>> On Tue, Dec 10, 2013 at 09:43:35PM +0000, Laura Abbott wrote:
->>>>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>>>>> index 4bd7579..4134212 100644
->>>>>> --- a/arch/arm64/mm/dma-mapping.c
->>>>>> +++ b/arch/arm64/mm/dma-mapping.c
->>>>>> @@ -33,7 +33,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
->>>>>>     					  dma_addr_t *dma_handle, gfp_t flags,
->>>>>>     					  struct dma_attrs *attrs)
->>>>>>     {
->>>>>> -	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
->>>>>> +	if (dev && IS_ENABLED(CONFIG_ZONE_DMA32) &&
->>>>>>     	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
->>>>>>     		flags |= GFP_DMA32;
->>>>>>     	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
->>>>>
->>>>> Unless I'm misreading the code, it looks like there are paths through
->>>>> swiotlb_alloc_coherent that will dereference the dev parameter without a
->>>>> NULL check. Are you sure we should allow for NULL devices here?
->>>>>
->>>>
->>>> The current ARM code allows for NULL devices so that would be a
->>>> difference in behavior between arm and arm64. We're also relying on this
->>>> behavior in some code. Where exactly in swiotlb_alloc_coherent does this
->>>> dereference happen? The only one I see is checked with 'if (hwdev &&
->>>> hwdev->coherent_dma_mask)'
+From: Olof Johansson <olof@lixom.net>
+Date: Thu, 12 Dec 2013 00:53:00 -0800
+
+> On Thu, Dec 12, 2013 at 12:46 AM, tedheadster <tedheadster@gmail.com> wrote:
+>> On Thu, Dec 12, 2013 at 3:39 AM, Olof Johansson <olof@lixom.net> wrote:
 >>>
->>> phys_to_dma could, but doesn't. The one I spotted was buried down in:
+>>> Commit c45f812f0280 ('8390 : Replace ei_debug with msg_enable/NETIF_MSG_*
+>>> feature') ended up moving the printout of version[] from something that
+>>> will be compiled out due to defines, to something that is now evaluated
+>>> at runtime.
 >>>
->>>     map_single -> swiotlb_tbl_map_single -> dma_get_seg_boundary
+>>> That means that what always used to be an access to an __initdata string
+>>> from non-__init code started showing up as a section mismatch when it
+>>> didn't before.
+>>>
+>>> All other 8390 versions skip __initdata on the version string, and
+>>> starting to annotate the whole chain of callers with __init seems like
+>>> more churn than it's worth on this driver, so remove it from etherh.c as
+>>> well.
 >>>
 >>
->> Ah yes I see that now.
->>
->> I guess the question still stands though, should we fixup the parts of
->> the code to fully support the NULL devices or do we tell clients to fix
->> their code and fail the allocation with a warning not to pass NULL?
->
-> Assuming it's always possible to pass in a non-NULL device, I'd be tempted
-> to fix the callers. Can you think of a valid use-case where the caller
-> doesn't have a device handle to pass in?
->
+>> Olof,
+>>   should you also remove the __init tag from etherh_banner() since it is
+>> called from etherh_probe(), which does not have an __init tag?
+> 
+> Hmm.
+> 
+> The section warning functionality is clever enough to not trigger when
+> a function is named _probe() and references __initdata, and discarding
+> etherh_banner() should be just fine so I don't see a need to remove
+> it.
 
-Depends on your definition of 'valid' ;)
-
-The only cases we've been able to come up with are places where we've 
-been abusing the DMA APIs slightly to get chunks of contiguous memory 
-through CMA for miscellaneous debugging/testing purposes. I only 
-stumbled across this problem at all while writing a quick test case for 
-CMA. I'd argue that if there is a real use case for non-device large 
-contiguous allocations there should be a new dedicated API that doesn't 
-break the dma abstraction.
-
-I suggest for now we add a big WARN when a NULL device is passed in and 
-see how many people complain.
-
-Laura
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Right, applied, thanks Olof.
