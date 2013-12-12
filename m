@@ -1,67 +1,59 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 12 Dec 2013 17:24:00 +0000
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
-Message-ID: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
+From: w-kwok2@ti.com (Kwok, WingMan)
+Date: Thu, 12 Dec 2013 17:24:31 +0000
+Subject: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
+In-Reply-To: <52A685E5.9060604@ti.com>
+References: <1386627424-373-1-git-send-email-w-kwok2@ti.com>
+ <1386627424-373-3-git-send-email-w-kwok2@ti.com> <52A685E5.9060604@ti.com>
+Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C603@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
-size for their register block. This causes the sh_modbile_sdhi driver to
-fail to communicate with card at-all.
 
-Change each sdhi node size from 0x100 to 0x200 to correct this.
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Linux SH <linux-sh@vger.kernel.org>
-Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Tested-by: William Towle <william.towle@codethink.co.uk>
----
- arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> -----Original Message-----
+> From: Quadros, Roger
+> Sent: Monday, December 09, 2013 10:09 PM
+> To: Kwok, WingMan; linux-usb at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; Shilimkar, Santosh; Balbi, Felipe;
+> Greg Kroah-Hartman
+> Subject: Re: [PATCH v3 2/2] usb: phy: Add keystone usb phy driver
+> 
+> On 12/10/2013 03:47 AM, WingMan Kwok wrote:
+> > Add Keystone platform USB PHY driver support. Current main purpose of
+> > this driver is to enable the PHY reference clock gate on the Keystone
+> > SoC. Otherwise it is a nop PHY.
+> >
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> > ---
+> >  drivers/usb/phy/Kconfig        |   10 +++
+> >  drivers/usb/phy/Makefile       |    1 +
+> >  drivers/usb/phy/phy-keystone.c |  142
+> > ++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 153 insertions(+)
+> >  create mode 100644 drivers/usb/phy/phy-keystone.c
+> >
+> > diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig index
+> > 08e2f39..c6792f43 100644
+> > --- a/drivers/usb/phy/Kconfig
+> > +++ b/drivers/usb/phy/Kconfig
+> > @@ -40,6 +40,16 @@ config ISP1301_OMAP
+> >  	  This driver can also be built as a module.  If so, the module
+> >  	  will be called isp1301_omap.
+> >
+> > +config KEYSTONE_USB_PHY
+> > +	tristate "Keystone USB PHY Driver"
+> > +	depends on ARCH_KEYSTONE
+> > +	select USB_PHY
+> 
+> NOP_USB_XCEIV selects USB_PHY so not necessary.
+> 
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 68b7b87..e218f25 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -254,7 +254,7 @@
- 
- 	sdhi0: sd at ee100000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee100000 0 0x100>;
-+		reg = <0 0xee100000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
- 		cap-sd-highspeed;
-@@ -263,7 +263,7 @@
- 
- 	sdhi1: sd at ee120000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee120000 0 0x100>;
-+		reg = <0 0xee120000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
- 		cap-sd-highspeed;
-@@ -272,7 +272,7 @@
- 
- 	sdhi2: sd at ee140000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee140000 0 0x100>;
-+		reg = <0 0xee140000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
- 		cap-sd-highspeed;
-@@ -281,7 +281,7 @@
- 
- 	sdhi3: sd at ee160000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee160000 0 0x100>;
-+		reg = <0 0xee160000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 168 IRQ_TYPE_LEVEL_HIGH>;
- 		cap-sd-highspeed;
--- 
-1.8.5.1
+Yes I have fixed it and updated patch which I'll post.
+" config AM335X_PHY_USB" needs to be fixed as well.
+
+Regards
+WingMan
