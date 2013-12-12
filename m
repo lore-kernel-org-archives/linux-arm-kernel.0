@@ -1,36 +1,24 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 12 Dec 2013 14:30:45 -0600
-Subject: [PATCHv6 5/5] ARM: socfpga_defconfig: enable SD/MMC support
-In-Reply-To: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1386880245-10192-6-git-send-email-dinguyen@altera.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 12 Dec 2013 14:07:54 -0700
+Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <201312121925.27591.marex@denx.de>
+References: <1386757818-5154-1-git-send-email-marex@denx.de>
+ <201312121122.33746.marex@denx.de>
+ <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
+ <201312121925.27591.marex@denx.de>
+Message-ID: <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Thu, Dec 12, 2013 at 11:25 AM, Marek Vasut <marex@denx.de> wrote:
+> Bjorn, would you mind picking 2/7...6/7 of this series so we are done with
+> those? I will re-post 1/7 as a self-standing patch afterwards, it has no impact
+> on the rest of the series.
 
-Enables the dw_mmc driver for SOCFPGA.
+Sure.  I can't really evaluate these myself, so I'm looking for acks
+from Richard or Shawn.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
-v6: none
-v5: Add dw_mmc driver into socfpga_defconfig
-v4: none
-v3: none
-v2: none
----
- arch/arm/configs/socfpga_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+I noticed Pratyush, Tim, and Harro had some questions the first time
+around, and I don't know whether they got resolved.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index 4e1ce21..8fff96ba 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -82,3 +82,5 @@ CONFIG_DEBUG_INFO=y
- CONFIG_ENABLE_DEFAULT_TRACERS=y
- CONFIG_DEBUG_USER=y
- CONFIG_XZ_DEC=y
-+CONFIG_MMC=y
-+CONFIG_MMC_DW=y
--- 
-1.7.9.5
+Bjorn
