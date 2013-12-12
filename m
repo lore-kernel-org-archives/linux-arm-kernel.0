@@ -1,36 +1,42 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Dec 2013 15:38:43 -0600
-Subject: [PATCH 5/7] usb: dwc3: omap: fix order of pm_runtime vs child removal
+Date: Thu, 12 Dec 2013 15:38:42 -0600
+Subject: [PATCH 4/7] usb: dwc3: omap: fix pm_runtime usage
 In-Reply-To: <1386884325-11440-1-git-send-email-balbi@ti.com>
 References: <1386884325-11440-1-git-send-email-balbi@ti.com>
-Message-ID: <1386884325-11440-6-git-send-email-balbi@ti.com>
+Message-ID: <1386884325-11440-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pm_runtime_put_sync() will kill dwc3's clocks and,
-since dwc3 core accesses registers during removal,
-we must make sure to unregister core before
-disabling clocks and pm_runtime.
+even if pm_runtime_get*() fails, it still increments
+pm usage counter, so we must pm_runtime_put*()
+in that case too. Fix that observation in dwc3-omap.c.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/dwc3/dwc3-omap.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/dwc3/dwc3-omap.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
-index 076bb28..a9090a1 100644
+index aea305d..076bb28 100644
 --- a/drivers/usb/dwc3/dwc3-omap.c
 +++ b/drivers/usb/dwc3/dwc3-omap.c
-@@ -580,9 +580,9 @@ static int dwc3_omap_remove(struct platform_device *pdev)
- 	if (omap->extcon_id_dev.edev)
- 		extcon_unregister_interest(&omap->extcon_id_dev);
- 	dwc3_omap_disable_irqs(omap);
-+	device_for_each_child(&pdev->dev, NULL, dwc3_omap_remove_core);
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
--	device_for_each_child(&pdev->dev, NULL, dwc3_omap_remove_core);
+@@ -451,7 +451,7 @@ static int dwc3_omap_probe(struct platform_device *pdev)
+ 	ret = pm_runtime_get_sync(dev);
+ 	if (ret < 0) {
+ 		dev_err(dev, "get_sync failed with err %d\n", ret);
+-		goto err0;
++		goto err1;
+ 	}
  
- 	return 0;
- }
+ 	reg = dwc3_omap_readl(omap->base, USBOTGSS_REVISION);
+@@ -566,8 +566,6 @@ err2:
+ 
+ err1:
+ 	pm_runtime_put_sync(dev);
+-
+-err0:
+ 	pm_runtime_disable(dev);
+ 
+ 	return ret;
 -- 
 1.8.4.GIT
