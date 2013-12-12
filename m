@@ -1,42 +1,88 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Dec 2013 17:07:13 +0100
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-Message-ID: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+Date: Thu, 12 Dec 2013 17:07:19 +0100
+Subject: [PATCH v2 6/8] clk: max77686: Refactor driver data handling
+In-Reply-To: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1386864441-19561-7-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series intends to improve clock provider impementation of max77686
-PMIC driver. First two patches are simple fixes of current implementation
-to allow correct control of provided clocks. Further patches refactor
-the driver to make the code cleaner and prepare for further patches. Then
-last two patches add registration of OF clock provider and adjust device
-tree nodes of boards containing max77686 chip to contain properties
-required by clock provider.
+As a prerequisite for further patch adding OF clock provider support to
+the driver, this patch changes the driver to store an array of struct
+clk * as driver data.
 
-Tested on Exynos4412-based Trats2 board, with additional patches adding
-driver being a consumer of one of max77686 clocks.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/clk/clk-max77686.c | 26 ++++++++++++++------------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
 
-Changes since v1:
- - rebased on top of current clk-next (no functional changes)
-
-Tomasz Figa (8):
-  clk: max77686: Correct callback used for checking clock status
-  clk: max77686: Provide .recalc_rate() operation
-  clk: max77686: Refactor successful exit of probe function
-  clk: max77686: Make max77686_clk_register() return struct clk *
-  clk: max77686: Fix clean-up in error and remove paths
-  clk: max77686: Refactor driver data handling
-  clk: max77686: Register OF clock provider
-  ARM: dts: Add clock provider specific properties to max77686 node
-
- .../devicetree/bindings/clock/maxim,max77686.txt   | 38 +++++++++
- Documentation/devicetree/bindings/mfd/max77686.txt |  3 +
- arch/arm/boot/dts/cros5250-common.dtsi             |  1 +
- arch/arm/boot/dts/exynos4412-odroidx.dts           |  1 +
- arch/arm/boot/dts/exynos4412-trats2.dts            |  1 +
- drivers/clk/clk-max77686.c                         | 97 +++++++++++++---------
- 6 files changed, 104 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77686.txt
-
+diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+index 81b3680..3cf38dc 100644
+--- a/drivers/clk/clk-max77686.c
++++ b/drivers/clk/clk-max77686.c
+@@ -137,12 +137,13 @@ static struct clk *max77686_clk_register(struct device *dev,
+ static int max77686_clk_probe(struct platform_device *pdev)
+ {
+ 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+-	struct max77686_clk **max77686_clks;
++	struct max77686_clk *max77686_clks[MAX77686_CLKS_NUM];
++	struct clk **clocks;
+ 	int i, ret;
+ 
+-	max77686_clks = devm_kzalloc(&pdev->dev, sizeof(struct max77686_clk *)
++	clocks = devm_kzalloc(&pdev->dev, sizeof(struct clk *)
+ 					* MAX77686_CLKS_NUM, GFP_KERNEL);
+-	if (!max77686_clks)
++	if (!clocks)
+ 		return -ENOMEM;
+ 
+ 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
+@@ -153,22 +154,20 @@ static int max77686_clk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
+-		struct clk *clk;
+-
+ 		max77686_clks[i]->iodev = iodev;
+ 		max77686_clks[i]->mask = 1 << i;
+ 		max77686_clks[i]->hw.init = &max77686_clks_init[i];
+ 
+-		clk = max77686_clk_register(&pdev->dev, max77686_clks[i]);
+-		if (IS_ERR(clk)) {
+-			ret = PTR_ERR(clk);
++		clocks[i] = max77686_clk_register(&pdev->dev, max77686_clks[i]);
++		if (IS_ERR(clocks[i])) {
++			ret = PTR_ERR(clocks[i]);
+ 			dev_err(&pdev->dev, "failed to register %s\n",
+ 				max77686_clks[i]->hw.init->name);
+ 			goto err_clocks;
+ 		}
+ 	}
+ 
+-	platform_set_drvdata(pdev, max77686_clks);
++	platform_set_drvdata(pdev, clocks);
+ 
+ 	return 0;
+ 
+@@ -183,12 +182,15 @@ err_clocks:
+ 
+ static int max77686_clk_remove(struct platform_device *pdev)
+ {
+-	struct max77686_clk **max77686_clks = platform_get_drvdata(pdev);
++	struct clk **clocks = platform_get_drvdata(pdev);
+ 	int i;
+ 
+ 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
+-		clkdev_drop(max77686_clks[i]->lookup);
+-		clk_unregister(max77686_clks[i]->hw.clk);
++		struct clk_hw *hw = __clk_get_hw(clocks[i]);
++		struct max77686_clk *max77686 = to_max77686_clk(hw);
++
++		clkdev_drop(max77686->lookup);
++		clk_unregister(clocks[i]);
+ 	}
+ 	return 0;
+ }
 -- 
 1.8.4.3
