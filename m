@@ -1,19 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 12 Dec 2013 13:08:35 -0700
-Subject: [PATCH] ARM: tegra: convert device tree files to use key defines
-In-Reply-To: <1385989797-10879-1-git-send-email-ldewangan@nvidia.com>
-References: <1385989797-10879-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <52AA17C3.5050700@wwwdotorg.org>
+Date: Thu, 12 Dec 2013 13:14:35 -0700
+Subject: [PATCH V3 0/4] ARM: tegra: convert dts files of all Tegra
+ platforms to use pinctrl defines
+In-Reply-To: <1386240249-30786-1-git-send-email-ldewangan@nvidia.com>
+References: <1386240249-30786-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <52AA192B.9090906@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 06:09 AM, Laxman Dewangan wrote:
-> Use key code macros for all key code refernced for keys.
-> 
-> For tegra20-seaboard.dts and tegra20-harmony.dts:
->   The key comment for key (16th row and 1st column) is KEY_KPSLASH but
->   code is 0x004e which is the key code for KEY_KPPLUS. As there other
->   key exist with KY_KPPLUS, I am assuming key code is wrong and comment
->   is fine. With this assumption, I am keeping the key code as KEY_KPSLASH.
+On 12/05/2013 03:44 AM, Laxman Dewangan wrote:
+> This patch series convert dts files of all Tegra's platforms to use the pinctron
+> dt-binding macro for better readability.
 
-I've applied this to Tegra's for-3.14/dt branch.
+I've applied the series to Tegra's for-3.14/dt branch.
