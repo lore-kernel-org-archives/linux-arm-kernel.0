@@ -1,78 +1,59 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Dec 2013 17:07:18 +0100
-Subject: [PATCH v2 5/8] clk: max77686: Fix clean-up in error and remove paths
+Date: Thu, 12 Dec 2013 17:07:21 +0100
+Subject: [PATCH v2 8/8] ARM: dts: Add clock provider specific properties to
+ max77686 node
 In-Reply-To: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
 References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1386864441-19561-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1386864441-19561-9-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes invalid kfree() and adds missing call to clk_unregister()
-in error and remove paths in max77686_clk_probe(). While at it, error
-handling is also cleaned up.
+This patch adds a label and #clock-cells property to device node of
+max77686 PMIC to allow using it as a clock provider.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/clk-max77686.c | 32 ++++++++++----------------------
- 1 file changed, 10 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/cros5250-common.dtsi   | 1 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts | 1 +
+ arch/arm/boot/dts/exynos4412-trats2.dts  | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 2e6ba0e..81b3680 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -162,20 +162,9 @@ static int max77686_clk_probe(struct platform_device *pdev)
- 		clk = max77686_clk_register(&pdev->dev, max77686_clks[i]);
- 		if (IS_ERR(clk)) {
- 			ret = PTR_ERR(clk);
--
--			switch (i) {
--			case MAX77686_CLK_AP:
--				dev_err(&pdev->dev, "Fail to register CLK_AP\n");
--				goto err_clk_ap;
--				break;
--			case MAX77686_CLK_CP:
--				dev_err(&pdev->dev, "Fail to register CLK_CP\n");
--				goto err_clk_cp;
--				break;
--			case MAX77686_CLK_PMIC:
--				dev_err(&pdev->dev, "Fail to register CLK_PMIC\n");
--				goto err_clk_pmic;
--			}
-+			dev_err(&pdev->dev, "failed to register %s\n",
-+				max77686_clks[i]->hw.init->name);
-+			goto err_clocks;
- 		}
- 	}
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index 42cef0a..a9dc776 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -48,6 +48,7 @@
+ 			pinctrl-0 = <&max77686_irq>;
+ 			wakeup-source;
+ 			reg = <0x09>;
++			#clock-cells = <1>;
  
-@@ -183,13 +172,12 @@ static int max77686_clk_probe(struct platform_device *pdev)
+ 			voltage-regulators {
+ 				ldo1_reg: LDO1 {
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 46c678e..8d337cc 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -119,6 +119,7 @@
+ 		max77686: pmic at 09 {
+ 			compatible = "maxim,max77686";
+ 			reg = <0x09>;
++			#clock-cells = <1>;
  
- 	return 0;
+ 			voltage-regulators {
+ 				ldo1_reg: LDO1 {
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index fb7b9ae..c21a8b9 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -139,6 +139,7 @@
+ 			interrupt-parent = <&gpx0>;
+ 			interrupts = <7 0>;
+ 			reg = <0x09>;
++			#clock-cells = <1>;
  
--err_clk_pmic:
--	clkdev_drop(max77686_clks[MAX77686_CLK_CP]->lookup);
--	kfree(max77686_clks[MAX77686_CLK_CP]->hw.clk);
--err_clk_cp:
--	clkdev_drop(max77686_clks[MAX77686_CLK_AP]->lookup);
--	kfree(max77686_clks[MAX77686_CLK_AP]->hw.clk);
--err_clk_ap:
-+err_clocks:
-+	for (--i; i >= 0; --i) {
-+		clkdev_drop(max77686_clks[i]->lookup);
-+		clk_unregister(max77686_clks[i]->hw.clk);
-+	}
-+
- 	return ret;
- }
- 
-@@ -200,7 +188,7 @@ static int max77686_clk_remove(struct platform_device *pdev)
- 
- 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
- 		clkdev_drop(max77686_clks[i]->lookup);
--		kfree(max77686_clks[i]->hw.clk);
-+		clk_unregister(max77686_clks[i]->hw.clk);
- 	}
- 	return 0;
- }
+ 			voltage-regulators {
+ 				ldo1_reg: ldo1 {
 -- 
 1.8.4.3
