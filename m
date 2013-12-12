@@ -1,54 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Dec 2013 17:20:49 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212171108.GA2337@1wt.eu>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <20131212144853.GO4360@n2100.arm.linux.org.uk>
- <1386860657.25449.3.camel@sakura.staff.proxad.net>
- <20131212154110.GQ4360@n2100.arm.linux.org.uk>
- <20131212160426.GD31816@1wt.eu>
- <20131212164748.GS4360@n2100.arm.linux.org.uk> <20131212171108.GA2337@1wt.eu>
-Message-ID: <20131212172049.GU4360@n2100.arm.linux.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 12 Dec 2013 17:24:00 +0000
+Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
+Message-ID: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 06:11:08PM +0100, Willy Tarreau wrote:
-> Another thing that can be done to improve the folding of the 16-bit
-> checksum is to swap the values to be added, sum them and only keep
-> the high half integer which already contains the carry. At least on
-> x86 I save some cycles doing this :
-> 
->               31:24  23:16  15:8  7:0
->      sum32 =    D      C      B    A
-> 
->      To fold this into 16-bit at a time, I just do this :
-> 
->                    31:24     23:16          15:8  7:0
->      sum32           D         C              B    A
->   +  sum32swapped    B         A              D    C
->   =                 A+B  C+A+carry(B+D/C+A)  B+D  C+A
-> 
-> so just take the upper result and you get the final 16-bit word at
-> once.
-> 
-> In C it does :
-> 
->        fold16 = (((sum32 >> 16) | (sum32 << 16)) + sum32) >> 16
-> 
-> When the CPU has a rotate instruction, it's fast :-)
+The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
+size for their register block. This causes the sh_modbile_sdhi driver to
+fail to communicate with card at-all.
 
-Indeed - and if your CPU can do the rotate and add at the same time,
-it's just a singe instruction, and it ends up looking remarkably
-similar to this:
+Change each sdhi node size from 0x100 to 0x200 to correct this.
 
-static inline __sum16 csum_fold(__wsum sum)
-{
-        __asm__(
-        "add    %0, %1, %1, ror #16     @ csum_fold"
-        : "=r" (sum)
-        : "r" (sum)
-        : "cc");
-        return (__force __sum16)(~(__force u32)sum >> 16);
-}
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Linux SH <linux-sh@vger.kernel.org>
+Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Tested-by: William Towle <william.towle@codethink.co.uk>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 68b7b87..e218f25 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -254,7 +254,7 @@
+ 
+ 	sdhi0: sd at ee100000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee100000 0 0x100>;
++		reg = <0 0xee100000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+@@ -263,7 +263,7 @@
+ 
+ 	sdhi1: sd at ee120000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee120000 0 0x100>;
++		reg = <0 0xee120000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+@@ -272,7 +272,7 @@
+ 
+ 	sdhi2: sd at ee140000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee140000 0 0x100>;
++		reg = <0 0xee140000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+@@ -281,7 +281,7 @@
+ 
+ 	sdhi3: sd at ee160000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee160000 0 0x100>;
++		reg = <0 0xee160000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 168 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+-- 
+1.8.5.1
