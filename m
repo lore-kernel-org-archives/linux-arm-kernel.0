@@ -1,35 +1,55 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 12 Dec 2013 15:22:49 +0530
-Subject: [PATCH] ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
-Message-ID: <1386841969-765-1-git-send-email-rnayak@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 12 Dec 2013 10:53:52 +0100
+Subject: [PATCH 1/5] clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag
+ for the sysreg clock
+In-Reply-To: <CAM4voanSSqqAzRqrNrRc+HYh4vtq3zgNeGQYCVG6sE6nB_eWGA@mail.gmail.com>
+References: <1386763029-8516-1-git-send-email-a.kesavan@samsung.com>
+ <CAD=FV=XG+5n+SW_bDiFtQB7ieViAxVAO5E12+y-DgY34maT6DQ@mail.gmail.com>
+ <CAM4voanSSqqAzRqrNrRc+HYh4vtq3zgNeGQYCVG6sE6nB_eWGA@mail.gmail.com>
+Message-ID: <57785646.ACHYxksEZV@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with
- DEBUG_LL' we moved from parsing cmdline to identify uart used for earlycon
-to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
+On Thursday 12 of December 2013 10:06:36 Abhilash Kesavan wrote:
+> Hi Tomasz and Doug,
+> 
+> Thanks for the review.
+> On Thu, Dec 12, 2013 at 6:00 AM, Doug Anderson <dianders@chromium.org> wrote:
+> > Tomasz,
+> >
+> > On Wed, Dec 11, 2013 at 4:13 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+[snip]
+> >> Still, I discussed about such cases as this with Sylwester a bit today and
+> >> maybe a bit different approach would be better. There is a number of clocks
+> >> that need to be always on, such as PMU (but also a lot of currently undefined
+> >> ones). IMHO it would be nice to make sure they are enabled at boot time
+> >> and do one of following:
+> >> 1) claim and enable them directly from the clock controller driver
+> >> 2) define them with CLK_IGNORE_UNUSED flag and enable them directly from
+> >>    the clock controller driver (without increasing the refcount, so users could
+> >>    possibly disable them later),
+> >> 3) add a generic flag, such as CLK_BOOT_ENABLE (or something), that would
+> >>    make the CCF enable such clock at bootup (in addition to implying
+> >>    CLK_IGNORE_UNUSED).
+> >>
+> >> For me, the most sensible option would be 2) as it doesn't bloat the CCF with
+> >> yet another flag and doesn't encourage people to leave clocks always on
+> >> just because of laziness stopping them from implementing proper clock
+> >> support in drivers.
+> >
+> > Right, we're using #2 for this now, but one problem is that it's
+> > possible that the firmware may turn off one of these misc-type clocks.
+> >  On exynos5250-snow we ran into this.  The firmware actually gates the
+> > clock needed for accessing the chip_id, though perhaps that's not one
+> > of the clocks that needs to be on all the time.
+> 
+> Yes, If the firmware gates sysreg then we should see failures at
+> boot-up or later.
+> Is this patch OK for now ? How would you guys like me to proceed on this ?
 
-On DRA7 though, we seem to be missing this flag, and atleast on the DRA7 EVM
-where we use uart1 for console, boot fails with DEBUG_LL enabled.
+Yes, as I wrote in my original reply, for now your patch is fine as we
+don't have the infrastructure for handling such clocks in a stricter
+way yet.
 
-Reported-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index db32d53..18f333c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1637,7 +1637,7 @@ static struct omap_hwmod dra7xx_uart1_hwmod = {
- 	.class		= &dra7xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
- 	.main_clk	= "uart1_gfclk_mux",
--	.flags		= HWMOD_SWSUP_SIDLE_ACT,
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP2UART1_FLAGS,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DRA7XX_CM_L4PER_UART1_CLKCTRL_OFFSET,
--- 
-1.7.9.5
+Best regards,
+Tomasz
