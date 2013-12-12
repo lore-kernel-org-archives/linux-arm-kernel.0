@@ -1,49 +1,125 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 20:15:18 +0100
-Subject: [PATCH v2 2/3] pinctrl: Add msm8x74 configuration
-In-Reply-To: <52A7C4BB.6000701@codeaurora.org>
-References: <1386295805-13708-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1386295805-13708-3-git-send-email-bjorn.andersson@sonymobile.com>
- <52A24E08.706@codeaurora.org>
- <20131210084140.GF11990@sonymobile.com>
- <52A7C4BB.6000701@codeaurora.org>
-Message-ID: <CACRpkdY9Z71VcS6ERiaDbg9P7qPEK_jCVXLvoCDx6YztYCnR2Q@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 12 Dec 2013 19:25:27 +0100
+Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
+References: <1386757818-5154-1-git-send-email-marex@denx.de>
+ <201312121122.33746.marex@denx.de>
+ <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
+Message-ID: <201312121925.27591.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 2:49 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 12/10/13 00:41, Bjorn Andersson wrote:
->> On Fri 06 Dec 14:22 PST 2013, Stephen Boyd wrote:
+On Thursday, December 12, 2013 at 07:16:18 PM, Tim Harvey wrote:
+> On Thu, Dec 12, 2013 at 2:22 AM, Marek Vasut <marex@denx.de> wrote:
+> > On Thursday, December 12, 2013 at 06:10:31 AM, Tim Harvey wrote:
+> > > On Wed, Dec 11, 2013 at 2:30 AM, Marek Vasut <marex@denx.de> wrote:
+> > > > Some boards do not have a PCIe reset GPIO. To avoid probe
+> > > > failure on these boards, make the reset GPIO optional as
+> > > > well.
+> > > > 
+> > > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > > Cc: Frank Li <lznuaa@gmail.com>
+> > > > Cc: Harro Haan <hrhaan@gmail.com>
+> > > > Cc: Jingoo Han <jg1.han@samsung.com>
+> > > > Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> > > > Cc: Pratyush Anand <pratyush.anand@st.com>
+> > > > Cc: Richard Zhu <r65037@freescale.com>
+> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > Cc: Sean Cross <xobs@kosagi.com>
+> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > > Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> > > > Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> > > > Cc: Tim Harvey <tharvey@gateworks.com>
+> > > > Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> > > > Cc: Yinghai Lu <yinghai@kernel.org>
+> > > > ---
+> > > > 
+> > > >  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+> > > >  drivers/pci/host/pci-imx6.c                        | 29
+> > > >  +++++++++++----------- 2 files changed, 16 insertions(+), 15
+> > > >  deletions(-)
+> > > > 
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> > > > b/Documentation/devicetree/bindings/pci/designware-pcie.txt index
+> > > > d5d26d4..b7a2279 100644
+> > > > --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> > > > +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> > > > 
+> > > > @@ -19,9 +19,9 @@ Required properties:
+> > > >         to define the mapping of the PCIe interface to interrupt
+> > > >         numbers.
+> > > >  
+> > > >  - num-lanes: number of lanes to use
+> > > > 
+> > > > -- reset-gpio: gpio pin number of power good signal
+> > > > 
+> > > >  Optional properties for fsl,imx6q-pcie
+> > > > 
+> > > > +- reset-gpio: gpio pin number of power good signal
+> > > > 
+> > > >  - power-on-gpio: gpio pin number of power-enable signal
+> > > >  - wake-up-gpio: gpio pin number of incoming wakeup signal
+> > > >  - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable
+> > > >  signal
+> > > > 
+> > > > diff --git a/drivers/pci/host/pci-imx6.c
+> > > > b/drivers/pci/host/pci-imx6.c index bd70af8..52027ad 100644
+> > > > --- a/drivers/pci/host/pci-imx6.c
+> > > > +++ b/drivers/pci/host/pci-imx6.c
+> > > > @@ -214,9 +214,12 @@ static int imx6_pcie_assert_core_reset(struct
+> > > > pcie_port *pp)
+> > > > 
+> > > >         regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > > >         
+> > > >                         IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+> > > > 
+> > > > -       gpio_set_value(imx6_pcie->reset_gpio, 0);
+> > > > -       msleep(100);
+> > > > -       gpio_set_value(imx6_pcie->reset_gpio, 1);
+> > > > +       /* Some boards don't have PCIe reset GPIO. */
+> > > > +       if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+> > > > +               gpio_set_value(imx6_pcie->reset_gpio, 0);
+> > > > +               msleep(100);
+> > > > +               gpio_set_value(imx6_pcie->reset_gpio, 1);
+> > > > +       }
+> > > > 
+> > > >         return 0;
+> > > >  
+> > > >  }
+> > > 
+> > > Marek,
+> > > 
+> > > Though not the fault of your patch, I noticed while looking at this
+> > > that the PCI Express specification is not being properly met with
+> > > regards to PERST# and the reference clock.  The spec states that
+> > > PERST# must be kept asserted until after the reference clock is stable
+> > > (I'm not entirely clear how long of a delay is needed for the clock to
+> > > become stable but I think the value is typically the 100ms).  I see in
+> > > the current pci-imx6.c code that imx6_pcie_host_init calls
+> > > imx6_pcie_assert_core_reset first, then imx6_pcie_init_phy, followed
+> > > by imx6_pcie_deassert_core_reset.  Despite the function names,
+> > > imx6_pcie_assert_core_reset as shown above asserts then de-asserts
+> > > PERST# before the clock is enabled in imx6_pcie_deassert_core_reset.
+> > > This seems to me to be a violation of the spec and I believe the
+> > > msleep(100) and de-assertion of the option reset_gpio should be done
+> > > in imx6_pcie_deassert_core reset after the clock is brought up.
+> > > 
+> > > If you agree with my assessment, would you mind resolving this issue
+> > > at the same time?  If not, I'm happy to follow-up with a patch to
+> > > resolve it after your patch is accepted.
+> > 
+> > Is this not resolved by patch 0006 in this series please?
+> 
+> Marek,
+> 
+> Yes it is addressed there.  Sorry - I missed that.
 
->>> Also, do we ever plan to have anything more than the gpio pins and the
->>> sdc pins? It seems like we spend a lot of space describing exactly the
->>> same thing in these structs for each of the 146 gpio pins when we could
->>> just know that range 0 to 146 is gpio pins and have different code for
->>> that part vs the 6 or something sd pins.
->>>
->> We have to have a pingroup list, so I did look at having that list
->> referencing a common object with the gpio/sdc specific data.
->>
->> But just having it in one large blob is the way that other pinctrl
->> drivers does it and hence a common problem to pinctrl and multi-platform
->> arm support.
->
-> I don't follow what Linus is recommending. How could
-> .gpio_request_enable()/.gpio_disable_free() help us here?
+No problem, thanks for checking it :)
 
-That removes the need to define a single group for each pin that
-can be used as GPIO.
+Bjorn, would you mind picking 2/7...6/7 of this series so we are done with 
+those? I will re-post 1/7 as a self-standing patch afterwards, it has no impact 
+on the rest of the series.
 
-It is described in Documentation/pinctrl.txt under the heading
-"Pin control interaction with the GPIO subsystem"
-
-On a related key I guess drivers/gpio/gpio-msm-v2.c needs
-to be patched to call pinctrl_request_gpio()/
-pinctrl_free_gpio()/pinctrl_gpio_direction_input()/
-pinctrl_gpio_direction_output() before the GPIO back-end
-works at all so there is still time to change this (plus it is
-not part of the DT binding or anything so it can be changed
-at any time).
-
-Yours,
-Linus Walleij
+Shawn, can you please pick 7/7 ?
