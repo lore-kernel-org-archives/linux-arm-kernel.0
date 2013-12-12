@@ -1,73 +1,95 @@
-From: panchaxari.prasannamurthy@linaro.org (panchaxari)
-Date: Thu, 12 Dec 2013 10:42:32 +0530
-Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
- by default
-Message-ID: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Thu, 12 Dec 2013 13:13:08 +0800
+Subject: [PATCH 01/12] SPEAr13xx: Correct dt field name for stmmac phy-addr
+In-Reply-To: <CAGb2v67tK7W12Ljb-j+KJhGQkZ_k_p0WK+kcYiRqOuQujJL1HA@mail.gmail.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <1078549fa412fb34ab2c95a6232096570abee12d.1386752447.git.mohit.kumar@st.com>
+ <52A847D1.5000409@st.com> <001b01cef6d2$9104f7b0$b30ee710$%han@samsung.com>
+ <52A934A2.8020101@st.com>
+ <CAGb2v67tK7W12Ljb-j+KJhGQkZ_k_p0WK+kcYiRqOuQujJL1HA@mail.gmail.com>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189F95F6435@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR have been enabled as default configs
-to S5P64X0 platforms.
+Hello Shiraz/Viresh,
 
-Introduction of PHYS_VIRT config as default would enable phy-to-virt and
-virt-to-phy translation function at boot and module loading time
-and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
-enable calculation of kernel load address at run time.
+> -----Original Message-----
+> From: wens213 at gmail.com [mailto:wens213 at gmail.com] On Behalf Of
+> Chen-Yu Tsai
+> Sent: Thursday, December 12, 2013 9:37 AM
+> To: Rajeev KUMAR
+> Cc: Jingoo Han; Pratyush ANAND; devicetree at vger.kernel.org; Mohit
+> KUMAR DCG; spear-devel; Viresh Kumar; linux-pci at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; Florian Fainelli
+> Subject: Re: [PATCH 01/12] SPEAr13xx: Correct dt field name for stmmac phy-
+> addr
+> 
+> Hi,
+> 
+> On Thu, Dec 12, 2013 at 11:59 AM, Rajeev kumar <rajeev-
+> dlh.kumar at st.com> wrote:
+> > On 12/12/2013 6:09 AM, Jingoo Han wrote:
+> >>
+> >> On Wednesday, December 11, 2013 8:09 PM, Rajeev kumar wrote:
+> >>>
+> >>> On 12/11/2013 3:08 PM, Mohit KUMAR wrote:
+> >>>>
+> >>>> DT field name for the phy address changed since kernel 3.10. Set
+> >>>> the snps,phy-addr to 0xffffffff so that the driver probes for the phy.
+> >>>>
+> >>>> Signed-off-by: Mohit Kumar<mohit.kumar@st.com>
+> >>>> Cc: Pratyush Anand<pratyush.anand@st.com>
+> >>>> Cc: Viresh Kumar<viresh.linux@gmail.com>
+> >>>> Cc: spear-devel at list.st.com
+> >>>> Cc: linux-arm-kernel at lists.infradead.org
+> >>>> Cc: devicetree at vger.kernel.org
+> >>>> ---
+> >>>>    arch/arm/boot/dts/spear13xx.dtsi |    1 +
+> >>>>    1 files changed, 1 insertions(+), 0 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/spear13xx.dtsi
+> >>>> b/arch/arm/boot/dts/spear13xx.dtsi
+> >>>> index 4382547..3518803 100644
+> >>>> --- a/arch/arm/boot/dts/spear13xx.dtsi
+> >>>> +++ b/arch/arm/boot/dts/spear13xx.dtsi
+> >>>> @@ -155,6 +155,7 @@
+> >>>>
+> >>>>                 gmac0: eth at e2000000 {
+> >>>>                         compatible = "st,spear600-gmac";
+> >>>> +                       snps,phy-addr =<0xffffffff>;
+> >>>
+> >>>
+> >>> Don't you think it should be st,phy-addr =<0xffffffff>, as the
+> >>> manufacturer is 'st' as the compatible suggest
+> >>
+> >>
+> >> Hi Rajeev Kumar,
+> >>
+> >> According to the Documentation, it guides to use 'snps' prefix.
+> >>
+> >> In my humble opinion,
+> >> 'gmac' is a Synopsys based IP. Thus, if 'snps,phy-addr' is not ST
+> >> specific, 'snps' prefix can be used.
+> >>
+> >
+> >
+> > Very much true, I raise the point just becuase compatible =
+> > "st,spear600-gmac". Check the manufacturer name here.
+> 
+> As documented, "st,spear600-gmac" is there for backwards compatibility. It
+> should really be updated to '"snps,dwmac-<version>", "snps,dwmac"'.
+> 
+> 
+> 
+> 
+> >> ./Documentation/devicetree/bindings/net/stmmac.txt
+> >> - snps,phy-addr         phy address to connect to.
+> 
+> About the "snps,phy-addr" property, Florian recently raised the issue that
+> this is !standard. I am currently implementing proper DT ethernet phy node
+> support for stmmac. Just a heads up. :)
+> 
+- Any comment on this?
 
-PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
-systems with NOR flash devices, and ZRELADDR config is mutually exclusive
-to ZBOOT_ROM.
-
-CFT::Call For Testing
-
-Requesting maintainers of S5P64X0 platforms to evaluate the changes on the
-board and comment, as I dont have the board for testing and also requesting
-an ACK
-
-Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-
----
-The samsung S5P64X0 vega has an average performing CPU with max speed 667 Mhz.
-This SOC has two variants S5P6440 and S5P6450. It has one core based on
-ARM1176JZF-S instruction set, and has 16KB data and instruction cache each.
-
-SOC has a memory subsystem with support to NAND Flash interface with x8 data
-bus, with 1/4/8/12/16 bit hardware ECC circuit and 4KB Page mode. It has
-Mobile DDR interface with x16 or x32 data bus, and DDR2 interface with x16 or
-x32 data bus it also supports eMMC4.4.
-
-Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
-and ZRELADDR
--------------------------------------------------
-
-https://lkml.org/lkml/2011/10/14/434
-
--------------------------------------------------
----
- arch/arm/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 934e26c..8986335 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -759,6 +759,8 @@ config ARCH_S3C64XX
- 
- config ARCH_S5P64X0
- 	bool "Samsung S5P6440 S5P6450"
-+	select ARM_PATCH_PHYS_VIRT
-+	select AUTO_ZRELADDR
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
- 	select CPU_V6
--- 
-1.7.10.4
+Regards
+Mohit
