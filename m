@@ -1,33 +1,35 @@
-From: panchaxari.prasannamurthy@linaro.org (Panchaxari Prasannamurthy Tumkur)
-Date: Thu, 12 Dec 2013 16:33:46 +0530
-Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
- AUTO_ZRELADDR by default
-In-Reply-To: <26167386.hX5eWUjT6T@flatron>
-References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
- <26167386.hX5eWUjT6T@flatron>
-Message-ID: <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 12 Dec 2013 12:15:57 +0100
+Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI
+ host maintainers
+In-Reply-To: <20131211183237.GI4699@google.com>
+References: <20131211183237.GI4699@google.com>
+Message-ID: <20131212111556.GB11524@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz
+On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
+> If this looks reasonable, I'll merge it via the PCI tree for v3.13.
+> 
+> Bjorn
+> 
+> 
+> MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI host maintainers
+> 
+> Add entries for PCI host controller drivers in drivers/pci/host/.
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  MAINTAINERS |   31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
 
-> Could you explain the purpose of this change on S5P64x0?
->
-> This is actually quite a poor platform choice. As of today, the kernel
-> is stuck with supporting just SMDK6440/6450 boards, which are proprietary
-> development boards and it doesn't look like any further boards will show
-> up in future. Kukjin has actually proposed removing support for this
-> platform at all and I consider this reasonable.
->
-> Kukjin, should we proceed with removal?
+Looks good to me:
 
-The purpose of this patch is with the greater intent of consolidating
-ARM-32 kernel. Which means a generic kernel for ARM-32 processors.
-
-Hence these platform supported configs are introduced as default for
-that particular platform.
-
-I hope i answered your question. Else please mail me with further queries.
-
-thanks
-Panchaxari
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/14e7981b/attachment.sig>
