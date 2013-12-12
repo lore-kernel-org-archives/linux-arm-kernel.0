@@ -1,37 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Dec 2013 13:16:54 +0000
-Subject: regulator-core has_full_constraints set too late for dt using
- boards ?
-In-Reply-To: <52A9B48A.8040601@redhat.com>
-References: <52A88805.1080704@redhat.com>
- <20131211160225.GB11468@sirena.org.uk>
- <52A98C72.2040203@redhat.com>
- <20131212104208.GG11044@sirena.org.uk>
- <52A9A9DB.5050102@redhat.com>
- <20131212122347.GK11044@sirena.org.uk>
- <52A9B48A.8040601@redhat.com>
-Message-ID: <20131212131654.GL11044@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Dec 2013 14:24:37 +0100
+Subject: [PATCH] serial: pl011: also enable DMA Rx polling with no
+ platform data
+In-Reply-To: <Pine.LNX.4.64.1312120923160.32185@axis700.grange>
+References: <1385631664-32607-1-git-send-email-linus.walleij@linaro.org>
+ <Pine.LNX.4.64.1312091229550.30018@axis700.grange>
+ <Pine.LNX.4.64.1312120923160.32185@axis700.grange>
+Message-ID: <CACRpkdZ2n64EnVaB81bo578jmMzmW+OMGjehVTO=7Pa1zBGAvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 02:05:14PM +0100, Hans de Goede wrote:
-> On 12/12/2013 01:23 PM, Mark Brown wrote:
+On Thu, Dec 12, 2013 at 10:18 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
 
-> >It's sitting in my review queue, it's not very well described so it's
-> >not clear that you've selected the correct criteria and I need to find
-> >time to actually look at it properly.
+> An addendum to this patch, that might well lead to dropping it and,
+> possibly, doing the opposite - removing the DMA Rx polling completely.
 
-> Since regulator_get_optional is the only one calling
-> _regulator_get() with both allow_dummy and exclusive set to
-> false I've added the following condition to printing the
-> error:
+I agree with your reasoning, but not with dropping the Rx code
+altogether. However we should also drop my patch so we restore
+the opt-in-only characteristic until we can rootcause this.
 
-Put some of this analysis in the commit message and perhaps a comment in
-the code please...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/a3e93479/attachment.sig>
+Greg can you please drop or revert
+commit 17438217a6f5e33d920ed3821a4b857311cc2872
+"serial: pl011: use DMA RX polling by default"
+from the TTY tree until this has been sorted out?
+
+Yours,
+Linus Walleij
