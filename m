@@ -1,398 +1,79 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 12 Dec 2013 14:19:20 +0000
-Subject: [Xen-devel] [PATCH v2] xen/block: Correctly define structures
- in public headers on ARM32 and ARM64
-In-Reply-To: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
-References: <1386085237-8334-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <1386857960.11201.57.camel@kazak.uk.xensource.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 12 Dec 2013 15:19:26 +0100
+Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
+In-Reply-To: <1386857410.22947.78.camel@sakura.staff.proxad.net>
+References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
+ <20131212124015.GL4360@n2100.arm.linux.org.uk>
+ <1386855390.22947.68.camel@sakura.staff.proxad.net>
+ <yw1xppp2ji38.fsf@unicorn.mansr.com>
+ <1386857410.22947.78.camel@sakura.staff.proxad.net>
+Message-ID: <20131212141926.GA31816@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-03 at 15:40 +0000, Julien Grall wrote:
-> On ARM (32 bits and 64 bits), the double-word is 8-bytes aligned. This will
-> result on different structure from Xen and Linux repositories.
+Hi Maxime,
+
+On Thu, Dec 12, 2013 at 03:10:10PM +0100, Maxime Bizon wrote:
 > 
-> As Linux is using __packed__ attribute, it must have a 4-bytes padding before
-> each "id" field.
+> On Thu, 2013-12-12 at 13:48 +0000, M?ns Rullg?rd wrote:
 > 
-> This change breaks guest block support with older kernel. IMHO, it's acceptable
-> because Xen on ARM is still on Tech Preview and the hypercall ABI is not yet
-> freezed.
+> > In the code above, the outer (uint16_t) cast should clear the top half,
+> > as should passing the value to a function (inline doesn't alter the
+> > semantics) as a 16-bit type, so there's something fishy here.
 > 
-> Only one architecture (x86_32) doesn't have 64-bit ABI for the block interface.
-> Don't add padding if Linux is compiled for this architecture.
+> using __attribute__((noinline)), or putting the function in another file
+> makes the bug disappear
+> 
+> But I'm not convinced inline doesn't change the semantic, since gcc is
+> merging the function inside another one the rules of calling convention
+> should not matter anymore.
 
-Konrad asked for confirmation that this didn't change x86.
+I disagree here, since gcc may decide by itself to inline or not, it must
+not impact the validity of the emitted code. Inline functions have input
+and output types for a reason!
 
-Using
-http://stackoverflow.com/questions/9788679/how-to-get-the-relative-adress-of-a-field-in-a-structure-dump-c
+(...)
+> #include <stdint.h>
+> #include <stdio.h>
+> 
+> static inline uint32_t asm_add(uint16_t len, uint32_t sum)
+> {
+>         __asm__(
+>         "add    %0, %1, %2 \n"
+>         : "=&r"(sum)
+>         : "r" (sum), "r" (len)
+>         );
+>         return sum;
+> }
 
-I created offsets.py as described there then for i386, amd64, arm, arm64
-before and after I built with CONFIG_DEBUG_INFO but not
-CONFIG_DEBUG_INFO_REDUCED then:
+Hmmm aren't you passing a 16-bit register directly to the ASM for being used
+as a 32-bit one ? This seems hasardous to me since nowhere you tell gcc how
+you're going to use the register.
 
-        $ cat script
-        python
-        sys.path.insert(0, '')
-        import offsets
-        end
-        
-        offsets-of "struct blkif_request"
-        offsets-of "struct blkif_request_rw"
-        offsets-of "struct blkif_request_discard"
-        offsets-of "struct blkif_request_other"
-        offsets-of "struct blkif_request_indirect"
-        $ gdb -x script --batch drivers/block/xen-blkfront.o
-        struct blkif_request {
-            operation => 0
-            u => 1
-        }
-        struct blkif_request_rw {
-            nr_segments => 0
-            handle => 1
-            _pad1 => 3
-            id => 7
-            sector_number => 15
-            seg => 23
-        }
-        struct blkif_request_discard {
-            flag => 0
-            _pad1 => 1
-            _pad2 => 3
-            id => 7
-            sector_number => 15
-            nr_sectors => 23
-            _pad3 => 31
-        }
-        struct blkif_request_other {
-            _pad1 => 0
-            _pad2 => 1
-            _pad3 => 3
-            id => 7
-        }
-        struct blkif_request_indirect {
-            indirect_op => 0
-            nr_segments => 1
-            _pad1 => 3
-            id => 7
-            sector_number => 15
-            handle => 23
-            _pad2 => 25
-            indirect_grefs => 27
-            _pad3 => 59
-        }
+Could you check if that fixes it :
 
-There is no difference to either x86 arch:
-        $ diff -q x86_32.{before,after} && echo same
-        same
-        $ diff -q x86_64.{before,after} && echo same
-        same
-        $
-And crucially:
-        $ diff -q arm.after arm64.after && echo same
-        same
-        $ diff -q arm.after x86_64.after && echo same
-        same
-        $
+ static inline uint32_t asm_add(uint16_t len, uint32_t sum)
+ {
+         uint32_t len32 = len;
 
-Full results attached.
+         __asm__(
+         "add    %0, %1, %2 \n"
+         : "=&r"(sum)
+         : "r" (sum), "r" (len32)
+         );
+         return sum;
+ }
 
-Ian.
+Or maybe simply :
 
+ static inline uint32_t asm_add(uint16_t len, uint32_t sum)
+ {
+         __asm__(
+         "add    %0, %1, %2 \n"
+         : "=&r"(sum)
+         : "r" (sum), "r" (uint32_t)(len)
+         );
+         return sum;
+ }
 
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    seg => 23
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    _pad2 => 3
-    id => 7
-    sector_number => 15
-    nr_sectors => 23
-    _pad3 => 31
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    _pad3 => 3
-    id => 7
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    handle => 23
-    _pad2 => 25
-    indirect_grefs => 27
-    _pad3 => 59
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    id => 3
-    sector_number => 11
-    seg => 19
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    id => 3
-    sector_number => 11
-    nr_sectors => 19
-    _pad3 => 27
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    id => 3
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    id => 3
-    sector_number => 11
-    handle => 19
-    _pad2 => 21
-    indirect_grefs => 23
-    _pad3 => 55
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    seg => 23
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    _pad2 => 3
-    id => 7
-    sector_number => 15
-    nr_sectors => 23
-    _pad3 => 31
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    _pad3 => 3
-    id => 7
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    handle => 23
-    _pad2 => 25
-    indirect_grefs => 27
-    _pad3 => 59
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    id => 3
-    sector_number => 11
-    seg => 19
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    id => 3
-    sector_number => 11
-    nr_sectors => 19
-    _pad3 => 27
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    id => 3
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    id => 3
-    sector_number => 11
-    handle => 19
-    _pad2 => 21
-    indirect_grefs => 23
-    _pad3 => 55
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    id => 3
-    sector_number => 11
-    seg => 19
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    id => 3
-    sector_number => 11
-    nr_sectors => 19
-    _pad3 => 27
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    id => 3
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    id => 3
-    sector_number => 11
-    handle => 19
-    _pad2 => 21
-    indirect_grefs => 23
-    _pad3 => 55
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    id => 3
-    sector_number => 11
-    seg => 19
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    id => 3
-    sector_number => 11
-    nr_sectors => 19
-    _pad3 => 27
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    id => 3
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    id => 3
-    sector_number => 11
-    handle => 19
-    _pad2 => 21
-    indirect_grefs => 23
-    _pad3 => 55
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    seg => 23
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    _pad2 => 3
-    id => 7
-    sector_number => 15
-    nr_sectors => 23
-    _pad3 => 31
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    _pad3 => 3
-    id => 7
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    handle => 23
-    _pad2 => 25
-    indirect_grefs => 27
-    _pad3 => 59
-}
--------------- next part --------------
-struct blkif_request {
-    operation => 0
-    u => 1
-}
-struct blkif_request_rw {
-    nr_segments => 0
-    handle => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    seg => 23
-}
-struct blkif_request_discard {
-    flag => 0
-    _pad1 => 1
-    _pad2 => 3
-    id => 7
-    sector_number => 15
-    nr_sectors => 23
-    _pad3 => 31
-}
-struct blkif_request_other {
-    _pad1 => 0
-    _pad2 => 1
-    _pad3 => 3
-    id => 7
-}
-struct blkif_request_indirect {
-    indirect_op => 0
-    nr_segments => 1
-    _pad1 => 3
-    id => 7
-    sector_number => 15
-    handle => 23
-    _pad2 => 25
-    indirect_grefs => 27
-    _pad3 => 59
-}
+Willy
