@@ -1,44 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Dec 2013 11:06:18 -0800
-Subject: [PATCH 5/8] mfd: Move pm8xxx-irq.c contents into only driver
- that uses it
-In-Reply-To: <20131211093552.GG16780@lee--X1>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-6-git-send-email-sboyd@codeaurora.org>
- <20131211093552.GG16780@lee--X1>
-Message-ID: <52AA092A.3040605@codeaurora.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 12 Dec 2013 20:07:09 +0100
+Subject: [PATCH v2 1/9] arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
+In-Reply-To: <552285d2-8d57-4509-a014-d97065232376@DB8EHSMHS004.ehs.local>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1385514296-26702-2-git-send-email-soren.brinkmann@xilinx.com>
+ <52A97979.1030205@monstr.eu>
+ <552285d2-8d57-4509-a014-d97065232376@DB8EHSMHS004.ehs.local>
+Message-ID: <52AA095D.4020707@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/13 01:35, Lee Jones wrote:
-> On Tue, 10 Dec 2013, Stephen Boyd wrote:
->
->> The pm8xxx-irq.c code is practically mandatory given that the
->> pm8921-core driver will WARN about it missing and the Kconfig
->> marks it as default y when a PM8xxx chips is enabled. The only
->> reason the file was split out was because we planned to support
->> other pm8xxx chips with different pm8xxx-core.c files. Now that
->> we have DT on ARM this isn't necessary because we should be able
->> to support all the ssbi based PM8xxx chips in one driver and one
->> file with no data bloat. Let's move this code into the only
->> driver that uses it right now (pm8921) so that it's always compiled when
->> needed. In the future we can rename pm8921-core.c to something
->> more generic.
+On 12/12/2013 06:01 PM, S?ren Brinkmann wrote:
+> Hi Michal,
+> 
+> On Thu, Dec 12, 2013 at 09:53:13AM +0100, Michal Simek wrote:
+>> On 11/27/2013 02:04 AM, Soren Brinkmann wrote:
+>>> The bindings for the TTC changed in commit 'arm: zynq: Use standard
+>>> timer binding' (e932900a3279b5dbb6d8f43c7b369003620e137c). That change
+>>> removed possible subnodes from this driver rendering the 'clock-ranges'
+>>> property invalid for this node.
+>>>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> ---
+>>>  arch/arm/boot/dts/zynq-7000.dtsi | 2 --
+>>>  1 file changed, 2 deletions(-)
 >>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  drivers/mfd/Kconfig       |  10 --
->>  drivers/mfd/pm8921-core.c | 349 +++++++++++++++++++++++++++++++++++++++++++
->>  drivers/mfd/pm8xxx-irq.c  | 371 ----------------------------------------------
-> If you're going to take this approach (which I'm fine with unless
-> there are likely to be anymore incarnations of pm8xxx chips?), I think
-> you should also clean-up the header in this patch.
->
->   include/linux/mfd/pm8xxx/irq.h
->
+>> I think this is completely unrelated to cpufreq and should just go
+>> directly via arm-soc tree.
+>> If yes, I will add 1/9 and 2/9 to zynq/dt branch.
+> 
+> I agree. This is just clean up that I found during this work. The second
+> patch could go in as well I think. cpufreq will need the CPU nodes
+> later, but I think there is no real reason to not add them now.
 
-Thanks. I'll remove the header and resend.
+ok then. 1/9 and 2/9 applied to zynq/dt branch.
+
+Thanks,
+Michal
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/ce8f31d6/attachment.sig>
