@@ -1,42 +1,83 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Thu, 12 Dec 2013 08:26:08 -0500
-Subject: [PATCH v5 7/9] phy: add Broadcom Kona USB2 PHY DT binding
+Date: Thu, 12 Dec 2013 08:26:10 -0500
+Subject: [PATCH v5 9/9] ARM: dts: add usb udc support to bcm281xx
 In-Reply-To: <1386854770-2173-1-git-send-email-mporter@linaro.org>
 References: <1386854770-2173-1-git-send-email-mporter@linaro.org>
-Message-ID: <1386854770-2173-8-git-send-email-mporter@linaro.org>
+Message-ID: <1386854770-2173-10-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a binding that describes the Broadcom Kona USB2 PHY found
-on the BCM281xx family of SoCs.
+Adds USB OTG/PHY and clock support to BCM281xx and enables
+UDC support on the bcm11351-brt and bcm28155-ap boards.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 ---
- Documentation/devicetree/bindings/phy/bcm-phy.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/bcm-phy.txt
+ arch/arm/boot/dts/bcm11351-brt.dts |  6 ++++++
+ arch/arm/boot/dts/bcm11351.dtsi    | 18 ++++++++++++++++++
+ arch/arm/boot/dts/bcm28155-ap.dts  |  8 ++++++++
+ 3 files changed, 32 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/bcm-phy.txt b/Documentation/devicetree/bindings/phy/bcm-phy.txt
-new file mode 100644
-index 0000000..3dc8b3d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/bcm-phy.txt
-@@ -0,0 +1,15 @@
-+BROADCOM KONA USB2 PHY
+diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+index 23cd16d..396b704 100644
+--- a/arch/arm/boot/dts/bcm11351-brt.dts
++++ b/arch/arm/boot/dts/bcm11351-brt.dts
+@@ -44,5 +44,11 @@
+ 		status = "okay";
+ 	};
+ 
++	usbotg: usb at 3f120000 {
++		status = "okay";
++	};
+ 
++	usbphy: usb-phy at 3f130000 {
++		status = "okay";
++	};
+ };
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 1246885..0fbb455 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -243,4 +243,22 @@
+ 			#clock-cells = <0>;
+ 		};
+ 	};
 +
-+Required properties:
-+ - compatible: brcm,kona-usb2-phy
-+ - reg: offset and length of the PHY registers
-+ - #phy-cells: must be 0
-+Refer to phy/phy-bindings.txt for the generic PHY binding properties
-+
-+Example:
++	usbotg: usb at 3f120000 {
++		compatible = "snps,dwc2";
++		reg = <0x3f120000 0x10000>;
++		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&usb_otg_ahb_clk>;
++		clock-names = "otg";
++		phys = <&usbphy>;
++		phy-names = "usb2-phy";
++		status = "disabled";
++	};
 +
 +	usbphy: usb-phy at 3f130000 {
 +		compatible = "brcm,kona-usb2-phy";
 +		reg = <0x3f130000 0x28>;
 +		#phy-cells = <0>;
++		status = "disabled";
 +	};
+ };
+diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+index 08e47c2..a3bc436 100644
+--- a/arch/arm/boot/dts/bcm28155-ap.dts
++++ b/arch/arm/boot/dts/bcm28155-ap.dts
+@@ -43,4 +43,12 @@
+ 		cd-gpios = <&gpio 14 0>;
+ 		status = "okay";
+ 	};
++
++	usbotg: usb at 3f120000 {
++		status = "okay";
++	};
++
++	usbphy: usb-phy at 3f130000 {
++		status = "okay";
++	};
+ };
 -- 
 1.8.4
