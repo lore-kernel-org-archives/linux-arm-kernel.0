@@ -1,54 +1,130 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Dec 2013 21:29:26 +0100
-Subject: [PATCH v4 2/4] Documentation: Add APM X-Gene SoC 15Gbps
- Multi-purpose PHY driver binding documentation
-In-Reply-To: <52A9C8C5.8030809@interlog.com>
-References: <1386833435-30498-1-git-send-email-lho@apm.com>
- <201312121427.20040.arnd@arndb.de> <52A9C8C5.8030809@interlog.com>
-Message-ID: <201312122129.26714.arnd@arndb.de>
+From: al.stone@linaro.org (Al Stone)
+Date: Thu, 12 Dec 2013 13:31:48 -0700
+Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: introduce
+ CONFIG_ACPI_REDUCED_HARDWARE to enable this ACPI mode
+In-Reply-To: <20131210224912.996FCC40CE1@trevor.secretlab.ca>
+References: <1386192127-28564-1-git-send-email-al.stone@linaro.org> <
+ 1386192127-28564-2-git-send-email-al.stone@linaro.org> <20131210123717.
+ 59493C40A27@trevor.secretlab.ca> <52A72D9F.1070004@linaro.org>
+ <20131210224912.996FCC40CE1@trevor.secretlab.ca>
+Message-ID: <52AA1D34.3080808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013, Douglas Gilbert wrote:
-> >
-> >> +- apm,tx-speed              : Tx operating speed. One set of 3-tuple for
-> >> +                      Gen1 (0x1), Gen2 (0x3), and Gen3 (0x7). Default is
-> >> +                      0x7.
-> >
-> > I'm completely confused by this description. Can you rephrase this?
-> > It sounds like the only possible values are <1 3 7> for this property.
-> 
-> Most likely Gen1, Gen2 and Gen3 are SATA-speak corresponding to SAS's
-> G1, G2 and G3:
-> 
-> G1   Gen1     1.5 Gbps
-> G2   Gen2     3 Gbps
-> G3   Gen3     6 Gbps
-> G4   -        12 Gbps
-> G5   -        24 Gbps
-> 
-> And the "7" corresponding to Gen3 is indicating backward compatibility
-> with Gen2 and Gen1. The SAS-3 draft only requires backward compatibility
-> two generations. Thus you can buy a SAS 12 Gbps HBA today that will
-> not support the original SATA 1.5 Gbps class of disks. The corresponding
-> value would be 0xe (rather than 0xf) using the tx-speed convention above.
-> 
-> 
-> My explanation is a bit long winded to put in a device-tree bindings
-> file. "RTFM: SATA drafts." should suffice.
-> 
-> 
-> BTW Compared to some device-tree binding explanations I have had
-> to wade through, the above looks pretty good.
-> 
+On 12/10/2013 03:49 PM, Grant Likely wrote:
+> Hi Hanjun,
+>
+> Okay, so after talking with Al and Graeme on IRC, I think I understand
+> what is going on. The fact that ACPICA doesn't allow for both normal and
+> hardware reduced support in the same build is a very big problem.
+> However, it isn't a problem for ARM since we'll never support
+> non-hardware reduced mode. The x86 folks need to work that out when/if
+> they ever add support for hardware reduced mode.
+>
+> So I would say the thing to do is only allow hardware reduced mode to be
+> enabled on ARM, and make it ultra clear in the config text that it
+> cannot be supported on x86 before ACPICA is fixed.
+>
+> g.
 
-Well, the problem is that this is not a SATA device but a PHY device
-that happens to support SATA among its protocols (at least PCIe
-as well, possibly more but I don't have the specs). The binding
-document has to cover all the possibilities or allow extensions
-for the other protocols to be implemented later. Having the driver
-support SATA only initially is fine, but we shouldn't plan for
-breaking compatibility with an established binding just a short time
-later.
+Agreed.  Will make it so in the next version.
 
-	Arnd
+> On Tue, 10 Dec 2013 23:05:03 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> On 2013???12???10??? 20:37, Grant Likely wrote:
+>>> On Wed,  4 Dec 2013 14:22:03 -0700, al.stone at linaro.org wrote:
+>>>> From: Al Stone <al.stone@linaro.org>
+>>>>
+>>>> To enable the hardware reduced mode of ACPI on some platforms (such as
+>>>> ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
+>>>> to TRUE in the ACPICA source.
+>>>>
+>>>> This can be done more resonably by introducing a kernel config item
+>>>> to enable/disable ACPI_REDUCED_HARDWARE.  We can then change the kernel
+>>>> config instead of having to modify the kernel source directly to enable
+>>>> the reduced hardware mode of ACPI.
+>>>>
+>>>> Lv Zheng suggested that this configuration item does not belong in ACPICA,
+>>>> the upstream source for much of the ACPI internals, but rather to the
+>>>> Linux kernel itself.  Hence, we introduce this flag so that we can make
+>>>> ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
+>>>> please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
+>>>>
+>>>> Support for X86 in hardware reduced mode is also provided to make it
+>>>> simpler to debug this mode, and to provide for probable use in such
+>>>> products.  Hardware reduced mode, despite the name, exists primarily
+>>>> to allow newer platforms to use a much simpler form of ACPI that does
+>>>> not require supporting the legacy of previous versions of the specification,
+>>>> and is likely to be used more often in the near future as a result.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>>>> ---
+>>>>    drivers/acpi/Kconfig            | 8 ++++++++
+>>>>    include/acpi/platform/aclinux.h | 6 ++++++
+>>>>    2 files changed, 14 insertions(+)
+>>>>
+>>>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>>>> index 5d92485..66e6bb2 100644
+>>>> --- a/drivers/acpi/Kconfig
+>>>> +++ b/drivers/acpi/Kconfig
+>>>> @@ -343,6 +343,14 @@ config ACPI_BGRT
+>>>>    	  data from the firmware boot splash. It will appear under
+>>>>    	  /sys/firmware/acpi/bgrt/ .
+>>>>
+>>>> +config ACPI_REDUCED_HARDWARE
+>>>> +	bool "Hardware-reduced ACPI support"
+>>>> +	depends on X86 || ARM || ARM64
+>>>> +	help
+>>>> +	This config adds support for Hardware-reduced ACPI. When this option
+>>>> +	is selected, will generate a specialized version of ACPICA that ONLY
+>>>> +	supports the ACPI "reduced hardware".
+>>>> +
+>>>>    source "drivers/acpi/apei/Kconfig"
+>>>>
+>>>>    config ACPI_EXTLOG
+>>>> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+>>>> index 28f4f4d..a33f502 100644
+>>>> --- a/include/acpi/platform/aclinux.h
+>>>> +++ b/include/acpi/platform/aclinux.h
+>>>> @@ -52,6 +52,12 @@
+>>>>
+>>>>    #ifdef __KERNEL__
+>>>>
+>>>> +/* Compile for reduced hardware mode if requested for this kernel config */
+>>>> +
+>>>> +#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+>>>> +#define ACPI_REDUCED_HARDWARE 1
+>>>> +#endif
+>>> Will this change the way ACPICA is compiled? Will it disable
+>>> non-hardware-reduced mode?
+>>
+>> Both yes. ACPICA supports reduced hardware mode when
+>> ACPI_REDUCED_HARWARE is TRUE at compile time. There is
+>> no way to support both normal ACPI and hardware reduced
+>> ACPI with single binary image for now.
+>>
+>>> If so, then this is a big problem. Enabling
+>>> the hardware reduced feature should *not* break normal ACPI usage.
+>>
+>> It will break normal ACPI usage but it is ok I think. Since
+>> lots of features are not supported in the hardware in hardware
+>> reduced mode, and normal ACPI will not run probably such as
+>> leading kernel panic when refer to some registers which are not
+>> exist on reduced hardware, we should introduce this kernel
+>> config and modify the ACPI drivers to avoid such failures.
+>>
+>> Thanks
+>> Hanjun
+>>
+>
+
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
