@@ -1,127 +1,73 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 11 Dec 2013 21:10:31 -0800
-Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <1386757818-5154-1-git-send-email-marex@denx.de>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
-Message-ID: <CAJ+vNU38oofeUjJ2s1J-2JNC+UM0MsET3EaGvDaGF9URS_efTA@mail.gmail.com>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Thu, 12 Dec 2013 10:42:32 +0530
+Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
+ by default
+Message-ID: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 2:30 AM, Marek Vasut <marex@denx.de> wrote:
->
-> Some boards do not have a PCIe reset GPIO. To avoid probe
-> failure on these boards, make the reset GPIO optional as
-> well.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Harro Haan <hrhaan@gmail.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
-> ---
->  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
->  drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
->  2 files changed, 16 insertions(+), 15 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index d5d26d4..b7a2279 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -19,9 +19,9 @@ Required properties:
->         to define the mapping of the PCIe interface to interrupt
->         numbers.
->  - num-lanes: number of lanes to use
-> -- reset-gpio: gpio pin number of power good signal
->
->  Optional properties for fsl,imx6q-pcie
-> +- reset-gpio: gpio pin number of power good signal
->  - power-on-gpio: gpio pin number of power-enable signal
->  - wake-up-gpio: gpio pin number of incoming wakeup signal
->  - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable signal
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index bd70af8..52027ad 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -214,9 +214,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
->         regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->                         IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
->
-> -       gpio_set_value(imx6_pcie->reset_gpio, 0);
-> -       msleep(100);
-> -       gpio_set_value(imx6_pcie->reset_gpio, 1);
-> +       /* Some boards don't have PCIe reset GPIO. */
-> +       if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> +               gpio_set_value(imx6_pcie->reset_gpio, 0);
-> +               msleep(100);
-> +               gpio_set_value(imx6_pcie->reset_gpio, 1);
-> +       }
->
->         return 0;
->  }
+ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR have been enabled as default configs
+to S5P64X0 platforms.
 
-Marek,
+Introduction of PHYS_VIRT config as default would enable phy-to-virt and
+virt-to-phy translation function at boot and module loading time
+and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
+enable calculation of kernel load address at run time.
 
-Though not the fault of your patch, I noticed while looking at this
-that the PCI Express specification is not being properly met with
-regards to PERST# and the reference clock.  The spec states that
-PERST# must be kept asserted until after the reference clock is stable
-(I'm not entirely clear how long of a delay is needed for the clock to
-become stable but I think the value is typically the 100ms).  I see in
-the current pci-imx6.c code that imx6_pcie_host_init calls
-imx6_pcie_assert_core_reset first, then imx6_pcie_init_phy, followed
-by imx6_pcie_deassert_core_reset.  Despite the function names,
-imx6_pcie_assert_core_reset as shown above asserts then de-asserts
-PERST# before the clock is enabled in imx6_pcie_deassert_core_reset.
-This seems to me to be a violation of the spec and I believe the
-msleep(100) and de-assertion of the option reset_gpio should be done
-in imx6_pcie_deassert_core reset after the clock is brought up.
+PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
+systems with NOR flash devices, and ZRELADDR config is mutually exclusive
+to ZBOOT_ROM.
 
-If you agree with my assessment, would you mind resolving this issue
-at the same time?  If not, I'm happy to follow-up with a patch to
-resolve it after your patch is accepted.
+CFT::Call For Testing
 
-Thanks,
+Requesting maintainers of S5P64X0 platforms to evaluate the changes on the
+board and comment, as I dont have the board for testing and also requesting
+an ACK
 
-Tim
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
 
-> @@ -439,17 +442,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->
->         /* Fetch GPIOs */
->         imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> -       if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
-> -               dev_err(&pdev->dev, "no reset-gpio defined\n");
-> -               ret = -ENODEV;
-> -       }
-> -       ret = devm_gpio_request_one(&pdev->dev,
-> -                               imx6_pcie->reset_gpio,
-> -                               GPIOF_OUT_INIT_LOW,
-> -                               "PCIe reset");
-> -       if (ret) {
-> -               dev_err(&pdev->dev, "unable to get reset gpio\n");
-> -               goto err;
-> +       if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> +               ret = devm_gpio_request_one(&pdev->dev,
-> +                                       imx6_pcie->reset_gpio,
-> +                                       GPIOF_OUT_INIT_LOW,
-> +                                       "PCIe reset");
-> +               if (ret) {
-> +                       dev_err(&pdev->dev, "unable to get reset gpio\n");
-> +                       goto err;
-> +               }
->         }
->
->         imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
-> --
-> 1.8.4.3
->
+---
+The samsung S5P64X0 vega has an average performing CPU with max speed 667 Mhz.
+This SOC has two variants S5P6440 and S5P6450. It has one core based on
+ARM1176JZF-S instruction set, and has 16KB data and instruction cache each.
+
+SOC has a memory subsystem with support to NAND Flash interface with x8 data
+bus, with 1/4/8/12/16 bit hardware ECC circuit and 4KB Page mode. It has
+Mobile DDR interface with x16 or x32 data bus, and DDR2 interface with x16 or
+x32 data bus it also supports eMMC4.4.
+
+Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
+and ZRELADDR
+-------------------------------------------------
+
+https://lkml.org/lkml/2011/10/14/434
+
+-------------------------------------------------
+---
+ arch/arm/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 934e26c..8986335 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -759,6 +759,8 @@ config ARCH_S3C64XX
+ 
+ config ARCH_S5P64X0
+ 	bool "Samsung S5P6440 S5P6450"
++	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_SAMSUNG_PWM
+ 	select CPU_V6
+-- 
+1.7.10.4
