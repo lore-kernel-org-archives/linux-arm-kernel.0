@@ -1,80 +1,66 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Thu, 12 Dec 2013 21:42:26 +0530
-Subject: [PATCH v2 1/2] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API header
-In-Reply-To: <1386864747-29006-1-git-send-email-anup.patel@linaro.org>
-References: <1386864747-29006-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1386864747-29006-5-git-send-email-anup.patel@linaro.org>
+Date: Thu, 12 Dec 2013 21:42:22 +0530
+Subject: [PATCH RESEND] arm64: KVM: Add Kconfig option for max VCPUs per-Guest
+Message-ID: <1386864747-29006-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we don't have an exit reason to notify user space about
-a system-level event (for e.g. system reset or shutdown) triggered
-by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
-this purpose. We can also inform user space about the 'type' and
-architecture specific 'flags' of a system-level event using the
-kvm_run structure.
+Current max VCPUs per-Guest is set to 4 which is preventing
+us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
+X-Gene Storm SOC) with 8 Host CPUs.
 
-This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM arm/arm64
-in-kernel PSCI support to reset/shutdown VMs.
+The correct value of max VCPUs per-Guest should be same as
+the max CPUs supported by GICv2 which is 8 but, increasing
+value of max VCPUs per-Guest can make things slower hence
+we add Kconfig option to let KVM users select appropriate
+max VCPUs per-Guest.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 ---
- Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
- include/uapi/linux/kvm.h          |    8 ++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |    7 ++++++-
+ arch/arm64/kvm/Kconfig            |   11 +++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index aad3244..4ef180e 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2699,6 +2699,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
- external interrupt has just been delivered into the guest. User space
- should put the acknowledged interrupt vector into the 'epr' field.
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 5d85a02..0a1d697 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -26,7 +26,12 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
  
-+		/* KVM_EXIT_SYSTEM_EVENT */
-+		struct {
-+#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-+#define KVM_SYSTEM_EVENT_RESET          2
-+			__u32 type;
-+			__u64 flags;
-+		} system_event;
+-#define KVM_MAX_VCPUS 4
++#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
++#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
++#else
++#define KVM_MAX_VCPUS 0
++#endif
 +
-+If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
-+a system-level event using some architecture specific mechanism (hypercall
-+or some special instruction). In case of ARM/ARM64, this is triggered using
-+HVC instruction based PSCI call from the vcpu. The 'type' field describes
-+the system-level event type. The 'flags' field describes architecture
-+specific flags for the system-level event.
-+
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 902f124..bb13faa 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -171,6 +171,7 @@ struct kvm_pit_config {
- #define KVM_EXIT_WATCHDOG         21
- #define KVM_EXIT_S390_TSCH        22
- #define KVM_EXIT_EPR              23
-+#define KVM_EXIT_SYSTEM_EVENT     24
+ #define KVM_USER_MEM_SLOTS 32
+ #define KVM_PRIVATE_MEM_SLOTS 4
+ #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 4480ab3..8ba85e9 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -36,6 +36,17 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
  
- /* For KVM_EXIT_INTERNAL_ERROR */
- /* Emulate instruction failed. */
-@@ -301,6 +302,13 @@ struct kvm_run {
- 		struct {
- 			__u32 epr;
- 		} epr;
-+		/* KVM_EXIT_SYSTEM_EVENT */
-+		struct {
-+#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-+#define KVM_SYSTEM_EVENT_RESET          2
-+			__u32 type;
-+			__u64 flags;
-+		} system_event;
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
++config KVM_ARM_MAX_VCPUS
++	int "Number maximum supported virtual CPUs per VM"
++	depends on KVM_ARM_HOST
++	default 4
++	help
++	  Static number of max supported virtual CPUs per VM.
++
++	  If you choose a high number, the vcpu structures will be quite
++	  large, so only choose a reasonable number that you expect to
++	  actually use.
++
+ config KVM_ARM_VGIC
+ 	bool
+ 	depends on KVM_ARM_HOST && OF
 -- 
 1.7.9.5
