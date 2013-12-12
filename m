@@ -1,38 +1,25 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Dec 2013 12:40:59 +0100
-Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
- AUTO_ZRELADDR by default
-In-Reply-To: <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
-References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
- <26167386.hX5eWUjT6T@flatron>
- <CAAunhULO5n3rf5_Q+HwExd=kadsPC_rTz9oP8kXKM7krBetbdQ@mail.gmail.com>
-Message-ID: <3126277.U19MiHChc4@amdc1227>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Dec 2013 11:46:10 +0000
+Subject: [PATCH V7 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <CAPrCYkct6XePhYEEC=x0yNQoS-z=fcp2_WKxU1Zk0eO=9+ZaLA@mail.gmail.com>
+References: <1386151791-4881-1-git-send-email-vkale@apm.com>
+ <1386151791-4881-3-git-send-email-vkale@apm.com>
+ <20131209165003.GJ13908@mudshark.cambridge.arm.com>
+ <CAPrCYkfS9h_yoQMcrQDXpW_3FcSfiPz0aeNX+_gc=G4exSEVWg@mail.gmail.com>
+ <CAPrCYkct6XePhYEEC=x0yNQoS-z=fcp2_WKxU1Zk0eO=9+ZaLA@mail.gmail.com>
+Message-ID: <20131212114610.GA23971@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 of December 2013 16:33:46 Panchaxari Prasannamurthy Tumkur wrote:
-> Hi Tomasz
+On Thu, Dec 12, 2013 at 06:33:59AM +0000, Vinayak Kale wrote:
+> > Below fixup works fine on APM platform.
+> > Do you want me to send this fixup as part of next revision of the
+> > patch or will you apply it yourself? (For later case, you have my ack)
 > 
-> > Could you explain the purpose of this change on S5P64x0?
-> >
-> > This is actually quite a poor platform choice. As of today, the kernel
-> > is stuck with supporting just SMDK6440/6450 boards, which are proprietary
-> > development boards and it doesn't look like any further boards will show
-> > up in future. Kukjin has actually proposed removing support for this
-> > platform at all and I consider this reasonable.
-> >
-> > Kukjin, should we proceed with removal?
-> 
-> The purpose of this patch is with the greater intent of consolidating
-> ARM-32 kernel. Which means a generic kernel for ARM-32 processors.
+> Any comments? Do I need to send the fix-up in next revision of patch?
 
-OK. So do you have plans to send similar patches for other, more active
-(and closer to having multiplatform support) platforms, such as s3c64xx,
-s5pv210 and exynos?
+Looks fine to me; I've folded in my changes and applied it to my aarch64
+branch. I'll queue it for 3.14 when Catalin and I start putting that
+together.
 
-In case of s5p64x0 probably the only person capable of testing it is
-Kukjin, as we don't have any other active people with boards based on
-these SoCs.
-
-Best regards,
-Tomasz
+Will
