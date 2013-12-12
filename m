@@ -1,60 +1,320 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 12 Dec 2013 18:35:37 +0100
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212172049.GU4360@n2100.arm.linux.org.uk>
-References: <1386850444.22947.46.camel@sakura.staff.proxad.net>
- <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <20131212144853.GO4360@n2100.arm.linux.org.uk>
- <1386860657.25449.3.camel@sakura.staff.proxad.net>
- <20131212154110.GQ4360@n2100.arm.linux.org.uk>
- <20131212160426.GD31816@1wt.eu>
- <20131212164748.GS4360@n2100.arm.linux.org.uk> <20131212171108.GA2337@1wt.eu>
- <20131212172049.GU4360@n2100.arm.linux.org.uk>
-Message-ID: <20131212173537.GB2337@1wt.eu>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Thu, 12 Dec 2013 19:36:51 +0200
+Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <52A9DB78.1040805@linaro.org>
+References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <52A9DB78.1040805@linaro.org>
+Message-ID: <52A9F433.8020003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 05:20:49PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 12, 2013 at 06:11:08PM +0100, Willy Tarreau wrote:
-> > Another thing that can be done to improve the folding of the 16-bit
-> > checksum is to swap the values to be added, sum them and only keep
-> > the high half integer which already contains the carry. At least on
-> > x86 I save some cycles doing this :
-> > 
-> >               31:24  23:16  15:8  7:0
-> >      sum32 =    D      C      B    A
-> > 
-> >      To fold this into 16-bit at a time, I just do this :
-> > 
-> >                    31:24     23:16          15:8  7:0
-> >      sum32           D         C              B    A
-> >   +  sum32swapped    B         A              D    C
-> >   =                 A+B  C+A+carry(B+D/C+A)  B+D  C+A
-> > 
-> > so just take the upper result and you get the final 16-bit word at
-> > once.
-> > 
-> > In C it does :
-> > 
-> >        fold16 = (((sum32 >> 16) | (sum32 << 16)) + sum32) >> 16
-> > 
-> > When the CPU has a rotate instruction, it's fast :-)
+On 12/12/2013 05:51 PM, Daniel Lezcano wrote:
+> On 12/11/2013 07:00 PM, Ivan Khoronzhuk wrote:
+>> Add broadcast clock-event device for the Keystone arch.
+>>
+>> The timer can be configured as a general-purpose 64-bit timer,
+>> dual general-purpose 32-bit timers. When configured as dual 32-bit
+>> timers, each half can operate in conjunction (chain mode) or
+>> independently (unchained mode) of each other.
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>>   drivers/clocksource/Makefile         |    1 +
+>>   drivers/clocksource/timer-keystone.c |  223 
+>> ++++++++++++++++++++++++++++++++++
+>>   2 files changed, 224 insertions(+)
+>>   create mode 100644 drivers/clocksource/timer-keystone.c
+>>
+>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>> index 33621ef..2acf3fc 100644
+>> --- a/drivers/clocksource/Makefile
+>> +++ b/drivers/clocksource/Makefile
+>> @@ -36,3 +36,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)        += arm_arch_timer.o
+>>   obj-$(CONFIG_ARM_GLOBAL_TIMER)        += arm_global_timer.o
+>>   obj-$(CONFIG_CLKSRC_METAG_GENERIC)    += metag_generic.o
+>>   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)    += dummy_timer.o
+>> +obj-$(CONFIG_ARCH_KEYSTONE)        += timer-keystone.o
+>> diff --git a/drivers/clocksource/timer-keystone.c 
+>> b/drivers/clocksource/timer-keystone.c
+>> new file mode 100644
+>> index 0000000..4a8083a
+>> --- /dev/null
+>> +++ b/drivers/clocksource/timer-keystone.c
+>> @@ -0,0 +1,223 @@
+>> +/*
+>> + * Keystone broadcast clock-event
+>> + *
+>> + * Copyright 2013 Texas Instruments, Inc.
+>> + *
+>> + * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/clocksource.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +
+>> +#define TIMER_NAME            "timer64-event"
+>> +
+>> +/* Timer register offsets */
+>> +#define TIM12                0x10
+>> +#define TIM34                0x14
+>> +#define PRD12                0x18
+>> +#define PRD34                0x1c
+>> +#define TCR                0x20
+>> +#define TGCR                0x24
+>> +#define INTCTLSTAT            0x44
+>> +
+>> +/* Timer register bitfields */
+>> +#define TCR_ENAMODE_MASK        0xC0
+>> +#define TCR_ENAMODE_ONESHOT_MASK    0x40
+>> +#define TCR_ENAMODE_PERIODIC_MASK    0x80
+>> +
+>> +#define TGCR_TIM_UNRESET_MASK        0x03
+>> +#define INTCTLSTAT_ENINT_MASK        0x01
+>> +
+>> +/**
+>> + * struct keystone_timer: holds timer's data
+>> + * @base: timer memory base address
+>> + * @clk_rate: source clock rate
+>> + * @irqacrion: interrupt action descriptor
+>> + * @event_dev: event device based on timer
+>> + */
+>> +static struct keystone_timer {
+>> +    void __iomem *base;
+>> +    unsigned long clk_rate;
+>> +    struct irqaction irqaction;
+>> +    struct clock_event_device event_dev;
+>> +} timer;
+>> +
+>> +static inline u32 keystone_timer_readl(unsigned long rg)
+>> +{
+>> +    return readl(timer.base + rg);
+>> +}
+>> +
+>> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
+>> +{
+>> +    writel(val, timer.base + rg);
+>> +}
+>> +
+>> +/**
+>> + * keystone_timer_config: configures timer to work in 
+>> oneshot/periodic modes, in
+>> + * other cases disables timer.
+>> + * @ mode: mode to configure
+>> + * @ period: cycles number to configure for
+>> + */
+>> +static int keystone_timer_config(u64 period, enum clock_event_mode mode)
+>> +{
+>> +    u32 tcr;
+>> +
+>> +    tcr = keystone_timer_readl(TCR);
+>> +
+>> +    /* disable timer */
+>> +    tcr &= ~(TCR_ENAMODE_MASK);
+>> +    keystone_timer_writel(tcr, TCR);
 > 
-> Indeed - and if your CPU can do the rotate and add at the same time,
-> it's just a singe instruction, and it ends up looking remarkably
-> similar to this:
+> Please move this write after the switch (cf. linked comment below)
 > 
-> static inline __sum16 csum_fold(__wsum sum)
-> {
->         __asm__(
->         "add    %0, %1, %1, ror #16     @ csum_fold"
->         : "=r" (sum)
->         : "r" (sum)
->         : "cc");
->         return (__force __sum16)(~(__force u32)sum >> 16);
-> }
 
-Marvelous :-)
+See below
 
-Willy
+>> +    /* set enable mode or leave disabled timer */
+>> +    switch (mode) {
+>> +    case CLOCK_EVT_MODE_ONESHOT:
+>> +        tcr |= TCR_ENAMODE_ONESHOT_MASK;
+>> +        break;
+>> +    case CLOCK_EVT_MODE_PERIODIC:
+>> +        tcr |= TCR_ENAMODE_PERIODIC_MASK;
+>> +        break;
+>> +    default:
+>> +        return 0;
+> 
+> Shouldn't you return an error ?
+> 
+
+It returns value only for convenient usage in keystone_set_next_event(),
+see [1].
+
+In general, this function is used to configure the timer.
+The procedure is that we need to stop the timer then set it.
+If timer needs to be disabled (shutdown mode), function disables it and returns.
+
+>> +    }
+>> +
+>> +    /* reset counter to zero, set new period */
+>> +    keystone_timer_writel(0, TIM12);
+>> +    keystone_timer_writel(0, TIM34);
+>> +    keystone_timer_writel(period & 0xffffffff, PRD12);
+>> +    keystone_timer_writel(period >> 32, PRD34);
+>> +
+>> +    /* enable timer */
+>> +    keystone_timer_writel(tcr, TCR);
+>> +    return 0;
+>> +}
+>> +
+>> +static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
+>> +{
+>> +    struct clock_event_device *evt = &timer.event_dev;
+>> +
+>> +    evt->event_handler(evt);
+>> +    return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int keystone_set_next_event(unsigned long cycles,
+>> +                  struct clock_event_device *evt)
+>> +{
+>> +    return keystone_timer_config(cycles, evt->mode);
+
+[1]
+
+>> +}
+>> +
+>> +static void keystone_set_mode(enum clock_event_mode mode,
+>> +                 struct clock_event_device *evt)
+>> +{
+>> +    u64 period;
+>> +
+>> +    switch (mode) {
+>> +    case CLOCK_EVT_MODE_PERIODIC:
+>> +        period = timer.clk_rate / (HZ);
+>> +        keystone_timer_config(period, CLOCK_EVT_MODE_PERIODIC);
+>> +        break;
+>> +    case CLOCK_EVT_MODE_UNUSED:
+>> +    case CLOCK_EVT_MODE_SHUTDOWN:
+>> +    case CLOCK_EVT_MODE_ONESHOT:
+>> +        keystone_timer_config(0, CLOCK_EVT_MODE_SHUTDOWN);
+> 
+> I don't really this code assuming the side effect of specifying a 
+> unsupported mode will disable the timer.
+> 
+
+In case of an unsupported mode the function does nothing.
+Is it not correct?
+
+It disables the timer only in 3 cases.
+CLOCK_EVT_MODE_UNUSED
+CLOCK_EVT_MODE_SHUTDOWN
+CLOCK_EVT_MODE_ONESHOT
+
+For CLOCK_EVT_MODE_ONESHOT,
+It is supposed that then keystone_set_next_even() will re-enable the timer.
+
+>> +    default:
+>> +        break;
+>> +    }
+>> +}
+>> +
+>> +static void __init keystone_timer_init(struct device_node *np)
+>> +{
+>> +    struct clock_event_device *event_dev = &timer.event_dev;
+>> +    struct irqaction *irqaction = &timer.irqaction;
+>> +    unsigned long rate;
+>> +    struct clk *clk;
+>> +    int irq, error;
+>> +    u32 tgcr;
+>> +
+>> +    irq  = irq_of_parse_and_map(np, 0);
+>> +    if (irq == NO_IRQ) {
+>> +        pr_err("%s: failed to map interrupts\n", __func__);
+>> +        return;
+>> +    }
+>> +
+>> +    timer.base = of_iomap(np, 0);
+>> +    if (!timer.base) {
+>> +        pr_err("%s: failed to map registers\n", __func__);
+>> +        return;
+>> +    }
+>> +
+>> +    clk = of_clk_get(np, 0);
+>> +    if (!clk) {
+>> +        pr_err("%s: failed to get clock\n", __func__);
+>> +        iounmap(timer.base);
+>> +        return;
+>> +    }
+>> +
+>> +    error = clk_prepare_enable(clk);
+>> +    if (error) {
+>> +        pr_err("%s: failed to enable clock\n", __func__);
+>> +        goto err;
+>> +    }
+>> +
+>> +    rate = clk_get_rate(clk);
+>> +
+>> +    /* disable, use internal clock source */
+>> +    keystone_timer_writel(0, TCR);
+>> +
+>> +    /* reset timer as 64-bit, no pre-scaler, plus features are 
+>> disabled */
+>> +    tgcr = 0;
+>> +    keystone_timer_writel(0, TGCR);
+>> +
+>> +    /* unreset timer */
+>> +    tgcr |= TGCR_TIM_UNRESET_MASK;
+>> +    keystone_timer_writel(tgcr, TGCR);
+>> +
+>> +    /* init counter to zero */
+>> +    keystone_timer_writel(0, TIM12);
+>> +    keystone_timer_writel(0, TIM34);
+>> +
+>> +    timer.clk_rate = rate;
+>> +
+>> +    /* enable timer interrupts */
+>> +    keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
+>> +
+>> +    keystone_timer_config(0, CLOCK_EVT_MODE_UNUSED);
+> 
+> Same comment here.
+> 
+
+you are right, I disabled the timer above.., so
+I may delete "keystone_timer_config(0, CLOCK_EVT_MODE_UNUSED);"
+
+>> +    /* init irqaction */
+>> +    irqaction->flags = IRQF_TIMER;
+>> +    irqaction->handler = keystone_timer_interrupt;
+>> +    irqaction->name = TIMER_NAME;
+>> +    irqaction->dev_id = (void *)&timer;
+>> +    error = setup_irq(irq, irqaction);
+>> +    if (error) {
+>> +        pr_err("%s: failed to setup irq\n", __func__);
+>> +        goto err;
+>> +    }
+>> +
+>> +    /* setup clockevent */
+>> +    event_dev->features = CLOCK_EVT_FEAT_PERIODIC | 
+>> CLOCK_EVT_FEAT_ONESHOT;
+>> +    event_dev->set_next_event = keystone_set_next_event;
+>> +    event_dev->set_mode = keystone_set_mode;
+>> +    event_dev->cpumask = cpu_all_mask;
+>> +    event_dev->owner = THIS_MODULE;
+>> +    event_dev->name = TIMER_NAME;
+>> +
+>> +    clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
+>> +
+>> +    pr_info("keystone timer clock @%lu Hz\n", rate);
+>> +    return;
+>> +err:
+>> +    clk_put(clk);
+>> +    iounmap(timer.base);
+>> +}
+>> +
+>> +CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
+>> +                    keystone_timer_init);
+>>
+> 
+> 
+
+
+-- 
+Regards,
+Ivan Khoronzhuk
