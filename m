@@ -1,39 +1,284 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 12 Dec 2013 15:50:45 +0000
-Subject: gcc miscompiles csum_tcpudp_magic() on ARMv5
-In-Reply-To: <20131212154309.GR4360@n2100.arm.linux.org.uk> (Russell King's
- message of "Thu, 12 Dec 2013 15:43:09 +0000")
-References: <20131212124015.GL4360@n2100.arm.linux.org.uk>
- <1386855390.22947.68.camel@sakura.staff.proxad.net>
- <yw1xppp2ji38.fsf@unicorn.mansr.com>
- <1386857410.22947.78.camel@sakura.staff.proxad.net>
- <20131212141926.GA31816@1wt.eu>
- <1386858504.22947.85.camel@sakura.staff.proxad.net>
- <yw1xd2l2jflc.fsf@unicorn.mansr.com> <20131212150745.GB31816@1wt.eu>
- <yw1xsityhzd1.fsf@unicorn.mansr.com> <20131212152849.GC31816@1wt.eu>
- <20131212154309.GR4360@n2100.arm.linux.org.uk>
-Message-ID: <yw1xob4mhxuy.fsf@unicorn.mansr.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 12 Dec 2013 16:51:20 +0100
+Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52A9DB78.1040805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-
-> On Thu, Dec 12, 2013 at 04:28:49PM +0100, Willy Tarreau wrote:
->> On Thu, Dec 12, 2013 at 03:18:18PM +0000, M?ns Rullg?rd wrote:
->> > The ABI for function calls sign/zero-extends all arguments prior to the
->> > call.
->> 
->> OK then that's pretty clear, there's no ambiguity, thanks for the precision.
+On 12/11/2013 07:00 PM, Ivan Khoronzhuk wrote:
+> Add broadcast clock-event device for the Keystone arch.
 >
-> Let's be clear about this: there is no GCC bug here - the kernel code
-> unfortunately what is buggy.  asm() input arguments are not subject to
-> this promotion irrespective of the ABI.
+> The timer can be configured as a general-purpose 64-bit timer,
+> dual general-purpose 32-bit timers. When configured as dual 32-bit
+> timers, each half can operate in conjunction (chain mode) or
+> independently (unchained mode) of each other.
+>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>   drivers/clocksource/Makefile         |    1 +
+>   drivers/clocksource/timer-keystone.c |  223 ++++++++++++++++++++++++++++++++++
+>   2 files changed, 224 insertions(+)
+>   create mode 100644 drivers/clocksource/timer-keystone.c
+>
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 33621ef..2acf3fc 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -36,3 +36,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+>   obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
+>   obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+>   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+> +obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+> diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
+> new file mode 100644
+> index 0000000..4a8083a
+> --- /dev/null
+> +++ b/drivers/clocksource/timer-keystone.c
+> @@ -0,0 +1,223 @@
+> +/*
+> + * Keystone broadcast clock-event
+> + *
+> + * Copyright 2013 Texas Instruments, Inc.
+> + *
+> + * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +
+> +#define TIMER_NAME			"timer64-event"
+> +
+> +/* Timer register offsets */
+> +#define TIM12				0x10
+> +#define TIM34				0x14
+> +#define PRD12				0x18
+> +#define PRD34				0x1c
+> +#define TCR				0x20
+> +#define TGCR				0x24
+> +#define INTCTLSTAT			0x44
+> +
+> +/* Timer register bitfields */
+> +#define TCR_ENAMODE_MASK		0xC0
+> +#define TCR_ENAMODE_ONESHOT_MASK	0x40
+> +#define TCR_ENAMODE_PERIODIC_MASK	0x80
+> +
+> +#define TGCR_TIM_UNRESET_MASK		0x03
+> +#define INTCTLSTAT_ENINT_MASK		0x01
+> +
+> +/**
+> + * struct keystone_timer: holds timer's data
+> + * @base: timer memory base address
+> + * @clk_rate: source clock rate
+> + * @irqacrion: interrupt action descriptor
+> + * @event_dev: event device based on timer
+> + */
+> +static struct keystone_timer {
+> +	void __iomem *base;
+> +	unsigned long clk_rate;
+> +	struct irqaction irqaction;
+> +	struct clock_event_device event_dev;
+> +} timer;
+> +
+> +static inline u32 keystone_timer_readl(unsigned long rg)
+> +{
+> +	return readl(timer.base + rg);
+> +}
+> +
+> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
+> +{
+> +	writel(val, timer.base + rg);
+> +}
+> +
+> +/**
+> + * keystone_timer_config: configures timer to work in oneshot/periodic modes, in
+> + * other cases disables timer.
+> + * @ mode: mode to configure
+> + * @ period: cycles number to configure for
+> + */
+> +static int keystone_timer_config(u64 period, enum clock_event_mode mode)
+> +{
+> +	u32 tcr;
+> +
+> +	tcr = keystone_timer_readl(TCR);
+> +
+> +	/* disable timer */
+> +	tcr &= ~(TCR_ENAMODE_MASK);
+> +	keystone_timer_writel(tcr, TCR);
 
-At the asm() the value should already have been zero-extended.  Since
-the code does not do anything with undefined behaviour, the fact that
-different optimisation levels give different results clearly indicates a
-compiler bug.
+Please move this write after the switch (cf. linked comment below)
+
+> +	/* set enable mode or leave disabled timer */
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +		tcr |= TCR_ENAMODE_ONESHOT_MASK;
+> +		break;
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		tcr |= TCR_ENAMODE_PERIODIC_MASK;
+> +		break;
+> +	default:
+> +		return 0;
+
+Shouldn't you return an error ?
+
+> +	}
+> +
+> +	/* reset counter to zero, set new period */
+> +	keystone_timer_writel(0, TIM12);
+> +	keystone_timer_writel(0, TIM34);
+> +	keystone_timer_writel(period & 0xffffffff, PRD12);
+> +	keystone_timer_writel(period >> 32, PRD34);
+> +
+> +	/* enable timer */
+> +	keystone_timer_writel(tcr, TCR);
+> +	return 0;
+> +}
+> +
+> +static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = &timer.event_dev;
+> +
+> +	evt->event_handler(evt);
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int keystone_set_next_event(unsigned long cycles,
+> +				  struct clock_event_device *evt)
+> +{
+> +	return keystone_timer_config(cycles, evt->mode);
+> +}
+> +
+> +static void keystone_set_mode(enum clock_event_mode mode,
+> +			     struct clock_event_device *evt)
+> +{
+> +	u64 period;
+> +
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		period = timer.clk_rate / (HZ);
+> +		keystone_timer_config(period, CLOCK_EVT_MODE_PERIODIC);
+> +		break;
+> +	case CLOCK_EVT_MODE_UNUSED:
+> +	case CLOCK_EVT_MODE_SHUTDOWN:
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +		keystone_timer_config(0, CLOCK_EVT_MODE_SHUTDOWN);
+
+I don't really this code assuming the side effect of specifying a 
+unsupported mode will disable the timer.
+
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+> +static void __init keystone_timer_init(struct device_node *np)
+> +{
+> +	struct clock_event_device *event_dev = &timer.event_dev;
+> +	struct irqaction *irqaction = &timer.irqaction;
+> +	unsigned long rate;
+> +	struct clk *clk;
+> +	int irq, error;
+> +	u32 tgcr;
+> +
+> +	irq  = irq_of_parse_and_map(np, 0);
+> +	if (irq == NO_IRQ) {
+> +		pr_err("%s: failed to map interrupts\n", __func__);
+> +		return;
+> +	}
+> +
+> +	timer.base = of_iomap(np, 0);
+> +	if (!timer.base) {
+> +		pr_err("%s: failed to map registers\n", __func__);
+> +		return;
+> +	}
+> +
+> +	clk = of_clk_get(np, 0);
+> +	if (!clk) {
+> +		pr_err("%s: failed to get clock\n", __func__);
+> +		iounmap(timer.base);
+> +		return;
+> +	}
+> +
+> +	error = clk_prepare_enable(clk);
+> +	if (error) {
+> +		pr_err("%s: failed to enable clock\n", __func__);
+> +		goto err;
+> +	}
+> +
+> +	rate = clk_get_rate(clk);
+> +
+> +	/* disable, use internal clock source */
+> +	keystone_timer_writel(0, TCR);
+> +
+> +	/* reset timer as 64-bit, no pre-scaler, plus features are disabled */
+> +	tgcr = 0;
+> +	keystone_timer_writel(0, TGCR);
+> +
+> +	/* unreset timer */
+> +	tgcr |= TGCR_TIM_UNRESET_MASK;
+> +	keystone_timer_writel(tgcr, TGCR);
+> +
+> +	/* init counter to zero */
+> +	keystone_timer_writel(0, TIM12);
+> +	keystone_timer_writel(0, TIM34);
+> +
+> +	timer.clk_rate = rate;
+> +
+> +	/* enable timer interrupts */
+> +	keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
+> +
+> +	keystone_timer_config(0, CLOCK_EVT_MODE_UNUSED);
+
+Same comment here.
+
+> +	/* init irqaction */
+> +	irqaction->flags = IRQF_TIMER;
+> +	irqaction->handler = keystone_timer_interrupt;
+> +	irqaction->name = TIMER_NAME;
+> +	irqaction->dev_id = (void *)&timer;
+> +	error = setup_irq(irq, irqaction);
+> +	if (error) {
+> +		pr_err("%s: failed to setup irq\n", __func__);
+> +		goto err;
+> +	}
+> +
+> +	/* setup clockevent */
+> +	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> +	event_dev->set_next_event = keystone_set_next_event;
+> +	event_dev->set_mode = keystone_set_mode;
+> +	event_dev->cpumask = cpu_all_mask;
+> +	event_dev->owner = THIS_MODULE;
+> +	event_dev->name = TIMER_NAME;
+> +
+> +	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
+> +
+> +	pr_info("keystone timer clock @%lu Hz\n", rate);
+> +	return;
+> +err:
+> +	clk_put(clk);
+> +	iounmap(timer.base);
+> +}
+> +
+> +CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
+> +					keystone_timer_init);
+>
+
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
