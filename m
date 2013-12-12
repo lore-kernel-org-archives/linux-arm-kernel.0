@@ -1,63 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Dec 2013 15:13:01 -0800
-Subject: [PATCH 3/8] regmap: Add support for using regmap over ssbi
-In-Reply-To: <20131211132729.GT11468@sirena.org.uk>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
- <20131210235000.GK11468@sirena.org.uk> <52A7AE1B.3040201@codeaurora.org>
- <20131211005106.GL11468@sirena.org.uk> <52A7C0C3.2070805@codeaurora.org>
- <20131211132729.GT11468@sirena.org.uk>
-Message-ID: <52AA42FD.4040503@codeaurora.org>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 12 Dec 2013 15:30:47 -0800
+Subject: [PATCH v4 2/4] Documentation: Add APM X-Gene SoC 15Gbps
+ Multi-purpose PHY driver binding documentation
+In-Reply-To: <201312122129.26714.arnd@arndb.de>
+References: <1386833435-30498-1-git-send-email-lho@apm.com>
+ <201312121427.20040.arnd@arndb.de> <52A9C8C5.8030809@interlog.com>
+ <201312122129.26714.arnd@arndb.de>
+Message-ID: <CAPw-ZTnBEj0ap60iHB7peMkEvOAJxyNFmd40+cZmAcTXOpi3Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/13 05:27, Mark Brown wrote:
-> On Tue, Dec 10, 2013 at 05:32:51PM -0800, Stephen Boyd wrote:
+Hi,
+
+
+On Thu, Dec 12, 2013 at 12:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 12 December 2013, Douglas Gilbert wrote:
+>> >
+>> >> +- apm,tx-speed              : Tx operating speed. One set of 3-tuple for
+>> >> +                      Gen1 (0x1), Gen2 (0x3), and Gen3 (0x7). Default is
+>> >> +                      0x7.
+>> >
+>> > I'm completely confused by this description. Can you rephrase this?
+>> > It sounds like the only possible values are <1 3 7> for this property.
+>>
+>> Most likely Gen1, Gen2 and Gen3 are SATA-speak corresponding to SAS's
+>> G1, G2 and G3:
+>>
+>> G1   Gen1     1.5 Gbps
+>> G2   Gen2     3 Gbps
+>> G3   Gen3     6 Gbps
+>> G4   -        12 Gbps
+>> G5   -        24 Gbps
+>>
+>> And the "7" corresponding to Gen3 is indicating backward compatibility
+>> with Gen2 and Gen1. The SAS-3 draft only requires backward compatibility
+>> two generations. Thus you can buy a SAS 12 Gbps HBA today that will
+>> not support the original SATA 1.5 Gbps class of disks. The corresponding
+>> value would be 0xe (rather than 0xf) using the tx-speed convention above.
+>>
+>>
+>> My explanation is a bit long winded to put in a device-tree bindings
+>> file. "RTFM: SATA drafts." should suffice.
+>>
+>>
+>> BTW Compared to some device-tree binding explanations I have had
+>> to wade through, the above looks pretty good.
+>>
 >
->> Are you suggesting we implement the reg_read/reg_write as global helpers
->> that the config points to and then call regmap_init()? At a quick glance
-> Yes, assuming your bus really is limited in the way it seems from the
-> code.
-
-Ok, I'm happy to go the reg_read/reg_write way if we can have the
-bulk_read and bulk_write operations work. I was trying to mimic the
-regmap_mmio code because it seems to do the same things with respect to
-bulk operations. Or perhaps this code should live in drivers/mfd/ssbi.c
-and then we could return an error from the regmap_init call if
-use_single_rw is false?
-
+> Well, the problem is that this is not a SATA device but a PHY device
+> that happens to support SATA among its protocols (at least PCIe
+> as well, possibly more but I don't have the specs). The binding
+> document has to cover all the possibilities or allow extensions
+> for the other protocols to be implemented later. Having the driver
+> support SATA only initially is fine, but we shouldn't plan for
+> breaking compatibility with an established binding just a short time
+> later.
 >
->> it looks like we lose out on regmap_bulk_read() if we do that. There is
->> one driver that will use regmap_bulk_read(), but I suppose we can just
-> bulk_read() should decay to individual reads if there isn't a block
-> operaton and it's not like the hardware actually supports bulk reads
-> anyway.
+[Loc Ho]
+I will document them as XXGbps and drop the term GenX. As of right
+now, we only have SATA and I will document on 1.5Gbps, 3.0Gbps, and
+6Gbps. Also, keep in mind that these override are used for SATA. PCIe
+doesn't need these custom override setting per port at this time. A
+single value so far work just fine for PCIe, SGMII, and XFI.
 
-So regmap_bulk_read() should work if I don't have a map->bus? To make it
-work with reg_read/write I had to do this. I'm not sure how to make
-bulk_write work.
+Any other comments...
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 9c021d9..1ccd61b 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1897,14 +1897,10 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
-        size_t val_bytes = map->format.val_bytes;
-        bool vol = regmap_volatile_range(map, reg, val_count);
- 
--       if (!map->bus)
--               return -EINVAL;
--       if (!map->format.parse_inplace)
--               return -EINVAL;
-        if (reg % map->reg_stride)
-                return -EINVAL;
- 
--       if (vol || map->cache_type == REGCACHE_NONE) {
-+       if (map->bus && map->format.parse_inplace && (vol || map->cache_type == REGCACHE_NONE)) {
-                /*
-                 * Some devices does not support bulk read, for
-                 * them we have a series of single read operations.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+-Loc
