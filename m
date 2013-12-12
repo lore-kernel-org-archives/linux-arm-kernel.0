@@ -1,34 +1,32 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Dec 2013 14:20:30 -0700
-Subject: [PATCH 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
- <201312121122.33746.marex@denx.de>
- <CAJ+vNU0aoOtZEdq6GDPpwZAgu+EN3FjHnr8JAdXCxOiDfJ5m6A@mail.gmail.com>
- <201312121925.27591.marex@denx.de>
- <CAErSpo7C4rJZBuBUDRN6L_fkQZNthfeY=_oJ=_WCcqAxoj2Xig@mail.gmail.com>
-Message-ID: <CAErSpo682q3TkjsZvtR4Qhvvwfmx7FUB2QZTfQV+3Q+nK0C-7w@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 12 Dec 2013 22:22:02 +0100
+Subject: [PATCH CFT] ARM:S5P64X0: Enable ARM_PATCH_PHYS_VIRT and
+ AUTO_ZRELADDR by default
+In-Reply-To: <CACRpkdbGSXA8oT8L-0fzJx7esXn7GWQA+Wi7WCQKX9eiy-fYCQ@mail.gmail.com>
+References: <1386825152-398-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+ <26167386.hX5eWUjT6T@flatron>
+ <CACRpkdbGSXA8oT8L-0fzJx7esXn7GWQA+Wi7WCQKX9eiy-fYCQ@mail.gmail.com>
+Message-ID: <CA+Ln22EaSpzrSaW-TC1BMhnj8aPZMfK9pCTqBMnGXC3B-06FBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 2:07 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Thu, Dec 12, 2013 at 11:25 AM, Marek Vasut <marex@denx.de> wrote:
->> Bjorn, would you mind picking 2/7...6/7 of this series so we are done with
->> those? I will re-post 1/7 as a self-standing patch afterwards, it has no impact
->> on the rest of the series.
+2013/12/12 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Dec 12, 2013 at 10:47 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 >
-> Sure.  I can't really evaluate these myself, so I'm looking for acks
-> from Richard or Shawn.
+>> This is actually quite a poor platform choice. As of today, the kernel
+>> is stuck with supporting just SMDK6440/6450 boards, which are proprietary
+>> development boards and it doesn't look like any further boards will show
+>> up in future. Kukjin has actually proposed removing support for this
+>> platform at all and I consider this reasonable.
+>>
+>> Kukjin, should we proceed with removal?
 >
-> I noticed Pratyush, Tim, and Harro had some questions the first time
-> around, and I don't know whether they got resolved.
+> Isn't Mark Brown using that platform for some various stuff?
 
-By the way, I tried to apply patches 2-6 to my pci/host-imx6 branch,
-but patch 6 ("PCI: imx6: Fix bugs in PCIe startup code") didn't apply
-cleanly.
+Not as far as I know.
 
-I pushed the branch to
-http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-imx6
-if you want to try it yourself.
+He's using Cragganmore board based on s3c6410, but this is a different
+platform (s3c64xx).
 
-Bjorn
+Best regards,
+Tomasz
