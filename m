@@ -1,96 +1,30 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 12 Dec 2013 21:27:16 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <201312112112.52746.arnd@arndb.de>
-References: <1386770541-15056-1-git-send-email-zhangfei.gao@linaro.org>
- <201312111549.14017.arnd@arndb.de> <52A8868A.3000105@linaro.org>
- <201312112112.52746.arnd@arndb.de>
-Message-ID: <52A9B9B4.3080105@linaro.org>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu, 12 Dec 2013 14:27:57 +0100
+Subject: [PATCH 1/4] ARM: dts: imx6qdl: add aliases for can interfaces
+In-Reply-To: <1386854880-21805-1-git-send-email-LW@KARO-electronics.de>
+References: <1386854880-21805-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1386854880-21805-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd
 
-On 12/12/2013 04:12 AM, Arnd Bergmann wrote:
-> On Wednesday 11 December 2013, zhangfei wrote:
->>>
->>> I have not seen "clk-table" and "clk-table-num" before. Are these standard
->>> properties? What are the units that are used here, what does the index mean?
->>>
->>
->> "clk-table" and "clk-table-num" are private properties.
->> Instead simply on/off, the ip need different ciu clock for each timing mode.
->
-> But aren't the times fixed for each mode? Why do you need to specify them in
-> the DT? I would expect that the clock rates for each mode are set in the
-> MMC and SD specifications. When you call clk_set_rate(), it should normally
-> be enough to ask for the clock you actually want and let the clk subsystem
-> figure out how to set up the parents and multipliers on the way.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Yes. that's will be perfect.
-
-However, currently this ip still has no such capability.
-1. Input rate for init are diferent for different controller, not the 
-init 400K, some are 13M, others are 25M, since different clock source.
-This can be easily solved by clock-freq-init = <25000000>
-2. There is maxmum limit, also can be easily solved by define CLK_MAX.
-3. However some mode can not use the max speed from ios->clock
-for example UHS_SDR104_MAX_DTR 208000000 can not be used, only half may 
-be reached, at least currently.
-
->
->> Take emmc as example,
->> clk-table-num = <8>;
->> clk-table =
->> <13000000 50000000 0 0 13000000 50000000 0 100000000>;
->> MMC_TIMING_LEGACY mode, 25M should be set with parent clock 180M,
->> MMC_TIMING_MMC_HS mode, 50M is required with parent clock 360M
->>
->> "clk-table" list all clocks to be set in all supported timing one by one.
->> "clk-table-num" is the table number, since not find function getting
->> table number.
->> For example, next version will support MMC_TIMING_MMC_HS200 mode, the
->> clk-table-num = <9> with 9 clocks in the "clk-table"
->
-> If you have a property with an array, you can use of_find_property()
-> to get to the 'struct property' and then read the 'length' member
-> of that struct, or you can use of_property_for_each_u32() to iterate
-> through each value.
-
-Great, this works.
-
->
-> While I still hope that you don't even need this array as per the reasoning
-> above, if you actually need it, you should specify exactly what each
-> value means, such as
->
-> 1. CIU clock rate in HZ for 20MHz SPI mode operation
-> 2. CIU clock rate in HZ for 25MHz SD card operation
-> 3. CIU clock rate in HZ for 26MHz MMC card operation
-> 4. CIU clock rate in HZ for 50MHz SD card operation
-> ...
-
-How about this desc
-
-* clock-freq-table: should be the frequency (in Hz) array of the ciu 
-clock
-         in each supported timing. 
-
-         1. CIU clock rate in HZ for MMC_TIMING_LEGACY mode 
-
-         2. CIU clock rate in HZ for MMC_TIMING_MMC_HS mode
-         3. CIU clock rate in HZ for MMC_TIMING_SD_HS mode
-         4. CIU clock rate in HZ for MMC_TIMING_UHS_SDR12 mode 
-
-         5. CIU clock rate in HZ for MMC_TIMING_UHS_SDR25 mode 
-
-         6. CIU clock rate in HZ for MMC_TIMING_UHS_SDR50 mode 
-
-         7. CIU clock rate in HZ for MMC_TIMING_UHS_SDR104 mode 
-
-         8. CIU clock rate in HZ for MMC_TIMING_SD_HS mode 
-
-         9. CIU clock rate in HZ for MMC_TIMING_MMC_HS200 mode 
-
-
-Thanks
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 16f6974..858ecd7 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -14,6 +14,8 @@
+ 
+ / {
+ 	aliases {
++		can0 = &can1;
++		can1 = &can2;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+-- 
+1.7.2.5
