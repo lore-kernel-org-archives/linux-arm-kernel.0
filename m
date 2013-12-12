@@ -1,21 +1,47 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 11 Dec 2013 20:39:36 -0500
-Subject: mmc: mxs: Use mmc_of_parse
-In-Reply-To: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de> (Sascha
- Hauer's message of "Thu, 5 Dec 2013 14:34:45 +0100")
-References: <1386250491-4708-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <87y53q6e5j.fsf@octavius.laptop.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 12 Dec 2013 10:55:00 +0900
+Subject: [PATCH 11/12] MAINTAINERS: Add ST SPEAr13xx PCIe driver maintainer
+In-Reply-To: <0f924b2ad771dd5c3486c81ed524a3f6e7d813b9.1386752447.git.mohit.kumar@st.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <0f924b2ad771dd5c3486c81ed524a3f6e7d813b9.1386752447.git.mohit.kumar@st.com>
+Message-ID: <002601cef6dd$2adbdb60$80939220$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wednesday, December 11, 2013 6:39 PM, Mohit Kumar wrote:
+> 
+> Add Mohit Kumar as maintainer for ST SPEAr13xx PCIe driver.
+> 
+> Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: linux-pci at vger.kernel.org
 
-On Thu, Dec 05 2013, Sascha Hauer wrote:
-> We have a generic mmc_of_parse function. Use it in the mxs-mmc driver
-> to make the code simpler and to parse some new devicetree propeties.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-Great, thanks for doing this; all six patches pushed to mmc-next for 3.14.
+Best regards,
+Jingoo Han
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> ---
+>  MAINTAINERS |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 8285ed4..fd03da6 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6462,6 +6462,12 @@ L:	linux-pci at vger.kernel.org
+>  S:	Maintained
+>  F:	drivers/pci/host/pci-exynos.c
+> 
+> +PCIE DRIVER FOR ST SPEAR13XX
+> +M:	Mohit Kumar <mohit.kumar@st.com>
+> +L:	linux-pci at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/pci/host/pcie-spear13xx.c
+> +
+>  PCMCIA SUBSYSTEM
+>  P:	Linux PCMCIA Team
+>  L:	linux-pcmcia at lists.infradead.org
+> --
+> 1.7.0.1
