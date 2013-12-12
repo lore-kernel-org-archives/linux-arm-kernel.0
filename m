@@ -1,39 +1,42 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 12 Dec 2013 13:19:39 +0100
-Subject: regulator-core has_full_constraints set too late for dt using
- boards ?
-In-Reply-To: <20131212104208.GG11044@sirena.org.uk>
-References: <52A88805.1080704@redhat.com>
- <20131211160225.GB11468@sirena.org.uk> <52A98C72.2040203@redhat.com>
- <20131212104208.GG11044@sirena.org.uk>
-Message-ID: <52A9A9DB.5050102@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Dec 2013 12:22:36 +0000
+Subject: [PATCH 5/6] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <20131212115639.GD28621@e103034-lin>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <1386767606-6391-5-git-send-email-broonie@kernel.org>
+ <20131211144755.GF596@darko.cambridge.arm.com>
+ <20131211173142.GD11468@sirena.org.uk>
+ <alpine.LFD.2.10.1312111414500.15948@knanqh.ubzr>
+ <20131212115639.GD28621@e103034-lin>
+Message-ID: <20131212122236.GJ11044@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 12, 2013 at 11:56:40AM +0000, Morten Rasmussen wrote:
 
-On 12/12/2013 11:42 AM, Mark Brown wrote:
-> On Thu, Dec 12, 2013 at 11:14:10AM +0100, Hans de Goede wrote:
->> On 12/11/2013 05:02 PM, Mark Brown wrote:
->
->>> Please look at the current code, that's not how this works any more.
->
->> More current then 3.13-rc3 ? Because that is what I've been looking at.
->
-> Yes, -next.  It'll be going to Linus probably this week.
->
->> I could be completely wrong of course. Either way could you give a few
->> hints as to how my interpretation of how this works is wrong ?
->
-> It's correct for the code you've been looking at but has since been
-> changed.  Please look at the changes in -next, you should generally
-> check -next for the current state of things.
+> > > I'm also worried about putting numbers into the DT now with all the
+> > > scheduler work going on, this time next year we may well have a
+> > > completely different idea of what we want to tell the scheduler.  It may
+> > > be that we end up being able to explicitly tell the scheduler about
+> > > things like the memory architecture, or that the scheduler just gets
+> > > smarter and can estimate all this stuff at runtime.  
 
-Ah yes, I see, thanks for clarifying this.
+> I agree. We need to sort the scheduler side out first before we commit
+> to anything. If we are worried about including code into v8 that we are
+> going to change later, then it is probably better to leave this part
+> out. See my response to Mark's patch subset with the same patch for
+> details (I didn't see this thread until afterwardsi - sorry).
 
-Note my patch to not do a dev_err when no regulator is found for
-regulator_get_optional still is needed in -next.
-
-Thanks & Regards,
-
-Hans
+My take on change is that we should be doing as good a job as we can
+with the scheduler we have so users get whatever we're able to deliver
+at the current time.  Having to change in kernel code shouldn't be that
+big a deal, especially with something like this where the scheduler is
+free to ignore what it's told without churning the interface.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/219906ec/attachment.sig>
