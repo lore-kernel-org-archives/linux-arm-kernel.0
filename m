@@ -1,158 +1,64 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Dec 2013 17:12:17 +0100
-Subject: [PATCH v3 5/6] ARM: dts: exynos: Fix missing spaces after labels
+Date: Thu, 12 Dec 2013 17:12:14 +0100
+Subject: [PATCH v3 2/6] ARM: dts: exynos4: Drop interrupt controller properties
+ from MCT nodes
 In-Reply-To: <1386864738-19829-1-git-send-email-t.figa@samsung.com>
 References: <1386864738-19829-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1386864738-19829-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1386864738-19829-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For consistency with other device tree nodes, this patch adds missing
-spaces after node labels.
+MCT is not an interrupt controller and so there is no point for device
+tree nodes representing it to contain interrupt-controller
+and #interrupt-cells properties.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi            | 4 ++--
- arch/arm/boot/dts/exynos4210.dtsi         | 4 ++--
- arch/arm/boot/dts/exynos4212.dtsi         | 2 +-
- arch/arm/boot/dts/exynos4412.dtsi         | 2 +-
- arch/arm/boot/dts/exynos5.dtsi            | 4 ++--
- arch/arm/boot/dts/exynos5250-smdk5250.dts | 6 +++---
- arch/arm/boot/dts/exynos5440.dtsi         | 2 +-
- 7 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/exynos4210.dtsi | 2 --
+ arch/arm/boot/dts/exynos4212.dtsi | 2 --
+ arch/arm/boot/dts/exynos4412.dtsi | 2 --
+ 3 files changed, 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index a73eeb5..4fed2ad 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -85,14 +85,14 @@
- 		reg = <0x10023CE0 0x20>;
- 	};
- 
--	gic:interrupt-controller at 10490000 {
-+	gic: interrupt-controller at 10490000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
- 		reg = <0x10490000 0x1000>, <0x10480000 0x100>;
- 	};
- 
--	combiner:interrupt-controller at 10440000 {
-+	combiner: interrupt-controller at 10440000 {
- 		compatible = "samsung,exynos4210-combiner";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
 diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index b0fee69..48ecd7a 100644
+index 057d682..1a6440ae6 100644
 --- a/arch/arm/boot/dts/exynos4210.dtsi
 +++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -36,11 +36,11 @@
- 		reg = <0x10023CA0 0x20>;
- 	};
- 
--	gic:interrupt-controller at 10490000 {
-+	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
- 	};
- 
--	combiner:interrupt-controller at 10440000 {
-+	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <16>;
- 		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
- 			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+@@ -51,8 +51,6 @@
+ 	mct at 10050000 {
+ 		compatible = "samsung,exynos4210-mct";
+ 		reg = <0x10050000 0x800>;
+-		interrupt-controller;
+-		#interrups-cells = <2>;
+ 		interrupt-parent = <&mct_map>;
+ 		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+ 			     <4 0>, <5 0>;
 diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 443b8a2..94a43f9 100644
+index 6f34d7f..028752e 100644
 --- a/arch/arm/boot/dts/exynos4212.dtsi
 +++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -22,7 +22,7 @@
- / {
- 	compatible = "samsung,exynos4212";
- 
--	gic:interrupt-controller at 10490000 {
-+	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
- 	};
- 
+@@ -38,8 +38,6 @@
+ 	mct at 10050000 {
+ 		compatible = "samsung,exynos4412-mct";
+ 		reg = <0x10050000 0x800>;
+-		interrupt-controller;
+-		#interrups-cells = <2>;
+ 		interrupt-parent = <&mct_map>;
+ 		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+ 			     <4 0>, <5 0>;
 diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 1388ce0..ec1b166 100644
+index e743e67..85d2c26 100644
 --- a/arch/arm/boot/dts/exynos4412.dtsi
 +++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -22,7 +22,7 @@
- / {
- 	compatible = "samsung,exynos4412";
- 
--	gic:interrupt-controller at 10490000 {
-+	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x4000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index e52b038..258dca4 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -23,7 +23,7 @@
- 		reg = <0x10000000 0x100>;
- 	};
- 
--	combiner:interrupt-controller at 10440000 {
-+	combiner: interrupt-controller at 10440000 {
- 		compatible = "samsung,exynos4210-combiner";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-@@ -39,7 +39,7 @@
- 				<0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
- 	};
- 
--	gic:interrupt-controller at 10481000 {
-+	gic: interrupt-controller at 10481000 {
- 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 13746df..3f80c23 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -37,7 +37,7 @@
- 		};
- 	};
- 
--	vdd:fixed-regulator at 0 {
-+	vdd: fixed-regulator at 0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vdd-supply";
- 		regulator-min-microvolt = <1800000>;
-@@ -45,7 +45,7 @@
- 		regulator-always-on;
- 	};
- 
--	dbvdd:fixed-regulator at 1 {
-+	dbvdd: fixed-regulator at 1 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "dbvdd-supply";
- 		regulator-min-microvolt = <3300000>;
-@@ -53,7 +53,7 @@
- 		regulator-always-on;
- 	};
- 
--	spkvdd:fixed-regulator at 2 {
-+	spkvdd: fixed-regulator at 2 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "spkvdd-supply";
- 		regulator-min-microvolt = <5000000>;
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 8da1070..02a0a12 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -29,7 +29,7 @@
- 		#clock-cells = <1>;
- 	};
- 
--	gic:interrupt-controller at 2E0000 {
-+	gic: interrupt-controller at 2E0000 {
- 		compatible = "arm,cortex-a15-gic";
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
+@@ -38,8 +38,6 @@
+ 	mct at 10050000 {
+ 		compatible = "samsung,exynos4412-mct";
+ 		reg = <0x10050000 0x800>;
+-		interrupt-controller;
+-		#interrups-cells = <2>;
+ 		interrupt-parent = <&mct_map>;
+ 		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+ 			     <4 0>, <5 0>, <6 0>, <7 0>;
 -- 
 1.8.4.3
