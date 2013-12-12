@@ -1,49 +1,169 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 13 Dec 2013 01:44:53 +0200
-Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
-In-Reply-To: <CAPcyv4hr2N0kiZabsJJjfmFqTRbT_ntjX4Rdg=THpYg=_2cELg@mail.gmail.com>
-References: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
- <20131212224249.GX4360@n2100.arm.linux.org.uk>
- <CAPcyv4hr2N0kiZabsJJjfmFqTRbT_ntjX4Rdg=THpYg=_2cELg@mail.gmail.com>
-Message-ID: <20131212234453.GB8754@blackmetal.musicnaut.iki.fi>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 12 Dec 2013 15:46:27 -0800
+Subject: [PATCH v4 2/4] Documentation: Add APM X-Gene SoC 15Gbps
+ Multi-purpose PHY driver binding documentation
+In-Reply-To: <201312122225.23604.arnd@arndb.de>
+References: <1386833435-30498-1-git-send-email-lho@apm.com>
+ <201312121427.20040.arnd@arndb.de>
+ <CAPw-ZTn4f7w7gxuKoeq6YfHsAfOSaZx_skbo4-MCv2EfS_oHMQ@mail.gmail.com>
+ <201312122225.23604.arnd@arndb.de>
+Message-ID: <CAPw-ZTkV8mpanbRNvjqpXzNhoispf_id8OtAEPsfpgsffcP1QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 03:36:13PM -0800, Dan Williams wrote:
-> On Thu, Dec 12, 2013 at 2:42 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Dec 12, 2013 at 11:11:55PM +0200, Aaro Koskinen wrote:
-> >> If the non-DT channel add path fails, the kernel will crash as the
-> >> channel is not set to NULL and it will try to release the channel using
-> >> the error value. Fix that.
-> >>
-> >> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> >> ---
-> >>  drivers/dma/mv_xor.c | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-> >> index 7807f0ef4e20..2cb35a62c7f0 100644
-> >> --- a/drivers/dma/mv_xor.c
-> >> +++ b/drivers/dma/mv_xor.c
-> >> @@ -1227,6 +1227,7 @@ static int mv_xor_probe(struct platform_device *pdev)
-> >>                                                  cd->cap_mask, irq);
-> >>                       if (IS_ERR(xordev->channels[i])) {
-> >>                               ret = PTR_ERR(xordev->channels[i]);
-> >> +                             xordev->channels[i] = NULL;
-> >>                               goto err_channel_add;
-> >>                       }
-> >>               }
-> >
-> > Yes, I found this too, and although this is _a_ fix, it's not my
-> > preferred.  I'd much prefer this instead - avoid writing invalid
-> > channels to xordev->channels[i] in the first place...  Slightly
-> > larger patch but IMHO more correct.
-> >
-> 
-> Looks good to me.  Aaro?
+HI,
 
-I'm also fine this version. Just to be sure, I tested the error path on
-my Marvell OpenRD client, so you can put my Tested-by to the final patch.
+>> >> +- reg                  : First PHY memory resource is the SDS PHY access
+>> >> +                         resource.
+>> >> +                         Second PHY memory resoruce is the clock and reset
+>> >> +                         resources.
+>> >> +                         Third PHY memory resource is the SDS PHY access
+>> >> +                         resource outside of the IP if it is type
+>> >> +                         "apm,xgene-phy-ext".
+>> >
+>> > Why do the "clock and reset" resources not use a clock driver and a reset
+>> > driver?
+>> >
+>> > I would expect these to get replaced with
+>> >
+>> >         clocks          : Reference to external clock input
+>> >         resets          : Reference to reset controller input
+>> [Loc Ho]
+>> The clock register has bit for the SDS interface, each sata ports,
+>> CSR, AXI interface, and the PM (power management) interface. The clock
+>> and CSR for all these are enabled by the host controller driver.
+>> Unfortunately, during calibration the SATA ports clocks must not be
+>> enable. This sequence is required by the hardware itself. Unless I
+>> separate out the two, this requirement is handled by the PHY. If you
+>> believe this is needed, I can have two separate clocks but it is over
+>> kill. You can look at function xgene_phy_sata_setup_preclk and
+>> xgene_phy_sata_setup_postclk.
+>
+>
+> I'm not looking at this from the driver side but rather from the way the
+> hardware is built. My understanding is that you have clock and reset
+> registers in a separate register file that also handles clocks and reset
+> lines for other devices with the same layout. If this is true, you
+> should definitely write a clock driver and a reset driver to support
+> the respective register layouts, and use the clock and reset APIs
+> in the kernel to call them, rather than poking the raw registers from
+> an unrelated driver.
 
-A.
+The HW has one clock register and one CSR (configuration status
+register) for all SATA and PHY sub-HW block. Each bit corresponding to
+one sub-HW block. In a perfect HW, one would just enable the clock and
+take the CSR out of reset  and then go on initialize the HW. But there
+is an requirement to have some sub-HW block remain in reset until it
+is completed. It sounds like to me that I will need to separate them
+out. I will separate the clock interface into two components - one for
+the host and one for the PHY.
+
+>
+>> >> +Optional properties:
+>> >> +- status             : Shall be "ok" if enabled or "disabled" if disabled.
+>> >> +                       Default is "ok".
+>> >> +- apm,tx-eye-tuning  : Manual control to fine tune the capture of the serial
+>> >> +                       bit lines from the automatic calibrated position.
+>> >> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
+>> >> +                       Range from 0 to 0x7f in unit of one bit period.
+>> >> +                       Default is 0xa.
+>> >
+>> > What does gen1, gen2 and gen3 refer to? Is this PCIe, SATA or serdes generations
+>> > or all of them?
+>> [Loc Ho]
+>> Douglas already commented on this. Gen1 in SATA term is 1.5Gbps, Gen2
+>> is 3.0Gbps, and Gen3 is 6Gbps.
+>>
+>> >
+>> > Why are there two sets?
+>> [Loc Ho]
+>> Each controller has two SATA ports - one set for each port.
+>
+> Ok.
+>
+>> > Will this have to change if you add PCIe support?
+>> [Loc Ho]
+>> So far, we don't see a need to use override setting for PCIe
+>
+> The problem is that with the encoding you have chosen, it becomes a lot harder
+> to add that if it turns out to be needed later.
+[Loc Ho]
+PCIe also has Gen1, Gen2, and Gen3. USB has 1.1, 2.0, and 3.0. XSGMII
+is only 1Gbps. XFI is only 10Gbps. Let me put this in the text.
+
+>
+>> > I would suggest using decimal notation here instead of hexadecimal since you
+>> > are dealing with numbers couting things. Same for the others.
+>> [Loc Ho]
+>> Okay... for future version.
+>>
+>> >
+>> >> +- apm,tx-eye-direction       : Eye tuning manual control direction. 0 means sample
+>> >> +                       data earlier than the nominal sampling point. 1 means
+>> >> +                       sample data later than the nominal sampling point.
+>> >> +                       Two set of 3-tuple setting for Gen1, Gen2, and Gen3.
+>> >> +                       Default is 0x0.
+>> >> +
+>> >> +- apm,tx-boost-gain  : Frequency boost AC (LSB 3-bit) and DC (2-bit)
+>> >> +                       gain control. Two set of 3-tuple setting for Gen1,
+>> >> +                       Gen2, and Gen3. Range is between 0 to 0x1f in unit
+>> >> +                       of dB. Default is 0x3.
+>> >> +
+>> >> +- apm,tx-amplitude   : Amplitude control. Two set of 3-tuple setting for
+>> >> +                       Gen1, Gen2, and Gen3. Range is between 0 to 0xf in
+>> >> +                       unit of 13.3mV. Default is 0xf.
+>> >
+>> > Units of 13.3mV don't seem to be useful as a generic measurement. I'd
+>> > recommend using milivolts or microvolts.
+>> [Loc Ho]
+>> Each unit is 13.3mV. If I use millivolt, then someone can set fraction
+>> which will get round up or down. If you still strongly suggest this is
+>> required, then fine.
+>
+> The amplitude sounds like something that a lot of PHY drivers would need to
+> set, and we really want everybody to use the same property definitions for
+> describing the same things.
+[Loc Ho]
+Okay... I understand and stay with millivolt and let the driver handle
+the conversion
+
+>
+>> >> +- apm,tx-pre-cursor1 : 1st pre-cursor emphasis taps control. Two set of
+>> >> +                       3-tuple setting for Gen1, Gen2, and Gen3. Range is
+>> >> +                       between 0 to 0xf in unit of 18.2mV. Default is 0x0.
+>> >> +- apm,tx-pre-cursor2 : 2st pre-cursor emphasis taps control. Two set of
+>> >> +                       3-tuple setting for Gen1, Gen2, and Gen3. Range is
+>> >> +                       between 0 to 0x7 in unit of 18.2mV. Default is 0x0.
+>> >> +- apm,tx-post-cursor : Post-cursor emphasis taps control. Two set of
+>> >> +                       3-tuple setting for Gen1, Gen2, and Gen3. Range is
+>> >> +                       between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
+>> >
+>> > Same here.
+>> >
+>> >> +- apm,tx-speed               : Tx operating speed. One set of 3-tuple for
+>> >> +                       Gen1 (0x1), Gen2 (0x3), and Gen3 (0x7). Default is
+>> >> +                       0x7.
+>> >
+>> > I'm completely confused by this description. Can you rephrase this?
+>> > It sounds like the only possible values are <1 3 7> for this property.
+>> [Loc Ho]
+>> Douglas already comment on this. If you believe this needs to be
+>> rephrased, then let me know.
+>
+> I think it's still rather confusing to the casual reader. Let me try to rephrase
+> what I understand and you can decide whether you want to use that text, or correct
+> my mistakes.
+>
+> apm,sata-speed          : Tx operating speed for SATA mode. A 3-tuple for each
+>                           supported link speed on the host, with a bit mask of
+>                           compatible device speeds, encoded as
+>                             0x0001 - SATA-I (1.5gbits/s)
+>                             0x0002 - SATA-II (3.0gbits/s)
+>                             0x0004 - SATA-6G (6.0gbits/s)
+>                         Default is <0x1 0x3 0x7>.
+>
+
+I got it. Why not stay with unit of Kbps and let the driver handle the
+conversion?
+
+-Loc
