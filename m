@@ -1,74 +1,86 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 12 Dec 2013 14:09:05 -0800
-Subject: [PATCH] arm64: Correct virt_addr_valid
-In-Reply-To: <20131212180249.GV4360@n2100.arm.linux.org.uk>
-References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
- <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
- <20131211104429.GE26730@mudshark.cambridge.arm.com>
- <20131211110618.GG4360@n2100.arm.linux.org.uk>
- <20131211172635.GJ26730@mudshark.cambridge.arm.com>
- <20131211211333.GI4360@n2100.arm.linux.org.uk>
- <20131212175753.GG3382@arm.com>
- <20131212180249.GV4360@n2100.arm.linux.org.uk>
-Message-ID: <52AA3401.3000004@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 12 Dec 2013 23:11:03 +0100
+Subject: [PATCH v2] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car
+ PCI host maintainers
+In-Reply-To: <20131212204610.GK4699@google.com>
+References: <20131211183237.GI4699@google.com>
+ <20131212204610.GK4699@google.com>
+Message-ID: <20131212231103.3ceeb3bb@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 10:02 AM, Russell King - ARM Linux wrote:
-> On Thu, Dec 12, 2013 at 05:57:54PM +0000, Catalin Marinas wrote:
->> On Wed, Dec 11, 2013 at 09:13:33PM +0000, Russell King - ARM Linux wrote:
->>> There is actually a concern here, and that's if the v:p translation isn't
->>> linear, could it return false results?
->>>
->>> According to my grep skills, we have one platform where this is true -
->>> Realview:
->>>
->>>   * 256MB @ 0x00000000 -> PAGE_OFFSET
->>>   * 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
->>>   * 256MB @ 0x80000000 -> PAGE_OFFSET + 0x30000000
->>>
->>> The v:p translation is done via:
->>>
->>>           ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 : \
->>>            (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 : \
->>>            (virt) - PAGE_OFFSET)
->>>
->>> Now the questions - what do values below PAGE_OFFSET give us?  Very
->>> large numbers, which pfn_valid() should return false for.  What about
->>> values > PAGE_OFFSET2 + 256MB?  The same.
->>>
->>> So this all _looks_ fine.  Wait a moment, what about highmem?  Let's say
->>> that the last 256MB is only available as highmem, and let's go back to
->>> Laura's patch:
->>>
->>> old:
->>> #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
->>> 				 ((void *)(kaddr) < (void *)high_memory))
->>> new:
->>> #define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
->>>
->>> The former _excludes_ highmem, but the latter _includes_ it.
->>>
->>> virt_addr_valid(v) should only ever return _true_ for the lowmem area,
->>> never anywhere else - that's part of its point.  It's there to answer
->>> the question "is this a valid virtual pointer which I can dereference".
->>>
->>> So... We actually need a combination of both of these tests.
->>
->> Just to avoid any confusion, on arm64 we don't have non-linear v:p
->> translation as there is plenty of VA space to live with holes. So the
->> original patch is fine.
->
-> The point I make above actually has nothing to do with non-linear v:p
-> translations.
->
+Dear Bjorn Helgaas,
 
-Yes, I believe the point was that if we call virt_addr_valid on a 
-not-direct-mapped address it should return false. We still need the 
-range check on arm64 systems as well to ensure this.
+On Thu, 12 Dec 2013 13:46:10 -0700, Bjorn Helgaas wrote:
+> [+cc Thomas]
+> 
+> On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
+> > If this looks reasonable, I'll merge it via the PCI tree for v3.13.
+> 
+> OK, here's another try.  I'm not actually trying to nominate anybody; I
+> just tried to write down the list we came up with in an earlier discussion [1].
+> 
+> I'd like confirmation from the following people that they approve of being
+> listed here:
+> 
+>   Richard Zhu (IMX6)
+>   Thomas Petazzoni (MVEBU)
+>   Magnus Damm (R-CAR)
+> 
+> I think everybody else listed has already said they approve.
+> 
+> [1] http://lkml.kernel.org/r/CAErSpo5tN==4nSv2u3SUBe_L4VsWn4P7TN+LtrC172Qj1vhtog at mail.gmail.com
+> 
+> 
+> MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI host maintainers
+> 
+> From: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> Add entries for PCI host controller drivers in drivers/pci/host/.
+> 
+> Signed-off-by: Mohit Kumar <mohit.kumar@st.com>		(DesignWare)
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>	(DesignWare)
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>	(R-CAR)
+> Acked-by: Jason Cooper <jason@lakedaemon.net>		(MVEBU)
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> ---
+>  MAINTAINERS |   34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 8285ed4676b6..1c5dc36ec522 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6449,19 +6449,53 @@ F:	drivers/pci/
+>  F:	include/linux/pci*
+>  F:	arch/x86/pci/
+>  
+> +PCI DRIVER FOR IMX6
+> +M:	Richard Zhu <r65037@freescale.com>
+> +M:	Shawn Guo <shawn.guo@linaro.org>
+> +L:	linux-pci at vger.kernel.org
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/pci/host/*imx6*
+> +
+> +PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
+> +M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> +M:	Jason Cooper <jason@lakedaemon.net>
+> +L:	linux-pci at vger.kernel.org
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/pci/host/*mvebu*
 
-Laura
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
+Thanks for doing this!
+
+Best regards,
+
+Thomas
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
