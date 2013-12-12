@@ -1,44 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 11 Dec 2013 16:49:05 -0800
-Subject: [GIT PULL v3][for 3.14] pull request for hisilicon soc
-In-Reply-To: <52A82C02.5050609@gmail.com>
-References: <52A82C02.5050609@gmail.com>
-Message-ID: <20131212004905.GF21531@quad.lixom.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 12 Dec 2013 10:05:33 +0900
+Subject: [PATCH 07/12] pcie: designware: add dw_pcie prefix before
+ cfg_read/write
+In-Reply-To: <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <11157a3462fcad1067bddd27dcd580bbeb2c289e.1386752447.git.mohit.kumar@st.com>
+Message-ID: <002001cef6d6$423d7040$c6b850c0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 05:10:26PM +0800, Haojian Zhuang wrote:
-> Hi all,
+On Wednesday, December 11, 2013 6:39 PM, Mohit Kumar wrote:
 > 
-> Please help to merge pull request for hisilicon soc. This pull
-> request is used to replace all previous request for hisilicon. The
-> changes is in below.
+> From: Pratyush Anand <pratyush.anand@st.com>
 > 
->    1. Update the git repository address from ssh:// to git://.
->    2. Add clock binding in DTS file. This patch is contained in v11
-> & v12 patch sets, and everybody like this binding.
->    3. Add the GPIOLIB selection by default.
+> cfg_read/write function are designware pcie specific. Add dw_pcie prefix
+> to avoid collision in global name space.
 > 
-> Best Regards
-> Haojian
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/hisilicon-basic
-> 
-> for you to fetch changes up to be05bfccdbe65915da4a7d0e4713ad3489fd5f37:
-> 
->   ARM: hi3xxx: select GPIO in Kconfig (2013-12-11 17:01:45 +0800)
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Mohit Kumar <mohit.kumar@st.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: spear-devel at list.st.com
+> Cc: linux-pci at vger.kernel.org
 
-Sigh.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-This code is different from the patches you posted. In particular the
-"add smp support" patch is different, maybe others too.
+It looks good. Also, I tested this patch on Exynos platform.
 
+Best regards,
+Jingoo Han
 
--Olof
+> ---
+>  drivers/pci/host/pci-exynos.c      |    5 +++--
+>  drivers/pci/host/pcie-designware.c |   23 ++++++++++++++---------
+>  drivers/pci/host/pcie-designware.h |    4 ++--
+>  3 files changed, 19 insertions(+), 13 deletions(-)
