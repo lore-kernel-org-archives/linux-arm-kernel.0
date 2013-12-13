@@ -1,65 +1,38 @@
-From: panchaxari.prasannamurthy@linaro.org (panchaxari)
-Date: Fri, 13 Dec 2013 16:58:25 +0530
-Subject: [PATCH CFT] ARM:S3C24XX: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
- by default
-Message-ID: <1386934105-23392-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Dec 2013 11:39:03 +0000
+Subject: [PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option
+In-Reply-To: <CACmBeS1d-EX5oPD8f7P-ufmF=MutdTO+LgG23Cb0=biR8yQPCg@mail.gmail.com>
+References: <1386922149-4561-1-git-send-email-jonas.jensen@gmail.com>
+ <20131213095655.GB4360@n2100.arm.linux.org.uk>
+ <CACmBeS1d-EX5oPD8f7P-ufmF=MutdTO+LgG23Cb0=biR8yQPCg@mail.gmail.com>
+Message-ID: <20131213113903.GE4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configs ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR are enabled as default
-to platform S3C24XX.
+On Fri, Dec 13, 2013 at 11:51:09AM +0100, Jonas Jensen wrote:
+> On 13 December 2013 10:56, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > So, having these symbols enabled (provided the right ones for FA526 are
+> > also enabled) makes no difference.  So I don't buy your explanation.
+> 
+> The explanation is indeed false, CPU_FA526 and CPU_ARM920T get along just fine.
+> That's not where the problem is.
+> 
+> Panic goes away after removing CONFIG_ARM_THUMB=y.
+> 
+> I assume this is what should happen on processors without thumb?
 
-Introduction of PHYS_VIRT config as default would enable phy-to-virt and
-virt-to-phy translation function at boot and module loading time
-and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
-enable calculation of kernel load address at run time.
+I see what's causing this: the kuser helpers are using "bx lr" to return
+which will be undefined on non-Thumb CPUs.  We generally cope fine with
+non-Thumb CPUs, conditionalising where necessary on HWCAP_THUMB or the
+T bit in the PSR being set.
 
-PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
-systems with NOR flash devices, and ZRELADDR config is mutually exclusive
-to ZBOOT_ROM.
+However, it looks like the kuser helpers got missed.  As a check, please
+look at arch/arm/kernel/entry-armv.S, find the line with:
 
-CFT::Call For Testing
+	.macro	usr_ret, reg
 
-Requesting maintainers of S3C24XX  platforms to evaluate the changes on the
-board and comment, as I dont have the board for testing and also requesting
-an ACK the changes.
+and ensure that the mov pc, \reg case always gets used.  Please report
+back.
 
-Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-
----
-S3C24XX is basically a Samsung SOC with ARM920T instruction set, and has
-an operating frquency of 203MHz, it also has enhanced MMU architecture
-to support WinCE, EPOC 32 and Linux.
-
-This SOC is an Integrated system for hand-held devices and general
-embedded systems.
-
-Supports various types of ROM for booting (NOR/NAND Flash, EEPROM, and others).
-Supports 8 memory banks, 128M for each bank, with a total of 1GB.
----
- arch/arm/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 32acacb..ec1faea 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -708,6 +708,8 @@ config ARCH_S3C24XX
- 	bool "Samsung S3C24XX SoCs"
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_PATCH_PHYS_VIRT
-+	select AUTO_ZRELADDR
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
- 	select GENERIC_CLOCKEVENTS
--- 
-1.7.10.4
+Thanks.
