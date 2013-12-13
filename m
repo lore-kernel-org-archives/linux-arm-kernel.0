@@ -1,34 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Dec 2013 22:23:38 -0600
-Subject: [PATCH v6 03/15] usb: phy-mxs: Add auto clock and power setting
-In-Reply-To: <1386897825-6130-4-git-send-email-peter.chen@freescale.com>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-4-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131213042338.GD867@saruman.home>
+From: david.a.cohen@linux.intel.com (David Cohen)
+Date: Thu, 12 Dec 2013 20:29:19 -0800
+Subject: [PATCH 3/7] usb: dwc3: pci: add pm_runtime support
+In-Reply-To: <20131213041719.GB867@saruman.home>
+References: <1386884325-11440-1-git-send-email-balbi@ti.com>
+ <1386884325-11440-4-git-send-email-balbi@ti.com>
+ <20131213015605.GC29964@psi-dev26.jf.intel.com>
+ <20131213041719.GB867@saruman.home>
+Message-ID: <20131213042919.GB31992@psi-dev26.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 09:23:33AM +0800, Peter Chen wrote:
-> With the auto setting, the PHY's clock and power can be
-> recovered correctly from low power mode, it is ganranteed by IC logic.
+On Thu, Dec 12, 2013 at 10:17:19PM -0600, Felipe Balbi wrote:
+> On Thu, Dec 12, 2013 at 05:56:05PM -0800, David Cohen wrote:
+> > On Thu, Dec 12, 2013 at 03:38:41PM -0600, Felipe Balbi wrote:
+> > > teach the PCI glue about pm_runtime so that
+> > > it's easier to teach dwc3 core about it
+> > > later.
+> > > 
+> > > No functional changes otherwise.
+> > > 
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > I was able to test this one with Intel Merrifield:
+> > Acked-by: David Cohen <david.a.cohen@linux.intel.com>
+> 
+> cool, thanks. Although that'd be a Tested-by. Is it ok to add your name
+> as Tested-by instead ?
 
-s/ganranteed/guaranteed
+Yeah :)
 
-Also, I think you need to be slightly more verbose here. Maybe explain a
-bit what is the "auto setting". From what I can see from the code, it's
-a way to let HW manage clock gating.
+Br, David
 
-Another question, does this feature work in all SoCs where this IP is
-available ?
-
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/082b1919/attachment.sig>
+> 
+> -- 
+> balbi
