@@ -1,42 +1,60 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 13 Dec 2013 10:59:09 +0900
-Subject: possible regression on 3.13 when calling flush_dcache_page
-In-Reply-To: <20131212143618.GJ12099@ldesroches-Latitude-E6320>
-References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
- <20131212143618.GJ12099@ldesroches-Latitude-E6320>
-Message-ID: <20131213015909.GA8845@lge.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 13 Dec 2013 09:23:37 +0800
+Subject: [PATCH v6 07/15] usb: phy: add notify suspend and resume callback
+In-Reply-To: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
+References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386897825-6130-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
-> fix mmc mailing list address error
-> 
-> On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
-> > Hi,
-> > 
-> > With v3.13-rc3 I have an error when the atmel-mci driver calls
-> > flush_dcache_page (log at the end of the message).
-> > 
-> > Since I didn't have it before, I did a git bisect and the commit introducing
-> > the error is the following one:
-> > 
-> > 106a74e slab: replace free and inuse in struct slab with newly introduced active
-> > 
-> > I don't know if this commit has introduced a bug or if it has revealed a bug
-> > in the atmel-mci driver.
+They are used to notify PHY that the controller enters suspend
+or finishes resume.
 
-Hello,
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ include/linux/usb/phy.h |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-I think that this commit may not introduce a bug. This patch remove one
-variable on slab management structure and replace variable name. So there
-is no functional change.
-
-I doubt that side-effect of this patch reveals a bug in other place.
-Side-effect is reduced memory usage for slab management structure. It would
-makes some slabs have more objects with more density since slab management
-structure is sometimes on the page for objects. So if it diminishes, more
-objects can be in the page.
-
-Anyway, I will look at it more. If you have any progress, please let me know.
-
-Thanks.
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 6c0b1c5..a747960 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -116,6 +116,11 @@ struct usb_phy {
+ 			enum usb_device_speed speed);
+ 	int	(*notify_disconnect)(struct usb_phy *x,
+ 			enum usb_device_speed speed);
++	int	(*notify_suspend)(struct usb_phy *x,
++			enum usb_device_speed speed);
++	int	(*notify_resume)(struct usb_phy *x,
++			enum usb_device_speed speed);
++
+ };
+ 
+ /**
+@@ -282,6 +287,24 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
+ 		return 0;
+ }
+ 
++static inline int usb_phy_notify_suspend
++	(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x && x->notify_suspend)
++		return x->notify_suspend(x, speed);
++	else
++		return 0;
++}
++
++static inline int usb_phy_notify_resume
++	(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x && x->notify_resume)
++		return x->notify_resume(x, speed);
++	else
++		return 0;
++}
++
+ /* notifiers */
+ static inline int
+ usb_register_notifier(struct usb_phy *x, struct notifier_block *nb)
+-- 
+1.7.8
