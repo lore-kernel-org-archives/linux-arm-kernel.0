@@ -1,63 +1,43 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 12 Dec 2013 16:32:46 -0800
-Subject: [PATCH v5 0/3] Exynos 5410 support
-In-Reply-To: <52A836C9.9020405@samsung.com> (Tarek Dakhran's message of "Wed,
- 11 Dec 2013 13:56:25 +0400")
-References: <1386685599-31536-1-git-send-email-v.tyrtov@samsung.com>
- <87ppp48xrs.fsf@linaro.org> <52A836C9.9020405@samsung.com>
-Message-ID: <87haad615d.fsf@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Dec 2013 18:43:37 -0600
+Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+In-Reply-To: <52AA54E4.5000606@ti.com>
+References: <20131212214306.GS1939@saruman.home>
+ <1386884755-12366-1-git-send-email-balbi@ti.com>
+ <52AA54E4.5000606@ti.com>
+Message-ID: <20131213004337.GA31622@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarek Dakhran <t.dakhran@samsung.com> writes:
+On Thu, Dec 12, 2013 at 07:29:24PM -0500, Santosh Shilimkar wrote:
+> On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
+> > A bare-minimum PM implementation which will
+> > server as building block for more complex
+> s/server/serve ;-)
 
-> On 12/10/2013 08:40 PM, Kevin Hilman wrote:
->> Vyacheslav Tyrtov <v.tyrtov@samsung.com> writes:
->>
->>> The series of patches represent support of Exynos 5410 SoC
->>>
->>> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
->>>
->>> Patches add new platform description, support of clock controller and device
->>> tree for Exynos 5410.
->>>
->>> Dual cluster support for Exynos 5410 (EDCS) has been removed from this series
->>> This patches is activating only the big cluster (all A15 cores)
->> Testing this series on top of v3.13-rc3, plus a couple of other
->> necessary changes (which should've probably been noted in the changelog):
->>
->> 1) change CONFIG_NR_CPUS=8 in .config
->> 2) add the exynos combiner patch from Chander:
->>     [PATCH v2] irqchip: exynos-combiner: remove hard-coded irq_base value
->>
->> I'm still only seeing 2 out of 4 cores come up on my odroid-xu:
->>
->> [    0.045000] CPU: Testing write buffer coherency: ok
->> [    0.045000] CPU0: update cpu_power 1024
->> [    0.045000] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
->> [    0.045000] Setting up static identity map for 0x403717d8 - 0x40371830
->> [    0.045000] CPU1: Booted secondary processor
->> [    0.065000] CPU1: update cpu_power 1024
->> [    0.065000] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
->> [    1.075000] CPU2: failed to boot: -38
->> [    2.075000] CPU3: failed to boot: -38
->> [    2.075000] Brought up 2 CPUs
->> [    2.075000] SMP: Total of 2 processors activated.
->> [    2.075000] CPU: All CPU(s) started in SVC mode.
->>
-> Hi Kevin,
->
-> EDCS(exynos dual cluster support) moved to separate patch now.
-> This patches introduce only base SoC support  (2xA15).
+hah! :-) will fix in my branch.
 
-Thanks for the clarification
+> > PM implementation in the future.
+> > 
+> > At the least will not leave clocks on unnecessarily
+> > when e.g.  a user write mem to /sys/power/state.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> > 
+> > improve error path a little bit.
+> > 
+> We will test this out. Thanks for the
+> patch Felipe.
 
-I thought there were 4 A15s, and the changelog mentioned this patch
-enabled "all A15s".
+thanks.
 
-Kevin
-
-> Patches tested on samsung smdk5410 board.
->
-> Next version of EDCS patches will be available soon.
-> They allow power on and boot all 8 cores.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/db14b78b/attachment.sig>
