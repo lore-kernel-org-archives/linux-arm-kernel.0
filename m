@@ -1,59 +1,42 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 13 Dec 2013 14:23:35 +0800
-Subject: [PATCH v6 07/15] usb: phy: add notify suspend and resume callback
-In-Reply-To: <20131213042722.GG867@saruman.home>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-8-git-send-email-peter.chen@freescale.com>
- <20131213042722.GG867@saruman.home>
-Message-ID: <CAL411-o7YBzQitOPZodnp6OsRrUZf2LPzbWUY6AJpHo29x2FzQ@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 13 Dec 2013 11:54:10 +0530
+Subject: [PATCH 1/2] ARM: tegra: enable ams AS3722 drivers
+In-Reply-To: <52AA2FD1.3020000@wwwdotorg.org>
+References: <1386855064-10993-1-git-send-email-ldewangan@nvidia.com>
+ <52AA2891.2020502@wwwdotorg.org> <52AA2FD1.3020000@wwwdotorg.org>
+Message-ID: <52AAA80A.7010905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 12:27 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Fri, Dec 13, 2013 at 09:23:37AM +0800, Peter Chen wrote:
->> They are used to notify PHY that the controller enters suspend
->> or finishes resume.
+On Friday 13 December 2013 03:21 AM, Stephen Warren wrote:
+> On 12/12/2013 02:20 PM, Stephen Warren wrote:
+>> On 12/12/2013 06:31 AM, Laxman Dewangan wrote:
+>>> ams AS3722 is the system power manager module IC for the Tegra124 based
+>>> Venice2 platform. Enable configs for gpio, pincontrol, rtc, regulator
+>>> support from this device.
+>> I've squashed patch 1/2 into Tegra's for-3.14/defconfig branch.
 >>
->> Signed-off-by: Peter Chen <peter.chen@freescale.com>
->> ---
->>  include/linux/usb/phy.h |   23 +++++++++++++++++++++++
->>  1 files changed, 23 insertions(+), 0 deletions(-)
->>
->> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
->> index 6c0b1c5..a747960 100644
->> --- a/include/linux/usb/phy.h
->> +++ b/include/linux/usb/phy.h
->> @@ -116,6 +116,11 @@ struct usb_phy {
->>                       enum usb_device_speed speed);
->>       int     (*notify_disconnect)(struct usb_phy *x,
->>                       enum usb_device_speed speed);
->> +     int     (*notify_suspend)(struct usb_phy *x,
->> +                     enum usb_device_speed speed);
->> +     int     (*notify_resume)(struct usb_phy *x,
->> +                     enum usb_device_speed speed);
->> +
+>> I've applied patch 2/2 to Tegra's for-3.14/dt branch.
+> Actually, I'm dropping patch 2/2 since it causes a whole bunch of error
+> spew during boot:
 >
-> I still don't think this is necessary. Why don't you just call
-> usb_phy_set_suspend() directly ? And why do you need the extra speed
-> argument ?
->
-> --
+>> [    0.628315] tegra124-pinctrl 70000868.pinmux: invalid group "dap2_dout_pp2" for function "rsvd4"
+>> [    0.635309] tegra124-pinctrl 70000868.pinmux: does not have pin group dap2_dout_pp2
+>> [    0.642999] tegra124-pinctrl 70000868.pinmux: could not map group config for "dap2_dout_pp2"
+>> [    0.731176] as3722-pinctrl as3722-pinctrl: pin gpio0 already requested by as3722-pinctrl; cannot claim for as3722-regulator
+>> [    0.742312] as3722-pinctrl as3722-pinctrl: pin-0 (as3722-regulator) status -22
+>> [    0.749526] as3722-pinctrl as3722-pinctrl: could not request pin 0 (gpio0) from group gpio0  on device as3722-pinctrl
+>> [    0.760133] as3722-regulator as3722-regulator: Error applying setting, reverse things back
+>> [    0.835838] as3722-regulator as3722-regulator: Failed to find supply vin-ldo1-6
+>> [    0.843312] as3722-regulator as3722-regulator: regulator 8 register failed -517
+>> [    0.852263] platform as3722-regulator: Driver as3722-regulator requests probe deferral
+>> [    0.984920] as3722-pinctrl as3722-pinctrl: pin gpio0 already requested by as3722-pinctrl; cannot claim for as3722-rtc
+>> [    0.995537] as3722-pinctrl as3722-pinctrl: pin-0 (as3722-rtc) status -22
+>> [    1.002244] as3722-pinctrl as3722-pinctrl: could not request pin 0 (gpio0) from group gpio0  on device as3722-pinctrl
+>> [    1.012848] as3722-rtc as3722-rtc: Error applying setting, reverse things back
 
-It is different with PHY's power/clock.
+I did not observe this issue in my log, probably overlooked.
+I will repro this and fix/update the issue/patch.
 
-Eg, for .notify_resume, it needs to be called after host controller finishes
- sending resume signal. If its operation is executed before controller sends
-resume signal, the disconnect operation during the resume will not be detected.
-
-.notify_suspend and .notify_resume needs to be called during ehci suspend/
-resume operation for mxs-phy typed controller.
-
-For mxs-phy, this operation is only needed for high speed connection,
-and to aligned with .nofity_connect/.notify_disconnect, I added the speed
-argument. If the user doesn't need it, it can pass USB_SPEED_UNKNOWN like
-below post.
-
-http://marc.info/?l=linux-usb&m=138418998118519&w=2
-
-BR,
-Peter Chen
+Thanks,
+laxman
