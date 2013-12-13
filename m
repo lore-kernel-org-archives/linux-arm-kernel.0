@@ -1,79 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Dec 2013 11:57:57 +0000
-Subject: [PATCH] arm64: Correct virt_addr_valid
-In-Reply-To: <52AA3401.3000004@codeaurora.org>
-References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
- <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
- <20131211104429.GE26730@mudshark.cambridge.arm.com>
- <20131211110618.GG4360@n2100.arm.linux.org.uk>
- <20131211172635.GJ26730@mudshark.cambridge.arm.com>
- <20131211211333.GI4360@n2100.arm.linux.org.uk>
- <20131212175753.GG3382@arm.com>
- <20131212180249.GV4360@n2100.arm.linux.org.uk>
- <52AA3401.3000004@codeaurora.org>
-Message-ID: <20131213115757.GC22933@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 13 Dec 2013 12:06:29 +0000
+Subject: [PATCH 0/2] Cache flush fixes
+Message-ID: <1386936391-30493-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 10:09:05PM +0000, Laura Abbott wrote:
-> On 12/12/2013 10:02 AM, Russell King - ARM Linux wrote:
-> > On Thu, Dec 12, 2013 at 05:57:54PM +0000, Catalin Marinas wrote:
-> >> On Wed, Dec 11, 2013 at 09:13:33PM +0000, Russell King - ARM Linux wrote:
-> >>> There is actually a concern here, and that's if the v:p translation isn't
-> >>> linear, could it return false results?
-> >>>
-> >>> According to my grep skills, we have one platform where this is true -
-> >>> Realview:
-> >>>
-> >>>   * 256MB @ 0x00000000 -> PAGE_OFFSET
-> >>>   * 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
-> >>>   * 256MB @ 0x80000000 -> PAGE_OFFSET + 0x30000000
-> >>>
-> >>> The v:p translation is done via:
-> >>>
-> >>>           ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 : \
-> >>>            (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 : \
-> >>>            (virt) - PAGE_OFFSET)
-> >>>
-> >>> Now the questions - what do values below PAGE_OFFSET give us?  Very
-> >>> large numbers, which pfn_valid() should return false for.  What about
-> >>> values > PAGE_OFFSET2 + 256MB?  The same.
-> >>>
-> >>> So this all _looks_ fine.  Wait a moment, what about highmem?  Let's say
-> >>> that the last 256MB is only available as highmem, and let's go back to
-> >>> Laura's patch:
-> >>>
-> >>> old:
-> >>> #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
-> >>> 				 ((void *)(kaddr) < (void *)high_memory))
-> >>> new:
-> >>> #define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
-> >>>
-> >>> The former _excludes_ highmem, but the latter _includes_ it.
-> >>>
-> >>> virt_addr_valid(v) should only ever return _true_ for the lowmem area,
-> >>> never anywhere else - that's part of its point.  It's there to answer
-> >>> the question "is this a valid virtual pointer which I can dereference".
-> >>>
-> >>> So... We actually need a combination of both of these tests.
-> >>
-> >> Just to avoid any confusion, on arm64 we don't have non-linear v:p
-> >> translation as there is plenty of VA space to live with holes. So the
-> >> original patch is fine.
-> >
-> > The point I make above actually has nothing to do with non-linear v:p
-> > translations.
+This patch set fixes a couple of cache flushing problems that I ran
+into recently, whilst running libhugetlbfs tests (mainly the
+icache-hygiene test).
 
-OK, I re-read it now.
+One problem was due to not flushing enough, the other was due to
+flushing too much. Hopefully, this patch set makes things jussst
+right :-).
 
-> Yes, I believe the point was that if we call virt_addr_valid on a 
-> not-direct-mapped address it should return false. We still need the 
-> range check on arm64 systems as well to ensure this.
+I am not sure whether or not these should be marked as for stable?
 
-On arm64 we don't have highmem, so all RAM would be directly mapped (and
-linear). Is there a case on a 64-bit architecture where pfn_valid() is
-true but the memory not mapped? We don't unmap any memory which is
-pfn_valid().
+Cheers,
+-- 
+Steve
+
+Steve Capper (2):
+  arm: mm: fix dcache flush logic for compound high pages
+  arm: cacheflush: Fix user split-caching logic
+
+ arch/arm/kernel/traps.c |  2 +-
+ arch/arm/mm/flush.c     | 11 ++++++-----
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
 -- 
-Catalin
+1.8.1.4
