@@ -1,60 +1,26 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 13 Dec 2013 08:38:44 +0100
-Subject: [PATCH v6 01/15] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <CAL411-rt=_O5qaO_=AHps-LgrNyGwLdFSoCHk2POEn_p-Sn5qg@mail.gmail.com>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-2-git-send-email-peter.chen@freescale.com>
- <20131213081545.0185d3cb@ipc1.ka-ro>
- <CAL411-rt=_O5qaO_=AHps-LgrNyGwLdFSoCHk2POEn_p-Sn5qg@mail.gmail.com>
-Message-ID: <20131213083844.060ff5ef@ipc1.ka-ro>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Thu, 12 Dec 2013 23:48:47 -0800
+Subject: [PATCH v4 1/8] ARM: dts: Declare clocks as fixed on bcm11351
+In-Reply-To: <CAAYSxhp3MsnaX80tF7iCzUfjfjyQnOoZbTrtBKs_nAk4SUYReQ@mail.gmail.com>
+References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
+ <1386271244-3927-2-git-send-email-tim.kryger@linaro.org>
+ <CAEPRUYrw_owwBYEmmXO3=OG9pXrKPrJTwF+jPVm4+-Vvf0Xorw@mail.gmail.com>
+ <CAAYSxhp3MsnaX80tF7iCzUfjfjyQnOoZbTrtBKs_nAk4SUYReQ@mail.gmail.com>
+Message-ID: <CAEPRUYoJJ054rGhZmMMBy93ZtLrFJPRkM6LHmjygcyaDqzbDEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Peter Chen wrote:
-> On Fri, Dec 13, 2013 at 3:15 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> > Hi,
-> >
-> > Peter Chen wrote:
-> >> Add "fsl,imx6q-usbphy" for imx6dq and imx6dl, add
-> >> "fsl,imx6sl-usbphy" for imx6sl.
-> >>
-> >> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    3 ++-
-> >>  1 files changed, 2 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> >> index 5835b27..d850e55 100644
-> >> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> >> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> >> @@ -1,7 +1,8 @@
-> >>  * Freescale MXS USB Phy Device
-> >>
-> >>  Required properties:
-> >> -- compatible: Should be "fsl,imx23-usbphy"
-> >> +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-usbphy"
-> >> +for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
-> >>
-> > indentation?
-> >
-> 
-> How many characters? 2 or 8?
+On Tue, Dec 10, 2013 at 12:26 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> On Mon, Dec 9, 2013 at 11:18 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+>> Applied to armsoc/for-3.14/dt
 >
-I would align the line with the first character in the previous line:
-- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-usbphy"
-  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+> Could you wait till other maintainers provide their acks and then take
+> the entire series into a branch that feeds into the arm-soc
+> drivers-for-linus branch?
+>
+> Thanks,
+> Tim Kryger
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+I'll try to sync with other maintainers to pull it in together. I'll
+leave this commit in as-is for now as it is harmless on its own. I'll
+back it off before 3.14 merge if it poses a problem.
