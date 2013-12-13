@@ -1,59 +1,42 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 13 Dec 2013 09:23:35 +0800
-Subject: [PATCH v6 05/15] ARM: dts: imx6: add anatop phandle for usbphy
-In-Reply-To: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386897825-6130-6-git-send-email-peter.chen@freescale.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 13 Dec 2013 10:59:09 +0900
+Subject: possible regression on 3.13 when calling flush_dcache_page
+In-Reply-To: <20131212143618.GJ12099@ldesroches-Latitude-E6320>
+References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
+ <20131212143618.GJ12099@ldesroches-Latitude-E6320>
+Message-ID: <20131213015909.GA8845@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add anatop phandle for usbphy
+On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
+> fix mmc mailing list address error
+> 
+> On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
+> > Hi,
+> > 
+> > With v3.13-rc3 I have an error when the atmel-mci driver calls
+> > flush_dcache_page (log at the end of the message).
+> > 
+> > Since I didn't have it before, I did a git bisect and the commit introducing
+> > the error is the following one:
+> > 
+> > 106a74e slab: replace free and inuse in struct slab with newly introduced active
+> > 
+> > I don't know if this commit has introduced a bug or if it has revealed a bug
+> > in the atmel-mci driver.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
- arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+Hello,
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 59154dc..4e74962 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -557,6 +557,7 @@
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 				clocks = <&clks 182>;
-+				fsl,anatop = <&anatop>;
- 			};
- 
- 			usbphy2: usbphy at 020ca000 {
-@@ -564,6 +565,7 @@
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 				clocks = <&clks 183>;
-+				fsl,anatop = <&anatop>;
- 			};
- 
- 			snvs at 020cc000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..30322b5 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -489,6 +489,7 @@
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
-+				fsl,anatop = <&anatop>;
- 			};
- 
- 			usbphy2: usbphy at 020ca000 {
-@@ -496,6 +497,7 @@
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
-+				fsl,anatop = <&anatop>;
- 			};
- 
- 			snvs at 020cc000 {
--- 
-1.7.8
+I think that this commit may not introduce a bug. This patch remove one
+variable on slab management structure and replace variable name. So there
+is no functional change.
+
+I doubt that side-effect of this patch reveals a bug in other place.
+Side-effect is reduced memory usage for slab management structure. It would
+makes some slabs have more objects with more density since slab management
+structure is sometimes on the page for objects. So if it diminishes, more
+objects can be in the page.
+
+Anyway, I will look at it more. If you have any progress, please let me know.
+
+Thanks.
