@@ -1,63 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Dec 2013 17:36:21 -0800
-Subject: [RFC PATCH] arm/arm64: KVM: allow the use of THP on 2MB aligned
- memslots
-In-Reply-To: <1386859881-13482-1-git-send-email-marc.zyngier@arm.com>
-References: <1386859881-13482-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20131213013621.GS2871@cbox>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 12 Dec 2013 17:40:07 -0800
+Subject: [PATCH] MAINTAINERS: Add maintainer for the ARM Ux500 clock driver
+In-Reply-To: <CACRpkdbQ5tCih0C01yKZ1N7KnJYE0EG-szFH-2JOF21uGom98Q@mail.gmail.com>
+References: <1384252872-5717-1-git-send-email-ulf.hansson@linaro.org>
+ <CACRpkdbQ5tCih0C01yKZ1N7KnJYE0EG-szFH-2JOF21uGom98Q@mail.gmail.com>
+Message-ID: <20131213014007.11981.73728@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 02:51:21PM +0000, Marc Zyngier wrote:
-> The THP code in KVM/ARM is a bit restrictive in not allowing a THP
-> to be used if the VMA is not 2MB aligned. Actually, it is not so much
-> the VMA that matters, but the associated memslot:
+Quoting Linus Walleij (2013-11-18 02:49:37)
+> On Tue, Nov 12, 2013 at 11:41 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > ---
+> >  MAINTAINERS |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
 > 
-> A process can perfectly mmap a region with no particular alignment
-> restriction, and then pass a 2MB aligned address to KVM. In this
-> case, KVM will only use this 2MB aligned region, and will ignore
-> the range between vma->vm_start and memslot->userspace_addr.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> The fix is then to check the alignment of memslot->userspace_addr.
+> Mike: I assume you will take this patch?
 
-That's more correct, but I'm wondering if it's enough.
+Taken into clk-next.
 
-What happens if the base_gfn is not aligned to a 2MB region, will we not
-be mapping something completely bogus here?
-
+Thanks,
+Mike
 
 > 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/mmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 5809069..cec641a 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -667,14 +667,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->  	} else {
->  		/*
-> -		 * Pages belonging to VMAs not aligned to the PMD mapping
-> +		 * Pages belonging to memslots not aligned to the PMD mapping
->  		 * granularity cannot be mapped using block descriptors even
->  		 * if the pages belong to a THP for the process, because the
->  		 * stage-2 block descriptor will cover more than a single THP
->  		 * and we loose atomicity for unmapping, updates, and splits
->  		 * of the THP or other pages in the stage-2 block range.
->  		 */
-> -		if (vma->vm_start & ~PMD_MASK)
-> +		if (memslot->userspace_addr & ~PMD_MASK)
->  			force_pte = true;
->  	}
->  	up_read(&current->mm->mmap_sem);
-> -- 
-> 1.8.2.3
-> 
-> 
-
--- 
-Christoffer
+> Yours,
+> Linus Walleij
