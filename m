@@ -1,214 +1,294 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:51 +0900
-Subject: [PATCH 18/33] ARM: shmobile: Remove legacy platform devices from
- EMEV2 SoC code
+Date: Fri, 13 Dec 2013 11:29:55 +0900
+Subject: [PATCH 22/33] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
 In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
 References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <59032702ead9056231f273e0e99655c2f2280491.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187.1386897180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Now when KZM9D legacy C board support code is
-gone then remove emev2_add_standard_devices()
-and all the platform devices from setup-emev2.c.
+SH-Mobile platforms are transitioning from non-multiplatform to
+multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
+been created to group all multiplatform-enabled SH-Mobile SoCs. The
+existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
+been converted yet.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+This arrangement works fine for the arch/ code, but lots of drivers
+needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
+ARCH_SHMOBILE only. In order to avoid changing them, rename
+ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
+ARCH_SHMOBILE configuration symbol that is selected by both
+ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/emev2.h |   5 -
- arch/arm/mach-shmobile/setup-emev2.c        | 148 ----------------------------
- 2 files changed, 153 deletions(-)
+ arch/arm/Kconfig                           | 14 ++++++++------
+ arch/arm/Makefile                          |  1 -
+ arch/arm/boot/compressed/Makefile          |  2 +-
+ arch/arm/boot/dts/Makefile                 |  2 +-
+ arch/arm/configs/ape6evm_defconfig         |  2 +-
+ arch/arm/configs/armadillo800eva_defconfig |  2 +-
+ arch/arm/configs/bockw_defconfig           |  2 +-
+ arch/arm/configs/koelsch_defconfig         |  2 +-
+ arch/arm/configs/kzm9d_defconfig           |  2 +-
+ arch/arm/configs/kzm9g_defconfig           |  2 +-
+ arch/arm/configs/lager_defconfig           |  2 +-
+ arch/arm/configs/mackerel_defconfig        |  2 +-
+ arch/arm/configs/marzen_defconfig          |  2 +-
+ arch/arm/mach-shmobile/Kconfig             |  8 ++++++--
+ drivers/Makefile                           |  2 +-
+ 15 files changed, 26 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/emev2.h b/arch/arm/mach-shmobile/include/mach/emev2.h
-index c2eb756..fcb142a 100644
---- a/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ b/arch/arm/mach-shmobile/include/mach/emev2.h
-@@ -3,12 +3,7 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..483d316 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -644,8 +644,9 @@ config ARCH_MSM
+ 	  stack and controls some vital subsystems
+ 	  (clock and power control, etc).
  
- extern void emev2_map_io(void);
- extern void emev2_init_delay(void);
--extern void emev2_add_standard_devices(void);
- extern void emev2_clock_init(void);
--
--#define EMEV2_GPIO_BASE 200
--#define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
--
- extern struct smp_operations emev2_smp_ops;
+-config ARCH_SHMOBILE
+-	bool "Renesas SH-Mobile / R-Mobile"
++config ARCH_SHMOBILE_LEGACY
++	bool "Renesas SH-Mobile / R-Mobile (non-multiplatform)"
++	select ARCH_SHMOBILE
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+@@ -660,7 +661,8 @@ config ARCH_SHMOBILE
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select SPARSE_IRQ
+ 	help
+-	  Support for Renesas's SH-Mobile and R-Mobile ARM platforms.
++	  Support for Renesas's SH-Mobile and R-Mobile ARM platforms using
++	  a non-multiplatform kernel.
  
- #endif /* __ASM_EMEV2_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 4d39bf4..e7031b0 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -19,22 +19,12 @@
- #include <linux/clk-provider.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/platform_device.h>
--#include <linux/platform_data/gpio-em.h>
- #include <linux/of_platform.h>
--#include <linux/delay.h>
--#include <linux/input.h>
--#include <linux/io.h>
--#include <linux/irqchip/arm-gic.h>
- #include <mach/common.h>
- #include <mach/emev2.h>
--#include <mach/irqs.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/mach/time.h>
+ config ARCH_RPC
+ 	bool "RiscPC"
+@@ -1611,7 +1613,7 @@ config HZ_FIXED
+ 	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+ 		ARCH_S5PV210 || ARCH_EXYNOS4
+ 	default AT91_TIMER_HZ if ARCH_AT91
+-	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
++	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE_LEGACY
+ 	default 0
  
- static struct map_desc emev2_io_desc[] __initdata = {
- #ifdef CONFIG_SMP
-@@ -53,144 +43,6 @@ void __init emev2_map_io(void)
- 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
- }
+ choice
+@@ -1796,8 +1798,8 @@ config ARCH_WANT_GENERAL_HUGETLB
+ source "mm/Kconfig"
  
--/* UART */
--static struct resource uart0_resources[] = {
--	DEFINE_RES_MEM(0xe1020000, 0x38),
--	DEFINE_RES_IRQ(40),
--};
--
--static struct resource uart1_resources[] = {
--	DEFINE_RES_MEM(0xe1030000, 0x38),
--	DEFINE_RES_IRQ(41),
--};
--
--static struct resource uart2_resources[] = {
--	DEFINE_RES_MEM(0xe1040000, 0x38),
--	DEFINE_RES_IRQ(42),
--};
--
--static struct resource uart3_resources[] = {
--	DEFINE_RES_MEM(0xe1050000, 0x38),
--	DEFINE_RES_IRQ(43),
--};
--
--#define emev2_register_uart(idx)					\
--	platform_device_register_simple("serial8250-em", idx,		\
--					uart##idx##_resources,		\
--					ARRAY_SIZE(uart##idx##_resources))
--
--/* STI */
--static struct resource sti_resources[] = {
--	DEFINE_RES_MEM(0xe0180000, 0x54),
--	DEFINE_RES_IRQ(157),
--};
--
--#define emev2_register_sti()					\
--	platform_device_register_simple("em_sti", 0,		\
--					sti_resources,		\
--					ARRAY_SIZE(sti_resources))
--
--/* GIO */
--static struct gpio_em_config gio0_config = {
--	.gpio_base = 0,
--	.irq_base = EMEV2_GPIO_IRQ(0),
--	.number_of_pins = 32,
--};
--
--static struct resource gio0_resources[] = {
--	DEFINE_RES_MEM(0xe0050000, 0x2c),
--	DEFINE_RES_MEM(0xe0050040, 0x20),
--	DEFINE_RES_IRQ(99),
--	DEFINE_RES_IRQ(100),
--};
--
--static struct gpio_em_config gio1_config = {
--	.gpio_base = 32,
--	.irq_base = EMEV2_GPIO_IRQ(32),
--	.number_of_pins = 32,
--};
--
--static struct resource gio1_resources[] = {
--	DEFINE_RES_MEM(0xe0050080, 0x2c),
--	DEFINE_RES_MEM(0xe00500c0, 0x20),
--	DEFINE_RES_IRQ(101),
--	DEFINE_RES_IRQ(102),
--};
--
--static struct gpio_em_config gio2_config = {
--	.gpio_base = 64,
--	.irq_base = EMEV2_GPIO_IRQ(64),
--	.number_of_pins = 32,
--};
--
--static struct resource gio2_resources[] = {
--	DEFINE_RES_MEM(0xe0050100, 0x2c),
--	DEFINE_RES_MEM(0xe0050140, 0x20),
--	DEFINE_RES_IRQ(103),
--	DEFINE_RES_IRQ(104),
--};
--
--static struct gpio_em_config gio3_config = {
--	.gpio_base = 96,
--	.irq_base = EMEV2_GPIO_IRQ(96),
--	.number_of_pins = 32,
--};
--
--static struct resource gio3_resources[] = {
--	DEFINE_RES_MEM(0xe0050180, 0x2c),
--	DEFINE_RES_MEM(0xe00501c0, 0x20),
--	DEFINE_RES_IRQ(105),
--	DEFINE_RES_IRQ(106),
--};
--
--static struct gpio_em_config gio4_config = {
--	.gpio_base = 128,
--	.irq_base = EMEV2_GPIO_IRQ(128),
--	.number_of_pins = 31,
--};
--
--static struct resource gio4_resources[] = {
--	DEFINE_RES_MEM(0xe0050200, 0x2c),
--	DEFINE_RES_MEM(0xe0050240, 0x20),
--	DEFINE_RES_IRQ(107),
--	DEFINE_RES_IRQ(108),
--};
--
--#define emev2_register_gio(idx)						\
--	platform_device_register_resndata(&platform_bus, "em_gio",	\
--					  idx, gio##idx##_resources,	\
--					  ARRAY_SIZE(gio##idx##_resources), \
--					  &gio##idx##_config,		\
--					  sizeof(struct gpio_em_config))
--
--static struct resource pmu_resources[] = {
--	DEFINE_RES_IRQ(152),
--	DEFINE_RES_IRQ(153),
--};
--
--#define emev2_register_pmu()					\
--	platform_device_register_simple("arm-pmu", -1,		\
--					pmu_resources,		\
--					ARRAY_SIZE(pmu_resources))
--
--void __init emev2_add_standard_devices(void)
--{
--	if (!IS_ENABLED(CONFIG_COMMON_CLK))
--		emev2_clock_init();
--
--	emev2_register_uart(0);
--	emev2_register_uart(1);
--	emev2_register_uart(2);
--	emev2_register_uart(3);
--	emev2_register_sti();
--	emev2_register_gio(0);
--	emev2_register_gio(1);
--	emev2_register_gio(2);
--	emev2_register_gio(3);
--	emev2_register_gio(4);
--	emev2_register_pmu();
--}
--
- void __init emev2_init_delay(void)
- {
- 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
+ config FORCE_MAX_ZONEORDER
+-	int "Maximum zone order" if ARCH_SHMOBILE
+-	range 11 64 if ARCH_SHMOBILE
++	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
++	range 11 64 if ARCH_SHMOBILE_LEGACY
+ 	default "12" if SOC_AM33XX
+ 	default "9" if SA1111
+ 	default "11"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c99b108..1edf8eb 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -190,7 +190,6 @@ machine-$(CONFIG_ARCH_S5PC100)		+= s5pc100
+ machine-$(CONFIG_ARCH_S5PV210)		+= s5pv210
+ machine-$(CONFIG_ARCH_SA1100)		+= sa1100
+ machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
+-machine-$(CONFIG_ARCH_SHMOBILE_MULTI) 	+= shmobile
+ machine-$(CONFIG_ARCH_SIRF)		+= prima2
+ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+ machine-$(CONFIG_ARCH_STI)		+= sti
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index e7190bb..f54d5a2 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -64,7 +64,7 @@ else
+ endif
+ endif
+ 
+-ifeq ($(CONFIG_ARCH_SHMOBILE),y)
++ifeq ($(CONFIG_ARCH_SHMOBILE_LEGACY),y)
+ OBJS		+= head-shmobile.o
+ endif
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d57c1a6..5839077 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -216,7 +216,7 @@ dtb-$(CONFIG_ARCH_U8500) += ste-snowball.dtb \
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+ dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
+ 	s3c6410-smdk6410.dtb
+-dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
++dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
+index 1ce3994..cb26c62 100644
+--- a/arch/arm/configs/ape6evm_defconfig
++++ b/arch/arm/configs/ape6evm_defconfig
+@@ -13,7 +13,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ # CONFIG_BLOCK is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_R8A73A4=y
+ CONFIG_MACH_APE6EVM=y
+ # CONFIG_ARM_THUMB is not set
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index fae939d..5abf1a2 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -15,7 +15,7 @@ CONFIG_MODULE_FORCE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_R8A7740=y
+ CONFIG_MACH_ARMADILLO800EVA=y
+ # CONFIG_SH_TIMER_TMU is not set
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index b38cd10..1dd3971 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -8,7 +8,7 @@ CONFIG_SYSCTL_SYSCALL=y
+ CONFIG_EMBEDDED=y
+ CONFIG_SLAB=y
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_R8A7778=y
+ CONFIG_MACH_BOCKW=y
+ CONFIG_MEMORY_START=0x60000000
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index 825c16d..7fd65a0 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -9,7 +9,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ # CONFIG_BLOCK is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_R8A7791=y
+ CONFIG_MACH_KOELSCH=y
+ # CONFIG_SWP_EMULATE is not set
+diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+index 6c37f4a..217f1dd 100644
+--- a/arch/arm/configs/kzm9d_defconfig
++++ b/arch/arm/configs/kzm9d_defconfig
+@@ -13,7 +13,7 @@ CONFIG_SLAB=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_EMEV2=y
+ CONFIG_MACH_KZM9D=y
+ CONFIG_MEMORY_START=0x40000000
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index 1ad0280..9934dbc2 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -22,7 +22,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_SH73A0=y
+ CONFIG_MACH_KZM9G=y
+ CONFIG_MEMORY_START=0x41000000
+diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+index 35bff5e..35dc8b2 100644
+--- a/arch/arm/configs/lager_defconfig
++++ b/arch/arm/configs/lager_defconfig
+@@ -12,7 +12,7 @@ CONFIG_SLAB=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_R8A7790=y
+ CONFIG_MACH_LAGER=y
+ # CONFIG_SH_TIMER_TMU is not set
+diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
+index 9fb1189..a61e165 100644
+--- a/arch/arm/configs/mackerel_defconfig
++++ b/arch/arm/configs/mackerel_defconfig
+@@ -14,7 +14,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_SH7372=y
+ CONFIG_MACH_MACKEREL=y
+ CONFIG_MEMORY_SIZE=0x10000000
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 5cc6360..6981338 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -9,7 +9,7 @@ CONFIG_SYSCTL_SYSCALL=y
+ CONFIG_EMBEDDED=y
+ CONFIG_SLAB=y
+ # CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_SHMOBILE_LEGACY=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_MACH_MARZEN=y
+ CONFIG_MEMORY_START=0x60000000
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 180b71f..1b7df17 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -1,6 +1,10 @@
++config ARCH_SHMOBILE
++	bool
++
+ config ARCH_SHMOBILE_MULTI
+ 	bool "SH-Mobile Series" if ARCH_MULTI_V7
+ 	depends on MMU
++	select ARCH_SHMOBILE
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU if SMP
+@@ -30,7 +34,7 @@ config MACH_KZM9D
+ comment "SH-Mobile System Configuration"
+ endif
+ 
+-if ARCH_SHMOBILE
++if ARCH_SHMOBILE_LEGACY
+ 
+ comment "SH-Mobile System Type"
+ 
+@@ -272,7 +276,7 @@ source "drivers/sh/Kconfig"
+ 
+ endif
+ 
+-if ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI
++if ARCH_SHMOBILE
+ 
+ menu "Timer and clock configuration"
+ 
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 3cc8214..8e3b8b0 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -118,7 +118,7 @@ obj-$(CONFIG_SGI_SN)		+= sn/
+ obj-y				+= firmware/
+ obj-$(CONFIG_CRYPTO)		+= crypto/
+ obj-$(CONFIG_SUPERH)		+= sh/
+-obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
++obj-$(CONFIG_ARCH_SHMOBILE_LEGACY)	+= sh/
+ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+ obj-y				+= clocksource/
+ endif
 -- 
 1.8.4
