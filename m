@@ -1,70 +1,74 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Dec 2013 09:20:18 -0800
-Subject: [PATCH] arm/arm64: KVM: relax the requirements of VMA alignment
- for THP
-In-Reply-To: <1386953766-1568-1-git-send-email-marc.zyngier@arm.com>
-References: <1386953766-1568-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20131213172018.GT2871@cbox>
+Date: Fri, 13 Dec 2013 09:21:29 -0800
+Subject: [PATCH 00/10] Support VGIC save/restore using device control API
+In-Reply-To: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20131213172129.GU2871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 04:56:06PM +0000, Marc Zyngier wrote:
-> The THP code in KVM/ARM is a bit restrictive in not allowing a THP
-> to be used if the VMA is not 2MB aligned. Actually, it is not so much
-> the VMA that matters, but the associated memslot:
-> 
-> A process can perfectly mmap a region with no particular alignment
-> restriction, and then pass a 2MB aligned address to KVM. In this
-> case, KVM will only use this 2MB aligned region, and will ignore
-> the range between vma->vm_start and memslot->userspace_addr.
-> 
-> It can also choose to place this memslot at whatever alignment it
-> wants in the IPA space. In the end, what matters is the relative
-> alignment of the user space and IPA mappings with respect to a
-> 2M page. They absolutely must be the same if you want to use THP.
+Whoops, I forgot to mark these as v4... Sorry about that!
 
-Looks good to me:
+-Christoffer
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+On Thu, Dec 12, 2013 at 11:55:39AM -0800, Christoffer Dall wrote:
+> Implement save/restore of the VGIC state using the newer KVM Device
+> Control API.  This requries some number of changes to existing code in
+> addition to actually supporting save/restore of the necessary state.
 > 
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/mmu.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
+> The first patches (01-03) support creating the VGIC using the Device
+> Control API.  This change is necessary because there are no other
+> suitable KVM APIs that we can leverage to access the VGIC state from
+> user space and the device control API was crafted exactly for this
+> purpose.
 > 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 5809069..9cad7a9 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -667,14 +667,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->  	} else {
->  		/*
-> -		 * Pages belonging to VMAs not aligned to the PMD mapping
-> -		 * granularity cannot be mapped using block descriptors even
-> -		 * if the pages belong to a THP for the process, because the
-> -		 * stage-2 block descriptor will cover more than a single THP
-> -		 * and we loose atomicity for unmapping, updates, and splits
-> -		 * of the THP or other pages in the stage-2 block range.
-> +		 * Pages belonging to memslots that don't have the same
-> +		 * alignment for userspace and IPA cannot be mapped using
-> +		 * block descriptors even if the pages belong to a THP for
-> +		 * the process, because the stage-2 block descriptor will
-> +		 * cover more than a single THP and we loose atomicity for
-> +		 * unmapping, updates, and splits of the THP or other pages
-> +		 * in the stage-2 block range.
->  		 */
-> -		if (vma->vm_start & ~PMD_MASK)
-> +		if ((memslot->userspace_addr & ~PMD_MASK) !=
-> +		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
->  			force_pte = true;
->  	}
->  	up_read(&current->mm->mmap_sem);
+> Subsequent patches add the missing infrastructure and user space API
+> pieces necessary to actually save and restore the VGIC state.  The GIC
+> v2.0 architecture specification already specifies registers that can be
+> used to save and restore the complete VGIC state for suspend/resume
+> purposes on real hardware, and we can reuse this interface for the
+> VGIC.  The API is therefore based on the memory-mapped register accesses
+> defined in the specs.  See the individual patches for details.
+> 
+> The patches are based on kvm-arm-next with the arch timers save/restore
+> patches applied:
+> git://git.linaro.org/people/cdall/linux-kvm-arm.git timer-migrate-v4
+> 
+> This patch series based on the above can be cloned from:
+> git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v4
+> 
+> User space patches for QEMU have also been posted on the list, but an
+> updated version is underway.  Tested on Versatile Express TC2.
+> 
+> Changelogs in the individual patches.
+> 
+> Christoffer Dall (10):
+>   ARM: KVM: Allow creating the VGIC after VCPUs
+>   KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
+>   KVM: arm-vgic: Set base addr through device API
+>   irqchip: arm-gic: Define additional MMIO offsets and masks
+>   KVM: arm-vgic: Make vgic mmio functions more generic
+>   arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
+>   KVM: arm-vgic: Add vgic reg access from dev attr
+>   KVM: arm-vgic: Support unqueueing of LRs to the dist
+>   KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
+>   KVM: arm-vgic: Support CPU interface reg access
+> 
+>  Documentation/virtual/kvm/api.txt              |   7 +-
+>  Documentation/virtual/kvm/devices/arm-vgic.txt |  73 ++++
+>  arch/arm/include/uapi/asm/kvm.h                |   8 +
+>  arch/arm/kvm/arm.c                             |  17 +-
+>  include/kvm/arm_vgic.h                         |   2 +-
+>  include/linux/irqchip/arm-gic.h                |  12 +
+>  include/linux/kvm_host.h                       |   1 +
+>  include/uapi/linux/kvm.h                       |   1 +
+>  virt/kvm/arm/vgic.c                            | 581 +++++++++++++++++++++++--
+>  virt/kvm/kvm_main.c                            |   6 +-
+>  10 files changed, 670 insertions(+), 38 deletions(-)
+>  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
+> 
 > -- 
-> 1.8.2.3
-> 
+> 1.8.4.3
 > 
 
 -- 
