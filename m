@@ -1,128 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:32 +0900
-Subject: [PATCH 06/69] ARM: shmobile: r8a7791 GPIO device tree node
+Date: Fri, 13 Dec 2013 11:30:48 +0900
+Subject: [PATCH 14/69] ARM: shmobile: r8a7778: add SDHI support on DTSI
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <ab87e3fc0b3532f8ff1cb08b9f3680bc98be7728.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <04cbd88902dd16a8f20db808ab444035be2557ac.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add GPIO controllers to the r8a7791 DTSI file.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 96 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
+ arch/arm/boot/dts/r8a7778.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 765d989..344f1f7 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -46,6 +46,102 @@
- 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 0ff38e6..873eeb9 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -164,4 +164,34 @@
+ 		interrupts = <0 61 4>;
+ 		status = "disabled";
  	};
- 
-+	gpio0: gpio at ffc40000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc40000 0 0x50>;
++
++	sdhi0: sdhi at ffe4c000 {
++		compatible = "renesas,sdhi-r8a7778";
++		reg = <0xffe4c000 0x100>;
 +		interrupt-parent = <&gic>;
-+		interrupts = <0 4 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
++		interrupts = <0 87 4>;
++		cap-sd-highspeed;
++		cap-sdio-irq;
++		status = "disabled";
 +	};
 +
-+	gpio1: gpio at ffc41000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc41000 0 0x50>;
++	sdhi1: sdhi at ffe4d000 {
++		compatible = "renesas,sdhi-r8a7778";
++		reg = <0xffe4d000 0x100>;
 +		interrupt-parent = <&gic>;
-+		interrupts = <0 5 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 32 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
++		interrupts = <0 88 4>;
++		cap-sd-highspeed;
++		cap-sdio-irq;
++		status = "disabled";
 +	};
 +
-+	gpio2: gpio at ffc42000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc42000 0 0x50>;
++	sdhi2: sdhi at ffe4f000 {
++		compatible = "renesas,sdhi-r8a7778";
++		reg = <0xffe4f000 0x100>;
 +		interrupt-parent = <&gic>;
-+		interrupts = <0 6 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 64 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
++		interrupts = <0 86 4>;
++		cap-sd-highspeed;
++		cap-sdio-irq;
++		status = "disabled";
 +	};
-+
-+	gpio3: gpio at ffc43000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc43000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 7 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 96 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio4: gpio at ffc44000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc44000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 8 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 128 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio5: gpio at ffc45000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc45000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 9 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 160 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio6: gpio at ffc45400 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc45400 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 10 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 192 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio7: gpio at ffc45800 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc45800 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 11 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 224 26>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <1 13 0xf08>,
+ };
 -- 
 1.8.4
