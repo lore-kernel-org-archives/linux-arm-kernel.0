@@ -1,56 +1,43 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 13 Dec 2013 14:23:45 +0100
-Subject: [PATCH] ARM: dts: imx53: add support for Ka-Ro TX53 modules
-In-Reply-To: <20131213131507.GN24559@pengutronix.de>
-References: <1386852128-32220-1-git-send-email-LW@KARO-electronics.de>
- <20131213081744.GR18380@S2101-09.ap.freescale.net>
- <20131213105417.71a42133@ipc1.ka-ro>
- <20131213121646.GU18380@S2101-09.ap.freescale.net>
- <20131213134240.595d27ae@ipc1.ka-ro>
- <20131213125719.GM24559@pengutronix.de>
- <20131213141001.389a178e@ipc1.ka-ro>
- <20131213131507.GN24559@pengutronix.de>
-Message-ID: <20131213142345.414344a6@ipc1.ka-ro>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 13 Dec 2013 14:25:17 +0100
+Subject: arm-soc: Xilinx Zynq dt changes for v3.14
+In-Reply-To: <20131213112659.GD4360@n2100.arm.linux.org.uk>
+References: <52AAC671.6000207@monstr.eu>
+ <20131213112659.GD4360@n2100.arm.linux.org.uk>
+Message-ID: <52AB0ABD.1050307@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
-Sascha Hauer wrote:
-> On Fri, Dec 13, 2013 at 02:10:01PM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Sascha Hauer wrote:
-> > > 
-> > > Actually the i.MX supports inversion in hardware. It's bit 18 in the
-> > > PWMCR register.
-> > > 
-> > I totally missed this up to now. :(
-> > Is it true for all i.MX SoCs? Or do we need to distinguish between SoCs
-> > that can do the inversion and those that cannot?
+On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
+> 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
+>    individually.  The whole point of arm at kernel.org is that it reaches
+>    the current arm-soc maintainers, whoever they may be at the time that
+>    you send your email without you needing to know who they are.
 > 
-> It should work for >= i.MX27.
-> 
-OK, thanks.
+> 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
+>    a pull request message.
 
-> > I could provide a patch to utilize this feature, but probably not
-> > before the new year. There is something called 'vacation' in the way. ;)
-> 
-> What's the problem? That's the time your boss can't tell you to do
-> soemthing else ;)
-> 
-Somewhere in the world are still places where there is no internet and
-no computers. ;)
+Thanks, I will keep this in my mind for future. I am just doing what I have done
+before and this is the first complain I have got.
+
+Thanks,
+Michal
 
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/faae07da/attachment.sig>
