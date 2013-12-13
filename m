@@ -1,59 +1,50 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Fri, 13 Dec 2013 14:13:42 +0530
-Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
-Message-ID: <1386924222-23169-1-git-send-email-vkale@apm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 13 Dec 2013 09:48:33 +0100
+Subject: [PATCH v2 2/4] rename ARCH_BCM to ARCH_BCM_MOBILE (clocksource)
+In-Reply-To: <1379956836-5866-3-git-send-email-bcm@fixthebug.org>
+References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
+ <1379956836-5866-3-git-send-email-bcm@fixthebug.org>
+Message-ID: <52AAC9E1.6070405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print the cpu frequency field in /proc/cpuinfo.
+On 09/23/2013 07:20 PM, Christian Daudt wrote:
+> Currently ARCH_BCM has been used for Broadcom
+> Mobile V7 based SoCs. In order to allow other Broadcom
+> SoCs to also use mach-bcm directory and files, this patch
+> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
+> uses ARCH_BCM to define any Broadcom chip residing
+> in mach-bcm directory.
+>
+> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+> Acked-by: Olof Johansson <olof@lixom.net>
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
----
- arch/arm64/kernel/setup.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index bd9bbd0..bca982b 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -41,6 +41,7 @@
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
-+#include <linux/cpufreq.h>
- 
- #include <asm/cputype.h>
- #include <asm/elf.h>
-@@ -278,9 +279,19 @@ static const char *hwcap_str[] = {
- 	NULL
- };
- 
-+static unsigned int get_cpufreq_khz(unsigned int cpu)
-+{
-+#ifdef CONFIG_CPU_FREQ
-+	return cpufreq_quick_get(cpu);
-+#else
-+	return 0;
-+#endif
-+}
-+
- static int c_show(struct seq_file *m, void *v)
- {
- 	int i;
-+	unsigned int cpufreq_khz;
- 
- 	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
- 		   cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
-@@ -294,6 +305,10 @@ static int c_show(struct seq_file *m, void *v)
- #ifdef CONFIG_SMP
- 		seq_printf(m, "processor\t: %d\n", i);
- #endif
-+		cpufreq_khz = get_cpufreq_khz(i);
-+		if (cpufreq_khz)
-+			seq_printf(m, "cpu MHz\t\t: %u.%02u\n",
-+				cpufreq_khz / 1000, (cpufreq_khz % 1000));
- 	}
- 
- 	/* dump out the processor features */
+
+> Changes from v1:
+>   - fix alpha ordering in dts/Makefile
+>   - break into 4 patches for separate subsys
+>
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 704d6d3..4207ab4 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -25,7 +25,7 @@ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+>   obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
+>   obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+>   obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
+> -obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
+> +obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_timer.o
+>   obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
+>   obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+>   obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+>
+
+
 -- 
-1.5.6.3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
