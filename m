@@ -1,83 +1,109 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Dec 2013 08:16:16 -0600
-Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
-In-Reply-To: <20131213103632.GC19177@mudshark.cambridge.arm.com>
-References: <1386924222-23169-1-git-send-email-vkale@apm.com>
- <20131213103632.GC19177@mudshark.cambridge.arm.com>
-Message-ID: <CAL_Jsq+Z9K4sus6xwN9KYyCUVWy7NFBQCGYvz0wrt=J7h+G35Q@mail.gmail.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Fri, 13 Dec 2013 15:16:25 +0100
+Subject: [PATCH] ARM/KVM: inject data abort on unhandled memory access
+In-Reply-To: <20131211005532.GF2871@cbox>
+References: <1386256221-12294-1-git-send-email-andre.przywara@linaro.org>
+ <CAFEAcA8tsdMjok8EQe-2ybuuCn_g7ZEYROwSPVcwr5A1VyrOVA@mail.gmail.com>
+ <52A7434D.609@linaro.org> <20131211005532.GF2871@cbox>
+Message-ID: <52AB16B9.8060607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 4:36 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Dec 13, 2013 at 08:43:42AM +0000, Vinayak Kale wrote:
->> Print the cpu frequency field in /proc/cpuinfo.
+On 12/11/2013 01:55 AM, Christoffer Dall wrote:
+> On Tue, Dec 10, 2013 at 05:37:33PM +0100, Andre Przywara wrote:
+>> On 12/05/2013 04:15 PM, Peter Maydell wrote:
+>>> On 5 December 2013 15:10, Andre Przywara <andre.przywara@linaro.org> wrote:
+>>>> If a KVM guest accesses memory that is outside its memory map (so no
+>>>> MMIO and no RAM), KVM will return -ENOSYS to userland, causing QEMU
+>>>> to do an abort() and kill the whole guest. This happens while
+>>>> executing dmidecode on ARM, which mmaps /dev/mem and scans the first
+>>>> Megabyte of memory for a DMI BIOS signature (sic!).
+>>>> Of course this is silly, but in any case crashing the whole guest
+>>>> does not seems appropriate.
+>>>> So lets mimic native hardware's behavior in this case and inject a
+>>>> Data Abort exception into the guest. In the previous case this will
+>>>> crash dmidecode with SIGSEGV, but keeps the guest alive.
+>>>
+>>>> --- a/arch/arm/kvm/mmio.c
+>>>> +++ b/arch/arm/kvm/mmio.c
+>>>> @@ -183,7 +183,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>                          return ret;
+>>>>          } else {
+>>>>                  kvm_err("load/store instruction decoding not implemented\n");
+>>>> -               return -ENOSYS;
+>>>> +               kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+>>>> +               return 1;
+>>>>          }
+>>>
+>>> This seems like it's mixing two different error cases:
+>>>   (1) guest tries to access something with nothing backing it at all
+>>>   -> should definitely cause a guest Data Abort
+>>>   (2) guest tries to access something (whether at a valid device address
+>>>   or not) with a "complex" instruction like LDM/STM which we can't deal
+>>>   without emulating it
+>>
+>> I see. But looking at the ARM ARM there is no easy way of telling
+>> the two apart, right? Or can we check the address for sanity easily?
+>> Currently we cannot handle both cases anyway, so I'd like to refrain
+>> from doing instruction decoding to see whether it was an instruction
+>> involving a register writeback or the like.
+>>
 >
-> Why? ["x86 does this" isn't a valid answer :)].
-
-People want to know this stuff. How about making lscpu work and print
-useful things. Here is what you get on x66. You get a lot less on ARM
-IIRC. lscpu uses on cpuinfo and sysfs data. The cache info is based on
-sysfs cache data which I believe someone is working on for ARM.
-
-Architecture:          x86_64
-CPU op-mode(s):        32-bit, 64-bit
-Byte Order:            Little Endian
-CPU(s):                4
-On-line CPU(s) list:   0-3
-Thread(s) per core:    2
-Core(s) per socket:    2
-Socket(s):             1
-NUMA node(s):          1
-Vendor ID:             GenuineIntel
-CPU family:            6
-Model:                 37
-Stepping:              5
-CPU MHz:               2393.881
-BogoMIPS:              4787.76
-Virtualization:        VT-x
-L1d cache:             32K
-L1i cache:             32K
-L2 cache:              256K
-L3 cache:              3072K
-NUMA node0 CPU(s):     0-3
-
-
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> ---
->>  arch/arm64/kernel/setup.c |   15 +++++++++++++++
->>  1 files changed, 15 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index bd9bbd0..bca982b 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -41,6 +41,7 @@
->>  #include <linux/memblock.h>
->>  #include <linux/of_fdt.h>
->>  #include <linux/of_platform.h>
->> +#include <linux/cpufreq.h>
->>
->>  #include <asm/cputype.h>
->>  #include <asm/elf.h>
->> @@ -278,9 +279,19 @@ static const char *hwcap_str[] = {
->>       NULL
->>  };
->>
->> +static unsigned int get_cpufreq_khz(unsigned int cpu)
->> +{
->> +#ifdef CONFIG_CPU_FREQ
->> +     return cpufreq_quick_get(cpu);
->> +#else
->> +     return 0;
->> +#endif
->> +}
+> Eh, in the kernel, all you can see there, is that the ISV bit in the HSR
+> is not set, which means that the decode information in that register is
+> not valid.
 >
-> That's going to be hilarious fun when cpufreq isn't compiled in.
-> Just use the existing sysfs interfaces exposed by the cpufreq governers if
-> you need to know this stuff.
+> This is completely orthorgonal to the question of what the VM model is
+> and how KVM and user space defines the memory map for your system.  The
+> way KVM works is that it knows about RAM, so it can tell if it's RAM or
+> *something else* (MMIO, nothing at all, ...), and if it's RAM, KVM will
+> handle the fault in the kernel, and otherwise will just exit to user
+> space with the MMIO address.
+>
+> I'm currently not sure what QEMU does if that address is not backed by
+> anything, or KVM tool for that matter, but it should inject a data abort
+> I suppose...
 
-We should be able to get the frequency independently from cpufreq
-being enabled. This should come from DT cpu clock-frequency property
-if cpufreq is not enabled.
+Good point you mentioned. I checked again and we fail only because we do 
+ldmia on the non-RAM area (because dmidecode uses memcpy).
+By writing a small test case I get 0xffffffff back when reading normally 
+(with ld) from 0xf0000, but crash when calling memcpy.
+So I agree that ldm/stm emulation is the right fix, but I wonder if we 
+could change QEMU to not too hastily call abort(), but check the memory 
+address and inject an DAbort if it's not valid. -ENOSYS seems to be only 
+returned by this particular case, if I looked correctly.
+Not sure if that's feasible though, and also if ldm/stm emulation 
+wouldn't reach the user faster than a QEMU patch.
 
-Rob
+Regards,
+Andre.
+
+>
+>>> The error message you've removed relates to (2). I think there's a reasonable
+>>> case to make for "log and reflect back into guest as a Data Abort"; silently
+>>> Data Aborting seems a bit cryptic.
+>>
+>> Actually I didn't remove the message, I just removed the return.
+>> But I can adjust the message, to something like:
+>> vcpu_unimpl(vcpu, "guest data abort with invalid syndrome\n");
+>>
+>
+> I don't think such a change is necessary.
+>
+>>>
+>>> Of course if the guest tries to do a memcpy() on the device memory
+>>> (which IIRC is what is happening with dmidecode in this case) then it's
+>>> very likely to hit case (2).
+>>
+>> Good point. dmidecode does mmap, then memcpy, so it's likely to use
+>> ldm (if glibc provides this, the dmidecode binary does not use ldm
+>> directly).
+>>
+>> But in general this reminds me to push fixing dmidecode. Xen has a
+>> similar fix now in queue ;-)
+>>
+>>> Or we could try to get the ldm/stm emulation code upstream :-)
+>>
+>> Sure, go ahead ;-)
+>>
+>
