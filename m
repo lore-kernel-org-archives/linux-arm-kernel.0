@@ -1,75 +1,65 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 13 Dec 2013 13:45:33 +0100
-Subject: [PATCH 4/4] ARM: dts: imx6qdl: add support for Ka-Ro TX6 modules
-In-Reply-To: <20131213121308.GT18380@S2101-09.ap.freescale.net>
-References: <1386854880-21805-1-git-send-email-LW@KARO-electronics.de>
- <1386854880-21805-5-git-send-email-LW@KARO-electronics.de>
- <20131213121308.GT18380@S2101-09.ap.freescale.net>
-Message-ID: <20131213134533.51c84319@ipc1.ka-ro>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Dec 2013 20:51:31 +0800
+Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
+In-Reply-To: <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
+ <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+ <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <20131213125129.GV18380@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 13, 2013 at 10:29:43AM +0000, Li.Xiubo at freescale.com wrote:
+> Hi Shawn,
+> 
+> > -	ret = regulator_bulk_get(codec->dev, ARRAY_SIZE(sgtl5000->supplies),
+> > -				sgtl5000->supplies);
+> > -	if (!ret)
+> > -		external_vddd = 1;
+> > -	else {
+> > +	/* External VDDD only works before revision 0x11 */
+> > +	if (sgtl5000->revision < 0x11) {
+> > +		vddd = regulator_get_optional(codec->dev, "VDDD");
+> > +		if (IS_ERR(vddd)) {
+> > +			/* See if it's just not registered yet */
+> > +			if (PTR_ERR(vddd) == -EPROBE_DEFER)
+> > +				return -EPROBE_DEFER;
+> > +		} else {
+> > +			external_vddd = 1;
+> > +			regulator_put(vddd);
+> > +		}
+> 
+> Shouldn't we handle other errors ?
 
-Shawn Guo wrote:
-> Lothar,
-> 
-> Please check the patch against those comments that I put on the TX53
-> patches.  A couple of comments embedded below.
-> 
-> On Thu, Dec 12, 2013 at 02:28:00PM +0100, Lothar Wa?mann wrote:
-> ...
-> > @@ -0,0 +1,350 @@
-> > +/*
-> > + * Copyright 2013 Lothar Wa?mann <LW@KARO-electronics.de>
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "imx6dl.dtsi"
-> > +#include "imx6qdl-tx6.dtsi"
-> > +
-> > +/ {
-> > +	model = "Ka-Ro electronics TX6DL Module";
-> > +	compatible = "fsl,imx6dl-tx6dl", "fsl,imx6dl";
-> 
-> karo,imx6dl-tx6dl
-> 
-Of course...
+We do not really care other errors.  In case that an external VDDD is
+present on hardware design but regulator_get_optional("VDDD") still
+fails for some other reason, we should turn to use the internal LDO
+anyway rather than simply failing out.
 
-> <snip>
+> We can see that from the regulator_get_optional()-->_regulator_get(), there
+> are many other errors maybe returned. Not considering other error cases, If
+> the dt is used here, only ERR_PTR(-ENODEV) will be returned if the external
+> VDDD is absent, and only this case the ERR_PTR(_ENODEV) error will be returned,
+> Or if dt is not used and there has no external VDDD was found, the
+> ERR_PTR(-EPROBE_DEFER) will be returned.
 > 
-> > +&iomuxc {
-> > +	display {
-> > +		pinctrl_disp0_1: disp0grp-1 {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
-> > +				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
-> > +				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
-> > +				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
-> > +				/* PAD DISP0_DAT0 is used for the Flexcan transceiver control */
+> So, if the external VDDD is not used, only ERR_PTR(-ENODEV) and ERR_PTR(-EPROBE_DEFER)
+> maybe returned ignoring other errors.
 > 
-> So how will this pingrp be used, without DATA00?
-> 
-The HW design of a baseboard for this module is somewhat unfortunate in
-that it uses the LCD0 pin as Enable pin for the flexcan transceiver.
-In this configuration the LCD will be missing the LSB.
+> How about the following ? 
+> -----------------
+> +	if (IS_ERR(vddd)) {
+> +		/* See if it's just not registered yet */
+> +		if (PTR_ERR(vddd) != -ENODEV)
+> +			return PTR_ERR(vddd);
 
+Just for example, if PTR_ERR(vddd) is -EBUSY here, instead of failing
+out, why do not we switch to internal LDO for continuing the probe?
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Shawn
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> +	} else {
+> +		external_vddd = 1;
+> +		regulator_put(vddd);
+> +	}
+> -----------------
