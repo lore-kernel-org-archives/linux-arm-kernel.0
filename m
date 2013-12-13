@@ -1,34 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:49 +0900
-Subject: [PATCH 16/33] ARM: shmobile: Use ->init_late() in shared EMEV2 case
+Date: Fri, 13 Dec 2013 11:30:00 +0900
+Subject: [PATCH 27/33] ARM: shmobile: r8a7790: fixup I2C clock source
 In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
 References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <3f348e1c3f47f4c0c21cb1f4c1d6af4ea02d59e8.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <d59f4be9d0c2acf6bf16b4f8361593b4bbb4490b.1386897180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Hook up shmobile_init_late() to enable various
-code such as suspend-to-RAM and CPUIdle.
+I2C clock is based on P clock, not HP clock
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-emev2.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 2d64b95..4d39bf4 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -218,6 +218,7 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.map_io		= emev2_map_io,
- 	.init_early	= emev2_init_delay,
- 	.init_machine	= emev2_add_standard_devices_dt,
-+	.init_late	= shmobile_init_late,
- 	.dt_compat	= emev2_boards_compat_dt,
- MACHINE_END
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index ecec746..3a267c2 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -196,10 +196,10 @@ enum {
+ };
  
+ static struct clk mstp_clks[MSTP_NR] = {
+-	[MSTP931] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 31, 0), /* I2C0 */
+-	[MSTP930] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 30, 0), /* I2C1 */
+-	[MSTP929] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 29, 0), /* I2C2 */
+-	[MSTP928] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 28, 0), /* I2C3 */
++	[MSTP931] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 31, 0), /* I2C0 */
++	[MSTP930] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 30, 0), /* I2C1 */
++	[MSTP929] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 29, 0), /* I2C2 */
++	[MSTP928] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 28, 0), /* I2C3 */
+ 	[MSTP917] = SH_CLK_MSTP32(&qspi_clk, SMSTPCR9, 17, 0), /* QSPI */
+ 	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+ 	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
 -- 
 1.8.4
