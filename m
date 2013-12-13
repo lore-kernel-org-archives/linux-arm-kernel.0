@@ -1,81 +1,66 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 13 Dec 2013 16:32:00 +0530
-Subject: [PATCH v5 6/9] usb: gadget: s3c-hsotg: get phy bus width from
- phy subsystem
-In-Reply-To: <1386854770-2173-7-git-send-email-mporter@linaro.org>
-References: <1386854770-2173-1-git-send-email-mporter@linaro.org>
- <1386854770-2173-7-git-send-email-mporter@linaro.org>
-Message-ID: <52AAE928.5040308@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 13 Dec 2013 11:04:15 +0000
+Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
+In-Reply-To: <CANqRtoT86xdh-c73f-_59sD3E=90yW1wOp5Bobmi4qJywA72uA@mail.gmail.com>
+References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
+ <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
+ <CANqRtoT86xdh-c73f-_59sD3E=90yW1wOp5Bobmi4qJywA72uA@mail.gmail.com>
+Message-ID: <52AAE9AF.6010704@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013 06:56 PM, Matt Porter wrote:
-> Adds support for querying the phy bus width from the generic phy
-> subsystem. Configure UTMI bus width in GUSBCFG based on this value.
-> 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
->  drivers/usb/gadget/s3c-hsotg.h |  1 +
->  2 files changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> index e9683c2..168aaa9 100644
-> --- a/drivers/usb/gadget/s3c-hsotg.c
-> +++ b/drivers/usb/gadget/s3c-hsotg.c
-> @@ -144,6 +144,7 @@ struct s3c_hsotg_ep {
->   * @regs: The memory area mapped for accessing registers.
->   * @irq: The IRQ number we are using
->   * @supplies: Definition of USB power supplies
-> + * @phyif: PHY interface width
->   * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
->   * @num_of_eps: Number of available EPs (excluding EP0)
->   * @debug_root: root directrory for debugfs.
-> @@ -171,6 +172,7 @@ struct s3c_hsotg {
->  
->  	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
->  
-> +	u32			phyif;
->  	unsigned int		dedicated_fifos:1;
->  	unsigned char           num_of_eps;
->  
-> @@ -2276,7 +2278,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
->  	 */
->  
->  	/* set the PLL on, remove the HNP/SRP and set the PHY */
-> -	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
-> +	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
->  	       (0x5 << 10), hsotg->regs + GUSBCFG);
->  
->  	s3c_hsotg_init_fifo(hsotg);
-> @@ -3621,6 +3623,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
->  		goto err_supplies;
->  	}
->  
-> +	/* Set default UTMI width */
-> +	hsotg->phyif = GUSBCFG_PHYIf16;
-> +
-> +	/*
-> +	 * If using the generic PHY framework, check if the PHY bus
-> +	 * width is 8-bit and set the phyif appropriately.
-> +	 */
-> +	if (hsotg->phy && (phy_get_bus_width(phy) == 8))
-> +		hsotg->phyif = GUSBCFG_PHYIf8;
-> +
->  	if (hsotg->phy)
->  		phy_init(hsotg->phy);
->  
-> diff --git a/drivers/usb/gadget/s3c-hsotg.h b/drivers/usb/gadget/s3c-hsotg.h
-> index d650b12..85f549f 100644
-> --- a/drivers/usb/gadget/s3c-hsotg.h
-> +++ b/drivers/usb/gadget/s3c-hsotg.h
-> @@ -55,6 +55,7 @@
->  #define GUSBCFG_HNPCap				(1 << 9)
->  #define GUSBCFG_SRPCap				(1 << 8)
->  #define GUSBCFG_PHYIf16			(1 << 3)
-> +#define GUSBCFG_PHYIf8				(0 << 3)
->  #define GUSBCFG_TOutCal_MASK			(0x7 << 0)
->  #define GUSBCFG_TOutCal_SHIFT			(0)
->  #define GUSBCFG_TOutCal_LIMIT			(0x7)
-> 
+On 13/12/13 10:56, Magnus Damm wrote:
+> Hey Morimoto-san,
+>
+> On Fri, Dec 13, 2013 at 11:37 AM, Kuninori Morimoto
+> <kuninori.morimoto.gx@gmail.com> wrote:
+>>
+>> Hi Ben
+>>
+>> Thank you for your patch
+>>
+>>> The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
+>>> size for their register block. This causes the sh_modbile_sdhi driver to
+>>> fail to communicate with card at-all.
+>>>
+>>> Change each sdhi node size from 0x100 to 0x200 to correct this.
+>>>
+>>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>>> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+>>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>>> Cc: Simon Horman <horms@verge.net.au>
+>>> Cc: Linux SH <linux-sh@vger.kernel.org>
+>>> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
+>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>> Tested-by: William Towle <william.towle@codethink.co.uk>
+>>> ---
+>>
+>> Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
+>> The wrong is SDHI/TMIO driver side, not SoC side.
+>> Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
+>> but it need more time (= there is merge timing issue)
+>
+> Thanks for supporting Ben regarding this SDHI issue.
+>
+> Would it be possible for you to share a list of patches needed to get
+> SDHI working? If some parts are missing then please post them so the
+> patches are available on public lists.
+>
+> I would like to make it possible for Ben to test your patch stack if
+> he happens to have time.
+
+Thanks, I think I have all the previous ones that where pushed to the
+linux-sh list. If there's a git tree I could pull from that would make
+our job easier.
+
+We have got SDHI0 and SDHI2 working with device tree, but we're
+currently seeing less than a megabyte a second when direcly dd-ing
+blocks from the card. Is this a noted issue? We got ~11MiB without
+DMA on the 3.4-ltsi series.
+
+As a note, I will be away from the 20th December untill Janurary 6th
+and it is likely the rest of the team here will be away from 21st.
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
