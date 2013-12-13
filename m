@@ -1,46 +1,38 @@
-From: jiada_wang@mentor.com (jiada_wang at mentor.com)
-Date: Thu, 12 Dec 2013 21:52:46 -0800
-Subject: [PATCH] dma: imx: correct sdmac->status for cyclic dma tx
-Message-ID: <1386913966-20595-1-git-send-email-jiada_wang@mentor.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 13 Dec 2013 13:55:25 +0800
+Subject: [PATCH v6 03/15] usb: phy-mxs: Add auto clock and power setting
+In-Reply-To: <20131213042338.GD867@saruman.home>
+References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
+ <1386897825-6130-4-git-send-email-peter.chen@freescale.com>
+ <20131213042338.GD867@saruman.home>
+Message-ID: <CAL411-qnME4n64PXMeSucgt-jZXNrKei3uA-eSMv4jE3SDmSVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiada Wang <jiada_wang@mentor.com>
+On Fri, Dec 13, 2013 at 12:23 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Fri, Dec 13, 2013 at 09:23:33AM +0800, Peter Chen wrote:
+>> With the auto setting, the PHY's clock and power can be
+>> recovered correctly from low power mode, it is ganranteed by IC logic.
+>
+> s/ganranteed/guaranteed
+>
 
-In cyclic dma tx's handler sdma_handle_channel_loop(),
-SDMA channel statue is set to either DMA_ERROR or DMA_IN_PROGRESS
-based on each period's status. This has the following issues:
+Will change.
 
-1) If one period's status is BD_RROR, then channel status
-   will be set to DMA_ERROR, but it will be overwritten to DMA_IN_PROGRESS
-   if the following periods are OK.
-2) DMA client may call sdma_control(DMA_TERMINATE_ALL) to stop the cyclic dma
-   operation, sdma channel status will be set to DMA_ERROR,
-   but if after this handler is called, then again the channel status will be overwritten
-   to DMA_IN_PROGRESS. Then the following dmaengine_prep_dma_cyclic() will always fail,
-   as channel status is DMA_IN_PROGRESS.
+> Also, I think you need to be slightly more verbose here. Maybe explain a
+> bit what is the "auto setting". From what I can see from the code, it's
+> a way to let HW manage clock gating.
+>
 
-As in cyclic dma tx, channel status will be initially set to DMA_IN_PROGRESS,
-driver only needs to change it to DMA_ERROR, when something wrong happens
-(one period status is wrong, or stoped by client explicitly).
+Yes, you are right. This feature is used to open related power and clocks
+automatically after receiving wakeup signal. I will add more explanation.
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
----
- drivers/dma/imx-sdma.c | 2 --
- 1 file changed, 2 deletions(-)
+> Another question, does this feature work in all SoCs where this IP is
+> available ?
+>
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index c75679d..c8a0094 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -605,8 +605,6 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
- 
- 		if (bd->mode.status & BD_RROR)
- 			sdmac->status = DMA_ERROR;
--		else
--			sdmac->status = DMA_IN_PROGRESS;
- 
- 		bd->mode.status |= BD_DONE;
- 		sdmac->buf_tail++;
+Yes, these auto bits are existed from the 1st generation mxs-phy.
+
 -- 
-1.8.1.2
+BR,
+Peter Chen
