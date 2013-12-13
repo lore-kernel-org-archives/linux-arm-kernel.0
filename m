@@ -1,26 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Dec 2013 18:17:25 +0000
-Subject: [PATCH 1/5] arm64: Fix __data_loc value
-In-Reply-To: <20131213174647.GJ4360@n2100.arm.linux.org.uk>
-References: <cover.1386879684.git.geoff@infradead.org>
- <35a937043d1b3eae1b1ea547efc25f75b5f43f67.1386879684.git.geoff@infradead.org>
- <20131213174647.GJ4360@n2100.arm.linux.org.uk>
-Message-ID: <20131213181725.GR22933@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 13 Dec 2013 10:19:53 -0800
+Subject: [PATCH 09/15] mtd: sh_flctl: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <3651259.U0RP9jvU5Q@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <3651259.U0RP9jvU5Q@avalon>
+Message-ID: <20131213181953.GY27149@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 05:46:47PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 12, 2013 at 08:39:45PM +0000, Geoff Levand wrote:
-> > The __data_loc variable should be set to the VMA of the data section, not
-> > the LMA.
-> > 
-> > At present LOAD_OFFSET is not set and defaults to zero, so this bug
-> > does not cause any problems.
+On Wed, Dec 11, 2013 at 01:48:50PM +0100, Laurent Pinchart wrote:
+> Hi David,
 > 
-> Why does ARM64 have this in the first place?  __data_loc is used for
-> XIP support on ARM, does ARM64 have XIP support?
+> Could you please pick this patch up for v3.14 ?
 
-Not a good reason, copy-paste leftover.
+I'm not David, but I pushed your patch over a week ago. I guess I forgot
+to warn you. Sorry!
 
--- 
-Catalin
+> On Wednesday 27 November 2013 02:18:31 Laurent Pinchart wrote:
+> > This helps increasing build testing coverage.
+> > 
+> > Cc: David Woodhouse <dwmw2@infradead.org>
+> > Cc: linux-mtd at lists.infradead.org
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Acked-by: Simon Horman <horms@verge.net.au>
+
+This patch is in l2-mtd.git. Thanks!
+
+Brian
