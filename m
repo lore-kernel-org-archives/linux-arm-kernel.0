@@ -1,58 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Dec 2013 16:56:06 +0000
-Subject: [PATCH] arm/arm64: KVM: relax the requirements of VMA alignment for
- THP
-Message-ID: <1386953766-1568-1-git-send-email-marc.zyngier@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 13 Dec 2013 09:59:22 -0700
+Subject: [PATCH V2] ARM: tegra: fix pinctrl misconfiguration on Venic2
+In-Reply-To: <52AAA870.4090609@nvidia.com>
+References: <1386886322-2700-1-git-send-email-swarren@wwwdotorg.org>
+ <52AAA870.4090609@nvidia.com>
+Message-ID: <52AB3CEA.70405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The THP code in KVM/ARM is a bit restrictive in not allowing a THP
-to be used if the VMA is not 2MB aligned. Actually, it is not so much
-the VMA that matters, but the associated memslot:
+On 12/12/2013 11:25 PM, Laxman Dewangan wrote:
+> On Friday 13 December 2013 03:42 AM, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Other boards use PULL_NONE for their debug UART pins, and without this
+>> change, the board doesn't accept any serial input.
+>>
+>> Don't set the I2S port pins to tristate mode, or no audio signal will
+>> be sent out.
+>>
+>> Fixes: 605ae5804385 ("ARM: tegra: add default pinctrl nodes for Venice2")
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> v2: Added fix for I2S port.
+>>
+>> Laxman, can you please go through the whole pinctrl configuration for
+>> Venice2 and make sure it's correct. Perhaps the best approach would be
+>> to compare it against our downstream kernels for this board.
+>
+> The patch is generated based on downstream ref platforms setting,
+> Let me again check with very similar board in dowsntream.
 
-A process can perfectly mmap a region with no particular alignment
-restriction, and then pass a 2MB aligned address to KVM. In this
-case, KVM will only use this 2MB aligned region, and will ignore
-the range between vma->vm_start and memslot->userspace_addr.
-
-It can also choose to place this memslot at whatever alignment it
-wants in the IPA space. In the end, what matters is the relative
-alignment of the user space and IPA mappings with respect to a
-2M page. They absolutely must be the same if you want to use THP.
-
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/mmu.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 5809069..9cad7a9 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -667,14 +667,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
- 		/*
--		 * Pages belonging to VMAs not aligned to the PMD mapping
--		 * granularity cannot be mapped using block descriptors even
--		 * if the pages belong to a THP for the process, because the
--		 * stage-2 block descriptor will cover more than a single THP
--		 * and we loose atomicity for unmapping, updates, and splits
--		 * of the THP or other pages in the stage-2 block range.
-+		 * Pages belonging to memslots that don't have the same
-+		 * alignment for userspace and IPA cannot be mapped using
-+		 * block descriptors even if the pages belong to a THP for
-+		 * the process, because the stage-2 block descriptor will
-+		 * cover more than a single THP and we loose atomicity for
-+		 * unmapping, updates, and splits of the THP or other pages
-+		 * in the stage-2 block range.
- 		 */
--		if (vma->vm_start & ~PMD_MASK)
-+		if ((memslot->userspace_addr & ~PMD_MASK) !=
-+		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
- 			force_pte = true;
- 	}
- 	up_read(&current->mm->mmap_sem);
--- 
-1.8.2.3
+Oh, you mean this isn't a pinctrl configuration for Venice2 then? As you
+know, we do have a separate downstream kernel with full Venice2 support;
+you should use that as a reference.
