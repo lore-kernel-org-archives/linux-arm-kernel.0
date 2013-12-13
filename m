@@ -1,74 +1,36 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 12 Dec 2013 19:49:36 -0800
-Subject: [GIT PULL v2][for 3.14] pull request for hisilicon clock
-In-Reply-To: <52A82691.5030207@gmail.com>
-References: <52A82691.5030207@gmail.com>
-Message-ID: <CAPtuhThYJWwnsTq1eZ59RMtaFGteWJ+QWBa_S07bO+qo8rk6eA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Dec 2013 22:17:19 -0600
+Subject: [PATCH 3/7] usb: dwc3: pci: add pm_runtime support
+In-Reply-To: <20131213015605.GC29964@psi-dev26.jf.intel.com>
+References: <1386884325-11440-1-git-send-email-balbi@ti.com>
+ <1386884325-11440-4-git-send-email-balbi@ti.com>
+ <20131213015605.GC29964@psi-dev26.jf.intel.com>
+Message-ID: <20131213041719.GB867@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 12:47 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> Hi Mike,
->
-> Please help to pull request from hisilicon clock. It's used to replace the
-> old request. The change is in below.
->
->     1. Fix the git repository address link from ssh:// to git://.
->     2. Append two patches to fix the wrong setting in hi3620 clock driver.
-> All the fix are in the clock tables.
+On Thu, Dec 12, 2013 at 05:56:05PM -0800, David Cohen wrote:
+> On Thu, Dec 12, 2013 at 03:38:41PM -0600, Felipe Balbi wrote:
+> > teach the PCI glue about pm_runtime so that
+> > it's easier to teach dwc3 core about it
+> > later.
+> > 
+> > No functional changes otherwise.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> I was able to test this one with Intel Merrifield:
+> Acked-by: David Cohen <david.a.cohen@linux.intel.com>
 
-Looks good to me! Taken into clk-next. I guess I am missing some
-support since I did not see a way to compile in support for the 3620
-SoC, but the clock driver itself looks fine.
+cool, thanks. Although that'd be a Tested-by. Is it ok to add your name
+as Tested-by instead ?
 
-Regards,
-Mike
-
->
-> Best Regards
-> Haojian
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/clk-hisilicon
->
-> for you to fetch changes up to ea010e5188dab61b64c1ad0221adc271039e7775:
->
->   clk: hi3620: add gate clock flag (2013-12-11 16:42:23 +0800)
->
-> ----------------------------------------------------------------
-> clk-hisilicon-for-3.14
->
-> ----------------------------------------------------------------
-> Haojian Zhuang (3):
->       clk: hisilicon: add common clock support
->       clk: hi3620: fix wrong flags on divider
->       clk: hi3620: add gate clock flag
->
->  Documentation/devicetree/bindings/clock/hi3620-clock.txt |  19 +++++++
->  drivers/clk/Makefile                                     |   1 +
->  drivers/clk/hisilicon/Makefile                           |   5 ++
->  drivers/clk/hisilicon/clk-hi3620.c                       | 242
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/hisilicon/clk.c                              | 171
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/hisilicon/clk.h                              | 103
-> ++++++++++++++++++++++++++++++++++++
->  drivers/clk/hisilicon/clkgate-separated.c                | 130
-> ++++++++++++++++++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/hi3620-clock.h                 | 152
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  8 files changed, 823 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/hi3620-clock.txt
->  create mode 100644 drivers/clk/hisilicon/Makefile
->  create mode 100644 drivers/clk/hisilicon/clk-hi3620.c
->  create mode 100644 drivers/clk/hisilicon/clk.c
->  create mode 100644 drivers/clk/hisilicon/clk.h
->  create mode 100644 drivers/clk/hisilicon/clkgate-separated.c
->  create mode 100644 include/dt-bindings/clock/hi3620-clock.h
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/857afe3a/attachment.sig>
