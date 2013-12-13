@@ -1,159 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:34 +0900
-Subject: [PATCH 60/69] ARM: shmobile: emev2: Use interrupt macros in DT files
-In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
-References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <3dc76086fa0a8def96f331785cceb6e84e3c34de.1386901186.git.horms+renesas@verge.net.au>
+Date: Fri, 13 Dec 2013 11:29:46 +0900
+Subject: [PATCH 13/33] ARM: shmobile: r8a7790: add QSPI support
+In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
+References: <cover.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <3dd3b1cf068a64a71f1b40319ca33fcb50842bc0.1386897180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Hiep Cao Minh <cm-hiep@jinso.co.jp>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Adds support for QSPI on the r8a7790.
+
+Signed-off-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts |  3 ++-
- arch/arm/boot/dts/emev2.dtsi      | 30 ++++++++++++++++++------------
- 2 files changed, 20 insertions(+), 13 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index baaa66c..50ccd15 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -12,6 +12,7 @@
- #include "emev2.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "EMEV2 KZM9D Board";
-@@ -49,7 +50,7 @@
- 		reg = <0x20000000 0x10000>;
- 		phy-mode = "mii";
- 		interrupt-parent = <&gpio0>;
--		interrupts = <1 1>;	/* active high */
-+		interrupts = <1 IRQ_TYPE_EDGE_RISING>;
- 		reg-io-width = <4>;
- 		smsc,irq-active-high;
- 		smsc,irq-push-pull;
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index 256c2f8..8467e4c 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -9,6 +9,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	compatible = "renesas,emev2";
-@@ -48,8 +49,8 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 120 4>,
--			     <0 121 4>;
-+		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 121 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	smu at e0110000 {
-@@ -129,7 +130,7 @@
- 	sti at e0180000 {
- 		compatible = "renesas,em-sti";
- 		reg = <0xe0180000 0x54>;
--		interrupts = <0 125 0>;
-+		interrupts = <0 125 IRQ_TYPE_NONE>;
- 		clocks = <&sti_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -137,7 +138,7 @@
- 	uart at e1020000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1020000 0x38>;
--		interrupts = <0 8 0>;
-+		interrupts = <0 8 IRQ_TYPE_NONE>;
- 		clocks = <&usia_u0_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -145,7 +146,7 @@
- 	uart at e1030000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1030000 0x38>;
--		interrupts = <0 9 0>;
-+		interrupts = <0 9 IRQ_TYPE_NONE>;
- 		clocks = <&usib_u1_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -153,7 +154,7 @@
- 	uart at e1040000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1040000 0x38>;
--		interrupts = <0 10 0>;
-+		interrupts = <0 10 IRQ_TYPE_NONE>;
- 		clocks = <&usib_u2_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -161,7 +162,7 @@
- 	uart at e1050000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1050000 0x38>;
--		interrupts = <0 11 0>;
-+		interrupts = <0 11 IRQ_TYPE_NONE>;
- 		clocks = <&usib_u3_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -169,7 +170,8 @@
- 	gpio0: gpio at e0050000 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
--		interrupts = <0 67 0>, <0 68 0>;
-+		interrupts = <0 67 IRQ_TYPE_NONE>,
-+			     <0 68 IRQ_TYPE_NONE>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
-@@ -179,7 +181,8 @@
- 	gpio1: gpio at e0050080 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050080 0x2c>, <0xe00500c0 0x20>;
--		interrupts = <0 69 0>, <0 70 0>;
-+		interrupts = <0 69 IRQ_TYPE_NONE>,
-+			     <0 70 IRQ_TYPE_NONE>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
-@@ -189,7 +192,8 @@
- 	gpio2: gpio at e0050100 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050100 0x2c>, <0xe0050140 0x20>;
--		interrupts = <0 71 0>, <0 72 0>;
-+		interrupts = <0 71 IRQ_TYPE_NONE>,
-+			     <0 72 IRQ_TYPE_NONE>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
-@@ -199,7 +203,8 @@
- 	gpio3: gpio at e0050180 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050180 0x2c>, <0xe00501c0 0x20>;
--		interrupts = <0 73 0>, <0 74 0>;
-+		interrupts = <0 73 IRQ_TYPE_NONE>,
-+			     <0 74 IRQ_TYPE_NONE>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpios = <32>;
-@@ -209,7 +214,8 @@
- 	gpio4: gpio at e0050200 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050200 0x2c>, <0xe0050240 0x20>;
--		interrupts = <0 75 0>, <0 76 0>;
-+		interrupts = <0 75 IRQ_TYPE_NONE>,
-+			     <0 76 IRQ_TYPE_NONE>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		ngpios = <31>;
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 161d44e..5269640 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -183,6 +183,7 @@ static struct clk div6_clks[DIV6_NR] = {
+ /* MSTP */
+ enum {
+ 	MSTP931, MSTP930, MSTP929, MSTP928,
++	MSTP917,
+ 	MSTP813,
+ 	MSTP726, MSTP725, MSTP724, MSTP723, MSTP722, MSTP721, MSTP720,
+ 	MSTP717, MSTP716,
+@@ -199,6 +200,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP930] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 30, 0), /* I2C1 */
+ 	[MSTP929] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 29, 0), /* I2C2 */
+ 	[MSTP928] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 28, 0), /* I2C3 */
++	[MSTP917] = SH_CLK_MSTP32(&qspi_clk, SMSTPCR9, 17, 0), /* QSPI */
+ 	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+ 	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
+ 	[MSTP725] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 25, 0), /* LVDS1 */
+@@ -298,6 +300,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("ee220000.mmcif", &mstp_clks[MSTP305]),
+ 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
+ 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
++	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+ 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP704]),
+ 	CLKDEV_ICK_ID("usbhs", "usb_phy_rcar_gen2", &mstp_clks[MSTP704]),
+ };
 -- 
 1.8.4
