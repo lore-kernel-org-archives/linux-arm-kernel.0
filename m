@@ -1,44 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:30:47 +0900
-Subject: [PATCH 13/69] ARM: shmobile: bockw: fixup MMC pin conflict on DTS
+Date: Fri, 13 Dec 2013 11:31:25 +0900
+Subject: [PATCH 51/69] ARM: shmobile: Koelsch DT reference GPIO LED support
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <9ebe54baf8a166384201b4a78c649106047ebc75.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <614a198d45e523f6066f1c22b9c10e4067f2c44a.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Add led6, led7 and led8 to the Koelsch DT reference board support.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw-reference.dts | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-index c6b834f..4d997f8 100644
---- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -51,10 +51,6 @@
- 		vdd33a-supply = <&fixedregulator3v3>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+index 8e7e917..1919273 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+@@ -11,6 +11,7 @@
  
--	mmc_pins: mmc {
--		renesas,groups = "mmc_data8", "mmc_ctrl";
--		renesas,function = "mmc";
--	};
- };
+ /dts-v1/;
+ #include "r8a7791.dtsi"
++#include <dt-bindings/gpio/gpio.h>
  
- &mmcif {
-@@ -79,4 +75,9 @@
- 		renesas,groups = "scif0_data_a", "scif0_ctrl";
- 		renesas,function = "scif0";
+ / {
+ 	model = "Koelsch";
+@@ -29,6 +30,19 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
  	};
 +
-+	mmc_pins: mmc {
-+		renesas,groups = "mmc_data8", "mmc_ctrl";
-+		renesas,function = "mmc";
++	leds {
++		compatible = "gpio-leds";
++		led6 {
++			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++		};
++		led7 {
++			gpios = <&gpio2 20 GPIO_ACTIVE_HIGH>;
++		};
++		led8 {
++			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
++		};
 +	};
  };
+ 
+ &pfc {
 -- 
 1.8.4
