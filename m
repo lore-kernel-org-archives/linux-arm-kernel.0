@@ -1,36 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Dec 2013 17:27:10 +0000
-Subject: [PATCH] arm/arm64: KVM: relax the requirements of VMA alignment
- for THP
-In-Reply-To: <20131213172018.GT2871@cbox>
-References: <1386953766-1568-1-git-send-email-marc.zyngier@arm.com>
- <20131213172018.GT2871@cbox>
-Message-ID: <52AB436E.1030709@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Dec 2013 09:31:10 -0800
+Subject: [PATCH v2 0/3] OMAP2+: hwmod: Add support to parse clock info
+ from DT
+In-Reply-To: <1386848309-14076-1-git-send-email-rnayak@ti.com>
+References: <1386848309-14076-1-git-send-email-rnayak@ti.com>
+Message-ID: <20131213173110.GF28184@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/13 17:20, Christoffer Dall wrote:
-> On Fri, Dec 13, 2013 at 04:56:06PM +0000, Marc Zyngier wrote:
->> The THP code in KVM/ARM is a bit restrictive in not allowing a THP
->> to be used if the VMA is not 2MB aligned. Actually, it is not so much
->> the VMA that matters, but the associated memslot:
->>
->> A process can perfectly mmap a region with no particular alignment
->> restriction, and then pass a 2MB aligned address to KVM. In this
->> case, KVM will only use this 2MB aligned region, and will ignore
->> the range between vma->vm_start and memslot->userspace_addr.
->>
->> It can also choose to place this memslot at whatever alignment it
->> wants in the IPA space. In the end, what matters is the relative
->> alignment of the user space and IPA mappings with respect to a
->> 2M page. They absolutely must be the same if you want to use THP.
+* Rajendra Nayak <rnayak@ti.com> [131212 03:40]:
+> v1 of this series was posted a while back [1] but there wasn't much that
+> was concluded if the approach used in the series was acceptable or if there
+> are better alternatives. So I am just doing a repost of these to see if we
+> can conclude this time around.
 > 
-> Looks good to me:
+> Needless to say, patches are based off Teros omap-clocks-to-dt v10 series [2]
+> and I also pulled in Tonys fix to handle DT nodes with multiple 'ti,hwmod'
+> values [3]. The approach taken in the series *does not* work for cases with
+> multiple 'ti,hwmod' values and hence [3] helps me skip those instances
+> for now. But based on some of the recent discussions on multiple 'ti-hwmod'
+> values [4] it looks like its generally agreed upon that having DT nodes with
+> multiple 'ti-hwmod' property is wrong and that those instances need to be
+> fixed up anyway.
+
+Yeah we need to have 1-to-1 mapping of device entries in the .dtsi files
+to the device entries in the omap_hwmod_*_data.c files. And then we can
+just deprecate "ti,hwmods" property and start parsing the standard compatible
+flag instead.
+
+Regards,
+
+Tony
+ 
+> [1] http://www.spinics.net/lists/linux-omap/msg95746.html
+> [2] http://www.spinics.net/lists/devicetree/msg13455.html
+> [3] http://www.spinics.net/lists/arm-kernel/msg288036.html
+> [4] http://www.spinics.net/lists/arm-kernel/msg288023.html
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Thanks for the review!
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Rajendra Nayak (3):
+>   ARM: OMAP2+: Add support to parse 'main_clk' info from DT
+>   ARM: OMAP2+: Add support to parse optional clk info from DT
+>   ARM: OMAP4: dts: Add main and optional clock data into DT
+> 
+>  arch/arm/boot/dts/omap4.dtsi               |  100 +++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod.c           |   88 ++++++++++++++++++--
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  122 ----------------------------
+>  3 files changed, 180 insertions(+), 130 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
