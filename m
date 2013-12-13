@@ -1,47 +1,55 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 13 Dec 2013 10:52:23 -0500
-Subject: [PATCH v6 6/7] arm64, jump label: optimize jump label
- implementation
-In-Reply-To: <20131213105023.67e45640@gandalf.local.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Dec 2013 15:54:31 +0000
+Subject: [PATCH v6 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <1386691433-6827-3-git-send-email-liuj97@gmail.com>
 References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
- <1386691433-6827-7-git-send-email-liuj97@gmail.com>
- <20131213154104.GG19177@mudshark.cambridge.arm.com>
- <20131213105023.67e45640@gandalf.local.home>
-Message-ID: <20131213105223.664f960b@gandalf.local.home>
+ <1386691433-6827-3-git-send-email-liuj97@gmail.com>
+Message-ID: <20131213155431.GH19177@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Dec 2013 10:50:23 -0500
-Steven Rostedt <rostedt@goodmis.org> wrote:
+On Tue, Dec 10, 2013 at 04:03:48PM +0000, Jiang Liu wrote:
+> Introduce three interfaces to patch kernel and module code:
+> aarch64_insn_patch_text_nosync():
+> 	patch code without synchronization, it's caller's responsibility
+> 	to synchronize all CPUs if needed.
+> aarch64_insn_patch_text_sync():
+> 	patch code and always synchronize with stop_machine()
+> aarch64_insn_patch_text():
+> 	patch code and synchronize with stop_machine() if needed
+> 
+> Signed-off-by: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h |  10 +++-
+>  arch/arm64/kernel/insn.c      | 117 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 126 insertions(+), 1 deletion(-)
 
-> On Fri, 13 Dec 2013 15:41:04 +0000
-> Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/jump_label.h>
-> > > +#include <asm/jump_label.h>
-> > > +#include <asm/insn.h>
-> > > +
-> > > +#ifdef HAVE_JUMP_LABEL
-> > 
-> > Slightly worrying... this should be CONFIG_HAVE_JUMP_LABEL, right? How did
-> > you manage to test this code?
-> 
-> In <linux/jump_label.h> we have:
-> 
-> #if defined(CC_HAVE_ASM_GOTO) && defined(CONFIG_JUMP_LABEL)
-> 
-> [...]
-> 
-> # include <asm/jump_label.h>
+Two comments on the patching callback...
 
-This also makes the include of <asm/jump_label.h> in the C file
-redundant.
+> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+> +{
+> +	int i, ret = 0;
+> +	struct aarch64_insn_patch *pp = arg;
+> +
+> +	/* The first CPU becomes master */
+> +	if (atomic_inc_return(&pp->cpu_count) == 1) {
+> +		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+> +			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+> +							     pp->new_insns[i]);
+> +		/* Make sure changes are visible to other CPUs and let them continue */
+> +		smp_wmb();
 
--- Steve
+As I mentioned last time, you can rely on aarch64_insn_patch_text_nosync to
+enforce ordering (flush_icache_range ends with dsb; isb). Just add a comment
+saying that.
 
-> # define HAVE_JUMP_LABEL
-> #endif	/* CC_HAVE_ASM_GOTO && CONFIG_JUMP_LABEL */
-> 
-> 
-> -- Steve
+> +		atomic_set(&pp->cpu_count, -1);
+> +	} else {
+> +		while (atomic_read(&pp->cpu_count) != -1)
+> +			cpu_relax();
+> +		smp_rmb();
+
+You don't need the smp_rmb here.
+
+Will
