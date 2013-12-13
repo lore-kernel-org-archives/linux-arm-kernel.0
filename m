@@ -1,68 +1,80 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 13 Dec 2013 13:57:20 +0100
-Subject: [PATCH] ARM: dts: imx53: add support for Ka-Ro TX53 modules
-In-Reply-To: <20131213134240.595d27ae@ipc1.ka-ro>
-References: <1386852128-32220-1-git-send-email-LW@KARO-electronics.de>
- <20131213081744.GR18380@S2101-09.ap.freescale.net>
- <20131213105417.71a42133@ipc1.ka-ro>
- <20131213121646.GU18380@S2101-09.ap.freescale.net>
- <20131213134240.595d27ae@ipc1.ka-ro>
-Message-ID: <20131213125719.GM24559@pengutronix.de>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 13 Dec 2013 13:59:00 +0100
+Subject: [PATCH 02/12] dt-bindings: document s3c24xx controller for external
+ clock output
+In-Reply-To: <201312131356.40755.heiko@sntech.de>
+References: <201312131356.40755.heiko@sntech.de>
+Message-ID: <201312131359.00450.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 01:42:40PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo wrote:
-> > On Fri, Dec 13, 2013 at 10:54:17AM +0100, Lothar Wa?mann wrote:
-> > > > > +		compatible = "pwm-backlight";
-> > > > > +		pwms = <&pwm2 0 500000>;
-> > > > > +		power-supply = <&reg_3v3>;
-> > > > > +		brightness-levels = <
-> > > > > +			100 99 98 97 96 95 94 93 92 91
-> > > > > +			 90 89 88 87 86 85 84 83 82 81
-> > > > > +			 80 79 78 77 76 75 74 73 72 71
-> > > > > +			 70 69 68 67 66 65 64 63 62 61
-> > > > > +			 60 59 58 57 56 55 54 53 52 51
-> > > > > +			 50 49 48 47 46 45 44 43 42 41
-> > > > > +			 40 39 38 37 36 35 34 33 32 31
-> > > > > +			 30 29 28 27 26 25 24 23 22 21
-> > > > > +			 20 19 18 17 16 15 14 13 12 11
-> > > > > +			 10  9  8  7  6  5  4  3  2  1
-> > > > > +			  0
-> > > > 
-> > > > Why is it so unique to start with 100 and end with 0?  Does it even
-> > > > work?  Here is what I read from bindings doc.
-> > > > 
-> > > Yes, it works. The backlight control of the displays we typically use
-> > > is active low. This is a poor man's way to get an inverted PWM output!
-> > > (And one in which the number written to the sysfs file corresponds to
-> > > the actual duty cycle of the PWM output)
-> > 
-> > I think Linux pwm driver should be improved for this case rather than
-> > manipulate device tree in a way that violate the defined bindings.
-> >
-> I admit I would be happier with a 'polarity' flag like other PWM
-> drivers provide it. I tried to add polarity support in the generic PWM
-> layer, so that all HW drivers that do not support inversion in HW can
-> make use of it, but this gives problems with client drivers that don't
-> know about the inversion and disable the PWM when the duty cycle is set
-> to 0.
-> Maybe I'll find some time to find a proper solution for this issue.
+The clock settings are distributed over a regular register and parts
+of the misccr register.
 
-Actually the i.MX supports inversion in hardware. It's bit 18 in the
-PWMCR register.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ .../bindings/clock/samsung,s3c2410-dclk.txt        |   53 ++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
 
-As a sidenote IMO client drivers shouldn't make assumptions about the
-pwm output when a pwm is disabled anyway. If clients want to have a
-constant output they should set the duty cycle to 0 or 100%.
-
-Sascha
-
-
+diff --git a/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt b/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
+new file mode 100644
+index 0000000..0a1f7b1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
+@@ -0,0 +1,53 @@
++* Samsung S3C24XX External Clock Output Controller
++
++The S3C24XX series can generate clock signals on two clock output pads.
++The clock binding described here is applicable to all SoCs in
++the s3c24x family.
++
++Required Properties:
++
++- compatible: should be one of the following.
++  - "samsung,s3c2410-dclk" - controller in S3C2410 SoCs.
++  - "samsung,s3c2412-dclk" - controller in S3C2412 SoCs.
++  - "samsung,s3c2440-dclk" - controller in S3C2440 and S3C2442 SoCs.
++  - "samsung,s3c2443-dclk" - controller in S3C2443 and later SoCs.
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- #clock-cells: should be 1.
++- samsung,misccr: phandle to the syscon managing the misccr register, which
++  holds configuration settings for different soc-components (clocks, usb, ...).
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume.
++
++All available clocks are defined as preprocessor macros in
++dt-bindings/clock/samsung,s3c2410-dclk.h header and can be used in device
++tree sources.
++
++To enable the clock outputs it is necessary to configure the pins accordingly
++using the pinctrl framework.
++
++Example:
++
++&pinctrl_0 {
++	clkout0: clkout0 {
++		samsung,pins = "gph-9";
++		samsung,pin-function = <2>;
++	};
++	clkout1: clkout1 {
++		samsung,pins = "gph-10";
++		samsung,pin-function = <2>;
++	};
++};
++
++[...]
++
++	clocks: clock-controller at 56000084 {
++		compatible = "samsung,s3c2410-dclk";
++		reg = <0x56000084 0x4>;
++		#clock-cells = <1>;
++		samsung,misccr = <&misccr>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&clkout0>, <&clkout1>;
++	};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
