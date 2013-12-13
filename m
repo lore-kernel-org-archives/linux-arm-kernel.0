@@ -1,15 +1,13 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 13 Dec 2013 10:20:25 +0100
-Subject: [PATCH v2 1/5] net: mv643xx_eth: properly start/stop phy device
+Date: Fri, 13 Dec 2013 10:20:28 +0100
+Subject: [PATCH v2 4/5] net: phy: resume/suspend PHYs on attach/detach
 In-Reply-To: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1386926429-28818-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1386926429-28818-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using phydev, it should be phy_start/phy_stop'ed properly. This
-driver doesn't do that, so add the corresponding calls to port_start/
-stop respectively.
+This ensures PHYs are resumed on attach and suspended on detach.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
@@ -22,30 +20,29 @@ Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ drivers/net/phy/phy_device.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 61088a6..3aa706f 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -2098,6 +2098,7 @@ static void port_start(struct mv643xx_eth_private *mp)
- 		mv643xx_eth_get_settings(mp->dev, &cmd);
- 		phy_reset(mp);
- 		mv643xx_eth_set_settings(mp->dev, &cmd);
-+		phy_start(mp->phy);
- 	}
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index 6f0e9e4..3903f44 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -570,6 +570,8 @@ static int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
+ 	if (err)
+ 		phy_detach(phydev);
  
- 	/*
-@@ -2293,7 +2294,8 @@ static int mv643xx_eth_stop(struct net_device *dev)
- 	del_timer_sync(&mp->rx_oom);
++	phy_resume(phydev);
++
+ 	return err;
+ }
  
- 	netif_carrier_off(dev);
--
-+	if (mp->phy)
-+		phy_stop(mp->phy);
- 	free_irq(dev->irq, dev);
+@@ -615,6 +617,7 @@ void phy_detach(struct phy_device *phydev)
+ {
+ 	phydev->attached_dev->phydev = NULL;
+ 	phydev->attached_dev = NULL;
++	phy_suspend(phydev);
  
- 	port_reset(mp);
+ 	/* If the device had no specific driver before (i.e. - it
+ 	 * was using the generic driver), we unbind the device
 -- 
 1.7.2.5
