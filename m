@@ -1,57 +1,69 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Dec 2013 09:31:33 +0100
-Subject: [PATCH V2 3/3] ARM: ux500: regulators: Remove dead code for SD-card
- regulator
-Message-ID: <1386923493-9286-1-git-send-email-ulf.hansson@linaro.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 13 Dec 2013 09:33:47 +0100
+Subject: arm-soc: Xilinx Zynq cleanups for v3.14
+Message-ID: <52AAC66B.70404@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The signal-voltage regulator is handled through a gpio regulator
-configured in DT. Remove the old dead code.
+Hi Arnd, Kevin and Olof,
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-regulators.c |   14 --------------
- arch/arm/mach-ux500/board-mop500-regulators.h |    1 -
- 2 files changed, 15 deletions(-)
+Please pull these cleanup patches to your tree.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 0dc44c6..a4e139a 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -30,20 +30,6 @@ struct regulator_init_data gpio_en_3v3_regulator = {
-        .consumer_supplies = gpio_en_3v3_consumers,
- };
- 
--static struct regulator_consumer_supply sdi0_reg_consumers[] = {
--        REGULATOR_SUPPLY("vqmmc", "sdi0"),
--};
--
--struct regulator_init_data sdi0_reg_init_data = {
--        .constraints = {
--                .min_uV         = 1800000,
--                .max_uV         = 2900000,
--                .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|REGULATOR_CHANGE_STATUS,
--        },
--        .num_consumer_supplies  = ARRAY_SIZE(sdi0_reg_consumers),
--        .consumer_supplies      = sdi0_reg_consumers,
--};
--
- /*
-  * TPS61052 regulator
-  */
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-index 039f513..9bece38 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.h
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-@@ -18,7 +18,6 @@ extern struct ab8500_regulator_platform_data ab8500_regulator_plat_data;
- extern struct ab8500_regulator_platform_data ab8505_regulator_plat_data;
- extern struct regulator_init_data tps61052_regulator;
- extern struct regulator_init_data gpio_en_3v3_regulator;
--extern struct regulator_init_data sdi0_reg_init_data;
- 
- void mop500_regulator_init(void);
- 
+Thanks,
+Michal
+
+
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.14
+
+for you to fetch changes up to 2605f85275a7d5ccc5a59b05eed139656ad4e8a2:
+
+  ARM: zynq: remove unnecessary setting of cpu_present_mask (2013-12-10 14:20:25 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq cleanup patches for v3.14
+
+This branch contains these fixes:
+- SMP cleanups
+- platform initialization cleanup
+
+----------------------------------------------------------------
+Michal Simek (1):
+      arm: zynq: Add support for zynq_cpu_kill function
+
+Soren Brinkmann (4):
+      arm: zynq: platsmp: Remove CPU presence check
+      arm: zynq: Invalidate L1 in secondary boot
+      arm: zynq: Use of_platform_populate instead of bus_probe
+      arm: zynq: Set proper GIC flags
+
+Sudeep KarkadaNagesha (1):
+      ARM: zynq: remove unnecessary setting of cpu_present_mask
+
+ arch/arm/mach-zynq/common.c  | 16 ++++++++++------
+ arch/arm/mach-zynq/common.h  |  2 ++
+ arch/arm/mach-zynq/headsmp.S |  6 +++++-
+ arch/arm/mach-zynq/platsmp.c | 25 ++++++++++---------------
+ 4 files changed, 27 insertions(+), 22 deletions(-)
+
+
 -- 
-1.7.9.5
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/b3ca4690/attachment.sig>
