@@ -1,61 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:30:58 +0900
-Subject: [PATCH 24/69] ARM: shmobile: armadillo: tidyup DT node naming
+Date: Fri, 13 Dec 2013 11:31:18 +0900
+Subject: [PATCH 44/69] ARM: shmobile: Configure r8a7791 PFC on Koelsch via DTS
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <e63763b9b55a6833047199bd587e061520302ffc.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <b91a89cf8d9880d1d82c7f9f4c1a448bb680dc2c.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-According to ePAPR spec,
-this patch tidies up DT node name.
+Configure the "D" set of data signals for SCIF0 and SCIF1
+on the Koelsch board to setup pinctrl serial console bits.
 
-This patch removed un-used "touchscreen" label
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 1c56c5e..6a54219 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -90,7 +90,7 @@
- 
- &i2c0 {
- 	status = "okay";
--	touchscreen: st1232 at 55 {
-+	touchscreen at 55 {
- 		compatible = "sitronix,st1232";
- 		reg = <0x55>;
- 		interrupt-parent = <&irqpin1>;
-@@ -105,12 +105,12 @@
- 	pinctrl-0 = <&scifa1_pins>;
- 	pinctrl-names = "default";
- 
--	scifa1_pins: scifa1 {
-+	scifa1_pins: serial1 {
- 		renesas,groups = "scifa1_data";
- 		renesas,function = "scifa1";
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+index 1a0f082..8e7e917 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+@@ -30,3 +30,18 @@
+ 		#size-cells = <1>;
  	};
- 
--	st1232_pins: st1232 {
-+	st1232_pins: touchscreen {
- 		renesas,groups = "intc_irq10";
- 		renesas,function = "intc";
- 	};
-@@ -125,7 +125,7 @@
- 		renesas,function = "mmc0";
- 	};
- 
--	sdhi0_pins: sdhi0 {
-+	sdhi0_pins: sd0 {
- 		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
- 		renesas,function = "sdhi0";
- 	};
+ };
++
++&pfc {
++	pinctrl-0 = <&scif0_pins &scif1_pins>;
++	pinctrl-names = "default";
++
++	scif0_pins: serial0 {
++		renesas,groups = "scif0_data_d";
++		renesas,function = "scif0";
++	};
++
++	scif1_pins: serial1 {
++		renesas,groups = "scif1_data_d";
++		renesas,function = "scif1";
++	};
++};
 -- 
 1.8.4
