@@ -1,58 +1,59 @@
-From: M.Mann@arkona-technologies.de (Matthias Mann)
-Date: Fri, 13 Dec 2013 09:42:35 +0100
-Subject: [PATCH] pci: designware: fix missing msi irqs
-In-Reply-To: <52AA0EB2.2070701@arkona-technologies.de>
-References: <20131212182903.409515738@gmail.com>
- <52AA0EB2.2070701@arkona-technologies.de>
-Message-ID: <52AAC87B.6000007@arkona-technologies.de>
+From: vkale@apm.com (Vinayak Kale)
+Date: Fri, 13 Dec 2013 14:13:42 +0530
+Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
+Message-ID: <1386924222-23169-1-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.12.2013 20:29, schrieb Matthias Mann:
-> Am 12.12.2013 19:29, schrieb Harro Haan:
->> The interrupts were cleared after the irq handler was called.
->> This means that new interrupts that occur after the handler handled
->> the previous irq but before the interrupt is cleared will be missed.
->
-> I discovered the same issue today. I'll test that patch tomorrow.
->
-I tested this patch on our custom i.MX6 board with an Altera FPGA as PCIe
-device and it fixed the missed MSI interrupts.
+Print the cpu frequency field in /proc/cpuinfo.
 
-Tested-by:  Matthias Mann <m.mann@arkona-technologies.de>
+Signed-off-by: Vinayak Kale <vkale@apm.com>
+---
+ arch/arm64/kernel/setup.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-Regards
-Matthias Mann
-
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index bd9bbd0..bca982b 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -41,6 +41,7 @@
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
++#include <linux/cpufreq.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
+@@ -278,9 +279,19 @@ static const char *hwcap_str[] = {
+ 	NULL
+ };
+ 
++static unsigned int get_cpufreq_khz(unsigned int cpu)
++{
++#ifdef CONFIG_CPU_FREQ
++	return cpufreq_quick_get(cpu);
++#else
++	return 0;
++#endif
++}
++
+ static int c_show(struct seq_file *m, void *v)
+ {
+ 	int i;
++	unsigned int cpufreq_khz;
+ 
+ 	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+ 		   cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
+@@ -294,6 +305,10 @@ static int c_show(struct seq_file *m, void *v)
+ #ifdef CONFIG_SMP
+ 		seq_printf(m, "processor\t: %d\n", i);
+ #endif
++		cpufreq_khz = get_cpufreq_khz(i);
++		if (cpufreq_khz)
++			seq_printf(m, "cpu MHz\t\t: %u.%02u\n",
++				cpufreq_khz / 1000, (cpufreq_khz % 1000));
+ 	}
+ 
+ 	/* dump out the processor features */
 -- 
-
-Matthias Mann
-Research & Development
-
-Phone: 	+49 (0) 6155 7802883
-Fax: 	+49 (0) 6155 7802880
-Email: 	M.Mann at arkona-technologies.de 
-<mailto:M.Mann@arkona-technologies.de>
-Web: 	www.arkona-technologies.de <http://www.arkona-technologies.de>
-
-arkona technologies GmbH
-Im Leuschnerpark 4
-64347 Griesheim
-Germany
-
-Amtsgericht / Commercial Register of Darmstadt, HRB 90080
-USt-ID: DE273794666
-Steuernummer / Tax-ID: 007 / 228 / 19331
-Gesch?ftsf?hrung / Managing Director: Rainer Sturm
-
-This e-mail may contain confidential and/or privileged information. If you are
-not the intended recipient (or have received this e-mail in error) please notify
-the sender immediately and delete this message and any attachments from your
-system. Any unauthorised copying, disclosure or distribution of the material in
-this e-mail is strictly forbidden.
-
-We cannot accept any responsibility for the accuracy or completeness of this
-message as it has been transmitted over a public network. If, despite our use of
-anti-virus software, a virus enters your systems in connection with the sending
-of the e-mail, you may not hold us liable for any damages that may possibly
-arise in that connection. We will accept liability which by law we cannot exclude.
+1.5.6.3
