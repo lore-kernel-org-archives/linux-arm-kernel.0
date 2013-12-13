@@ -1,25 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Dec 2013 20:58:21 +0100
-Subject: [PATCH v2 02/11] arm: pxa27x: support ICP DAS LP-8x4x
-In-Reply-To: <1386679620.7152.226.camel@host5.omatika.ru>
-References: <1385879185-22455-3-git-send-email-ynvich@gmail.com>
- <1386348542-9584-1-git-send-email-ynvich@gmail.com>
- <CACRpkdYVsGSyMS6sSTqqJ4XrE3GqpWkJsY7GDazi5ix7xjKQ=Q@mail.gmail.com>
- <1386679620.7152.226.camel@host5.omatika.ru>
-Message-ID: <CACRpkda2qpHbRKu3WuHs9wApMZ83BW8etBc5Uz095pyvBsWWOQ@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 12 Dec 2013 19:58:46 -0800
+Subject: [PATCH 1/2] gpio: msm: Fix irq mask/unmask by writing bits
+ instead of numbers
+In-Reply-To: <CACRpkdY8W8tGVH-Os5neeFfHWjojdB5fBbjgWcsWkiMyJj=YAA@mail.gmail.com>
+References: <1386717544-478-1-git-send-email-sboyd@codeaurora.org>
+ <CACRpkdY8W8tGVH-Os5neeFfHWjojdB5fBbjgWcsWkiMyJj=YAA@mail.gmail.com>
+Message-ID: <20131213035845.GK11990@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 1:47 PM, Sergei Ianovich <ynvich@gmail.com> wrote:
-> On Tue, 2013-12-10 at 13:43 +0100, Linus Walleij wrote:
->> Argh! Now you're adding another user for a legacy custom pin control
->> implementation. But if noone is going to modernize PXA2xx what
->> can we do :-/
->
-> I've rewritten the device to use device tree and posted patch series for
-> that.
+On Thu 12 Dec 11:02 PST 2013, Linus Walleij wrote:
 
-THANKS! For doing this.
+> On Wed, Dec 11, 2013 at 12:19 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> > We should be writing bits here but instead we're writing the
+> > numbers that correspond to the bits we want to write. Fix it by
+> > wrapping the numbers in the BIT() macro. This fixes gpios acting
+> > as interrupts.
+> >
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> I've applied this for fixes and tagged for stable.
+> Bj?rn, Rohit: OK?
 
-Yours,
-Linus Walleij
+This looks good.
+
+JFYI; the pinctrl-msm is written with gpio-msm-v2 in mind as well, so replacing
+it with pinctrl is on my todo list...
+
+Regards,
+Bjorn
