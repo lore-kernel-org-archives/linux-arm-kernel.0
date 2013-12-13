@@ -1,43 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 13 Dec 2013 11:38:54 -0500
-Subject: [PATCH 1/4] irqchip: armada-370-xp: fix IPI race condition
-In-Reply-To: <20131212232327.01f4aaff@skate>
-References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131212232327.01f4aaff@skate>
-Message-ID: <20131213163854.GD2609@titan.lakedaemon.net>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Fri, 13 Dec 2013 08:43:46 -0800
+Subject: [PATCH v2 2/4] rename ARCH_BCM to ARCH_BCM_MOBILE (clocksource)
+In-Reply-To: <52AAC9E1.6070405@linaro.org>
+References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
+ <1379956836-5866-3-git-send-email-bcm@fixthebug.org>
+ <52AAC9E1.6070405@linaro.org>
+Message-ID: <CAEPRUYpxrhsif-OWi+mcbwbp1V7=8H250Fvx5McbGqifRzh8rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomass :)
+On Fri, Dec 13, 2013 at 12:48 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 09/23/2013 07:20 PM, Christian Daudt wrote:
+>>
+>> Currently ARCH_BCM has been used for Broadcom
+>> Mobile V7 based SoCs. In order to allow other Broadcom
+>> SoCs to also use mach-bcm directory and files, this patch
+>> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
+>> uses ARCH_BCM to define any Broadcom chip residing
+>> in mach-bcm directory.
+>>
+>> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+>> Acked-by: Olof Johansson <olof@lixom.net>
+>
+>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>
 
-On Thu, Dec 12, 2013 at 11:23:27PM +0100, Thomas Petazzoni wrote:
-> Hello Thomas,
-> 
-> As the irqchip maintainer, this patch, as well as the following patch
-> "irqchip: armada-370-xp: fix MSI race condition" should go through your
-> tree.
-> 
-> They have been sent for quite some time now. Is there any reason you
-> haven't picked them up? I realized I only Cc'ed you when sending them
-> originally, while you should have been the main recipient, maybe that
-> explains why I didn't get any feedback.
-> 
-> Would it be possible to merge them for 3.13 ? Notice that the below
-> patch should also be backported into stable kernel all the way to 3.8.
+Thanks. I've applied it to armsoc/for-3.14/soc
 
-oops.  I'm maintaining an mvebu topic branch for irqchip changes, and
-forgot to look in my -fixes mail folder when putting it together.  I'll
-take both of these into mvebu/irqchip-fixes and send a pull request to
-Thomas in a few days.
 
-Added:
-
-Cc: stable at vger.kernel.org # v3.8+
-Fixes: 344e873e5657e8dc0 'arm: mvebu: Add IPI support via doorbells'
-
-to this patch.
-
-thx,
-
-Jason.
+ csd
