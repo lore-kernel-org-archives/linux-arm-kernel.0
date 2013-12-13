@@ -1,52 +1,69 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 13 Dec 2013 13:57:06 +0900
-Subject: [PATCH 09/12] pcie: SPEAr13xx: Add designware pcie support
-In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB66189F95F66A2@EAPEX1MAIL1.st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <f5c9cbbd116d462c428afc2e8afefd95aad8c6ec.1386752447.git.mohit.kumar@st.com>
- <201312120000.54545.arnd@arndb.de>
- <2CC2A0A4A178534D93D5159BF3BCB66189F95F66A2@EAPEX1MAIL1.st.com>
-Message-ID: <002c01cef7bf$c5a7b640$50f722c0$%han@samsung.com>
+From: av.tikhomirov@samsung.com (Anton Tikhomirov)
+Date: Fri, 13 Dec 2013 14:01:32 +0900
+Subject: [PATCH 7/7] usb: dwc3: exynos: add pm_runtime support
+In-Reply-To: <1386884325-11440-8-git-send-email-balbi@ti.com>
+References: <1386884325-11440-1-git-send-email-balbi@ti.com>
+ <1386884325-11440-8-git-send-email-balbi@ti.com>
+Message-ID: <000301cef7c0$640c1ce0$2c2456a0$%tikhomirov@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 13, 2013 1:30 PM, Mohit KUMAR DCG wrote:
-> On Thursday, December 12, 2013 4:31 AM, Arnd Bergmann wrote:
-> > On Wednesday 11 December 2013, Mohit Kumar wrote:
+Hi Felipe,
 
-[.....]
-
-> > > +struct spear13xx_pcie {
-> > > +	void __iomem		*phy_base;
-> > > +	void __iomem		*app_base;
-> > > +	struct clk		*clk;
-> > > +	struct pcie_port	pp;
-> > > +	int			id;
-> > > +	int			is_gen1;
-> > > +};
-> >
-> > The pcie driver shouldn't have direct access to the phy registers, use a phy
-> > driver for that.
+> -static int dwc3_exynos_suspend(struct device *dev)
+> +static int __dwc3_exynos_suspend(struct dwc3_exynos *exynos)
+>  {
+> -	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> -
+>  	clk_disable(exynos->clk);
 > 
-> - OK. In few workarounds we have to access controller as well as phy registers,
-> How we should handle such cases if we separate out phy driver from here? Should it be
-> through phy global functions called from pcie driver?
+>  	return 0;
+>  }
+> 
+> +static int __dwc3_exynos_resume(struct dwc3_exynos *exynos)
+> +{
+> +	return clk_enable(exynos->clk);
+> +}
+> +
+> +static int dwc3_exynos_suspend(struct device *dev)
+> +{
+> +	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> +
+> +	return __dwc3_exynos_suspend(exynos);
 
-Arnd, do you mean the following?
+If dwc3-exynos is runtime suspended, the clock will be disabled
+second time here (unbalanced clk_enable/clk_disable).
 
-1. Implement Spear PCIe PHY driver using General PHY framework.
-  ./drivers/phy/phy-spear13xx-pcie.c
+> +}
+> +
+>  static int dwc3_exynos_resume(struct device *dev)
+>  {
+>  	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> +	int ret;	
+> 
+> -	clk_enable(exynos->clk);
+> +	ret = __dwc3_exynos_resume(exynos);
+> +	if (ret)
+> +		return ret;
+> 
+>  	/* runtime set active to reflect active state. */
+>  	pm_runtime_disable(dev);
+> @@ -207,8 +238,24 @@ static int dwc3_exynos_resume(struct device *dev)
+>  	return 0;
+>  }
+> 
+> +static int dwc3_exynos_runtime_suspend(struct device *dev)
+> +{
+> +	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> +
+> +	return __dwc3_exynos_suspend(exynos);
+> +}
+> +
+> +static int dwc3_exynos_runtime_resume(struct device *dev)
+> +{
+> +	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> +
+> +	return __dwc3_exynos_resume(exynos);
+> +}
 
-2. Call General PHY APIs
-  ./drivers/pci/host/pcie-spear13xx.c
-  #include <linux/phy/phy.h>
-
-  pp->phy = devm_phy_get(pp->dev, ...);
-
-  phy_power_on(pp->phy);
-
-  phy_power_off(pp->phy);
-
-
-Best regards,
-Jingoo Han
+Thanks
