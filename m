@@ -1,70 +1,46 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Thu, 12 Dec 2013 23:56:55 -0800
-Subject: [PATCH v4 2/8] ARM: dts: Specify clocks for UARTs on bcm11351
-In-Reply-To: <1386271244-3927-3-git-send-email-tim.kryger@linaro.org>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-3-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYow0iZLugp21KEw5FtSSnXbzzu+KWt7G9QKMTPESG8JrA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Fri, 13 Dec 2013 08:57:23 +0100
+Subject: [PATCH 1/2] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <1386857210-4944-1-git-send-email-linus.walleij@linaro.org>
+References: <1386857210-4944-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201312130857.23890.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> The frequency property in "snps,dw-apb-uart" entries are no longer
-> required if the rate of the external clock can be determined using the
-> clk api (see e302cd9 serial: 8250_dw: add support for clk api).
->
-> This patch replaces the frequency property in the UART nodes of
-> bcm11351.dtsi with references to the relevant clocks following the
-> common clock binding.
->
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Am Donnerstag, 12. Dezember 2013, 15:06:50 schrieb Linus Walleij:
+> This isolates the custom S3C24xx GPIO definition table to
+> <linux/platform_data/gpio-samsung-s3x24xx.h> as this is
+> used in a few different places in the kernel, removing the
+> need to depend on the implicit inclusion of <mach/gpio.h>
+> from <linux/gpio.h> and thus getting rid of a few nasty
+> cross-dependencies.
+> 
+> We also delete the nifty CONFIG_S3C24XX_GPIO_EXTRA stuff.
+> The biggest this can ever be for the S3C24XX is
+> CONFIG_S3C24XX_GPIO_EXTRA = 128, and then for CPU_S3C2443 or
+> CPU_S3C2416 32*12 GPIOs are added, so 32*12+128 = 512
+> is the absolute roof value on this platform. So we set
+> the size of ARCH_NR_GPIO to this and the GPIOs array will
+> fit any S3C24XX platform, as per pattern from other archs.
+> 
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/boot/dts/bcm11351.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index eca6fbc..9b99c52 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -43,7 +43,7 @@
->                 compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
->                 status = "disabled";
->                 reg = <0x3e000000 0x1000>;
-> -               clock-frequency = <13000000>;
-> +               clocks = <&uartb_clk>;
->                 interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
->                 reg-shift = <2>;
->                 reg-io-width = <4>;
-> @@ -53,7 +53,7 @@
->                 compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
->                 status = "disabled";
->                 reg = <0x3e001000 0x1000>;
-> -               clock-frequency = <13000000>;
-> +               clocks = <&uartb2_clk>;
->                 interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
->                 reg-shift = <2>;
->                 reg-io-width = <4>;
-> @@ -63,7 +63,7 @@
->                 compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
->                 status = "disabled";
->                 reg = <0x3e002000 0x1000>;
-> -               clock-frequency = <13000000>;
-> +               clocks = <&uartb3_clk>;
->                 interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
->                 reg-shift = <2>;
->                 reg-io-width = <4>;
-> @@ -73,7 +73,7 @@
->                 compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
->                 status = "disabled";
->                 reg = <0x3e003000 0x1000>;
-> -               clock-frequency = <13000000>;
-> +               clocks = <&uartb4_clk>;
->                 interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
->                 reg-shift = <2>;
->                 reg-io-width = <4>;
-> --
-> 1.8.0.1
->
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+> ChangeLog v1->v2:
+> - Added an #ifdef ARCH_S3C24XX around the header inclusion
+>   in drivers/gpio/gpio-samsung.c as we would otherwise
+>   have colliding definitions when compiling S3C64XX.
+> - Rename inclusion guard in the header file.
+> 
+> If one of the maintainers give me an ACK for this I will
+> take it through the GPIO tree.
+> ---
+
+I'm not the maintainer of s3c24xx, but this looks nice ;-)
+
+Acked-by: Heiko Stuebner <heiko@sntech.de>
