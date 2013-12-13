@@ -1,94 +1,54 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 13 Dec 2013 13:56:40 +0100
-Subject: [PATCH 00/12] ARM: S3C24XX: convert s3c2410,
- s3c2440 s3c2442 to common clock framework
-Message-ID: <201312131356.40755.heiko@sntech.de>
+Date: Fri, 13 Dec 2013 13:57:19 +0100
+Subject: [PATCH 01/12] ARM: S3C24XX: cpufreq-utils: don't write raw values to
+ MPLLCON when using ccf
+In-Reply-To: <201312131356.40755.heiko@sntech.de>
+References: <201312131356.40755.heiko@sntech.de>
+Message-ID: <201312131357.19899.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series converts the earliest s3c socs to use a clock driver based on the
-common clock framework instead of the old Samsung clock implementation.
+The s3c24xx cpufreq driver needs to change the mpll speed and was doing
+this by writing raw values from a translation table into the MPLLCON
+register.
 
-The only obstacle I found was the configuration of the clkout outputs in
-the different machines. As I lack hardware test and knowledge on what is
-expected there, somebody with interest in these machines will have to
-step up to implement the clkout configuration
-This can for example be done in the machine_init function after
-the platform-devices (and thus the dclk-device) are populated.
+Change this to use a regular clk_set_rate call when using the common
+clock framework and only write the raw value in the samsung_clock case.
 
-This leaves the s3c2412 soc to be converted, as it has yet another different
-clock tree.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/cpufreq-utils.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Tested on an Openmoko Neo Freerunner (S3C2442), but of course more tests
-would be really helpful.
-
-Heiko Stuebner (12):
-  ARM: S3C24XX: cpufreq-utils: don't write raw values to MPLLCON when using ccf
-  dt-bindings: document s3c24xx controller for external clock output
-  clk: samsung: add clock driver for external clock outputs
-  ARM: S3C24XX: enable usage of common dclk if common clock framework is enabled
-  ARM: S3C24XX: only store clock registers when old clock code is active
-  clk: samsung: add plls used by the early s3c24xx cpus
-  dt-bindings: add documentation for s3c2410 clock controller
-  clk: samsung: add clock controller driver for s3c2410, s3c2440 and s3c2442
-  ARM: S3C24XX: add platform code for conversion to the common clock framework
-  ARM: S3C24XX: convert s3c2440 and s3c2442 to common clock framework
-  ARM: S3C24XX: convert s3c2410 to common clock framework
-  ARM: S3C24XX: remove legacy clock code
-
- .../bindings/clock/samsung,s3c2410-clock.txt       |   50 ++
- .../bindings/clock/samsung,s3c2410-dclk.txt        |   53 ++
- arch/arm/mach-s3c24xx/Kconfig                      |   50 +-
- arch/arm/mach-s3c24xx/Makefile                     |    6 +-
- arch/arm/mach-s3c24xx/clock-dclk.c                 |  195 --------
- arch/arm/mach-s3c24xx/clock-s3c2410.c              |  285 -----------
- arch/arm/mach-s3c24xx/clock-s3c2440.c              |  217 --------
- arch/arm/mach-s3c24xx/clock-s3c244x.c              |  141 ------
- arch/arm/mach-s3c24xx/common.c                     |   45 +-
- arch/arm/mach-s3c24xx/common.h                     |   11 +-
- arch/arm/mach-s3c24xx/cpufreq-utils.c              |   13 +
- arch/arm/mach-s3c24xx/include/mach/regs-clock.h    |   18 -
- arch/arm/mach-s3c24xx/include/mach/regs-gpio.h     |    3 -
- arch/arm/mach-s3c24xx/mach-amlm5900.c              |    9 +-
- arch/arm/mach-s3c24xx/mach-anubis.c                |   15 +-
- arch/arm/mach-s3c24xx/mach-at2440evb.c             |   10 +-
- arch/arm/mach-s3c24xx/mach-bast.c                  |   15 +-
- arch/arm/mach-s3c24xx/mach-gta02.c                 |    8 +-
- arch/arm/mach-s3c24xx/mach-h1940.c                 |   10 +-
- arch/arm/mach-s3c24xx/mach-mini2440.c              |   10 +-
- arch/arm/mach-s3c24xx/mach-n30.c                   |   12 +-
- arch/arm/mach-s3c24xx/mach-nexcoder.c              |   10 +-
- arch/arm/mach-s3c24xx/mach-osiris.c                |   15 +-
- arch/arm/mach-s3c24xx/mach-otom.c                  |   10 +-
- arch/arm/mach-s3c24xx/mach-qt2410.c                |    9 +-
- arch/arm/mach-s3c24xx/mach-rx1950.c                |   15 +-
- arch/arm/mach-s3c24xx/mach-rx3715.c                |   10 +-
- arch/arm/mach-s3c24xx/mach-smdk2410.c              |    9 +-
- arch/arm/mach-s3c24xx/mach-smdk2440.c              |   10 +-
- arch/arm/mach-s3c24xx/mach-tct_hammer.c            |    9 +-
- arch/arm/mach-s3c24xx/mach-vr1000.c                |   15 +-
- arch/arm/mach-s3c24xx/pm.c                         |   13 +-
- arch/arm/mach-s3c24xx/s3c2410.c                    |   56 ---
- arch/arm/mach-s3c24xx/s3c2442.c                    |  111 -----
- arch/arm/mach-s3c24xx/s3c244x.c                    |   59 +--
- drivers/clk/samsung/Makefile                       |    2 +
- drivers/clk/samsung/clk-pll.c                      |  182 +++++++
- drivers/clk/samsung/clk-pll.h                      |    3 +
- drivers/clk/samsung/clk-s3c2410-dclk.c             |  517 ++++++++++++++++++++
- drivers/clk/samsung/clk-s3c2410.c                  |  428 ++++++++++++++++
- include/dt-bindings/clock/samsung,s3c2410-clock.h  |   64 +++
- include/dt-bindings/clock/samsung,s3c2410-dclk.h   |   28 ++
- 42 files changed, 1575 insertions(+), 1176 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2410-clock.txt
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
- delete mode 100644 arch/arm/mach-s3c24xx/clock-dclk.c
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2410.c
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2440.c
- delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c244x.c
- create mode 100644 drivers/clk/samsung/clk-s3c2410-dclk.c
- create mode 100644 drivers/clk/samsung/clk-s3c2410.c
- create mode 100644 include/dt-bindings/clock/samsung,s3c2410-clock.h
- create mode 100644 include/dt-bindings/clock/samsung,s3c2410-dclk.h
-
+diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+index 2a0aa56..680a031 100644
+--- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
++++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+@@ -14,6 +14,7 @@
+ #include <linux/errno.h>
+ #include <linux/cpufreq.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ 
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
+@@ -60,5 +61,17 @@ void s3c2410_cpufreq_setrefresh(struct s3c_cpufreq_config *cfg)
+  */
+ void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
+ {
++#ifdef CONFIG_SAMSUNG_CLOCK
+ 	__raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
++#endif
++
++#ifdef CONFIG_COMMON_CLK
++	struct clk *mpll = clk_get(NULL, "mpll");
++	if (IS_ERR(mpll))
++		return;
++
++	clk_set_rate(mpll, cfg->pll.frequency);
++
++	clk_put(mpll);
++#endif
+ }
 -- 
 1.7.10.4
