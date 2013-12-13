@@ -1,56 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:00 +0900
-Subject: [PATCH 26/69] ARM: shmobile: kzm9g: tidyup DT node naming
+Date: Fri, 13 Dec 2013 11:31:16 +0900
+Subject: [PATCH 42/69] ARM: shmobile: sh73a0: fixup sdhi compatible name
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <26adf1a79e847ac147c1cc9f2c033ff5e4a73e22.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <e8a8b8a3cd6e09209a9c253a22673836ef794f58.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-According to ePAPR spec,
-this patch tidies up DT node name.
+sh73a0 != r8a7740
 
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 8ee06dd..df75aea 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -205,7 +205,7 @@
- 		renesas,function = "i2c3";
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index aef8a61..29d2ee6 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -203,7 +203,7 @@
  	};
  
--	mmcif_pins: mmcif {
-+	mmcif_pins: mmc {
- 		mux {
- 			renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
- 			renesas,function = "mmc0";
-@@ -217,17 +217,17 @@
- 		};
+ 	sdhi0: sd at ee100000 {
+-		compatible = "renesas,sdhi-r8a7740";
++		compatible = "renesas,sdhi-sh73a0";
+ 		reg = <0xee100000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH
+@@ -215,7 +215,7 @@
+ 
+ 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
+ 	sdhi1: sd@ee120000 {
+-		compatible = "renesas,sdhi-r8a7740";
++		compatible = "renesas,sdhi-sh73a0";
+ 		reg = <0xee120000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH
+@@ -226,7 +226,7 @@
  	};
  
--	scifa4_pins: scifa4 {
-+	scifa4_pins: serial4 {
- 		renesas,groups = "scifa4_data", "scifa4_ctrl";
- 		renesas,function = "scifa4";
- 	};
- 
--	sdhi0_pins: sdhi0 {
-+	sdhi0_pins: sd0 {
- 		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd", "sdhi0_wp";
- 		renesas,function = "sdhi0";
- 	};
- 
--	sdhi2_pins: sdhi2 {
-+	sdhi2_pins: sd2 {
- 		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
- 		renesas,function = "sdhi2";
- 	};
+ 	sdhi2: sd@ee140000 {
+-		compatible = "renesas,sdhi-r8a7740";
++		compatible = "renesas,sdhi-sh73a0";
+ 		reg = <0xee140000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH
 -- 
 1.8.4
