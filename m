@@ -1,87 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:37 +0900
-Subject: [PATCH 63/69] ARM: shmobile: armadillo: add FSI support for DTS
+Date: Fri, 13 Dec 2013 11:30:45 +0900
+Subject: [PATCH 11/69] ARM: shmobile: r8a7778: add MMCIF support on DTSI
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <6a3549d464bf8dc05ab87eab0f3ed2da0dbc5379.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <f7b901757918a99a52ef3ff281401ee1118fa7f6.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch support FSI-WM8978 with simple audio card
-
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../boot/dts/r8a7740-armadillo800eva-reference.dts | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/boot/dts/r8a7778.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 7b80f19..6d6fd3d 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -87,6 +87,24 @@
- 		pinctrl-0 = <&backlight_pins>;
- 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index a582211..0ff38e6 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -156,4 +156,12 @@
+ 		interrupts = <0 77 0x4>;
+ 		status = "disabled";
  	};
 +
-+	sound {
-+		compatible = "simple-audio-card";
-+
-+		simple-audio-card,format = "i2s";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sh_fsi2 0>;
-+			bitclock-inversion;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&wm8978>;
-+			bitclock-master;
-+			frame-master;
-+			system-clock-frequency = <12288000>;
-+		};
++	mmcif: mmcif at ffe4e000 {
++		compatible = "renesas,sh-mmcif";
++		reg = <0xffe4e000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 61 4>;
++		status = "disabled";
 +	};
  };
- 
- &i2c0 {
-@@ -100,6 +118,12 @@
- 		pinctrl-names = "default";
- 		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
- 	};
-+
-+	wm8978: wm8978 at 1a {
-+		#sound-dai-cells = <0>;
-+		compatible = "wlf,wm8978";
-+		reg = <0x1a>;
-+	};
- };
- 
- &pfc {
-@@ -130,6 +154,12 @@
- 		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
- 		renesas,function = "sdhi0";
- 	};
-+
-+	fsia_pins: sounda {
-+		renesas,groups = "fsia_sclk_in", "fsia_mclk_out",
-+				 "fsia_data_in_1", "fsia_data_out_0";
-+		renesas,function = "fsia";
-+	};
- };
- 
- &tpu {
-@@ -156,3 +186,10 @@
- 	cd-gpios = <&pfc 167 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-+
-+&sh_fsi2 {
-+	pinctrl-0 = <&fsia_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
 -- 
 1.8.4
