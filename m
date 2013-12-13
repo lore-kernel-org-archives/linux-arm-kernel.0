@@ -1,64 +1,76 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 13 Dec 2013 09:33:53 +0100
-Subject: arm-soc: Xilinx Zynq dt changes for v3.14
-Message-ID: <52AAC671.6000207@monstr.eu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Dec 2013 08:34:02 +0000
+Subject: [RFC PATCH] arm/arm64: KVM: allow the use of THP on 2MB aligned
+ memslots
+In-Reply-To: <20131213013621.GS2871@cbox>
+References: <1386859881-13482-1-git-send-email-marc.zyngier@arm.com>
+ <20131213013621.GS2871@cbox>
+Message-ID: <65d2a9ecb5ca1475c9ededfeb13d2961@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+On 2013-12-13 01:36, Christoffer Dall wrote:
+> On Thu, Dec 12, 2013 at 02:51:21PM +0000, Marc Zyngier wrote:
+>> The THP code in KVM/ARM is a bit restrictive in not allowing a THP
+>> to be used if the VMA is not 2MB aligned. Actually, it is not so 
+>> much
+>> the VMA that matters, but the associated memslot:
+>>
+>> A process can perfectly mmap a region with no particular alignment
+>> restriction, and then pass a 2MB aligned address to KVM. In this
+>> case, KVM will only use this 2MB aligned region, and will ignore
+>> the range between vma->vm_start and memslot->userspace_addr.
+>>
+>> The fix is then to check the alignment of memslot->userspace_addr.
+>
+> That's more correct, but I'm wondering if it's enough.
+>
+> What happens if the base_gfn is not aligned to a 2MB region, will we 
+> not
+> be mapping something completely bogus here?
 
-Please pull these dt changes to your tree.
+Indeed. So far, we haven't seen a stupid enough userspace, but I'm sure 
+it will happen.
+
+I'll update this patch to also check for the base IPA of the memslot.
 
 Thanks,
-Michal
 
-
-The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
-
-  Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.14
-
-for you to fetch changes up to 41e4cdb95efa7e8fc88c65cb3c7221e89b9efb49:
-
-  arm: dt: zynq: Add 'cpus' node (2013-12-12 09:50:23 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq dt patches for v3.14
-
-- Add gem support
-- Add cpus node
-- TTC cleanup
-
-----------------------------------------------------------------
-Soren Brinkmann (2):
-      arm: dt: zynq: Remove 'clock-ranges' from TTC nodes
-      arm: dt: zynq: Add 'cpus' node
-
-Steffen Trumtrar (1):
-      ARM: zynq: add gem support
-
- arch/arm/boot/dts/zynq-7000.dtsi | 39 +++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/zynq-zc702.dts |  5 +++++
- arch/arm/boot/dts/zynq-zc706.dts |  5 +++++
- arch/arm/boot/dts/zynq-zed.dts   |  5 +++++
- 4 files changed, 52 insertions(+), 2 deletions(-)
-
+         M.
+>
+>>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/mmu.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 5809069..cec641a 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -667,14 +667,14 @@ static int user_mem_abort(struct kvm_vcpu 
+>> *vcpu, phys_addr_t fault_ipa,
+>>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>>  	} else {
+>>  		/*
+>> -		 * Pages belonging to VMAs not aligned to the PMD mapping
+>> +		 * Pages belonging to memslots not aligned to the PMD mapping
+>>  		 * granularity cannot be mapped using block descriptors even
+>>  		 * if the pages belong to a THP for the process, because the
+>>  		 * stage-2 block descriptor will cover more than a single THP
+>>  		 * and we loose atomicity for unmapping, updates, and splits
+>>  		 * of the THP or other pages in the stage-2 block range.
+>>  		 */
+>> -		if (vma->vm_start & ~PMD_MASK)
+>> +		if (memslot->userspace_addr & ~PMD_MASK)
+>>  			force_pte = true;
+>>  	}
+>>  	up_read(&current->mm->mmap_sem);
+>> --
+>> 1.8.2.3
+>>
+>>
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/34badfe2/attachment.sig>
+Fast, cheap, reliable. Pick two.
