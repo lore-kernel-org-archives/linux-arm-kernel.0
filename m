@@ -1,34 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Dec 2013 12:14:36 +0100
-Subject: [PATCH] pinctrl: pinconf: remove warning: unused variable 'ops'
-Message-ID: <1386933276-7158-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 13 Dec 2013 16:52:53 +0530
+Subject: [PATCH] phy: Add exynos-phy driver
+In-Reply-To: <52A83B87.205@samsung.com>
+References: <1385558788-10880-1-git-send-email-t.stanislaws@samsung.com>
+ <52A8364B.5020204@ti.com> <52A83B87.205@samsung.com>
+Message-ID: <52AAEE0D.7010203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/pinctrl/pinconf.c | 2 --
- 1 file changed, 2 deletions(-)
+Hi,
 
-diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-index 4187fe58794d..8bfa0643e5dc 100644
---- a/drivers/pinctrl/pinconf.c
-+++ b/drivers/pinctrl/pinconf.c
-@@ -296,7 +296,6 @@ static void pinconf_dump_pin(struct pinctrl_dev *pctldev,
- static int pinconf_pins_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
--	const struct pinconf_ops *ops = pctldev->desc->confops;
- 	unsigned i, pin;
- 
- 	seq_puts(s, "Pin config settings per pin\n");
-@@ -343,7 +342,6 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
- 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
--	const struct pinconf_ops *ops = pctldev->desc->confops;
- 	unsigned ngroups = pctlops->get_groups_count(pctldev);
- 	unsigned selector = 0;
- 
--- 
-1.8.3.2
+On Wednesday 11 December 2013 03:46 PM, Sylwester Nawrocki wrote:
+> On 11/12/13 10:54, Kishon Vijay Abraham I wrote:
+>> On Wednesday 27 November 2013 06:56 PM, Tomasz Stanislawski wrote:
+>>>> Hello everyone,
+>>>> The Samsung SoCs from Exynos family are enhanced with a bunch of switches
+>>>> dedicated for IP blocks. Those switches are called PHYs in Exynos
+>>>> specification. They are usually controlled by a single bit in a single
+>>>> one-word-long register.
+>>
+>> So only enabling this switch is enough for the controller or some other actual
+>> PHY IP is needed along with this switch?
+>>
+>> However I'm not sure if the switch should be modelled as PHY as it is not a PHY
+>> in the real sense.
+> 
+> These are ordinary PHY devices embedded in an SoC. I wouldn't really call
+> them "switches", as they indeed provide the physical layer functionality 
+> for various interfaces, like USB, HDMI, MIPI CSI/DSI, etc. Their control 
+
+Are they used along with the phy IPs for which Kamil and others have sent
+patches or this is used in different SoCs from what Kamil uses?
+
+Thanks
+Kishon
+
+> interface is often very simple - usually only an enable and a reset 
+> control bit. But that can't change the fact they are real PHY devices,
+> so let's not call them switches, that's just untrue.
+> 
+> Regards,
+> Sylwester
+> 
