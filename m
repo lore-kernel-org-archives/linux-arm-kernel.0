@@ -1,37 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:44 +0900
-Subject: [PATCH 11/33] ARM: shmobile: r8a7779: add SDHI clock support for DT
+Date: Fri, 13 Dec 2013 11:29:48 +0900
+Subject: [PATCH 07/33] ARM: shmobile: r8a73a4: don't use named irq for
+ DMAEngine
 In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
 References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <ac0ddd9d0baa68e952428325d42cc50a80b18761.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <1a936a38561b6b12c5075f704d97688ae56ceb05.1386897180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
+sh-dma-engine driver doesn't care irq name.
+
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/setup-r8a73a4.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index badb8b7..5c83259 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -201,9 +201,13 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
- 	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
-+	CLKDEV_DEV_ID("ffe4c000.sdhi", &mstp_clks[MSTP323]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
-+	CLKDEV_DEV_ID("ffe4d000.sdhi", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
-+	CLKDEV_DEV_ID("ffe4e000.sdhi", &mstp_clks[MSTP321]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
-+	CLKDEV_DEV_ID("ffe4f000.sdhi", &mstp_clks[MSTP320]), /* SDHI3 */
- 	CLKDEV_DEV_ID("rcar-du-r8a7779", &mstp_clks[MSTP103]), /* DU */
- };
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index b0f2749..cc94b64 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -275,7 +275,7 @@ static const struct sh_dmae_pdata dma_pdata = {
  
+ static struct resource dma_resources[] = {
+ 	DEFINE_RES_MEM(0xe6700020, 0x89e0),
+-	DEFINE_RES_IRQ_NAMED(gic_spi(220), "error_irq"),
++	DEFINE_RES_IRQ(gic_spi(220)),
+ 	{
+ 		/* IRQ for channels 0-19 */
+ 		.start  = gic_spi(200),
 -- 
 1.8.4
