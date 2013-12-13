@@ -1,39 +1,63 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 12 Dec 2013 20:24:15 -0500
-Subject: [PATCH v3 13/23] mm/lib/swiotlb: Use memblock apis for early
- memory allocations
-In-Reply-To: <20131212170857.e36d016a95992c932da824b0@linux-foundation.org>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-14-git-send-email-santosh.shilimkar@ti.com>
- <20131212170857.e36d016a95992c932da824b0@linux-foundation.org>
-Message-ID: <52AA61BF.9080204@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Dec 2013 17:36:21 -0800
+Subject: [RFC PATCH] arm/arm64: KVM: allow the use of THP on 2MB aligned
+ memslots
+In-Reply-To: <1386859881-13482-1-git-send-email-marc.zyngier@arm.com>
+References: <1386859881-13482-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20131213013621.GS2871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013 08:08 PM, Andrew Morton wrote:
-> On Mon, 9 Dec 2013 16:50:46 -0500 Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+On Thu, Dec 12, 2013 at 02:51:21PM +0000, Marc Zyngier wrote:
+> The THP code in KVM/ARM is a bit restrictive in not allowing a THP
+> to be used if the VMA is not 2MB aligned. Actually, it is not so much
+> the VMA that matters, but the associated memslot:
 > 
->> Switch to memblock interfaces for early memory allocator instead of
->> bootmem allocator. No functional change in beahvior than what it is
->> in current code from bootmem users points of view.
->>
->> Archs already converted to NO_BOOTMEM now directly use memblock
->> interfaces instead of bootmem wrappers build on top of memblock. And the
->> archs which still uses bootmem, these new apis just fallback to exiting
->> bootmem APIs.
+> A process can perfectly mmap a region with no particular alignment
+> restriction, and then pass a 2MB aligned address to KVM. In this
+> case, KVM will only use this 2MB aligned region, and will ignore
+> the range between vma->vm_start and memslot->userspace_addr.
 > 
-> This one makes my x86_64 test box fail to boot.  There's no obvious
-> indication why and I don't have netconsole on this machine, sorry.  It
-> simply fails to mount the root fs.
-> 
-> config:
-> 
-Thanks for config and reporting the issue.
-Unfortunately I don't have ability to test x86 machine but will
-try to analyze it and find out whats could be going wrong.
+> The fix is then to check the alignment of memslot->userspace_addr.
 
-Failure around rootfs mount means it could be something to do
-with memory free related code from the patch.
+That's more correct, but I'm wondering if it's enough.
 
-Regards,
-Santosh
+What happens if the base_gfn is not aligned to a 2MB region, will we not
+be mapping something completely bogus here?
+
+
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/mmu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 5809069..cec641a 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -667,14 +667,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>  	} else {
+>  		/*
+> -		 * Pages belonging to VMAs not aligned to the PMD mapping
+> +		 * Pages belonging to memslots not aligned to the PMD mapping
+>  		 * granularity cannot be mapped using block descriptors even
+>  		 * if the pages belong to a THP for the process, because the
+>  		 * stage-2 block descriptor will cover more than a single THP
+>  		 * and we loose atomicity for unmapping, updates, and splits
+>  		 * of the THP or other pages in the stage-2 block range.
+>  		 */
+> -		if (vma->vm_start & ~PMD_MASK)
+> +		if (memslot->userspace_addr & ~PMD_MASK)
+>  			force_pte = true;
+>  	}
+>  	up_read(&current->mm->mmap_sem);
+> -- 
+> 1.8.2.3
+> 
+> 
+
+-- 
+Christoffer
