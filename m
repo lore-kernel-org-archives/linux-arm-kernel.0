@@ -1,29 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Dec 2013 10:45:34 +0000
-Subject: [PATCH 1/3] regulator: act8865: add PMIC(Power Management IC)
- driver
-In-Reply-To: <B256D81BAE5131468A838E5D7A24364172EDB624@penmbx01>
-References: <1386811131-2720-1-git-send-email-wenyou.yang@atmel.com>
- <1386811131-2720-2-git-send-email-wenyou.yang@atmel.com>
- <20131212165149.GO11044@sirena.org.uk>
- <B256D81BAE5131468A838E5D7A24364172EDB624@penmbx01>
-Message-ID: <20131213104534.GU11044@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 13 Dec 2013 10:47:28 +0000
+Subject: [PATCH 1/1] usb: musb: ux500_dma: fix potential NULL dereference error
+Message-ID: <1386931648-1540-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 07:10:36AM +0000, Yang, Wenyou wrote:
+static checker warning: "drivers/usb/musb/ux500_dma.c:335
+ux500_dma_controller_start()
+         error: potential NULL dereference 'param_array'."
 
-> > Please keep this and the Makefile sorted.
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/usb/musb/ux500_dma.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> Only this one confuses me,
-> How can I sort it? By i2c interface, by regulator type: voltage or current?
-> Where is act8865 should be?
-
-By name - look at the existing entries.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/8d26f41a/attachment.sig>
+diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
+index 3700e97..9aad00f 100644
+--- a/drivers/usb/musb/ux500_dma.c
++++ b/drivers/usb/musb/ux500_dma.c
+@@ -336,7 +336,9 @@ static int ux500_dma_controller_start(struct ux500_dma_controller *controller)
+ 							    data ?
+ 							    data->dma_filter :
+ 							    NULL,
+-							    param_array[ch_num]);
++							    param_array ?
++							    param_array[ch_num] :
++							    NULL);
+ 
+ 			if (!ux500_channel->dma_chan) {
+ 				ERR("Dma pipe allocation error dir=%d ch=%d\n",
+-- 
+1.8.3.2
