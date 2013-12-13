@@ -1,64 +1,77 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 13 Dec 2013 12:46:00 +0100
-Subject: [PATCH V1 01/11] ARM: dts: imx: sabrelite: add Dual Lite/Solo
- support
-In-Reply-To: <1386899355-17379-2-git-send-email-troy.kisky@boundarydevices.com>
-References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
- <1386899355-17379-2-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <201312131246.00944.marex@denx.de>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Fri, 13 Dec 2013 17:25:57 +0530
+Subject: [PATCH CFT] ARM:S3C64XX: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
+ by default
+Message-ID: <1386935757-24125-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 13, 2013 at 02:49:05 AM, Troy Kisky wrote:
-> This makes the structure of Sabre Lite board files the same
-> as Sabre SD board files so that they are easier to compare.
-> 
-> By this, I mean that the majority of the file imx6q-sabrelite.dts
-> is moved to imx6qdl-sabrelite.dtsi so that both imx6q-sabrelite.dts
-> and imx6dl-sabrelite.dts can include it.
-> 
-> Now Sabre Lite has support for Dual Lite/Solo
-> processors.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/imx6dl-sabrelite.dts             |  20 ++
->  arch/arm/boot/dts/imx6q-sabrelite.dts              | 214
-> +-------------------- ...{imx6q-sabrelite.dts => imx6qdl-sabrelite.dtsi} |
->  10 -
->  4 files changed, 22 insertions(+), 223 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6dl-sabrelite.dts
->  copy arch/arm/boot/dts/{imx6q-sabrelite.dts => imx6qdl-sabrelite.dtsi}
-> (96%)
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 342d16d..3c6f456 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -149,6 +149,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx6dl-gw53xx.dtb \
->  	imx6dl-gw54xx.dtb \
->  	imx6dl-sabreauto.dtb \
-> +	imx6dl-sabrelite.dtb \
->  	imx6dl-sabresd.dtb \
->  	imx6dl-wandboard.dtb \
->  	imx6q-arm2.dtb \
-> diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> b/arch/arm/boot/dts/imx6dl-sabrelite.dts new file mode 100644
-> index 0000000..2de0447
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> @@ -0,0 +1,20 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
+Configs ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR are enabled as default
+to S3C64XX platform
 
-Are you sure about this copyright message ? Isn't this copyright BD ?
+Introduction of PHYS_VIRT config as default would enable phy-to-virt and
+virt-to-phy translation function at boot and module loading time
+and enforce dynamic reallocation of memory. AUTO_ZRELADDR config would
+enable calculation of kernel load address at run time.
 
-Otherwise,
+PHYS_VIRT config is mutually exclusive to XIP_KERNEL, XIP_KERNEL is used in
+systems with NOR flash devices, and ZRELADDR config is mutually exclusive
+to ZBOOT_ROM.
 
-Reviewed-by: Marek Vasut <marex@denx.de>
+CFT::Call For Testing
 
-Best regards,
-Marek Vasut
+Requesting maintainers of S3C64XX  platforms to evaluate the changes on the
+board and comment, as I dont have the board for testing and also requesting
+an ACK the changes.
+
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: Mark Brown <broonie@linaro.org>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+
+---
+This is basically a Samsung SOC with ARM1176JZF-S instruction set, and has
+an operating frquency of 667MHz, it also has 64bit AXI bus. It supports
+WinCE, Linux, Android and Ubuntu.
+
+This platform has two variants of CPU, S3C6400 and S3C6410.
+
+This SOC is an Integrated system for Mobile Internet Device, Notebook,
+handheld/3G mobile devices.
+
+Supports various types of ROM for booting (NOR/NAND Flash, OneNand, SD-card
+and others).
+
+Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
+and ZRELADDR
+---------------------------------------------------
+
+https://lkml.org/lkml/2011/10/14/434
+
+-------------------------------------------------
+---
+ arch/arm/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7c6247b..ec1faea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -731,7 +731,9 @@ config ARCH_S3C64XX
+ 	bool "Samsung S3C64XX"
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARM_PATCH_PHYS_VIRT
+ 	select ARM_VIC
++	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_SAMSUNG_PWM
+ 	select COMMON_CLK
+-- 
+1.7.10.4
