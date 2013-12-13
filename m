@@ -1,67 +1,52 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Fri, 13 Dec 2013 16:57:07 +0800
-Subject: [PATCHv7 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM.
-In-Reply-To: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1386925027-16288-5-git-send-email-Li.Xiubo@freescale.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Fri, 13 Dec 2013 09:52:02 +0000
+Subject: [RFCv2 endianess 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131212124222.GK11524@ulmo.nvidia.com>
+References: <1386309134-1822-1-git-send-email-Li.Xiubo@freescale.com>
+ <1386309134-1822-2-git-send-email-Li.Xiubo@freescale.com>
+ <04e52411558f44d99a603c288e2dcc50@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131210101959.GE1809@e106331-lin.cambridge.arm.com>
+ <e806828e7d4f488c88d7bd05bdd007d2@BY2PR03MB505.namprd03.prod.outlook.com>
+ <d6985022e8aa4e21b618205ddf521d9f@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131212124222.GK11524@ulmo.nvidia.com>
+Message-ID: <51a162531bd447f7bf934018d0526fec@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the binding documentation for Freescale FlexTimer Module
-(FTM) PWM driver under Documentation/devicetree/bindings/pwm/.
+Hi Thierry,
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Kumar Gala <galak@codeaurora.org>
----
- .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> I think perhaps what Mark may have meant was something like this:
+> 
+> 	static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> 					const void __iomem *addr)
+> 	{
+> 		u32 value = readl(addr);
+> 
+> 		if (likely(fpc->big_endian))
+> 			value = be32_to_cpu(value);
+> 		else
+> 			value = le32_to_cpu(value);
+> 
+> 		return value;
+> 	}
+> 
+> 	static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc, u32 value,
+> 					  const void __iomem *addr)
+> 	{
+> 		if (likely(fpc->big_endian))
+> 			value = cpu_to_be32(value);
+> 		else
+> 			value = cpu_to_le32(value);
+> 
+> 		writel(value, addr);
+> 	}
+> 
+> That way you call the accessors only once, and do the conversion after
+> or before that.
+> 
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-new file mode 100644
-index 0000000..6ae6377
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-@@ -0,0 +1,38 @@
-+Freescale FlexTimer Module (FTM) PWM controller
-+
-+Required properties:
-+- compatible: Should be "fsl,vf610-ftm-pwm".
-+- reg: Physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clock-names : Should include the following module clock source entries:
-+    "ftm_sys" (module clock, also can be used as counter clock),
-+    "ftm_ext" (external counter clock),
-+    "ftm_fix" (fixed counter clock),
-+    "ftm_cnt_clk_en" (external and fixed counter clock enable/disable).
-+- clocks : Must contain a clock specifier for each entry in clock-names,
-+  See clock/clock-bindings.txt for details of the property values.
-+- pinctrl-names: Must contain a "default" entry.
-+- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-+  See pinctrl/pinctrl-bindings.txt for details of the property values.
-+- big-endian: If this property is absent, the little endian mode will be in
-+  use as default, or the big endian mode will be in use for all the device
-+  registers.
-+
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+		compatible = "fsl,vf610-ftm-pwm";
-+		reg = <0x40038000 0x1000>;
-+		#pwm-cells = <3>;
-+		clock-names = "ftm_sys", "ftm_ext",
-+				"ftm_fix", "ftm_cnt_clk_en";
-+		clocks = <&clks VF610_CLK_FTM0>,
-+			<&clks VF610_CLK_FTM0_EXT_SEL>,
-+			<&clks VF610_CLK_FTM0_FIX_SEL>,
-+			<&clks VF610_CLK_FTM0_EXT_FIX_EN>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pwm0_1>;
-+		big-endian;
-+};
--- 
-1.8.4
+Yes, this looks better.
+And I have already sent the v7 patches has addressed about this.
+
+--
+Xiubo
