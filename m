@@ -1,33 +1,40 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Fri, 13 Dec 2013 08:43:46 -0800
-Subject: [PATCH v2 2/4] rename ARCH_BCM to ARCH_BCM_MOBILE (clocksource)
-In-Reply-To: <52AAC9E1.6070405@linaro.org>
-References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
- <1379956836-5866-3-git-send-email-bcm@fixthebug.org>
- <52AAC9E1.6070405@linaro.org>
-Message-ID: <CAEPRUYpxrhsif-OWi+mcbwbp1V7=8H250Fvx5McbGqifRzh8rg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Dec 2013 16:45:18 +0000
+Subject: [PATCH 5/5] arm64: Add LOAD_OFFSET symbol for linker scripts
+In-Reply-To: <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
+Message-ID: <20131213164517.GM19177@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 12:48 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 09/23/2013 07:20 PM, Christian Daudt wrote:
->>
->> Currently ARCH_BCM has been used for Broadcom
->> Mobile V7 based SoCs. In order to allow other Broadcom
->> SoCs to also use mach-bcm directory and files, this patch
->> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
->> uses ARCH_BCM to define any Broadcom chip residing
->> in mach-bcm directory.
->>
->> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
->> Acked-by: Olof Johansson <olof@lixom.net>
->
->
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->
+On Thu, Dec 12, 2013 at 08:39:46PM +0000, Geoff Levand wrote:
+> Add a definition for the LOAD_OFFSET symbol used in the linker
+> scripts.  LOAD_OFFSET is used to generate the load address of
+> the section.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
 
-Thanks. I've applied it to armsoc/for-3.14/soc
+This isn't a standard SoB line. Please choose an email address and lose the
+non-standard suffix.
 
+> ---
+>  arch/arm64/include/asm/memory.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 3776217..1994c56 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -52,6 +52,8 @@
+>  #define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
+>  #define TASK_SIZE_64		(UL(1) << VA_BITS)
+>  
+> +#define LOAD_OFFSET		(PAGE_OFFSET)
 
- csd
+Can you be more specific about why we need this please? We don't seem to use
+this on ARM, and I can't really think of a sensible value to define it as,
+either. PAGE_OFFSET is a virtual address, which doesn't make much sense to
+me, but perhaps I'm missing something.
+
+Will
