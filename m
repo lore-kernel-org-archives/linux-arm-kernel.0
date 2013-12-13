@@ -1,70 +1,74 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 13 Dec 2013 14:41:50 +0800
-Subject: [PATCH v9 2/2] PWM: atmel-pwm: add device tree binding document
-In-Reply-To: <1386916910-24832-1-git-send-email-voice.shen@atmel.com>
-References: <1386916910-24832-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1386916910-24832-3-git-send-email-voice.shen@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Dec 2013 14:43:02 +0800
+Subject: [PATCH 1/2] ASoC: sgtl5000: read chip revision for once
+Message-ID: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add atmel pwm driver device tree binding document
+Store chip revision in struct sgtl5000_priv when sgtl5000_i2c_probe()
+reads it out from register, so that we can use it in
+sgtl5000_enable_regulators() with no need to read register again.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 ++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+ sound/soc/codecs/sgtl5000.c |   16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-new file mode 100644
-index 0000000..1c1a5fa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -0,0 +1,41 @@
-+Atmel PWM controller
-+
-+Required properties:
-+  - compatible: should be one of:
-+    - "atmel,at91sam9rl-pwm"
-+    - "atmel,sama5d3-pwm"
-+  - reg: physical base address and length of the controller's registers
-+  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-+    description of the cells format
-+
-+Example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-+
-+The following the pwm led based example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-+
-+	pwdleds {
-+		compatible = "pwm-leds";
-+
-+		d1 {
-+			label = "d1";
-+			pwms = <&pwm0 3 5000 0>
-+			max-brightness = <255>;
-+		};
-+
-+		d2 {
-+			label = "d2";
-+			pwms = <&pwm0 1 5000 1>
-+			max-brightness = <255>;
-+		};
-+	};
+diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+index 1f4093f..bd291d2 100644
+--- a/sound/soc/codecs/sgtl5000.c
++++ b/sound/soc/codecs/sgtl5000.c
+@@ -115,6 +115,7 @@ struct sgtl5000_priv {
+ 	struct ldo_regulator *ldo;
+ 	struct regmap *regmap;
+ 	struct clk *mclk;
++	int revision;
+ };
+ 
+ /*
+@@ -1300,9 +1301,7 @@ static int sgtl5000_replace_vddd_with_ldo(struct snd_soc_codec *codec)
+ 
+ static int sgtl5000_enable_regulators(struct snd_soc_codec *codec)
+ {
+-	int reg;
+ 	int ret;
+-	int rev;
+ 	int i;
+ 	int external_vddd = 0;
+ 	struct sgtl5000_priv *sgtl5000 = snd_soc_codec_get_drvdata(codec);
+@@ -1332,14 +1331,7 @@ static int sgtl5000_enable_regulators(struct snd_soc_codec *codec)
+ 	 * workaround for revision 0x11 and later,
+ 	 * roll back to use internal LDO
+ 	 */
+-
+-	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ID, &reg);
+-	if (ret)
+-		goto err_regulator_disable;
+-
+-	rev = (reg & SGTL5000_REVID_MASK) >> SGTL5000_REVID_SHIFT;
+-
+-	if (external_vddd && rev >= 0x11) {
++	if (external_vddd && sgtl5000->revision >= 0x11) {
+ 		/* disable all regulator first */
+ 		regulator_bulk_disable(ARRAY_SIZE(sgtl5000->supplies),
+ 					sgtl5000->supplies);
+@@ -1362,9 +1354,6 @@ static int sgtl5000_enable_regulators(struct snd_soc_codec *codec)
+ 
+ 	return 0;
+ 
+-err_regulator_disable:
+-	regulator_bulk_disable(ARRAY_SIZE(sgtl5000->supplies),
+-				sgtl5000->supplies);
+ err_regulator_free:
+ 	regulator_bulk_free(ARRAY_SIZE(sgtl5000->supplies),
+ 				sgtl5000->supplies);
+@@ -1566,6 +1555,7 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
+ 
+ 	rev = (reg & SGTL5000_REVID_MASK) >> SGTL5000_REVID_SHIFT;
+ 	dev_info(&client->dev, "sgtl5000 revision 0x%x\n", rev);
++	sgtl5000->revision = rev;
+ 
+ 	i2c_set_clientdata(client, sgtl5000);
+ 
 -- 
 1.7.9.5
