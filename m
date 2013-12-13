@@ -1,46 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Dec 2013 22:27:22 -0600
-Subject: [PATCH v6 07/15] usb: phy: add notify suspend and resume callback
-In-Reply-To: <1386897825-6130-8-git-send-email-peter.chen@freescale.com>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-8-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131213042722.GG867@saruman.home>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Fri, 13 Dec 2013 12:30:03 +0800
+Subject: [PATCH 09/12] pcie: SPEAr13xx: Add designware pcie support
+In-Reply-To: <201312120000.54545.arnd@arndb.de>
+References: <cover.1386752447.git.mohit.kumar@st.com>
+ <f5c9cbbd116d462c428afc2e8afefd95aad8c6ec.1386752447.git.mohit.kumar@st.com>
+ <201312120000.54545.arnd@arndb.de>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189F95F66A2@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 09:23:37AM +0800, Peter Chen wrote:
-> They are used to notify PHY that the controller enters suspend
-> or finishes resume.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  include/linux/usb/phy.h |   23 +++++++++++++++++++++++
->  1 files changed, 23 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-> index 6c0b1c5..a747960 100644
-> --- a/include/linux/usb/phy.h
-> +++ b/include/linux/usb/phy.h
-> @@ -116,6 +116,11 @@ struct usb_phy {
->  			enum usb_device_speed speed);
->  	int	(*notify_disconnect)(struct usb_phy *x,
->  			enum usb_device_speed speed);
-> +	int	(*notify_suspend)(struct usb_phy *x,
-> +			enum usb_device_speed speed);
-> +	int	(*notify_resume)(struct usb_phy *x,
-> +			enum usb_device_speed speed);
-> +
+Hello Arnd,
 
-I still don't think this is necessary. Why don't you just call
-usb_phy_set_suspend() directly ? And why do you need the extra speed
-argument ?
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, December 12, 2013 4:31 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Mohit KUMAR DCG; linux-pci at vger.kernel.org; Pratyush ANAND; Jingoo
+> Han; Viresh Kumar; spear-devel
+> Subject: Re: [PATCH 09/12] pcie: SPEAr13xx: Add designware pcie support
+> 
+> On Wednesday 11 December 2013, Mohit Kumar wrote:
+> > +#include <linux/clk.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/pci.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/resource.h>
+> > +#include <mach/spear.h>
+> 
+> This won't actually build: you cannot access mach/*.h header files from
+> outside of mach-spear!
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/f7b3cd3a/attachment.sig>
+- OK, will fix it.
+
+> 
+> > +struct spear13xx_pcie {
+> > +	void __iomem		*phy_base;
+> > +	void __iomem		*app_base;
+> > +	struct clk		*clk;
+> > +	struct pcie_port	pp;
+> > +	int			id;
+> > +	int			is_gen1;
+> > +};
+> 
+> The pcie driver shouldn't have direct access to the phy registers, use a phy
+> driver for that.
+
+- OK. In few workarounds we have to access controller as well as phy registers,
+How we should handle such cases if we separate out phy driver from here? Should it be
+through phy global functions called from pcie driver?
+
+Thanks
+Mohit
