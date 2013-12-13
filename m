@@ -1,62 +1,43 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Fri, 13 Dec 2013 18:42:55 +0530
-Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
-In-Reply-To: <20131213103632.GC19177@mudshark.cambridge.arm.com>
-References: <1386924222-23169-1-git-send-email-vkale@apm.com>
- <20131213103632.GC19177@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkfMW2zWiLWRvEkGcM2OdAXKHas7=sMRke=mp0oz2eETyg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 13 Dec 2013 14:15:07 +0100
+Subject: [PATCH] ARM: dts: imx53: add support for Ka-Ro TX53 modules
+In-Reply-To: <20131213141001.389a178e@ipc1.ka-ro>
+References: <1386852128-32220-1-git-send-email-LW@KARO-electronics.de>
+ <20131213081744.GR18380@S2101-09.ap.freescale.net>
+ <20131213105417.71a42133@ipc1.ka-ro>
+ <20131213121646.GU18380@S2101-09.ap.freescale.net>
+ <20131213134240.595d27ae@ipc1.ka-ro>
+ <20131213125719.GM24559@pengutronix.de>
+ <20131213141001.389a178e@ipc1.ka-ro>
+Message-ID: <20131213131507.GN24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 4:06 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Dec 13, 2013 at 08:43:42AM +0000, Vinayak Kale wrote:
->> Print the cpu frequency field in /proc/cpuinfo.
->
-> Why? ["x86 does this" isn't a valid answer :)].
+On Fri, Dec 13, 2013 at 02:10:01PM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Sascha Hauer wrote:
+> > 
+> > Actually the i.MX supports inversion in hardware. It's bit 18 in the
+> > PWMCR register.
+> > 
+> I totally missed this up to now. :(
+> Is it true for all i.MX SoCs? Or do we need to distinguish between SoCs
+> that can do the inversion and those that cannot?
 
-Well, that's actually the main motive :-)
+It should work for >= i.MX27.
 
-Secondly, earlier in amr64 port, /proc/cpuinfo used to print BogoMIPS.
-So people used to get mislead with the values. Although in current
-tree, we don't have that print. So that's not much of a concern now.
-(You had removed it I guess for the same reason :))
+> 
+> I could provide a patch to utilize this feature, but probably not
+> before the new year. There is something called 'vacation' in the way. ;)
 
->
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> ---
->>  arch/arm64/kernel/setup.c |   15 +++++++++++++++
->>  1 files changed, 15 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index bd9bbd0..bca982b 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -41,6 +41,7 @@
->>  #include <linux/memblock.h>
->>  #include <linux/of_fdt.h>
->>  #include <linux/of_platform.h>
->> +#include <linux/cpufreq.h>
->>
->>  #include <asm/cputype.h>
->>  #include <asm/elf.h>
->> @@ -278,9 +279,19 @@ static const char *hwcap_str[] = {
->>       NULL
->>  };
->>
->> +static unsigned int get_cpufreq_khz(unsigned int cpu)
->> +{
->> +#ifdef CONFIG_CPU_FREQ
->> +     return cpufreq_quick_get(cpu);
->> +#else
->> +     return 0;
->> +#endif
->> +}
->
-> That's going to be hilarious fun when cpufreq isn't compiled in.
+What's the problem? That's the time your boss can't tell you to do
+soemthing else ;)
 
-In that case, we are not printing the value since above function will return 0.
+Sascha
 
-> Just use the existing sysfs interfaces exposed by the cpufreq governers if
-> you need to know this stuff.
->
-> Will
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
