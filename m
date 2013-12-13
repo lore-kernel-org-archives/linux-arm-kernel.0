@@ -1,40 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Dec 2013 16:49:58 +0000
-Subject: [PATCH 4/5] arm64: Add missing AT() macros to vmlinux.lds.S
-In-Reply-To: <51cf7ba0aab8ae3677673cab65ec560d78a645ce.1386879684.git.geoff@infradead.org>
-References: <cover.1386879684.git.geoff@infradead.org>
- <51cf7ba0aab8ae3677673cab65ec560d78a645ce.1386879684.git.geoff@infradead.org>
-Message-ID: <20131213164958.GO19177@mudshark.cambridge.arm.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 13 Dec 2013 11:51:15 -0500
+Subject: [PATCH v6 1/9] phy: add phy_get_bus_width()/phy_set_bus_width() calls
+In-Reply-To: <1386953483-21631-1-git-send-email-mporter@linaro.org>
+References: <1386953483-21631-1-git-send-email-mporter@linaro.org>
+Message-ID: <1386953483-21631-2-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 08:39:46PM +0000, Geoff Levand wrote:
-> Add missing AT() macros to vmlinux.lds to generate the sections
-> properly.  Some elf file tools expect correct paddr values in
-> vmlinux.
-> 
-> Fixes bad paddr values written to vmlinux like these:
-> 
->   Program Header:
->     LOAD off 0x0000000000010000 vaddr 0xffffffc000080000 paddr 0xffffffc000080000 align 2**16
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
-> ---
->  arch/arm64/kernel/vmlinux.lds.S | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 6563b64..065fe40d 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -48,11 +48,11 @@ SECTIONS
->  
->  	. = PAGE_OFFSET + TEXT_OFFSET;
->  
-> -	.head.text : {
-> +	.head.text : AT(ADDR(.head.text) - LOAD_OFFSET) {
+This adds a pair of APIs that allows the generic PHY subsystem to
+provide information on the PHY bus width. The PHY provider driver may
+use phy_set_bus_width() to set the bus width that the PHY supports.
+The controller driver may then use phy_get_bus_width() to fetch the
+PHY bus width in order to properly configure the controller.
 
-Since LOAD_OFFSET is PAGE_OFFSET, does this assume that physical memory
-starts at 0x0?
+Signed-off-by: Matt Porter <mporter@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ include/linux/phy/phy.h | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Will
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 6d72269..e273e5a 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -38,6 +38,14 @@ struct phy_ops {
+ };
+ 
+ /**
++ * struct phy_attrs - represents phy attributes
++ * @bus_width: Data path width implemented by PHY
++ */
++struct phy_attrs {
++	u32			bus_width;
++};
++
++/**
+  * struct phy - represents the phy device
+  * @dev: phy device
+  * @id: id of the phy device
+@@ -46,6 +54,7 @@ struct phy_ops {
+  * @mutex: mutex to protect phy_ops
+  * @init_count: used to protect when the PHY is used by multiple consumers
+  * @power_count: used to protect when the PHY is used by multiple consumers
++ * @phy_attrs: used to specify PHY specific attributes
+  */
+ struct phy {
+ 	struct device		dev;
+@@ -55,6 +64,7 @@ struct phy {
+ 	struct mutex		mutex;
+ 	int			init_count;
+ 	int			power_count;
++	struct phy_attrs	attrs;
+ };
+ 
+ /**
+@@ -127,6 +137,14 @@ int phy_init(struct phy *phy);
+ int phy_exit(struct phy *phy);
+ int phy_power_on(struct phy *phy);
+ int phy_power_off(struct phy *phy);
++static inline int phy_get_bus_width(struct phy *phy)
++{
++	return phy->attrs.bus_width;
++}
++static inline void phy_set_bus_width(struct phy *phy, int bus_width)
++{
++	phy->attrs.bus_width = bus_width;
++}
+ struct phy *phy_get(struct device *dev, const char *string);
+ struct phy *devm_phy_get(struct device *dev, const char *string);
+ void phy_put(struct phy *phy);
+@@ -199,6 +217,16 @@ static inline int phy_power_off(struct phy *phy)
+ 	return -ENOSYS;
+ }
+ 
++static inline int phy_get_bus_width(struct phy *phy)
++{
++	return -ENOSYS;
++}
++
++static inline void phy_set_bus_width(struct phy *phy, int bus_width)
++{
++	return;
++}
++
+ static inline struct phy *phy_get(struct device *dev, const char *string)
+ {
+ 	return ERR_PTR(-ENOSYS);
+-- 
+1.8.4
