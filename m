@@ -1,29 +1,75 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 12 Dec 2013 17:51:58 -0800
-Subject: [PATCH 22/41] clk: ux500: Copy u8500_clk_init() ready for DT
- enablement
-In-Reply-To: <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
-References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
- <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
-Message-ID: <20131213015158.11981.27135@quantum>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 12 Dec 2013 18:14:02 -0800
+Subject: [PATCHv7 04/12] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <20131212113920.70E8BC40637@trevor.secretlab.ca>
+References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
+ <1386835033-4701-5-git-send-email-hdoyu@nvidia.com>
+ <20131212113920.70E8BC40637@trevor.secretlab.ca>
+Message-ID: <20131213021402.GB14192@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2013-09-20 13:59:46)
-> On Wed, Sep 18, 2013 at 2:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Dec 12, 2013 at 11:39:20AM +0000, Grant Likely wrote:
+> On Thu, 12 Dec 2013 09:57:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> > IOMMU devices on the bus need to be poplulated first, then iommu
+> > master devices are done later.
+> > 
+> > With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
+> > whether a device can be an iommu msater or not. If a device can, we'll
+> > defer to populate that device till an iommu device is populated. Then,
+> > those deferred iommu master devices are populated and configured with
+> > help of the already populated iommu device.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > ---
+> > This is related to the following discussion:
+> >   [RFC PATCH] Documentation: devicetree: add description for generic bus properties
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215042.html
+> > 
+> > v6:
+> > Spinned off only driver core part from:
+> >   [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+> > 
+> > v5:
+> > Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
+> > 
+> > v4:
+> > This is newly added, and the successor of the following RFC:
+> >   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
+> >   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  drivers/base/dd.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> > index 0605176..0605f52 100644
+> > --- a/drivers/base/dd.c
+> > +++ b/drivers/base/dd.c
+> > @@ -25,6 +25,7 @@
+> >  #include <linux/async.h>
+> >  #include <linux/pm_runtime.h>
+> >  #include <linux/pinctrl/devinfo.h>
+> > +#include <linux/of_iommu.h>
+> >  
+> >  #include "base.h"
+> >  #include "power/power.h"
+> > @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+> >  
+> >  	dev->driver = drv;
+> >  
+> > +	ret = of_iommu_attach(dev);
+> > +	if (ret)
+> > +		goto probe_failed;
+> > +
 > 
-> > Here we're using the old clock initialisation function as a template.
-> > It's necessary to remove all of the clk_register_clkdev() calls as
-> > they don't make sense when booting with Device Tree.
-> >
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> I *really* like the looks of this! Mike can we have your ACK on this?
+> As discussed before, I really don't think hooking in to dd.c is the
+> right thing to do here, and certainly not as a device tree specific
+> function. ACPI or PCI described devices may have the same constraints
+> and those won't have DT descriptions.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+I agree, this shouldn't be in the driver core.
 
-> 
-> Yours,
-> Linus Walleij
+greg k-h
