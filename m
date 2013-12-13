@@ -1,45 +1,36 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Fri, 13 Dec 2013 16:04:38 +0000
-Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
-In-Reply-To: <52AA54E4.5000606@ti.com>
-References: <20131212214306.GS1939@saruman.home>
- <1386884755-12366-1-git-send-email-balbi@ti.com> <52AA54E4.5000606@ti.com>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C786@DFLE11.ent.ti.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 13 Dec 2013 11:11:40 -0500
+Subject: [PATCH v6 7/7] jump_label: use defined macros instead of
+ hard-coding for better readability
+In-Reply-To: <20131213160041.GK19177@mudshark.cambridge.arm.com>
+References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
+ <1386691433-6827-8-git-send-email-liuj97@gmail.com>
+ <20131213160041.GK19177@mudshark.cambridge.arm.com>
+Message-ID: <20131213111140.064b9616@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
 
-> -----Original Message-----
-> From: Shilimkar, Santosh
-> Sent: Thursday, December 12, 2013 7:29 PM
-> To: Balbi, Felipe
-> Cc: Linux USB Mailing List; kgene.kim at samsung.com; Linux ARM Kernel
-> Mailing List; linux-samsung-soc at vger.kernel.org; Linux OMAP Mailing List;
-> Kwok, WingMan
-> Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
-> 
-> On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
-> > A bare-minimum PM implementation which will server as building block
-> > for more complex
-> s/server/serve ;-)
-> > PM implementation in the future.
-> >
-> > At the least will not leave clocks on unnecessarily when e.g.  a user
-> > write mem to /sys/power/state.
-> >
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+[ added Jason Baron too (the original author) ]
+
+On Fri, 13 Dec 2013 16:00:41 +0000
+Will Deacon <will.deacon@arm.com> wrote:
+
+> On Tue, Dec 10, 2013 at 04:03:53PM +0000, Jiang Liu wrote:
+> > Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
+> > readability.
+> > 
+> > Signed-off-by: Jiang Liu <liuj97@gmail.com>
 > > ---
-> >
-> > improve error path a little bit.
-> >
-> We will test this out. Thanks for the
-> patch Felipe.
+> >  include/linux/jump_label.h | 15 ++++++++++-----
+> >  1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> Whilst this looks alright to me, I think we probably need an ack from Steve
+> in order to take changes to the core code.
+> 
+> Will
 > 
 
-I have tested the patch and the keystone usb driver continues to function,
-though I can't test suspend at this time as the rest of the system does
-not that functionality yet.
+Thanks for the heads up. I'll take a look at it.
 
-Thanks
-WingMan
+-- Steve
