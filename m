@@ -1,50 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:46 +0900
-Subject: [PATCH 13/33] ARM: shmobile: r8a7790: add QSPI support
-In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
-References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <3dd3b1cf068a64a71f1b40319ca33fcb50842bc0.1386897180.git.horms+renesas@verge.net.au>
+Date: Fri, 13 Dec 2013 11:31:36 +0900
+Subject: [PATCH 62/69] ARM: shmobile: r8a7740: add FSI support via DTSI
+In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
+References: <cover.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <efcd869b7c5ef0cff5887842afe2c184e509807a.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hiep Cao Minh <cm-hiep@jinso.co.jp>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Adds support for QSPI on the r8a7790.
-
-Signed-off-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 161d44e..5269640 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -183,6 +183,7 @@ static struct clk div6_clks[DIV6_NR] = {
- /* MSTP */
- enum {
- 	MSTP931, MSTP930, MSTP929, MSTP928,
-+	MSTP917,
- 	MSTP813,
- 	MSTP726, MSTP725, MSTP724, MSTP723, MSTP722, MSTP721, MSTP720,
- 	MSTP717, MSTP716,
-@@ -199,6 +200,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP930] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 30, 0), /* I2C1 */
- 	[MSTP929] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 29, 0), /* I2C2 */
- 	[MSTP928] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 28, 0), /* I2C3 */
-+	[MSTP917] = SH_CLK_MSTP32(&qspi_clk, SMSTPCR9, 17, 0), /* QSPI */
- 	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
- 	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
- 	[MSTP725] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 25, 0), /* LVDS1 */
-@@ -298,6 +300,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("ee220000.mmcif", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
-+	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP704]),
- 	CLKDEV_ICK_ID("usbhs", "usb_phy_rcar_gen2", &mstp_clks[MSTP704]),
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index b1c2ed9..52255bf 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -208,4 +208,13 @@
+ 		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
++
++	sh_fsi2: sound at fe1f0000 {
++		#sound-dai-cells = <1>;
++		compatible = "renesas,sh_fsi2";
++		reg = <0xfe1f0000 0x400>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 9 0x4>;
++		status = "disabled";
++	};
  };
 -- 
 1.8.4
