@@ -1,30 +1,62 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 13 Dec 2013 21:15:52 +0100
-Subject: [PATCH] ARM: s3c64xx: Do not select both CPU_V6 and CPU_V6K at the
- same time
-Message-ID: <1386965752-15954-1-git-send-email-tomasz.figa@gmail.com>
+From: w-kwok2@ti.com (Kwok, WingMan)
+Date: Fri, 13 Dec 2013 20:18:42 +0000
+Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+In-Reply-To: <20131213195431.GF5292@saruman.home>
+References: <20131212214306.GS1939@saruman.home>
+ <1386884755-12366-1-git-send-email-balbi@ti.com> <52AA54E4.5000606@ti.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E0415C786@DFLE11.ent.ti.com>
+ <20131213195431.GF5292@saruman.home>
+Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C84D@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use V6K extensions, these symbols must not be selected at the same
-time, so this patch keeps only CPU_V6K selected for S3C64XX.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+> -----Original Message-----
+> From: Balbi, Felipe
+> Sent: Friday, December 13, 2013 2:55 PM
+> To: Kwok, WingMan
+> Cc: Shilimkar, Santosh; Balbi, Felipe; Linux USB Mailing List;
+> kgene.kim at samsung.com; Linux ARM Kernel Mailing List; linux-samsung-
+> soc at vger.kernel.org; Linux OMAP Mailing List
+> Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+> 
+> On Fri, Dec 13, 2013 at 10:04:38AM -0600, Kwok, WingMan wrote:
+> > Hello
+> >
+> > > -----Original Message-----
+> > > From: Shilimkar, Santosh
+> > > Sent: Thursday, December 12, 2013 7:29 PM
+> > > To: Balbi, Felipe
+> > > Cc: Linux USB Mailing List; kgene.kim at samsung.com; Linux ARM Kernel
+> > > Mailing List; linux-samsung-soc at vger.kernel.org; Linux OMAP Mailing
+> > > List; Kwok, WingMan
+> > > Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM
+> > > support
+> > >
+> > > On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
+> > > > A bare-minimum PM implementation which will server as building
+> > > > block for more complex
+> > > s/server/serve ;-)
+> > > > PM implementation in the future.
+> > > >
+> > > > At the least will not leave clocks on unnecessarily when e.g.  a
+> > > > user write mem to /sys/power/state.
+> > > >
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > ---
+> > > >
+> > > > improve error path a little bit.
+> > > >
+> > > We will test this out. Thanks for the patch Felipe.
+> > >
+> >
+> > I have tested the patch and the keystone usb driver continues to
+> > function, though I can't test suspend at this time as the rest of the
+> > system does not that functionality yet.
+> 
+> Thanks, should I add your Tested-by ?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b64a8ef..4df191b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -731,7 +731,6 @@ config ARCH_S3C64XX
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
- 	select COMMON_CLK
--	select CPU_V6
- 	select CPU_V6K
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_SAMSUNG
--- 
-1.8.5.1
+Yes please.
+
+Thanks
+WingMan
