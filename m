@@ -1,68 +1,64 @@
-From: angus.clark@st.com (Angus Clark)
-Date: Fri, 13 Dec 2013 15:06:53 +0000
-Subject: [PATCH v3 08/36] mtd: devices: Provide header for shared OPCODEs
- and SFDP commands
-In-Reply-To: <20131210214849.GE27149@ld-irv-0074.broadcom.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-9-git-send-email-lee.jones@linaro.org>
- <20131210214849.GE27149@ld-irv-0074.broadcom.com>
-Message-ID: <52AB228D.5030003@st.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Dec 2013 09:13:47 -0600
+Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
+In-Reply-To: <20131213142407.GI4360@n2100.arm.linux.org.uk>
+References: <1386924222-23169-1-git-send-email-vkale@apm.com>
+ <20131213103632.GC19177@mudshark.cambridge.arm.com>
+ <CAL_Jsq+Z9K4sus6xwN9KYyCUVWy7NFBQCGYvz0wrt=J7h+G35Q@mail.gmail.com>
+ <20131213142407.GI4360@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqLPnm4j8zAWehw=8o3r8CUKs=eiGEYYDR=dVdR87-arcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 09:48 PM, Brian Norris wrote:
-> On Fri, Nov 29, 2013 at 12:18:57PM +0000, Lee Jones wrote:
->> JEDEC have helped to standardise a great deal of the commands which
->> can be issued to a Serial Flash devices. Many of the OPCODEs and all
->> of the Serial Flash Discoverable Parameters (SFDP) commands are
->> generic across devices. This patch provides a shared point where
->> these commands can be defined.
+On Fri, Dec 13, 2013 at 8:24 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Dec 13, 2013 at 08:16:16AM -0600, Rob Herring wrote:
+>> On Fri, Dec 13, 2013 at 4:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Fri, Dec 13, 2013 at 08:43:42AM +0000, Vinayak Kale wrote:
+>> >> Print the cpu frequency field in /proc/cpuinfo.
+>> >
+>> > Why? ["x86 does this" isn't a valid answer :)].
+>>
+>> People want to know this stuff.
+>
+> People want to know this stuff so they can do stupid things in userspace,
+> like make the assumption that if it gets reported that the CPU is running
+> at N MHz, then that means to delay M us, they need Z instructions in a
+> loop.
+>
+> We've also had people want the cache information in userspace, so that
+> they can use that to make a decision on whether function X would be
+> faster than Y, rather than measuring each implementation and basing it
+> off measurement - we've shown in the past that the cache information
+> doesn't let you make that kind of decision, because the result is
+> affected not only by the cache but many other parameters as well (such
+> as the implementation of the CPU itself.)
+>
+> I've been dead against exporting cache information from the kernel into
+> userspace: it's not something that userspace should ever concern itself
+> with, and it's not something that userspace should ever use to make
+> decisions about what code should be run.
+>
+> So, "people want to know this stuff" is a poor reason.  A good reason is
+> "If I have access to X, then it allows me to do Y, and this is the right
+> way to allow me to do Y".  So far, I haven't seen any evidence that the
+> export of cache information gives the right solution to any userspace
+> problem.  Hence, my position is still the same as above, and this
+> information should *never* be exported to userspace.
 
-This comment isn't entirely correct.  The SFDP standard (JESD216A) does not go
-as far as standardising the OPCODES, but merely a way of determining at runtime
-which operations are supported (e.g. READ_1_1_4, READ_1_4_4), and the associated
-opcodes; vendors are still free to use a different opcode for a particular
-operation.
+I agree using it for functional purposes in this way is stupid. It is
+more for informational purposes than functional reasons. The use case
+I hear is server OEMs want to run some tool(s) to dump out system
+information for support requests. You can argue all day long that
+there are other ways to do something, but they already have the
+infrastructure in place on x86. For example, they may want to know if
+the user changed the CPU or DIMMs. Frequency and cache sizes may be
+part of the SKU. One way or another, this information is going to get
+to userspace. The real question is should the kernel provide a
+standard cross-arch interface to various fields or just pass this
+information thru to userspace via DMI tables, /proc/device-tree, ACPI,
+etc. I'd rather see this presented in a standard way so userspace does
+not have to change depending on whether the data comes from DT, DMI,
+ACPI or somewhere else.
 
->> +/* JEDEC Standard - Serial Flash Discoverable Parmeters (SFDP) Commands */
->> +#define FLASH_CMD_READ		0x03	/* READ */
->> +#define FLASH_CMD_READ_FAST	0x0b	/* FAST READ */
->> +#define FLASH_CMD_READ_1_1_2	0x3b	/* DUAL OUTPUT READ */
->> +#define FLASH_CMD_READ_1_2_2	0xbb	/* DUAL I/O READ */
->> +#define FLASH_CMD_READ_1_1_4	0x6b	/* QUAD OUTPUT READ */
->> +#define FLASH_CMD_READ_1_4_4	0xeb	/* QUAD I/O READ */
-> 
-> All of these {1,2,4}_{1,2,4}_{1,2,4} suffixes are a little cryptic; I
-> ended up referring to the SFDP spec to figure out what the first number
-> meant. Can you document them briefly at the top of this SFDP list?
-
-I think the {x,y,z} descriptions offer the simplest way of representing the
-myriad of operations supported by various devices -- it was one thing SFDP did
-get right.  However, I agree, the nomenclature  does need explained.  We also
-need a way of representing 32-bit address commands, and SDR vs DDR commands --
-this has not yet been addresses by SFDP.
-
-> Since you list these, does SFDP even describe the 32-bit addressing
-> commands? 
-
-Not yet, but I believe "JESD216B" will include a parameter table related to
-32-bit address instructions.
-
-> It seems like it assumes the device is switched (statefully)
-> between 24-bit and 32-bit address modes (or kept permanently in one or
-> the other).
-
-And the complexity increases!  The st_spi_fsm H/W also supports a memory-mapped
-mode for booting.  However, the boot controller is hard-coded to issue 24-bit
-address cycles.  If the Serial Flash device includes a dedicated REST pin, and
-this is appropriately routed to the system reset, then we have no issue -- the
-device will reset to its power-on state following a warm reset.  If a reset pin
-is not available, then certain precautions can be followed to minimise problems
-with warm resets.   If the Serial Flash device supports a 32-bit instruction
-set, then this should be used in preference, and we can avoid any statefull
-transitions.  Failing that, we can minimise the window in which a reset would
-fail by issuing EN4B/EX4B before/after each operation.  Of course, if we know
-the system is not subject to these constraints, then we just need to issue EN4B
-at the start, and stay in 4B mode.
-
-All this knowledge needs to be in the spi-nor layer...
+Rob
