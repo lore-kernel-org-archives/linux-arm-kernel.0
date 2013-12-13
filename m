@@ -1,26 +1,29 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 09:14:56 +0900
-Subject: [PATCH 00/10] sh-pfc: Fix GPIO to IRQ mapping
-In-Reply-To: <CACRpkdZnqzAWdnmjo6cNakwOZcLjZ2Mt_LtM1Vf-L9=b_0_p4g@mail.gmail.com>
-References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131212131139.GE30624@verge.net.au>
- <CACRpkdZnqzAWdnmjo6cNakwOZcLjZ2Mt_LtM1Vf-L9=b_0_p4g@mail.gmail.com>
-Message-ID: <20131213001456.GB32101@verge.net.au>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 12 Dec 2013 19:29:24 -0500
+Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+In-Reply-To: <1386884755-12366-1-git-send-email-balbi@ti.com>
+References: <20131212214306.GS1939@saruman.home>
+ <1386884755-12366-1-git-send-email-balbi@ti.com>
+Message-ID: <52AA54E4.5000606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 10:05:55PM +0100, Linus Walleij wrote:
-> On Thu, Dec 12, 2013 at 2:11 PM, Simon Horman <horms@verge.net.au> wrote:
+On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
+> A bare-minimum PM implementation which will
+> server as building block for more complex
+s/server/serve ;-)
+> PM implementation in the future.
 > 
-> > It seems to me that if Linus applies the pfc changes the
-> > shmobile changes could be applied independently. Am I missing
-> > and do the shmobile patches have build-dependencies on the pfc patches?
+> At the least will not leave clocks on unnecessarily
+> when e.g.  a user write mem to /sys/power/state.
 > 
-> I've applied the PFC changes to the pin control tree and will push
-> to kernelorg shortly, then allow it to stablilze before you attempt to
-> pull that into the SH mobile tree please, and notify me before
-> doing so and make sure to just pick the top commit you need.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+> 
+> improve error path a little bit.
+> 
+We will test this out. Thanks for the
+patch Felipe.
 
-Thanks, I understand.
-
-I'll re-visit this next week.
+Regards,
+Santosh
