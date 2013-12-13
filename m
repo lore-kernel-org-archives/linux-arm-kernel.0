@@ -1,71 +1,55 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Fri, 13 Dec 2013 12:18:35 +0800
-Subject: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to header file
-In-Reply-To: <201312112348.06755.arnd@arndb.de>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <9ae7b152da13c094b024c54d27187aab96e439b3.1386752447.git.mohit.kumar@st.com>
- <201312112348.06755.arnd@arndb.de>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189F95F669D@EAPEX1MAIL1.st.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Dec 2013 22:19:19 -0600
+Subject: [PATCH v6 02/15] usb: phy-mxs: Add platform judgement code
+In-Reply-To: <1386897825-6130-3-git-send-email-peter.chen@freescale.com>
+References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
+ <1386897825-6130-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131213041918.GC867@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Fri, Dec 13, 2013 at 09:23:32AM +0800, Peter Chen wrote:
+> The mxs-phy has several bugs and features at different
+> versions, the driver code can get it through of_device_id.data.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
+>  1 files changed, 49 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 545844b..6d49040 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+>   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+>   * on behalf of DENX Software Engineering GmbH
+>   *
+> @@ -20,6 +20,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/of_device.h>
+>  
+>  #define DRIVER_NAME "mxs_phy"
+>  
+> @@ -34,13 +35,55 @@
+>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+>  
+> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, December 12, 2013 4:18 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Mohit KUMAR DCG; linux-pci at vger.kernel.org; Pratyush ANAND; spear-
-> devel; Viresh Kumar
-> Subject: Re: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to
-> header file
-> 
-> On Wednesday 11 December 2013, Mohit Kumar wrote:
-> > From: Pratyush Anand <pratyush.anand@st.com>
-> >
-> > Move SPEAr1340 definitions to header files so that theese can be used
-> > by other code too.
-> 
-> This looks like a regression, we intentionally made them private and they
-> should be moved into a proper driver instead of being globally visible.
-> 
-> > diff --git a/arch/arm/mach-spear/include/mach/spear.h
-> > b/arch/arm/mach-spear/include/mach/spear.h
-> > index 5cdc53d..4526f75 100644
-> > --- a/arch/arm/mach-spear/include/mach/spear.h
-> > +++ b/arch/arm/mach-spear/include/mach/spear.h
-> > @@ -86,6 +86,61 @@
-> >  /* Debug uart for linux, will be used for debug and uncompress messages
-> */
-> >  #define SPEAR_DBG_UART_BASE			UART_BASE
-> >
-> > +/* PCIe/SATA Base addresses */
-> > +#define SPEAR1340_SATA_BASE			UL(0xB1000000)
-> > +#define SPEAR1340_PCIE_BASE			UL(0xB1000000)
-> 
-> These should be in DT only.
-> 
-> > +/* Power Management Registers */
-> > +#define SPEAR1340_PCM_CFG			(VA_MISC_BASE +
-> 0x100)
-> > +#define SPEAR1340_PCM_WKUP_CFG
-> 	(VA_MISC_BASE + 0x104)
-> > +#define SPEAR1340_SWITCH_CTR			(VA_MISC_BASE +
-> 0x108)
-> > +
-> > +#define SPEAR1340_PERIP1_SW_RST
-> 	(VA_MISC_BASE + 0x318)
-> > +#define SPEAR1340_PERIP2_SW_RST
-> 	(VA_MISC_BASE + 0x31C)
-> > +#define SPEAR1340_PERIP3_SW_RST
-> 	(VA_MISC_BASE + 0x320)
-> 	
-> The RST bits should probably go into a drivers/reset driver. Not sure what the
-> other registers do, but I'm sure we can find a driver for these too, possibly
-> they should be part of the PHY driver?
+defined, but never used.
 
--  Perhaps if we implement phy and reset driver then we may not require to move these definitions and
-it will address most of your comments on SPEar13xx pcie driver. I am understanding and working on this.l 
-
-Regards
-Mohit
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/e5011fca/attachment.sig>
