@@ -1,47 +1,76 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:30:35 +0900
-Subject: [PATCH 1/3] ARM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-In-Reply-To: <cover.1386899269.git.horms+renesas@verge.net.au>
-References: <cover.1386899269.git.horms+renesas@verge.net.au>
-Message-ID: <6802cdc58d4fe66cffd6cd04ee55e65dd61eeeeb.1386899269.git.horms+renesas@verge.net.au>
+Date: Fri, 13 Dec 2013 11:31:27 +0900
+Subject: [PATCH 53/69] ARM: shmobile: kzm9g-reference: Add GPIO keys to DT
+In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
+References: <cover.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <5ec5f73463611514fe46b2167e471b17626007f9.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Other than not being useful it is also not possible to link
-the code under this condition as phy_register_fixup_for_id(),
-mdiobus_read() and mdiobus_write() are absent.
-
-arch/arm/mach-shmobile/built-in.o: In function `lager_ksz8041_fixup':
-board-lager.c:(.text+0xb8): undefined reference to `mdiobus_read'
-board-lager.c:(.text+0xd4): undefined reference to `mdiobus_write'
-arch/arm/mach-shmobile/built-in.o: In function `lager_init':
-board-lager.c:(.init.text+0xafc): undefined reference to `phy_register_fixup_for_id'
-
-This problem was introduced by 48c8b96f21817aad
-("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
-
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 46 ++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index a8d3ce6..e0406fd 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -245,7 +245,9 @@ static void __init lager_init(void)
- {
- 	lager_add_standard_devices();
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index d58877d..5bb593d 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -106,6 +106,52 @@
+ 			gpios = <&pfc 23 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		back-key {
++			gpios = <&pcf8575 8 GPIO_ACTIVE_LOW>;
++			linux,code = <158>;
++			label = "SW3";
++		};
++
++		right-key {
++			gpios = <&pcf8575 9 GPIO_ACTIVE_LOW>;
++			linux,code = <106>;
++			label = "SW2-R";
++		};
++
++		left-key {
++			gpios = <&pcf8575 10 GPIO_ACTIVE_LOW>;
++			linux,code = <105>;
++			label = "SW2-L";
++		};
++
++		enter-key {
++			gpios = <&pcf8575 11 GPIO_ACTIVE_LOW>;
++			linux,code = <28>;
++			label = "SW2-P";
++		};
++
++		up-key {
++			gpios = <&pcf8575 12 GPIO_ACTIVE_LOW>;
++			linux,code = <103>;
++			label = "SW2-U";
++		};
++
++		down-key {
++			gpios = <&pcf8575 13 GPIO_ACTIVE_LOW>;
++			linux,code = <108>;
++			label = "SW2-D";
++		};
++
++		home-key {
++			gpios = <&pcf8575 14 GPIO_ACTIVE_LOW>;
++			linux,code = <102>;
++			label = "SW1";
++		};
++	};
+ };
  
--	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-+	if (IS_ENABLED(CONFIG_PHYLIB))
-+		phy_register_fixup_for_id("r8a7790-ether-ff:01",
-+					  lager_ksz8041_fixup);
- }
- 
- static const char * const lager_boards_compat_dt[] __initconst = {
+ &i2c0 {
 -- 
 1.8.4
