@@ -1,38 +1,90 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Thu, 12 Dec 2013 18:37:08 -0800 (PST)
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
-In-Reply-To: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 13 Dec 2013 10:57:47 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <201312122140.08566.arnd@arndb.de>
+References: <1386770541-15056-1-git-send-email-zhangfei.gao@linaro.org>
+ <201312112112.52746.arnd@arndb.de> <52A9B9B4.3080105@linaro.org>
+ <201312122140.08566.arnd@arndb.de>
+Message-ID: <52AA77AB.9030203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Ben
 
-Thank you for your patch
+On 12/13/2013 04:40 AM, Arnd Bergmann wrote:
+> On Thursday 12 December 2013, zhangfei wrote:
+>> On 12/12/2013 04:12 AM, Arnd Bergmann wrote:
+>>> On Wednesday 11 December 2013, zhangfei wrote:
+>>>
+>>> But aren't the times fixed for each mode? Why do you need to specify them in
+>>> the DT? I would expect that the clock rates for each mode are set in the
+>>> MMC and SD specifications. When you call clk_set_rate(), it should normally
+>>> be enough to ask for the clock you actually want and let the clk subsystem
+>>> figure out how to set up the parents and multipliers on the way.
+>>
+>> Yes. that's will be perfect.
+>>
+>> However, currently this ip still has no such capability.
+>>   Input rate for init are diferent for different controller, not the
+>> init 400K, some are 13M, others are 25M, since different clock source.
+>> This can be easily solved by clock-freq-init = <25000000>
+>> 2. There is maxmum limit, also can be easily solved by define CLK_MAX.
+>> 3. However some mode can not use the max speed from ios->clock
+>> for example UHS_SDR104_MAX_DTR 208000000 can not be used, only half may
+>> be reached, at least currently.
+>
+> I don't fully understand the explanation,
 
-> The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
-> size for their register block. This causes the sh_modbile_sdhi driver to
-> fail to communicate with card at-all.
-> 
-> Change each sdhi node size from 0x100 to 0x200 to correct this.
-> 
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Linux SH <linux-sh@vger.kernel.org>
-> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> Tested-by: William Towle <william.towle@codethink.co.uk>
-> ---
+This is the ip's limitation currently, that some mode can only operate 
+at limited freq, rather than the max freq from spec.
+Will upgrade to use ios->clock once the limitation is solved.
 
-Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
-The wrong is SDHI/TMIO driver side, not SoC side.
-Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
-but it need more time (= there is merge timing issue)
+but if some of the other
+> people with interest in dw-mmc (I've added some more to Cc now) think
+> this makes sense, I'm fine with it too.
+>
+Could I treat this as Ack or Partially Ack for the next version :)
 
-Best regards
----
-Kuninori Morimoto
+>> How about this desc
+>>
+>> * clock-freq-table: should be the frequency (in Hz) array of the ciu
+>> clock
+>>           in each supported timing.
+>>
+>>           1. CIU clock rate in HZ for MMC_TIMING_LEGACY mode
+>>
+>>           2. CIU clock rate in HZ for MMC_TIMING_MMC_HS mode
+>>           3. CIU clock rate in HZ for MMC_TIMING_SD_HS mode
+>>           4. CIU clock rate in HZ for MMC_TIMING_UHS_SDR12 mode
+>>
+>>           5. CIU clock rate in HZ for MMC_TIMING_UHS_SDR25 mode
+>>
+>>           6. CIU clock rate in HZ for MMC_TIMING_UHS_SDR50 mode
+>>
+>>           7. CIU clock rate in HZ for MMC_TIMING_UHS_SDR104 mode
+>>
+>>           8. CIU clock rate in HZ for MMC_TIMING_SD_HS mode
+>>
+>>           9. CIU clock rate in HZ for MMC_TIMING_MMC_HS200 mode
+>>
+>
+> Yes, that is much better. but please avoid using Linux internal
+> identifiers (e.g. MMC_TIMING_LEGACY) and instead use the terminology from
+> the MMC and SD specs. Also 'Hz' is the official symbol for Hertz, not 'HZ'.
+>
+
+Update to
+
+* clock-freq-table: should be the frequency (in Hz) array of the ciu clock
+         in each supported mode.
+         0. CIU clock rate in Hz for DS mode
+         1. CIU clock rate in Hz for MMC HS mode
+         2. CIU clock rate in Hz for SD HS mode
+         3. CIU clock rate in Hz for SDR12 mode
+         4. CIU clock rate in Hz for SDR25 mode
+         5. CIU clock rate in Hz for SDR50 mode
+         6. CIU clock rate in Hz for SDR104 mode
+         7. CIU clock rate in Hz for DDR50 mode
+         8. CIU clock rate in Hz for HS200 mode
+
+Thanks
