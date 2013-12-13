@@ -1,60 +1,44 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Fri, 13 Dec 2013 00:22:33 -0800
-Subject: [PATCH v4 4/8] ARM: dts: Specify clocks for SDHCIs on bcm11351
-In-Reply-To: <1386271244-3927-5-git-send-email-tim.kryger@linaro.org>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-5-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYrg9EQO5TnEprF0zeXmiaTOsb5Ht38AztLiWyUKJz072Q@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 13 Dec 2013 08:23:21 +0000
+Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
+In-Reply-To: <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
+References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
+ <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
+Message-ID: <52AAC3F9.3050909@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> Specify the external clock label in each SDHCI node.
+On 13/12/13 02:37, Kuninori Morimoto wrote:
 >
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  arch/arm/boot/dts/bcm11351.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+> Hi Ben
 >
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index 9b99c52..25ca128 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -118,6 +118,7 @@
->                 compatible = "brcm,kona-sdhci";
->                 reg = <0x3f180000 0x10000>;
->                 interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&sdio1_clk>;
->                 status = "disabled";
->         };
+> Thank you for your patch
 >
-> @@ -125,6 +126,7 @@
->                 compatible = "brcm,kona-sdhci";
->                 reg = <0x3f190000 0x10000>;
->                 interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&sdio2_clk>;
->                 status = "disabled";
->         };
+>> The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
+>> size for their register block. This causes the sh_modbile_sdhi driver to
+>> fail to communicate with card at-all.
+>>
+>> Change each sdhi node size from 0x100 to 0x200 to correct this.
+>>
+>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: Simon Horman <horms@verge.net.au>
+>> Cc: Linux SH <linux-sh@vger.kernel.org>
+>> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>> Tested-by: William Towle <william.towle@codethink.co.uk>
+>> ---
 >
-> @@ -132,6 +134,7 @@
->                 compatible = "brcm,kona-sdhci";
->                 reg = <0x3f1a0000 0x10000>;
->                 interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&sdio3_clk>;
->                 status = "disabled";
->         };
->
-> @@ -139,6 +142,7 @@
->                 compatible = "brcm,kona-sdhci";
->                 reg = <0x3f1b0000 0x10000>;
->                 interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&sdio4_clk>;
->                 status = "disabled";
->         };
->
-> --
-> 1.8.0.1
->
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+> Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
+> The wrong is SDHI/TMIO driver side, not SoC side.
+> Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
+> but it need more time (= there is merge timing issue)
+
+Ok, thanks. We will keep this in our tree until the SDHI driver
+is sorted out.
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
