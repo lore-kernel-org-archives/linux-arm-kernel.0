@@ -1,69 +1,71 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 13 Dec 2013 09:14:07 -0800
-Subject: [PATCH] regmap: Allow regmap_bulk_read() to work for "no-bus" regmaps
-In-Reply-To: <20131213104128.GT11044@sirena.org.uk>
-References: <1386718523-2587-1-git-send-email-sboyd@codeaurora.org>
- <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
- <20131210235000.GK11468@sirena.org.uk>
- <52A7AE1B.3040201@codeaurora.org>
- <20131211005106.GL11468@sirena.org.uk>
- <52A7C0C3.2070805@codeaurora.org>
- <20131211132729.GT11468@sirena.org.uk>
- <52AA42FD.4040503@codeaurora.org>
- <20131213104128.GT11044@sirena.org.uk>
-Message-ID: <20131213171407.GN21983@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 13 Dec 2013 09:20:18 -0800
+Subject: [PATCH] arm/arm64: KVM: relax the requirements of VMA alignment
+ for THP
+In-Reply-To: <1386953766-1568-1-git-send-email-marc.zyngier@arm.com>
+References: <1386953766-1568-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20131213172018.GT2871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-regmap_bulk_read() should decay to performing individual reads if
-we're using a "no-bus" regmap. Unfortunately, it returns an
-error because there is no map->bus pointer. Fix it.
+On Fri, Dec 13, 2013 at 04:56:06PM +0000, Marc Zyngier wrote:
+> The THP code in KVM/ARM is a bit restrictive in not allowing a THP
+> to be used if the VMA is not 2MB aligned. Actually, it is not so much
+> the VMA that matters, but the associated memslot:
+> 
+> A process can perfectly mmap a region with no particular alignment
+> restriction, and then pass a 2MB aligned address to KVM. In this
+> case, KVM will only use this 2MB aligned region, and will ignore
+> the range between vma->vm_start and memslot->userspace_addr.
+> 
+> It can also choose to place this memslot at whatever alignment it
+> wants in the IPA space. In the end, what matters is the relative
+> alignment of the user space and IPA mappings with respect to a
+> 2M page. They absolutely must be the same if you want to use THP.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Looks good to me:
 
-On 12/13/13 02:41, Mark Brown wrote:
-> On Thu, Dec 12, 2013 at 03:13:01PM -0800, Stephen Boyd wrote:
->
->>> bulk_read() should decay to individual reads if there isn't a block
->>> operaton and it's not like the hardware actually supports bulk reads
->>> anyway.
->
->> So regmap_bulk_read() should work if I don't have a map->bus? To make it
->> work with reg_read/write I had to do this. I'm not sure how to make
->> bulk_write work.
->
-> Yes, I'd expect the operation to work.  Your changes below are mostly
-> fine (we should add an additional check for values that aren't integer
-> numbers of bytes, I can add that) - can you send as a signed off patch
-> please and I'll apply?
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Here you go. Do you have any suggestions on how to make regmap_bulk_write()
-work?
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/mmu.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 5809069..9cad7a9 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -667,14 +667,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>  	} else {
+>  		/*
+> -		 * Pages belonging to VMAs not aligned to the PMD mapping
+> -		 * granularity cannot be mapped using block descriptors even
+> -		 * if the pages belong to a THP for the process, because the
+> -		 * stage-2 block descriptor will cover more than a single THP
+> -		 * and we loose atomicity for unmapping, updates, and splits
+> -		 * of the THP or other pages in the stage-2 block range.
+> +		 * Pages belonging to memslots that don't have the same
+> +		 * alignment for userspace and IPA cannot be mapped using
+> +		 * block descriptors even if the pages belong to a THP for
+> +		 * the process, because the stage-2 block descriptor will
+> +		 * cover more than a single THP and we loose atomicity for
+> +		 * unmapping, updates, and splits of the THP or other pages
+> +		 * in the stage-2 block range.
+>  		 */
+> -		if (vma->vm_start & ~PMD_MASK)
+> +		if ((memslot->userspace_addr & ~PMD_MASK) !=
+> +		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
+>  			force_pte = true;
+>  	}
+>  	up_read(&current->mm->mmap_sem);
+> -- 
+> 1.8.2.3
+> 
+> 
 
- drivers/base/regmap/regmap.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 9c021d9..1ccd61b 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1897,14 +1897,10 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
- 	size_t val_bytes = map->format.val_bytes;
- 	bool vol = regmap_volatile_range(map, reg, val_count);
- 
--	if (!map->bus)
--		return -EINVAL;
--	if (!map->format.parse_inplace)
--		return -EINVAL;
- 	if (reg % map->reg_stride)
- 		return -EINVAL;
- 
--	if (vol || map->cache_type == REGCACHE_NONE) {
-+	if (map->bus && map->format.parse_inplace && (vol || map->cache_type == REGCACHE_NONE)) {
- 		/*
- 		 * Some devices does not support bulk read, for
- 		 * them we have a series of single read operations.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Christoffer
