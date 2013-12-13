@@ -1,38 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Dec 2013 13:39:24 +0800
-Subject: [PATCH] MAINTAINERS: Add DesignWare, i.MX6, Armada, R-Car PCI
- host maintainers
-In-Reply-To: <CAErSpo5O1nSkKmWfHGGZiuVdvRxFjNNDS-8BWKFhnCgwVSdr8A@mail.gmail.com>
-References: <20131211183237.GI4699@google.com>
- <20131212070045.GO18380@S2101-09.ap.freescale.net>
- <CAErSpo5O1nSkKmWfHGGZiuVdvRxFjNNDS-8BWKFhnCgwVSdr8A@mail.gmail.com>
-Message-ID: <20131213053922.GP18380@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 13 Dec 2013 13:15:09 +0800
+Subject: [PATCH v6 02/15] usb: phy-mxs: Add platform judgement code
+In-Reply-To: <20131213041918.GC867@saruman.home>
+References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
+ <1386897825-6130-3-git-send-email-peter.chen@freescale.com>
+ <20131213041918.GC867@saruman.home>
+Message-ID: <20131213051508.GA16072@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 01:29:00PM -0700, Bjorn Helgaas wrote:
-> On Thu, Dec 12, 2013 at 12:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > Hi Bjorn,
-> >
-> > On Wed, Dec 11, 2013 at 11:32:37AM -0700, Bjorn Helgaas wrote:
-> >> +PCI DRIVER FOR IMX6
-> >> +M:   Shawn Guo <shawn.guo@linaro.org>
-> >
-> > Thanks for the nomination.  But I think a better person for this
-> > position would be Richard Zhu <r65037@freescale.com> (copied).  He knows
-> > the driver and controller much better than myself, and most importantly
-> > he is the driver owner for Freescale kernel and he has the contact to
-> > Freescale PCIe hardware people.
+On Thu, Dec 12, 2013 at 10:19:19PM -0600, Felipe Balbi wrote:
+> On Fri, Dec 13, 2013 at 09:23:32AM +0800, Peter Chen wrote:
+> > The mxs-phy has several bugs and features at different
+> > versions, the driver code can get it through of_device_id.data.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
+> >  1 files changed, 49 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > index 545844b..6d49040 100644
+> > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > @@ -1,5 +1,5 @@
+> >  /*
+> > - * Copyright 2012 Freescale Semiconductor, Inc.
+> > + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+> >   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> >   * on behalf of DENX Software Engineering GmbH
+> >   *
+> > @@ -20,6 +20,7 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/err.h>
+> >  #include <linux/io.h>
+> > +#include <linux/of_device.h>
+> >  
+> >  #define DRIVER_NAME "mxs_phy"
+> >  
+> > @@ -34,13 +35,55 @@
+> >  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+> >  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+> >  
+> > +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
 > 
-> Richard, are you OK with being listed here?
+> defined, but never used.
+> 
 
-Richard is on leave these two days.  Hope he will be back to online
-soon.
+At current code, this define is after definition of struct mxs_phy,
+I think the lines of #define should be at the same place, so I move
+it up.
 
-> Shawn, do you want to be
-> listed here in addition, if only to make sure you're copied on changes
-> to pci-imx6.c?
+-- 
 
-Okay, thanks, Bjorn.
-
-Shawn
+Best Regards,
+Peter Chen
