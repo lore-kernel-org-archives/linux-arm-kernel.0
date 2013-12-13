@@ -1,30 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 14 Dec 2013 02:24:53 +0300
-Subject: [PATCH] irq-gic: remove file name from heading comment
-Message-ID: <201312140224.53928.sergei.shtylyov@cogentembedded.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Fri, 13 Dec 2013 23:47:41 +0100
+Subject: [PATCH] ARM/cpuidle: remove __init tag from Calxeda cpuidle probe
+ function
+In-Reply-To: <52AB82CD.3040100@linaro.org>
+References: <1386967759-12952-1-git-send-email-andre.przywara@linaro.org>
+ <52AB82CD.3040100@linaro.org>
+Message-ID: <52AB8E8D.70806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-File names in the heading comments  fell out of favor long ago, and this one
-weren't even changed when the driver was moved from arch/arm/common/, so remove
-it at last...
+On 12/13/2013 10:57 PM, Daniel Lezcano wrote:
+> On 12/13/2013 09:49 PM, Andre Przywara wrote:
+>> Commit 60a66e370007e8535b7a561353b07b37deaf35ba changed the Calxeda
+>> cpuidle driver to a platform driver, copying the __init tag from the
+>> _init() to the newly used _probe() function. However, "probe should
+>> not be __init." (Rob said ;-)
+>> Remove the __init tag to fix a section mismatch in the Calxeda
+>> cpuidle driver.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+>> ---
+>
+> Applied to my tree for 3.14.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Daniel,
 
----
-The patch is against the 'irq/core' branch of the 'tip.git' repo.
+thanks!
+But since this is a regression (3.12 compiles fine), can someone please 
+push this still for 3.13? If I am not mistaken, the rework was 
+introduced in the last merge window, so I'd consider this a bug fix.
 
- drivers/irqchip/irq-gic.c |    2 --
- 1 file changed, 2 deletions(-)
+Thanks,
+Andre.
 
-Index: tip/drivers/irqchip/irq-gic.c
-===================================================================
---- tip.orig/drivers/irqchip/irq-gic.c
-+++ tip/drivers/irqchip/irq-gic.c
-@@ -1,6 +1,4 @@
- /*
-- *  linux/arch/arm/common/gic.c
-- *
-  *  Copyright (C) 2002 ARM Limited, All Rights Reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
+> Thanks for the fix.
+
+>
+>    -- Daniel
+>
+>>   drivers/cpuidle/cpuidle-calxeda.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-calxeda.c
+>> b/drivers/cpuidle/cpuidle-calxeda.c
+>> index 3679563..6e51114 100644
+>> --- a/drivers/cpuidle/cpuidle-calxeda.c
+>> +++ b/drivers/cpuidle/cpuidle-calxeda.c
+>> @@ -65,7 +65,7 @@ static struct cpuidle_driver calxeda_idle_driver = {
+>>       .state_count = 2,
+>>   };
+>>
+>> -static int __init calxeda_cpuidle_probe(struct platform_device *pdev)
+>> +static int calxeda_cpuidle_probe(struct platform_device *pdev)
+>>   {
+>>       return cpuidle_register(&calxeda_idle_driver, NULL);
+>>   }
+>>
+>
+>
