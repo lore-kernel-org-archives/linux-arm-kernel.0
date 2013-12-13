@@ -1,53 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Dec 2013 10:05:45 +0100
-Subject: [GIT PULL] at91: drivers for 3.14 #1
-Message-ID: <1386925545-10495-1-git-send-email-nicolas.ferre@atmel.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Fri, 13 Dec 2013 18:18:12 +0900
+Subject: [PATCH 1/2] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <201312130857.23890.heiko@sntech.de>
+References: <1386857210-4944-1-git-send-email-linus.walleij@linaro.org>
+ <201312130857.23890.heiko@sntech.de>
+Message-ID: <0bc201cef7e4$3f2cae20$bd860a60$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Heiko St?bner wrote:
+> 
+> Am Donnerstag, 12. Dezember 2013, 15:06:50 schrieb Linus Walleij:
+> > This isolates the custom S3C24xx GPIO definition table to
+> > <linux/platform_data/gpio-samsung-s3x24xx.h> as this is
+> > used in a few different places in the kernel, removing the
+> > need to depend on the implicit inclusion of <mach/gpio.h>
+> > from <linux/gpio.h> and thus getting rid of a few nasty
+> > cross-dependencies.
+> >
+> > We also delete the nifty CONFIG_S3C24XX_GPIO_EXTRA stuff.
+> > The biggest this can ever be for the S3C24XX is
+> > CONFIG_S3C24XX_GPIO_EXTRA = 128, and then for CPU_S3C2443 or
+> > CPU_S3C2416 32*12 GPIOs are added, so 32*12+128 = 512
+> > is the absolute roof value on this platform. So we set
+> > the size of ARCH_NR_GPIO to this and the GPIOs array will
+> > fit any S3C24XX platform, as per pattern from other archs.
+> >
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-This is a "drivers" series that adds Device Tree support to 
-Atmel crypto drivers (AES/[T]DES/SHA). As the DT part of this
-addition is in at91-3.14-dt I thought it would be simpler to take
-this series through arm-soc. I asked and got Herbert's blessing.
+For this whole series:
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-The Device Tree entries documented in these patches are very simple
-and only declare the reg/irq values and the link to DMA.
+> > Cc: linux-samsung-soc at vger.kernel.org
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > ChangeLog v1->v2:
+> > - Added an #ifdef ARCH_S3C24XX around the header inclusion
+> >   in drivers/gpio/gpio-samsung.c as we would otherwise
+> >   have colliding definitions when compiling S3C64XX.
+> > - Rename inclusion guard in the header file.
+> >
+> > If one of the maintainers give me an ACK for this I will
+> > take it through the GPIO tree.
+> > ---
+> 
+> I'm not the maintainer of s3c24xx, but this looks nice ;-)
+> 
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-Thanks, best regards,
+Linus, please take this series with my ack.
 
-The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
-
-  ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-drivers
-
-for you to fetch changes up to 1ca5b7d95315c42cf0b78d33cd316e404a9f137c:
-
-  crypto: atmel-sha - add sha information to the log (2013-12-12 18:39:36 +0100)
-
-----------------------------------------------------------------
-AT91 crypto drivers DT support:
-- add DT to sha/des/aes existing drivers
-- add DMA DT
-- all documentation added to crypto/atmel-crypto.txt file
-
-----------------------------------------------------------------
-Nicolas Ferre (4):
-      crypto: atmel-aes - add support for Device Tree
-      crypto: atmel-tdes - add support for Device Tree
-      crypto: atmel-sha - add support for Device Tree
-      crypto: atmel-sha - add sha information to the log
-
- .../devicetree/bindings/crypto/atmel-crypto.txt    |  68 ++++++++++
- drivers/crypto/atmel-aes.c                         | 143 ++++++++++++++-------
- drivers/crypto/atmel-sha.c                         | 103 +++++++++++----
- drivers/crypto/atmel-tdes.c                        | 143 ++++++++++++++-------
- 4 files changed, 334 insertions(+), 123 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-
--- 
-Nicolas Ferre
+Thanks,
+Kukjin
