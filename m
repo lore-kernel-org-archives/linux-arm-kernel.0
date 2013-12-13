@@ -1,107 +1,45 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 13 Dec 2013 09:23:38 +0800
-Subject: [PATCH v6 08/15] usb: phy-mxs: Add implementation of nofity_suspend
- and notify_resume
+Date: Fri, 13 Dec 2013 09:23:41 +0800
+Subject: [PATCH v6 11/15] usb: phy-mxs: add controller id
 In-Reply-To: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
 References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386897825-6130-9-git-send-email-peter.chen@freescale.com>
+Message-ID: <1386897825-6130-12-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementation of notify_suspend and notify_resume will be different
-according to mxs_phy_data->flags.
+It is used to access un-regulator registers according to
+different controllers.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   55 ++++++++++++++++++++++++++++++++++++++---
- 1 files changed, 51 insertions(+), 4 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 0ef930a..e3df53f 100644
+index b446cc2..5649970 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -166,8 +166,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- static int mxs_phy_on_connect(struct usb_phy *phy,
- 		enum usb_device_speed speed)
- {
--	dev_dbg(phy->dev, "%s speed device has connected\n",
--		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+	dev_dbg(phy->dev, "%s device has connected\n",
-+		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
+@@ -111,6 +111,7 @@ struct mxs_phy {
+ 	struct clk *clk;
+ 	const struct mxs_phy_data *data;
+ 	struct regmap *regmap_anatop;
++	int port_id;
+ };
  
- 	if (speed == USB_SPEED_HIGH)
- 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-@@ -179,8 +179,8 @@ static int mxs_phy_on_connect(struct usb_phy *phy,
- static int mxs_phy_on_disconnect(struct usb_phy *phy,
- 		enum usb_device_speed speed)
- {
--	dev_dbg(phy->dev, "%s speed device has disconnected\n",
--		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+	dev_dbg(phy->dev, "%s device has disconnected\n",
-+		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
+ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+@@ -279,6 +280,13 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
  
- 	if (speed == USB_SPEED_HIGH)
- 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-@@ -189,6 +189,48 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
- 	return 0;
- }
- 
-+static int mxs_phy_on_suspend(struct usb_phy *phy,
-+		enum usb_device_speed speed)
-+{
-+	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-+
-+	dev_dbg(phy->dev, "%s device has suspended\n",
-+		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
-+
-+	/* delay 4ms to wait bus entering idle */
-+	usleep_range(4000, 5000);
-+
-+	if (mxs_phy->data->flags & MXS_PHY_ABNORMAL_IN_SUSPEND) {
-+		writel_relaxed(0xffffffff, phy->io_priv + HW_USBPHY_PWD);
-+		writel_relaxed(0, phy->io_priv + HW_USBPHY_PWD);
++	ret = of_alias_get_id(np, "usbphy");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
++		return ret;
 +	}
++	mxs_phy->port_id = ret;
 +
-+	if (speed == USB_SPEED_HIGH)
-+		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+				phy->io_priv + HW_USBPHY_CTRL_CLR);
-+
-+	return 0;
-+}
-+
-+/*
-+ * The resume signal must be finished here.
-+ */
-+static int mxs_phy_on_resume(struct usb_phy *phy,
-+		enum usb_device_speed speed)
-+{
-+	dev_dbg(phy->dev, "%s device has resumed\n",
-+		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
-+
-+	if (speed == USB_SPEED_HIGH) {
-+		/* Make sure the device has switched to High-Speed mode */
-+		udelay(500);
-+		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+				phy->io_priv + HW_USBPHY_CTRL_SET);
-+	}
-+
-+	return 0;
-+}
-+
- static int mxs_phy_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -235,6 +277,11 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, mxs_phy);
- 
-+	if (mxs_phy->data->flags & MXS_PHY_SENDING_SOF_TOO_FAST) {
-+		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend;
-+		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
-+	}
-+
- 	if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
- 		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
- 			(np, "fsl,anatop");
+ 	mxs_phy->phy.io_priv		= base;
+ 	mxs_phy->phy.dev		= &pdev->dev;
+ 	mxs_phy->phy.label		= DRIVER_NAME;
 -- 
 1.7.8
