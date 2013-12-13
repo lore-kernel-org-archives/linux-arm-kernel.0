@@ -1,68 +1,89 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 13 Dec 2013 09:09:09 +0100
-Subject: [PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option
-Message-ID: <1386922149-4561-1-git-send-email-jonas.jensen@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Dec 2013 09:16:45 +0100
+Subject: [PATCH] ARM: integrator: use managed resources for the IM-PD1
+Message-ID: <1386922605-29700-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_FA526 lacks thumb state support and doesn't get along with some
-of the options enabled by ARCH_MULTI_V4T.
+Switch the IM-PD1 driver to use managed resources and cut down
+on boilerplate.
 
-More specifically it doesn't get along with CPU_ARM920T:
-
-CPU_ABRT_EV4T
-CPU_CACHE_V4WT
-CPU_COPY_V4WB
-CPU_TLB_V4WBI
-
-One or a combination of the above cause trouble for userspace, the
-following happens when kernel tries to exec init:
-
-[   11.790000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000004
-[   11.790000]
-[   11.790000] CPU: 0 PID: 1 Comm: init Not tainted 3.13.0-rc3-next-20131212+ #1332
-[   11.790000] [<c000d620>] (unwind_backtrace) from [<c000ba54>] (show_stack+0x18/0x1c)
-[   11.790000] [<c000ba54>] (show_stack) from [<c027f498>] (dump_stack+0x20/0x28)
-[   11.790000] [<c027f498>] (dump_stack) from [<c027ce80>] (panic+0x98/0x1ec)
-[   11.790000] [<c027ce80>] (panic) from [<c0016d4c>] (do_exit+0x80c/0x8e8)
-[   11.790000] [<c0016d4c>] (do_exit) from [<c0016ea4>] (do_group_exit+0x44/0xb8)
-[   11.790000] [<c0016ea4>] (do_group_exit) from [<c0022dbc>] (get_signal_to_deliver+0x2fc/0x5a4)
-[   11.790000] [<c0022dbc>] (get_signal_to_deliver) from [<c027ca38>] (do_signal+0xac/0x3e0)
-[   11.790000] [<c027ca38>] (do_signal) from [<c000b460>] (do_work_pending+0xcc/0xe8)
-[   11.790000] [<c000b460>] (do_work_pending) from [<c0009374>] (work_pending+0xc/0x20)
-
-Reinsert ARCH_MULTI_V4 so it can be used on platforms with CPU_FA526.
-
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ arch/arm/mach-integrator/impd1.c | 36 ++++++++++--------------------------
+ 1 file changed, 10 insertions(+), 26 deletions(-)
 
-Notes:
-    I don't know how to handle this so I'm making it standalone for
-    your feedback (it was broken out from MOXA ART SoC series).
-    
-    This is important for MOXA ART (and other FA526 platforms),
-    please have a look.
-    
-    Applies to next-20131213
-
- arch/arm/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b64a8ef..4f88ff3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -863,6 +863,11 @@ menu "Multiple platform selection"
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 9f82f9dcbb98..aeeae0d79a18 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -307,25 +307,23 @@ static struct impd1_device impd1_devs[] = {
+ static int impd1_probe(struct lm_device *dev)
+ {
+ 	struct impd1_module *impd1;
+-	int i, ret;
++	int i;
  
- comment "CPU Core family selection"
+ 	if (dev->id != module_id)
+ 		return -EINVAL;
  
-+config ARCH_MULTI_V4
-+	bool "ARMv4 based platforms (FA526, StrongARM)"
-+	depends on !ARCH_MULTI_V6_V7
-+	select ARCH_MULTI_V4_V5
-+
- config ARCH_MULTI_V4T
- 	bool "ARMv4T based platforms (ARM720T, ARM920T, ...)"
- 	depends on !ARCH_MULTI_V6_V7
+-	if (!request_mem_region(dev->resource.start, SZ_4K, "LM registers"))
++	if (!devm_request_mem_region(&dev->dev, dev->resource.start,
++				     SZ_4K, "LM registers"))
+ 		return -EBUSY;
+ 
+-	impd1 = kzalloc(sizeof(struct impd1_module), GFP_KERNEL);
+-	if (!impd1) {
+-		ret = -ENOMEM;
+-		goto release_lm;
+-	}
++	impd1 = devm_kzalloc(&dev->dev, sizeof(struct impd1_module),
++			     GFP_KERNEL);
++	if (!impd1)
++		return -ENOMEM;
+ 
+-	impd1->base = ioremap(dev->resource.start, SZ_4K);
+-	if (!impd1->base) {
+-		ret = -ENOMEM;
+-		goto free_impd1;
+-	}
++	impd1->base = devm_ioremap(&dev->dev, dev->resource.start, SZ_4K);
++	if (!impd1->base)
++		return -ENOMEM;
+ 
+ 	lm_set_drvdata(dev, impd1);
+ 
+@@ -353,14 +351,6 @@ static int impd1_probe(struct lm_device *dev)
+ 	}
+ 
+ 	return 0;
+-
+- free_impd1:
+-	if (impd1 && impd1->base)
+-		iounmap(impd1->base);
+-	kfree(impd1);
+- release_lm:
+-	release_mem_region(dev->resource.start, SZ_4K);
+-	return ret;
+ }
+ 
+ static int impd1_remove_one(struct device *dev, void *data)
+@@ -371,16 +361,10 @@ static int impd1_remove_one(struct device *dev, void *data)
+ 
+ static void impd1_remove(struct lm_device *dev)
+ {
+-	struct impd1_module *impd1 = lm_get_drvdata(dev);
+-
+ 	device_for_each_child(&dev->dev, NULL, impd1_remove_one);
+ 	integrator_impd1_clk_exit(dev->id);
+ 
+ 	lm_set_drvdata(dev, NULL);
+-
+-	iounmap(impd1->base);
+-	kfree(impd1);
+-	release_mem_region(dev->resource.start, SZ_4K);
+ }
+ 
+ static struct lm_driver impd1_driver = {
 -- 
-1.8.2.1
+1.8.3.1
