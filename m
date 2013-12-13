@@ -1,343 +1,69 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 13 Dec 2013 07:55:54 +0100
-Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52A9F433.8020003@ti.com>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52A9DB78.1040805@linaro.org> <52A9F433.8020003@ti.com>
-Message-ID: <52AAAF7A.2020102@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 12 Dec 2013 23:00:05 -0800
+Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
+In-Reply-To: <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
+References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+ <20131128055706.GM8834@intel.com>
+ <20131209235035.GA11632@n2100.arm.linux.org.uk>
+ <20131210101331.GG29580@intel.com>
+ <20131210111449.GY4360@n2100.arm.linux.org.uk>
+ <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
+Message-ID: <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 06:36 PM, ivan.khoronzhuk wrote:
-> On 12/12/2013 05:51 PM, Daniel Lezcano wrote:
->> On 12/11/2013 07:00 PM, Ivan Khoronzhuk wrote:
->>> Add broadcast clock-event device for the Keystone arch.
->>>
->>> The timer can be configured as a general-purpose 64-bit timer,
->>> dual general-purpose 32-bit timers. When configured as dual 32-bit
->>> timers, each half can operate in conjunction (chain mode) or
->>> independently (unchained mode) of each other.
->>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>>    drivers/clocksource/Makefile         |    1 +
->>>    drivers/clocksource/timer-keystone.c |  223
->>> ++++++++++++++++++++++++++++++++++
->>>    2 files changed, 224 insertions(+)
->>>    create mode 100644 drivers/clocksource/timer-keystone.c
->>>
->>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->>> index 33621ef..2acf3fc 100644
->>> --- a/drivers/clocksource/Makefile
->>> +++ b/drivers/clocksource/Makefile
->>> @@ -36,3 +36,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)        += arm_arch_timer.o
->>>    obj-$(CONFIG_ARM_GLOBAL_TIMER)        += arm_global_timer.o
->>>    obj-$(CONFIG_CLKSRC_METAG_GENERIC)    += metag_generic.o
->>>    obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)    += dummy_timer.o
->>> +obj-$(CONFIG_ARCH_KEYSTONE)        += timer-keystone.o
->>> diff --git a/drivers/clocksource/timer-keystone.c
->>> b/drivers/clocksource/timer-keystone.c
->>> new file mode 100644
->>> index 0000000..4a8083a
->>> --- /dev/null
->>> +++ b/drivers/clocksource/timer-keystone.c
->>> @@ -0,0 +1,223 @@
->>> +/*
->>> + * Keystone broadcast clock-event
->>> + *
->>> + * Copyright 2013 Texas Instruments, Inc.
->>> + *
->>> + * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + */
->>> +
->>> +#include <linux/clk.h>
->>> +#include <linux/clockchips.h>
->>> +#include <linux/clocksource.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_irq.h>
->>> +
->>> +#define TIMER_NAME            "timer64-event"
->>> +
->>> +/* Timer register offsets */
->>> +#define TIM12                0x10
->>> +#define TIM34                0x14
->>> +#define PRD12                0x18
->>> +#define PRD34                0x1c
->>> +#define TCR                0x20
->>> +#define TGCR                0x24
->>> +#define INTCTLSTAT            0x44
->>> +
->>> +/* Timer register bitfields */
->>> +#define TCR_ENAMODE_MASK        0xC0
->>> +#define TCR_ENAMODE_ONESHOT_MASK    0x40
->>> +#define TCR_ENAMODE_PERIODIC_MASK    0x80
->>> +
->>> +#define TGCR_TIM_UNRESET_MASK        0x03
->>> +#define INTCTLSTAT_ENINT_MASK        0x01
->>> +
->>> +/**
->>> + * struct keystone_timer: holds timer's data
->>> + * @base: timer memory base address
->>> + * @clk_rate: source clock rate
->>> + * @irqacrion: interrupt action descriptor
->>> + * @event_dev: event device based on timer
->>> + */
->>> +static struct keystone_timer {
->>> +    void __iomem *base;
->>> +    unsigned long clk_rate;
->>> +    struct irqaction irqaction;
->>> +    struct clock_event_device event_dev;
->>> +} timer;
->>> +
->>> +static inline u32 keystone_timer_readl(unsigned long rg)
->>> +{
->>> +    return readl(timer.base + rg);
->>> +}
->>> +
->>> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
->>> +{
->>> +    writel(val, timer.base + rg);
->>> +}
->>> +
->>> +/**
->>> + * keystone_timer_config: configures timer to work in
->>> oneshot/periodic modes, in
->>> + * other cases disables timer.
->>> + * @ mode: mode to configure
->>> + * @ period: cycles number to configure for
->>> + */
->>> +static int keystone_timer_config(u64 period, enum clock_event_mode mode)
->>> +{
->>> +    u32 tcr;
->>> +
->>> +    tcr = keystone_timer_readl(TCR);
->>> +
->>> +    /* disable timer */
->>> +    tcr &= ~(TCR_ENAMODE_MASK);
->>> +    keystone_timer_writel(tcr, TCR);
+On Wed, Dec 11, 2013 at 1:10 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, Dec 10, 2013 at 3:14 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Dec 10, 2013 at 03:43:31PM +0530, Vinod Koul wrote:
+>>> On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
+>>> > On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
+>>> > > + Dan
+>>> > >
+>>> > > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
+>>> > > > The following commit:
+>>> > > >
+>>> > > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
+>>> > > >
+>>> > > > removed the last caller to mv_desc_get_dest_addr(), creating the
+>>> > > > warning:
+>>> > > >
+>>> > > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
+>>> > > >   but not used [-Wunused-function]
+>>> > > >
+>>> > > > Remove it.
+>>> > > >
+>>> > > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+>>> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
+>>> > >
+>>> > > This should go thru Dan's tree
+>>> >
+>>> > So what's happening with this patch?  I don't see it in -rc yet.
+>>> Dan has applied this to his next. So this should show us in next rc1
 >>
->> Please move this write after the switch (cf. linked comment below)
->>
+>> Wrong answer.  This is a compile regression introduced in the last merge
+>> window, it should be going into an -rc kernel.
 >
-> See below
->
->>> +    /* set enable mode or leave disabled timer */
->>> +    switch (mode) {
->>> +    case CLOCK_EVT_MODE_ONESHOT:
->>> +        tcr |= TCR_ENAMODE_ONESHOT_MASK;
->>> +        break;
->>> +    case CLOCK_EVT_MODE_PERIODIC:
->>> +        tcr |= TCR_ENAMODE_PERIODIC_MASK;
->>> +        break;
->>> +    default:
->>> +        return 0;
->>
->> Shouldn't you return an error ?
->>
->
-> It returns value only for convenient usage in keystone_set_next_event(),
-> see [1].
->
-> In general, this function is used to configure the timer.
-> The procedure is that we need to stop the timer then set it.
-> If timer needs to be disabled (shutdown mode), function disables it and returns.
->
->>> +    }
->>> +
->>> +    /* reset counter to zero, set new period */
->>> +    keystone_timer_writel(0, TIM12);
->>> +    keystone_timer_writel(0, TIM34);
->>> +    keystone_timer_writel(period & 0xffffffff, PRD12);
->>> +    keystone_timer_writel(period >> 32, PRD34);
->>> +
->>> +    /* enable timer */
->>> +    keystone_timer_writel(tcr, TCR);
->>> +    return 0;
->>> +}
->>> +
->>> +static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
->>> +{
->>> +    struct clock_event_device *evt = &timer.event_dev;
->>> +
->>> +    evt->event_handler(evt);
->>> +    return IRQ_HANDLED;
->>> +}
->>> +
->>> +static int keystone_set_next_event(unsigned long cycles,
->>> +                  struct clock_event_device *evt)
->>> +{
->>> +    return keystone_timer_config(cycles, evt->mode);
->
-> [1]
->
->>> +}
->>> +
->>> +static void keystone_set_mode(enum clock_event_mode mode,
->>> +                 struct clock_event_device *evt)
->>> +{
->>> +    u64 period;
->>> +
->>> +    switch (mode) {
->>> +    case CLOCK_EVT_MODE_PERIODIC:
->>> +        period = timer.clk_rate / (HZ);
->>> +        keystone_timer_config(period, CLOCK_EVT_MODE_PERIODIC);
->>> +        break;
->>> +    case CLOCK_EVT_MODE_UNUSED:
->>> +    case CLOCK_EVT_MODE_SHUTDOWN:
->>> +    case CLOCK_EVT_MODE_ONESHOT:
->>> +        keystone_timer_config(0, CLOCK_EVT_MODE_SHUTDOWN);
->>
->> I don't really this code assuming the side effect of specifying a
->> unsupported mode will disable the timer.
->>
->
-> In case of an unsupported mode the function does nothing.
-> Is it not correct?
->
-> It disables the timer only in 3 cases.
-> CLOCK_EVT_MODE_UNUSED
-> CLOCK_EVT_MODE_SHUTDOWN
-> CLOCK_EVT_MODE_ONESHOT
->
-> For CLOCK_EVT_MODE_ONESHOT,
-> It is supposed that then keystone_set_next_even() will re-enable the timer.
+> Vinod, if your fixes branch is ready I'll take it along with the rest
+> of the regression fixes to Linus.
 
-The code looks like is doing what is expected. It is not about a bug but 
-a coding style issue. I am not in favor of passing the 
-CLOCK_EVT_MODE_SHUTDOWN which default in keystone_timer_config on 
-returning no error. The caller assumes the function will exit without 
-re-enabling the timer. It is correct from an implementation POV but IMO 
-it is a bit subtle and prone to errors for the future modifications.
+Ok, I see you sent dma-slave/fixes up, I'll follow up with the rest:
 
-If keystone_timer_config(period, __A_VALUE_FROM_SPACE__) is called, it 
-will return no error and disables the timer.
+Dan Williams (5):
+      dma: fix build warnings in ppc4xx
+      dma: fix fsldma build warnings
+      dmatest: fix build warning on mips
+      dma: fix build warnings in txx9
+      dmaengine: fix enable for high order unmap pools
 
-IMO, for the sake of clarity, defining the different modes in the switch 
-and returning an error on default would be more convenient.
+Ezequiel Garcia (1):
+      dma: mv_xor: Use dmaengine_unmap_data for the self-tests
 
-For this reason, you shouldn't disable the timer before checking the 
-correctness of the mode, thus the comment about moving the timer 
-disabling after the switch.
+Jason Cooper (1):
+      dma: mv_xor: remove mv_desc_get_dest_addr()
 
->>> +    default:
->>> +        break;
->>> +    }
->>> +}
->>> +
->>> +static void __init keystone_timer_init(struct device_node *np)
->>> +{
->>> +    struct clock_event_device *event_dev = &timer.event_dev;
->>> +    struct irqaction *irqaction = &timer.irqaction;
->>> +    unsigned long rate;
->>> +    struct clk *clk;
->>> +    int irq, error;
->>> +    u32 tgcr;
->>> +
->>> +    irq  = irq_of_parse_and_map(np, 0);
->>> +    if (irq == NO_IRQ) {
->>> +        pr_err("%s: failed to map interrupts\n", __func__);
->>> +        return;
->>> +    }
->>> +
->>> +    timer.base = of_iomap(np, 0);
->>> +    if (!timer.base) {
->>> +        pr_err("%s: failed to map registers\n", __func__);
->>> +        return;
->>> +    }
->>> +
->>> +    clk = of_clk_get(np, 0);
->>> +    if (!clk) {
->>> +        pr_err("%s: failed to get clock\n", __func__);
->>> +        iounmap(timer.base);
->>> +        return;
->>> +    }
->>> +
->>> +    error = clk_prepare_enable(clk);
->>> +    if (error) {
->>> +        pr_err("%s: failed to enable clock\n", __func__);
->>> +        goto err;
->>> +    }
->>> +
->>> +    rate = clk_get_rate(clk);
->>> +
->>> +    /* disable, use internal clock source */
->>> +    keystone_timer_writel(0, TCR);
->>> +
->>> +    /* reset timer as 64-bit, no pre-scaler, plus features are
->>> disabled */
->>> +    tgcr = 0;
->>> +    keystone_timer_writel(0, TGCR);
->>> +
->>> +    /* unreset timer */
->>> +    tgcr |= TGCR_TIM_UNRESET_MASK;
->>> +    keystone_timer_writel(tgcr, TGCR);
->>> +
->>> +    /* init counter to zero */
->>> +    keystone_timer_writel(0, TIM12);
->>> +    keystone_timer_writel(0, TIM34);
->>> +
->>> +    timer.clk_rate = rate;
->>> +
->>> +    /* enable timer interrupts */
->>> +    keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
->>> +
->>> +    keystone_timer_config(0, CLOCK_EVT_MODE_UNUSED);
->>
->> Same comment here.
->>
->
-> you are right, I disabled the timer above.., so
-> I may delete "keystone_timer_config(0, CLOCK_EVT_MODE_UNUSED);"
->
->>> +    /* init irqaction */
->>> +    irqaction->flags = IRQF_TIMER;
->>> +    irqaction->handler = keystone_timer_interrupt;
->>> +    irqaction->name = TIMER_NAME;
->>> +    irqaction->dev_id = (void *)&timer;
->>> +    error = setup_irq(irq, irqaction);
->>> +    if (error) {
->>> +        pr_err("%s: failed to setup irq\n", __func__);
->>> +        goto err;
->>> +    }
->>> +
->>> +    /* setup clockevent */
->>> +    event_dev->features = CLOCK_EVT_FEAT_PERIODIC |
->>> CLOCK_EVT_FEAT_ONESHOT;
->>> +    event_dev->set_next_event = keystone_set_next_event;
->>> +    event_dev->set_mode = keystone_set_mode;
->>> +    event_dev->cpumask = cpu_all_mask;
->>> +    event_dev->owner = THIS_MODULE;
->>> +    event_dev->name = TIMER_NAME;
->>> +
->>> +    clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
->>> +
->>> +    pr_info("keystone timer clock @%lu Hz\n", rate);
->>> +    return;
->>> +err:
->>> +    clk_put(clk);
->>> +    iounmap(timer.base);
->>> +}
->>> +
->>> +CLOCKSOURCE_OF_DECLARE(keystone_timer, "ti,keystone-timer",
->>> +                    keystone_timer_init);
->>>
->>
->>
->
->
+Olof Johansson (1):
+      dmaengine: at_hdmac: remove unused function
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Russell King (1):
+      dmaengine: mv_xor: fix oops when channels fail to initialise
