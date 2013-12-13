@@ -1,46 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:21 +0900
-Subject: [PATCH 47/69] ARM: shmobile: Use r8a7790 suffix for MMCIF compat
- string
-In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
-References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <063e85607ddf26e5ede36b7454eddc8e87544540.1386901186.git.horms+renesas@verge.net.au>
+Date: Fri, 13 Dec 2013 11:30:24 +0900
+Subject: [GIT PULL 0/3] Renesas ARM based SoC fixes for v3.13
+Message-ID: <cover.1386899269.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add "renesas,mmcif-r8a7790" to the compatible string for MMCIF
-in case of r8a7790. This makes the MMCIF follow the same style
-as the other devices and also makes it more future proof.
+please consider these Renesas ARM based SoC fixes for v3.13.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index f844b63..fb9225f 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -230,7 +230,7 @@
- 	};
- 
- 	mmcif0: mmcif at ee200000 {
--		compatible = "renesas,sh-mmcif";
-+		compatible = "renesas,mmcif-r8a7790", "renesas,sh-mmcif";
- 		reg = <0 0xee200000 0 0x80>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
-@@ -239,7 +239,7 @@
- 	};
- 
- 	mmcif1: mmc at ee220000 {
--		compatible = "renesas,sh-mmcif";
-+		compatible = "renesas,mmcif-r8a7790", "renesas,sh-mmcif";
- 		reg = <0 0xee220000 0 0x80>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 170 IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.8.4
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.13
+
+for you to fetch changes up to 23de2278ebc3a2f971ce45ca5e5e35c9d5a74040:
+
+  ARM: shmobile: r8a7790: Fix GPIO resources in DTS (2013-11-28 17:04:39 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC fixes for v3.13
+
+* r8a7790 (R-Car H1) SoC
+  - Correct GPIO resources in DT.
+
+    This problem has been present since GPIOs were added to the r8a7790 SoC
+    by f98e10c88aa95bf7 ("ARM: shmobile: r8a7790: Add GPIO controller
+    devices to device tree") in v3.12-rc1.
+
+* irqchip renesas-intc-irqpin
+  - Correct register bitfield shift calculation
+
+    This bug has been present since the renesas-intc-irqpin driver was
+    introduced by 443580486e3b9657 ("irqchip: Renesas INTC External IRQ pin
+    driver") in v3.10-rc1
+
+* Lager board
+  - Do not build the phy fixup unless CONFIG_PHYLIB is enabled
+
+    This problem was introduced by 48c8b96f21817aad
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      irqchip: renesas-intc-irqpin: Fix register bitfield shift calculation
+
+Magnus Damm (1):
+      ARM: shmobile: r8a7790: Fix GPIO resources in DTS
+
+Simon Horman (1):
+      ARM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
+
+ arch/arm/boot/dts/r8a7790.dtsi            | 24 ++++++++++++------------
+ arch/arm/mach-shmobile/board-lager.c      |  4 +++-
+ drivers/irqchip/irq-renesas-intc-irqpin.c |  8 +++++---
+ 3 files changed, 20 insertions(+), 16 deletions(-)
