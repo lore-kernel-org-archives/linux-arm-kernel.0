@@ -1,19 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Dec 2013 17:17:59 +0100
-Subject: [PATCH v4 2/2] ARM: mach-moxart: add MOXA ART SoC device tree
- files
-In-Reply-To: <1386945188-8316-3-git-send-email-jonas.jensen@gmail.com>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
- <1386945188-8316-3-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <201312131717.59921.arnd@arndb.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 13 Dec 2013 11:20:19 -0500
+Subject: [PATCH v6 7/7] jump_label: use defined macros instead of
+ hard-coding for better readability
+In-Reply-To: <1386691433-6827-8-git-send-email-liuj97@gmail.com>
+References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>
+ <1386691433-6827-8-git-send-email-liuj97@gmail.com>
+Message-ID: <20131213112019.751f7946@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 December 2013, Jonas Jensen wrote:
-> Add a generic (dtsi) include file for MOXA ART SoCs.
-> 
-> Also add a file for UC-7112-LX.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+On Wed, 11 Dec 2013 00:03:53 +0800
+Jiang Liu <liuj97@gmail.com> wrote:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
+> readability.
+
+Looks good, just a little nit. (see below)
+
+> 
+> Signed-off-by: Jiang Liu <liuj97@gmail.com>
+> ---
+>  include/linux/jump_label.h | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
+> index 3999977..192ccba 100644
+> --- a/include/linux/jump_label.h
+> +++ b/include/linux/jump_label.h
+> @@ -81,18 +81,21 @@ struct module;
+>  #include <linux/atomic.h>
+>  #ifdef HAVE_JUMP_LABEL
+>  
+> -#define JUMP_LABEL_TRUE_BRANCH 1UL
+> +#define JUMP_LABEL_TYPE_FALSE_BRANCH	0UL
+> +#define JUMP_LABEL_TYPE_TRUE_BRANCH	1UL
+> +#define JUMP_LABEL_TYPE_MASK		1UL
+>  
+>  static
+>  inline struct jump_entry *jump_label_get_entries(struct static_key *key)
+>  {
+>  	return (struct jump_entry *)((unsigned long)key->entries
+> -						& ~JUMP_LABEL_TRUE_BRANCH);
+> +						& ~JUMP_LABEL_TYPE_MASK);
+>  }
+>  
+>  static inline bool jump_label_get_branch_default(struct static_key *key)
+>  {
+> -	if ((unsigned long)key->entries & JUMP_LABEL_TRUE_BRANCH)
+> +	if (((unsigned long)key->entries & JUMP_LABEL_TYPE_MASK) ==
+> +	    JUMP_LABEL_TYPE_TRUE_BRANCH)
+>  		return true;
+>  	return false;
+>  }
+> @@ -123,9 +126,11 @@ extern void static_key_slow_dec(struct static_key *key);
+>  extern void jump_label_apply_nops(struct module *mod);
+>  
+>  #define STATIC_KEY_INIT_TRUE ((struct static_key) \
+> -	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
+> +	{ .enabled = ATOMIC_INIT(1), \
+> +	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
+>  #define STATIC_KEY_INIT_FALSE ((struct static_key) \
+> -	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
+> +	{ .enabled = ATOMIC_INIT(0), \
+> +	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
+
+Can we prettify the backslashes like:
+
+#define STATIC_KEY_INIT_TRUE ((struct static_key)		\
+	{ .enabled = ATOMIC_INIT(1),				\
+	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
+#define STATIC_KEY_INIT_FALSE ((struct static_key)		\
+	{ .enabled = ATOMIC_INIT(0),				\
+	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
+
+
+Other than that.
+
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+
+-- Steve
+
+>  
+>  #else  /* !HAVE_JUMP_LABEL */
+>  
