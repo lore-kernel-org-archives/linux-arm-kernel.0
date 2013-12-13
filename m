@@ -1,191 +1,21 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 12 Dec 2013 18:49:15 -0700
-Subject: [PATCH V1 11/11] ARM: dts: imx: add nitrogen6x board
-In-Reply-To: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1386899355-17379-12-git-send-email-troy.kisky@boundarydevices.com>
+From: david.a.cohen@linux.intel.com (David Cohen)
+Date: Thu, 12 Dec 2013 17:56:05 -0800
+Subject: [PATCH 3/7] usb: dwc3: pci: add pm_runtime support
+In-Reply-To: <1386884325-11440-4-git-send-email-balbi@ti.com>
+References: <1386884325-11440-1-git-send-email-balbi@ti.com>
+ <1386884325-11440-4-git-send-email-balbi@ti.com>
+Message-ID: <20131213015605.GC29964@psi-dev26.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add file imx6q-nitrogen6x.dts,
-	imx6dl-nitrogen6x.dts,
-	imx6qdl-nitrogen6x.dtsi
+On Thu, Dec 12, 2013 at 03:38:41PM -0600, Felipe Balbi wrote:
+> teach the PCI glue about pm_runtime so that
+> it's easier to teach dwc3 core about it
+> later.
+> 
+> No functional changes otherwise.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-And add board to makefile.
-
-Eric Nelson created a web page to show the
-differences between Nitrogen6x and Sabre Lite boards.
-http://boundarydevices.com/differences-sabre-lite-nitrogen6x
-
-
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/boot/dts/Makefile                         |  2 ++
- arch/arm/boot/dts/imx6dl-nitrogen6x.dts            | 22 ++++++++++++++++++
- arch/arm/boot/dts/imx6q-nitrogen6x.dts             | 26 ++++++++++++++++++++++
- ...6qdl-sabrelite.dtsi => imx6qdl-nitrogen6x.dtsi} | 17 +++++++-------
- 4 files changed, 58 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-nitrogen6x.dts
- create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6x.dts
- copy arch/arm/boot/dts/{imx6qdl-sabrelite.dtsi => imx6qdl-nitrogen6x.dtsi} (95%)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 3c6f456..f8fb8d0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -148,6 +148,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6dl-gw52xx.dtb \
- 	imx6dl-gw53xx.dtb \
- 	imx6dl-gw54xx.dtb \
-+	imx6dl-nitrogen6x.dtb \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabrelite.dtb \
- 	imx6dl-sabresd.dtb \
-@@ -160,6 +161,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-gw53xx.dtb \
- 	imx6q-gw5400-a.dtb \
- 	imx6q-gw54xx.dtb \
-+	imx6q-nitrogen6x.dtb \
- 	imx6q-phytec-pbab01.dtb \
- 	imx6q-sabreauto.dtb \
- 	imx6q-sabrelite.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-nitrogen6x.dts b/arch/arm/boot/dts/imx6dl-nitrogen6x.dts
-new file mode 100644
-index 0000000..89d32f3
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-nitrogen6x.dts
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright 2013 Boundary Devices, Inc.
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-nitrogen6x.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 DualLite Nitrogen6x Board";
-+	compatible = "fsl,imx6dl-nitrogen6x", "fsl,imx6dl";
-+
-+};
-diff --git a/arch/arm/boot/dts/imx6q-nitrogen6x.dts b/arch/arm/boot/dts/imx6q-nitrogen6x.dts
-new file mode 100644
-index 0000000..5790172
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-nitrogen6x.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2013 Boundary Devices, Inc.
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-nitrogen6x.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 Quad Nitrogen6x Board";
-+	compatible = "fsl,imx6q-nitrogen6x", "fsl,imx6q";
-+
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-similarity index 95%
-copy from arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-copy to arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index 1a95faf..3e60ba5 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -1,4 +1,5 @@
- /*
-+ * Copyright 2013 Boundary Devices, Inc.
-  * Copyright 2011 Freescale Semiconductor, Inc.
-  * Copyright 2011 Linaro Ltd.
-  *
-@@ -91,9 +92,9 @@
- 	};
- 
- 	sound {
--		compatible = "fsl,imx6q-sabrelite-sgtl5000",
-+		compatible = "fsl,imx6q-nitrogen6x-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
--		model = "imx6q-sabrelite-sgtl5000";
-+		model = "imx6q-nitrogen6x-sgtl5000";
- 		ssi-controller = <&ssi1>;
- 		audio-codec = <&codec>;
- 		audio-routing =
-@@ -101,7 +102,7 @@
- 			"Mic Jack", "Mic Bias",
- 			"Headphone Jack", "HP_OUT";
- 		mux-int-port = <1>;
--		mux-ext-port = <4>;
-+		mux-ext-port = <3>;
- 	};
- 
- 	backlight_lcd {
-@@ -147,7 +148,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
--	phy-reset-gpios = <&gpio3 23 0>;
-+	phy-reset-gpios = <&gpio1 27 0>;
- 	txen-skew-ps = <0>;
- 	txc-skew-ps = <3000>;
- 	rxdv-skew-ps = <0>;
-@@ -182,15 +183,14 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
- 
--	imx6q-sabrelite {
-+	imx6q-nitrogen6x {
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
- /* uSDHC4 CD  */		MX6QDL_PAD_NANDF_D6__GPIO2_IO06		0x1b0b0
- /* spi-nor CS */		MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x1b0b0
- /* otg power en */		MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0
--/* ethernet phy reset */	MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
-+/* ethernet phy reset */	MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x000b0
- /* USDHC3 CD  */		MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0
--/* USDHC3 WP  */		MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1f0b0
- /* SGTL5000 sys_mclk  */	MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x000b0
- /* Power Button */		MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x1b0b0
- /* Menu Button */		MX6QDL_PAD_NANDF_D1__GPIO2_IO01		0x1b0b0
-@@ -202,7 +202,7 @@
- 		};
- 
- 		pinctrl_audmux: audmuxgrp {
--			fsl,pins = <MX6QDL_AUDMUX_PINGRP1>;
-+			fsl,pins = <MX6QDL_AUDMUX_PINGRP2>;
- 		};
- 
- 		pinctrl_ecspi1: ecspi1grp {
-@@ -352,7 +352,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
- 	cd-gpios = <&gpio7 0 0>;
--	wp-gpios = <&gpio7 1 0>;
- 	vmmc-supply = <&reg_3p3v>;
- 	status = "okay";
- };
--- 
-1.8.1.2
+I was able to test this one with Intel Merrifield:
+Acked-by: David Cohen <david.a.cohen@linux.intel.com>
