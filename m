@@ -1,49 +1,33 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 13 Dec 2013 16:37:35 -0500
-Subject: [PATCH v3 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <1386625856-12942-9-git-send-email-santosh.shilimkar@ti.com>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-9-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131213213735.GM27070@htj.dyndns.org>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 13 Dec 2013 22:50:45 +0100
+Subject: [PATCH V1 06/11] ARM: dts: imx6qdl-sabrelite: add gpio-keys
+In-Reply-To: <52AB55B6.7080104@boundarydevices.com>
+References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
+ <201312131251.13852.marex@denx.de> <52AB55B6.7080104@boundarydevices.com>
+Message-ID: <201312132250.45796.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 04:50:41PM -0500, Santosh Shilimkar wrote:
-> Introduce memblock memory allocation APIs which allow to support
-> PAE or LPAE extension on 32 bits archs where the physical memory
-> start address can be beyond 4GB. In such cases, existing bootmem
-> APIs which operate on 32 bit addresses won't work and needs
-> memblock layer which operates on 64 bit addresses.
+On Friday, December 13, 2013 at 07:45:10 PM, Troy Kisky wrote:
+> On 12/13/2013 4:51 AM, Marek Vasut wrote:
+> > On Friday, December 13, 2013 at 02:49:10 AM, Troy Kisky wrote:
+> >> Add power, menu, home, back, volume up, and volume down
+> >> buttons.
+> >> 
+> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > 
+> > Are these really present on the board or are they on some expansion
+> > board? I am not sure how to handle this case when the GPIO buttons are
+> > on optional expansion board, maybe someone else (Shawn?) will help here.
+> > 
+> > Best regards,
+> > Marek Vasut
+> 
+> You are right, it is an expansion board. But the signals do not conflict
+> with any other
+> expansion board that I know of.
 
-The overall API looks good to me.  Thanks for doing this!
+... yet ;-)
 
-> +static void * __init memblock_virt_alloc_internal(
-> +				phys_addr_t size, phys_addr_t align,
-> +				phys_addr_t min_addr, phys_addr_t max_addr,
-> +				int nid)
-> +{
-> +	phys_addr_t alloc;
-> +	void *ptr;
-> +
-> +	if (nid == MAX_NUMNODES)
-> +		pr_warn("%s: usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE\n",
-> +			__func__);
-
-Why not use WARN_ONCE()?  Also, shouldn't nid be set to NUMA_NO_NODE
-here?
-
-...
-> +	if (nid != NUMA_NO_NODE) {
-
-Otherwise, the above test is broken.
-
-> +		alloc = memblock_find_in_range_node(size, align, min_addr,
-> +						    max_addr,  NUMA_NO_NODE);
-> +		if (alloc)
-> +			goto done;
-> +	}
-
-Thanks.
-
--- 
-tejun
+Best regards,
+Marek Vasut
