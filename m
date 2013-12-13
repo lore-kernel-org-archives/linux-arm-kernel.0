@@ -1,39 +1,37 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Fri, 13 Dec 2013 17:07:11 -0600
-Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
-Message-ID: <1386976031-21651-1-git-send-email-dinguyen@altera.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 13 Dec 2013 18:15:15 -0500
+Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+In-Reply-To: <20131213004337.GA31622@saruman.home>
+References: <20131212214306.GS1939@saruman.home>
+ <1386884755-12366-1-git-send-email-balbi@ti.com> <52AA54E4.5000606@ti.com>
+ <20131213004337.GA31622@saruman.home>
+Message-ID: <52AB9503.2090801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thursday 12 December 2013 07:43 PM, Felipe Balbi wrote:
+> On Thu, Dec 12, 2013 at 07:29:24PM -0500, Santosh Shilimkar wrote:
+>> On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
+>>> A bare-minimum PM implementation which will
+>>> server as building block for more complex
+>> s/server/serve ;-)
+> 
+> hah! :-) will fix in my branch.
+> 
+>>> PM implementation in the future.
+>>>
+>>> At the least will not leave clocks on unnecessarily
+>>> when e.g.  a user write mem to /sys/power/state.
+>>>
+>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>> ---
+>>>
+>>> improve error path a little bit.
+>>>
+>> We will test this out. Thanks for the
+>> patch Felipe.
+> 
+I see Wingman already tested the patch.
+Feel free add, my ack if you need one...
 
-Please pull in these 3 patches that cleans up the SOCFPGA clock driver.
-
-Thanks,
-
-Dinh
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14
-
-for you to fetch changes up to be4cf9f262a069a91d095b9c17aed44e12699236:
-
-  clk: socfpga: Remove socfpga_init_clocks (2013-12-13 16:54:38 -0600)
-
-----------------------------------------------------------------
-SOCFPGA clk cleanups for 3.14
-
-----------------------------------------------------------------
-Dinh Nguyen (3):
-      clk: socfpga: Map the clk manager base address in the clock driver
-      clk: socfpga: Look for the GPIO_DB_CLK by its offset
-      clk: socfpga: Remove socfpga_init_clocks
-
- arch/arm/mach-socfpga/socfpga.c |    5 -----
- drivers/clk/socfpga/clk.c       |   31 +++++++++++++++++--------------
- 2 files changed, 17 insertions(+), 19 deletions(-)
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
