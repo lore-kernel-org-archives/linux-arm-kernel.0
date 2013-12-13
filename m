@@ -1,90 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Dec 2013 23:59:08 +0000
-Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
-In-Reply-To: <20131212234453.GB8754@blackmetal.musicnaut.iki.fi>
-References: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
- <20131212224249.GX4360@n2100.arm.linux.org.uk>
- <CAPcyv4hr2N0kiZabsJJjfmFqTRbT_ntjX4Rdg=THpYg=_2cELg@mail.gmail.com>
- <20131212234453.GB8754@blackmetal.musicnaut.iki.fi>
-Message-ID: <20131212235908.GZ4360@n2100.arm.linux.org.uk>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 12 Dec 2013 18:05:19 -0600
+Subject: [PATCH v5 3/9] usb: gadget: s3c-hsotg: enable build for other
+ platforms
+In-Reply-To: <20131212220726.GA4205@beef>
+References: <1386854770-2173-1-git-send-email-mporter@linaro.org>
+ <1386854770-2173-4-git-send-email-mporter@linaro.org>
+ <52AA2FE3.3060200@gmail.com> <20131212220726.GA4205@beef>
+Message-ID: <52AA4F3F.4070907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: [PATCH] dmaengine: mv_xor: fix oops when channels fail to initialise
 
-When a channel fails to initialise, we error out and clean up any
-previously unregistered channels by walking the entire xordev->channels
-array.  Unfortunately, there are paths which end up storing an error
-pointer in this array, which we then try and dereference in the cleanup
-code, which causes an oops.
+On 12/12/13 4:07 PM, Matt Porter wrote:
+> On Thu, Dec 12, 2013 at 03:51:31PM -0600, Dinh Nguyen wrote:
+>> Hi Matt,
+>>
+>> On 12/12/13 7:26 AM, Matt Porter wrote:
+>>> Remove unused Samsung-specific machine include and Kconfig
+>>> dependency on S3C.
+>>>
+>>> Signed-off-by: Matt Porter <mporter@linaro.org>
+>>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+>>> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+>>> ---
+>>>  drivers/usb/gadget/Kconfig     | 7 +++----
+>>>  drivers/usb/gadget/s3c-hsotg.c | 2 --
+>>>  2 files changed, 3 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+>>> index a91e642..970bd1a 100644
+>>> --- a/drivers/usb/gadget/Kconfig
+>>> +++ b/drivers/usb/gadget/Kconfig
+>>> @@ -294,11 +294,10 @@ config USB_PXA27X
+>>>  	   gadget drivers to also be dynamically linked.
+>>>  
+>>>  config USB_S3C_HSOTG
+>>> -	tristate "S3C HS/OtG USB Device controller"
+>>> -	depends on S3C_DEV_USB_HSOTG
+>>> +	tristate "Designware/S3C HS/OtG USB Device controller"
+>>>  	help
+>>> -	  The Samsung S3C64XX USB2.0 high-speed gadget controller
+>>> -	  integrated into the S3C64XX series SoC.
+>>> +	  The Designware USB2.0 high-speed gadget controller
+>>> +	  integrated into the S3C64XX and BCM281xx series SoC.
+>> Thanks for doing this. The SOCFPGA platform is also using this driver.
+>> So perhaps a
+>> more generic message here?
+> Ok, I wasn't aware since I didn't see anybody else try to fix this
+> driver in mainline. How about this?
+>
+> 	The Designware USB2.0 high-speed gadget controller
+> 	integrated into many SoCS.
+That looks fine to me. Yeah, I didn't realize the s3c driver was just the
+Synopsys DWC2 peripheral driver until I saw drivers/staging/dwc2. I was
+in process of switching over to use it and then I saw your patchset.
 
-Fix this by avoiding writing invalid pointers to this array in the first
-place.
-
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/mv_xor.c |   24 +++++++++++++-----------
- 1 files changed, 13 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 7807f0ef4e20..a7e91090443e 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -1176,6 +1176,7 @@ static int mv_xor_probe(struct platform_device *pdev)
- 		int i = 0;
- 
- 		for_each_child_of_node(pdev->dev.of_node, np) {
-+			struct mv_xor_chan *chan;
- 			dma_cap_mask_t cap_mask;
- 			int irq;
- 
-@@ -1193,21 +1194,21 @@ static int mv_xor_probe(struct platform_device *pdev)
- 				goto err_channel_add;
- 			}
- 
--			xordev->channels[i] =
--				mv_xor_channel_add(xordev, pdev, i,
--						   cap_mask, irq);
--			if (IS_ERR(xordev->channels[i])) {
--				ret = PTR_ERR(xordev->channels[i]);
--				xordev->channels[i] = NULL;
-+			chan = mv_xor_channel_add(xordev, pdev, i,
-+						  cap_mask, irq);
-+			if (IS_ERR(chan)) {
-+				ret = PTR_ERR(chan);
- 				irq_dispose_mapping(irq);
- 				goto err_channel_add;
- 			}
- 
-+			xordev->channels[i] = chan;
- 			i++;
- 		}
- 	} else if (pdata && pdata->channels) {
- 		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
- 			struct mv_xor_channel_data *cd;
-+			struct mv_xor_chan *chan;
- 			int irq;
- 
- 			cd = &pdata->channels[i];
-@@ -1222,13 +1223,14 @@ static int mv_xor_probe(struct platform_device *pdev)
- 				goto err_channel_add;
- 			}
- 
--			xordev->channels[i] =
--				mv_xor_channel_add(xordev, pdev, i,
--						   cd->cap_mask, irq);
--			if (IS_ERR(xordev->channels[i])) {
--				ret = PTR_ERR(xordev->channels[i]);
-+			chan = mv_xor_channel_add(xordev, pdev, i,
-+						  cd->cap_mask, irq);
-+			if (IS_ERR(chan)) {
-+				ret = PTR_ERR(chan);
- 				goto err_channel_add;
- 			}
-+
-+			xordev->channels[i] = chan;
- 		}
- 	}
- 
+Thanks,
+Dinh
+>
+> If that looks better to you I'll plan to add it in an update. I would
+> like to see if we can gather a couple acks at this point or if there are
+> any additional DT comments before sending another update.
+>
+> -Matt
+>
+>>>  
+>>>  config USB_S3C2410
+>>>  	tristate "S3C2410 USB Device Controller"
+>>> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+>>> index 33eb690..8ceb5ef 100644
+>>> --- a/drivers/usb/gadget/s3c-hsotg.c
+>>> +++ b/drivers/usb/gadget/s3c-hsotg.c
+>>> @@ -37,8 +37,6 @@
+>>>  #include <linux/usb/phy.h>
+>>>  #include <linux/platform_data/s3c-hsotg.h>
+>>>  
+>>> -#include <mach/map.h>
+>>> -
+>>>  #include "s3c-hsotg.h"
+>>>  
+>>>  static const char * const s3c_hsotg_supply_names[] = {
