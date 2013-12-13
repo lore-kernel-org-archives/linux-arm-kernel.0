@@ -1,58 +1,75 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 13 Dec 2013 21:19:44 +0100
-Subject: [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for HSMMC1
-Message-ID: <1386965984-16028-1-git-send-email-tomasz.figa@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 13 Dec 2013 14:22:40 -0600
+Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+In-Reply-To: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C84D@DFLE11.ent.ti.com>
+References: <20131212214306.GS1939@saruman.home>
+ <1386884755-12366-1-git-send-email-balbi@ti.com>
+ <52AA54E4.5000606@ti.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E0415C786@DFLE11.ent.ti.com>
+ <20131213195431.GF5292@saruman.home>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E0415C84D@DFLE11.ent.ti.com>
+Message-ID: <20131213202240.GK5292@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to board schematics, for HSMMC1 a GPIO line is used to detect
-card presence, while currently it is being configured for internal card
-detect line, which is multiplexed with card detect line of HSMMC0 and
-thus breaking it.
+On Fri, Dec 13, 2013 at 02:18:42PM -0600, Kwok, WingMan wrote:
+> 
+> > -----Original Message-----
+> > From: Balbi, Felipe
+> > Sent: Friday, December 13, 2013 2:55 PM
+> > To: Kwok, WingMan
+> > Cc: Shilimkar, Santosh; Balbi, Felipe; Linux USB Mailing List;
+> > kgene.kim at samsung.com; Linux ARM Kernel Mailing List; linux-samsung-
+> > soc at vger.kernel.org; Linux OMAP Mailing List
+> > Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+> > 
+> > On Fri, Dec 13, 2013 at 10:04:38AM -0600, Kwok, WingMan wrote:
+> > > Hello
+> > >
+> > > > -----Original Message-----
+> > > > From: Shilimkar, Santosh
+> > > > Sent: Thursday, December 12, 2013 7:29 PM
+> > > > To: Balbi, Felipe
+> > > > Cc: Linux USB Mailing List; kgene.kim at samsung.com; Linux ARM Kernel
+> > > > Mailing List; linux-samsung-soc at vger.kernel.org; Linux OMAP Mailing
+> > > > List; Kwok, WingMan
+> > > > Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM
+> > > > support
+> > > >
+> > > > On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
+> > > > > A bare-minimum PM implementation which will server as building
+> > > > > block for more complex
+> > > > s/server/serve ;-)
+> > > > > PM implementation in the future.
+> > > > >
+> > > > > At the least will not leave clocks on unnecessarily when e.g.  a
+> > > > > user write mem to /sys/power/state.
+> > > > >
+> > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > > ---
+> > > > >
+> > > > > improve error path a little bit.
+> > > > >
+> > > > We will test this out. Thanks for the patch Felipe.
+> > > >
+> > >
+> > > I have tested the patch and the keystone usb driver continues to
+> > > function, though I can't test suspend at this time as the rest of the
+> > > system does not that functionality yet.
+> > 
+> > Thanks, should I add your Tested-by ?
+> 
+> Yes please.
 
-This patch adds proper sdhci platform data setting card detect type to
-external GPIO and fixing operation of HSMMC0.
+you need to reply with Tested-by: Your Name <your.email@domain.com> just
+to make it all official. Sorry
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/mach-s3c64xx/mach-mini6410.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 58d46a3..97ae470 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -36,7 +36,9 @@
- #include <plat/devs.h>
- #include <plat/fb.h>
- #include <linux/platform_data/mtd-nand-s3c2410.h>
-+#include <linux/platform_data/mmc-sdhci-s3c.h>
- #include <plat/regs-serial.h>
-+#include <plat/sdhci.h>
- #include <linux/platform_data/touchscreen-s3c2410.h>
- 
- #include <video/platform_lcd.h>
-@@ -214,6 +216,13 @@ static struct platform_device mini6410_lcd_powerdev = {
- 	.dev.platform_data	= &mini6410_lcd_power_data,
- };
- 
-+static struct s3c_sdhci_platdata mini6410_hsmmc1_pdata = {
-+	.max_width		= 4,
-+	.cd_type		= S3C_SDHCI_CD_GPIO,
-+	.ext_cd_gpio		= S3C64XX_GPN(10),
-+	.ext_cd_gpio_invert	= true,
-+};
-+
- static struct platform_device *mini6410_devices[] __initdata = {
- 	&mini6410_device_eth,
- 	&s3c_device_hsmmc0,
-@@ -321,6 +330,7 @@ static void __init mini6410_machine_init(void)
- 
- 	s3c_nand_set_platdata(&mini6410_nand_info);
- 	s3c_fb_set_platdata(&mini6410_lcd_pdata[features.lcd_index]);
-+	s3c_sdhci1_set_platdata(&mini6410_hsmmc1_pdata);
- 	s3c24xx_ts_set_platdata(NULL);
- 
- 	/* configure nCS1 width to 16 bits */
 -- 
-1.8.5.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/6bed2d1d/attachment-0001.sig>
