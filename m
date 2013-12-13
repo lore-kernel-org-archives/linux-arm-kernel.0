@@ -1,20 +1,61 @@
 From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Fri, 13 Dec 2013 23:44:06 +0800
-Subject: [PATCH 0/2] Add missing audio-related clocks to imx6 clock tree
-Message-ID: <cover.1386949189.git.Guangyu.Chen@freescale.com>
+Date: Fri, 13 Dec 2013 23:44:07 +0800
+Subject: [PATCH 1/2] ARM: imx6sl: Add missing pll4_audio_div to the clock tree
+In-Reply-To: <cover.1386949189.git.Guangyu.Chen@freescale.com>
+References: <cover.1386949189.git.Guangyu.Chen@freescale.com>
+Message-ID: <7c2a52ab20e746cf61afa1ec0c1578174f094772.1386949189.git.Guangyu.Chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches appends some essential clocks of audio IP to the
-current i.MX6 Series clock trees. 
+There's a dividor for pll4_audio clock missing in clock tree, thus add it.
 
-Nicolin Chen (2):
-  ARM: imx6sl: Add missing pll4_audio_div to the clock tree
-  ARM: imx6sl: Add missing spba clock to clock tree
+Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sl.c           | 5 +++--
+ include/dt-bindings/clock/imx6sl-clock.h | 3 ++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
- arch/arm/mach-imx/clk-imx6sl.c           | 6 ++++--
- include/dt-bindings/clock/imx6sl-clock.h | 4 +++-
- 2 files changed, 7 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index a222280..5eb5522 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -29,14 +29,14 @@ static const char const *periph_sels[]		= { "pre_periph_sel", "periph_clk2_podf"
+ static const char const *periph2_sels[]		= { "pre_periph2_sel", "periph2_clk2_podf", };
+ static const char const *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
+ static const char const *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
+-static const char const *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_post_div", "dummy", };
++static const char const *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_audio_div", "dummy", };
+ static const char const *perclk_sels[]		= { "ipg", "osc", };
+ static const char const *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
+ static const char const *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
+ static const char const *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
+ static const char const *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
+ static const char const *epdc_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd1", "pll3_pfd1", };
+-static const char const *audio_sels[]		= { "pll4_post_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
++static const char const *audio_sels[]		= { "pll4_audio_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
+ static const char const *ecspi_sels[]		= { "pll3_60m", "osc", };
+ static const char const *uart_sels[]		= { "pll3_80m", "osc", };
+ 
+@@ -104,6 +104,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 
+ 	/*                                                           dev   name              parent_name      flags                reg        shift width div: flags, div_table lock */
+ 	clks[IMX6SL_CLK_PLL4_POST_DIV]  = clk_register_divider_table(NULL, "pll4_post_div",  "pll4_audio",    CLK_SET_RATE_PARENT, base + 0x70,  19, 2,   0, post_div_table, &imx_ccm_lock);
++	clks[IMX6SL_CLK_PLL4_AUDIO_DIV] =       clk_register_divider(NULL, "pll4_audio_div", "pll4_post_div", CLK_SET_RATE_PARENT, base + 0x170, 15, 1,   0, &imx_ccm_lock);
+ 	clks[IMX6SL_CLK_PLL5_POST_DIV]  = clk_register_divider_table(NULL, "pll5_post_div",  "pll5_video",    CLK_SET_RATE_PARENT, base + 0xa0,  19, 2,   0, post_div_table, &imx_ccm_lock);
+ 	clks[IMX6SL_CLK_PLL5_VIDEO_DIV] = clk_register_divider_table(NULL, "pll5_video_div", "pll5_post_div", CLK_SET_RATE_PARENT, base + 0x170, 30, 2,   0, video_div_table, &imx_ccm_lock);
+ 	clks[IMX6SL_CLK_ENET_REF]       = clk_register_divider_table(NULL, "enet_ref",       "pll6_enet",     0,                   base + 0xe0,  0,  2,   0, clk_enet_ref_table, &imx_ccm_lock);
+diff --git a/include/dt-bindings/clock/imx6sl-clock.h b/include/dt-bindings/clock/imx6sl-clock.h
+index 46f7495..4735e84 100644
+--- a/include/dt-bindings/clock/imx6sl-clock.h
++++ b/include/dt-bindings/clock/imx6sl-clock.h
+@@ -143,6 +143,7 @@
+ #define IMX6SL_CLK_USDHC2		130
+ #define IMX6SL_CLK_USDHC3		131
+ #define IMX6SL_CLK_USDHC4		132
+-#define IMX6SL_CLK_END			133
++#define IMX6SL_CLK_PLL4_AUDIO_DIV	133
++#define IMX6SL_CLK_END			134
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6SL_H */
 -- 
 1.8.4
