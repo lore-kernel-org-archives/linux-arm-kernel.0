@@ -1,42 +1,45 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 13 Dec 2013 17:02:58 +0100
-Subject: [PATCH v14] dmaengine: Add MOXA ART DMA engine driver
-In-Reply-To: <1386851534-11288-1-git-send-email-jonas.jensen@gmail.com>
-References: <1386774824-1638-1-git-send-email-jonas.jensen@gmail.com>
- <1386851534-11288-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <52AB2FB2.7000009@metafoo.de>
+From: w-kwok2@ti.com (Kwok, WingMan)
+Date: Fri, 13 Dec 2013 16:04:38 +0000
+Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+In-Reply-To: <52AA54E4.5000606@ti.com>
+References: <20131212214306.GS1939@saruman.home>
+ <1386884755-12366-1-git-send-email-balbi@ti.com> <52AA54E4.5000606@ti.com>
+Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C786@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 01:32 PM, Jonas Jensen wrote:
-> The MOXA ART SoC has a DMA controller capable of offloading expensive
-> memory operations, such as large copies. This patch adds support for
-> the controller including four channels. Two of these are used to
-> handle MMC copy on the UC-7112-LX hardware. The remaining two can be
-> used in a future audio driver or client application.
+Hello
+
+> -----Original Message-----
+> From: Shilimkar, Santosh
+> Sent: Thursday, December 12, 2013 7:29 PM
+> To: Balbi, Felipe
+> Cc: Linux USB Mailing List; kgene.kim at samsung.com; Linux ARM Kernel
+> Mailing List; linux-samsung-soc at vger.kernel.org; Linux OMAP Mailing List;
+> Kwok, WingMan
+> Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
 > 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
-[...]
-> +static size_t moxart_dma_desc_size_in_flight(struct moxart_chan *ch)
-> +{
-> +	size_t size;
-> +	unsigned int completed_cycles, cycles, i;
-> +
-> +	for (size = i = 0; i <= ch->sgidx; i++)
-> +		size += ch->desc->sg[i].len;
+> On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
+> > A bare-minimum PM implementation which will server as building block
+> > for more complex
+> s/server/serve ;-)
+> > PM implementation in the future.
+> >
+> > At the least will not leave clocks on unnecessarily when e.g.  a user
+> > write mem to /sys/power/state.
+> >
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >
+> > improve error path a little bit.
+> >
+> We will test this out. Thanks for the
+> patch Felipe.
+> 
 
-This still does not look right. The residue is the amount of data that still
-needs to be transferred, so you need to count the the segments that have not
-been completed yet. Just like I wrote in the last mail loop from ch->sgidx
-to ch->desc->sglen.
+I have tested the patch and the keystone usb driver continues to function,
+though I can't test suspend at this time as the rest of the system does
+not that functionality yet.
 
-> +	cycles = readl(ch->base + REG_OFF_CYCLES);
-> +	completed_cycles = (ch->desc->dma_cycles - cycles);
-> +	size -= completed_cycles << es_bytes[ch->desc->es];
-> +
-> +	dev_dbg(chan2dev(&ch->vc.chan), "%s: size=%zu\n", __func__, size);
-> +
-> +	return size;
-> +}
-[...]
+Thanks
+WingMan
