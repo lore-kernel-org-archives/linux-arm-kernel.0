@@ -1,44 +1,23 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 13 Dec 2013 08:23:21 +0000
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
-In-Reply-To: <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
-References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
- <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
-Message-ID: <52AAC3F9.3050909@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Dec 2013 09:20:39 +0100
+Subject: [PATCH 1/2] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <201312130857.23890.heiko@sntech.de>
+References: <1386857210-4944-1-git-send-email-linus.walleij@linaro.org>
+ <201312130857.23890.heiko@sntech.de>
+Message-ID: <CACRpkdaHy8BDmj+noGqhOm=c0UmSn6pKb9WbGEPtP7M-KwYxLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/13 02:37, Kuninori Morimoto wrote:
->
-> Hi Ben
->
-> Thank you for your patch
->
->> The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
->> size for their register block. This causes the sh_modbile_sdhi driver to
->> fail to communicate with card at-all.
->>
->> Change each sdhi node size from 0x100 to 0x200 to correct this.
->>
->> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Linux SH <linux-sh@vger.kernel.org>
->> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> Tested-by: William Towle <william.towle@codethink.co.uk>
->> ---
->
-> Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
-> The wrong is SDHI/TMIO driver side, not SoC side.
-> Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
-> but it need more time (= there is merge timing issue)
+On Fri, Dec 13, 2013 at 8:57 AM, Heiko St?bner <heiko@sntech.de> wrote:
 
-Ok, thanks. We will keep this in our tree until the SDHI driver
-is sorted out.
+> I'm not the maintainer of s3c24xx,
 
+Maybe you should be. I have a hard time getting the generic
+Samsung maintainers' attention to S3C patches...
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> but this looks nice ;-)
+
+Do you think you can test it on hardware?
+
+Yours,
+Linus Walleij
