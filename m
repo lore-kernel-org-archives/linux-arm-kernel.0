@@ -1,63 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:39 +0900
-Subject: [PATCH 65/69] ARM: shmobile: Use r8a7740 suffix for INTC compat string
+Date: Fri, 13 Dec 2013 11:31:30 +0900
+Subject: [PATCH 04/69] ARM: shmobile: lager: add MMCIF support on DTS
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <96327999805dfb5b6e91e6969311d9a77a0160cd.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <02b4a748c7ef37c2852478e67251a86e36d87152.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add "renesas,intc-irqpin-r8a7740" to the compatible string for the
-IRQ pins in case of r8a7740 INTC. This makes the INTC irqpin follow
-the same style as the other devices and also makes it more future proof.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager-reference.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 52255bf..2782f64 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -41,7 +41,7 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager-reference.dts b/arch/arm/boot/dts/r8a7790-lager-reference.dts
+index 0a3f0c6..75730f5 100644
+--- a/arch/arm/boot/dts/r8a7790-lager-reference.dts
++++ b/arch/arm/boot/dts/r8a7790-lager-reference.dts
+@@ -42,6 +42,15 @@
+ 			gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
++
++	fixedregulator3v3: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
  
- 	/* irqpin0: IRQ0 - IRQ7 */
- 	irqpin0: irqpin at e6900000 {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe6900000 4>,
-@@ -62,7 +62,7 @@
- 
- 	/* irqpin1: IRQ8 - IRQ15 */
- 	irqpin1: irqpin at e6900004 {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe6900004 4>,
-@@ -83,7 +83,7 @@
- 
- 	/* irqpin2: IRQ16 - IRQ23 */
- 	irqpin2: irqpin at e6900008 {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe6900008 4>,
-@@ -104,7 +104,7 @@
- 
- 	/* irqpin3: IRQ24 - IRQ31 */
- 	irqpin3: irqpin at e690000c {
--		compatible = "renesas,intc-irqpin";
-+		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0xe690000c 4>,
+ &pfc {
+@@ -57,4 +66,19 @@
+ 		renesas,groups = "scif1_data";
+ 		renesas,function = "scif1";
+ 	};
++
++	mmc1_pins: mmc1 {
++		renesas,groups = "mmc1_data8", "mmc1_ctrl";
++		renesas,function = "mmc1";
++	};
++};
++
++&mmcif1 {
++	pinctrl-0 = <&mmc1_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&fixedregulator3v3>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
+ };
 -- 
 1.8.4
