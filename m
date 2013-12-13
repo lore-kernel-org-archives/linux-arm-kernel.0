@@ -1,75 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Dec 2013 09:21:29 -0800
-Subject: [PATCH 00/10] Support VGIC save/restore using device control API
-In-Reply-To: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
-References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20131213172129.GU2871@cbox>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 13 Dec 2013 18:23:44 +0100
+Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
+In-Reply-To: <201312131717.25435.arnd@arndb.de>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <1386945188-8316-2-git-send-email-jonas.jensen@gmail.com>
+ <201312131717.25435.arnd@arndb.de>
+Message-ID: <CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whoops, I forgot to mark these as v4... Sorry about that!
+On 13 December 2013 17:17, Arnd Bergmann <arnd@arndb.de> wrote:
+> IIRC the separate defconfig is needed because we have never gotten a mixed fa526+arm9
+> kernel to boot, right? In theory it is supposed to work and there is most likely just
+> a small bug somewhere. Once that is working, we can think about adding a generic
+> multi_v4_v5_defconfig that handles all multipltform capable platforms along the lines
+> of multi_v7_defconfig.
 
--Christoffer
+A mixed kernel can boot without panic (tested today).
 
-On Thu, Dec 12, 2013 at 11:55:39AM -0800, Christoffer Dall wrote:
-> Implement save/restore of the VGIC state using the newer KVM Device
-> Control API.  This requries some number of changes to existing code in
-> addition to actually supporting save/restore of the necessary state.
-> 
-> The first patches (01-03) support creating the VGIC using the Device
-> Control API.  This change is necessary because there are no other
-> suitable KVM APIs that we can leverage to access the VGIC state from
-> user space and the device control API was crafted exactly for this
-> purpose.
-> 
-> Subsequent patches add the missing infrastructure and user space API
-> pieces necessary to actually save and restore the VGIC state.  The GIC
-> v2.0 architecture specification already specifies registers that can be
-> used to save and restore the complete VGIC state for suspend/resume
-> purposes on real hardware, and we can reuse this interface for the
-> VGIC.  The API is therefore based on the memory-mapped register accesses
-> defined in the specs.  See the individual patches for details.
-> 
-> The patches are based on kvm-arm-next with the arch timers save/restore
-> patches applied:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git timer-migrate-v4
-> 
-> This patch series based on the above can be cloned from:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v4
-> 
-> User space patches for QEMU have also been posted on the list, but an
-> updated version is underway.  Tested on Versatile Express TC2.
-> 
-> Changelogs in the individual patches.
-> 
-> Christoffer Dall (10):
->   ARM: KVM: Allow creating the VGIC after VCPUs
->   KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
->   KVM: arm-vgic: Set base addr through device API
->   irqchip: arm-gic: Define additional MMIO offsets and masks
->   KVM: arm-vgic: Make vgic mmio functions more generic
->   arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
->   KVM: arm-vgic: Add vgic reg access from dev attr
->   KVM: arm-vgic: Support unqueueing of LRs to the dist
->   KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
->   KVM: arm-vgic: Support CPU interface reg access
-> 
->  Documentation/virtual/kvm/api.txt              |   7 +-
->  Documentation/virtual/kvm/devices/arm-vgic.txt |  73 ++++
->  arch/arm/include/uapi/asm/kvm.h                |   8 +
->  arch/arm/kvm/arm.c                             |  17 +-
->  include/kvm/arm_vgic.h                         |   2 +-
->  include/linux/irqchip/arm-gic.h                |  12 +
->  include/linux/kvm_host.h                       |   1 +
->  include/uapi/linux/kvm.h                       |   1 +
->  virt/kvm/arm/vgic.c                            | 581 +++++++++++++++++++++++--
->  virt/kvm/kvm_main.c                            |   6 +-
->  10 files changed, 670 insertions(+), 38 deletions(-)
->  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
-> 
-> -- 
-> 1.8.4.3
-> 
+The panic is avoided when CONFIG_ARM_THUMB=y is removed.
 
--- 
-Christoffer
+See thread "[PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option":
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/219004.html
+
+
+> I've been out of the loop a bit here. I initially suggested having the restart
+> handler be part of the watchdog driver, and I thought you had done that in an
+> earlier version. What has changed your mind?
+
+I got the impression from Guenter Roeck's review, that it doesn't belong there,
+maybe I was too quick to remove it?
+
+See thread "[PATCH] watchdog: Add MOXA ART watchdog driver":
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183065.html
+
+
+Thanks,
+Jonas
