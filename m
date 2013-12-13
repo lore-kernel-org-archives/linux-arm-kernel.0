@@ -1,83 +1,124 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:30:04 +0900
-Subject: [PATCH 31/33] ARM: shmobile: r8a7790: add SSI MSTP clocks
-In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
-References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <b3cc52eb9e9cdb4fab9340ca285f8d9685f5db30.1386897180.git.horms+renesas@verge.net.au>
+Date: Fri, 13 Dec 2013 11:31:32 +0900
+Subject: [PATCH 58/69] ARM: shmobile: Fix r8a7791 GPIO resources in DTS
+In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
+References: <cover.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <89fbba1210a171f134b72c4d3ccf376265c6ff3f.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+The r8a7791 GPIO resources are currently incorrect. Fix that
+by making them match the English r8a7791 v0.31 data sheet.
+
+Tested with GPIO LED using Koelsch DT reference.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index a510813..36c8917 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -53,6 +53,7 @@
- #define SMSTPCR7 0xe615014c
- #define SMSTPCR8 0xe6150990
- #define SMSTPCR9 0xe6150994
-+#define SMSTPCR10 0xe6150998
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index e36b3652..a349aff 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -49,9 +49,9 @@
+ 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
  
- #define SDCKCR		0xE6150074
- #define SD2CKCR		0xE6150078
-@@ -182,6 +183,8 @@ static struct clk div6_clks[DIV6_NR] = {
+-	gpio0: gpio at ffc40000 {
++	gpio0: gpio at e6050000 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc40000 0 0x50>;
++		reg = <0 0xe6050000 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 4 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -61,9 +61,9 @@
+ 		interrupt-controller;
+ 	};
  
- /* MSTP */
- enum {
-+	MSTP1015, MSTP1014, MSTP1013, MSTP1012, MSTP1011, MSTP1010,
-+	MSTP1009, MSTP1008, MSTP1007, MSTP1006, MSTP1005,
- 	MSTP931, MSTP930, MSTP929, MSTP928,
- 	MSTP917,
- 	MSTP813,
-@@ -196,6 +199,17 @@ enum {
- };
+-	gpio1: gpio at ffc41000 {
++	gpio1: gpio at e6051000 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc41000 0 0x50>;
++		reg = <0 0xe6051000 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 5 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -73,9 +73,9 @@
+ 		interrupt-controller;
+ 	};
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP1015] = SH_CLK_MSTP32(&p_clk, SMSTPCR10, 15, 0), /* SSI0 */
-+	[MSTP1014] = SH_CLK_MSTP32(&p_clk, SMSTPCR10, 14, 0), /* SSI1 */
-+	[MSTP1013] = SH_CLK_MSTP32(&p_clk, SMSTPCR10, 13, 0), /* SSI2 */
-+	[MSTP1012] = SH_CLK_MSTP32(&p_clk, SMSTPCR10, 12, 0), /* SSI3 */
-+	[MSTP1011] = SH_CLK_MSTP32(&p_clk, SMSTPCR10, 11, 0), /* SSI4 */
-+	[MSTP1010] = SH_CLK_MSTP32(&p_clk, SMSTPCR10, 10, 0), /* SSI5 */
-+	[MSTP1009] = SH_CLK_MSTP32(&p_clk, SMSTPCR10,  9, 0), /* SSI6 */
-+	[MSTP1008] = SH_CLK_MSTP32(&p_clk, SMSTPCR10,  8, 0), /* SSI7 */
-+	[MSTP1007] = SH_CLK_MSTP32(&p_clk, SMSTPCR10,  7, 0), /* SSI8 */
-+	[MSTP1006] = SH_CLK_MSTP32(&p_clk, SMSTPCR10,  6, 0), /* SSI9 */
-+	[MSTP1005] = SH_CLK_MSTP32(&p_clk, SMSTPCR10,  5, 0), /* SSI ALL */
- 	[MSTP931] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 31, 0), /* I2C0 */
- 	[MSTP930] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 30, 0), /* I2C1 */
- 	[MSTP929] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 29, 0), /* I2C2 */
-@@ -266,6 +280,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("ssprs",		&div6_clks[DIV6_SSPRS]),
+-	gpio2: gpio at ffc42000 {
++	gpio2: gpio at e6052000 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc42000 0 0x50>;
++		reg = <0 0xe6052000 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 6 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -85,9 +85,9 @@
+ 		interrupt-controller;
+ 	};
  
- 	/* MSTP */
-+	CLKDEV_DEV_ID("rcar_sound", &mstp_clks[MSTP1005]),
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
-@@ -306,6 +321,16 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7790", &mstp_clks[MSTP724]),
- 	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7790", &mstp_clks[MSTP723]),
- 	CLKDEV_ICK_ID("du.2", "rcar-du-r8a7790", &mstp_clks[MSTP722]),
-+	CLKDEV_ICK_ID("ssi.0", "rcar_sound", &mstp_clks[MSTP1015]),
-+	CLKDEV_ICK_ID("ssi.1", "rcar_sound", &mstp_clks[MSTP1014]),
-+	CLKDEV_ICK_ID("ssi.2", "rcar_sound", &mstp_clks[MSTP1013]),
-+	CLKDEV_ICK_ID("ssi.3", "rcar_sound", &mstp_clks[MSTP1012]),
-+	CLKDEV_ICK_ID("ssi.4", "rcar_sound", &mstp_clks[MSTP1011]),
-+	CLKDEV_ICK_ID("ssi.5", "rcar_sound", &mstp_clks[MSTP1010]),
-+	CLKDEV_ICK_ID("ssi.6", "rcar_sound", &mstp_clks[MSTP1009]),
-+	CLKDEV_ICK_ID("ssi.7", "rcar_sound", &mstp_clks[MSTP1008]),
-+	CLKDEV_ICK_ID("ssi.8", "rcar_sound", &mstp_clks[MSTP1007]),
-+	CLKDEV_ICK_ID("ssi.9", "rcar_sound", &mstp_clks[MSTP1006]),
+-	gpio3: gpio at ffc43000 {
++	gpio3: gpio at e6053000 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc43000 0 0x50>;
++		reg = <0 0xe6053000 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 7 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -97,9 +97,9 @@
+ 		interrupt-controller;
+ 	};
  
- };
+-	gpio4: gpio at ffc44000 {
++	gpio4: gpio at e6054000 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc44000 0 0x50>;
++		reg = <0 0xe6054000 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -109,9 +109,9 @@
+ 		interrupt-controller;
+ 	};
  
+-	gpio5: gpio at ffc45000 {
++	gpio5: gpio at e6055000 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc45000 0 0x50>;
++		reg = <0 0xe6055000 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -121,9 +121,9 @@
+ 		interrupt-controller;
+ 	};
+ 
+-	gpio6: gpio at ffc45400 {
++	gpio6: gpio at e6055400 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc45400 0 0x50>;
++		reg = <0 0xe6055400 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -133,9 +133,9 @@
+ 		interrupt-controller;
+ 	};
+ 
+-	gpio7: gpio at ffc45800 {
++	gpio7: gpio at e6055800 {
+ 		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
+-		reg = <0 0xffc45800 0 0x50>;
++		reg = <0 0xe6055800 0 0x50>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
 -- 
 1.8.4
