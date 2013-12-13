@@ -1,50 +1,60 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 13 Dec 2013 13:54:31 -0600
-Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
-In-Reply-To: <230CBA6E4B6B6B418E8730AC28E6FC7E0415C786@DFLE11.ent.ti.com>
-References: <20131212214306.GS1939@saruman.home>
- <1386884755-12366-1-git-send-email-balbi@ti.com>
- <52AA54E4.5000606@ti.com>
- <230CBA6E4B6B6B418E8730AC28E6FC7E0415C786@DFLE11.ent.ti.com>
-Message-ID: <20131213195431.GF5292@saruman.home>
+Date: Fri, 13 Dec 2013 13:56:18 -0600
+Subject: [PATCH 7/7] usb: dwc3: exynos: add pm_runtime support
+In-Reply-To: <000301cef7c0$640c1ce0$2c2456a0$%tikhomirov@samsung.com>
+References: <1386884325-11440-1-git-send-email-balbi@ti.com>
+ <1386884325-11440-8-git-send-email-balbi@ti.com>
+ <000301cef7c0$640c1ce0$2c2456a0$%tikhomirov@samsung.com>
+Message-ID: <20131213195618.GG5292@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 10:04:38AM -0600, Kwok, WingMan wrote:
-> Hello
+On Fri, Dec 13, 2013 at 02:01:32PM +0900, Anton Tikhomirov wrote:
+> Hi Felipe,
 > 
-> > -----Original Message-----
-> > From: Shilimkar, Santosh
-> > Sent: Thursday, December 12, 2013 7:29 PM
-> > To: Balbi, Felipe
-> > Cc: Linux USB Mailing List; kgene.kim at samsung.com; Linux ARM Kernel
-> > Mailing List; linux-samsung-soc at vger.kernel.org; Linux OMAP Mailing List;
-> > Kwok, WingMan
-> > Subject: Re: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
+> > -static int dwc3_exynos_suspend(struct device *dev)
+> > +static int __dwc3_exynos_suspend(struct dwc3_exynos *exynos)
+> >  {
+> > -	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> > -
+> >  	clk_disable(exynos->clk);
 > > 
-> > On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
-> > > A bare-minimum PM implementation which will server as building block
-> > > for more complex
-> > s/server/serve ;-)
-> > > PM implementation in the future.
-> > >
-> > > At the least will not leave clocks on unnecessarily when e.g.  a user
-> > > write mem to /sys/power/state.
-> > >
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >
-> > > improve error path a little bit.
-> > >
-> > We will test this out. Thanks for the
-> > patch Felipe.
+> >  	return 0;
+> >  }
 > > 
+> > +static int __dwc3_exynos_resume(struct dwc3_exynos *exynos)
+> > +{
+> > +	return clk_enable(exynos->clk);
+> > +}
+> > +
+> > +static int dwc3_exynos_suspend(struct device *dev)
+> > +{
+> > +	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> > +
+> > +	return __dwc3_exynos_suspend(exynos);
 > 
-> I have tested the patch and the keystone usb driver continues to function,
-> though I can't test suspend at this time as the rest of the system does
-> not that functionality yet.
+> If dwc3-exynos is runtime suspended, the clock will be disabled
+> second time here (unbalanced clk_enable/clk_disable).
 
-Thanks, should I add your Tested-by ?
+I don't get what you mean but there is something that probably needs
+fixing, I guess below makes it better:
+
+diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+index c93919a..1e5720a 100644
+--- a/drivers/usb/dwc3/dwc3-exynos.c
++++ b/drivers/usb/dwc3/dwc3-exynos.c
+@@ -218,6 +218,9 @@ static int dwc3_exynos_suspend(struct device *dev)
+ {
+ 	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+ 
++	if (pm_runtime_suspended(dev))
++		return 0;
++
+ 	return __dwc3_exynos_suspend(exynos);
+ }
+ 
+
+Is that what you meant ?
 
 -- 
 balbi
@@ -54,4 +64,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/921df1ff/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131213/b6321c93/attachment-0001.sig>
