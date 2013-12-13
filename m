@@ -1,40 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Dec 2013 16:45:18 +0000
-Subject: [PATCH 5/5] arm64: Add LOAD_OFFSET symbol for linker scripts
-In-Reply-To: <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
+Date: Fri, 13 Dec 2013 16:46:46 +0000
+Subject: [PATCH 2/5] arm64: Fix the soft_restart routine
+In-Reply-To: <fbf47d394de6bd7332b00bc706a9f38cd7a68327.1386879684.git.geoff@infradead.org>
 References: <cover.1386879684.git.geoff@infradead.org>
- <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
-Message-ID: <20131213164517.GM19177@mudshark.cambridge.arm.com>
+ <fbf47d394de6bd7332b00bc706a9f38cd7a68327.1386879684.git.geoff@infradead.org>
+Message-ID: <20131213164646.GN19177@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Dec 12, 2013 at 08:39:46PM +0000, Geoff Levand wrote:
-> Add a definition for the LOAD_OFFSET symbol used in the linker
-> scripts.  LOAD_OFFSET is used to generate the load address of
-> the section.
+> Change the soft_restart() routine to call cpu_reset() at its identity mapped
+> physical address.
+> 
+> The cpu_reset() routine must be called at its identity mapped physical address
+> so that when the MMU is turned off the instruction pointer will be at the correct
+> location in physical memory.
 > 
 > Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
-
-This isn't a standard SoB line. Please choose an email address and lose the
-non-standard suffix.
-
 > ---
->  arch/arm64/include/asm/memory.h | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm64/kernel/process.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 3776217..1994c56 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -52,6 +52,8 @@
->  #define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
->  #define TASK_SIZE_64		(UL(1) << VA_BITS)
->  
-> +#define LOAD_OFFSET		(PAGE_OFFSET)
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index de17c89..985eb42 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -72,7 +72,13 @@ static void setup_restart(void)
+>  void soft_restart(unsigned long addr)
+>  {
+>  	setup_restart();
+> -	cpu_reset(addr);
+> +
+> +	/*
+> +	 * cpu_reset turns the MMU off, so must be called at its identity
+> +	 * mapped physical address.
+> +	 */
+> +
+> +	(*(void(*)(unsigned long))virt_to_phys(cpu_reset))(addr);
 
-Can you be more specific about why we need this please? We don't seem to use
-this on ARM, and I can't really think of a sensible value to define it as,
-either. PAGE_OFFSET is a virtual address, which doesn't make much sense to
-me, but perhaps I'm missing something.
+This isn't right; although cpu_reset *does* need to run from the idmap,
+actually the idmap only includes __turn_mmu_on. You just get lucky because
+its section-mapped and happens to include the code you want.
+
+The cast is also cleaner if you define a phys_reset_t type, like we do for
+arch/arm/.
 
 Will
