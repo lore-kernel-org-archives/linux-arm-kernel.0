@@ -1,56 +1,29 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 13 Dec 2013 09:23:45 +0800
-Subject: [PATCH v6 15/15] usb: phy-mxs: Add sync time after controller clear
- phcd
-In-Reply-To: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1386897825-6130-16-git-send-email-peter.chen@freescale.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 12 Dec 2013 17:51:58 -0800
+Subject: [PATCH 22/41] clk: ux500: Copy u8500_clk_init() ready for DT
+ enablement
+In-Reply-To: <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+ <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
+Message-ID: <20131213015158.11981.27135@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After clear portsc.phcd, PHY needs 200us stable time for switch
-32K clock to AHB clock.
+Quoting Linus Walleij (2013-09-20 13:59:46)
+> On Wed, Sep 18, 2013 at 2:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Here we're using the old clock initialisation function as a template.
+> > It's necessary to remove all of the clk_register_clkdev() calls as
+> > they don't make sense when booting with Device Tree.
+> >
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> I *really* like the looks of this! Mike can we have your ACK on this?
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 885f8d9..68bd981 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -156,6 +156,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
- 	return mxs_phy->data == &imx6sl_phy_data;
- }
- 
-+/*
-+ * PHY needs some 32K cycles to switch from 32K clock to
-+ * bus (such as AHB/AXI, etc) clock.
-+ */
-+static void mxs_phy_clock_switch_delay(void)
-+{
-+	usleep_range(300, 400);
-+}
-+
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- {
- 	int ret;
-@@ -281,6 +290,7 @@ static int mxs_phy_init(struct usb_phy *phy)
- {
- 	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
- 
-+	mxs_phy_clock_switch_delay();
- 	clk_prepare_enable(mxs_phy->clk);
- 	return mxs_phy_hw_init(mxs_phy);
- }
-@@ -305,6 +315,7 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- 		       x->io_priv + HW_USBPHY_CTRL_SET);
- 		clk_disable_unprepare(mxs_phy->clk);
- 	} else {
-+		mxs_phy_clock_switch_delay();
- 		clk_prepare_enable(mxs_phy->clk);
- 		writel(BM_USBPHY_CTRL_CLKGATE,
- 		       x->io_priv + HW_USBPHY_CTRL_CLR);
--- 
-1.7.8
+> 
+> Yours,
+> Linus Walleij
