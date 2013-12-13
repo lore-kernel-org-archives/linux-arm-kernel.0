@@ -1,155 +1,333 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:33 +0900
-Subject: [GIT PULL v2 00/33] Renesas ARM based SoC updates for v3.14
-Message-ID: <cover.1386897180.git.horms+renesas@verge.net.au>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Fri, 13 Dec 2013 06:27:17 +0400
+Subject: [PATCH v2 08/16] mtd: support BB SRAM on ICP DAS LP-8x4x
+In-Reply-To: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+Message-ID: <1386901645-28895-9-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+This provides an MTD device driver for 512kB of battery backed up SRAM
+on ICPDAS LP-8X4X programmable automation controllers.
 
-please consider these Renesas ARM based SoC updates for v3.14.
+SRAM chip is connected via FPGA and is not accessible without a driver,
+unlike flash memory which is wired to CPU MMU.
 
-As discussed elsewhere, this pull-request also includes defconfig changes
-related to renaming ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY. These are also
-to avoid build regressions when using defconfigs
+This SRAM becomes an excellent persisent storage of volatile process
+data like counter values and sensor statuses. Storing those data in
+flash or mmc card is not a viable solution.
 
-As this pull request is based on v3.12, which does not include
-genmai_defconfig, it has not been updated. Rather, I have queued up a patch
-in my defconfig to switch it to use ARCH_SHMOBILE_LEGACY.  This does
-involve breaking that defconfig. However as it is new and not in
-wide-spread use it seems better to live with that temporary breakage than
-to have soc depend on defconfig (as was the case in the previous version of
-this pull request).
+Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+---
+   v0..v2
+   * use device tree
+   * use devm helpers where possible
 
+ arch/arm/boot/dts/pxa27x-lp8x4x.dts |   6 +
+ arch/arm/configs/lp8x4x_defconfig   |   1 +
+ drivers/mtd/devices/Kconfig         |  14 +++
+ drivers/mtd/devices/Makefile        |   1 +
+ drivers/mtd/devices/sram_lp8x4x.c   | 227 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 249 insertions(+)
+ create mode 100644 drivers/mtd/devices/sram_lp8x4x.c
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.14
-
-for you to fetch changes up to fee05eb3d2ce4813b5e9a70ab888d2bc0047f4e1:
-
-  ARM: shmobile: r8a7779: add HSPI clock support for DT (2013-12-10 17:20:15 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC updates for v3.14
-
-* Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-
-* r8a7791 SoC (R-Car M2)
-  - Add thermal platform device
-  - Add DU and LVDS clocks
-  - GPIO platform device support
-  - PFC platform device support
-  - Select IRQC
-
-* r8a7790 SoC (R-Car H2)
-  - Tidyup clock table order
-  - Fixup I2C clock source
-  - Correct EXTAL divider settings
-  - Add clocks for thermal devices and SSI
-
-* r8a7779 SoC (R-Car H1)
-  - Add I2C clock for DT
-
-* r8a7778 SoC (R-Car M1)
-  - Add HSPI clocks for DT
-  - Add I2C clock for DT
-  - Add HPBIFx DMAEngine support
-
-* r8a7740 SoC (R-Mobile A1)
-  - Add FSI clocks for DT
-
-* emev2 SoC (Emma Mobile)
-  - Move to Multi-platform
-  - Remove legacy board code
-
-* r7s72100 SoC (RZ/A1H)
-  - Select GPIO
-
-* r8a73a4 SoC (R-Mobile APE6)
-  - Don't used named IRC for DMAEngine
-
-----------------------------------------------------------------
-Hiep Cao Minh (1):
-      ARM: shmobile: r8a7790: add QSPI support
-
-Kuninori Morimoto (13):
-      ARM: shmobile: r8a7778: add I2C clock for DT
-      ARM: shmobile: r8a7779: add I2C clock for DT
-      ARM: shmobile: r8a73a4: don't use named irq for DMAEngine
-      ARM: shmobile: r8a7778: add MMCIF clock support for DT
-      ARM: shmobile: r8a7778: add SDHI clock support for DT
-      ARM: shmobile: r8a7779: add SDHI clock support for DT
-      ARM: shmobile: r8a7778: add HSPI clock support for DT
-      ARM: shmobile: r8a7790: care EXTAL divider settings
-      ARM: shmobile: r8a7790: fixup I2C clock source
-      ARM: shmobile: r8a7790: tidyup clock table order
-      ARM: shmobile: r8a7778: add HPBIFx DMAEngine support
-      ARM: shmobile: r8a7790: add SSI MSTP clocks
-      ARM: shmobile: r8a7740: add FSI clock support for DT
-
-Laurent Pinchart (2):
-      ARM: shmobile: r8a7791: Add DU and LVDS clocks
-      ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-
-Magnus Damm (14):
-      ARM: shmobile: Select IRQC in case of the r8a7791 SoC
-      ARM: shmobile: r8a7791 PFC platform device support
-      ARM: shmobile: Select GPIO in case of the r8a7791 SoC
-      ARM: shmobile: r8a7791 GPIO platform device support
-      ARM: shmobile: Select GPIO in case of the r7s72100 SoC
-      ARM: shmobile: Enable MTU2 on r7s72100
-      ARM: shmobile: Add shared EMEV2 code for ->init_machine()
-      ARM: shmobile: Use ->init_late() in shared EMEV2 case
-      ARM: shmobile: Remove legacy KZM9D board code
-      ARM: shmobile: Remove legacy platform devices from EMEV2 SoC code
-      ARM: shmobile: Select USE_OF on EMEV2
-      ARM: shmobile: Add r8a7790 clocks for thermal devices
-      ARM: shmobile: Add r8a7791 thermal platform device
-      ARM: shmobile: Add r8a7791 clocks for thermal devices
-
-Simon Horman (2):
-      ARM: shmobile: Select AUTO_ZRELADDR for EMEV2
-      ARM: shmobile: r8a7779: add HSPI clock support for DT
-
-Valentine Barshak (1):
-      ARM: shmobile: r8a7790: Add USBHS clock support
-
- arch/arm/Kconfig                              |  14 ++-
- arch/arm/Makefile                             |   1 -
- arch/arm/boot/compressed/Makefile             |   2 +-
- arch/arm/boot/dts/Makefile                    |   2 +-
- arch/arm/configs/ape6evm_defconfig            |   2 +-
- arch/arm/configs/armadillo800eva_defconfig    |   2 +-
- arch/arm/configs/bockw_defconfig              |   2 +-
- arch/arm/configs/koelsch_defconfig            |   2 +-
- arch/arm/configs/kzm9d_defconfig              |   2 +-
- arch/arm/configs/kzm9g_defconfig              |   2 +-
- arch/arm/configs/lager_defconfig              |   2 +-
- arch/arm/configs/mackerel_defconfig           |   2 +-
- arch/arm/configs/marzen_defconfig             |   2 +-
- arch/arm/mach-shmobile/Kconfig                |  19 +--
- arch/arm/mach-shmobile/Makefile               |   1 -
- arch/arm/mach-shmobile/Makefile.boot          |   1 -
- arch/arm/mach-shmobile/board-kzm9d.c          |  92 ---------------
- arch/arm/mach-shmobile/clock-r7s72100.c       |   1 +
- arch/arm/mach-shmobile/clock-r8a7740.c        |   1 +
- arch/arm/mach-shmobile/clock-r8a7778.c        |  11 ++
- arch/arm/mach-shmobile/clock-r8a7779.c        |  11 ++
- arch/arm/mach-shmobile/clock-r8a7790.c        |  58 +++++++--
- arch/arm/mach-shmobile/clock-r8a7791.c        |  14 ++-
- arch/arm/mach-shmobile/include/mach/emev2.h   |   5 -
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  18 +++
- arch/arm/mach-shmobile/include/mach/r8a7791.h |   1 +
- arch/arm/mach-shmobile/setup-emev2.c          | 163 ++------------------------
- arch/arm/mach-shmobile/setup-r7s72100.c       |  22 ++++
- arch/arm/mach-shmobile/setup-r8a73a4.c        |   2 +-
- arch/arm/mach-shmobile/setup-r8a7778.c        |  51 ++++++++
- arch/arm/mach-shmobile/setup-r8a7791.c        |  65 ++++++++++
- drivers/Makefile                              |   2 +-
- 32 files changed, 285 insertions(+), 290 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/board-kzm9d.c
+diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+index 574e853..b7f8cfc 100644
+--- a/arch/arm/boot/dts/pxa27x-lp8x4x.dts
++++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+@@ -59,6 +59,12 @@
+ 		device-width = <1>;
+ 	};
+ 
++	sram at 1700a000 {
++		compatible = "icpdas,sram-lp8x4x";
++		reg = <0x1700a000 0x1000
++		       0x1700901e 0x1>;
++	};
++
+ 	pxabus {
+ 		pxairq: interrupt-controller at 40d00000 {
+ 			marvell,intc-priority;
+diff --git a/arch/arm/configs/lp8x4x_defconfig b/arch/arm/configs/lp8x4x_defconfig
+index 57f2830..8fa871e 100644
+--- a/arch/arm/configs/lp8x4x_defconfig
++++ b/arch/arm/configs/lp8x4x_defconfig
+@@ -57,6 +57,7 @@ CONFIG_MTD_CFI_ADV_OPTIONS=y
+ CONFIG_MTD_CFI_GEOMETRY=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_SRAM_LP8X4X=y
+ CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_LOOP_MIN_COUNT=2
+diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
+index 0128138..95f2075 100644
+--- a/drivers/mtd/devices/Kconfig
++++ b/drivers/mtd/devices/Kconfig
+@@ -217,4 +217,18 @@ config BCH_CONST_T
+ 	default 4
+ endif
+ 
++config MTD_SRAM_LP8X4X
++	tristate "SRAM on ICPDAS LP-8X4X"
++	depends on OF && ARCH_PXA
++       ---help---
++	 This provides an MTD device driver for 512kiB of battery backed up SRAM
++	 on ICPDAS LP-8X4X programmable automation controllers.
++
++	 SRAM chip is connected via FPGA and is not accessible without a driver,
++	 unlike flash memory which is wired to CPU MMU.
++
++	 Say N, unless you plan to run this kernel on LP-8X4X.
++
++	 If you say M, the module will be called sram_lp8x4x.
++
+ endmenu
+diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
+index d83bd73..56a74c9 100644
+--- a/drivers/mtd/devices/Makefile
++++ b/drivers/mtd/devices/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_MTD_NAND_OMAP_BCH)	+= elm.o
+ obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
+ obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
+ obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
++obj-$(CONFIG_MTD_SRAM_LP8X4X)	+= sram_lp8x4x.o
+ 
+ 
+ CFLAGS_docg3.o			+= -I$(src)
+diff --git a/drivers/mtd/devices/sram_lp8x4x.c b/drivers/mtd/devices/sram_lp8x4x.c
+new file mode 100644
+index 0000000..9dc7149
+--- /dev/null
++++ b/drivers/mtd/devices/sram_lp8x4x.c
+@@ -0,0 +1,227 @@
++/*
++ *  linux/drivers/mtd/devices/lp8x4x_sram.c
++ *
++ *  MTD Driver for SRAM on ICPDAS LP-8x4x
++ *  Copyright (C) 2013 Sergei Ianovich <ynvich@gmail.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation or any later version.
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mtd/map.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/platform_device.h>
++#include <linux/of_device.h>
++#include <linux/slab.h>
++#include <linux/string_helpers.h>
++#include <linux/types.h>
++
++#include <asm/mach/flash.h>
++
++struct lp8x4x_sram_info {
++	void __iomem	*bank;
++	void __iomem	*virt;
++	struct mutex	lock;
++	unsigned	active_bank;
++	struct mtd_info	mtd;
++};
++
++static int
++lp8x4x_sram_erase(struct mtd_info *mtd, struct erase_info *instr)
++{
++	struct lp8x4x_sram_info *info = mtd->priv;
++	unsigned bank = instr->addr >> 11;
++	unsigned offset = (instr->addr & 0x7ff) << 1;
++	loff_t i;
++
++	mutex_lock(&info->lock);
++	if (unlikely(bank != info->active_bank)) {
++		info->active_bank = bank;
++		iowrite8(bank, info->bank);
++	}
++	for (i = 0; i < instr->len; i++) {
++		iowrite8(0xff, info->virt + offset);
++		offset += 2;
++		if (unlikely(offset == 0)) {
++			info->active_bank++;
++			iowrite8(info->active_bank, info->bank);
++		}
++	}
++	mutex_unlock(&info->lock);
++	instr->state = MTD_ERASE_DONE;
++	mtd_erase_callback(instr);
++
++	return 0;
++}
++
++static int
++lp8x4x_sram_write(struct mtd_info *mtd, loff_t to, size_t len,
++		size_t *retlen, const u_char *b)
++{
++	struct lp8x4x_sram_info *info = mtd->priv;
++	unsigned bank = to >> 11;
++	unsigned offset = (to & 0x7ff) << 1;
++	loff_t i;
++
++	mutex_lock(&info->lock);
++	if (unlikely(bank != info->active_bank)) {
++		info->active_bank = bank;
++		iowrite8(bank, info->bank);
++	}
++	for (i = 0; i < len; i++) {
++		iowrite8(b[i], info->virt + offset);
++		offset += 2;
++		if (unlikely(offset == 0)) {
++			info->active_bank++;
++			iowrite8(info->active_bank, info->bank);
++		}
++	}
++	mutex_unlock(&info->lock);
++	*retlen = len;
++	return 0;
++}
++
++static int
++lp8x4x_sram_read(struct mtd_info *mtd, loff_t from, size_t len,
++		size_t *retlen, u_char *b)
++{
++	struct lp8x4x_sram_info *info = mtd->priv;
++	unsigned bank = from >> 11;
++	unsigned offset = (from & 0x7ff) << 1;
++	loff_t i;
++
++	mutex_lock(&info->lock);
++	if (unlikely(bank != info->active_bank)) {
++		info->active_bank = bank;
++		iowrite8(bank, info->bank);
++	}
++	for (i = 0; i < len; i++) {
++		b[i] = ioread8(info->virt + offset);
++		offset += 2;
++		if (unlikely(offset == 0)) {
++			info->active_bank++;
++			iowrite8(info->active_bank, info->bank);
++		}
++	}
++	mutex_unlock(&info->lock);
++	*retlen = len;
++	return 0;
++}
++
++static void
++lp8x4x_sram_sync(struct mtd_info *mtd)
++{
++}
++
++static struct of_device_id of_flash_match[] = {
++	{
++		.compatible	= "icpdas,sram-lp8x4x",
++	},
++	{ },
++};
++MODULE_DEVICE_TABLE(of, of_flash_match);
++
++static const char * const probe_types[] = {
++	"cmdlinepart", "RedBoot", "ofpart", "ofoldpart", NULL };
++
++static int
++lp8x4x_sram_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *match;
++	struct lp8x4x_sram_info *info;
++	struct resource *r1, *r2;
++	char sz_str[16];
++	struct mtd_part_parser_data ppdata;
++	int err = 0;
++
++	match = of_match_device(of_flash_match, &pdev->dev);
++	if (!match)
++		return -EINVAL;
++
++	r1 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	r2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!r1 || !r2)
++		return -ENODEV;
++
++	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++
++	info->virt =  devm_ioremap_resource(&pdev->dev, r1);
++	if (!info->virt) {
++		dev_err(&pdev->dev, "Failed to ioremap %p\n",
++		       info->virt);
++		return -EFAULT;
++	}
++
++	info->bank = devm_ioremap_resource(&pdev->dev, r2);
++	if (!info->bank) {
++		dev_err(&pdev->dev, "Failed to ioremap %p\n",
++		       info->bank);
++		return -EFAULT;
++	}
++
++	info->mtd.priv = info;
++	info->mtd.name = "SRAM";
++	info->mtd.type = MTD_RAM;
++	info->mtd.flags = MTD_CAP_RAM;
++	info->mtd.size = resource_size(r1) << 7;
++	info->mtd.erasesize = 512;
++	info->mtd.writesize = 4;
++	info->mtd._erase = lp8x4x_sram_erase;
++	info->mtd._write = lp8x4x_sram_write;
++	info->mtd._read = lp8x4x_sram_read;
++	info->mtd._sync = lp8x4x_sram_sync;
++	info->mtd.owner = THIS_MODULE;
++
++	mutex_init(&info->lock);
++	iowrite8(info->active_bank, info->bank);
++	platform_set_drvdata(pdev, info);
++
++	ppdata.of_node = pdev->dev.of_node;
++	err = mtd_device_parse_register(&info->mtd, probe_types, &ppdata,
++			NULL, 0);
++
++	if (err < 0) {
++		dev_err(&pdev->dev, "Failed to register platform device\n");
++		return err;
++	}
++
++	string_get_size(info->mtd.size, STRING_UNITS_2, sz_str,
++			sizeof(sz_str));
++	dev_info(&pdev->dev, "using %s SRAM on LP-8X4X as %s\n", sz_str,
++			dev_name(&info->mtd.dev));
++	return 0;
++}
++
++static int
++lp8x4x_sram_remove(struct platform_device *dev)
++{
++	struct lp8x4x_sram_info *info = platform_get_drvdata(dev);
++
++	mtd_device_unregister(&info->mtd);
++	platform_set_drvdata(dev, NULL);
++	return 0;
++}
++
++static struct platform_driver lp8x4x_sram_driver = {
++	.driver = {
++		.name		= "sram-lp8x4x",
++		.owner		= THIS_MODULE,
++		.of_match_table = of_flash_match,
++	},
++	.probe		= lp8x4x_sram_probe,
++	.remove		= lp8x4x_sram_remove,
++};
++
++module_platform_driver(lp8x4x_sram_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Sergei Ianovich <ynvich@gmail.com>");
++MODULE_DESCRIPTION("MTD driver for SRAM on ICPDAS LP-8x4x");
+-- 
+1.8.4.3
