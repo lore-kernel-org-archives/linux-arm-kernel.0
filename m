@@ -1,21 +1,64 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 13 Dec 2013 12:53:32 +0100
-Subject: [PATCH V1 07/11] ARM: dts: imx6qdl-sabrelite: add pwms for
- backlights
-In-Reply-To: <1386899355-17379-8-git-send-email-troy.kisky@boundarydevices.com>
+Date: Fri, 13 Dec 2013 12:46:00 +0100
+Subject: [PATCH V1 01/11] ARM: dts: imx: sabrelite: add Dual Lite/Solo
+ support
+In-Reply-To: <1386899355-17379-2-git-send-email-troy.kisky@boundarydevices.com>
 References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
- <1386899355-17379-8-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <201312131253.32773.marex@denx.de>
+ <1386899355-17379-2-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <201312131246.00944.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 13, 2013 at 02:49:11 AM, Troy Kisky wrote:
-> add pwm1 for lcd backlight
-> add pwm4 for lvds backlight
-> add pwm3 for ov5640 mipi clock
+On Friday, December 13, 2013 at 02:49:05 AM, Troy Kisky wrote:
+> This makes the structure of Sabre Lite board files the same
+> as Sabre SD board files so that they are easier to compare.
+> 
+> By this, I mean that the majority of the file imx6q-sabrelite.dts
+> is moved to imx6qdl-sabrelite.dtsi so that both imx6q-sabrelite.dts
+> and imx6dl-sabrelite.dts can include it.
+> 
+> Now Sabre Lite has support for Dual Lite/Solo
+> processors.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/imx6dl-sabrelite.dts             |  20 ++
+>  arch/arm/boot/dts/imx6q-sabrelite.dts              | 214
+> +-------------------- ...{imx6q-sabrelite.dts => imx6qdl-sabrelite.dtsi} |
+>  10 -
+>  4 files changed, 22 insertions(+), 223 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-sabrelite.dts
+>  copy arch/arm/boot/dts/{imx6q-sabrelite.dts => imx6qdl-sabrelite.dtsi}
+> (96%)
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 342d16d..3c6f456 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -149,6 +149,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6dl-gw53xx.dtb \
+>  	imx6dl-gw54xx.dtb \
+>  	imx6dl-sabreauto.dtb \
+> +	imx6dl-sabrelite.dtb \
+>  	imx6dl-sabresd.dtb \
+>  	imx6dl-wandboard.dtb \
+>  	imx6q-arm2.dtb \
+> diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts
+> b/arch/arm/boot/dts/imx6dl-sabrelite.dts new file mode 100644
+> index 0000000..2de0447
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
+> @@ -0,0 +1,20 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
 
-The camera needs a PWM ? I am a little surprised by such a design, but I might 
-just be lacking knowledge.
+Are you sure about this copyright message ? Isn't this copyright BD ?
+
+Otherwise,
+
+Reviewed-by: Marek Vasut <marex@denx.de>
 
 Best regards,
 Marek Vasut
