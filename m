@@ -1,81 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:47 +0900
-Subject: [PATCH 14/33] ARM: shmobile: Enable MTU2 on r7s72100
+Date: Fri, 13 Dec 2013 11:29:56 +0900
+Subject: [PATCH 23/33] ARM: shmobile: Add r8a7790 clocks for thermal devices
 In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
 References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <d18e06116d5e7b277e73e3bdc6e08208aabcedc7.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <9654fd7322c378d5955b179c49bbedb3e1de55f3.1386897180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add MTU2 as r7s72100 system timer.
+Add the r8a7790 DT thermal device to the legacy clocks.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c |  1 +
- arch/arm/mach-shmobile/setup-r7s72100.c | 22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 4aba20c..1c9d261 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -178,6 +178,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
-+	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
- };
- 
- void __init r7s72100_clock_init(void)
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index d4eb509..55f0b9c 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r7s72100.h>
-@@ -58,6 +59,26 @@ static inline void r7s72100_register_scif(int idx)
- 				      sizeof(struct plat_sci_port));
- }
- 
-+
-+static struct sh_timer_config mtu2_0_platform_data __initdata = {
-+	.name = "MTU2_0",
-+	.timer_bit = 0,
-+	.channel_offset = -0x80,
-+	.clockevent_rating = 200,
-+};
-+
-+static struct resource mtu2_0_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xfcff0300, 0x27),
-+	DEFINE_RES_IRQ(gic_iid(139)), /* MTU2 TGI0A */
-+};
-+
-+#define r7s72100_register_mtu2(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_mtu2",	\
-+					  idx, mtu2_##idx##_resources,	\
-+					  ARRAY_SIZE(mtu2_##idx##_resources), \
-+					  &mtu2_##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
-+
- void __init r7s72100_add_dt_devices(void)
- {
- 	r7s72100_register_scif(SCIF0);
-@@ -68,6 +89,7 @@ void __init r7s72100_add_dt_devices(void)
- 	r7s72100_register_scif(SCIF5);
- 	r7s72100_register_scif(SCIF6);
- 	r7s72100_register_scif(SCIF7);
-+	r7s72100_register_mtu2(0);
- }
- 
- void __init r7s72100_init_early(void)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 5269640..33e80b10 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -286,6 +286,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
+ 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
+ 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
++	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
 -- 
 1.8.4
