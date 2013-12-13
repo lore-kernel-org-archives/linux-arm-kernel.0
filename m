@@ -1,36 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:17 +0900
-Subject: [PATCH 43/69] ARM: shmobile: Use r8a7791 suffix for IRQC compat string
+Date: Fri, 13 Dec 2013 11:30:59 +0900
+Subject: [PATCH 25/69] ARM: shmobile: ape6evm: tidyup DT node naming
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <26041b06107fbf4618422618630f154f8d1a7d64.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <eeafbdf3253f23cbd30ee5f876ee9bb696a3c207.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add "renesas,irqc-r8a7791" to the compatible string for IRQC
-in case of r8a7791. This makes the IRQC follow the same style
-as the other devices and also makes it more future proof.
+According to ePAPR spec,
+this patch tidies up DT node name.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 86d5d3a..d85254c 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -154,7 +154,7 @@
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+index 9443e93..25dbc1c 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+@@ -88,22 +88,22 @@
+ 	pinctrl-0 = <&scifa0_pins>;
+ 	pinctrl-names = "default";
+ 
+-	scifa0_pins: scifa0 {
++	scifa0_pins: serial0 {
+ 		renesas,groups = "scifa0_data";
+ 		renesas,function = "scifa0";
  	};
  
- 	irqc0: interrupt-controller at e61c0000 {
--		compatible = "renesas,irqc";
-+		compatible = "renesas,irqc-r8a7791", "renesas,irqc";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		reg = <0 0xe61c0000 0 0x200>;
+-	mmc0_pins: mmcif {
++	mmc0_pins: mmc {
+ 		renesas,groups = "mmc0_data8", "mmc0_ctrl";
+ 		renesas,function = "mmc0";
+ 	};
+ 
+-	sdhi0_pins: sdhi0 {
++	sdhi0_pins: sd0 {
+ 		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
+ 		renesas,function = "sdhi0";
+ 	};
+ 
+-	sdhi1_pins: sdhi1 {
++	sdhi1_pins: sd1 {
+ 		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
+ 		renesas,function = "sdhi1";
+ 	};
 -- 
 1.8.4
