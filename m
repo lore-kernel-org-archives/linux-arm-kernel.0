@@ -1,57 +1,46 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 13 Dec 2013 13:15:09 +0800
-Subject: [PATCH v6 02/15] usb: phy-mxs: Add platform judgement code
-In-Reply-To: <20131213041918.GC867@saruman.home>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-3-git-send-email-peter.chen@freescale.com>
- <20131213041918.GC867@saruman.home>
-Message-ID: <20131213051508.GA16072@shlinux1.ap.freescale.net>
+From: jiada_wang@mentor.com (jiada_wang at mentor.com)
+Date: Thu, 12 Dec 2013 21:52:46 -0800
+Subject: [PATCH] dma: imx: correct sdmac->status for cyclic dma tx
+Message-ID: <1386913966-20595-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 10:19:19PM -0600, Felipe Balbi wrote:
-> On Fri, Dec 13, 2013 at 09:23:32AM +0800, Peter Chen wrote:
-> > The mxs-phy has several bugs and features at different
-> > versions, the driver code can get it through of_device_id.data.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
-> >  1 files changed, 49 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > index 545844b..6d49040 100644
-> > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > @@ -1,5 +1,5 @@
-> >  /*
-> > - * Copyright 2012 Freescale Semiconductor, Inc.
-> > + * Copyright 2012-2013 Freescale Semiconductor, Inc.
-> >   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-> >   * on behalf of DENX Software Engineering GmbH
-> >   *
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/delay.h>
-> >  #include <linux/err.h>
-> >  #include <linux/io.h>
-> > +#include <linux/of_device.h>
-> >  
-> >  #define DRIVER_NAME "mxs_phy"
-> >  
-> > @@ -34,13 +35,55 @@
-> >  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
-> >  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
-> >  
-> > +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> 
-> defined, but never used.
-> 
+From: Jiada Wang <jiada_wang@mentor.com>
 
-At current code, this define is after definition of struct mxs_phy,
-I think the lines of #define should be at the same place, so I move
-it up.
+In cyclic dma tx's handler sdma_handle_channel_loop(),
+SDMA channel statue is set to either DMA_ERROR or DMA_IN_PROGRESS
+based on each period's status. This has the following issues:
 
+1) If one period's status is BD_RROR, then channel status
+   will be set to DMA_ERROR, but it will be overwritten to DMA_IN_PROGRESS
+   if the following periods are OK.
+2) DMA client may call sdma_control(DMA_TERMINATE_ALL) to stop the cyclic dma
+   operation, sdma channel status will be set to DMA_ERROR,
+   but if after this handler is called, then again the channel status will be overwritten
+   to DMA_IN_PROGRESS. Then the following dmaengine_prep_dma_cyclic() will always fail,
+   as channel status is DMA_IN_PROGRESS.
+
+As in cyclic dma tx, channel status will be initially set to DMA_IN_PROGRESS,
+driver only needs to change it to DMA_ERROR, when something wrong happens
+(one period status is wrong, or stoped by client explicitly).
+
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+---
+ drivers/dma/imx-sdma.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index c75679d..c8a0094 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -605,8 +605,6 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
+ 
+ 		if (bd->mode.status & BD_RROR)
+ 			sdmac->status = DMA_ERROR;
+-		else
+-			sdmac->status = DMA_IN_PROGRESS;
+ 
+ 		bd->mode.status |= BD_DONE;
+ 		sdmac->buf_tail++;
 -- 
-
-Best Regards,
-Peter Chen
+1.8.1.2
