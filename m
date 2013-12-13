@@ -1,79 +1,62 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 13 Dec 2013 14:10:01 +0100
-Subject: [PATCH] ARM: dts: imx53: add support for Ka-Ro TX53 modules
-In-Reply-To: <20131213125719.GM24559@pengutronix.de>
-References: <1386852128-32220-1-git-send-email-LW@KARO-electronics.de>
- <20131213081744.GR18380@S2101-09.ap.freescale.net>
- <20131213105417.71a42133@ipc1.ka-ro>
- <20131213121646.GU18380@S2101-09.ap.freescale.net>
- <20131213134240.595d27ae@ipc1.ka-ro>
- <20131213125719.GM24559@pengutronix.de>
-Message-ID: <20131213141001.389a178e@ipc1.ka-ro>
+From: vkale@apm.com (Vinayak Kale)
+Date: Fri, 13 Dec 2013 18:42:55 +0530
+Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
+In-Reply-To: <20131213103632.GC19177@mudshark.cambridge.arm.com>
+References: <1386924222-23169-1-git-send-email-vkale@apm.com>
+ <20131213103632.GC19177@mudshark.cambridge.arm.com>
+Message-ID: <CAPrCYkfMW2zWiLWRvEkGcM2OdAXKHas7=sMRke=mp0oz2eETyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 13, 2013 at 4:06 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Dec 13, 2013 at 08:43:42AM +0000, Vinayak Kale wrote:
+>> Print the cpu frequency field in /proc/cpuinfo.
+>
+> Why? ["x86 does this" isn't a valid answer :)].
 
-Sascha Hauer wrote:
-> On Fri, Dec 13, 2013 at 01:42:40PM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Shawn Guo wrote:
-> > > On Fri, Dec 13, 2013 at 10:54:17AM +0100, Lothar Wa?mann wrote:
-> > > > > > +		compatible = "pwm-backlight";
-> > > > > > +		pwms = <&pwm2 0 500000>;
-> > > > > > +		power-supply = <&reg_3v3>;
-> > > > > > +		brightness-levels = <
-> > > > > > +			100 99 98 97 96 95 94 93 92 91
-> > > > > > +			 90 89 88 87 86 85 84 83 82 81
-> > > > > > +			 80 79 78 77 76 75 74 73 72 71
-> > > > > > +			 70 69 68 67 66 65 64 63 62 61
-> > > > > > +			 60 59 58 57 56 55 54 53 52 51
-> > > > > > +			 50 49 48 47 46 45 44 43 42 41
-> > > > > > +			 40 39 38 37 36 35 34 33 32 31
-> > > > > > +			 30 29 28 27 26 25 24 23 22 21
-> > > > > > +			 20 19 18 17 16 15 14 13 12 11
-> > > > > > +			 10  9  8  7  6  5  4  3  2  1
-> > > > > > +			  0
-> > > > > 
-> > > > > Why is it so unique to start with 100 and end with 0?  Does it even
-> > > > > work?  Here is what I read from bindings doc.
-> > > > > 
-> > > > Yes, it works. The backlight control of the displays we typically use
-> > > > is active low. This is a poor man's way to get an inverted PWM output!
-> > > > (And one in which the number written to the sysfs file corresponds to
-> > > > the actual duty cycle of the PWM output)
-> > > 
-> > > I think Linux pwm driver should be improved for this case rather than
-> > > manipulate device tree in a way that violate the defined bindings.
-> > >
-> > I admit I would be happier with a 'polarity' flag like other PWM
-> > drivers provide it. I tried to add polarity support in the generic PWM
-> > layer, so that all HW drivers that do not support inversion in HW can
-> > make use of it, but this gives problems with client drivers that don't
-> > know about the inversion and disable the PWM when the duty cycle is set
-> > to 0.
-> > Maybe I'll find some time to find a proper solution for this issue.
-> 
-> Actually the i.MX supports inversion in hardware. It's bit 18 in the
-> PWMCR register.
-> 
-I totally missed this up to now. :(
-Is it true for all i.MX SoCs? Or do we need to distinguish between SoCs
-that can do the inversion and those that cannot?
+Well, that's actually the main motive :-)
 
-I could provide a patch to utilize this feature, but probably not
-before the new year. There is something called 'vacation' in the way. ;)
+Secondly, earlier in amr64 port, /proc/cpuinfo used to print BogoMIPS.
+So people used to get mislead with the values. Although in current
+tree, we don't have that print. So that's not much of a concern now.
+(You had removed it I guess for the same reason :))
 
+>
+>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>> ---
+>>  arch/arm64/kernel/setup.c |   15 +++++++++++++++
+>>  1 files changed, 15 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index bd9bbd0..bca982b 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -41,6 +41,7 @@
+>>  #include <linux/memblock.h>
+>>  #include <linux/of_fdt.h>
+>>  #include <linux/of_platform.h>
+>> +#include <linux/cpufreq.h>
+>>
+>>  #include <asm/cputype.h>
+>>  #include <asm/elf.h>
+>> @@ -278,9 +279,19 @@ static const char *hwcap_str[] = {
+>>       NULL
+>>  };
+>>
+>> +static unsigned int get_cpufreq_khz(unsigned int cpu)
+>> +{
+>> +#ifdef CONFIG_CPU_FREQ
+>> +     return cpufreq_quick_get(cpu);
+>> +#else
+>> +     return 0;
+>> +#endif
+>> +}
+>
+> That's going to be hilarious fun when cpufreq isn't compiled in.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+In that case, we are not printing the value since above function will return 0.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> Just use the existing sysfs interfaces exposed by the cpufreq governers if
+> you need to know this stuff.
+>
+> Will
