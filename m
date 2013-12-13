@@ -1,30 +1,31 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 13 Dec 2013 14:00:30 +0800
-Subject: [PATCH v6 04/15] usb: doc: phy-mxs: update binding for adding
- anatop phandle
-In-Reply-To: <20131213042504.GE867@saruman.home>
+Date: Fri, 13 Dec 2013 14:04:54 +0800
+Subject: [PATCH v6 06/15] usb: phy-mxs: Add anatop regmap
+In-Reply-To: <20131213042627.GF867@saruman.home>
 References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-5-git-send-email-peter.chen@freescale.com>
- <20131213042504.GE867@saruman.home>
-Message-ID: <CAL411-rKen4q+Vfn6biO8URWDBfgCuzat0k2SkWoUzAryD_5Lw@mail.gmail.com>
+ <1386897825-6130-7-git-send-email-peter.chen@freescale.com>
+ <20131213042627.GF867@saruman.home>
+Message-ID: <CAL411-peWM-dpdWDvR2KX9tBGK2tkhwZTWvyLbYevpA6-9rNRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 12:25 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Fri, Dec 13, 2013 at 09:23:34AM +0800, Peter Chen wrote:
->> Add anatop phandle which is used to access anatop registers to
->> control PHY's power and other USB operations.
+On Fri, Dec 13, 2013 at 12:26 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
 >
-> no related to this patch, but this feels like OMAP's System Control
-> Module (a rather simplistic IP which control power for a few other IPs).
+> On Fri, Dec 13, 2013 at 09:23:36AM +0800, Peter Chen wrote:
+>> @@ -226,6 +235,16 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>>
+>>       platform_set_drvdata(pdev, mxs_phy);
+>>
+>> +     if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
 >
-> We're starting to see a pattern here, eventually we will need a more
-> generic approach to such types of modules. For now, don't worry :-)
+> instead of the flag, you can check if that binding exist and use the
+> binding itself as a flag.
 >
 
-We use syscon (system controller) driver (drivers/mfd/syscon.c)
-to handle it, syscon uses regmap to visit register which can keep
-register access exclusively.
+If flag MXS_PHY_HAS_ANATOP is existed, that binding must need to be
+existed, or it is an error.  syscon_regmap_lookup_by_phandle will return
+error is the binding is not existed.
 
 -- 
 BR,
