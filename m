@@ -1,48 +1,26 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Fri, 13 Dec 2013 09:59:44 -0800
-Subject: [PATCH v2 3/4] rename ARCH_BCM to ARCH_BCM_MOBILE (mmc)
-In-Reply-To: <1379956836-5866-4-git-send-email-bcm@fixthebug.org>
-References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
- <1379956836-5866-4-git-send-email-bcm@fixthebug.org>
-Message-ID: <CAEPRUYoCo9q_xq_0=OqgtmYpchVWGrJkQdnrj5Yk4SkAfNrLiQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Dec 2013 18:17:25 +0000
+Subject: [PATCH 1/5] arm64: Fix __data_loc value
+In-Reply-To: <20131213174647.GJ4360@n2100.arm.linux.org.uk>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <35a937043d1b3eae1b1ea547efc25f75b5f43f67.1386879684.git.geoff@infradead.org>
+ <20131213174647.GJ4360@n2100.arm.linux.org.uk>
+Message-ID: <20131213181725.GR22933@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 10:20 AM, Christian Daudt <bcm@fixthebug.org> wrote:
-> Currently ARCH_BCM has been used for Broadcom
-> Mobile V7 based SoCs. In order to allow other Broadcom
-> SoCs to also use mach-bcm directory and files, this patch
-> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
-> uses ARCH_BCM to define any Broadcom chip residing
-> in mach-bcm directory.
->
-> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
->
-> Changes from v1:
->  - fix alpha ordering in dts/Makefile
->  - break into 4 patches for separate subsys
->
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..7e89650 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -251,7 +251,7 @@ config MMC_SDHCI_S3C_DMA
->
->  config MMC_SDHCI_BCM_KONA
->         tristate "SDHCI support on Broadcom KONA platform"
-> -       depends on ARCH_BCM
-> +       depends on ARCH_BCM_MOBILE
->         select MMC_SDHCI_PLTFM
->         help
->           This selects the Broadcom Kona Secure Digital Host Controller
-> --
-> 1.7.10.4
->
-Chris,
- This is the last unacked piece of this patchset - could you pls
-review it ? Also let me know if you're pulling it in or if you want me
-to pull it into bcm to armsoc.
+On Fri, Dec 13, 2013 at 05:46:47PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 12, 2013 at 08:39:45PM +0000, Geoff Levand wrote:
+> > The __data_loc variable should be set to the VMA of the data section, not
+> > the LMA.
+> > 
+> > At present LOAD_OFFSET is not set and defaults to zero, so this bug
+> > does not cause any problems.
+> 
+> Why does ARM64 have this in the first place?  __data_loc is used for
+> XIP support on ARM, does ARM64 have XIP support?
 
- Thanks,
-   csd
+Not a good reason, copy-paste leftover.
+
+-- 
+Catalin
