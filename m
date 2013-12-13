@@ -1,54 +1,45 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 13 Dec 2013 19:56:35 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
-In-Reply-To: <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
-References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
- <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
-Message-ID: <CANqRtoT86xdh-c73f-_59sD3E=90yW1wOp5Bobmi4qJywA72uA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 13 Dec 2013 16:30:46 +0530
+Subject: [PATCH v5 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
+In-Reply-To: <1386854770-2173-6-git-send-email-mporter@linaro.org>
+References: <1386854770-2173-1-git-send-email-mporter@linaro.org>
+ <1386854770-2173-6-git-send-email-mporter@linaro.org>
+Message-ID: <52AAE8DE.2030801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Morimoto-san,
-
-On Fri, Dec 13, 2013 at 11:37 AM, Kuninori Morimoto
-<kuninori.morimoto.gx@gmail.com> wrote:
->
-> Hi Ben
->
-> Thank you for your patch
->
->> The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
->> size for their register block. This causes the sh_modbile_sdhi driver to
->> fail to communicate with card at-all.
->>
->> Change each sdhi node size from 0x100 to 0x200 to correct this.
->>
->> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Linux SH <linux-sh@vger.kernel.org>
->> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> Tested-by: William Towle <william.towle@codethink.co.uk>
->> ---
->
-> Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
-> The wrong is SDHI/TMIO driver side, not SoC side.
-> Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
-> but it need more time (= there is merge timing issue)
-
-Thanks for supporting Ben regarding this SDHI issue.
-
-Would it be possible for you to share a list of patches needed to get
-SDHI working? If some parts are missing then please post them so the
-patches are available on public lists.
-
-I would like to make it possible for Ben to test your patch stack if
-he happens to have time.
-
-My plan is to try out r8a7791 SDHI early next week.
-
-Cheers,
-
-/ magnus
+On Thursday 12 December 2013 06:56 PM, Matt Porter wrote:
+> If a generic phy is present, call phy_init()/phy_exit(). This supports
+> generic phys that must be soft reset before power on.
+> 
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+> index 7c5d8bd..e9683c2 100644
+> --- a/drivers/usb/gadget/s3c-hsotg.c
+> +++ b/drivers/usb/gadget/s3c-hsotg.c
+> @@ -3621,6 +3621,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+>  		goto err_supplies;
+>  	}
+>  
+> +	if (hsotg->phy)
+> +		phy_init(hsotg->phy);
+> +
+>  	/* usb phy enable */
+>  	s3c_hsotg_phy_enable(hsotg);
+>  
+> @@ -3714,6 +3717,8 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+>  	}
+>  
+>  	s3c_hsotg_phy_disable(hsotg);
+> +	if (hsotg->phy)
+> +		phy_exit(hsotg->phy);
+>  	clk_disable_unprepare(hsotg->clk);
+>  
+>  	return 0;
+> 
