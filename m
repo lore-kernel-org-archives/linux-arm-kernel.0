@@ -1,43 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Dec 2013 18:43:37 -0600
-Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
-In-Reply-To: <52AA54E4.5000606@ti.com>
-References: <20131212214306.GS1939@saruman.home>
- <1386884755-12366-1-git-send-email-balbi@ti.com>
- <52AA54E4.5000606@ti.com>
-Message-ID: <20131213004337.GA31622@saruman.home>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 12 Dec 2013 16:48:27 -0800
+Subject: [PATCH 3/3] swiotlb: Add support for CMA allocations
+In-Reply-To: <20131210104231.GB2521@darko.cambridge.arm.com>
+References: <1386634334-31139-1-git-send-email-lauraa@codeaurora.org>
+ <1386634334-31139-4-git-send-email-lauraa@codeaurora.org>
+ <1da8f502-0e34-4b54-929e-bcbe40b20b7f@email.android.com>
+ <52A66211.6010707@codeaurora.org>
+ <83dd58eb-9a44-4b76-aa68-4669b26acab8@email.android.com>
+ <20131210102555.GB2338@mudshark.cambridge.arm.com>
+ <20131210104231.GB2521@darko.cambridge.arm.com>
+Message-ID: <52AA595B.7090708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 07:29:24PM -0500, Santosh Shilimkar wrote:
-> On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
-> > A bare-minimum PM implementation which will
-> > server as building block for more complex
-> s/server/serve ;-)
+On 12/10/2013 2:42 AM, Catalin Marinas wrote:
+>
+> For coherency, we could build it on top of whatever dma (allocation) ops
+> are registered, whether swiotlb or iommu (see part of
+> https://git.kernel.org/cgit/linux/kernel/git/cmarinas/linux-aarch64.git/commit/?h=devel&id=c67fe405be6b55399c9e53dfeba5e2c6b930e429)
+>
+> Regarding iommu, I don't think we need CMA on top, so it makes sense to
+> keep the CMA in the swiotlb code.
+>
 
-hah! :-) will fix in my branch.
+Catalin, is that just sample/design code or is that patch going to be 
+merged sometime?
 
-> > PM implementation in the future.
-> > 
-> > At the least will not leave clocks on unnecessarily
-> > when e.g.  a user write mem to /sys/power/state.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > 
-> > improve error path a little bit.
-> > 
-> We will test this out. Thanks for the
-> patch Felipe.
-
-thanks.
+Thanks,
+Laura
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131212/db14b78b/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
