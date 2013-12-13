@@ -1,76 +1,128 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:31:27 +0900
-Subject: [PATCH 53/69] ARM: shmobile: kzm9g-reference: Add GPIO keys to DT
+Date: Fri, 13 Dec 2013 11:31:32 +0900
+Subject: [PATCH 06/69] ARM: shmobile: r8a7791 GPIO device tree node
 In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au>
 References: <cover.1386901186.git.horms+renesas@verge.net.au>
-Message-ID: <5ec5f73463611514fe46b2167e471b17626007f9.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <ab87e3fc0b3532f8ff1cb08b9f3680bc98be7728.1386901186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Add GPIO controllers to the r8a7791 DTSI file.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 46 ++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 96 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index d58877d..5bb593d 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -106,6 +106,52 @@
- 			gpios = <&pfc 23 GPIO_ACTIVE_LOW>;
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 765d989..344f1f7 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -46,6 +46,102 @@
+ 		interrupts = <1 9 0xf04>;
  	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		back-key {
-+			gpios = <&pcf8575 8 GPIO_ACTIVE_LOW>;
-+			linux,code = <158>;
-+			label = "SW3";
-+		};
-+
-+		right-key {
-+			gpios = <&pcf8575 9 GPIO_ACTIVE_LOW>;
-+			linux,code = <106>;
-+			label = "SW2-R";
-+		};
-+
-+		left-key {
-+			gpios = <&pcf8575 10 GPIO_ACTIVE_LOW>;
-+			linux,code = <105>;
-+			label = "SW2-L";
-+		};
-+
-+		enter-key {
-+			gpios = <&pcf8575 11 GPIO_ACTIVE_LOW>;
-+			linux,code = <28>;
-+			label = "SW2-P";
-+		};
-+
-+		up-key {
-+			gpios = <&pcf8575 12 GPIO_ACTIVE_LOW>;
-+			linux,code = <103>;
-+			label = "SW2-U";
-+		};
-+
-+		down-key {
-+			gpios = <&pcf8575 13 GPIO_ACTIVE_LOW>;
-+			linux,code = <108>;
-+			label = "SW2-D";
-+		};
-+
-+		home-key {
-+			gpios = <&pcf8575 14 GPIO_ACTIVE_LOW>;
-+			linux,code = <102>;
-+			label = "SW1";
-+		};
-+	};
- };
  
- &i2c0 {
++	gpio0: gpio at ffc40000 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc40000 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 4 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 0 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio1: gpio at ffc41000 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc41000 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 5 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 32 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio2: gpio at ffc42000 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc42000 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 6 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 64 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio3: gpio at ffc43000 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc43000 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 7 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 96 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio4: gpio at ffc44000 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc44000 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 8 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 128 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio5: gpio at ffc45000 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc45000 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 9 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 160 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio6: gpio at ffc45400 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc45400 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 10 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 192 32>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
++	gpio7: gpio at ffc45800 {
++		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
++		reg = <0 0xffc45800 0 0x50>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 11 0x4>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		gpio-ranges = <&pfc 0 224 26>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <1 13 0xf08>,
 -- 
 1.8.4
