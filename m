@@ -1,67 +1,214 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Dec 2013 11:29:54 +0900
-Subject: [PATCH 21/33] ARM: shmobile: r8a7791: Add DU and LVDS clocks
+Date: Fri, 13 Dec 2013 11:29:51 +0900
+Subject: [PATCH 18/33] ARM: shmobile: Remove legacy platform devices from
+ EMEV2 SoC code
 In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au>
 References: <cover.1386897180.git.horms+renesas@verge.net.au>
-Message-ID: <cf4f85ccd5c235123a8a1827d2265da5c33a1bb0.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <59032702ead9056231f273e0e99655c2f2280491.1386897180.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-The ZX parent clock isn't implemented yet, add it as well.
+Now when KZM9D legacy C board support code is
+gone then remove emev2_add_standard_devices()
+and all the platform devices from setup-emev2.c.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7791.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/emev2.h |   5 -
+ arch/arm/mach-shmobile/setup-emev2.c        | 148 ----------------------------
+ 2 files changed, 153 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index c9a26f1..fda7c6c 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -103,6 +103,7 @@ SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
- SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
- SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
- SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
-+SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
+diff --git a/arch/arm/mach-shmobile/include/mach/emev2.h b/arch/arm/mach-shmobile/include/mach/emev2.h
+index c2eb756..fcb142a 100644
+--- a/arch/arm/mach-shmobile/include/mach/emev2.h
++++ b/arch/arm/mach-shmobile/include/mach/emev2.h
+@@ -3,12 +3,7 @@
  
- static struct clk *main_clks[] = {
- 	&extal_clk,
-@@ -116,11 +117,12 @@ static struct clk *main_clks[] = {
- 	&rclk_clk,
- 	&mp_clk,
- 	&cp_clk,
-+	&zx_clk,
- };
+ extern void emev2_map_io(void);
+ extern void emev2_init_delay(void);
+-extern void emev2_add_standard_devices(void);
+ extern void emev2_clock_init(void);
+-
+-#define EMEV2_GPIO_BASE 200
+-#define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
+-
+ extern struct smp_operations emev2_smp_ops;
  
- /* MSTP */
- enum {
--	MSTP721, MSTP720,
-+	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
- 	MSTP719, MSTP718, MSTP715, MSTP714,
- 	MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
-@@ -129,6 +131,9 @@ enum {
- };
+ #endif /* __ASM_EMEV2_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 4d39bf4..e7031b0 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -19,22 +19,12 @@
+ #include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/platform_device.h>
+-#include <linux/platform_data/gpio-em.h>
+ #include <linux/of_platform.h>
+-#include <linux/delay.h>
+-#include <linux/input.h>
+-#include <linux/io.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
+ #include <mach/emev2.h>
+-#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/time.h>
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
-+	[MSTP724] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 24, 0), /* DU0 */
-+	[MSTP723] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 23, 0), /* DU1 */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP719] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 19, 0), /* SCIF2 */
-@@ -164,6 +169,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
+ static struct map_desc emev2_io_desc[] __initdata = {
+ #ifdef CONFIG_SMP
+@@ -53,144 +43,6 @@ void __init emev2_map_io(void)
+ 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
+ }
  
- 	/* MSTP */
-+	CLKDEV_ICK_ID("lvds.0", "rcar-du-r8a7791", &mstp_clks[MSTP726]),
-+	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7791", &mstp_clks[MSTP724]),
-+	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7791", &mstp_clks[MSTP723]),
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]), /* SCIFB0 */
+-/* UART */
+-static struct resource uart0_resources[] = {
+-	DEFINE_RES_MEM(0xe1020000, 0x38),
+-	DEFINE_RES_IRQ(40),
+-};
+-
+-static struct resource uart1_resources[] = {
+-	DEFINE_RES_MEM(0xe1030000, 0x38),
+-	DEFINE_RES_IRQ(41),
+-};
+-
+-static struct resource uart2_resources[] = {
+-	DEFINE_RES_MEM(0xe1040000, 0x38),
+-	DEFINE_RES_IRQ(42),
+-};
+-
+-static struct resource uart3_resources[] = {
+-	DEFINE_RES_MEM(0xe1050000, 0x38),
+-	DEFINE_RES_IRQ(43),
+-};
+-
+-#define emev2_register_uart(idx)					\
+-	platform_device_register_simple("serial8250-em", idx,		\
+-					uart##idx##_resources,		\
+-					ARRAY_SIZE(uart##idx##_resources))
+-
+-/* STI */
+-static struct resource sti_resources[] = {
+-	DEFINE_RES_MEM(0xe0180000, 0x54),
+-	DEFINE_RES_IRQ(157),
+-};
+-
+-#define emev2_register_sti()					\
+-	platform_device_register_simple("em_sti", 0,		\
+-					sti_resources,		\
+-					ARRAY_SIZE(sti_resources))
+-
+-/* GIO */
+-static struct gpio_em_config gio0_config = {
+-	.gpio_base = 0,
+-	.irq_base = EMEV2_GPIO_IRQ(0),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio0_resources[] = {
+-	DEFINE_RES_MEM(0xe0050000, 0x2c),
+-	DEFINE_RES_MEM(0xe0050040, 0x20),
+-	DEFINE_RES_IRQ(99),
+-	DEFINE_RES_IRQ(100),
+-};
+-
+-static struct gpio_em_config gio1_config = {
+-	.gpio_base = 32,
+-	.irq_base = EMEV2_GPIO_IRQ(32),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio1_resources[] = {
+-	DEFINE_RES_MEM(0xe0050080, 0x2c),
+-	DEFINE_RES_MEM(0xe00500c0, 0x20),
+-	DEFINE_RES_IRQ(101),
+-	DEFINE_RES_IRQ(102),
+-};
+-
+-static struct gpio_em_config gio2_config = {
+-	.gpio_base = 64,
+-	.irq_base = EMEV2_GPIO_IRQ(64),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio2_resources[] = {
+-	DEFINE_RES_MEM(0xe0050100, 0x2c),
+-	DEFINE_RES_MEM(0xe0050140, 0x20),
+-	DEFINE_RES_IRQ(103),
+-	DEFINE_RES_IRQ(104),
+-};
+-
+-static struct gpio_em_config gio3_config = {
+-	.gpio_base = 96,
+-	.irq_base = EMEV2_GPIO_IRQ(96),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio3_resources[] = {
+-	DEFINE_RES_MEM(0xe0050180, 0x2c),
+-	DEFINE_RES_MEM(0xe00501c0, 0x20),
+-	DEFINE_RES_IRQ(105),
+-	DEFINE_RES_IRQ(106),
+-};
+-
+-static struct gpio_em_config gio4_config = {
+-	.gpio_base = 128,
+-	.irq_base = EMEV2_GPIO_IRQ(128),
+-	.number_of_pins = 31,
+-};
+-
+-static struct resource gio4_resources[] = {
+-	DEFINE_RES_MEM(0xe0050200, 0x2c),
+-	DEFINE_RES_MEM(0xe0050240, 0x20),
+-	DEFINE_RES_IRQ(107),
+-	DEFINE_RES_IRQ(108),
+-};
+-
+-#define emev2_register_gio(idx)						\
+-	platform_device_register_resndata(&platform_bus, "em_gio",	\
+-					  idx, gio##idx##_resources,	\
+-					  ARRAY_SIZE(gio##idx##_resources), \
+-					  &gio##idx##_config,		\
+-					  sizeof(struct gpio_em_config))
+-
+-static struct resource pmu_resources[] = {
+-	DEFINE_RES_IRQ(152),
+-	DEFINE_RES_IRQ(153),
+-};
+-
+-#define emev2_register_pmu()					\
+-	platform_device_register_simple("arm-pmu", -1,		\
+-					pmu_resources,		\
+-					ARRAY_SIZE(pmu_resources))
+-
+-void __init emev2_add_standard_devices(void)
+-{
+-	if (!IS_ENABLED(CONFIG_COMMON_CLK))
+-		emev2_clock_init();
+-
+-	emev2_register_uart(0);
+-	emev2_register_uart(1);
+-	emev2_register_uart(2);
+-	emev2_register_uart(3);
+-	emev2_register_sti();
+-	emev2_register_gio(0);
+-	emev2_register_gio(1);
+-	emev2_register_gio(2);
+-	emev2_register_gio(3);
+-	emev2_register_gio(4);
+-	emev2_register_pmu();
+-}
+-
+ void __init emev2_init_delay(void)
+ {
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
 -- 
 1.8.4
