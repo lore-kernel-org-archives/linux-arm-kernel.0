@@ -1,38 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 14 Dec 2013 18:41:53 +0000
-Subject: [PATCH 02/10] arm: select ARCH_MIGHT_HAVE_PC_SERIO
-In-Reply-To: <1387040376-26906-3-git-send-email-msalter@redhat.com>
-References: <1387040376-26906-1-git-send-email-msalter@redhat.com>
- <1387040376-26906-3-git-send-email-msalter@redhat.com>
-Message-ID: <20131214184153.GM4360@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 Dec 2013 19:50:09 +0100
+Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
+In-Reply-To: <CACmBeS3Xse5KkFqkM5Ye+qaaxpVCjyeGz7Oc9sr0PN+pZ9sztQ@mail.gmail.com>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <52AC7E41.7050201@roeck-us.net>
+ <CACmBeS3Xse5KkFqkM5Ye+qaaxpVCjyeGz7Oc9sr0PN+pZ9sztQ@mail.gmail.com>
+Message-ID: <201312141950.09447.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 11:59:28AM -0500, Mark Salter wrote:
-> Architectures which might use an i8042 for serial IO to keyboard,
-> mouse, etc should select ARCH_MIGHT_HAVE_PC_SERIO.
+On Saturday 14 December 2013, Jonas Jensen wrote:
+> >
+> > Conceptually it might be cleaner to write a separate driver, for example
+> > in drivers/power/restart, than plugging the functionality into
+> > the watchdog driver, at least if you don't want it in architecture
+> > or platform code. The xgene restart driver is a good example.
+> >
 > 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+> Moving it to a new power/restart driver seems reasonable to me, I'm
+> really just looking for a home for it, I would have preferred a
+> hardware with reset in a separate register though.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c1f1a7e..6990dc5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -6,6 +6,7 @@ config ARM
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->  	select ARCH_HAVE_CUSTOM_GPIO_H
->  	select ARCH_MIGHT_HAVE_PC_PARPORT
-> +	select ARCH_MIGHT_HAVE_PC_SERIO if FOOTBRIDGE_HOST
->  	select ARCH_USE_CMPXCHG_LOCKREF
->  	select ARCH_WANT_IPC_PARSE_VERSION
->  	select BUILDTIME_EXTABLE_SORT if MMU
+> I now plan to remove it for v5 and submit a separate driver.
 
-It would be better to put this in arch/arm/mach-footbridge/Kconfig -
-ARM is impled as being true there.
+I still think it's better to leave it in the watchdog driver: This
+driver attaches to the watchdog device, and adding a separate driver
+for reset means we have to trick the core Linux code into attaching
+two drivers to one device in some way, or the device tree has to fake
+a second device that doesn't exist in hardware but is only needed
+because of Linux implementation details.
 
-Thanks.
+	Arnd
