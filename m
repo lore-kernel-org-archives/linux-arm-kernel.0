@@ -1,73 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 14 Dec 2013 09:27:52 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
-In-Reply-To: <52AAE9AF.6010704@codethink.co.uk>
-References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
- <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
- <CANqRtoT86xdh-c73f-_59sD3E=90yW1wOp5Bobmi4qJywA72uA@mail.gmail.com>
- <52AAE9AF.6010704@codethink.co.uk>
-Message-ID: <20131214002752.GA12173@verge.net.au>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 13 Dec 2013 17:31:15 -0700
+Subject: [PATCH 5/5] arm64: Add LOAD_OFFSET symbol for linker scripts
+In-Reply-To: <1386980430.1002.96.camel@smoke>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
+ <20131213164517.GM19177@mudshark.cambridge.arm.com>
+ <1386980430.1002.96.camel@smoke>
+Message-ID: <20131214003115.GI12904@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 11:04:15AM +0000, Ben Dooks wrote:
-> On 13/12/13 10:56, Magnus Damm wrote:
-> >Hey Morimoto-san,
-> >
-> >On Fri, Dec 13, 2013 at 11:37 AM, Kuninori Morimoto
-> ><kuninori.morimoto.gx@gmail.com> wrote:
-> >>
-> >>Hi Ben
-> >>
-> >>Thank you for your patch
-> >>
-> >>>The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
-> >>>size for their register block. This causes the sh_modbile_sdhi driver to
-> >>>fail to communicate with card at-all.
-> >>>
-> >>>Change each sdhi node size from 0x100 to 0x200 to correct this.
-> >>>
-> >>>Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >>>Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> >>>Cc: Magnus Damm <magnus.damm@gmail.com>
-> >>>Cc: Simon Horman <horms@verge.net.au>
-> >>>Cc: Linux SH <linux-sh@vger.kernel.org>
-> >>>Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-> >>>Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> >>>Tested-by: William Towle <william.towle@codethink.co.uk>
-> >>>---
-> >>
-> >>Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
-> >>The wrong is SDHI/TMIO driver side, not SoC side.
-> >>Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
-> >>but it need more time (= there is merge timing issue)
-> >
-> >Thanks for supporting Ben regarding this SDHI issue.
-> >
-> >Would it be possible for you to share a list of patches needed to get
-> >SDHI working? If some parts are missing then please post them so the
-> >patches are available on public lists.
-> >
-> >I would like to make it possible for Ben to test your patch stack if
-> >he happens to have time.
+On Fri, Dec 13, 2013 at 04:20:30PM -0800, Geoff Levand wrote:
+> > Can you be more specific about why we need this please? We don't seem to use
+> > this on ARM, and I can't really think of a sensible value to define it as,
+> > either. PAGE_OFFSET is a virtual address, which doesn't make much sense to
+> > me, but perhaps I'm missing something.
 > 
-> Thanks, I think I have all the previous ones that where pushed to the
-> linux-sh list. If there's a git tree I could pull from that would make
-> our job easier.
+> As I mentioned before, LOAD_OFFSET defaults to zero if it is not defined by the
+> arch, so our arm64 vmlinux files currently have their paddr's equal to their
+> vaddr's, so something like 0xffffffc000080000.
 
-A good idea, sorry for not already having that in place.
+FWIW, I posted a similar patch for ARM32 last year:
 
-Morimoto-san, could you help me to create a topic branch for R-Car Gen2
-SDHI by sending me a list of patches and/or brances in other people's
-trees?
+https://lkml.org/lkml/2012/9/30/145
 
-> We have got SDHI0 and SDHI2 working with device tree, but we're
-> currently seeing less than a megabyte a second when direcly dd-ing
-> blocks from the card. Is this a noted issue? We got ~11MiB without
-> DMA on the 3.4-ltsi series.
-> 
-> As a note, I will be away from the 20th December untill Janurary 6th
-> and it is likely the rest of the team here will be away from 21st.
+We are using it here to convey to desired load address to the boot
+loader. My patch makes LOAD_OFFSET equal to PLAT_PHYS_OFFSET for
+non-relocatable kernels, 0 otherwise.
 
-I think it is likely that most of Japan will be on vacation from
-the 28th to the 6th. I intend to be but I don't speak for others.
+If ARM64 takes Geoffs changes I can resend my patch for ARM32.
+
+Regards,
+Jason
