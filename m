@@ -1,39 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 14 Dec 2013 12:30:24 -0500
-Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
- clock initialization
-In-Reply-To: <52AC4568.7030201@gmail.com>
-References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
- <201312140400.16794.arnd@arndb.de> <52AC4568.7030201@gmail.com>
-Message-ID: <52AC95B0.7090303@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 14 Dec 2013 18:35:14 +0100
+Subject: [PATCH 1/4] irqchip: armada-370-xp: fix IPI race condition
+In-Reply-To: <20131213163854.GD2609@titan.lakedaemon.net>
+References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20131212232327.01f4aaff@skate>
+ <20131213163854.GD2609@titan.lakedaemon.net>
+Message-ID: <20131214183514.3707a4dd@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 December 2013 06:47 AM, Sebastian Hesselbarth wrote:
+Dear Jason Cooper,
 
-[..]
+On Fri, 13 Dec 2013 11:38:54 -0500, Jason Cooper wrote:
 
-> From 4ef4720c0d7ca9be57b06dc7ab1483c77a5ada1d Mon Sep 17 00:00:00 2001
-> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Date: Sat, 14 Dec 2013 12:21:01 +0100
-> Subject: [PATCH] ARM: keystone: remove call to of_clk_init
+> > Would it be possible to merge them for 3.13 ? Notice that the below
+> > patch should also be backported into stable kernel all the way to 3.8.
 > 
-> Commit
+> oops.  I'm maintaining an mvebu topic branch for irqchip changes, and
+> forgot to look in my -fixes mail folder when putting it together.  I'll
+> take both of these into mvebu/irqchip-fixes and send a pull request to
+> Thomas in a few days.
 > 
-> 4178bac ARM: call of_clk_init from default time_init handler
+> Added:
 > 
-> added implicit call to of_clk_init(NULL) from default time_init callback.
-> This causes double clock initialization on keystone, leading to boot
-> failures.
+> Cc: stable at vger.kernel.org # v3.8+
+> Fixes: 344e873e5657e8dc0 'arm: mvebu: Add IPI support via doorbells'
 > 
-> This patch fixes boot failure on keystone by dropping the call to
-> of_clk_init(NULL) in keystone_pm_runtime_init(), which is set as
-> subsys_initcall and therefore called after arch-wide .init_time callback.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-I already have a patch [1] for this in my queue. Thanks
+> to this patch.
 
-Regards,
-Santosh
-[1] http://www.spinics.net/lists/arm-kernel/msg288578.html
+Great, thanks! Note that the patch will not apply as is on 3.8, but I
+will be able to provide a backported variant of it when needed.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
