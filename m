@@ -1,36 +1,38 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Sun, 15 Dec 2013 03:03:51 +0400
-Subject: [PATCH v2 16/16] misc: support for I-8024 in LP-8x4x
-In-Reply-To: <201312142159.40250.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 Dec 2013 00:39:46 +0100
+Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <1387049660.7152.317.camel@host5.omatika.ru>
 References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1386901645-28895-17-git-send-email-ynvich@gmail.com>
- <201312142159.40250.arnd@arndb.de>
-Message-ID: <1387062231.13062.43.camel@host5.omatika.ru>
+ <201312142006.26979.arnd@arndb.de>
+ <1387049660.7152.317.camel@host5.omatika.ru>
+Message-ID: <201312150039.46681.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-12-14 at 21:59 +0100, Arnd Bergmann wrote:
-> Have you checked that the nsleep definition actually does the
-> right thing here? 450 nanoseconds must be close the latency
-> you get from calling schedule_hrtimeout(). I'd suggest using
-> either ndelay() or usleep_range() instead, depending on your
-> needs.
+On Saturday 14 December 2013, Sergei Ianovich wrote:
+> On Sat, 2013-12-14 at 20:06 +0100, Arnd Bergmann wrote:
+> > On Friday 13 December 2013, Sergei Ianovich wrote:
+> > > Non-dts implementation supply required DMA channel numbers as
+> > > IORESOURCE_DMA. However, there is was no way to get them from
+> > > device tree.
+> > 
+> > Please update this changeset comment, I think it still refers to
+> > the earlier version.
+> 
+> ---
+> Non-dts implementation supply required DMA channel numbers as
+> IORESOURCE_DMA. We can also get them from the device tree, if it
+> is present.
+> ---
+> 
+> Is this fine?
 
-Documentation/timers/timers-howto.txt stated there was a significant
-overhead when setting up usleep_range. I studied implementation and
-found that schedule_hrtimeout was certainly less than 520000 CPU cycles
-that udelay(1) would consume.
+I would mention that the binding is designed to work with the dmaengine
+framework as soon as we have figured out how to make that work without
+the problems you found.
 
-It worked. I haven't checked actual delay time. However, machines with
-the driver (based on 3.8) are in production since May 2013 without
-issues.
+> Should I post v3, if so? 
 
-> If nsleep is really useful here, we should probably add that
-> as a generic API rather than having it in one driver.
+I'd wait a little longer for more comments.
 
-I've also used this nsleep for driving RTC clock (DS1302) since May
-2013.
-
-Now I see that my code is a clone of usleep_range(x, x). I will convert
-my code to use it.
+	Arnd
