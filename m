@@ -1,56 +1,26 @@
-From: rashika.kheria@gmail.com (Rashika Kheria)
-Date: Sat, 14 Dec 2013 13:16:06 +0530
-Subject: [PATCH] drivers: clk: Fix build break introduced in 3e1e4a5f
-Message-ID: <20131214074606.GA20826@rashika>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Sat, 14 Dec 2013 00:14:22 -0800
+Subject: [PATCH v4 5/8] mmc: sdhci-bcm-kona: Add basic use of clocks
+In-Reply-To: <1386271244-3927-6-git-send-email-tim.kryger@linaro.org>
+References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
+ <1386271244-3927-6-git-send-email-tim.kryger@linaro.org>
+Message-ID: <CAEPRUYrPXf7QNzput0bz_UPfytRy1eYgyOJYnH5v2v4DCEKSNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the build break introduced by 3e1e4a5f. The mentioned
-commit id makes the changes in file "include/linux/mfd/samsung/core.h"
-by changing the members of structure sec_pmic_dev.
+On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> Enable the external clock needed by the host controller during the
+> probe and disable it during the remove.
+>
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
 
-The patch replaces "regmap" with "regmap_pmic" because structure
-sec_pmic_dev no more contains any member named regmap.
+Reviewed-by: Christian Daudt <bcm@fixthebug.org>
 
-Thus, it removes the undefined reference to regmap in functions
-s2mps11_clk_prepare(), s2mps11_clk_unprepare() and s2mps11_clk_probe().
+Chris,
+ Are you ok with me pulling this patch along with the rest of the
+patchset into the bcm tree?
 
-Signed-off-by: Rashika Kheria <rashika.kheria@gmail.com>
----
- drivers/clk/clk-s2mps11.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index 7be41e6..94e3695 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -60,7 +60,7 @@ static int s2mps11_clk_prepare(struct clk_hw *hw)
- 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
- 	int ret;
- 
--	ret = regmap_update_bits(s2mps11->iodev->regmap,
-+	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
- 				S2MPS11_REG_RTC_CTRL,
- 				 s2mps11->mask, s2mps11->mask);
- 	if (!ret)
-@@ -74,7 +74,8 @@ static void s2mps11_clk_unprepare(struct clk_hw *hw)
- 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
- 	int ret;
- 
--	ret = regmap_update_bits(s2mps11->iodev->regmap, S2MPS11_REG_RTC_CTRL,
-+	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
-+			   S2MPS11_REG_RTC_CTRL,
- 			   s2mps11->mask, ~s2mps11->mask);
- 
- 	if (!ret)
-@@ -174,7 +175,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 		s2mps11_clk->hw.init = &s2mps11_clks_init[i];
- 		s2mps11_clk->mask = 1 << i;
- 
--		ret = regmap_read(s2mps11_clk->iodev->regmap,
-+		ret = regmap_read(s2mps11_clk->iodev->regmap_pmic,
- 				  S2MPS11_REG_RTC_CTRL, &val);
- 		if (ret < 0)
- 			goto err_reg;
--- 
-1.7.9.5
+ Thanks,
+   csd
