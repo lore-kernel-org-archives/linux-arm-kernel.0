@@ -1,67 +1,44 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 13 Dec 2013 19:38:06 -0500
-Subject: [PATCH] mm/ARM: fix ARMs __ffs() to conform to avoid warning with
- NO_BOOTMEM
-Message-ID: <1386981486-3173-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 13 Dec 2013 19:44:28 -0500
+Subject: [PATCH v3 07/23] mm/memblock: switch to use NUMA_NO_NODE instead
+ of MAX_NUMNODES
+In-Reply-To: <20131213212912.GL27070@htj.dyndns.org>
+References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386625856-12942-8-git-send-email-santosh.shilimkar@ti.com>
+ <20131213212912.GL27070@htj.dyndns.org>
+Message-ID: <52ABA9EC.5070100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building ARM with NO_BOOTMEM generates below warning.
+On Friday 13 December 2013 04:29 PM, Tejun Heo wrote:
+> On Mon, Dec 09, 2013 at 04:50:40PM -0500, Santosh Shilimkar wrote:
+>> +	if (nid == MAX_NUMNODES)
+>> +		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
+>> +			     __func__);
+> 
+> Why not just use WARN_ONCE()?  We'd want to know who the caller is
+> anyway.  Also, wouldn't something like the following simpler?
+> 
+> 	if (WARN_ONCE(nid == MAX_NUMNODES, blah blah))
+> 		nid = NUMA_NO_NODE;
+> 
+Agree.
 
-mm/nobootmem.c: In function _____free_pages_memory___:
-mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
+>> @@ -768,6 +773,11 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
+>>  	struct memblock_type *rsv = &memblock.reserved;
+>>  	int mi = *idx & 0xffffffff;
+>>  	int ri = *idx >> 32;
+>> +	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
+>> +
+>> +	if (nid == MAX_NUMNODES)
+>> +		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
+>> +			     __func__);
+> 
+> Ditto.
+>
+OK.
 
-	order = min(MAX_ORDER - 1UL, __ffs(start));
-
-ARM's __ffs() differs from other architectures in that it ends up being
-an int, whereas almost everyone else is unsigned long.
-
-So fix ARMs __ffs() to conform to other architectures. Suggested by
-Russell King <linux@arm.linux.org.uk>
-
-Some more details in below thread -
-	https://lkml.org/lkml/2013/12/9/807
-
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/bitops.h |   23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index e691ec9..5f41d81 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -270,10 +270,25 @@ static inline int fls(int x)
- 	return ret;
- }
- 
--#define __fls(x) (fls(x) - 1)
--#define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
--#define __ffs(x) (ffs(x) - 1)
--#define ffz(x) __ffs( ~(x) )
-+static inline unsigned long __fls(unsigned long x)
-+{
-+	return fls(x) - 1;
-+}
-+
-+static inline int ffs(int x)
-+{
-+	return fls(x & -x);
-+}
-+
-+static inline unsigned long __ffs(unsigned long x)
-+{
-+	return ffs(x) - 1;
-+}
-+
-+static inline unsigned long ffz(unsigned long x)
-+{
-+	return __ffs(~x);
-+}
- 
- #endif
- 
--- 
-1.7.9.5
+> 
+> Reviwed-by: Tejun Heo <tj@kernel.org>
+> 
+Thanks
