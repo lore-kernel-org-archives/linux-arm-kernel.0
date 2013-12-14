@@ -1,44 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Dec 2013 05:01:05 +0100
-Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
-In-Reply-To: <20131213190707.GA9713@roeck-us.net>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
- <CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>
- <20131213190707.GA9713@roeck-us.net>
-Message-ID: <201312140501.05749.arnd@arndb.de>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Sat, 14 Dec 2013 12:43:11 +0800
+Subject: [PATCH -next] ARM: pxa: fix return value check in
+ em_x270_sensor_init()
+Message-ID: <CAPgLHd_SQbatw9n57n-FPT1O3j4s_8YonjO8RwWCUscroh5jcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 December 2013, Guenter Roeck wrote:
-> On Fri, Dec 13, 2013 at 06:23:44PM +0100, Jonas Jensen wrote:
-> > On 13 December 2013 17:17, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > I've been out of the loop a bit here. I initially suggested having the restart
-> > > handler be part of the watchdog driver, and I thought you had done that in an
-> > > earlier version. What has changed your mind?
-> > 
-> > I got the impression from Guenter Roeck's review, that it doesn't belong there,
-> > maybe I was too quick to remove it?
-> > 
-> You'd have to answer the questions I raised in my review if you want it in
-> there.
-> 
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Let me reply to your comment from that email:
+In case of error, the function regulator_get() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check
+should be replaced with IS_ERR().
 
-> > +
-> > +	arm_pm_restart = moxart_wdt_restart;
->
-> It is quite unusual that system restart code is implemented in a watchdog
-> driver (which may not even be compiled into an image, or not be loaded).
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-pxa/em-x270.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I had asked Jonas to do it in the watchdog driver because that driver is
-the place that handles this particular register. We have moved a bunch
-of restart handlers into drivers/power for similar reasons, and those
-can also be compiled out. The restart handler isn't actually essential
-for most operations, and we have moved some far more important drivers
-from arch/arm into drivers/, such as clocks, interrupts, timers etc.
-
-The restart handler in this case is the only piece of code that remains in
-mach-moxart, and I would really like it to be completely empty.
-
-	Arnd
+diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+index 6915a9f..339b422 100644
+--- a/arch/arm/mach-pxa/em-x270.c
++++ b/arch/arm/mach-pxa/em-x270.c
+@@ -971,9 +971,9 @@ static int em_x270_sensor_init(void)
+ 	gpio_direction_output(cam_reset, 0);
+ 
+ 	em_x270_camera_ldo = regulator_get(NULL, "vcc cam");
+-	if (em_x270_camera_ldo == NULL) {
++	if (IS_ERR(em_x270_camera_ldo)) {
+ 		gpio_free(cam_reset);
+-		return -ENODEV;
++		return PTR_ERR(em_x270_camera_ldo);
+ 	}
+ 
+ 	ret = regulator_enable(em_x270_camera_ldo);
