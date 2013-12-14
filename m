@@ -1,101 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 14 Dec 2013 02:41:44 +0100
-Subject: [PATCH v4 0/5] Renesas R-Car Gen2 Common Clock Framework arch/
- support
-In-Reply-To: <20131214012624.GF12584@verge.net.au>
-References: <1386770716-21610-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131214012624.GF12584@verge.net.au>
-Message-ID: <3998896.4EUoySjjs7@avalon>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 13 Dec 2013 18:44:53 -0700
+Subject: [PATCH V1 05/11] ARM: dts: imx6qdl-sabrelite: specify pad settings
+In-Reply-To: <201312132250.29518.marex@denx.de>
+References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
+ <201312131248.32208.marex@denx.de> <52AB5511.7040209@boundarydevices.com>
+ <201312132250.29518.marex@denx.de>
+Message-ID: <52ABB815.9030203@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 12/13/2013 2:50 PM, Marek Vasut wrote:
+> On Friday, December 13, 2013 at 07:42:25 PM, Troy Kisky wrote:
+>> On 12/13/2013 4:48 AM, Marek Vasut wrote:
+>>> On Friday, December 13, 2013 at 02:49:09 AM, Troy Kisky wrote:
+>>>> Don't use 0x80000000 to get default pad settings.
+>>> What is the rationale behind this change please? Can you explain more in
+>>> detail?
+>> No real need, but I thought relying on what the boot loader did or did
+>> not do
+>> was discouraged?
+> Full ACK on this, we do not rely on bootloader configuration (though these two
+> should be in-line).
+>
+>> What is the value in not explicitly setting the pad registers?
+> My question was in the direction of "why do you need to change the pin
+> configuration values from the current ones?". This is what I want to understand.
+>
+>> Btw, I need to rebase series on your patch anyway so omitting this patch
+>> would be easy.
+> I am not saying to omit it, please do not misunderstand me. I am just wondering
+> why the change from 0x80000000 to 0x1b0b0 .
+>
+> Best regards,
+> Marek Vasut
+>
+O.K., I'll change the commit log to say exact what is changing, since it 
+is very hard to tell
+from the patch. I should have done that without needing the prompt :-)
 
-On Saturday 14 December 2013 10:26:24 Simon Horman wrote:
-> [ CC Magnus ]
-> 
-> On Wed, Dec 11, 2013 at 03:05:11PM +0100, Laurent Pinchart wrote:
-> > Hello,
-> > 
-> > This is a repost of the arch patches from the "[PATCH v3 0/8] Renesas
-> > R-Car Gen2 Common Clock Framework support" patch series. The first three
-> > patches in that series have been reposted separately in the "[PATCH v4
-> > 0/3] Renesas R-Car Gen2 Common Clock Framework drivers" series to get
-> > merged through Mike Turquette's tree, while this series will go through
-> > the ARM SoC tree.
-> > 
-> > I've asked Mike to provide a stable branch when merging the CCF driver
-> > patches.
-> > 
-> > Laurent Pinchart (5):
-> >   ARM: shmobile: r8a7790: Add clock index macros for DT sources
-> >   ARM: shmobile: r8a7791: Add clock index macros for DT sources
-> >   ARM: shmobile: r8a7790: Add clocks
-> >   ARM: shmobile: r8a7790: Reference clocks
-> >   ARM: shmobile: r8a7791: Add clocks
-> >  
-> >  arch/arm/boot/dts/r8a7790.dtsi            | 328 +++++++++++++++++++++++++
-> >  arch/arm/boot/dts/r8a7791.dtsi            | 313 +++++++++++++++++++++++++
-> >  include/dt-bindings/clock/r8a7790-clock.h | 100 +++++++++
-> >  include/dt-bindings/clock/r8a7791-clock.h | 105 ++++++++++
-> >  4 files changed, 846 insertions(+)
-> >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-> >  create mode 100644 include/dt-bindings/clock/r8a7791-clock.h
-> 
-> Hi Laurent,
-> 
-> I would like to confirm the dependencies of this series with you.
-> As I understand things the dependencies that were not present
-> in renesas-devel-v3.13-rc2-20131211 are as follows.
-> 
-> If any of the patches below can be skipped without breaking this series
-> or the followup series "[PATCH v4 00/16] Lager and Koelsch multiplatform
-> support" then I am all for not treating them as dependencies at all.
-> 
-> 
-> * [PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework drivers
->   Status: Waiting for response from Mike Turquette
-
-The dependency is correct, but the status has changed. Mike has merged the 
-patches in his tree in the clk-next-shmobile branch 
-(https://git.linaro.org/people/mike.turquette/linux.git/shortlog/refs/heads/clk-next-shmobile).
-
-> * mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
->   Status: Merged by Chris Ball. I believe we need a stable branch from him.
-
-You can drop this dependency as the koelsch reference boards lack SDHI support 
-and the lager reference board has the SDHI devices disabled.
-
-> * spi: sh-msiof: Convert to clk_prepare/unprepare
->   spi: sh-msiof: Use devm_* managed allocators
->   Status: Merged by Mark Brown. I believe we need a stable branch from him.
-
-You can drop this dependency as the lager and koelsch reference boards lack 
-SPI support.
-
-> * usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
->   Status: In Felipe Balbi's next branch. It is stable, right?
-
-Correct, but you can drop this dependency as the lager and koelsch reference 
-boards lack USB support.
-
-> * clocksource: sh_tmu: Add clk_prepare/unprepare support
->   clocksource: sh_tmu: Release clock when sh_tmu_register() fails
->   clocksource: sh_mtu2: Add clk_prepare/unprepare support
->   clocksource: sh_mtu2: Release clock when sh_mtu2_register() fails
->   Status: Present in v3.13-rc3. No problem!
-> 
-> * clocksource: sh_cmt: Add clk_prepare/unprepare support
->   Status: I think I have dropped the ball here.
->           Regardless, I think it it needs to be accepted by Daniel Lezcano
-
-That's the only missing one. Do you plan to handle this with Daniel ?
-
-> * serial: sh-sci: Convert to clk_prepare/unprepare
->   serial: sh-sci: Don't enable/disable port from within break timer
->   Status: I have queued these up
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks
+Troy
