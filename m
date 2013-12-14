@@ -1,38 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 Dec 2013 00:39:46 +0100
-Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
-In-Reply-To: <1387049660.7152.317.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312142006.26979.arnd@arndb.de>
- <1387049660.7152.317.camel@host5.omatika.ru>
-Message-ID: <201312150039.46681.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 14 Dec 2013 15:57:31 -0800
+Subject: [PATCH v2 2/3] clk: bcm281xx: add initial clock framework support
+In-Reply-To: <529F4B4F.4020405@linaro.org>
+References: <529F4B0F.2020801@linaro.org> <529F4B4F.4020405@linaro.org>
+Message-ID: <20131214235731.26321.53050@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 December 2013, Sergei Ianovich wrote:
-> On Sat, 2013-12-14 at 20:06 +0100, Arnd Bergmann wrote:
-> > On Friday 13 December 2013, Sergei Ianovich wrote:
-> > > Non-dts implementation supply required DMA channel numbers as
-> > > IORESOURCE_DMA. However, there is was no way to get them from
-> > > device tree.
-> > 
-> > Please update this changeset comment, I think it still refers to
-> > the earlier version.
-> 
-> ---
-> Non-dts implementation supply required DMA channel numbers as
-> IORESOURCE_DMA. We can also get them from the device tree, if it
-> is present.
-> ---
-> 
-> Is this fine?
+Quoting Alex Elder (2013-12-04 07:33:35)
+> +       return true;
+> +}
+> +
+> +/* A bit position must be less than the number of bits in a 32-bit
+> register. */
 
-I would mention that the binding is designed to work with the dmaengine
-framework as soon as we have figured out how to make that work without
-the problems you found.
+Hi Alex,
 
-> Should I post v3, if so? 
+The patch is corrupt at line 634 and several other places below.  Did
+you edit it manually? I'm happy with the series after reviewing it but
+it cannot be applied. Can you fix the issue and send me a pull request?
 
-I'd wait a little longer for more comments.
-
-	Arnd
+Thanks,
+Mike
