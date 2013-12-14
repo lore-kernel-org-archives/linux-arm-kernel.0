@@ -1,23 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Dec 2013 20:02:38 +0100
-Subject: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to header file
-In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB66189F95F669D@EAPEX1MAIL1.st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <201312112348.06755.arnd@arndb.de>
- <2CC2A0A4A178534D93D5159BF3BCB66189F95F669D@EAPEX1MAIL1.st.com>
-Message-ID: <201312142002.38423.arnd@arndb.de>
+Date: Sat, 14 Dec 2013 20:06:26 +0100
+Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <1386901645-28895-4-git-send-email-ynvich@gmail.com>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-4-git-send-email-ynvich@gmail.com>
+Message-ID: <201312142006.26979.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 December 2013, Mohit KUMAR DCG wrote:
-> > The RST bits should probably go into a drivers/reset driver. Not sure what the
-> > other registers do, but I'm sure we can find a driver for these too, possibly
-> > they should be part of the PHY driver?
-> 
-> -  Perhaps if we implement phy and reset driver then we may not require to move these definitions and
-> it will address most of your comments on SPEar13xx pcie driver. I am understanding and working on this.l 
-> 
+On Friday 13 December 2013, Sergei Ianovich wrote:
+> Non-dts implementation supply required DMA channel numbers as
+> IORESOURCE_DMA. However, there is was no way to get them from
+> device tree.
 
-Ok, very good.
+Please update this changeset comment, I think it still refers to
+the earlier version.
+ 
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Daniel Mack <zonque@gmail.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+
+The patch looks ok in case we are merging your patches for 3.14
+and Daniel's patches later than that. If they end up in the
+same merge window however, we'd have to be care to resolve
+the obvious conflict in a proper way.
 
 	Arnd
