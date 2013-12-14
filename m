@@ -1,32 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 14 Dec 2013 10:05:02 +0900
-Subject: [PATCH 08/12] mmc: sh_mobile_sdhi: Convert to
- clk_prepare/unprepare
-In-Reply-To: <87mwk66c1m.fsf@octavius.laptop.org>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <23114596.UeGyAebmZh@avalon> <87a9g67t63.fsf@octavius.laptop.org>
- <4390506.Q1di3yUE6Z@avalon> <87mwk66c1m.fsf@octavius.laptop.org>
-Message-ID: <20131214010502.GE12584@verge.net.au>
+From: syin@broadcom.com (Sherman Yin)
+Date: Fri, 13 Dec 2013 17:16:00 -0800
+Subject: [PATCH v3 4/6] pinctrl: Add pinctrl binding for Broadcom Capri
+ SoCs
+In-Reply-To: <CACRpkdY7s+eUFkg0AsaN5B9-1y_mTJ29Y-D9CkRG2GQ3JshP+w@mail.gmail.com>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>	<1386787041-6035-1-git-send-email-syin@broadcom.com>	<1386787041-6035-5-git-send-email-syin@broadcom.com>
+ <CACRpkdY7s+eUFkg0AsaN5B9-1y_mTJ29Y-D9CkRG2GQ3JshP+w@mail.gmail.com>
+Message-ID: <52ABB150.1030702@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 09:25:09PM -0500, Chris Ball wrote:
-> Hi Laurent,
-> 
-> On Wed, Dec 11 2013, Laurent Pinchart wrote:
-> >> I'm sorry about the delay -- it's in mmc-next for 3.14 now.
-> >
-> > Thanks a lot and sorry about shouting. Don't worry about the delay, I only 
-> > wanted to make sure the patch would get in v3.14.
-> 
-> No worries, it was deserved yelling.  :-)
-> 
-> > [PATCH v3 1/3] mmc: sh_mmcif: Factorize DMA channel request and configuration 
-> > code
-> > [PATCH v3 2/3] mmc: sh_mmcif: Fix compilation warning on 64-bit platforms
-> 
-> These two are in mmc-next now too.  (I usually wait for someone with
-> SH hardware to ACK, but I understand that Guennadi's not around as
-> much anymore.)
+On 13-12-12 12:37 PM, Linus Walleij wrote:
+> On Wed, Dec 11, 2013 at 7:37 PM, Sherman Yin <syin@broadcom.com> wrote:
+>
+>> Adds pinctrl driver devicetree binding for Broadcom Capri (BCM281xx) SoCs.
+>>
+>> Signed-off-by: Sherman Yin <syin@broadcom.com>
+>> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> ---
+>> v3: Use generic pin config properties instead of brcm-specific ones.  Clarified
+>>      pin types (standard, i2c, hdmi).
+>> v2: Use hyphens instead of underscore in DT property names.
+>
+> Overall this is very nice!
 
-I believe I can provide such Acks going forwards.
+Thanks!
+
+>> +- bias-pull-up:                        Integer. Pull up strength in Ohm:
+>> +                                       1: 1.2 kOhm
+>> +                                       2: 1.8 kOhm
+>> +                                       3: 720 Ohm
+>> +                                       4: 2.7 kOhm
+>> +                                       5: 831 Ohm
+>> +                                       6: 1.08 kOhm
+>> +                                       7: 568 Ohm
+>
+> Please do not use these custom enumerators 1 thru 7.
+> Instead say that the argument is given in ohms, so for
+> example:
+>
+> bias-pull-up = <12000>;
+>
+> Then translate this into the proper enumerator in your
+> driver instead.
+
+Ok.  The 3 bits in this enumeration correspond to enabling the 3 pull up 
+Rs (1.2k, 1.8k, 2.7k) in parallel, so the enum kind of make sense. But 
+sure I can change it to actual ohms and will error out in the driver if 
+specified value is not one of the 7.
+
+> No full example provided in the binding! This needs to
+> be there for understanding.
+
+Ok Will add some examples.
+
+Thanks,
+Sherman
