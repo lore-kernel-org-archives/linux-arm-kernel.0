@@ -1,91 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 14 Dec 2013 17:27:07 -0500
-Subject: [PATCH 0/4] ARM: mvebu: sort DT nodes by reg address
-In-Reply-To: <cover.1386861599.git.jason@lakedaemon.net>
-References: <20130816061500.GE7035@quad.lixom.net>
- <cover.1386861599.git.jason@lakedaemon.net>
-Message-ID: <20131214222707.GH2609@titan.lakedaemon.net>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sun, 15 Dec 2013 03:03:51 +0400
+Subject: [PATCH v2 16/16] misc: support for I-8024 in LP-8x4x
+In-Reply-To: <201312142159.40250.arnd@arndb.de>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-17-git-send-email-ynvich@gmail.com>
+ <201312142159.40250.arnd@arndb.de>
+Message-ID: <1387062231.13062.43.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 03:25:15PM +0000, Jason Cooper wrote:
-> Olof, all,
-> 
-> I love December!  I'm getting around to some of the items on my -onice folder.
-> Namely, this one:
-> 
-> On Thu, Aug 15, 2013 at 11:15:00PM -0700, Olof Johansson wrote:
-> > On Wed, Aug 14, 2013 at 02:59:45PM -0400, Jason Cooper wrote:
-> ...
-> > > diff --cc arch/arm/boot/dts/kirkwood.dtsi
-> > > index 70f414d,1d6921d..6489b98
-> > > --- a/arch/arm/boot/dts/kirkwood.dtsi
-> > > +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> > > @@@ -47,11 -30,30 +40,35 @@@
-> > >             #address-cells = <1>;
-> > >             #size-cells = <1>;
-> > >   
-> > > +           timer: timer at 20300 {
-> > > +                   compatible = "marvell,orion-timer";
-> > > +                   reg = <0x20300 0x20>;
-> > > +                   interrupt-parent = <&bridge_intc>;
-> > > +                   interrupts = <1>, <2>;
-> > > +                   clocks = <&core_clk 0>;
-> > > +           };
-> > > + 
-> > > +           intc: main-interrupt-ctrl at 20200 {
-> > > +                   compatible = "marvell,orion-intc";
-> > > +                   interrupt-controller;
-> > > +                   #interrupt-cells = <1>;
-> > > +                   reg = <0x20200 0x10>, <0x20210 0x10>;
-> > > +           };
-> > > + 
-> > > +           bridge_intc: bridge-interrupt-ctrl at 20110 {
-> > > +                   compatible = "marvell,orion-bridge-intc";
-> > > +                   interrupt-controller;
-> > > +                   #interrupt-cells = <1>;
-> > > +                   reg = <0x20110 0x8>;
-> > > +                   interrupts = <1>;
-> > > +                   marvell,#interrupts = <6>;
-> > > +           };
-> > > + 
-> > >  +          mbusc: mbus-controller at 20000 {
-> > >  +                  compatible = "marvell,mbus-controller";
-> > >  +                  reg = <0x20000 0x80>, <0x1500 0x20>;
-> > >  +          };
-> > >  +
-> > >             core_clk: core-clocks at 10030 {
-> > >                     compatible = "marvell,kirkwood-core-clock";
-> > >                     reg = <0x10030 0x4>;
-> > 
-> > This file is a real mess. :( Nothing is sorted properly under the ocp/ bus.
-> > It's common to sort by memory address. Or I'd even take alphabetically if
-> > there was a good reason to do so. Just some order of some kind.
-> 
-> Done.
-> 
-> thx,
-> 
-> Jason.
-> 
-> Jason Cooper (4):
->   ARM: kirkwood: sort dt nodes by address
->   ARM: dove: sort DT nodes by address
->   ARM: orion5x: sort DT nodes by address
->   ARM: mvebu: sort DT nodes by address
-> 
->  arch/arm/boot/dts/armada-370-xp.dtsi | 176 ++++++-------
->  arch/arm/boot/dts/armada-370.dtsi    |  74 +++---
->  arch/arm/boot/dts/armada-xp.dtsi     | 100 +++----
->  arch/arm/boot/dts/dove.dtsi          | 496 +++++++++++++++++------------------
->  arch/arm/boot/dts/kirkwood.dtsi      | 140 +++++-----
->  arch/arm/boot/dts/orion5x.dtsi       | 106 ++++----
->  6 files changed, 546 insertions(+), 546 deletions(-)
+On Sat, 2013-12-14 at 21:59 +0100, Arnd Bergmann wrote:
+> Have you checked that the nsleep definition actually does the
+> right thing here? 450 nanoseconds must be close the latency
+> you get from calling schedule_hrtimeout(). I'd suggest using
+> either ndelay() or usleep_range() instead, depending on your
+> needs.
 
-Series applied to mvebu/dt
+Documentation/timers/timers-howto.txt stated there was a significant
+overhead when setting up usleep_range. I studied implementation and
+found that schedule_hrtimeout was certainly less than 520000 CPU cycles
+that udelay(1) would consume.
 
-And Jason, next time, don't take so long.  :)
+It worked. I haven't checked actual delay time. However, machines with
+the driver (based on 3.8) are in production since May 2013 without
+issues.
 
-thx,
+> If nsleep is really useful here, we should probably add that
+> as a generic API rather than having it in one driver.
 
-Jason.
+I've also used this nsleep for driving RTC clock (DS1302) since May
+2013.
+
+Now I see that my code is a clone of usleep_range(x, x). I will convert
+my code to use it.
