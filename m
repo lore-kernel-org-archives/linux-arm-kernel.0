@@ -1,49 +1,54 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 14 Dec 2013 12:14:16 -0800
-Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
-In-Reply-To: <201312141950.09447.arnd@arndb.de>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
- <52AC7E41.7050201@roeck-us.net>
- <CACmBeS3Xse5KkFqkM5Ye+qaaxpVCjyeGz7Oc9sr0PN+pZ9sztQ@mail.gmail.com>
- <201312141950.09447.arnd@arndb.de>
-Message-ID: <52ACBC18.6020301@roeck-us.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Sat, 14 Dec 2013 13:18:23 -0700
+Subject: Memory mapping of config space of pcie devices
+In-Reply-To: <CAHH3p5J7Se8zu64MfoSDkAN_NtOp=qv1DcvWBAa8jWKouo0TXg@mail.gmail.com>
+References: <CAHH3p5+3Zy+YkgDS_1bJ7B84w5iHOh6-QG7LRJXo2WQHREcRHw@mail.gmail.com>
+ <CAErSpo59htYoPBoouUfSXAVXwCUQPK-TB_zG0BkE-PLhV=KRbQ@mail.gmail.com>
+ <CAHH3p5J7Se8zu64MfoSDkAN_NtOp=qv1DcvWBAa8jWKouo0TXg@mail.gmail.com>
+Message-ID: <CAErSpo5k1KZuaL7jYp1-5YaxjdZseDPrFo64mJcb2tu2PWJowA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2013 10:50 AM, Arnd Bergmann wrote:
-> On Saturday 14 December 2013, Jonas Jensen wrote:
+[+cc devicetree, linux-arm-kernel]
+
+On Sat, Dec 14, 2013 at 1:05 PM, shiv prakash Agarwal
+<chhotu.shiv@gmail.com> wrote:
+> On Sun, Dec 15, 2013 at 12:29 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>> On Sat, Dec 14, 2013 at 11:32 AM, shiv prakash Agarwal
+>> <chhotu.shiv@gmail.com> wrote:
+>>> Hi All,
 >>>
->>> Conceptually it might be cleaner to write a separate driver, for example
->>> in drivers/power/restart, than plugging the functionality into
->>> the watchdog driver, at least if you don't want it in architecture
->>> or platform code. The xgene restart driver is a good example.
->>>
+>>> How devices config spaces are mapped to host memory?
+>>> Is it being handled by core driver? I could not locate.
 >>
->> Moving it to a new power/restart driver seems reasonable to me, I'm
->> really just looking for a home for it, I would have preferred a
->> hardware with reset in a separate register though.
+>> The PCI core does not map config space into memory.  That's not even
+>> possible for the legacy config access methods, e.g., using I/O ports
+>> 0xcf8 and 0xcfc [1].
 >>
->> I now plan to remove it for v5 and submit a separate driver.
+>> If you're wondering about how Linux uses ECAM, that's mostly in
+>> arch/x86/pci/mmconfig*.  That code does ioremap the ECAM area into
+>> kernel virtual space, but only for access via pci_read_config_word(),
+>> pci_write_config_word(), etc.
+>>
+>> Bjorn
+>>
+>> [1] http://en.wikipedia.org/wiki/PCI_configuration_space#Software_implementation
 >
-> I still think it's better to leave it in the watchdog driver: This
-> driver attaches to the watchdog device, and adding a separate driver
-> for reset means we have to trick the core Linux code into attaching
-> two drivers to one device in some way, or the device tree has to fake
-> a second device that doesn't exist in hardware but is only needed
-> because of Linux implementation details.
+> Thanks Bjorn for quick reply,
 >
+> Above reference says:
+> During system initialization, firmware determines the base address for
+> this ?stolen? address region and communicates it to the root complex
+> and to the operating system. This communication method is
+> implementation-specific, and not defined in the PCI Express
+> specification.
+>
+> How above is implemented on ARM?
 
-Hmm ... not sure I agree. I don't see a problem with something like "arm,moxart-reboot".
-There are already vexpress-reboot and xgene-reboot properties which do pretty much
-the same.
+On x86, we learn the ECAM address via ACPI (the MCFG table or a host
+bridge _CBA method).  I don't know how this is done on ARM.  I could
+imagine it being done via device tree, but I really don't know.
+Unfortunately both the address discovery and the actual ECAM accesses
+are in arch-specific code.
 
-Actually, you don't even need that; the reset driver could simply re-use the
-"moxa,moxart-watchdog" property. After all, all that specifies is that there
-is a compatible driver. Look for "samsung,s3c2410-wdt" for an example of another
-reset handler doing just that.
-
-Attaching it to the watchdog device seems to be more problematic given the
-(currently) optional nature of the watchdog driver and its different scope.
-
-Thanks,
-Guenter
+Bjorn
