@@ -1,41 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 14 Dec 2013 18:35:14 +0100
-Subject: [PATCH 1/4] irqchip: armada-370-xp: fix IPI race condition
-In-Reply-To: <20131213163854.GD2609@titan.lakedaemon.net>
-References: <1385396807-19027-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1385396807-19027-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131212232327.01f4aaff@skate>
- <20131213163854.GD2609@titan.lakedaemon.net>
-Message-ID: <20131214183514.3707a4dd@skate>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Sat, 14 Dec 2013 10:32:31 -0800
+Subject: [PATCH 10/10] Kconfig: cleanup SERIO_I8042 dependencies
+In-Reply-To: <1387040376-26906-11-git-send-email-msalter@redhat.com>
+References: <1387040376-26906-1-git-send-email-msalter@redhat.com>
+ <1387040376-26906-11-git-send-email-msalter@redhat.com>
+Message-ID: <52ACA43F.2040402@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Fri, 13 Dec 2013 11:38:54 -0500, Jason Cooper wrote:
-
-> > Would it be possible to merge them for 3.13 ? Notice that the below
-> > patch should also be backported into stable kernel all the way to 3.8.
+On 12/14/2013 08:59 AM, Mark Salter wrote:
+> Remove messy dependencies from SERIO_I8042 by having it depend on one
+> Kconfig symbol (ARCH_MIGHT_HAVE_PC_SERIO) and having architectures
+> which need it select ARCH_MIGHT_HAVE_PC_SERIO in arch/*/Kconfig.
+> New architectures are unlikely to need SERIO_I8042, so this avoids
+> having an ever growing list of architectures to exclude.
 > 
-> oops.  I'm maintaining an mvebu topic branch for irqchip changes, and
-> forgot to look in my -fixes mail folder when putting it together.  I'll
-> take both of these into mvebu/irqchip-fixes and send a pull request to
-> Thomas in a few days.
-> 
-> Added:
-> 
-> Cc: stable at vger.kernel.org # v3.8+
-> Fixes: 344e873e5657e8dc0 'arm: mvebu: Add IPI support via doorbells'
-> 
-> to this patch.
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> CC: Richard Henderson <rth@twiddle.net>
+> CC: linux-alpha at vger.kernel.org
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: Tony Luck <tony.luck@intel.com>
+> CC: Fenghua Yu <fenghua.yu@intel.com>
+> CC: linux-ia64 at vger.kernel.org
+> CC: Ralf Baechle <ralf@linux-mips.org>
+> CC: linux-mips at linux-mips.org
+> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> CC: Paul Mackerras <paulus@samba.org>
+> CC: linuxppc-dev at lists.ozlabs.org
+> CC: Paul Mundt <lethal@linux-sh.org>
+> CC: linux-sh at vger.kernel.org
+> CC: "David S. Miller" <davem@davemloft.net>
+> CC: sparclinux at vger.kernel.org
+> CC: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> CC: Ingo Molnar <mingo@redhat.com>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: "H. Peter Anvin" <hpa@zytor.com>
+> CC: x86 at kernel.org
 
-Great, thanks! Note that the patch will not apply as is on 3.8, but I
-will be able to provide a backported variant of it when needed.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: H. Peter Anvin <hpa@linux.intel.com>
