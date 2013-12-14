@@ -1,48 +1,64 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 14 Dec 2013 21:46:57 +0800
-Subject: [PATCH V1 03/11] ARM: dts: imx6qdl-sabrelite: remove usdhc4
- wp-gpio
-In-Reply-To: <1386899355-17379-4-git-send-email-troy.kisky@boundarydevices.com>
+Date: Sat, 14 Dec 2013 21:54:24 +0800
+Subject: [PATCH V1 04/11] ARM: dts: imx6qdl-sabrelite: add comments for
+ pinctrl_hog
+In-Reply-To: <1386899355-17379-5-git-send-email-troy.kisky@boundarydevices.com>
 References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
- <1386899355-17379-4-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20131214134656.GC16177@S2101-09.ap.freescale.net>
+ <1386899355-17379-5-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20131214135422.GD16177@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 06:49:07PM -0700, Troy Kisky wrote:
-> On Sabre Lite usdhc4 is a micro sd slot, which has no
-> write protect.
+On Thu, Dec 12, 2013 at 06:49:08PM -0700, Troy Kisky wrote:
+> Add a comment to tell the purpose of each pin. This
+> makes it easy to tell if it should go somewhere else.
+> i.e. the spi-nor cs could be put with pinctrl_ecspi1.
 > 
 > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index c4aa504..be899d3 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> @@ -114,13 +114,13 @@
+>  	imx6q-sabrelite {
+>  		pinctrl_hog: hoggrp {
+>  			fsl,pins = <
+> -				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000
+> -				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+> -				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
+> -				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
+> -				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
+> -				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
+> -				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
+> +/* uSDHC4 CD  */		MX6QDL_PAD_NANDF_D6__GPIO2_IO06	0x80000000
 
-Applied #1, #2 and #3, thanks.
+After we move to board specific pingrp, it might be easier to move the
+device related pin into corresponding pingrp and limit the hoggrp to
+hold those truly non-owner pins.  For this uSDHC4 CD example, it will be
+something like below.
+
+	pinctrl_usdhc4: usdhc4grp {
+		fsl,pins = <
+			MX6QDL_USDHC4_PINGRP_D4
+			MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000 /* CD */
+		>;
+	};
 
 Shawn
 
-> ---
->  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> index 903da14..c4aa504 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> @@ -115,7 +115,6 @@
->  		pinctrl_hog: hoggrp {
->  			fsl,pins = <
->  				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000
-> -				MX6QDL_PAD_NANDF_D7__GPIO2_IO07 0x80000000
->  				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
->  				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
->  				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
-> @@ -230,7 +229,6 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_usdhc4>;
->  	cd-gpios = <&gpio2 6 0>;
-> -	wp-gpios = <&gpio2 7 0>;
->  	vmmc-supply = <&reg_3p3v>;
->  	status = "okay";
->  };
+> +/* spi-nor CS */		MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x80000000
+> +/* otg power en */		MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x80000000
+> +/* ethernet phy reset */	MX6QDL_PAD_EIM_D23__GPIO3_IO23	0x80000000
+> +/* USDHC3 CD  */		MX6QDL_PAD_SD3_DAT5__GPIO7_IO00	0x80000000
+> +/* USDHC3 WP  */		MX6QDL_PAD_SD3_DAT4__GPIO7_IO01	0x1f0b0
+> +/* SGTL5000 sys_mclk  */	MX6QDL_PAD_GPIO_0__CCM_CLKO1	0x80000000
+>  			>;
+>  		};
+>  
 > -- 
 > 1.8.1.2
 > 
