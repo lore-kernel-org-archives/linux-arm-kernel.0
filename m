@@ -1,37 +1,34 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 14 Dec 2013 09:15:07 +0400
-Subject: [PATCH 1/3] can: mcp251x: Convert driver to use common clk
- framework
-In-Reply-To: <528340A7.9080708@pengutronix.de>
-References: <1384332144-15211-1-git-send-email-shc_work@mail.ru>
- <528340A7.9080708@pengutronix.de>
-Message-ID: <20131214091507.35557bcf132c885cfba69008@mail.ru>
+From: kasimling@gmail.com (Alex Ling)
+Date: Sat, 14 Dec 2013 13:21:30 +0800
+Subject: [PATCH v2 1/1] ARM: dts: Add missing clocks for exynos4412 dwmmc node
+Message-ID: <1386998490-19456-1-git-send-email-kasimling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Nov 2013 10:04:39 +0100
-Marc Kleine-Budde <mkl@pengutronix.de> wrote:
+This patch adds "biu" and "ciu" clocks for exynos4412 dwmmc
+node. Without this patch, dwmmc host driver will skip enabling the
+two clocks and it will break dwmmc host function on exynos4412.
+Tested on FriendlyARM TINY4412 board.
 
-> as this series adds device tree bindings, please add
-> devicetree at vger.kernel.org on Cc for the whole series.
-> 
-> On 11/13/2013 09:42 AM, Alexander Shiyan wrote:
-> > This patch converts mcp251x driver to using common clk framework
-> > for getting input frequency. The change was made for the preparation
-> > of the driver work with the devicetree. As a result private header
-> > for the driver is eliminated.
-> > Additionally, all existing users of the driver was converted to use
-> > this feature.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> 
-> Looks good from my point of view. I'll take the whole series via the
-> linux-can tree, if there are no objections. I'd like to have the pxa and
-> imx maintainer's Ack and an Ack from the DT list.
-> 
-> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Alex Ling <kasimling@gmail.com>
+---
+Changes for v2:
+   - Fix patch description as Mark Rutland suggested
 
-Ping. Resend?
+ arch/arm/boot/dts/exynos4412.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index e743e67..67bef99 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -67,5 +67,7 @@
+ 		interrupts = <0 77 0>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&clock 301>, <&clock 149>;
++		clock-names = "biu", "ciu";
+ 	};
+ };
 -- 
-Alexander Shiyan <shc_work@mail.ru>
+1.7.9.5
