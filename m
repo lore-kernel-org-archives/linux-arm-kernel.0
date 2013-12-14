@@ -1,52 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Dec 2013 22:33:26 +0100
-Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
-In-Reply-To: <1386880245-10192-3-git-send-email-dinguyen@altera.com>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-3-git-send-email-dinguyen@altera.com>
-Message-ID: <201312142233.27143.arnd@arndb.de>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sun, 15 Dec 2013 01:55:46 +0400
+Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
+In-Reply-To: <201312142203.45740.arnd@arndb.de>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <201312142203.45740.arnd@arndb.de>
+Message-ID: <1387058146.13062.24.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Sat, 2013-12-14 at 22:03 +0100, Arnd Bergmann wrote:
+> On Friday 13 December 2013, Sergei Ianovich wrote:
+> > I've also decided not to create a single mfd device for
+> > machine-specific devices. Instead each type is supported by a separate
+> > driver in respective subsystem. It was tempting to hardcode all the
+> > constants in one source file, but that requires ugly initialization.
+> > The taken way produces much cleaner code.
 > 
-> Add a "altr,socfpga-sdmmc-sdr-clk" clock type in the SOCFPGA clock driver. This
-> clock type is not really a "clock" for say, but a mechanism to set the phase
-> shift of the clock that is used to feed the SD/MMC CIU's clock. This clock does
-> not have parent so it is designated as a CLK_IS_ROOT.
+> I think you should at least change the DT representation for the FPGA
+> to show one device as the actual FPGA and attach children to that,
+> multiple indirection levels if necessary.
 > 
-> This clock implements the set_clk_rate method that is meant to receive the SDR
-> settings that is designated by the "samsung,dw-mshc-sdr-timing" binding. The
-> SD/MMC driver passes this clock phase information into the clock driver to use.
+> I suspect that the fpga is on some external-bus port with a specific
+> chip-select, so I would model this as
 > 
-> This enables the SD/MMC driver to touch registers that are located outside of
-> the SD/MMC IP, which helps make the core SD/MMC driver generic.
+>         extbus {
+>                 compatible = "simple-bus";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 /* bus addresses 0-0xfffff mapped to 0x17000000 */
+>                 ranges = <0 0x17000000 0x100000>;
+>                 interrupt-parent = <&fpga-irq>;
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@alter.com>
+>                 fpga-irq: irq at 6 {
+>                         regs = <6 16>; /* translated addresses
+>                         ...
+>                 };
+> 
+>                 fgpa-bus {
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+>                         ranges;
+> 
+>                         serial at 9050 {
+>                                 ...
+>                         };
+>                 };
+>         };
+> 
+> I also think you don't need to make the devices quite as fine-grained
+> here but instead group things together more. I would probably indeed
+> put everything that is not on one of the slots into a common device,
+> including the irqchip.
 
-Ok, this looks like it will work, but we haven't concluded if this is the
-best way to do it. I'm looking for guidance from Mike here.
+There are basically 2 options: one-for-all mfd device and one-for-one
+device drivers.
 
-The alternatives I can see for this particular problem are:
+MFD
+pros:
+* easy to add into the tree (one file)
+* easy config (one option)
 
-1. fake a clock and use the 'clk_set_rate' callback to set the phase
-   rather than the clock frequency (as you do in this patch).
-2. extend the common clock API to provide a 'clk_set_phase' interface
-   that you can call on the CIU clock to set this, so you don't have
-   to fake anything. This seems to be the nicest interface if we have
-   the same problem in more drivers.
-3. make the phase setting private to whichever clock is used for CIU
-   (as one of your previous patches did, which I did not like).
-4. make the phase an additional argument to the clock specifier,
-   so you would have <&mmcclock 12345 5678> rather than just <&mmcclock>
-   in the mmc host device node to specify the two possible phases.
+Separate devices
+* easy to support devices as respective subsystems evolve
+* easy to add new feature without breaking existing ones. Eg. it may
+make sense to provide industrial IO interface on analog IO devices
+* possible to have fine-grained configuration (eg. SRAM in kernel,
+serial and slot as modules)
+* proper device tree serves as a datasheet for the machine, so anyone
+who needs to work on it will have a decent view of the internals
 
-I would also like to get buy-in from Zhangfei Gao, since he is working
-on the same thing. Please coordinate with him to make sure whatever
-one of you comes up with works for the other one too. At the moment,
-patches are flying so fast without much discussion inbetween that I'd
-prefer Chris to hold off from merging either one until you have both
-revieved and Acked each other's patches.
-
-	Arnd
+I believe long-term benefits of separate devices outweigh immediate
+effects of an MFD. However, I certainly don't see the big picture and
+will accept your decision. Please make one.
