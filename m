@@ -1,77 +1,73 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 13 Dec 2013 16:20:30 -0800
-Subject: [PATCH 5/5] arm64: Add LOAD_OFFSET symbol for linker scripts
-In-Reply-To: <20131213164517.GM19177@mudshark.cambridge.arm.com>
-References: <cover.1386879684.git.geoff@infradead.org>
- <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
- <20131213164517.GM19177@mudshark.cambridge.arm.com>
-Message-ID: <1386980430.1002.96.camel@smoke>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 14 Dec 2013 09:27:52 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sies
+In-Reply-To: <52AAE9AF.6010704@codethink.co.uk>
+References: <1386869040-20849-1-git-send-email-ben.dooks@codethink.co.uk>
+ <871u1hsd44.wl%kuninori.morimoto.gx@gmail.com>
+ <CANqRtoT86xdh-c73f-_59sD3E=90yW1wOp5Bobmi4qJywA72uA@mail.gmail.com>
+ <52AAE9AF.6010704@codethink.co.uk>
+Message-ID: <20131214002752.GA12173@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Will,
-
-On Fri, 2013-12-13 at 16:45 +0000, Will Deacon wrote:
-> On Thu, Dec 12, 2013 at 08:39:46PM +0000, Geoff Levand wrote:
-> > Add a definition for the LOAD_OFFSET symbol used in the linker
-> > scripts.  LOAD_OFFSET is used to generate the load address of
-> > the section.
-> > 
-> > Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
+On Fri, Dec 13, 2013 at 11:04:15AM +0000, Ben Dooks wrote:
+> On 13/12/13 10:56, Magnus Damm wrote:
+> >Hey Morimoto-san,
+> >
+> >On Fri, Dec 13, 2013 at 11:37 AM, Kuninori Morimoto
+> ><kuninori.morimoto.gx@gmail.com> wrote:
+> >>
+> >>Hi Ben
+> >>
+> >>Thank you for your patch
+> >>
+> >>>The r8a7790.dtsi file has three sdhi nodes which all have the wrong resource
+> >>>size for their register block. This causes the sh_modbile_sdhi driver to
+> >>>fail to communicate with card at-all.
+> >>>
+> >>>Change each sdhi node size from 0x100 to 0x200 to correct this.
+> >>>
+> >>>Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >>>Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> >>>Cc: Magnus Damm <magnus.damm@gmail.com>
+> >>>Cc: Simon Horman <horms@verge.net.au>
+> >>>Cc: Linux SH <linux-sh@vger.kernel.org>
+> >>>Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
+> >>>Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> >>>Tested-by: William Towle <william.towle@codethink.co.uk>
+> >>>---
+> >>
+> >>Unfortunately, sdhi resource size 0x100 is corrent on Renesas SDHI.
+> >>The wrong is SDHI/TMIO driver side, not SoC side.
+> >>Now, I'm working/sending sh_modbile_sdhi driver fixup patches for R-Car H2,
+> >>but it need more time (= there is merge timing issue)
+> >
+> >Thanks for supporting Ben regarding this SDHI issue.
+> >
+> >Would it be possible for you to share a list of patches needed to get
+> >SDHI working? If some parts are missing then please post them so the
+> >patches are available on public lists.
+> >
+> >I would like to make it possible for Ben to test your patch stack if
+> >he happens to have time.
 > 
-> This isn't a standard SoB line. Please choose an email address and lose the
-> non-standard suffix.
+> Thanks, I think I have all the previous ones that where pushed to the
+> linux-sh list. If there's a git tree I could pull from that would make
+> our job easier.
 
-It took me a little while to find it, but here are the comments
-regarding sign-off tags from the 2004 discussion:
+A good idea, sorry for not already having that in place.
 
-  https://lkml.org/lkml/2004/5/25/108
+Morimoto-san, could you help me to create a topic branch for R-Car Gen2
+SDHI by sending me a list of patches and/or brances in other people's
+trees?
 
-I put on the extra tag for the benefit of those who generate patch
-submission statistics.
-
-> > ---
-> >  arch/arm64/include/asm/memory.h | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> > index 3776217..1994c56 100644
-> > --- a/arch/arm64/include/asm/memory.h
-> > +++ b/arch/arm64/include/asm/memory.h
-> > @@ -52,6 +52,8 @@
-> >  #define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
-> >  #define TASK_SIZE_64		(UL(1) << VA_BITS)
-> >  
-> > +#define LOAD_OFFSET		(PAGE_OFFSET)
+> We have got SDHI0 and SDHI2 working with device tree, but we're
+> currently seeing less than a megabyte a second when direcly dd-ing
+> blocks from the card. Is this a noted issue? We got ~11MiB without
+> DMA on the 3.4-ltsi series.
 > 
-> Can you be more specific about why we need this please? We don't seem to use
-> this on ARM, and I can't really think of a sensible value to define it as,
-> either. PAGE_OFFSET is a virtual address, which doesn't make much sense to
-> me, but perhaps I'm missing something.
+> As a note, I will be away from the 20th December untill Janurary 6th
+> and it is likely the rest of the team here will be away from 21st.
 
-As I mentioned before, LOAD_OFFSET defaults to zero if it is not defined by the
-arch, so our arm64 vmlinux files currently have their paddr's equal to their
-vaddr's, so something like 0xffffffc000080000.
-
-kexec-tools uses the paddr from the elf file in its generic elf file loader.
-Those kexec-tools routines do some sanity checks on the elf headers and one of
-those checks is if the paddr seems sane.  A paddr of 0xffffffc000080000 fails
-the test, and rightfully so I think.
-
-I could make a special arm64 hack in kexec-tools to handle this, but I think
-the proper thing to do is to get some sane paddr values in our vmlinux files.
-
-I agree that PAGE_OFFSET isn't quite right, since zero is not really where the
-kernel is located, but it is a handy base, as the proper location is an offset
-from there.  My plan is to have the arm64 vmlinux loader routines in kexec-tools
-either take a load offset from the kexec command line, or dig out the value from
-the device tree.  I'm still working on that part and am not sure what will work.
-
-I haven't looked into it yet, but we shouldn't have this problem with the boot
-wrapper files, as we know where the kernel is located at from the device tree.
-
-Sorry for such a long explanation.  Does it make sense?  Any suggestions would
-be appreciated.
-
--Geoff
+I think it is likely that most of Japan will be on vacation from
+the 28th to the 6th. I intend to be but I don't speak for others.
