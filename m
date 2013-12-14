@@ -1,33 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Dec 2013 19:50:09 +0100
-Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
-In-Reply-To: <CACmBeS3Xse5KkFqkM5Ye+qaaxpVCjyeGz7Oc9sr0PN+pZ9sztQ@mail.gmail.com>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
- <52AC7E41.7050201@roeck-us.net>
- <CACmBeS3Xse5KkFqkM5Ye+qaaxpVCjyeGz7Oc9sr0PN+pZ9sztQ@mail.gmail.com>
-Message-ID: <201312141950.09447.arnd@arndb.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 14 Dec 2013 19:57:06 +0100
+Subject: [PATCH] ARM: dts: add board dts file for EXYNOS4412 based
+ TINY4412 board
+In-Reply-To: <1384520969-2450-1-git-send-email-kasimling@gmail.com>
+References: <1384520969-2450-1-git-send-email-kasimling@gmail.com>
+Message-ID: <23915888.rvPOtSbknd@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 December 2013, Jonas Jensen wrote:
-> >
-> > Conceptually it might be cleaner to write a separate driver, for example
-> > in drivers/power/restart, than plugging the functionality into
-> > the watchdog driver, at least if you don't want it in architecture
-> > or platform code. The xgene restart driver is a good example.
-> >
-> 
-> Moving it to a new power/restart driver seems reasonable to me, I'm
-> really just looking for a home for it, I would have preferred a
-> hardware with reset in a separate register though.
-> 
-> I now plan to remove it for v5 and submit a separate driver.
+Hi Alex,
 
-I still think it's better to leave it in the watchdog driver: This
-driver attaches to the watchdog device, and adding a separate driver
-for reset means we have to trick the core Linux code into attaching
-two drivers to one device in some way, or the device tree has to fake
-a second device that doesn't exist in hardware but is only needed
-because of Linux implementation details.
+On Friday 15 of November 2013 21:09:29 Alex Ling wrote:
+> Add a minimal board dts file for EXYNOS4412 based FriendlyARM's
+> TINY4412 board. This patch including adds the node to support
+> peripherals like UART, SD card on SDMMC2 port, and this patch
+> adds GPIO connected LEDS and configure its properties like
+> following:
+> LED1: use 'heartbeat' trigger, blinking while the board is running.
+> LED4: use 'mmc0' trigger, on when mmc0 is accessing.
+> LED2 and LED3 can be controlled from userspace.
 
-	Arnd
+Well, all the LEDs can be controlled from userspace. The default trigger
+is just the initial setting, which can be changed later by userspace.
+It's just a general comment, not an issue with the patch, though.
+
+Anyway, you don't need such detailed patch description, as you can see
+most of the things directly from the code. In case of this patch, just the
+list of supported peripherals is fine, without going into minor details,
+such as LED triggers.
+
+Also, please see my comments inline.
+
+[snip]
+> diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+> new file mode 100644
+> index 0000000..78ace14
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+[snip]
+> +	leds {
+> +		compatible = "gpio-leds";
+
+style: A blank line should be separating properties from nodes.
+
+> +		led1 {
+> +			label = "led1:heart";
+
+Are the labels for this and the LEDs below related to the hardware?
+I mean, the label should preferrably come from the board documentation,
+or a label on the PCB next to the LED. Also they shouldn't represent
+any particular use case, so you should remove the ":heart" suffix.
+
+> +			gpios = <&gpm4 0 1>;
+> +			default-state = "off";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+
+style: Subnodes should be separated with blank lines.
+
+Otherwise the patch looks fine.
+
+Best regards,
+Tomasz
