@@ -1,28 +1,72 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Sat, 14 Dec 2013 09:32:36 +0100
-Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
-In-Reply-To: <20131213190707.GA9713@roeck-us.net>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
- <1386945188-8316-2-git-send-email-jonas.jensen@gmail.com>
- <201312131717.25435.arnd@arndb.de>
- <CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>
- <20131213190707.GA9713@roeck-us.net>
-Message-ID: <CACmBeS2_WZj6_HJo0N50TBwneNVmeB9TyXbHRLm9CJFGNN+HtQ@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Sat, 14 Dec 2013 01:32:46 -0700
+Subject: [PATCH v5 0/4] PHY: Add APM X-Gene SoC 15Gbps Multi-purpose PHY
+ support
+Message-ID: <1387009970-737-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2013 20:07, Guenter Roeck <linux@roeck-us.net> wrote:
->> I got the impression from Guenter Roeck's review, that it doesn't belong there,
->> maybe I was too quick to remove it?
->>
-> You'd have to answer the questions I raised in my review if you want it in
-> there.
+This patch adds support for APM X-Gene SoC 15Gbps Multi-purpose PHY. This
+is the physical layer interface for the corresponding host controller. This
+driver uses the new PHY generic framework posted by Kishon Vijay Abrahm.
+In addition, the new PHY generic framework is patched to provide an
+function to set the speed of the PHY.
 
-I didn't see a solution at the time. Now I'm thinking arm_pm_restart
-can be set later in probe, preventing a crash on load failure, and
-maybe it can be unset on unload.
+v5
+* Update DTS binding documentation
+* Remove direct clock access and use clock interface instead
+* Change override parameters to decimal instead hex values
+* Change apm,tx-amplitude, apm,tx-pre-cursor1, apm,tx-pre-cursor2,
+  apm,tx-post-cursor to be unit of uV
 
-Would you accept a patch for this?
+v4
+* Update documentation with 'apm,' instead 'apm-'
+* Change DTS override parameter to have 'apm,'
+* Add select GENERIC_PHY to Kconfig PHY_XGENE
+* Make override parameters to be pair of three values instead one
+* Some minor comment and indentation changes
+* Remove error register addition offset
+* Add ULL to constants
+* Use module_init instead subsys_initcall
+* Make DTS node based on first register address
+* Update override setting values
 
-Best regards,
-Jonas
+v3
+* Major re-write of the code based on various review comments
+* Support external clock only at the moment
+* Support SATA mode only at the moment
+* No UEFI support at the moment
+
+v2
+* Remove port knowledge from functions
+* Make all functions static
+* Remove ID completely
+* Make resource requirement based on compatible type
+* Rename override PHY parameters with more descriptive name
+* Add override PHY parameter for per controller, per port, and per speed
+* Patch the generic PHY frame to expose set_speed operation
+
+v1
+* Initial version
+
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+Loc Ho (4):
+  PHY: Add function set_speed to generic PHY framework
+  Documentation: Add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+    binding documentation
+  PHY: add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+  arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY DTS entries
+
+ .../devicetree/bindings/ata/apm-xgene-phy.txt      |   94 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   76 +
+ drivers/phy/Kconfig                                |    7 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-core.c                             |   21 +
+ drivers/phy/phy-xgene.c                            | 1811 ++++++++++++++++++++
+ include/linux/phy/phy.h                            |    8 +
+ 7 files changed, 2019 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene-phy.txt
+ create mode 100644 drivers/phy/phy-xgene.c
