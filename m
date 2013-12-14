@@ -1,54 +1,44 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 14 Dec 2013 13:18:23 -0700
-Subject: Memory mapping of config space of pcie devices
-In-Reply-To: <CAHH3p5J7Se8zu64MfoSDkAN_NtOp=qv1DcvWBAa8jWKouo0TXg@mail.gmail.com>
-References: <CAHH3p5+3Zy+YkgDS_1bJ7B84w5iHOh6-QG7LRJXo2WQHREcRHw@mail.gmail.com>
- <CAErSpo59htYoPBoouUfSXAVXwCUQPK-TB_zG0BkE-PLhV=KRbQ@mail.gmail.com>
- <CAHH3p5J7Se8zu64MfoSDkAN_NtOp=qv1DcvWBAa8jWKouo0TXg@mail.gmail.com>
-Message-ID: <CAErSpo5k1KZuaL7jYp1-5YaxjdZseDPrFo64mJcb2tu2PWJowA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 Dec 2013 21:59:39 +0100
+Subject: [PATCH v2 16/16] misc: support for I-8024 in LP-8x4x
+In-Reply-To: <1386901645-28895-17-git-send-email-ynvich@gmail.com>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1386901645-28895-17-git-send-email-ynvich@gmail.com>
+Message-ID: <201312142159.40250.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc devicetree, linux-arm-kernel]
+On Friday 13 December 2013, Sergei Ianovich wrote:
+> +void nsleep(unsigned long nanosec)
+> +{
+> +       ktime_t t = ns_to_ktime(nanosec);
+> +       long state = current->state;
+> +
+> +       __set_current_state(TASK_UNINTERRUPTIBLE);
+> +       schedule_hrtimeout(&t, HRTIMER_MODE_REL);
+> +       __set_current_state(state);
+> +}
+> +
+> +static void lp8x4x_slot_reset_AO(struct lp8x4x_slot *s)
+> +{
+> +       int i;
+> +       mutex_lock(&s->lock);
+> +       for (i = 0; i < s->AO_len; i++)
+> +               s->AO[i] = 0x2000;
+> +       iowrite8(0x00, s->data_addr);
+> +       nsleep(450);
+> +       iowrite8(0xff, s->data_addr);
+> +       mutex_unlock(&s->lock);
+> +}
 
-On Sat, Dec 14, 2013 at 1:05 PM, shiv prakash Agarwal
-<chhotu.shiv@gmail.com> wrote:
-> On Sun, Dec 15, 2013 at 12:29 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Sat, Dec 14, 2013 at 11:32 AM, shiv prakash Agarwal
->> <chhotu.shiv@gmail.com> wrote:
->>> Hi All,
->>>
->>> How devices config spaces are mapped to host memory?
->>> Is it being handled by core driver? I could not locate.
->>
->> The PCI core does not map config space into memory.  That's not even
->> possible for the legacy config access methods, e.g., using I/O ports
->> 0xcf8 and 0xcfc [1].
->>
->> If you're wondering about how Linux uses ECAM, that's mostly in
->> arch/x86/pci/mmconfig*.  That code does ioremap the ECAM area into
->> kernel virtual space, but only for access via pci_read_config_word(),
->> pci_write_config_word(), etc.
->>
->> Bjorn
->>
->> [1] http://en.wikipedia.org/wiki/PCI_configuration_space#Software_implementation
->
-> Thanks Bjorn for quick reply,
->
-> Above reference says:
-> During system initialization, firmware determines the base address for
-> this ?stolen? address region and communicates it to the root complex
-> and to the operating system. This communication method is
-> implementation-specific, and not defined in the PCI Express
-> specification.
->
-> How above is implemented on ARM?
+Have you checked that the nsleep definition actually does the
+right thing here? 450 nanoseconds must be close the latency
+you get from calling schedule_hrtimeout(). I'd suggest using
+either ndelay() or usleep_range() instead, depending on your
+needs.
 
-On x86, we learn the ECAM address via ACPI (the MCFG table or a host
-bridge _CBA method).  I don't know how this is done on ARM.  I could
-imagine it being done via device tree, but I really don't know.
-Unfortunately both the address discovery and the actual ECAM accesses
-are in arch-specific code.
+If nsleep is really useful here, we should probably add that
+as a generic API rather than having it in one driver.
 
-Bjorn
+	Arnd
