@@ -1,90 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 14 Dec 2013 13:44:57 +0800
-Subject: [PATCH v2] ARM: dts: vf610: make pinctrl nodes board specific
-In-Reply-To: <87haadesl9.fsf@nbsps.com>
-References: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
- <1386686213-13801-1-git-send-email-shawn.guo@linaro.org>
- <87mwk5eugj.fsf@nbsps.com> <87haadesl9.fsf@nbsps.com>
-Message-ID: <20131214054455.GB6903@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 13 Dec 2013 21:50:29 -0800
+Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
+ clock initialization
+In-Reply-To: <201312140400.16794.arnd@arndb.de>
+References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
+ <201312140400.16794.arnd@arndb.de>
+Message-ID: <CAOesGMgj1mOp+TnazcEd98NPdTQ=Mm-zbD4jMuAeZfx8V9MPzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 03:12:50PM -0500, Bill Pringlemeir wrote:
-> On 12 Dec 2013, bpringlemeir at nbsps.com wrote:
-> 
-> > On 10 Dec 2013, shawn.guo at linaro.org wrote:
-> >
-> >> Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that
-> >> boards that share the same pinctrl setting do not have to define it time
-> >> and time again in <board>.dts.  However, along with the devices and use
-> >> cases being added continuously, the pinctrl setting nodes under iomuxc
-> >> becomes more than expected.  This bloats device tree blob for particular
-> >> board unnecessarily since only a small subset of those pinctrl setting
-> >> nodes will be used by the board.  It impacts not only the DTB file size
-> >> but also the run-time device tree lookup efficiency.
-> 
-> >> arch/arm/boot/dts/vf610-pingrp.h   |  127 ++++++++++++++++++++++++++
-> 
-> > Thanks for including this file.  I was looking a NAND flash and the
-> > common configuration are 8/16 bit.  This solution is better as,
-> 
-> Actually, this is a generic file but we have,
-> 
-> +#define VF610_SAI2_PINGRP1 \
-> +	VF610_PAD_PTA16__SAI2_TX_BCLK		0x02ed \
-> +	VF610_PAD_PTA18__SAI2_TX_DATA		0x02ee \
-> +	VF610_PAD_PTA19__SAI2_TX_SYNC		0x02ed \
-> +	VF610_PAD_PTA21__SAI2_RX_BCLK		0x02ed \
-> +	VF610_PAD_PTA22__SAI2_RX_DATA		0x02ed \
-> +	VF610_PAD_PTA23__SAI2_RX_SYNC		0x02ed \
-> +	VF610_PAD_PTB18__EXT_AUDIO_MCLK		0x02ed
-> 
-> The SAI might not use 'VF610_PAD_PTB18__EXT_AUDIO_MCLK' nor either
-> 'VF610_PAD_PTA16__SAI2_TX_BCLK' or 'VF610_PAD_PTA21__SAI2_RX_BCLK'.
-> There are some pins that are absolutely needed for a module to function
-> and then there are some optional pins.
-> 
-> That said, this is nothing that you have changed.  It was like this to
-> begin with in the generic 'vf610.dtsi' file.
+On Fri, Dec 13, 2013 at 7:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 13 December 2013, Tomasz Figa wrote:
+>> Commit
+>>
+>> 4178bac ARM: call of_clk_init from default time_init handler
+>>
+>> added implicit call to of_clk_init() from default time_init callback,
+>> but it did not change platforms calling it from other callbacks, despite
+>> of not having custom time_init callbacks. This caused double clock
+>> initialization on such platforms, leading to boot failures. An example
+>> of such platform is mach-s3c64xx.
+>>
+>> This patch fixes boot failure on s3c64xx by dropping custom init_irq
+>> callback, which had a call to of_clk_init() and moving system reset
+>> initialization to init_machine callback. This allows us to have
+>> clocks initialized properly without a need to have custom init_time or
+>> init_irq callbacks.
+>>
+>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>
+> I see of_clk_init(NULL) getting called on two other ARM platforms:
+>
+> $ git grep -w of_clk_init arch/arm
+> arch/arm/kernel/time.c:         of_clk_init(NULL);
+> arch/arm/mach-keystone/pm_domain.c:     of_clk_init(NULL);
+> arch/arm/mach-mvebu/armada-370-xp.c:    of_clk_init(NULL);
+> arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:        of_clk_init(NULL);
+>
+> Are the other two platforms ok here?
+>
+> I assume that mvebu is fine since Sebastian would have noticed breaking
+> that one and it has a custom init_time function, but keystone seems
+> broken in the same way as s3c64xx. Santosh, can you have a look?
 
-Yea, the PINGRP defined in vf610-pingrp.h should be generic rather than
-board specific.  It seems that VF610_SAI2_PINGRP1 is used nowhere for
-now, so we can change it easily.  Patch is welcomed.
+Yeah, and Free Electrons also sent two systems to Kevin so he has them
+in his boot test setup, and they're still happy there. Keystone lacks
+such coverage though, so Santosh will need to check.
 
-Shawn
 
-> 
-> For instance some designs may have NAND flash CS0 and CS1 and other may
-> only include one (or they have no NAND at all).  Anything that uses the
-> NAND flash driver needs at least,
-> 
-> 	VF610_PAD_PTD23__NF_IO7		0x28df
-> 	VF610_PAD_PTD22__NF_IO6		0x28df
-> 	VF610_PAD_PTD21__NF_IO5		0x28df
-> 	VF610_PAD_PTD20__NF_IO4		0x28df
-> 	VF610_PAD_PTD19__NF_IO3		0x28df
-> 	VF610_PAD_PTD18__NF_IO2		0x28df
-> 	VF610_PAD_PTD17__NF_IO1		0x28df
-> 	VF610_PAD_PTD16__NF_IO0		0x28df
-> 	VF610_PAD_PTB24__NF_WE_B	0x28c2
-> 	VF610_PAD_PTB27__NF_RE_B	0x28c2
-> 	VF610_PAD_PTC26__NF_RB_B	0x280d
-> 	VF610_PAD_PTC27__NF_ALE		0x28c2
-> 	VF610_PAD_PTC28__NF_CLE		0x28c2
-> 
-> and one of,
-> 
-> 	VF610_PAD_PTB25__NF_CE0_B	0x28c2
->         VF610_PAD_PTB26__NF_CE1_B	0x28c2
-> 
-> For the SAI, I am pretty sure that there are multiple master clocks
-> possible and that for synchronous modes, only one TX or RX clk is needed
-> and possibly the SYNC as well (I am thinking I2S).  If these are generic
-> definitions for any board, then maybe they should be separated more or
-> the group should be 'VF610_TWR_SAI2_PINGRP1'; Ie, particular to the
-> machine.
-> 
-> Anyways, this is a pre-existing issue.
-> 
-> Fwiw,
-> Bill Pringlemeir.
+-Olof
