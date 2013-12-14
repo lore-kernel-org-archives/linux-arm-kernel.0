@@ -1,33 +1,71 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Sat, 14 Dec 2013 11:59:28 -0500
-Subject: [PATCH 02/10] arm: select ARCH_MIGHT_HAVE_PC_SERIO
+Date: Sat, 14 Dec 2013 11:59:36 -0500
+Subject: [PATCH 10/10] Kconfig: cleanup SERIO_I8042 dependencies
 In-Reply-To: <1387040376-26906-1-git-send-email-msalter@redhat.com>
 References: <1387040376-26906-1-git-send-email-msalter@redhat.com>
-Message-ID: <1387040376-26906-3-git-send-email-msalter@redhat.com>
+Message-ID: <1387040376-26906-11-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architectures which might use an i8042 for serial IO to keyboard,
-mouse, etc should select ARCH_MIGHT_HAVE_PC_SERIO.
+Remove messy dependencies from SERIO_I8042 by having it depend on one
+Kconfig symbol (ARCH_MIGHT_HAVE_PC_SERIO) and having architectures
+which need it select ARCH_MIGHT_HAVE_PC_SERIO in arch/*/Kconfig.
+New architectures are unlikely to need SERIO_I8042, so this avoids
+having an ever growing list of architectures to exclude.
 
 Signed-off-by: Mark Salter <msalter@redhat.com>
+CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+CC: Richard Henderson <rth@twiddle.net>
+CC: linux-alpha at vger.kernel.org
 CC: Russell King <linux@arm.linux.org.uk>
 CC: linux-arm-kernel at lists.infradead.org
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64 at vger.kernel.org
+CC: Ralf Baechle <ralf@linux-mips.org>
+CC: linux-mips at linux-mips.org
+CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+CC: Paul Mackerras <paulus@samba.org>
+CC: linuxppc-dev at lists.ozlabs.org
+CC: Paul Mundt <lethal@linux-sh.org>
+CC: linux-sh at vger.kernel.org
+CC: "David S. Miller" <davem@davemloft.net>
+CC: sparclinux at vger.kernel.org
+CC: Guan Xuetao <gxt@mprc.pku.edu.cn>
+CC: Ingo Molnar <mingo@redhat.com>
+CC: Thomas Gleixner <tglx@linutronix.de>
+CC: "H. Peter Anvin" <hpa@zytor.com>
+CC: x86 at kernel.org
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/input/serio/Kconfig | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..6990dc5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -6,6 +6,7 @@ config ARM
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
-+	select ARCH_MIGHT_HAVE_PC_SERIO if FOOTBRIDGE_HOST
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_WANT_IPC_PARSE_VERSION
- 	select BUILDTIME_EXTABLE_SORT if MMU
+diff --git a/drivers/input/serio/Kconfig b/drivers/input/serio/Kconfig
+index 8541f94..1f5cec2 100644
+--- a/drivers/input/serio/Kconfig
++++ b/drivers/input/serio/Kconfig
+@@ -16,14 +16,19 @@ config SERIO
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called serio.
+ 
++config ARCH_MIGHT_HAVE_PC_SERIO
++	bool
++	help
++	  Select this config option from the architecture Kconfig if
++	  the architecture might use a PC serio device (i8042) to
++          communicate with keyboard, mouse, etc.
++
+ if SERIO
+ 
+ config SERIO_I8042
+ 	tristate "i8042 PC Keyboard controller"
+ 	default y
+-	depends on !PARISC && (!ARM || FOOTBRIDGE_HOST) && \
+-		   (!SUPERH || SH_CAYMAN) && !M68K && !BLACKFIN && !S390 && \
+-		   !ARC
++	depends on ARCH_MIGHT_HAVE_PC_SERIO
+ 	help
+ 	  i8042 is the chip over which the standard AT keyboard and PS/2
+ 	  mouse are connected to the computer. If you use these devices,
 -- 
 1.8.3.1
