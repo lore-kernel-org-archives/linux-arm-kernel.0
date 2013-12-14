@@ -1,48 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 13 Dec 2013 19:52:42 -0500
-Subject: [PATCH v3 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <20131213213735.GM27070@htj.dyndns.org>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-9-git-send-email-santosh.shilimkar@ti.com>
- <20131213213735.GM27070@htj.dyndns.org>
-Message-ID: <52ABABDA.4020808@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 14 Dec 2013 10:05:02 +0900
+Subject: [PATCH 08/12] mmc: sh_mobile_sdhi: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <87mwk66c1m.fsf@octavius.laptop.org>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <23114596.UeGyAebmZh@avalon> <87a9g67t63.fsf@octavius.laptop.org>
+ <4390506.Q1di3yUE6Z@avalon> <87mwk66c1m.fsf@octavius.laptop.org>
+Message-ID: <20131214010502.GE12584@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 December 2013 04:37 PM, Tejun Heo wrote:
-> On Mon, Dec 09, 2013 at 04:50:41PM -0500, Santosh Shilimkar wrote:
->> Introduce memblock memory allocation APIs which allow to support
->> PAE or LPAE extension on 32 bits archs where the physical memory
->> start address can be beyond 4GB. In such cases, existing bootmem
->> APIs which operate on 32 bit addresses won't work and needs
->> memblock layer which operates on 64 bit addresses.
+On Wed, Dec 11, 2013 at 09:25:09PM -0500, Chris Ball wrote:
+> Hi Laurent,
 > 
-> The overall API looks good to me.  Thanks for doing this!
+> On Wed, Dec 11 2013, Laurent Pinchart wrote:
+> >> I'm sorry about the delay -- it's in mmc-next for 3.14 now.
+> >
+> > Thanks a lot and sorry about shouting. Don't worry about the delay, I only 
+> > wanted to make sure the patch would get in v3.14.
 > 
->> +static void * __init memblock_virt_alloc_internal(
->> +				phys_addr_t size, phys_addr_t align,
->> +				phys_addr_t min_addr, phys_addr_t max_addr,
->> +				int nid)
->> +{
->> +	phys_addr_t alloc;
->> +	void *ptr;
->> +
->> +	if (nid == MAX_NUMNODES)
->> +		pr_warn("%s: usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE\n",
->> +			__func__);
+> No worries, it was deserved yelling.  :-)
 > 
-> Why not use WARN_ONCE()?  Also, shouldn't nid be set to NUMA_NO_NODE
-> here?
+> > [PATCH v3 1/3] mmc: sh_mmcif: Factorize DMA channel request and configuration 
+> > code
+> > [PATCH v3 2/3] mmc: sh_mmcif: Fix compilation warning on 64-bit platforms
 > 
-You want all the users using MAX_NUMNODES to know about it so that
-the wrong usage can be fixed. WARN_ONCE will hide that.
+> These two are in mmc-next now too.  (I usually wait for someone with
+> SH hardware to ACK, but I understand that Guennadi's not around as
+> much anymore.)
 
-> ...
->> +	if (nid != NUMA_NO_NODE) {
-> 
-> Otherwise, the above test is broken.
-> 
-So the idea was just to warn the users and allow them to fix
-the code. Well we are just allowing the existing users of using
-either MAX_NUMNODES or NUMA_NO_NODE continue to work. Thats what
-we discussed, right ?
+I believe I can provide such Acks going forwards.
