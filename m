@@ -1,51 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 13 Dec 2013 21:50:29 -0800
+Date: Fri, 13 Dec 2013 21:52:11 -0800
 Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
  clock initialization
-In-Reply-To: <201312140400.16794.arnd@arndb.de>
+In-Reply-To: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
 References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
- <201312140400.16794.arnd@arndb.de>
-Message-ID: <CAOesGMgj1mOp+TnazcEd98NPdTQ=Mm-zbD4jMuAeZfx8V9MPzQ@mail.gmail.com>
+Message-ID: <CAOesGMifjnTDUcsweOwsw9fFgsE7b4q3wsASfP8YL-uMH5KiPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 7:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 13 December 2013, Tomasz Figa wrote:
->> Commit
->>
->> 4178bac ARM: call of_clk_init from default time_init handler
->>
->> added implicit call to of_clk_init() from default time_init callback,
->> but it did not change platforms calling it from other callbacks, despite
->> of not having custom time_init callbacks. This caused double clock
->> initialization on such platforms, leading to boot failures. An example
->> of such platform is mach-s3c64xx.
->>
->> This patch fixes boot failure on s3c64xx by dropping custom init_irq
->> callback, which had a call to of_clk_init() and moving system reset
->> initialization to init_machine callback. This allows us to have
->> clocks initialized properly without a need to have custom init_time or
->> init_irq callbacks.
->>
->> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Fri, Dec 13, 2013 at 11:59 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Commit
 >
-> I see of_clk_init(NULL) getting called on two other ARM platforms:
+> 4178bac ARM: call of_clk_init from default time_init handler
 >
-> $ git grep -w of_clk_init arch/arm
-> arch/arm/kernel/time.c:         of_clk_init(NULL);
-> arch/arm/mach-keystone/pm_domain.c:     of_clk_init(NULL);
-> arch/arm/mach-mvebu/armada-370-xp.c:    of_clk_init(NULL);
-> arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:        of_clk_init(NULL);
+> added implicit call to of_clk_init() from default time_init callback,
+> but it did not change platforms calling it from other callbacks, despite
+> of not having custom time_init callbacks. This caused double clock
+> initialization on such platforms, leading to boot failures. An example
+> of such platform is mach-s3c64xx.
 >
-> Are the other two platforms ok here?
+> This patch fixes boot failure on s3c64xx by dropping custom init_irq
+> callback, which had a call to of_clk_init() and moving system reset
+> initialization to init_machine callback. This allows us to have
+> clocks initialized properly without a need to have custom init_time or
+> init_irq callbacks.
 >
-> I assume that mvebu is fine since Sebastian would have noticed breaking
-> that one and it has a custom init_time function, but keystone seems
-> broken in the same way as s3c64xx. Santosh, can you have a look?
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 11 +----------
+>  1 file changed, 1 insertion(+), 10 deletions(-)
+>
+> NOTE: This is a critical boot regression fix for mach-s3c64xx that
+> should be merged for next 3.13-rc release.
 
-Yeah, and Free Electrons also sent two systems to Kevin so he has them
-in his boot test setup, and they're still happy there. Keystone lacks
-such coverage though, so Santosh will need to check.
+Applied to fixes. We sent a batch of fixes just the other day so this
+will likely go in sometime next week, but it'll be in linux-next as of
+the next release.
+
+Hm, it'd be nice to get better coverage of 64xx as well as exynos 4.
+Are there any cheap 64xx development boards out there?
 
 
 -Olof
