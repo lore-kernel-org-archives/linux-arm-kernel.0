@@ -1,45 +1,48 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 14 Dec 2013 17:35:23 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzNdIGNhbjogbWNwMjUxeDogQ29udmVydCBkcml2ZXIg?=
- =?UTF-8?B?dG8gdXNlIGNvbW1vbiBjbGsgZnJhbWV3b3Jr?=
-In-Reply-To: <52AC5A9D.3010703@pengutronix.de>
-References: <1384332144-15211-1-git-send-email-shc_work@mail.ru>
- <20131214091507.35557bcf132c885cfba69008@mail.ru>
- <52AC5A9D.3010703@pengutronix.de>
-Message-ID: <1387028123.883417068@f330.i.mail.ru>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 14 Dec 2013 21:46:57 +0800
+Subject: [PATCH V1 03/11] ARM: dts: imx6qdl-sabrelite: remove usdhc4
+ wp-gpio
+In-Reply-To: <1386899355-17379-4-git-send-email-troy.kisky@boundarydevices.com>
+References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1386899355-17379-4-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20131214134656.GC16177@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 12/14/2013 06:15 AM, Alexander Shiyan wrote:
-> > On Wed, 13 Nov 2013 10:04:39 +0100
-> > Marc Kleine-Budde <mkl@pengutronix.de> wrote:
-> > 
-> >> as this series adds device tree bindings, please add
-> >> devicetree at vger.kernel.org on Cc for the whole series.
-> >>
-> >> On 11/13/2013 09:42 AM, Alexander Shiyan wrote:
-> >>> This patch converts mcp251x driver to using common clk framework
-> >>> for getting input frequency. The change was made for the preparation
-> >>> of the driver work with the devicetree. As a result private header
-> >>> for the driver is eliminated.
-> >>> Additionally, all existing users of the driver was converted to use
-> >>> this feature.
-> >>>
-> >>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> >>
-> >> Looks good from my point of view. I'll take the whole series via the
-> >> linux-can tree, if there are no objections. I'd like to have the pxa and
-> >> imx maintainer's Ack and an Ack from the DT list.
-> >>
-> >> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > 
-> > Ping. Resend?
+On Thu, Dec 12, 2013 at 06:49:07PM -0700, Troy Kisky wrote:
+> On Sabre Lite usdhc4 is a micro sd slot, which has no
+> write protect.
 > 
-> Is Dmitry's comment still valid?
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+
+Applied #1, #2 and #3, thanks.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> PXA does not employ COMMON_CLK yet (WIP locally, but it is not finished
-> yet), so clk_register_fixed() will probably fail.
-
-OK, I'll make another version then.
-
----
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index 903da14..c4aa504 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> @@ -115,7 +115,6 @@
+>  		pinctrl_hog: hoggrp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 0x80000000
+> -				MX6QDL_PAD_NANDF_D7__GPIO2_IO07 0x80000000
+>  				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+>  				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
+>  				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
+> @@ -230,7 +229,6 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usdhc4>;
+>  	cd-gpios = <&gpio2 6 0>;
+> -	wp-gpios = <&gpio2 7 0>;
+>  	vmmc-supply = <&reg_3p3v>;
+>  	status = "okay";
+>  };
+> -- 
+> 1.8.1.2
+> 
