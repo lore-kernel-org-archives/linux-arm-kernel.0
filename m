@@ -1,34 +1,67 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 13 Dec 2013 17:31:15 -0700
-Subject: [PATCH 5/5] arm64: Add LOAD_OFFSET symbol for linker scripts
-In-Reply-To: <1386980430.1002.96.camel@smoke>
-References: <cover.1386879684.git.geoff@infradead.org>
- <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
- <20131213164517.GM19177@mudshark.cambridge.arm.com>
- <1386980430.1002.96.camel@smoke>
-Message-ID: <20131214003115.GI12904@obsidianresearch.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 13 Dec 2013 19:38:06 -0500
+Subject: [PATCH] mm/ARM: fix ARMs __ffs() to conform to avoid warning with
+ NO_BOOTMEM
+Message-ID: <1386981486-3173-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 04:20:30PM -0800, Geoff Levand wrote:
-> > Can you be more specific about why we need this please? We don't seem to use
-> > this on ARM, and I can't really think of a sensible value to define it as,
-> > either. PAGE_OFFSET is a virtual address, which doesn't make much sense to
-> > me, but perhaps I'm missing something.
-> 
-> As I mentioned before, LOAD_OFFSET defaults to zero if it is not defined by the
-> arch, so our arm64 vmlinux files currently have their paddr's equal to their
-> vaddr's, so something like 0xffffffc000080000.
+Building ARM with NO_BOOTMEM generates below warning.
 
-FWIW, I posted a similar patch for ARM32 last year:
+mm/nobootmem.c: In function _____free_pages_memory___:
+mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
 
-https://lkml.org/lkml/2012/9/30/145
+	order = min(MAX_ORDER - 1UL, __ffs(start));
 
-We are using it here to convey to desired load address to the boot
-loader. My patch makes LOAD_OFFSET equal to PLAT_PHYS_OFFSET for
-non-relocatable kernels, 0 otherwise.
+ARM's __ffs() differs from other architectures in that it ends up being
+an int, whereas almost everyone else is unsigned long.
 
-If ARM64 takes Geoffs changes I can resend my patch for ARM32.
+So fix ARMs __ffs() to conform to other architectures. Suggested by
+Russell King <linux@arm.linux.org.uk>
 
-Regards,
-Jason
+Some more details in below thread -
+	https://lkml.org/lkml/2013/12/9/807
+
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/include/asm/bitops.h |   23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index e691ec9..5f41d81 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -270,10 +270,25 @@ static inline int fls(int x)
+ 	return ret;
+ }
+ 
+-#define __fls(x) (fls(x) - 1)
+-#define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
+-#define __ffs(x) (ffs(x) - 1)
+-#define ffz(x) __ffs( ~(x) )
++static inline unsigned long __fls(unsigned long x)
++{
++	return fls(x) - 1;
++}
++
++static inline int ffs(int x)
++{
++	return fls(x & -x);
++}
++
++static inline unsigned long __ffs(unsigned long x)
++{
++	return ffs(x) - 1;
++}
++
++static inline unsigned long ffz(unsigned long x)
++{
++	return __ffs(~x);
++}
+ 
+ #endif
+ 
+-- 
+1.7.9.5
