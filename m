@@ -1,104 +1,97 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 14 Dec 2013 12:47:52 +0100
-Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
- clock initialization
-In-Reply-To: <201312140400.16794.arnd@arndb.de>
-References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
- <201312140400.16794.arnd@arndb.de>
-Message-ID: <52AC4568.7030201@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 14 Dec 2013 13:24:22 +0100
+Subject: [PATCHv7 04/12] driver/core: populate devices in order for IOMMUs
+In-Reply-To: <20131213021402.GB14192@kroah.com>
+References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
+ <1386835033-4701-5-git-send-email-hdoyu@nvidia.com>
+ <20131212113920.70E8BC40637@trevor.secretlab.ca>
+ <20131213021402.GB14192@kroah.com>
+Message-ID: <20131214122421.GB17467@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2013 04:00 AM, Arnd Bergmann wrote:
-> On Friday 13 December 2013, Tomasz Figa wrote:
->> Commit
->>
->> 4178bac ARM: call of_clk_init from default time_init handler
->>
->> added implicit call to of_clk_init() from default time_init callback,
->> but it did not change platforms calling it from other callbacks, despite
->> of not having custom time_init callbacks. This caused double clock
->> initialization on such platforms, leading to boot failures. An example
->> of such platform is mach-s3c64xx.
->>
->> This patch fixes boot failure on s3c64xx by dropping custom init_irq
->> callback, which had a call to of_clk_init() and moving system reset
->> initialization to init_machine callback. This allows us to have
->> clocks initialized properly without a need to have custom init_time or
->> init_irq callbacks.
->>
->> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Thu, Dec 12, 2013 at 06:14:02PM -0800, Greg KH wrote:
+> On Thu, Dec 12, 2013 at 11:39:20AM +0000, Grant Likely wrote:
+> > On Thu, 12 Dec 2013 09:57:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> > > IOMMU devices on the bus need to be poplulated first, then iommu
+> > > master devices are done later.
+> > > 
+> > > With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
+> > > whether a device can be an iommu msater or not. If a device can, we'll
+> > > defer to populate that device till an iommu device is populated. Then,
+> > > those deferred iommu master devices are populated and configured with
+> > > help of the already populated iommu device.
+> > > 
+> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > ---
+> > > This is related to the following discussion:
+> > >   [RFC PATCH] Documentation: devicetree: add description for generic bus properties
+> > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215042.html
+> > > 
+> > > v6:
+> > > Spinned off only driver core part from:
+> > >   [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
+> > > 
+> > > v5:
+> > > Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
+> > > 
+> > > v4:
+> > > This is newly added, and the successor of the following RFC:
+> > >   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
+> > >   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
+> > > 
+> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > ---
+> > >  drivers/base/dd.c | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > > 
+> > > diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> > > index 0605176..0605f52 100644
+> > > --- a/drivers/base/dd.c
+> > > +++ b/drivers/base/dd.c
+> > > @@ -25,6 +25,7 @@
+> > >  #include <linux/async.h>
+> > >  #include <linux/pm_runtime.h>
+> > >  #include <linux/pinctrl/devinfo.h>
+> > > +#include <linux/of_iommu.h>
+> > >  
+> > >  #include "base.h"
+> > >  #include "power/power.h"
+> > > @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+> > >  
+> > >  	dev->driver = drv;
+> > >  
+> > > +	ret = of_iommu_attach(dev);
+> > > +	if (ret)
+> > > +		goto probe_failed;
+> > > +
+> > 
+> > As discussed before, I really don't think hooking in to dd.c is the
+> > right thing to do here, and certainly not as a device tree specific
+> > function. ACPI or PCI described devices may have the same constraints
+> > and those won't have DT descriptions.
+> 
+> I agree, this shouldn't be in the driver core.
 
-Thomas,
+Okay, so what would be an alternative? Grant's objection makes sense and
+we could easily just wrap the call to of_iommu_attach() within a generic
+iommu_attach() that could decide at runtime which exact implementation
+to call, depending on whether the device is DT, ACPI, PCI or whatnot.
 
-thanks for catching this and sorry for the inconvenience. Either I
-simply missed s3c64xx or it went in with that global of_clk_init
-patch.
+If we don't want something like that in the core either, then the only
+other alternative would be to call this from each driver. However given
+the desire to handle IOMMUs completely transparently for device drivers
+that would be missing the point.
 
-> I see of_clk_init(NULL) getting called on two other ARM platforms:
->
-> $ git grep -w of_clk_init arch/arm
-> arch/arm/kernel/time.c:         of_clk_init(NULL);
-> arch/arm/mach-keystone/pm_domain.c:     of_clk_init(NULL);
-> arch/arm/mach-mvebu/armada-370-xp.c:    of_clk_init(NULL);
-> arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:        of_clk_init(NULL);
->
-> Are the other two platforms ok here?
+Perhaps moving this into platform_drv_probe() would be more acceptable?
+That's still somewhat core, but maybe suburban enough.
 
-mvebu is fine as long as it has its own .init_time callback (which it
-has).
-
-> I assume that mvebu is fine since Sebastian would have noticed breaking
-> that one and it has a custom init_time function, but keystone seems
-> broken in the same way as s3c64xx. Santosh, can you have a look?
-
-I also had a look at keystone and guess it is broken, too.
-of_clk_init(NULL) is called in keystone_pm_runtime_init() which is
-set as subsys_initcall. Simply removing the extra of_clk_init call
-in keystone_pm_runtime_init should be enough here:
-
- From 4ef4720c0d7ca9be57b06dc7ab1483c77a5ada1d Mon Sep 17 00:00:00 2001
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date: Sat, 14 Dec 2013 12:21:01 +0100
-Subject: [PATCH] ARM: keystone: remove call to of_clk_init
-
-Commit
-
-4178bac ARM: call of_clk_init from default time_init handler
-
-added implicit call to of_clk_init(NULL) from default time_init callback.
-This causes double clock initialization on keystone, leading to boot
-failures.
-
-This patch fixes boot failure on keystone by dropping the call to
-of_clk_init(NULL) in keystone_pm_runtime_init(), which is set as
-subsys_initcall and therefore called after arch-wide .init_time callback.
-
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-  arch/arm/mach-keystone/pm_domain.c | 2 --
-  1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-keystone/pm_domain.c 
-b/arch/arm/mach-keystone/pm_domain.c
-index 2962523..3f17e16 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -16,7 +16,6 @@
-  #include <linux/pm_runtime.h>
-  #include <linux/pm_clock.h>
-  #include <linux/platform_device.h>
--#include <linux/clk-provider.h>
-  #include <linux/of.h>
-
-  #ifdef CONFIG_PM_RUNTIME
-@@ -74,7 +73,6 @@ int __init keystone_pm_runtime_init(void)
-  	if (!np)
-  		return 0;
-
--	of_clk_init(NULL);
-  	pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
-
-  	return 0;
--- 
-1.8.4.rc3
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131214/e99a967b/attachment.sig>
