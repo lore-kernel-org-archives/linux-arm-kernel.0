@@ -1,90 +1,91 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 14 Dec 2013 17:21:39 -0500
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14 (incr #3)
-Message-ID: <20131214222139.GG2609@titan.lakedaemon.net>
+Date: Sat, 14 Dec 2013 17:27:07 -0500
+Subject: [PATCH 0/4] ARM: mvebu: sort DT nodes by reg address
+In-Reply-To: <cover.1386861599.git.jason@lakedaemon.net>
+References: <20130816061500.GE7035@quad.lixom.net>
+ <cover.1386861599.git.jason@lakedaemon.net>
+Message-ID: <20131214222707.GH2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Thu, Dec 12, 2013 at 03:25:15PM +0000, Jason Cooper wrote:
+> Olof, all,
+> 
+> I love December!  I'm getting around to some of the items on my -onice folder.
+> Namely, this one:
+> 
+> On Thu, Aug 15, 2013 at 11:15:00PM -0700, Olof Johansson wrote:
+> > On Wed, Aug 14, 2013 at 02:59:45PM -0400, Jason Cooper wrote:
+> ...
+> > > diff --cc arch/arm/boot/dts/kirkwood.dtsi
+> > > index 70f414d,1d6921d..6489b98
+> > > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > > @@@ -47,11 -30,30 +40,35 @@@
+> > >             #address-cells = <1>;
+> > >             #size-cells = <1>;
+> > >   
+> > > +           timer: timer at 20300 {
+> > > +                   compatible = "marvell,orion-timer";
+> > > +                   reg = <0x20300 0x20>;
+> > > +                   interrupt-parent = <&bridge_intc>;
+> > > +                   interrupts = <1>, <2>;
+> > > +                   clocks = <&core_clk 0>;
+> > > +           };
+> > > + 
+> > > +           intc: main-interrupt-ctrl at 20200 {
+> > > +                   compatible = "marvell,orion-intc";
+> > > +                   interrupt-controller;
+> > > +                   #interrupt-cells = <1>;
+> > > +                   reg = <0x20200 0x10>, <0x20210 0x10>;
+> > > +           };
+> > > + 
+> > > +           bridge_intc: bridge-interrupt-ctrl at 20110 {
+> > > +                   compatible = "marvell,orion-bridge-intc";
+> > > +                   interrupt-controller;
+> > > +                   #interrupt-cells = <1>;
+> > > +                   reg = <0x20110 0x8>;
+> > > +                   interrupts = <1>;
+> > > +                   marvell,#interrupts = <6>;
+> > > +           };
+> > > + 
+> > >  +          mbusc: mbus-controller at 20000 {
+> > >  +                  compatible = "marvell,mbus-controller";
+> > >  +                  reg = <0x20000 0x80>, <0x1500 0x20>;
+> > >  +          };
+> > >  +
+> > >             core_clk: core-clocks at 10030 {
+> > >                     compatible = "marvell,kirkwood-core-clock";
+> > >                     reg = <0x10030 0x4>;
+> > 
+> > This file is a real mess. :( Nothing is sorted properly under the ocp/ bus.
+> > It's common to sort by memory address. Or I'd even take alphabetically if
+> > there was a good reason to do so. Just some order of some kind.
+> 
+> Done.
+> 
+> thx,
+> 
+> Jason.
+> 
+> Jason Cooper (4):
+>   ARM: kirkwood: sort dt nodes by address
+>   ARM: dove: sort DT nodes by address
+>   ARM: orion5x: sort DT nodes by address
+>   ARM: mvebu: sort DT nodes by address
+> 
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 176 ++++++-------
+>  arch/arm/boot/dts/armada-370.dtsi    |  74 +++---
+>  arch/arm/boot/dts/armada-xp.dtsi     | 100 +++----
+>  arch/arm/boot/dts/dove.dtsi          | 496 +++++++++++++++++------------------
+>  arch/arm/boot/dts/kirkwood.dtsi      | 140 +++++-----
+>  arch/arm/boot/dts/orion5x.dtsi       | 106 ++++----
+>  6 files changed, 546 insertions(+), 546 deletions(-)
 
-Here's another round of DT changes.  They've all been in -next for at
-least a few days.  This is an incremental pull from tags/mvebu-dt-3.14-2
-in the mvebu/dt branch.
+Series applied to mvebu/dt
+
+And Jason, next time, don't take so long.  :)
 
 thx,
 
 Jason.
-
-
-The following changes since commit 46ca506c43d64e11257a0a113701e9bcccf52416:
-
-  ARM: kirkwood: Add support for NETGEAR ReadyNAS NV+ v2 (2013-12-01 22:18:44 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14-3
-
-for you to fetch changes up to 69e18e26b5773092276a9702244784faf9b6c65f:
-
-  ARM: mvebu: Enable NAND controller in A370 Reference Design board (2013-12-12 14:04:34 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.14 (incr. #3)
-
- - kirkwood
-    - use symbolic names for gpios and key inputs
-
- - mvebu
-    - add the pxa nand controller to the ReadyNAS and A370-RD boards
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: DT: Kirkwood: Use symbolic names from input.h
-      ARM: DT: Kirkwood: Use symbolic names from gpio.h
-
-Arnaud Ebalard (3):
-      ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts file
-      ARM: mvebu: Enable NAND controller in ReadyNAS 104 .dts file
-      ARM: mvebu: Enable NAND controller in ReadyNAS 2120 .dts file
-
-Ezequiel Garcia (1):
-      ARM: mvebu: Enable NAND controller in A370 Reference Design board
-
- arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 36 ++++++++++++++++++++++
- arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 36 ++++++++++++++++++++++
- arch/arm/boot/dts/armada-370-rd.dts                | 21 +++++++++++++
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     | 36 ++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-cloudbox.dts            | 10 +++---
- arch/arm/boot/dts/kirkwood-db.dtsi                 |  4 +--
- arch/arm/boot/dts/kirkwood-dns320.dts              | 10 +++---
- arch/arm/boot/dts/kirkwood-dns325.dts              | 10 +++---
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              | 18 +++++------
- arch/arm/boot/dts/kirkwood-dockstar.dts            |  4 +--
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |  6 ++--
- arch/arm/boot/dts/kirkwood-goflexnet.dts           | 22 ++++++-------
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |  8 ++---
- arch/arm/boot/dts/kirkwood-ib62x0.dts              | 16 +++++-----
- arch/arm/boot/dts/kirkwood-iconnect.dts            | 24 +++++++--------
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      | 20 ++++++------
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |  4 +--
- arch/arm/boot/dts/kirkwood-lsxl.dtsi               | 28 ++++++++---------
- arch/arm/boot/dts/kirkwood-mplcec4.dts             | 14 ++++-----
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     | 14 ++++-----
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |  2 --
- .../boot/dts/kirkwood-netgear_readynas_nv+_v2.dts  |  2 --
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  8 ++---
- arch/arm/boot/dts/kirkwood-ns2lite.dts             |  2 +-
- arch/arm/boot/dts/kirkwood-ns2max.dts              | 10 +++---
- arch/arm/boot/dts/kirkwood-ns2mini.dts             | 10 +++---
- arch/arm/boot/dts/kirkwood-nsa310-common.dtsi      |  4 +--
- arch/arm/boot/dts/kirkwood-nsa310.dts              | 32 +++++++++----------
- arch/arm/boot/dts/kirkwood-nsa310a.dts             | 30 +++++++++---------
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts       | 10 +++---
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts       | 10 +++---
- arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts    |  6 ++--
- arch/arm/boot/dts/kirkwood-sheevaplug.dts          |  4 +--
- arch/arm/boot/dts/kirkwood-topkick.dts             | 10 +++---
- arch/arm/boot/dts/kirkwood-ts219-6281.dts          |  8 ++---
- arch/arm/boot/dts/kirkwood-ts219-6282.dts          |  8 ++---
- arch/arm/boot/dts/kirkwood.dtsi                    |  2 ++
- 37 files changed, 313 insertions(+), 186 deletions(-)
