@@ -1,44 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 13 Dec 2013 21:52:11 -0800
-Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
- clock initialization
-In-Reply-To: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
-References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CAOesGMifjnTDUcsweOwsw9fFgsE7b4q3wsASfP8YL-uMH5KiPA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sat, 14 Dec 2013 15:07:31 +0900
+Subject: [GIT PULL] Renesas ARM based SoC Clocksource updates for v3.14
+Message-ID: <cover.1387000863.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 11:59 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Commit
->
-> 4178bac ARM: call of_clk_init from default time_init handler
->
-> added implicit call to of_clk_init() from default time_init callback,
-> but it did not change platforms calling it from other callbacks, despite
-> of not having custom time_init callbacks. This caused double clock
-> initialization on such platforms, leading to boot failures. An example
-> of such platform is mach-s3c64xx.
->
-> This patch fixes boot failure on s3c64xx by dropping custom init_irq
-> callback, which had a call to of_clk_init() and moving system reset
-> initialization to init_machine callback. This allows us to have
-> clocks initialized properly without a need to have custom init_time or
-> init_irq callbacks.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 11 +----------
->  1 file changed, 1 insertion(+), 10 deletions(-)
->
-> NOTE: This is a critical boot regression fix for mach-s3c64xx that
-> should be merged for next 3.13-rc release.
+Hi Daniel,
 
-Applied to fixes. We sent a batch of fixes just the other day so this
-will likely go in sometime next week, but it'll be in linux-next as of
-the next release.
+please consider this Renesas ARM based SoC Clocksource update for v3.14.
 
-Hm, it'd be nice to get better coverage of 64xx as well as exynos 4.
-Are there any cheap 64xx development boards out there?
+I would also like to request that you make a branch available
+for me to use as a base for a branch containing SoC changes
+targeted at v3.14 that depend on this clocksource update.
+
+Thanks
 
 
--Olof
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.14
+
+for you to fetch changes up to d78e9474459768c9aaf8cfd8bc54957d44771f46:
+
+  clocksource: sh_cmt: Add clk_prepare/unprepare support (2013-12-14 12:57:36 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC Clocksource updates for v3.14
+
+* Add clk_prepare/unprepare support to sh_cmt
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      clocksource: sh_cmt: Add clk_prepare/unprepare support
+
+ drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
