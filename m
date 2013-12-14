@@ -1,54 +1,126 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Sat, 14 Dec 2013 10:12:51 +0800
-Subject: [PATCH v5 0/3] mmc: dw_mmc: add dw_mmc-k3
-Message-ID: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 14 Dec 2013 11:19:01 +0900
+Subject: [PATCH v4 0/5] Renesas R-Car Gen2 Common Clock Framework arch/
+ support
+In-Reply-To: <20131214021113.GA22927@verge.net.au>
+References: <1386770716-21610-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131214012624.GF12584@verge.net.au> <3998896.4EUoySjjs7@avalon>
+ <20131214021113.GA22927@verge.net.au>
+Message-ID: <20131214021900.GB22927@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V5:
-0002:
-Follow advice from Arnd, 
-Update dt descirption and use of_property_for_each_u32 to get table number.
+On Sat, Dec 14, 2013 at 11:11:14AM +0900, Simon Horman wrote:
+> On Sat, Dec 14, 2013 at 02:41:44AM +0100, Laurent Pinchart wrote:
+> > Hi Simon,
+> > 
+> > On Saturday 14 December 2013 10:26:24 Simon Horman wrote:
+> > > [ CC Magnus ]
+> > > 
+> > > On Wed, Dec 11, 2013 at 03:05:11PM +0100, Laurent Pinchart wrote:
+> > > > Hello,
+> > > > 
+> > > > This is a repost of the arch patches from the "[PATCH v3 0/8] Renesas
+> > > > R-Car Gen2 Common Clock Framework support" patch series. The first three
+> > > > patches in that series have been reposted separately in the "[PATCH v4
+> > > > 0/3] Renesas R-Car Gen2 Common Clock Framework drivers" series to get
+> > > > merged through Mike Turquette's tree, while this series will go through
+> > > > the ARM SoC tree.
+> > > > 
+> > > > I've asked Mike to provide a stable branch when merging the CCF driver
+> > > > patches.
+> > > > 
+> > > > Laurent Pinchart (5):
+> > > >   ARM: shmobile: r8a7790: Add clock index macros for DT sources
+> > > >   ARM: shmobile: r8a7791: Add clock index macros for DT sources
+> > > >   ARM: shmobile: r8a7790: Add clocks
+> > > >   ARM: shmobile: r8a7790: Reference clocks
+> > > >   ARM: shmobile: r8a7791: Add clocks
+> > > >  
+> > > >  arch/arm/boot/dts/r8a7790.dtsi            | 328 +++++++++++++++++++++++++
+> > > >  arch/arm/boot/dts/r8a7791.dtsi            | 313 +++++++++++++++++++++++++
+> > > >  include/dt-bindings/clock/r8a7790-clock.h | 100 +++++++++
+> > > >  include/dt-bindings/clock/r8a7791-clock.h | 105 ++++++++++
+> > > >  4 files changed, 846 insertions(+)
+> > > >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
+> > > >  create mode 100644 include/dt-bindings/clock/r8a7791-clock.h
+> > > 
+> > > Hi Laurent,
+> > > 
+> > > I would like to confirm the dependencies of this series with you.
+> > > As I understand things the dependencies that were not present
+> > > in renesas-devel-v3.13-rc2-20131211 are as follows.
+> > > 
+> > > If any of the patches below can be skipped without breaking this series
+> > > or the followup series "[PATCH v4 00/16] Lager and Koelsch multiplatform
+> > > support" then I am all for not treating them as dependencies at all.
+> > > 
+> > > 
+> > > * [PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework drivers
+> > >   Status: Waiting for response from Mike Turquette
+> > 
+> > The dependency is correct, but the status has changed. Mike has merged the 
+> > patches in his tree in the clk-next-shmobile branch 
+> > (https://git.linaro.org/people/mike.turquette/linux.git/shortlog/refs/heads/clk-next-shmobile).
+> 
+> Great!
+> 
+> > > * mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
+> > >   Status: Merged by Chris Ball. I believe we need a stable branch from him.
+> > 
+> > You can drop this dependency as the koelsch reference boards lack SDHI
+> > support and the lager reference board has the SDHI devices disabled.
+> 
+> Thanks, got it.
+> 
+> > > * spi: sh-msiof: Convert to clk_prepare/unprepare
+> > >   spi: sh-msiof: Use devm_* managed allocators
+> > >   Status: Merged by Mark Brown. I believe we need a stable branch from him.
+> > 
+> > You can drop this dependency as the lager and koelsch reference boards lack 
+> > SPI support.
+> > 
+> > > * usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
+> > >   Status: In Felipe Balbi's next branch. It is stable, right?
+> > 
+> > Correct, but you can drop this dependency as the lager and koelsch reference 
+> > boards lack USB support.
+> 
+> Understood.
+> 
+> > > * clocksource: sh_tmu: Add clk_prepare/unprepare support
+> > >   clocksource: sh_tmu: Release clock when sh_tmu_register() fails
+> > >   clocksource: sh_mtu2: Add clk_prepare/unprepare support
+> > >   clocksource: sh_mtu2: Release clock when sh_mtu2_register() fails
+> > >   Status: Present in v3.13-rc3. No problem!
+> > > 
+> > > * clocksource: sh_cmt: Add clk_prepare/unprepare support
+> > >   Status: I think I have dropped the ball here.
+> > >           Regardless, I think it it needs to be accepted by Daniel Lezcano
+> > 
+> > That's the only missing one. Do you plan to handle this with Daniel ?
+> 
+> Yes, I will ask him to pick it up ASAP. Sorry for the mess there.
 
-v4:
-Follow Arnd's suggestion abstracting specific tuning to clock,
-also because new version ip use different method and not use same tuning registers.
+Hi,
 
-0001 acked by Jaehoon
+I think I may have found the reason that I dropped the ball,
+which is that I was waiting for v2 of the patch but never saw it.
 
-v3:
-0001: 
-Put set/clear_bit DW_MMC_CARD_PRESENT in dw_mci_get_cd, 
-Since dw_mci_request will check DW_MMC_CARD_PRESENT before sending cmd
+In order to stop me making a further mess of this would
+you be able to re-post it to Daniel directly?
 
-0002:
-Follow suggestion from Chris, Kumar and Seungwon
-Sync to latest mmc-next, which is 3.12-rc2
-Remove enum dw_mci_k3_type etc
-
-v2:
-Follow Jaehoon's suggestion
-Use slot-gpio.c handle cd pin
-Move table out to dts
-other suggestion
-
-Zhangfei Gao (3):
-  mmc: dw_mmc: use slot-gpio to handle cd pin
-  mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-  clk: hisilicon: add hi3620_mmc_clks
-
- .../bindings/arm/hisilicon/hisilicon.txt           |   14 ++
- .../devicetree/bindings/clock/hi3620-clock.txt     |    1 +
- .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   59 +++++
- drivers/clk/hisilicon/clk-hi3620.c                 |  262 ++++++++++++++++++++
- drivers/mmc/host/Kconfig                           |   10 +
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/dw_mmc-k3.c                       |  133 ++++++++++
- drivers/mmc/host/dw_mmc.c                          |   48 +++-
- include/dt-bindings/clock/hi3620-clock.h           |    5 +
- 9 files changed, 520 insertions(+), 13 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
- create mode 100644 drivers/mmc/host/dw_mmc-k3.c
-
--- 
-1.7.9.5
+> > > * serial: sh-sci: Convert to clk_prepare/unprepare
+> > >   serial: sh-sci: Don't enable/disable port from within break timer
+> > >   Status: I have queued these up
+> > 
+> > -- 
+> > Regards,
+> > 
+> > Laurent Pinchart
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
