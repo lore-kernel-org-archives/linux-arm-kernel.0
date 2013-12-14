@@ -1,37 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 13 Dec 2013 18:15:15 -0500
-Subject: [PATCH v2 1/7] usb: dwc3: keystone: add basic PM support
-In-Reply-To: <20131213004337.GA31622@saruman.home>
-References: <20131212214306.GS1939@saruman.home>
- <1386884755-12366-1-git-send-email-balbi@ti.com> <52AA54E4.5000606@ti.com>
- <20131213004337.GA31622@saruman.home>
-Message-ID: <52AB9503.2090801@ti.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 13 Dec 2013 16:20:02 -0800
+Subject: [PATCH 1/5] arm64: Fix __data_loc value
+In-Reply-To: <20131213181725.GR22933@arm.com>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <35a937043d1b3eae1b1ea547efc25f75b5f43f67.1386879684.git.geoff@infradead.org>
+ <20131213174647.GJ4360@n2100.arm.linux.org.uk>
+ <20131213181725.GR22933@arm.com>
+Message-ID: <1386980402.1002.93.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 December 2013 07:43 PM, Felipe Balbi wrote:
-> On Thu, Dec 12, 2013 at 07:29:24PM -0500, Santosh Shilimkar wrote:
->> On Thursday 12 December 2013 04:45 PM, Felipe Balbi wrote:
->>> A bare-minimum PM implementation which will
->>> server as building block for more complex
->> s/server/serve ;-)
-> 
-> hah! :-) will fix in my branch.
-> 
->>> PM implementation in the future.
->>>
->>> At the least will not leave clocks on unnecessarily
->>> when e.g.  a user write mem to /sys/power/state.
->>>
->>> Signed-off-by: Felipe Balbi <balbi@ti.com>
->>> ---
->>>
->>> improve error path a little bit.
->>>
->> We will test this out. Thanks for the
->> patch Felipe.
-> 
-I see Wingman already tested the patch.
-Feel free add, my ack if you need one...
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Hi Catalin,
+
+On Fri, 2013-12-13 at 18:17 +0000, Catalin Marinas wrote:
+> On Fri, Dec 13, 2013 at 05:46:47PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Dec 12, 2013 at 08:39:45PM +0000, Geoff Levand wrote:
+> > > The __data_loc variable should be set to the VMA of the data section, not
+> > > the LMA.
+> > > 
+> > > At present LOAD_OFFSET is not set and defaults to zero, so this bug
+> > > does not cause any problems.
+> > 
+> > Why does ARM64 have this in the first place?  __data_loc is used for
+> > XIP support on ARM, does ARM64 have XIP support?
+> 
+> Not a good reason, copy-paste leftover.
+
+I didn't check how __data_loc was used.  I assumed it was of some use
+and just did what was needed to suppress a link error in my work.
+
+I'll post a patch that removes it.
+
+-Geoff
