@@ -1,27 +1,28 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Sat, 14 Dec 2013 00:26:00 -0800
-Subject: [PATCH v4 7/8] clocksource: kona: Add basic use of external clock
-In-Reply-To: <1386271244-3927-8-git-send-email-tim.kryger@linaro.org>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-8-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYqg2hzwudwLq+MyBfY119e22HzBe5H+03vGA4VVrL9rYw@mail.gmail.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Sat, 14 Dec 2013 09:32:36 +0100
+Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
+In-Reply-To: <20131213190707.GA9713@roeck-us.net>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <1386945188-8316-2-git-send-email-jonas.jensen@gmail.com>
+ <201312131717.25435.arnd@arndb.de>
+ <CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>
+ <20131213190707.GA9713@roeck-us.net>
+Message-ID: <CACmBeS2_WZj6_HJo0N50TBwneNVmeB9TyXbHRLm9CJFGNN+HtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> When an clock is specified in the device tree, enable it and use it to
-> determine the external clock frequency.
->
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
+On 13 December 2013 20:07, Guenter Roeck <linux@roeck-us.net> wrote:
+>> I got the impression from Guenter Roeck's review, that it doesn't belong there,
+>> maybe I was too quick to remove it?
+>>
+> You'd have to answer the questions I raised in my review if you want it in
+> there.
 
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+I didn't see a solution at the time. Now I'm thinking arm_pm_restart
+can be set later in probe, preventing a crash on load failure, and
+maybe it can be unset on unload.
 
-Daniel,
- Are you ok with me pulling this patch in with the rest of the
-patchset into the bcm tree ?
+Would you accept a patch for this?
 
- Thanks,
-   csd
+Best regards,
+Jonas
