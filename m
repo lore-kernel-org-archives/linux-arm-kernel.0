@@ -1,97 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 14 Dec 2013 13:24:22 +0100
-Subject: [PATCHv7 04/12] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <20131213021402.GB14192@kroah.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-5-git-send-email-hdoyu@nvidia.com>
- <20131212113920.70E8BC40637@trevor.secretlab.ca>
- <20131213021402.GB14192@kroah.com>
-Message-ID: <20131214122421.GB17467@mithrandir>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 Dec 2013 13:31:39 +0100
+Subject: [PATCH 1/3] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <20131214092715.6735074a15ce6128d128875f@mail.ru>
+References: <1386008042-6826-1-git-send-email-shc_work@mail.ru>
+ <201312071714.25454.arnd@arndb.de>
+ <20131214092715.6735074a15ce6128d128875f@mail.ru>
+Message-ID: <201312141331.39372.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 06:14:02PM -0800, Greg KH wrote:
-> On Thu, Dec 12, 2013 at 11:39:20AM +0000, Grant Likely wrote:
-> > On Thu, 12 Dec 2013 09:57:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
-> > > IOMMU devices on the bus need to be poplulated first, then iommu
-> > > master devices are done later.
-> > > 
-> > > With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
-> > > whether a device can be an iommu msater or not. If a device can, we'll
-> > > defer to populate that device till an iommu device is populated. Then,
-> > > those deferred iommu master devices are populated and configured with
-> > > help of the already populated iommu device.
-> > > 
-> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > ---
-> > > This is related to the following discussion:
-> > >   [RFC PATCH] Documentation: devicetree: add description for generic bus properties
-> > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215042.html
-> > > 
-> > > v6:
-> > > Spinned off only driver core part from:
-> > >   [PATCHv5 2/9] driver/core: populate devices in order for IOMMUs
-> > > 
-> > > v5:
-> > > Use "iommus=" binding instread of arm,smmu's "#stream-id-cells".
-> > > 
-> > > v4:
-> > > This is newly added, and the successor of the following RFC:
-> > >   [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
-> > >   http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
-> > > 
-> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > ---
-> > >  drivers/base/dd.c | 5 +++++
-> > >  1 file changed, 5 insertions(+)
-> > > 
-> > > diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> > > index 0605176..0605f52 100644
-> > > --- a/drivers/base/dd.c
-> > > +++ b/drivers/base/dd.c
-> > > @@ -25,6 +25,7 @@
-> > >  #include <linux/async.h>
-> > >  #include <linux/pm_runtime.h>
-> > >  #include <linux/pinctrl/devinfo.h>
-> > > +#include <linux/of_iommu.h>
-> > >  
-> > >  #include "base.h"
-> > >  #include "power/power.h"
-> > > @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
-> > >  
-> > >  	dev->driver = drv;
-> > >  
-> > > +	ret = of_iommu_attach(dev);
-> > > +	if (ret)
-> > > +		goto probe_failed;
-> > > +
-> > 
-> > As discussed before, I really don't think hooking in to dd.c is the
-> > right thing to do here, and certainly not as a device tree specific
-> > function. ACPI or PCI described devices may have the same constraints
-> > and those won't have DT descriptions.
+On Saturday 14 December 2013, Alexander Shiyan wrote:
+> On Sat, 7 Dec 2013 17:14:25 +0100
+> Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> I agree, this shouldn't be in the driver core.
+> > On Saturday 07 December 2013, Alexander Shiyan wrote:
+> > > > > +void __init clps711x_intc_init(phys_addr_t base, resource_size_t size)
+> > > > > +{
+> > > > > +   BUG_ON(_clps711x_intc_init(NULL, base, size));
+> > > > > +}
+> > > > > +EXPORT_SYMBOL(clps711x_intc_init);
+> > > > 
+> > > > No need to export this symbol, because you don't call the function from
+> > > > loadable modules.
+> > > 
+> > > OK. I will remove it in the next version by adding "maybe_unused" to this
+> > > function to avoid possible warnings.
+> > 
+> > The __maybe_unused should not be needed, as the function will still have
+> > global scope.
+> 
+> Arnd can you merge this series with manual EXPORT_SYMBOL removal? Resend?
 
-Okay, so what would be an alternative? Grant's objection makes sense and
-we could easily just wrap the call to of_iommu_attach() within a generic
-iommu_attach() that could decide at runtime which exact implementation
-to call, depending on whether the device is DT, ACPI, PCI or whatnot.
+I'm still traveling at the moment and will only be resuming my normal arm-soc
+work in January. All arm-soc patches are handled by Olof and Kevin still,
+and irqchip patches go through Thomas anyway (or can get merged through arm-soc
+with his Ack in case of dependencies).
 
-If we don't want something like that in the core either, then the only
-other alternative would be to call this from each driver. However given
-the desire to handle IOMMUs completely transparently for device drivers
-that would be missing the point.
-
-Perhaps moving this into platform_drv_probe() would be more acceptable?
-That's still somewhat core, but maybe suburban enough.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131214/e99a967b/attachment.sig>
+	Arnd
