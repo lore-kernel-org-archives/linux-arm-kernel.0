@@ -1,41 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 14 Dec 2013 15:07:31 +0900
-Subject: [GIT PULL] Renesas ARM based SoC Clocksource updates for v3.14
-Message-ID: <cover.1387000863.git.horms+renesas@verge.net.au>
+Date: Sat, 14 Dec 2013 15:07:32 +0900
+Subject: [PATCH] clocksource: sh_cmt: Add clk_prepare/unprepare support
+In-Reply-To: <cover.1387000863.git.horms+renesas@verge.net.au>
+References: <cover.1387000863.git.horms+renesas@verge.net.au>
+Message-ID: <d78e9474459768c9aaf8cfd8bc54957d44771f46.1387000863.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-please consider this Renesas ARM based SoC Clocksource update for v3.14.
+Prepare the clock at probe time, as there is no other appropriate place
+in the driver where we're allowed to sleep.
 
-I would also like to request that you make a branch available
-for me to use as a base for a branch containing SoC changes
-targeted at v3.14 that depend on this clocksource update.
-
-Thanks
-
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.14
-
-for you to fetch changes up to d78e9474459768c9aaf8cfd8bc54957d44771f46:
-
-  clocksource: sh_cmt: Add clk_prepare/unprepare support (2013-12-14 12:57:36 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC Clocksource updates for v3.14
-
-* Add clk_prepare/unprepare support to sh_cmt
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      clocksource: sh_cmt: Add clk_prepare/unprepare support
-
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
  1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index 0965e98..940341a 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -634,12 +634,18 @@ static int sh_cmt_clock_event_next(unsigned long delta,
+ 
+ static void sh_cmt_clock_event_suspend(struct clock_event_device *ced)
+ {
+-	pm_genpd_syscore_poweroff(&ced_to_sh_cmt(ced)->pdev->dev);
++	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
++
++	pm_genpd_syscore_poweroff(&p->pdev->dev);
++	clk_unprepare(p->clk);
+ }
+ 
+ static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
+ {
+-	pm_genpd_syscore_poweron(&ced_to_sh_cmt(ced)->pdev->dev);
++	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
++
++	clk_prepare(p->clk);
++	pm_genpd_syscore_poweron(&p->pdev->dev);
+ }
+ 
+ static void sh_cmt_register_clockevent(struct sh_cmt_priv *p,
+@@ -737,6 +743,10 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err2;
+ 	}
+ 
++	ret = clk_prepare(p->clk);
++	if (ret < 0)
++		goto err3;
++
+ 	if (res2 && (resource_size(res2) == 4)) {
+ 		/* assume both CMSTR and CMCSR to be 32-bit */
+ 		p->read_control = sh_cmt_read32;
+@@ -773,19 +783,21 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 			      cfg->clocksource_rating);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "registration failed\n");
+-		goto err3;
++		goto err4;
+ 	}
+ 	p->cs_enabled = false;
+ 
+ 	ret = setup_irq(irq, &p->irqaction);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+-		goto err3;
++		goto err4;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, p);
+ 
+ 	return 0;
++err4:
++	clk_unprepare(p->clk);
+ err3:
+ 	clk_put(p->clk);
+ err2:
+-- 
+1.8.4
