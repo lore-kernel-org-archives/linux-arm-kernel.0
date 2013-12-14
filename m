@@ -1,44 +1,62 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Sat, 14 Dec 2013 23:34:20 +0400
-Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
-In-Reply-To: <201312142006.26979.arnd@arndb.de>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1386901645-28895-4-git-send-email-ynvich@gmail.com>
- <201312142006.26979.arnd@arndb.de>
-Message-ID: <1387049660.7152.317.camel@host5.omatika.ru>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 14 Dec 2013 14:48:24 -0500
+Subject: [PATCH v3 08/23] mm/memblock: Add memblock memory allocation apis
+In-Reply-To: <20131214110844.GB17954@htj.dyndns.org>
+References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
+ <1386625856-12942-9-git-send-email-santosh.shilimkar@ti.com>
+ <20131213213735.GM27070@htj.dyndns.org> <52ABABDA.4020808@ti.com>
+ <20131214110844.GB17954@htj.dyndns.org>
+Message-ID: <52ACB608.3050802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-12-14 at 20:06 +0100, Arnd Bergmann wrote:
-> On Friday 13 December 2013, Sergei Ianovich wrote:
-> > Non-dts implementation supply required DMA channel numbers as
-> > IORESOURCE_DMA. However, there is was no way to get them from
-> > device tree.
+On Saturday 14 December 2013 06:08 AM, Tejun Heo wrote:
+> Hello, Santosh.
 > 
-> Please update this changeset comment, I think it still refers to
-> the earlier version.
-
----
-Non-dts implementation supply required DMA channel numbers as
-IORESOURCE_DMA. We can also get them from the device tree, if it
-is present.
----
-
-Is this fine?
-
-Should I post v3, if so? 
-
-> > Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> > CC: Daniel Mack <zonque@gmail.com>
-> > CC: Arnd Bergmann <arnd@arndb.de>
+> On Fri, Dec 13, 2013 at 07:52:42PM -0500, Santosh Shilimkar wrote:
+>>>> +static void * __init memblock_virt_alloc_internal(
+>>>> +				phys_addr_t size, phys_addr_t align,
+>>>> +				phys_addr_t min_addr, phys_addr_t max_addr,
+>>>> +				int nid)
+>>>> +{
+>>>> +	phys_addr_t alloc;
+>>>> +	void *ptr;
+>>>> +
+>>>> +	if (nid == MAX_NUMNODES)
+>>>> +		pr_warn("%s: usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE\n",
+>>>> +			__func__);
+>>>
+>>> Why not use WARN_ONCE()?  Also, shouldn't nid be set to NUMA_NO_NODE
+>>> here?
+>>>
+>> You want all the users using MAX_NUMNODES to know about it so that
+>> the wrong usage can be fixed. WARN_ONCE will hide that.
 > 
-> The patch looks ok in case we are merging your patches for 3.14
-> and Daniel's patches later than that. If they end up in the
-> same merge window however, we'd have to be care to resolve
-> the obvious conflict in a proper way.
+> Well, it doesn't really help anyone to be printing multiple messages
+> without any info on who was the caller and if this thing is gonna be
+> in mainline triggering of the warning should be rare anyway.  It's
+> more of a tool to gather one-off cases in the wild.  WARN_ONCE()
+> usually is the better choice as otherwise the warnings can swamp the
+> machine and console output in certain cases.
+>
+Fair enough.
+ 
+>>> ...
+>>>> +	if (nid != NUMA_NO_NODE) {
+>>>
+>>> Otherwise, the above test is broken.
+>>>
+>> So the idea was just to warn the users and allow them to fix
+>> the code. Well we are just allowing the existing users of using
+>> either MAX_NUMNODES or NUMA_NO_NODE continue to work. Thats what
+>> we discussed, right ?
+> 
+> Huh?  Yeah, sure.  You're testing @nid against MAX_NUMNODES at the
+> beginning of the function.  If it's MAX_NUMNODES, you print a warning
+> but nothing else, so the if() conditional above, which should succeed,
+> would fail.  Am I missing sth here?
+> 
+I get it now. Sorry I missed your point in first part. We will fix this.
 
-The most recently published Daniel's patch (Aug 2013) wraps
-IORESOURCE_DMA handling on DT presence in a similar way, but doesn't do
-any actual DT processing. So there is no conflict at the moment. Daniel
-can comment better on this, though.
+Regards,
+Santosh
