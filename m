@@ -1,126 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 14 Dec 2013 12:50:58 +0900
-Subject: [PATCH v4 0/5] Renesas R-Car Gen2 Common Clock Framework arch/
- support
-In-Reply-To: <1565505.MyhvH9DDk2@avalon>
-References: <1386770716-21610-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131214021113.GA22927@verge.net.au>
- <20131214021900.GB22927@verge.net.au> <1565505.MyhvH9DDk2@avalon>
-Message-ID: <20131214035054.GA24421@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 Dec 2013 05:01:05 +0100
+Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
+In-Reply-To: <20131213190707.GA9713@roeck-us.net>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>
+ <20131213190707.GA9713@roeck-us.net>
+Message-ID: <201312140501.05749.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 03:27:23AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
+On Friday 13 December 2013, Guenter Roeck wrote:
+> On Fri, Dec 13, 2013 at 06:23:44PM +0100, Jonas Jensen wrote:
+> > On 13 December 2013 17:17, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > I've been out of the loop a bit here. I initially suggested having the restart
+> > > handler be part of the watchdog driver, and I thought you had done that in an
+> > > earlier version. What has changed your mind?
+> > 
+> > I got the impression from Guenter Roeck's review, that it doesn't belong there,
+> > maybe I was too quick to remove it?
+> > 
+> You'd have to answer the questions I raised in my review if you want it in
+> there.
 > 
-> On Saturday 14 December 2013 11:19:01 Simon Horman wrote:
-> > On Sat, Dec 14, 2013 at 11:11:14AM +0900, Simon Horman wrote:
-> > > On Sat, Dec 14, 2013 at 02:41:44AM +0100, Laurent Pinchart wrote:
-> > > > On Saturday 14 December 2013 10:26:24 Simon Horman wrote:
-> > > > > [ CC Magnus ]
-> > > > > 
-> > > > > On Wed, Dec 11, 2013 at 03:05:11PM +0100, Laurent Pinchart wrote:
-> > > > > > Hello,
-> > > > > > 
-> > > > > > This is a repost of the arch patches from the "[PATCH v3 0/8]
-> > > > > > Renesas R-Car Gen2 Common Clock Framework support" patch series. The
-> > > > > > first three patches in that series have been reposted separately in
-> > > > > > the "[PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework
-> > > > > > drivers" series to get merged through Mike Turquette's tree, while
-> > > > > > this series will go through the ARM SoC tree.
-> > > > > > 
-> > > > > > I've asked Mike to provide a stable branch when merging the CCF
-> > > > > > driver patches.
-> > > > > > 
-> > > > > > Laurent Pinchart (5):
-> > > > > >   ARM: shmobile: r8a7790: Add clock index macros for DT sources
-> > > > > >   ARM: shmobile: r8a7791: Add clock index macros for DT sources
-> > > > > >   ARM: shmobile: r8a7790: Add clocks
-> > > > > >   ARM: shmobile: r8a7790: Reference clocks
-> > > > > >   ARM: shmobile: r8a7791: Add clocks
-> > > > > >  
-> > > > > >  arch/arm/boot/dts/r8a7790.dtsi            | 328 +++++++++++++++++++
-> > > > > >  arch/arm/boot/dts/r8a7791.dtsi            | 313 +++++++++++++++++++
-> > > > > >  include/dt-bindings/clock/r8a7790-clock.h | 100 +++++++++
-> > > > > >  include/dt-bindings/clock/r8a7791-clock.h | 105 ++++++++++
-> > > > > >  4 files changed, 846 insertions(+)
-> > > > > >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-> > > > > >  create mode 100644 include/dt-bindings/clock/r8a7791-clock.h
-> > > > > 
-> > > > > Hi Laurent,
-> > > > > 
-> > > > > I would like to confirm the dependencies of this series with you.
-> > > > > As I understand things the dependencies that were not present
-> > > > > in renesas-devel-v3.13-rc2-20131211 are as follows.
-> > > > > 
-> > > > > If any of the patches below can be skipped without breaking this
-> > > > > series or the followup series "[PATCH v4 00/16] Lager and Koelsch
-> > > > > multiplatform support" then I am all for not treating them as
-> > > > > dependencies at all.
-> > > > > 
-> > > > > 
-> > > > > * [PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework drivers
-> > > > >   Status: Waiting for response from Mike Turquette
-> > > > 
-> > > > The dependency is correct, but the status has changed. Mike has merged
-> > > > the patches in his tree in the clk-next-shmobile branch
-> > > > (https://git.linaro.org/people/mike.turquette/linux.git/shortlog/refs/he
-> > > > ads/clk-next-shmobile).
-> > >
-> > > Great!
-> > > 
-> > > > > * mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
-> > > > >   Status: Merged by Chris Ball. I believe we need a stable branch from
-> > > > >   him.
-> > > > 
-> > > > You can drop this dependency as the koelsch reference boards lack SDHI
-> > > > support and the lager reference board has the SDHI devices disabled.
-> > > 
-> > > Thanks, got it.
-> > > 
-> > > > > * spi: sh-msiof: Convert to clk_prepare/unprepare
-> > > > >   spi: sh-msiof: Use devm_* managed allocators
-> > > > >   Status: Merged by Mark Brown. I believe we need a stable branch from
-> > > > >   him.
-> > > > 
-> > > > You can drop this dependency as the lager and koelsch reference boards
-> > > > lack SPI support.
-> > > > 
-> > > > > * usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
-> > > > >   Status: In Felipe Balbi's next branch. It is stable, right?
-> > > > 
-> > > > Correct, but you can drop this dependency as the lager and koelsch
-> > > > reference boards lack USB support.
-> > > 
-> > > Understood.
-> > > 
-> > > > > * clocksource: sh_tmu: Add clk_prepare/unprepare support
-> > > > >   clocksource: sh_tmu: Release clock when sh_tmu_register() fails
-> > > > >   clocksource: sh_mtu2: Add clk_prepare/unprepare support
-> > > > >   clocksource: sh_mtu2: Release clock when sh_mtu2_register() fails
-> > > > >   Status: Present in v3.13-rc3. No problem!
-> > > > > 
-> > > > > * clocksource: sh_cmt: Add clk_prepare/unprepare support
-> > > > >   Status: I think I have dropped the ball here.
-> > > > >           Regardless, I think it it needs to be accepted by Daniel
-> > > > >           Lezcano
-> > > > 
-> > > > That's the only missing one. Do you plan to handle this with Daniel ?
-> > > 
-> > > Yes, I will ask him to pick it up ASAP. Sorry for the mess there.
-> > 
-> > Hi,
-> > 
-> > I think I may have found the reason that I dropped the ball,
-> > which is that I was waiting for v2 of the patch but never saw it.
-> > 
-> > In order to stop me making a further mess of this would
-> > you be able to re-post it to Daniel directly?
-> 
-> When I mentioned v2 for the clocksource patches ("Re: [PATCH 01/12] 
-> clocksource: sh_cmt: Add clk_prepare/unprepare support", Date: 30/10/2013 
-> 01:13) I meant v2 of the whole series. The sh_tmu and sh_mtu2 patches required 
-> a v2, but the sh_tmu patch didn't. v1 is thus the correct one. Do I need to 
-> resend it, or can you take it from the list ?
 
-I can take it.
+Let me reply to your comment from that email:
+
+> > +
+> > +	arm_pm_restart = moxart_wdt_restart;
+>
+> It is quite unusual that system restart code is implemented in a watchdog
+> driver (which may not even be compiled into an image, or not be loaded).
+
+I had asked Jonas to do it in the watchdog driver because that driver is
+the place that handles this particular register. We have moved a bunch
+of restart handlers into drivers/power for similar reasons, and those
+can also be compiled out. The restart handler isn't actually essential
+for most operations, and we have moved some far more important drivers
+from arch/arm into drivers/, such as clocks, interrupts, timers etc.
+
+The restart handler in this case is the only piece of code that remains in
+mach-moxart, and I would really like it to be completely empty.
+
+	Arnd
