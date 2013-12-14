@@ -1,34 +1,35 @@
-From: kasimling@gmail.com (Alex Ling)
-Date: Sat, 14 Dec 2013 13:21:30 +0800
-Subject: [PATCH v2 1/1] ARM: dts: Add missing clocks for exynos4412 dwmmc node
-Message-ID: <1386998490-19456-1-git-send-email-kasimling@gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 14 Dec 2013 09:27:15 +0400
+Subject: [PATCH 1/3] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <201312071714.25454.arnd@arndb.de>
+References: <1386008042-6826-1-git-send-email-shc_work@mail.ru>
+ <201312071530.07901.arnd@arndb.de>
+ <1386427222.453069261@f379.i.mail.ru>
+ <201312071714.25454.arnd@arndb.de>
+Message-ID: <20131214092715.6735074a15ce6128d128875f@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds "biu" and "ciu" clocks for exynos4412 dwmmc
-node. Without this patch, dwmmc host driver will skip enabling the
-two clocks and it will break dwmmc host function on exynos4412.
-Tested on FriendlyARM TINY4412 board.
+On Sat, 7 Dec 2013 17:14:25 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Alex Ling <kasimling@gmail.com>
----
-Changes for v2:
-   - Fix patch description as Mark Rutland suggested
+> On Saturday 07 December 2013, Alexander Shiyan wrote:
+> > > > +void __init clps711x_intc_init(phys_addr_t base, resource_size_t size)
+> > > > +{
+> > > > +   BUG_ON(_clps711x_intc_init(NULL, base, size));
+> > > > +}
+> > > > +EXPORT_SYMBOL(clps711x_intc_init);
+> > > 
+> > > No need to export this symbol, because you don't call the function from
+> > > loadable modules.
+> > 
+> > OK. I will remove it in the next version by adding "maybe_unused" to this
+> > function to avoid possible warnings.
+> 
+> The __maybe_unused should not be needed, as the function will still have
+> global scope.
 
- arch/arm/boot/dts/exynos4412.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+Arnd can you merge this series with manual EXPORT_SYMBOL removal? Resend?
 
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index e743e67..67bef99 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -67,5 +67,7 @@
- 		interrupts = <0 77 0>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&clock 301>, <&clock 149>;
-+		clock-names = "biu", "ciu";
- 	};
- };
 -- 
-1.7.9.5
+Alexander Shiyan <shc_work@mail.ru>
