@@ -1,43 +1,44 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 14 Dec 2013 07:50:25 -0800
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Sat, 14 Dec 2013 17:26:25 +0100
 Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
-In-Reply-To: <CACmBeS2_WZj6_HJo0N50TBwneNVmeB9TyXbHRLm9CJFGNN+HtQ@mail.gmail.com>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>	<1386945188-8316-2-git-send-email-jonas.jensen@gmail.com>	<201312131717.25435.arnd@arndb.de>	<CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>	<20131213190707.GA9713@roeck-us.net>
+In-Reply-To: <52AC7E41.7050201@roeck-us.net>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <1386945188-8316-2-git-send-email-jonas.jensen@gmail.com>
+ <201312131717.25435.arnd@arndb.de>
+ <CACmBeS0Uz+Z=MsqvXburO1swCdyGvEXHhfs8M7ZnMMKBNJjG1A@mail.gmail.com>
+ <20131213190707.GA9713@roeck-us.net>
  <CACmBeS2_WZj6_HJo0N50TBwneNVmeB9TyXbHRLm9CJFGNN+HtQ@mail.gmail.com>
-Message-ID: <52AC7E41.7050201@roeck-us.net>
+ <52AC7E41.7050201@roeck-us.net>
+Message-ID: <CACmBeS3Xse5KkFqkM5Ye+qaaxpVCjyeGz7Oc9sr0PN+pZ9sztQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2013 12:32 AM, Jonas Jensen wrote:
-> On 13 December 2013 20:07, Guenter Roeck <linux@roeck-us.net> wrote:
->>> I got the impression from Guenter Roeck's review, that it doesn't belong there,
->>> maybe I was too quick to remove it?
->>>
->> You'd have to answer the questions I raised in my review if you want it in
->> there.
+On 14 December 2013 16:50, Guenter Roeck <linux@roeck-us.net> wrote:
+> The above would at least avoid the crash, though I would not understand
+> the point of having an unloadable restart handler. Forcing the watchdog
+> driver into the kernel just because you want the restart handler in it
+> would seem odd. And if the restart handler is optional, why have it
+> in the first place ? I also don't follow Arnd's logic of wanting to have
+> the code in the watchdog driver just because it happens to use a register
+> that it needs.
 >
-> I didn't see a solution at the time. Now I'm thinking arm_pm_restart
-> can be set later in probe, preventing a crash on load failure, and
-> maybe it can be unset on unload.
+> Conceptually it might be cleaner to write a separate driver, for example
+> in drivers/power/restart, than plugging the functionality into
+> the watchdog driver, at least if you don't want it in architecture
+> or platform code. The xgene restart driver is a good example.
 >
-> Would you accept a patch for this?
->
+> Anyway, it is not up to me to accept the code, that is up to Wim.
+> My rejection was primarily due to technical flaws, which can be addressed.
+> For the logical reasoning you'll have to convince Wim.
 
-The above would at least avoid the crash, though I would not understand
-the point of having an unloadable restart handler. Forcing the watchdog
-driver into the kernel just because you want the restart handler in it
-would seem odd. And if the restart handler is optional, why have it
-in the first place ? I also don't follow Arnd's logic of wanting to have
-the code in the watchdog driver just because it happens to use a register
-that it needs.
+Thanks for the replies.
 
-Conceptually it might be cleaner to write a separate driver, for example
-in drivers/power/restart, than plugging the functionality into
-the watchdog driver, at least if you don't want it in architecture
-or platform code. The xgene restart driver is a good example.
+Moving it to a new power/restart driver seems reasonable to me, I'm
+really just looking for a home for it, I would have preferred a
+hardware with reset in a separate register though.
 
-Anyway, it is not up to me to accept the code, that is up to Wim.
-My rejection was primarily due to technical flaws, which can be addressed.
-For the logical reasoning you'll have to convince Wim.
+I now plan to remove it for v5 and submit a separate driver.
 
-Guenter
+
+Regards,
+Jonas
