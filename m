@@ -1,111 +1,135 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 14 Dec 2013 11:11:14 +0900
-Subject: [PATCH v4 0/5] Renesas R-Car Gen2 Common Clock Framework arch/
- support
-In-Reply-To: <3998896.4EUoySjjs7@avalon>
-References: <1386770716-21610-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131214012624.GF12584@verge.net.au> <3998896.4EUoySjjs7@avalon>
-Message-ID: <20131214021113.GA22927@verge.net.au>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Sat, 14 Dec 2013 10:12:52 +0800
+Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
+In-Reply-To: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1386987174-1788-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 02:41:44AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Saturday 14 December 2013 10:26:24 Simon Horman wrote:
-> > [ CC Magnus ]
-> > 
-> > On Wed, Dec 11, 2013 at 03:05:11PM +0100, Laurent Pinchart wrote:
-> > > Hello,
-> > > 
-> > > This is a repost of the arch patches from the "[PATCH v3 0/8] Renesas
-> > > R-Car Gen2 Common Clock Framework support" patch series. The first three
-> > > patches in that series have been reposted separately in the "[PATCH v4
-> > > 0/3] Renesas R-Car Gen2 Common Clock Framework drivers" series to get
-> > > merged through Mike Turquette's tree, while this series will go through
-> > > the ARM SoC tree.
-> > > 
-> > > I've asked Mike to provide a stable branch when merging the CCF driver
-> > > patches.
-> > > 
-> > > Laurent Pinchart (5):
-> > >   ARM: shmobile: r8a7790: Add clock index macros for DT sources
-> > >   ARM: shmobile: r8a7791: Add clock index macros for DT sources
-> > >   ARM: shmobile: r8a7790: Add clocks
-> > >   ARM: shmobile: r8a7790: Reference clocks
-> > >   ARM: shmobile: r8a7791: Add clocks
-> > >  
-> > >  arch/arm/boot/dts/r8a7790.dtsi            | 328 +++++++++++++++++++++++++
-> > >  arch/arm/boot/dts/r8a7791.dtsi            | 313 +++++++++++++++++++++++++
-> > >  include/dt-bindings/clock/r8a7790-clock.h | 100 +++++++++
-> > >  include/dt-bindings/clock/r8a7791-clock.h | 105 ++++++++++
-> > >  4 files changed, 846 insertions(+)
-> > >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-> > >  create mode 100644 include/dt-bindings/clock/r8a7791-clock.h
-> > 
-> > Hi Laurent,
-> > 
-> > I would like to confirm the dependencies of this series with you.
-> > As I understand things the dependencies that were not present
-> > in renesas-devel-v3.13-rc2-20131211 are as follows.
-> > 
-> > If any of the patches below can be skipped without breaking this series
-> > or the followup series "[PATCH v4 00/16] Lager and Koelsch multiplatform
-> > support" then I am all for not treating them as dependencies at all.
-> > 
-> > 
-> > * [PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework drivers
-> >   Status: Waiting for response from Mike Turquette
-> 
-> The dependency is correct, but the status has changed. Mike has merged the 
-> patches in his tree in the clk-next-shmobile branch 
-> (https://git.linaro.org/people/mike.turquette/linux.git/shortlog/refs/heads/clk-next-shmobile).
+Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
+Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
+mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
 
-Great!
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+---
+ drivers/mmc/host/dw_mmc.c |   48 +++++++++++++++++++++++++++++++++------------
+ 1 file changed, 35 insertions(+), 13 deletions(-)
 
-> > * mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
-> >   Status: Merged by Chris Ball. I believe we need a stable branch from him.
-> 
-> You can drop this dependency as the koelsch reference boards lack SDHI
-> support and the lager reference board has the SDHI devices disabled.
-
-Thanks, got it.
-
-> > * spi: sh-msiof: Convert to clk_prepare/unprepare
-> >   spi: sh-msiof: Use devm_* managed allocators
-> >   Status: Merged by Mark Brown. I believe we need a stable branch from him.
-> 
-> You can drop this dependency as the lager and koelsch reference boards lack 
-> SPI support.
-> 
-> > * usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
-> >   Status: In Felipe Balbi's next branch. It is stable, right?
-> 
-> Correct, but you can drop this dependency as the lager and koelsch reference 
-> boards lack USB support.
-
-Understood.
-
-> > * clocksource: sh_tmu: Add clk_prepare/unprepare support
-> >   clocksource: sh_tmu: Release clock when sh_tmu_register() fails
-> >   clocksource: sh_mtu2: Add clk_prepare/unprepare support
-> >   clocksource: sh_mtu2: Release clock when sh_mtu2_register() fails
-> >   Status: Present in v3.13-rc3. No problem!
-> > 
-> > * clocksource: sh_cmt: Add clk_prepare/unprepare support
-> >   Status: I think I have dropped the ball here.
-> >           Regardless, I think it it needs to be accepted by Daniel Lezcano
-> 
-> That's the only missing one. Do you plan to handle this with Daniel ?
-
-Yes, I will ask him to pick it up ASAP. Sorry for the mess there.
-
-> > * serial: sh-sci: Convert to clk_prepare/unprepare
-> >   serial: sh-sci: Don't enable/disable port from within break timer
-> >   Status: I have queued these up
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 4bce0deec362..a776f24f4311 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -36,6 +36,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
++#include <linux/mmc/slot-gpio.h>
+ 
+ #include "dw_mmc.h"
+ 
+@@ -1032,20 +1033,26 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	int present;
+ 	struct dw_mci_slot *slot = mmc_priv(mmc);
+ 	struct dw_mci_board *brd = slot->host->pdata;
++	int gpio_cd = !mmc_gpio_get_cd(mmc);
+ 
+ 	/* Use platform get_cd function, else try onboard card detect */
+ 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+ 		present = 1;
+ 	else if (brd->get_cd)
+ 		present = !brd->get_cd(slot->id);
++	else if (!IS_ERR_VALUE(gpio_cd))
++		present = !!gpio_cd;
+ 	else
+ 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
+ 			== 0 ? 1 : 0;
+ 
+-	if (present)
++	if (present) {
++		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is present\n");
+-	else
++	} else {
++		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is not present\n");
++	}
+ 
+ 	return present;
+ }
+@@ -1926,10 +1933,6 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+ 			/* Card change detected */
+ 			slot->last_detect_state = present;
+ 
+-			/* Mark card as present if applicable */
+-			if (present != 0)
+-				set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+-
+ 			/* Clean up queue if present */
+ 			mrq = slot->mrq;
+ 			if (mrq) {
+@@ -1977,8 +1980,6 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+ 
+ 			/* Power down slot */
+ 			if (present == 0) {
+-				clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+-
+ 				/* Clear down the FIFO */
+ 				dw_mci_fifo_reset(host);
+ #ifdef CONFIG_MMC_DW_IDMAC
+@@ -2079,6 +2080,26 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+ 
+ 	return gpio;
+ }
++
++/* find the cd gpio for a given slot; or -1 if none specified */
++static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
++					struct mmc_host *mmc)
++{
++	struct device_node *np = dw_mci_of_find_slot_node(dev, slot);
++	int gpio;
++
++	if (!np)
++		return;
++
++	gpio = of_get_named_gpio(np, "cd-gpios", 0);
++
++	/* Having a missing entry is valid; return silently */
++	if (!gpio_is_valid(gpio))
++		return;
++
++	if (mmc_gpio_request_cd(mmc, gpio, 0))
++		dev_warn(dev, "gpio [%d] request failed\n", gpio);
++}
+ #else /* CONFIG_OF */
+ static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
+ {
+@@ -2096,6 +2117,11 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+ {
+ 	return -EINVAL;
+ }
++static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
++					struct mmc_host *mmc)
++{
++	return;
++}
+ #endif /* CONFIG_OF */
+ 
+ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+@@ -2197,12 +2223,8 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ #endif /* CONFIG_MMC_DW_IDMAC */
+ 	}
+ 
+-	if (dw_mci_get_cd(mmc))
+-		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+-	else
+-		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+-
+ 	slot->wp_gpio = dw_mci_of_get_wp_gpio(host->dev, slot->id);
++	dw_mci_of_get_cd_gpio(host->dev, slot->id, mmc);
+ 
+ 	ret = mmc_add_host(mmc);
+ 	if (ret)
+-- 
+1.7.9.5
