@@ -1,18 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 14 Dec 2013 22:15:43 +0800
-Subject: [PATCH 0/2] Add missing audio-related clocks to imx6 clock tree
-In-Reply-To: <cover.1386949189.git.Guangyu.Chen@freescale.com>
-References: <cover.1386949189.git.Guangyu.Chen@freescale.com>
-Message-ID: <20131214141541.GG16177@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 14 Dec 2013 15:16:29 +0100
+Subject: [PATCH V1 05/11] ARM: dts: imx6qdl-sabrelite: specify pad settings
+In-Reply-To: <20131214132905.GB16177@S2101-09.ap.freescale.net>
+References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
+ <201312132250.29518.marex@denx.de>
+ <20131214132905.GB16177@S2101-09.ap.freescale.net>
+Message-ID: <201312141516.29435.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 11:44:06PM +0800, Nicolin Chen wrote:
-> This series of patches appends some essential clocks of audio IP to the
-> current i.MX6 Series clock trees. 
+On Saturday, December 14, 2013 at 02:29:07 PM, Shawn Guo wrote:
+> On Fri, Dec 13, 2013 at 10:50:29PM +0100, Marek Vasut wrote:
+> > On Friday, December 13, 2013 at 07:42:25 PM, Troy Kisky wrote:
+> > > On 12/13/2013 4:48 AM, Marek Vasut wrote:
+> > > > On Friday, December 13, 2013 at 02:49:09 AM, Troy Kisky wrote:
+> > > >> Don't use 0x80000000 to get default pad settings.
+> > > > 
+> > > > What is the rationale behind this change please? Can you explain more
+> > > > in detail?
+> > > 
+> > > No real need, but I thought relying on what the boot loader did or did
+> > > not do
+> > > was discouraged?
+> > 
+> > Full ACK on this, we do not rely on bootloader configuration (though
+> > these two should be in-line).
+> > 
+> > > What is the value in not explicitly setting the pad registers?
+> > 
+> > My question was in the direction of "why do you need to change the pin
+> > configuration values from the current ones?". This is what I want to
+> > understand.
+> > 
+> > > Btw, I need to rebase series on your patch anyway so omitting this
+> > > patch would be easy.
+> > 
+> > I am not saying to omit it, please do not misunderstand me. I am just
+> > wondering why the change from 0x80000000 to 0x1b0b0 .
 > 
-> Nicolin Chen (2):
->   ARM: imx6sl: Add missing pll4_audio_div to the clock tree
->   ARM: imx6sl: Add missing spba clock to clock tree
+> Per Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt,
+> 
+>  Bits used for CONFIG:
+>  NO_PAD_CTL(1 << 31): indicate this pin does not need config.
+> 
+> 0x80000000 tells pinctrl driver to not touch pad config register at all.
+> In that case, the configuration of the pad will be what boot loader
+> configures or just the reset value.
+> 
+> Explicitly putting a proper pad config value instead of 0x80000000
+> should be something we encourage.
 
-Applied both, thanks.
+Gotcha, thanks!
+
+Best regards,
+Marek Vasut
