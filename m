@@ -1,7 +1,7 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 16 Dec 2013 05:21:21 +0900
-Subject: [GIT PULL 1/7] Samsung fixes for v3.14
-Message-ID: <52AE0F41.7050706@samsung.com>
+Date: Mon, 16 Dec 2013 05:21:34 +0900
+Subject: [GIT PULL 2/7] Samsung cleanup for v3.14
+Message-ID: <52AE0F4E.5070309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,38 +12,36 @@ The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-fixes
+tags/samsung-cleanup
 
-for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
+for you to fetch changes up to 7c394e7be4d267c02eaaac8fa197a7c1b023c99b:
 
-   ARM: dts: Update display clock frequency for Origen-4412 (2013-12-16 
-04:41:57 +0900)
-
-----------------------------------------------------------------
-Samsung non-critical fixes for v3.14
-- Switch FIFO mode for arch_enable_uart_fifo()
-- Add missing op_mode for PMIC on exynos5250-arndale
-- Add missing clock-frequency for CPU on exynos5250
-- Fix typo samaung to samsung for exynos5420-pinctrl
-- Fix display clock-frequency for exynos4210/exynos4412-origen
+   ARM: EXYNOS: Constify clksrc immutable register restore tables 
+(2013-12-12 07:09:33 +0900)
 
 ----------------------------------------------------------------
-Alexander Shiyan (1):
-       ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
+Samsung cleanup for v3.14
+- remove unused SAMSUNG_GPIOLIB_4BIT and IRQF_DISABLED
+- constify immutable PMU data table and PM clksrc register
+- make const struct for sleep_save
 
-Sachin Kamat (4):
-       ARM: dts: Add missing op_mode property to PMIC on Arndale
-       ARM: dts: Add missing frequency property to exynos5250
-       ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
-       ARM: dts: Update display clock frequency for Origen-4412
+----------------------------------------------------------------
+Daniel Kurtz (3):
+       ARM: EXYNOS: Constify data tables for pmu
+       ARM: SAMSUNG: Let s3c_pm_do_restore_*() take const sleep_save
+       ARM: EXYNOS: Constify clksrc immutable register restore tables
 
-Tushar Behera (1):
-       ARM: dts: Update display clock frequency for Origen-4210
+Michael Opdenacker (2):
+       ARM: SAMSUNG: remove unused SAMSUNG_GPIOLIB_4BIT Kconfig parameter
+       ARM: SAMSUNG: remove IRQF_DISABLED
 
-  arch/arm/boot/dts/exynos4210-origen.dts         | 2 +-
-  arch/arm/boot/dts/exynos4412-origen.dts         | 2 +-
-  arch/arm/boot/dts/exynos5250-arndale.dts        | 2 ++
-  arch/arm/boot/dts/exynos5250.dtsi               | 2 ++
-  arch/arm/boot/dts/exynos5420-pinctrl.dtsi       | 2 +-
-  arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
-  6 files changed, 9 insertions(+), 3 deletions(-)
+  arch/arm/Kconfig                        |  1 -
+  arch/arm/mach-exynos/pm.c               |  4 ++--
+  arch/arm/mach-exynos/pmu.c              | 14 +++++++-------
+  arch/arm/mach-s3c24xx/dma.c             |  2 +-
+  arch/arm/mach-s3c24xx/simtec-usb.c      |  3 +--
+  arch/arm/mach-s3c64xx/mach-smartq.c     |  2 +-
+  arch/arm/plat-samsung/Kconfig           |  8 --------
+  arch/arm/plat-samsung/include/plat/pm.h |  4 ++--
+  arch/arm/plat-samsung/pm.c              |  4 ++--
+  9 files changed, 16 insertions(+), 26 deletions(-)
