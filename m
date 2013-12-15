@@ -1,50 +1,107 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 15 Dec 2013 02:36:57 -0800
-Subject: [PATCH 10/10] Kconfig: cleanup SERIO_I8042 dependencies
-In-Reply-To: <52ACA43F.2040402@zytor.com>
-References: <1387040376-26906-1-git-send-email-msalter@redhat.com>
- <1387040376-26906-11-git-send-email-msalter@redhat.com>
- <52ACA43F.2040402@zytor.com>
-Message-ID: <20131215103657.GB20197@core.coreip.homeip.net>
+Date: Sun, 15 Dec 2013 02:42:42 -0800
+Subject: [PATCH 5/7] genirq: Add devm_request_any_context_irq()
+In-Reply-To: <1386718996-3733-6-git-send-email-sboyd@codeaurora.org>
+References: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
+ <1386718996-3733-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131215104242.GD20197@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 10:32:31AM -0800, H. Peter Anvin wrote:
-> On 12/14/2013 08:59 AM, Mark Salter wrote:
-> > Remove messy dependencies from SERIO_I8042 by having it depend on one
-> > Kconfig symbol (ARCH_MIGHT_HAVE_PC_SERIO) and having architectures
-> > which need it select ARCH_MIGHT_HAVE_PC_SERIO in arch/*/Kconfig.
-> > New architectures are unlikely to need SERIO_I8042, so this avoids
-> > having an ever growing list of architectures to exclude.
-> > 
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > CC: Richard Henderson <rth@twiddle.net>
-> > CC: linux-alpha at vger.kernel.org
-> > CC: Russell King <linux@arm.linux.org.uk>
-> > CC: linux-arm-kernel at lists.infradead.org
-> > CC: Tony Luck <tony.luck@intel.com>
-> > CC: Fenghua Yu <fenghua.yu@intel.com>
-> > CC: linux-ia64 at vger.kernel.org
-> > CC: Ralf Baechle <ralf@linux-mips.org>
-> > CC: linux-mips at linux-mips.org
-> > CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > CC: Paul Mackerras <paulus@samba.org>
-> > CC: linuxppc-dev at lists.ozlabs.org
-> > CC: Paul Mundt <lethal@linux-sh.org>
-> > CC: linux-sh at vger.kernel.org
-> > CC: "David S. Miller" <davem@davemloft.net>
-> > CC: sparclinux at vger.kernel.org
-> > CC: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> > CC: Ingo Molnar <mingo@redhat.com>
-> > CC: Thomas Gleixner <tglx@linutronix.de>
-> > CC: "H. Peter Anvin" <hpa@zytor.com>
-> > CC: x86 at kernel.org
+On Tue, Dec 10, 2013 at 03:43:14PM -0800, Stephen Boyd wrote:
+> Some drivers use request_any_context_irq() but there isn't a
+> devm_* function for it. Add one so that these drivers don't need
+> to explicitly free the irq on driver detach.
 > 
-> Acked-by: H. Peter Anvin <hpa@linux.intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
 
-How are we going to merge this? In bulk through input tree or peacemeal
-through all arches first?
+Thomas, would it be OK with me picking this patch through my tree if you
+do not have issues with it?
+
+Thanks.
+
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  include/linux/interrupt.h |  5 +++++
+>  kernel/irq/devres.c       | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+> 
+> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+> index c9e831d..8334f9b 100644
+> --- a/include/linux/interrupt.h
+> +++ b/include/linux/interrupt.h
+> @@ -160,6 +160,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
+>  					 devname, dev_id);
+>  }
+>  
+> +extern int __must_check
+> +devm_request_any_context_irq(struct device *dev, unsigned int irq,
+> +		 irq_handler_t handler, unsigned long irqflags,
+> +		 const char *devname, void *dev_id);
+> +
+>  extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+>  
+>  /*
+> diff --git a/kernel/irq/devres.c b/kernel/irq/devres.c
+> index bd8e788..f71e9ff 100644
+> --- a/kernel/irq/devres.c
+> +++ b/kernel/irq/devres.c
+> @@ -73,6 +73,51 @@ int devm_request_threaded_irq(struct device *dev, unsigned int irq,
+>  EXPORT_SYMBOL(devm_request_threaded_irq);
+>  
+>  /**
+> + *	devm_request_any_context_irq - allocate an interrupt line for a managed device
+> + *	@dev: device to request interrupt for
+> + *	@irq: Interrupt line to allocate
+> + *	@handler: Function to be called when the IRQ occurs
+> + *	@thread_fn: function to be called in a threaded interrupt context. NULL
+> + *		    for devices which handle everything in @handler
+> + *	@irqflags: Interrupt type flags
+> + *	@devname: An ascii name for the claiming device
+> + *	@dev_id: A cookie passed back to the handler function
+> + *
+> + *	Except for the extra @dev argument, this function takes the
+> + *	same arguments and performs the same function as
+> + *	request_any_context_irq().  IRQs requested with this function will be
+> + *	automatically freed on driver detach.
+> + *
+> + *	If an IRQ allocated with this function needs to be freed
+> + *	separately, devm_free_irq() must be used.
+> + */
+> +int devm_request_any_context_irq(struct device *dev, unsigned int irq,
+> +			      irq_handler_t handler, unsigned long irqflags,
+> +			      const char *devname, void *dev_id)
+> +{
+> +	struct irq_devres *dr;
+> +	int rc;
+> +
+> +	dr = devres_alloc(devm_irq_release, sizeof(struct irq_devres),
+> +			  GFP_KERNEL);
+> +	if (!dr)
+> +		return -ENOMEM;
+> +
+> +	rc = request_any_context_irq(irq, handler, irqflags, devname, dev_id);
+> +	if (rc) {
+> +		devres_free(dr);
+> +		return rc;
+> +	}
+> +
+> +	dr->irq = irq;
+> +	dr->dev_id = dev_id;
+> +	devres_add(dev, dr);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(devm_request_any_context_irq);
+> +
+> +/**
+>   *	devm_free_irq - free an interrupt
+>   *	@dev: device to free interrupt for
+>   *	@irq: Interrupt line to free
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
 
 -- 
 Dmitry
