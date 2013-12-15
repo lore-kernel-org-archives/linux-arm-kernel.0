@@ -1,50 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 Dec 2013 01:21:24 +0100
-Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
-In-Reply-To: <52ACBC18.6020301@roeck-us.net>
-References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
- <201312141950.09447.arnd@arndb.de> <52ACBC18.6020301@roeck-us.net>
-Message-ID: <201312150121.24414.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 14 Dec 2013 16:51:07 -0800
+Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
+In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20131215005107.26321.50455@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 December 2013, Guenter Roeck wrote:
-> Hmm ... not sure I agree. I don't see a problem with something like "arm,moxart-reboot".
-> There are already vexpress-reboot and xgene-reboot properties which do pretty much
-> the same.
+Quoting Tero Kristo (2013-11-26 00:05:41)
+> Hi,
 > 
-> Actually, you don't even need that; the reset driver could simply re-use the
-> "moxa,moxart-watchdog" property. After all, all that specifies is that there
-> is a compatible driver. Look for "samsung,s3c2410-wdt" for an example of another
-> reset handler doing just that.
+> Changes compared to v9:
+> - rebased on top of 3.13-rc1
+> - modified the low level clk register API to provide SoC specific clk_readl
+>   and clk_writel support which can be registered during boot, TI SoC variant
+>   uses regmap on low level
+> - dropped regmap parameter from clock init calls, instead a helper is used
+>   for getting regmap index along with the register offset from DT
+> - dropped regmap parameter from clock structs, instead platform specific
+>   clk_readl / clk_writel are used to parse reg parameter according to
+>   platform, for TI SoC:s, this is encoded as:
+>   struct clk_omap_reg {
+>     u16 offset; /* register offset */
+>     u16 index; /* regmap index */
+>   }
+> - Nishanth's comments to v9 mostly addressed, except for the CLK_OF_DECLARE
+>   tweak which I would actually want some feedback upon, basically the problem
+>   is I need to return status from the clk init functions so I can see if
+>   -EAGAIN is passed, in which case init will be retried later, maybe some of
+>   this can be made generic, like converting all the CLK_OF_DECLARE type
+>   functions to return status
 > 
-> Attaching it to the watchdog device seems to be more problematic given the
-> (currently) optional nature of the watchdog driver and its different scope.
+> Testing done:
+> - omap3-beagle : boot + suspend/resume
+> - omap3-beagle-xm : boot (thanks to Nishanth)
+> - omap4-panda-es : boot + suspend/resume
 
-As far as I'm concerned a watchdog driver is just as optional as a reboot
-driver. The vexpress and xgene reset drivers are different because those
-are actually dedicated devices that are there only to do rebooting.
+A quick note in testing: trace_clk_div_ck ends up as an orphan clock on
+my Panda ES.
 
-The "samsung,s3c2410-wdt" device is exactly the same category as the moxart
-one, but the code to use it performs the same hack by scanning the
-device tree ad hoc from the platform initialization. I think it should
-be integrated into watchdog the same way, and if we have more drivers
-in that category, we'd probably want a generic watchdog reboot callback
-function that wdt drivers can hook up to the architecture reset handler.
+Regards,
+Mike
 
-The main difference I see between plat-samsung and mach-moxart here is that
-the samsung platforms still need a lot of code in arch/arm to get things
-to work (this will have to change as soon as we get an arm64 exynos, which
-would have everything in proper drivers), while for moxart this is the only
-non-driver code.
-
-Reusing the moxa,moxart-watchdog device from a separate reboot driver is
-a violation of the driver model, since we can't really bind two platform
-drivers to one platform device, unless you add another device in drivers/mfd
-to create two children for wdt and reboot, but that would be really silly.
-You could use the same code that samsung has at the moment in a loadable
-module, which effectively implements a linux-2.4 style driver that probes
-the device in the module_init function rather than registering a struct
-device_driver with a probe callback.
-
-	Arnd
+> - omap5-uevm : boot
+> - dra7-evm : boot
+> - am335x-bone : boot
+> 
+> Separate branches available at https://github.com/t-kristo/linux-pm.git
+> 
+> - full: 3.13-rc1-dt-clks-v10 (should be merged last, contains everything)
+> - clk driver only: 3.13-rc1-dt-clks-v10-for-mike
+> - DT data only: 3.13-rc1-dt-clks-v10-for-benoit
+> 
+> -Tero
+> 
