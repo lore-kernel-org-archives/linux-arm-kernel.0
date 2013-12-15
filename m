@@ -1,137 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 15 Dec 2013 15:04:57 +0100
-Subject: [PATCH 3/5] ARM: dts: sun5i: Add new sun5i-a13-olinuxino-micro
- board
-In-Reply-To: <1387058295-20641-4-git-send-email-hdegoede@redhat.com>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <1387058295-20641-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20131215140457.GG3651@lukather>
+From: kasimling@gmail.com (Alex Ling)
+Date: Sun, 15 Dec 2013 22:14:53 +0800
+Subject: [PATCH v2 1/1] ARM: dts: Add missing clocks for exynos4412 dwmmc
+ node
+In-Reply-To: <6057819.pWzq25qpVf@flatron>
+References: <1386998490-19456-1-git-send-email-kasimling@gmail.com>
+ <6057819.pWzq25qpVf@flatron>
+Message-ID: <CAHaF_kimHy38cL79uZDRy-OWCDs2m0TRAQyT=JaHVfWgHLz2JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 10:58:13PM +0100, Hans de Goede wrote:
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Thanks for pointing out this, Tomasz. I'll use those patches instead.
 
-Commit log :)
 
-Please detail what the board is, what features it has, etc.
+Regards,
+Alex
 
-Other than that, I'm mostly ok with this patch (except that you can
-also probably add your copyright, but that's your call :))
-
-Could you send it as a single patch, separate from this serie (since
-it's not really related in the end).
-
-Thanks!
-Maxime
-
-> ---
->  arch/arm/boot/dts/Makefile                      |  1 +
->  arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 66 +++++++++++++++++++++++++
->  2 files changed, 67 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d57c1a6..b663ed7 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -255,6 +255,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
->  	sun4i-a10-hackberry.dtb \
->  	sun5i-a10s-olinuxino-micro.dtb \
->  	sun5i-a13-olinuxino.dtb \
-> +	sun5i-a13-olinuxino-micro.dtb \
->  	sun6i-a31-colombus.dtb \
->  	sun7i-a20-cubieboard2.dtb \
->  	sun7i-a20-cubietruck.dtb \
-> diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-> new file mode 100644
-> index 0000000..26df7e8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "sun5i-a13.dtsi"
-> +
-> +/ {
-> +	model = "Olimex A13-Olinuxino Micro";
-> +	compatible = "olimex,a13-olinuxino-micro", "allwinner,sun5i-a13";
-> +
-> +	soc at 01c00000 {
-> +		pinctrl at 01c20800 {
-> +			led_pins_olinuxinom: led_pins at 0 {
-> +				allwinner,pins = "PG9";
-> +				allwinner,function = "gpio_out";
-> +				allwinner,drive = <1>;
-> +				allwinner,pull = <0>;
-> +			};
-> +		};
-> +
-> +		uart1: serial at 01c28400 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart1_pins_b>;
-> +			status = "okay";
-> +		};
-> +
-> +		i2c0: i2c at 01c2ac00 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		i2c1: i2c at 01c2b000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		i2c2: i2c at 01c2b400 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c2_pins_a>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pins_olinuxinom>;
-> +
-> +		power {
-
-Could you add a label here?
-
-Something like a13-olinuxino-micro:green:power ?
-
-> +			gpios = <&pio 6 9 0>;
-> +			default-state = "on";
-> +		};
-> +	};
-> +};
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131215/0c6225d3/attachment-0001.sig>
+On Sat, Dec 14, 2013 at 9:24 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Alex,
+>
+> On Saturday 14 of December 2013 13:21:30 Alex Ling wrote:
+>> This patch adds "biu" and "ciu" clocks for exynos4412 dwmmc
+>> node. Without this patch, dwmmc host driver will skip enabling the
+>> two clocks and it will break dwmmc host function on exynos4412.
+>> Tested on FriendlyARM TINY4412 board.
+>>
+>> Signed-off-by: Alex Ling <kasimling@gmail.com>
+>> ---
+>> Changes for v2:
+>>    - Fix patch description as Mark Rutland suggested
+>>
+>>  arch/arm/boot/dts/exynos4412.dtsi |    2 ++
+>>  1 file changed, 2 insertions(+)
+>
+> The patch is correct, but unfortunately it's not the only thing that
+> is wrong with MSHC device tree node for Exynos4x12.
+>
+> Please refer to my series fixing DW-MSHC support on Exynos4x12 (and
+> enabling it on TRATS2 board):
+> http://www.spinics.net/lists/arm-kernel/msg293652.html
+>
+> Best regards,
+> Tomasz
+>
