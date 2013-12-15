@@ -1,117 +1,47 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 15 Dec 2013 20:23:36 +0100
-Subject: [PATCH v3] ARM: dts: sun5i: Add new sun5i-a13-olinuxino-micro board
-Message-ID: <1387135416-16180-1-git-send-email-hdegoede@redhat.com>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Sun, 15 Dec 2013 20:35:17 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <52ADF7D8.2010900@redhat.com>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <20131215162109.GI3651@lukather> <52ADF7D8.2010900@redhat.com>
+Message-ID: <2378731.6b9MyH8v8A@dizzy-6.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A13-OLinuXino-MICRO is a small dev-board with the Allwinner A13 SoC:
-https://www.olimex.com/Products/OLinuXino/A13/A13-OLinuXino-MICRO/
+Hi
 
-Features:
-A13 Cortex A8 processor at 1GHz, 3D Mali400 GPU
-256 MB RAM (128Mbit x 16)
-5VDC input power supply with own ICs, noise immune design
-1 USB host
-1 USB OTG which can power the board
-SD-card connector for booting the Linux image
-VGA video output
-LCD signals available on connector so you still can use LCD if you disable VGA/HDMI
-Audio output
-Microphone input pads (no connector)
+> >>>> [...]
+> >>>> +	mmc->f_max		= 50000000;
+> >>>> [...]
+> >> [...]
+> >> in case of sdc3 they are putting 200000000 in f_max (as that is often
+> >> used for sdio cards) but then later in set_ios they clamp the passed
+> >> in clock to 47000000 Mhz, so I seriously doubt that 200Mhz has actually
+> >> worked. Hence I've simply gone for a safe range for now. If someone has
+> >> cards capable of doing 200 MHz we could certainly run various tests and
+> >> try to improve this, but for now this seems a sane range to start with.
+> > That's probably something that you should mention in your comment then :)
+> Good point, David ?
+Yes.
+a) We should mention any reason why we did what.
+b) If there is room for optimization we should mention that as well since:
+	i) we won't remember every single detail in half a year
+	ii) someone else might need to follow our considerations
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 68 +++++++++++++++++++++++++
- 2 files changed, 69 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+> Right, my bad, sorry. I was so happy I was finally ready to send the patch
+> upstream (I finally had fixed everything on my todo list), I rushed the
+> cover letter a bit. I was planning on putting things like this in there,
+> as well as why we didn't try to extend the mmc-dw driver, but I forgot.
+Do you have something like this in mind? -> drivers/mmc/host/dw_mmc-exynos.c
+Might actually be working if it actually is the same IDMAC controller.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d57c1a6..b663ed7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -255,6 +255,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
- 	sun4i-a10-hackberry.dtb \
- 	sun5i-a10s-olinuxino-micro.dtb \
- 	sun5i-a13-olinuxino.dtb \
-+	sun5i-a13-olinuxino-micro.dtb \
- 	sun6i-a31-colombus.dtb \
- 	sun7i-a20-cubieboard2.dtb \
- 	sun7i-a20-cubietruck.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-new file mode 100644
-index 0000000..fe2ce0a
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -0,0 +1,68 @@
-+/*
-+ * Copyright 2012 Maxime Ripard
-+ * Copyright 2013 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "sun5i-a13.dtsi"
-+
-+/ {
-+	model = "Olimex A13-Olinuxino Micro";
-+	compatible = "olimex,a13-olinuxino-micro", "allwinner,sun5i-a13";
-+
-+	soc at 01c00000 {
-+		pinctrl at 01c20800 {
-+			led_pins_olinuxinom: led_pins at 0 {
-+				allwinner,pins = "PG9";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <1>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_pins_b>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olinuxinom>;
-+
-+		power {
-+			label = "a13-olinuxino-micro:green:power";
-+			gpios = <&pio 6 9 0>;
-+			default-state = "on";
-+		};
-+	};
-+};
--- 
-1.8.4.2
+cheers
+David
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131215/31695d5c/attachment.sig>
