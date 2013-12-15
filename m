@@ -1,42 +1,89 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 15 Dec 2013 08:28:17 +0400
-Subject: [PATCH v3 10/10] ARM: locomo: don't clobber chip data for chained irq
+Date: Sun, 15 Dec 2013 08:28:11 +0400
+Subject: [PATCH v3 04/10] arm: sa1100: use new functions that hide PWER access
 In-Reply-To: <1387081697-21841-1-git-send-email-dbaryshkov@gmail.com>
 References: <1387081697-21841-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1387081697-21841-11-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1387081697-21841-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently locomo uses chip data to pass private data to chained irq
-handler. Thus it clobbers the private data of the corresponding chip
-(sa1100 or pxa). Make locomo use handler data for this purpose.
+In order to continue cleaning up of the sa11x0 IRQ driver, split away
+PWER setting. Now irq driver asks core to enable either irq wake event
+or to enable GPIO wake event, instead of accessing PWER directly.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/common/locomo.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/irq.c | 28 ++++++++++++----------------
+ 1 file changed, 12 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
-index b55c362..f26bd50 100644
---- a/arch/arm/common/locomo.c
-+++ b/arch/arm/common/locomo.c
-@@ -140,7 +140,7 @@ static struct locomo_dev_info locomo_devices[] = {
+diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
+index 68e8f9d..341d296 100644
+--- a/arch/arm/mach-sa1100/irq.c
++++ b/arch/arm/mach-sa1100/irq.c
+@@ -33,6 +33,7 @@
+ static int GPIO_IRQ_rising_edge;
+ static int GPIO_IRQ_falling_edge;
+ static int GPIO_IRQ_mask = (1 << 11) - 1;
++static int GPIO_IRQ_wake_mask;
  
- static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+ /*
+  * To get the GPIO number from an IRQ number
+@@ -91,10 +92,11 @@ static void sa1100_low_gpio_unmask(struct irq_data *d)
+ static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
  {
--	struct locomo *lchip = irq_get_chip_data(irq);
-+	struct locomo *lchip = irq_get_handler_data(irq);
- 	int req, i;
+ 	if (on)
+-		PWER |= 1 << d->irq;
++		GPIO_IRQ_wake_mask |= BIT(d->irq);
+ 	else
+-		PWER &= ~(1 << d->irq);
+-	return 0;
++		GPIO_IRQ_wake_mask &= ~BIT(d->irq);
++
++	return sa11x0_gpio_set_wake(d->irq, on);
+ }
  
- 	/* Acknowledge the parent IRQ */
-@@ -198,7 +198,7 @@ static void locomo_setup_irq(struct locomo *lchip)
- 	 * Install handler for IRQ_LOCOMO_HW.
+ static struct irq_chip sa1100_low_gpio_chip = {
+@@ -172,10 +174,11 @@ static void sa1100_high_gpio_unmask(struct irq_data *d)
+ static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
+ {
+ 	if (on)
+-		PWER |= GPIO11_27_MASK(d->irq);
++		GPIO_IRQ_wake_mask |= GPIO11_27_MASK(d->irq);
+ 	else
+-		PWER &= ~GPIO11_27_MASK(d->irq);
+-	return 0;
++		GPIO_IRQ_wake_mask &= ~GPIO11_27_MASK(d->irq);
++
++	return sa11x0_gpio_set_wake(GPIO_11_27_IRQ(d->irq), on);
+ }
+ 
+ static struct irq_chip sa1100_high_gpio_chip = {
+@@ -206,14 +209,7 @@ static void sa1100_unmask_irq(struct irq_data *d)
+  */
+ static int sa1100_set_wake(struct irq_data *d, unsigned int on)
+ {
+-	if (d->irq == IRQ_RTCAlrm) {
+-		if (on)
+-			PWER |= PWER_RTC;
+-		else
+-			PWER &= ~PWER_RTC;
+-		return 0;
+-	}
+-	return -EINVAL;
++	return sa11x0_sc_set_wake(d->irq, on);
+ }
+ 
+ static struct irq_chip sa1100_normal_chip = {
+@@ -253,8 +249,8 @@ static int sa1100irq_suspend(void)
+ 	/*
+ 	 * Set the appropriate edges for wakeup.
  	 */
- 	irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
--	irq_set_chip_data(lchip->irq, lchip);
-+	irq_set_handler_data(lchip->irq, lchip);
- 	irq_set_chained_handler(lchip->irq, locomo_handler);
- 
- 	/* Install handlers for IRQ_LOCOMO_* */
+-	GRER = PWER & GPIO_IRQ_rising_edge;
+-	GFER = PWER & GPIO_IRQ_falling_edge;
++	GRER = GPIO_IRQ_wake_mask & GPIO_IRQ_rising_edge;
++	GFER = GPIO_IRQ_wake_mask & GPIO_IRQ_falling_edge;
+ 	
+ 	/*
+ 	 * Clear any pending GPIO interrupts.
 -- 
 1.8.5.1
