@@ -1,69 +1,64 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 15 Dec 2013 08:28:09 +0400
-Subject: [PATCH v3 02/10] ARM: sa1100: drop entry-macro.S
+Date: Sun, 15 Dec 2013 08:28:10 +0400
+Subject: [PATCH v3 03/10] ARM: sa1100: add platform functions to handle PWER
+ settings
 In-Reply-To: <1387081697-21841-1-git-send-email-dbaryshkov@gmail.com>
 References: <1387081697-21841-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1387081697-21841-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1387081697-21841-4-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Eremin-Solenikov <dmitry_eremin@mentor.com>
+PWER settings logically belongs neither to GPIO nor to system IRQ code.
+Add special functions to handle PWER (for GPIO and for system IRQs)
+from platform code.
 
-As mach-sa1100 was converted to MULTI_IRQ_HANDLER, drop now-unused
-entry-macro.S file.
-
-Signed-off-by: Dmitry Eremin-Solenikov <dmitry_eremin@mentor.com>
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/include/mach/entry-macro.S | 41 -------------------------
- 1 file changed, 41 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/entry-macro.S
+ arch/arm/mach-sa1100/generic.c | 21 +++++++++++++++++++++
+ arch/arm/mach-sa1100/generic.h |  2 ++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/arch/arm/mach-sa1100/include/mach/entry-macro.S b/arch/arm/mach-sa1100/include/mach/entry-macro.S
-deleted file mode 100644
-index 8cf7630..0000000
---- a/arch/arm/mach-sa1100/include/mach/entry-macro.S
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- * arch/arm/mach-sa1100/include/mach/entry-macro.S
-- *
-- * Low-level IRQ helper macros for SA1100-based platforms
-- *
-- * This file is licensed under  the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--		.macro  get_irqnr_preamble, base, tmp
--		mov	\base, #0xfa000000		@ ICIP = 0xfa050000
--		add	\base, \base, #0x00050000
--		.endm
--
--		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--		ldr	\irqstat, [\base]		@ get irqs
--		ldr	\irqnr, [\base, #4]		@ ICMR = 0xfa050004
--		ands	\irqstat, \irqstat, \irqnr
--		mov	\irqnr, #0
--		beq	1001f
--		tst	\irqstat, #0xff
--		moveq	\irqstat, \irqstat, lsr #8
--		addeq	\irqnr, \irqnr, #8
--		tsteq	\irqstat, #0xff
--		moveq	\irqstat, \irqstat, lsr #8
--		addeq	\irqnr, \irqnr, #8
--		tsteq	\irqstat, #0xff
--		moveq	\irqstat, \irqstat, lsr #8
--		addeq	\irqnr, \irqnr, #8
--		tst	\irqstat, #0x0f
--		moveq	\irqstat, \irqstat, lsr #4
--		addeq	\irqnr, \irqnr, #4
--		tst	\irqstat, #0x03
--		moveq	\irqstat, \irqstat, lsr #2
--		addeq	\irqnr, \irqnr, #2
--		tst	\irqstat, #0x01
--		addeqs	\irqnr, \irqnr, #1
--1001:
--		.endm
--
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index d4ea142..002fe6b 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -410,3 +410,24 @@ void sa1110_mb_enable(void)
+ 	local_irq_restore(flags);
+ }
+ 
++int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
++{
++	if (on)
++		PWER |= 1 << gpio;
++	else
++		PWER &= ~(1 << gpio);
++
++	return 0;
++}
++
++int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
++{
++	if (irq != IRQ_RTCAlrm)
++		return -EINVAL;
++
++	if (on)
++		PWER |= PWER_RTC;
++	else
++		PWER &= ~PWER_RTC;
++	return 0;
++}
+diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
+index 0d92e11..a002b95 100644
+--- a/arch/arm/mach-sa1100/generic.h
++++ b/arch/arm/mach-sa1100/generic.h
+@@ -12,6 +12,8 @@ extern void __init sa1100_init_irq(void);
+ extern void __init sa1100_init_gpio(void);
+ extern void sa11x0_restart(enum reboot_mode, const char *);
+ extern void sa11x0_init_late(void);
++extern int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on);
++extern int sa11x0_sc_set_wake(unsigned int irq, unsigned int on);
+ 
+ #define SET_BANK(__nr,__start,__size) \
+ 	mi->bank[__nr].start = (__start), \
 -- 
 1.8.5.1
