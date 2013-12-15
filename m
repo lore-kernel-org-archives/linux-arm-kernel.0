@@ -1,141 +1,125 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 14 Dec 2013 16:48:44 -0800
-Subject: [PATCHv10 01/41] clk: add support for platform specific clock I/O
- wrapper functions
-In-Reply-To: <1385453182-24421-2-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-2-git-send-email-t-kristo@ti.com>
-Message-ID: <20131215004844.26321.2882@quantum>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sun, 15 Dec 2013 10:05:46 +0800
+Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
+ timing through clock framework
+In-Reply-To: <1386880245-10192-2-git-send-email-dinguyen@altera.com>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-2-git-send-email-dinguyen@altera.com>
+Message-ID: <52AD0E7A.50208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2013-11-26 00:05:42)
-> Current clock wrappers assume simple and direct mapped hardware register
-> access. Improve this support by adding functionality for registering
-> platform specific clock I/O wrappers, which can be used to support
-> various features needed like endianess conversions, indexed regmap support,
-> etc. Default I/O wrapper provided also which uses the existing direct
-> I/O mapped behavior.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Dear Dinh
 
-There is a separate discussion on removing regmap for reading omap clk
-registers. I guess this patch is not needed in that case?
-
-Regards,
-Mike
-
+On 12/13/2013 04:30 AM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+>
+> All implementations of the Synopsys DW SD/MMC IP have settings to control
+> the phase shift of the CIU clk. These phase shift settings are necessary for
+> the SD/MMC to correctly clock the card. All variants of the dw_mmc will need
+> these settings, but how they are implemented can vastly vary.
+>
+> This patch enables the setting for the SDR and/or DDR settings through the
+> common clock framework.
+>
+> Depends on the patch "mmc: dw_mmc: Enable the hold reg for certain speed modes",
+> that is already reading the "samsung,dw-mshc-sdr-timing" and
+> "samsung,dw-mshc-ddr-timing" bindings, this patch saves those values into a
+> u32 bitmask that can be passed to the clock framework to use.
+>
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 > ---
->  drivers/clk/clk.c            |   68 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk-provider.h |   15 +++++-----
->  2 files changed, 75 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 2cf2ea6..c331386 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -34,6 +34,74 @@ static HLIST_HEAD(clk_root_list);
->  static HLIST_HEAD(clk_orphan_list);
->  static LIST_HEAD(clk_notifier_list);
->  
-> +/**
-> + * clk_readl_default - default clock register read support function
-> + * @reg: register to read
-> + *
-> + * Default implementation for reading a clock register.
-> + */
-> +static u32 clk_readl_default(u32 __iomem *reg)
-> +{
-> +       return readl(reg);
-> +}
+> v6: Add this patch
+> v5: none
+> v4: none
+> v3: none
+> v2: none
+> ---
+>   drivers/mmc/host/dw_mmc.c  |   23 +++++++++++++++++++++++
+>   include/linux/mmc/dw_mmc.h |    6 ++++++
+>   2 files changed, 29 insertions(+)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 480dafe..1fb5cff 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2431,6 +2431,8 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+>   	if ((sdr_timing[1] == 0) || (ddr_timing[1] == 0))
+>   		pdata->cclk_in_drv = 0;
+>
+> +	pdata->sdr_timing = (sdr_timing[1] | (sdr_timing[0] << 4));
+> +	pdata->ddr_timing = (ddr_timing[1] | (ddr_timing[0] << 4));
+>   	return pdata;
+>   }
+>
+> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
+>   		dev_dbg(host->dev, "ciu clock not available\n");
+>   		host->bus_hz = host->pdata->bus_hz;
+>   	} else {
+> +		/* If the CIU clk is available, we check for SDR and DDR
+> +		 * timing phase shift settings. But not all platforms
+> +		 * may have populated these settings, the driver will not fail
+> +		 * if these settings are not specified.
+> +		 */
+> +		if (host->pdata->sdr_timing) {
+> +			host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
+> +			if (IS_ERR(host->sdr_clk))
+> +				dev_dbg(host->dev, "sdr_mmc clock not available\n");
+> +			else
+> +				clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
+> +		}
 > +
-> +/**
-> + * clk_writel_default - default clock register write support function
-> + * @val: value to write
-> + * @reg: register to write to
-> + *
-> + * Default implementation for writing a clock register.
-> + */
-> +static void clk_writel_default(u32 val, u32 __iomem *reg)
-> +{
-> +       writel(val, reg);
-> +}
+> +		if (host->pdata->ddr_timing) {
+> +			host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
+> +			if (IS_ERR(host->ddr_clk))
+> +				dev_dbg(host->dev, "ddr_mmc clock not available\n");
+> +			else
+> +				clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
+> +		}
 > +
-> +struct clk_reg_ops clk_reg_ops_default = {
-> +       .clk_readl = clk_readl_default,
-> +       .clk_writel = clk_writel_default
-> +};
-> +
-> +static struct clk_reg_ops *clk_reg_ops = &clk_reg_ops_default;
-> +
-> +/**
-> + * clk_register_reg_ops - register access functions for clock registers
-> + * @ops: register level ops
-> + *
-> + * Registers platform or SoC specific operations for reading / writing
-> + * clock registers.
-> + */
-> +int clk_register_reg_ops(struct clk_reg_ops *ops)
-> +{
-> +       if (!ops)
-> +               return -EINVAL;
-> +       clk_reg_ops = ops;
-> +       return 0;
-> +}
-> +
-> +/**
-> + * clk_readl - read a clock register value from hardware
-> + * @reg: register to read
-> + *
-> + * Uses the registered clk_reg_ops to read a hardware clock register value.
-> + */
-> +u32 clk_readl(u32 __iomem *reg)
-> +{
-> +       return clk_reg_ops->clk_readl(reg);
-> +}
-> +
-> +/**
-> + * clk_writel - write a clock register value to hardware
-> + * @val: value to write
-> + * @reg: register to write
-> + *
-> + * Uses the registered clk_reg_ops to write a hardware clock register value.
-> + */
-> +void clk_writel(u32 val, u32 __iomem *reg)
-> +{
-> +       clk_reg_ops->clk_writel(val, reg);
-> +}
-> +
->  /***           locking             ***/
->  static void clk_prepare_lock(void)
->  {
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 7e59253..16e4df2 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -512,15 +512,14 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
->   * for improved portability across platforms
->   */
->  
-> -static inline u32 clk_readl(u32 __iomem *reg)
-> -{
-> -       return readl(reg);
-> -}
-> +struct clk_reg_ops {
-> +       u32 (*clk_readl)(u32 __iomem *reg);
-> +       void (*clk_writel)(u32 val, u32 __iomem *reg);
-> +};
->  
-> -static inline void clk_writel(u32 val, u32 __iomem *reg)
-> -{
-> -       writel(val, reg);
-> -}
-> +u32 clk_readl(u32 __iomem *reg);
-> +void clk_writel(u32 val, u32 __iomem *reg);
-> +int clk_register_reg_ops(struct clk_reg_ops *ops);
->  
->  #endif /* CONFIG_COMMON_CLK */
->  #endif /* CLK_PROVIDER_H */
-> -- 
-> 1.7.9.5
-> 
+
+Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed, 
+fixed as each controller, or different with different board.
+In case they are fixed, or fixed in each controller, and only required 
+to be set in probe only once, maybe they can be hide in clk_mmc_ops.prepare
+And the clock can be used as ciu_clock, or parent of ciu_clock, which is 
+called in dw_mmc.c, maybe these code can be ignored.
+
+
+
+>   		ret = clk_prepare_enable(host->ciu_clk);
+>   		if (ret) {
+>   			dev_err(host->dev, "failed to enable ciu clock\n");
+> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> index 2b5b8bf..ad90ad1 100644
+> --- a/include/linux/mmc/dw_mmc.h
+> +++ b/include/linux/mmc/dw_mmc.h
+> @@ -83,6 +83,8 @@ struct mmc_data;
+>    * @priv: Implementation defined private data.
+>    * @biu_clk: Pointer to bus interface unit clock instance.
+>    * @ciu_clk: Pointer to card interface unit clock instance.
+> + * @sdr_clk: Pointer to the SDR clock instance.
+> + * @ddr_clk: Pointer to the DDR clock instance.
+>    * @slot: Slots sharing this MMC controller.
+>    * @fifo_depth: depth of FIFO.
+>    * @data_shift: log2 of FIFO item size.
+> @@ -170,6 +172,8 @@ struct dw_mci {
+>   	void			*priv;
+>   	struct clk		*biu_clk;
+>   	struct clk		*ciu_clk;
+> +	struct clk		*sdr_clk;
+> +	struct clk		*ddr_clk;
+>   	struct dw_mci_slot	*slot[MAX_MCI_SLOTS];
+>
+>   	/* FIFO push and pull */
+> @@ -241,6 +245,8 @@ struct dw_mci_board {
+>   	u32 caps2;	/* More capabilities */
+>   	u32 pm_caps;	/* PM capabilities */
+>   	u32 cclk_in_drv;	/*cclk_in_drv phase shift */
+> +	u32 sdr_timing;	/* Single data rate timing setting. */
+> +	u32 ddr_timing;	/* Double data rate timing setting. */
+
+Are they fixed or not?
+
+Thanks
+Zhangfei
