@@ -1,7 +1,7 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 16 Dec 2013 05:21:54 +0900
-Subject: [GIT PULL 4/7] Samsung dev for v3.14
-Message-ID: <52AE0F62.80409@samsung.com>
+Date: Mon, 16 Dec 2013 05:22:36 +0900
+Subject: [GIT PULL 5/7] Samsung irq for v3.14
+Message-ID: <52AE0F8C.3040408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,25 +12,20 @@ The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-dev
+tags/samsung-irq
 
-for you to fetch changes up to 70bacadbd07248576290de40cc217c06f0f2d3c3:
+for you to fetch changes up to 9403ac88220d79f8822e22c875ad1ebd7ffbea6f:
 
-   ARM: S3C64XX: Select CPU_V6K instead of CPU_V6 (2013-12-16 04:08:51 
-+0900)
-
-----------------------------------------------------------------
-Samsung updates for v3.14
-- Skip eint_init() for pinctrl-exynos because of re-executing
-- Use CPU_V6K for S3C64XX(ARM1176JZF-s) instead of CPU_V6
+   irqchip: exynos-combiner: remove hard-coded irq_base value 
+(2013-12-02 07:15:51 +0900)
 
 ----------------------------------------------------------------
-Mateusz Krawczuk (1):
-       ARM: SAMSUNG: if detected device tree skip irq init for S5P
+Samsung irq update for v3.14
+- use linear irq domain for exynos-combiner
 
-Tomasz Figa (1):
-       ARM: S3C64XX: Select CPU_V6K instead of CPU_V6
+----------------------------------------------------------------
+Chander Kashyap (1):
+       irqchip: exynos-combiner: remove hard-coded irq_base value
 
-  arch/arm/Kconfig                     | 2 +-
-  arch/arm/plat-samsung/s5p-irq-eint.c | 4 ++++
-  2 files changed, 5 insertions(+), 1 deletion(-)
+  drivers/irqchip/exynos-combiner.c | 15 +++------------
+  1 file changed, 3 insertions(+), 12 deletions(-)
