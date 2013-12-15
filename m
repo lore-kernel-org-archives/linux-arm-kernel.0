@@ -1,100 +1,112 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Sun, 15 Dec 2013 11:39:07 -0600
-Subject: [PATCH v2 2/3] clk: bcm281xx: add initial clock framework support
-In-Reply-To: <20131214235731.26321.53050@quantum>
-References: <529F4B0F.2020801@linaro.org> <529F4B4F.4020405@linaro.org>
- <20131214235731.26321.53050@quantum>
-Message-ID: <52ADE93B.3070907@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 15 Dec 2013 19:41:28 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <20131215162109.GI3651@lukather>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
+ <20131215134415.GE3651@lukather> <52ADBAA3.7060507@redhat.com>
+ <20131215162109.GI3651@lukather>
+Message-ID: <52ADF7D8.2010900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2013 05:57 PM, Mike Turquette wrote:
-> Quoting Alex Elder (2013-12-04 07:33:35)
->> +       return true;
->> +}
->> +
->> +/* A bit position must be less than the number of bits in a 32-bit
->> register. */
-> 
-> Hi Alex,
-> 
-> The patch is corrupt at line 634 and several other places below.  Did
-> you edit it manually? I'm happy with the series after reviewing it but
-> it cannot be applied. Can you fix the issue and send me a pull request?
-> 
-> Thanks,
-> Mike
-> 
+Hi,
 
-First, yes I sent it manually (copy from the git-generated patch
-and paste into a mail message, and I'm sorry about that.  I have
-yet to set up my Linaro settings for "git-send-email" and I'll
-do that this week.
+On 12/15/2013 05:21 PM, Maxime Ripard wrote:
+> On Sun, Dec 15, 2013 at 03:20:19PM +0100, Hans de Goede wrote:
+<snip>
 
-I have a v3 that has been updated to apply to v3.13-rc3 (there
-is no -rc4 yet).
+>>>> +static const struct of_device_id sunxi_mmc_of_match[] = {
+>>>> +	{ .compatible = "allwinner,sun4i-mmc", },
+>>>> +	{ .compatible = "allwinner,sun5i-mmc", },
+>>>
+>>> Please use sun5i-a13-mmc as your compatible.
+>>
+>> Can you explain a bit why? In essence currently we have
+>> 2 versions of the mmc controller, those found on sun4i
+>> and those found on sun5i and sun7i. I thought that the
+>> norm was to use the oldest soc version in which a revision
+>> of an ip-block first appears as the compatible string ?
+>
+> Indeed.
+>
+>> Note I've tested this with both a13 and a10s SOCs, if we
+>> add a sun5i-a13-mmc we should also add a sun5i-a10s-mmc
+>> and a sun5i-a20-mmc, or would that then be sun7i-a20-mmc?
+>
+> And the A13 has been the first SoC in the sun5i family, hence why we
+> should use sun5i-a13 as the prefix here. If the A10s and A20 would not
+> have been compatible with the A13 MMC controller, we would have used
+> sun5i-a10s-mmc and sun7i-a20-mmc, respectively.
 
-I'm not sure how this works with the series of 8 patches from Tim
-Kryger that it depends on.  But here is a pull request for the
-version (including the prerequisites) based on 3.13-rc3.  (It is
-done manually again, so there are some line wraps...)
+Ah I see, you meant s/allwinner,sun5i-mmc/allwinner,sun5i-a13-mmc/
 
-Thanks a lot for the review Mike.  I know you're a busy guy.
+I interpreted your remark as adding an extra allwinner,sun5i-a13-mmc
+compatible string. Using allwinner,sun5i-a13-mmc instead of
+allwinner,sun5i-mmc makes sense. David having us both editing the
+driver at the same time seems counter-productive, can you take care
+of this too?
 
-					-Alex
+>
+>> To me just having sun5i-mmc for sun5i+ socs seems simpler.
+>
+> And if we ever find out that A10s or A13 differs in some way, we will
+> end up introducing a compatible that will be sun5i-a10s-mmc, along
+> with the sun5i-mmc we already have, which is not really the more
+> consistent thing we would have done.
+>
+>> <snip>
+>>
+>>>> +	mmc->ops		= &sunxi_mmc_ops;
+>>>> +	mmc->max_blk_count	= 8192;
+>>>> +	mmc->max_blk_size	= 4096;
+>>>> +	mmc->max_segs		= PAGE_SIZE / sizeof(struct sunxi_idma_des);
+>>>> +	mmc->max_seg_size	= (1 << host->idma_des_size_bits);
+>>>> +	mmc->max_req_size	= mmc->max_seg_size * mmc->max_segs;
+>>>> +	/* 400kHz ~ 50MHz */
+>>>> +	mmc->f_min		=   400000;
+>>>> +	mmc->f_max		= 50000000;
+>>>
+>>> Hmmm, the tables earlier seem to suggest it can do much more than that.
+>>
+>> I know, but this is what the allwinner android kernels are using, actually
+>> in case of sdc3 they are putting 200000000 in f_max (as that is often
+>> used for sdio cards) but then later in set_ios they clamp the passed
+>> in clock to 47000000 Mhz, so I seriously doubt that 200Mhz has actually
+>> worked. Hence I've simply gone for a safe range for now. If someone has
+>> cards capable of doing 200 MHz we could certainly run various tests and
+>> try to improve this, but for now this seems a sane range to start with.
+>
+> That's probably something that you should mention in your comment then :)
 
-The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
+Good point, David ?
 
-  Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
+<snip>
 
-are available in the git repository at:
+>>> Hmmm, I see no implementation for this function. Didn't you forget
+>>> a file here? (and it should probably be a separate patch anyway).
+>>
+>> The implementation is part of Emilio's clk branch, but he forgot
+>> to add a header for it, so I'm fixing that up here, I guess this
+>> should go through Emlio's tree as a separate patch.
+>
+> As far as I know, this work has never been posted, let alone
+> merged.
 
-  ssh://git at git.linaro.org/people/alex.elder/linux.git
-review/bcm-kona-clocks-v3
+I don't know if it has been posted, but it has been in his tree for a
+while now. Anyways I'll send him a standalone patch for the clk/sunxi.h
+file.
 
-for you to fetch changes up to cf62c29babf6068abf91588411704566812b7900:
+ > Anyway, the dependencies you have is something that you should
+ > mention in your cover letter, so that we know what to merge, in which
+ > order, and when to merge it.
 
-  ARM: dts: bcm281xx: define real clocks (2013-12-13 10:40:21 -0600)
+Right, my bad, sorry. I was so happy I was finally ready to send the patch
+upstream (I finally had fixed everything on my todo list), I rushed the
+cover letter a bit. I was planning on putting things like this in there,
+as well as why we didn't try to extend the mmc-dw driver, but I forgot.
 
-----------------------------------------------------------------
-Alex Elder (3):
-      clk: bcm281xx: define kona clock binding
-      clk: bcm281xx: add initial clock framework support
-      ARM: dts: bcm281xx: define real clocks
+Thanks & Regards,
 
-Tim Kryger (8):
-      ARM: dts: Declare clocks as fixed on bcm11351
-      ARM: dts: Specify clocks for UARTs on bcm11351
-      Documentation: dt: kona-sdhci: Add clocks property
-      ARM: dts: Specify clocks for SDHCIs on bcm11351
-      mmc: sdhci-bcm-kona: Add basic use of clocks
-      Documentation: dt: kona-timer: Add clocks property
-      clocksource: kona: Add basic use of external clock
-      ARM: dts: Specify clocks for timer on bcm11351
-
- .../devicetree/bindings/arm/bcm/kona-timer.txt     |    7 +-
- .../devicetree/bindings/clock/bcm-kona-clock.txt   |   93 ++
- .../devicetree/bindings/mmc/kona-sdhci.txt         |    4 +
- arch/arm/boot/dts/bcm11351.dtsi                    |  199 +++-
- drivers/clk/Kconfig                                |    1 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/bcm/Kconfig                            |    8 +
- drivers/clk/bcm/Makefile                           |    3 +
- drivers/clk/bcm/clk-bcm281xx.c                     |  416 ++++++++
- drivers/clk/bcm/clk-kona-setup.c                   |  769 +++++++++++++++
- drivers/clk/bcm/clk-kona.c                         | 1033
-++++++++++++++++++++
- drivers/clk/bcm/clk-kona.h                         |  414 ++++++++
- drivers/clocksource/bcm_kona_timer.c               |   14 +-
- drivers/mmc/host/sdhci-bcm-kona.c                  |   37 +-
- include/dt-bindings/clock/bcm281xx.h               |   65 ++
- 15 files changed, 3053 insertions(+), 11 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
- create mode 100644 drivers/clk/bcm/Kconfig
- create mode 100644 drivers/clk/bcm/Makefile
- create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
- create mode 100644 drivers/clk/bcm/clk-kona-setup.c
- create mode 100644 drivers/clk/bcm/clk-kona.c
- create mode 100644 drivers/clk/bcm/clk-kona.h
- create mode 100644 include/dt-bindings/clock/bcm281xx.h
+Hans
