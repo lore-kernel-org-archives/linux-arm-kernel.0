@@ -1,51 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 15 Dec 2013 21:18:15 +0100
-Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
- hosts found on Allwinner sunxi SoCs
-In-Reply-To: <2378731.6b9MyH8v8A@dizzy-6.site>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <20131215162109.GI3651@lukather> <52ADF7D8.2010900@redhat.com>
- <2378731.6b9MyH8v8A@dizzy-6.site>
-Message-ID: <52AE0E87.2040304@redhat.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 16 Dec 2013 05:21:21 +0900
+Subject: [GIT PULL 1/7] Samsung fixes for v3.14
+Message-ID: <52AE0F41.7050706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-On 12/15/2013 08:35 PM, David Lanzend?rfer wrote:
-> Hi
->
->>>>>> [...]
->>>>>> +	mmc->f_max		= 50000000;
->>>>>> [...]
->>>> [...]
->>>> in case of sdc3 they are putting 200000000 in f_max (as that is often
->>>> used for sdio cards) but then later in set_ios they clamp the passed
->>>> in clock to 47000000 Mhz, so I seriously doubt that 200Mhz has actually
->>>> worked. Hence I've simply gone for a safe range for now. If someone has
->>>> cards capable of doing 200 MHz we could certainly run various tests and
->>>> try to improve this, but for now this seems a sane range to start with.
->>> That's probably something that you should mention in your comment then :)
->> Good point, David ?
-> Yes.
-> a) We should mention any reason why we did what.
-> b) If there is room for optimization we should mention that as well since:
-> 	i) we won't remember every single detail in half a year
-> 	ii) someone else might need to follow our considerations
->
->> Right, my bad, sorry. I was so happy I was finally ready to send the patch
->> upstream (I finally had fixed everything on my todo list), I rushed the
->> cover letter a bit. I was planning on putting things like this in there,
->> as well as why we didn't try to extend the mmc-dw driver, but I forgot.
-> Do you have something like this in mind? -> drivers/mmc/host/dw_mmc-exynos.c
+   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-No, as explained in my previous mail the idmac being shared seemed to be the
-only 2 things the dw-mmc controller and the sunxi-mmc controller have in common.
+are available in the git repository at:
 
-Looking at dw_mmc-exynos.c it still pretty much is the classic dw-mmc controller
-with some extra bits, where as the sunxi controller is significantly different
-(which allows us to write a significant simpler driver).
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes
 
-Regards,
+for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
 
-Hans
+   ARM: dts: Update display clock frequency for Origen-4412 (2013-12-16 
+04:41:57 +0900)
+
+----------------------------------------------------------------
+Samsung non-critical fixes for v3.14
+- Switch FIFO mode for arch_enable_uart_fifo()
+- Add missing op_mode for PMIC on exynos5250-arndale
+- Add missing clock-frequency for CPU on exynos5250
+- Fix typo samaung to samsung for exynos5420-pinctrl
+- Fix display clock-frequency for exynos4210/exynos4412-origen
+
+----------------------------------------------------------------
+Alexander Shiyan (1):
+       ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
+
+Sachin Kamat (4):
+       ARM: dts: Add missing op_mode property to PMIC on Arndale
+       ARM: dts: Add missing frequency property to exynos5250
+       ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
+       ARM: dts: Update display clock frequency for Origen-4412
+
+Tushar Behera (1):
+       ARM: dts: Update display clock frequency for Origen-4210
+
+  arch/arm/boot/dts/exynos4210-origen.dts         | 2 +-
+  arch/arm/boot/dts/exynos4412-origen.dts         | 2 +-
+  arch/arm/boot/dts/exynos5250-arndale.dts        | 2 ++
+  arch/arm/boot/dts/exynos5250.dtsi               | 2 ++
+  arch/arm/boot/dts/exynos5420-pinctrl.dtsi       | 2 +-
+  arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
+  6 files changed, 9 insertions(+), 3 deletions(-)
