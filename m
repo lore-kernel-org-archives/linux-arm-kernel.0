@@ -1,82 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 Dec 2013 03:55:27 +0100
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <1387073571.13062.102.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312150153.54044.arnd@arndb.de>
- <1387073571.13062.102.camel@host5.omatika.ru>
-Message-ID: <201312150355.27755.arnd@arndb.de>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Sat, 14 Dec 2013 21:16:39 -0600
+Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
+ timing through clock framework
+In-Reply-To: <52AD0E7A.50208@linaro.org>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-2-git-send-email-dinguyen@altera.com>
+ <52AD0E7A.50208@linaro.org>
+Message-ID: <52AD1F17.5040708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 December 2013, Sergei Ianovich wrote:
-> On Sun, 2013-12-15 at 01:53 +0100, Arnd Bergmann wrote:
-> > On Saturday 14 December 2013, Sergei Ianovich wrote:
-> > Unfortunately I don't have a good way to judge the tradeoffs without
-> > understanding more about the design of the hardware. Did I understand
-> > you right that you expect future versions of the FPGA bitstream
-> > to implement additional features or have a different set of endpoint
-> > devices?
-> 
-> I am trying to reduce time you spend on review as much as possible.
-> Please feel free to say if I do something to the opposite.
-> 
-> I could write a lengthy description of the machine as I understand it,
-> if need be. I am not related to its vendor in any way, so it may or may
-> not be correct.
-> 
-> I've made to work 100% of features my client needs in the machine. It is
-> ~80% of the devices on the frame and ~10% of possible slot modules.
-> There are chances someone else will work on the rest, eg. the device
-> vendor.
-> 
-> This page contains a photo, if there is any interest to see how it looks
-> like:
-> http://www.icpdas.com/root/product/solutions/pac/linpac/lp-8x4x_hardware.html
+Hi Zhangfei,
 
-I see, thanks for the clarification.
+On 12/14/13 8:05 PM, zhangfei wrote:
+> Dear Dinh
+>
+> On 12/13/2013 04:30 AM, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> All implementations of the Synopsys DW SD/MMC IP have settings to
+>> control
+>> the phase shift of the CIU clk. These phase shift settings are
+>> necessary for
+>> the SD/MMC to correctly clock the card. All variants of the dw_mmc
+>> will need
+>> these settings, but how they are implemented can vastly vary.
+>>
+>> This patch enables the setting for the SDR and/or DDR settings
+>> through the
+>> common clock framework.
+>>
+>> Depends on the patch "mmc: dw_mmc: Enable the hold reg for certain
+>> speed modes",
+>> that is already reading the "samsung,dw-mshc-sdr-timing" and
+>> "samsung,dw-mshc-ddr-timing" bindings, this patch saves those values
+>> into a
+>> u32 bitmask that can be passed to the clock framework to use.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>> ---
+>> v6: Add this patch
+>> v5: none
+>> v4: none
+>> v3: none
+>> v2: none
+>> ---
+>>   drivers/mmc/host/dw_mmc.c  |   23 +++++++++++++++++++++++
+>>   include/linux/mmc/dw_mmc.h |    6 ++++++
+>>   2 files changed, 29 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 480dafe..1fb5cff 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -2431,6 +2431,8 @@ static struct dw_mci_board
+>> *dw_mci_parse_dt(struct dw_mci *host)
+>>       if ((sdr_timing[1] == 0) || (ddr_timing[1] == 0))
+>>           pdata->cclk_in_drv = 0;
+>>
+>> +    pdata->sdr_timing = (sdr_timing[1] | (sdr_timing[0] << 4));
+>> +    pdata->ddr_timing = (ddr_timing[1] | (ddr_timing[0] << 4));
+>>       return pdata;
+>>   }
+>>
+>> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
+>>           dev_dbg(host->dev, "ciu clock not available\n");
+>>           host->bus_hz = host->pdata->bus_hz;
+>>       } else {
+>> +        /* If the CIU clk is available, we check for SDR and DDR
+>> +         * timing phase shift settings. But not all platforms
+>> +         * may have populated these settings, the driver will not fail
+>> +         * if these settings are not specified.
+>> +         */
+>> +        if (host->pdata->sdr_timing) {
+>> +            host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
+>> +            if (IS_ERR(host->sdr_clk))
+>> +                dev_dbg(host->dev, "sdr_mmc clock not available\n");
+>> +            else
+>> +                clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
+>> +        }
+>> +
+>> +        if (host->pdata->ddr_timing) {
+>> +            host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
+>> +            if (IS_ERR(host->ddr_clk))
+>> +                dev_dbg(host->dev, "ddr_mmc clock not available\n");
+>> +            else
+>> +                clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
+>> +        }
+>> +
+>
+> Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed,
+> fixed as each controller, or different with different board.
+Yes, they are fixed for each controller per SoC.
+> In case they are fixed, or fixed in each controller, and only required
+> to be set in probe only once, maybe they can be hide in
+> clk_mmc_ops.prepare
+> And the clock can be used as ciu_clock, or parent of ciu_clock, which
+> is called in dw_mmc.c, maybe these code can be ignored.
+>
+Please see v5 of this patch: https://patchwork.kernel.org/patch/3311121/
+The issue with V5 was that there is no way for the dw_mmc driver to pass
+the clock phase settings
+in the clk_mmc_ops.prepare function.
+>
+>
+>>           ret = clk_prepare_enable(host->ciu_clk);
+>>           if (ret) {
+>>               dev_err(host->dev, "failed to enable ciu clock\n");
+>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+>> index 2b5b8bf..ad90ad1 100644
+>> --- a/include/linux/mmc/dw_mmc.h
+>> +++ b/include/linux/mmc/dw_mmc.h
+>> @@ -83,6 +83,8 @@ struct mmc_data;
+>>    * @priv: Implementation defined private data.
+>>    * @biu_clk: Pointer to bus interface unit clock instance.
+>>    * @ciu_clk: Pointer to card interface unit clock instance.
+>> + * @sdr_clk: Pointer to the SDR clock instance.
+>> + * @ddr_clk: Pointer to the DDR clock instance.
+>>    * @slot: Slots sharing this MMC controller.
+>>    * @fifo_depth: depth of FIFO.
+>>    * @data_shift: log2 of FIFO item size.
+>> @@ -170,6 +172,8 @@ struct dw_mci {
+>>       void            *priv;
+>>       struct clk        *biu_clk;
+>>       struct clk        *ciu_clk;
+>> +    struct clk        *sdr_clk;
+>> +    struct clk        *ddr_clk;
+>>       struct dw_mci_slot    *slot[MAX_MCI_SLOTS];
+>>
+>>       /* FIFO push and pull */
+>> @@ -241,6 +245,8 @@ struct dw_mci_board {
+>>       u32 caps2;    /* More capabilities */
+>>       u32 pm_caps;    /* PM capabilities */
+>>       u32 cclk_in_drv;    /*cclk_in_drv phase shift */
+>> +    u32 sdr_timing;    /* Single data rate timing setting. */
+>> +    u32 ddr_timing;    /* Double data rate timing setting. */
+>
+> Are they fixed or not?
+They are fixed values that is represented in the DTS bindings.
 
-> > If so, I would argue that anything that you consider an optional
-> > sub-device should have its own device node in the device tree.
-> > 
-> > Also, do you have to model hardware that is connected to the FPGA
-> > rather than being part of it?
-> 
-> Anything that can be plugged into the device is discoverable, so doesn't
-> require to be in the device tree.
-
-Ah, good.
-
-> > I suspect that you may have a different understanding of the term
-> > MFD than what I was suggesting: A typical MFD driver in Linux is
-> > basically a container device that has some registers on its own
-> > like a version detection or the irqchip but mainly is there to
-> > create sub-devices that each have a subset of the available
-> > registers. The sub-devices may or may not be describe in DT in this
-> > case.
-> 
-> I may be missing something. My general understanding seems to be as
-> follows. MFD will have probe/remove functionality of drivers for SRAM,
-> RTC, serial modules in the patch series. MFD will be to FPGA what C
-> language machine file was to machine: lots of hardcoded constants and
-> functions which implement non-standard behavior (like set_termios in
-> 8250_lp8x4x.c). This seems to be wrong to me, as device tree is
-> specifically designed to handle platform device initialization.
-> 
-> The tree you drafted in the previous mail was 100% correct. I though
-> about doing something like that. I decided not to, since all devices
-> behind the FPGA are transparently accessed by CPU. I like the idea. I
-> haven't resent a series with FPGA bus only because you wrote in the same
-> mail that we need an MFD.
-> 
-> If you say so, we will have an MFD.
-
-I think I was confused by the fact that the FPGA both has multiple
-integrated devices and multiple pluggable devices. Given your explanations,
-I think the way you have structured your code is good, and an MFD would
-not help. Please just restructure the DT representation to contain the
-external-bus and/or the fpga connected to it. You probably don't need both,
-but it doesn't hurt to show them as different device-nodes either.
-Your choice.
-
-	Arnd
+Dinh
+>
+> Thanks
+> Zhangfei
