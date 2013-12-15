@@ -1,56 +1,98 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 14 Dec 2013 16:51:07 -0800
-Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
-In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20131215005107.26321.50455@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 Dec 2013 01:53:53 +0100
+Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
+In-Reply-To: <1387058146.13062.24.camel@host5.omatika.ru>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <201312142203.45740.arnd@arndb.de>
+ <1387058146.13062.24.camel@host5.omatika.ru>
+Message-ID: <201312150153.54044.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2013-11-26 00:05:41)
-> Hi,
+On Saturday 14 December 2013, Sergei Ianovich wrote:
+> On Sat, 2013-12-14 at 22:03 +0100, Arnd Bergmann wrote:
+> > On Friday 13 December 2013, Sergei Ianovich wrote:
+> > > I've also decided not to create a single mfd device for
+> > > machine-specific devices. Instead each type is supported by a separate
+> > > driver in respective subsystem. It was tempting to hardcode all the
+> > > constants in one source file, but that requires ugly initialization.
+> > > The taken way produces much cleaner code.
+> > 
+> > I think you should at least change the DT representation for the FPGA
+> > to show one device as the actual FPGA and attach children to that,
+> > multiple indirection levels if necessary.
+> > 
+> > I suspect that the fpga is on some external-bus port with a specific
+> > chip-select, so I would model this as
+> > 
+> >         extbus {
+> >                 compatible = "simple-bus";
+> >                 #address-cells = <1>;
+> >                 #size-cells = <1>;
+> >                 /* bus addresses 0-0xfffff mapped to 0x17000000 */
+> >                 ranges = <0 0x17000000 0x100000>;
+> >                 interrupt-parent = <&fpga-irq>;
+> > 
+> >                 fpga-irq: irq at 6 {
+> >                         regs = <6 16>; /* translated addresses
+> >                         ...
+> >                 };
+> > 
+> >                 fgpa-bus {
+> >                         #address-cells = <1>;
+> >                         #size-cells = <1>;
+> >                         ranges;
+> > 
+> >                         serial at 9050 {
+> >                                 ...
+> >                         };
+> >                 };
+> >         };
+> > 
+> > I also think you don't need to make the devices quite as fine-grained
+> > here but instead group things together more. I would probably indeed
+> > put everything that is not on one of the slots into a common device,
+> > including the irqchip.
 > 
-> Changes compared to v9:
-> - rebased on top of 3.13-rc1
-> - modified the low level clk register API to provide SoC specific clk_readl
->   and clk_writel support which can be registered during boot, TI SoC variant
->   uses regmap on low level
-> - dropped regmap parameter from clock init calls, instead a helper is used
->   for getting regmap index along with the register offset from DT
-> - dropped regmap parameter from clock structs, instead platform specific
->   clk_readl / clk_writel are used to parse reg parameter according to
->   platform, for TI SoC:s, this is encoded as:
->   struct clk_omap_reg {
->     u16 offset; /* register offset */
->     u16 index; /* regmap index */
->   }
-> - Nishanth's comments to v9 mostly addressed, except for the CLK_OF_DECLARE
->   tweak which I would actually want some feedback upon, basically the problem
->   is I need to return status from the clk init functions so I can see if
->   -EAGAIN is passed, in which case init will be retried later, maybe some of
->   this can be made generic, like converting all the CLK_OF_DECLARE type
->   functions to return status
+> There are basically 2 options: one-for-all mfd device and one-for-one
+> device drivers.
 > 
-> Testing done:
-> - omap3-beagle : boot + suspend/resume
-> - omap3-beagle-xm : boot (thanks to Nishanth)
-> - omap4-panda-es : boot + suspend/resume
+> MFD
+> pros:
+> * easy to add into the tree (one file)
+> * easy config (one option)
+> 
+> Separate devices
+> * easy to support devices as respective subsystems evolve
+> * easy to add new feature without breaking existing ones. Eg. it may
+> make sense to provide industrial IO interface on analog IO devices
+> * possible to have fine-grained configuration (eg. SRAM in kernel,
+> serial and slot as modules)
+> * proper device tree serves as a datasheet for the machine, so anyone
+> who needs to work on it will have a decent view of the internals
+> 
+> I believe long-term benefits of separate devices outweigh immediate
+> effects of an MFD. However, I certainly don't see the big picture and
+> will accept your decision. Please make one.
 
-A quick note in testing: trace_clk_div_ck ends up as an orphan clock on
-my Panda ES.
+Unfortunately I don't have a good way to judge the tradeoffs without
+understanding more about the design of the hardware. Did I understand
+you right that you expect future versions of the FPGA bitstream
+to implement additional features or have a different set of endpoint
+devices?
 
-Regards,
-Mike
+If so, I would argue that anything that you consider an optional
+sub-device should have its own device node in the device tree.
 
-> - omap5-uevm : boot
-> - dra7-evm : boot
-> - am335x-bone : boot
-> 
-> Separate branches available at https://github.com/t-kristo/linux-pm.git
-> 
-> - full: 3.13-rc1-dt-clks-v10 (should be merged last, contains everything)
-> - clk driver only: 3.13-rc1-dt-clks-v10-for-mike
-> - DT data only: 3.13-rc1-dt-clks-v10-for-benoit
-> 
-> -Tero
-> 
+Also, do you have to model hardware that is connected to the FPGA
+rather than being part of it?
+
+I suspect that you may have a different understanding of the term
+MFD than what I was suggesting: A typical MFD driver in Linux is
+basically a container device that has some registers on its own
+like a version detection or the irqchip but mainly is there to
+create sub-devices that each have a subset of the available
+registers. The sub-devices may or may not be describe in DT in this
+case.
+
+	Arnd
