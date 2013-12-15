@@ -1,91 +1,157 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 15 Dec 2013 18:43:50 +0530
-Subject: [PATCH v6 6/6] ARM: davinci: da850 evm: add GPIO pinumux entries
- DT node
-In-Reply-To: <1385057731-4348-7-git-send-email-prabhakar.csengg@gmail.com>
-References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
- <1385057731-4348-7-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <52ADAB0E.4020800@ti.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Sun, 15 Dec 2013 22:30:13 +0900
+Subject: [RFC v2 1/4] power: asv: Add common ASV support for Samsung SoCs
+In-Reply-To: <4229773.U5JovcREjb@amdc1227>
+References: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
+ <1384515691-26299-2-git-send-email-sachin.kamat@linaro.org>
+ <4229773.U5JovcREjb@amdc1227>
+Message-ID: <CAKew6eVSOQaHjYj3JRhJKnozY26OkeUGhvC2usadfUqW9hyu2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 November 2013 11:45 PM, Prabhakar Lad wrote:
-> From: KV Sujith <sujithkv@ti.com>
-> 
-> Add GPIO DT node and pinmux entries for DA850 EVM. GPIO is
-> configurable differently on different boards. So add GPIO
-> pinmuxing in dts file.
-> 
-> Signed-off-by: KV Sujith <sujithkv@ti.com>
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> ---
->  arch/arm/boot/dts/da850-evm.dts |   20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index 588ce58..f82c129 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -17,6 +17,21 @@
->  	soc {
->  		pmx_core: pinmux at 1c14120 {
->  			status = "okay";
-> +
-> +			gpio_pins: pinmux_gpio_pins {
-> +				pinctrl-single,bits = <
-> +					/* GPIO2_4 GPIO2_6 */
-> +					0x18 0x00008080 0x0000f0f0
-> +					/* GPIO2_8 GPIO2_15 */
-> +					0x14 0x80000008 0xf000000f
-> +					/* GPIO3_12 GPIO3_13 */
-> +					0x1C 0x00008800 0x0000ff00
-> +					/* GPIO4_0 GPIO4_1 */
-> +					0x28 0x88000000 0xff000000
-> +					/* GPIO6_9 GPIO6_10 GPIO6_13 */
-> +					0x34 0x08800800 0x0ff00f00
-> +				>;
-> +			};
->  		};
+Hi Tomasz,
 
-Shouldn't these pinmux entries be part of actual device
-node which needs them to be muxed this way? For now, I
-have committed the attached reduced patch.
+Thanks for your thorough review and nice suggestions.
 
-Thanks,
-Sekhar
+[snip]
+>> +}
+>> +
+>> +static struct asv_member *asv_get_mem(enum asv_type_id asv_type)
+>
+> I don't really like this enum based look-up. It's hard to define an enum
+> that covers any possible existing and future platforms that would not be
+> bloated with single platform specific entries. IMHO something string based
+> could be more scalable.
+>
 
----8<---
->From 3a9574f2aa4ffd9b867321a1f298893410bd3718 Mon Sep 17 00:00:00 2001
-From: KV Sujith <sujithkv@ti.com>
-Date: Thu, 21 Nov 2013 23:45:31 +0530
-Subject: [PATCH 1/1] ARM: davinci: da850 evm: add GPIO pinumux entries DT node
+Yes, I also agree string based look-up will be better. I was thinking
+to convert to it,
+after initial discussion over the APIs.
 
-Add GPIO DT node and pinmux entries for DA850 EVM. GPIO is
-configurable differently on different boards. So add GPIO
-pinmuxing in dts file.
+>> +{
+>> +     struct asv_member *asv_mem;
+>> +     struct asv_info *asv_info;
+>> +
+>> +     list_for_each_entry(asv_mem, &asv_list, node) {
+>> +             asv_info = asv_mem->asv_info;
+>> +             if (asv_type == asv_info->type)
+>> +                     return asv_mem;
+>> +     }
+>
+> Don't you need any kind of locking here? A mutex in add_asv_member()
+> suggests that read access to the list should be protected as well.
+>
 
-Signed-off-by: KV Sujith <sujithkv@ti.com>
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/da850-evm.dts |    3 +++
- 1 file changed, 3 insertions(+)
+hmmm, yes should be their for completeness of code.
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 588ce58..1e11e5a 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -101,6 +101,9 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mii_pins>;
- 		};
-+		gpio: gpio at 1e26000 {
-+			status = "okay";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
--- 
-1.7.10.1
+>> +
+>> +     return NULL;
+>> +}
+>> +
+>> +unsigned int asv_get_volt(enum asv_type_id target_type,
+>> +                                             unsigned int target_freq)
+>
+> Do you need this function at all? I believe this is all about populating
+> device's OPP array with frequencies and voltages according to its ASV
+> level. Users will be able to query for required voltage using standard OPP
+> calls then, without a need for ASV specific functions like this one.
+>
+
+Yes, I had put a comment in initial version after commit message :
+"Hopefully asv_get_volt() can go out in future, once all users start using OPP
+library." , which seems to be missed in this version.
+I had kept it for the time being in initial version, to keep it
+usable(for testing) with
+existing cpufreq drivers, which need to reworked and may take time.
+
+[snip]
+>> +
+>> +     for (i = 0; i < asv_info->nr_dvfs_level; i++) {
+>> +             if (dev_pm_opp_add(dev, dvfs_table[i].freq * 1000,
+>> +                     dvfs_table[i].volt)) {
+>> +                     dev_warn(dev, "Failed to add OPP %d\n",
+>> +                              dvfs_table[i].freq);
+>
+> Hmm, shouldn't it be considered a failure instead?
+>
+
+hmm, not really always. Theoretically system with some less(failed to add)
+levels can work. Moreover I had prefered to keep it only warning, just to
+keep the behaviour of  asv_init_opp_table() similar to that of its
+counter part of_init_opp_table().
+
+>> +                     continue;
+>> +             }
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static struct asv_member *asv_init_member(struct asv_info *asv_info)
+>> +{
+>> +     struct asv_member *asv_mem;
+>> +     int ret = 0;
+>> +
+>> +     if (!asv_info) {
+>> +             pr_err("No ASV info provided\n");
+>> +             return NULL;
+>
+> I'd suggest adopting the ERR_PTR() convention, which allows returning more
+> information about the error.
+>
+
+Will it be really usefull here?, as we are not checking return value
+of any function.
+Bur for some cases below, i will also like to get it used.
+
+>> +     }
+>> +
+>> +     asv_mem = kzalloc(sizeof(*asv_mem), GFP_KERNEL);
+>> +     if (!asv_mem) {
+>> +             pr_err("Allocation failed for member: %s\n", asv_info->name);
+>> +             return NULL;
+>> +     }
+
+[snip]
+>
+> Hmm, I don't see a point of these three separate callbacks above.
+>
+> In general, I'd suggest a different architecture. I'd see this more as:
+>
+> 1) Platform code registers static platform device to instantiate SoC ASV
+>    driver.
+> 2) SoC specific ASV driver probes, reads group ID from hardware register,
+>    calls register_asv_member() with appropriate DVFS table for detected
+>    group.
+> 3) Driver using ASV calls asv_init_opp_table() with its struct device and
+>    ASV member name, which causes the ASV code to fill device's operating
+>    point using OPP calls.
+>
+> Now client driver has all the information it needs and the work of ASV
+> subsystem is done. The control flow between drivers would be much simpler
+> and no callbacks would have to be called.
+>
+
+Architecture stated above seems to be a subset(one possible way of use),
+of the proposed architecture. If someone really have nothing much to do,
+he can adopt the above stated approach using this framework also,
+callbacks are not mandatory.
+
+Since we usually have more things to do other than only reading
+fused group value and simply parsing a table index, so in drivers we have to
+implement functions to segregate stuff and different people do it in
+different way. Its an attempt to provide a way to keep structure(functions)
+similar for easy understanding and factoring out of common code.
+
+Moreover, I feels need of callbacks if we have to do something depending
+upon(specific) the user/instance of  ASV member. One thing came
+in my mind was dev_node may be required if we may think of parsing
+ASV table from DT and may be more things in future.
+
+
+I would like to get rectified, other nit/suggestions stated by you in
+next version.
+
+
+Thanks & Regards,
+ Yadwinder
