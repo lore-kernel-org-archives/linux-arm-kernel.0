@@ -1,143 +1,27 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 15 Dec 2013 15:31:29 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/5] ARM: dts: sun4i: Add support for mmc
-In-Reply-To: <20131215135854.GF3651@lukather>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <1387058295-20641-3-git-send-email-hdegoede@redhat.com>
- <20131215135854.GF3651@lukather>
-Message-ID: <52ADBD41.4050104@redhat.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Sun, 15 Dec 2013 10:50:26 -0500
+Subject: [PATCH 10/10] Kconfig: cleanup SERIO_I8042 dependencies
+In-Reply-To: <20131215103657.GB20197@core.coreip.homeip.net>
+References: <1387040376-26906-1-git-send-email-msalter@redhat.com>
+ <1387040376-26906-11-git-send-email-msalter@redhat.com>
+ <52ACA43F.2040402@zytor.com>
+ <20131215103657.GB20197@core.coreip.homeip.net>
+Message-ID: <1387122626.1979.136.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, 2013-12-15 at 02:36 -0800, Dmitry Torokhov wrote:
+> On Sat, Dec 14, 2013 at 10:32:31AM -0800, H. Peter Anvin wrote:
+> > On 12/14/2013 08:59 AM, Mark Salter wrote:
+> > > Remove messy dependencies from SERIO_I8042 by having it depend on one
+> > > Kconfig symbol (ARCH_MIGHT_HAVE_PC_SERIO) and having architectures
+> > > which need it select ARCH_MIGHT_HAVE_PC_SERIO in arch/*/Kconfig.
+> > > New architectures are unlikely to need SERIO_I8042, so this avoids
+> > > having an ever growing list of architectures to exclude.
 
-On 12/15/2013 02:58 PM, Maxime Ripard wrote:
-> Hi Hans,
->
-> On Sat, Dec 14, 2013 at 10:58:12PM +0100, Hans de Goede wrote:
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Commit-log :)
+> How are we going to merge this? In bulk through input tree or peacemeal
+> through all arches first?
+> 
 
-Heh.
-
-Note as said before I expect David to take things from here.
-
->
->> ---
->>   arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 16 ++++++++++++++++
->>   arch/arm/boot/dts/sun4i-a10.dtsi           | 16 ++++++++++++++++
->>   2 files changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> index 425a7db..d193937 100644
->> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> @@ -42,7 +42,23 @@
->>   			};
->>   		};
->>
->> +		sdc0: sdc at 01c0f000 {
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&sdc0_pins_a>;
->> +			pinctrl-1 = <&mmc0_cd_pin_cubieboard>;
->> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
->> +			cd-mode = <1>;
->> +			status = "okay";
->> +		};
->> +
->>   		pinctrl at 01c20800 {
->> +			mmc0_cd_pin_cubieboard: mmc0_cd_pin at 0 {
->> +				allwinner,pins = "PH1";
->> +				allwinner,function = "gpio_in";
->> +				allwinner,drive = <0>;
->> +				allwinner,pull = <0>;
->> +			};
->> +
->
-> You seem to be using mmc and sdc without any real distinction. Please
-> try to be consistent and use only one of the two (and I have a slight
-> preference for mmc :))
-
-I just took what David was using. I agree picking one and staying with
-it would be better.
-
->
->>   			led_pins_cubieboard: led_pins at 0 {
->>   				allwinner,pins = "PH20", "PH21";
->>   				allwinner,function = "gpio_out";
->> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
->> index 4dccdb0..13bccd5 100644
->> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> @@ -306,6 +306,15 @@
->>   			#size-cells = <0>;
->>   		};
->>
->> +		sdc0: sdc at 01c0f000 {
->> +			compatible = "allwinner,sun4i-mmc";
->> +			reg = <0x01c0f000 0x1000>;
->> +			clocks = <&ahb_gates 8>, <&mmc0>;
->> +			interrupts = <32>;
->> +			bus-width = <4>;
->> +			status = "disabled";
->> +		};
->> +
->
-> The A10 has much more mmc controller doesn't it?
-
-Yes 4 of them.
-
-> Could you add all of them in the DT ?
->
->>   		intc: interrupt-controller at 01c20400 {
->>   			compatible = "allwinner,sun4i-ic";
->>   			reg = <0x01c20400 0x400>;
->> @@ -376,6 +385,13 @@
->>   				allwinner,drive = <0>;
->>   				allwinner,pull = <0>;
->>   			};
->> +
->> +			sdc0_pins_a: sdc0 at 0 {
->> +				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
->> +				allwinner,function = "mmc0";
->> +				allwinner,drive = <3>;
->> +				allwinner,pull = <1>;
->
-> Wow, you need both the pullups and a 40mA output?
-
-Yes and no. The pullups are enabled by uboot and the allwinner
-sources, most of my testing has been done without them, which
-seems to work fine. I've enabled them to be consisten with the
-allwinner sources and u-boot.
-
-As for drive = <3>, we need drive = <2> for normal modes,
-and drive = <3> for ddr mode. I simply picked <3> to keep
-things KISS. It should not matter much in power usage, as
-it will only make the flanks of the signal more steep. Once the
-desired output level is reached the current will drop off. It will
-use more current when changing the level, but for half the time,
-so the effective power usage (current * time) is the same.
-
-> Ideally, I'd like this patch to be splitted into three:
->    - One that adds the MMC controller nodes to the DTSI
->    - One that adds the muxing options you need to the pinctrl node
->    - One that enables the controller on the boards
-
-Sounds like a good job for David. Note I've a lot more boards for
-which I would like to add mmc support or dts files in general
-(will do so as time permits).
-
-For those boards which already have a dts I'll send mmc adding dts
-patches to David for now so he can add the changes to the patch-set.
-
-How do you want to deal with new boards ? Send the addition of the
-base board to you (and CC David as he will need them in his tree too),
-and then send a patch to add mmc to the dts to David ?
-
-Or should I simply make it one big patch including mmc in the initial
-commit ?
-
-Regards,
-
-Hans
+They should all go together to eliminate the chance of bisect breakage.
+Either the input tree or maybe akpm tree.
