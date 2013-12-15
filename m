@@ -1,89 +1,72 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Sun, 15 Dec 2013 06:12:51 +0400
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <201312150153.54044.arnd@arndb.de>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312142203.45740.arnd@arndb.de>
- <1387058146.13062.24.camel@host5.omatika.ru>
- <201312150153.54044.arnd@arndb.de>
-Message-ID: <1387073571.13062.102.camel@host5.omatika.ru>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sun, 15 Dec 2013 10:18:45 +0800
+Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
+In-Reply-To: <201312142233.27143.arnd@arndb.de>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-3-git-send-email-dinguyen@altera.com>
+ <201312142233.27143.arnd@arndb.de>
+Message-ID: <52AD1185.6090501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-12-15 at 01:53 +0100, Arnd Bergmann wrote:
-> On Saturday 14 December 2013, Sergei Ianovich wrote:
-> > There are basically 2 options: one-for-all mfd device and one-for-one
-> > device drivers.
-> > 
-> > MFD
-> > pros:
-> > * easy to add into the tree (one file)
-> > * easy config (one option)
-> > 
-> > Separate devices
-> > * easy to support devices as respective subsystems evolve
-> > * easy to add new feature without breaking existing ones. Eg. it may
-> > make sense to provide industrial IO interface on analog IO devices
-> > * possible to have fine-grained configuration (eg. SRAM in kernel,
-> > serial and slot as modules)
-> > * proper device tree serves as a datasheet for the machine, so anyone
-> > who needs to work on it will have a decent view of the internals
-> > 
-> > I believe long-term benefits of separate devices outweigh immediate
-> > effects of an MFD. However, I certainly don't see the big picture and
-> > will accept your decision. Please make one.
-> 
-> Unfortunately I don't have a good way to judge the tradeoffs without
-> understanding more about the design of the hardware. Did I understand
-> you right that you expect future versions of the FPGA bitstream
-> to implement additional features or have a different set of endpoint
-> devices?
+Dear Arnd
 
-I am trying to reduce time you spend on review as much as possible.
-Please feel free to say if I do something to the opposite.
+On 12/15/2013 05:33 AM, Arnd Bergmann wrote:
+> On Thursday 12 December 2013, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> Add a "altr,socfpga-sdmmc-sdr-clk" clock type in the SOCFPGA clock driver. This
+>> clock type is not really a "clock" for say, but a mechanism to set the phase
+>> shift of the clock that is used to feed the SD/MMC CIU's clock. This clock does
+>> not have parent so it is designated as a CLK_IS_ROOT.
+>>
+>> This clock implements the set_clk_rate method that is meant to receive the SDR
+>> settings that is designated by the "samsung,dw-mshc-sdr-timing" binding. The
+>> SD/MMC driver passes this clock phase information into the clock driver to use.
+>>
+>> This enables the SD/MMC driver to touch registers that are located outside of
+>> the SD/MMC IP, which helps make the core SD/MMC driver generic.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@alter.com>
+>
+> Ok, this looks like it will work, but we haven't concluded if this is the
+> best way to do it. I'm looking for guidance from Mike here.
+>
+> The alternatives I can see for this particular problem are:
+>
+> 1. fake a clock and use the 'clk_set_rate' callback to set the phase
+>     rather than the clock frequency (as you do in this patch).
+> 2. extend the common clock API to provide a 'clk_set_phase' interface
+>     that you can call on the CIU clock to set this, so you don't have
+>     to fake anything. This seems to be the nicest interface if we have
+>     the same problem in more drivers.
+> 3. make the phase setting private to whichever clock is used for CIU
+>     (as one of your previous patches did, which I did not like).
+> 4. make the phase an additional argument to the clock specifier,
+>     so you would have <&mmcclock 12345 5678> rather than just <&mmcclock>
+>     in the mmc host device node to specify the two possible phases.
+>
+> I would also like to get buy-in from Zhangfei Gao, since he is working
+> on the same thing. Please coordinate with him to make sure whatever
+> one of you comes up with works for the other one too. At the moment,
+> patches are flying so fast without much discussion inbetween that I'd
+> prefer Chris to hold off from merging either one until you have both
+> revieved and Acked each other's patches.
+>
 
-I could write a lengthy description of the machine as I understand it,
-if need be. I am not related to its vendor in any way, so it may or may
-not be correct.
+This is our case
+In this version ip, supported now.
+Only several mode (LEGACY, HS) are supported in the code, where fixed 
+div and sample is need to be set, so we can hide them in clock.
+And each controller have different value & register, so different 
+controller use different clock.
+These clock can be ciu_clock, whose parent are original clock input.
 
-I've made to work 100% of features my client needs in the machine. It is
-~80% of the devices on the frame and ~10% of possible slot modules.
-There are chances someone else will work on the rest, eg. the device
-vendor.
+In next version ip, which still not in hand.
+HS200 and other mode have to be supported, tuning process have to be 
+included, good example is drivers/mmc/host/dw_mmc-exynos.c
+.execute_tuning         = dw_mci_exynos_execute_tuning,
+It have to choose the best point during the tuning process.
+Some other mode may still need tuning, which is special in our case.
 
-This page contains a photo, if there is any interest to see how it looks
-like:
-http://www.icpdas.com/root/product/solutions/pac/linpac/lp-8x4x_hardware.html
-
-> If so, I would argue that anything that you consider an optional
-> sub-device should have its own device node in the device tree.
-> 
-> Also, do you have to model hardware that is connected to the FPGA
-> rather than being part of it?
-
-Anything that can be plugged into the device is discoverable, so doesn't
-require to be in the device tree.
-
-> I suspect that you may have a different understanding of the term
-> MFD than what I was suggesting: A typical MFD driver in Linux is
-> basically a container device that has some registers on its own
-> like a version detection or the irqchip but mainly is there to
-> create sub-devices that each have a subset of the available
-> registers. The sub-devices may or may not be describe in DT in this
-> case.
-
-I may be missing something. My general understanding seems to be as
-follows. MFD will have probe/remove functionality of drivers for SRAM,
-RTC, serial modules in the patch series. MFD will be to FPGA what C
-language machine file was to machine: lots of hardcoded constants and
-functions which implement non-standard behavior (like set_termios in
-8250_lp8x4x.c). This seems to be wrong to me, as device tree is
-specifically designed to handle platform device initialization.
-
-The tree you drafted in the previous mail was 100% correct. I though
-about doing something like that. I decided not to, since all devices
-behind the FPGA are transparently accessed by CPU. I like the idea. I
-haven't resent a series with FPGA bus only because you wrote in the same
-mail that we need an MFD.
-
-If you say so, we will have an MFD.
+Zhangfei
