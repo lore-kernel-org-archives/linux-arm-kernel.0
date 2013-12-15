@@ -1,145 +1,129 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Sat, 14 Dec 2013 21:16:39 -0600
-Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
- timing through clock framework
-In-Reply-To: <52AD0E7A.50208@linaro.org>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-2-git-send-email-dinguyen@altera.com>
- <52AD0E7A.50208@linaro.org>
-Message-ID: <52AD1F17.5040708@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 14 Dec 2013 19:24:55 -0800
+Subject: [PATCH v3 01/12] clk: Fix debugfs reparenting NULL pointer
+ dereference
+In-Reply-To: <1381909214-12693-2-git-send-email-sboyd@codeaurora.org>
+References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
+ <1381909214-12693-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131215032455.26321.7522@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhangfei,
+Quoting Stephen Boyd (2013-10-16 00:40:03)
+> Adding clocks from a kernel module can cause a NULL pointer
+> dereference if the parent of a clock is added after the clock is
+> added. This happens because __clk_init() iterates over the list
+> of orphans and reparents the orphans to the clock being
+> registered before creating the debugfs entry for the clock.
+> Create the debugfs entry first before reparenting the orphans.
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 00000028
+> pgd = ef3e4000
+> [00000028] *pgd=bf810831
+> Internal error: Oops: 17 [#1] PREEMPT SMP ARM
+> Modules linked in: mmcc_8960(+)
+> CPU: 0 PID: 52 Comm: modprobe Not tainted 3.12.0-rc2-00023-g1021a28-dirty #659
+> task: ef319200 ti: ef3a6000 task.ti: ef3a6000
+> PC is at lock_rename+0x24/0xc4
+> LR is at debugfs_rename+0x34/0x208
+> pc : [<c0317238>]    lr : [<c047dfe4>]    psr: 00000013
+> sp : ef3a7b88  ip : ef3a7ba8  fp : ef3a7ba4
+> r10: ef3d51cc  r9 : ef3bc680  r8 : ef3d5210
+> r7 : ef3bc640  r6 : eee287e0  r5 : eee287e0  r4 : 00000000
+> r3 : ef3bc640  r2 : 00000000  r1 : eee287e0  r0 : 00000000
+> Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> Control: 10c5787d  Table: af3e406a  DAC: 00000015
+> Process modprobe (pid: 52, stack limit = 0xef3a6240)
+> Stack: (0xef3a7b88 to 0xef3a8000)
+> 7b80:                   ef3bc640 ee4047e0 00000000 eee287e0 ef3a7bec ef3a7ba8
+> 7ba0: c047dfe4 c0317220 ef3bc680 ef3d51cc ef3a7bdc ef3a7bc0 c06e29d0 c0268784
+> 7bc0: c08946e8 ef3d5210 00000000 ef3bc700 ef3d5290 ef3d5210 ef3bc680 ef3d51cc
+> 7be0: ef3a7c0c ef3a7bf0 c05b9e9c c047dfbc 00000000 00000000 ef3d5210 ef3d5290
+> 7c00: ef3a7c24 ef3a7c10 c05baebc c05b9e30 00000001 00000001 ef3a7c64 ef3a7c28
+> 7c20: c05bb124 c05bae9c bf000cd8 ef3bc7c0 000000d0 c0ff129c bf001774 00000002
+> 7c40: ef3bc740 ef3d5290 ef0f9a10 bf001774 bf00042c 00000061 ef3a7c8c ef3a7c68
+> 7c60: c05bb480 c05baed8 bf001774 ef3d5290 ef0f9a10 bf001774 ef38bc10 ef0f9a00
+> 7c80: ef3a7cac ef3a7c90 c05bb5a8 c05bb3a0 bf001774 00000062 ef0f9a10 ef38bc18
+> 7ca0: ef3a7cec ef3a7cb0 bf00010c c05bb56c 00000000 ef38ba00 00000000 ef3d60d0
+> 7cc0: ef3a7cdc c0fefc24 ef0f9a10 c0a091c0 bf000d24 00000000 bf0029f0 bf006000
+> 7ce0: ef3a7cfc ef3a7cf0 c05156c0 bf000040 ef3a7d2c ef3a7d00 c0513f5c c05156a8
+> 7d00: ef3a7d2c ef0f9a10 ef0f9a10 bf000d24 ef0f9a44 c09ca588 00000000 bf006000
+> 7d20: ef3a7d4c ef3a7d30 c05142b8 c0513ecc ef0fd25c 00000000 bf000d24 c0514214
+> 7d40: ef3a7d74 ef3a7d50 c0512030 c0514220 ef0050a8 ef0fd250 ef0050f8 bf000d24
+> 7d60: ef37c100 c09ed150 ef3a7d84 ef3a7d78 c05139c8 c0511fd8 ef3a7
+> 7d80: c051344c c05139a8 bf000864 c09ca588 ef3a7db4 bf000d24 bf002
+> 7da0: c09ca588 00000000 ef3a7dcc ef3a7db8 c05149dc c0513360 ef3a7
+> 7dc0: ef3a7ddc ef3a7dd0 c0515914 c0514960 ef3a7dec ef3a7de0 bf006
+> 7de0: ef3a7e74 ef3a7df0 c0208800 bf00600c ef3a7e1c ef3a7e00 c04c5
+> 7e00: ffffffff c09d46c4 00000000 bf0029a8 ef3a7e34 ef3a7e20 c024c
+> 7e20: ffffffff c09d46c4 ef3a7e5c ef3a7e38 c024e2fc c024ce40 00000
+> 7e40: ef3a7f48 bf0029b4 bf0029a8 271aeb1c ef3a7f48 bf0029a8 00000001 ef383c00
+> 7e60: bf0029f0 00000001 ef3a7f3c ef3a7e78 c028fac4 c0208718 bf0029b4 00007fff
+> 7e80: c028cd58 000000d2 f0065000 00000000 ef3a7ebc 00000000 00000000 bf0029b4
+> 7ea0: 00000000 bf0029ac bf0029b4 ef3a6000 ef3a7efc c08bf128 00000000 00000000
+> 7ec0: 00000000 00000000 00000000 00000000 6e72656b 00006c65 00000000 00000000
+> 7ee0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 7f00: 00000000 00000000 00000000 271aeb1c ef3a7f2c 00016376 b6f38008 001d3774
+> 7f20: 00000080 c020f968 ef3a6000 00000000 ef3a7fa4 ef3a7f40 c02904dc c028e178
+> 7f40: c020f898 010ccfa8 f0065000 00016376 f0073f60 f0073d7d f007a1e8 00002b24
+> 7f60: 000039e4 00000000 00000000 00000000 0000002f 00000030 00000019 00000016
+> 7f80: 00000012 00000000 00000000 010de1b2 b6f38008 010ccfa8 00000000 ef3a7fa8
+> 7fa0: c020f6c0 c0290434 010de1b2 b6f38008 b6f38008 00016376 001d3774 00000000
+> 7fc0: 010de1b2 b6f38008 010ccfa8 00000080 010de1b2 bedb6f90 010de1c9 0001d8dc
+> 7fe0: 0000000c bedb674c 0001ce30 000094c4 60000010 b6f38008 00000008 0000001d
+> [<c0317238>] (lock_rename+0x24/0xc4) from [<c047dfe4>] (debugfs_rename+0x34/0x208)
+> [<c047dfe4>] (debugfs_rename+0x34/0x208) from [<c05b9e9c>] (clk_debug_reparent+0x78/0xc0)
+> [<c05baebc>] (__clk_reparent+0x2c/0x3c) from [<c05bb124>] (__clk_init+0x258/0x4c8)
+> [<c05bb124>] (__clk_init+0x258/0x4c8) from [<c05bb480>] (_clk_register+0xec/0x1cc)
+> [<c05bb480>] (_clk_register+0xec/0x1cc) from [<c05bb5a8>] (devm_clk_register+0x48/0x7c)
+> [<c05bb5a8>] (devm_clk_register+0x48/0x7c) from [<bf00010c>] (msm_mmcc_8960_probe+0xd8/0x190 [mmcc_8960])
+> [<bf00010c>] (msm_mmcc_8960_probe+0xd8/0x190 [mmcc_8960]) from [<c05156c0>] (platform_drv_probe+0x24/0x28)
+> [<c05156c0>] (platform_drv_probe+0x24/0x28) from [<c0513f5c>] (driver_probe_device+0x9c/0x354)
+> [<c0513f5c>] (driver_probe_device+0x9c/0x354) from [<c05142b8>] (__driver_attach+0xa4/0xa8)
+> [<c05142b8>] (__driver_attach+0xa4/0xa8) from [<c0512030>] (bus_for_each_dev+0x64/0x98)
+> [<c0512030>] (bus_for_each_dev+0x64/0x98) from [<c05139c8>] (driver_attach+0x2c/0x30)
+> [<c05139c8>] (driver_attach+0x2c/0x30) from [<c051344c>] (bus_add_driver+0xf8/0x2a8)
+> [<c051344c>] (bus_add_driver+0xf8/0x2a8) from [<c05149dc>] (driver_register+0x88/0x104)
+> [<c05149dc>] (driver_register+0x88/0x104) from [<c0515914>] (__platform_driver_register+0x58/0x6c)
+> [<c0515914>] (__platform_driver_register+0x58/0x6c) from [<bf006018>] (msm_mmcc_8960_driver_init+0x18/0x24 [mmcc_8960])
+> [<bf006018>] (msm_mmcc_8960_driver_init+0x18/0x24 [mmcc_8960]) from [<c0208800>] (do_one_initcall+0xf4/0x1b8)
+> [<c0208800>] (do_one_initcall+0xf4/0x1b8) from [<c028fac4>] (load_module+0x1958/0x22bc)
+> [<c028fac4>] (load_module+0x1958/0x22bc) from [<c02904dc>] (SyS_init_module+0xb4/0x120)
+> [<c02904dc>] (SyS_init_module+0xb4/0x120) from [<c020f6c0>] (ret_fast_syscall+0x0/0x48)
+> Code: e1500001 e1a04000 e1a05001 0a000021 (e5903028)
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-On 12/14/13 8:05 PM, zhangfei wrote:
-> Dear Dinh
->
-> On 12/13/2013 04:30 AM, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> All implementations of the Synopsys DW SD/MMC IP have settings to
->> control
->> the phase shift of the CIU clk. These phase shift settings are
->> necessary for
->> the SD/MMC to correctly clock the card. All variants of the dw_mmc
->> will need
->> these settings, but how they are implemented can vastly vary.
->>
->> This patch enables the setting for the SDR and/or DDR settings
->> through the
->> common clock framework.
->>
->> Depends on the patch "mmc: dw_mmc: Enable the hold reg for certain
->> speed modes",
->> that is already reading the "samsung,dw-mshc-sdr-timing" and
->> "samsung,dw-mshc-ddr-timing" bindings, this patch saves those values
->> into a
->> u32 bitmask that can be passed to the clock framework to use.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> ---
->> v6: Add this patch
->> v5: none
->> v4: none
->> v3: none
->> v2: none
->> ---
->>   drivers/mmc/host/dw_mmc.c  |   23 +++++++++++++++++++++++
->>   include/linux/mmc/dw_mmc.h |    6 ++++++
->>   2 files changed, 29 insertions(+)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 480dafe..1fb5cff 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -2431,6 +2431,8 @@ static struct dw_mci_board
->> *dw_mci_parse_dt(struct dw_mci *host)
->>       if ((sdr_timing[1] == 0) || (ddr_timing[1] == 0))
->>           pdata->cclk_in_drv = 0;
->>
->> +    pdata->sdr_timing = (sdr_timing[1] | (sdr_timing[0] << 4));
->> +    pdata->ddr_timing = (ddr_timing[1] | (ddr_timing[0] << 4));
->>       return pdata;
->>   }
->>
->> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
->>           dev_dbg(host->dev, "ciu clock not available\n");
->>           host->bus_hz = host->pdata->bus_hz;
->>       } else {
->> +        /* If the CIU clk is available, we check for SDR and DDR
->> +         * timing phase shift settings. But not all platforms
->> +         * may have populated these settings, the driver will not fail
->> +         * if these settings are not specified.
->> +         */
->> +        if (host->pdata->sdr_timing) {
->> +            host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
->> +            if (IS_ERR(host->sdr_clk))
->> +                dev_dbg(host->dev, "sdr_mmc clock not available\n");
->> +            else
->> +                clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
->> +        }
->> +
->> +        if (host->pdata->ddr_timing) {
->> +            host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
->> +            if (IS_ERR(host->ddr_clk))
->> +                dev_dbg(host->dev, "ddr_mmc clock not available\n");
->> +            else
->> +                clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
->> +        }
->> +
->
-> Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed,
-> fixed as each controller, or different with different board.
-Yes, they are fixed for each controller per SoC.
-> In case they are fixed, or fixed in each controller, and only required
-> to be set in probe only once, maybe they can be hide in
-> clk_mmc_ops.prepare
-> And the clock can be used as ciu_clock, or parent of ciu_clock, which
-> is called in dw_mmc.c, maybe these code can be ignored.
->
-Please see v5 of this patch: https://patchwork.kernel.org/patch/3311121/
-The issue with V5 was that there is no way for the dw_mmc driver to pass
-the clock phase settings
-in the clk_mmc_ops.prepare function.
->
->
->>           ret = clk_prepare_enable(host->ciu_clk);
->>           if (ret) {
->>               dev_err(host->dev, "failed to enable ciu clock\n");
->> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
->> index 2b5b8bf..ad90ad1 100644
->> --- a/include/linux/mmc/dw_mmc.h
->> +++ b/include/linux/mmc/dw_mmc.h
->> @@ -83,6 +83,8 @@ struct mmc_data;
->>    * @priv: Implementation defined private data.
->>    * @biu_clk: Pointer to bus interface unit clock instance.
->>    * @ciu_clk: Pointer to card interface unit clock instance.
->> + * @sdr_clk: Pointer to the SDR clock instance.
->> + * @ddr_clk: Pointer to the DDR clock instance.
->>    * @slot: Slots sharing this MMC controller.
->>    * @fifo_depth: depth of FIFO.
->>    * @data_shift: log2 of FIFO item size.
->> @@ -170,6 +172,8 @@ struct dw_mci {
->>       void            *priv;
->>       struct clk        *biu_clk;
->>       struct clk        *ciu_clk;
->> +    struct clk        *sdr_clk;
->> +    struct clk        *ddr_clk;
->>       struct dw_mci_slot    *slot[MAX_MCI_SLOTS];
->>
->>       /* FIFO push and pull */
->> @@ -241,6 +245,8 @@ struct dw_mci_board {
->>       u32 caps2;    /* More capabilities */
->>       u32 pm_caps;    /* PM capabilities */
->>       u32 cclk_in_drv;    /*cclk_in_drv phase shift */
->> +    u32 sdr_timing;    /* Single data rate timing setting. */
->> +    u32 ddr_timing;    /* Double data rate timing setting. */
->
-> Are they fixed or not?
-They are fixed values that is represented in the DTS bindings.
+Taken into clk-next. Thanks!
 
-Dinh
->
-> Thanks
-> Zhangfei
+Mike
+
+> ---
+>  drivers/clk/clk.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index a004769..fbb5d59 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1737,6 +1737,7 @@ int __clk_init(struct device *dev, struct clk *clk)
+>         else
+>                 clk->rate = 0;
+>  
+> +       clk_debug_register(clk);
+>         /*
+>          * walk the list of orphan clocks and reparent any that are children of
+>          * this clock
+> @@ -1767,8 +1768,6 @@ int __clk_init(struct device *dev, struct clk *clk)
+>         if (clk->ops->init)
+>                 clk->ops->init(clk->hw);
+>  
+> -       clk_debug_register(clk);
+> -
+>  out:
+>         clk_prepare_unlock();
+>  
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
