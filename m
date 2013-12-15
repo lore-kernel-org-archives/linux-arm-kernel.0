@@ -1,37 +1,117 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Sun, 15 Dec 2013 19:30:52 +0100
-Subject: [PATCH 2/2] pinctrl: at91: replace clk_prepare + clk_enable by
- clk_prepare_enable
-In-Reply-To: <1387132252-2584-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387132252-2584-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1387132252-2584-3-git-send-email-b.brezillon@overkiz.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 15 Dec 2013 20:23:36 +0100
+Subject: [PATCH v3] ARM: dts: sun5i: Add new sun5i-a13-olinuxino-micro board
+Message-ID: <1387135416-16180-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the clk_prepare and clk_enable calls by a single
-clk_prepare_enable call.
+The A13-OLinuXino-MICRO is a small dev-board with the Allwinner A13 SoC:
+https://www.olimex.com/Products/OLinuXino/A13/A13-OLinuXino-MICRO/
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Features:
+A13 Cortex A8 processor at 1GHz, 3D Mali400 GPU
+256 MB RAM (128Mbit x 16)
+5VDC input power supply with own ICs, noise immune design
+1 USB host
+1 USB OTG which can power the board
+SD-card connector for booting the Linux image
+VGA video output
+LCD signals available on connector so you still can use LCD if you disable VGA/HDMI
+Audio output
+Microphone input pads (no connector)
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/pinctrl/pinctrl-at91.c |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 68 +++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 82f6301..4deb9cb 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1359,10 +1359,8 @@ void at91_pinctrl_gpio_resume(void)
- 
- 		pio = gpio_chips[i]->regbase;
- 
--		if (!wakeups[i]) {
--			if (clk_prepare(gpio_chips[i]->clock) == 0)
--				clk_enable(gpio_chips[i]->clock);
--		}
-+		if (!wakeups[i])
-+			clk_prepare_enable(gpio_chips[i]->clock);
- 
- 		__raw_writel(wakeups[i], pio + PIO_IDR);
- 		__raw_writel(backups[i], pio + PIO_IER);
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d57c1a6..b663ed7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -255,6 +255,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-hackberry.dtb \
+ 	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a13-olinuxino.dtb \
++	sun5i-a13-olinuxino-micro.dtb \
+ 	sun6i-a31-colombus.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+ 	sun7i-a20-cubietruck.dtb \
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+new file mode 100644
+index 0000000..fe2ce0a
+--- /dev/null
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+@@ -0,0 +1,68 @@
++/*
++ * Copyright 2012 Maxime Ripard
++ * Copyright 2013 Hans de Goede <hdegoede@redhat.com>
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun5i-a13.dtsi"
++
++/ {
++	model = "Olimex A13-Olinuxino Micro";
++	compatible = "olimex,a13-olinuxino-micro", "allwinner,sun5i-a13";
++
++	soc at 01c00000 {
++		pinctrl at 01c20800 {
++			led_pins_olinuxinom: led_pins at 0 {
++				allwinner,pins = "PG9";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		uart1: serial at 01c28400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart1_pins_b>;
++			status = "okay";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
++
++		i2c2: i2c at 01c2b400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olinuxinom>;
++
++		power {
++			label = "a13-olinuxino-micro:green:power";
++			gpios = <&pio 6 9 0>;
++			default-state = "on";
++		};
++	};
++};
 -- 
-1.7.9.5
+1.8.4.2
