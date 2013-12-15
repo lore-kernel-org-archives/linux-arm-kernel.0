@@ -1,36 +1,92 @@
-From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
-Date: Sun, 15 Dec 2013 17:33:57 +0100
-Subject: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC hosts found on
- Allwinner sunxi SoCs
-In-Reply-To: <52ADBAA3.7060507@redhat.com>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <20131215134415.GE3651@lukather> <52ADBAA3.7060507@redhat.com>
-Message-ID: <1870422.7CyGeURSCU@dizzy-6.site>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Mon, 16 Dec 2013 00:36:26 +0800
+Subject: [PATCH v3 [resend] 04/18] smp,
+ ARM: kill SMP single function call interrupt
+In-Reply-To: <1387125400-28849-1-git-send-email-liuj97@gmail.com>
+References: <1387125400-28849-1-git-send-email-liuj97@gmail.com>
+Message-ID: <1387125400-28849-5-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-> David, since you'll be doing v2 I guess you'll be filling in v2. FYI
-> I've tested this on sun4i-a10, sun5i-a10s sun5i-a13 and sun7i-a20.
-Yeah. I'll take care of it.
-I'll work out a V2 which incorporates all the comments made on the first patch
-set you've handed in.
+Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
+similar to smp_call_function_single()" has unified the way to handle
+single and multiple cross-CPU function calls. Now only one interrupt
+is needed for architecture specific code to support generic SMP function
+call interfaces, so kill the redundant single function call interrupt.
 
-> It uses dma in bus-master mode using a built-in designware idmac controller,
-> which is identical to the one found in the mmc-dw hosts. Note the rest of
-> the host is not identical, I've looked into reusing the mmc-dw driver but
-> that does not seem like a good idea (manual sending stop commands
-> versus auto stop on sunxi, completely different registers, etc.).
-It's already a good thing, that I know now what the command set of the IDMAC 
-controller is, since I had no idea how to configure it exactly.
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Shaohua Li <shli@kernel.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Jiri Kosina <trivial@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Jiang Liu <liuj97@gmail.com>
+---
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/kernel/smp.c          | 10 +---------
+ 2 files changed, 2 insertions(+), 10 deletions(-)
 
-> The plan is for David to send v2 of this patch-set so that should take care
-> of that :)
-ok
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131215/86b73642/attachment.sig>
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index fe3ea77..3d7351c 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	8
++#define NR_IPI	7
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index dc894ab..e24a23d 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -65,7 +65,6 @@ enum ipi_msg_type {
+ 	IPI_TIMER,
+ 	IPI_RESCHEDULE,
+ 	IPI_CALL_FUNC,
+-	IPI_CALL_FUNC_SINGLE,
+ 	IPI_CPU_STOP,
+ 	IPI_IRQ_WORK,
+ 	IPI_COMPLETION,
+@@ -448,7 +447,7 @@ void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+ 
+ void arch_send_call_function_single_ipi(int cpu)
+ {
+-	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
++	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
+ }
+ 
+ #ifdef CONFIG_IRQ_WORK
+@@ -465,7 +464,6 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+-	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ 	S(IPI_COMPLETION, "completion interrupts"),
+@@ -579,12 +577,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
+-	case IPI_CALL_FUNC_SINGLE:
+-		irq_enter();
+-		generic_smp_call_function_single_interrupt();
+-		irq_exit();
+-		break;
+-
+ 	case IPI_CPU_STOP:
+ 		irq_enter();
+ 		ipi_cpu_stop(cpu);
+-- 
+1.8.1.2
