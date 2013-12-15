@@ -1,98 +1,141 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 Dec 2013 01:53:53 +0100
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <1387058146.13062.24.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312142203.45740.arnd@arndb.de>
- <1387058146.13062.24.camel@host5.omatika.ru>
-Message-ID: <201312150153.54044.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 14 Dec 2013 16:48:44 -0800
+Subject: [PATCHv10 01/41] clk: add support for platform specific clock I/O
+ wrapper functions
+In-Reply-To: <1385453182-24421-2-git-send-email-t-kristo@ti.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20131215004844.26321.2882@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 December 2013, Sergei Ianovich wrote:
-> On Sat, 2013-12-14 at 22:03 +0100, Arnd Bergmann wrote:
-> > On Friday 13 December 2013, Sergei Ianovich wrote:
-> > > I've also decided not to create a single mfd device for
-> > > machine-specific devices. Instead each type is supported by a separate
-> > > driver in respective subsystem. It was tempting to hardcode all the
-> > > constants in one source file, but that requires ugly initialization.
-> > > The taken way produces much cleaner code.
-> > 
-> > I think you should at least change the DT representation for the FPGA
-> > to show one device as the actual FPGA and attach children to that,
-> > multiple indirection levels if necessary.
-> > 
-> > I suspect that the fpga is on some external-bus port with a specific
-> > chip-select, so I would model this as
-> > 
-> >         extbus {
-> >                 compatible = "simple-bus";
-> >                 #address-cells = <1>;
-> >                 #size-cells = <1>;
-> >                 /* bus addresses 0-0xfffff mapped to 0x17000000 */
-> >                 ranges = <0 0x17000000 0x100000>;
-> >                 interrupt-parent = <&fpga-irq>;
-> > 
-> >                 fpga-irq: irq at 6 {
-> >                         regs = <6 16>; /* translated addresses
-> >                         ...
-> >                 };
-> > 
-> >                 fgpa-bus {
-> >                         #address-cells = <1>;
-> >                         #size-cells = <1>;
-> >                         ranges;
-> > 
-> >                         serial at 9050 {
-> >                                 ...
-> >                         };
-> >                 };
-> >         };
-> > 
-> > I also think you don't need to make the devices quite as fine-grained
-> > here but instead group things together more. I would probably indeed
-> > put everything that is not on one of the slots into a common device,
-> > including the irqchip.
+Quoting Tero Kristo (2013-11-26 00:05:42)
+> Current clock wrappers assume simple and direct mapped hardware register
+> access. Improve this support by adding functionality for registering
+> platform specific clock I/O wrappers, which can be used to support
+> various features needed like endianess conversions, indexed regmap support,
+> etc. Default I/O wrapper provided also which uses the existing direct
+> I/O mapped behavior.
 > 
-> There are basically 2 options: one-for-all mfd device and one-for-one
-> device drivers.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+
+There is a separate discussion on removing regmap for reading omap clk
+registers. I guess this patch is not needed in that case?
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/clk.c            |   68 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h |   15 +++++-----
+>  2 files changed, 75 insertions(+), 8 deletions(-)
 > 
-> MFD
-> pros:
-> * easy to add into the tree (one file)
-> * easy config (one option)
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2cf2ea6..c331386 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -34,6 +34,74 @@ static HLIST_HEAD(clk_root_list);
+>  static HLIST_HEAD(clk_orphan_list);
+>  static LIST_HEAD(clk_notifier_list);
+>  
+> +/**
+> + * clk_readl_default - default clock register read support function
+> + * @reg: register to read
+> + *
+> + * Default implementation for reading a clock register.
+> + */
+> +static u32 clk_readl_default(u32 __iomem *reg)
+> +{
+> +       return readl(reg);
+> +}
+> +
+> +/**
+> + * clk_writel_default - default clock register write support function
+> + * @val: value to write
+> + * @reg: register to write to
+> + *
+> + * Default implementation for writing a clock register.
+> + */
+> +static void clk_writel_default(u32 val, u32 __iomem *reg)
+> +{
+> +       writel(val, reg);
+> +}
+> +
+> +struct clk_reg_ops clk_reg_ops_default = {
+> +       .clk_readl = clk_readl_default,
+> +       .clk_writel = clk_writel_default
+> +};
+> +
+> +static struct clk_reg_ops *clk_reg_ops = &clk_reg_ops_default;
+> +
+> +/**
+> + * clk_register_reg_ops - register access functions for clock registers
+> + * @ops: register level ops
+> + *
+> + * Registers platform or SoC specific operations for reading / writing
+> + * clock registers.
+> + */
+> +int clk_register_reg_ops(struct clk_reg_ops *ops)
+> +{
+> +       if (!ops)
+> +               return -EINVAL;
+> +       clk_reg_ops = ops;
+> +       return 0;
+> +}
+> +
+> +/**
+> + * clk_readl - read a clock register value from hardware
+> + * @reg: register to read
+> + *
+> + * Uses the registered clk_reg_ops to read a hardware clock register value.
+> + */
+> +u32 clk_readl(u32 __iomem *reg)
+> +{
+> +       return clk_reg_ops->clk_readl(reg);
+> +}
+> +
+> +/**
+> + * clk_writel - write a clock register value to hardware
+> + * @val: value to write
+> + * @reg: register to write
+> + *
+> + * Uses the registered clk_reg_ops to write a hardware clock register value.
+> + */
+> +void clk_writel(u32 val, u32 __iomem *reg)
+> +{
+> +       clk_reg_ops->clk_writel(val, reg);
+> +}
+> +
+>  /***           locking             ***/
+>  static void clk_prepare_lock(void)
+>  {
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 7e59253..16e4df2 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -512,15 +512,14 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+>   * for improved portability across platforms
+>   */
+>  
+> -static inline u32 clk_readl(u32 __iomem *reg)
+> -{
+> -       return readl(reg);
+> -}
+> +struct clk_reg_ops {
+> +       u32 (*clk_readl)(u32 __iomem *reg);
+> +       void (*clk_writel)(u32 val, u32 __iomem *reg);
+> +};
+>  
+> -static inline void clk_writel(u32 val, u32 __iomem *reg)
+> -{
+> -       writel(val, reg);
+> -}
+> +u32 clk_readl(u32 __iomem *reg);
+> +void clk_writel(u32 val, u32 __iomem *reg);
+> +int clk_register_reg_ops(struct clk_reg_ops *ops);
+>  
+>  #endif /* CONFIG_COMMON_CLK */
+>  #endif /* CLK_PROVIDER_H */
+> -- 
+> 1.7.9.5
 > 
-> Separate devices
-> * easy to support devices as respective subsystems evolve
-> * easy to add new feature without breaking existing ones. Eg. it may
-> make sense to provide industrial IO interface on analog IO devices
-> * possible to have fine-grained configuration (eg. SRAM in kernel,
-> serial and slot as modules)
-> * proper device tree serves as a datasheet for the machine, so anyone
-> who needs to work on it will have a decent view of the internals
-> 
-> I believe long-term benefits of separate devices outweigh immediate
-> effects of an MFD. However, I certainly don't see the big picture and
-> will accept your decision. Please make one.
-
-Unfortunately I don't have a good way to judge the tradeoffs without
-understanding more about the design of the hardware. Did I understand
-you right that you expect future versions of the FPGA bitstream
-to implement additional features or have a different set of endpoint
-devices?
-
-If so, I would argue that anything that you consider an optional
-sub-device should have its own device node in the device tree.
-
-Also, do you have to model hardware that is connected to the FPGA
-rather than being part of it?
-
-I suspect that you may have a different understanding of the term
-MFD than what I was suggesting: A typical MFD driver in Linux is
-basically a container device that has some registers on its own
-like a version detection or the irqchip but mainly is there to
-create sub-devices that each have a subset of the available
-registers. The sub-devices may or may not be describe in DT in this
-case.
-
-	Arnd
