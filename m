@@ -1,72 +1,74 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sun, 15 Dec 2013 10:18:45 +0800
-Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
-In-Reply-To: <201312142233.27143.arnd@arndb.de>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-3-git-send-email-dinguyen@altera.com>
- <201312142233.27143.arnd@arndb.de>
-Message-ID: <52AD1185.6090501@linaro.org>
+From: kasimling@gmail.com (Alex Ling)
+Date: Sun, 15 Dec 2013 10:38:04 +0800
+Subject: [PATCH] ARM: dts: add board dts file for EXYNOS4412 based
+ TINY4412 board
+In-Reply-To: <23915888.rvPOtSbknd@flatron>
+References: <1384520969-2450-1-git-send-email-kasimling@gmail.com>
+ <23915888.rvPOtSbknd@flatron>
+Message-ID: <CAHaF_khsrAkaepHX8yObxKQx6aq9oagzRgAx=J6G6R2fCUN7wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd
+Tomasz,
+Thanks for reviewing. I'll fix the patch description and style problems.
 
-On 12/15/2013 05:33 AM, Arnd Bergmann wrote:
-> On Thursday 12 December 2013, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Add a "altr,socfpga-sdmmc-sdr-clk" clock type in the SOCFPGA clock driver. This
->> clock type is not really a "clock" for say, but a mechanism to set the phase
->> shift of the clock that is used to feed the SD/MMC CIU's clock. This clock does
->> not have parent so it is designated as a CLK_IS_ROOT.
->>
->> This clock implements the set_clk_rate method that is meant to receive the SDR
->> settings that is designated by the "samsung,dw-mshc-sdr-timing" binding. The
->> SD/MMC driver passes this clock phase information into the clock driver to use.
->>
->> This enables the SD/MMC driver to touch registers that are located outside of
->> the SD/MMC IP, which helps make the core SD/MMC driver generic.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@alter.com>
->
-> Ok, this looks like it will work, but we haven't concluded if this is the
-> best way to do it. I'm looking for guidance from Mike here.
->
-> The alternatives I can see for this particular problem are:
->
-> 1. fake a clock and use the 'clk_set_rate' callback to set the phase
->     rather than the clock frequency (as you do in this patch).
-> 2. extend the common clock API to provide a 'clk_set_phase' interface
->     that you can call on the CIU clock to set this, so you don't have
->     to fake anything. This seems to be the nicest interface if we have
->     the same problem in more drivers.
-> 3. make the phase setting private to whichever clock is used for CIU
->     (as one of your previous patches did, which I did not like).
-> 4. make the phase an additional argument to the clock specifier,
->     so you would have <&mmcclock 12345 5678> rather than just <&mmcclock>
->     in the mmc host device node to specify the two possible phases.
->
-> I would also like to get buy-in from Zhangfei Gao, since he is working
-> on the same thing. Please coordinate with him to make sure whatever
-> one of you comes up with works for the other one too. At the moment,
-> patches are flying so fast without much discussion inbetween that I'd
-> prefer Chris to hold off from merging either one until you have both
-> revieved and Acked each other's patches.
->
 
-This is our case
-In this version ip, supported now.
-Only several mode (LEGACY, HS) are supported in the code, where fixed 
-div and sample is need to be set, so we can hide them in clock.
-And each controller have different value & register, so different 
-controller use different clock.
-These clock can be ciu_clock, whose parent are original clock input.
+Regards,
+Alex
 
-In next version ip, which still not in hand.
-HS200 and other mode have to be supported, tuning process have to be 
-included, good example is drivers/mmc/host/dw_mmc-exynos.c
-.execute_tuning         = dw_mci_exynos_execute_tuning,
-It have to choose the best point during the tuning process.
-Some other mode may still need tuning, which is special in our case.
-
-Zhangfei
+On Sun, Dec 15, 2013 at 2:57 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Alex,
+>
+> On Friday 15 of November 2013 21:09:29 Alex Ling wrote:
+>> Add a minimal board dts file for EXYNOS4412 based FriendlyARM's
+>> TINY4412 board. This patch including adds the node to support
+>> peripherals like UART, SD card on SDMMC2 port, and this patch
+>> adds GPIO connected LEDS and configure its properties like
+>> following:
+>> LED1: use 'heartbeat' trigger, blinking while the board is running.
+>> LED4: use 'mmc0' trigger, on when mmc0 is accessing.
+>> LED2 and LED3 can be controlled from userspace.
+>
+> Well, all the LEDs can be controlled from userspace. The default trigger
+> is just the initial setting, which can be changed later by userspace.
+> It's just a general comment, not an issue with the patch, though.
+>
+> Anyway, you don't need such detailed patch description, as you can see
+> most of the things directly from the code. In case of this patch, just the
+> list of supported peripherals is fine, without going into minor details,
+> such as LED triggers.
+>
+> Also, please see my comments inline.
+>
+> [snip]
+>> diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+>> new file mode 100644
+>> index 0000000..78ace14
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+> [snip]
+>> +     leds {
+>> +             compatible = "gpio-leds";
+>
+> style: A blank line should be separating properties from nodes.
+>
+>> +             led1 {
+>> +                     label = "led1:heart";
+>
+> Are the labels for this and the LEDs below related to the hardware?
+> I mean, the label should preferrably come from the board documentation,
+> or a label on the PCB next to the LED. Also they shouldn't represent
+> any particular use case, so you should remove the ":heart" suffix.
+>
+>> +                     gpios = <&gpm4 0 1>;
+>> +                     default-state = "off";
+>> +                     linux,default-trigger = "heartbeat";
+>> +             };
+>
+> style: Subnodes should be separated with blank lines.
+>
+> Otherwise the patch looks fine.
+>
+> Best regards,
+> Tomasz
+>
