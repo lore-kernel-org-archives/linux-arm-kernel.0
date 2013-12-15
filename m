@@ -1,1334 +1,161 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 15 Dec 2013 14:44:15 +0100
-Subject: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC hosts found on
- Allwinner sunxi SoCs
-In-Reply-To: <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20131215134415.GE3651@lukather>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 15 Dec 2013 14:51:03 +0100
+Subject: [RFC v2 1/4] power: asv: Add common ASV support for Samsung SoCs
+In-Reply-To: <CAKew6eVSOQaHjYj3JRhJKnozY26OkeUGhvC2usadfUqW9hyu2Q@mail.gmail.com>
+References: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
+ <4229773.U5JovcREjb@amdc1227>
+ <CAKew6eVSOQaHjYj3JRhJKnozY26OkeUGhvC2usadfUqW9hyu2Q@mail.gmail.com>
+Message-ID: <11098201.47kElN2vGm@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-I won't comment on the MMC driver itself, and leave Chris comment on
-that, but still, I have a few things.
-
-On Sat, Dec 14, 2013 at 10:58:11PM +0100, Hans de Goede wrote:
-> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+On Sunday 15 of December 2013 22:30:13 Yadwinder Singh Brar wrote:
+[snip]
+> >> +
+> >> +     return NULL;
+> >> +}
+> >> +
+> >> +unsigned int asv_get_volt(enum asv_type_id target_type,
+> >> +                                             unsigned int target_freq)
+> >
+> > Do you need this function at all? I believe this is all about populating
+> > device's OPP array with frequencies and voltages according to its ASV
+> > level. Users will be able to query for required voltage using standard OPP
+> > calls then, without a need for ASV specific functions like this one.
+> >
 > 
-> This is based on the driver Allwinner ships in there Android kernel sources.
+> Yes, I had put a comment in initial version after commit message :
+> "Hopefully asv_get_volt() can go out in future, once all users start using OPP
+> library." , which seems to be missed in this version.
+> I had kept it for the time being in initial version, to keep it
+> usable(for testing) with
+> existing cpufreq drivers, which need to reworked and may take time.
+
+Hmm, at the moment none of cpufreq drivers use ASV, so they need to be
+reworked anyway to use it either by the means of a private get_volt
+function or OPP framework. I agree that OPP may require more work,
+though.
+
+If we decide to keep this function in final version, a comment should be
+added saying that its usage is deprecated in favor of generic OPP helpers.
+
 > 
-> Initial porting to upstream kernels done by David Lanzend?rfer, additional
-> fixes and cleanups by Hans de Goede.
+> [snip]
+> >> +
+> >> +     for (i = 0; i < asv_info->nr_dvfs_level; i++) {
+> >> +             if (dev_pm_opp_add(dev, dvfs_table[i].freq * 1000,
+> >> +                     dvfs_table[i].volt)) {
+> >> +                     dev_warn(dev, "Failed to add OPP %d\n",
+> >> +                              dvfs_table[i].freq);
+> >
+> > Hmm, shouldn't it be considered a failure instead?
+> >
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> hmm, not really always. Theoretically system with some less(failed to add)
+> levels can work. Moreover I had prefered to keep it only warning, just to
+> keep the behaviour of  asv_init_opp_table() similar to that of its
+> counter part of_init_opp_table().
 
-Your commit log is a bit sparse. What capabilities this controller
-has? Is it using DMA? If so, how? What SoCs are supported/it has been
-tested on? etc.
+I'm not quite convinced about it. If dev_pm_opp_add() fails, doesn't it mean
+that something broke seriously in upper layer and we should propagate the
+error down? Especially when looking at opp_add(), the only failure
+conditions I can find are memory allocation errors which mean that the
+system is unlikely to operate correctly anyway.
 
-Also, you probably needs David's SoB here.
-
-> ---
->  drivers/mmc/host/Kconfig     |   8 +
->  drivers/mmc/host/Makefile    |   2 +
->  drivers/mmc/host/sunxi-mci.c | 908 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/mmc/host/sunxi-mci.h | 246 ++++++++++++
->  include/linux/clk/sunxi.h    |  22 ++
-
-Please add your dt bindings documentation in Documentation/devicetree/bindings
-
->  5 files changed, 1186 insertions(+)
->  create mode 100644 drivers/mmc/host/sunxi-mci.c
->  create mode 100644 drivers/mmc/host/sunxi-mci.h
->  create mode 100644 include/linux/clk/sunxi.h
 > 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..69a7171 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -665,3 +665,11 @@ config MMC_REALTEK_PCI
->  	help
->  	  Say Y here to include driver code to support SD/MMC card interface
->  	  of Realtek PCI-E card reader
-> +
-> +config MMC_SUNXI
-> +	tristate "Allwinner sunxi SD/MMC Host Controller support"
-> +	depends on ARCH_SUNXI
-> +	default y
+> >> +                     continue;
+> >> +             }
+> >> +     }
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static struct asv_member *asv_init_member(struct asv_info *asv_info)
+> >> +{
+> >> +     struct asv_member *asv_mem;
+> >> +     int ret = 0;
+> >> +
+> >> +     if (!asv_info) {
+> >> +             pr_err("No ASV info provided\n");
+> >> +             return NULL;
+> >
+> > I'd suggest adopting the ERR_PTR() convention, which allows returning more
+> > information about the error.
+> >
+> 
+> Will it be really usefull here?, as we are not checking return value
+> of any function.
 
-I'm not that fond of these "default y" patterns. It forces the driver
-down to every user of the multiplatform kernels. I'd suggest removing
-the default and adding the driver to the defconfigs we have.
+Why not? Here you have ERR_PTR(-EINVAL), then...
 
-> +	help
-> +	  This selects support for the SD/MMC Host Controller on
-> +	  Allwinner sunxi SoCs.
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index c41d0c3..f76f783 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -52,6 +52,8 @@ obj-$(CONFIG_MMC_WMT)		+= wmt-sdmmc.o
->  
->  obj-$(CONFIG_MMC_REALTEK_PCI)	+= rtsx_pci_sdmmc.o
->  
-> +obj-$(CONFIG_MMC_SUNXI)		+= sunxi-mci.o
-> +
->  obj-$(CONFIG_MMC_SDHCI_PLTFM)		+= sdhci-pltfm.o
->  obj-$(CONFIG_MMC_SDHCI_CNS3XXX)		+= sdhci-cns3xxx.o
->  obj-$(CONFIG_MMC_SDHCI_ESDHC_IMX)	+= sdhci-esdhc-imx.o
-> diff --git a/drivers/mmc/host/sunxi-mci.c b/drivers/mmc/host/sunxi-mci.c
-> new file mode 100644
-> index 0000000..e091ebb
-> --- /dev/null
-> +++ b/drivers/mmc/host/sunxi-mci.c
-> @@ -0,0 +1,908 @@
-> +/*
-> + * Driver for sunxi SD/MMC host controllers
-> + * (C) Copyright 2007-2011 Reuuimlla Technology Co., Ltd.
-> + * (C) Copyright 2007-2011 Aaron Maoye <leafy.myeh@reuuimllatech.com>
-> + * (C) Copyright 2013-2013 O2S GmbH <www.o2s.ch>
-> + * (C) Copyright 2013-2013 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> + * (C) Copyright 2013-2013 Hans de Goede <hdegoede@redhat.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/device.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-private.h>
-> +#include <linux/clk/sunxi.h>
-> +
-> +#include <linux/gpio.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/scatterlist.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/slab.h>
-> +#include <linux/regulator/consumer.h>
-> +
-> +#include <linux/of_address.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include <linux/mmc/host.h>
-> +#include <linux/mmc/sd.h>
-> +#include <linux/mmc/mmc.h>
-> +#include <linux/mmc/core.h>
-> +#include <linux/mmc/card.h>
-> +
-> +#include "sunxi-mci.h"
-> +
-> +static void sunxi_mmc_init_host(struct mmc_host *mmc)
-> +{
-> +	u32 rval;
-> +	struct sunxi_mmc_host *smc_host = mmc_priv(mmc);
-> +
-> +	/* reset controller */
-> +	rval = mci_readl(smc_host, REG_GCTRL) | SDXC_HWReset;
-> +	mci_writel(smc_host, REG_GCTRL, rval);
-> +
-> +	mci_writel(smc_host, REG_FTRGL, 0x20070008);
-> +	mci_writel(smc_host, REG_TMOUT, 0xffffffff);
-> +	mci_writel(smc_host, REG_IMASK, smc_host->sdio_imask);
-> +	mci_writel(smc_host, REG_RINTR, 0xffffffff);
-> +	mci_writel(smc_host, REG_DBGC, 0xdeb);
-> +	mci_writel(smc_host, REG_FUNS, 0xceaa0000);
-> +	mci_writel(smc_host, REG_DLBA, smc_host->sg_dma);
+> Bur for some cases below, i will also like to get it used.
+> 
+> >> +     }
+> >> +
+> >> +     asv_mem = kzalloc(sizeof(*asv_mem), GFP_KERNEL);
+> >> +     if (!asv_mem) {
+> >> +             pr_err("Allocation failed for member: %s\n", asv_info->name);
+> >> +             return NULL;
 
-I suppose we have no idea what these magics are all about ? :(
+ERR_PTR(-ENOMEM) here.
 
-> +	rval = mci_readl(smc_host, REG_GCTRL)|SDXC_INTEnb;
-> +	rval &= ~SDXC_AccessDoneDirect;
-> +	mci_writel(smc_host, REG_GCTRL, rval);
-> +}
-> +
-> +static void sunxi_mmc_exit_host(struct sunxi_mmc_host *smc_host)
-> +{
-> +	mci_writel(smc_host, REG_GCTRL, SDXC_HWReset);
-> +}
-> +
-> +/* /\* UHS-I Operation Modes */
-> +/*  * DS		25MHz	12.5MB/s	3.3V */
-> +/*  * HS		50MHz	25MB/s		3.3V */
-> +/*  * SDR12	25MHz	12.5MB/s	1.8V */
-> +/*  * SDR25	50MHz	25MB/s		1.8V */
-> +/*  * SDR50	100MHz	50MB/s		1.8V */
-> +/*  * SDR104	208MHz	104MB/s		1.8V */
-> +/*  * DDR50	50MHz	50MB/s		1.8V */
-> +/*  * MMC Operation Modes */
-> +/*  * DS		26MHz	26MB/s		3/1.8/1.2V */
-> +/*  * HS		52MHz	52MB/s		3/1.8/1.2V */
-> +/*  * HSDDR	52MHz	104MB/s		3/1.8/1.2V */
-> +/*  * HS200	200MHz	200MB/s		1.8/1.2V */
-> +/*  * */
-> +/*  * Spec. Timing */
-> +/*  * SD3.0 */
-> +/*  * Fcclk    Tcclk   Fsclk   Tsclk   Tis     Tih     odly  RTis     RTih */
-> +/*  * 400K     2.5us   24M     41ns    5ns     5ns     1     2209ns   41ns */
-> +/*  * 25M      40ns    600M    1.67ns  5ns     5ns     3     14.99ns  5.01ns */
-> +/*  * 50M      20ns    600M    1.67ns  6ns     2ns     3     14.99ns  5.01ns */
-> +/*  * 50MDDR   20ns    600M    1.67ns  6ns     0.8ns   2     6.67ns   3.33ns */
-> +/*  * 104M     9.6ns   600M    1.67ns  3ns     0.8ns   1     7.93ns   1.67ns */
-> +/*  * 208M     4.8ns   600M    1.67ns  1.4ns   0.8ns   1     3.33ns   1.67ns */
-> +
-> +/*  * 25M      40ns    300M    3.33ns  5ns     5ns     2     13.34ns   6.66ns */
-> +/*  * 50M      20ns    300M    3.33ns  6ns     2ns     2     13.34ns   6.66ns */
-> +/*  * 50MDDR   20ns    300M    3.33ns  6ns     0.8ns   1     6.67ns    3.33ns */
-> +/*  * 104M     9.6ns   300M    3.33ns  3ns     0.8ns   0     7.93ns    1.67ns */
-> +/*  * 208M     4.8ns   300M    3.33ns  1.4ns   0.8ns   0     3.13ns    1.67ns */
-> +
-> +/*  * eMMC4.5 */
-> +/*  * 400K     2.5us   24M     41ns    3ns     3ns     1     2209ns    41ns */
-> +/*  * 25M      40ns    600M    1.67ns  3ns     3ns     3     14.99ns   5.01ns */
-> +/*  * 50M      20ns    600M    1.67ns  3ns     3ns     3     14.99ns   5.01ns */
-> +/*  * 50MDDR   20ns    600M    1.67ns  2.5ns   2.5ns   2     6.67ns    3.33ns */
-> +/*  * 200M     5ns     600M    1.67ns  1.4ns   0.8ns   1     3.33ns    1.67ns */
-> +/*  *\/ */
-> +
-> +static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
-> +				    struct mmc_data *data)
-> +{
-> +	struct sunxi_idma_des *pdes = (struct sunxi_idma_des *)host->sg_cpu;
-> +	struct sunxi_idma_des *pdes_pa = (struct sunxi_idma_des *)host->sg_dma;
-> +	int i, max_len = (1 << host->idma_des_size_bits);
-> +
-> +	for (i = 0; i < data->sg_len; i++) {
-> +		pdes[i].config = SDXC_IDMAC_DES0_CH | SDXC_IDMAC_DES0_OWN |
-> +				 SDXC_IDMAC_DES0_DIC;
-> +
-> +		if (data->sg[i].length == max_len)
-> +			pdes[i].buf_size = 0; /* 0 == max_len */
-> +		else
-> +			pdes[i].buf_size = data->sg[i].length;
-> +
-> +		pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
-> +		pdes[i].buf_addr_ptr2 = (u32)&pdes_pa[i + 1];
-> +	}
+These are two completely different error cases.
 
-Please add a newline.
+> >> +     }
+> 
+> [snip]
+> >
+> > Hmm, I don't see a point of these three separate callbacks above.
+> >
+> > In general, I'd suggest a different architecture. I'd see this more as:
+> >
+> > 1) Platform code registers static platform device to instantiate SoC ASV
+> >    driver.
+> > 2) SoC specific ASV driver probes, reads group ID from hardware register,
+> >    calls register_asv_member() with appropriate DVFS table for detected
+> >    group.
+> > 3) Driver using ASV calls asv_init_opp_table() with its struct device and
+> >    ASV member name, which causes the ASV code to fill device's operating
+> >    point using OPP calls.
+> >
+> > Now client driver has all the information it needs and the work of ASV
+> > subsystem is done. The control flow between drivers would be much simpler
+> > and no callbacks would have to be called.
+> >
+> 
+> Architecture stated above seems to be a subset(one possible way of use),
+> of the proposed architecture. If someone really have nothing much to do,
+> he can adopt the above stated approach using this framework also,
+> callbacks are not mandatory.
 
-> +	pdes[0].config |= SDXC_IDMAC_DES0_FD;
-> +	pdes[i - 1].config = SDXC_IDMAC_DES0_OWN | SDXC_IDMAC_DES0_LD;
-> +
-> +	wmb(); /* Ensure idma_des hit main mem before we start the idmac */
-> +}
-> +
-> +static enum dma_data_direction sunxi_mmc_get_dma_dir(struct mmc_data *data)
-> +{
-> +	if (data->flags & MMC_DATA_WRITE)
-> +		return DMA_TO_DEVICE;
-> +	else
-> +		return DMA_FROM_DEVICE;
-> +}
-> +
-> +static int sunxi_mmc_prepare_dma(struct sunxi_mmc_host *smc_host,
-> +				 struct mmc_data *data)
-> +{
-> +	u32 dma_len;
-> +	u32 i;
-> +	u32 temp;
-> +	struct scatterlist *sg;
-> +
-> +	dma_len = dma_map_sg(mmc_dev(smc_host->mmc), data->sg, data->sg_len,
-> +			     sunxi_mmc_get_dma_dir(data));
-> +	if (dma_len == 0) {
-> +		dev_err(mmc_dev(smc_host->mmc), "dma_map_sg failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	for_each_sg(data->sg, sg, data->sg_len, i) {
-> +		if (sg->offset & 3 || sg->length & 3) {
-> +			dev_err(mmc_dev(smc_host->mmc),
-> +				"unaligned scatterlist: os %x length %d\n",
-> +				sg->offset, sg->length);
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	sunxi_mmc_init_idma_des(smc_host, data);
-> +
-> +	temp = mci_readl(smc_host, REG_GCTRL);
-> +	temp |= SDXC_DMAEnb;
-> +	mci_writel(smc_host, REG_GCTRL, temp);
-> +	temp |= SDXC_DMAReset;
-> +	mci_writel(smc_host, REG_GCTRL, temp);
-> +
-> +	mci_writel(smc_host, REG_DMAC, SDXC_IDMACSoftRST);
-> +
-> +	if (!(data->flags & MMC_DATA_WRITE))
-> +		mci_writel(smc_host, REG_IDIE, SDXC_IDMACReceiveInt);
-> +
-> +	mci_writel(smc_host, REG_DMAC, SDXC_IDMACFixBurst | SDXC_IDMACIDMAOn);
-> +
-> +	return 0;
-> +}
-> +
-> +static void sunxi_mmc_send_manual_stop(struct sunxi_mmc_host *host,
-> +				       struct mmc_request *req)
-> +{
-> +	u32 cmd_val = SDXC_Start | SDXC_RspExp | SDXC_StopAbortCMD
-> +			| SDXC_CheckRspCRC | MMC_STOP_TRANSMISSION;
-> +	u32 ri = 0;
-> +	unsigned long expire = jiffies + msecs_to_jiffies(1000);
-> +
-> +	mci_writel(host, REG_CARG, 0);
-> +	mci_writel(host, REG_CMDR, cmd_val);
+I believe that kernel design principles are to first start with something
+simple and then if a real need for an extension shows up then extend
+existing code base with missing features.
 
-Please add a newline.
+> 
+> Since we usually have more things to do other than only reading
+> fused group value and simply parsing a table index, so in drivers we have to
+> implement functions to segregate stuff and different people do it in
+> different way. Its an attempt to provide a way to keep structure(functions)
+> similar for easy understanding and factoring out of common code.
 
-> +	do {
-> +		ri = mci_readl(host, REG_RINTR);
-> +	} while (!(ri & (SDXC_CmdDone | SDXC_IntErrBit)) &&
-> +		 time_before(jiffies, expire));
-> +
-> +	if (ri & SDXC_IntErrBit) {
-> +		dev_err(mmc_dev(host->mmc), "send stop command failed\n");
-> +		if (req->stop)
-> +			req->stop->resp[0] = -ETIMEDOUT;
-> +	} else {
-> +		if (req->stop)
-> +			req->stop->resp[0] = mci_readl(host, REG_RESP0);
-> +	}
-> +
-> +	mci_writel(host, REG_RINTR, 0xffff);
-> +}
-> +
-> +static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *smc_host)
-> +{
-> +	struct mmc_command *cmd = smc_host->mrq->cmd;
-> +	struct mmc_data *data = smc_host->mrq->data;
-> +
-> +	/* For some cmds timeout is normal with sd/mmc cards */
-> +	if ((smc_host->int_sum & SDXC_IntErrBit) == SDXC_RespTimeout &&
-> +			(cmd->opcode == 5 || cmd->opcode == 52))
-> +		return;
-> +
-> +	dev_err(mmc_dev(smc_host->mmc),
-> +		"smc %d err, cmd %d,%s%s%s%s%s%s%s%s%s%s !!\n",
-> +		smc_host->mmc->index, cmd->opcode,
-> +		data ? (data->flags & MMC_DATA_WRITE ? " WR" : " RD") : "",
-> +		smc_host->int_sum & SDXC_RespErr     ? " RE"     : "",
-> +		smc_host->int_sum & SDXC_RespCRCErr  ? " RCE"    : "",
-> +		smc_host->int_sum & SDXC_DataCRCErr  ? " DCE"    : "",
-> +		smc_host->int_sum & SDXC_RespTimeout ? " RTO"    : "",
-> +		smc_host->int_sum & SDXC_DataTimeout ? " DTO"    : "",
-> +		smc_host->int_sum & SDXC_FIFORunErr  ? " FE"     : "",
-> +		smc_host->int_sum & SDXC_HardWLocked ? " HL"     : "",
-> +		smc_host->int_sum & SDXC_StartBitErr ? " SBE"    : "",
-> +		smc_host->int_sum & SDXC_EndBitErr   ? " EBE"    : ""
-> +		);
-> +}
-> +
-> +static void sunxi_mmc_finalize_request(struct sunxi_mmc_host *host)
-> +{
-> +	struct mmc_request *mrq;
-> +	unsigned long iflags;
-> +
-> +	spin_lock_irqsave(&host->lock, iflags);
-> +
-> +	mrq = host->mrq;
-> +	if (!mrq) {
-> +		spin_unlock_irqrestore(&host->lock, iflags);
-> +		dev_err(mmc_dev(host->mmc), "no request to finalize\n");
-> +		return;
-> +	}
-> +
-> +	if (host->int_sum & SDXC_IntErrBit) {
-> +		sunxi_mmc_dump_errinfo(host);
-> +		mrq->cmd->error = -ETIMEDOUT;
-> +		if (mrq->data)
-> +			mrq->data->error = -ETIMEDOUT;
-> +		if (mrq->stop)
-> +			mrq->stop->error = -ETIMEDOUT;
-> +	} else {
-> +		if (mrq->cmd->flags & MMC_RSP_136) {
-> +			mrq->cmd->resp[0] = mci_readl(host, REG_RESP3);
-> +			mrq->cmd->resp[1] = mci_readl(host, REG_RESP2);
-> +			mrq->cmd->resp[2] = mci_readl(host, REG_RESP1);
-> +			mrq->cmd->resp[3] = mci_readl(host, REG_RESP0);
-> +		} else {
-> +			mrq->cmd->resp[0] = mci_readl(host, REG_RESP0);
-> +		}
-> +		if (mrq->data)
-> +			mrq->data->bytes_xfered =
-> +				mrq->data->blocks * mrq->data->blksz;
-> +	}
-> +
-> +	if (mrq->data) {
-> +		struct mmc_data *data = mrq->data;
-> +		u32 temp;
-> +
-> +		mci_writel(host, REG_IDST, 0x337);
-> +		mci_writel(host, REG_DMAC, 0);
-> +		temp = mci_readl(host, REG_GCTRL);
-> +		mci_writel(host, REG_GCTRL, temp|SDXC_DMAReset);
-> +		temp &= ~SDXC_DMAEnb;
-> +		mci_writel(host, REG_GCTRL, temp);
-> +		temp |= SDXC_FIFOReset;
-> +		mci_writel(host, REG_GCTRL, temp);
-> +		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-> +				     sunxi_mmc_get_dma_dir(data));
-> +	}
-> +
-> +	mci_writel(host, REG_RINTR, 0xffff);
-> +
-> +	dev_dbg(mmc_dev(host->mmc), "req done, resp %08x %08x %08x %08x\n",
-> +		mrq->cmd->resp[0], mrq->cmd->resp[1],
-> +		mrq->cmd->resp[2], mrq->cmd->resp[3]);
-> +
-> +	host->mrq = NULL;
-> +	host->int_sum = 0;
-> +	host->wait_dma = 0;
-> +
-> +	spin_unlock_irqrestore(&host->lock, iflags);
-> +
-> +	if (mrq->data && mrq->data->error) {
-> +		dev_err(mmc_dev(host->mmc),
-> +			"data error, sending stop command\n");
-> +		sunxi_mmc_send_manual_stop(host, mrq);
-> +	}
-> +
-> +	mmc_request_done(host->mmc, mrq);
-> +}
-> +
-> +static s32 sunxi_mmc_get_ro(struct mmc_host *mmc)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +
-> +	int read_only = 0;
-> +
-> +	if (gpio_is_valid(host->wp_pin)) {
-> +		pinctrl_request_gpio(host->wp_pin);
+I fail to see those more things. Could you elaborate a bit about them?
 
-This is actually not needed. It's already called by gpio_request.
+>From what I see, all the potential ASV users need is a set of operating
+points (frequency:voltage pairs) appropriate for the SoC we are running
+on (i.e. matching our ASV group index). Is there anything more we need to
+do for ASV support?
 
-> +		read_only = gpio_get_value(host->wp_pin);
-> +	}
-> +
-> +	return read_only;
-> +}
-> +
-> +static irqreturn_t sunxi_mmc_irq(int irq, void *dev_id)
-> +{
-> +	struct sunxi_mmc_host *host = dev_id;
-> +	u32 finalize = 0;
-> +	u32 sdio_int = 0;
-> +	u32 msk_int;
-> +	u32 idma_int;
-> +
-> +	spin_lock(&host->lock);
-> +
-> +	idma_int  = mci_readl(host, REG_IDST);
-> +	msk_int   = mci_readl(host, REG_MISTA);
-> +
-> +	dev_dbg(mmc_dev(host->mmc), "irq: rq %p mi %08x idi %08x\n",
-> +		host->mrq, msk_int, idma_int);
-> +
-> +	if (host->mrq) {
-> +		if (idma_int & SDXC_IDMACReceiveInt)
-> +			host->wait_dma = 0;
-> +
-> +		host->int_sum |= msk_int;
-> +
-> +		/* Wait for CmdDone on RespTimeout before finishing the req */
-> +		if ((host->int_sum & SDXC_RespTimeout) &&
-> +				!(host->int_sum & SDXC_CmdDone))
-> +			mci_writel(host, REG_IMASK,
-> +				   host->sdio_imask | SDXC_CmdDone);
-> +		else if (host->int_sum & SDXC_IntErrBit)
-> +			finalize = 1; /* Don't wait for dma on error */
-> +		else if (host->int_sum & SDXC_IntDoneBit && !host->wait_dma)
-> +			finalize = 1; /* Done */
-> +
-> +		if (finalize) {
-> +			mci_writel(host, REG_IMASK, host->sdio_imask);
-> +			mci_writel(host, REG_IDIE, 0);
-> +		}
-> +	}
-> +
-> +	if (msk_int & SDXC_SDIOInt)
-> +		sdio_int = 1;
-> +
-> +	mci_writel(host, REG_RINTR, msk_int);
-> +	mci_writel(host, REG_IDST, idma_int);
-> +
-> +	spin_unlock(&host->lock);
-> +
-> +	if (finalize)
-> +		tasklet_schedule(&host->tasklet);
-> +
-> +	if (sdio_int)
-> +		mmc_signal_sdio_irq(host->mmc);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static void sunxi_mmc_tasklet(unsigned long data)
-> +{
-> +	struct sunxi_mmc_host *smc_host = (struct sunxi_mmc_host *) data;
-> +	sunxi_mmc_finalize_request(smc_host);
-> +}
-> +
-> +static void sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
-> +{
-> +	unsigned long expire = jiffies + msecs_to_jiffies(2000);
-> +	u32 rval;
-> +
-> +	rval = mci_readl(host, REG_CLKCR);
-> +	rval &= ~(SDXC_CardClkOn | SDXC_LowPowerOn);
+> 
+> Moreover, I feels need of callbacks if we have to do something depending
+> upon(specific) the user/instance of  ASV member. One thing came
+> in my mind was dev_node may be required if we may think of parsing
+> ASV table from DT and may be more things in future.
 
-Please add a newline.
+We can always add such things later, if real need shows up. As I said
+above, we should rather start with something simple, to avoid
+overdesigning things without knowing real use cases that may show
+up later.
 
-> +	if (oclk_en)
-> +		rval |= SDXC_CardClkOn;
-
-Please add a newline.
-
-> +	if (!host->io_flag)
-> +		rval |= SDXC_LowPowerOn;
-
-Please add a newline.
-
-> +	mci_writel(host, REG_CLKCR, rval);
-> +
-> +	rval = SDXC_Start | SDXC_UPCLKOnly | SDXC_WaitPreOver;
-> +	if (host->voltage_switching)
-> +		rval |= SDXC_VolSwitch;
-> +	mci_writel(host, REG_CMDR, rval);
-> +	do {
-> +		rval = mci_readl(host, REG_CMDR);
-> +	} while (time_before(jiffies, expire) && (rval & SDXC_Start));
-> +
-> +	if (rval & SDXC_Start) {
-> +		dev_err(mmc_dev(host->mmc), "fatal err update clk timeout\n");
-> +		host->ferror = 1;
-> +	}
-> +}
-> +
-> +static void sunxi_mmc_set_clk_dly(struct sunxi_mmc_host *smc_host,
-> +				  u32 oclk_dly, u32 sclk_dly)
-> +{
-> +	unsigned long iflags;
-> +	struct clk_hw *hw = __clk_get_hw(smc_host->clk_mod);
-> +
-> +	spin_lock_irqsave(&smc_host->lock, iflags);
-> +	clk_sunxi_mmc_phase_control(hw, sclk_dly, oclk_dly);
-> +	spin_unlock_irqrestore(&smc_host->lock, iflags);
-> +}
-> +
-> +struct sunxi_mmc_clk_dly mmc_clk_dly[MMC_CLK_MOD_NUM] = {
-> +	{ MMC_CLK_400K, 0, 7 },
-> +	{ MMC_CLK_25M, 0, 5 },
-> +	{ MMC_CLK_50M, 3, 5 },
-> +	{ MMC_CLK_50MDDR, 2, 4 },
-> +	{ MMC_CLK_50MDDR_8BIT, 2, 4 },
-> +	{ MMC_CLK_100M, 1, 4 },
-> +	{ MMC_CLK_200M, 1, 4 },
-> +};
-> +
-> +static void sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *smc_host,
-> +				   unsigned int rate)
-> +{
-> +	u32 newrate;
-> +	u32 src_clk;
-> +	u32 oclk_dly;
-> +	u32 sclk_dly;
-> +	u32 temp;
-> +	struct sunxi_mmc_clk_dly *dly = NULL;
-> +
-> +	newrate = clk_round_rate(smc_host->clk_mod, rate);
-> +	if (smc_host->clk_mod_rate == newrate) {
-> +		dev_dbg(mmc_dev(smc_host->mmc), "clk already %d, rounded %d\n",
-> +			rate, newrate);
-> +		return;
-> +	}
-> +
-> +	dev_dbg(mmc_dev(smc_host->mmc), "setting clk to %d, rounded %d\n",
-> +		rate, newrate);
-> +
-> +	/* setting clock rate */
-> +	clk_disable(smc_host->clk_mod);
-> +	clk_set_rate(smc_host->clk_mod, newrate);
-> +	clk_enable(smc_host->clk_mod);
-> +	smc_host->clk_mod_rate = newrate = clk_get_rate(smc_host->clk_mod);
-> +	dev_dbg(mmc_dev(smc_host->mmc), "clk is now %d\n", newrate);
-> +
-> +	sunxi_mmc_oclk_onoff(smc_host, 0);
-> +	/* clear internal divider */
-> +	temp = mci_readl(smc_host, REG_CLKCR);
-> +	temp &= ~0xff;
-> +	mci_writel(smc_host, REG_CLKCR, temp);
-> +
-> +	/* determine delays */
-> +	if (rate <= 400000) {
-> +		dly = &mmc_clk_dly[MMC_CLK_400K];
-> +	} else if (rate <= 25000000) {
-> +		dly = &mmc_clk_dly[MMC_CLK_25M];
-> +	} else if (rate <= 50000000) {
-> +		if (smc_host->ddr) {
-> +			if (smc_host->bus_width == 8)
-> +				dly = &mmc_clk_dly[MMC_CLK_50MDDR_8BIT];
-> +			else
-> +				dly = &mmc_clk_dly[MMC_CLK_50MDDR];
-> +		} else {
-> +			dly = &mmc_clk_dly[MMC_CLK_50M];
-> +		}
-> +	} else if (rate <= 104000000) {
-> +		dly = &mmc_clk_dly[MMC_CLK_100M];
-> +	} else if (rate <= 208000000) {
-> +		dly = &mmc_clk_dly[MMC_CLK_200M];
-> +	} else
-> +		dly = &mmc_clk_dly[MMC_CLK_50M];
-
-You need some brackets around that else statement
-
-> +
-> +	oclk_dly = dly->oclk_dly;
-> +	sclk_dly = dly->sclk_dly;
-> +
-> +	src_clk = clk_get_rate(clk_get_parent(smc_host->clk_mod));
-> +	if (src_clk >= 300000000 && src_clk <= 400000000) {
-> +		if (oclk_dly)
-> +			oclk_dly--;
-> +		if (sclk_dly)
-> +			sclk_dly--;
-> +	}
-> +
-> +	sunxi_mmc_set_clk_dly(smc_host, oclk_dly, sclk_dly);
-> +	sunxi_mmc_oclk_onoff(smc_host, 1);
-> +
-> +	/* oclk_onoff sets various irq status bits, clear these */
-> +	mci_writel(smc_host, REG_RINTR,
-> +		   mci_readl(smc_host, REG_RINTR) & ~SDXC_SDIOInt);
-> +}
-> +
-> +static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +	u32 temp;
-> +	s32 err;
-> +
-> +	/* Set the power state */
-> +	switch (ios->power_mode) {
-> +	case MMC_POWER_ON:
-> +		break;
-> +
-> +	case MMC_POWER_UP:
-> +		if (!IS_ERR(host->vmmc)) {
-> +			mmc_regulator_set_ocr(host->mmc, host->vmmc, ios->vdd);
-> +			udelay(200);
-> +		}
-> +
-> +		err =  clk_prepare_enable(host->clk_ahb);
-> +		if (err) {
-> +			dev_err(mmc_dev(host->mmc), "AHB clk err %d\n", err);
-> +			host->ferror = 1;
-> +			return;
-> +		}
-> +		err =  clk_prepare_enable(host->clk_mod);
-> +		if (err) {
-> +			dev_err(mmc_dev(host->mmc), "MOD clk err %d\n", err);
-> +			host->ferror = 1;
-> +			return;
-> +		}
-> +
-> +		sunxi_mmc_init_host(mmc);
-> +		enable_irq(host->irq);
-> +
-> +		dev_dbg(mmc_dev(host->mmc), "power on!\n");
-> +		host->ferror = 0;
-> +		break;
-> +
-> +	case MMC_POWER_OFF:
-> +		dev_dbg(mmc_dev(host->mmc), "power off!\n");
-> +		disable_irq(host->irq);
-> +		sunxi_mmc_exit_host(host);
-> +		clk_disable_unprepare(host->clk_ahb);
-> +		clk_disable_unprepare(host->clk_mod);
-> +		if (!IS_ERR(host->vmmc))
-> +			mmc_regulator_set_ocr(host->mmc, host->vmmc, 0);
-> +		host->ferror = 0;
-> +		break;
-> +	}
-> +
-> +	/* set bus width */
-> +	switch (ios->bus_width) {
-> +	case MMC_BUS_WIDTH_1:
-> +		mci_writel(host, REG_WIDTH, SDXC_WIDTH1);
-> +		host->bus_width = 1;
-> +		break;
-> +	case MMC_BUS_WIDTH_4:
-> +		mci_writel(host, REG_WIDTH, SDXC_WIDTH4);
-> +		host->bus_width = 4;
-> +		break;
-> +	case MMC_BUS_WIDTH_8:
-> +		mci_writel(host, REG_WIDTH, SDXC_WIDTH8);
-> +		host->bus_width = 8;
-> +		break;
-> +	}
-> +
-> +	/* set ddr mode */
-> +	temp = mci_readl(host, REG_GCTRL);
-> +	if (ios->timing == MMC_TIMING_UHS_DDR50) {
-> +		temp |= SDXC_DDR_MODE;
-> +		host->ddr = 1;
-> +	} else {
-> +		temp &= ~SDXC_DDR_MODE;
-> +		host->ddr = 0;
-> +	}
-> +	mci_writel(host, REG_GCTRL, temp);
-> +
-> +	/* set up clock */
-> +	if (ios->clock && ios->power_mode) {
-> +		dev_dbg(mmc_dev(host->mmc), "ios->clock: %d\n", ios->clock);
-> +		sunxi_mmc_clk_set_rate(host, ios->clock);
-> +		usleep_range(50000, 55000);
-> +	}
-> +}
-> +
-> +static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> +{
-> +	struct sunxi_mmc_host *smc_host = mmc_priv(mmc);
-> +	unsigned long flags;
-> +	u32 imask;
-> +
-> +	spin_lock_irqsave(&smc_host->lock, flags);
-> +	imask = mci_readl(smc_host, REG_IMASK);
-> +	if (enable) {
-> +		smc_host->sdio_imask = SDXC_SDIOInt;
-> +		imask |= SDXC_SDIOInt;
-> +	} else {
-> +		smc_host->sdio_imask = 0;
-> +		imask &= ~SDXC_SDIOInt;
-> +	}
-> +	mci_writel(smc_host, REG_IMASK, imask);
-> +	spin_unlock_irqrestore(&smc_host->lock, flags);
-> +}
-> +
-> +static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
-> +{
-> +	struct sunxi_mmc_host *smc_host = mmc_priv(mmc);
-> +	mci_writel(smc_host, REG_HWRST, 0);
-> +	udelay(10);
-> +	mci_writel(smc_host, REG_HWRST, 1);
-> +	udelay(300);
-> +}
-> +
-> +static int sunxi_mmc_card_present(struct mmc_host *mmc)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +
-> +	switch (host->cd_mode) {
-> +	case CARD_DETECT_BY_GPIO_POLL:
-> +		return !gpio_get_value(host->cd_pin); /* Signal inverted */
-> +	case CARD_ALWAYS_PRESENT:
-> +		return 1;
-> +	}
-> +	return 0; /* Never reached */
-> +}
-> +
-> +static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +	struct mmc_command *cmd = mrq->cmd;
-> +	struct mmc_data *data = mrq->data;
-> +	unsigned long iflags;
-> +	u32 imask = SDXC_IntErrBit;
-> +	u32 cmd_val = SDXC_Start | (cmd->opcode & 0x3f);
-> +	u32 byte_cnt = 0;
-> +	int ret;
-> +
-> +	if (!sunxi_mmc_card_present(mmc) || host->ferror) {
-> +		dev_dbg(mmc_dev(host->mmc), "no medium present\n");
-> +		mrq->cmd->error = -ENOMEDIUM;
-> +		mmc_request_done(mmc, mrq);
-> +		return;
-> +	}
-> +
-> +	if (data) {
-> +		byte_cnt = data->blksz * data->blocks;
-> +		mci_writel(host, REG_BLKSZ, data->blksz);
-> +		mci_writel(host, REG_BCNTR, byte_cnt);
-> +		ret = sunxi_mmc_prepare_dma(host, data);
-> +		if (ret < 0) {
-> +			dev_err(mmc_dev(host->mmc), "prepare DMA failed\n");
-> +			cmd->error = ret;
-> +			cmd->data->error = ret;
-> +			mmc_request_done(host->mmc, mrq);
-> +			return;
-> +		}
-> +	}
-> +
-> +	if (cmd->opcode == MMC_GO_IDLE_STATE) {
-> +		cmd_val |= SDXC_SendInitSeq;
-> +		imask |= SDXC_CmdDone;
-> +	}
-> +
-> +	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
-> +		cmd_val |= SDXC_VolSwitch;
-> +		imask |= SDXC_VolChgDone;
-> +		host->voltage_switching = 1;
-> +		sunxi_mmc_oclk_onoff(host, 1);
-> +	}
-> +
-> +	if (cmd->flags & MMC_RSP_PRESENT) {
-> +		cmd_val |= SDXC_RspExp;
-> +		if (cmd->flags & MMC_RSP_136)
-> +			cmd_val |= SDXC_LongRsp;
-> +		if (cmd->flags & MMC_RSP_CRC)
-> +			cmd_val |= SDXC_CheckRspCRC;
-> +
-> +		if ((cmd->flags & MMC_CMD_MASK) == MMC_CMD_ADTC) {
-> +			cmd_val |= SDXC_DataExp | SDXC_WaitPreOver;
-> +			if (cmd->data->flags & MMC_DATA_STREAM) {
-> +				imask |= SDXC_AutoCMDDone;
-> +				cmd_val |= SDXC_Seqmod | SDXC_SendAutoStop;
-> +			}
-> +			if (cmd->data->stop) {
-> +				imask |= SDXC_AutoCMDDone;
-> +				cmd_val |= SDXC_SendAutoStop;
-> +			} else
-> +				imask |= SDXC_DataOver;
-> +
-> +			if (cmd->data->flags & MMC_DATA_WRITE)
-> +				cmd_val |= SDXC_Write;
-> +			else
-> +				host->wait_dma = 1;
-> +		} else
-> +			imask |= SDXC_CmdDone;
-> +	} else
-> +		imask |= SDXC_CmdDone;
-> +
-> +	dev_dbg(mmc_dev(host->mmc), "cmd %d(%08x) arg %x ie 0x%08x len %d\n",
-> +		cmd_val & 0x3f, cmd_val, cmd->arg, imask,
-> +		mrq->data ? mrq->data->blksz * mrq->data->blocks : 0);
-> +
-> +	spin_lock_irqsave(&host->lock, iflags);
-> +	host->mrq = mrq;
-> +	mci_writel(host, REG_IMASK, host->sdio_imask | imask);
-> +	spin_unlock_irqrestore(&host->lock, iflags);
-> +
-> +	mci_writel(host, REG_CARG, cmd->arg);
-> +	mci_writel(host, REG_CMDR, cmd_val);
-> +}
-> +
-> +static const struct of_device_id sunxi_mmc_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-mmc", },
-> +	{ .compatible = "allwinner,sun5i-mmc", },
-
-Please use sun5i-a13-mmc as your compatible.
-
-
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
-> +
-> +static struct mmc_host_ops sunxi_mmc_ops = {
-> +	.request	 = sunxi_mmc_request,
-> +	.set_ios	 = sunxi_mmc_set_ios,
-> +	.get_ro		 = sunxi_mmc_get_ro,
-> +	.get_cd		 = sunxi_mmc_card_present,
-> +	.enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
-> +	.hw_reset	 = sunxi_mmc_hw_reset,
-> +};
-> +
-> +static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
-> +				      struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int ret;
-> +
-> +	if (of_device_is_compatible(np, "allwinner,sun4i-mmc"))
-> +		host->idma_des_size_bits = 13;
-> +	else
-> +		host->idma_des_size_bits = 16;
-> +
-> +	host->vmmc = devm_regulator_get_optional(&pdev->dev, "vmmc");
-> +	if (IS_ERR(host->vmmc) && PTR_ERR(host->vmmc) == -EPROBE_DEFER)
-> +		return -EPROBE_DEFER;
-> +
-> +	host->reg_base = devm_ioremap_resource(&pdev->dev,
-> +			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
-> +	if (IS_ERR(host->reg_base))
-> +		return PTR_ERR(host->reg_base);
-> +
-> +	host->irq = platform_get_irq(pdev, 0);
-> +	ret = devm_request_irq(&pdev->dev, host->irq, sunxi_mmc_irq, 0,
-> +			       "sunxi-mci", host);
-> +	if (ret)
-> +		return ret;
-> +	disable_irq(host->irq);
-> +
-> +	host->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-> +	if (IS_ERR(host->clk_ahb)) {
-> +		dev_err(&pdev->dev, "Could not get ahb clock\n");
-> +		return PTR_ERR(host->clk_ahb);
-> +	}
-> +
-> +	host->clk_mod = devm_clk_get(&pdev->dev, "mod");
-> +	if (IS_ERR(host->clk_mod)) {
-> +		dev_err(&pdev->dev, "Could not get mod clock\n");
-> +		return PTR_ERR(host->clk_mod);
-> +	}
-> +
-> +	of_property_read_u32(np, "bus-width", &host->bus_width);
-> +	if (host->bus_width != 1 && host->bus_width != 4) {
-> +		dev_err(&pdev->dev, "Invalid bus-width %d\n", host->bus_width);
-> +		return -EINVAL;
-> +	}
-> +
-> +	of_property_read_u32(np, "cd-mode", &host->cd_mode);
-> +	switch (host->cd_mode) {
-> +	case CARD_DETECT_BY_GPIO_POLL:
-> +		host->cd_pin = of_get_named_gpio(np, "cd-gpios", 0);
-> +		if (!gpio_is_valid(host->cd_pin)) {
-> +			dev_err(&pdev->dev, "Invalid cd-gpios\n");
-> +			return -EINVAL;
-> +		}
-> +		ret = devm_gpio_request(&pdev->dev, host->cd_pin, "mmc_cd");
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "Could not get cd-gpios\n");
-> +			return ret;
-> +		}
-> +		gpio_direction_input(host->cd_pin);
-> +		break;
-> +	case CARD_ALWAYS_PRESENT:
-> +		break;
-> +	default:
-> +		dev_err(&pdev->dev, "Invalid cd-mode %d\n", host->cd_mode);
-> +		return -EINVAL;
-> +	}
-> +
-> +	host->wp_pin = of_get_named_gpio(np, "wp-gpios", 0);
-> +	if (gpio_is_valid(host->wp_pin)) {
-> +		ret = devm_gpio_request(&pdev->dev, host->wp_pin, "mmc_wp");
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "Could not get wp-gpios\n");
-> +			return ret;
-> +		}
-> +		gpio_direction_input(host->wp_pin);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_mmc_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_mmc_host *host;
-> +	struct mmc_host *mmc;
-> +	int ret;
-> +
-> +	mmc = mmc_alloc_host(sizeof(struct sunxi_mmc_host), &pdev->dev);
-> +	if (!mmc) {
-> +		dev_err(&pdev->dev, "mmc alloc host failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	host = mmc_priv(mmc);
-> +	host->mmc = mmc;
-> +	spin_lock_init(&host->lock);
-> +	tasklet_init(&host->tasklet, sunxi_mmc_tasklet, (unsigned long)host);
-> +
-> +	ret = sunxi_mmc_resource_request(host, pdev);
-> +	if (ret)
-> +		goto error_free_host;
-> +
-> +	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE,
-> +					  &host->sg_dma, GFP_KERNEL);
-> +	if (!host->sg_cpu) {
-> +		dev_err(&pdev->dev, "Failed to allocate DMA descriptor mem\n");
-> +		ret = -ENOMEM;
-> +		goto error_free_host;
-> +	}
-> +
-> +	mmc->ops		= &sunxi_mmc_ops;
-> +	mmc->max_blk_count	= 8192;
-> +	mmc->max_blk_size	= 4096;
-> +	mmc->max_segs		= PAGE_SIZE / sizeof(struct sunxi_idma_des);
-> +	mmc->max_seg_size	= (1 << host->idma_des_size_bits);
-> +	mmc->max_req_size	= mmc->max_seg_size * mmc->max_segs;
-> +	/* 400kHz ~ 50MHz */
-> +	mmc->f_min		=   400000;
-> +	mmc->f_max		= 50000000;
-
-Hmmm, the tables earlier seem to suggest it can do much more than that.
-
-> +	/* available voltages */
-> +	if (!IS_ERR(host->vmmc))
-> +		mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vmmc);
-> +	else
-> +		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
-> +
-> +	mmc->caps = MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
-> +		MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_SDR50 |
-> +		MMC_CAP_UHS_DDR50 | MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL |
-> +		MMC_CAP_DRIVER_TYPE_A;
-
-Please add a newline.
-
-> +	if (host->bus_width == 4)
-> +		mmc->caps |= MMC_CAP_4_BIT_DATA;
-
-Please add a newline.
-
-> +	mmc->caps2 = MMC_CAP2_NO_PRESCAN_POWERUP;
-> +
-> +	ret = mmc_add_host(mmc);
-> +	if (ret)
-> +		goto error_free_dma;
-> +
-> +	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
-> +	platform_set_drvdata(pdev, mmc);
-> +	return 0;
-> +
-> +error_free_dma:
-> +	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-> +error_free_host:
-> +	mmc_free_host(mmc);
-> +	return ret;
-> +}
-> +
-> +static int sunxi_mmc_remove(struct platform_device *pdev)
-> +{
-> +	struct mmc_host	*mmc = platform_get_drvdata(pdev);
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +
-> +	mmc_remove_host(mmc);
-> +	sunxi_mmc_exit_host(host);
-> +	tasklet_disable(&host->tasklet);
-> +	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-> +	mmc_free_host(mmc);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver sunxi_mmc_driver = {
-> +	.driver = {
-> +		.name	= "sunxi-mci",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(sunxi_mmc_of_match),
-> +	},
-> +	.probe		= sunxi_mmc_probe,
-> +	.remove		= sunxi_mmc_remove,
-> +};
-> +module_platform_driver(sunxi_mmc_driver);
-> +
-> +MODULE_DESCRIPTION("Allwinner's SD/MMC Card Controller Driver");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("David Lanzend?rfer <david.lanzendoerfer@o2s.ch>");
-> +MODULE_ALIAS("platform:sunxi-mmc");
-> diff --git a/drivers/mmc/host/sunxi-mci.h b/drivers/mmc/host/sunxi-mci.h
-> new file mode 100644
-> index 0000000..332d3ae
-> --- /dev/null
-> +++ b/drivers/mmc/host/sunxi-mci.h
-> @@ -0,0 +1,246 @@
-> +/*
-> + * Driver for sunxi SD/MMC host controllers
-> + * (C) Copyright 2007-2011 Reuuimlla Technology Co., Ltd.
-> + * (C) Copyright 2007-2011 Aaron Maoye <leafy.myeh@reuuimllatech.com>
-> + * (C) Copyright 2013-2013 O2S GmbH <www.o2s.ch>
-> + * (C) Copyright 2013-2013 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> + * (C) Copyright 2013-2013 Hans de Goede <hdegoede@redhat.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +#ifndef __SUNXI_MCI_H__
-> +#define __SUNXI_MCI_H__
-> +
-> +/* register offset define */
-> +#define SDXC_REG_GCTRL	(0x00) /* SMC Global Control Register */
-> +#define SDXC_REG_CLKCR	(0x04) /* SMC Clock Control Register */
-> +#define SDXC_REG_TMOUT	(0x08) /* SMC Time Out Register */
-> +#define SDXC_REG_WIDTH	(0x0C) /* SMC Bus Width Register */
-> +#define SDXC_REG_BLKSZ	(0x10) /* SMC Block Size Register */
-> +#define SDXC_REG_BCNTR	(0x14) /* SMC Byte Count Register */
-> +#define SDXC_REG_CMDR	(0x18) /* SMC Command Register */
-> +#define SDXC_REG_CARG	(0x1C) /* SMC Argument Register */
-> +#define SDXC_REG_RESP0	(0x20) /* SMC Response Register 0 */
-> +#define SDXC_REG_RESP1	(0x24) /* SMC Response Register 1 */
-> +#define SDXC_REG_RESP2	(0x28) /* SMC Response Register 2 */
-> +#define SDXC_REG_RESP3	(0x2C) /* SMC Response Register 3 */
-> +#define SDXC_REG_IMASK	(0x30) /* SMC Interrupt Mask Register */
-> +#define SDXC_REG_MISTA	(0x34) /* SMC Masked Interrupt Status Register */
-> +#define SDXC_REG_RINTR	(0x38) /* SMC Raw Interrupt Status Register */
-> +#define SDXC_REG_STAS	(0x3C) /* SMC Status Register */
-> +#define SDXC_REG_FTRGL	(0x40) /* SMC FIFO Threshold Watermark Registe */
-> +#define SDXC_REG_FUNS	(0x44) /* SMC Function Select Register */
-> +#define SDXC_REG_CBCR	(0x48) /* SMC CIU Byte Count Register */
-> +#define SDXC_REG_BBCR	(0x4C) /* SMC BIU Byte Count Register */
-> +#define SDXC_REG_DBGC	(0x50) /* SMC Debug Enable Register */
-> +#define SDXC_REG_HWRST	(0x78) /* SMC Card Hardware Reset for Register */
-> +#define SDXC_REG_DMAC	(0x80) /* SMC IDMAC Control Register */
-> +#define SDXC_REG_DLBA	(0x84) /* SMC IDMAC Descriptor List Base Addre */
-> +#define SDXC_REG_IDST	(0x88) /* SMC IDMAC Status Register */
-> +#define SDXC_REG_IDIE	(0x8C) /* SMC IDMAC Interrupt Enable Register */
-> +#define SDXC_REG_CHDA	(0x90)
-> +#define SDXC_REG_CBDA	(0x94)
-> +
-> +#define mci_readl(host, reg) \
-> +	__raw_readl((host)->reg_base + SDXC_##reg)
-> +#define mci_writel(host, reg, value) \
-> +	__raw_writel((value), (host)->reg_base + SDXC_##reg)
-
-No barriers ? :(
-
-> +/* global control register bits */
-> +#define SDXC_SoftReset		BIT(0)
-> +#define SDXC_FIFOReset		BIT(1)
-> +#define SDXC_DMAReset		BIT(2)
-> +#define SDXC_HWReset		(SDXC_SoftReset|SDXC_FIFOReset|SDXC_DMAReset)
-> +#define SDXC_INTEnb		BIT(4)
-> +#define SDXC_DMAEnb		BIT(5)
-> +#define SDXC_DebounceEnb	BIT(8)
-> +#define SDXC_PosedgeLatchData	BIT(9)
-> +#define SDXC_DDR_MODE		BIT(10)
-> +#define SDXC_MemAccessDone	BIT(29)
-> +#define SDXC_AccessDoneDirect	BIT(30)
-> +#define SDXC_ACCESS_BY_AHB	BIT(31)
-> +#define SDXC_ACCESS_BY_DMA	(0U << 31)
-> +/* clock control bits */
-> +#define SDXC_CardClkOn		BIT(16)
-> +#define SDXC_LowPowerOn		BIT(17)
-> +/* bus width */
-> +#define SDXC_WIDTH1		(0)
-> +#define SDXC_WIDTH4		(1)
-> +#define SDXC_WIDTH8		(2)
-> +/* smc command bits */
-> +#define SDXC_RspExp		BIT(6)
-> +#define SDXC_LongRsp		BIT(7)
-> +#define SDXC_CheckRspCRC	BIT(8)
-> +#define SDXC_DataExp		BIT(9)
-> +#define SDXC_Write		BIT(10)
-> +#define SDXC_Seqmod		BIT(11)
-> +#define SDXC_SendAutoStop	BIT(12)
-> +#define SDXC_WaitPreOver	BIT(13)
-> +#define SDXC_StopAbortCMD	BIT(14)
-> +#define SDXC_SendInitSeq	BIT(15)
-> +#define SDXC_UPCLKOnly		BIT(21)
-> +#define SDXC_RdCEATADev		BIT(22)
-> +#define SDXC_CCSExp		BIT(23)
-> +#define SDXC_EnbBoot		BIT(24)
-> +#define SDXC_AltBootOpt		BIT(25)
-> +#define SDXC_BootACKExp		BIT(26)
-> +#define SDXC_BootAbort		BIT(27)
-> +#define SDXC_VolSwitch	        BIT(28)
-> +#define SDXC_UseHoldReg	        BIT(29)
-> +#define SDXC_Start	        BIT(31)
-> +/* interrupt bits */
-> +#define SDXC_RespErr		BIT(1)
-> +#define SDXC_CmdDone		BIT(2)
-> +#define SDXC_DataOver		BIT(3)
-> +#define SDXC_TxDataReq		BIT(4)
-> +#define SDXC_RxDataReq		BIT(5)
-> +#define SDXC_RespCRCErr		BIT(6)
-> +#define SDXC_DataCRCErr		BIT(7)
-> +#define SDXC_RespTimeout	BIT(8)
-> +#define SDXC_DataTimeout	BIT(9)
-> +#define SDXC_VolChgDone		BIT(10)
-> +#define SDXC_FIFORunErr		BIT(11)
-> +#define SDXC_HardWLocked	BIT(12)
-> +#define SDXC_StartBitErr	BIT(13)
-> +#define SDXC_AutoCMDDone	BIT(14)
-> +#define SDXC_EndBitErr		BIT(15)
-> +#define SDXC_SDIOInt		BIT(16)
-> +#define SDXC_CardInsert		BIT(30)
-> +#define SDXC_CardRemove		BIT(31)
-> +#define SDXC_IntErrBit		(SDXC_RespErr | SDXC_RespCRCErr | \
-> +				 SDXC_DataCRCErr | SDXC_RespTimeout | \
-> +				 SDXC_DataTimeout | SDXC_FIFORunErr | \
-> +				 SDXC_HardWLocked | SDXC_StartBitErr | \
-> +				 SDXC_EndBitErr) /* 0xbbc2 */
-> +#define SDXC_IntDoneBit		(SDXC_AutoCMDDone | SDXC_DataOver | \
-> +				 SDXC_CmdDone | SDXC_VolChgDone)
-> +/* status */
-> +#define SDXC_RXWLFlag		BIT(0)
-> +#define SDXC_TXWLFlag		BIT(1)
-> +#define SDXC_FIFOEmpty		BIT(2)
-> +#define SDXC_FIFOFull		BIT(3)
-> +#define SDXC_CardPresent	BIT(8)
-> +#define SDXC_CardDataBusy	BIT(9)
-> +#define SDXC_DataFSMBusy	BIT(10)
-> +#define SDXC_DMAReq		BIT(31)
-> +#define SDXC_FIFO_SIZE		(16)
-> +/* Function select */
-> +#define SDXC_CEATAOn		(0xceaaU << 16)
-> +#define SDXC_SendIrqRsp		BIT(0)
-> +#define SDXC_SDIORdWait		BIT(1)
-> +#define SDXC_AbtRdData		BIT(2)
-> +#define SDXC_SendCCSD		BIT(8)
-> +#define SDXC_SendAutoStopCCSD	BIT(9)
-> +#define SDXC_CEATADevIntEnb	BIT(10)
-> +/* IDMA controller bus mod bit field */
-> +#define SDXC_IDMACSoftRST	BIT(0)
-> +#define SDXC_IDMACFixBurst	BIT(1)
-> +#define SDXC_IDMACIDMAOn	BIT(7)
-> +#define SDXC_IDMACRefetchDES	BIT(31)
-> +/* IDMA status bit field */
-> +#define SDXC_IDMACTransmitInt	BIT(0)
-> +#define SDXC_IDMACReceiveInt	BIT(1)
-> +#define SDXC_IDMACFatalBusErr	BIT(2)
-> +#define SDXC_IDMACDesInvalid	BIT(4)
-> +#define SDXC_IDMACCardErrSum	BIT(5)
-> +#define SDXC_IDMACNormalIntSum	BIT(8)
-> +#define SDXC_IDMACAbnormalIntSum BIT(9)
-> +#define SDXC_IDMACHostAbtInTx	BIT(10)
-> +#define SDXC_IDMACHostAbtInRx	BIT(10)
-> +#define SDXC_IDMACIdle		(0U << 13)
-> +#define SDXC_IDMACSuspend	(1U << 13)
-> +#define SDXC_IDMACDESCRd	(2U << 13)
-> +#define SDXC_IDMACDESCCheck	(3U << 13)
-> +#define SDXC_IDMACRdReqWait	(4U << 13)
-> +#define SDXC_IDMACWrReqWait	(5U << 13)
-> +#define SDXC_IDMACRd		(6U << 13)
-> +#define SDXC_IDMACWr		(7U << 13)
-> +#define SDXC_IDMACDESCClose	(8U << 13)
-> +
-> +struct sunxi_idma_des {
-> +	u32	config;
-> +#define SDXC_IDMAC_DES0_DIC	BIT(1)  /* disable interrupt on completion */
-> +#define SDXC_IDMAC_DES0_LD	BIT(2)  /* last descriptor */
-> +#define SDXC_IDMAC_DES0_FD	BIT(3)  /* first descriptor */
-> +#define SDXC_IDMAC_DES0_CH	BIT(4)  /* chain mode */
-> +#define SDXC_IDMAC_DES0_ER	BIT(5)  /* end of ring */
-> +#define SDXC_IDMAC_DES0_CES	BIT(30) /* card error summary */
-> +#define SDXC_IDMAC_DES0_OWN	BIT(31) /* 1-idma owns it, 0-host owns it */
-> +
-> +	/*
-> +	 * If the idma-des-size-bits of property is ie 13, bufsize bits are:
-> +	 *  Bits  0-12: buf1 size
-> +	 *  Bits 13-25: buf2 size
-> +	 *  Bits 26-31: not used
-> +	 * Since we only ever set buf1 size, we can simply store it directly.
-> +	 */
-> +	u32	buf_size;
-> +	u32	buf_addr_ptr1;
-> +	u32	buf_addr_ptr2;
-> +};
-> +
-> +struct sunxi_mmc_host {
-> +	struct mmc_host *mmc;
-> +	struct regulator *vmmc;
-> +
-> +	/* IO mapping base */
-> +	void __iomem *reg_base;
-> +
-> +	spinlock_t lock;
-> +	struct tasklet_struct tasklet;
-> +
-> +	/* clock management */
-> +	struct clk *clk_ahb;
-> +	struct clk *clk_mod;
-> +
-> +	/* indicator pins */
-> +	int wp_pin;
-> +	int cd_pin;
-> +	int cd_mode;
-> +#define CARD_DETECT_BY_GPIO_POLL (1)	/* mmc detected by gpio check */
-> +#define CARD_ALWAYS_PRESENT      (2)	/* mmc always present */
-
-Just a question here, have you tested to use the external interrupts?
-(Is that even possible on the pins that are used as card detect?)
-
-> +	/* ios information */
-> +	u32		clk_mod_rate;
-> +	u32		bus_width;
-> +	u32		idma_des_size_bits;
-> +	u32		ddr;
-> +	u32		voltage_switching;
-> +
-> +	/* irq */
-> +	int		irq;
-> +	u32		int_sum;
-> +	u32		sdio_imask;
-> +
-> +	/* flags */
-> +	u32		power_on:1;
-> +	u32		io_flag:1;
-> +	u32		wait_dma:1;
-> +
-> +	dma_addr_t	sg_dma;
-> +	void		*sg_cpu;
-> +
-> +	struct mmc_request *mrq;
-> +	u32		ferror;
-> +};
-> +
-> +#define MMC_CLK_400K            0
-> +#define MMC_CLK_25M             1
-> +#define MMC_CLK_50M             2
-> +#define MMC_CLK_50MDDR          3
-> +#define MMC_CLK_50MDDR_8BIT     4
-> +#define MMC_CLK_100M            5
-> +#define MMC_CLK_200M            6
-> +#define MMC_CLK_MOD_NUM         7
-> +
-> +struct sunxi_mmc_clk_dly {
-> +	u32 mode;
-> +	u32 oclk_dly;
-> +	u32 sclk_dly;
-> +};
-> +
-> +#endif
-> diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
-> new file mode 100644
-> index 0000000..1ef5c89
-> --- /dev/null
-> +++ b/include/linux/clk/sunxi.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright 2013 - Hans de Goede <hdegoede@redhat.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __LINUX_CLK_SUNXI_H_
-> +#define __LINUX_CLK_SUNXI_H_
-> +
-> +#include <linux/clk.h>
-> +
-> +void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output);
-> +
-> +#endif
-
-Hmmm, I see no implementation for this function. Didn't you forget
-a file here? (and it should probably be a separate patch anyway).
-
-Thanks a lot for this work,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131215/0d14372c/attachment-0001.sig>
+Best regards,
+Tomasz
