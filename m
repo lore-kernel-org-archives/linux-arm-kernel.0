@@ -1,66 +1,28 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 14 Dec 2013 20:56:41 -0800
-Subject: [PATCH] drivers: clk: Fix build break introduced in 3e1e4a5f
-In-Reply-To: <20131214074606.GA20826@rashika>
-References: <20131214074606.GA20826@rashika>
-Message-ID: <20131215045641.23538.82881@quantum>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sun, 15 Dec 2013 17:23:58 +0900
+Subject: [PATCH RFC 0/2] pinctl: sh-pfc: r7s72100: Ethernet support
+Message-ID: <1387095840-15008-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rashika Kheria (2013-12-13 23:46:06)
-> This patch fixes the build break introduced by 3e1e4a5f. The mentioned
-> commit id makes the changes in file "include/linux/mfd/samsung/core.h"
-> by changing the members of structure sec_pmic_dev.
-> 
-> The patch replaces "regmap" with "regmap_pmic" because structure
-> sec_pmic_dev no more contains any member named regmap.
-> 
-> Thus, it removes the undefined reference to regmap in functions
-> s2mps11_clk_prepare(), s2mps11_clk_unprepare() and s2mps11_clk_probe().
-> 
-> Signed-off-by: Rashika Kheria <rashika.kheria@gmail.com>
+Hi,
 
-Thanks for the fix. Taken into clk-next.
+this is a first pass at adding ethernet support to sh-pfc for
+the r7s72100 SoC.
 
-Regards,
-Mike
+It has been written with reference to the hardware documentation
+but not well tested.
 
-> ---
->  drivers/clk/clk-s2mps11.c |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-> index 7be41e6..94e3695 100644
-> --- a/drivers/clk/clk-s2mps11.c
-> +++ b/drivers/clk/clk-s2mps11.c
-> @@ -60,7 +60,7 @@ static int s2mps11_clk_prepare(struct clk_hw *hw)
->         struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
->         int ret;
->  
-> -       ret = regmap_update_bits(s2mps11->iodev->regmap,
-> +       ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
->                                 S2MPS11_REG_RTC_CTRL,
->                                  s2mps11->mask, s2mps11->mask);
->         if (!ret)
-> @@ -74,7 +74,8 @@ static void s2mps11_clk_unprepare(struct clk_hw *hw)
->         struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
->         int ret;
->  
-> -       ret = regmap_update_bits(s2mps11->iodev->regmap, S2MPS11_REG_RTC_CTRL,
-> +       ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
-> +                          S2MPS11_REG_RTC_CTRL,
->                            s2mps11->mask, ~s2mps11->mask);
->  
->         if (!ret)
-> @@ -174,7 +175,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->                 s2mps11_clk->hw.init = &s2mps11_clks_init[i];
->                 s2mps11_clk->mask = 1 << i;
->  
-> -               ret = regmap_read(s2mps11_clk->iodev->regmap,
-> +               ret = regmap_read(s2mps11_clk->iodev->regmap_pmic,
->                                   S2MPS11_REG_RTC_CTRL, &val);
->                 if (ret < 0)
->                         goto err_reg;
-> -- 
-> 1.7.9.5
-> 
+This series is based on the topic/r7s72100-v3.13-rc3-20131214v2
+tag in my renesas tree.
+
+Simon Horman (2):
+  pinctl: sh-pfc: r7s72100: Ethernet support
+  ARM: shmobile: r7s72100: Add ethernet PFC node to DT
+
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 25 +++++++++-
+ drivers/pinctrl/sh-pfc/pfc-r7s72100.c           | 64 +++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 1 deletion(-)
+
+- 
+1.8.4
