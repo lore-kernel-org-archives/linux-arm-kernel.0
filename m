@@ -1,62 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 16 Dec 2013 05:23:01 +0900
-Subject: [GIT PULL 7/7] Samsung SoC for v3.14
-Message-ID: <52AE0FA5.3090804@samsung.com>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Sun, 15 Dec 2013 22:19:56 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <52AE0E87.2040304@redhat.com>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <2378731.6b9MyH8v8A@dizzy-6.site> <52AE0E87.2040304@redhat.com>
+Message-ID: <1743952.noztKtcF2Y@dizzy-6.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > [...]
+> > Do you have something like this in mind? ->
+> > drivers/mmc/host/dw_mmc-exynos.c
+> No, as explained in my previous mail the idmac being shared seemed to be the
+> only 2 things the dw-mmc controller and the sunxi-mmc controller have in
+> common.
+Ok.
 
-   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> Looking at dw_mmc-exynos.c it still pretty much is the classic dw-mmc
+> controller with some extra bits, where as the sunxi controller is
+> significantly different (which allows us to write a significant simpler
+> driver).
+Do you have an outline for such a driver as you imagine it?
+I'd be interested into some "experiments".
+Maybe you have a repository where you could push a dedicated tree
+for some colaboration on this?
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-soc
-
-for you to fetch changes up to 538cfbb4c40ab59688236484138133b8e3e89220:
-
-   ARM: dts: Add initial support for Arndale Octa board (2013-12-16 
-05:05:43 +0900)
-
-----------------------------------------------------------------
-Samsung SoC updates for v3.14
-- Add exynos5410 SoC and smdk5410 board support
-   : add supporting SoC and board DT files
-   : add clk-exynos5410 with using CCF
-- Add exynos5420-arndale-octa board support
-   : basic supporting for Arndale Octa board
-
-----------------------------------------------------------------
-Sachin Kamat (1):
-       ARM: dts: Add initial support for Arndale Octa board
-
-Tarek Dakhran (3):
-       ARM: EXYNOS: Add support for EXYNOS5410 SoC
-       clk: exynos5410: register clocks using common clock framework
-       ARM: dts: Add initial device tree support for EXYNOS5410
-
-  .../devicetree/bindings/clock/exynos5410-clock.txt |  54 +++++
-  arch/arm/boot/dts/Makefile                         |   2 +
-  arch/arm/boot/dts/exynos5410-smdk5410.dts          |  72 +++++++
-  arch/arm/boot/dts/exynos5410.dtsi                  | 145 +++++++++++++
-  arch/arm/boot/dts/exynos5420-arndale-octa.dts      |  66 ++++++
-  arch/arm/mach-exynos/Kconfig                       |  10 +
-  arch/arm/mach-exynos/common.c                      |  18 ++
-  arch/arm/mach-exynos/include/mach/map.h            |   1 +
-  arch/arm/mach-exynos/mach-exynos5-dt.c             |   1 +
-  arch/arm/mach-exynos/platsmp.c                     |   2 +
-  arch/arm/plat-samsung/include/plat/cpu.h           |   8 +
-  arch/arm/plat-samsung/include/plat/map-s5p.h       |   3 +
-  drivers/clk/samsung/Makefile                       |   1 +
-  drivers/clk/samsung/clk-exynos5410.c               | 239 
-+++++++++++++++++++++
-  include/dt-bindings/clock/exynos5410.h             |  32 +++
-  15 files changed, 654 insertions(+)
-  create mode 100644 
-Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
-  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
-  create mode 100644 arch/arm/boot/dts/exynos5420-arndale-octa.dts
-  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
-  create mode 100644 include/dt-bindings/clock/exynos5410.h
+regards
+David
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131215/87862fea/attachment.sig>
