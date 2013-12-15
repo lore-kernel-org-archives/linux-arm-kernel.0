@@ -1,10 +1,10 @@
 From: liuj97@gmail.com (Jiang Liu)
-Date: Mon, 16 Dec 2013 00:36:26 +0800
-Subject: [PATCH v3 [resend] 04/18] smp,
- ARM: kill SMP single function call interrupt
+Date: Mon, 16 Dec 2013 00:36:27 +0800
+Subject: [PATCH v3 [resend] 05/18] smp,
+ ARM64: kill SMP single function call interrupt
 In-Reply-To: <1387125400-28849-1-git-send-email-liuj97@gmail.com>
 References: <1387125400-28849-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1387125400-28849-5-git-send-email-liuj97@gmail.com>
+Message-ID: <1387125400-28849-6-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,41 +24,38 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Jiang Liu <liuj97@gmail.com>
 ---
- arch/arm/include/asm/hardirq.h |  2 +-
- arch/arm/kernel/smp.c          | 10 +---------
+ arch/arm64/include/asm/hardirq.h |  2 +-
+ arch/arm64/kernel/smp.c          | 10 +---------
  2 files changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index fe3ea77..3d7351c 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -5,7 +5,7 @@
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 990c051..3be64c8 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
  #include <linux/threads.h>
  #include <asm/irq.h>
  
--#define NR_IPI	8
-+#define NR_IPI	7
+-#define NR_IPI	4
++#define NR_IPI	3
  
  typedef struct {
  	unsigned int __softirq_pending;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index dc894ab..e24a23d 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -65,7 +65,6 @@ enum ipi_msg_type {
- 	IPI_TIMER,
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index a0c2ca6..ea3e9ab 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -59,7 +59,6 @@ struct secondary_data secondary_data;
+ enum ipi_msg_type {
  	IPI_RESCHEDULE,
  	IPI_CALL_FUNC,
 -	IPI_CALL_FUNC_SINGLE,
  	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-@@ -448,7 +447,7 @@ void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+ };
+ 
+@@ -438,14 +437,13 @@ void arch_send_call_function_ipi_mask(const struct cpumask *mask)
  
  void arch_send_call_function_single_ipi(int cpu)
  {
@@ -66,16 +63,15 @@ index dc894ab..e24a23d 100644
 +	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
  }
  
- #ifdef CONFIG_IRQ_WORK
-@@ -465,7 +464,6 @@ static const char *ipi_types[NR_IPI] = {
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ static const char *ipi_types[NR_IPI] = {
+ #define S(x,s)	[x - IPI_RESCHEDULE] = s
  	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
  	S(IPI_CALL_FUNC, "Function call interrupts"),
 -	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
  	S(IPI_CPU_STOP, "CPU stop interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- 	S(IPI_COMPLETION, "completion interrupts"),
-@@ -579,12 +577,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ };
+ 
+@@ -520,12 +518,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
  		irq_exit();
  		break;
  
