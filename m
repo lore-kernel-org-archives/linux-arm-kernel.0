@@ -1,190 +1,326 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 14 Dec 2013 20:23:03 -0800
-Subject: [PATCHv10 10/41] CLK: TI: add support for clockdomain binding
-In-Reply-To: <1385453182-24421-11-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-11-git-send-email-t-kristo@ti.com>
-Message-ID: <20131215042303.23538.19248@quantum>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Sun, 15 Dec 2013 14:27:49 +1000
+Subject: [PATCH v4 2/2] ARM: mach-moxart: add MOXA ART SoC device tree
+ files
+In-Reply-To: <1386945188-8316-3-git-send-email-jonas.jensen@gmail.com>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <1386945188-8316-3-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CAEgOgz7=xZ8N+vGuaQ6L3n5SYpS3bS+xN88WXDH+A7m7JNLrcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2013-11-26 00:05:51)
-> Some OMAP clocks require knowledge about their parent clockdomain for
-> book keeping purposes. This patch creates a new DT binding for TI
-> clockdomains, which act as a collection of device clocks.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+On Sat, Dec 14, 2013 at 12:33 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> Add a generic (dtsi) include file for MOXA ART SoCs.
+>
+> Also add a file for UC-7112-LX.
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 > ---
->  .../devicetree/bindings/clock/ti/clockdomain.txt   |   21 ++++++
->  arch/arm/mach-omap2/clock.h                        |    1 -
->  drivers/clk/ti/Makefile                            |    3 +-
->  drivers/clk/ti/clockdomain.c                       |   70 ++++++++++++++++++++
->  include/linux/clk/ti.h                             |    3 +
->  5 files changed, 96 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/clockdomain.txt
->  create mode 100644 drivers/clk/ti/clockdomain.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/ti/clockdomain.txt b/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
+>  Documentation/devicetree/bindings/arm/moxart.txt |  12 +++
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/moxart-uc7112lx.dts            | 131 +++++++++++++++++++++++
+>  arch/arm/boot/dts/moxart.dtsi                    | 100 +++++++++++++++++
+>  4 files changed, 244 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/moxart.txt
+>  create mode 100644 arch/arm/boot/dts/moxart-uc7112lx.dts
+>  create mode 100644 arch/arm/boot/dts/moxart.dtsi
+>
+> diff --git a/Documentation/devicetree/bindings/arm/moxart.txt b/Documentation/devicetree/bindings/arm/moxart.txt
 > new file mode 100644
-> index 0000000..45e6f7c
+> index 0000000..11087ed
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
-> @@ -0,0 +1,21 @@
-> +Binding for Texas Instruments clockdomain.
+> +++ b/Documentation/devicetree/bindings/arm/moxart.txt
+> @@ -0,0 +1,12 @@
+> +MOXA ART device tree bindings
 > +
-> +Binding status: Unstable - ABI compatibility may be broken in the future
+> +Boards with the MOXA ART SoC shall have the following properties:
 > +
-> +This binding uses the common clock binding[1]. Every clock on
+> +Required root node property:
+> +
+> +compatible = "moxa,moxart";
+> +
+> +Boards:
+> +
+> +- UC-7112-LX: embedded computer
+> +  compatible = "moxa,moxart-uc-7112-lx", "moxa,moxart"
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9fe33e7..f331b22 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -318,6 +318,7 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+>  dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+>         zynq-zc706.dtb \
+>         zynq-zed.dtb
+> +dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
+>
+>  targets += dtbs
+>  targets += $(dtb-y)
+> diff --git a/arch/arm/boot/dts/moxart-uc7112lx.dts b/arch/arm/boot/dts/moxart-uc7112lx.dts
+> new file mode 100644
+> index 0000000..c63d013
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/moxart-uc7112lx.dts
+> @@ -0,0 +1,131 @@
+> +/* moxart-uc7112lx.dts - Device Tree file for MOXA UC-7112-LX
+> + *
+> + * Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "moxart.dtsi"
+> +
+> +/ {
+> +       model = "MOXA UC-7112-LX";
+> +       compatible = "moxa,moxart-uc-7112-lx", "moxa,moxart";
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0x0 0x2000000>;
+> +       };
+> +
+> +       flash at 80000000,0 {
+> +               compatible = "numonyx,js28f128", "cfi-flash";
+> +               reg = <0x80000000 0x1000000>;
+> +               bank-width = <2>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               partition at 0 {
+> +                       label = "bootloader";
+> +                       reg = <0x0 0x40000>;
+> +               };
+> +               partition at 40000 {
+> +                       label = "linux kernel";
+> +                       reg = <0x40000 0x1C0000>;
+> +               };
+> +               partition at 200000 {
+> +                       label = "root filesystem";
+> +                       reg = <0x200000 0x800000>;
+> +               };
+> +               partition at a00000 {
+> +                       label = "user filesystem";
+> +                       reg = <0xa00000 0x600000>;
+> +               };
+> +       };
+> +
+> +       sdhci: sdhci at 98e00000 {
+> +               compatible = "moxa,moxart-sdhci";
+> +               reg = <0x98e00000 0x5C>;
+> +               interrupts = <5 0>;
+> +               clocks = <&clk_apb>;
+> +               dmas =  <&dma 5>,
+> +                       <&dma 5>;
+> +               dma-names = "tx", "rx";
+> +       };
 
-The patch looks fine to me but I think that the binding description
-should capture the fact that you are re-using the common clock binding
-but that this binding definition does not define any new clocks or clock
-controllers in the way that a typical clock binding would.
+Is your SDHCI really implemented on the board level? The fact that its
+reg property is within the same as the SoC range (for your dtsi)
+suggests the SDHCI is part of the SoC and should perhaps be in the
+dtsi?
 
-This code uses the 'clocks' property the same way that any other
-consumer binding definition would, such as an MMC controller or UART.
-Those bindings do not say that they are based on the common clock
-binding AFAIK.
+> +
+> +       mdio0: mdio at 90900090 {
+> +               compatible = "moxa,moxart-mdio";
+> +               reg = <0x90900090 0x8>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ethphy0: ethernet-phy at 1 {
+> +                       device_type = "ethernet-phy";
+> +                       compatible = "moxa,moxart-rtl8201cp", "ethernet-phy-ieee802.3-c22";
+> +                       reg = <1>;
+> +               };
+> +       };
+> +
+> +       mdio1: mdio at 92000090 {
+> +               compatible = "moxa,moxart-mdio";
+> +               reg = <0x92000090 0x8>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ethphy1: ethernet-phy at 1 {
+> +                       device_type = "ethernet-phy";
+> +                       compatible = "moxa,moxart-rtl8201cp", "ethernet-phy-ieee802.3-c22";
+> +                       reg = <1>;
+> +               };
+> +       };
+> +
+> +       mac0: mac at 90900000 {
+> +               compatible = "moxa,moxart-mac";
+> +               reg = <0x90900000 0x90>;
+> +               interrupts = <25 0>;
+> +               phy-handle = <&ethphy0>;
+> +               phy-mode = "mii";
+> +       };
+> +
+> +       mac1: mac at 92000000 {
+> +               compatible = "moxa,moxart-mac";
+> +               reg = <0x92000000 0x90>;
+> +               interrupts = <27 0>;
+> +               phy-handle = <&ethphy1>;
+> +               phy-mode = "mii";
+> +       };
+
+Same for MACs.
+
+> +
+> +       uart0: uart at 98200000 {
+> +               compatible = "ns16550a";
+> +               reg = <0x98200000 0x20>;
+> +               interrupts = <31 8>;
+> +               reg-shift = <2>;
+> +               reg-io-width = <4>;
+> +               clock-frequency = <14745600>;
+> +               status = "okay";
+> +       };
+> +
+
+And UARTs.
+
+Let me know if i'm misunderstanding dts/dtsi split but looking at some
+of the other SoCs this seems inconsistent to me.
 
 Regards,
-Mike
+Peter
 
-> +TI SoC belongs to one clockdomain, but software only needs this
-> +information for specific clocks which require their parent
-> +clockdomain to be controlled when the clock is enabled/disabled.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be "ti,clockdomain"
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clocks : link phandles of clocks within this domain
-> +
-> +Examples:
-> +       dss_clkdm: dss_clkdm {
-> +               compatible = "ti,clockdomain";
-> +               clocks = <&dss1_alwon_fck_3430es2>, <&dss_ick_3430es2>;
+> +       leds {
+> +               compatible = "gpio-leds";
+> +               user-led {
+> +                       label = "ready-led";
+> +                       gpios = <&gpio 27 0x1>;
+> +                       default-state = "on";
+> +                       linux,default-trigger = "default-on";
+> +               };
 > +       };
-> diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-> index bc0f9fc..6bd72b5 100644
-> --- a/arch/arm/mach-omap2/clock.h
-> +++ b/arch/arm/mach-omap2/clock.h
-> @@ -38,7 +38,6 @@ struct omap_clk {
->         }
->  
->  struct clockdomain;
-> -#define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
->  
->  #define DEFINE_STRUCT_CLK(_name, _parent_array_name, _clkops_name)     \
->         static struct clk _name = {                             \
-> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-> index 7cba389..67056fb 100644
-> --- a/drivers/clk/ti/Makefile
-> +++ b/drivers/clk/ti/Makefile
-> @@ -1,4 +1,5 @@
->  ifneq ($(CONFIG_OF),)
->  obj-y                                  += clk.o dpll.o autoidle.o divider.o \
-> -                                          fixed-factor.o gate.o composite.o
-> +                                          fixed-factor.o gate.o clockdomain.o \
-> +                                          composite.o
->  endif
-> diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-> new file mode 100644
-> index 0000000..f1e0038
-> --- /dev/null
-> +++ b/drivers/clk/ti/clockdomain.c
-> @@ -0,0 +1,70 @@
-> +/*
-> + * OMAP clockdomain support
-> + *
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *
-> + * Tero Kristo <t-kristo@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
 > +
-> +#include <linux/clk-provider.h>
-> +#include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clk/ti.h>
+> +       gpio_keys_polled {
+> +               compatible = "gpio-keys-polled";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               poll-interval = <500>;
+> +               button at 25 {
+> +                       label = "GPIO Reset";
+> +                       linux,code = <116>;
+> +                       gpios = <&gpio 25 1>;
+> +               };
+> +       };
 > +
-> +#undef pr_fmt
-> +#define pr_fmt(fmt) "%s: " fmt, __func__
-> +
-> +static void __init of_ti_clockdomain_setup(struct device_node *node)
-> +{
-> +       struct clk *clk;
-> +       struct clk_hw *clk_hw;
-> +       const char *clkdm_name = node->name;
-> +       int i;
-> +       int num_clks;
-> +
-> +       num_clks = of_count_phandle_with_args(node, "clocks", "#clock-cells");
-> +
-> +       for (i = 0; i < num_clks; i++) {
-> +               clk = of_clk_get(node, i);
-> +               if (__clk_get_flags(clk) & CLK_IS_BASIC) {
-> +                       pr_warn("can't setup clkdm for basic clk %s\n",
-> +                               __clk_get_name(clk));
-> +                       continue;
-> +               }
-> +               clk_hw = __clk_get_hw(clk);
-> +               to_clk_hw_omap(clk_hw)->clkdm_name = clkdm_name;
-> +               omap2_init_clk_clkdm(clk_hw);
-> +       }
-> +}
-> +
-> +static struct of_device_id ti_clkdm_match_table[] __initdata = {
-> +       { .compatible = "ti,clockdomain" },
-> +       { }
+> +       chosen {
+> +               bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/mmcblk0p1 rw rootwait";
+> +       };
 > +};
-> +
-> +/**
-> + * ti_dt_clockdomains_setup - setup device tree clockdomains
+> diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
+> new file mode 100644
+> index 0000000..0ea51ed
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/moxart.dtsi
+> @@ -0,0 +1,100 @@
+> +/* moxart.dtsi - Device Tree Include file for MOXA ART family SoC
 > + *
-> + * Initializes clockdomain nodes for a SoC. This parses through all the
-> + * nodes with compatible = "ti,clockdomain", and add the clockdomain
-> + * info for all the clocks listed under these. This function shall be
-> + * called after rest of the DT clock init has completed and all
-> + * clock nodes have been registered.
+> + * Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * Licensed under GPLv2 or later.
 > + */
-> +void __init ti_dt_clockdomains_setup(void)
-> +{
-> +       struct device_node *np;
-> +       for_each_matching_node(np, ti_clkdm_match_table) {
-> +               of_ti_clockdomain_setup(np);
-> +       }
-> +}
-> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-> index 872ff2a..231b071 100644
-> --- a/include/linux/clk/ti.h
-> +++ b/include/linux/clk/ti.h
-> @@ -204,6 +204,8 @@ struct clk_omap_reg {
->         u16 index;
->  };
->  
-> +#define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
 > +
->  void omap2_init_clk_hw_omap_clocks(struct clk *clk);
->  int omap3_noncore_dpll_enable(struct clk_hw *hw);
->  void omap3_noncore_dpll_disable(struct clk_hw *hw);
-> @@ -232,6 +234,7 @@ int omap2_dflt_clk_is_enabled(struct clk_hw *hw);
->  void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
->  void ti_dt_clocks_register(struct ti_dt_clk *oclks);
->  void ti_dt_clk_init_provider(struct device_node *np, int index);
-> +void ti_dt_clockdomains_setup(void);
->  int of_ti_clk_autoidle_setup(struct device_node *node);
->  int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
->  
-> -- 
-> 1.7.9.5
-> 
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +       compatible = "moxa,moxart";
+> +       model = "MOXART";
+> +       interrupt-parent = <&intc>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "faraday,fa526";
+> +                       reg = <0>;
+> +               };
+> +       };
+> +
+> +       clocks {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ref12: ref12M {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <12000000>;
+> +               };
+> +       };
+> +
+> +       soc {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               reg = <0x90000000 0x10000000>;
+> +               ranges;
+> +
+> +               intc: interrupt-controller at 98800000 {
+> +                       compatible = "moxa,moxart-ic";
+> +                       reg = <0x98800000 0x38>;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <2>;
+> +                       interrupt-mask = <0x00080000>;
+> +               };
+> +
+> +               clk_pll: clk_pll at 98100000 {
+> +                       compatible = "moxa,moxart-pll-clock";
+> +                       #clock-cells = <0>;
+> +                       reg = <0x98100000 0x34>;
+> +                       clocks = <&ref12>;
+> +               };
+> +
+> +               clk_apb: clk_apb at 98100000 {
+> +                       compatible = "moxa,moxart-apb-clock";
+> +                       #clock-cells = <0>;
+> +                       reg = <0x98100000 0x34>;
+> +                       clocks = <&clk_pll>;
+> +               };
+> +
+> +               timer: timer at 98400000 {
+> +                       compatible = "moxa,moxart-timer";
+> +                       reg = <0x98400000 0x42>;
+> +                       interrupts = <19 1>;
+> +                       clocks = <&clk_apb>;
+> +               };
+> +
+> +               gpio: gpio at 98700000 {
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +                       compatible = "moxa,moxart-gpio";
+> +                       reg = <0x98700000 0xC>;
+> +               };
+> +
+> +               rtc: rtc {
+> +                       compatible = "moxa,moxart-rtc";
+> +                       gpio-rtc-sclk = <&gpio 5 0>;
+> +                       gpio-rtc-data = <&gpio 6 0>;
+> +                       gpio-rtc-reset = <&gpio 7 0>;
+> +               };
+> +
+> +               dma: dma at 90500000 {
+> +                       compatible = "moxa,moxart-dma";
+> +                       reg = <0x90500080 0x40>;
+> +                       interrupts = <24 0>;
+> +                       #dma-cells = <1>;
+> +               };
+> +
+> +               watchdog: watchdog at 98500000 {
+> +                       compatible = "moxa,moxart-watchdog";
+> +                       reg = <0x98500000 0x10>;
+> +                       clocks = <&clk_apb>;
+> +               };
+> +       };
+> +};
+> --
+> 1.8.2.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
