@@ -1,60 +1,94 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sun, 15 Dec 2013 19:10:08 +0800
-Subject: [PATCH v6 7/7] jump_label: use defined macros instead of
- hard-coding for better readability
-In-Reply-To: <20131213112019.751f7946@gandalf.local.home>
-References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>	<1386691433-6827-8-git-send-email-liuj97@gmail.com>
- <20131213112019.751f7946@gandalf.local.home>
-Message-ID: <52AD8E10.2010904@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 15 Dec 2013 03:21:04 -0800
+Subject: [PATCH 1/7] Input: pmic8xxx-pwrkey - Pass input device directly
+ to interrupt
+In-Reply-To: <1386718996-3733-2-git-send-email-sboyd@codeaurora.org>
+References: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
+ <1386718996-3733-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131215112103.GA14818@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2013 12:20 AM, Steven Rostedt wrote:
-> On Wed, 11 Dec 2013 00:03:53 +0800
-> Jiang Liu <liuj97@gmail.com> wrote:
-> 
->> Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
->> readability.
-> 
-> Looks good, just a little nit. (see below)
-> 
->>
->> Signed-off-by: Jiang Liu <liuj97@gmail.com>
->> ---
->>  include/linux/jump_label.h | 15 ++++++++++-----
-...
->> @@ -123,9 +126,11 @@ extern void static_key_slow_dec(struct static_key *key);
->>  extern void jump_label_apply_nops(struct module *mod);
->>  
->>  #define STATIC_KEY_INIT_TRUE ((struct static_key) \
->> -	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
->> +	{ .enabled = ATOMIC_INIT(1), \
->> +	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
->>  #define STATIC_KEY_INIT_FALSE ((struct static_key) \
->> -	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
->> +	{ .enabled = ATOMIC_INIT(0), \
->> +	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
-> 
-> Can we prettify the backslashes like:
-> 
-> #define STATIC_KEY_INIT_TRUE ((struct static_key)		\
-> 	{ .enabled = ATOMIC_INIT(1),				\
-> 	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
-> #define STATIC_KEY_INIT_FALSE ((struct static_key)		\
-> 	{ .enabled = ATOMIC_INIT(0),				\
-> 	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
-> 
-> 
-> Other than that.
-> 
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-Thanks Steve.
-Will make this change.
+Hi Stephen,
 
+On Tue, Dec 10, 2013 at 03:43:10PM -0800, Stephen Boyd wrote:
+> Instead of passing the pointer to the container structure just
+> pass the input device here. This saves a dereference in the fast
+> path.
 > 
-> -- Steve
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/input/misc/pmic8xxx-pwrkey.c | 22 ++++++++--------------
+>  1 file changed, 8 insertions(+), 14 deletions(-)
 > 
->>  
->>  #else  /* !HAVE_JUMP_LABEL */
->>  
+> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+> index ce3c426..233b216 100644
+> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
+> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+> @@ -32,26 +32,21 @@
+>   * @key_press_irq: key press irq number
+>   */
+>  struct pmic8xxx_pwrkey {
+> -	struct input_dev *pwr;
+
+This causes compile errors as you need pwrkey->pwr in remove() to
+unregister input device. I'll fix it up.
+
+>  	int key_press_irq;
+>  };
+>  
+> -static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
+> +static irqreturn_t pwrkey_press_irq(int irq, void *pwr)
+>  {
+> -	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
+> -
+> -	input_report_key(pwrkey->pwr, KEY_POWER, 1);
+> -	input_sync(pwrkey->pwr);
+> +	input_report_key(pwr, KEY_POWER, 1);
+> +	input_sync(pwr);
+>  
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
+> +static irqreturn_t pwrkey_release_irq(int irq, void *pwr)
+>  {
+> -	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
+> -
+> -	input_report_key(pwrkey->pwr, KEY_POWER, 0);
+> -	input_sync(pwrkey->pwr);
+> +	input_report_key(pwr, KEY_POWER, 0);
+> +	input_sync(pwr);
+>  
+>  	return IRQ_HANDLED;
+>  }
+> @@ -147,12 +142,11 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	pwrkey->key_press_irq = key_press_irq;
+> -	pwrkey->pwr = pwr;
+>  
+>  	platform_set_drvdata(pdev, pwrkey);
+>  
+>  	err = devm_request_irq(&pdev->dev, key_press_irq, pwrkey_press_irq,
+> -		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwrkey);
+> +		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwr);
+>  	if (err < 0) {
+>  		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
+>  				 key_press_irq, err);
+> @@ -160,7 +154,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	err = devm_request_irq(&pdev->dev, key_release_irq, pwrkey_release_irq,
+> -		 IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_release", pwrkey);
+> +		 IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_release", pwr);
+>  	if (err < 0) {
+>  		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
+>  				 key_release_irq, err);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
+
+-- 
+Dmitry
