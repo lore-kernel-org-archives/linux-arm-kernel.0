@@ -1,79 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 14 Dec 2013 20:35:47 -0800
-Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
-In-Reply-To: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20131215043547.23538.63736@quantum>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sun, 15 Dec 2013 12:37:30 +0800
+Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
+ timing through clock framework
+In-Reply-To: <52AD1F17.5040708@gmail.com>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-2-git-send-email-dinguyen@altera.com>
+ <52AD0E7A.50208@linaro.org> <52AD1F17.5040708@gmail.com>
+Message-ID: <52AD320A.4030502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2013-11-26 00:05:41)
-> Hi,
-> 
 
-Hi Tero,
 
-Thanks for your long suffering patience on this series. The clock
-patches look very good to me with exception of a few small comments. Let
-me know how I can help with the hierarchal DT stuff since I think that
-has been the gating factor for this series for the past few revisions.
+On 12/15/2013 11:16 AM, Dinh Nguyen wrote:
+> Hi Zhangfei,
+>
+>>> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
+>>>            dev_dbg(host->dev, "ciu clock not available\n");
+>>>            host->bus_hz = host->pdata->bus_hz;
+>>>        } else {
+>>> +        /* If the CIU clk is available, we check for SDR and DDR
+>>> +         * timing phase shift settings. But not all platforms
+>>> +         * may have populated these settings, the driver will not fail
+>>> +         * if these settings are not specified.
+>>> +         */
+>>> +        if (host->pdata->sdr_timing) {
+>>> +            host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
+>>> +            if (IS_ERR(host->sdr_clk))
+>>> +                dev_dbg(host->dev, "sdr_mmc clock not available\n");
+>>> +            else
+>>> +                clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
+>>> +        }
+>>> +
+>>> +        if (host->pdata->ddr_timing) {
+>>> +            host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
+>>> +            if (IS_ERR(host->ddr_clk))
+>>> +                dev_dbg(host->dev, "ddr_mmc clock not available\n");
+>>> +            else
+>>> +                clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
+>>> +        }
+>>> +
+>>
+>> Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed,
+>> fixed as each controller, or different with different board.
+> Yes, they are fixed for each controller per SoC.
+>> In case they are fixed, or fixed in each controller, and only required
+>> to be set in probe only once, maybe they can be hide in
+>> clk_mmc_ops.prepare
+>> And the clock can be used as ciu_clock, or parent of ciu_clock, which
+>> is called in dw_mmc.c, maybe these code can be ignored.
+>>
+> Please see v5 of this patch: https://patchwork.kernel.org/patch/3311121/
+> The issue with V5 was that there is no way for the dw_mmc driver to pass
+> the clock phase settings
+> in the clk_mmc_ops.prepare function.
 
-> Changes compared to v9:
-> - rebased on top of 3.13-rc1
-> - modified the low level clk register API to provide SoC specific clk_readl
->   and clk_writel support which can be registered during boot, TI SoC variant
->   uses regmap on low level
+Personally, I think v5 is simpler :)
 
-Regarding regmap, will that be dropped for V11? I don't care whether it
-stays or goes but the approach you took is probably too top-level. Patch
-#1 sets clk_reg_ops system-wide which probably isn't right. Different
-clock drivers might compete to set those ops and the last one to write
-wins.
+Could these fixed para be used as internal para when register.
+Like
+socfpga_gate_clk_init
+rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
+         compatible = "altr,socfpga-gate-clk";
+	clocks = <&mainclk>;
+	div-reg = <0x64 0 2>;
+	clk-gate = <0x60 1>;
+Could we also define mmc-ciu-clock with para clk-init.
 
-A better approach is to support regmap ops on a per-clock basis (for
-clocks that use the generic implementations like clk-divider and
-clk-gate; obviously this is overkill for entirely hardware-specific
-clocks). Stephen Boyd's approach is a better solution[1][2] but
-unfortunately that approach dumps crap into struct clk_hw which is bad.
-
-Anyways if you decide against regmap for V11 then the whole issue is
-avoided.
-
-Regards,
-Mike
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/273742
-[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/273744
-
-> - dropped regmap parameter from clock init calls, instead a helper is used
->   for getting regmap index along with the register offset from DT
-> - dropped regmap parameter from clock structs, instead platform specific
->   clk_readl / clk_writel are used to parse reg parameter according to
->   platform, for TI SoC:s, this is encoded as:
->   struct clk_omap_reg {
->     u16 offset; /* register offset */
->     u16 index; /* regmap index */
->   }
-> - Nishanth's comments to v9 mostly addressed, except for the CLK_OF_DECLARE
->   tweak which I would actually want some feedback upon, basically the problem
->   is I need to return status from the clk init functions so I can see if
->   -EAGAIN is passed, in which case init will be retried later, maybe some of
->   this can be made generic, like converting all the CLK_OF_DECLARE type
->   functions to return status
-> 
-> Testing done:
-> - omap3-beagle : boot + suspend/resume
-> - omap3-beagle-xm : boot (thanks to Nishanth)
-> - omap4-panda-es : boot + suspend/resume
-> - omap5-uevm : boot
-> - dra7-evm : boot
-> - am335x-bone : boot
-> 
-> Separate branches available at https://github.com/t-kristo/linux-pm.git
-> 
-> - full: 3.13-rc1-dt-clks-v10 (should be merged last, contains everything)
-> - clk driver only: 3.13-rc1-dt-clks-v10-for-mike
-> - DT data only: 3.13-rc1-dt-clks-v10-for-benoit
-> 
-> -Tero
-> 
+Thanks
