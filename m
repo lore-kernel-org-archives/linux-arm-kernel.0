@@ -1,24 +1,50 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 14 Dec 2013 15:57:31 -0800
-Subject: [PATCH v2 2/3] clk: bcm281xx: add initial clock framework support
-In-Reply-To: <529F4B4F.4020405@linaro.org>
-References: <529F4B0F.2020801@linaro.org> <529F4B4F.4020405@linaro.org>
-Message-ID: <20131214235731.26321.53050@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 Dec 2013 01:21:24 +0100
+Subject: [PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
+In-Reply-To: <52ACBC18.6020301@roeck-us.net>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <201312141950.09447.arnd@arndb.de> <52ACBC18.6020301@roeck-us.net>
+Message-ID: <201312150121.24414.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2013-12-04 07:33:35)
-> +       return true;
-> +}
-> +
-> +/* A bit position must be less than the number of bits in a 32-bit
-> register. */
+On Saturday 14 December 2013, Guenter Roeck wrote:
+> Hmm ... not sure I agree. I don't see a problem with something like "arm,moxart-reboot".
+> There are already vexpress-reboot and xgene-reboot properties which do pretty much
+> the same.
+> 
+> Actually, you don't even need that; the reset driver could simply re-use the
+> "moxa,moxart-watchdog" property. After all, all that specifies is that there
+> is a compatible driver. Look for "samsung,s3c2410-wdt" for an example of another
+> reset handler doing just that.
+> 
+> Attaching it to the watchdog device seems to be more problematic given the
+> (currently) optional nature of the watchdog driver and its different scope.
 
-Hi Alex,
+As far as I'm concerned a watchdog driver is just as optional as a reboot
+driver. The vexpress and xgene reset drivers are different because those
+are actually dedicated devices that are there only to do rebooting.
 
-The patch is corrupt at line 634 and several other places below.  Did
-you edit it manually? I'm happy with the series after reviewing it but
-it cannot be applied. Can you fix the issue and send me a pull request?
+The "samsung,s3c2410-wdt" device is exactly the same category as the moxart
+one, but the code to use it performs the same hack by scanning the
+device tree ad hoc from the platform initialization. I think it should
+be integrated into watchdog the same way, and if we have more drivers
+in that category, we'd probably want a generic watchdog reboot callback
+function that wdt drivers can hook up to the architecture reset handler.
 
-Thanks,
-Mike
+The main difference I see between plat-samsung and mach-moxart here is that
+the samsung platforms still need a lot of code in arch/arm to get things
+to work (this will have to change as soon as we get an arm64 exynos, which
+would have everything in proper drivers), while for moxart this is the only
+non-driver code.
+
+Reusing the moxa,moxart-watchdog device from a separate reboot driver is
+a violation of the driver model, since we can't really bind two platform
+drivers to one platform device, unless you add another device in drivers/mfd
+to create two children for wdt and reboot, but that would be really silly.
+You could use the same code that samsung has at the moment in a loadable
+module, which effectively implements a linux-2.4 style driver that probes
+the device in the module_init function rather than registering a struct
+device_driver with a probe callback.
+
+	Arnd
