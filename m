@@ -1,57 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Dec 2013 11:39:55 -0500
-Subject: [PATCH 0/2] gpio: davinci: reuse for keystone arch
-In-Reply-To: <52AF17A6.3060007@ti.com>
-References: <1386871973-26762-1-git-send-email-grygorii.strashko@ti.com>
- <52ACAD50.6060003@ti.com> <52ADB3BC.3080605@ti.com> <52AF17A6.3060007@ti.com>
-Message-ID: <52AF2CDB.3080406@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 16 Dec 2013 16:49:25 +0000
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1387212565-12668-1-git-send-email-broonie@kernel.org>
+References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
+Message-ID: <1387212565-12668-4-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 December 2013 10:09 AM, Santosh Shilimkar wrote:
-> On Sunday 15 December 2013 08:50 AM, Sekhar Nori wrote:
->> On Sunday 15 December 2013 12:41 AM, Santosh Shilimkar wrote:
->>> Linus, Sekhar,
->>>
->>> On Thursday 12 December 2013 01:12 PM, Grygorii Strashko wrote:
->>>> This series is intended to update Davinci GPIO driver and reuse
->>>> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
->>>> Keystone GPIO IP: supports:
->>>> - up to 32 GPIO lines;
->>>> - only unbanked irqs;
->>>>
->>>> See Documentation:
->>>> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->>>>
->>>> This series depends on:
->>>> [1] "[PATCH 1/2] gpio: davinci: Fix a check for unbanked gpio"
->>>> https://lkml.org/lkml/2013/11/8/22
->>>> [2] "[PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement"
->>>> https://www.mail-archive.com/devicetree at vger.kernel.org/msg05970.html
->>>> [3] "gpio: davinci: get rid of DAVINCI_N_GPIO"
->>>> https://lkml.org/lkml/2013/11/26/405
->>>> [4] "gpio: introduce GPIO_DAVINCI kconfig option"
->>>> https://lkml.org/lkml/2013/11/26/435
->>>> [5] "gpio: davinci: use chained_irq_enter/chained_irq_exit API"
->>>> https://lkml.org/lkml/2013/11/26/428
->>>>
->>>> To handle all dependencies, I've created a branch where I collected all 
->>>> "ready to merge" patches (all acks added in patches) and this series:
->>>> - https://github.com/grygoriyS/linux.git
->>>> - branch: keystone-master-gpio-for-next
->>>>
->>> Can one of you pull all these patches ?
->>
->> So I went through my backlog and queued all that I think is ready. Here
->> is the branch. Let me know if there is anything else missing.
->>
-> The $subject series (2 patches) don't seems to be on your branch.
-> 
-Ofcourse Linus needs to ack them before they can be considered.
-I have couple of comments as well so refresh of the series
-would be needed.
+From: Mark Brown <broonie@linaro.org>
 
-Linus, Can you also please look at them.
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads.
 
-Regards,
-Santosh
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8. These numbers are just an initial and basic
+approximation for use with the current scheduler, it is likely that both
+experience with silicon and ongoing work on improving the scheduler will
+lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index eae508ca816a..d080ba77a812 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -183,6 +183,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.8.5.1
