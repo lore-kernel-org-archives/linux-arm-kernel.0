@@ -1,57 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 11:26:35 -0700
-Subject: [PATCHv7 04/12] driver/core: populate devices in order for IOMMUs
-In-Reply-To: <20131213021402.GB14192@kroah.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-5-git-send-email-hdoyu@nvidia.com>
- <20131212113920.70E8BC40637@trevor.secretlab.ca>
- <20131213021402.GB14192@kroah.com>
-Message-ID: <52AF45DB.9050302@wwwdotorg.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 16 Dec 2013 10:28:45 -0800
+Subject: [PATCH] arm64: Correct virt_addr_valid
+In-Reply-To: <20131213115757.GC22933@arm.com>
+References: <1386724982-16997-1-git-send-email-lauraa@codeaurora.org>
+ <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104429.GE26730@mudshark.cambridge.arm.com>
+ <20131211110618.GG4360@n2100.arm.linux.org.uk>
+ <20131211172635.GJ26730@mudshark.cambridge.arm.com>
+ <20131211211333.GI4360@n2100.arm.linux.org.uk>
+ <20131212175753.GG3382@arm.com>
+ <20131212180249.GV4360@n2100.arm.linux.org.uk>
+ <52AA3401.3000004@codeaurora.org> <20131213115757.GC22933@arm.com>
+Message-ID: <52AF465D.8040000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 07:14 PM, Greg KH wrote:
-> On Thu, Dec 12, 2013 at 11:39:20AM +0000, Grant Likely wrote:
->> On Thu, 12 Dec 2013 09:57:05 +0200, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
->>> IOMMU devices on the bus need to be poplulated first, then iommu
->>> master devices are done later.
->>>
->>> With CONFIG_OF_IOMMU, "iommus=" DT binding would be used to identify
->>> whether a device can be an iommu msater or not. If a device can, we'll
->>> defer to populate that device till an iommu device is populated. Then,
->>> those deferred iommu master devices are populated and configured with
->>> help of the already populated iommu device.
+On 12/13/2013 3:57 AM, Catalin Marinas wrote:
+>
+> OK, I re-read it now.
+>
+>> Yes, I believe the point was that if we call virt_addr_valid on a
+>> not-direct-mapped address it should return false. We still need the
+>> range check on arm64 systems as well to ensure this.
+>
+> On arm64 we don't have highmem, so all RAM would be directly mapped (and
+> linear). Is there a case on a 64-bit architecture where pfn_valid() is
+> true but the memory not mapped? We don't unmap any memory which is
+> pfn_valid().
+>
 
->>> This is related to the following discussion:
->>>   [RFC PATCH] Documentation: devicetree: add description for generic bus properties
->>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215042.html
+We don't have highmem but we still have a vmalloc region. Calling 
+virt_to_page on a vmalloc address will not give a valid page so 
+virt_addr_valid should return false on anything in the vmalloc region.
 
->>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+Thanks,
+Laura
 
->>> @@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->>>  
->>>  	dev->driver = drv;
->>>  
->>> +	ret = of_iommu_attach(dev);
->>> +	if (ret)
->>> +		goto probe_failed;
->>> +
->>
->> As discussed before, I really don't think hooking in to dd.c is the
->> right thing to do here, and certainly not as a device tree specific
->> function. ACPI or PCI described devices may have the same constraints
->> and those won't have DT descriptions.
-> 
-> I agree, this shouldn't be in the driver core.
-
-I don't think I agree. It'd greatly simplify driver probe() routines if
-the driver core could acquire/set up as many resources as it could on
-behalf of drivers. It'd be nice if it pre-mapped any registers, acquired
-clocks, regulators, ... That way, we wouldn't need to write all that
-code in each individual driver's probe() routine. Now, in many cases
-this is rather difficult since there's currently no way for the driver
-core to know which resources a driver needs, but when the driver core
-can/does know this, shouldn't it simplify the life of drivers?
-Longer-term, perhaps drivers can provide the driver core with some
-specification of the resources it needs (such as a list of clock,
-regulator, ... names), to fill in the missing information.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
