@@ -1,73 +1,149 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 16 Dec 2013 16:29:38 +0900
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <52AE8A0E.2050005@linaro.org>
-References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
- <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
- <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
- <52AE8A0E.2050005@linaro.org>
-Message-ID: <003901cefa30$93c3cce0$bb4b66a0$%jun@samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 16 Dec 2013 10:06:01 +0200
+Subject: [PATCHv10 01/41] clk: add support for platform specific clock
+ I/O wrapper functions
+In-Reply-To: <20131215004844.26321.2882@quantum>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-2-git-send-email-t-kristo@ti.com>
+ <20131215004844.26321.2882@quantum>
+Message-ID: <52AEB469.10602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, December 16, 2013, Zhangfei Gao wrote: 
-> Dear Seungwon
-> 
-> On 12/16/2013 11:50 AM, Seungwon Jeon wrote:
-> > On Sat, December 14, 2013, Zhangfei Gao wrote:
-> 
-> >> +	/* SoC portion */
-> >> +	dwmmc_0: dwmmc0 at fcd03000 {
-> >> +		compatible = "hisilicon,hi4511-dw-mshc";
-> >> +		reg = <0xfcd03000 0x1000>;
-> >> +		interrupts = <0 16 4>;
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
-> >> +		clock-names = "ciu", "biu";
-> >> +		clock-freq-table =
-> >> +		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
-> > I think it could be solved with mmc->f_min and mmc->f_max(from clock-freq-min-max property)
-> > if there is no limitation per each speed mode. As seeing described table, it looks that.
-> 
-> Have tried them before, but unfortunately, they are different.
-> 
-> The controller can not generate clock itself, while depending on the
-> outside clock generator, which may require to change clock source in
-> differnt mode.
-> 
-> The value we want is set the capacibility of the clock input and the max
-> clock freq where mmc works stable in that mode, which may be different
-> in different mode.
-> 
-> clock-freq-min-max will set the value for set_ios.
-> For example, we use 25M as clock capability when init, which can not be
-> set as freq-min, and used as set_ios, where 400K should be used,
-> otherwise init definitely fail.
-Can you check 'f_init' within 'drivers/mmc/core/core.c' file?
-If you set 'f_min = 25000000' for init-sequence, mmc_set_ios() will pass that rate through 'ios.clock'
-Then, dw_mmc-k3 can do clk_set_rate() with 25MHz at dw_mci_k3_set_ios().
-And other required speeds for each mode seem not specific compared with standard spec.
-Also clk_set_rate() would be possible with 'ios.clock' instead of specific table.
-I just referred your example's clock-freq-table above.
+On 12/15/2013 02:48 AM, Mike Turquette wrote:
+> Quoting Tero Kristo (2013-11-26 00:05:42)
+>> Current clock wrappers assume simple and direct mapped hardware register
+>> access. Improve this support by adding functionality for registering
+>> platform specific clock I/O wrappers, which can be used to support
+>> various features needed like endianess conversions, indexed regmap support,
+>> etc. Default I/O wrapper provided also which uses the existing direct
+>> I/O mapped behavior.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>
+> There is a separate discussion on removing regmap for reading omap clk
+> registers. I guess this patch is not needed in that case?
 
-> 
-> >> +static int dw_mci_k3_suspend(struct device *dev)
-> >> +{
-> >> +	struct dw_mci *host = dev_get_drvdata(dev);
-> >> +
-> >> +	if (!IS_ERR(host->ciu_clk))
-> >> +		clk_disable_unprepare(host->ciu_clk);
-> >> +
-> >> +	return dw_mci_suspend(host);
-> > If k3 needs clk_disable here, dw_mci_suspend()is expected to be called prior to
-> clk_disable_unprepare()?
-> > Of course, it's ok at present though.
-> >
-> 
-> Sure, it can be switched, though dw_mci_suspend does nothing related
-> with clock now.
-Yes, but if some works with ciu_clk is added in dw_mci_suspend(), it will affect.
+Actually, this is still needed, as I need to map the clocks according to 
+their parent nodes.
 
-Thanks,
-Seungwon Jeon
+-Tero
+
+>
+> Regards,
+> Mike
+>
+>> ---
+>>   drivers/clk/clk.c            |   68 ++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/clk-provider.h |   15 +++++-----
+>>   2 files changed, 75 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 2cf2ea6..c331386 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -34,6 +34,74 @@ static HLIST_HEAD(clk_root_list);
+>>   static HLIST_HEAD(clk_orphan_list);
+>>   static LIST_HEAD(clk_notifier_list);
+>>
+>> +/**
+>> + * clk_readl_default - default clock register read support function
+>> + * @reg: register to read
+>> + *
+>> + * Default implementation for reading a clock register.
+>> + */
+>> +static u32 clk_readl_default(u32 __iomem *reg)
+>> +{
+>> +       return readl(reg);
+>> +}
+>> +
+>> +/**
+>> + * clk_writel_default - default clock register write support function
+>> + * @val: value to write
+>> + * @reg: register to write to
+>> + *
+>> + * Default implementation for writing a clock register.
+>> + */
+>> +static void clk_writel_default(u32 val, u32 __iomem *reg)
+>> +{
+>> +       writel(val, reg);
+>> +}
+>> +
+>> +struct clk_reg_ops clk_reg_ops_default = {
+>> +       .clk_readl = clk_readl_default,
+>> +       .clk_writel = clk_writel_default
+>> +};
+>> +
+>> +static struct clk_reg_ops *clk_reg_ops = &clk_reg_ops_default;
+>> +
+>> +/**
+>> + * clk_register_reg_ops - register access functions for clock registers
+>> + * @ops: register level ops
+>> + *
+>> + * Registers platform or SoC specific operations for reading / writing
+>> + * clock registers.
+>> + */
+>> +int clk_register_reg_ops(struct clk_reg_ops *ops)
+>> +{
+>> +       if (!ops)
+>> +               return -EINVAL;
+>> +       clk_reg_ops = ops;
+>> +       return 0;
+>> +}
+>> +
+>> +/**
+>> + * clk_readl - read a clock register value from hardware
+>> + * @reg: register to read
+>> + *
+>> + * Uses the registered clk_reg_ops to read a hardware clock register value.
+>> + */
+>> +u32 clk_readl(u32 __iomem *reg)
+>> +{
+>> +       return clk_reg_ops->clk_readl(reg);
+>> +}
+>> +
+>> +/**
+>> + * clk_writel - write a clock register value to hardware
+>> + * @val: value to write
+>> + * @reg: register to write
+>> + *
+>> + * Uses the registered clk_reg_ops to write a hardware clock register value.
+>> + */
+>> +void clk_writel(u32 val, u32 __iomem *reg)
+>> +{
+>> +       clk_reg_ops->clk_writel(val, reg);
+>> +}
+>> +
+>>   /***           locking             ***/
+>>   static void clk_prepare_lock(void)
+>>   {
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 7e59253..16e4df2 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -512,15 +512,14 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+>>    * for improved portability across platforms
+>>    */
+>>
+>> -static inline u32 clk_readl(u32 __iomem *reg)
+>> -{
+>> -       return readl(reg);
+>> -}
+>> +struct clk_reg_ops {
+>> +       u32 (*clk_readl)(u32 __iomem *reg);
+>> +       void (*clk_writel)(u32 val, u32 __iomem *reg);
+>> +};
+>>
+>> -static inline void clk_writel(u32 val, u32 __iomem *reg)
+>> -{
+>> -       writel(val, reg);
+>> -}
+>> +u32 clk_readl(u32 __iomem *reg);
+>> +void clk_writel(u32 val, u32 __iomem *reg);
+>> +int clk_register_reg_ops(struct clk_reg_ops *ops);
+>>
+>>   #endif /* CONFIG_COMMON_CLK */
+>>   #endif /* CLK_PROVIDER_H */
+>> --
+>> 1.7.9.5
+>>
