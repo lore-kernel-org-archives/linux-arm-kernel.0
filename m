@@ -1,61 +1,49 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 15:10:09 -0700
-Subject: [GIT PULL 07/10] ARM: tegra: Trusted Foundations firmware support
+Date: Mon, 16 Dec 2013 15:10:08 -0700
+Subject: [GIT PULL 06/10] ARM: tegra: powergate driver changes
 In-Reply-To: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
 References: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1387231812-5701-7-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1387231812-5701-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Trusted Foundations secure-mode firmware, as found
-on NVIDIA SHIELD. This allows Linux to run in non-secure mode on this
-board; all previous Tegra support has assumed the kernel is running in
-secure mode.
+This branch includes all the changes to Tegra's powergate driver for 3.14.
+These are separate out, since the Tegra DRM changes for 3.14 rely on the
+new APIs introduced here.
 
-This branch is based on v3.13-rc1, and shouldn't cause any merge
-conflicts.
+A few cleanups and fixes are included, plus additions of Tegra124 SoC
+support, and a new API for manipulating Tegra's IO rail deep power down
+states.
+
+This branch is based on tag tegra-for-3.14-dmas-resets-rework, in order
+to avoid conflicts with the addition of common reset controller support
+to the powergate driver.
 
 ----------------------------------------------------------------
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+The following changes since commit 8a0a1af30cbf56b41220a02e34835022c4d72f41:
 
-  Linux 3.13-rc1
+  spi: tegra: checking for ERR_PTR instead of NULL
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.14-trusted-foundations
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.14-powergate
 
-for you to fetch changes up to f47d41acfd65919c669921674444caa471723c87:
+for you to fetch changes up to 9d4450ae87398e248e8700e3507748e0d1751e25:
 
-  ARM: tegra: support Trusted Foundations by default
+  ARM: tegra: Add IO rail support
 
 ----------------------------------------------------------------
 
-Alexandre Courbot (7):
-      ARM: add basic support for Trusted Foundations
-      of: add vendor prefix for Trusted Logic Mobility
-      of: add Trusted Foundations bindings documentation
-      ARM: tegra: add support for Trusted Foundations
-      ARM: tegra: split setting of CPU reset handler
-      ARM: tegra: set CPU reset handler using firmware
-      ARM: tegra: support Trusted Foundations by default
+Thierry Reding (7):
+      ARM: tegra: Fix some whitespace oddities
+      ARM: tegra: Rename cpu0 powergate to crail
+      ARM: tegra: Export tegra_powergate_power_off()
+      ARM: tegra: Export tegra_powergate_remove_clamping()
+      ARM: tegra: Add Tegra124 powergate support
+      ARM: tegra: Special-case the 3D clamps on Tegra124
+      ARM: tegra: Add IO rail support
 
- .../arm/firmware/tlm,trusted-foundations.txt    | 20 +++++
- Documentation/devicetree/bindings/arm/tegra.txt |  5 ++
- .../devicetree/bindings/vendor-prefixes.txt     |  1 +
- arch/arm/Kconfig                                |  2 +
- arch/arm/Makefile                               |  1 +
- arch/arm/configs/tegra_defconfig                |  1 +
- arch/arm/firmware/Kconfig                       | 28 +++++++
- arch/arm/firmware/Makefile                      |  1 +
- arch/arm/firmware/trusted_foundations.c         | 81 ++++++++++++++++++++
- arch/arm/include/asm/trusted_foundations.h      | 67 ++++++++++++++++
- arch/arm/mach-tegra/Kconfig                     |  1 +
- arch/arm/mach-tegra/reset.c                     | 40 +++++++---
- arch/arm/mach-tegra/tegra.c                     |  2 +
- 13 files changed, 239 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/firmware/tlm,trusted-foundations.txt
- create mode 100644 arch/arm/firmware/Kconfig
- create mode 100644 arch/arm/firmware/Makefile
- create mode 100644 arch/arm/firmware/trusted_foundations.c
- create mode 100644 arch/arm/include/asm/trusted_foundations.h
+ arch/arm/mach-tegra/powergate.c | 195 ++++++++++++++++++++++++++++++++++-
+ include/linux/tegra-powergate.h |  48 +++++++++
+ 2 files changed, 240 insertions(+), 3 deletions(-)
