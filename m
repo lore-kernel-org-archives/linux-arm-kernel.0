@@ -1,62 +1,88 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 16 Dec 2013 13:05:18 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
-References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
- <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
- <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
-Message-ID: <52AE8A0E.2050005@linaro.org>
+From: vkale@apm.com (Vinayak Kale)
+Date: Mon, 16 Dec 2013 10:43:29 +0530
+Subject: [PATCH] arm64: print cpu frequency in /proc/cpuinfo
+In-Reply-To: <CAL_Jsq+Z9K4sus6xwN9KYyCUVWy7NFBQCGYvz0wrt=J7h+G35Q@mail.gmail.com>
+References: <1386924222-23169-1-git-send-email-vkale@apm.com>
+ <20131213103632.GC19177@mudshark.cambridge.arm.com>
+ <CAL_Jsq+Z9K4sus6xwN9KYyCUVWy7NFBQCGYvz0wrt=J7h+G35Q@mail.gmail.com>
+Message-ID: <CAPrCYkeib0gxjdK7TAouKpz8hVnuB+UyaDWFU8pMGG_7UmhD0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Dec 13, 2013 at 7:46 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Fri, Dec 13, 2013 at 4:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Fri, Dec 13, 2013 at 08:43:42AM +0000, Vinayak Kale wrote:
+>>> Print the cpu frequency field in /proc/cpuinfo.
+>>
+>> Why? ["x86 does this" isn't a valid answer :)].
+>
+> People want to know this stuff. How about making lscpu work and print
+> useful things. Here is what you get on x66. You get a lot less on ARM
+> IIRC. lscpu uses on cpuinfo and sysfs data. The cache info is based on
+> sysfs cache data which I believe someone is working on for ARM.
+>
+> Architecture:          x86_64
+> CPU op-mode(s):        32-bit, 64-bit
+> Byte Order:            Little Endian
+> CPU(s):                4
+> On-line CPU(s) list:   0-3
+> Thread(s) per core:    2
+> Core(s) per socket:    2
+> Socket(s):             1
+> NUMA node(s):          1
+> Vendor ID:             GenuineIntel
+> CPU family:            6
+> Model:                 37
+> Stepping:              5
+> CPU MHz:               2393.881
+> BogoMIPS:              4787.76
+> Virtualization:        VT-x
+> L1d cache:             32K
+> L1i cache:             32K
+> L2 cache:              256K
+> L3 cache:              3072K
+> NUMA node0 CPU(s):     0-3
+>
+>
+>>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>>> ---
+>>>  arch/arm64/kernel/setup.c |   15 +++++++++++++++
+>>>  1 files changed, 15 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>>> index bd9bbd0..bca982b 100644
+>>> --- a/arch/arm64/kernel/setup.c
+>>> +++ b/arch/arm64/kernel/setup.c
+>>> @@ -41,6 +41,7 @@
+>>>  #include <linux/memblock.h>
+>>>  #include <linux/of_fdt.h>
+>>>  #include <linux/of_platform.h>
+>>> +#include <linux/cpufreq.h>
+>>>
+>>>  #include <asm/cputype.h>
+>>>  #include <asm/elf.h>
+>>> @@ -278,9 +279,19 @@ static const char *hwcap_str[] = {
+>>>       NULL
+>>>  };
+>>>
+>>> +static unsigned int get_cpufreq_khz(unsigned int cpu)
+>>> +{
+>>> +#ifdef CONFIG_CPU_FREQ
+>>> +     return cpufreq_quick_get(cpu);
+>>> +#else
+>>> +     return 0;
+>>> +#endif
+>>> +}
+>>
+>> That's going to be hilarious fun when cpufreq isn't compiled in.
+>> Just use the existing sysfs interfaces exposed by the cpufreq governers if
+>> you need to know this stuff.
+>
+> We should be able to get the frequency independently from cpufreq
+> being enabled. This should come from DT cpu clock-frequency property
+> if cpufreq is not enabled.
 
-Dear Seungwon
+Reading cpu-freq from DT won't work in case of cpu frequency scaling.
 
-On 12/16/2013 11:50 AM, Seungwon Jeon wrote:
-> On Sat, December 14, 2013, Zhangfei Gao wrote:
-
->> +	/* SoC portion */
->> +	dwmmc_0: dwmmc0 at fcd03000 {
->> +		compatible = "hisilicon,hi4511-dw-mshc";
->> +		reg = <0xfcd03000 0x1000>;
->> +		interrupts = <0 16 4>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
->> +		clock-names = "ciu", "biu";
->> +		clock-freq-table =
->> +		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
-> I think it could be solved with mmc->f_min and mmc->f_max(from clock-freq-min-max property)
-> if there is no limitation per each speed mode. As seeing described table, it looks that.
-
-Have tried them before, but unfortunately, they are different.
-
-The controller can not generate clock itself, while depending on the
-outside clock generator, which may require to change clock source in
-differnt mode.
-
-The value we want is set the capacibility of the clock input and the max
-clock freq where mmc works stable in that mode, which may be different
-in different mode.
-
-clock-freq-min-max will set the value for set_ios.
-For example, we use 25M as clock capability when init, which can not be
-set as freq-min, and used as set_ios, where 400K should be used,
-otherwise init definitely fail.
-
->> +static int dw_mci_k3_suspend(struct device *dev)
->> +{
->> +	struct dw_mci *host = dev_get_drvdata(dev);
->> +
->> +	if (!IS_ERR(host->ciu_clk))
->> +		clk_disable_unprepare(host->ciu_clk);
->> +
->> +	return dw_mci_suspend(host);
-> If k3 needs clk_disable here, dw_mci_suspend()is expected to be called prior to clk_disable_unprepare()?
-> Of course, it's ok at present though.
-> 
-
-Sure, it can be switched, though dw_mci_suspend does nothing related
-with clock now.
-
-Thanks
+>
+> Rob
