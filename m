@@ -1,87 +1,51 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 16 Dec 2013 16:08:29 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <003901cefa30$93c3cce0$bb4b66a0$%jun@samsung.com>
-References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
- <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
- <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
- <52AE8A0E.2050005@linaro.org>
- <003901cefa30$93c3cce0$bb4b66a0$%jun@samsung.com>
-Message-ID: <52AEB4FD.4070707@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Dec 2013 08:12:42 +0000
+Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
+In-Reply-To: <52AB5FE2.5060803@wwwdotorg.org>
+References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+ <20131211092435.GC16780@lee--X1> <52AB5FE2.5060803@wwwdotorg.org>
+Message-ID: <20131216081242.GD18769@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 13 Dec 2013, Stephen Warren wrote:
 
-
-On 12/16/2013 03:29 PM, Seungwon Jeon wrote:
-> On Mon, December 16, 2013, Zhangfei Gao wrote:
->> Dear Seungwon
->>
->> On 12/16/2013 11:50 AM, Seungwon Jeon wrote:
->>> On Sat, December 14, 2013, Zhangfei Gao wrote:
->>
->>>> +	/* SoC portion */
->>>> +	dwmmc_0: dwmmc0 at fcd03000 {
->>>> +		compatible = "hisilicon,hi4511-dw-mshc";
->>>> +		reg = <0xfcd03000 0x1000>;
->>>> +		interrupts = <0 16 4>;
->>>> +		#address-cells = <1>;
->>>> +		#size-cells = <0>;
->>>> +		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
->>>> +		clock-names = "ciu", "biu";
->>>> +		clock-freq-table =
->>>> +		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
->>> I think it could be solved with mmc->f_min and mmc->f_max(from clock-freq-min-max property)
->>> if there is no limitation per each speed mode. As seeing described table, it looks that.
->>
->> Have tried them before, but unfortunately, they are different.
->>
->> The controller can not generate clock itself, while depending on the
->> outside clock generator, which may require to change clock source in
->> differnt mode.
->>
->> The value we want is set the capacibility of the clock input and the max
->> clock freq where mmc works stable in that mode, which may be different
->> in different mode.
->>
->> clock-freq-min-max will set the value for set_ios.
->> For example, we use 25M as clock capability when init, which can not be
->> set as freq-min, and used as set_ios, where 400K should be used,
->> otherwise init definitely fail.
-> Can you check 'f_init' within 'drivers/mmc/core/core.c' file?
-> If you set 'f_min = 25000000' for init-sequence, mmc_set_ios() will pass that rate through 'ios.clock'
-> Then, dw_mmc-k3 can do clk_set_rate() with 25MHz at dw_mci_k3_set_ios().
-
-This means controller directly use 25M init emmc and sd card, it will fail.
-We still need 400K init freq, while the input clock source is 25M,
-divided by the controller.
-
-> And other required speeds for each mode seem not specific compared with standard spec.
-> Also clk_set_rate() would be possible with 'ios.clock' instead of specific table.
-> I just referred your example's clock-freq-table above.
-There also some controller limitation currently.
-In some mode, the controller only works well in the limited freq.
-For example UHS_SDR104_MAX_DTR 208000000 can not be used, only half may
-be reached, at least currently
-
+> On 12/11/2013 02:24 AM, Lee Jones wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> mfd_add_device() assigns .of_node in the device objects it creates only
+> >> if the mfd_cell for the device has the .of_compatible field set and the
+> >> DT node for the top-level MFD device contains a child whose compatible
+> >> property matches the cell's .of_compatible field.
+> >>
+> >> This leaves .of_node unset in many cases. When this happens, entries in
+> >> the DT /aliases property which refer to the top-level MFD DT node will
+> >> never match the MFD child devices, hence causing the requested alias not
+> >> to be honored.
+> >>
+> >> Solve this by setting each MFD child device's .of_node equal to the top-
+> >> level MFD device's .of_node field in the cases where it would otherwise
+> >> remain unset.
+> >>
+> >> The first use-case for this will be aliases for the TPS6586x's RTC
+> >> device.
+> >>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >>  drivers/mfd/mfd-core.c | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> > 
+> > I've tentatively applied this patch, but if it starts to cause more
+> > problems than it solves we'll have to endeavour to find a different
+> > solution.
 > 
->>
->>>> +static int dw_mci_k3_suspend(struct device *dev)
->>>> +{
->>>> +	struct dw_mci *host = dev_get_drvdata(dev);
->>>> +
->>>> +	if (!IS_ERR(host->ciu_clk))
->>>> +		clk_disable_unprepare(host->ciu_clk);
->>>> +
->>>> +	return dw_mci_suspend(host);
->>> If k3 needs clk_disable here, dw_mci_suspend()is expected to be called prior to
->> clk_disable_unprepare()?
->>> Of course, it's ok at present though.
->>>
->>
->> Sure, it can be switched, though dw_mci_suspend does nothing related
->> with clock now.
-> Yes, but if some works with ciu_clk is added in dw_mci_suspend(), it will affect.
-> 
-Sorry for the misunderstood, I mean it make sense and will change.
-Thanks the advice.
+> Thanks. I don't see this in linux-next yet though, so it's not getting
+> much testing. Did you forget to push your branch?
+
+Pushed now, sorry for the delay.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
