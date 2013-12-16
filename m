@@ -1,49 +1,32 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 16 Dec 2013 14:11:58 +0800
-Subject: [PATCH -next] mmc: s3cmci: fix return value check in
- s3cmci_debugfs_attach()
-Message-ID: <CAPgLHd_RRUvHocV8nziQUcfQrBsN3ApzFu5+CDdz3ruDiiB50w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 15 Dec 2013 22:14:02 -0800
+Subject: [PATCH v2 2/3] clk: bcm281xx: add initial clock framework support
+In-Reply-To: <52AE81B3.4010203@linaro.org>
+References: <529F4B0F.2020801@linaro.org> <529F4B4F.4020405@linaro.org>
+ <20131214235731.26321.53050@quantum> <52ADE93B.3070907@linaro.org>
+ <E566434B-F630-4AD3-91EC-BD5599767F2E@linaro.org>
+ <52AE81B3.4010203@linaro.org>
+Message-ID: <CAPtuhTi08LO7XfZa=7xArA2m2989FkTo4v+WRH+d_JmeKhvjuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Sun, Dec 15, 2013 at 8:29 PM, Alex Elder <alex.elder@linaro.org> wrote:
+> In the mean time, I have created a new branch that
+> is based on v3.13-rc4 (and includes Tim's prerequisite
+> patches).  Pull request (still wrapped my my mailer)
+> is below.
 
-In case of error, the function debugfs_create_*() returns NULL
-pointer not ERR_PTR() if debugfs is enabled. The IS_ERR() test
-in the return value check should be replaced with NULL test.
+Hi Alex,
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/mmc/host/s3cmci.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+This isn't a mess but is pretty normal. Can you create a new branch
+with only your 2 clock patches applied on top of my clk-next branch?
+You should merge "ARM: dts: bcm281xx: define real clocks" through the
+arm-soc tree. Then you can send another pull request to me which has
+just the 2 bcm clock patches based on clk-next and everything will
+eventually end up linux-next all together.
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 2fce5ea..ca6e30f 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1586,7 +1586,7 @@ static void s3cmci_debugfs_attach(struct s3cmci_host *host)
- 	struct device *dev = &host->pdev->dev;
- 
- 	host->debug_root = debugfs_create_dir(dev_name(dev), NULL);
--	if (IS_ERR(host->debug_root)) {
-+	if (!host->debug_root) {
- 		dev_err(dev, "failed to create debugfs root\n");
- 		return;
- 	}
-@@ -1595,14 +1595,14 @@ static void s3cmci_debugfs_attach(struct s3cmci_host *host)
- 						host->debug_root, host,
- 						&s3cmci_fops_state);
- 
--	if (IS_ERR(host->debug_state))
-+	if (!host->debug_state)
- 		dev_err(dev, "failed to create debug state file\n");
- 
- 	host->debug_regs = debugfs_create_file("regs", 0444,
- 					       host->debug_root, host,
- 					       &s3cmci_fops_regs);
- 
--	if (IS_ERR(host->debug_regs))
-+	if (!host->debug_regs)
- 		dev_err(dev, "failed to create debug regs file\n");
- }
- 
+Just FYI if I took your pull request as-is then the clk-next tree
+would become polluted with lots of extra bcm patches.
+
+Regards,
+Mike
