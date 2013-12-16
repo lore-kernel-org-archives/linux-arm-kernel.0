@@ -1,42 +1,61 @@
-From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
-Date: Mon, 16 Dec 2013 22:54:21 +0100
-Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
-In-Reply-To: <52AF68DB.7090105@elopez.com.ar>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <20131215045116.23538.4@quantum> <52AF68DB.7090105@elopez.com.ar>
-Message-ID: <2899559.jbTzDM2qtE@dizzy-6.site>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Dec 2013 15:10:04 -0700
+Subject: [GIT PULL 02/10] ARM: tegra: dependency from the ASoC tree
+In-Reply-To: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
+References: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1387231812-5701-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-> that takes the MMC clock (and only the MMC clock) and does the setup
-> (it's basically configuring two values, "sample" and "output", into the
-> clock register). I really don't know what does this do/why is it
-> required/when is it used; I'm cc'ing Hans and David who can hopefully
-> explain that part.
-Since the read/write operations have to happen asynchronously and in a manner
-so that the data provided by the SD-Card can be fetched on time, a specific
-clock phase shift is required as you can see in the linked picture[1].
-That's what the function is doing: It accesses the special registers of the
-MMC clock device and configures this phase offset.
+This is the work so far on dmaengine for v3.14, it is being cross merged
+into the Tegra tree to support a large DMA overhaul there.  The main
+additions are a change in the DMA request API which allows better
+interaction at system startup using deferred probes and methods for
+overriding the default device and channel names used to request DMA.
 
-> I also saw a similar requirement from the gmac people (on cc too), who
-> needed to set the phy type (or something like that) on one of the clock
-> registers; so I'm thinking maybe a generic "tune something" approach
-> that lets users configure some clock-dependent, arbitrary aspect of the
-> clock is the way forward. Otherwise, we're going to end up bloating the
-> clock framework with a lot of callback pointers that are going to be
-> used in one or two clocks out of potentially hundreds on the whole system.
-It totally makes sense, since GMAC will be doing asynchrous
-operations as well.
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
 
--David
+----------------------------------------------------------------
 
-[1] http://www.chipestimate.com/techtalk/images/11022010_fig2_3.JPG
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/b7515f05/attachment.sig>
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+  Linux 3.13-rc1
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git asoc-dma-v3.14
+
+or:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git asoc-dma-v3.14
+
+for you to fetch changes up to e9036c2a60f368b8ddc349fbbcde918ed32ab597:
+
+  ASoC: dmaengine: fix deferred probe detection
+
+----------------------------------------------------------------
+
+Lars-Peter Clausen (2):
+      ASoC: Add resource managed snd_dmaengine_pcm_register()
+      ASoC: generic-dmaengine-pcm: Set BATCH flag when residue reporting is not supported
+
+Mark Brown (2):
+      Merge remote-tracking branch 'asoc/fix/dma' into asoc-dma
+      Merge branch 'topic/defer_probe' of git://git.infradead.org/users/vkoul/slave-dma into asoc-dma
+
+Stephen Warren (6):
+      ASoC: restructure dmaengine_pcm_request_chan_of()
+      ASoC: don't leak on error in snd_dmaengine_pcm_register
+      ASoC: dmaengine: add custom DMA config to snd_dmaengine_pcm_config
+      dma: add channel request API that supports deferred probe
+      ASoC: dmaengine: support deferred probe for DMA channels
+      ASoC: dmaengine: fix deferred probe detection
+
+ drivers/dma/dmaengine.c               | 35 +++++++++--
+ drivers/dma/of-dma.c                  | 15 +++--
+ include/linux/dmaengine.h             |  8 +++
+ include/sound/dmaengine_pcm.h         | 10 ++++
+ sound/soc/soc-devres.c                | 41 +++++++++++++
+ sound/soc/soc-generic-dmaengine-pcm.c | 94 +++++++++++++++++++++++-------
+ 6 files changed, 171 insertions(+), 32 deletions(-)
