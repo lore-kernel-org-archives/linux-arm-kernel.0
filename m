@@ -1,32 +1,75 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 17 Dec 2013 00:38:20 +0400
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <201312161856.11384.arnd@arndb.de>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312150355.27755.arnd@arndb.de>
- <1387198885.13062.154.camel@host5.omatika.ru>
- <201312161856.11384.arnd@arndb.de>
-Message-ID: <1387226300.13062.161.camel@host5.omatika.ru>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 16 Dec 2013 12:40:37 -0800
+Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <52AEF560.9010603@ti.com>
+References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <52AA65EA.20902@codeaurora.org> <52AEF560.9010603@ti.com>
+Message-ID: <20131216204037.GS21983@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-16 at 18:56 +0100, Arnd Bergmann wrote:
-> Ok, I see. This sounds like some of the other platforms we have with
-> external memory buses. If there is a chance that Linux ever has to
-> program the per-CS settings into the bus controller, I would suggest
-> to represent that as well as a separate node, like this
+On 12/16, ivan.khoronzhuk wrote:
+> On 12/13/2013 03:42 AM, Stephen Boyd wrote:
+> > On 12/11/13 10:00, Ivan Khoronzhuk wrote:
+> >> +
+> >> +static inline u32 keystone_timer_readl(unsigned long rg)
+> >> +{
+> >> +	return readl(timer.base + rg);
+> >> +}
+> >> +
+> >> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
+> >> +{
+> >> +	writel(val, timer.base + rg);
+> >> +}
+> > 
+> > It's probably better to use the relaxed variants here to avoid any
+> > memory barriers that aren't necessary.
+> >
+> 
+> Yes, but the code has places where I cannot use relaxed variants.
+> 
+> From timer user guide:
+> "Writes from the configuration bus to the timer registers are not allowed
+> when the timer is active, except for stopping or resetting the timers.
+> Registers that are protected by hardware include CNTLO, CNTHI, PRDLO,
+> PRDHI, TGCR (except the TIMLORS and TIMHIRS bits), and TCR (except the
+> ENAMODE bits)."
+> 
+> According to this I have to add keystone readl/write relaxed functions
+> and use mixed calls of writel/writel_relaxed functions.
+> 
+> For instance, for keystone_timer_config() which is used by
+> keystone_set_next_event(), I will do following:
+> -----
+> tcr = keystone_timer_readl_relaxed(TCR);
+> 
+> /* disable timer */
+> tcr &= ~(TCR_ENAMODE_MASK);
+> keystone_timer_writel_relaxed(tcr, TCR);
+> ...
+> /* reset counter to zero, set new period */
+> *** here I have to be sure the timer is disabled ***
+> keystone_timer_writel(0, TIM12);
+> keystone_timer_writel_relaxed(0, TIM34);
+> keystone_timer_writel_relaxed(period & 0xffffffff, PRD12);
+> keystone_timer_writel_relaxed(period >> 32, PRD34);
+> 
+> /* enable timer */
+> *** here I have to be sure that TIM and PRD registers are written ***
+> keystone_timer_writel(tcr, TCR);
+> ---
+> 
+> The same for keystone_timer_init().
+> 
+> Will it be better?
 
-This is a platform-specific bus (PXA27x). Should it go into pxa27x.dtsi
-rather than machine dts?
+Why not just put the explicit memory barriers where you need them
+and always use the relaxed variants in the mmio wrappers? That
+way you're always sure the memory barriers are there and that
+they're properly documented.
 
-> In case there is a driver for the extbus node, I would not make it
-> "simple-bus" but instead add a separate compatible string to match
-> the driver, and let that driver call of_platform_populate
-> to probe the children after the bus is set up.
-
-There seems to be none at the moment. However, some machines need to
-setup these partitions as a part of their initialization. So complete
-migration to DT will require this driver.
-
-In LP-8x4x case everything is setup by the bootloader. So "simple-bus"
-works for me.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
