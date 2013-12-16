@@ -1,100 +1,71 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 12:02:42 -0700
-Subject: [PATCHv7 08/12] iommu/tegra: smmu: calculate ASID register offset
- by ID
-In-Reply-To: <1386835033-4701-9-git-send-email-hdoyu@nvidia.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-9-git-send-email-hdoyu@nvidia.com>
-Message-ID: <52AF4E52.9010000@wwwdotorg.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 16 Dec 2013 20:09:53 +0100
+Subject: [GIT PULL] Support for efm32
+Message-ID: <20131216190953.GB14866@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 12:57 AM, Hiroshi Doyu wrote:
-> ASID register offset is caclulated by SWGROUP ID so that we can get
-> rid of old SoC specific MACROs. This ID conversion is needed for the
-> unified SMMU driver over Tegra SoCs. We use dt-bindings MACRO instead
-> of SoC dependent MACROs. The formula is:
-> 
->   MC_SMMU_<swgroup name>_ASID_0 = MC_SMMU_AFI_ASID_0 + ID * 4;
-> 
-> Now SWGROUP ID is the global HardWare Accelerator(HWA) identifier
-> among all Tegra SoC except Tegra2.
+The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
 
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
 
->  static int __smmu_client_set_hwgrp(struct smmu_client *c,
-> -				   unsigned long map, int on)
-> +				   unsigned long *map, int on)
->  {
->  	int i;
->  	struct smmu_as *as = c->as;
->  	u32 val, offs, mask = SMMU_ASID_ENABLE(as->asid);
->  	struct smmu_device *smmu = as->smmu;
->  
->  	if (!on)
-> +		map = c->hwgrp;
->  
-> +	for_each_set_bit(i, map, TEGRA_SWGROUP_MAX) {
->  		offs = HWGRP_ASID_REG(i);
->  		val = smmu_read(smmu, offs);
->  		if (on) {
->  			if (WARN_ON(val & mask))
->  				goto err_hw_busy;
->  			val |= mask;
-> +			memcpy(c->hwgrp, map, sizeof(u64));
->  		} else {
->  			WARN_ON((val & mask) == mask);
->  			val &= ~mask;
->  		}
->  		smmu_write(smmu, val, offs);
->  	}
+are available in the git repository at:
 
-This function doesn't make a lot of sense to me. The registers it's
-manipulating aren't a bitmask, so I don't see why the code is performing
-bitmask AND/OR operations on the register. Instead, don't you want the
-following:
+  git://git.pengutronix.de/git/ukl/linux.git tags/efm32
 
-#define SMMU_ASID_ENABLE	(1 << 31)
-#define SMMU_ASID_ENABLED(asid)	(SMMU_ASID_ENABLE | asid)
-#define SMMU_ASID_DISABLE	0
+for you to fetch changes up to ef43eff3447f30b4a3cfc61813902c2e57c20245:
 
-static int __smmu_client_set_hwgrp(struct smmu_client *c,
-				   unsigned long *map, int on)
-{
-	int i;
-	struct smmu_as *as = c->as;
-	u32 val, offs, new_val;
-	struct smmu_device *smmu = as->smmu;
+  ARM: device trees for Energy Micro's EFM32 Cortex-M3 SoCs (2013-12-16 17:51:34 +0100)
 
-	if (!on)
-		map = c->hwgrp;
+----------------------------------------------------------------
+These two commits add preliminary support for Energy Micro (now Silicon Labs)
+Giant Gecko SoCs. They have a Cortex-M3 core, and so are Thumb2 only and don't
+feature an MMU. With these changes merged there is no additional code needed
+under arch/arm to run Linux on such a SoC.
+----------------------------------------------------------------
 
-	for_each_set_bit(i, map, TEGRA_SWGROUP_MAX) {
-		offs = HWGRP_ASID_REG(i);
-		val = smmu_read(smmu, offs);
-		if (on)
-			new_val = SMMU_ASID_ENABLED(as->asid);
-		else
-			new_val = 0;
-		WARN_ON(val & SMMU_ASID_ENABLE ==
-			new_val & SMMU_ASID_ENABLE);
-		if (on) {
-			if (val & SMMU_ASID_ENABLE)
-				goto err_hw_busy;
-			memcpy(c->hwgrp, map, sizeof(u64));
-		}
-		smmu_write(smmu, val, offs);
-	}
+Compared to the patch sent a few days ago (v5, Message-Id:
+1386694516-5876-1-git-send-email-u.kleine-koenig at pengutronix.de), I let
+ARCH_EFM32 temporarily select CLKSRC_MMIO until 4ff3774 (clocksource:
+time-efm32: Select CLKSRC_MMIO) hits mainline. Also I just noticed that
+the clk support got in v3.13-rc1, so the device tree is buildable now.
+This patch adding the device tree sources wasn't sent yet in it's
+current form, so I will send it as reply to this mail. I hope it's not
+controversal, so the two patches can go in together.
 
-> @@ -804,7 +727,7 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
->  		return -ENOMEM;
->  	client->dev = dev;
->  	client->as = as;
-> -	map = (unsigned long)dev->platform_data;
-> +	map = (unsigned long *)dev->platform_data;
->  	if (!map)
->  		return -EINVAL;
+I choosed to base these changes on top of a more recent tree than
+armsoc/next/soc currently is based on (v3.13-rc1 vs v3.13-rc4) because
+to successfully build for ARM v7-M commit 5091333 (ARM: 7895/1: signal:
+fix armv7-m build issue in sigreturn_codes.S) which is included in
+v3.13-rc3 (but not earlier).
 
-Presumably we can simply delete that now since everything using this
-driver is on DT; we can't rely on the platform_data of client struct
-devices...
+Uwe Kleine-K?nig (2):
+      ARM: new platform for Energy Micro's EFM32 Cortex-M3 SoCs
+      ARM: device trees for Energy Micro's EFM32 Cortex-M3 SoCs
+
+ arch/arm/Kconfig                               |  22 +++-
+ arch/arm/Makefile                              |   1 +
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/armv7-m.dtsi                 |  18 +++
+ arch/arm/boot/dts/efm32gg-dk3750.dts           |  86 +++++++++++++
+ arch/arm/boot/dts/efm32gg.dtsi                 | 172 +++++++++++++++++++++++++
+ arch/arm/configs/efm32_defconfig               | 102 +++++++++++++++
+ arch/arm/mach-efm32/Makefile                   |   1 +
+ arch/arm/mach-efm32/Makefile.boot              |   3 +
+ arch/arm/mach-efm32/dtmachine.c                |  15 +++
+ arch/arm/mach-efm32/include/mach/entry-macro.S |   4 +
+ arch/arm/mach-efm32/include/mach/timex.h       |   3 +
+ 12 files changed, 427 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/armv7-m.dtsi
+ create mode 100644 arch/arm/boot/dts/efm32gg-dk3750.dts
+ create mode 100644 arch/arm/boot/dts/efm32gg.dtsi
+ create mode 100644 arch/arm/configs/efm32_defconfig
+ create mode 100644 arch/arm/mach-efm32/Makefile
+ create mode 100644 arch/arm/mach-efm32/Makefile.boot
+ create mode 100644 arch/arm/mach-efm32/dtmachine.c
+ create mode 100644 arch/arm/mach-efm32/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-efm32/include/mach/timex.h
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
