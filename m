@@ -1,82 +1,74 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Sun, 15 Dec 2013 21:24:40 -0600
-Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
- timing through clock framework
-In-Reply-To: <52AD320A.4030502@linaro.org>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-2-git-send-email-dinguyen@altera.com>
- <52AD0E7A.50208@linaro.org> <52AD1F17.5040708@gmail.com>
- <52AD320A.4030502@linaro.org>
-Message-ID: <52AE7278.1080506@gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Mon, 16 Dec 2013 03:31:29 +0000
+Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
+In-Reply-To: <20131213125129.GV18380@S2101-09.ap.freescale.net>
+References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
+ <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+ <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131213125129.GV18380@S2101-09.ap.freescale.net>
+Message-ID: <892cbb07bd064f44b2af45f106aeb479@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 12/14/13 10:37 PM, zhangfei wrote:
->
->
-> On 12/15/2013 11:16 AM, Dinh Nguyen wrote:
->> Hi Zhangfei,
->>
->>>> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
->>>>            dev_dbg(host->dev, "ciu clock not available\n");
->>>>            host->bus_hz = host->pdata->bus_hz;
->>>>        } else {
->>>> +        /* If the CIU clk is available, we check for SDR and DDR
->>>> +         * timing phase shift settings. But not all platforms
->>>> +         * may have populated these settings, the driver will not
->>>> fail
->>>> +         * if these settings are not specified.
->>>> +         */
->>>> +        if (host->pdata->sdr_timing) {
->>>> +            host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
->>>> +            if (IS_ERR(host->sdr_clk))
->>>> +                dev_dbg(host->dev, "sdr_mmc clock not available\n");
->>>> +            else
->>>> +                clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
->>>> +        }
->>>> +
->>>> +        if (host->pdata->ddr_timing) {
->>>> +            host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
->>>> +            if (IS_ERR(host->ddr_clk))
->>>> +                dev_dbg(host->dev, "ddr_mmc clock not available\n");
->>>> +            else
->>>> +                clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
->>>> +        }
->>>> +
->>>
->>> Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed,
->>> fixed as each controller, or different with different board.
->> Yes, they are fixed for each controller per SoC.
->>> In case they are fixed, or fixed in each controller, and only required
->>> to be set in probe only once, maybe they can be hide in
->>> clk_mmc_ops.prepare
->>> And the clock can be used as ciu_clock, or parent of ciu_clock, which
->>> is called in dw_mmc.c, maybe these code can be ignored.
->>>
->> Please see v5 of this patch: https://patchwork.kernel.org/patch/3311121/
->> The issue with V5 was that there is no way for the dw_mmc driver to pass
->> the clock phase settings
->> in the clk_mmc_ops.prepare function.
->
-> Personally, I think v5 is simpler :)
-I agree...
->
-> Could these fixed para be used as internal para when register.
-> Like
-> socfpga_gate_clk_init
-> rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
->         compatible = "altr,socfpga-gate-clk";
->     clocks = <&mainclk>;
->     div-reg = <0x64 0 2>;
->     clk-gate = <0x60 1>;
-> Could we also define mmc-ciu-clock with para clk-init.
-Hmm..this was one of Arnd's suggestion. Will this also work for you? If
-so then I think I can
-proceed down this path, as I think this should be the most direct and
-simplest.
+> > > -	ret = regulator_bulk_get(codec->dev, ARRAY_SIZE(sgtl5000->supplies),
+> > > -				sgtl5000->supplies);
+> > > -	if (!ret)
+> > > -		external_vddd = 1;
+> > > -	else {
+> > > +	/* External VDDD only works before revision 0x11 */
+> > > +	if (sgtl5000->revision < 0x11) {
+> > > +		vddd = regulator_get_optional(codec->dev, "VDDD");
+> > > +		if (IS_ERR(vddd)) {
+> > > +			/* See if it's just not registered yet */
+> > > +			if (PTR_ERR(vddd) == -EPROBE_DEFER)
+> > > +				return -EPROBE_DEFER;
+> > > +		} else {
+> > > +			external_vddd = 1;
+> > > +			regulator_put(vddd);
+> > > +		}
+> >
+> > Shouldn't we handle other errors ?
+> 
+> We do not really care other errors.  In case that an external VDDD is present
+> on hardware design but regulator_get_optional("VDDD") still fails for some
+> other reason, we should turn to use the internal LDO anyway rather than simply
+> failing out.
+> 
+> > We can see that from the regulator_get_optional()-->_regulator_get(),
+> > there are many other errors maybe returned. Not considering other
+> > error cases, If the dt is used here, only ERR_PTR(-ENODEV) will be
+> > returned if the external VDDD is absent, and only this case the
+> > ERR_PTR(_ENODEV) error will be returned, Or if dt is not used and
+> > there has no external VDDD was found, the
+> > ERR_PTR(-EPROBE_DEFER) will be returned.
+> >
+> > So, if the external VDDD is not used, only ERR_PTR(-ENODEV) and
+> > ERR_PTR(-EPROBE_DEFER) maybe returned ignoring other errors.
+> >
+> > How about the following ?
+> > -----------------
+> > +	if (IS_ERR(vddd)) {
+> > +		/* See if it's just not registered yet */
+> > +		if (PTR_ERR(vddd) != -ENODEV)
+> > +			return PTR_ERR(vddd);
+> 
+> Just for example, if PTR_ERR(vddd) is -EBUSY here, instead of failing out, why
+> do not we switch to internal LDO for continuing the probe?
+> 
+
+Yes, sounds perfect.
+
+Well, the regulator_get_optional() is still needed to improve.
+For instance, if dts is not used for one platform and the external VDDD supply is
+absent. The regulator_get_optional() will return -EPROBE_DEFER, so the SGTL5000's
+probe, and then the SGTL5000 will do the deferral probe, and this time the same
+-EPROBE_DEFER error will return again. 
+Where should this special handling be dealt with ? Is here or regulator_get_optional()
+will be better ?
+
 
 Thanks,
-Dinh
->
-> Thanks
+
+--
+Xiubo
