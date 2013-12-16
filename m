@@ -1,61 +1,33 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 16 Dec 2013 14:46:12 -0800
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <20131216192816.GC14866@pengutronix.de>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131126134117.GF28642@pengutronix.de>
- <20131126134444.GG28642@pengutronix.de>
- <20131126183629.GK28642@pengutronix.de>
- <20131216001158.0e15e93c.akpm@linux-foundation.org>
- <20131216192816.GC14866@pengutronix.de>
-Message-ID: <20131216144612.8f33194eb247f81a0741b64a@linux-foundation.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 16 Dec 2013 23:23:31 +0000
+Subject: [PATCHv4] rtc: Add support for Intersil ISL12057 I2C RTC chip
+In-Reply-To: <20131216213706.GA8527@roeck-us.net>
+References: <1dec5992db795b61e91e0abf910dee7fce322ccc.1387227955.git.arno@natisbad.org>
+ <20131216213706.GA8527@roeck-us.net>
+Message-ID: <20131216232331.GK3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Dec 2013 20:28:16 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
+On Mon, Dec 16, 2013 at 01:37:06PM -0800, Guenter Roeck wrote:
 
-> Hello Andrew,
-> 
-> On Mon, Dec 16, 2013 at 12:11:58AM -0800, Andrew Morton wrote:
-> > On Tue, 26 Nov 2013 19:36:29 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
-> > > On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K__nig wrote:
-> > > > On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K__nig wrote:
-> > > > > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K__nig wrote:
-> > > > > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> > > > > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> > > > > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> > > > > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> > > > > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> > > > > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
-> > > > > > 
-> > > > > > So better include it explicitly not only because the last link will go
-> > > > > > away soon.
-> > > > > > 
-> > > > > > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > > > > Ping. Is this patch ok despite Jean-Christophe's objection?
-> > > > I saw that akpm already took it into his tree.
-> > > This patch is one of the last few that are needed to drop <mach/timex.h>
-> > > alltogether that I don't have an ack from the respective maintainer yet.
-> > > 
-> > > Can you give your ack instead of sending the patch to Linus, then I'd
-> > > take it with the patch dropping <mach/timex.h> to make it easier to
-> > > merge.
-> > 
-> > ack ;)
-> thanks. There is another rtc change that I didn't receive any feedback
-> for from a maintainer:
-> 
-> 	rtc: pxa: drop unused #define TIMER_FREQ
+> Here is a snippet from the saved patch:
 
-ack.  Robert Jarzmik also acked that one.
+>  obj-$(CONFIG_RTC_DRV_IMXDI)    +=3D rtc-imxdi.o
+>  obj-$(CONFIG_RTC_DRV_ISL1208)  +=3D rtc-isl1208.o
+>  obj-$(CONFIG_RTC_DRV_ISL12022) +=3D rtc-isl12022.o
+> +obj-$(CONFIG_RTC_DRV_ISL12057)  +=3D rtc-isl12057.o
+>  obj-$(CONFIG_RTC_DRV_JZ4740)   +=3D rtc-jz4740.o
+>  obj-$(CONFIG_RTC_DRV_LP8788)   +=3D rtc-lp8788.o
+>  obj-$(CONFIG_RTC_DRV_LPC32XX)  +=3D rtc-lpc32xx.o
 
-> . In the meantime I send a pull request asking to ignore that I didn't
-> get any maintainer reply for the rtc changes. Do you think it's sensible
-> to change the entry in MAINTAINERS? Any combination of:
-> 
-> 	a) drop Alessandro's M: line
-> 	b) add you
-> 	c) change Status from Maintained to Odd Fixes or Orphan
+> Something is adding those '3D' after each '=' into the patch.
 
-Yeah, I should have a couple hundred MAINTAINERS entries.  Instead I
-just lurk on mailing lists ;)
+That's quoted printable MIME encoding of the =, presumably your MUA
+doesn't do MIME (or the header went AWOL, though it's there in my copy).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/1da3c983/attachment.sig>
