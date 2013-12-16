@@ -1,135 +1,73 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 16 Dec 2013 16:29:00 +0900
-Subject: [PATCH 2/2] gpio: davinci: reuse for Keystone SoC
-In-Reply-To: <1386871973-26762-3-git-send-email-grygorii.strashko@ti.com>
-References: <1386871973-26762-1-git-send-email-grygorii.strashko@ti.com>
- <1386871973-26762-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CAAVeFuJSe_BZ+cr8ZVz-etAzsUbe_taS+0EqM+pXhKhTdyuWiQ@mail.gmail.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Mon, 16 Dec 2013 16:29:38 +0900
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52AE8A0E.2050005@linaro.org>
+References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
+ <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
+ <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
+ <52AE8A0E.2050005@linaro.org>
+Message-ID: <003901cefa30$93c3cce0$bb4b66a0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 3:12 AM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> The similar GPIO HW block is used by keystone SoCs as
-> in Davinci SoCs.
-> Hence, reuse Davinci GPIO driver for Keystone taking into
-> account that Keystone contains ARM GIC IRQ controller which
-> is implemented using IRQ Chip.
->
-> Documentation:
->         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> CC: Sekhar Nori <nsekhar@ti.com>
-> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: devicetree at vger.kernel.org
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
->  drivers/gpio/gpio-davinci.c                        |   49 +++++++++++++++-----
->  2 files changed, 40 insertions(+), 13 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> index a2e839d..4ce9862 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> @@ -1,7 +1,7 @@
-> -Davinci GPIO controller bindings
-> +Davinci/Keystone GPIO controller bindings
->
->  Required Properties:
-> -- compatible: should be "ti,dm6441-gpio"
-> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
->
->  - reg: Physical base address of the controller and the size of memory mapped
->         registers.
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 73f65ca..3e44e0c 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -413,6 +413,27 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
->         .xlate = irq_domain_xlate_onetwocell,
->  };
->
-> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
-> +{
-> +       static struct irq_chip_type gpio_unbanked;
-> +
-> +       gpio_unbanked = *container_of(irq_get_chip(irq),
-> +                                     struct irq_chip_type, chip);
-> +
-> +       return &gpio_unbanked.chip;
-> +};
-> +
-> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
-> +{
-> +       static struct irq_chip gpio_unbanked;
-> +
-> +       gpio_unbanked = *irq_get_chip(irq);
-> +       pr_err("keystone_gpio_get_irq_chip\n");
+On Mon, December 16, 2013, Zhangfei Gao wrote: 
+> Dear Seungwon
+> 
+> On 12/16/2013 11:50 AM, Seungwon Jeon wrote:
+> > On Sat, December 14, 2013, Zhangfei Gao wrote:
+> 
+> >> +	/* SoC portion */
+> >> +	dwmmc_0: dwmmc0 at fcd03000 {
+> >> +		compatible = "hisilicon,hi4511-dw-mshc";
+> >> +		reg = <0xfcd03000 0x1000>;
+> >> +		interrupts = <0 16 4>;
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
+> >> +		clock-names = "ciu", "biu";
+> >> +		clock-freq-table =
+> >> +		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
+> > I think it could be solved with mmc->f_min and mmc->f_max(from clock-freq-min-max property)
+> > if there is no limitation per each speed mode. As seeing described table, it looks that.
+> 
+> Have tried them before, but unfortunately, they are different.
+> 
+> The controller can not generate clock itself, while depending on the
+> outside clock generator, which may require to change clock source in
+> differnt mode.
+> 
+> The value we want is set the capacibility of the clock input and the max
+> clock freq where mmc works stable in that mode, which may be different
+> in different mode.
+> 
+> clock-freq-min-max will set the value for set_ios.
+> For example, we use 25M as clock capability when init, which can not be
+> set as freq-min, and used as set_ios, where 400K should be used,
+> otherwise init definitely fail.
+Can you check 'f_init' within 'drivers/mmc/core/core.c' file?
+If you set 'f_min = 25000000' for init-sequence, mmc_set_ios() will pass that rate through 'ios.clock'
+Then, dw_mmc-k3 can do clk_set_rate() with 25MHz at dw_mci_k3_set_ios().
+And other required speeds for each mode seem not specific compared with standard spec.
+Also clk_set_rate() would be possible with 'ios.clock' instead of specific table.
+I just referred your example's clock-freq-table above.
 
-Do you intend this pr_err() to remain here?
+> 
+> >> +static int dw_mci_k3_suspend(struct device *dev)
+> >> +{
+> >> +	struct dw_mci *host = dev_get_drvdata(dev);
+> >> +
+> >> +	if (!IS_ERR(host->ciu_clk))
+> >> +		clk_disable_unprepare(host->ciu_clk);
+> >> +
+> >> +	return dw_mci_suspend(host);
+> > If k3 needs clk_disable here, dw_mci_suspend()is expected to be called prior to
+> clk_disable_unprepare()?
+> > Of course, it's ok at present though.
+> >
+> 
+> Sure, it can be switched, though dw_mci_suspend does nothing related
+> with clock now.
+Yes, but if some works with ciu_clk is added in dw_mci_suspend(), it will affect.
 
-> +       return &gpio_unbanked;
-> +};
-> +
-> +static const struct of_device_id davinci_gpio_ids[];
-> +
->  /*
->   * NOTE:  for suspend/resume, probably best to make a platform_device with
->   * suspend_late/resume_resume calls hooking into results of the set_wake()
-> @@ -433,6 +454,15 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->         struct davinci_gpio_platform_data *pdata = dev->platform_data;
->         struct davinci_gpio_regs __iomem *g;
->         struct irq_domain       *irq_domain = NULL;
-> +       const struct of_device_id *match;
-> +       struct irq_chip *irq_chip;
-> +       struct irq_chip *(*gpio_get_irq_chip)(unsigned int irq);
-> +
-> +       gpio_get_irq_chip = davinci_gpio_get_irq_chip;
-> +       match = of_match_device(of_match_ptr(davinci_gpio_ids),
-> +                               dev);
-> +       if (match)
-> +               gpio_get_irq_chip = match->data;
->
->         ngpio = pdata->ngpio;
->         res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> @@ -442,7 +472,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->         }
->
->         bank_irq = res->start;
-> -
->         if (!bank_irq) {
->                 dev_err(dev, "Invalid IRQ resource\n");
->                 return -ENODEV;
-> @@ -484,25 +513,22 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->         }
->
->         /*
-> -        * AINTC can handle direct/unbanked IRQs for GPIOs, with the GPIO
-> +        * INTC can handle direct/unbanked IRQs for GPIOs, with the GPIO
->          * controller only handling trigger modes.  We currently assume no
->          * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
->          */
->         if (pdata->gpio_unbanked) {
-> -               static struct irq_chip_type gpio_unbanked;
-> -
->                 /* pass "bank 0" GPIO IRQs to AINTC */
->                 chips[0].chip.to_irq = gpio_to_irq_unbanked;
->                 chips[0].gpio_irq = bank_irq;
->                 chips[0].gpio_unbanked = pdata->gpio_unbanked;
->                 binten = BIT(0);
->
-> -               /* AINTC handles mask/unmask; GPIO handles triggering */
-> +               /* INTC handles mask/unmask; GPIO handles triggering */
->                 irq = bank_irq;
-> -               gpio_unbanked = *container_of(irq_get_chip(irq),
-> -                                             struct irq_chip_type, chip);
-> -               gpio_unbanked.chip.name = "GPIO-AINTC";
-> -               gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
-> +               irq_chip = gpio_get_irq_chip(irq);
-> +               irq_chip->name = "GPIO-AINTC";
-
-According to the other renamings I see in this file, shouldn't the
-string also be changed to "GPIO-INTC"?
+Thanks,
+Seungwon Jeon
