@@ -1,67 +1,44 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 16 Dec 2013 11:34:38 +0100
-Subject: [PATCH v4 7/8] clocksource: kona: Add basic use of external clock
-In-Reply-To: <1386271244-3927-8-git-send-email-tim.kryger@linaro.org>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-8-git-send-email-tim.kryger@linaro.org>
-Message-ID: <52AED73E.5090507@linaro.org>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 16 Dec 2013 10:41:38 +0000
+Subject: [PATCH] clk: clk-divider: fix divisor > 255 bug
+Message-ID: <1387190498-15392-1-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2013 08:20 PM, Tim Kryger wrote:
-> When an clock is specified in the device tree, enable it and use it to
-> determine the external clock frequency.
->
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Commit 6d9252bd9a4bb (clk: Add support for power of two type dividers)
+merged in v3.6 added the _get_val function to convert a divisor value to
+a register field value depending on the flags. However it used the type
+u8 for the div field, causing divisors larger than 255 to be masked
+and the resultant clock rate to be too high.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+E.g. in my case an 11bit divider was supposed to divide 24.576 MHz down
+to 32.768KHz. The divisor was correctly calculated as 750 (0x2ee). This
+was masked to 238 (0xee) resulting in a frequency of 103.26KHz.
 
-> ---
->   drivers/clocksource/bcm_kona_timer.c | 14 +++++++++++---
->   1 file changed, 11 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-> index 0d7d8c3..8a4ab36 100644
-> --- a/drivers/clocksource/bcm_kona_timer.c
-> +++ b/drivers/clocksource/bcm_kona_timer.c
-> @@ -17,6 +17,7 @@
->   #include <linux/jiffies.h>
->   #include <linux/clockchips.h>
->   #include <linux/types.h>
-> +#include <linux/clk.h>
->
->   #include <linux/io.h>
->   #include <asm/mach/time.h>
-> @@ -107,11 +108,18 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
->   static void __init kona_timers_init(struct device_node *node)
->   {
->   	u32 freq;
-> +	struct clk *external_clk;
->
-> -	if (!of_property_read_u32(node, "clock-frequency", &freq))
-> +	external_clk = of_clk_get_by_name(node, NULL);
-> +
-> +	if (!IS_ERR(external_clk)) {
-> +		arch_timer_rate = clk_get_rate(external_clk);
-> +		clk_prepare_enable(external_clk);
-> +	} else if (!of_property_read_u32(node, "clock-frequency", &freq)) {
->   		arch_timer_rate = freq;
-> -	else
-> -		panic("clock-frequency not set in the .dts file");
-> +	} else {
-> +		panic("unable to determine clock-frequency");
-> +	}
->
->   	/* Setup IRQ numbers */
->   	timers.tmr_irq = irq_of_parse_and_map(node, 0);
->
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: stable at vger.kernel.org
+---
+Since this bug was introduced in 3.6, it probably should by applied to
+stable 3.10 and 3.12.
+---
+ drivers/clk/clk-divider.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 8d3009e44fba..5543b7df8e16 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -87,7 +87,7 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
+ 	return 0;
+ }
+ 
+-static unsigned int _get_val(struct clk_divider *divider, u8 div)
++static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
+ {
+ 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
+ 		return div;
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.1.2
