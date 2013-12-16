@@ -1,72 +1,62 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Dec 2013 22:04:36 +0100
-Subject: [PATCH 2/4] arm64: Add hwcaps for crypto and CRC32 extensions.
+Date: Mon, 16 Dec 2013 22:04:38 +0100
+Subject: [PATCH 4/4] arm64: add 32-bit compat hwcaps for v8 crypto extensions
 In-Reply-To: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1387227878-30438-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1387227878-30438-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@linaro.org>
+The ARMv8 Crypto Extensions may also be available to userland
+processes running in 32-bit mode. Allocate the compat bits and
+set them at boot.
 
-Advertise the optional cryptographic and CRC32 instructions to
-user space where present. Several hwcap bits [3-7] are allocated.
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-[bit 2 is taken now so use bits 3-7 instead]
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/uapi/asm/hwcap.h |  6 +++++-
- arch/arm64/kernel/setup.c           | 37 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/hwcap.h |  6 ++++++
+ arch/arm64/kernel/setup.c      | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index 9b12476..73cf0f5 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -22,6 +22,10 @@
- #define HWCAP_FP		(1 << 0)
- #define HWCAP_ASIMD		(1 << 1)
- #define HWCAP_EVTSTRM		(1 << 2)
--
-+#define HWCAP_AES		(1 << 3)
-+#define HWCAP_PMULL		(1 << 4)
-+#define HWCAP_SHA1		(1 << 5)
-+#define HWCAP_SHA2		(1 << 6)
-+#define HWCAP_CRC32		(1 << 7)
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 6cddbb0..4ae8c69 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -31,6 +31,12 @@
+ #define COMPAT_HWCAP_IDIVT	(1 << 18)
+ #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
+ #define COMPAT_HWCAP_EVTSTRM	(1 << 21)
++#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
++#define COMPAT_HWCAP_AES	(1 << 22)
++#define COMPAT_HWCAP_PMULL	(1 << 23)
++#define COMPAT_HWCAP_SHA1	(1 << 24)
++#define COMPAT_HWCAP_SHA2	(1 << 25)
++#define COMPAT_HWCAP_CRC32	(1 << 26)
  
- #endif /* _UAPI__ASM_HWCAP_H */
+ #ifndef __ASSEMBLY__
+ /*
 diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 0bc5e4c..961c961 100644
+index 961c961..283039d 100644
 --- a/arch/arm64/kernel/setup.c
 +++ b/arch/arm64/kernel/setup.c
-@@ -116,6 +116,7 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
- static void __init setup_processor(void)
- {
- 	struct cpu_info *cpu_info;
-+	u64 features, block;
- 
- 	/*
- 	 * locate processor in the list of supported processor
-@@ -136,6 +137,37 @@ static void __init setup_processor(void)
- 
- 	sprintf(init_utsname()->machine, ELF_PLATFORM);
- 	elf_hwcap = 0;
+@@ -168,6 +168,38 @@ static void __init setup_processor(void)
+ 	block = (features >> 16) & 0xf;
+ 	if (block && !(block & 0x8))
+ 		elf_hwcap |= HWCAP_CRC32;
 +
++#ifdef CONFIG_COMPAT
 +	/*
-+	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
-+	 * The blocks we test below represent incremental functionality
-+	 * for non-negative values. Negative values are reserved.
++	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
++	 * the Aarch32 32-bit execution state.
 +	 */
-+	features = read_cpuid(ID_AA64ISAR0_EL1);
++	features = read_cpuid(ID_ISAR5_EL1);
 +	block = (features >> 4) & 0xf;
 +	if (!(block & 0x8)) {
 +		switch (block) {
 +		default:
 +		case 2:
-+			elf_hwcap |= HWCAP_PMULL;
++			compat_elf_hwcap |= COMPAT_HWCAP_PMULL;
 +		case 1:
-+			elf_hwcap |= HWCAP_AES;
++			compat_elf_hwcap |= COMPAT_HWCAP_AES;
 +		case 0:
 +			break;
 +		}
@@ -74,29 +64,18 @@ index 0bc5e4c..961c961 100644
 +
 +	block = (features >> 8) & 0xf;
 +	if (block && !(block & 0x8))
-+		elf_hwcap |= HWCAP_SHA1;
++		compat_elf_hwcap |= COMPAT_HWCAP_SHA1;
 +
 +	block = (features >> 12) & 0xf;
 +	if (block && !(block & 0x8))
-+		elf_hwcap |= HWCAP_SHA2;
++		compat_elf_hwcap |= COMPAT_HWCAP_SHA2;
 +
 +	block = (features >> 16) & 0xf;
 +	if (block && !(block & 0x8))
-+		elf_hwcap |= HWCAP_CRC32;
++		compat_elf_hwcap |= COMPAT_HWCAP_CRC32;
++#endif
  }
  
  static void __init setup_machine_fdt(phys_addr_t dt_phys)
-@@ -270,6 +302,11 @@ static const char *hwcap_str[] = {
- 	"fp",
- 	"asimd",
- 	"evtstrm",
-+	"aes",
-+	"pmull",
-+	"sha1",
-+	"sha2",
-+	"crc32",
- 	NULL
- };
- 
 -- 
 1.8.3.2
