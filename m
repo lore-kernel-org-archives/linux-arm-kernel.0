@@ -1,172 +1,61 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 16 Dec 2013 14:10:04 +0530
-Subject: [PATCH v4 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <1386166641-7567-2-git-send-email-andrew@lunn.ch>
-References: <1386166641-7567-1-git-send-email-andrew@lunn.ch>
- <1386166641-7567-2-git-send-email-andrew@lunn.ch>
-Message-ID: <CAKohpo=cPMF+Op_EOwPy2Nn0wz=7bSepCy08DPJAvpmcN7o0AA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 16 Dec 2013 14:22:06 +0530
+Subject: [PATCH] omap: twl-common: Fix musb-hdrc device name.
+In-Reply-To: <20131213173636.GG28184@atomide.com>
+References: <1386059589-4030-1-git-send-email-marek.belisko@open-nandra.com>
+ <529D9D43.6040101@ti.com>
+ <CAAfyv37Vie1vZK2XQ1cfVq6eVnSuaBLfykk6pU8fwEyqvPF4BA@mail.gmail.com>
+ <CAAfyv35gVVNydrk8vifSyidpFjEXjGiT4-i2dgN5Un2=FuHaqQ@mail.gmail.com>
+ <20131205184323.GF26766@atomide.com>
+ <CAAfyv37e9+OLH-KegPCEhc0sbBS7UVnaSGU0mBw2AxAN9D7Akw@mail.gmail.com>
+ <20131209175006.GD12527@atomide.com>
+ <CAAfyv36P7DDcdaLWtXnZXPfQWPL20shE3kOHWtD0mSmH7aixdg@mail.gmail.com>
+ <52AAF5E6.1050900@ti.com> <20131213173636.GG28184@atomide.com>
+Message-ID: <52AEBF36.9010400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2013 19:47, Andrew Lunn <andrew@lunn.ch> wrote:
-> The Marvell Dove SoC can run the CPU at two frequencies. The high
-> frequencey is from a PLL, while the lower is the same as the DDR
-> clock. Add a cpufreq driver to swap between these frequences.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hi,
 
-I was sure about it and checked it again. I haven't Acked this patch
-until now. :)
+On Friday 13 December 2013 11:06 PM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [131213 03:57]:
+>> On Friday 13 December 2013 04:57 PM, Belisko Marek wrote:
+>>> Kishon can you please comment on that? Would be possible to get your
+>>> patch to 3.13 (I seen some comments from Felipe).
+>>
+>> I'm not sure as my patch modifies all the board files. There was initially some
+>> confusion w.r.t when the board files will be dropped. But since board files
+>> will still be there in 3.13, I'd recommend my patch  [1] to be taken. Anyways
+>> if you have tested my patch (series), pls give your Tested-by.
+>>
+>> Tony, summary of the issue..
+>> After the platform devices are created using PLATFORM_DEVID_AUTO, the
+>> device names given in usb_bind_phy (in board file) does not match with
+>> the actual device name causing the USB PHY library not to return the
+>> PHY reference when the MUSB controller request for the PHY in the non-dt boot
+>> case. So removed creating platform devices using PLATFORM_DEVID_AUTO in
+>> omap2430.c. So had to make the corresponding changes in board files.
+> 
+> OK. Can you please repost with a proper commit id for what caused the
+> regression and summararize why it should be fixed this way. Something like:
+> 
+> Commit abcd1234 (usb: blah foo bar) caused blah blah blah. Fix the issue
+> with blah blah blah. Note that the board-*.c files will be removed soon,
+> but for v3.13 we still support both legacy booting and device tree based
+> booting and need to fix it.
 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index ce52ed949249..af7c4947f218 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -8,6 +8,11 @@ config ARM_BIG_LITTLE_CPUFREQ
->         help
->           This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
->
-> +config ARM_DOVE_CPUFREQ
-> +       def_bool ARCH_DOVE && OF
-> +       help
-> +         This adds the CPUFreq driver for Marvell Dove SoCs.
+huh.. I think we can have a much simpler fix. All this binding in board file
+was introduced to support platforms that has multiple PHYs of the same type.
+But musb/omap2430.c serves platforms that has only one PHY of a particular
+type. We can just go back to usb_get_phy(enum usb_phy_type type) instead of
+'usb_get_phy_dev' in omap2430.c. Felipe, what do you think?
 
-Please add this one after DT_BL one.. I know you wanted to keep
-them in alphabetical order (probably we need to rename DT_BL),
-but keeping both BIG LITTLE options makes more sense.
+Cheers
+Kishon
 
-I will do the renaming later.
-
->  config ARM_DT_BL_CPUFREQ
->         tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
->         depends on ARM_BIG_LITTLE_CPUFREQ && OF
-
-> diff --git a/drivers/cpufreq/dove-cpufreq.c b/drivers/cpufreq/dove-cpufreq.c
-> +static int dove_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +       struct device *cpu_dev;
-> +       struct resource *res;
-> +       int err, irq;
-> +
-> +       memset(&priv, 0, sizeof(priv));
-> +       priv.dev = &pdev->dev;
-> +
-> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> +                                          "cpufreq: DFS");
-> +       priv.dfs = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(priv.dfs))
-> +               return PTR_ERR(priv.dfs);
-> +
-> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> +                                          "cpufreq: PMU CR");
-> +       priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(priv.pmu_cr))
-> +               return PTR_ERR(priv.pmu_cr);
-> +
-> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> +                                          "cpufreq: PMU Clk Div");
-> +       priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(priv.pmu_clk_div))
-> +               return PTR_ERR(priv.pmu_clk_div);
-> +
-> +       cpu_dev = get_cpu_device(0);
-> +
-> +       priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
-> +       if (IS_ERR(priv.cpu_clk)) {
-> +               err = PTR_ERR(priv.cpu_clk);
-> +               goto out;
-> +       }
-
-You are doing clk_disable_unprepare in out, and you haven't enabled
-them yet. So, just return error from here.
-
-> +       err = clk_prepare_enable(priv.cpu_clk);
-> +       if (err)
-> +               goto out;
-
-same here
-
-> +       dove_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
-> +
-> +       priv.ddr_clk = devm_clk_get(cpu_dev, "ddrclk");
-> +       if (IS_ERR(priv.ddr_clk)) {
-> +               err = PTR_ERR(priv.ddr_clk);
-> +               goto out;
-
-You need to do unprepare only for cpu clk here.
-
-> +       }
-> +
-> +       err = clk_prepare_enable(priv.ddr_clk);
-> +       if (err)
-> +               goto out;
-
-same here
-
-> +
-> +       dove_freq_table[1].frequency = clk_get_rate(priv.ddr_clk) / 1000;
-
-Because you are using 0 and 1 in index for CPU and DDR freq at multiple
-places, probably makes sense to make Macros for them ?
-
-> +
-> +       irq = irq_of_parse_and_map(cpu_dev->of_node, 0);
-> +       if (!irq) {
-> +               err = -ENXIO;
-> +               goto out;
-> +       }
-> +
-> +       err = devm_request_irq(&pdev->dev, irq, dove_cpufreq_irq,
-> +                              0, "dove-cpufreq", NULL);
-> +       if (err) {
-> +               dev_err(&pdev->dev, "cannot assign irq %d, %d\n", irq, err);
-> +               goto out;
-> +       }
-> +
-> +       /* Read the target ratio which should be the DDR ratio */
-> +       priv.dpratio = readl_relaxed(priv.pmu_clk_div);
-> +       priv.dpratio = (priv.dpratio & DPRATIO_MASK) >> DPRATIO_OFFS;
-> +       priv.dpratio = priv.dpratio << L2_RATIO_OFFS;
-> +
-> +       /* Save L2 ratio at reset */
-> +       priv.xpratio = readl(priv.pmu_clk_div);
-> +       priv.xpratio = (priv.xpratio & XPRATIO_MASK) >> XPRATIO_OFFS;
-> +       priv.xpratio = priv.xpratio << L2_RATIO_OFFS;
-> +
-> +       err = cpufreq_register_driver(&dove_cpufreq_driver);
-> +       if (!err)
-> +               return 0;
-> +
-> +       dev_err(priv.dev, "Failed to register cpufreq driver");
-> +
-> +out:
-> +       clk_disable_unprepare(priv.ddr_clk);
-> +       clk_disable_unprepare(priv.cpu_clk);
-> +
-> +       return err;
-> +}
-> +
-> +static int dove_cpufreq_remove(struct platform_device *pdev)
-> +{
-> +       cpufreq_unregister_driver(&dove_cpufreq_driver);
-> +
-> +       clk_disable_unprepare(priv.ddr_clk);
-> +       clk_disable_unprepare(priv.cpu_clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver dove_cpufreq_platform_driver = {
-> +       .probe = dove_cpufreq_probe,
-> +       .remove = dove_cpufreq_remove,
-> +       .driver = {
-> +               .name = "dove-cpufreq",
-> +               .owner = THIS_MODULE,
-> +       },
-> +};
-> +
-> +module_platform_driver(dove_cpufreq_platform_driver);
-
-Otherwise looks fine :)
+> 
+> Regards,
+> 
+> Tony
+>  
+>> [1] -> http://lists.scusting.com/index.php?t=msg&th=375579&start=0&S=Google
