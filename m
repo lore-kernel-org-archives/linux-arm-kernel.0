@@ -1,186 +1,86 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 16 Dec 2013 17:54:31 +0100
-Subject: [PATCH 1/3] ARM64: perf: add support for perf registers API
-In-Reply-To: <1387212873-8248-1-git-send-email-jean.pihet@linaro.org>
-References: <1387212873-8248-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1387212873-8248-2-git-send-email-jean.pihet@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Dec 2013 16:55:22 +0000
+Subject: [PATCH 3/6] arm64: lib: Implement optimized memset routine
+In-Reply-To: <1386743082-5231-4-git-send-email-zhichang.yuan@linaro.org>
+References: <1386743082-5231-1-git-send-email-zhichang.yuan@linaro.org>
+ <1386743082-5231-4-git-send-email-zhichang.yuan@linaro.org>
+Message-ID: <20131216165522.GG20193@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the functions required for the perf registers API,
-allowing the perf tool to interface kernel register dumps with libunwind
-in order to provide userspace backtracing.
-Compat mode is also supported.
+On Wed, Dec 11, 2013 at 06:24:39AM +0000, zhichang.yuan at linaro.org wrote:
+> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+> 
+> This patch, based on Linaro's Cortex Strings library, improves
+> the performance of the assembly optimized memset() function.
+> 
+> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
+> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+> ---
+>  arch/arm64/lib/memset.S |  227 +++++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 201 insertions(+), 26 deletions(-)
+> 
+> diff --git a/arch/arm64/lib/memset.S b/arch/arm64/lib/memset.S
+> index 87e4a68..90b973e 100644
+> --- a/arch/arm64/lib/memset.S
+> +++ b/arch/arm64/lib/memset.S
+> @@ -1,13 +1,21 @@
+>  /*
+>   * Copyright (C) 2013 ARM Ltd.
+> + * Copyright (C) 2013 Linaro.
+> + *
+> + * This code is based on glibc cortex strings work originally authored by Linaro
+> + * and re-licensed under GPLv2 for the Linux kernel. The original code can
+> + * be found @
+> + *
+> + * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
+> + * files/head:/src/aarch64/
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 
-Only the general purpose user space registers are exported, i.e.:
- PERF_REG_ARM_X0,
- ...
- PERF_REG_ARM_X28,
- PERF_REG_ARM_FP,
- PERF_REG_ARM_LR,
- PERF_REG_ARM_SP,
- PERF_REG_ARM_PC
-and not the PERF_REG_ARM_V* registers.
+Why are you changing this?
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig                      |  2 ++
- arch/arm64/include/asm/ptrace.h         |  1 +
- arch/arm64/include/uapi/asm/Kbuild      |  1 +
- arch/arm64/include/uapi/asm/perf_regs.h | 40 ++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile              |  1 +
- arch/arm64/kernel/perf_regs.c           | 46 +++++++++++++++++++++++++++++++++
- 6 files changed, 91 insertions(+)
- create mode 100644 arch/arm64/include/uapi/asm/perf_regs.h
- create mode 100644 arch/arm64/kernel/perf_regs.c
+>   * GNU General Public License for more details.
+>   *
+>   * You should have received a copy of the GNU General Public License
+> @@ -18,7 +26,7 @@
+>  #include <asm/assembler.h>
+>  
+>  /*
+> - * Fill in the buffer with character c (alignment handled by the hardware)
+> + * Fill in the buffer with character c
+>   *
+>   * Parameters:
+>   *	x0 - buf
+> @@ -27,27 +35,194 @@
+>   * Returns:
+>   *	x0 - buf
+>   */
+> +
+> +/* By default we assume that the DC instruction can be used to zero
+> +*  data blocks more efficiently.  In some circumstances this might be
+> +*  unsafe, for example in an asymmetric multiprocessor environment with
+> +*  different DC clear lengths (neither the upper nor lower lengths are
+> +*  safe to use).  The feature can be disabled by defining DONT_USE_DC.
+> +*/
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 88c8b6c1..f8609dc 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -28,6 +28,8 @@ config ARM64
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
- 	select HAVE_MEMBLOCK
- 	select HAVE_PERF_EVENTS
-+	select HAVE_PERF_REGS
-+	select HAVE_PERF_USER_STACK_DUMP
- 	select IRQ_DOMAIN
- 	select MODULES_USE_ELF_RELA
- 	select NO_BOOTMEM
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 0e7fa49..fbb0020 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -68,6 +68,7 @@
- 
- /* Architecturally defined mapping between AArch32 and AArch64 registers */
- #define compat_usr(x)	regs[(x)]
-+#define compat_fp	regs[11]
- #define compat_sp	regs[13]
- #define compat_lr	regs[14]
- #define compat_sp_hyp	regs[15]
-diff --git a/arch/arm64/include/uapi/asm/Kbuild b/arch/arm64/include/uapi/asm/Kbuild
-index e4b78bd..942376d 100644
---- a/arch/arm64/include/uapi/asm/Kbuild
-+++ b/arch/arm64/include/uapi/asm/Kbuild
-@@ -9,6 +9,7 @@ header-y += byteorder.h
- header-y += fcntl.h
- header-y += hwcap.h
- header-y += kvm_para.h
-+header-y += perf_regs.h
- header-y += param.h
- header-y += ptrace.h
- header-y += setup.h
-diff --git a/arch/arm64/include/uapi/asm/perf_regs.h b/arch/arm64/include/uapi/asm/perf_regs.h
-new file mode 100644
-index 0000000..06bf360
---- /dev/null
-+++ b/arch/arm64/include/uapi/asm/perf_regs.h
-@@ -0,0 +1,40 @@
-+#ifndef _ASM_ARM_PERF_REGS_H
-+#define _ASM_ARM_PERF_REGS_H
-+
-+enum perf_event_arm_regs {
-+	PERF_REG_ARM_X0,
-+	PERF_REG_ARM_X1,
-+	PERF_REG_ARM_X2,
-+	PERF_REG_ARM_X3,
-+	PERF_REG_ARM_X4,
-+	PERF_REG_ARM_X5,
-+	PERF_REG_ARM_X6,
-+	PERF_REG_ARM_X7,
-+	PERF_REG_ARM_X8,
-+	PERF_REG_ARM_X9,
-+	PERF_REG_ARM_X10,
-+	PERF_REG_ARM_X11,
-+	PERF_REG_ARM_X12,
-+	PERF_REG_ARM_X13,
-+	PERF_REG_ARM_X14,
-+	PERF_REG_ARM_X15,
-+	PERF_REG_ARM_X16,
-+	PERF_REG_ARM_X17,
-+	PERF_REG_ARM_X18,
-+	PERF_REG_ARM_X19,
-+	PERF_REG_ARM_X20,
-+	PERF_REG_ARM_X21,
-+	PERF_REG_ARM_X22,
-+	PERF_REG_ARM_X23,
-+	PERF_REG_ARM_X24,
-+	PERF_REG_ARM_X25,
-+	PERF_REG_ARM_X26,
-+	PERF_REG_ARM_X27,
-+	PERF_REG_ARM_X28,
-+	PERF_REG_ARM_FP,
-+	PERF_REG_ARM_LR,
-+	PERF_REG_ARM_SP,
-+	PERF_REG_ARM_PC,
-+	PERF_REG_ARM_MAX,
-+};
-+#endif /* _ASM_ARM_PERF_REGS_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ba2fd4..dffdd93 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -15,6 +15,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
-+arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-diff --git a/arch/arm64/kernel/perf_regs.c b/arch/arm64/kernel/perf_regs.c
-new file mode 100644
-index 0000000..d5c8fd7
---- /dev/null
-+++ b/arch/arm64/kernel/perf_regs.c
-@@ -0,0 +1,46 @@
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/perf_event.h>
-+#include <linux/bug.h>
-+#include <asm/perf_regs.h>
-+#include <asm/ptrace.h>
-+
-+u64 perf_reg_value(struct pt_regs *regs, int idx)
-+{
-+	if (WARN_ON_ONCE((u32)idx >= PERF_REG_ARM_MAX))
-+		return 0;
-+
-+	/*
-+	 * Compat (i.e. 32 bit) mode:
-+	 * - PC has been set in the pt_regs struct in kernel_entry,
-+	 * - Handle FP, SP and LR here.
-+	 */
-+	if (compat_user_mode(regs)) {
-+		if ((u32)idx == PERF_REG_ARM_FP)
-+			return regs->compat_fp;
-+		if ((u32)idx == PERF_REG_ARM_SP)
-+			return regs->compat_sp;
-+		if ((u32)idx == PERF_REG_ARM_LR)
-+			return regs->compat_lr;
-+	}
-+
-+	return regs->regs[idx];
-+}
-+
-+#define REG_RESERVED (~((1ULL << PERF_REG_ARM_MAX) - 1))
-+
-+int perf_reg_validate(u64 mask)
-+{
-+	if (!mask || mask & REG_RESERVED)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+u64 perf_reg_abi(struct task_struct *task)
-+{
-+	if (test_tsk_thread_flag(task, TIF_32BIT))
-+		return PERF_SAMPLE_REGS_ABI_32;
-+	else
-+		return PERF_SAMPLE_REGS_ABI_64;
-+}
--- 
-1.7.11.7
+We already use DC ZVA for clear_page, so I think we should start off using
+it unconditionally. If we need to revisit this later, we can, but adding a
+random #ifdef doesn't feel like something we need initially.
+
+For the benefit of anybody else reviewing this; the DC ZVA instruction still
+works for normal, non-cacheable memory.
+
+The comments I made on the earlier patch wrt quality of comments and labels
+seem to apply to all of the patches in this series.
+
+Will
