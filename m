@@ -1,71 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Dec 2013 18:56:11 +0100
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <1387198885.13062.154.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312150355.27755.arnd@arndb.de>
- <1387198885.13062.154.camel@host5.omatika.ru>
-Message-ID: <201312161856.11384.arnd@arndb.de>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Mon, 16 Dec 2013 19:07:28 +0100
+Subject: Spurious timeouts in mvmdio
+In-Reply-To: <20131203234209.GW16735@n2100.arm.linux.org.uk>
+References: <529CA42A.3040504@freebox.fr>
+ <20131203122346.GD29282@titan.lakedaemon.net>
+ <20131203124033.GT16735@n2100.arm.linux.org.uk>
+ <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
+ <529E5F03.8040607@gmail.com>
+ <8d65780eb7bfe49bb0734a09f05f70a6@doppler.thel33t.co.uk>
+ <529E66A4.4050000@gmail.com>
+ <ae69666fd3b61411d7bbd9ac993cec13@doppler.thel33t.co.uk>
+ <20131203234209.GW16735@n2100.arm.linux.org.uk>
+Message-ID: <52AF4160.9080703@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 December 2013, Sergei Ianovich wrote:
-> PXA27x memory bus can have up to 10 devices: up to 6 slower
-> flash/SRAM/variable-latency-IO selected by nCS<0> to <5>, and up to 4
-> partions of SDRAM selected by nSDCS<0> to <3>.
-> 
-> It appears that the FPGA is directly connected to the memory bus and is
-> selected by nCS<5>. According to MSC2 configuration (already in the
-> mainstream U-Boot), the FPGA is configured as a synchronous SRAM with
-> access cycle of 30x memory bus cycles. So I made it a top-level bus like
-> pxabus.
-> 
-> Ethernet devices are also connected to the memory bus via some kind of
-> gate array. This one is a bit faster -- 15x memory cycles, which is
-> still a lot. It explains why network transfers are never faster than 15
-> Mbit/s.
+On 12/04/2013 12:42 AM, Russell King - ARM Linux wrote:
+> Alternatively, code it like this instead.
+>
+>   drivers/net/ethernet/marvell/mvmdio.c |   32 +++++++++++++++-----------------
+>   1 files changed, 15 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+> index 7354960b583b..a6f59831fc5b 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -76,31 +76,29 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+>   {
+>   	struct orion_mdio_dev *dev = bus->priv;
+>   	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
+> -	unsigned long end = jiffies + timeout;
+> -	int timedout = 0;
+>
+> -	while (1) {
+> -	        if (orion_mdio_smi_is_done(dev))
+> +	if (dev->err_interrupt > 0) {
+> +		if (wait_event_timeout(dev->smi_busy_wait,
+> +				       orion_mdio_smi_is_done(dev),
+> +				       1 + timeout))
+>   			return 0;
+> -	        else if (timedout)
+> -			break;
+> +	} else {
+> +		unsigned long end = jiffies + timeout;
+>
+> -	        if (dev->err_interrupt <= 0) {
+> -			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
+> -				     MVMDIO_SMI_POLL_INTERVAL_MAX);
+> +		while (1) {
+> +	        	if (orion_mdio_smi_is_done(dev))
+> +				return 0;
+>
+>   			if (time_is_before_jiffies(end))
+> -				++timedout;
+> -	        } else {
+> -			wait_event_timeout(dev->smi_busy_wait,
+> -				           orion_mdio_smi_is_done(dev),
+> -				           timeout);
+> -
+> -			++timedout;
+> -	        }
+> +				break;
+> +
+> +			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
+> +				     MVMDIO_SMI_POLL_INTERVAL_MAX);
+> +		}
+>   	}
+>
+>   	dev_err(bus->parent, "Timeout: SMI busy for too long\n");
+> +
+>   	return  -ETIMEDOUT;
+>   }
 
-Ok, I see. This sounds like some of the other platforms we have with
-external memory buses. If there is a chance that Linux ever has to
-program the per-CS settings into the bus controller, I would suggest
-to represent that as well as a separate node, like this
+Hi Russell,
 
-extbus {
-	compatible = "simple-bus";
+I did not find any commit for this in 3.13-rc4.
 
-	#address-cells = <2>; /* first cell is nCS, second is address */
-	#size-cells = <1>;
+Would you prefer I submit my attempt at refactoring the 
+orion_mdio_wait_ready() code ?
 
-	ranges = <0 0 0 0x04000000>
-		 <1 0 0x04000000 0x04000000>
-		 <2 0 0x08000000 0x04000000>
-		 <3 0 0x0c000000 0x04000000>
-	  	 <4 0 0x10000000 0x04000000>
-	  	 <5 0 0x14000000 0x04000000>;
+Regards,
 
-	timings = ...;
-
-	flash at 0 {
-		reg = <0 0x0 0x02000000>;
-		...
-	};
-
-	flash at 1 {
-		reg = <1 0x0 0x02000000>;
-		...
-	};
-
-	fpga at 5 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0 5 0x03000000 0x10000>;
-		...
-	};
-};
-
-In case there is a driver for the extbus node, I would not make it
-"simple-bus" but instead add a separate compatible string to match
-the driver, and let that driver call of_platform_populate
-to probe the children after the bus is set up.
-
-	Arnd
+-- 
+Nicolas Schichan
+Freebox SAS
