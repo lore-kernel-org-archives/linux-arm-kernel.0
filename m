@@ -1,128 +1,167 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 15:10:06 -0700
-Subject: [GIT PULL 04/10] ARM: tegra: dependency from the clock tree
+Date: Mon, 16 Dec 2013 15:10:07 -0700
+Subject: [GIT PULL 05/10] ARM: tegra: common DMA/reset DT binding conversion
 In-Reply-To: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
 References: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1387231812-5701-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1387231812-5701-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch includes the Tegra clock driver changes for 3.14, which are a
-dependency for the Tegra DMA/reset common binding conversion.
+This series converts the Tegra DTs and drivers to use the common/
+standard DMA and reset bindings, rather than custom bindings. It also
+adds complete documentation for the Tegra clock bindings without
+actually changing any binding definitions.
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+This conversion relies on a few sets of patches in branches from outside
+the Tegra tree:
+
+1) A patch to add an DMA channel request API which allows deferred probe
+   to be implemented.
+
+2) A patch to implement a common part of the of_xlate function for DMA
+   controllers.
+
+3) Some ASoC patches (which in turn rely on (1) above), which support
+   deferred probe during DMA channel allocation.
+
+4) The Tegra clock driver changes for 3.14.
+
+Consequently, this branch is based on a merge of all of those external
+branches.
+
+In turn, this branch is or will be pulled into a few places that either
+rely on features introduced here, or would otherwise conflict with the
+patches:
+
+a) Tegra's own for-3.14/powergate and for-4.14/dt branches, to avoid
+   conflicts.
+
+b) The DRM tree, which introduces new code that relies on the reset
+   controller framework introduced in this branch, and to avoid
+   conflicts.
 
 ----------------------------------------------------------------
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+The following changes since commit e9827d9be9777cf287dd1340e6e7a8526f9e0b70:
 
-  Linux 3.13-rc1
+  Merge tag 'clk-tegra-for-3.14' into for-3.14/dmas-resets-rework
 
 are available in the git repository at:
 
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux clk-tegra-for-3.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.14-dmas-resets-rework
 
-or:
+for you to fetch changes up to 8a0a1af30cbf56b41220a02e34835022c4d72f41:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git clk-tegra-for-3.14
-
-The branch is also included in the following repo, but was pulled before
-Peter set up a signed tag for it:
-
-  git://git.linaro.org/people/mturquette/linux.git for-next
-
-for you to fetch changes up to 62ce7cd62f534023224912dc9b909963f26a38da:
-
-  clk: tegra: fix __clk_lookup() return value checks
+  spi: tegra: checking for ERR_PTR instead of NULL
 
 ----------------------------------------------------------------
 
-Alexandre Courbot (1):
-      clk: tegra: add FUSE clock device
+Dan Carpenter (1):
+      spi: tegra: checking for ERR_PTR instead of NULL
 
-Andrew Chew (1):
-      clk: tegra: Set the clk parent of host1x to pll_p
+Stephen Warren (29):
+      ARM: tegra: add missing clock documentation to DT bindings
+      ARM: tegra: document reset properties in DT bindings
+      ARM: tegra: document use of standard DMA DT bindings
+      ARM: tegra: update DT files to add reset properties
+      ARM: tegra: update DT files to add DMA properties
+      ARM: tegra: select the reset framework
+      clk: tegra: implement a reset driver
+      pci: tegra: use reset framework
+      drm/tegra: use reset framework
+      ARM: tegra: pass reset to tegra_powergate_sequence_power_up()
+      dma: tegra: use reset framework
+      dma: tegra: register as an OF DMA controller
+      ASoC: tegra: use reset framework
+      ASoC: tegra: call pm_runtime APIs around register accesses
+      ASoC: tegra: allocate AHUB FIFO during probe() not startup()
+      ASoC: tegra: convert to standard DMA DT bindings
+      i2c: tegra: use reset framework
+      staging: nvec: use reset framework
+      spi: tegra: use reset framework
+      spi: tegra: convert to standard DMA DT bindings
+      serial: tegra: use reset framework
+      serial: tegra: convert to standard DMA DT bindings
+      Input: tegra-kbc - use reset framework
+      USB: EHCI: tegra: use reset framework
+      ARM: tegra: remove legacy clock entries from DT
+      ARM: tegra: remove legacy DMA entries from DT
+      clk: tegra: remove legacy reset APIs
+      clk: tegra: remove bogus PCIE_XCLK
+      ASoC: tegra: update module reset list for Tegra124
 
-Joseph Lo (2):
-      clk: tegra124: add wait_for_reset and disable_clock for tegra_cpu_car_ops
-      clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
-
-Mark Zhang (3):
-      clk: tegra: Correct sbc mux width & parent
-      clk: tegra: Fix vde/2d/3d clock src offset
-      clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2
-
-Mikko Perttunen (1):
-      clk: tegra114: Initialize clocks needed for HDMI
-
-Peter De Schrijver (27):
-      ARM: tegra114: add missing clocks to binding
-      clk: tegra: replace enum tegra114_clk by binding header
-      clk: tegra: add TEGRA_DIVIDER_ROUND_UP for periph clks
-      clk: tegra: PLLE spread spectrum control
-      ARM: tegra30: add missing CLK IDs
-      clk: tegra: simplify periph clock data
-      clk: tegra: common periph_clk_enb_refcnt and clks
-      clk: tegra: Add TEGRA_PERIPH_NO_DIV flag
-      clk: tegra: move some PLLC and PLLXC init to clk-pll.c
-      clk: tegra: use pll_ref as the pll_e parent
-      clk: tegra: move fields to tegra_clk_pll_params
-      clk: tegra: add header for common tegra clock IDs
-      clk: tegra: add common infra for DT clocks
-      clk: tegra: add clkdev registration infra
-      clk: tegra: move audio clk to common file
-      clk: tegra: move periph clocks to common file
-      clk: tegra: move PMC, fixed clocks to common files
-      clk: tegra: introduce common gen4 super clock
-      clk: tegra: move tegra30 to common infra
-      clk: tegra: move tegra20 to common infra
-      clk: tegra: Add support for PLLSS
-      clk: tegra: Add periph regs bank X
-      clk: tegra: add locking to periph clks
-      clk: tegra: add TEGRA_PERIPH_NO_GATE
-      clk: tegra124: Add common clk IDs to clk-id.h
-      clk: tegra124: Add new peripheral clocks
-      clk: tegra124: Add support for Tegra124 clocks
-
-Thierry Reding (6):
-      clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-      clk: tegra: Fix clock rate computation
-      clk: tegra: Initialize secondary gr3d clock on Tegra30
-      clk: tegra: Properly setup PWM clock on Tegra30
-      clk: tegra: Initialize DSI low-power clocks
-      clk: tegra: Do not print errors for clk_round_rate()
-
-Wei Yongjun (1):
-      clk: tegra: fix __clk_lookup() return value checks
-
- .../bindings/clock/nvidia,tegra124-car.txt      |   59 +
- drivers/clk/tegra/Makefile                      |    7 +-
- drivers/clk/tegra/clk-id.h                      |  235 +++
- drivers/clk/tegra/clk-periph-gate.c             |    8 +-
- drivers/clk/tegra/clk-periph.c                  |   32 +-
- drivers/clk/tegra/clk-pll.c                     |  407 ++++-
- drivers/clk/tegra/clk-tegra-audio.c             |  215 +++
- drivers/clk/tegra/clk-tegra-fixed.c             |  111 ++
- drivers/clk/tegra/clk-tegra-periph.c            |  674 +++++++
- drivers/clk/tegra/clk-tegra-pmc.c               |  132 ++
- drivers/clk/tegra/clk-tegra-super-gen4.c        |  149 ++
- drivers/clk/tegra/clk-tegra114.c                | 1687 ++++--------------
- drivers/clk/tegra/clk-tegra124.c                | 1424 +++++++++++++++
- drivers/clk/tegra/clk-tegra20.c                 |  818 ++++-----
- drivers/clk/tegra/clk-tegra30.c                 | 1506 +++++-----------
- drivers/clk/tegra/clk.c                         |  166 ++
- drivers/clk/tegra/clk.h                         |  115 +-
- include/dt-bindings/clock/tegra114-car.h        |    8 +-
- include/dt-bindings/clock/tegra124-car.h        |  341 ++++
- include/dt-bindings/clock/tegra30-car.h         |   10 +-
- 20 files changed, 5091 insertions(+), 3013 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
- create mode 100644 drivers/clk/tegra/clk-id.h
- create mode 100644 drivers/clk/tegra/clk-tegra-audio.c
- create mode 100644 drivers/clk/tegra/clk-tegra-fixed.c
- create mode 100644 drivers/clk/tegra/clk-tegra-periph.c
- create mode 100644 drivers/clk/tegra/clk-tegra-pmc.c
- create mode 100644 drivers/clk/tegra/clk-tegra-super-gen4.c
- create mode 100644 drivers/clk/tegra/clk-tegra124.c
- create mode 100644 include/dt-bindings/clock/tegra124-car.h
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt   |   1 +
+ .../bindings/clock/nvidia,tegra114-car.txt      |   4 +
+ .../bindings/clock/nvidia,tegra124-car.txt      |   4 +
+ .../bindings/clock/nvidia,tegra20-car.txt       |   4 +
+ .../bindings/clock/nvidia,tegra30-car.txt       |   4 +
+ .../devicetree/bindings/dma/tegra20-apbdma.txt  |  14 ++
+ .../bindings/gpu/nvidia,tegra20-host1x.txt      | 122 +++++++++++++
+ .../bindings/i2c/nvidia,tegra20-i2c.txt         |  27 ++-
+ .../bindings/input/nvidia,tegra20-kbc.txt       |   9 +
+ .../bindings/mmc/nvidia,tegra20-sdhci.txt       |   9 +
+ .../devicetree/bindings/nvec/nvidia,nvec.txt    |  12 ++
+ .../bindings/pci/nvidia,tegra20-pcie.txt        |  26 +--
+ .../bindings/pwm/nvidia,tegra20-pwm.txt         |   9 +
+ .../bindings/rtc/nvidia,tegra20-rtc.txt         |   3 +
+ .../bindings/serial/nvidia,tegra20-hsuart.txt   |  19 +-
+ .../sound/nvidia,tegra-audio-alc5632.txt        |   7 +-
+ .../sound/nvidia,tegra-audio-rt5640.txt         |   7 +-
+ .../sound/nvidia,tegra-audio-wm8753.txt         |   7 +-
+ .../sound/nvidia,tegra-audio-wm8903.txt         |   7 +-
+ .../sound/nvidia,tegra-audio-wm9712.txt         |   7 +-
+ .../bindings/sound/nvidia,tegra20-ac97.txt      |  20 ++-
+ .../bindings/sound/nvidia,tegra20-i2s.txt       |  19 +-
+ .../bindings/sound/nvidia,tegra30-ahub.txt      |  63 +++++--
+ .../bindings/sound/nvidia,tegra30-i2s.txt       |  11 +-
+ .../bindings/spi/nvidia,tegra114-spi.txt        |  24 ++-
+ .../bindings/spi/nvidia,tegra20-sflash.txt      |  20 ++-
+ .../bindings/spi/nvidia,tegra20-slink.txt       |  20 ++-
+ .../bindings/timer/nvidia,tegra20-timer.txt     |   3 +
+ .../bindings/timer/nvidia,tegra30-timer.txt     |   3 +
+ .../bindings/usb/nvidia,tegra20-ehci.txt        |   7 +-
+ arch/arm/boot/dts/tegra114.dtsi                 | 157 +++++++++++++----
+ arch/arm/boot/dts/tegra20-paz00.dts             |   2 +
+ arch/arm/boot/dts/tegra20.dtsi                  | 136 ++++++++++++--
+ arch/arm/boot/dts/tegra30.dtsi                  | 175 ++++++++++++++++---
+ arch/arm/mach-tegra/Kconfig                     |   2 +
+ arch/arm/mach-tegra/powergate.c                 |   8 +-
+ drivers/clk/tegra/clk-periph-gate.c             |  22 ---
+ drivers/clk/tegra/clk-periph.c                  |  40 -----
+ drivers/clk/tegra/clk-tegra114.c                |   3 +-
+ drivers/clk/tegra/clk-tegra124.c                |   2 +-
+ drivers/clk/tegra/clk-tegra20.c                 |   9 +-
+ drivers/clk/tegra/clk-tegra30.c                 |  10 +-
+ drivers/clk/tegra/clk.c                         |  50 +++++-
+ drivers/clk/tegra/clk.h                         |   3 +-
+ drivers/dma/tegra20-apb-dma.c                   |  52 +++++-
+ drivers/gpu/drm/tegra/Kconfig                   |   1 +
+ drivers/gpu/drm/tegra/dc.c                      |  10 +-
+ drivers/gpu/drm/tegra/drm.h                     |   3 +
+ drivers/gpu/drm/tegra/gr3d.c                    |  22 ++-
+ drivers/gpu/drm/tegra/hdmi.c                    |  15 +-
+ drivers/i2c/busses/i2c-tegra.c                  |  13 +-
+ drivers/input/keyboard/tegra-kbc.c              |  13 +-
+ drivers/pci/host/pci-tegra.c                    |  53 ++++--
+ drivers/spi/Kconfig                             |   3 +
+ drivers/spi/spi-tegra114.c                      |  66 ++++---
+ drivers/spi/spi-tegra20-sflash.c                |  18 +-
+ drivers/spi/spi-tegra20-slink.c                 |  66 ++++---
+ drivers/staging/nvec/nvec.c                     |  11 +-
+ drivers/staging/nvec/nvec.h                     |   5 +-
+ drivers/tty/serial/serial-tegra.c               |  38 ++--
+ drivers/usb/host/ehci-tegra.c                   |  14 +-
+ include/dt-bindings/clock/tegra20-car.h         |   2 +-
+ include/dt-bindings/clock/tegra30-car.h         |   2 +-
+ include/linux/clk/tegra.h                       |   7 -
+ include/linux/tegra-powergate.h                 |   7 +-
+ sound/soc/tegra/Kconfig                         |   2 +
+ sound/soc/tegra/tegra20_ac97.c                  |  11 --
+ sound/soc/tegra/tegra20_i2s.c                   |  20 +--
+ sound/soc/tegra/tegra30_ahub.c                  | 138 +++++++++------
+ sound/soc/tegra/tegra30_ahub.h                  |  11 +-
+ sound/soc/tegra/tegra30_i2s.c                   |  97 +++++-----
+ sound/soc/tegra/tegra30_i2s.h                   |   3 +
+ sound/soc/tegra/tegra_pcm.c                     |  17 +-
+ sound/soc/tegra/tegra_pcm.h                     |   5 +
+ 74 files changed, 1320 insertions(+), 516 deletions(-)
