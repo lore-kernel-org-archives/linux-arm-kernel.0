@@ -1,80 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Dec 2013 11:02:53 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/5] ARM: dts: sun4i: Add support for mmc
-In-Reply-To: <52ADBD41.4050104@redhat.com>
+Date: Mon, 16 Dec 2013 11:05:51 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <CAOMqctRspBPmNsyXye_gpfwGoZ=gMcCzEjM+hD3g+ZfQix7G6Q@mail.gmail.com>
 References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <1387058295-20641-3-git-send-email-hdegoede@redhat.com>
- <20131215135854.GF3651@lukather> <52ADBD41.4050104@redhat.com>
-Message-ID: <20131216100253.GC3037@lukather>
+ <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
+ <20131215134415.GE3651@lukather>
+ <CAOMqctRspBPmNsyXye_gpfwGoZ=gMcCzEjM+hD3g+ZfQix7G6Q@mail.gmail.com>
+Message-ID: <20131216100551.GD3037@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-Damn google-groups removed me from Cc :)
-
-On Sun, Dec 15, 2013 at 03:31:29PM +0100, Hans de Goede wrote:
-> >>@@ -376,6 +385,13 @@
-> >>  				allwinner,drive = <0>;
-> >>  				allwinner,pull = <0>;
-> >>  			};
-> >>+
-> >>+			sdc0_pins_a: sdc0 at 0 {
-> >>+				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
-> >>+				allwinner,function = "mmc0";
-> >>+				allwinner,drive = <3>;
-> >>+				allwinner,pull = <1>;
+On Sun, Dec 15, 2013 at 11:01:17PM +0100, Michal Suchanek wrote:
+> On 15 December 2013 14:44, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> >> --- a/drivers/mmc/host/Kconfig
+> >> +++ b/drivers/mmc/host/Kconfig
+> >> @@ -665,3 +665,11 @@ config MMC_REALTEK_PCI
+> >>       help
+> >>         Say Y here to include driver code to support SD/MMC card interface
+> >>         of Realtek PCI-E card reader
+> >> +
+> >> +config MMC_SUNXI
+> >> +     tristate "Allwinner sunxi SD/MMC Host Controller support"
+> >> +     depends on ARCH_SUNXI
+> >> +     default y
 > >
-> >Wow, you need both the pullups and a 40mA output?
+> > I'm not that fond of these "default y" patterns. It forces the driver
+> > down to every user of the multiplatform kernels. I'd suggest removing
+> > the default and adding the driver to the defconfigs we have.
 > 
-> Yes and no. The pullups are enabled by uboot and the allwinner
-> sources, most of my testing has been done without them, which
-> seems to work fine. I've enabled them to be consisten with the
-> allwinner sources and u-boot.
+> And why would you build support for sunxi without building support for
+> sunxi mmc?
 
-Henrik was suggesting that in most boards it's not required to set up
-the internal pullups. Maybe we can just disable them by default, and
-we will always be able to enable them at the board level if needed.
+Because you can?
 
-> As for drive = <3>, we need drive = <2> for normal modes,
-> and drive = <3> for ddr mode. I simply picked <3> to keep
-> things KISS. It should not matter much in power usage, as
-> it will only make the flanks of the signal more steep. Once the
-> desired output level is reached the current will drop off. It will
-> use more current when changing the level, but for half the time,
-> so the effective power usage (current * time) is the same.
+And where am I actually suggesting to do so?
 
-Ok, let's keep it to 40mA then. It will indeed be simpler :)
+> Like 90%+ sunxi devices actually have a SD slot or an eMMC or a SDIO
+> card connected so what's the point of supporting sunxi without sunxi
+> mmc?
 
-> >Ideally, I'd like this patch to be splitted into three:
-> >   - One that adds the MMC controller nodes to the DTSI
-> >   - One that adds the muxing options you need to the pinctrl node
-> >   - One that enables the controller on the boards
-> 
-> Sounds like a good job for David. Note I've a lot more boards for
-> which I would like to add mmc support or dts files in general
-> (will do so as time permits).
-> 
-> For those boards which already have a dts I'll send mmc adding dts
-> patches to David for now so he can add the changes to the patch-set.
-> 
-> How do you want to deal with new boards ? Send the addition of the
-> base board to you (and CC David as he will need them in his tree too),
-> and then send a patch to add mmc to the dts to David ?
-
-I don't really like having a variable-sweep patch serie. Just send
-your DT additions to me, saying that you depend on the MMC serie from
-David.
-
-I'm pretty happy with the DT bindings so far, so we can even merge
-these DT patches before the MMC driver has been merged
-
-> Or should I simply make it one big patch including mmc in the initial
-> commit ?
-
-I really prefer to have patches as small as possible (while being
-reasonable). It's much easier to merge and allows to have a cleaner
-history.
+And does your assumption still stand if you take into account all the
+other ARM boards?
 
 Maxime
 
@@ -88,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/e1472527/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/34d20ff6/attachment.sig>
