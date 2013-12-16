@@ -1,75 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 16 Dec 2013 12:40:37 -0800
-Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52AEF560.9010603@ti.com>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52AA65EA.20902@codeaurora.org> <52AEF560.9010603@ti.com>
-Message-ID: <20131216204037.GS21983@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 16 Dec 2013 21:38:01 +0100
+Subject: [PATCH 0/2] Add SMP support for the Allwinner A31 SoCs
+In-Reply-To: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20131216203801.GN3037@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16, ivan.khoronzhuk wrote:
-> On 12/13/2013 03:42 AM, Stephen Boyd wrote:
-> > On 12/11/13 10:00, Ivan Khoronzhuk wrote:
-> >> +
-> >> +static inline u32 keystone_timer_readl(unsigned long rg)
-> >> +{
-> >> +	return readl(timer.base + rg);
-> >> +}
-> >> +
-> >> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
-> >> +{
-> >> +	writel(val, timer.base + rg);
-> >> +}
-> > 
-> > It's probably better to use the relaxed variants here to avoid any
-> > memory barriers that aren't necessary.
-> >
+On Sun, Nov 03, 2013 at 10:30:11AM +0100, Maxime Ripard wrote:
+> Hi everyone,
 > 
-> Yes, but the code has places where I cannot use relaxed variants.
-> 
-> From timer user guide:
-> "Writes from the configuration bus to the timer registers are not allowed
-> when the timer is active, except for stopping or resetting the timers.
-> Registers that are protected by hardware include CNTLO, CNTHI, PRDLO,
-> PRDHI, TGCR (except the TIMLORS and TIMHIRS bits), and TCR (except the
-> ENAMODE bits)."
-> 
-> According to this I have to add keystone readl/write relaxed functions
-> and use mixed calls of writel/writel_relaxed functions.
-> 
-> For instance, for keystone_timer_config() which is used by
-> keystone_set_next_event(), I will do following:
-> -----
-> tcr = keystone_timer_readl_relaxed(TCR);
-> 
-> /* disable timer */
-> tcr &= ~(TCR_ENAMODE_MASK);
-> keystone_timer_writel_relaxed(tcr, TCR);
-> ...
-> /* reset counter to zero, set new period */
-> *** here I have to be sure the timer is disabled ***
-> keystone_timer_writel(0, TIM12);
-> keystone_timer_writel_relaxed(0, TIM34);
-> keystone_timer_writel_relaxed(period & 0xffffffff, PRD12);
-> keystone_timer_writel_relaxed(period >> 32, PRD34);
-> 
-> /* enable timer */
-> *** here I have to be sure that TIM and PRD registers are written ***
-> keystone_timer_writel(tcr, TCR);
-> ---
-> 
-> The same for keystone_timer_init().
-> 
-> Will it be better?
+> The Allwinner A31 is a quad-Cortex-A7 SoC. This patchset adds support
+> for the bringup of the others CPUs at startup.
 
-Why not just put the explicit memory barriers where you need them
-and always use the relaxed variants in the mmio wrappers? That
-way you're always sure the memory barriers are there and that
-they're properly documented.
+Applied respectively to sunxi/dt-for-3.14 and sunxi/core-for-3.14.
+
+Maxime
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/e0266e0a/attachment-0001.sig>
