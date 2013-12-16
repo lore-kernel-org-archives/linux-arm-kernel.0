@@ -1,51 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Dec 2013 14:17:29 +0100
-Subject: [PATCH v3 4/6] pinctrl: Add pinctrl binding for Broadcom Capri
- SoCs
-In-Reply-To: <52ABB150.1030702@broadcom.com>
-References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
- <1386787041-6035-1-git-send-email-syin@broadcom.com>
- <1386787041-6035-5-git-send-email-syin@broadcom.com>
- <CACRpkdY7s+eUFkg0AsaN5B9-1y_mTJ29Y-D9CkRG2GQ3JshP+w@mail.gmail.com>
- <52ABB150.1030702@broadcom.com>
-Message-ID: <CACRpkdZ5Cxii48CsVJzEaBhvZOs8JCcR_hJV=RczhHbW4aqG-w@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 16 Dec 2013 17:25:42 +0400
+Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
+In-Reply-To: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
+References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <52AEFF56.5010602@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 2:16 AM, Sherman Yin <syin@broadcom.com> wrote:
+Hello.
 
->>> +- bias-pull-up:                        Integer. Pull up strength in Ohm:
->>> +                                       1: 1.2 kOhm
->>> +                                       2: 1.8 kOhm
->>> +                                       3: 720 Ohm
->>> +                                       4: 2.7 kOhm
->>> +                                       5: 831 Ohm
->>> +                                       6: 1.08 kOhm
->>> +                                       7: 568 Ohm
->>
->>
->> Please do not use these custom enumerators 1 thru 7.
->> Instead say that the argument is given in ohms, so for
->> example:
->>
->> bias-pull-up = <12000>;
->>
->> Then translate this into the proper enumerator in your
->> driver instead.
->
-> Ok.  The 3 bits in this enumeration correspond to enabling the 3 pull up Rs
-> (1.2k, 1.8k, 2.7k) in parallel, so the enum kind of make sense. But sure I
-> can change it to actual ohms and will error out in the driver if specified
-> value is not one of the 7.
+On 16-12-2013 4:31, Simon Horman wrote:
 
-Aha, that's how they do it :-)
+> The koelsch board uses has an SH ethernet controller which uses a Micrel
+> phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
+> Micrel-specific phy driver rather than relying on the generic phy driver.
 
-Please write this in a comment in the driver because it makes
-it a lot easier to understand what is going on, and e.g. how to
-fuzz an apropriate resistance.
+    Frankly speaking, I'm seeing no advantages to doing that.
 
-Can you tell me something about how such resistors are produced
-in silicon?
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Yours,
-Linus Walleij
+    Analogous changes are needed for BOCK-W and Lager boards since they all 
+use the same KSZ8041RNLI PHY chip. I was going to submit such changes with the 
+PHY IRQ patches but since no IRQ is generated still, this got delayed...
+
+WBR, Sergei
