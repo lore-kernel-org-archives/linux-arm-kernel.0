@@ -1,67 +1,78 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Mon, 16 Dec 2013 20:51:33 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
- without PCI on ARM64
-In-Reply-To: <20131209180155.GG19163@arm.com>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312091735.05014.arnd@arndb.de> <20131209165548.GE19163@arm.com>
- <201312091820.23006.arnd@arndb.de> <20131209180155.GG19163@arm.com>
-Message-ID: <20131216205133.GI5617@xora-haswell.xora.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 16 Dec 2013 15:55:54 -0500
+Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <20131216204037.GS21983@codeaurora.org>
+References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <52AA65EA.20902@codeaurora.org> <52AEF560.9010603@ti.com>
+ <20131216204037.GS21983@codeaurora.org>
+Message-ID: <52AF68DA.9000104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 09, 2013 at 06:01:55PM +0000, Catalin Marinas wrote:
-> On Mon, Dec 09, 2013 at 05:20:22PM +0000, Arnd Bergmann wrote:
-> > On Monday 09 December 2013, Catalin Marinas wrote:
-> > > CONFIG_PCI does not exist on arm64 yet (we have some internal patches
-> > > but may not be ready to be posted before the holidays; they try to share
-> > > code with other archs, so more discussions before merging). We could add
-> > > CONFIG_PCI and some dummy functions on arm64 for development (not to be
-> > > upstreamed) or Hanjun could continue to use the current patch before we
-> > > get PCI working. In the order of priorities, we'll have to merge PCI
-> > > before ACPI anyway.
-> > 
-> > Well, lack of PCI support on ARM64 is a much better reason for accepting
-> > the patch than potential use on non-server platforms of course.
+On Monday 16 December 2013 03:40 PM, Stephen Boyd wrote:
+> On 12/16, ivan.khoronzhuk wrote:
+>> On 12/13/2013 03:42 AM, Stephen Boyd wrote:
+>>> On 12/11/13 10:00, Ivan Khoronzhuk wrote:
+>>>> +
+>>>> +static inline u32 keystone_timer_readl(unsigned long rg)
+>>>> +{
+>>>> +	return readl(timer.base + rg);
+>>>> +}
+>>>> +
+>>>> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
+>>>> +{
+>>>> +	writel(val, timer.base + rg);
+>>>> +}
+>>>
+>>> It's probably better to use the relaxed variants here to avoid any
+>>> memory barriers that aren't necessary.
+>>>
+>>
+>> Yes, but the code has places where I cannot use relaxed variants.
+>>
+>> From timer user guide:
+>> "Writes from the configuration bus to the timer registers are not allowed
+>> when the timer is active, except for stopping or resetting the timers.
+>> Registers that are protected by hardware include CNTLO, CNTHI, PRDLO,
+>> PRDHI, TGCR (except the TIMLORS and TIMHIRS bits), and TCR (except the
+>> ENAMODE bits)."
+>>
+>> According to this I have to add keystone readl/write relaxed functions
+>> and use mixed calls of writel/writel_relaxed functions.
+>>
+>> For instance, for keystone_timer_config() which is used by
+>> keystone_set_next_event(), I will do following:
+>> -----
+>> tcr = keystone_timer_readl_relaxed(TCR);
+>>
+>> /* disable timer */
+>> tcr &= ~(TCR_ENAMODE_MASK);
+>> keystone_timer_writel_relaxed(tcr, TCR);
+>> ...
+>> /* reset counter to zero, set new period */
+>> *** here I have to be sure the timer is disabled ***
+>> keystone_timer_writel(0, TIM12);
+>> keystone_timer_writel_relaxed(0, TIM34);
+>> keystone_timer_writel_relaxed(period & 0xffffffff, PRD12);
+>> keystone_timer_writel_relaxed(period >> 32, PRD34);
+>>
+>> /* enable timer */
+>> *** here I have to be sure that TIM and PRD registers are written ***
+>> keystone_timer_writel(tcr, TCR);
+>> ---
+>>
+>> The same for keystone_timer_init().
+>>
+>> Will it be better?
 > 
-> As I said above about priorities, we are not in a hurry to merge ACPI
-> for arm64 before PCI is supported.
+> Why not just put the explicit memory barriers where you need them
+> and always use the relaxed variants in the mmio wrappers? That
+> way you're always sure the memory barriers are there and that
+> they're properly documented.
 > 
-> > What is the status of the PCI work though? I suspect it won't be all
-> > that hard to add minimal PCI support for a simple mmconfig plus
-> > fixed I/O space based host of the kind that qemu can easily provide.
-> 
-> Liviu (ARM engineer) has been working on generalising the microblaze
-> code (which is very similar to powerpc) and enable it on arm64. The
-> patches will be posted soon (though may slip into the new year) but
-> there will be many discussions on how to do this best, so I don't expect
-> a quick merge.
-> 
-> In parallel, Will is looking at getting PCI to work with kvmtool and
-> that's something we could merge sooner (but again, in the new year).
-> 
-> > The hard part that we want to share code with other architectures is
-> > supporting pluggable host controllers, and I think we can defer that
-> > a bit.
-> 
-> Indeed, this would take time.
-> 
-Hi Catalin,
+I agree with Stephen.
 
-So the real question now is how do we progress with these ACPI patches? After
-repeated incorrect accusations of developing behind closed doors I am loath
-to dissapear back into linaro with them for another few months.
-
-Also as Mark Brown has already pointed out the bigger the patchset gets
-while developed in Linaro trees the more strain it is going to put on
-maintainers for review.
-
-We have worked to try and keep the patchset as self contained as possible
-and to affect arch/arm64 in a minimal way. It should not affect it at all
-in the !CONFIG_ACPI case.
-
-Currently Hanjun is busy preparing a v2 PATCH series which contains amendments
-for all the technical issues found in review so far. Should we continue with
-this process until all the neccessary Acks are in place?
-
-Graeme
+Regards,
+Santosh
