@@ -1,163 +1,45 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 16 Dec 2013 22:05:01 +0100
-Subject: [PATCHv3,
- RESEND] rtc: Add support for Intersil ISL12057 I2C RTC chip
-References: <637f26e051b700ca510a0af695dfd84cf2bfd35d.1387222475.git.arno@natisbad.org>
- <20131216201424.GA6639@roeck-us.net>
-Message-ID: <87r49cpkw2.fsf@natisbad.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 16 Dec 2013 22:06:30 +0100
+Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
+In-Reply-To: <52AF68DB.7090105@elopez.com.ar>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-3-git-send-email-dinguyen@altera.com>
+ <201312142233.27143.arnd@arndb.de> <52AD1185.6090501@linaro.org>
+ <20131215045116.23538.4@quantum> <52AF68DB.7090105@elopez.com.ar>
+Message-ID: <52AF6B56.1020209@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi,
 
-Thanks for the fast feedback! I have handled all your comments and
-tested the resulting version on my RN102 w/o problems. Will send a
-v4 in a few minutes.
-
-Can you just look at first comment below?
-
-Guenter Roeck <linux@roeck-us.net> writes:
-
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->> This is a resend - just in case the initial mail slept through - as I
->> got no feedback over the past week. I have also Cc'ed additional
->> people.
->> 
-> Looks like your mailer corrupts the patch. You'll have to fix that.
-
-If you wonder about the text below the SoB, this is just informational,
-i.e. to avoid having it in the final commit. Can you be more specific
-if this is not what you meant, i.e. how the patch is otherwise
-corrupted?
-
-
->> +#define ISL12057_REG_RTC_HR_PM  (1<<5) /* AM/PM bit in 12h format */
->> +#define ISL12057_REG_RTC_HR_MIL (1<<6) /* 24h/12h format */
+On 12/16/2013 09:55 PM, Emilio L?pez wrote:
+> Hi Mike et al,
 >
-> Use BIT() or at least spaces around '<<'.
-
-Will use BIT().
-
-
->> +static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
->> +{
->> +	tm->tm_sec  = bcd2bin(regs[ISL12057_REG_RTC_SC]);
->> +	tm->tm_min  = bcd2bin(regs[ISL12057_REG_RTC_MN]);
+> El 15/12/13 01:51, Mike Turquette escribi?:
+>> clk_set_phase has been proposed before and now may be the time to add
+>> it. There are two things that need to be addressed:
+>>
+>> 1) what are the values for the phase? This needs to work for others that
+>> must set clk phase, so we need to consider all those requirements before
+>> making a new function declaration in clk.h
+>>
+>> 2) is setting a clock's phase something done dynamically? Put another
+>> way, does the same clock has it's phase set multiple times while the
+>> system is running? For static configuration that only happens during
+>> initialization we do not need a new API. The clock driver can handle it
+>> privately. For dynamic operations though we likely need a new API.
 >
-> Extra spaces.
-
-ok.
-
->> +static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
->> +{
->> +	struct i2c_client *client = to_i2c_client(dev);
->> +	struct isl12057_rtc_data *data = i2c_get_clientdata(client);
->> +	u8 regs[ISL12057_RTC_SEC_LEN];
->> +	int ret;
->> +
->> +	mutex_lock(&data->lock);
->> +	ret = regmap_bulk_read(data->regmap, ISL12057_REG_RTC_SC, regs,
->> +			       ISL12057_RTC_SEC_LEN);
->> +	mutex_unlock(&data->lock);
->> +
->> +	if (ret) {
->> +		dev_err(&client->dev, "%s: RTC read failed\n", __func__);
+> We on sunxi also need this for our (not yet merged) MMC driver; we currently have it implemented as an exported
 >
-> 'dev' and '&client->dev' should be the same, so why not just use
-> 'dev' ?
+> void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
 >
-> Reason for asking is that this is the major use of 'client'. To get 'data',
-> you could use 'dev_set_drvdata' and 'dev_get_drvdata'. Then you could replace
-> 	struct i2c_client *client = to_i2c_client(dev);
-> 	struct isl12057_rtc_data *data = i2c_get_clientdata(client);
-> with
-> 	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
-> everywhere.
+> that takes the MMC clock (and only the MMC clock) and does the setup (it's basically configuring two values, "sample" and "output", into the clock register). I really don't know what does this do/why is it required/when is it used; I'm cc'ing Hans and David who can hopefully explain that part.
 
-Feasible. And It also helps removing a field in my private structure.
+I'm afraid I cannot explain that part, the MMC controller in the sunxi SoCs
+is undocumented, so what we're doing there comes straight from the android
+kernel code. I do understand most of the bits of the sunxi-mci driver, but
+this bit is black magic to me.
 
+Regards,
 
->> +static int isl12057_probe(struct i2c_client *client,
->> +			  const struct i2c_device_id *id)
->> +{
->> +	struct device *dev = &client->dev;
->> +	struct isl12057_rtc_data *data;
->> +	struct rtc_device *rtc;
->> +	struct regmap *regmap;
->> +	int ret = 0;
->
-> Unless I am missing something, this initialization is unnecessary.
-
-You are right.
-
-
->> +	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C |
->> +				     I2C_FUNC_SMBUS_BYTE_DATA |
->> +				     I2C_FUNC_SMBUS_I2C_BLOCK))
->> +		return -ENODEV;
->> +
->> +	regmap = devm_regmap_init_i2c(client, &isl12057_rtc_regmap_config);
->> +	if (IS_ERR(regmap)) {
->> +		ret = PTR_ERR(regmap);
->> +		dev_err(&client->dev, "regmap allocation failed: %d\n", ret);
->
-> Since you assigned dev = &client->dev above, might as well use it.
-
-Will do.
-
-
->> +		return ret;
->> +	}
->> +
->> +	ret = isl12057_i2c_validate_client(regmap);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = isl12057_check_rtc_status(dev, regmap);
->> +	if (ret)
->> +		return ret;
->> +
->> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> +	if (!data)
->> +		return -ENOMEM;
->> +
->> +	mutex_init(&data->lock);
->> +	data->client = client;
->
-> data->client does not appear to be used anywhere.
-
-Removed.
-
-
->> +	data->regmap = regmap;
->> +	i2c_set_clientdata(client, data);
->> +
->> +	rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops, THIS_MODULE);
->> +	if (IS_ERR(rtc))
->> +		return PTR_ERR(rtc);
->> +	data->rtc = rtc;
->
-> data->rtc does not seem to be used anywhere.
-
-Correct.
-
-
->
->> +
->> +	return 0;
->> +}
->> +
->> +#ifdef CONFIG_OF
->> +static struct of_device_id isl12057_dt_match[] = {
->> +	{ .compatible = "isl,isl12057" },
->> +	{ },
->> +};
->> +#endif
->> +
-> Is this needed ? For i2c devices, struct i2c_device_id should be
-> sufficient.
-
-Kept that one as per Mark's comment.
-
-a+
+Hans
