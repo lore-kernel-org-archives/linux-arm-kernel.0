@@ -1,9 +1,7 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 16 Dec 2013 11:01:45 -0800
-Subject: [PATCHv2 2/2] arm64: Correct virt_addr_valid
-In-Reply-To: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
-References: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1387220505-9799-2-git-send-email-lauraa@codeaurora.org>
+Date: Mon, 16 Dec 2013 11:01:44 -0800
+Subject: [PATCHv2 1/2] arm: Correct virt_addr_valid
+Message-ID: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,29 +12,29 @@ virtual address range. There's no guarantee that just because a
 virtual address falls bewteen PAGE_OFFSET and high_memory the
 associated physical memory has a valid backing struct page. Follow
 the example of other architectures and convert to pfn_valid to
-verify that the virtual address is actually valid.
+verify that the virtual address is actually valid. The check for
+an address between PAGE_OFFSET and high_memory is still necessary
+as vmalloc/highmem addresses are not valid with virt_to_page.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/include/asm/memory.h |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/memory.h |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 3776217..b8ec776 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -146,8 +146,9 @@ static inline void *phys_to_virt(phys_addr_t x)
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 9ecccc8..6211df0 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -350,7 +350,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
  
  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
--#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
--				 ((void *)(kaddr) < (void *)high_memory))
+-#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
 +#define virt_addr_valid(kaddr)	(pfn_valid(__pa(kaddr) >> PAGE_SHIFT) && \
 +	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory))
-+
  
  #endif
  
