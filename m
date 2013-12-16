@@ -1,23 +1,38 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Mon, 16 Dec 2013 17:23:47 +0100
-Subject: [PATCH 10/10] Kconfig: cleanup SERIO_I8042 dependencies
-In-Reply-To: <1387040376-26906-11-git-send-email-msalter@redhat.com>
-References: <1387040376-26906-1-git-send-email-msalter@redhat.com>
- <1387040376-26906-11-git-send-email-msalter@redhat.com>
-Message-ID: <20131216162346.GA19285@linux-mips.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 16 Dec 2013 16:28:15 +0000
+Subject: [PATCH V2] arm: mm: fix dcache flush logic for compound high pages
+In-Reply-To: <20131216155403.GC20193@mudshark.cambridge.arm.com>
+References: <1387206223-1670-1-git-send-email-steve.capper@linaro.org>
+ <20131216155403.GC20193@mudshark.cambridge.arm.com>
+Message-ID: <20131216162814.GA3605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 11:59:36AM -0500, Mark Salter wrote:
+On Mon, Dec 16, 2013 at 03:54:04PM +0000, Will Deacon wrote:
+> On Mon, Dec 16, 2013 at 03:03:43PM +0000, Steve Capper wrote:
+> > When given a compound high page, __flush_dcache_page will only flush
+> > the first page of the compound page repeatedly rather than the entire
+> > set of constituent pages.
+> > 
+> > This patch corrects the logic such that all constituent pages are now
+> > flushed.
+> 
+> Since this probably wants to go to -stable, it's worth mentioning the commit
+> which introduced it in the commit text.
+> 
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > ---
+> > V2: style change use page + i rather than separate struct *cpage
+> > ---
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Cheers Steve.
+> 
+> Will
 
-> -	depends on !PARISC && (!ARM || FOOTBRIDGE_HOST) && \
-> -		   (!SUPERH || SH_CAYMAN) && !M68K && !BLACKFIN && !S390 && \
-> -		   !ARC
-> +	depends on ARCH_MIGHT_HAVE_PC_SERIO
+Ta Will,
+That's in Russell's system as: 7923/1
 
-Most dependencies on an architecture's kconfig symbol outside arch/
-should probably be treated as a bug.
-
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
-
-  Ralf
+-- 
+Steve
