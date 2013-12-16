@@ -1,38 +1,52 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon, 16 Dec 2013 15:47:30 +0400
-Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
-In-Reply-To: <52AECEB2.4070807@gmail.com>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1386901645-28895-4-git-send-email-ynvich@gmail.com>
- <201312142006.26979.arnd@arndb.de>
- <1387049660.7152.317.camel@host5.omatika.ru> <52AECEB2.4070807@gmail.com>
-Message-ID: <1387194450.13062.134.camel@host5.omatika.ru>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Dec 2013 11:49:54 +0000
+Subject: [PATCH 06/10] arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
+In-Reply-To: <1386878149-13397-7-git-send-email-christoffer.dall@linaro.org>
+References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+ <1386878149-13397-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <52AEE8E2.1090500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-16 at 10:58 +0100, Daniel Mack wrote:
-> On 12/14/2013 08:34 PM, Sergei Ianovich wrote:
-> > On Sat, 2013-12-14 at 20:06 +0100, Arnd Bergmann wrote:
+On 12/12/13 19:55, Christoffer Dall wrote:
+> The arch-generic KVM code expects the cpu field of a vcpu to be -1 if
+> the vcpu is no longer assigned to a cpu.  This is used for the optimized
+> make_all_cpus_request path and will be used by the vgic code to check
+> that no vcpus are running.
 > 
-> >> The patch looks ok in case we are merging your patches for 3.14
-> >> and Daniel's patches later than that. If they end up in the
-> >> same merge window however, we'd have to be care to resolve
-> >> the obvious conflict in a proper way.
-> > 
-> > The most recently published Daniel's patch (Aug 2013) wraps
-> > IORESOURCE_DMA handling on DT presence in a similar way,
-> 
-> Erm, no it doesn't. My patch uses dma_request_slave_channel_compat() in
-> DT case, and that works fine with the current version of pdma, and
-> there's no need to read the "dmas" properties directly.
-> 
-> If you want to provide a way to simply denote the dma channel numbers,
-> without looking at the actual phandle, then yes, we could merge this
-> patch first, but it would be effectively reverted a proper implementation.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Daniel is right. His patch doesn't need to read "dmas" directly. So my
-patch won't need to change drivers/mmc/host/pxamci.c at all, if it is
-applied after Daniel's one.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-What are we going to do in this context?
+	M.
+
+> ---
+> Changelog[v4]:
+>  - New in series
+> 
+>  arch/arm/kvm/arm.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index f290b22..b92ff6d3 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -342,6 +342,13 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  {
+> +	/*
+> +	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
+> +	 * if the vcpu is no longer assigned to a cpu.  This is used for the
+> +	 * optimized make_all_cpus_request path.
+> +	 */
+> +	vcpu->cpu = -1;
+> +
+>  	kvm_arm_set_running_vcpu(NULL);
+>  }
+>  
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
