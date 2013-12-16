@@ -1,23 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Dec 2013 14:23:37 +0100
-Subject: [PATCH 2/2] pinctrl: at91: replace clk_prepare + clk_enable by
- clk_prepare_enable
-In-Reply-To: <1387132252-2584-3-git-send-email-b.brezillon@overkiz.com>
-References: <1387132252-2584-1-git-send-email-b.brezillon@overkiz.com>
- <1387132252-2584-3-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <CACRpkdbzPqWFsr1bCfgd9YpmyJ-04W8Yu5R_T-M6vOczT0y57Q@mail.gmail.com>
+Date: Mon, 16 Dec 2013 14:17:29 +0100
+Subject: [PATCH v3 4/6] pinctrl: Add pinctrl binding for Broadcom Capri
+ SoCs
+In-Reply-To: <52ABB150.1030702@broadcom.com>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-5-git-send-email-syin@broadcom.com>
+ <CACRpkdY7s+eUFkg0AsaN5B9-1y_mTJ29Y-D9CkRG2GQ3JshP+w@mail.gmail.com>
+ <52ABB150.1030702@broadcom.com>
+Message-ID: <CACRpkdZ5Cxii48CsVJzEaBhvZOs8JCcR_hJV=RczhHbW4aqG-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 15, 2013 at 7:30 PM, Boris BREZILLON
-<b.brezillon@overkiz.com> wrote:
+On Sat, Dec 14, 2013 at 2:16 AM, Sherman Yin <syin@broadcom.com> wrote:
 
-> Replace the clk_prepare and clk_enable calls by a single
-> clk_prepare_enable call.
+>>> +- bias-pull-up:                        Integer. Pull up strength in Ohm:
+>>> +                                       1: 1.2 kOhm
+>>> +                                       2: 1.8 kOhm
+>>> +                                       3: 720 Ohm
+>>> +                                       4: 2.7 kOhm
+>>> +                                       5: 831 Ohm
+>>> +                                       6: 1.08 kOhm
+>>> +                                       7: 568 Ohm
+>>
+>>
+>> Please do not use these custom enumerators 1 thru 7.
+>> Instead say that the argument is given in ohms, so for
+>> example:
+>>
+>> bias-pull-up = <12000>;
+>>
+>> Then translate this into the proper enumerator in your
+>> driver instead.
 >
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Ok.  The 3 bits in this enumeration correspond to enabling the 3 pull up Rs
+> (1.2k, 1.8k, 2.7k) in parallel, so the enum kind of make sense. But sure I
+> can change it to actual ohms and will error out in the driver if specified
+> value is not one of the 7.
 
-Patch applied with Nicolas' ACK.
+Aha, that's how they do it :-)
+
+Please write this in a comment in the driver because it makes
+it a lot easier to understand what is going on, and e.g. how to
+fuzz an apropriate resistance.
+
+Can you tell me something about how such resistors are produced
+in silicon?
 
 Yours,
 Linus Walleij
