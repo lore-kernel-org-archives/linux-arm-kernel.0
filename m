@@ -1,47 +1,405 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 16 Dec 2013 15:22:35 +0000
-Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <52AF11FE.70000@linaro.org>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <52AF11FE.70000@linaro.org>
-Message-ID: <20131216152235.GI3185@sirena.org.uk>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Mon, 16 Dec 2013 09:25:54 -0600
+Subject: [PATCH v3 3/3] ARM: dts: bcm281xx: define real clocks
+Message-ID: <52AF1B82.10806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 10:45:18PM +0800, Alex Shi wrote:
-> On 12/11/2013 09:13 PM, Mark Brown wrote:
+Replace the "fake" clocks defined in the "bcm11351.dtsi" device tree
+file with real definitions backed by the new BCM281xx clock driver.
 
-> > +struct cputopo_arm {
-> > +	int thread_id;
-> > +	int core_id;
-> > +	int socket_id;
+Signed-off-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+---
+v3: - update "bsc[1-3]" definitions, which are queued for v3.14
+v2: - got rid of the "not_selected" clock definition
 
-> Forgive me if I am stupid. :)
+ arch/arm/boot/dts/bcm11351.dtsi |  248
+++++++++++++++++++++++++++-------------
+ 1 file changed, 168 insertions(+), 80 deletions(-)
 
-> why we don't need a cluster_id? and does one cpu socket include few
-> clusters?
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi
+b/arch/arm/boot/dts/bcm11351.dtsi
+index 4bfd7e3..e1f8c0a 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -14,6 +14,8 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
 
-The ARMv7 code calls a cluster a socket I think because it's trying to
-maintain similarity with other architectures and the ARMv8 code follows
-ARMv7 in this regard.  At the minute we're using this ID for whatever
-the lowest level of grouping is above a core and presenting the
-scheduler with a flat topology there - the topology binding and MPIDR
-both allow multiple layers of cluster so you could definitely have
-multiple clusters in a supercluster.
++#include "dt-bindings/clock/bcm281xx.h"
++
+ #include "skeleton.dtsi"
 
-Without practical examples of such systems or more architecture
-documentation than I've been able to find it's not clear how to
-represent them to the scheduler, it will depend on how closely
-associated the clusters are and what the scheduler's features are,
-perhaps we should describe such a system as NUMA but it's not clear to
-me that this would produce the desired results.  I wonder if we may end
-up figuring this out from other data such as descriptions of caches and
-interconnects rather than purely from the topology information.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/b1c8dde4/attachment.sig>
+ / {
+@@ -43,7 +45,7 @@
+ 		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
+ 		status = "disabled";
+ 		reg = <0x3e000000 0x1000>;
+-		clocks = <&uartb_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_UARTB>;
+ 		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <4>;
+@@ -53,7 +55,7 @@
+ 		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
+ 		status = "disabled";
+ 		reg = <0x3e001000 0x1000>;
+-		clocks = <&uartb2_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_UARTB2>;
+ 		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <4>;
+@@ -63,7 +65,7 @@
+ 		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
+ 		status = "disabled";
+ 		reg = <0x3e002000 0x1000>;
+-		clocks = <&uartb3_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_UARTB3>;
+ 		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <4>;
+@@ -73,7 +75,7 @@
+ 		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
+ 		status = "disabled";
+ 		reg = <0x3e003000 0x1000>;
+-		clocks = <&uartb4_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_UARTB4>;
+ 		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <4>;
+@@ -95,7 +97,7 @@
+ 		compatible = "brcm,kona-timer";
+ 		reg = <0x35006000 0x1000>;
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&hub_timer_clk>;
++		clocks = <&aon_ccu BCM281XX_AON_CCU_HUB_TIMER>;
+ 	};
+
+ 	gpio: gpio at 35003000 {
+@@ -118,7 +120,7 @@
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f180000 0x10000>;
+ 		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&sdio1_clk>;
++		clocks = <&master_ccu BCM281XX_MASTER_CCU_SDIO1>;
+ 		status = "disabled";
+ 	};
+
+@@ -126,7 +128,7 @@
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f190000 0x10000>;
+ 		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&sdio2_clk>;
++		clocks = <&master_ccu BCM281XX_MASTER_CCU_SDIO2>;
+ 		status = "disabled";
+ 	};
+
+@@ -134,7 +136,7 @@
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1a0000 0x10000>;
+ 		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&sdio3_clk>;
++		clocks = <&master_ccu BCM281XX_MASTER_CCU_SDIO3>;
+ 		status = "disabled";
+ 	};
+
+@@ -142,7 +144,7 @@
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1b0000 0x10000>;
+ 		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&sdio4_clk>;
++		clocks = <&master_ccu BCM281XX_MASTER_CCU_SDIO4>;
+ 		status = "disabled";
+ 	};
+
+@@ -152,7 +154,7 @@
+ 		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&bsc1_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_BSC1>;
+ 		status = "disabled";
+ 	};
+
+@@ -162,7 +164,7 @@
+ 		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&bsc2_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_BSC2>;
+ 		status = "disabled";
+ 	};
+
+@@ -172,7 +174,7 @@
+ 		interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&bsc3_clk>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_BSC3>;
+ 		status = "disabled";
+ 	};
+
+@@ -182,99 +184,125 @@
+ 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&pmu_bsc_clk>;
++		clocks = <&aon_ccu BCM281XX_AON_CCU_PMU_BSC>;
+ 		status = "disabled";
+ 	};
+
+ 	clocks {
+-		bsc1_clk: bsc1 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		root_ccu: root_ccu {
++			compatible = "brcm,bcm11351-root-ccu";
++			reg = <0x35001000 0x0f00>;
++			#clock-cells = <1>;
++			clock-output-names = "frac_1m";
++		};
++
++		hub_ccu: hub_ccu {
++			compatible = "brcm,bcm11351-hub-ccu";
++			reg = <0x34000000 0x0f00>;
++			#clock-cells = <1>;
++			clock-output-names = "tmon_1m";
++		};
++
++		aon_ccu: aon_ccu {
++			compatible = "brcm,bcm11351-aon-ccu";
++			reg = <0x35002000 0x0f00>;
++			#clock-cells = <1>;
++			clock-output-names = "hub_timer",
++					     "pmu_bsc",
++					     "pmu_bsc_var";
++		};
++
++		master_ccu: master_ccu {
++			compatible = "brcm,bcm11351-master-ccu";
++			reg = <0x3f001000 0x0f00>;
++			#clock-cells = <1>;
++			clock-output-names = "sdio1",
++					     "sdio2",
++					     "sdio3",
++					     "sdio4",
++					     "usb_ic",
++					     "hsic2_48m",
++					     "hsic2_12m";
++		};
++
++		slave_ccu: slave_ccu {
++			compatible = "brcm,bcm11351-slave-ccu";
++			reg = <0x3e011000 0x0f00>;
++			#clock-cells = <1>;
++			clock-output-names = "uartb",
++					     "uartb2",
++					     "uartb3",
++					     "uartb4",
++					     "ssp0",
++					     "ssp2",
++					     "bsc1",
++					     "bsc2",
++					     "bsc3",
++					     "pwm";
++		};
++
++		ref_1m_clk: ref_1m {
+ 			#clock-cells = <0>;
+-		};
+-
+-		bsc2_clk: bsc2 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		bsc3_clk: bsc3 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		pmu_bsc_clk: pmu_bsc {
+-			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		hub_timer_clk: hub_timer {
+-			compatible = "fixed-clock";
+-			clock-frequency = <32768>;
+-			#clock-cells = <0>;
+-		};
+-
+-		pwm_clk: pwm {
+-			compatible = "fixed-clock";
+-			clock-frequency = <26000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		sdio1_clk: sdio1 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <48000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		sdio2_clk: sdio2 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <48000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		sdio3_clk: sdio3 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <48000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		sdio4_clk: sdio4 {
+-			compatible = "fixed-clock";
+-			clock-frequency = <48000000>;
+-			#clock-cells = <0>;
+-		};
+-
+-		tmon_1m_clk: tmon_1m {
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <1000000>;
++		};
++
++		ref_32k_clk: ref_32k {
+ 			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
+ 		};
+
+-		uartb_clk: uartb {
++		bbl_32k_clk: bbl_32k {
++			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
++			clock-frequency = <32768>;
++		};
++
++		ref_13m_clk: ref_13m {
+ 			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
+ 		};
+
+-		uartb2_clk: uartb2 {
++		var_13m_clk: var_13m {
++			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <13000000>;
++		};
++
++		dft_19_5m_clk: dft_19_5m {
+ 			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <19500000>;
+ 		};
+
+-		uartb3_clk: uartb3 {
++		ref_crystal_clk: ref_crystal {
++			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
++			clock-frequency = <26000000>;
++		};
++
++		ref_cx40_clk: ref_cx40 {
+ 			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <40000000>;
+ 		};
+
+-		uartb4_clk: uartb4 {
++		ref_52m_clk: ref_52m {
++			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+-			clock-frequency = <13000000>;
++			clock-frequency = <52000000>;
++		};
++
++		var_52m_clk: var_52m {
+ 			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <52000000>;
+ 		};
+
+ 		usb_otg_ahb_clk: usb_otg_ahb {
+@@ -282,5 +310,65 @@
+ 			clock-frequency = <52000000>;
+ 			#clock-cells = <0>;
+ 		};
++
++		ref_96m_clk: ref_96m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <96000000>;
++		};
++
++		var_96m_clk: var_96m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <96000000>;
++		};
++
++		ref_104m_clk: ref_104m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <104000000>;
++		};
++
++		var_104m_clk: var_104m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <104000000>;
++		};
++
++		ref_156m_clk: ref_156m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <156000000>;
++		};
++
++		var_156m_clk: var_156m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <156000000>;
++		};
++
++		ref_208m_clk: ref_208m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <208000000>;
++		};
++
++		var_208m_clk: var_208m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <208000000>;
++		};
++
++		ref_312m_clk: ref_312m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <312000000>;
++		};
++
++		var_312m_clk: var_312m {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <312000000>;
++		};
+ 	};
+ };
+-- 
+1.7.9.5
