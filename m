@@ -1,51 +1,47 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 16 Dec 2013 15:12:32 +0000
+Date: Mon, 16 Dec 2013 15:22:35 +0000
 Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20131216144638.GE8931@e102568-lin.cambridge.arm.com>
+In-Reply-To: <52AF11FE.70000@linaro.org>
 References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
  <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <20131216105734.GA8931@e102568-lin.cambridge.arm.com>
- <20131216122948.GF3185@sirena.org.uk>
- <20131216144638.GE8931@e102568-lin.cambridge.arm.com>
-Message-ID: <20131216151232.GH3185@sirena.org.uk>
+ <52AF11FE.70000@linaro.org>
+Message-ID: <20131216152235.GI3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 02:46:38PM +0000, Lorenzo Pieralisi wrote:
-> On Mon, Dec 16, 2013 at 12:29:48PM +0000, Mark Brown wrote:
+On Mon, Dec 16, 2013 at 10:45:18PM +0800, Alex Shi wrote:
+> On 12/11/2013 09:13 PM, Mark Brown wrote:
 
-> > Well, we need to consider the possibility of ACPI or whatever as well.
+> > +struct cputopo_arm {
+> > +	int thread_id;
+> > +	int core_id;
+> > +	int socket_id;
 
-> That's a fair point, I will have a look at v2.
+> Forgive me if I am stupid. :)
 
-Probably best to wait until the v4 or whatever that I'm going to post
-shortly (need to do a few more checks locally before I post).  I'll CC
-you.
+> why we don't need a cluster_id? and does one cpu socket include few
+> clusters?
 
-[MPIDR parsing]
-> > Again, this is gone from the current version.  Like I said to Catalin it
-> > does feel like this is making more work for systems that have done the
-> > right thing with their MPIDRs which doesn't seem ideal (and note that
-> > all the DTs that you guys are publishing for your models lack any
-> > topology information at present).
+The ARMv7 code calls a cluster a socket I think because it's trying to
+maintain similarity with other architectures and the ARMv8 code follows
+ARMv7 in this regard.  At the minute we're using this ID for whatever
+the lowest level of grouping is above a core and presenting the
+scheduler with a flat topology there - the topology binding and MPIDR
+both allow multiple layers of cluster so you could definitely have
+multiple clusters in a supercluster.
 
-> This is an age-old question and the problem has always been that the
-> "right thing" is recommended, not enforced. I do not want to turn this into
-> bikeshedding, as long as cpu-map node takes priority if present, fine by me.
-
-I already dropped that code, though I could resurrect it (perhaps as a
-separate patch).  The way the code was written was as you describe as a
-last resort - MPIDR would only be considered if the explict topology
-binding was not present, it was done as a last step before reporting if
-no other topology information was discovered.
-
-Actually now I think about it if we're not going to parse the MPIDR we
-should probably update the bindings to say that the topology binding is
-mandatory for any v8 system with more than one core.
+Without practical examples of such systems or more architecture
+documentation than I've been able to find it's not clear how to
+represent them to the scheduler, it will depend on how closely
+associated the clusters are and what the scheduler's features are,
+perhaps we should describe such a system as NUMA but it's not clear to
+me that this would produce the desired results.  I wonder if we may end
+up figuring this out from other data such as descriptions of caches and
+interconnects rather than purely from the topology information.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/9a8ff959/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/b1c8dde4/attachment.sig>
