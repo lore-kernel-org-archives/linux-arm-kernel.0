@@ -1,21 +1,37 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Dec 2013 15:56:13 -0800
-Subject: [PATCHv5] rtc: Add support for Intersil ISL12057 I2C RTC chip
-In-Reply-To: <bb04b9b4d76e735526ccc8e72df27a3ca894b4ca.1387235949.git.arno@natisbad.org>
-References: <bb04b9b4d76e735526ccc8e72df27a3ca894b4ca.1387235949.git.arno@natisbad.org>
-Message-ID: <20131216235613.GA12307@roeck-us.net>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 16 Dec 2013 16:59:33 -0700
+Subject: [PATCH V1 03/11] ARM: dts: imx6qdl-sabrelite: remove usdhc4
+ wp-gpio
+In-Reply-To: <201312162054.36699.marex@denx.de>
+References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
+ <20131214134656.GC16177@S2101-09.ap.freescale.net>
+ <52AF57A6.5090203@boundarydevices.com> <201312162054.36699.marex@denx.de>
+Message-ID: <52AF93E5.40501@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 12:39:22AM +0100, Arnaud Ebalard wrote:
-> 
-> Intersil ISL12057 I2C RTC chip also supports two alarms. This patch
-> only adds support for basic RTC functionalities (i.e. getting and
-> setting time). Tests have been performed on NETGEAR ReadyNAS 102 w/
-> startup/shutdown scripts, hwclock, ntpdate and openntpd.
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+On 12/16/2013 12:54 PM, Marek Vasut wrote:
+> On Monday, December 16, 2013 at 08:42:30 PM, Troy Kisky wrote:
+>> On 12/14/2013 6:46 AM, Shawn Guo wrote:
+>>> On Thu, Dec 12, 2013 at 06:49:07PM -0700, Troy Kisky wrote:
+>>>> On Sabre Lite usdhc4 is a micro sd slot, which has no
+>>>> write protect.
+>>>>
+>>>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>>> Applied #1, #2 and #3, thanks.
+>>>
+>>> Shawn
+>> Thanks for the rebase on Marek's PCIe patch. However, PCIe is a common
+>> feature
+>> and should be moved to imx6qdl-sabrelite.dtsi.
+>>
+>> Should I send a patch to do this, or will you fix it up, or will Marek?
+> I will gladly let such a privilege slip, I am overloaded like hell :(
+>
+> Best regards,
+> Marek Vasut
+>
+I have loads of time:-) and will send a new series which includes it.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-
-Guenter
+Thanks
+Troy
