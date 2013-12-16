@@ -1,7 +1,9 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 16 Dec 2013 20:11:37 +0100
+Date: Mon, 16 Dec 2013 20:12:03 +0100
 Subject: [PATCH 2/2] ARM: device trees for Energy Micro's EFM32 Cortex-M3 SoCs
-Message-ID: <1387221097-6752-1-git-send-email-u.kleine-koenig@pengutronix.de>
+In-Reply-To: <20131216190953.GB14866@pengutronix.de>
+References: <20131216190953.GB14866@pengutronix.de>
+Message-ID: <1387221123-6794-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
