@@ -1,45 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Dec 2013 10:57:11 +0100
-Subject: [PATCH 2/2] pinctrl: at91: replace clk_prepare + clk_enable by
- clk_prepare_enable
-In-Reply-To: <1387132252-2584-3-git-send-email-b.brezillon@overkiz.com>
-References: <1387132252-2584-1-git-send-email-b.brezillon@overkiz.com>
- <1387132252-2584-3-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52AECE77.9000601@atmel.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 16 Dec 2013 10:58:10 +0100
+Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
+In-Reply-To: <1387049660.7152.317.camel@host5.omatika.ru>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>	
+ <1386901645-28895-1-git-send-email-ynvich@gmail.com>	
+ <1386901645-28895-4-git-send-email-ynvich@gmail.com>	
+ <201312142006.26979.arnd@arndb.de>
+ <1387049660.7152.317.camel@host5.omatika.ru>
+Message-ID: <52AECEB2.4070807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/2013 19:30, Boris BREZILLON :
-> Replace the clk_prepare and clk_enable calls by a single
-> clk_prepare_enable call.
+On 12/14/2013 08:34 PM, Sergei Ianovich wrote:
+> On Sat, 2013-12-14 at 20:06 +0100, Arnd Bergmann wrote:
+
+>> The patch looks ok in case we are merging your patches for 3.14
+>> and Daniel's patches later than that. If they end up in the
+>> same merge window however, we'd have to be care to resolve
+>> the obvious conflict in a proper way.
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> The most recently published Daniel's patch (Aug 2013) wraps
+> IORESOURCE_DMA handling on DT presence in a similar way,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Erm, no it doesn't. My patch uses dma_request_slave_channel_compat() in
+DT case, and that works fine with the current version of pdma, and
+there's no need to read the "dmas" properties directly.
 
-> ---
->  drivers/pinctrl/pinctrl-at91.c |    6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 82f6301..4deb9cb 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1359,10 +1359,8 @@ void at91_pinctrl_gpio_resume(void)
->  
->  		pio = gpio_chips[i]->regbase;
->  
-> -		if (!wakeups[i]) {
-> -			if (clk_prepare(gpio_chips[i]->clock) == 0)
-> -				clk_enable(gpio_chips[i]->clock);
-> -		}
-> +		if (!wakeups[i])
-> +			clk_prepare_enable(gpio_chips[i]->clock);
->  
->  		__raw_writel(wakeups[i], pio + PIO_IDR);
->  		__raw_writel(backups[i], pio + PIO_IER);
-> 
+If you want to provide a way to simply denote the dma channel numbers,
+without looking at the actual phandle, then yes, we could merge this
+patch first, but it would be effectively reverted a proper implementation.
 
 
--- 
-Nicolas Ferre
+Daniel
