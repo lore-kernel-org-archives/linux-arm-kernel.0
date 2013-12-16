@@ -1,37 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Dec 2013 09:28:22 -0800
-Subject: [PATCH v5] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <3bfd63dd-6bf1-4ae9-aaab-b913f9739c19@DB8EHSMHS015.ehs.local>
-References: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
- <b625092b-682c-4072-85a6-9f9d7f378ec0@VA3EHSMHS043.ehs.local>
- <20131002231751.4343.81234@quantum> <52AC8857.8070504@roeck-us.net>
- <3bfd63dd-6bf1-4ae9-aaab-b913f9739c19@DB8EHSMHS015.ehs.local>
-Message-ID: <20131216172822.GB1811@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Dec 2013 17:29:17 +0000
+Subject: [PATCH 5/5] arm64: Add LOAD_OFFSET symbol for linker scripts
+In-Reply-To: <1386980430.1002.96.camel@smoke>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <92660d1b81279aa6784a33eff2f102e78d883931.1386879684.git.geoff@infradead.org>
+ <20131213164517.GM19177@mudshark.cambridge.arm.com>
+ <1386980430.1002.96.camel@smoke>
+Message-ID: <20131216172917.GJ20193@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 09:03:02AM -0800, S?ren Brinkmann wrote:
-> Hi Guenther, Mike,
-> 
-> On Sat, Dec 14, 2013 at 08:33:27AM -0800, Guenter Roeck wrote:
-> > On 10/02/2013 04:17 PM, Mike Turquette wrote:
-> > >Quoting S?ren Brinkmann (2013-10-02 10:20:38)
-> > >>Hi Mike,
-> > >>
-> > >>could you please comment on this/apply it to clk-next?
-> > >
-> > >It looks good and is in the queue. Will show up in clk-next in a few
-> > >days.
-> > >
-> > Hi Mike,
+On Sat, Dec 14, 2013 at 12:20:30AM +0000, Geoff Levand wrote:
+> On Fri, 2013-12-13 at 16:45 +0000, Will Deacon wrote:
+> > On Thu, Dec 12, 2013 at 08:39:46PM +0000, Geoff Levand wrote:
+> > > Add a definition for the LOAD_OFFSET symbol used in the linker
+> > > scripts.  LOAD_OFFSET is used to generate the load address of
+> > > the section.
+> > > 
+> > > Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
 > > 
-> > trying again ... what happened with this driver ? Any reason for not pushing it after all ?
+> > This isn't a standard SoB line. Please choose an email address and lose the
+> > non-standard suffix.
 > 
-> I've been waiting for it to appear in clk-next for a while too. I just
-> fetched the repo and it's there.
-> Thanks Guenter for following up and Mike for applying.
+> It took me a little while to find it, but here are the comments
+> regarding sign-off tags from the 2004 discussion:
 > 
-Great!
+>   https://lkml.org/lkml/2004/5/25/108
+> 
+> I put on the extra tag for the benefit of those who generate patch
+> submission statistics.
 
-Thanks,
-Guenter
+Hmm, there still doesn't appear to be a *single* occurrence of this in the
+git log, even nearly a decade later. I'm also not very interested in patch
+submission statistics, so I'd rather we stick with the status-quo.
+
+> > > ---
+> > >  arch/arm64/include/asm/memory.h | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> > > index 3776217..1994c56 100644
+> > > --- a/arch/arm64/include/asm/memory.h
+> > > +++ b/arch/arm64/include/asm/memory.h
+> > > @@ -52,6 +52,8 @@
+> > >  #define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
+> > >  #define TASK_SIZE_64		(UL(1) << VA_BITS)
+> > >  
+> > > +#define LOAD_OFFSET		(PAGE_OFFSET)
+> > 
+> > Can you be more specific about why we need this please? We don't seem to use
+> > this on ARM, and I can't really think of a sensible value to define it as,
+> > either. PAGE_OFFSET is a virtual address, which doesn't make much sense to
+> > me, but perhaps I'm missing something.
+> 
+> As I mentioned before, LOAD_OFFSET defaults to zero if it is not defined by the
+> arch, so our arm64 vmlinux files currently have their paddr's equal to their
+> vaddr's, so something like 0xffffffc000080000.
+> 
+> kexec-tools uses the paddr from the elf file in its generic elf file loader.
+> Those kexec-tools routines do some sanity checks on the elf headers and one of
+> those checks is if the paddr seems sane.  A paddr of 0xffffffc000080000 fails
+> the test, and rightfully so I think.
+> 
+> I could make a special arm64 hack in kexec-tools to handle this, but I think
+> the proper thing to do is to get some sane paddr values in our vmlinux files.
+
+But how? There isn't an architected physical address map, so it's impossible
+to pick a correct physical address base at link time.
+
+> I agree that PAGE_OFFSET isn't quite right, since zero is not really where the
+> kernel is located, but it is a handy base, as the proper location is an offset
+> from there.  My plan is to have the arm64 vmlinux loader routines in kexec-tools
+> either take a load offset from the kexec command line, or dig out the value from
+> the device tree.  I'm still working on that part and am not sure what will work.
+
+Using PAGE_OFFSET is worse than `isn't quite right'. In fact, it's only
+right in exactly one case: where physical memory begins at 0x0!
+
+> I haven't looked into it yet, but we shouldn't have this problem with the boot
+> wrapper files, as we know where the kernel is located at from the device tree.
+> 
+> Sorry for such a long explanation.  Does it make sense?  Any suggestions would
+> be appreciated.
+
+I think kexec-tools needs to drop the expectation that the kernel is linked
+to run at a particular physical address, since this isn't the case.
+
+Will
