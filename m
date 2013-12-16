@@ -1,53 +1,56 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 16 Dec 2013 12:38:48 +0000
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sizes
-In-Reply-To: <1387197528-1177-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1387197528-1177-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1387197528-1177-2-git-send-email-ben.dooks@codethink.co.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 16 Dec 2013 13:42:37 +0100
+Subject: [PATCH v3] ARM: sunxi: fix sun5i-a13 port F multiplexing
+Message-ID: <1387197757-6017-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The r8a7790.dtsi file has four sdhi nodes which the first two have the wrong
-resource size for their register block. This causes the sh_modbile_sdhi driver
-to fail to communicate with card at-all.
+The correct value for selecting the mmc0 function on port F pins is 2 not 4,
+as per the data-sheet:
+http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
 
-Change sdhi{0,1} node size from 0x100 to 0x200 to correct these nodes
-as per Kuninori Morimoto's response to the original patch where all four
-nodes where changed. sdhi{2,3} are the correct size.
-
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Linux SH <linux-sh@vger.kernel.org>
-Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Tested-by: William Towle <william.towle@codethink.co.uk>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/pinctrl-sunxi-pins.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 68b7b87..c600103 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -254,7 +254,7 @@
- 
- 	sdhi0: sd at ee100000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee100000 0 0x100>;
-+		reg = <0 0xee100000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
- 		cap-sd-highspeed;
-@@ -263,7 +263,7 @@
- 
- 	sdhi1: sd at ee120000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee120000 0 0x100>;
-+		reg = <0 0xee120000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
- 		cap-sd-highspeed;
+diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
+index 2c7446a..7c1b05e 100644
+--- a/drivers/pinctrl/pinctrl-sunxi-pins.h
++++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
+@@ -1932,27 +1932,27 @@ static const struct sunxi_desc_pin sun5i_a13_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PF0,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x4, "mmc0")),		/* D1 */
++		  SUNXI_FUNCTION(0x2, "mmc0")),		/* D1 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PF1,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x4, "mmc0")),		/* D0 */
++		  SUNXI_FUNCTION(0x2, "mmc0")),		/* D0 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PF2,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x4, "mmc0")),		/* CLK */
++		  SUNXI_FUNCTION(0x2, "mmc0")),		/* CLK */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PF3,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x4, "mmc0")),		/* CMD */
++		  SUNXI_FUNCTION(0x2, "mmc0")),		/* CMD */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PF4,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x4, "mmc0")),		/* D3 */
++		  SUNXI_FUNCTION(0x2, "mmc0")),		/* D3 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PF5,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x4, "mmc0")),		/* D2 */
++		  SUNXI_FUNCTION(0x2, "mmc0")),		/* D2 */
+ 	/* Hole */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PG0,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
-1.8.5.1
+1.8.4.2
