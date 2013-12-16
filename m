@@ -1,24 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Dec 2013 18:48:58 +0000
-Subject: Spurious timeouts in mvmdio
-In-Reply-To: <52AF4160.9080703@freebox.fr>
-References: <529CA42A.3040504@freebox.fr>
- <20131203122346.GD29282@titan.lakedaemon.net>
- <20131203124033.GT16735@n2100.arm.linux.org.uk>
- <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
- <529E5F03.8040607@gmail.com>
- <8d65780eb7bfe49bb0734a09f05f70a6@doppler.thel33t.co.uk>
- <529E66A4.4050000@gmail.com>
- <ae69666fd3b61411d7bbd9ac993cec13@doppler.thel33t.co.uk>
- <20131203234209.GW16735@n2100.arm.linux.org.uk> <52AF4160.9080703@freebox.fr>
-Message-ID: <20131216184858.GR4360@n2100.arm.linux.org.uk>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 16 Dec 2013 11:01:45 -0800
+Subject: [PATCHv2 2/2] arm64: Correct virt_addr_valid
+In-Reply-To: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
+References: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1387220505-9799-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 07:07:28PM +0100, Nicolas Schichan wrote:
-> I did not find any commit for this in 3.13-rc4.
->
-> Would you prefer I submit my attempt at refactoring the  
-> orion_mdio_wait_ready() code ?
+The definition of virt_addr_valid is that virt_addr_valid should
+return true if and only if virt_to_page returns a valid pointer.
+The current definition of virt_addr_valid only checks against the
+virtual address range. There's no guarantee that just because a
+virtual address falls bewteen PAGE_OFFSET and high_memory the
+associated physical memory has a valid backing struct page. Follow
+the example of other architectures and convert to pfn_valid to
+verify that the virtual address is actually valid.
 
-It's up to Jason.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm64/include/asm/memory.h |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 3776217..b8ec776 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -146,8 +146,9 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
+ 
+ #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+-#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
+-				 ((void *)(kaddr) < (void *)high_memory))
++#define virt_addr_valid(kaddr)	(pfn_valid(__pa(kaddr) >> PAGE_SHIFT) && \
++	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory))
++
+ 
+ #endif
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
