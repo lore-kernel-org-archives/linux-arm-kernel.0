@@ -1,260 +1,101 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Mon, 16 Dec 2013 16:14:10 -0500
-Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling when
- cpufreq is changed
-In-Reply-To: <1387228450-641-1-git-send-email-b20788@freescale.com>
-References: <1387228450-641-1-git-send-email-b20788@freescale.com>
-Message-ID: <1387228450-641-2-git-send-email-b20788@freescale.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Mon, 16 Dec 2013 18:18:04 +0900
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52AEB4FD.4070707@linaro.org>
+References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
+ <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
+ <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
+ <52AE8A0E.2050005@linaro.org>
+ <003901cefa30$93c3cce0$bb4b66a0$%jun@samsung.com>
+ <52AEB4FD.4070707@linaro.org>
+Message-ID: <004c01cefa3f$b9afe880$2d0fb980$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on i.MX6Q, cpu freq change need to follow below flows:
+On Mon, December 16, 2013, Zhangfei Gao wrote:
+> On 12/16/2013 03:29 PM, Seungwon Jeon wrote:
+> > On Mon, December 16, 2013, Zhangfei Gao wrote:
+> >> Dear Seungwon
+> >>
+> >> On 12/16/2013 11:50 AM, Seungwon Jeon wrote:
+> >>> On Sat, December 14, 2013, Zhangfei Gao wrote:
+> >>
+> >>>> +	/* SoC portion */
+> >>>> +	dwmmc_0: dwmmc0 at fcd03000 {
+> >>>> +		compatible = "hisilicon,hi4511-dw-mshc";
+> >>>> +		reg = <0xfcd03000 0x1000>;
+> >>>> +		interrupts = <0 16 4>;
+> >>>> +		#address-cells = <1>;
+> >>>> +		#size-cells = <0>;
+> >>>> +		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
+> >>>> +		clock-names = "ciu", "biu";
+> >>>> +		clock-freq-table =
+> >>>> +		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
+> >>> I think it could be solved with mmc->f_min and mmc->f_max(from clock-freq-min-max property)
+> >>> if there is no limitation per each speed mode. As seeing described table, it looks that.
+> >>
+> >> Have tried them before, but unfortunately, they are different.
+> >>
+> >> The controller can not generate clock itself, while depending on the
+> >> outside clock generator, which may require to change clock source in
+> >> differnt mode.
+> >>
+> >> The value we want is set the capacibility of the clock input and the max
+> >> clock freq where mmc works stable in that mode, which may be different
+> >> in different mode.
+> >>
+> >> clock-freq-min-max will set the value for set_ios.
+> >> For example, we use 25M as clock capability when init, which can not be
+> >> set as freq-min, and used as set_ios, where 400K should be used,
+> >> otherwise init definitely fail.
+> > Can you check 'f_init' within 'drivers/mmc/core/core.c' file?
+> > If you set 'f_min = 25000000' for init-sequence, mmc_set_ios() will pass that rate through
+> 'ios.clock'
+> > Then, dw_mmc-k3 can do clk_set_rate() with 25MHz at dw_mci_k3_set_ios().
+> 
+> This means controller directly use 25M init emmc and sd card, it will fail.
+> We still need 400K init freq, while the input clock source is 25M,
+> divided by the controller.
+> 
+> > And other required speeds for each mode seem not specific compared with standard spec.
+> > Also clk_set_rate() would be possible with 'ios.clock' instead of specific table.
+> > I just referred your example's clock-freq-table above.
+> There also some controller limitation currently.
+> In some mode, the controller only works well in the limited freq.
+> For example UHS_SDR104_MAX_DTR 208000000 can not be used, only half may
+> be reached, at least currently
+Ok. I see your condition. I misunderstood a little bit.
+I wonder whether limitation is only max frequency(SDR104 or HS200) except for init-freq.
+How about other mode? Working is fine with normal clock rate(from clock-freq-table)?
 
-1. each setpoint has different VDDARM, VDDSOC/PU voltage, get the setpoint
-table from dts;
-2. when cpu freq is scaling up, need to increase VDDSOC/PU voltage before
-VDDARM, if VDDPU is off, no need to change it;
-3. when cpu freq is scaling down, need to decrease VDDARM voltage before
-VDDSOC/PU, if VDDPU is off, no need to change it;
+Thanks,
+Seungwon Jeon
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- drivers/cpufreq/imx6q-cpufreq.c |  161 ++++++++++++++++++++++++++++++---------
- 1 file changed, 126 insertions(+), 35 deletions(-)
-
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 4b3f18e..5fb302e 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -17,10 +17,6 @@
- #include <linux/platform_device.h>
- #include <linux/regulator/consumer.h>
- 
--#define PU_SOC_VOLTAGE_NORMAL	1250000
--#define PU_SOC_VOLTAGE_HIGH	1275000
--#define FREQ_1P2_GHZ		1200000000
--
- static struct regulator *arm_reg;
- static struct regulator *pu_reg;
- static struct regulator *soc_reg;
-@@ -35,6 +31,14 @@ static struct device *cpu_dev;
- static struct cpufreq_frequency_table *freq_table;
- static unsigned int transition_latency;
- 
-+struct soc_opp {
-+	u32 arm_freq;
-+	u32 soc_volt;
-+};
-+
-+static struct soc_opp *imx6_soc_opp;
-+static u32 soc_opp_count;
-+
- static unsigned int imx6q_get_speed(unsigned int cpu)
- {
- 	return clk_get_rate(arm_clk) / 1000;
-@@ -45,6 +49,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 	struct dev_pm_opp *opp;
- 	unsigned long freq_hz, volt, volt_old;
- 	unsigned int old_freq, new_freq;
-+	unsigned int soc_opp_index = 0;
- 	int ret;
- 
- 	new_freq = freq_table[index].frequency;
-@@ -63,29 +68,48 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 	rcu_read_unlock();
- 	volt_old = regulator_get_voltage(arm_reg);
- 
--	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
-+	/* Find the matching VDDSOC/VDDPU operating voltage */
-+	while (soc_opp_index < soc_opp_count) {
-+		if (new_freq == imx6_soc_opp[soc_opp_index].arm_freq)
-+			break;
-+		soc_opp_index++;
-+	}
-+	if (soc_opp_index >= soc_opp_count) {
-+		dev_err(cpu_dev,
-+			"Can NOT find matching imx6_soc_opp voltage!\n");
-+			return -EINVAL;
-+	}
-+
-+	dev_dbg(cpu_dev, "%u MHz, arm %ld mV, soc-pu %d mV --> %u MHz, arm %ld mV, soc-pu %d mV\n",
- 		old_freq / 1000, volt_old / 1000,
--		new_freq / 1000, volt / 1000);
-+		imx6_soc_opp[soc_opp_index].soc_volt / 1000,
-+		new_freq / 1000, volt / 1000,
-+		imx6_soc_opp[soc_opp_index].soc_volt / 1000);
- 
- 	/* scaling up?  scale voltage before frequency */
- 	if (new_freq > old_freq) {
-+		if (regulator_is_enabled(pu_reg)) {
-+			ret = regulator_set_voltage_tol(pu_reg,
-+				imx6_soc_opp[soc_opp_index].soc_volt, 0);
-+			if (ret) {
-+				dev_err(cpu_dev,
-+					"failed to scale vddpu up: %d\n", ret);
-+				return ret;
-+			}
-+		}
-+		ret = regulator_set_voltage_tol(soc_reg,
-+				imx6_soc_opp[soc_opp_index].soc_volt, 0);
-+		if (ret) {
-+			dev_err(cpu_dev,
-+				"failed to scale vddsoc up: %d\n", ret);
-+			return ret;
-+		}
- 		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
- 		if (ret) {
- 			dev_err(cpu_dev,
- 				"failed to scale vddarm up: %d\n", ret);
- 			return ret;
- 		}
--
--		/*
--		 * Need to increase vddpu and vddsoc for safety
--		 * if we are about to run at 1.2 GHz.
--		 */
--		if (new_freq == FREQ_1P2_GHZ / 1000) {
--			regulator_set_voltage_tol(pu_reg,
--					PU_SOC_VOLTAGE_HIGH, 0);
--			regulator_set_voltage_tol(soc_reg,
--					PU_SOC_VOLTAGE_HIGH, 0);
--		}
- 	}
- 
- 	/*
-@@ -120,12 +144,22 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 				 "failed to scale vddarm down: %d\n", ret);
- 			ret = 0;
- 		}
--
--		if (old_freq == FREQ_1P2_GHZ / 1000) {
--			regulator_set_voltage_tol(pu_reg,
--					PU_SOC_VOLTAGE_NORMAL, 0);
--			regulator_set_voltage_tol(soc_reg,
--					PU_SOC_VOLTAGE_NORMAL, 0);
-+		ret = regulator_set_voltage_tol(soc_reg,
-+				imx6_soc_opp[soc_opp_index].soc_volt, 0);
-+		if (ret) {
-+			dev_warn(cpu_dev,
-+				"failed to scale vddsoc down: %d\n", ret);
-+			ret = 0;
-+		}
-+		if (regulator_is_enabled(pu_reg)) {
-+			ret = regulator_set_voltage_tol(pu_reg,
-+				imx6_soc_opp[soc_opp_index].soc_volt, 0);
-+			if (ret) {
-+				dev_warn(cpu_dev,
-+					"failed to scale vddpu down: %d\n",
-+					ret);
-+				ret = 0;
-+			}
- 		}
- 	}
- 
-@@ -153,6 +187,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 	struct dev_pm_opp *opp;
- 	unsigned long min_volt, max_volt;
- 	int num, ret;
-+	const struct property *prop;
-+	const __be32 *val;
-+	u32 nr, i;
- 
- 	cpu_dev = get_cpu_device(0);
- 	if (!cpu_dev) {
-@@ -201,9 +238,75 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		goto put_node;
- 	}
- 
-+	prop = of_find_property(np, "fsl,soc-operating-points", NULL);
-+	if (!prop) {
-+		dev_err(cpu_dev,
-+			"fsl,soc-operating-points node not found!\n");
-+		goto free_freq_table;
-+	}
-+	if (!prop->value) {
-+		dev_err(cpu_dev,
-+			"No entries in fsl-soc-operating-points node!\n");
-+		goto free_freq_table;
-+	}
-+
-+	/*
-+	 * Each OPP is a set of tuples consisting of frequency and
-+	 * voltage like <freq-kHz vol-uV>.
-+	 */
-+	nr = prop->length / sizeof(u32);
-+	if (nr % 2) {
-+		dev_err(cpu_dev, "Invalid fsl-soc-operating-points list!\n");
-+		goto free_freq_table;
-+	}
-+
-+	/* Get the VDDSOC/VDDPU voltages that need to track the CPU voltages. */
-+	imx6_soc_opp = devm_kzalloc(cpu_dev,
-+		sizeof(struct soc_opp) * (nr / 2), GFP_KERNEL);
-+
-+	if (imx6_soc_opp == NULL) {
-+		dev_err(cpu_dev, "No Memory for VDDSOC/PU table!\n");
-+		goto free_freq_table;
-+	}
-+
-+	rcu_read_lock();
-+	val = prop->value;
-+
-+	min_volt = max_volt = 0;
-+	for (i = 0; i < nr / 2; i++) {
-+		unsigned long freq = be32_to_cpup(val++);
-+		unsigned long volt = be32_to_cpup(val++);
-+
-+		if (i == 0)
-+			min_volt = max_volt = volt;
-+		if (volt < min_volt)
-+			min_volt = volt;
-+		if (volt > max_volt)
-+			max_volt = volt;
-+		opp = dev_pm_opp_find_freq_exact(cpu_dev, freq * 1000, true);
-+		imx6_soc_opp[i].arm_freq = freq;
-+		imx6_soc_opp[i].soc_volt = volt;
-+		soc_opp_count++;
-+	}
-+	rcu_read_unlock();
-+
- 	if (of_property_read_u32(np, "clock-latency", &transition_latency))
- 		transition_latency = CPUFREQ_ETERNAL;
- 
-+	if (min_volt * max_volt != 0) {
-+		/*
-+		 * Calculate the ramp time for max voltage change in the
-+		 * VDDSOC and VDDPU regulators.
-+		 */
-+		ret = regulator_set_voltage_time(soc_reg, min_volt, max_volt);
-+		if (ret > 0)
-+			transition_latency += ret * 1000;
-+
-+		ret = regulator_set_voltage_time(pu_reg, min_volt, max_volt);
-+		if (ret > 0)
-+			transition_latency += ret * 1000;
-+	}
-+
- 	/*
- 	 * OPP is maintained in order of increasing frequency, and
- 	 * freq_table initialised from OPP is therefore sorted in the
-@@ -221,18 +324,6 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 	if (ret > 0)
- 		transition_latency += ret * 1000;
- 
--	/* Count vddpu and vddsoc latency in for 1.2 GHz support */
--	if (freq_table[num].frequency == FREQ_1P2_GHZ / 1000) {
--		ret = regulator_set_voltage_time(pu_reg, PU_SOC_VOLTAGE_NORMAL,
--						 PU_SOC_VOLTAGE_HIGH);
--		if (ret > 0)
--			transition_latency += ret * 1000;
--		ret = regulator_set_voltage_time(soc_reg, PU_SOC_VOLTAGE_NORMAL,
--						 PU_SOC_VOLTAGE_HIGH);
--		if (ret > 0)
--			transition_latency += ret * 1000;
--	}
--
- 	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
- 	if (ret) {
- 		dev_err(cpu_dev, "failed register driver: %d\n", ret);
--- 
-1.7.9.5
+> 
+> >
+> >>
+> >>>> +static int dw_mci_k3_suspend(struct device *dev)
+> >>>> +{
+> >>>> +	struct dw_mci *host = dev_get_drvdata(dev);
+> >>>> +
+> >>>> +	if (!IS_ERR(host->ciu_clk))
+> >>>> +		clk_disable_unprepare(host->ciu_clk);
+> >>>> +
+> >>>> +	return dw_mci_suspend(host);
+> >>> If k3 needs clk_disable here, dw_mci_suspend()is expected to be called prior to
+> >> clk_disable_unprepare()?
+> >>> Of course, it's ok at present though.
+> >>>
+> >>
+> >> Sure, it can be switched, though dw_mci_suspend does nothing related
+> >> with clock now.
+> > Yes, but if some works with ciu_clk is added in dw_mci_suspend(), it will affect.
+> >
+> Sorry for the misunderstood, I mean it make sense and will change.
+> Thanks the advice.
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
