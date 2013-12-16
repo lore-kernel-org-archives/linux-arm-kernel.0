@@ -1,34 +1,25 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 16 Dec 2013 10:58:10 +0100
-Subject: [PATCH v2 03/16] ARM: dts: provide DMA config to pxamci
-In-Reply-To: <1387049660.7152.317.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>	
- <1386901645-28895-1-git-send-email-ynvich@gmail.com>	
- <1386901645-28895-4-git-send-email-ynvich@gmail.com>	
- <201312142006.26979.arnd@arndb.de>
- <1387049660.7152.317.camel@host5.omatika.ru>
-Message-ID: <52AECEB2.4070807@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 16 Dec 2013 11:00:54 +0100
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+In-Reply-To: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
+References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
+Message-ID: <52AECF56.8020508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2013 08:34 PM, Sergei Ianovich wrote:
-> On Sat, 2013-12-14 at 20:06 +0100, Arnd Bergmann wrote:
-
->> The patch looks ok in case we are merging your patches for 3.14
->> and Daniel's patches later than that. If they end up in the
->> same merge window however, we'd have to be care to resolve
->> the obvious conflict in a proper way.
+On 16/12/2013 00:47, Stephen Rothwell :
+> Hi Simon,
 > 
-> The most recently published Daniel's patch (Aug 2013) wraps
-> IORESOURCE_DMA handling on DT presence in a similar way,
+> Today's linux-next merge of the renesas tree got a conflict in
+> drivers/clk/Makefile between commit 0ad6125b1579 ("clk: at91: add PMC
+> base support") from the arm-soc tree and commit 10cdfe9f327a ("clk:
+> shmobile: Add R-Car Gen2 clocks support") from the renesas tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-Erm, no it doesn't. My patch uses dma_request_slave_channel_compat() in
-DT case, and that works fine with the current version of pdma, and
-there's no need to read the "dmas" properties directly.
+Fine for me.
 
-If you want to provide a way to simply denote the dma channel numbers,
-without looking at the actual phandle, then yes, we could merge this
-patch first, but it would be effectively reverted a proper implementation.
-
-
-Daniel
+Thanks. Bye,
+-- 
+Nicolas Ferre
