@@ -1,84 +1,82 @@
-From: av.tikhomirov@samsung.com (Anton Tikhomirov)
-Date: Mon, 16 Dec 2013 11:47:12 +0900
-Subject: [PATCH 7/7] usb: dwc3: exynos: add pm_runtime support
-In-Reply-To: <20131213201831.GJ5292@saruman.home>
-References: <1386884325-11440-1-git-send-email-balbi@ti.com>
- <1386884325-11440-8-git-send-email-balbi@ti.com>
- <000301cef7c0$640c1ce0$2c2456a0$%tikhomirov@samsung.com>
- <20131213195618.GG5292@saruman.home> <20131213201831.GJ5292@saruman.home>
-Message-ID: <00a701cefa09$1f26f6e0$5d74e4a0$%tikhomirov@samsung.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Sun, 15 Dec 2013 21:24:40 -0600
+Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
+ timing through clock framework
+In-Reply-To: <52AD320A.4030502@linaro.org>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-2-git-send-email-dinguyen@altera.com>
+ <52AD0E7A.50208@linaro.org> <52AD1F17.5040708@gmail.com>
+ <52AD320A.4030502@linaro.org>
+Message-ID: <52AE7278.1080506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
 
-> On Fri, Dec 13, 2013 at 01:56:18PM -0600, Felipe Balbi wrote:
-> > On Fri, Dec 13, 2013 at 02:01:32PM +0900, Anton Tikhomirov wrote:
-> > > Hi Felipe,
-> > >
-> > > > -static int dwc3_exynos_suspend(struct device *dev)
-> > > > +static int __dwc3_exynos_suspend(struct dwc3_exynos *exynos)
-> > > >  {
-> > > > -	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
-> > > > -
-> > > >  	clk_disable(exynos->clk);
-> > > >
-> > > >  	return 0;
-> > > >  }
-> > > >
-> > > > +static int __dwc3_exynos_resume(struct dwc3_exynos *exynos)
-> > > > +{
-> > > > +	return clk_enable(exynos->clk);
-> > > > +}
-> > > > +
-> > > > +static int dwc3_exynos_suspend(struct device *dev)
-> > > > +{
-> > > > +	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
-> > > > +
-> > > > +	return __dwc3_exynos_suspend(exynos);
-> > >
-> > > If dwc3-exynos is runtime suspended, the clock will be disabled
-> > > second time here (unbalanced clk_enable/clk_disable).
-> >
-> > I don't get what you mean but there is something that probably needs
-> > fixing, I guess below makes it better:
-> >
-> > diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-
-> exynos.c
-> > index c93919a..1e5720a 100644
-> > --- a/drivers/usb/dwc3/dwc3-exynos.c
-> > +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> > @@ -218,6 +218,9 @@ static int dwc3_exynos_suspend(struct device *dev)
-> >  {
-> >  	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
-> >
-> > +	if (pm_runtime_suspended(dev))
-> > +		return 0;
-> > +
-> >  	return __dwc3_exynos_suspend(exynos);
-> >  }
-> >
-> >
-> > Is that what you meant ?
-> 
-> note, however, that this is *not* a case where we would fall today. See
-> that we pm_runtime_get() in probe and only pm_runtime_put() during
-> remove. So there would never be a case where we would try system
-> suspend 
-> while device was already runtime suspended.
+On 12/14/13 10:37 PM, zhangfei wrote:
+>
+>
+> On 12/15/2013 11:16 AM, Dinh Nguyen wrote:
+>> Hi Zhangfei,
+>>
+>>>> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
+>>>>            dev_dbg(host->dev, "ciu clock not available\n");
+>>>>            host->bus_hz = host->pdata->bus_hz;
+>>>>        } else {
+>>>> +        /* If the CIU clk is available, we check for SDR and DDR
+>>>> +         * timing phase shift settings. But not all platforms
+>>>> +         * may have populated these settings, the driver will not
+>>>> fail
+>>>> +         * if these settings are not specified.
+>>>> +         */
+>>>> +        if (host->pdata->sdr_timing) {
+>>>> +            host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
+>>>> +            if (IS_ERR(host->sdr_clk))
+>>>> +                dev_dbg(host->dev, "sdr_mmc clock not available\n");
+>>>> +            else
+>>>> +                clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
+>>>> +        }
+>>>> +
+>>>> +        if (host->pdata->ddr_timing) {
+>>>> +            host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
+>>>> +            if (IS_ERR(host->ddr_clk))
+>>>> +                dev_dbg(host->dev, "ddr_mmc clock not available\n");
+>>>> +            else
+>>>> +                clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
+>>>> +        }
+>>>> +
+>>>
+>>> Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed,
+>>> fixed as each controller, or different with different board.
+>> Yes, they are fixed for each controller per SoC.
+>>> In case they are fixed, or fixed in each controller, and only required
+>>> to be set in probe only once, maybe they can be hide in
+>>> clk_mmc_ops.prepare
+>>> And the clock can be used as ciu_clock, or parent of ciu_clock, which
+>>> is called in dw_mmc.c, maybe these code can be ignored.
+>>>
+>> Please see v5 of this patch: https://patchwork.kernel.org/patch/3311121/
+>> The issue with V5 was that there is no way for the dw_mmc driver to pass
+>> the clock phase settings
+>> in the clk_mmc_ops.prepare function.
+>
+> Personally, I think v5 is simpler :)
+I agree...
+>
+> Could these fixed para be used as internal para when register.
+> Like
+> socfpga_gate_clk_init
+> rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
+>         compatible = "altr,socfpga-gate-clk";
+>     clocks = <&mainclk>;
+>     div-reg = <0x64 0 2>;
+>     clk-gate = <0x60 1>;
+> Could we also define mmc-ciu-clock with para clk-init.
+Hmm..this was one of Arnd's suggestion. Will this also work for you? If
+so then I think I can
+proceed down this path, as I think this should be the most direct and
+simplest.
 
-You are right, while runtime PM is blocked by get_sync() in probe, this
-check
-doesn't matter.
-
-> 
-> I have fixed all patches in my testing/next branch anyway, just to make
-> sure we're "idiot-proof" when it comes to implementing real runtime pm
-> later on :-)
-> 
-> cheers
-> 
-> --
-> balbi
-
-Thank you
+Thanks,
+Dinh
+>
+> Thanks
