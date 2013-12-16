@@ -1,45 +1,36 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 16 Dec 2013 22:06:30 +0100
-Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
-In-Reply-To: <52AF68DB.7090105@elopez.com.ar>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-3-git-send-email-dinguyen@altera.com>
- <201312142233.27143.arnd@arndb.de> <52AD1185.6090501@linaro.org>
- <20131215045116.23538.4@quantum> <52AF68DB.7090105@elopez.com.ar>
-Message-ID: <52AF6B56.1020209@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 16 Dec 2013 21:09:15 +0000
+Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to
+ double clock initialization
+In-Reply-To: <1500417.9RFCmzklxv@flatron>
+References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
+ <CAOesGMifjnTDUcsweOwsw9fFgsE7b4q3wsASfP8YL-uMH5KiPA@mail.gmail.com>
+ <CAPTRvHn7yTt6mC1fjEn5Ra9yx=GZ1DyNQtGWvHsDd_LkuiM_wA@mail.gmail.com>
+ <1500417.9RFCmzklxv@flatron>
+Message-ID: <20131216210915.GD3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Dec 14, 2013 at 04:41:06AM -0800, Tomasz Figa wrote:
 
-On 12/16/2013 09:55 PM, Emilio L?pez wrote:
-> Hi Mike et al,
->
-> El 15/12/13 01:51, Mike Turquette escribi?:
->> clk_set_phase has been proposed before and now may be the time to add
->> it. There are two things that need to be addressed:
->>
->> 1) what are the values for the phase? This needs to work for others that
->> must set clk phase, so we need to consider all those requirements before
->> making a new function declaration in clk.h
->>
->> 2) is setting a clock's phase something done dynamically? Put another
->> way, does the same clock has it's phase set multiple times while the
->> system is running? For static configuration that only happens during
->> initialization we do not need a new API. The clock driver can handle it
->> privately. For dynamic operations though we likely need a new API.
->
-> We on sunxi also need this for our (not yet merged) MMC driver; we currently have it implemented as an exported
->
-> void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
->
-> that takes the MMC clock (and only the MMC clock) and does the setup (it's basically configuring two values, "sample" and "output", into the clock register). I really don't know what does this do/why is it required/when is it used; I'm cc'ing Hans and David who can hopefully explain that part.
+>  - Wolfson Cragganmore 6410 - Mark Brown (copied) is using it for some
+>    testing of audio codec AFAIK, but I'm not sure if you can get that
+>    anywhere.
 
-I'm afraid I cannot explain that part, the MMC controller in the sunxi SoCs
-is undocumented, so what we're doing there comes straight from the android
-kernel code. I do understand most of the bits of the sunxi-mci driver, but
-this bit is black magic to me.
+Essentially no, though you could try asking nicely.  It's not suitable
+for a test farm anyway without a SD mux as the only bootloader supported
+is Qi which only boots from flash.
 
-Regards,
+>  - SMDK6400/SMDK6410 are Samsung's official development boards for
+>    S3C6400/S3C6410 - I have access to one at the office; no idea if
+>    you can get one anywhere,
 
-Hans
+I believe they're no longer available though ICBW.  The cost for low
+volume orders is likely to be a bit high too.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/fdf10a37/attachment.sig>
