@@ -1,52 +1,56 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 16 Dec 2013 13:48:33 +0100
-Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
-In-Reply-To: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
-References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <2459303.277Jr8aotM@amdc1032>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 16 Dec 2013 12:49:12 +0000
+Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <CAOMqctTdasLxJki0xu4aq_sEgujDt3Jdu=BXy9WvQeji282_Rg@mail.gmail.com>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
+ <20131215134415.GE3651@lukather>
+ <CAOMqctRspBPmNsyXye_gpfwGoZ=gMcCzEjM+hD3g+ZfQix7G6Q@mail.gmail.com>
+ <20131216100551.GD3037@lukather>
+ <CAOMqctTdasLxJki0xu4aq_sEgujDt3Jdu=BXy9WvQeji282_Rg@mail.gmail.com>
+Message-ID: <1387198152.10247.19.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Monday, December 16, 2013 05:31:10 PM Abhilash Kesavan wrote:
-> Add PMU configuration table for various low power modes - AFTR/LPA/SLEEP.
-> Also, add core s2r support for Exynos5420.
+On Mon, 2013-12-16 at 12:59 +0100, Michal Suchanek wrote:
+> On 16 December 2013 11:05, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Sun, Dec 15, 2013 at 11:01:17PM +0100, Michal Suchanek wrote:
+> >> On 15 December 2013 14:44, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> >> --- a/drivers/mmc/host/Kconfig
+> >> >> +++ b/drivers/mmc/host/Kconfig
+> >> >> @@ -665,3 +665,11 @@ config MMC_REALTEK_PCI
+> >> >>       help
+> >> >>         Say Y here to include driver code to support SD/MMC card interface
+> >> >>         of Realtek PCI-E card reader
+> >> >> +
+> >> >> +config MMC_SUNXI
+> >> >> +     tristate "Allwinner sunxi SD/MMC Host Controller support"
+> >> >> +     depends on ARCH_SUNXI
+> >> >> +     default y
+> >> >
+> >> > I'm not that fond of these "default y" patterns. It forces the driver
+> >> > down to every user of the multiplatform kernels. I'd suggest removing
+> >> > the default and adding the driver to the defconfigs we have.
+> >>
+> >> And why would you build support for sunxi without building support for
+> >> sunxi mmc?
+> >
+> > Because you can?
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
-> This patch depends on "ARM: EXYNOS5: Add PMU settings for exynos5420"
-> http://www.spinics.net/lists/linux-samsung-soc/msg24902.html
+> But does that need to be the default? And is that sane default?
+> 
+> >
+> > And where am I actually suggesting to do so?
+> 
+> Just a few lines above. You suggest it should not be built by default.
 
-[...]
+I'm pretty sure this isn't specific to sunxi, in the past Linus has
+complained about the inappropriate use of "default y". Apparently it
+should only be used rarely.
 
-> @@ -253,10 +316,20 @@ static int exynos_pm_suspend(void)
->  
->  	/* Setting SEQ_OPTION register */
->  
-> -	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
-> -	__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
-> +	if (soc_is_exynos5420()) {
-> +		cluster_id = (read_cpuid(CPUID_MPIDR) >> 8) & 0xf;
-> +		if (!cluster_id)
-> +			__raw_writel(EXYNOS5420_ARM_USE_STANDBY_WFI0,
-> +				     S5P_CENTRAL_SEQ_OPTION);
-> +		else
-> +			__raw_writel(EXYNOS5420_KFC_USE_STANDBY_WFI0,
-> +				     S5P_CENTRAL_SEQ_OPTION);
-> +	} else if (soc_is_exynos5250()) {
+Note that default in the Kconfig is different to the defconfig file.
 
-Adding a check here for EXYNOS5250 doesn't look correct
-(the old code behavior for older EXYNOYS SoCs should be
-preserved).
-
-> +		tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
-> +		__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
-> +	}
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Ian.
