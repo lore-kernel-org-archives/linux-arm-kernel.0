@@ -1,42 +1,92 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 16 Dec 2013 00:11:58 -0800
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <20131126183629.GK28642@pengutronix.de>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131126134117.GF28642@pengutronix.de>
- <20131126134444.GG28642@pengutronix.de>
- <20131126183629.GK28642@pengutronix.de>
-Message-ID: <20131216001158.0e15e93c.akpm@linux-foundation.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 16 Dec 2013 10:12:16 +0200
+Subject: [PATCHv10 00/41] ARM: TI SoC clock DT conversion
+In-Reply-To: <20131215043547.23538.63736@quantum>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <20131215043547.23538.63736@quantum>
+Message-ID: <52AEB5E0.5070807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013 19:36:29 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
+On 12/15/2013 06:35 AM, Mike Turquette wrote:
+> Quoting Tero Kristo (2013-11-26 00:05:41)
+>> Hi,
+>>
+>
+> Hi Tero,
+>
+> Thanks for your long suffering patience on this series. The clock
+> patches look very good to me with exception of a few small comments. Let
+> me know how I can help with the hierarchal DT stuff since I think that
+> has been the gating factor for this series for the past few revisions.
+>
+>> Changes compared to v9:
+>> - rebased on top of 3.13-rc1
+>> - modified the low level clk register API to provide SoC specific clk_readl
+>>    and clk_writel support which can be registered during boot, TI SoC variant
+>>    uses regmap on low level
+>
+> Regarding regmap, will that be dropped for V11? I don't care whether it
+> stays or goes but the approach you took is probably too top-level. Patch
+> #1 sets clk_reg_ops system-wide which probably isn't right. Different
+> clock drivers might compete to set those ops and the last one to write
+> wins.
 
-> Hello Andrew,
-> 
-> On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K__nig wrote:
-> > On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K__nig wrote:
-> > > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K__nig wrote:
-> > > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> > > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> > > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> > > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> > > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> > > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
-> > > > 
-> > > > So better include it explicitly not only because the last link will go
-> > > > away soon.
-> > > > 
-> > > > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > > Ping. Is this patch ok despite Jean-Christophe's objection?
-> > I saw that akpm already took it into his tree.
-> This patch is one of the last few that are needed to drop <mach/timex.h>
-> alltogether that I don't have an ack from the respective maintainer yet.
-> 
-> Can you give your ack instead of sending the patch to Linus, then I'd
-> take it with the patch dropping <mach/timex.h> to make it easier to
-> merge.
+I will be dropping regmap for v11. However...
 
-ack ;)
+>
+> A better approach is to support regmap ops on a per-clock basis (for
+> clocks that use the generic implementations like clk-divider and
+> clk-gate; obviously this is overkill for entirely hardware-specific
+> clocks). Stephen Boyd's approach is a better solution[1][2] but
+> unfortunately that approach dumps crap into struct clk_hw which is bad.
+>
+> Anyways if you decide against regmap for V11 then the whole issue is
+> avoided.
 
-I dropped my copy.
+Not avoided, some sort of solution is still needed to wrap the register 
+reads/writes. Alternatives are basically top level clk_ops or some stuff 
+like the patches you referred to, however it needs to be expanded to 
+support also the basic clock types.
+
+-Tero
+
+>
+> Regards,
+> Mike
+>
+> [1] http://article.gmane.org/gmane.linux.ports.arm.kernel/273742
+> [2] http://article.gmane.org/gmane.linux.ports.arm.kernel/273744
+>
+>> - dropped regmap parameter from clock init calls, instead a helper is used
+>>    for getting regmap index along with the register offset from DT
+>> - dropped regmap parameter from clock structs, instead platform specific
+>>    clk_readl / clk_writel are used to parse reg parameter according to
+>>    platform, for TI SoC:s, this is encoded as:
+>>    struct clk_omap_reg {
+>>      u16 offset; /* register offset */
+>>      u16 index; /* regmap index */
+>>    }
+>> - Nishanth's comments to v9 mostly addressed, except for the CLK_OF_DECLARE
+>>    tweak which I would actually want some feedback upon, basically the problem
+>>    is I need to return status from the clk init functions so I can see if
+>>    -EAGAIN is passed, in which case init will be retried later, maybe some of
+>>    this can be made generic, like converting all the CLK_OF_DECLARE type
+>>    functions to return status
+>>
+>> Testing done:
+>> - omap3-beagle : boot + suspend/resume
+>> - omap3-beagle-xm : boot (thanks to Nishanth)
+>> - omap4-panda-es : boot + suspend/resume
+>> - omap5-uevm : boot
+>> - dra7-evm : boot
+>> - am335x-bone : boot
+>>
+>> Separate branches available at https://github.com/t-kristo/linux-pm.git
+>>
+>> - full: 3.13-rc1-dt-clks-v10 (should be merged last, contains everything)
+>> - clk driver only: 3.13-rc1-dt-clks-v10-for-mike
+>> - DT data only: 3.13-rc1-dt-clks-v10-for-benoit
+>>
+>> -Tero
+>>
