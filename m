@@ -1,46 +1,22 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 16 Dec 2013 09:54:05 +0900
-Subject: [PATCH] pci: designware: fix missing msi irqs
-In-Reply-To: <20131212182903.409515738@gmail.com>
-References: <20131212182903.409515738@gmail.com>
-Message-ID: <005b01cef9f9$52022bd0$f6068370$%han@samsung.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 15 Dec 2013 20:27:25 -0500 (EST)
+Subject: [PATCH 10/10] Kconfig: cleanup SERIO_I8042 dependencies
+In-Reply-To: <1387122626.1979.136.camel@deneb.redhat.com>
+References: <52ACA43F.2040402@zytor.com>
+ <20131215103657.GB20197@core.coreip.homeip.net>
+ <1387122626.1979.136.camel@deneb.redhat.com>
+Message-ID: <20131215.202725.1549146673897801643.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 13, 2013 3:29 AM, Harro Haan wrote:
-> 
-> The interrupts were cleared after the irq handler was called.
-> This means that new interrupts that occur after the handler handled
-> the previous irq but before the interrupt is cleared will be missed.
-> 
-> Signed-off-by: Harro Haan <hrhaan@gmail.com>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Richard Zhu <hong-xing.zhu@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Juergen Beisert <jbe@pengutronix.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
+From: Mark Salter <msalter@redhat.com>
+Date: Sun, 15 Dec 2013 10:50:26 -0500
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+> On Sun, 2013-12-15 at 02:36 -0800, Dmitry Torokhov wrote:
+>> How are we going to merge this? In bulk through input tree or peacemeal
+>> through all arches first?
+>
+> They should all go together to eliminate the chance of bisect breakage.
+> Either the input tree or maybe akpm tree.
 
-I was not able to reproduce the problem, however it looks
-good. Also, there is no side effect on Exynos platform.
-
-Mohit,
-If you have some comments, please let us know.
-
-Best regards,
-Jingoo Han
-
-> ---
->  drivers/pci/host/pcie-designware.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+This sounds good to me.
