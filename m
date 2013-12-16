@@ -1,59 +1,49 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 16 Dec 2013 18:39:39 +0200
-Subject: [PATCH 3/4] arm: dts: keystone-evm: add LEDs supports
-In-Reply-To: <1387211981-26045-1-git-send-email-grygorii.strashko@ti.com>
-References: <1387211981-26045-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1387211981-26045-4-git-send-email-grygorii.strashko@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Dec 2013 15:46:01 +0000
+Subject: [PATCH 1/3] arm64: add EFI stub
+In-Reply-To: <1386341754.1861.188.camel@deneb.redhat.com>
+References: <1385762712-17043-1-git-send-email-msalter@redhat.com>
+ <1385762712-17043-2-git-send-email-msalter@redhat.com>
+ <20131205141853.GA974@darko.cambridge.arm.com>
+ <1386341754.1861.188.camel@deneb.redhat.com>
+Message-ID: <20131216154601.GH17713@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone EVMK2HX supports 4 debug LEDs controlled by GPIO lines as
-following (active level is high);
+On Fri, Dec 06, 2013 at 02:55:54PM +0000, Mark Salter wrote:
+> On Thu, 2013-12-05 at 14:18 +0000, Catalin Marinas wrote:
+> > On Fri, Nov 29, 2013 at 10:05:10PM +0000, Mark Salter wrote:
+> > > +       add     x2, sp, 16
+> > > +       str     x8, [x2]
+> > > +       bl      efi_entry
+> > > +       cmn     x0, #1
+> > > +       b.eq    efi_load_fail
+> > > +
+> > > +       /*
+> > > +        * efi_entry() will have relocated the kernel image if necessary
+> > > +        * and we return here with device tree address in x0 and the kernel
+> > > +        * entry point stored at *image_addr. Save those values in registers
+> > > +        * which are preserved by __flush_dcache_all.
+> > > +        */
+> > > +       ldr     x1, [sp, #16]
+> > > +       mov     x20, x0
+> > > +       mov     x21, x1
+> > > +
+> > > +       bl      __flush_dcache_all
+> > 
+> > Regarding __flush_dcache_all, I plan to remove it for all cases apart
+> > from power management with the MMU disabled. With MMU enabled, there is
+> > no guarantee that this function does the right thing. It's even worse in
+> > the guest context.
+> 
+> According to booting.txt, the dcache needs to be invalidated. Is there
+> something existing I can use or do I need to write it?
 
-DBG_D1 green gpio12
-DBG_D1 red   gpio13
-DBG_D1 blue  gpio14
-DBG_D1 blue  gpio15
+The function will stay for a few cases where needed. But here the
+D-cache and MMU are still on at this point and there is a slight chance
+of speculative loads after the flush (though only clean lines). You
+could move this after he MMU disabling (but still keep the I-cache on
+for performance).
 
-For more information see schematics:
- http://wfcache.advantech.com/www/support/TI-EVM/download/Schematics/PDF/K2H_K2EVM-HK_SCH_A102_Rev1_0.pdf
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2hk-evm.dts |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-index 15b3a95..07bf1e9 100644
---- a/arch/arm/boot/dts/k2hk-evm.dts
-+++ b/arch/arm/boot/dts/k2hk-evm.dts
-@@ -52,4 +52,27 @@
- 			};
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		debug1_1 {
-+			label = "keystone:green:debug1";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>; /* 12 */
-+		};
-+
-+		debug1_2 {
-+			label = "keystone:red:debug1";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; /* 13 */
-+		};
-+
-+		debug2 {
-+			label = "keystone:blue:debug2";
-+			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>; /* 14 */
-+		};
-+
-+		debug3 {
-+			label = "keystone:blue:debug3";
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; /* 15 */
-+		};
-+	};
- };
 -- 
-1.7.9.5
+Catalin
