@@ -1,48 +1,59 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Dec 2013 22:04:34 +0100
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-Message-ID: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 16 Dec 2013 22:04:37 +0100
+Subject: [PATCH 3/4] ARM: allocate hwcaps bits for v8 crypto extensions
+In-Reply-To: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1387227878-30438-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is an expansion of the patch posted by Steve Capper about 6 weeks
-ago that allocates hwcaps bits for CRC and Crypto Extensions instructions so
-userland can discover whether the current CPU has any of those capabilities.
+ARM binaries running under an arm64 kernel are able to use
+the special 32 bit versions of the v8 Crypto Extensions.
 
-Patch #1 is a cleanup patch for read_cpuid(), which allowed me to skip adding
-yet another #define to asm/cputype.h (for ID_ISAR5_EL1)
+Even if the ARM port itself does not cover systems with such
+capabilities, the allocation of 32-bit hwcaps bits should be
+aligned between ARM and arm64 so a 32-bit userland does not need
+to care about the difference.
 
-Patch #2 is Steve's original patch, but slightly tweaked because hwcaps bit 2
-has been allocated for something else in the mean time.
+This patch allocates bits 22-26 for the Crypto Extensions AES,
+PMULL.64, SHA1, SHA2 and CRC32 respectively.
 
-Patch #3 allocates the capability bits in the arch/arm tree. This is necessary
-because 32-bit ARM binaries can execute both under ARM and under arm64 kernels,
-so there should be agreement about the meaning of feature bits, even if those
-features don't actually exist on systems covered by the arch/arm tree.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/uapi/asm/hwcap.h | 5 +++++
+ arch/arm/kernel/setup.c           | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-@Russell: if this looks ok to you, could you please indicate whether you prefer
-to take this patch separately, or ack it and let it be merged as part of the
-series.
-
-Patch #4 advertises the CRC and Crypto Extensions to 32-bit binaries running
-under an arm64 kernel.
-
-Ard Biesheuvel (3):
-  arm64: drop redundant macros from read_cpuid()
-  ARM: allocate hwcaps bits for v8 crypto extensions
-  arm64: add 32-bit compat hwcaps for v8 crypto extensions
-
-Steve Capper (1):
-  arm64: Add hwcaps for crypto and CRC32 extensions.
-
- arch/arm/include/uapi/asm/hwcap.h   |  5 +++
- arch/arm/kernel/setup.c             |  5 +++
- arch/arm64/include/asm/cputype.h    | 18 +++-------
- arch/arm64/include/asm/hwcap.h      |  6 ++++
- arch/arm64/include/uapi/asm/hwcap.h |  6 +++-
- arch/arm64/kernel/setup.c           | 69 +++++++++++++++++++++++++++++++++++++
- 6 files changed, 94 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 7dcc10d..0726024 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -27,5 +27,10 @@
+ #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
+ #define HWCAP_LPAE	(1 << 20)
+ #define HWCAP_EVTSTRM	(1 << 21)
++#define HWCAP_AES	(1 << 22)
++#define HWCAP_PMULL	(1 << 23)
++#define HWCAP_SHA1	(1 << 24)
++#define HWCAP_SHA2	(1 << 25)
++#define HWCAP_CRC32	(1 << 26)
+ 
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6a1b8a8..57e6b5e 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -990,6 +990,11 @@ static const char *hwcap_str[] = {
+ 	"vfpd32",
+ 	"lpae",
+ 	"evtstrm",
++	"aes",
++	"pmull",
++	"sha1",
++	"sha2",
++	"crc32",
+ 	NULL
+ };
+ 
 -- 
 1.8.3.2
