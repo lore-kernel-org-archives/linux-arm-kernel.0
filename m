@@ -1,46 +1,42 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 16 Dec 2013 16:26:44 -0500
-Subject: [PATCH v6 5/9] usb: gadget: s3c-hsotg: use generic
- phy_init()/phy_exit() support
-In-Reply-To: <20131216212001.GD12896@saruman.home>
-References: <1386953483-21631-1-git-send-email-mporter@linaro.org>
- <1386953483-21631-6-git-send-email-mporter@linaro.org>
- <20131216212001.GD12896@saruman.home>
-Message-ID: <20131216212644.GA15814@beef>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 16 Dec 2013 15:29:18 -0600
+Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
+In-Reply-To: <1387209225-11520-1-git-send-email-kishon@ti.com>
+References: <1387209225-11520-1-git-send-email-kishon@ti.com>
+Message-ID: <20131216212918.GH12896@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 03:20:01PM -0600, Felipe Balbi wrote:
-> On Fri, Dec 13, 2013 at 11:51:19AM -0500, Matt Porter wrote:
-> > If a generic phy is present, call phy_init()/phy_exit(). This supports
-> > generic phys that must be soft reset before power on.
-> > 
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > ---
-> >  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> > index 7c5d8bd..e9683c2 100644
-> > --- a/drivers/usb/gadget/s3c-hsotg.c
-> > +++ b/drivers/usb/gadget/s3c-hsotg.c
-> > @@ -3621,6 +3621,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
-> >  		goto err_supplies;
-> >  	}
-> >  
-> > +	if (hsotg->phy)
-> > +		phy_init(hsotg->phy);
+Hi,
+
+On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I wrote:
+> After the platform devices are created using PLATFORM_DEVID_AUTO, the
+> device names given in usb_bind_phy (in board file) does not match with
+> the actual device name causing the USB PHY library not to return the
+> PHY reference when the MUSB controller request for the PHY in the non-dt boot
+> case.
+> So removed creating platform devices using PLATFORM_DEVID_AUTO in omap2430.c.
 > 
-> doesn't build. you need to include <linux/phy/phy.h>
+> Did enumeration testing in omap3 beagle.
+> 
+> Changes from v2:
+> * Fixed the commit log
+> 
+> Changes from v1:
+> * refreshed to the latested mainline kernel
+> * added musb_put_id from omap2430 remove.
 
-It depends on https://lkml.org/lkml/2013/12/5/172 which I noted in the
-cover letter. At this point, I don't know if Kamil's whole series will
-make it to 3.14 so that patch may have to be taken separately. He has a
-trivial update to make on the binding example is all for this patch.
+Tony, how do you want to handle this ? You want me to provide you a
+branch which we both merge ?
 
-I was wondering today if we might just want to separate that out now. I
-originally had a similar patch in my series but his was posted first so
-I rebased on that.
+cheers
 
--Matt
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/13634c31/attachment-0001.sig>
