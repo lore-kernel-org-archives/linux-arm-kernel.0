@@ -1,80 +1,72 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Mon, 16 Dec 2013 11:38:34 +0800
-Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
- timing through clock framework
-In-Reply-To: <52AE7278.1080506@gmail.com>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-2-git-send-email-dinguyen@altera.com>
- <52AD0E7A.50208@linaro.org> <52AD1F17.5040708@gmail.com>
- <52AD320A.4030502@linaro.org> <52AE7278.1080506@gmail.com>
-Message-ID: <CABQgh9FVkA=VNPddRqQk07neL-vU1NSFaNf8B+tFKAsiTJQd-g@mail.gmail.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Mon, 16 Dec 2013 09:15:44 +0530
+Subject: Memory mapping of config space of pcie devices
+In-Reply-To: <CAErSpo5k1KZuaL7jYp1-5YaxjdZseDPrFo64mJcb2tu2PWJowA@mail.gmail.com>
+References: <CAHH3p5+3Zy+YkgDS_1bJ7B84w5iHOh6-QG7LRJXo2WQHREcRHw@mail.gmail.com>
+ <CAErSpo59htYoPBoouUfSXAVXwCUQPK-TB_zG0BkE-PLhV=KRbQ@mail.gmail.com>
+ <CAHH3p5J7Se8zu64MfoSDkAN_NtOp=qv1DcvWBAa8jWKouo0TXg@mail.gmail.com>
+ <CAErSpo5k1KZuaL7jYp1-5YaxjdZseDPrFo64mJcb2tu2PWJowA@mail.gmail.com>
+Message-ID: <20131216034544.GA2445@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2013 11:24, Dinh Nguyen <dinh.linux@gmail.com> wrote:
->
->>>>> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
->>>>>            dev_dbg(host->dev, "ciu clock not available\n");
->>>>>            host->bus_hz = host->pdata->bus_hz;
->>>>>        } else {
->>>>> +        /* If the CIU clk is available, we check for SDR and DDR
->>>>> +         * timing phase shift settings. But not all platforms
->>>>> +         * may have populated these settings, the driver will not
->>>>> fail
->>>>> +         * if these settings are not specified.
->>>>> +         */
->>>>> +        if (host->pdata->sdr_timing) {
->>>>> +            host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
->>>>> +            if (IS_ERR(host->sdr_clk))
->>>>> +                dev_dbg(host->dev, "sdr_mmc clock not available\n");
->>>>> +            else
->>>>> +                clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
->>>>> +        }
->>>>> +
->>>>> +        if (host->pdata->ddr_timing) {
->>>>> +            host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
->>>>> +            if (IS_ERR(host->ddr_clk))
->>>>> +                dev_dbg(host->dev, "ddr_mmc clock not available\n");
->>>>> +            else
->>>>> +                clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
->>>>> +        }
->>>>> +
->>>>
->>>> Just curious, does pdata->sdr_timing and pdata->ddr_timing are fixed,
->>>> fixed as each controller, or different with different board.
->>> Yes, they are fixed for each controller per SoC.
->>>> In case they are fixed, or fixed in each controller, and only required
->>>> to be set in probe only once, maybe they can be hide in
->>>> clk_mmc_ops.prepare
->>>> And the clock can be used as ciu_clock, or parent of ciu_clock, which
->>>> is called in dw_mmc.c, maybe these code can be ignored.
->>>>
->>> Please see v5 of this patch: https://patchwork.kernel.org/patch/3311121/
->>> The issue with V5 was that there is no way for the dw_mmc driver to pass
->>> the clock phase settings
->>> in the clk_mmc_ops.prepare function.
->>
->> Personally, I think v5 is simpler :)
-> I agree...
->>
->> Could these fixed para be used as internal para when register.
->> Like
->> socfpga_gate_clk_init
->> rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
->>         compatible = "altr,socfpga-gate-clk";
->>     clocks = <&mainclk>;
->>     div-reg = <0x64 0 2>;
->>     clk-gate = <0x60 1>;
->> Could we also define mmc-ciu-clock with para clk-init.
-> Hmm..this was one of Arnd's suggestion. Will this also work for you? If
-> so then I think I can
-> proceed down this path, as I think this should be the most direct and
-> simplest.
->
+On Sun, Dec 15, 2013 at 04:18:23AM +0800, Bjorn Helgaas wrote:
+> [+cc devicetree, linux-arm-kernel]
+> 
+> On Sat, Dec 14, 2013 at 1:05 PM, shiv prakash Agarwal
+> <chhotu.shiv@gmail.com> wrote:
+> > On Sun, Dec 15, 2013 at 12:29 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> >> On Sat, Dec 14, 2013 at 11:32 AM, shiv prakash Agarwal
+> >> <chhotu.shiv@gmail.com> wrote:
+> >>> Hi All,
+> >>>
+> >>> How devices config spaces are mapped to host memory?
+> >>> Is it being handled by core driver? I could not locate.
+> >>
+> >> The PCI core does not map config space into memory.  That's not even
+> >> possible for the legacy config access methods, e.g., using I/O ports
+> >> 0xcf8 and 0xcfc [1].
+> >>
+> >> If you're wondering about how Linux uses ECAM, that's mostly in
+> >> arch/x86/pci/mmconfig*.  That code does ioremap the ECAM area into
+> >> kernel virtual space, but only for access via pci_read_config_word(),
+> >> pci_write_config_word(), etc.
+> >>
+> >> Bjorn
+> >>
+> >> [1] http://en.wikipedia.org/wiki/PCI_configuration_space#Software_implementation
+> >
+> > Thanks Bjorn for quick reply,
+> >
+> > Above reference says:
+> > During system initialization, firmware determines the base address for
+> > this ?stolen? address region and communicates it to the root complex
+> > and to the operating system. This communication method is
+> > implementation-specific, and not defined in the PCI Express
+> > specification.
+> >
+> > How above is implemented on ARM?
+> 
+> On x86, we learn the ECAM address via ACPI (the MCFG table or a host
+> bridge _CBA method).  I don't know how this is done on ARM.  I could
+> imagine it being done via device tree, but I really don't know.
+> Unfortunately both the address discovery and the actual ECAM accesses
+> are in arch-specific code.
 
-Yes, go ahead.
-sdr_timing & ddr_timing only takes effect on socfpga-mmc.
-It is good to put in clk driver specifically for socfpga, instead of
-putting in common dw_mmc.c
+Yes, it comes from device tree. DT sends CPU address range allocated
+for cfg transfers. pci_read_config_word and pci_write_config_word
+send bdf and offset. Address translation unit of your RC driver should
+be programmed in such a way that it translates cpu address to the cfg
+address based on bdf and offset.
 
-Thanks
+You can see one such implementation in drivers/pci/host/pcie-designware.c
+
+Regards
+Pratyush
+
+> 
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
