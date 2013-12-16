@@ -1,43 +1,100 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 16 Dec 2013 11:01:44 -0800
-Subject: [PATCHv2 1/2] arm: Correct virt_addr_valid
-Message-ID: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Dec 2013 12:02:42 -0700
+Subject: [PATCHv7 08/12] iommu/tegra: smmu: calculate ASID register offset
+ by ID
+In-Reply-To: <1386835033-4701-9-git-send-email-hdoyu@nvidia.com>
+References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
+ <1386835033-4701-9-git-send-email-hdoyu@nvidia.com>
+Message-ID: <52AF4E52.9010000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of virt_addr_valid is that virt_addr_valid should
-return true if and only if virt_to_page returns a valid pointer.
-The current definition of virt_addr_valid only checks against the
-virtual address range. There's no guarantee that just because a
-virtual address falls bewteen PAGE_OFFSET and high_memory the
-associated physical memory has a valid backing struct page. Follow
-the example of other architectures and convert to pfn_valid to
-verify that the virtual address is actually valid. The check for
-an address between PAGE_OFFSET and high_memory is still necessary
-as vmalloc/highmem addresses are not valid with virt_to_page.
+On 12/12/2013 12:57 AM, Hiroshi Doyu wrote:
+> ASID register offset is caclulated by SWGROUP ID so that we can get
+> rid of old SoC specific MACROs. This ID conversion is needed for the
+> unified SMMU driver over Tegra SoCs. We use dt-bindings MACRO instead
+> of SoC dependent MACROs. The formula is:
+> 
+>   MC_SMMU_<swgroup name>_ASID_0 = MC_SMMU_AFI_ASID_0 + ID * 4;
+> 
+> Now SWGROUP ID is the global HardWare Accelerator(HWA) identifier
+> among all Tegra SoC except Tegra2.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/include/asm/memory.h |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 9ecccc8..6211df0 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -350,7 +350,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
- 
- #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
--#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
-+#define virt_addr_valid(kaddr)	(pfn_valid(__pa(kaddr) >> PAGE_SHIFT) && \
-+	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory))
- 
- #endif
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+>  static int __smmu_client_set_hwgrp(struct smmu_client *c,
+> -				   unsigned long map, int on)
+> +				   unsigned long *map, int on)
+>  {
+>  	int i;
+>  	struct smmu_as *as = c->as;
+>  	u32 val, offs, mask = SMMU_ASID_ENABLE(as->asid);
+>  	struct smmu_device *smmu = as->smmu;
+>  
+>  	if (!on)
+> +		map = c->hwgrp;
+>  
+> +	for_each_set_bit(i, map, TEGRA_SWGROUP_MAX) {
+>  		offs = HWGRP_ASID_REG(i);
+>  		val = smmu_read(smmu, offs);
+>  		if (on) {
+>  			if (WARN_ON(val & mask))
+>  				goto err_hw_busy;
+>  			val |= mask;
+> +			memcpy(c->hwgrp, map, sizeof(u64));
+>  		} else {
+>  			WARN_ON((val & mask) == mask);
+>  			val &= ~mask;
+>  		}
+>  		smmu_write(smmu, val, offs);
+>  	}
+
+This function doesn't make a lot of sense to me. The registers it's
+manipulating aren't a bitmask, so I don't see why the code is performing
+bitmask AND/OR operations on the register. Instead, don't you want the
+following:
+
+#define SMMU_ASID_ENABLE	(1 << 31)
+#define SMMU_ASID_ENABLED(asid)	(SMMU_ASID_ENABLE | asid)
+#define SMMU_ASID_DISABLE	0
+
+static int __smmu_client_set_hwgrp(struct smmu_client *c,
+				   unsigned long *map, int on)
+{
+	int i;
+	struct smmu_as *as = c->as;
+	u32 val, offs, new_val;
+	struct smmu_device *smmu = as->smmu;
+
+	if (!on)
+		map = c->hwgrp;
+
+	for_each_set_bit(i, map, TEGRA_SWGROUP_MAX) {
+		offs = HWGRP_ASID_REG(i);
+		val = smmu_read(smmu, offs);
+		if (on)
+			new_val = SMMU_ASID_ENABLED(as->asid);
+		else
+			new_val = 0;
+		WARN_ON(val & SMMU_ASID_ENABLE ==
+			new_val & SMMU_ASID_ENABLE);
+		if (on) {
+			if (val & SMMU_ASID_ENABLE)
+				goto err_hw_busy;
+			memcpy(c->hwgrp, map, sizeof(u64));
+		}
+		smmu_write(smmu, val, offs);
+	}
+
+> @@ -804,7 +727,7 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
+>  		return -ENOMEM;
+>  	client->dev = dev;
+>  	client->as = as;
+> -	map = (unsigned long)dev->platform_data;
+> +	map = (unsigned long *)dev->platform_data;
+>  	if (!map)
+>  		return -EINVAL;
+
+Presumably we can simply delete that now since everything using this
+driver is on DT; we can't rely on the platform_data of client struct
+devices...
