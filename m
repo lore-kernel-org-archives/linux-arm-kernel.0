@@ -1,20 +1,21 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 15:10:04 -0700
-Subject: [GIT PULL 02/10] ARM: tegra: dependency from the ASoC tree
+Date: Mon, 16 Dec 2013 15:10:05 -0700
+Subject: [GIT PULL 03/10] ARM: tegra: dependency 2 from the DMA tree
 In-Reply-To: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
 References: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1387231812-5701-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1387231812-5701-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the work so far on dmaengine for v3.14, it is being cross merged
-into the Tegra tree to support a large DMA overhaul there.  The main
-additions are a change in the DMA request API which allows better
-interaction at system startup using deferred probes and methods for
-overriding the default device and channel names used to request DMA.
+This branch introduces the dma_get_any_slave_channel() API, and is a
+dependency for Tegra's conversion to use the common/standard DMA
+DT bindings.
 
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
+Note that Vinod didn't create a signed tag for this branch, but is aware
+that I'm pulling this branch into the Tegra tree.
+
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
 
 ----------------------------------------------------------------
 
@@ -24,38 +25,22 @@ The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git asoc-dma-v3.14
+  git://git.infradead.org/users/vkoul/slave-dma.git topic/of
 
 or:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git asoc-dma-v3.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git for-3.14/deps-from-dma-of
 
-for you to fetch changes up to e9036c2a60f368b8ddc349fbbcde918ed32ab597:
+for you to fetch changes up to 8010dad55a0ab0e829f3733854e5235eef4e2734:
 
-  ASoC: dmaengine: fix deferred probe detection
+  dma: add dma_get_any_slave_channel(), for use in of_xlate()
 
 ----------------------------------------------------------------
 
-Lars-Peter Clausen (2):
-      ASoC: Add resource managed snd_dmaengine_pcm_register()
-      ASoC: generic-dmaengine-pcm: Set BATCH flag when residue reporting is not supported
+Stephen Warren (1):
+      dma: add dma_get_any_slave_channel(), for use in of_xlate()
 
-Mark Brown (2):
-      Merge remote-tracking branch 'asoc/fix/dma' into asoc-dma
-      Merge branch 'topic/defer_probe' of git://git.infradead.org/users/vkoul/slave-dma into asoc-dma
-
-Stephen Warren (6):
-      ASoC: restructure dmaengine_pcm_request_chan_of()
-      ASoC: don't leak on error in snd_dmaengine_pcm_register
-      ASoC: dmaengine: add custom DMA config to snd_dmaengine_pcm_config
-      dma: add channel request API that supports deferred probe
-      ASoC: dmaengine: support deferred probe for DMA channels
-      ASoC: dmaengine: fix deferred probe detection
-
- drivers/dma/dmaengine.c               | 35 +++++++++--
- drivers/dma/of-dma.c                  | 15 +++--
- include/linux/dmaengine.h             |  8 +++
- include/sound/dmaengine_pcm.h         | 10 ++++
- sound/soc/soc-devres.c                | 41 +++++++++++++
- sound/soc/soc-generic-dmaengine-pcm.c | 94 +++++++++++++++++++++++-------
- 6 files changed, 171 insertions(+), 32 deletions(-)
+ drivers/dma/dmaengine.c   | 28 ++++++++++++++++++++++++++++
+ drivers/dma/mmp_pdma.c    | 30 +++++++-----------------------
+ include/linux/dmaengine.h |  1 +
+ 3 files changed, 36 insertions(+), 23 deletions(-)
