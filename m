@@ -1,30 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Dec 2013 16:56:48 +0000
-Subject: [PATCH 4/6] arm64: lib: Implement optimized memcmp routine
-In-Reply-To: <1386743082-5231-5-git-send-email-zhichang.yuan@linaro.org>
-References: <1386743082-5231-1-git-send-email-zhichang.yuan@linaro.org>
- <1386743082-5231-5-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <20131216165647.GH20193@mudshark.cambridge.arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 16 Dec 2013 09:03:02 -0800
+Subject: [PATCH v5] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <52AC8857.8070504@roeck-us.net>
+References: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
+ <b625092b-682c-4072-85a6-9f9d7f378ec0@VA3EHSMHS043.ehs.local>
+ <20131002231751.4343.81234@quantum> <52AC8857.8070504@roeck-us.net>
+Message-ID: <3bfd63dd-6bf1-4ae9-aaab-b913f9739c19@DB8EHSMHS015.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 11, 2013 at 06:24:40AM +0000, zhichang.yuan at linaro.org wrote:
-> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+Hi Guenther, Mike,
+
+On Sat, Dec 14, 2013 at 08:33:27AM -0800, Guenter Roeck wrote:
+> On 10/02/2013 04:17 PM, Mike Turquette wrote:
+> >Quoting S?ren Brinkmann (2013-10-02 10:20:38)
+> >>Hi Mike,
+> >>
+> >>could you please comment on this/apply it to clk-next?
+> >
+> >It looks good and is in the queue. Will show up in clk-next in a few
+> >days.
+> >
+> Hi Mike,
 > 
-> This patch, based on Linaro's Cortex Strings library, adds
-> an assembly optimized memcmp() function.
+> trying again ... what happened with this driver ? Any reason for not pushing it after all ?
 
-[...]
+I've been waiting for it to appear in clk-next for a while too. I just
+fetched the repo and it's there.
+Thanks Guenter for following up and Mike for applying.
 
-> +#ifndef	__ARM64EB__
-> +	rev	diff, diff
-> +	rev	data1, data1
-> +	rev	data2, data2
-> +#endif
-
-Given that I can't see you defining __ARM64EB__, I'd take a guess at you
-never having tested this code on a big-endian machine.
-
-Please can you fix that?
-
-Will
+	S?ren
