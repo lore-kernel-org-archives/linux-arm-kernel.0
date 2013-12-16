@@ -1,149 +1,42 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 16 Dec 2013 10:06:01 +0200
-Subject: [PATCHv10 01/41] clk: add support for platform specific clock
- I/O wrapper functions
-In-Reply-To: <20131215004844.26321.2882@quantum>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-2-git-send-email-t-kristo@ti.com>
- <20131215004844.26321.2882@quantum>
-Message-ID: <52AEB469.10602@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 16 Dec 2013 00:11:58 -0800
+Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
+In-Reply-To: <20131126183629.GK28642@pengutronix.de>
+References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131126134117.GF28642@pengutronix.de>
+ <20131126134444.GG28642@pengutronix.de>
+ <20131126183629.GK28642@pengutronix.de>
+Message-ID: <20131216001158.0e15e93c.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2013 02:48 AM, Mike Turquette wrote:
-> Quoting Tero Kristo (2013-11-26 00:05:42)
->> Current clock wrappers assume simple and direct mapped hardware register
->> access. Improve this support by adding functionality for registering
->> platform specific clock I/O wrappers, which can be used to support
->> various features needed like endianess conversions, indexed regmap support,
->> etc. Default I/O wrapper provided also which uses the existing direct
->> I/O mapped behavior.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->
-> There is a separate discussion on removing regmap for reading omap clk
-> registers. I guess this patch is not needed in that case?
+On Tue, 26 Nov 2013 19:36:29 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
 
-Actually, this is still needed, as I need to map the clocks according to 
-their parent nodes.
+> Hello Andrew,
+> 
+> On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K__nig wrote:
+> > On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K__nig wrote:
+> > > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K__nig wrote:
+> > > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
+> > > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
+> > > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
+> > > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
+> > > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
+> > > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+> > > > 
+> > > > So better include it explicitly not only because the last link will go
+> > > > away soon.
+> > > > 
+> > > > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
+> > > Ping. Is this patch ok despite Jean-Christophe's objection?
+> > I saw that akpm already took it into his tree.
+> This patch is one of the last few that are needed to drop <mach/timex.h>
+> alltogether that I don't have an ack from the respective maintainer yet.
+> 
+> Can you give your ack instead of sending the patch to Linus, then I'd
+> take it with the patch dropping <mach/timex.h> to make it easier to
+> merge.
 
--Tero
+ack ;)
 
->
-> Regards,
-> Mike
->
->> ---
->>   drivers/clk/clk.c            |   68 ++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/clk-provider.h |   15 +++++-----
->>   2 files changed, 75 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 2cf2ea6..c331386 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -34,6 +34,74 @@ static HLIST_HEAD(clk_root_list);
->>   static HLIST_HEAD(clk_orphan_list);
->>   static LIST_HEAD(clk_notifier_list);
->>
->> +/**
->> + * clk_readl_default - default clock register read support function
->> + * @reg: register to read
->> + *
->> + * Default implementation for reading a clock register.
->> + */
->> +static u32 clk_readl_default(u32 __iomem *reg)
->> +{
->> +       return readl(reg);
->> +}
->> +
->> +/**
->> + * clk_writel_default - default clock register write support function
->> + * @val: value to write
->> + * @reg: register to write to
->> + *
->> + * Default implementation for writing a clock register.
->> + */
->> +static void clk_writel_default(u32 val, u32 __iomem *reg)
->> +{
->> +       writel(val, reg);
->> +}
->> +
->> +struct clk_reg_ops clk_reg_ops_default = {
->> +       .clk_readl = clk_readl_default,
->> +       .clk_writel = clk_writel_default
->> +};
->> +
->> +static struct clk_reg_ops *clk_reg_ops = &clk_reg_ops_default;
->> +
->> +/**
->> + * clk_register_reg_ops - register access functions for clock registers
->> + * @ops: register level ops
->> + *
->> + * Registers platform or SoC specific operations for reading / writing
->> + * clock registers.
->> + */
->> +int clk_register_reg_ops(struct clk_reg_ops *ops)
->> +{
->> +       if (!ops)
->> +               return -EINVAL;
->> +       clk_reg_ops = ops;
->> +       return 0;
->> +}
->> +
->> +/**
->> + * clk_readl - read a clock register value from hardware
->> + * @reg: register to read
->> + *
->> + * Uses the registered clk_reg_ops to read a hardware clock register value.
->> + */
->> +u32 clk_readl(u32 __iomem *reg)
->> +{
->> +       return clk_reg_ops->clk_readl(reg);
->> +}
->> +
->> +/**
->> + * clk_writel - write a clock register value to hardware
->> + * @val: value to write
->> + * @reg: register to write
->> + *
->> + * Uses the registered clk_reg_ops to write a hardware clock register value.
->> + */
->> +void clk_writel(u32 val, u32 __iomem *reg)
->> +{
->> +       clk_reg_ops->clk_writel(val, reg);
->> +}
->> +
->>   /***           locking             ***/
->>   static void clk_prepare_lock(void)
->>   {
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 7e59253..16e4df2 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -512,15 +512,14 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
->>    * for improved portability across platforms
->>    */
->>
->> -static inline u32 clk_readl(u32 __iomem *reg)
->> -{
->> -       return readl(reg);
->> -}
->> +struct clk_reg_ops {
->> +       u32 (*clk_readl)(u32 __iomem *reg);
->> +       void (*clk_writel)(u32 val, u32 __iomem *reg);
->> +};
->>
->> -static inline void clk_writel(u32 val, u32 __iomem *reg)
->> -{
->> -       writel(val, reg);
->> -}
->> +u32 clk_readl(u32 __iomem *reg);
->> +void clk_writel(u32 val, u32 __iomem *reg);
->> +int clk_register_reg_ops(struct clk_reg_ops *ops);
->>
->>   #endif /* CONFIG_COMMON_CLK */
->>   #endif /* CLK_PROVIDER_H */
->> --
->> 1.7.9.5
->>
+I dropped my copy.
