@@ -1,41 +1,44 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 16 Dec 2013 10:47:38 +1100
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-Message-ID: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 16 Dec 2013 09:31:12 +0900
+Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
+Message-ID: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+The koelsch board uses has an SH ethernet controller which uses a Micrel
+phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
+Micrel-specific phy driver rather than relying on the generic phy driver.
 
-Today's linux-next merge of the renesas tree got a conflict in
-drivers/clk/Makefile between commit 0ad6125b1579 ("clk: at91: add PMC
-base support") from the arm-soc tree and commit 10cdfe9f327a ("clk:
-shmobile: Add R-Car Gen2 clocks support") from the renesas tree.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index f01e878..670238a 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -41,6 +41,7 @@ config MACH_GENMAI
+ config MACH_KOELSCH
+ 	bool "Koelsch board"
+ 	depends on ARCH_R8A7791
++	select MICREL_PHY if SH_ETH
+ 
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+@@ -269,11 +270,13 @@ config MACH_KOELSCH
+ 	bool "Koelsch board"
+ 	depends on ARCH_R8A7791
+ 	select USE_OF
++	select MICREL_PHY if SH_ETH
+ 
+ config MACH_KOELSCH_REFERENCE
+ 	bool "Koelsch board - Reference Device Tree Implementation"
+ 	depends on ARCH_R8A7791
+ 	select USE_OF
++	select MICREL_PHY if SH_ETH
+ 	---help---
+ 	   Use reference implementation of Koelsch board support
+ 	   which makes use of device tree at the expense
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/clk/Makefile
-index ace7309c4369,8dd1339be98b..000000000000
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@@ -35,7 -35,7 +35,8 @@@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra
-  obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
-  obj-$(CONFIG_COMMON_CLK_XGENE)  += clk-xgene.o
-  obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
- +obj-$(CONFIG_COMMON_CLK_AT91)	+= at91/
-+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= shmobile/
-  
-  obj-$(CONFIG_X86)		+= x86/
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/5384b4b3/attachment-0001.sig>
+1.8.4
