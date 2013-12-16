@@ -1,252 +1,263 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Mon, 16 Dec 2013 17:01:25 +0400
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <201312150355.27755.arnd@arndb.de>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312150153.54044.arnd@arndb.de>
- <1387073571.13062.102.camel@host5.omatika.ru>
- <201312150355.27755.arnd@arndb.de>
-Message-ID: <1387198885.13062.154.camel@host5.omatika.ru>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 16 Dec 2013 21:12:16 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1387199536-7053-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-12-15 at 03:55 +0100, Arnd Bergmann wrote:
-> On Sunday 15 December 2013, Sergei Ianovich wrote:
-> ...
-> I think the way you have structured your code is good, and an MFD would
-> not help. Please just restructure the DT representation to contain the
-> external-bus and/or the fpga connected to it. You probably don't need both,
-> but it doesn't hurt to show them as different device-nodes either.
-> Your choice.
+Add dw_mmc-k3.c for k3v2, support sd/emmc
 
-PXA27x memory bus can have up to 10 devices: up to 6 slower
-flash/SRAM/variable-latency-IO selected by nCS<0> to <5>, and up to 4
-partions of SDRAM selected by nSDCS<0> to <3>.
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Signed-off-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
+---
+ .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   60 +++++++++
+ drivers/mmc/host/Kconfig                           |   10 ++
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/dw_mmc-k3.c                       |  134 ++++++++++++++++++++
+ 4 files changed, 205 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+ create mode 100644 drivers/mmc/host/dw_mmc-k3.c
 
-It appears that the FPGA is directly connected to the memory bus and is
-selected by nCS<5>. According to MSC2 configuration (already in the
-mainstream U-Boot), the FPGA is configured as a synchronous SRAM with
-access cycle of 30x memory bus cycles. So I made it a top-level bus like
-pxabus.
-
-Ethernet devices are also connected to the memory bus via some kind of
-gate array. This one is a bit faster -- 15x memory cycles, which is
-still a lot. It explains why network transfers are never faster than 15
-Mbit/s.
-
-The final tree looks like this:
-
-diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
 new file mode 100644
-index 0000000..cb2a31d
+index 000000000000..d7e2d7f159bb
 --- /dev/null
-+++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
-@@ -0,0 +1,208 @@
-+/* Device tree for ICP DAS LP-8x4x */
-+/dts-v1/;
++++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+@@ -0,0 +1,60 @@
++* Hisilicon specific extensions to the Synopsys Designware Mobile
++  Storage Host Controller
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "pxa27x.dtsi"
++Read synopsys-dw-mshc.txt for more details
 +
-+/ {
-+	model = "ICP DAS LP-8x4x programmable automation controller";
-+	compatible = "marvell,lp8x4x", "marvell,pxa270";
++The Synopsys designware mobile storage host controller is used to interface
++a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
++differences between the core Synopsys dw mshc controller properties described
++by synopsys-dw-mshc.txt and the properties used by the Hisilicon specific
++extensions to the Synopsys Designware Mobile Storage Host Controller.
 +
-+	aliases {
-+		ethernet0 = &eth0;
-+		ethernet1 = &eth1;
-+	};
++Required Properties:
 +
-+	memory {
-+		/*
-+		 * SDRAM
-+		 * connected to CPU via nSDCS<0>
-+		 */
-+		reg = <0xa0000000 0x08000000>;
-+	};
++* compatible: should be one of the following.
++  - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extentions.
 +
-+	regulators {
-+		compatible = "simple-bus";
++* clock-freq-table: should be the frequency (in Hz) array of the ciu clock
++	in each	supported mode.
++	0. CIU clock rate in Hz for DS mode
++	1. CIU clock rate in Hz for MMC HS mode
++	2. CIU clock rate in Hz for SD HS mode
++	3. CIU clock rate in Hz for SDR12 mode
++	4. CIU clock rate in Hz for SDR25 mode
++	5. CIU clock rate in Hz for SDR50 mode
++	6. CIU clock rate in Hz for SDR104 mode
++	7. CIU clock rate in Hz for DDR50 mode
++	8. CIU clock rate in Hz for HS200 mode
++
++Example:
++
++	/* for Hi3620 */
++
++	/* SoC portion */
++	dwmmc_0: dwmmc0 at fcd03000 {
++		compatible = "hisilicon,hi4511-dw-mshc";
++		reg = <0xfcd03000 0x1000>;
++		interrupts = <0 16 4>;
 +		#address-cells = <1>;
 +		#size-cells = <0>;
++		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
++		clock-names = "ciu", "biu";
++		clock-freq-table =
++		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
++	};
 +
-+		vmmc: regulator at 0 {
-+			compatible = "regulator-fixed";
++	/* Board portion */
++	dwmmc0 at fcd03000 {
++		num-slots = <1>;
++		vmmc-supply = <&ldo12>;
++		fifo-depth = <0x100>;
++		supports-highspeed;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
++		slot at 0 {
 +			reg = <0>;
-+			regulator-name = "vmmc";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
++			bus-width = <4>;
++			disable-wp;
++			cd-gpios = <&gpio10 3 0>;
 +		};
 +	};
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 7fc5099e44b2..45aaa2de0f58 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -575,6 +575,16 @@ config MMC_DW_SOCFPGA
+ 	  This selects support for Altera SoCFPGA specific extensions to the
+ 	  Synopsys DesignWare Memory Card Interface driver.
+ 
++config MMC_DW_K3
++	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
++	depends on MMC_DW
++	select MMC_DW_PLTFM
++	select MMC_DW_IDMAC
++	help
++	  This selects support for Hisilicon K3 SoC specific extensions to the
++	  Synopsys DesignWare Memory Card Interface driver. Select this option
++	  for platforms based on Hisilicon K3 SoC's.
 +
-+	flash at 00000000 {
-+		/*
-+		 * Boot memory
-+		 * connected to CPU via nCS<0>
-+		 */
-+		compatible = "cfi-flash";
-+		reg = <0x0 0x02000000>;
-+		bank-width = <4>;
-+		device-width = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		fs at 0 {
-+			label = "u-boot";
-+			reg = <0 0x40000>;
-+		};
-+		fs at 40000 {
-+			label = "settings";
-+			reg = <0x40000 0x40000>;
-+		};
-+		fs at 80000 {
-+			label = "kernel";
-+			reg = <0x80000 0x280000>;
-+		};
-+		fs at 300000 {
-+			label = "root_fs";
-+			reg = <0x300000 0x1d00000>;
-+		};
-+	};
+ config MMC_DW_PCI
+ 	tristate "Synopsys Designware MCI support on PCI bus"
+ 	depends on MMC_DW && PCI
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index c41d0c364509..64f5f8d35839 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -43,6 +43,7 @@ obj-$(CONFIG_MMC_DW)		+= dw_mmc.o
+ obj-$(CONFIG_MMC_DW_PLTFM)	+= dw_mmc-pltfm.o
+ obj-$(CONFIG_MMC_DW_EXYNOS)	+= dw_mmc-exynos.o
+ obj-$(CONFIG_MMC_DW_SOCFPGA)	+= dw_mmc-socfpga.o
++obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
+ obj-$(CONFIG_MMC_DW_PCI)	+= dw_mmc-pci.o
+ obj-$(CONFIG_MMC_SH_MMCIF)	+= sh_mmcif.o
+ obj-$(CONFIG_MMC_JZ4740)	+= jz4740_mmc.o
+diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+new file mode 100644
+index 000000000000..e3eea2883ae7
+--- /dev/null
++++ b/drivers/mmc/host/dw_mmc-k3.c
+@@ -0,0 +1,134 @@
++/*
++ * Copyright (c) 2013 Linaro Ltd.
++ * Copyright (c) 2013 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
-+	flash at 04000000 {
-+		/*
-+		 * connected to CPU via nCS<1>
-+		 */
-+		compatible = "cfi-flash";
-+		reg = <0x04000000 0x02000000>;
-+		bank-width = <2>;
-+		device-width = <1>;
-+	};
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/dw_mmc.h>
++#include <linux/of_address.h>
 +
-+	pxabus {
-+		pxairq: interrupt-controller at 40d00000 {
-+			marvell,intc-priority;
-+			marvell,intc-nr-irqs = <34>;
-+		};
++#include "dw_mmc.h"
++#include "dw_mmc-pltfm.h"
 +
-+		uart at 40100000 {
-+			status = "okay";
-+		};
-+
-+		uart at 40200000 {
-+			status = "okay";
-+		};
-+
-+		uart at 40700000 {
-+			status = "okay";
-+		};
-+
-+		mmc at 41100000 {
-+			status = "okay";
-+			vmmc-supply = <&vmmc>;
-+		};
-+
-+		ohci at 4c000000 {
-+			status = "okay";
-+			marvell,port-mode = <3>;
-+			marvell,oc-mode-perport;
-+			marvell,enable-port1;
-+		};
-+	};
-+
-+	extbus {
-+		/*
-+		 * Transparent bus, 2 byte-wide access
-+		 * connected to CPU via nCS<3>
-+		 */
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		interrupt-parent = <&gpio>;
-+
-+		eth0: eth at 0c000000 {
-+			compatible = "davicom,dm9000";
-+			reg = <0x0c000000 0x2
-+			       0x0c004000 0x2>;
-+			interrupts = <9 IRQ_TYPE_EDGE_RISING>;
-+			status = "okay";
-+		};
-+
-+		eth1: eth at 0d000000 {
-+			compatible = "davicom,dm9000";
-+			reg = <0x0d000000 0x2
-+			       0x0d004000 0x2>;
-+			interrupts = <82 IRQ_TYPE_EDGE_RISING>;
-+			status = "okay";
-+		};
-+	};
-+
-+	fpgabus {
-+		/*
-+		 * Transparent bus, 1 byte-wide access, even addresses only
-+		 * connected to CPU via nCS<5>
-+		 */
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x17000000 0x10000>;
-+		interrupt-parent = <&fpga>;
-+
-+		rtc at 901c {
-+			compatible = "ds,rtc-ds1302";
-+			reg = <0x901c 0x1>;
-+			status = "okay";
-+		};
-+
-+		sram at a000 {
-+			compatible = "icpdas,sram-lp8x4x";
-+			reg = <0xa000 0x1000
-+			       0x901e 0x1>;
-+		};
-+
-+		fpga: irq at 9006 {
-+			compatible = "icpdas,irq-lp8x4x";
-+			reg = <0x9006 0x16>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
-+			status = "okay";
-+		};
-+
-+		uart at 9050 {
-+			compatible = "icpdas,uart-lp8x4x";
-+			reg = <0x9050 0x10
-+			       0x9030 0x02>;
-+			interrupts = <13>;
-+			status = "okay";
-+		};
-+
-+		uart at 9060 {
-+			compatible = "icpdas,uart-lp8x4x";
-+			reg = <0x9060 0x10
-+			       0x9032 0x02>;
-+			interrupts = <14>;
-+			status = "okay";
-+		};
-+
-+		uart at 9070 {
-+			compatible = "icpdas,uart-lp8x4x";
-+			reg = <0x9070 0x10
-+			       0x9034 0x02>;
-+			interrupts = <15>;
-+			status = "okay";
-+		};
-+
-+		backplane at 9046 {
-+			compatible = "icpdas,backplane-lp8x4x";
-+			reg = <0x9046 0x2
-+			       0x9004 0x2
-+			       0x1000 0x10
-+			       0x2000 0x10
-+			       0x3000 0x10
-+			       0x4000 0x10
-+			       0x5000 0x10
-+			       0x6000 0x10
-+			       0x7000 0x10
-+			       0x8000 0x10>;
-+		};
-+	};
++#define MAX_NUMS	10
++struct dw_mci_k3_priv_data {
++	u32	clk_table[MAX_NUMS];
 +};
++
++static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
++{
++	struct dw_mci_k3_priv_data *priv = host->priv;
++	u32 rate = priv->clk_table[ios->timing];
++	int ret;
++
++	ret = clk_set_rate(host->ciu_clk, rate);
++	if (ret)
++		dev_warn(host->dev, "failed to set clock rate %uHz\n", rate);
++
++	host->bus_hz = clk_get_rate(host->ciu_clk);
++}
++
++static int dw_mci_k3_parse_dt(struct dw_mci *host)
++{
++	struct dw_mci_k3_priv_data *priv;
++	struct device_node *node = host->dev->of_node;
++	struct property *prop;
++	const __be32 *cur;
++	u32 val, num = 0;
++
++	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv) {
++		dev_err(host->dev, "mem alloc failed for private data\n");
++		return -ENOMEM;
++	}
++	host->priv = priv;
++
++	of_property_for_each_u32(node, "clock-freq-table", prop, cur, val) {
++		if (num >= MAX_NUMS)
++			break;
++		priv->clk_table[num++] = val;
++	}
++	return 0;
++}
++
++static unsigned long k3_dwmmc_caps[4] = {
++	MMC_CAP_4_BIT_DATA | MMC_CAP_SD_HIGHSPEED,
++	MMC_CAP_8_BIT_DATA | MMC_CAP_MMC_HIGHSPEED,
++	0,
++	0,
++};
++
++static const struct dw_mci_drv_data k3_drv_data = {
++	.caps			= k3_dwmmc_caps,
++	.set_ios		= dw_mci_k3_set_ios,
++	.parse_dt		= dw_mci_k3_parse_dt,
++};
++
++static const struct of_device_id dw_mci_k3_match[] = {
++	{ .compatible = "hisilicon,hi4511-dw-mshc", .data = &k3_drv_data, },
++	{},
++};
++MODULE_DEVICE_TABLE(of, dw_mci_k3_match);
++
++static int dw_mci_k3_probe(struct platform_device *pdev)
++{
++	const struct dw_mci_drv_data *drv_data;
++	const struct of_device_id *match;
++
++	match = of_match_node(dw_mci_k3_match, pdev->dev.of_node);
++	drv_data = match->data;
++
++	return dw_mci_pltfm_register(pdev, drv_data);
++}
++
++static int dw_mci_k3_suspend(struct device *dev)
++{
++	struct dw_mci *host = dev_get_drvdata(dev);
++	int ret = 0;
++
++	ret = dw_mci_suspend(host);
++	if (!ret)
++		clk_disable_unprepare(host->ciu_clk);
++
++	return ret;
++}
++
++static int dw_mci_k3_resume(struct device *dev)
++{
++	struct dw_mci *host = dev_get_drvdata(dev);
++	int ret = 0;
++
++	ret = clk_prepare_enable(host->ciu_clk);
++	if (ret) {
++		dev_err(host->dev, "failed to enable ciu clock\n");
++		return ret;
++	}
++
++	return dw_mci_resume(host);
++}
++
++SIMPLE_DEV_PM_OPS(dw_mci_k3_pmops, dw_mci_k3_suspend, dw_mci_k3_resume);
++
++static struct platform_driver dw_mci_k3_pltfm_driver = {
++	.probe		= dw_mci_k3_probe,
++	.remove		= dw_mci_pltfm_remove,
++	.driver		= {
++		.name		= "dwmmc_k3",
++		.of_match_table	= dw_mci_k3_match,
++		.pm		= &dw_mci_k3_pmops,
++	},
++};
++
++module_platform_driver(dw_mci_k3_pltfm_driver);
++
++MODULE_DESCRIPTION("K3 Specific DW-MSHC Driver Extension");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:dwmmc-k3");
+-- 
+1.7.9.5
