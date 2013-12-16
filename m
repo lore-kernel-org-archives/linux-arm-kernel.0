@@ -1,59 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 16 Dec 2013 14:24:07 +0530
-Subject: [PATCH 2/2] cpufreq: highbank: rework the kconfig dependencies
- for arm64
-In-Reply-To: <1386202994-30784-3-git-send-email-robherring2@gmail.com>
-References: <1386202994-30784-1-git-send-email-robherring2@gmail.com>
- <1386202994-30784-3-git-send-email-robherring2@gmail.com>
-Message-ID: <CAKohpomzgsQVuBOm-hrs0HNAJoM4zxExFn-rz5aCGyZSyeEatQ@mail.gmail.com>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Mon, 16 Dec 2013 10:04:38 +0100
+Subject: [linux-sunxi] Re: [PATCH 2/5] ARM: dts: sun4i: Add support for mmc
+In-Reply-To: <52ADBD41.4050104@redhat.com>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <20131215135854.GF3651@lukather> <52ADBD41.4050104@redhat.com>
+Message-ID: <11015171.YHkHMOrD9M@pagira.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2013 05:53, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Make ARM_HIGHBANK_CPUFREQ not depend on ARCH_HIGHBANK to enable on
-> arm64 and also give better build converage. Change the selects to be
+Hi
+> Note as said before I expect David to take things from here.
+I will start working on it this evening.
 
-s/converage/coverage
+> I just took what David was using. I agree picking one and staying with
+> it would be better.
+There is a reason why my working branch was called "plsdsif"
+(short for "Please don't shout at me in Finnish")
 
-> same depends as the cpu0 driver. Otherwise, we can get kconfig select
-> errors. Also, add missing depends for PL320_MBOX.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: cpufreq at vger.kernel.org
-> Cc: linux-pm at vger.kernel.org
-> ---
->  drivers/cpufreq/Kconfig.arm | 14 ++++++--------
->  1 file changed, 6 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index ce52ed9..0d7130d 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -65,16 +65,14 @@ config ARM_EXYNOS5440_CPUFREQ
->           If in doubt, say N.
->
->  config ARM_HIGHBANK_CPUFREQ
-> -       tristate "Calxeda Highbank-based"
-> -       depends on ARCH_HIGHBANK
-> -       select GENERIC_CPUFREQ_CPU0
-> +       tristate "Calxeda ECX based"
-> +       depends on HAVE_CLK && REGULATOR && OF
-> +       depends on PL320_MBOX
-> +       select ARCH_HAS_OPP
->         select PM_OPP
-> -       select REGULATOR
-> -
-> -       default m
-> +       select GENERIC_CPUFREQ_CPU0
->         help
-> -         This adds the CPUFreq driver for Calxeda Highbank SoC
-> -         based boards.
-> +         This adds the CPUFreq driver for Calxeda based SoCs.
->
->           If in doubt, say N.
+> Yes and no. The pullups are enabled by uboot and the allwinner
+> sources, most of my testing has been done without them, which
+> seems to work fine. I've enabled them to be consisten with the
+> allwinner sources and u-boot.
+Ok
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org> for both patches.
+> As for drive = <3>, we need drive = <2> for normal modes,
+> and drive = <3> for ddr mode. I simply picked <3> to keep
+> things KISS. It should not matter much in power usage, as
+> it will only make the flanks of the signal more steep. Once the
+> desired output level is reached the current will drop off. It will
+> use more current when changing the level, but for half the time,
+> so the effective power usage (current * time) is the same.
+In this case lets implement a switch which enables the pull ups for DDR
+mode and lets disable it by default in turn.
+This way we can make sure that we don't have doubled pull up,
+since this could actually mess up some circuitry.
+
+> > Ideally, I'd like this patch to be splitted into three:
+> >    - One that adds the MMC controller nodes to the DTSI
+> >    - One that adds the muxing options you need to the pinctrl node
+> >    - One that enables the controller on the boards
+> Sounds like a good job for David. Note I've a lot more boards for
+> which I would like to add mmc support or dts files in general
+> (will do so as time permits).
+Ok. I will work on it this evening.
+
+> For those boards which already have a dts I'll send mmc adding dts
+> patches to David for now so he can add the changes to the patch-set.
+Ok. I will create another branch and will incorporate your DTS files.
+
+> How do you want to deal with new boards ? Send the addition of the
+> base board to you (and CC David as he will need them in his tree too),
+> and then send a patch to add mmc to the dts to David ?
+Sounds good to me...
+ 
+> Or should I simply make it one big patch including mmc in the initial
+> commit ?
+I imagine that a messy approach. Especially if I'm supposed to refactor
+the patchset into a new one...
+
+cheers
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/21d5a173/attachment.sig>
