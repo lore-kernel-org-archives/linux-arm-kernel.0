@@ -1,64 +1,40 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 16 Dec 2013 15:43:43 +0100
-Subject: possible regression on 3.13 when calling flush_dcache_page
-In-Reply-To: <20131213015909.GA8845@lge.com>
-References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
- <20131212143618.GJ12099@ldesroches-Latitude-E6320>
- <20131213015909.GA8845@lge.com>
-Message-ID: <20131216144343.GD9627@ldesroches-Latitude-E6320>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 16 Dec 2013 22:45:18 +0800
+Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <1386767606-6391-4-git-send-email-broonie@kernel.org>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <1386767606-6391-4-git-send-email-broonie@kernel.org>
+Message-ID: <52AF11FE.70000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 12/11/2013 09:13 PM, Mark Brown wrote:
+> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> new file mode 100644
+> index 000000000000..611edefaeaf1
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/topology.h
+> @@ -0,0 +1,42 @@
+> +#ifndef _ASM_ARM_TOPOLOGY_H
+> +#define _ASM_ARM_TOPOLOGY_H
+> +
+> +#ifdef CONFIG_ARM_CPU_TOPOLOGY
+> +
+> +#include <linux/cpumask.h>
+> +
+> +struct cputopo_arm {
+> +	int thread_id;
+> +	int core_id;
+> +	int socket_id;
+> +	cpumask_t thread_sibling;
+> +	cpumask_t core_sibling;
+> +};
 
-On Fri, Dec 13, 2013 at 10:59:09AM +0900, Joonsoo Kim wrote:
-> On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
-> > fix mmc mailing list address error
-> > 
-> > On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
-> > > Hi,
-> > > 
-> > > With v3.13-rc3 I have an error when the atmel-mci driver calls
-> > > flush_dcache_page (log at the end of the message).
-> > > 
-> > > Since I didn't have it before, I did a git bisect and the commit introducing
-> > > the error is the following one:
-> > > 
-> > > 106a74e slab: replace free and inuse in struct slab with newly introduced active
-> > > 
-> > > I don't know if this commit has introduced a bug or if it has revealed a bug
-> > > in the atmel-mci driver.
-> 
-> Hello,
-> 
-> I think that this commit may not introduce a bug. This patch remove one
-> variable on slab management structure and replace variable name. So there
-> is no functional change.
-> 
+Forgive me if I am stupid. :)
 
-If I have reverted this patch and other ones you did on top of it and
-the issue disappear.
+why we don't need a cluster_id? and does one cpu socket include few
+clusters?
 
-> I doubt that side-effect of this patch reveals a bug in other place.
-> Side-effect is reduced memory usage for slab management structure. It would
-> makes some slabs have more objects with more density since slab management
-> structure is sometimes on the page for objects. So if it diminishes, more
-> objects can be in the page.
-> 
-> Anyway, I will look at it more. If you have any progress, please let me know.
-
-No progress at the moment.
-
-
-Regards
-
-Ludovic
-
-> 
-> Thanks.
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+-- 
+Thanks
+    Alex
