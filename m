@@ -1,35 +1,31 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 16 Dec 2013 18:39:40 +0200
-Subject: [PATCH 4/4] ARM: keystone_defconfig: enable LED support
-In-Reply-To: <1387211981-26045-1-git-send-email-grygorii.strashko@ti.com>
-References: <1387211981-26045-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1387211981-26045-5-git-send-email-grygorii.strashko@ti.com>
+Date: Mon, 16 Dec 2013 18:39:36 +0200
+Subject: [PATCH 0/4] ARM: keystone: enable GPIO support
+Message-ID: <1387211981-26045-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone GPIO functionality is ready for use, so LED support can be
-enabled in config.
+This series adds Keystone GPIO IP definition in DT and enable GPIO support in
+Keystone configuration file.
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/configs/keystone_defconfig |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Also, it enables LEDs support for Keystone 2 K2H EVM as specified in board 
+schematic. For more information see:
+- http://www.advantech.com/Support/TI-EVM/EVMK2HX.aspx 
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index e911f7f..fb1eb8a 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -161,3 +161,11 @@ CONFIG_CRYPTO_USER_API_SKCIPHER=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_DAVINCI=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_ONESHOT=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
+Depends on:
+[PATCH 0/2] gpio: davinci: reuse for keystone arch
+- https://lkml.org/lkml/2013/12/12/366
+
+Grygorii Strashko (4):
+  arm: dts: keystone: add GPIO device entry
+  ARM: keystone_defconfig: enable gpio support
+  arm: dts: keystone-evm: add LEDs supports
+  ARM: keystone_defconfig: enable LED support
+
+ arch/arm/boot/dts/k2hk-evm.dts      |   23 ++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi     |   45 +++++++++++++++++++++++++++++++++++
+ arch/arm/configs/keystone_defconfig |   11 +++++++++
+ 3 files changed, 79 insertions(+)
+
 -- 
 1.7.9.5
