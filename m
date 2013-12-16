@@ -1,30 +1,40 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 16 Dec 2013 11:49:27 +0100
-Subject: possible regression on 3.13 when calling flush_dcache_page
-In-Reply-To: <20131212171322.GT4360@n2100.arm.linux.org.uk>
-References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
- <20131212171322.GT4360@n2100.arm.linux.org.uk>
-Message-ID: <20131216104927.GA9627@ldesroches-Latitude-E6320>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Dec 2013 10:51:18 +0000 (UTC)
+Subject: [PATCHv10 22/41] ARM: dts: omap5 clock data
+In-Reply-To: <1385453182-24421-23-git-send-email-t-kristo@ti.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-23-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1312161046530.31680@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 05:13:22PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
-> > I'll investigate on atmel-mci driver side but if someone has also this
-> > issue or see what is wrong in the driver, please tell me all about it.
-> 
-> I'm not entirely sure what's causing this, but calling flush_dcache_page()
-> from an IRQ isn't the best idea, as one of its side effects will be to
-> unmask IRQs at the CPU.
-> 
+On Tue, 26 Nov 2013, Tero Kristo wrote:
 
-Thans for pointing this point. Having a look to other mmc drivers, it
-seems flush_dcache_page() is also called from an IRQ. Not sure that
-deferring it is the way to go.
+> This patch creates a unique node for each clock in the OMAP5 power,
+> reset and clock manager (PRCM).
 
-What should be the most proper solution?
+...
 
-> BTW, the faulting function seems to have been removed in more recent
-> kernels.
+> +&cm_core_aon {
+> +	pad_clks_src_ck: pad_clks_src_ck {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <12000000>;
+> +	};
+> +
+> +	pad_clks_ck: pad_clks_ck {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&pad_clks_src_ck>;
+> +		ti,bit-shift = <8>;
+> +		reg = <0x0108>;
+> +	};
 
-Same error with rc4 and linux-next.
+All of the clock data should be underneath a "clocks {" node, for all of 
+the chips.  Please see the Calxeda ECX clocks DT data as an example of how 
+this should look:
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/ecx-common.dtsi#n141
+
+
+- Paul
