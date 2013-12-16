@@ -1,267 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 16 Dec 2013 16:49:22 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-Message-ID: <1387212565-12668-1-git-send-email-broonie@kernel.org>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 16 Dec 2013 17:54:30 +0100
+Subject: [PATCH 0/3] ARM64: add perf support
+Message-ID: <1387212873-8248-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+Add perf support for the AARCH64 architecture. This includes the
+support for:
+- AARCH64 perf registers definition and hooks,
+- compat mode registers use, i.e. profiling a 32-bit binary on
+   a 64-bit system,
+- unwinding using the dwarf information from the .debug_frame
+   section of the ELF binary; only in 64-bit mode,
+- unwinding using the frame pointer information; in 64-bit and
+   compat modes.
 
-Add basic CPU topology support to arm64, based on the existing pre-v8
-code and some work done by Mark Hambleton.  This patch does not
-implement any topology discovery support since that should be based on
-information from firmware, it merely implements the scaffolding for
-integration of topology support in the architecture.
+ToDo:
+- add support for unwinding using the dwarf information in compat
+   mode. This requires some changes to the libunwind code.
 
-The goal is to separate the architecture hookup for providing topology
-information from the DT parsing in order to ease review and avoid
-blocking the architecture code (which will be built on by other work)
-with the DT code review by providing something something simple
-and basic.
+Tested on ARMv7 and ARMv8 platforms. The compat mode has been tested
+on ARMv8 using statically built 32-bit binaries.
 
-A following patch will implement support for parsing the DT topology
-bindings for ARM, similar patches will be needed for ACPI.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/Kconfig                | 24 ++++++++++
- arch/arm64/include/asm/topology.h | 39 ++++++++++++++++
- arch/arm64/kernel/Makefile        |  1 +
- arch/arm64/kernel/smp.c           | 12 +++++
- arch/arm64/kernel/topology.c      | 95 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 171 insertions(+)
- create mode 100644 arch/arm64/include/asm/topology.h
- create mode 100644 arch/arm64/kernel/topology.c
+Jean Pihet (3):
+  ARM64: perf: add support for perf registers API
+  ARM64: perf: wire up perf_regs and unwind support
+  ARM64: perf: add support for frame pointer unwinding in compat mode
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6d4dd22ee4b7..00fcd490b3be 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -154,6 +154,30 @@ config SMP
- 
- 	  If you don't know what to do here, say N.
- 
-+config ARM_CPU_TOPOLOGY
-+	bool "Support CPU topology definition"
-+	depends on SMP
-+	default y
-+	help
-+	  Support CPU topology definition, based on configuration
-+	  provided by the firmware.
-+
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
-+
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
-+
- config NR_CPUS
- 	int "Maximum number of CPUs (2-32)"
- 	range 2 32
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-new file mode 100644
-index 000000000000..58b8b84adcd2
---- /dev/null
-+++ b/arch/arm64/include/asm/topology.h
-@@ -0,0 +1,39 @@
-+#ifndef _ASM_ARM_TOPOLOGY_H
-+#define _ASM_ARM_TOPOLOGY_H
-+
-+#ifdef CONFIG_ARM_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cputopo_arm {
-+	int thread_id;
-+	int core_id;
-+	int socket_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
-+};
-+
-+extern struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
-+#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-+
-+#define mc_capable()	(cpu_topology[0].socket_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { }
-+static inline void store_cpu_topology(unsigned int cpuid) { }
-+
-+#endif
-+
-+#include <asm-generic/topology.h>
-+
-+#endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5ba2fd43a75b..2d145e38ad49 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-+arm64-obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index a0c2ca602cf8..0271fbde5363 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -113,6 +113,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
- }
- 
-+static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
-+{
-+	store_cpu_topology(cpuid);
-+}
-+
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -150,6 +155,8 @@ asmlinkage void secondary_start_kernel(void)
- 	 */
- 	notify_cpu_starting(cpu);
- 
-+	smp_store_cpu_info(cpu);
-+
- 	/*
- 	 * OK, now it's safe to let the boot CPU continue.  Wait for
- 	 * the CPU migration code to notice that the CPU is online
-@@ -388,6 +395,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	int err;
- 	unsigned int cpu, ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
-+	smp_store_cpu_info(smp_processor_id());
-+
-+
- 	/*
- 	 * are we trying to boot more cores than exist?
- 	 */
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-new file mode 100644
-index 000000000000..b078afa6958d
---- /dev/null
-+++ b/arch/arm64/kernel/topology.c
-@@ -0,0 +1,95 @@
-+/*
-+ * arch/arm64/kernel/topology.c
-+ *
-+ * Copyright (C) 2011,2013 Linaro Limited.
-+ * Written by: Vincent Guittot
-+ *
-+ * based on arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/export.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/smp_plat.h>
-+#include <asm/topology.h>
-+
-+/*
-+ * cpu topology table
-+ */
-+struct cputopo_arm cpu_topology[NR_CPUS];
-+EXPORT_SYMBOL_GPL(cpu_topology);
-+
-+const struct cpumask *cpu_coregroup_mask(int cpu)
-+{
-+	return &cpu_topology[cpu].core_sibling;
-+}
-+
-+static void update_siblings_masks(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
-+	int cpu;
-+
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		cpu_topo = &cpu_topology[cpu];
-+
-+		if (cpuid_topo->socket_id != cpu_topo->socket_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
-+
-+		if (cpuid_topo->core_id != cpu_topo->core_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
-+
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpuid_topo = &cpu_topology[cpuid];
-+
-+	/* DT should have been parsed by the time we get here */
-+	if (cpuid_topo->core_id == -1)
-+		pr_info("CPU%u: No topology information configured\n", cpuid);
-+	else
-+		update_siblings_masks(cpuid);
-+}
-+
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void __init init_cpu_topology(void)
-+{
-+	unsigned int cpu;
-+
-+	/* init core mask and power*/
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->socket_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
+ arch/arm64/Kconfig                        |  2 +
+ arch/arm64/include/asm/ptrace.h           |  1 +
+ arch/arm64/include/uapi/asm/Kbuild        |  1 +
+ arch/arm64/include/uapi/asm/perf_regs.h   | 40 ++++++++++++++
+ arch/arm64/kernel/Makefile                |  1 +
+ arch/arm64/kernel/perf_event.c            | 75 +++++++++++++++++++++++---
+ arch/arm64/kernel/perf_regs.c             | 46 ++++++++++++++++
+ tools/perf/arch/arm64/Makefile            |  7 +++
+ tools/perf/arch/arm64/include/perf_regs.h | 88 +++++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/util/dwarf-regs.c   | 81 ++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/util/unwind.c       | 82 ++++++++++++++++++++++++++++
+ tools/perf/config/Makefile                |  8 ++-
+ 12 files changed, 423 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm64/include/uapi/asm/perf_regs.h
+ create mode 100644 arch/arm64/kernel/perf_regs.c
+ create mode 100644 tools/perf/arch/arm64/Makefile
+ create mode 100644 tools/perf/arch/arm64/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm64/util/dwarf-regs.c
+ create mode 100644 tools/perf/arch/arm64/util/unwind.c
+
 -- 
-1.8.5.1
+1.7.11.7
