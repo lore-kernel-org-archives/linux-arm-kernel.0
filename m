@@ -1,52 +1,91 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 16 Dec 2013 11:59:10 -0800
-Subject: [PATCH 1/7] Input: pmic8xxx-pwrkey - Pass input device
- directly to interrupt
-In-Reply-To: <20131215112103.GA14818@core.coreip.homeip.net>
-References: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
- <1386718996-3733-2-git-send-email-sboyd@codeaurora.org>
- <20131215112103.GA14818@core.coreip.homeip.net>
-Message-ID: <20131216195910.GQ21983@codeaurora.org>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 16 Dec 2013 21:05:22 +0100
+Subject: [PATCH v4 2/2] ARM: mach-moxart: add MOXA ART SoC device tree
+ files
+In-Reply-To: <CAEgOgz7=xZ8N+vGuaQ6L3n5SYpS3bS+xN88WXDH+A7m7JNLrcw@mail.gmail.com>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <1386945188-8316-3-git-send-email-jonas.jensen@gmail.com>
+ <CAEgOgz7=xZ8N+vGuaQ6L3n5SYpS3bS+xN88WXDH+A7m7JNLrcw@mail.gmail.com>
+Message-ID: <CACmBeS1H96Scr+ycHa-Ar_t72Q2x=LH-2vrbQXiLiuYHyH3S-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15, Dmitry Torokhov wrote:
-> Hi Stephen,
-> 
-> On Tue, Dec 10, 2013 at 03:43:10PM -0800, Stephen Boyd wrote:
-> > Instead of passing the pointer to the container structure just
-> > pass the input device here. This saves a dereference in the fast
-> > path.
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  drivers/input/misc/pmic8xxx-pwrkey.c | 22 ++++++++--------------
-> >  1 file changed, 8 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-> > index ce3c426..233b216 100644
-> > --- a/drivers/input/misc/pmic8xxx-pwrkey.c
-> > +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-> > @@ -32,26 +32,21 @@
-> >   * @key_press_irq: key press irq number
-> >   */
-> >  struct pmic8xxx_pwrkey {
-> > -	struct input_dev *pwr;
-> 
-> This causes compile errors as you need pwrkey->pwr in remove() to
-> unregister input device. I'll fix it up.
-> 
+On 15 December 2013 05:27, Peter Crosthwaite
+<peter.crosthwaite@xilinx.com> wrote:
+>> +       sdhci: sdhci at 98e00000 {
+>> +               compatible = "moxa,moxart-sdhci";
+>> +               reg = <0x98e00000 0x5C>;
+>> +               interrupts = <5 0>;
+>> +               clocks = <&clk_apb>;
+>> +               dmas =  <&dma 5>,
+>> +                       <&dma 5>;
+>> +               dma-names = "tx", "rx";
+>> +       };
+>
+> Is your SDHCI really implemented on the board level? The fact that its
+> reg property is within the same as the SoC range (for your dtsi)
+> suggests the SDHCI is part of the SoC and should perhaps be in the
+> dtsi?
 
-Ah sorry. I forgot to send the patch before this that converts it
-to devm.
+>> +       mac1: mac at 92000000 {
+>> +               compatible = "moxa,moxart-mac";
+>> +               reg = <0x92000000 0x90>;
+>> +               interrupts = <27 0>;
+>> +               phy-handle = <&ethphy1>;
+>> +               phy-mode = "mii";
+>> +       };
+>
+> Same for MACs.
 
-> >  	err = devm_request_irq(&pdev->dev, key_press_irq, pwrkey_press_irq,
-> > -		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwrkey);
-> > +		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwr);
+>> +
+>> +       uart0: uart at 98200000 {
+>> +               compatible = "ns16550a";
+>> +               reg = <0x98200000 0x20>;
+>> +               interrupts = <31 8>;
+>> +               reg-shift = <2>;
+>> +               reg-io-width = <4>;
+>> +               clock-frequency = <14745600>;
+>> +               status = "okay";
+>> +       };
+>> +
+>
+> And UARTs.
+>
+> Let me know if i'm misunderstanding dts/dtsi split but looking at some
+> of the other SoCs this seems inconsistent to me.
 
-As you can see here because this driver isn't currently using
-devm_request_irq().
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+It is likely to be true, that technically these are all part of the
+SoC. By examining the hardware, there are no external chips (on either
+base or main board) that looks capable of handling such functions:
+
+https://plus.google.com/photos/103371465418643926605/albums/5820634595801767953
+
+I made the split with some consideration to other MOXA ART machines,
+that they can be added as a separate file including the same dtsi:
+
+MOXA ART hardware examples:
+
+UC-7112/UC-7110: "SD slot (UC-7112, and UC-7112 Plus only)":
+http://www.moxa.com/product/UC-7112_UC-7110.htm
+
+IA241: "64 MB RAM":
+http://www.moxa.com/product/IA241_IA240.htm
+
+UC-7101-LX: "One 10/100 Mbps Ethernet port":
+http://www.moxa.com/product/UC-7101-LX.htm
+
+
+UC-7112-LX has 32 MB RAM and two ethernet ports. This is why I think
+MAC is good as is, RAM should move out from SoC?
+
+I don't know if they all have a debug UART (I only have access to
+UC-7112-LX), and it's not obvious in specifications. UART can possibly
+be moved into SoC as you say.
+
+In cases where SD slot is missing but the register remains in the SoC,
+how is that normally handled?
+
+
+Regards,
+Jonas
