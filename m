@@ -1,46 +1,252 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Dec 2013 12:56:23 +0000
-Subject: [PATCH 00/10] Support VGIC save/restore using device control API
-In-Reply-To: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
-References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <52AEF877.7080906@arm.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Mon, 16 Dec 2013 17:01:25 +0400
+Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
+In-Reply-To: <201312150355.27755.arnd@arndb.de>
+References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
+ <201312150153.54044.arnd@arndb.de>
+ <1387073571.13062.102.camel@host5.omatika.ru>
+ <201312150355.27755.arnd@arndb.de>
+Message-ID: <1387198885.13062.154.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Sun, 2013-12-15 at 03:55 +0100, Arnd Bergmann wrote:
+> On Sunday 15 December 2013, Sergei Ianovich wrote:
+> ...
+> I think the way you have structured your code is good, and an MFD would
+> not help. Please just restructure the DT representation to contain the
+> external-bus and/or the fpga connected to it. You probably don't need both,
+> but it doesn't hurt to show them as different device-nodes either.
+> Your choice.
 
-On 12/12/13 19:55, Christoffer Dall wrote:
-> Implement save/restore of the VGIC state using the newer KVM Device
-> Control API.  This requries some number of changes to existing code in
-> addition to actually supporting save/restore of the necessary state.
-> 
-> The first patches (01-03) support creating the VGIC using the Device
-> Control API.  This change is necessary because there are no other
-> suitable KVM APIs that we can leverage to access the VGIC state from
-> user space and the device control API was crafted exactly for this
-> purpose.
-> 
-> Subsequent patches add the missing infrastructure and user space API
-> pieces necessary to actually save and restore the VGIC state.  The GIC
-> v2.0 architecture specification already specifies registers that can be
-> used to save and restore the complete VGIC state for suspend/resume
-> purposes on real hardware, and we can reuse this interface for the
-> VGIC.  The API is therefore based on the memory-mapped register accesses
-> defined in the specs.  See the individual patches for details.
-> 
-> The patches are based on kvm-arm-next with the arch timers save/restore
-> patches applied:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git timer-migrate-v4
-> 
-> This patch series based on the above can be cloned from:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v4
+PXA27x memory bus can have up to 10 devices: up to 6 slower
+flash/SRAM/variable-latency-IO selected by nCS<0> to <5>, and up to 4
+partions of SDRAM selected by nSDCS<0> to <3>.
 
-I think this series is getting ready. I commented on a couple of issues
-that can get fixed very quickly. Once they are fixed, we'll be able to
-add them in the upcoming PR for 3.14.
+It appears that the FPGA is directly connected to the memory bus and is
+selected by nCS<5>. According to MSC2 configuration (already in the
+mainstream U-Boot), the FPGA is configured as a synchronous SRAM with
+access cycle of 30x memory bus cycles. So I made it a top-level bus like
+pxabus.
 
-Thanks,
+Ethernet devices are also connected to the memory bus via some kind of
+gate array. This one is a bit faster -- 15x memory cycles, which is
+still a lot. It explains why network transfers are never faster than 15
+Mbit/s.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The final tree looks like this:
+
+diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+new file mode 100644
+index 0000000..cb2a31d
+--- /dev/null
++++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+@@ -0,0 +1,208 @@
++/* Device tree for ICP DAS LP-8x4x */
++/dts-v1/;
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "pxa27x.dtsi"
++
++/ {
++	model = "ICP DAS LP-8x4x programmable automation controller";
++	compatible = "marvell,lp8x4x", "marvell,pxa270";
++
++	aliases {
++		ethernet0 = &eth0;
++		ethernet1 = &eth1;
++	};
++
++	memory {
++		/*
++		 * SDRAM
++		 * connected to CPU via nSDCS<0>
++		 */
++		reg = <0xa0000000 0x08000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vmmc: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "vmmc";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	flash at 00000000 {
++		/*
++		 * Boot memory
++		 * connected to CPU via nCS<0>
++		 */
++		compatible = "cfi-flash";
++		reg = <0x0 0x02000000>;
++		bank-width = <4>;
++		device-width = <2>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		fs at 0 {
++			label = "u-boot";
++			reg = <0 0x40000>;
++		};
++		fs at 40000 {
++			label = "settings";
++			reg = <0x40000 0x40000>;
++		};
++		fs at 80000 {
++			label = "kernel";
++			reg = <0x80000 0x280000>;
++		};
++		fs at 300000 {
++			label = "root_fs";
++			reg = <0x300000 0x1d00000>;
++		};
++	};
++
++	flash at 04000000 {
++		/*
++		 * connected to CPU via nCS<1>
++		 */
++		compatible = "cfi-flash";
++		reg = <0x04000000 0x02000000>;
++		bank-width = <2>;
++		device-width = <1>;
++	};
++
++	pxabus {
++		pxairq: interrupt-controller at 40d00000 {
++			marvell,intc-priority;
++			marvell,intc-nr-irqs = <34>;
++		};
++
++		uart at 40100000 {
++			status = "okay";
++		};
++
++		uart at 40200000 {
++			status = "okay";
++		};
++
++		uart at 40700000 {
++			status = "okay";
++		};
++
++		mmc at 41100000 {
++			status = "okay";
++			vmmc-supply = <&vmmc>;
++		};
++
++		ohci at 4c000000 {
++			status = "okay";
++			marvell,port-mode = <3>;
++			marvell,oc-mode-perport;
++			marvell,enable-port1;
++		};
++	};
++
++	extbus {
++		/*
++		 * Transparent bus, 2 byte-wide access
++		 * connected to CPU via nCS<3>
++		 */
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		interrupt-parent = <&gpio>;
++
++		eth0: eth at 0c000000 {
++			compatible = "davicom,dm9000";
++			reg = <0x0c000000 0x2
++			       0x0c004000 0x2>;
++			interrupts = <9 IRQ_TYPE_EDGE_RISING>;
++			status = "okay";
++		};
++
++		eth1: eth at 0d000000 {
++			compatible = "davicom,dm9000";
++			reg = <0x0d000000 0x2
++			       0x0d004000 0x2>;
++			interrupts = <82 IRQ_TYPE_EDGE_RISING>;
++			status = "okay";
++		};
++	};
++
++	fpgabus {
++		/*
++		 * Transparent bus, 1 byte-wide access, even addresses only
++		 * connected to CPU via nCS<5>
++		 */
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x17000000 0x10000>;
++		interrupt-parent = <&fpga>;
++
++		rtc at 901c {
++			compatible = "ds,rtc-ds1302";
++			reg = <0x901c 0x1>;
++			status = "okay";
++		};
++
++		sram at a000 {
++			compatible = "icpdas,sram-lp8x4x";
++			reg = <0xa000 0x1000
++			       0x901e 0x1>;
++		};
++
++		fpga: irq at 9006 {
++			compatible = "icpdas,irq-lp8x4x";
++			reg = <0x9006 0x16>;
++			interrupt-parent = <&gpio>;
++			interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			status = "okay";
++		};
++
++		uart at 9050 {
++			compatible = "icpdas,uart-lp8x4x";
++			reg = <0x9050 0x10
++			       0x9030 0x02>;
++			interrupts = <13>;
++			status = "okay";
++		};
++
++		uart at 9060 {
++			compatible = "icpdas,uart-lp8x4x";
++			reg = <0x9060 0x10
++			       0x9032 0x02>;
++			interrupts = <14>;
++			status = "okay";
++		};
++
++		uart at 9070 {
++			compatible = "icpdas,uart-lp8x4x";
++			reg = <0x9070 0x10
++			       0x9034 0x02>;
++			interrupts = <15>;
++			status = "okay";
++		};
++
++		backplane at 9046 {
++			compatible = "icpdas,backplane-lp8x4x";
++			reg = <0x9046 0x2
++			       0x9004 0x2
++			       0x1000 0x10
++			       0x2000 0x10
++			       0x3000 0x10
++			       0x4000 0x10
++			       0x5000 0x10
++			       0x6000 0x10
++			       0x7000 0x10
++			       0x8000 0x10>;
++		};
++	};
++};
