@@ -1,129 +1,99 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 16 Dec 2013 13:20:20 +0900
-Subject: [PATCHv6 1/5] mmc: dw_mmc: Add support to set the SDR and DDR
- timing through clock framework
-In-Reply-To: <1386880245-10192-2-git-send-email-dinguyen@altera.com>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-2-git-send-email-dinguyen@altera.com>
-Message-ID: <000101cefa16$21c7a680$6556f380$%jun@samsung.com>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Sun, 15 Dec 2013 22:29:39 -0600
+Subject: [PATCH v2 2/3] clk: bcm281xx: add initial clock framework support
+In-Reply-To: <E566434B-F630-4AD3-91EC-BD5599767F2E@linaro.org>
+References: <529F4B0F.2020801@linaro.org> <529F4B4F.4020405@linaro.org>
+ <20131214235731.26321.53050@quantum> <52ADE93B.3070907@linaro.org>
+ <E566434B-F630-4AD3-91EC-BD5599767F2E@linaro.org>
+Message-ID: <52AE81B3.4010203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 13, 2013, Dinh Nguyen wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> All implementations of the Synopsys DW SD/MMC IP have settings to control
-> the phase shift of the CIU clk. These phase shift settings are necessary for
-> the SD/MMC to correctly clock the card. All variants of the dw_mmc will need
-> these settings, but how they are implemented can vastly vary.
-> 
-> This patch enables the setting for the SDR and/or DDR settings through the
-> common clock framework.
-> 
-> Depends on the patch "mmc: dw_mmc: Enable the hold reg for certain speed modes",
-> that is already reading the "samsung,dw-mshc-sdr-timing" and
-> "samsung,dw-mshc-ddr-timing" bindings, this patch saves those values into a
-> u32 bitmask that can be passed to the clock framework to use.
+On 12/15/2013 06:22 PM, Alex Elder wrote:
+> I think I can prepare a series that puts my changes
+> before Tim's. Unless I have trouble doing that
+> I will send that out in a few hours.
+. . .
 
-I didn't understand this patch.
-As you mentioned, clock implementation can be different each SOC.
-And what is the difference with existing ciu clock?
 
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> ---
-> v6: Add this patch
-> v5: none
-> v4: none
-> v3: none
-> v2: none
-> ---
->  drivers/mmc/host/dw_mmc.c  |   23 +++++++++++++++++++++++
->  include/linux/mmc/dw_mmc.h |    6 ++++++
->  2 files changed, 29 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 480dafe..1fb5cff 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2431,6 +2431,8 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
->  	if ((sdr_timing[1] == 0) || (ddr_timing[1] == 0))
->  		pdata->cclk_in_drv = 0;
-> 
-> +	pdata->sdr_timing = (sdr_timing[1] | (sdr_timing[0] << 4));
-> +	pdata->ddr_timing = (ddr_timing[1] | (ddr_timing[0] << 4));
-Can you explain what it is for?
+I got started on doing this but then I decided to go
+check on the status of Tim's series.  It looks like
+Christian is on the verge of taking his series in,
+and is planning to coordinate with the affected
+maintainers to do so.
 
-Thanks,
-Seungwon
+I'm going to assume that is going to happen quite
+soon--I hope in the next day or two.  So rather than
+muddy the waters even further, it might be best to
+just wait for Tim's series to be accepted and then
+you take mine in on top of that.
 
->  	return pdata;
->  }
-> 
-> @@ -2478,6 +2480,27 @@ int dw_mci_probe(struct dw_mci *host)
->  		dev_dbg(host->dev, "ciu clock not available\n");
->  		host->bus_hz = host->pdata->bus_hz;
->  	} else {
-> +		/* If the CIU clk is available, we check for SDR and DDR
-> +		 * timing phase shift settings. But not all platforms
-> +		 * may have populated these settings, the driver will not fail
-> +		 * if these settings are not specified.
-> +		 */
-> +		if (host->pdata->sdr_timing) {
-> +			host->sdr_clk = devm_clk_get(host->dev, "sdr_mmc_clk");
-> +			if (IS_ERR(host->sdr_clk))
-> +				dev_dbg(host->dev, "sdr_mmc clock not available\n");
-> +			else
-> +				clk_set_rate(host->sdr_clk, host->pdata->sdr_timing);
-> +		}
-> +
-> +		if (host->pdata->ddr_timing) {
-> +			host->ddr_clk = devm_clk_get(host->dev, "ddr_mmc_clk");
-> +			if (IS_ERR(host->ddr_clk))
-> +				dev_dbg(host->dev, "ddr_mmc clock not available\n");
-> +			else
-> +				clk_set_rate(host->ddr_clk, host->pdata->ddr_timing);
-> +		}
-> +
->  		ret = clk_prepare_enable(host->ciu_clk);
->  		if (ret) {
->  			dev_err(host->dev, "failed to enable ciu clock\n");
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index 2b5b8bf..ad90ad1 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -83,6 +83,8 @@ struct mmc_data;
->   * @priv: Implementation defined private data.
->   * @biu_clk: Pointer to bus interface unit clock instance.
->   * @ciu_clk: Pointer to card interface unit clock instance.
-> + * @sdr_clk: Pointer to the SDR clock instance.
-> + * @ddr_clk: Pointer to the DDR clock instance.
->   * @slot: Slots sharing this MMC controller.
->   * @fifo_depth: depth of FIFO.
->   * @data_shift: log2 of FIFO item size.
-> @@ -170,6 +172,8 @@ struct dw_mci {
->  	void			*priv;
->  	struct clk		*biu_clk;
->  	struct clk		*ciu_clk;
-> +	struct clk		*sdr_clk;
-> +	struct clk		*ddr_clk;
->  	struct dw_mci_slot	*slot[MAX_MCI_SLOTS];
-> 
->  	/* FIFO push and pull */
-> @@ -241,6 +245,8 @@ struct dw_mci_board {
->  	u32 caps2;	/* More capabilities */
->  	u32 pm_caps;	/* PM capabilities */
->  	u32 cclk_in_drv;	/*cclk_in_drv phase shift */
-> +	u32 sdr_timing;	/* Single data rate timing setting. */
-> +	u32 ddr_timing;	/* Double data rate timing setting. */
->  	/*
->  	 * Override fifo depth. If 0, autodetect it from the FIFOTH register,
->  	 * but note that this may not be reliable after a bootloader has used
-> --
-> 1.7.9.5
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+In any case this is a small mess that's going to
+require some coordination to get resolved.  Let
+me know if there's something else specific you
+would recommend.
+
+In the mean time, I have created a new branch that
+is based on v3.13-rc4 (and includes Tim's prerequisite
+patches).  Pull request (still wrapped my my mailer)
+is below.
+
+Thanks.
+
+					-Alex
+
+The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
+
+  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
+
+are available in the git repository at:
+
+  ssh://git at git.linaro.org/people/alex.elder/linux.git
+review/bcm-kona-clocks-v4
+
+for you to fetch changes up to deebd4ea75c159697d1e43416683d6068821b431:
+
+  ARM: dts: bcm281xx: define real clocks (2013-12-15 22:23:13 -0600)
+
+----------------------------------------------------------------
+Alex Elder (3):
+      clk: bcm281xx: define kona clock binding
+      clk: bcm281xx: add initial clock framework support
+      ARM: dts: bcm281xx: define real clocks
+
+Tim Kryger (8):
+      ARM: dts: Declare clocks as fixed on bcm11351
+      ARM: dts: Specify clocks for UARTs on bcm11351
+      Documentation: dt: kona-sdhci: Add clocks property
+      ARM: dts: Specify clocks for SDHCIs on bcm11351
+      mmc: sdhci-bcm-kona: Add basic use of clocks
+      Documentation: dt: kona-timer: Add clocks property
+      clocksource: kona: Add basic use of external clock
+      ARM: dts: Specify clocks for timer on bcm11351
+
+ .../devicetree/bindings/arm/bcm/kona-timer.txt     |    7 +-
+ .../devicetree/bindings/clock/bcm-kona-clock.txt   |   93 ++
+ .../devicetree/bindings/mmc/kona-sdhci.txt         |    4 +
+ arch/arm/boot/dts/bcm11351.dtsi                    |  199 +++-
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/bcm/Kconfig                            |    8 +
+ drivers/clk/bcm/Makefile                           |    3 +
+ drivers/clk/bcm/clk-bcm281xx.c                     |  416 ++++++++
+ drivers/clk/bcm/clk-kona-setup.c                   |  769 +++++++++++++++
+ drivers/clk/bcm/clk-kona.c                         | 1033
+++++++++++++++++++++
+ drivers/clk/bcm/clk-kona.h                         |  414 ++++++++
+ drivers/clocksource/bcm_kona_timer.c               |   14 +-
+ drivers/mmc/host/sdhci-bcm-kona.c                  |   37 +-
+ include/dt-bindings/clock/bcm281xx.h               |   65 ++
+ 15 files changed, 3053 insertions(+), 11 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
+ create mode 100644 drivers/clk/bcm/Kconfig
+ create mode 100644 drivers/clk/bcm/Makefile
+ create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
+ create mode 100644 drivers/clk/bcm/clk-kona-setup.c
+ create mode 100644 drivers/clk/bcm/clk-kona.c
+ create mode 100644 drivers/clk/bcm/clk-kona.h
+ create mode 100644 include/dt-bindings/clock/bcm281xx.h
