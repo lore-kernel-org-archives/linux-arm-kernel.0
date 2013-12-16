@@ -1,101 +1,83 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 16 Dec 2013 18:18:04 +0900
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <52AEB4FD.4070707@linaro.org>
-References: <1386987174-1788-1-git-send-email-zhangfei.gao@linaro.org>
- <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
- <000001cefa11$eb02f270$c108d750$%jun@samsung.com>
- <52AE8A0E.2050005@linaro.org>
- <003901cefa30$93c3cce0$bb4b66a0$%jun@samsung.com>
- <52AEB4FD.4070707@linaro.org>
-Message-ID: <004c01cefa3f$b9afe880$2d0fb980$%jun@samsung.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 16 Dec 2013 16:58:44 +0800
+Subject: [PATCH v3 1/7] mtd: spi-nor: copy the SPI NOR commands to a new
+ header file
+In-Reply-To: <1387184330-14448-1-git-send-email-b32955@freescale.com>
+References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
+Message-ID: <1387184330-14448-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, December 16, 2013, Zhangfei Gao wrote:
-> On 12/16/2013 03:29 PM, Seungwon Jeon wrote:
-> > On Mon, December 16, 2013, Zhangfei Gao wrote:
-> >> Dear Seungwon
-> >>
-> >> On 12/16/2013 11:50 AM, Seungwon Jeon wrote:
-> >>> On Sat, December 14, 2013, Zhangfei Gao wrote:
-> >>
-> >>>> +	/* SoC portion */
-> >>>> +	dwmmc_0: dwmmc0 at fcd03000 {
-> >>>> +		compatible = "hisilicon,hi4511-dw-mshc";
-> >>>> +		reg = <0xfcd03000 0x1000>;
-> >>>> +		interrupts = <0 16 4>;
-> >>>> +		#address-cells = <1>;
-> >>>> +		#size-cells = <0>;
-> >>>> +		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
-> >>>> +		clock-names = "ciu", "biu";
-> >>>> +		clock-freq-table =
-> >>>> +		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
-> >>> I think it could be solved with mmc->f_min and mmc->f_max(from clock-freq-min-max property)
-> >>> if there is no limitation per each speed mode. As seeing described table, it looks that.
-> >>
-> >> Have tried them before, but unfortunately, they are different.
-> >>
-> >> The controller can not generate clock itself, while depending on the
-> >> outside clock generator, which may require to change clock source in
-> >> differnt mode.
-> >>
-> >> The value we want is set the capacibility of the clock input and the max
-> >> clock freq where mmc works stable in that mode, which may be different
-> >> in different mode.
-> >>
-> >> clock-freq-min-max will set the value for set_ios.
-> >> For example, we use 25M as clock capability when init, which can not be
-> >> set as freq-min, and used as set_ios, where 400K should be used,
-> >> otherwise init definitely fail.
-> > Can you check 'f_init' within 'drivers/mmc/core/core.c' file?
-> > If you set 'f_min = 25000000' for init-sequence, mmc_set_ios() will pass that rate through
-> 'ios.clock'
-> > Then, dw_mmc-k3 can do clk_set_rate() with 25MHz at dw_mci_k3_set_ios().
-> 
-> This means controller directly use 25M init emmc and sd card, it will fail.
-> We still need 400K init freq, while the input clock source is 25M,
-> divided by the controller.
-> 
-> > And other required speeds for each mode seem not specific compared with standard spec.
-> > Also clk_set_rate() would be possible with 'ios.clock' instead of specific table.
-> > I just referred your example's clock-freq-table above.
-> There also some controller limitation currently.
-> In some mode, the controller only works well in the limited freq.
-> For example UHS_SDR104_MAX_DTR 208000000 can not be used, only half may
-> be reached, at least currently
-Ok. I see your condition. I misunderstood a little bit.
-I wonder whether limitation is only max frequency(SDR104 or HS200) except for init-freq.
-How about other mode? Working is fine with normal clock rate(from clock-freq-table)?
+This patch adds a new header :spi-nor.h,
+and copies all the SPI NOR commands and relative macros into this new header.
 
-Thanks,
-Seungwon Jeon
+This hearder can be used by the m25p80.c and other spi-nor controller,
+such as Freescale's Quadspi.
 
-> 
-> >
-> >>
-> >>>> +static int dw_mci_k3_suspend(struct device *dev)
-> >>>> +{
-> >>>> +	struct dw_mci *host = dev_get_drvdata(dev);
-> >>>> +
-> >>>> +	if (!IS_ERR(host->ciu_clk))
-> >>>> +		clk_disable_unprepare(host->ciu_clk);
-> >>>> +
-> >>>> +	return dw_mci_suspend(host);
-> >>> If k3 needs clk_disable here, dw_mci_suspend()is expected to be called prior to
-> >> clk_disable_unprepare()?
-> >>> Of course, it's ok at present though.
-> >>>
-> >>
-> >> Sure, it can be switched, though dw_mci_suspend does nothing related
-> >> with clock now.
-> > Yes, but if some works with ciu_clk is added in dw_mci_suspend(), it will affect.
-> >
-> Sorry for the misunderstood, I mean it make sense and will change.
-> Thanks the advice.
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ include/linux/mtd/spi-nor.h |   53 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 53 insertions(+), 0 deletions(-)
+ create mode 100644 include/linux/mtd/spi-nor.h
+
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+new file mode 100644
+index 0000000..ab2ea1e
+--- /dev/null
++++ b/include/linux/mtd/spi-nor.h
+@@ -0,0 +1,53 @@
++#ifndef __LINUX_MTD_SPI_NOR_H
++#define __LINUX_MTD_SPI_NOR_H
++
++/* Flash opcodes. */
++#define	OPCODE_WREN		0x06	/* Write enable */
++#define	OPCODE_RDSR		0x05	/* Read status register */
++#define	OPCODE_WRSR		0x01	/* Write status register 1 byte */
++#define	OPCODE_NORM_READ	0x03	/* Read data bytes (low frequency) */
++#define	OPCODE_FAST_READ	0x0b	/* Read data bytes (high frequency) */
++#define	OPCODE_QUAD_READ        0x6b    /* Read data bytes */
++#define	OPCODE_PP		0x02	/* Page program (up to 256 bytes) */
++#define	OPCODE_BE_4K		0x20	/* Erase 4KiB block */
++#define	OPCODE_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
++#define	OPCODE_BE_32K		0x52	/* Erase 32KiB block */
++#define	OPCODE_CHIP_ERASE	0xc7	/* Erase whole flash chip */
++#define	OPCODE_SE		0xd8	/* Sector erase (usually 64KiB) */
++#define	OPCODE_RDID		0x9f	/* Read JEDEC ID */
++#define	OPCODE_RDCR             0x35    /* Read configuration register */
++
++/* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
++#define	OPCODE_NORM_READ_4B	0x13	/* Read data bytes (low frequency) */
++#define	OPCODE_FAST_READ_4B	0x0c	/* Read data bytes (high frequency) */
++#define	OPCODE_QUAD_READ_4B	0x6c    /* Read data bytes */
++#define	OPCODE_PP_4B		0x12	/* Page program (up to 256 bytes) */
++#define	OPCODE_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
++
++/* Used for SST flashes only. */
++#define	OPCODE_BP		0x02	/* Byte program */
++#define	OPCODE_WRDI		0x04	/* Write disable */
++#define	OPCODE_AAI_WP		0xad	/* Auto address increment word program */
++
++/* Used for Macronix and Winbond flashes. */
++#define	OPCODE_EN4B		0xb7	/* Enter 4-byte mode */
++#define	OPCODE_EX4B		0xe9	/* Exit 4-byte mode */
++
++/* Used for Spansion flashes only. */
++#define	OPCODE_BRWR		0x17	/* Bank register write */
++
++/* Status Register bits. */
++#define	SR_WIP			1	/* Write in progress */
++#define	SR_WEL			2	/* Write enable latch */
++/* meaning of other SR_* bits may differ between vendors */
++#define	SR_BP0			4	/* Block protect 0 */
++#define	SR_BP1			8	/* Block protect 1 */
++#define	SR_BP2			0x10	/* Block protect 2 */
++#define	SR_SRWD			0x80	/* SR write protect */
++
++#define SR_QUAD_EN_MX           0x40    /* Macronix Quad I/O */
++
++/* Configuration Register bits. */
++#define CR_QUAD_EN_SPAN		0x2     /* Spansion Quad I/O */
++
++#endif
+-- 
+1.7.2.rc3
