@@ -1,29 +1,130 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Dec 2013 12:26:25 -0800
-Subject: [PATCH] ARM: ux500: turn on PRINTK_TIME in u8500_defconfig
-Message-ID: <1387225585-14107-1-git-send-email-olof@lixom.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Mon, 16 Dec 2013 21:24:14 +0100
+Subject: [RFC PATCH 03/10] ARM: at91: introduce OLD_IRQ_AT91 Kconfig option
+In-Reply-To: <1387225461-6201-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387225461-6201-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1387225461-6201-4-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I recently noticed slow booting of a board, and without printk timestamps it's
-harder to tell just where the delays are coming from. Enable it.
+Introduce a new Kconfig option OLD_IRQ_AT91 to prepare migration to the new
+AIC driver.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Enable this option for all supported at91 SoCs (both dt and non-dt boards).
+
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/configs/u8500_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-at91/Kconfig        |    7 +++++++
+ arch/arm/mach-at91/Kconfig.non_dt |    7 +++++++
+ arch/arm/mach-at91/Makefile       |    3 ++-
+ 3 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index c6ebc18..65f7788 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -119,6 +119,7 @@ CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index b4f7d6f..e1e6ff4 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -28,6 +28,10 @@ config OLD_CLK_AT91
+ 	bool
+ 	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
+ 
++config OLD_IRQ_AT91
++	bool
++	default false
++
+ config AT91_SAM9_ALT_RESET
+ 	bool
+ 	default !ARCH_AT91X40
+@@ -190,6 +194,7 @@ config MACH_AT91RM9200_DT
+ 	bool "Atmel AT91RM9200 Evaluation Kits with device-tree support"
+ 	depends on SOC_AT91RM9200
+ 	select USE_OF
++	select OLD_IRQ_AT91
+ 	help
+ 	  Select this if you want to experiment device-tree with
+ 	  an Atmel RM9200 Evaluation Kit.
+@@ -198,6 +203,7 @@ config MACH_AT91SAM9_DT
+ 	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
+ 	depends on SOC_AT91SAM9
+ 	select USE_OF
++	select OLD_IRQ_AT91
+ 	help
+ 	  Select this if you want to experiment device-tree with
+ 	  an Atmel Evaluation Kit.
+@@ -206,6 +212,7 @@ config MACH_SAMA5_DT
+ 	bool "Atmel SAMA5 Evaluation Kits with device-tree support"
+ 	depends on SOC_SAMA5
+ 	select USE_OF
++	select OLD_IRQ_AT91
+ 	select PHYLIB if NETDEVICES
+ 	help
+ 	  Select this if you want to experiment device-tree with
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+index b736b57..87dc5e1 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -13,31 +13,37 @@ config ARCH_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select SOC_AT91RM9200
+ 	select AT91_USE_OLD_CLK
++	select OLD_IRQ_AT91
+ 
+ config ARCH_AT91SAM9260
+ 	bool "AT91SAM9260 or AT91SAM9XE or AT91SAM9G20"
+ 	select SOC_AT91SAM9260
+ 	select AT91_USE_OLD_CLK
++	select OLD_IRQ_AT91
+ 
+ config ARCH_AT91SAM9261
+ 	bool "AT91SAM9261 or AT91SAM9G10"
+ 	select SOC_AT91SAM9261
+ 	select AT91_USE_OLD_CLK
++	select OLD_IRQ_AT91
+ 
+ config ARCH_AT91SAM9263
+ 	bool "AT91SAM9263"
+ 	select SOC_AT91SAM9263
+ 	select AT91_USE_OLD_CLK
++	select OLD_IRQ_AT91
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+ 	select SOC_AT91SAM9RL
+ 	select AT91_USE_OLD_CLK
++	select OLD_IRQ_AT91
+ 
+ config ARCH_AT91SAM9G45
+ 	bool "AT91SAM9G45"
+ 	select SOC_AT91SAM9G45
+ 	select AT91_USE_OLD_CLK
++	select OLD_IRQ_AT91
+ 
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+@@ -45,6 +51,7 @@ config ARCH_AT91X40
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
++	select OLD_IRQ_AT91
+ 
+ endchoice
+ 
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 705b38a..960c9dd 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -2,11 +2,12 @@
+ # Makefile for the linux kernel.
+ #
+ 
+-obj-y		:= irq.o gpio.o setup.o sysirq_mask.o
++obj-y		:= gpio.o setup.o sysirq_mask.o
+ obj-m		:=
+ obj-n		:=
+ obj-		:=
+ 
++obj-$(CONFIG_OLD_IRQ_AT91)	+= irq.o
+ obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
+ obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
+ obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
 -- 
-1.7.10.4
+1.7.9.5
