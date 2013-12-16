@@ -1,34 +1,118 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 16 Dec 2013 20:54:36 +0100
-Subject: [PATCH V1 03/11] ARM: dts: imx6qdl-sabrelite: remove usdhc4
- wp-gpio
-In-Reply-To: <52AF57A6.5090203@boundarydevices.com>
-References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
- <20131214134656.GC16177@S2101-09.ap.freescale.net>
- <52AF57A6.5090203@boundarydevices.com>
-Message-ID: <201312162054.36699.marex@denx.de>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Tue, 17 Dec 2013 09:53:27 +1000
+Subject: [PATCH v4 2/2] ARM: mach-moxart: add MOXA ART SoC device tree
+ files
+In-Reply-To: <CACmBeS1H96Scr+ycHa-Ar_t72Q2x=LH-2vrbQXiLiuYHyH3S-Q@mail.gmail.com>
+References: <1386945188-8316-1-git-send-email-jonas.jensen@gmail.com>
+ <1386945188-8316-3-git-send-email-jonas.jensen@gmail.com>
+ <CAEgOgz7=xZ8N+vGuaQ6L3n5SYpS3bS+xN88WXDH+A7m7JNLrcw@mail.gmail.com>
+ <CACmBeS1H96Scr+ycHa-Ar_t72Q2x=LH-2vrbQXiLiuYHyH3S-Q@mail.gmail.com>
+Message-ID: <CAEgOgz6qz8ES_rQX8+UE-Ukh=G=_kHnAWJLQ-sUm6vkz=Xa7pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 16, 2013 at 08:42:30 PM, Troy Kisky wrote:
-> On 12/14/2013 6:46 AM, Shawn Guo wrote:
-> > On Thu, Dec 12, 2013 at 06:49:07PM -0700, Troy Kisky wrote:
-> >> On Sabre Lite usdhc4 is a micro sd slot, which has no
-> >> write protect.
-> >> 
-> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > 
-> > Applied #1, #2 and #3, thanks.
-> > 
-> > Shawn
-> 
-> Thanks for the rebase on Marek's PCIe patch. However, PCIe is a common
-> feature
-> and should be moved to imx6qdl-sabrelite.dtsi.
-> 
-> Should I send a patch to do this, or will you fix it up, or will Marek?
+On Tue, Dec 17, 2013 at 6:05 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> On 15 December 2013 05:27, Peter Crosthwaite
+> <peter.crosthwaite@xilinx.com> wrote:
+>>> +       sdhci: sdhci at 98e00000 {
+>>> +               compatible = "moxa,moxart-sdhci";
+>>> +               reg = <0x98e00000 0x5C>;
+>>> +               interrupts = <5 0>;
+>>> +               clocks = <&clk_apb>;
+>>> +               dmas =  <&dma 5>,
+>>> +                       <&dma 5>;
+>>> +               dma-names = "tx", "rx";
+>>> +       };
+>>
+>> Is your SDHCI really implemented on the board level? The fact that its
+>> reg property is within the same as the SoC range (for your dtsi)
+>> suggests the SDHCI is part of the SoC and should perhaps be in the
+>> dtsi?
+>
+>>> +       mac1: mac at 92000000 {
+>>> +               compatible = "moxa,moxart-mac";
+>>> +               reg = <0x92000000 0x90>;
+>>> +               interrupts = <27 0>;
+>>> +               phy-handle = <&ethphy1>;
+>>> +               phy-mode = "mii";
+>>> +       };
+>>
+>> Same for MACs.
+>
+>>> +
+>>> +       uart0: uart at 98200000 {
+>>> +               compatible = "ns16550a";
+>>> +               reg = <0x98200000 0x20>;
+>>> +               interrupts = <31 8>;
+>>> +               reg-shift = <2>;
+>>> +               reg-io-width = <4>;
+>>> +               clock-frequency = <14745600>;
+>>> +               status = "okay";
+>>> +       };
+>>> +
+>>
+>> And UARTs.
+>>
+>> Let me know if i'm misunderstanding dts/dtsi split but looking at some
+>> of the other SoCs this seems inconsistent to me.
+>
+>
+> It is likely to be true, that technically these are all part of the
+> SoC. By examining the hardware, there are no external chips (on either
+> base or main board) that looks capable of handling such functions:
+>
+> https://plus.google.com/photos/103371465418643926605/albums/5820634595801767953
+>
+> I made the split with some consideration to other MOXA ART machines,
+> that they can be added as a separate file including the same dtsi:
+>
+> MOXA ART hardware examples:
+>
+> UC-7112/UC-7110: "SD slot (UC-7112, and UC-7112 Plus only)":
+> http://www.moxa.com/product/UC-7112_UC-7110.htm
+>
+> IA241: "64 MB RAM":
+> http://www.moxa.com/product/IA241_IA240.htm
+>
+> UC-7101-LX: "One 10/100 Mbps Ethernet port":
+> http://www.moxa.com/product/UC-7101-LX.htm
+>
+>
+> UC-7112-LX has 32 MB RAM and two ethernet ports. This is why I think
+> MAC is good as is, RAM should move out from SoC?
+>
+> I don't know if they all have a debug UART (I only have access to
+> UC-7112-LX), and it's not obvious in specifications. UART can possibly
+> be moved into SoC as you say.
+>
 
-I will gladly let such a privilege slip, I am overloaded like hell :(
+I think its going to all be in the SoC. Having it board level would
+mean you have a system bus as copper which is not very SoC like (at
+least for UART anyway).
 
-Best regards,
-Marek Vasut
+> In cases where SD slot is missing but the register remains in the SoC,
+> how is that normally handled?
+>
+
+Soren Brinkmann's recent addition of ethernet to the Zynq SoC
+illustrates the concept for a MAC. The two MACs are added to the
+shared dtsi but disabled. The board level dts then enables it for the
+one which is board populated:
+
+https://lkml.org/lkml/2013/12/11/434
+
+I think its generally applicable to your SD MAC and UART cases. The
+tegra20 dtsi illustrates the status = "disabled" concept specifically
+for SDHCI.
+
+Regards,
+Peter
+
+>
+> Regards,
+> Jonas
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
