@@ -1,50 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 12:19:37 -0700
-Subject: [PATCHv7 10/12] iommu/tegra: smmu: allow duplicate ASID wirte
-In-Reply-To: <1386835033-4701-11-git-send-email-hdoyu@nvidia.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-11-git-send-email-hdoyu@nvidia.com>
-Message-ID: <52AF5249.6050802@wwwdotorg.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 16 Dec 2013 20:28:16 +0100
+Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
+In-Reply-To: <20131216001158.0e15e93c.akpm@linux-foundation.org>
+References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131126134117.GF28642@pengutronix.de>
+ <20131126134444.GG28642@pengutronix.de>
+ <20131126183629.GK28642@pengutronix.de>
+ <20131216001158.0e15e93c.akpm@linux-foundation.org>
+Message-ID: <20131216192816.GC14866@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 12:57 AM, Hiroshi Doyu wrote:
-> The device, which belongs to the same ASID, can try to enable the same
-> ASID as the other swgroup devices. This should be allowed but just
-> skip the actual register write. If the write value is different, it
-> will return -EINVAL.
+Hello Andrew,
 
-I guess this simplifies the body of the code a lot. Given this, I would
-revise the code I suggested in response to a previous patch, to
-something more like:
+On Mon, Dec 16, 2013 at 12:11:58AM -0800, Andrew Morton wrote:
+> On Tue, 26 Nov 2013 19:36:29 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
+> > On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K__nig wrote:
+> > > On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K__nig wrote:
+> > > > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K__nig wrote:
+> > > > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
+> > > > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
+> > > > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
+> > > > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
+> > > > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
+> > > > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
+> > > > > 
+> > > > > So better include it explicitly not only because the last link will go
+> > > > > away soon.
+> > > > > 
+> > > > > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
+> > > > Ping. Is this patch ok despite Jean-Christophe's objection?
+> > > I saw that akpm already took it into his tree.
+> > This patch is one of the last few that are needed to drop <mach/timex.h>
+> > alltogether that I don't have an ack from the respective maintainer yet.
+> > 
+> > Can you give your ack instead of sending the patch to Linus, then I'd
+> > take it with the patch dropping <mach/timex.h> to make it easier to
+> > merge.
+> 
+> ack ;)
+thanks. There is another rtc change that I didn't receive any feedback
+for from a maintainer:
 
-		offs = HWGRP_ASID_REG(i);
-		val = smmu_read(smmu, offs);
-		if (on) {
-			if (WARN_ON(val && val != new_val))
-				return -ENODEV;
-			memcpy(c->hwgrp, map, sizeof(u64));
-		} else {
-			WARN_ON(val);
-		}
-		smmu_write(smmu, val, offs);
+	rtc: pxa: drop unused #define TIMER_FREQ
 
-> +			if (val) {
-> +				if (WARN_ON(val != mask))
-> +					return -EINVAL;
-> +				goto skip;
+. In the meantime I send a pull request asking to ignore that I didn't
+get any maintainer reply for the rtc changes. Do you think it's sensible
+to change the entry in MAINTAINERS? Any combination of:
 
-That means that:
+	a) drop Alessandro's M: line
+	b) add you
+	c) change Status from Maintained to Odd Fixes or Orphan
 
-a) No error is returned when the ASIDs don't match. Surely you still
-want to return an error?
+> I dropped my copy.
+fine, thanks
 
-b) "skip" skips setting up all HWGRP IDs for the device, whereas perhaps
-only 1 was shared yet the rest still need to be set up. If you really do
-want to ignore the error, then surely you want "continue;" here not
-"goto skip;"?
+I'll wait for some time now before adding your ack to my tree to prevent
+that you give me an ack for the other change just when I sent a new pull
+request :-)
 
-> +			}
-...
-> +skip:
->  	return 0;
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
