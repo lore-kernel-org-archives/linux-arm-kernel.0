@@ -1,247 +1,79 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Mon, 16 Dec 2013 15:58:03 +0200
-Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52AAAF7A.2020102@linaro.org>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52A9DB78.1040805@linaro.org> <52A9F433.8020003@ti.com>
- <52AAAF7A.2020102@linaro.org>
-Message-ID: <52AF06EB.7040506@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 16 Dec 2013 15:00:44 +0100
+Subject: [GIT PULL] ARM: Initial support for Marvell Berlin SoCs
+Message-ID: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2013 08:55 AM, Daniel Lezcano wrote:
-> On 12/12/2013 06:36 PM, ivan.khoronzhuk wrote:
->> On 12/12/2013 05:51 PM, Daniel Lezcano wrote:
->>> On 12/11/2013 07:00 PM, Ivan Khoronzhuk wrote:
->>>> Add broadcast clock-event device for the Keystone arch.
->>>>
->>>> The timer can be configured as a general-purpose 64-bit timer,
->>>> dual general-purpose 32-bit timers. When configured as dual 32-bit
->>>> timers, each half can operate in conjunction (chain mode) or
->>>> independently (unchained mode) of each other.
->>>>
->>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> ---
->>>>    drivers/clocksource/Makefile         |    1 +
->>>>    drivers/clocksource/timer-keystone.c |  223
->>>> ++++++++++++++++++++++++++++++++++
->>>>    2 files changed, 224 insertions(+)
->>>>    create mode 100644 drivers/clocksource/timer-keystone.c
->>>>
->>>> diff --git a/drivers/clocksource/Makefile 
->>>> b/drivers/clocksource/Makefile
->>>> index 33621ef..2acf3fc 100644
->>>> --- a/drivers/clocksource/Makefile
->>>> +++ b/drivers/clocksource/Makefile
->>>> @@ -36,3 +36,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)        += 
->>>> arm_arch_timer.o
->>>>    obj-$(CONFIG_ARM_GLOBAL_TIMER)        += arm_global_timer.o
->>>>    obj-$(CONFIG_CLKSRC_METAG_GENERIC)    += metag_generic.o
->>>>    obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)    += dummy_timer.o
->>>> +obj-$(CONFIG_ARCH_KEYSTONE)        += timer-keystone.o
->>>> diff --git a/drivers/clocksource/timer-keystone.c
->>>> b/drivers/clocksource/timer-keystone.c
->>>> new file mode 100644
->>>> index 0000000..4a8083a
->>>> --- /dev/null
->>>> +++ b/drivers/clocksource/timer-keystone.c
->>>> @@ -0,0 +1,223 @@
->>>> +/*
->>>> + * Keystone broadcast clock-event
->>>> + *
->>>> + * Copyright 2013 Texas Instruments, Inc.
->>>> + *
->>>> + * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or 
->>>> modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + */
->>>> +
->>>> +#include <linux/clk.h>
->>>> +#include <linux/clockchips.h>
->>>> +#include <linux/clocksource.h>
->>>> +#include <linux/interrupt.h>
->>>> +#include <linux/of_address.h>
->>>> +#include <linux/of_irq.h>
->>>> +
->>>> +#define TIMER_NAME            "timer64-event"
->>>> +
->>>> +/* Timer register offsets */
->>>> +#define TIM12                0x10
->>>> +#define TIM34                0x14
->>>> +#define PRD12                0x18
->>>> +#define PRD34                0x1c
->>>> +#define TCR                0x20
->>>> +#define TGCR                0x24
->>>> +#define INTCTLSTAT            0x44
->>>> +
->>>> +/* Timer register bitfields */
->>>> +#define TCR_ENAMODE_MASK        0xC0
->>>> +#define TCR_ENAMODE_ONESHOT_MASK    0x40
->>>> +#define TCR_ENAMODE_PERIODIC_MASK    0x80
->>>> +
->>>> +#define TGCR_TIM_UNRESET_MASK        0x03
->>>> +#define INTCTLSTAT_ENINT_MASK        0x01
->>>> +
->>>> +/**
->>>> + * struct keystone_timer: holds timer's data
->>>> + * @base: timer memory base address
->>>> + * @clk_rate: source clock rate
->>>> + * @irqacrion: interrupt action descriptor
->>>> + * @event_dev: event device based on timer
->>>> + */
->>>> +static struct keystone_timer {
->>>> +    void __iomem *base;
->>>> +    unsigned long clk_rate;
->>>> +    struct irqaction irqaction;
->>>> +    struct clock_event_device event_dev;
->>>> +} timer;
->>>> +
->>>> +static inline u32 keystone_timer_readl(unsigned long rg)
->>>> +{
->>>> +    return readl(timer.base + rg);
->>>> +}
->>>> +
->>>> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
->>>> +{
->>>> +    writel(val, timer.base + rg);
->>>> +}
->>>> +
->>>> +/**
->>>> + * keystone_timer_config: configures timer to work in
->>>> oneshot/periodic modes, in
->>>> + * other cases disables timer.
->>>> + * @ mode: mode to configure
->>>> + * @ period: cycles number to configure for
->>>> + */
->>>> +static int keystone_timer_config(u64 period, enum clock_event_mode 
->>>> mode)
->>>> +{
->>>> +    u32 tcr;
->>>> +
->>>> +    tcr = keystone_timer_readl(TCR);
->>>> +
->>>> +    /* disable timer */
->>>> +    tcr &= ~(TCR_ENAMODE_MASK);
->>>> +    keystone_timer_writel(tcr, TCR);
->>>
->>> Please move this write after the switch (cf. linked comment below)
->>>
->>
->> See below
->>
->>>> +    /* set enable mode or leave disabled timer */
->>>> +    switch (mode) {
->>>> +    case CLOCK_EVT_MODE_ONESHOT:
->>>> +        tcr |= TCR_ENAMODE_ONESHOT_MASK;
->>>> +        break;
->>>> +    case CLOCK_EVT_MODE_PERIODIC:
->>>> +        tcr |= TCR_ENAMODE_PERIODIC_MASK;
->>>> +        break;
->>>> +    default:
->>>> +        return 0;
->>>
->>> Shouldn't you return an error ?
->>>
->>
->> It returns value only for convenient usage in keystone_set_next_event(),
->> see [1].
->>
->> In general, this function is used to configure the timer.
->> The procedure is that we need to stop the timer then set it.
->> If timer needs to be disabled (shutdown mode), function disables it 
->> and returns.
->>
->>>> +    }
->>>> +
->>>> +    /* reset counter to zero, set new period */
->>>> +    keystone_timer_writel(0, TIM12);
->>>> +    keystone_timer_writel(0, TIM34);
->>>> +    keystone_timer_writel(period & 0xffffffff, PRD12);
->>>> +    keystone_timer_writel(period >> 32, PRD34);
->>>> +
->>>> +    /* enable timer */
->>>> +    keystone_timer_writel(tcr, TCR);
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
->>>> +{
->>>> +    struct clock_event_device *evt = &timer.event_dev;
->>>> +
->>>> +    evt->event_handler(evt);
->>>> +    return IRQ_HANDLED;
->>>> +}
->>>> +
->>>> +static int keystone_set_next_event(unsigned long cycles,
->>>> +                  struct clock_event_device *evt)
->>>> +{
->>>> +    return keystone_timer_config(cycles, evt->mode);
->>
->> [1]
->>
->>>> +}
->>>> +
->>>> +static void keystone_set_mode(enum clock_event_mode mode,
->>>> +                 struct clock_event_device *evt)
->>>> +{
->>>> +    u64 period;
->>>> +
->>>> +    switch (mode) {
->>>> +    case CLOCK_EVT_MODE_PERIODIC:
->>>> +        period = timer.clk_rate / (HZ);
->>>> +        keystone_timer_config(period, CLOCK_EVT_MODE_PERIODIC);
->>>> +        break;
->>>> +    case CLOCK_EVT_MODE_UNUSED:
->>>> +    case CLOCK_EVT_MODE_SHUTDOWN:
->>>> +    case CLOCK_EVT_MODE_ONESHOT:
->>>> +        keystone_timer_config(0, CLOCK_EVT_MODE_SHUTDOWN);
->>>
->>> I don't really this code assuming the side effect of specifying a
->>> unsupported mode will disable the timer.
->>>
->>
->> In case of an unsupported mode the function does nothing.
->> Is it not correct?
->>
->> It disables the timer only in 3 cases.
->> CLOCK_EVT_MODE_UNUSED
->> CLOCK_EVT_MODE_SHUTDOWN
->> CLOCK_EVT_MODE_ONESHOT
->>
->> For CLOCK_EVT_MODE_ONESHOT,
->> It is supposed that then keystone_set_next_even() will re-enable the 
->> timer.
-> 
-> The code looks like is doing what is expected. It is not about a bug but 
-> a coding style issue. I am not in favor of passing the 
-> CLOCK_EVT_MODE_SHUTDOWN which default in keystone_timer_config on 
-> returning no error. The caller assumes the function will exit without 
-> re-enabling the timer. It is correct from an implementation POV but IMO 
-> it is a bit subtle and prone to errors for the future modifications.
-> 
-> If keystone_timer_config(period, __A_VALUE_FROM_SPACE__) is called, it 
-> will return no error and disables the timer.
-> 
-> IMO, for the sake of clarity, defining the different modes in the switch 
-> and returning an error on default would be more convenient.
-> 
-> For this reason, you shouldn't disable the timer before checking the 
-> correctness of the mode, thus the comment about moving the timer 
-> disabling after the switch.
-> 
+Dear ARM maintainers,
 
-Ok,
-I'll add separate function "keystone_timer_disable()" for using in keystone_set_mode().
-The keystone_timer_config() will not be used for disabling the timer any more.
-In case of an unsupported mode the keystone_timer_config() will return -1.
+please pull the initial support patches for Marvell Berlin SoCs.
+While this is the initial PR, it is not yet split up into the
+usual sub-branches. If you require it, please request it.
 
+Compared to the last patch set sent on list, the branch below:
+- does not contain Tauros3 patch which has been submitted to
+  rmk's patch system separately [1].
+- went back to soc-board.dts[i] naming as mentioned by Olof.
 
--- 
-Regards,
-Ivan Khoronzhuk
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7922/1
+
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+  https://github.com/shesselba/linux-berlin.git topic/initial-for-v3.14
+
+for you to fetch changes up to 1c37fa10b275d3e5b6285066b5b27c8feae688c8:
+
+  ARM: add initial support for Marvell Berlin SoCs (2013-09-09 14:36:19 +0200)
+
+----------------------------------------------------------------
+
+Initial support for Marvell Berlin SoCs, e.g. Armada 1500 and
+Armada 1500-mini, found on various consumer devices like Google Chromecast
+and GoogleTV.
+
+----------------------------------------------------------------
+
+Sebastian Hesselbarth (8):
+      irqchip: add DesignWare APB ICTL interrupt controller
+      MAINTAINERS: add ARM Marvell Berlin SoC
+      ARM: add Marvell Berlin SoC familiy to Marvell doc
+      ARM: add Marvell Berlin SoCs to multi_v7_defconfig
+      ARM: add Marvell Berlin UART0 lowlevel debug
+      ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
+      ARM: add Armada 1500-mini and Chromecast device tree files
+      ARM: add initial support for Marvell Berlin SoCs
+
+ Documentation/arm/Marvell/README                   |   24 ++
+ .../devicetree/bindings/arm/marvell,berlin.txt     |   24 ++
+ .../interrupt-controller/snps,dw-apb-ictl.txt      |   32 +++
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   10 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    3 +
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
+ arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts  |   29 +++
+ arch/arm/boot/dts/berlin2cd.dtsi                   |  210 ++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |    3 +
+ arch/arm/mach-berlin/Kconfig                       |   29 +++
+ arch/arm/mach-berlin/Makefile                      |    1 +
+ arch/arm/mach-berlin/berlin.c                      |   39 ++++
+ drivers/irqchip/Kconfig                            |    4 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-dw-apb-ictl.c                  |  150 +++++++++++++
+ 19 files changed, 824 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+ create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+ create mode 100644 arch/arm/boot/dts/berlin2.dtsi
+ create mode 100644 arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+ create mode 100644 arch/arm/boot/dts/berlin2cd.dtsi
+ create mode 100644 arch/arm/mach-berlin/Kconfig
+ create mode 100644 arch/arm/mach-berlin/Makefile
+ create mode 100644 arch/arm/mach-berlin/berlin.c
+ create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
