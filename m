@@ -1,42 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Dec 2013 16:46:37 -0500
-Subject: [GIT PULL 3/3] ARM: MAINTAINERS: SOC updates for 3.14
-In-Reply-To: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1387230397-14338-3-git-send-email-santosh.shilimkar@ti.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 16 Dec 2013 21:50:04 +0000
+Subject: [PATCH] thermal: imx_thermal: add module device table
+Message-ID: <E1Vsg3A-0008Q1-9O@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Add the module device table declaration so the module can be loaded
+automatically at boot time.
 
-Please pull below couple of updates to MAINTAINERS file for Keystone
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/thermal/imx_thermal.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Regards,
-Santosh
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone/maintainer-file
-
-for you to fetch changes up to cffa8e3b5c7dcf7617268561397eb236651446f8:
-
-  MAINTAINERS: Add keystone clock drivers (2013-12-16 16:01:14 -0500)
-
-----------------------------------------------------------------
-Couple of updates to MAINTAINERS file for Keystone
-
-- Add git tree information
-- Add clock drivers entry
-
-----------------------------------------------------------------
-Santosh Shilimkar (2):
-      MAINTAINERS: Add keystone git tree information
-      MAINTAINERS: Add keystone clock drivers
-
- MAINTAINERS |    2 ++
- 1 file changed, 2 insertions(+)
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index 1d6c801c1eb9..230864886775 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -522,6 +522,7 @@ static const struct of_device_id of_imx_thermal_match[] = {
+ 	{ .compatible = "fsl,imx6q-tempmon", },
+ 	{ /* end */ }
+ };
++MODULE_DEVICE_TABLE(of, of_imx_thermal_match);
+ 
+ static struct platform_driver imx_thermal = {
+ 	.driver = {
+-- 
+1.7.4.4
