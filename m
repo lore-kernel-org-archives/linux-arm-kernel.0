@@ -1,196 +1,180 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 16 Dec 2013 11:04:35 -0600
-Subject: [RESEND LIST PATCHv7 3/4] mmc: dw_mmc-socfpga: Remove the SOCFPGA
- specific platform for dw_mmc
-In-Reply-To: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
-References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1387213476-22122-4-git-send-email-dinguyen@altera.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 16 Dec 2013 09:07:57 -0800
+Subject: [PATCH 08/10] KVM: arm-vgic: Support unqueueing of LRs to the dist
+In-Reply-To: <52AEF7D1.5050309@arm.com>
+References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
+ <1386878149-13397-9-git-send-email-christoffer.dall@linaro.org>
+ <52AEF7D1.5050309@arm.com>
+Message-ID: <20131216170757.GA12833@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Mon, Dec 16, 2013 at 12:53:37PM +0000, Marc Zyngier wrote:
+> On 12/12/13 19:55, Christoffer Dall wrote:
+> > To properly access the VGIC state from user space it is very unpractical
+> > to have to loop through all the LRs in all register access functions.
+> > Instead, support moving all pending state from LRs to the distributor,
+> > but leave active state LRs alone.
+> > 
+> > Note that to accurately present the active and pending state to VCPUs
+> > reading these distributor registers from a live VM, we would have to
+> > stop all other VPUs than the calling VCPU and ask each CPU to unqueue
+> > their LR state onto the distributor and add fields to track active state
+> > on the distributor side as well.  We don't have any users of such
+> > functionality yet and there are other inaccuracies of the GIC emulation,
+> > so don't provide accurate synchronized access to this state just yet.
+> > However, when the time comes, having this function should help.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> > Changelog[v4]:
+> >  - Reworked vgic_unqueue_irqs to explicitly check for the active bit and
+> >    to not use __test_and_clear_bit.
+> > 
+> > Changelog[v3]:
+> >  - New patch in series
+> > 
+> >  virt/kvm/arm/vgic.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 81 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 88599b5..8067e76 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -589,6 +589,78 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+> >  	return false;
+> >  }
+> >  
+> > +#define LR_CPUID(lr)	\
+> > +	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
+> > +#define LR_IRQID(lr)	\
+> > +	((lr) & GICH_LR_VIRTUALID)
+> > +
+> > +static void vgic_retire_lr(int lr_nr, int irq, struct vgic_cpu *vgic_cpu)
+> > +{
+> > +	clear_bit(lr_nr, vgic_cpu->lr_used);
+> > +	vgic_cpu->vgic_lr[lr_nr] &= ~GICH_LR_STATE;
+> > +	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
+> > +}
+> > +
+> > +/**
+> > + * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
+> > + * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
+> > + *
+> > + * Move any pending IRQs that have already been assigned to LRs back to the
+> > + * emulated distributor state so that the complete emulated state can be read
+> > + * from the main emulation structures without investigating the LRs.
+> > + *
+> > + * Note that IRQs in the active state in the LRs get their pending state moved
+> > + * to the distributor but the active state stays in the LRs, because we don't
+> > + * track the active state on the distributor side.
+> > + */
+> > +static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> > +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> > +	int vcpu_id = vcpu->vcpu_id;
+> > +	int i, irq, source_cpu;
+> > +	u32 *lr;
+> > +
+> > +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+> > +		lr = &vgic_cpu->vgic_lr[i];
+> > +		irq = LR_IRQID(*lr);
+> > +		source_cpu = LR_CPUID(*lr);
+> > +
+> > +		/*
+> > +		 * There are three options for the state bits:
+> > +		 *
+> > +		 * 01: pending
+> > +		 * 10: active
+> > +		 * 11: pending and active
+> > +		 *
+> > +		 * If the LR holds only an active interrupt (not pending) then
+> > +		 * just leave it alone.
+> > +		 */
+> > +		if ((*lr & GICH_LR_STATE) == GICH_LR_ACTIVE_BIT)
+> > +			continue;
+> > +
+> > +		/*
+> > +		 * If the interrupt was only pending (not "active" or "pending
+> > +		 * and active") then we the pending state will get moved to
+>                                      ^^ extra 'we'
+> > +		 * the distributor and the LR does not hold any info and can
+> > +		 * be marked as free for other use.
+> > +		 */
+> > +		if ((*lr & GICH_LR_STATE) == GICH_LR_PENDING_BIT)
+> > +			vgic_retire_lr(i, irq, vgic_cpu);
+> 
+> We should handle the ACTIVE+PENDING case, and I don't think we do.
+> Should it be (*lr & GICH_LR_PENDING_BIT)? I think the previous version
+> handled this case correctly.
+> 
 
-It turns now that the only really platform specific code that is needed for
-SOCFPGA is using the SDMMC_CMD_USE_HOLD_REG in the prepare_command function.
-Since the Rockchip already has this functionality, re-use the code that is
-already in dw_mmc-pltfm.c.
+nice catch!  We just need to always clear the pending bit on the LR.
+I'll fix that in a re-spin.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
-v7: none
-v6: none
-v5: none
-v4: Remove dw_mmc-socfpga platform specific code
-v3: none
-v2: none
----
- drivers/mmc/host/Kconfig          |    8 ---
- drivers/mmc/host/dw_mmc-socfpga.c |  138 -------------------------------------
- 2 files changed, 146 deletions(-)
- delete mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
+-Christoffer
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 7fc5099..6737a4f 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -567,14 +567,6 @@ config MMC_DW_EXYNOS
- 	  Synopsys DesignWare Memory Card Interface driver. Select this option
- 	  for platforms based on Exynos4 and Exynos5 SoC's.
- 
--config MMC_DW_SOCFPGA
--	tristate "SOCFPGA specific extensions for Synopsys DW Memory Card Interface"
--	depends on MMC_DW && MFD_SYSCON
--	select MMC_DW_PLTFM
--	help
--	  This selects support for Altera SoCFPGA specific extensions to the
--	  Synopsys DesignWare Memory Card Interface driver.
--
- config MMC_DW_PCI
- 	tristate "Synopsys Designware MCI support on PCI bus"
- 	depends on MMC_DW && PCI
-diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
-deleted file mode 100644
-index 3e8e53a..0000000
---- a/drivers/mmc/host/dw_mmc-socfpga.c
-+++ /dev/null
-@@ -1,138 +0,0 @@
--/*
-- * Altera SoCFPGA Specific Extensions for Synopsys DW Multimedia Card Interface
-- * driver
-- *
-- *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
-- *  Copyright (C) 2013 Altera Corporation
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * Taken from dw_mmc-exynos.c
-- */
--#include <linux/clk.h>
--#include <linux/mfd/syscon.h>
--#include <linux/mmc/host.h>
--#include <linux/mmc/dw_mmc.h>
--#include <linux/module.h>
--#include <linux/of.h>
--#include <linux/platform_device.h>
--#include <linux/regmap.h>
--
--#include "dw_mmc.h"
--#include "dw_mmc-pltfm.h"
--
--#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
--#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
--#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
--	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
--
--/* SOCFPGA implementation specific driver private data */
--struct dw_mci_socfpga_priv_data {
--	u8	ciu_div; /* card interface unit divisor */
--	u32	hs_timing; /* bitmask for CIU clock phase shift */
--	struct regmap   *sysreg; /* regmap for system manager register */
--};
--
--static int dw_mci_socfpga_priv_init(struct dw_mci *host)
--{
--	return 0;
--}
--
--static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
--{
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--
--	clk_disable_unprepare(host->ciu_clk);
--	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET,
--		priv->hs_timing);
--	clk_prepare_enable(host->ciu_clk);
--
--	host->bus_hz /= (priv->ciu_div + 1);
--	return 0;
--}
--
--static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
--{
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--
--	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
--		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
--}
--
--static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
--{
--	struct dw_mci_socfpga_priv_data *priv;
--	struct device_node *np = host->dev->of_node;
--	u32 timing[2];
--	u32 div = 0;
--	int ret;
--
--	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
--	if (!priv) {
--		dev_err(host->dev, "mem alloc failed for private data\n");
--		return -ENOMEM;
--	}
--
--	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
--	if (IS_ERR(priv->sysreg)) {
--		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
--		return PTR_ERR(priv->sysreg);
--	}
--
--	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
--	if (ret)
--		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
--	priv->ciu_div = div;
--
--	ret = of_property_read_u32_array(np,
--			"altr,dw-mshc-sdr-timing", timing, 2);
--	if (ret)
--		return ret;
--
--	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
--	host->priv = priv;
--	return 0;
--}
--
--static const struct dw_mci_drv_data socfpga_drv_data = {
--	.init			= dw_mci_socfpga_priv_init,
--	.setup_clock		= dw_mci_socfpga_setup_clock,
--	.prepare_command	= dw_mci_socfpga_prepare_command,
--	.parse_dt		= dw_mci_socfpga_parse_dt,
--};
--
--static const struct of_device_id dw_mci_socfpga_match[] = {
--	{ .compatible = "altr,socfpga-dw-mshc",
--			.data = &socfpga_drv_data, },
--	{},
--};
--MODULE_DEVICE_TABLE(of, dw_mci_socfpga_match);
--
--static int dw_mci_socfpga_probe(struct platform_device *pdev)
--{
--	const struct dw_mci_drv_data *drv_data;
--	const struct of_device_id *match;
--
--	match = of_match_node(dw_mci_socfpga_match, pdev->dev.of_node);
--	drv_data = match->data;
--	return dw_mci_pltfm_register(pdev, drv_data);
--}
--
--static struct platform_driver dw_mci_socfpga_pltfm_driver = {
--	.probe		= dw_mci_socfpga_probe,
--	.remove		= __exit_p(dw_mci_pltfm_remove),
--	.driver		= {
--		.name		= "dwmmc_socfpga",
--		.of_match_table	= dw_mci_socfpga_match,
--		.pm		= &dw_mci_pltfm_pmops,
--	},
--};
--
--module_platform_driver(dw_mci_socfpga_pltfm_driver);
--
--MODULE_DESCRIPTION("Altera SOCFPGA Specific DW-MSHC Driver Extension");
--MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:dwmmc-socfpga");
+> > +		/*
+> > +		 * Finally, reestablish the pending state on the distributor
+> > +		 * and the CPU interface.  It may have already been pending,
+> > +		 * but that is fine, then we are only setting a few bits that
+> > +		 * were already set.
+> > +		 */
+> > +		vgic_dist_irq_set(vcpu, irq);
+> > +		if (irq < VGIC_NR_SGIS)
+> > +			dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
+> > +		vgic_update_state(vcpu->kvm);
+> > +	}
+> > +}
+> > +
+> >  static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+> >  				  struct kvm_exit_mmio *mmio,
+> >  				  phys_addr_t offset)
+> > @@ -848,8 +920,6 @@ static void vgic_update_state(struct kvm *kvm)
+> >  	}
+> >  }
+> >  
+> > -#define LR_CPUID(lr)	\
+> > -	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
+> >  #define MK_LR_PEND(src, irq)	\
+> >  	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
+> >  
+> > @@ -871,9 +941,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+> >  		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
+> >  
+> >  		if (!vgic_irq_is_enabled(vcpu, irq)) {
+> > -			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
+> > -			clear_bit(lr, vgic_cpu->lr_used);
+> > -			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
+> > +			vgic_retire_lr(lr, irq, vgic_cpu);
+> >  			if (vgic_irq_is_active(vcpu, irq))
+> >  				vgic_irq_clear_active(vcpu, irq);
+> >  		}
+> > @@ -1675,6 +1743,14 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+> >  		}
+> >  	}
+> >  
+> > +	/*
+> > +	 * Move all pending IRQs from the LRs on all VCPUs so the pending
+> > +	 * state can be properly represented in the register state accessible
+> > +	 * through this API.
+> > +	 */
+> > +	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm)
+> > +		vgic_unqueue_irqs(tmp_vcpu);
+> > +
+> >  	offset -= r->base;
+> >  	r->handle_mmio(vcpu, &mmio, offset);
+> >  
+> > 
+> 
+> 
+> -- 
+> Jazz is not dead. It just smells funny...
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.7.9.5
+Christoffer
