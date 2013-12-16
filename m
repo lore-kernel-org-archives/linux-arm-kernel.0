@@ -1,29 +1,46 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Dec 2013 16:52:45 +0100
-Subject: pwm-backlight: 3.13-rc1 regression for old arm machine
-Message-ID: <87r49c6bea.fsf@free.fr>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 16 Dec 2013 21:23:43 +0530
+Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
+Message-ID: <1387209225-11520-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+After the platform devices are created using PLATFORM_DEVID_AUTO, the
+device names given in usb_bind_phy (in board file) does not match with
+the actual device name causing the USB PHY library not to return the
+PHY reference when the MUSB controller request for the PHY in the non-dt boot
+case.
+So removed creating platform devices using PLATFORM_DEVID_AUTO in omap2430.c.
 
-Since recently, and probable since last Linus's merge of PWM tree (Merge tag
-'pwm/for-3.13-rc1' of
-git://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm), my
-platform has its backlight broken.
+Did enumeration testing in omap3 beagle.
 
-The particularity of my platform:
- - arch/arm/mach-pxa/mioa701.c
- - no device tree
- - no power supply regulator for backlight
- - backlight controlled by a PWM
- - kernel message :
-[    1.495480] platform pwm-backlight: Driver pwm-backlight requests probe deferral
+Changes from v2:
+* Fixed the commit log
 
-I think other "old" platforms will suffer from this. Do you have a
-recommendation ?
+Changes from v1:
+* refreshed to the latested mainline kernel
+* added musb_put_id from omap2430 remove.
 
-Cheers.
+Kishon Vijay Abraham I (2):
+  usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
+  arm: omap: remove *.auto* from device names given in usb_bind_phy
 
---
-Robert
+ arch/arm/mach-omap2/board-2430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+ arch/arm/mach-omap2/board-ldp.c            |    2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+ arch/arm/mach-omap2/board-omap3logic.c     |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+ arch/arm/mach-omap2/board-overo.c          |    2 +-
+ arch/arm/mach-omap2/board-rx51.c           |    2 +-
+ drivers/usb/musb/musb_core.c               |   31 +++++++++++++++++++++++++++-
+ drivers/usb/musb/musb_core.h               |    2 ++
+ drivers/usb/musb/omap2430.c                |   19 +++++++++++++++--
+ 15 files changed, 61 insertions(+), 15 deletions(-)
+
+-- 
+1.7.10.4
