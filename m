@@ -1,66 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 16 Dec 2013 20:28:16 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <20131216001158.0e15e93c.akpm@linux-foundation.org>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131126134117.GF28642@pengutronix.de>
- <20131126134444.GG28642@pengutronix.de>
- <20131126183629.GK28642@pengutronix.de>
- <20131216001158.0e15e93c.akpm@linux-foundation.org>
-Message-ID: <20131216192816.GC14866@pengutronix.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 16 Dec 2013 12:42:30 -0700
+Subject: [PATCH V1 03/11] ARM: dts: imx6qdl-sabrelite: remove usdhc4
+ wp-gpio
+In-Reply-To: <20131214134656.GC16177@S2101-09.ap.freescale.net>
+References: <1386899355-17379-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1386899355-17379-4-git-send-email-troy.kisky@boundarydevices.com>
+ <20131214134656.GC16177@S2101-09.ap.freescale.net>
+Message-ID: <52AF57A6.5090203@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+On 12/14/2013 6:46 AM, Shawn Guo wrote:
+> On Thu, Dec 12, 2013 at 06:49:07PM -0700, Troy Kisky wrote:
+>> On Sabre Lite usdhc4 is a micro sd slot, which has no
+>> write protect.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> Applied #1, #2 and #3, thanks.
+>
+> Shawn
+>
+>
+Thanks for the rebase on Marek's PCIe patch. However, PCIe is a common 
+feature
+and should be moved to imx6qdl-sabrelite.dtsi.
 
-On Mon, Dec 16, 2013 at 12:11:58AM -0800, Andrew Morton wrote:
-> On Tue, 26 Nov 2013 19:36:29 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
-> > On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K__nig wrote:
-> > > On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K__nig wrote:
-> > > > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K__nig wrote:
-> > > > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> > > > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> > > > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> > > > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> > > > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> > > > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
-> > > > > 
-> > > > > So better include it explicitly not only because the last link will go
-> > > > > away soon.
-> > > > > 
-> > > > > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > > > Ping. Is this patch ok despite Jean-Christophe's objection?
-> > > I saw that akpm already took it into his tree.
-> > This patch is one of the last few that are needed to drop <mach/timex.h>
-> > alltogether that I don't have an ack from the respective maintainer yet.
-> > 
-> > Can you give your ack instead of sending the patch to Linus, then I'd
-> > take it with the patch dropping <mach/timex.h> to make it easier to
-> > merge.
-> 
-> ack ;)
-thanks. There is another rtc change that I didn't receive any feedback
-for from a maintainer:
+Should I send a patch to do this, or will you fix it up, or will Marek?
 
-	rtc: pxa: drop unused #define TIMER_FREQ
 
-. In the meantime I send a pull request asking to ignore that I didn't
-get any maintainer reply for the rtc changes. Do you think it's sensible
-to change the entry in MAINTAINERS? Any combination of:
-
-	a) drop Alessandro's M: line
-	b) add you
-	c) change Status from Maintained to Odd Fixes or Orphan
-
-> I dropped my copy.
-fine, thanks
-
-I'll wait for some time now before adding your ack to my tree to prevent
-that you give me an ack for the other change just when I sent a new pull
-request :-)
-
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Troy
