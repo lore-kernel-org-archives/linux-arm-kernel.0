@@ -1,31 +1,47 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 16 Dec 2013 22:51:55 +0800
-Subject: [PATCH] ARM: Remove duplicate SCHED_HRTICK config option
-Message-ID: <1387205515.6989.1.camel@phoenix>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 16 Dec 2013 15:03:43 +0000
+Subject: [PATCH V2] arm: mm: fix dcache flush logic for compound high pages
+Message-ID: <1387206223-1670-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two SCHED_HRTICK config entries in Kconfig.
-This looks like a merge mistake. Fix it.
+When given a compound high page, __flush_dcache_page will only flush
+the first page of the compound page repeatedly rather than the entire
+set of constituent pages.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
+This patch corrects the logic such that all constituent pages are now
+flushed.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/arm/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
+V2: style change use page + i rather than separate struct *cpage
+---
+ arch/arm/mm/flush.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e462c5d..03649aa0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1656,9 +1656,6 @@ config HZ
- config SCHED_HRTICK
- 	def_bool HIGH_RES_TIMERS
- 
--config SCHED_HRTICK
--	def_bool HIGH_RES_TIMERS
--
- config THUMB2_KERNEL
- 	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
- 	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 6d5ba9a..3387e60 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -175,16 +175,16 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 		unsigned long i;
+ 		if (cache_is_vipt_nonaliasing()) {
+ 			for (i = 0; i < (1 << compound_order(page)); i++) {
+-				void *addr = kmap_atomic(page);
++				void *addr = kmap_atomic(page + i);
+ 				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+ 				kunmap_atomic(addr);
+ 			}
+ 		} else {
+ 			for (i = 0; i < (1 << compound_order(page)); i++) {
+-				void *addr = kmap_high_get(page);
++				void *addr = kmap_high_get(page + i);
+ 				if (addr) {
+ 					__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+-					kunmap_high(page);
++					kunmap_high(page + i);
+ 				}
+ 			}
+ 		}
 -- 
-1.8.1.2
+1.8.1.4
