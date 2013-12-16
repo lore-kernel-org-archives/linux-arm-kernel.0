@@ -1,37 +1,21 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Mon, 16 Dec 2013 15:54:47 -0800 (PST)
-Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sizes
-In-Reply-To: <1387197528-1177-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1387197528-1177-1-git-send-email-ben.dooks@codethink.co.uk>
- <1387197528-1177-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <87sitsnygu.wl%kuninori.morimoto.gx@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 16 Dec 2013 15:56:13 -0800
+Subject: [PATCHv5] rtc: Add support for Intersil ISL12057 I2C RTC chip
+In-Reply-To: <bb04b9b4d76e735526ccc8e72df27a3ca894b4ca.1387235949.git.arno@natisbad.org>
+References: <bb04b9b4d76e735526ccc8e72df27a3ca894b4ca.1387235949.git.arno@natisbad.org>
+Message-ID: <20131216235613.GA12307@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi
-
-> The r8a7790.dtsi file has four sdhi nodes which the first two have the wrong
-> resource size for their register block. This causes the sh_modbile_sdhi driver
-> to fail to communicate with card at-all.
+On Tue, Dec 17, 2013 at 12:39:22AM +0100, Arnaud Ebalard wrote:
 > 
-> Change sdhi{0,1} node size from 0x100 to 0x200 to correct these nodes
-> as per Kuninori Morimoto's response to the original patch where all four
-> nodes where changed. sdhi{2,3} are the correct size.
+> Intersil ISL12057 I2C RTC chip also supports two alarms. This patch
+> only adds support for basic RTC functionalities (i.e. getting and
+> setting time). Tests have been performed on NETGEAR ReadyNAS 102 w/
+> startup/shutdown scripts, hwclock, ntpdate and openntpd.
 > 
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Linux SH <linux-sh@vger.kernel.org>
-> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> Tested-by: William Towle <william.towle@codethink.co.uk>
-> ---
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-
-Best regards
----
-Kuninori Morimoto
+Guenter
