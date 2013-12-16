@@ -1,78 +1,50 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Dec 2013 15:55:54 -0500
-Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <20131216204037.GS21983@codeaurora.org>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52AA65EA.20902@codeaurora.org> <52AEF560.9010603@ti.com>
- <20131216204037.GS21983@codeaurora.org>
-Message-ID: <52AF68DA.9000104@ti.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Mon, 16 Dec 2013 17:55:55 -0300
+Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
+In-Reply-To: <20131215045116.23538.4@quantum>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-3-git-send-email-dinguyen@altera.com>
+ <201312142233.27143.arnd@arndb.de> <52AD1185.6090501@linaro.org>
+ <20131215045116.23538.4@quantum>
+Message-ID: <52AF68DB.7090105@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 December 2013 03:40 PM, Stephen Boyd wrote:
-> On 12/16, ivan.khoronzhuk wrote:
->> On 12/13/2013 03:42 AM, Stephen Boyd wrote:
->>> On 12/11/13 10:00, Ivan Khoronzhuk wrote:
->>>> +
->>>> +static inline u32 keystone_timer_readl(unsigned long rg)
->>>> +{
->>>> +	return readl(timer.base + rg);
->>>> +}
->>>> +
->>>> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
->>>> +{
->>>> +	writel(val, timer.base + rg);
->>>> +}
->>>
->>> It's probably better to use the relaxed variants here to avoid any
->>> memory barriers that aren't necessary.
->>>
->>
->> Yes, but the code has places where I cannot use relaxed variants.
->>
->> From timer user guide:
->> "Writes from the configuration bus to the timer registers are not allowed
->> when the timer is active, except for stopping or resetting the timers.
->> Registers that are protected by hardware include CNTLO, CNTHI, PRDLO,
->> PRDHI, TGCR (except the TIMLORS and TIMHIRS bits), and TCR (except the
->> ENAMODE bits)."
->>
->> According to this I have to add keystone readl/write relaxed functions
->> and use mixed calls of writel/writel_relaxed functions.
->>
->> For instance, for keystone_timer_config() which is used by
->> keystone_set_next_event(), I will do following:
->> -----
->> tcr = keystone_timer_readl_relaxed(TCR);
->>
->> /* disable timer */
->> tcr &= ~(TCR_ENAMODE_MASK);
->> keystone_timer_writel_relaxed(tcr, TCR);
->> ...
->> /* reset counter to zero, set new period */
->> *** here I have to be sure the timer is disabled ***
->> keystone_timer_writel(0, TIM12);
->> keystone_timer_writel_relaxed(0, TIM34);
->> keystone_timer_writel_relaxed(period & 0xffffffff, PRD12);
->> keystone_timer_writel_relaxed(period >> 32, PRD34);
->>
->> /* enable timer */
->> *** here I have to be sure that TIM and PRD registers are written ***
->> keystone_timer_writel(tcr, TCR);
->> ---
->>
->> The same for keystone_timer_init().
->>
->> Will it be better?
-> 
-> Why not just put the explicit memory barriers where you need them
-> and always use the relaxed variants in the mmio wrappers? That
-> way you're always sure the memory barriers are there and that
-> they're properly documented.
-> 
-I agree with Stephen.
+Hi Mike et al,
 
-Regards,
-Santosh
+El 15/12/13 01:51, Mike Turquette escribi?:
+> clk_set_phase has been proposed before and now may be the time to add
+> it. There are two things that need to be addressed:
+>
+> 1) what are the values for the phase? This needs to work for others that
+> must set clk phase, so we need to consider all those requirements before
+> making a new function declaration in clk.h
+>
+> 2) is setting a clock's phase something done dynamically? Put another
+> way, does the same clock has it's phase set multiple times while the
+> system is running? For static configuration that only happens during
+> initialization we do not need a new API. The clock driver can handle it
+> privately. For dynamic operations though we likely need a new API.
+
+We on sunxi also need this for our (not yet merged) MMC driver; we 
+currently have it implemented as an exported
+
+void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
+
+that takes the MMC clock (and only the MMC clock) and does the setup 
+(it's basically configuring two values, "sample" and "output", into the 
+clock register). I really don't know what does this do/why is it 
+required/when is it used; I'm cc'ing Hans and David who can hopefully 
+explain that part.
+
+I also saw a similar requirement from the gmac people (on cc too), who 
+needed to set the phy type (or something like that) on one of the clock 
+registers; so I'm thinking maybe a generic "tune something" approach 
+that lets users configure some clock-dependent, arbitrary aspect of the 
+clock is the way forward. Otherwise, we're going to end up bloating the 
+clock framework with a lot of callback pointers that are going to be 
+used in one or two clocks out of potentially hundreds on the whole system.
+
+Cheers,
+
+Emilio
