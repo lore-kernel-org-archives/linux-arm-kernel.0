@@ -1,31 +1,36 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Dec 2013 11:42:27 -0700
-Subject: [PATCHv7 05/12] iommu/core: add ops->{bound,unbind}_driver()
-In-Reply-To: <1386835033-4701-6-git-send-email-hdoyu@nvidia.com>
+Date: Mon, 16 Dec 2013 11:46:56 -0700
+Subject: [PATCHv7 07/12] iommu/tegra: smmu: register device to iommu
+ dynamically
+In-Reply-To: <1386835033-4701-8-git-send-email-hdoyu@nvidia.com>
 References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-6-git-send-email-hdoyu@nvidia.com>
-Message-ID: <52AF4993.80406@wwwdotorg.org>
+ <1386835033-4701-8-git-send-email-hdoyu@nvidia.com>
+Message-ID: <52AF4AA0.60006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/12/2013 12:57 AM, Hiroshi Doyu wrote:
-> ops->{bound,unbind}_driver() functions are called at
-> BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
+> platform_devices are registered as IOMMU'able dynamically via
+> add_device() and remove_device().
 
-Some explanation re: why the existing {add,remove}_device hooks aren't
-enough would be useful. I didn't really get that from the current commit
-description. What actions would an IOMMU driver take in these new
-callbacks that could not be taken in {add,remove}_device? Surely the
-IOMMU could set up any internal data structures, AS, or page tables,
-etc. within add_device, rather than deferring to bound_driver, which
-presumably happens after the device's probe(), yet the driver might want
-to make the HW do bus-master accesses within probe(), or at least map
-stuff into the page table...
+That says {add,remove}_device() ...
 
-> This is necessary to control the device population order. IOMMU master
-> devices depend on an IOMMU device instanciation. IOMMU master devices
+> Tegra SMMU can have multiple address spaces(AS). IOMMU'able devices
+> can belong to one of them. Multiple IOVA maps are created at boot-up,
+> which can be attached to devices later. We reserve 2 of them for
+> static assignment, AS[0] for system default, AS[1] for AHB clusters as
+> protected domain from others, where there are many traditional
+> pheripheral devices like USB, SD/MMC. They should be isolated from
+> some smart devices like host1x for system robustness. Even if smart
+> devices behaves wrongly, the traditional devices(SD/MMC, USB) wouldn't
+> be affected, and the system could continue most likely. DMA API(ARM)
+> needs ARM_DMA_USE_IOMMU to be enabled.
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> v6:
+> Use smmu_iommu_{bound,unbind}_driver() instead of
+> smmu_iommu_{add,del}_device() to register devices to SMMU.
 
-Is an "IOMMU master device" the device that issues transactions on the
-bus, which are affected by the IOMMU? The more common term for this is
-"bus master"; "IOMMU master device" sounds too similar to the "IOMMU"
-itself.
+... yet that says it's been changed to {bound,unbind}_driver(). BTW,
+what was the reason for this change?
