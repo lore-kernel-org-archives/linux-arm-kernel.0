@@ -1,56 +1,54 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 16 Dec 2013 16:58:49 +0800
-Subject: [PATCH v3 6/7] Documentation: add the binding file for Quadspi driver
+Date: Mon, 16 Dec 2013 16:58:48 +0800
+Subject: [PATCH v3 5/7] mtd: spi-nor: add a helper to find the spi_device_id
 In-Reply-To: <1387184330-14448-1-git-send-email-b32955@freescale.com>
 References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
-Message-ID: <1387184330-14448-7-git-send-email-b32955@freescale.com>
+Message-ID: <1387184330-14448-6-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the binding file for Freescale Quadspi driver.
+Add the spi_nor_match_id() to find the proper spi_device_id
+in the spi_nor_ids table.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- .../devicetree/bindings/mtd/fsl-quadspi.txt        |   31 ++++++++++++++++++++
- 1 files changed, 31 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+ drivers/mtd/spi-nor/spi-nor.c |   12 ++++++++++++
+ include/linux/mtd/spi-nor.h   |    1 +
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-new file mode 100644
-index 0000000..3475cfa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-@@ -0,0 +1,31 @@
-+* Freescale Quad Serial Peripheral Interface(QuadSPI)
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index eb72bce..268d019 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -1081,6 +1081,18 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+ 	return 0;
+ }
+ 
++const struct spi_device_id * spi_nor_match_id(char *name)
++{
++	const struct spi_device_id *id = spi_nor_ids;
 +
-+Required properties:
-+- compatible : Should be "fsl,vf610-qspi"
-+- reg : Offset and length of the register set for the device
-+- interrupts : Should contain the interrupt for the device
-+- clocks : The clocks needed by the QuadSPI controller
-+- clock-names : the name of the clocks
-+- fsl,nor-num : Contains the number of SPI NOR chips connected to
-+                the controller.
-+- fsl,nor-size : the size of each SPI NOR.
-+- fsl,max-frequency : the frequency at which the SPI NOR works.
++	while (id->name[0]) {
++		if (!strcmp(name, id->name))
++			return id;
++		id++;
++	}
++	return NULL;
++}
 +
-+Example:
-+
-+qspi0: quadspi at 40044000 {
-+	compatible = "fsl,vf610-qspi";
-+	reg = <0x40044000 0x1000>;
-+	interrupts = <0 24 0x04>;
-+	clocks = <&clks VF610_CLK_QSPI0_EN>,
-+		<&clks VF610_CLK_QSPI0>;
-+	clock-names = "qspi_en", "qspi";
-+	fsl,nor-num = <1>;
-+	fsl,nor-size = <0x1000000>;
-+	fsl,max-frequency = <66000000>;
-+	status = "okay";
-+
-+	flash0: s25fl128s at 0 {
-+		....
-+	};
-+};
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Freescale Semiconductor Inc.");
+ MODULE_DESCRIPTION("framework for SPI NOR nor");
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index a0c2a8b..7ed66d1 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -162,5 +162,6 @@ struct spi_nor {
+ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+ 			enum read_mode mode);
+ extern const struct spi_device_id spi_nor_ids[];
++const struct spi_device_id * spi_nor_match_id(char *name);
+ 
+ #endif
 -- 
 1.7.2.rc3
