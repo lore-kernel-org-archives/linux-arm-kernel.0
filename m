@@ -1,62 +1,67 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Mon, 16 Dec 2013 18:37:48 +0800
-Subject: [PATCH] ARM: dts: imx6qdl: add spdif support for sabreauto
-Message-ID: <1387190268-8041-1-git-send-email-Guangyu.Chen@freescale.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 16 Dec 2013 11:34:38 +0100
+Subject: [PATCH v4 7/8] clocksource: kona: Add basic use of external clock
+In-Reply-To: <1386271244-3927-8-git-send-email-tim.kryger@linaro.org>
+References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
+ <1386271244-3927-8-git-send-email-tim.kryger@linaro.org>
+Message-ID: <52AED73E.5090507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds spdif support for imx6qdl-sabreauto by inserting the cpu dai
-node with pinctrl group and its ASoC dai link node.
+On 12/05/2013 08:20 PM, Tim Kryger wrote:
+> When an clock is specified in the device tree, enable it and use it to
+> determine the external clock frequency.
+>
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
 
-Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index a526796..26fa0e5 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -14,6 +14,14 @@
- 	memory {
- 		reg = <0x10000000 0x80000000>;
- 	};
-+
-+	sound-spdif {
-+		compatible = "fsl,imx-audio-spdif",
-+			   "fsl,imx-sabreauto-spdif";
-+		model = "imx-spdif";
-+		spdif-controller = <&spdif>;
-+		spdif-in;
-+	};
- };
- 
- &ecspi1 {
-@@ -76,6 +84,12 @@
- 			fsl,pins = <MX6QDL_GPMI_NAND_PINGRP1>;
- 		};
- 
-+		pinctrl_spdif: spdifgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__SPDIF_IN 0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_uart4: uart4grp {
- 			fsl,pins = <MX6QDL_UART4_PINGRP1>;
- 		};
-@@ -102,6 +116,12 @@
- 	};
- };
- 
-+&spdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_spdif>;
-+	status = "okay";
-+};
-+
- &uart4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart4>;
+> ---
+>   drivers/clocksource/bcm_kona_timer.c | 14 +++++++++++---
+>   1 file changed, 11 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
+> index 0d7d8c3..8a4ab36 100644
+> --- a/drivers/clocksource/bcm_kona_timer.c
+> +++ b/drivers/clocksource/bcm_kona_timer.c
+> @@ -17,6 +17,7 @@
+>   #include <linux/jiffies.h>
+>   #include <linux/clockchips.h>
+>   #include <linux/types.h>
+> +#include <linux/clk.h>
+>
+>   #include <linux/io.h>
+>   #include <asm/mach/time.h>
+> @@ -107,11 +108,18 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
+>   static void __init kona_timers_init(struct device_node *node)
+>   {
+>   	u32 freq;
+> +	struct clk *external_clk;
+>
+> -	if (!of_property_read_u32(node, "clock-frequency", &freq))
+> +	external_clk = of_clk_get_by_name(node, NULL);
+> +
+> +	if (!IS_ERR(external_clk)) {
+> +		arch_timer_rate = clk_get_rate(external_clk);
+> +		clk_prepare_enable(external_clk);
+> +	} else if (!of_property_read_u32(node, "clock-frequency", &freq)) {
+>   		arch_timer_rate = freq;
+> -	else
+> -		panic("clock-frequency not set in the .dts file");
+> +	} else {
+> +		panic("unable to determine clock-frequency");
+> +	}
+>
+>   	/* Setup IRQ numbers */
+>   	timers.tmr_irq = irq_of_parse_and_map(node, 0);
+>
+
+
 -- 
-1.8.4
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
