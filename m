@@ -1,83 +1,93 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 16 Dec 2013 16:58:44 +0800
-Subject: [PATCH v3 1/7] mtd: spi-nor: copy the SPI NOR commands to a new
- header file
-In-Reply-To: <1387184330-14448-1-git-send-email-b32955@freescale.com>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
-Message-ID: <1387184330-14448-2-git-send-email-b32955@freescale.com>
+Date: Mon, 16 Dec 2013 16:58:43 +0800
+Subject: [PATCH v3 0/7] mtd: spi-nor: add a new framework for SPI NOR
+Message-ID: <1387184330-14448-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new header :spi-nor.h,
-and copies all the SPI NOR commands and relative macros into this new header.
+1.) Why add a new framework for SPI NOR?
+  The SPI-NOR controller such as Freescale's Quadspi controller is working
+  in a different way from the SPI bus. It should knows the NOR commands to
+  find the right LUT sequence. Unfortunately, the current code can not meet
+  this requirement.
 
-This hearder can be used by the m25p80.c and other spi-nor controller,
-such as Freescale's Quadspi.
+2.) How does this patch set do?
+   This patch set adds a new spi-nor layer.
+   Before this patch, the layer is like:
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- include/linux/mtd/spi-nor.h |   53 +++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 53 insertions(+), 0 deletions(-)
+                   MTD
+         ------------------------
+                  m25p80
+         ------------------------
+	       spi bus driver
+         ------------------------
+	        SPI NOR chip
+
+   After this patch, the layer is like:
+                   MTD
+         ------------------------
+                  spi-nor
+         ------------------------
+                  m25p80
+         ------------------------
+	       spi bus driver
+         ------------------------
+	       SPI NOR chip
+
+  With the spi-nor controller driver(Freescale Quadspi), it looks like:
+                   MTD
+         ------------------------
+                  spi-nor
+         ------------------------
+                fsl-quadspi
+         ------------------------
+	       SPI NOR chip
+
+3.) more details
+    This patch set adds a new data structrue spi_nor{}, clones most the common
+  code to spi-nor.c. Add spi_nor_xfer_cfg {} for the fundamental primitives:
+  read_xfer/write_xfer.
+
+    Make the m25p80.c/fsl_quaspi.c use the new APIs. 
+
+4.) Change log:
+v2 --> v3:
+	[1] add prepare/unprepare hooks for spi_nor{}.
+	[2] add a new "priv" field for spi_nor{}.
+	[3] add the Freescale Quadspi driver which supports the Quad read by
+             default. 
+
+v1 --> v2:
+	[1] follow Angus's advice, add more hooks and data structrures.
+	[2] others.
+
+
+Huang Shijie (7):
+  mtd: spi-nor: copy the SPI NOR commands to a new header file
+  mtd: spi-nor: add the basic data structures
+  mtd: spi-nor: add the framework for SPI NOR
+  mtd: m25p80: use the SPI nor framework
+  mtd: spi-nor: add a helper to find the spi_device_id
+  Documentation: add the binding file for Quadspi driver
+  mtd: spi-nor: Add Freescale QuadSpi driver
+
+ .../devicetree/bindings/mtd/fsl-quadspi.txt        |   31 +
+ drivers/mtd/Kconfig                                |    2 +
+ drivers/mtd/Makefile                               |    1 +
+ drivers/mtd/devices/Kconfig                        |    2 +-
+ drivers/mtd/devices/m25p80.c                       | 1271 ++------------------
+ drivers/mtd/spi-nor/Kconfig                        |   12 +
+ drivers/mtd/spi-nor/Makefile                       |    2 +
+ drivers/mtd/spi-nor/fsl-quadspi.c                  |  927 ++++++++++++++
+ drivers/mtd/spi-nor/spi-nor.c                      | 1098 +++++++++++++++++
+ include/linux/mtd/spi-nor.h                        |  167 +++
+ 10 files changed, 2335 insertions(+), 1178 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/Kconfig
+ create mode 100644 drivers/mtd/spi-nor/Makefile
+ create mode 100644 drivers/mtd/spi-nor/fsl-quadspi.c
+ create mode 100644 drivers/mtd/spi-nor/spi-nor.c
  create mode 100644 include/linux/mtd/spi-nor.h
 
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-new file mode 100644
-index 0000000..ab2ea1e
---- /dev/null
-+++ b/include/linux/mtd/spi-nor.h
-@@ -0,0 +1,53 @@
-+#ifndef __LINUX_MTD_SPI_NOR_H
-+#define __LINUX_MTD_SPI_NOR_H
-+
-+/* Flash opcodes. */
-+#define	OPCODE_WREN		0x06	/* Write enable */
-+#define	OPCODE_RDSR		0x05	/* Read status register */
-+#define	OPCODE_WRSR		0x01	/* Write status register 1 byte */
-+#define	OPCODE_NORM_READ	0x03	/* Read data bytes (low frequency) */
-+#define	OPCODE_FAST_READ	0x0b	/* Read data bytes (high frequency) */
-+#define	OPCODE_QUAD_READ        0x6b    /* Read data bytes */
-+#define	OPCODE_PP		0x02	/* Page program (up to 256 bytes) */
-+#define	OPCODE_BE_4K		0x20	/* Erase 4KiB block */
-+#define	OPCODE_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
-+#define	OPCODE_BE_32K		0x52	/* Erase 32KiB block */
-+#define	OPCODE_CHIP_ERASE	0xc7	/* Erase whole flash chip */
-+#define	OPCODE_SE		0xd8	/* Sector erase (usually 64KiB) */
-+#define	OPCODE_RDID		0x9f	/* Read JEDEC ID */
-+#define	OPCODE_RDCR             0x35    /* Read configuration register */
-+
-+/* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
-+#define	OPCODE_NORM_READ_4B	0x13	/* Read data bytes (low frequency) */
-+#define	OPCODE_FAST_READ_4B	0x0c	/* Read data bytes (high frequency) */
-+#define	OPCODE_QUAD_READ_4B	0x6c    /* Read data bytes */
-+#define	OPCODE_PP_4B		0x12	/* Page program (up to 256 bytes) */
-+#define	OPCODE_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
-+
-+/* Used for SST flashes only. */
-+#define	OPCODE_BP		0x02	/* Byte program */
-+#define	OPCODE_WRDI		0x04	/* Write disable */
-+#define	OPCODE_AAI_WP		0xad	/* Auto address increment word program */
-+
-+/* Used for Macronix and Winbond flashes. */
-+#define	OPCODE_EN4B		0xb7	/* Enter 4-byte mode */
-+#define	OPCODE_EX4B		0xe9	/* Exit 4-byte mode */
-+
-+/* Used for Spansion flashes only. */
-+#define	OPCODE_BRWR		0x17	/* Bank register write */
-+
-+/* Status Register bits. */
-+#define	SR_WIP			1	/* Write in progress */
-+#define	SR_WEL			2	/* Write enable latch */
-+/* meaning of other SR_* bits may differ between vendors */
-+#define	SR_BP0			4	/* Block protect 0 */
-+#define	SR_BP1			8	/* Block protect 1 */
-+#define	SR_BP2			0x10	/* Block protect 2 */
-+#define	SR_SRWD			0x80	/* SR write protect */
-+
-+#define SR_QUAD_EN_MX           0x40    /* Macronix Quad I/O */
-+
-+/* Configuration Register bits. */
-+#define CR_QUAD_EN_SPAN		0x2     /* Spansion Quad I/O */
-+
-+#endif
 -- 
 1.7.2.rc3
