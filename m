@@ -1,180 +1,230 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Dec 2013 09:07:57 -0800
-Subject: [PATCH 08/10] KVM: arm-vgic: Support unqueueing of LRs to the dist
-In-Reply-To: <52AEF7D1.5050309@arm.com>
+Date: Mon, 16 Dec 2013 09:08:56 -0800
+Subject: [PATCH 02/10] KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
+In-Reply-To: <52AEE7D1.6020106@arm.com>
 References: <1386878149-13397-1-git-send-email-christoffer.dall@linaro.org>
- <1386878149-13397-9-git-send-email-christoffer.dall@linaro.org>
- <52AEF7D1.5050309@arm.com>
-Message-ID: <20131216170757.GA12833@cbox>
+ <1386878149-13397-3-git-send-email-christoffer.dall@linaro.org>
+ <52AEE7D1.6020106@arm.com>
+Message-ID: <20131216170856.GB12833@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 12:53:37PM +0000, Marc Zyngier wrote:
+On Mon, Dec 16, 2013 at 11:45:21AM +0000, Marc Zyngier wrote:
 > On 12/12/13 19:55, Christoffer Dall wrote:
-> > To properly access the VGIC state from user space it is very unpractical
-> > to have to loop through all the LRs in all register access functions.
-> > Instead, support moving all pending state from LRs to the distributor,
-> > but leave active state LRs alone.
+> > Support creating the ARM VGIC device through the KVM_CREATE_DEVICE
+> > ioctl, which can then later be leveraged to use the
+> > KVM_{GET/SET}_DEVICE_ATTR, which is useful both for setting addresses in
+> > a more generic API than the ARM-specific one and is useful for
+> > save/restore of VGIC state.
 > > 
-> > Note that to accurately present the active and pending state to VCPUs
-> > reading these distributor registers from a live VM, we would have to
-> > stop all other VPUs than the calling VCPU and ask each CPU to unqueue
-> > their LR state onto the distributor and add fields to track active state
-> > on the distributor side as well.  We don't have any users of such
-> > functionality yet and there are other inaccuracies of the GIC emulation,
-> > so don't provide accurate synchronized access to this state just yet.
-> > However, when the time comes, having this function should help.
+> > Adds KVM_CAP_DEVICE_CTRL to ARM capabilities.
+> > 
+> > Note that we change the check for creating a VGIC from bailing out if
+> > any VCPUs were created, to bailing out if any VCPUs were ever run.  This
+> > is an important distinction that shouldn't break anything, but allows
+> > creating the VGIC after the VCPUs have been created.
 > > 
 > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > > ---
 > > Changelog[v4]:
-> >  - Reworked vgic_unqueue_irqs to explicitly check for the active bit and
-> >    to not use __test_and_clear_bit.
+> >  - Rename kvm_arm_vgic_ops to kvm_arm_vgic_v2_ops
+> >  - Add comment to kvm_vgic_create about locking vcpu->mutex
 > > 
 > > Changelog[v3]:
-> >  - New patch in series
+> >  - Prevent race in kvm_vgic_create by trying to take all the vcpu
+> >    locks before creating the vgic.
 > > 
-> >  virt/kvm/arm/vgic.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++----
-> >  1 file changed, 81 insertions(+), 5 deletions(-)
+> > Changelog[v2]:
+> >  - None
 > > 
+> >  Documentation/virtual/kvm/devices/arm-vgic.txt | 10 ++++
+> >  arch/arm/kvm/arm.c                             |  1 +
+> >  include/linux/kvm_host.h                       |  1 +
+> >  include/uapi/linux/kvm.h                       |  1 +
+> >  virt/kvm/arm/vgic.c                            | 63 +++++++++++++++++++++++++-
+> >  virt/kvm/kvm_main.c                            |  6 ++-
+> >  6 files changed, 79 insertions(+), 3 deletions(-)
+> >  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
+> > 
+> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> > new file mode 100644
+> > index 0000000..38f27f7
+> > --- /dev/null
+> > +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> > @@ -0,0 +1,10 @@
+> > +ARM Virtual Generic Interrupt Controller (VGIC)
+> > +===============================================
+> > +
+> > +Device types supported:
+> > +  KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+> > +
+> > +Only one VGIC instance may be instantiated through either this API or the
+> > +legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+> > +controller, requiring emulated user-space devices to inject interrupts to the
+> > +VGIC instead of directly to CPUs.
+> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> > index c9fe9d7..cc7c41a 100644
+> > --- a/arch/arm/kvm/arm.c
+> > +++ b/arch/arm/kvm/arm.c
+> > @@ -190,6 +190,7 @@ int kvm_dev_ioctl_check_extension(long ext)
+> >  	case KVM_CAP_IRQCHIP:
+> >  		r = vgic_present;
+> >  		break;
+> > +	case KVM_CAP_DEVICE_CTRL:
+> >  	case KVM_CAP_USER_MEMORY:
+> >  	case KVM_CAP_SYNC_MMU:
+> >  	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+> > diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> > index 9523d2a..521dd76 100644
+> > --- a/include/linux/kvm_host.h
+> > +++ b/include/linux/kvm_host.h
+> > @@ -1076,6 +1076,7 @@ struct kvm_device *kvm_device_from_filp(struct file *filp);
+> >  extern struct kvm_device_ops kvm_mpic_ops;
+> >  extern struct kvm_device_ops kvm_xics_ops;
+> >  extern struct kvm_device_ops kvm_vfio_ops;
+> > +extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+> >  
+> >  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+> >  
+> > diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> > index 902f124..b647c29 100644
+> > --- a/include/uapi/linux/kvm.h
+> > +++ b/include/uapi/linux/kvm.h
+> > @@ -853,6 +853,7 @@ struct kvm_device_attr {
+> >  #define  KVM_DEV_VFIO_GROUP			1
+> >  #define   KVM_DEV_VFIO_GROUP_ADD			1
+> >  #define   KVM_DEV_VFIO_GROUP_DEL			2
+> > +#define KVM_DEV_TYPE_ARM_VGIC_V2	5
+> >  
+> >  /*
+> >   * ioctls for VM fds
 > > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 88599b5..8067e76 100644
+> > index 5e9df47..b15d6c1 100644
 > > --- a/virt/kvm/arm/vgic.c
 > > +++ b/virt/kvm/arm/vgic.c
-> > @@ -589,6 +589,78 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
-> >  	return false;
-> >  }
+> > @@ -1433,20 +1433,45 @@ out:
 > >  
-> > +#define LR_CPUID(lr)	\
-> > +	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
-> > +#define LR_IRQID(lr)	\
-> > +	((lr) & GICH_LR_VIRTUALID)
-> > +
-> > +static void vgic_retire_lr(int lr_nr, int irq, struct vgic_cpu *vgic_cpu)
-> > +{
-> > +	clear_bit(lr_nr, vgic_cpu->lr_used);
-> > +	vgic_cpu->vgic_lr[lr_nr] &= ~GICH_LR_STATE;
-> > +	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-> > +}
-> > +
-> > +/**
-> > + * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
-> > + * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
-> > + *
-> > + * Move any pending IRQs that have already been assigned to LRs back to the
-> > + * emulated distributor state so that the complete emulated state can be read
-> > + * from the main emulation structures without investigating the LRs.
-> > + *
-> > + * Note that IRQs in the active state in the LRs get their pending state moved
-> > + * to the distributor but the active state stays in the LRs, because we don't
-> > + * track the active state on the distributor side.
-> > + */
-> > +static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> > +	int vcpu_id = vcpu->vcpu_id;
-> > +	int i, irq, source_cpu;
-> > +	u32 *lr;
-> > +
-> > +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-> > +		lr = &vgic_cpu->vgic_lr[i];
-> > +		irq = LR_IRQID(*lr);
-> > +		source_cpu = LR_CPUID(*lr);
-> > +
-> > +		/*
-> > +		 * There are three options for the state bits:
-> > +		 *
-> > +		 * 01: pending
-> > +		 * 10: active
-> > +		 * 11: pending and active
-> > +		 *
-> > +		 * If the LR holds only an active interrupt (not pending) then
-> > +		 * just leave it alone.
-> > +		 */
-> > +		if ((*lr & GICH_LR_STATE) == GICH_LR_ACTIVE_BIT)
-> > +			continue;
-> > +
-> > +		/*
-> > +		 * If the interrupt was only pending (not "active" or "pending
-> > +		 * and active") then we the pending state will get moved to
->                                      ^^ extra 'we'
-> > +		 * the distributor and the LR does not hold any info and can
-> > +		 * be marked as free for other use.
-> > +		 */
-> > +		if ((*lr & GICH_LR_STATE) == GICH_LR_PENDING_BIT)
-> > +			vgic_retire_lr(i, irq, vgic_cpu);
-> 
-> We should handle the ACTIVE+PENDING case, and I don't think we do.
-> Should it be (*lr & GICH_LR_PENDING_BIT)? I think the previous version
-> handled this case correctly.
-> 
-
-nice catch!  We just need to always clear the pending bit on the LR.
-I'll fix that in a re-spin.
-
--Christoffer
-
-> > +		/*
-> > +		 * Finally, reestablish the pending state on the distributor
-> > +		 * and the CPU interface.  It may have already been pending,
-> > +		 * but that is fine, then we are only setting a few bits that
-> > +		 * were already set.
-> > +		 */
-> > +		vgic_dist_irq_set(vcpu, irq);
-> > +		if (irq < VGIC_NR_SGIS)
-> > +			dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
-> > +		vgic_update_state(vcpu->kvm);
-> > +	}
-> > +}
-> > +
-> >  static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
-> >  				  struct kvm_exit_mmio *mmio,
-> >  				  phys_addr_t offset)
-> > @@ -848,8 +920,6 @@ static void vgic_update_state(struct kvm *kvm)
-> >  	}
-> >  }
+> >  int kvm_vgic_create(struct kvm *kvm)
+> >  {
+> > -	int ret = 0;
+> > +	int i, vcpu_lock_idx = -1, ret = 0;
+> > +	struct kvm_vcpu *vcpu;
 > >  
-> > -#define LR_CPUID(lr)	\
-> > -	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
-> >  #define MK_LR_PEND(src, irq)	\
-> >  	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
+> >  	mutex_lock(&kvm->lock);
 > >  
-> > @@ -871,9 +941,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
-> >  		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
-> >  
-> >  		if (!vgic_irq_is_enabled(vcpu, irq)) {
-> > -			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-> > -			clear_bit(lr, vgic_cpu->lr_used);
-> > -			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
-> > +			vgic_retire_lr(lr, irq, vgic_cpu);
-> >  			if (vgic_irq_is_active(vcpu, irq))
-> >  				vgic_irq_clear_active(vcpu, irq);
-> >  		}
-> > @@ -1675,6 +1743,14 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
-> >  		}
+> > -	if (atomic_read(&kvm->online_vcpus) || kvm->arch.vgic.vctrl_base) {
+> > +	if (kvm->arch.vgic.vctrl_base) {
+> >  		ret = -EEXIST;
+> >  		goto out;
 > >  	}
 > >  
 > > +	/*
-> > +	 * Move all pending IRQs from the LRs on all VCPUs so the pending
-> > +	 * state can be properly represented in the register state accessible
-> > +	 * through this API.
+> > +	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
+> > +	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
+> > +	 * that no other VCPUs are run while we create the vgic.
 > > +	 */
-> > +	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm)
-> > +		vgic_unqueue_irqs(tmp_vcpu);
+> > +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> > +		if (!mutex_trylock(&vcpu->mutex))
+> > +			goto out_unlock;
+> > +		vcpu_lock_idx = i;
+> > +	}
 > > +
-> >  	offset -= r->base;
-> >  	r->handle_mmio(vcpu, &mmio, offset);
+> > +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> > +		if (vcpu->arch.has_run_once) {
+> > +			ret = -EBUSY;
+> > +			goto out_unlock;
+> > +		}
+> > +	}
+> > +
+> >  	spin_lock_init(&kvm->arch.vgic.lock);
+> >  	kvm->arch.vgic.vctrl_base = vgic_vctrl_base;
+> >  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+> >  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
 > >  
+> > +out_unlock:
+> > +	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+> > +		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+> > +		mutex_unlock(&vcpu->mutex);
+> > +	}
+> > +
+> >  out:
+> >  	mutex_unlock(&kvm->lock);
+> >  	return ret;
+> > @@ -1510,3 +1535,37 @@ int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
+> >  	mutex_unlock(&kvm->lock);
+> >  	return r;
+> >  }
+> > +
+> > +static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+> > +{
+> > +	return -ENXIO;
+> > +}
+> > +
+> > +static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+> > +{
+> > +	return -ENXIO;
+> > +}
+> > +
+> > +static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+> > +{
+> > +	return -ENXIO;
+> > +}
+> > +
+> > +static void vgic_destroy(struct kvm_device *dev)
+> > +{
+> > +	kfree(dev);
+> > +}
+> > +
+> > +static int vgic_create(struct kvm_device *dev, u32 type)
+> > +{
+> > +	return kvm_vgic_create(dev->kvm);
+> > +}
+> > +
+> > +struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+> > +	.name = "kvm-arm-vgic",
+> > +	.create = vgic_create,
+> > +	.destroy = vgic_destroy,
+> > +	.set_attr = vgic_set_attr,
+> > +	.get_attr = vgic_get_attr,
+> > +	.has_attr = vgic_has_attr,
+> > +};
+> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> > index a0aa84b..954a0ba 100644
+> > --- a/virt/kvm/kvm_main.c
+> > +++ b/virt/kvm/kvm_main.c
+> > @@ -2279,7 +2279,11 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
+> >  #ifdef CONFIG_KVM_VFIO
+> >  	case KVM_DEV_TYPE_VFIO:
+> >  		ops = &kvm_vfio_ops;
+> > -		break;
+> 
+> I think you just broke VFIO.
+> 
+
+Yeah, I'm tired of thinking about VFIO for platform devices so I just
+deided to get rid of that stuff ;)
+
+> > +#endif
+> > +#ifdef CONFIG_KVM_ARM_VGIC
+> > +	case KVM_DEV_TYPE_ARM_VGIC_V2:
+> > +		ops = &kvm_arm_vgic_v2_ops;
+> > +	break;
+> 
+> Indentation?
+> 
+
+I have no idea what was in that coffee...
+
+> >  #endif
+> >  	default:
+> >  		return -ENODEV;
 > > 
 > 
+> Provided that you fix the above:
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> -- 
-> Jazz is not dead. It just smells funny...
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
+
+Thanks,
 -- 
 Christoffer
