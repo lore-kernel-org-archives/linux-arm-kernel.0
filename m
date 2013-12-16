@@ -1,79 +1,206 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 16 Dec 2013 15:00:44 +0100
-Subject: [GIT PULL] ARM: Initial support for Marvell Berlin SoCs
-Message-ID: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Mon, 16 Dec 2013 16:32:27 +0200
+Subject: [PATCH 2/5] phy: add support for indexed lookup
+In-Reply-To: <52AEDDE2.8060406@ti.com>
+References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1386601737-8735-3-git-send-email-heikki.krogerus@linux.intel.com>
+ <52AEDDE2.8060406@ti.com>
+Message-ID: <20131216143227.GA22944@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear ARM maintainers,
+Hi Kishon,
 
-please pull the initial support patches for Marvell Berlin SoCs.
-While this is the initial PR, it is not yet split up into the
-usual sub-branches. If you require it, please request it.
+On Mon, Dec 16, 2013 at 04:32:58PM +0530, Kishon Vijay Abraham I wrote:
+> On Monday 09 December 2013 08:38 PM, Heikki Krogerus wrote:
+> > Removes the need for the consumer drivers requesting the
+> > phys to provide name for the phy. This should ease the use
+> > of the framework considerable when using only one phy, which
+> > is usually the case when except with USB, but it can also
+> > be useful with multiple phys.
+> 
+> If index has to be used with multiple PHYs, the controller should be aware of
+> the order in which it is populated in dt data. That's not good.
 
-Compared to the last patch set sent on list, the branch below:
-- does not contain Tauros3 patch which has been submitted to
-  rmk's patch system separately [1].
-- went back to soc-board.dts[i] naming as mentioned by Olof.
+The Idea is not to replace the name based lookup. Just to provide
+possibility for index based lookup.
 
-[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7922/1
+With ACPI, if we get the device entries for PHYs, the order will be
+fixed and we will not have any other reference to the phys. In case
+of USB, the first one should always be USB2 PHY and the second the
+USB3 PHY.
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > This will also reduce noise from the framework when there is
+> > no phy by changing warnings to debug messages.
+> > 
+> > Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> > ---
+> >  drivers/phy/phy-core.c  | 106 ++++++++++++++++++++++++++++++++++--------------
+> >  include/linux/phy/phy.h |  14 +++++++
+> >  2 files changed, 89 insertions(+), 31 deletions(-)
+> > 
+> > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> > index 1102aef..99dc046 100644
+> > --- a/drivers/phy/phy-core.c
+> > +++ b/drivers/phy/phy-core.c
+> > @@ -53,7 +53,8 @@ static int devm_phy_match(struct device *dev, void *res, void *match_data)
+> >  	return res == match_data;
+> >  }
+> >  
+> > -static struct phy *phy_lookup(struct device *device, const char *con_id)
+> > +static struct phy *phy_lookup(struct device *device, const char *con_id,
+> > +			      unsigned int idx)
+> >  {
+> >  	unsigned int count;
+> >  	struct phy *phy;
+> > @@ -67,6 +68,10 @@ static struct phy *phy_lookup(struct device *device, const char *con_id)
+> >  		count = phy->init_data->num_consumers;
+> >  		consumers = phy->init_data->consumers;
+> >  		while (count--) {
+> > +			/* index must always match exactly */
+> > +			if (!con_id)
+> > +				if (idx != count)
+> > +					continue;
+> >  			if (!strcmp(consumers->dev_name, dev_name(device)) &&
+> >  					!strcmp(consumers->port, con_id)) {
+> >  				class_dev_iter_exit(&iter);
+> > @@ -242,7 +247,8 @@ EXPORT_SYMBOL_GPL(phy_power_off);
+> >  /**
+> >   * of_phy_get() - lookup and obtain a reference to a phy by phandle
+> >   * @dev: device that requests this phy
+> > - * @index: the index of the phy
+> > + * @con_id: name of the phy from device's point of view
+> > + * @idx: the index of the phy if name is not used
+> >   *
+> >   * Returns the phy associated with the given phandle value,
+> >   * after getting a refcount to it or -ENODEV if there is no such phy or
+> > @@ -250,12 +256,20 @@ EXPORT_SYMBOL_GPL(phy_power_off);
+> >   * not yet loaded. This function uses of_xlate call back function provided
+> >   * while registering the phy_provider to find the phy instance.
+> >   */
+> > -static struct phy *of_phy_get(struct device *dev, int index)
+> > +static struct phy *of_phy_get(struct device *dev, const char *con_id,
+> > +			      unsigned int idx)
+> >  {
+> >  	int ret;
+> >  	struct phy_provider *phy_provider;
+> >  	struct phy *phy = NULL;
+> >  	struct of_phandle_args args;
+> > +	int index;
+> > +
+> > +	if (!con_id)
+> > +		index = idx;
+> > +	else
+> > +		index = of_property_match_string(dev->of_node, "phy-names",
+> > +						 con_id);
+> >  
+> >  	ret = of_parse_phandle_with_args(dev->of_node, "phys", "#phy-cells",
+> >  		index, &args);
+> > @@ -348,38 +362,36 @@ struct phy *of_phy_simple_xlate(struct device *dev, struct of_phandle_args
+> >  EXPORT_SYMBOL_GPL(of_phy_simple_xlate);
+> >  
+> >  /**
+> > - * phy_get() - lookup and obtain a reference to a phy.
+> > + * phy_get_index() - obtain a phy based on index
+> 
+> NAK. It still takes a 'char' argument and the name is misleading.
+> Btw are you replacing phy_get() or adding a new API in addition to phy_get()?
 
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+Additional API. The phy_get() would in practice act as a wrapper after
+this. It could actually be just a #define macro in the include file.
+The function naming I just copied straight from gpiolib.c. I did not
+have the imagination for anything fancier.
 
-are available in the git repository at:
-  https://github.com/shesselba/linux-berlin.git topic/initial-for-v3.14
+I would like to be able to use some function like phy_get_index() and
+be able to deliver it both the name and the index. With DT you guys
+will always be able to use the name (and the string will always
+supersede the index if we do it like this), but with ACPI, and possibly
+the platform lookup tables, the index can be used...
 
-for you to fetch changes up to 1c37fa10b275d3e5b6285066b5b27c8feae688c8:
+phy2 = phy_get_index(dev, "usb2-phy", 0);
+phy3 = phy_get_index(dev, "usb3-phy", 1);
 
-  ARM: add initial support for Marvell Berlin SoCs (2013-09-09 14:36:19 +0200)
+> >   * @dev: device that requests this phy
+> >   * @con_id: name of the phy from device's point of view
+> > + * @idx: index of the phy to obtain in the consumer
+> >   *
+> > - * Returns the phy driver, after getting a refcount to it; or
+> > - * -ENODEV if there is no such phy.  The caller is responsible for
+> > - * calling phy_put() to release that count.
+> > + * This variant of phy_get() allows to access PHYs other than the first
+> > + * defined one for functions that define several PHYs.
+> >   */
+> > -struct phy *phy_get(struct device *dev, const char *con_id)
+> > +struct phy *phy_get_index(struct device *dev, const char *con_id,
+> > +			  unsigned int idx)
+> >  {
+> > -	int index = 0;
+> >  	struct phy *phy = NULL;
+> >  
+> > -	if (con_id == NULL) {
+> > -		dev_WARN(dev, "missing string\n");
+> > -		return ERR_PTR(-EINVAL);
+> > +	if (dev->of_node) {
+> > +		dev_dbg(dev, "using device tree for PHY lookup\n");
+> > +		phy = of_phy_get(dev, con_id, idx);
+> >  	}
+> >  
+> > -	if (dev->of_node) {
+> > -		index = of_property_match_string(dev->of_node, "phy-names",
+> > -						 con_id);
+> > -		phy = of_phy_get(dev, index);
+> > -		if (IS_ERR(phy)) {
+> > -			dev_err(dev, "unable to find phy\n");
+> > -			return phy;
+> > -		}
+> > -	} else {
+> > -		phy = phy_lookup(dev, con_id);
+> > -		if (IS_ERR(phy)) {
+> > -			dev_err(dev, "unable to find phy\n");
+> > -			return phy;
+> > -		}
+> > +	/**
+> > +	 * Either we are not using DT, or their lookup did not return
+> > +	 * a result. In that case, use platform lookup as a fallback.
+> > +	 */
+> 
+> In a dt boot, if it has not returned a result how will platform lookup help
+> since there wouldn't be be any board file in the case of dt boot (to populate
+> PHY consumers). Maybe your later patch will handle that.
 
-----------------------------------------------------------------
+This is something that I copy pasted from gpiolib.c. It felt like a
+good idea to have possibility to create lookup tables even when the
+device has of_node. I don't have strong feelings about this, so we can
+drop it if you like.
 
-Initial support for Marvell Berlin SoCs, e.g. Armada 1500 and
-Armada 1500-mini, found on various consumer devices like Google Chromecast
-and GoogleTV.
+> > +	if (!phy || IS_ERR(phy)) {
+> > +		dev_dbg(dev, "using lookup tables for PHY lookup");
+> > +		phy = phy_lookup(dev, con_id, idx);
+> > +	}
+> > +
+> > +	if (IS_ERR(phy)) {
+> > +		dev_dbg(dev, "unable to find phy\n");
+> > +		return phy;
+> >  	}
+> >  
+> >  	if (!try_module_get(phy->ops->owner))
+> > @@ -389,18 +401,20 @@ struct phy *phy_get(struct device *dev, const char *con_id)
+> >  
+> >  	return phy;
+> >  }
+> > -EXPORT_SYMBOL_GPL(phy_get);
+> > +EXPORT_SYMBOL_GPL(phy_get_index);
+> >  
+> >  /**
+> > - * devm_phy_get() - lookup and obtain a reference to a phy.
+> > + * devm_phy_get_index() - obtain a phy based on index
+> 
+> I don't see the need of these 2 APIs.
 
-----------------------------------------------------------------
+My goal is really just to prepare for ACPI with this one. I don't know
+if my commit message was not clear enough.
 
-Sebastian Hesselbarth (8):
-      irqchip: add DesignWare APB ICTL interrupt controller
-      MAINTAINERS: add ARM Marvell Berlin SoC
-      ARM: add Marvell Berlin SoC familiy to Marvell doc
-      ARM: add Marvell Berlin SoCs to multi_v7_defconfig
-      ARM: add Marvell Berlin UART0 lowlevel debug
-      ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
-      ARM: add Armada 1500-mini and Chromecast device tree files
-      ARM: add initial support for Marvell Berlin SoCs
+Thanks,
 
- Documentation/arm/Marvell/README                   |   24 ++
- .../devicetree/bindings/arm/marvell,berlin.txt     |   24 ++
- .../interrupt-controller/snps,dw-apb-ictl.txt      |   32 +++
- MAINTAINERS                                        |    6 +
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Kconfig.debug                             |   10 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/Makefile                         |    3 +
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
- arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts  |   29 +++
- arch/arm/boot/dts/berlin2cd.dtsi                   |  210 ++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig                |    3 +
- arch/arm/mach-berlin/Kconfig                       |   29 +++
- arch/arm/mach-berlin/Makefile                      |    1 +
- arch/arm/mach-berlin/berlin.c                      |   39 ++++
- drivers/irqchip/Kconfig                            |    4 +
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-dw-apb-ictl.c                  |  150 +++++++++++++
- 19 files changed, 824 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
- create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
- create mode 100644 arch/arm/boot/dts/berlin2.dtsi
- create mode 100644 arch/arm/boot/dts/berlin2cd-google-chromecast.dts
- create mode 100644 arch/arm/boot/dts/berlin2cd.dtsi
- create mode 100644 arch/arm/mach-berlin/Kconfig
- create mode 100644 arch/arm/mach-berlin/Makefile
- create mode 100644 arch/arm/mach-berlin/berlin.c
- create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
+-- 
+heikki
