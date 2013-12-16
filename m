@@ -1,57 +1,147 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 16 Dec 2013 13:18:15 +0200
-Subject: [PATCH 0/2] gpio: davinci: reuse for keystone arch
-In-Reply-To: <52ADB47E.1080505@ti.com>
-References: <1386871973-26762-1-git-send-email-grygorii.strashko@ti.com>	<52ACAD50.6060003@ti.com>	<52ADB3BC.3080605@ti.com>
- <52ADB47E.1080505@ti.com>
-Message-ID: <52AEE177.1090802@ti.com>
+Date: Mon, 16 Dec 2013 13:18:34 +0200
+Subject: [PATCH 2/2] gpio: davinci: reuse for Keystone SoC
+In-Reply-To: <CAAVeFuJSe_BZ+cr8ZVz-etAzsUbe_taS+0EqM+pXhKhTdyuWiQ@mail.gmail.com>
+References: <1386871973-26762-1-git-send-email-grygorii.strashko@ti.com>
+ <1386871973-26762-3-git-send-email-grygorii.strashko@ti.com>
+ <CAAVeFuJSe_BZ+cr8ZVz-etAzsUbe_taS+0EqM+pXhKhTdyuWiQ@mail.gmail.com>
+Message-ID: <52AEE18A.60102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2013 03:54 PM, Sekhar Nori wrote:
-> On Sunday 15 December 2013 07:20 PM, Sekhar Nori wrote:
->> On Sunday 15 December 2013 12:41 AM, Santosh Shilimkar wrote:
->>> Linus, Sekhar,
->>>
->>> On Thursday 12 December 2013 01:12 PM, Grygorii Strashko wrote:
->>>> This series is intended to update Davinci GPIO driver and reuse
->>>> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
->>>> Keystone GPIO IP: supports:
->>>> - up to 32 GPIO lines;
->>>> - only unbanked irqs;
->>>>
->>>> See Documentation:
->>>> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->>>>
->>>> This series depends on:
->>>> [1] "[PATCH 1/2] gpio: davinci: Fix a check for unbanked gpio"
->>>> https://lkml.org/lkml/2013/11/8/22
->>>> [2] "[PATCH v6 0/6] gpio: daVinci: cleanup and feature enhancement"
->>>> https://www.mail-archive.com/devicetree at vger.kernel.org/msg05970.html
->>>> [3] "gpio: davinci: get rid of DAVINCI_N_GPIO"
->>>> https://lkml.org/lkml/2013/11/26/405
->>>> [4] "gpio: introduce GPIO_DAVINCI kconfig option"
->>>> https://lkml.org/lkml/2013/11/26/435
->>>> [5] "gpio: davinci: use chained_irq_enter/chained_irq_exit API"
->>>> https://lkml.org/lkml/2013/11/26/428
->>>>
->>>> To handle all dependencies, I've created a branch where I collected all
->>>> "ready to merge" patches (all acks added in patches) and this series:
->>>> - https://github.com/grygoriyS/linux.git
->>>> - branch: keystone-master-gpio-for-next
->>>>
->>> Can one of you pull all these patches ?
+On 12/16/2013 09:29 AM, Alexandre Courbot wrote:
+> On Fri, Dec 13, 2013 at 3:12 AM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>> The similar GPIO HW block is used by keystone SoCs as
+>> in Davinci SoCs.
+>> Hence, reuse Davinci GPIO driver for Keystone taking into
+>> account that Keystone contains ARM GIC IRQ controller which
+>> is implemented using IRQ Chip.
 >>
->> So I went through my backlog and queued all that I think is ready. Here
->> is the branch. Let me know if there is anything else missing.
+>> Documentation:
+>>          http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>
+>> CC: Linus Walleij <linus.walleij@linaro.org>
+>> CC: Sekhar Nori <nsekhar@ti.com>
+>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> CC: devicetree at vger.kernel.org
+>>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>>   .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+>>   drivers/gpio/gpio-davinci.c                        |   49 +++++++++++++++-----
+>>   2 files changed, 40 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> index a2e839d..4ce9862 100644
+>> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> @@ -1,7 +1,7 @@
+>> -Davinci GPIO controller bindings
+>> +Davinci/Keystone GPIO controller bindings
+>>
+>>   Required Properties:
+>> -- compatible: should be "ti,dm6441-gpio"
+>> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+>>
+>>   - reg: Physical base address of the controller and the size of memory mapped
+>>          registers.
+>> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+>> index 73f65ca..3e44e0c 100644
+>> --- a/drivers/gpio/gpio-davinci.c
+>> +++ b/drivers/gpio/gpio-davinci.c
+>> @@ -413,6 +413,27 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
+>>          .xlate = irq_domain_xlate_onetwocell,
+>>   };
+>>
+>> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
+>> +{
+>> +       static struct irq_chip_type gpio_unbanked;
+>> +
+>> +       gpio_unbanked = *container_of(irq_get_chip(irq),
+>> +                                     struct irq_chip_type, chip);
+>> +
+>> +       return &gpio_unbanked.chip;
+>> +};
+>> +
+>> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
+>> +{
+>> +       static struct irq_chip gpio_unbanked;
+>> +
+>> +       gpio_unbanked = *irq_get_chip(irq);
+>> +       pr_err("keystone_gpio_get_irq_chip\n");
+>
+> Do you intend this pr_err() to remain here?
 
-Looks like everything are in place. Thanks.
+No, thanks - will remove.
 
 >
-> Forgot to mention that I have not been able to test them today though.
-> They will hit linux-next only after I have been able to test them and I
-> send a pull request to arm-soc or Linus W.
+>> +       return &gpio_unbanked;
+>> +};
+>> +
+>> +static const struct of_device_id davinci_gpio_ids[];
+>> +
+>>   /*
+>>    * NOTE:  for suspend/resume, probably best to make a platform_device with
+>>    * suspend_late/resume_resume calls hooking into results of the set_wake()
+>> @@ -433,6 +454,15 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>>          struct davinci_gpio_platform_data *pdata = dev->platform_data;
+>>          struct davinci_gpio_regs __iomem *g;
+>>          struct irq_domain       *irq_domain = NULL;
+>> +       const struct of_device_id *match;
+>> +       struct irq_chip *irq_chip;
+>> +       struct irq_chip *(*gpio_get_irq_chip)(unsigned int irq);
+>> +
+>> +       gpio_get_irq_chip = davinci_gpio_get_irq_chip;
+>> +       match = of_match_device(of_match_ptr(davinci_gpio_ids),
+>> +                               dev);
+>> +       if (match)
+>> +               gpio_get_irq_chip = match->data;
+>>
+>>          ngpio = pdata->ngpio;
+>>          res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> @@ -442,7 +472,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>>          }
+>>
+>>          bank_irq = res->start;
+>> -
+>>          if (!bank_irq) {
+>>                  dev_err(dev, "Invalid IRQ resource\n");
+>>                  return -ENODEV;
+>> @@ -484,25 +513,22 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>>          }
+>>
+>>          /*
+>> -        * AINTC can handle direct/unbanked IRQs for GPIOs, with the GPIO
+>> +        * INTC can handle direct/unbanked IRQs for GPIOs, with the GPIO
+>>           * controller only handling trigger modes.  We currently assume no
+>>           * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
+>>           */
+>>          if (pdata->gpio_unbanked) {
+>> -               static struct irq_chip_type gpio_unbanked;
+>> -
+>>                  /* pass "bank 0" GPIO IRQs to AINTC */
+>>                  chips[0].chip.to_irq = gpio_to_irq_unbanked;
+>>                  chips[0].gpio_irq = bank_irq;
+>>                  chips[0].gpio_unbanked = pdata->gpio_unbanked;
+>>                  binten = BIT(0);
+>>
+>> -               /* AINTC handles mask/unmask; GPIO handles triggering */
+>> +               /* INTC handles mask/unmask; GPIO handles triggering */
+>>                  irq = bank_irq;
+>> -               gpio_unbanked = *container_of(irq_get_chip(irq),
+>> -                                             struct irq_chip_type, chip);
+>> -               gpio_unbanked.chip.name = "GPIO-AINTC";
+>> -               gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
+>> +               irq_chip = gpio_get_irq_chip(irq);
+>> +               irq_chip->name = "GPIO-AINTC";
 >
+> According to the other renamings I see in this file, shouldn't the
+> string also be changed to "GPIO-INTC"?
+
+Right. Will change, it should be more generic now.
+
+I'll wait a bit for other comments and resend.
 
 Regards,
 -grygorii
