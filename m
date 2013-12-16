@@ -1,141 +1,65 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 16 Dec 2013 09:12:05 +0800
-Subject: [PATCH v6 08/15] usb: phy-mxs: Add implementation of
- nofity_suspend and notify_resume
-In-Reply-To: <20131213200924.GI5292@saruman.home>
-References: <1386897825-6130-1-git-send-email-peter.chen@freescale.com>
- <1386897825-6130-9-git-send-email-peter.chen@freescale.com>
- <20131213043236.GH867@saruman.home>
- <CAL411-rEJN_AkmJEooVB+45qDE8n8CGNq-ODUKMhfPyuQ5fPwA@mail.gmail.com>
- <20131213200924.GI5292@saruman.home>
-Message-ID: <20131216011204.GA14183@shlinux1.ap.freescale.net>
+From: av.tikhomirov@samsung.com (Anton Tikhomirov)
+Date: Mon, 16 Dec 2013 11:31:50 +0900
+Subject: [PATCH 7/7] usb: dwc3: exynos: add pm_runtime support
+In-Reply-To: <20131213195618.GG5292@saruman.home>
+References: <1386884325-11440-1-git-send-email-balbi@ti.com>
+ <1386884325-11440-8-git-send-email-balbi@ti.com>
+ <000301cef7c0$640c1ce0$2c2456a0$%tikhomirov@samsung.com>
+ <20131213195618.GG5292@saruman.home>
+Message-ID: <00a001cefa06$f9ab3d60$ed01b820$%tikhomirov@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 02:09:24PM -0600, Felipe Balbi wrote:
-> On Fri, Dec 13, 2013 at 02:31:42PM +0800, Peter Chen wrote:
-> > On Fri, Dec 13, 2013 at 12:32 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > > On Fri, Dec 13, 2013 at 09:23:38AM +0800, Peter Chen wrote:
-> > >> Implementation of notify_suspend and notify_resume will be different
-> > >> according to mxs_phy_data->flags.
-> > >>
-> > >> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > >> ---
-> > >>  drivers/usb/phy/phy-mxs-usb.c |   55 ++++++++++++++++++++++++++++++++++++++---
-> > >>  1 files changed, 51 insertions(+), 4 deletions(-)
-> > >>
-> > >> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > >> index 0ef930a..e3df53f 100644
-> > >> --- a/drivers/usb/phy/phy-mxs-usb.c
-> > >> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > >> @@ -166,8 +166,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
-> > >>  static int mxs_phy_on_connect(struct usb_phy *phy,
-> > >>               enum usb_device_speed speed)
-> > >>  {
-> > >> -     dev_dbg(phy->dev, "%s speed device has connected\n",
-> > >> -             (speed == USB_SPEED_HIGH) ? "high" : "non-high");
-> > >> +     dev_dbg(phy->dev, "%s device has connected\n",
-> > >> +             (speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
+Hi Felipe,
+
+> On Fri, Dec 13, 2013 at 02:01:32PM +0900, Anton Tikhomirov wrote:
+> > Hi Felipe,
+> >
+> > > -static int dwc3_exynos_suspend(struct device *dev)
+> > > +static int __dwc3_exynos_suspend(struct dwc3_exynos *exynos)
+> > >  {
+> > > -	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> > > -
+> > >  	clk_disable(exynos->clk);
 > > >
-> > > unrelated.
+> > >  	return 0;
+> > >  }
 > > >
-> > >> @@ -179,8 +179,8 @@ static int mxs_phy_on_connect(struct usb_phy *phy,
-> > >>  static int mxs_phy_on_disconnect(struct usb_phy *phy,
-> > >>               enum usb_device_speed speed)
-> > >>  {
-> > >> -     dev_dbg(phy->dev, "%s speed device has disconnected\n",
-> > >> -             (speed == USB_SPEED_HIGH) ? "high" : "non-high");
-> > >> +     dev_dbg(phy->dev, "%s device has disconnected\n",
-> > >> +             (speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
-> > >
-> > > unrelated.
-> > >
-> > 
-> > Marek suggested using that string, I will added it at another patch.
-> > 
-> > >> @@ -189,6 +189,48 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
-> > >>       return 0;
-> > >>  }
-> > >>
-> > >> +static int mxs_phy_on_suspend(struct usb_phy *phy,
-> > >> +             enum usb_device_speed speed)
-> > >> +{
-> > >> +     struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-> > >> +
-> > >> +     dev_dbg(phy->dev, "%s device has suspended\n",
-> > >> +             (speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
-> > >> +
-> > >> +     /* delay 4ms to wait bus entering idle */
-> > >> +     usleep_range(4000, 5000);
-> > >> +
-> > >> +     if (mxs_phy->data->flags & MXS_PHY_ABNORMAL_IN_SUSPEND) {
-> > >> +             writel_relaxed(0xffffffff, phy->io_priv + HW_USBPHY_PWD);
-> > >> +             writel_relaxed(0, phy->io_priv + HW_USBPHY_PWD);
-> > >> +     }
-> > >> +
-> > >> +     if (speed == USB_SPEED_HIGH)
-> > >> +             writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-> > >> +                             phy->io_priv + HW_USBPHY_CTRL_CLR);
-> > >
-> > > why only on HS ? So if !HS and !ABNORMAL, this is no-op.
-> > >
-> > >> +static int mxs_phy_on_resume(struct usb_phy *phy,
-> > >> +             enum usb_device_speed speed)
-> > >> +{
-> > >> +     dev_dbg(phy->dev, "%s device has resumed\n",
-> > >> +             (speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
-> > >> +
-> > >> +     if (speed == USB_SPEED_HIGH) {
-> > >> +             /* Make sure the device has switched to High-Speed mode */
-> > >> +             udelay(500);
-> > >> +             writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-> > >> +                             phy->io_priv + HW_USBPHY_CTRL_SET);
-> > >> +     }
-> > >
-> > > likewise, if !HS it's a no-op.
-> > >
-> > 
-> > Correct,  this operation is only needed for HS.
-> > 
-> > >> @@ -235,6 +277,11 @@ static int mxs_phy_probe(struct platform_device *pdev)
-> > >>
-> > >>       platform_set_drvdata(pdev, mxs_phy);
-> > >>
-> > >> +     if (mxs_phy->data->flags & MXS_PHY_SENDING_SOF_TOO_FAST) {
-> > >> +             mxs_phy->phy.notify_suspend = mxs_phy_on_suspend;
-> > >> +             mxs_phy->phy.notify_resume = mxs_phy_on_resume;
-> > >> +     }
-> > >
-> > > hmm, and seems like you only need notify_* on a buggy device. Sorry
-> > > Peter but you don't have enough arguments to make me agree with this
-> > > (and previous) patch.
-> > >
-> > > You gotta find a better way to handle this using normal phy
-> > > suspend/resume calls.
-> > >
-> > 
-> > Like I explained at previous patch, it needs to be notified during
-> > ehci suspend/resume.
-> > I admit it is a SoC bug, but all SoCs have bugs, hmm.
-> > Software needs the solution to workaround it which breaks the standard USB spec.
+> > > +static int __dwc3_exynos_resume(struct dwc3_exynos *exynos)
+> > > +{
+> > > +	return clk_enable(exynos->clk);
+> > > +}
+> > > +
+> > > +static int dwc3_exynos_suspend(struct device *dev)
+> > > +{
+> > > +	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+> > > +
+> > > +	return __dwc3_exynos_suspend(exynos);
+> >
+> > If dwc3-exynos is runtime suspended, the clock will be disabled
+> > second time here (unbalanced clk_enable/clk_disable).
 > 
-> Then I think what you need is a real notification mechanism. usbcore
-> already notifies about buses and devices being added and removed,
-> perhaps you can convince Greg to accept suspend/resume notifications.
+> I don't get what you mean but there is something that probably needs
+> fixing, I guess below makes it better:
 > 
-> With that, you can (conditionally) make this driver listen to usbcore
-> notifications. That'll be more work, but I guess it's best in the long
-> run as we won't need to keep on adding callbacks to the USB PHY
-> structure just because another buggy device showed up on the market.
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-
+> exynos.c
+> index c93919a..1e5720a 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -218,6 +218,9 @@ static int dwc3_exynos_suspend(struct device *dev)
+>  {
+>  	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
 > 
+> +	if (pm_runtime_suspended(dev))
+> +		return 0;
+> +
+>  	return __dwc3_exynos_suspend(exynos);
+>  }
+> 
+> 
+> Is that what you meant ?
 
-Okay, I will add this notification to .set_suspend now, it can work most of
-cases except disconnect during the resume signal.
+Yes, this is exactly what I meant.
 
-Besides notification API add, how about other patches, eg add .set_wakeup API?
-If you think there are no big problems, I will send v7 version.
-
--- 
-
-Best Regards,
-Peter Chen
+Thanks.
