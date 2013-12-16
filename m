@@ -1,130 +1,95 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Mon, 16 Dec 2013 21:24:14 +0100
-Subject: [RFC PATCH 03/10] ARM: at91: introduce OLD_IRQ_AT91 Kconfig option
+Date: Mon, 16 Dec 2013 21:24:15 +0100
+Subject: [RFC PATCH 04/10] ARM: at91: enclose at91_aic_xx calls in
+ IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks
 In-Reply-To: <1387225461-6201-1-git-send-email-b.brezillon@overkiz.com>
 References: <1387225461-6201-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1387225461-6201-4-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1387225461-6201-5-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new Kconfig option OLD_IRQ_AT91 to prepare migration to the new
-AIC driver.
+Enclose at91_aic_xx calls in IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks in
+order to prepare the migration to the new AIC driver.
 
-Enable this option for all supported at91 SoCs (both dt and non-dt boards).
+In the new AIC driver the suspend/resume functions are called by the
+generic irq framework and are no longer needed in the PM specific code.
+
+Moreover, the new AIC driver no longer exposes the at91_aic_base variable
+which is used by the at91_aic_read functions.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/mach-at91/Kconfig        |    7 +++++++
- arch/arm/mach-at91/Kconfig.non_dt |    7 +++++++
- arch/arm/mach-at91/Makefile       |    3 ++-
- 3 files changed, 16 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/pm.c    |   32 ++++++++++++++++++++------------
+ arch/arm/mach-at91/setup.c |    3 ++-
+ 2 files changed, 22 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index b4f7d6f..e1e6ff4 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -28,6 +28,10 @@ config OLD_CLK_AT91
- 	bool
- 	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index d43b79f..1dc6ed3 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -207,16 +207,19 @@ static int at91_pm_enter(suspend_state_t state)
+ 		at91_pinctrl_gpio_suspend();
+ 	else
+ 		at91_gpio_suspend();
+-	at91_irq_suspend();
  
-+config OLD_IRQ_AT91
-+	bool
-+	default false
+-	pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
+-			/* remember all the always-wake irqs */
+-			(at91_pmc_read(AT91_PMC_PCSR)
+-					| (1 << AT91_ID_FIQ)
+-					| (1 << AT91_ID_SYS)
+-					| (at91_get_extern_irq()))
+-				& at91_aic_read(AT91_AIC_IMR),
+-			state);
++	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91) && at91_aic_base) {
++		at91_irq_suspend();
 +
- config AT91_SAM9_ALT_RESET
- 	bool
- 	default !ARCH_AT91X40
-@@ -190,6 +194,7 @@ config MACH_AT91RM9200_DT
- 	bool "Atmel AT91RM9200 Evaluation Kits with device-tree support"
- 	depends on SOC_AT91RM9200
- 	select USE_OF
-+	select OLD_IRQ_AT91
- 	help
- 	  Select this if you want to experiment device-tree with
- 	  an Atmel RM9200 Evaluation Kit.
-@@ -198,6 +203,7 @@ config MACH_AT91SAM9_DT
- 	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
- 	depends on SOC_AT91SAM9
- 	select USE_OF
-+	select OLD_IRQ_AT91
- 	help
- 	  Select this if you want to experiment device-tree with
- 	  an Atmel Evaluation Kit.
-@@ -206,6 +212,7 @@ config MACH_SAMA5_DT
- 	bool "Atmel SAMA5 Evaluation Kits with device-tree support"
- 	depends on SOC_SAMA5
- 	select USE_OF
-+	select OLD_IRQ_AT91
- 	select PHYLIB if NETDEVICES
- 	help
- 	  Select this if you want to experiment device-tree with
-diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
-index b736b57..87dc5e1 100644
---- a/arch/arm/mach-at91/Kconfig.non_dt
-+++ b/arch/arm/mach-at91/Kconfig.non_dt
-@@ -13,31 +13,37 @@ config ARCH_AT91RM9200
- 	bool "AT91RM9200"
- 	select SOC_AT91RM9200
- 	select AT91_USE_OLD_CLK
-+	select OLD_IRQ_AT91
++		pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
++				/* remember all the always-wake irqs */
++				(at91_pmc_read(AT91_PMC_PCSR)
++						| (1 << AT91_ID_FIQ)
++						| (1 << AT91_ID_SYS)
++						| (at91_get_extern_irq()))
++					& at91_aic_read(AT91_AIC_IMR),
++				state);
++	}
  
- config ARCH_AT91SAM9260
- 	bool "AT91SAM9260 or AT91SAM9XE or AT91SAM9G20"
- 	select SOC_AT91SAM9260
- 	select AT91_USE_OLD_CLK
-+	select OLD_IRQ_AT91
+ 	switch (state) {
+ 		/*
+@@ -281,12 +284,17 @@ static int at91_pm_enter(suspend_state_t state)
+ 			goto error;
+ 	}
  
- config ARCH_AT91SAM9261
- 	bool "AT91SAM9261 or AT91SAM9G10"
- 	select SOC_AT91SAM9261
- 	select AT91_USE_OLD_CLK
-+	select OLD_IRQ_AT91
+-	pr_debug("AT91: PM - wakeup %08x\n",
+-			at91_aic_read(AT91_AIC_IPR) & at91_aic_read(AT91_AIC_IMR));
++	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91) && at91_aic_base)
++		pr_debug("AT91: PM - wakeup %08x\n",
++			 at91_aic_read(AT91_AIC_IPR) &
++			 at91_aic_read(AT91_AIC_IMR));
  
- config ARCH_AT91SAM9263
- 	bool "AT91SAM9263"
- 	select SOC_AT91SAM9263
- 	select AT91_USE_OLD_CLK
-+	select OLD_IRQ_AT91
+ error:
+ 	target_state = PM_SUSPEND_ON;
+-	at91_irq_resume();
++
++	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91) && at91_aic_base)
++		at91_irq_resume();
++
+ 	if (of_have_populated_dt())
+ 		at91_pinctrl_gpio_resume();
+ 	else
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 7d3f7cc..fa98176 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -49,7 +49,8 @@ void __init at91_init_irq_default(void)
+ void __init at91_init_interrupts(unsigned int *priority)
+ {
+ 	/* Initialize the AIC interrupt controller */
+-	at91_aic_init(priority, at91_boot_soc.extern_irq);
++	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91))
++		at91_aic_init(priority, at91_boot_soc.extern_irq);
  
- config ARCH_AT91SAM9RL
- 	bool "AT91SAM9RL"
- 	select SOC_AT91SAM9RL
- 	select AT91_USE_OLD_CLK
-+	select OLD_IRQ_AT91
- 
- config ARCH_AT91SAM9G45
- 	bool "AT91SAM9G45"
- 	select SOC_AT91SAM9G45
- 	select AT91_USE_OLD_CLK
-+	select OLD_IRQ_AT91
- 
- config ARCH_AT91X40
- 	bool "AT91x40"
-@@ -45,6 +51,7 @@ config ARCH_AT91X40
- 	select ARCH_USES_GETTIMEOFFSET
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
-+	select OLD_IRQ_AT91
- 
- endchoice
- 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 705b38a..960c9dd 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -2,11 +2,12 @@
- # Makefile for the linux kernel.
- #
- 
--obj-y		:= irq.o gpio.o setup.o sysirq_mask.o
-+obj-y		:= gpio.o setup.o sysirq_mask.o
- obj-m		:=
- obj-n		:=
- obj-		:=
- 
-+obj-$(CONFIG_OLD_IRQ_AT91)	+= irq.o
- obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
- obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
- obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
+ 	/* Enable GPIO interrupts */
+ 	at91_gpio_irq_setup();
 -- 
 1.7.9.5
