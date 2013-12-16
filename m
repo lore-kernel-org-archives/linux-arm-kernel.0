@@ -1,64 +1,75 @@
 From: dave.long@linaro.org (David Long)
-Date: Sun, 15 Dec 2013 23:08:35 -0500
-Subject: [PATCH v4 01/16] uprobes: allow ignoring of probe hits
+Date: Sun, 15 Dec 2013 23:08:36 -0500
+Subject: [PATCH v4 02/16] ARM: move shared uprobe/kprobe definitions into new
+ include file
 In-Reply-To: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
 References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1387166930-13182-2-git-send-email-dave.long@linaro.org>
+Message-ID: <1387166930-13182-3-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-Allow arches to decided to ignore a probe hit.  ARM will use this to
-only call handlers if the conditions to execute a conditionally executed
-instruction are satisfied.
+Separate the kprobe-only definitions from the definitions needed by
+both kprobes and uprobes.
 
 Signed-off-by: David A. Long <dave.long@linaro.org>
-Acked-by: Oleg Nesterov <oleg@redhat.com>
 ---
- include/linux/uprobes.h | 1 +
- kernel/events/uprobes.c | 9 +++++++++
- 2 files changed, 10 insertions(+)
+ arch/arm/include/asm/kprobes.h | 15 +--------------
+ arch/arm/include/asm/probes.h  | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm/include/asm/probes.h
 
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 319eae7..197a36e 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -134,6 +134,7 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
- extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
- extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
- extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
-+extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
-diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 24b7d6c..4eec7ce 100644
---- a/kernel/events/uprobes.c
-+++ b/kernel/events/uprobes.c
-@@ -1778,6 +1778,11 @@ static bool handle_trampoline(struct pt_regs *regs)
- 	return true;
- }
+diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+index f82ec22..30fc11b 100644
+--- a/arch/arm/include/asm/kprobes.h
++++ b/arch/arm/include/asm/kprobes.h
+@@ -28,21 +28,8 @@
+ #define kretprobe_blacklist_size	0
  
-+bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs)
-+{
-+	return false;
-+}
-+
- /*
-  * Run handler and ask thread to singlestep.
-  * Ensure all non-fatal signals cannot interrupt thread while it singlesteps.
-@@ -1828,7 +1833,11 @@ static void handle_swbp(struct pt_regs *regs)
- 	if (unlikely(!test_bit(UPROBE_COPY_INSN, &uprobe->flags)))
- 		goto out;
+ typedef u32 kprobe_opcode_t;
+-
+ struct kprobe;
+-typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+-typedef unsigned long (kprobe_check_cc)(unsigned long);
+-typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+-typedef void (kprobe_insn_fn_t)(void);
+-
+-/* Architecture specific copy of original instruction. */
+-struct arch_specific_insn {
+-	kprobe_opcode_t			*insn;
+-	kprobe_insn_handler_t		*insn_handler;
+-	kprobe_check_cc			*insn_check_cc;
+-	kprobe_insn_singlestep_t	*insn_singlestep;
+-	kprobe_insn_fn_t		*insn_fn;
+-};
++#include <asm/probes.h>
  
-+	if (arch_uprobe_ignore(&uprobe->arch, regs))
-+		goto out;
+ struct prev_kprobe {
+ 	struct kprobe *kp;
+diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+new file mode 100644
+index 0000000..21da148
+--- /dev/null
++++ b/arch/arm/include/asm/probes.h
+@@ -0,0 +1,18 @@
++#ifndef _ASM_PROBES_H
++#define _ASM_PROBES_H
 +
- 	handler_chain(uprobe, regs);
++typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
++typedef unsigned long (kprobe_check_cc)(unsigned long);
++typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
++typedef void (kprobe_insn_fn_t)(void);
 +
- 	if (can_skip_sstep(uprobe, regs))
- 		goto out;
- 
++/* Architecture specific copy of original instruction. */
++struct arch_specific_insn {
++	kprobe_opcode_t			*insn;
++	kprobe_insn_handler_t		*insn_handler;
++	kprobe_check_cc			*insn_check_cc;
++	kprobe_insn_singlestep_t	*insn_singlestep;
++	kprobe_insn_fn_t		*insn_fn;
++};
++
++#endif
 -- 
 1.8.1.2
