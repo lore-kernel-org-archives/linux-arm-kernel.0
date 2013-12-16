@@ -1,111 +1,46 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Mon, 16 Dec 2013 22:25:40 +0100
-Subject: [RFC PATCH 10/10] ARM: at91/dt: add new AIC irq mux definitions for
- sama5 SoCs
-In-Reply-To: <1387225461-6201-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387225461-6201-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1387229140-7642-1-git-send-email-b.brezillon@overkiz.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 16 Dec 2013 16:26:44 -0500
+Subject: [PATCH v6 5/9] usb: gadget: s3c-hsotg: use generic
+ phy_init()/phy_exit() support
+In-Reply-To: <20131216212001.GD12896@saruman.home>
+References: <1386953483-21631-1-git-send-email-mporter@linaro.org>
+ <1386953483-21631-6-git-send-email-mporter@linaro.org>
+ <20131216212001.GD12896@saruman.home>
+Message-ID: <20131216212644.GA15814@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add irq line muxing definition for sama5 SoCs.
+On Mon, Dec 16, 2013 at 03:20:01PM -0600, Felipe Balbi wrote:
+> On Fri, Dec 13, 2013 at 11:51:19AM -0500, Matt Porter wrote:
+> > If a generic phy is present, call phy_init()/phy_exit(). This supports
+> > generic phys that must be soft reset before power on.
+> > 
+> > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > ---
+> >  drivers/usb/gadget/s3c-hsotg.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+> > index 7c5d8bd..e9683c2 100644
+> > --- a/drivers/usb/gadget/s3c-hsotg.c
+> > +++ b/drivers/usb/gadget/s3c-hsotg.c
+> > @@ -3621,6 +3621,9 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+> >  		goto err_supplies;
+> >  	}
+> >  
+> > +	if (hsotg->phy)
+> > +		phy_init(hsotg->phy);
+> 
+> doesn't build. you need to include <linux/phy/phy.h>
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/sama5d3.dtsi      |   40 ++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/sama5d3_tcb1.dtsi |   22 +++++++++++++++++++
- 2 files changed, 61 insertions(+), 1 deletion(-)
+It depends on https://lkml.org/lkml/2013/12/5/172 which I noted in the
+cover letter. At this point, I don't know if Kamil's whole series will
+make it to 3.14 so that patch may have to be taken separately. He has a
+trivial update to make on the binding example is all for this patch.
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index de9fece..1e8f4b5 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -390,6 +390,44 @@
- 				interrupt-controller;
- 				reg = <0xfffff000 0x200>;
- 				atmel,external-irqs = <47>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				atmel,aic-irq-mapping = <0xffffffff 0x7ffff>;
-+
-+				sysc_irq_mux: irq-mux at 1 {
-+					compatible = "atmel,aic-mux";
-+					reg = <1>;
-+
-+					pmc_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&pmc 0 0x64 0x5074b>;
-+					};
-+
-+					rtc_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&rtc 0 0x24 0x1f>;
-+					};
-+				};
-+
-+				tcb0_irq_mux: irq-mux at 26 {
-+					compatible = "atmel,aic-mux";
-+					reg = <26>;
-+
-+					tc0_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&tcb0 0 0x28 0xff>;
-+					};
-+
-+					tc1_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&tcb0 0 0x68 0xff>;
-+					};
-+
-+					tc2_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&tcb0 0 0xa8 0xff>;
-+					};
-+				};
- 			};
- 
- 			pinctrl at fffff200 {
-@@ -1061,7 +1099,7 @@
- 				status = "disabled";
- 			};
- 
--			rtc at fffffeb0 {
-+			rtc: rtc at fffffeb0 {
- 				compatible = "atmel,at91rm9200-rtc";
- 				reg = <0xfffffeb0 0x30>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-index 382b044..123b153 100644
---- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-@@ -18,6 +18,28 @@
- 
- 	ahb {
- 		apb {
-+			aic: interrupt-controller at fffff000 {
-+				tcb1_irq_mux: irq-mux at 27 {
-+					compatible = "atmel,aic-mux";
-+					reg = <27>;
-+
-+					tc3_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&tcb1 0 0x28 0xff>;
-+					};
-+
-+					tc4_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&tcb1 0 0x68 0xff>;
-+					};
-+
-+					tc5_irq {
-+						compatible = "atmel,aic-mux-3reg-irq";
-+						atmel,aic-mux-irq-reg = <&tcb1 0 0xa8 0xff>;
-+					};
-+				};
-+			};
-+
- 			pmc: pmc at fffffc00 {
- 				periphck {
- 					tcb1_clk: tcb1_clk {
--- 
-1.7.9.5
+I was wondering today if we might just want to separate that out now. I
+originally had a similar patch in my series but his was posted first so
+I rebased on that.
+
+-Matt
