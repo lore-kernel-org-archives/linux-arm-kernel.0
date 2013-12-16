@@ -1,1423 +1,1017 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 16 Dec 2013 16:58:47 +0800
-Subject: [PATCH v3 4/7] mtd: m25p80: use the SPI nor framework
+Date: Mon, 16 Dec 2013 16:58:50 +0800
+Subject: [PATCH v3 7/7] mtd: spi-nor: Add Freescale QuadSpi driver
 In-Reply-To: <1387184330-14448-1-git-send-email-b32955@freescale.com>
 References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
-Message-ID: <1387184330-14448-5-git-send-email-b32955@freescale.com>
+Message-ID: <1387184330-14448-8-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new SPI nor framework, and rewrite the m25p80:
- (0) remove all the NOR comands.
- (1) change the m25p->command to an array.
- (2) implement the necessary hooks, such as m25p_read/m25p_write.
+(0) What is the Quadspi controller?
 
-Tested with the m25p32.
+    The Quadspi(Quad Serial Peripheral Interface) acts as an interface to
+    one single or two external serial flash devices, each with up to 4
+    bidirectional data lines.
+
+(1) The Quadspi controller is driven by the LUT(Look-up Table) registers.
+    The LUT registers are a look-up-table for sequences of instructions.
+    A valid sequence consists of four LUT registers.
+
+(2) The definition of the LUT register shows below:
+
+    ---------------------------------------------------
+    | INSTR1 | PAD1 | OPRND1 | INSTR0 | PAD0 | OPRND0 |
+    ---------------------------------------------------
+
+    There are several types of INSTRx, such as:
+	CMD	: the SPI NOR command.
+	ADDR	: the address for the SPI NOR command.
+	DUMMY	: the dummy cycles needed by the SPI NOR command.
+	....
+
+    There are several types of PADx, such as:
+	PAD1	: use a singe I/O line.
+	PAD2	: use two I/O lines.
+	PAD4	: use quad I/O lines.
+	....
+
+(3) Test this driver with the JFFS2 and UBIFS:
+
+    For jffs2:
+    -------------
+	#flash_eraseall /dev/mtd0
+	#mount -t jffs2 /dev/mtdblock0 tmp
+	#bonnie++ -d tmp -u 0 -s 10 -r 5
+
+    For ubifs:
+    -------------
+	#flash_eraseall /dev/mtd0
+	#ubiattach /dev/ubi_ctrl -m 0
+	#ubimkvol /dev/ubi0 -N test -m
+	#mount -t ubifs ubi0:test tmp
+	#bonnie++ -d tmp -u 0 -s 10 -r 5
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/devices/Kconfig  |    2 +-
- drivers/mtd/devices/m25p80.c | 1271 ++++--------------------------------------
- 2 files changed, 95 insertions(+), 1178 deletions(-)
+ drivers/mtd/spi-nor/Kconfig       |    6 +
+ drivers/mtd/spi-nor/Makefile      |    1 +
+ drivers/mtd/spi-nor/fsl-quadspi.c |  927 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 934 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/spi-nor/fsl-quadspi.c
 
-diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
-index 0128138..004b17b 100644
---- a/drivers/mtd/devices/Kconfig
-+++ b/drivers/mtd/devices/Kconfig
-@@ -80,7 +80,7 @@ config MTD_DATAFLASH_OTP
- 
- config MTD_M25P80
- 	tristate "Support most SPI Flash chips (AT26DF, M25P, W25X, ...)"
--	depends on SPI_MASTER
-+	depends on SPI_MASTER && MTD_SPI_NOR_BASE
+diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
+index 41591af..64cfc39 100644
+--- a/drivers/mtd/spi-nor/Kconfig
++++ b/drivers/mtd/spi-nor/Kconfig
+@@ -4,3 +4,9 @@ config MTD_SPI_NOR_BASE
  	help
- 	  This enables access to most modern SPI flash chips, used for
- 	  program and data storage.   Series supported include Atmel AT26DF,
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index 7b976e8..204fabe 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -20,1057 +20,152 @@
- #include <linux/errno.h>
- #include <linux/module.h>
- #include <linux/device.h>
--#include <linux/interrupt.h>
--#include <linux/mutex.h>
--#include <linux/math64.h>
--#include <linux/slab.h>
--#include <linux/sched.h>
--#include <linux/mod_devicetable.h>
- 
--#include <linux/mtd/cfi.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
--#include <linux/of_platform.h>
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
+ 	  This is the framework for the SPI NOR which can be used by the SPI
+ 	  device drivers and the SPI-NOR device driver.
++config SPI_FSL_QUADSPI
++	tristate "Freescale Quad SPI controller"
++	depends on ARCH_MXC && MTD_SPI_NOR_BASE
++	help
++	  This enables support for the Quad SPI controller in master mode.
++	  We only connect the NOR to this controller now.
+diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
+index 7dfe1f9..51f9d8b 100644
+--- a/drivers/mtd/spi-nor/Makefile
++++ b/drivers/mtd/spi-nor/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_MTD_SPI_NOR_BASE)	+= spi-nor.o
++obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+new file mode 100644
+index 0000000..52297dd
+--- /dev/null
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -0,0 +1,927 @@
++/*
++ * Freescale Quad SPI driver.
++ *
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/errno.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/timer.h>
++#include <linux/jiffies.h>
++#include <linux/completion.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
 +#include <linux/mtd/spi-nor.h>
- 
--/* Flash opcodes. */
--#define	OPCODE_WREN		0x06	/* Write enable */
--#define	OPCODE_RDSR		0x05	/* Read status register */
--#define	OPCODE_WRSR		0x01	/* Write status register 1 byte */
--#define	OPCODE_NORM_READ	0x03	/* Read data bytes (low frequency) */
--#define	OPCODE_FAST_READ	0x0b	/* Read data bytes (high frequency) */
--#define	OPCODE_QUAD_READ        0x6b    /* Read data bytes */
--#define	OPCODE_PP		0x02	/* Page program (up to 256 bytes) */
--#define	OPCODE_BE_4K		0x20	/* Erase 4KiB block */
--#define	OPCODE_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
--#define	OPCODE_BE_32K		0x52	/* Erase 32KiB block */
--#define	OPCODE_CHIP_ERASE	0xc7	/* Erase whole flash chip */
--#define	OPCODE_SE		0xd8	/* Sector erase (usually 64KiB) */
--#define	OPCODE_RDID		0x9f	/* Read JEDEC ID */
--#define	OPCODE_RDCR             0x35    /* Read configuration register */
--
--/* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
--#define	OPCODE_NORM_READ_4B	0x13	/* Read data bytes (low frequency) */
--#define	OPCODE_FAST_READ_4B	0x0c	/* Read data bytes (high frequency) */
--#define	OPCODE_QUAD_READ_4B	0x6c    /* Read data bytes */
--#define	OPCODE_PP_4B		0x12	/* Page program (up to 256 bytes) */
--#define	OPCODE_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
--
--/* Used for SST flashes only. */
--#define	OPCODE_BP		0x02	/* Byte program */
--#define	OPCODE_WRDI		0x04	/* Write disable */
--#define	OPCODE_AAI_WP		0xad	/* Auto address increment word program */
--
--/* Used for Macronix and Winbond flashes. */
--#define	OPCODE_EN4B		0xb7	/* Enter 4-byte mode */
--#define	OPCODE_EX4B		0xe9	/* Exit 4-byte mode */
--
--/* Used for Spansion flashes only. */
--#define	OPCODE_BRWR		0x17	/* Bank register write */
--
--/* Status Register bits. */
--#define	SR_WIP			1	/* Write in progress */
--#define	SR_WEL			2	/* Write enable latch */
--/* meaning of other SR_* bits may differ between vendors */
--#define	SR_BP0			4	/* Block protect 0 */
--#define	SR_BP1			8	/* Block protect 1 */
--#define	SR_BP2			0x10	/* Block protect 2 */
--#define	SR_SRWD			0x80	/* SR write protect */
--
--#define SR_QUAD_EN_MX           0x40    /* Macronix Quad I/O */
--
--/* Configuration Register bits. */
--#define CR_QUAD_EN_SPAN		0x2     /* Spansion Quad I/O */
--
--/* Define max times to check status register before we give up. */
--#define	MAX_READY_WAIT_JIFFIES	(40 * HZ)	/* M25P16 specs 40s max chip erase */
- #define	MAX_CMD_SIZE		6
--
--#define JEDEC_MFR(_jedec_id)	((_jedec_id) >> 16)
--
--/****************************************************************************/
--
--enum read_type {
--	M25P80_NORMAL = 0,
--	M25P80_FAST,
--	M25P80_QUAD,
--};
--
- struct m25p {
- 	struct spi_device	*spi;
--	struct mutex		lock;
-+	struct spi_nor		spi_nor;
- 	struct mtd_info		mtd;
--	u16			page_size;
--	u16			addr_width;
--	u8			erase_opcode;
--	u8			read_opcode;
--	u8			program_opcode;
--	u8			*command;
--	enum read_type		flash_read;
-+	u8			command[MAX_CMD_SIZE];
- };
- 
--static inline struct m25p *mtd_to_m25p(struct mtd_info *mtd)
--{
--	return container_of(mtd, struct m25p, mtd);
--}
--
--/****************************************************************************/
--
--/*
-- * Internal helper functions
-- */
--
--/*
-- * Read the status register, returning its value in the location
-- * Return the status register value.
-- * Returns negative if error occurred.
-- */
--static int read_sr(struct m25p *flash)
--{
--	ssize_t retval;
--	u8 code = OPCODE_RDSR;
--	u8 val;
--
--	retval = spi_write_then_read(flash->spi, &code, 1, &val, 1);
--
--	if (retval < 0) {
--		dev_err(&flash->spi->dev, "error %d reading SR\n",
--				(int) retval);
--		return retval;
--	}
--
--	return val;
--}
--
--/*
-- * Read configuration register, returning its value in the
-- * location. Return the configuration register value.
-- * Returns negative if error occured.
-- */
--static int read_cr(struct m25p *flash)
--{
--	u8 code = OPCODE_RDCR;
--	int ret;
--	u8 val;
--
--	ret = spi_write_then_read(flash->spi, &code, 1, &val, 1);
--	if (ret < 0) {
--		dev_err(&flash->spi->dev, "error %d reading CR\n", ret);
--		return ret;
--	}
--
--	return val;
--}
--
--/*
-- * Write status register 1 byte
-- * Returns negative if error occurred.
-- */
--static int write_sr(struct m25p *flash, u8 val)
--{
--	flash->command[0] = OPCODE_WRSR;
--	flash->command[1] = val;
--
--	return spi_write(flash->spi, flash->command, 2);
--}
--
--/*
-- * Set write enable latch with Write Enable command.
-- * Returns negative if error occurred.
-- */
--static inline int write_enable(struct m25p *flash)
--{
--	u8	code = OPCODE_WREN;
--
--	return spi_write_then_read(flash->spi, &code, 1, NULL, 0);
--}
--
--/*
-- * Send write disble instruction to the chip.
-- */
--static inline int write_disable(struct m25p *flash)
--{
--	u8	code = OPCODE_WRDI;
--
--	return spi_write_then_read(flash->spi, &code, 1, NULL, 0);
--}
--
--/*
-- * Enable/disable 4-byte addressing mode.
-- */
--static inline int set_4byte(struct m25p *flash, u32 jedec_id, int enable)
--{
--	int status;
--	bool need_wren = false;
--
--	switch (JEDEC_MFR(jedec_id)) {
--	case CFI_MFR_ST: /* Micron, actually */
--		/* Some Micron need WREN command; all will accept it */
--		need_wren = true;
--	case CFI_MFR_MACRONIX:
--	case 0xEF /* winbond */:
--		if (need_wren)
--			write_enable(flash);
--
--		flash->command[0] = enable ? OPCODE_EN4B : OPCODE_EX4B;
--		status = spi_write(flash->spi, flash->command, 1);
--
--		if (need_wren)
--			write_disable(flash);
--
--		return status;
--	default:
--		/* Spansion style */
--		flash->command[0] = OPCODE_BRWR;
--		flash->command[1] = enable << 7;
--		return spi_write(flash->spi, flash->command, 2);
--	}
--}
--
--/*
-- * Service routine to read status register until ready, or timeout occurs.
-- * Returns non-zero if error.
-- */
--static int wait_till_ready(struct m25p *flash)
--{
--	unsigned long deadline;
--	int sr;
--
--	deadline = jiffies + MAX_READY_WAIT_JIFFIES;
--
--	do {
--		if ((sr = read_sr(flash)) < 0)
--			break;
--		else if (!(sr & SR_WIP))
--			return 0;
--
--		cond_resched();
--
--	} while (!time_after_eq(jiffies, deadline));
--
--	return 1;
--}
--
--/*
-- * Write status Register and configuration register with 2 bytes
-- * The first byte will be written to the status register, while the
-- * second byte will be written to the configuration register.
-- * Return negative if error occured.
-- */
--static int write_sr_cr(struct m25p *flash, u16 val)
--{
--	flash->command[0] = OPCODE_WRSR;
--	flash->command[1] = val & 0xff;
--	flash->command[2] = (val >> 8);
--
--	return spi_write(flash->spi, flash->command, 3);
--}
--
--static int macronix_quad_enable(struct m25p *flash)
--{
--	int ret, val;
--	u8 cmd[2];
--	cmd[0] = OPCODE_WRSR;
--
--	val = read_sr(flash);
--	cmd[1] = val | SR_QUAD_EN_MX;
--	write_enable(flash);
--
--	spi_write(flash->spi, &cmd, 2);
--
--	if (wait_till_ready(flash))
--		return 1;
--
--	ret = read_sr(flash);
--	if (!(ret > 0 && (ret & SR_QUAD_EN_MX))) {
--		dev_err(&flash->spi->dev, "Macronix Quad bit not set\n");
--		return -EINVAL;
--	}
--
--	return 0;
--}
--
--static int spansion_quad_enable(struct m25p *flash)
-+static int m25p_read_reg(struct spi_nor *nor, u8 code, u8 *val, int len)
- {
-+	struct m25p *flash = nor->priv;
-+	struct spi_device *spi = flash->spi;
- 	int ret;
--	int quad_en = CR_QUAD_EN_SPAN << 8;
--
--	write_enable(flash);
--
--	ret = write_sr_cr(flash, quad_en);
--	if (ret < 0) {
--		dev_err(&flash->spi->dev,
--			"error while writing configuration register\n");
--		return -EINVAL;
--	}
- 
--	/* read back and check it */
--	ret = read_cr(flash);
--	if (!(ret > 0 && (ret & CR_QUAD_EN_SPAN))) {
--		dev_err(&flash->spi->dev, "Spansion Quad bit not set\n");
--		return -EINVAL;
--	}
-+	ret = spi_write_then_read(spi, &code, 1, val, len);
-+	if (ret < 0)
-+		dev_err(&spi->dev, "error %d reading %x\n", ret, code);
- 
--	return 0;
-+	return ret ;
- }
- 
--static int set_quad_mode(struct m25p *flash, u32 jedec_id)
--{
--	int status;
--
--	switch (JEDEC_MFR(jedec_id)) {
--	case CFI_MFR_MACRONIX:
--		status = macronix_quad_enable(flash);
--		if (status) {
--			dev_err(&flash->spi->dev,
--				"Macronix quad-read not enabled\n");
--			return -EINVAL;
--		}
--		return status;
--	default:
--		status = spansion_quad_enable(flash);
--		if (status) {
--			dev_err(&flash->spi->dev,
--				"Spansion quad-read not enabled\n");
--			return -EINVAL;
--		}
--		return status;
--	}
--}
--
--/*
-- * Erase the whole flash memory
-- *
-- * Returns 0 if successful, non-zero otherwise.
-- */
--static int erase_chip(struct m25p *flash)
--{
--	pr_debug("%s: %s %lldKiB\n", dev_name(&flash->spi->dev), __func__,
--			(long long)(flash->mtd.size >> 10));
--
--	/* Wait until finished previous write command. */
--	if (wait_till_ready(flash))
--		return 1;
--
--	/* Send write enable, then erase commands. */
--	write_enable(flash);
--
--	/* Set up command buffer. */
--	flash->command[0] = OPCODE_CHIP_ERASE;
--
--	spi_write(flash->spi, flash->command, 1);
--
--	return 0;
--}
--
--static void m25p_addr2cmd(struct m25p *flash, unsigned int addr, u8 *cmd)
-+static void m25p_addr2cmd(struct spi_nor *nor, unsigned int addr, u8 *cmd)
- {
- 	/* opcode is in cmd[0] */
--	cmd[1] = addr >> (flash->addr_width * 8 -  8);
--	cmd[2] = addr >> (flash->addr_width * 8 - 16);
--	cmd[3] = addr >> (flash->addr_width * 8 - 24);
--	cmd[4] = addr >> (flash->addr_width * 8 - 32);
-+	cmd[1] = addr >> (nor->addr_width * 8 -  8);
-+	cmd[2] = addr >> (nor->addr_width * 8 - 16);
-+	cmd[3] = addr >> (nor->addr_width * 8 - 24);
-+	cmd[4] = addr >> (nor->addr_width * 8 - 32);
- }
- 
--static int m25p_cmdsz(struct m25p *flash)
--{
--	return 1 + flash->addr_width;
--}
--
--/*
-- * Erase one sector of flash memory at offset ``offset'' which is any
-- * address within the sector which should be erased.
-- *
-- * Returns 0 if successful, non-zero otherwise.
-- */
--static int erase_sector(struct m25p *flash, u32 offset)
-+static int m25p_cmdsz(struct spi_nor *nor)
- {
--	pr_debug("%s: %s %dKiB at 0x%08x\n", dev_name(&flash->spi->dev),
--			__func__, flash->mtd.erasesize / 1024, offset);
--
--	/* Wait until finished previous write command. */
--	if (wait_till_ready(flash))
--		return 1;
--
--	/* Send write enable, then erase commands. */
--	write_enable(flash);
--
--	/* Set up command buffer. */
--	flash->command[0] = flash->erase_opcode;
--	m25p_addr2cmd(flash, offset, flash->command);
--
--	spi_write(flash->spi, flash->command, m25p_cmdsz(flash));
--
--	return 0;
-+	return 1 + nor->addr_width;
- }
- 
--/****************************************************************************/
--
--/*
-- * MTD implementation
-- */
--
--/*
-- * Erase an address range on the flash chip.  The address range may extend
-- * one or more erase sectors.  Return an error is there is a problem erasing.
-- */
--static int m25p80_erase(struct mtd_info *mtd, struct erase_info *instr)
-+static int m25p_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
-+			int wr_en)
- {
--	struct m25p *flash = mtd_to_m25p(mtd);
--	u32 addr,len;
--	uint32_t rem;
--
--	pr_debug("%s: %s at 0x%llx, len %lld\n", dev_name(&flash->spi->dev),
--			__func__, (long long)instr->addr,
--			(long long)instr->len);
--
--	div_u64_rem(instr->len, mtd->erasesize, &rem);
--	if (rem)
--		return -EINVAL;
--
--	addr = instr->addr;
--	len = instr->len;
--
--	mutex_lock(&flash->lock);
--
--	/* whole-chip erase? */
--	if (len == flash->mtd.size) {
--		if (erase_chip(flash)) {
--			instr->state = MTD_ERASE_FAILED;
--			mutex_unlock(&flash->lock);
--			return -EIO;
--		}
-+	struct m25p *flash = nor->priv;
-+	struct spi_device *spi = flash->spi;
- 
--	/* REVISIT in some cases we could speed up erasing large regions
--	 * by using OPCODE_SE instead of OPCODE_BE_4K.  We may have set up
--	 * to use "small sector erase", but that's not always optimal.
--	 */
--
--	/* "sector"-at-a-time erase */
--	} else {
--		while (len) {
--			if (erase_sector(flash, addr)) {
--				instr->state = MTD_ERASE_FAILED;
--				mutex_unlock(&flash->lock);
--				return -EIO;
--			}
--
--			addr += mtd->erasesize;
--			len -= mtd->erasesize;
--		}
--	}
--
--	mutex_unlock(&flash->lock);
--
--	instr->state = MTD_ERASE_DONE;
--	mtd_erase_callback(instr);
-+	flash->command[0] = opcode;
-+	if (buf)
-+		memcpy(&flash->command[1], buf, len);
- 
--	return 0;
-+	return spi_write(spi, flash->command, len + 1);
- }
- 
--/*
-- * Dummy Cycle calculation for different type of read.
-- * It can be used to support more commands with
-- * different dummy cycle requirements.
-- */
--static inline int m25p80_dummy_cycles_read(struct m25p *flash)
-+static void m25p_write(struct spi_nor *nor, loff_t to, size_t len,
-+			size_t *retlen, const u_char *buf)
- {
--	switch (flash->flash_read) {
--	case M25P80_FAST:
--	case M25P80_QUAD:
--		return 1;
--	case M25P80_NORMAL:
--		return 0;
--	default:
--		dev_err(&flash->spi->dev, "No valid read type supported\n");
--		return -1;
--	}
--}
--
--/*
-- * Read an address range from the flash chip.  The address range
-- * may be any size provided it is within the physical boundaries.
-- */
--static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
--	size_t *retlen, u_char *buf)
--{
--	struct m25p *flash = mtd_to_m25p(mtd);
--	struct spi_transfer t[2];
-+	struct m25p *flash = nor->priv;
-+	struct spi_device *spi = flash->spi;
-+	struct spi_transfer t[2] = {};
- 	struct spi_message m;
--	uint8_t opcode;
--	int dummy;
--
--	pr_debug("%s: %s from 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
--			__func__, (u32)from, len);
-+	int cmd_sz = m25p_cmdsz(nor);
- 
- 	spi_message_init(&m);
--	memset(t, 0, (sizeof t));
- 
--	dummy =  m25p80_dummy_cycles_read(flash);
--	if (dummy < 0) {
--		dev_err(&flash->spi->dev, "No valid read command supported\n");
--		return -EINVAL;
--	}
-+	if (nor->program_opcode == OPCODE_AAI_WP && nor->sst_write_second)
-+		cmd_sz = 1;
 +
-+	flash->command[0] = nor->program_opcode;
-+	m25p_addr2cmd(nor, to, flash->command);
- 
- 	t[0].tx_buf = flash->command;
--	t[0].len = m25p_cmdsz(flash) + dummy;
-+	t[0].len = cmd_sz;
- 	spi_message_add_tail(&t[0], &m);
- 
--	t[1].rx_buf = buf;
-+	t[1].tx_buf = buf;
- 	t[1].len = len;
- 	spi_message_add_tail(&t[1], &m);
- 
--	mutex_lock(&flash->lock);
--
--	/* Wait till previous write/erase is done. */
--	if (wait_till_ready(flash)) {
--		/* REVISIT status return?? */
--		mutex_unlock(&flash->lock);
--		return 1;
--	}
--
--	/* Set up the write data buffer. */
--	opcode = flash->read_opcode;
--	flash->command[0] = opcode;
--	m25p_addr2cmd(flash, from, flash->command);
--
--	spi_sync(flash->spi, &m);
--
--	*retlen = m.actual_length - m25p_cmdsz(flash) - dummy;
-+	spi_sync(spi, &m);
- 
--	mutex_unlock(&flash->lock);
--
--	return 0;
-+	*retlen += m.actual_length - cmd_sz;
- }
- 
- /*
-- * Write an address range to the flash chip.  Data must be written in
-- * FLASH_PAGESIZE chunks.  The address range may be any size provided
-- * it is within the physical boundaries.
-+ * Read an address range from the nor chip.  The address range
-+ * may be any size provided it is within the physical boundaries.
-  */
--static int m25p80_write(struct mtd_info *mtd, loff_t to, size_t len,
--	size_t *retlen, const u_char *buf)
-+static int m25p_read(struct spi_nor *nor, loff_t from, size_t len,
-+			size_t *retlen, u_char *buf)
- {
--	struct m25p *flash = mtd_to_m25p(mtd);
--	u32 page_offset, page_size;
-+	struct m25p *flash = nor->priv;
-+	struct spi_device *spi = flash->spi;
- 	struct spi_transfer t[2];
- 	struct spi_message m;
--
--	pr_debug("%s: %s to 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
--			__func__, (u32)to, len);
-+	int dummy = nor->read_dummy;
- 
- 	spi_message_init(&m);
- 	memset(t, 0, (sizeof t));
- 
-+	flash->command[0] = nor->read_opcode;
-+	m25p_addr2cmd(nor, from, flash->command);
++/* The registers */
++#define QUADSPI_MCR			0x00
++#define QUADSPI_MCR_RESERVED_SHIFT	16
++#define QUADSPI_MCR_RESERVED_MASK	(0xF << QUADSPI_MCR_RESERVED_SHIFT)
++#define QUADSPI_MCR_MDIS_SHIFT		14
++#define QUADSPI_MCR_MDIS_MASK		(1 << QUADSPI_MCR_MDIS_SHIFT)
++#define QUADSPI_MCR_CLR_TXF_SHIFT	11
++#define QUADSPI_MCR_CLR_TXF_MASK	(1 << QUADSPI_MCR_CLR_TXF_SHIFT)
++#define QUADSPI_MCR_CLR_RXF_SHIFT	10
++#define QUADSPI_MCR_CLR_RXF_MASK	(1 << QUADSPI_MCR_CLR_RXF_SHIFT)
++#define QUADSPI_MCR_DDR_EN_SHIFT	7
++#define QUADSPI_MCR_DDR_EN_MASK		(1 << QUADSPI_MCR_DDR_EN_SHIFT)
++#define QUADSPI_MCR_SWRSTHD_SHIFT	1
++#define QUADSPI_MCR_SWRSTHD_MASK	(1 << QUADSPI_MCR_SWRSTHD_SHIFT)
++#define QUADSPI_MCR_SWRSTSD_SHIFT	0
++#define QUADSPI_MCR_SWRSTSD_MASK	(1 << QUADSPI_MCR_SWRSTSD_SHIFT)
 +
- 	t[0].tx_buf = flash->command;
--	t[0].len = m25p_cmdsz(flash);
-+	t[0].len = m25p_cmdsz(nor) + dummy;
- 	spi_message_add_tail(&t[0], &m);
- 
--	t[1].tx_buf = buf;
-+	t[1].rx_buf = buf;
-+	t[1].len = len;
- 	spi_message_add_tail(&t[1], &m);
- 
--	mutex_lock(&flash->lock);
--
--	/* Wait until finished previous write command. */
--	if (wait_till_ready(flash)) {
--		mutex_unlock(&flash->lock);
--		return 1;
--	}
--
--	write_enable(flash);
--
--	/* Set up the opcode in the write buffer. */
--	flash->command[0] = flash->program_opcode;
--	m25p_addr2cmd(flash, to, flash->command);
--
--	page_offset = to & (flash->page_size - 1);
--
--	/* do all the bytes fit onto one page? */
--	if (page_offset + len <= flash->page_size) {
--		t[1].len = len;
--
--		spi_sync(flash->spi, &m);
--
--		*retlen = m.actual_length - m25p_cmdsz(flash);
--	} else {
--		u32 i;
--
--		/* the size of data remaining on the first page */
--		page_size = flash->page_size - page_offset;
--
--		t[1].len = page_size;
--		spi_sync(flash->spi, &m);
--
--		*retlen = m.actual_length - m25p_cmdsz(flash);
--
--		/* write everything in flash->page_size chunks */
--		for (i = page_size; i < len; i += page_size) {
--			page_size = len - i;
--			if (page_size > flash->page_size)
--				page_size = flash->page_size;
--
--			/* write the next page to flash */
--			m25p_addr2cmd(flash, to + i, flash->command);
--
--			t[1].tx_buf = buf + i;
--			t[1].len = page_size;
--
--			wait_till_ready(flash);
--
--			write_enable(flash);
--
--			spi_sync(flash->spi, &m);
--
--			*retlen += m.actual_length - m25p_cmdsz(flash);
--		}
--	}
--
--	mutex_unlock(&flash->lock);
-+	spi_sync(spi, &m);
- 
-+	*retlen = m.actual_length - m25p_cmdsz(nor) - dummy;
- 	return 0;
- }
- 
--static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
--		size_t *retlen, const u_char *buf)
-+static int m25p_erase(struct spi_nor *nor, loff_t offset)
- {
--	struct m25p *flash = mtd_to_m25p(mtd);
--	struct spi_transfer t[2];
--	struct spi_message m;
--	size_t actual;
--	int cmd_sz, ret;
--
--	pr_debug("%s: %s to 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
--			__func__, (u32)to, len);
--
--	spi_message_init(&m);
--	memset(t, 0, (sizeof t));
--
--	t[0].tx_buf = flash->command;
--	t[0].len = m25p_cmdsz(flash);
--	spi_message_add_tail(&t[0], &m);
--
--	t[1].tx_buf = buf;
--	spi_message_add_tail(&t[1], &m);
-+	struct m25p *flash = nor->priv;
-+	int ret;
- 
--	mutex_lock(&flash->lock);
-+	dev_dbg(nor->dev, "%dKiB at 0x%08x\n",
-+		flash->mtd.erasesize / 1024, (u32)offset);
- 
- 	/* Wait until finished previous write command. */
--	ret = wait_till_ready(flash);
-+	ret = nor->wait_till_ready(nor);
- 	if (ret)
--		goto time_out;
--
--	write_enable(flash);
--
--	actual = to % 2;
--	/* Start write from odd address. */
--	if (actual) {
--		flash->command[0] = OPCODE_BP;
--		m25p_addr2cmd(flash, to, flash->command);
--
--		/* write one byte. */
--		t[1].len = 1;
--		spi_sync(flash->spi, &m);
--		ret = wait_till_ready(flash);
--		if (ret)
--			goto time_out;
--		*retlen += m.actual_length - m25p_cmdsz(flash);
--	}
--	to += actual;
--
--	flash->command[0] = OPCODE_AAI_WP;
--	m25p_addr2cmd(flash, to, flash->command);
--
--	/* Write out most of the data here. */
--	cmd_sz = m25p_cmdsz(flash);
--	for (; actual < len - 1; actual += 2) {
--		t[0].len = cmd_sz;
--		/* write two bytes. */
--		t[1].len = 2;
--		t[1].tx_buf = buf + actual;
-+		return ret;
- 
--		spi_sync(flash->spi, &m);
--		ret = wait_till_ready(flash);
--		if (ret)
--			goto time_out;
--		*retlen += m.actual_length - cmd_sz;
--		cmd_sz = 1;
--		to += 2;
--	}
--	write_disable(flash);
--	ret = wait_till_ready(flash);
-+	/* Send write enable, then erase commands. */
-+	ret = nor->write_reg(nor, OPCODE_WREN, NULL, 0, 0);
- 	if (ret)
--		goto time_out;
--
--	/* Write out trailing byte if it exists. */
--	if (actual != len) {
--		write_enable(flash);
--		flash->command[0] = OPCODE_BP;
--		m25p_addr2cmd(flash, to, flash->command);
--		t[0].len = m25p_cmdsz(flash);
--		t[1].len = 1;
--		t[1].tx_buf = buf + actual;
--
--		spi_sync(flash->spi, &m);
--		ret = wait_till_ready(flash);
--		if (ret)
--			goto time_out;
--		*retlen += m.actual_length - m25p_cmdsz(flash);
--		write_disable(flash);
--	}
--
--time_out:
--	mutex_unlock(&flash->lock);
--	return ret;
--}
--
--static int m25p80_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
--{
--	struct m25p *flash = mtd_to_m25p(mtd);
--	uint32_t offset = ofs;
--	uint8_t status_old, status_new;
--	int res = 0;
--
--	mutex_lock(&flash->lock);
--	/* Wait until finished previous command */
--	if (wait_till_ready(flash)) {
--		res = 1;
--		goto err;
--	}
--
--	status_old = read_sr(flash);
--
--	if (offset < flash->mtd.size-(flash->mtd.size/2))
--		status_new = status_old | SR_BP2 | SR_BP1 | SR_BP0;
--	else if (offset < flash->mtd.size-(flash->mtd.size/4))
--		status_new = (status_old & ~SR_BP0) | SR_BP2 | SR_BP1;
--	else if (offset < flash->mtd.size-(flash->mtd.size/8))
--		status_new = (status_old & ~SR_BP1) | SR_BP2 | SR_BP0;
--	else if (offset < flash->mtd.size-(flash->mtd.size/16))
--		status_new = (status_old & ~(SR_BP0|SR_BP1)) | SR_BP2;
--	else if (offset < flash->mtd.size-(flash->mtd.size/32))
--		status_new = (status_old & ~SR_BP2) | SR_BP1 | SR_BP0;
--	else if (offset < flash->mtd.size-(flash->mtd.size/64))
--		status_new = (status_old & ~(SR_BP2|SR_BP0)) | SR_BP1;
--	else
--		status_new = (status_old & ~(SR_BP2|SR_BP1)) | SR_BP0;
--
--	/* Only modify protection if it will not unlock other areas */
--	if ((status_new&(SR_BP2|SR_BP1|SR_BP0)) >
--					(status_old&(SR_BP2|SR_BP1|SR_BP0))) {
--		write_enable(flash);
--		if (write_sr(flash, status_new) < 0) {
--			res = 1;
--			goto err;
--		}
--	}
--
--err:	mutex_unlock(&flash->lock);
--	return res;
--}
--
--static int m25p80_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
--{
--	struct m25p *flash = mtd_to_m25p(mtd);
--	uint32_t offset = ofs;
--	uint8_t status_old, status_new;
--	int res = 0;
--
--	mutex_lock(&flash->lock);
--	/* Wait until finished previous command */
--	if (wait_till_ready(flash)) {
--		res = 1;
--		goto err;
--	}
--
--	status_old = read_sr(flash);
--
--	if (offset+len > flash->mtd.size-(flash->mtd.size/64))
--		status_new = status_old & ~(SR_BP2|SR_BP1|SR_BP0);
--	else if (offset+len > flash->mtd.size-(flash->mtd.size/32))
--		status_new = (status_old & ~(SR_BP2|SR_BP1)) | SR_BP0;
--	else if (offset+len > flash->mtd.size-(flash->mtd.size/16))
--		status_new = (status_old & ~(SR_BP2|SR_BP0)) | SR_BP1;
--	else if (offset+len > flash->mtd.size-(flash->mtd.size/8))
--		status_new = (status_old & ~SR_BP2) | SR_BP1 | SR_BP0;
--	else if (offset+len > flash->mtd.size-(flash->mtd.size/4))
--		status_new = (status_old & ~(SR_BP0|SR_BP1)) | SR_BP2;
--	else if (offset+len > flash->mtd.size-(flash->mtd.size/2))
--		status_new = (status_old & ~SR_BP1) | SR_BP2 | SR_BP0;
--	else
--		status_new = (status_old & ~SR_BP0) | SR_BP2 | SR_BP1;
--
--	/* Only modify protection if it will not lock other areas */
--	if ((status_new&(SR_BP2|SR_BP1|SR_BP0)) <
--					(status_old&(SR_BP2|SR_BP1|SR_BP0))) {
--		write_enable(flash);
--		if (write_sr(flash, status_new) < 0) {
--			res = 1;
--			goto err;
--		}
--	}
--
--err:	mutex_unlock(&flash->lock);
--	return res;
--}
--
--/****************************************************************************/
--
--/*
-- * SPI device driver setup and teardown
-- */
--
--struct flash_info {
--	/* JEDEC id zero means "no ID" (most older chips); otherwise it has
--	 * a high byte of zero plus three data bytes: the manufacturer id,
--	 * then a two byte device id.
--	 */
--	u32		jedec_id;
--	u16             ext_id;
--
--	/* The size listed here is what works with OPCODE_SE, which isn't
--	 * necessarily called a "sector" by the vendor.
--	 */
--	unsigned	sector_size;
--	u16		n_sectors;
--
--	u16		page_size;
--	u16		addr_width;
--
--	u16		flags;
--#define	SECT_4K		0x01		/* OPCODE_BE_4K works uniformly */
--#define	M25P_NO_ERASE	0x02		/* No erase command needed */
--#define	SST_WRITE	0x04		/* use SST byte programming */
--#define	M25P_NO_FR	0x08		/* Can't do fastread */
--#define	SECT_4K_PMC	0x10		/* OPCODE_BE_4K_PMC works uniformly */
--#define	M25P80_QUAD_READ	0x20    /* Flash supports Quad Read */
--};
--
--#define INFO(_jedec_id, _ext_id, _sector_size, _n_sectors, _flags)	\
--	((kernel_ulong_t)&(struct flash_info) {				\
--		.jedec_id = (_jedec_id),				\
--		.ext_id = (_ext_id),					\
--		.sector_size = (_sector_size),				\
--		.n_sectors = (_n_sectors),				\
--		.page_size = 256,					\
--		.flags = (_flags),					\
--	})
--
--#define CAT25_INFO(_sector_size, _n_sectors, _page_size, _addr_width, _flags)	\
--	((kernel_ulong_t)&(struct flash_info) {				\
--		.sector_size = (_sector_size),				\
--		.n_sectors = (_n_sectors),				\
--		.page_size = (_page_size),				\
--		.addr_width = (_addr_width),				\
--		.flags = (_flags),					\
--	})
--
--/* NOTE: double check command sets and memory organization when you add
-- * more flash chips.  This current list focusses on newer chips, which
-- * have been converging on command sets which including JEDEC ID.
-- */
--static const struct spi_device_id m25p_ids[] = {
--	/* Atmel -- some are (confusingly) marketed as "DataFlash" */
--	{ "at25fs010",  INFO(0x1f6601, 0, 32 * 1024,   4, SECT_4K) },
--	{ "at25fs040",  INFO(0x1f6604, 0, 64 * 1024,   8, SECT_4K) },
--
--	{ "at25df041a", INFO(0x1f4401, 0, 64 * 1024,   8, SECT_4K) },
--	{ "at25df321a", INFO(0x1f4701, 0, 64 * 1024,  64, SECT_4K) },
--	{ "at25df641",  INFO(0x1f4800, 0, 64 * 1024, 128, SECT_4K) },
--
--	{ "at26f004",   INFO(0x1f0400, 0, 64 * 1024,  8, SECT_4K) },
--	{ "at26df081a", INFO(0x1f4501, 0, 64 * 1024, 16, SECT_4K) },
--	{ "at26df161a", INFO(0x1f4601, 0, 64 * 1024, 32, SECT_4K) },
--	{ "at26df321",  INFO(0x1f4700, 0, 64 * 1024, 64, SECT_4K) },
--
--	{ "at45db081d", INFO(0x1f2500, 0, 64 * 1024, 16, SECT_4K) },
--
--	/* EON -- en25xxx */
--	{ "en25f32",    INFO(0x1c3116, 0, 64 * 1024,   64, SECT_4K) },
--	{ "en25p32",    INFO(0x1c2016, 0, 64 * 1024,   64, 0) },
--	{ "en25q32b",   INFO(0x1c3016, 0, 64 * 1024,   64, 0) },
--	{ "en25p64",    INFO(0x1c2017, 0, 64 * 1024,  128, 0) },
--	{ "en25q64",    INFO(0x1c3017, 0, 64 * 1024,  128, SECT_4K) },
--	{ "en25qh256",  INFO(0x1c7019, 0, 64 * 1024,  512, 0) },
--
--	/* ESMT */
--	{ "f25l32pa", INFO(0x8c2016, 0, 64 * 1024, 64, SECT_4K) },
--
--	/* Everspin */
--	{ "mr25h256", CAT25_INFO( 32 * 1024, 1, 256, 2, M25P_NO_ERASE | M25P_NO_FR) },
--	{ "mr25h10",  CAT25_INFO(128 * 1024, 1, 256, 3, M25P_NO_ERASE | M25P_NO_FR) },
--
--	/* GigaDevice */
--	{ "gd25q32", INFO(0xc84016, 0, 64 * 1024,  64, SECT_4K) },
--	{ "gd25q64", INFO(0xc84017, 0, 64 * 1024, 128, SECT_4K) },
--
--	/* Intel/Numonyx -- xxxs33b */
--	{ "160s33b",  INFO(0x898911, 0, 64 * 1024,  32, 0) },
--	{ "320s33b",  INFO(0x898912, 0, 64 * 1024,  64, 0) },
--	{ "640s33b",  INFO(0x898913, 0, 64 * 1024, 128, 0) },
--
--	/* Macronix */
--	{ "mx25l2005a",  INFO(0xc22012, 0, 64 * 1024,   4, SECT_4K) },
--	{ "mx25l4005a",  INFO(0xc22013, 0, 64 * 1024,   8, SECT_4K) },
--	{ "mx25l8005",   INFO(0xc22014, 0, 64 * 1024,  16, 0) },
--	{ "mx25l1606e",  INFO(0xc22015, 0, 64 * 1024,  32, SECT_4K) },
--	{ "mx25l3205d",  INFO(0xc22016, 0, 64 * 1024,  64, 0) },
--	{ "mx25l3255e",  INFO(0xc29e16, 0, 64 * 1024,  64, SECT_4K) },
--	{ "mx25l6405d",  INFO(0xc22017, 0, 64 * 1024, 128, 0) },
--	{ "mx25l12805d", INFO(0xc22018, 0, 64 * 1024, 256, 0) },
--	{ "mx25l12855e", INFO(0xc22618, 0, 64 * 1024, 256, 0) },
--	{ "mx25l25635e", INFO(0xc22019, 0, 64 * 1024, 512, 0) },
--	{ "mx25l25655e", INFO(0xc22619, 0, 64 * 1024, 512, 0) },
--	{ "mx66l51235l", INFO(0xc2201a, 0, 64 * 1024, 1024, M25P80_QUAD_READ) },
--
--	/* Micron */
--	{ "n25q064",     INFO(0x20ba17, 0, 64 * 1024,  128, 0) },
--	{ "n25q128a11",  INFO(0x20bb18, 0, 64 * 1024,  256, 0) },
--	{ "n25q128a13",  INFO(0x20ba18, 0, 64 * 1024,  256, 0) },
--	{ "n25q256a",    INFO(0x20ba19, 0, 64 * 1024,  512, SECT_4K) },
--	{ "n25q512a",    INFO(0x20bb20, 0, 64 * 1024, 1024, SECT_4K) },
--
--	/* PMC */
--	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
--	{ "pm25lv010",   INFO(0,        0, 32 * 1024,    4, SECT_4K_PMC) },
--	{ "pm25lq032",   INFO(0x7f9d46, 0, 64 * 1024,   64, SECT_4K) },
--
--	/* Spansion -- single (large) sector size only, at least
--	 * for the chips listed here (without boot sectors).
--	 */
--	{ "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64, 0) },
--	{ "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128, 0) },
--	{ "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
--	{ "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512, M25P80_QUAD_READ) },
--	{ "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256, 0) },
--	{ "s70fl01gs",  INFO(0x010221, 0x4d00, 256 * 1024, 256, 0) },
--	{ "s25sl12800", INFO(0x012018, 0x0300, 256 * 1024,  64, 0) },
--	{ "s25sl12801", INFO(0x012018, 0x0301,  64 * 1024, 256, 0) },
--	{ "s25fl129p0", INFO(0x012018, 0x4d00, 256 * 1024,  64, 0) },
--	{ "s25fl129p1", INFO(0x012018, 0x4d01,  64 * 1024, 256, 0) },
--	{ "s25sl004a",  INFO(0x010212,      0,  64 * 1024,   8, 0) },
--	{ "s25sl008a",  INFO(0x010213,      0,  64 * 1024,  16, 0) },
--	{ "s25sl016a",  INFO(0x010214,      0,  64 * 1024,  32, 0) },
--	{ "s25sl032a",  INFO(0x010215,      0,  64 * 1024,  64, 0) },
--	{ "s25sl064a",  INFO(0x010216,      0,  64 * 1024, 128, 0) },
--	{ "s25fl016k",  INFO(0xef4015,      0,  64 * 1024,  32, SECT_4K) },
--	{ "s25fl064k",  INFO(0xef4017,      0,  64 * 1024, 128, SECT_4K) },
--
--	/* SST -- large erase sizes are "overlays", "sectors" are 4K */
--	{ "sst25vf040b", INFO(0xbf258d, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
--	{ "sst25vf080b", INFO(0xbf258e, 0, 64 * 1024, 16, SECT_4K | SST_WRITE) },
--	{ "sst25vf016b", INFO(0xbf2541, 0, 64 * 1024, 32, SECT_4K | SST_WRITE) },
--	{ "sst25vf032b", INFO(0xbf254a, 0, 64 * 1024, 64, SECT_4K | SST_WRITE) },
--	{ "sst25vf064c", INFO(0xbf254b, 0, 64 * 1024, 128, SECT_4K) },
--	{ "sst25wf512",  INFO(0xbf2501, 0, 64 * 1024,  1, SECT_4K | SST_WRITE) },
--	{ "sst25wf010",  INFO(0xbf2502, 0, 64 * 1024,  2, SECT_4K | SST_WRITE) },
--	{ "sst25wf020",  INFO(0xbf2503, 0, 64 * 1024,  4, SECT_4K | SST_WRITE) },
--	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
--
--	/* ST Microelectronics -- newer production may have feature updates */
--	{ "m25p05",  INFO(0x202010,  0,  32 * 1024,   2, 0) },
--	{ "m25p10",  INFO(0x202011,  0,  32 * 1024,   4, 0) },
--	{ "m25p20",  INFO(0x202012,  0,  64 * 1024,   4, 0) },
--	{ "m25p40",  INFO(0x202013,  0,  64 * 1024,   8, 0) },
--	{ "m25p80",  INFO(0x202014,  0,  64 * 1024,  16, 0) },
--	{ "m25p16",  INFO(0x202015,  0,  64 * 1024,  32, 0) },
--	{ "m25p32",  INFO(0x202016,  0,  64 * 1024,  64, 0) },
--	{ "m25p64",  INFO(0x202017,  0,  64 * 1024, 128, 0) },
--	{ "m25p128", INFO(0x202018,  0, 256 * 1024,  64, 0) },
--	{ "n25q032", INFO(0x20ba16,  0,  64 * 1024,  64, 0) },
--
--	{ "m25p05-nonjedec",  INFO(0, 0,  32 * 1024,   2, 0) },
--	{ "m25p10-nonjedec",  INFO(0, 0,  32 * 1024,   4, 0) },
--	{ "m25p20-nonjedec",  INFO(0, 0,  64 * 1024,   4, 0) },
--	{ "m25p40-nonjedec",  INFO(0, 0,  64 * 1024,   8, 0) },
--	{ "m25p80-nonjedec",  INFO(0, 0,  64 * 1024,  16, 0) },
--	{ "m25p16-nonjedec",  INFO(0, 0,  64 * 1024,  32, 0) },
--	{ "m25p32-nonjedec",  INFO(0, 0,  64 * 1024,  64, 0) },
--	{ "m25p64-nonjedec",  INFO(0, 0,  64 * 1024, 128, 0) },
--	{ "m25p128-nonjedec", INFO(0, 0, 256 * 1024,  64, 0) },
--
--	{ "m45pe10", INFO(0x204011,  0, 64 * 1024,    2, 0) },
--	{ "m45pe80", INFO(0x204014,  0, 64 * 1024,   16, 0) },
--	{ "m45pe16", INFO(0x204015,  0, 64 * 1024,   32, 0) },
--
--	{ "m25pe20", INFO(0x208012,  0, 64 * 1024,  4,       0) },
--	{ "m25pe80", INFO(0x208014,  0, 64 * 1024, 16,       0) },
--	{ "m25pe16", INFO(0x208015,  0, 64 * 1024, 32, SECT_4K) },
--
--	{ "m25px16",    INFO(0x207115,  0, 64 * 1024, 32, SECT_4K) },
--	{ "m25px32",    INFO(0x207116,  0, 64 * 1024, 64, SECT_4K) },
--	{ "m25px32-s0", INFO(0x207316,  0, 64 * 1024, 64, SECT_4K) },
--	{ "m25px32-s1", INFO(0x206316,  0, 64 * 1024, 64, SECT_4K) },
--	{ "m25px64",    INFO(0x207117,  0, 64 * 1024, 128, 0) },
--
--	/* Winbond -- w25x "blocks" are 64K, "sectors" are 4KiB */
--	{ "w25x10", INFO(0xef3011, 0, 64 * 1024,  2,  SECT_4K) },
--	{ "w25x20", INFO(0xef3012, 0, 64 * 1024,  4,  SECT_4K) },
--	{ "w25x40", INFO(0xef3013, 0, 64 * 1024,  8,  SECT_4K) },
--	{ "w25x80", INFO(0xef3014, 0, 64 * 1024,  16, SECT_4K) },
--	{ "w25x16", INFO(0xef3015, 0, 64 * 1024,  32, SECT_4K) },
--	{ "w25x32", INFO(0xef3016, 0, 64 * 1024,  64, SECT_4K) },
--	{ "w25q32", INFO(0xef4016, 0, 64 * 1024,  64, SECT_4K) },
--	{ "w25q32dw", INFO(0xef6016, 0, 64 * 1024,  64, SECT_4K) },
--	{ "w25x64", INFO(0xef3017, 0, 64 * 1024, 128, SECT_4K) },
--	{ "w25q64", INFO(0xef4017, 0, 64 * 1024, 128, SECT_4K) },
--	{ "w25q128", INFO(0xef4018, 0, 64 * 1024, 256, SECT_4K) },
--	{ "w25q80", INFO(0xef5014, 0, 64 * 1024,  16, SECT_4K) },
--	{ "w25q80bl", INFO(0xef4014, 0, 64 * 1024,  16, SECT_4K) },
--	{ "w25q128", INFO(0xef4018, 0, 64 * 1024, 256, SECT_4K) },
--	{ "w25q256", INFO(0xef4019, 0, 64 * 1024, 512, SECT_4K) },
--
--	/* Catalyst / On Semiconductor -- non-JEDEC */
--	{ "cat25c11", CAT25_INFO(  16, 8, 16, 1, M25P_NO_ERASE | M25P_NO_FR) },
--	{ "cat25c03", CAT25_INFO(  32, 8, 16, 2, M25P_NO_ERASE | M25P_NO_FR) },
--	{ "cat25c09", CAT25_INFO( 128, 8, 32, 2, M25P_NO_ERASE | M25P_NO_FR) },
--	{ "cat25c17", CAT25_INFO( 256, 8, 32, 2, M25P_NO_ERASE | M25P_NO_FR) },
--	{ "cat25128", CAT25_INFO(2048, 8, 64, 2, M25P_NO_ERASE | M25P_NO_FR) },
--	{ },
--};
--MODULE_DEVICE_TABLE(spi, m25p_ids);
--
--static const struct spi_device_id *jedec_probe(struct spi_device *spi)
--{
--	int			tmp;
--	u8			code = OPCODE_RDID;
--	u8			id[5];
--	u32			jedec;
--	u16                     ext_jedec;
--	struct flash_info	*info;
-+		return ret;
- 
--	/* JEDEC also defines an optional "extended device information"
--	 * string for after vendor-specific data, after the three bytes
--	 * we use here.  Supporting some chips might require using it.
--	 */
--	tmp = spi_write_then_read(spi, &code, 1, id, 5);
--	if (tmp < 0) {
--		pr_debug("%s: error %d reading JEDEC ID\n",
--				dev_name(&spi->dev), tmp);
--		return ERR_PTR(tmp);
--	}
--	jedec = id[0];
--	jedec = jedec << 8;
--	jedec |= id[1];
--	jedec = jedec << 8;
--	jedec |= id[2];
-+	/* Set up command buffer. */
-+	flash->command[0] = nor->erase_opcode;
-+	m25p_addr2cmd(nor, offset, flash->command);
- 
--	ext_jedec = id[3] << 8 | id[4];
-+	spi_write(flash->spi, flash->command, m25p_cmdsz(nor));
- 
--	for (tmp = 0; tmp < ARRAY_SIZE(m25p_ids) - 1; tmp++) {
--		info = (void *)m25p_ids[tmp].driver_data;
--		if (info->jedec_id == jedec) {
--			if (info->ext_id != 0 && info->ext_id != ext_jedec)
--				continue;
--			return &m25p_ids[tmp];
--		}
--	}
--	dev_err(&spi->dev, "unrecognized JEDEC id %06x\n", jedec);
--	return ERR_PTR(-ENODEV);
++#define QUADSPI_IPCR			0x08
++#define QUADSPI_IPCR_SEQID_SHIFT	24
++#define QUADSPI_IPCR_SEQID_MASK		(0xF << QUADSPI_IPCR_SEQID_SHIFT)
++
++#define QUADSPI_BUF0CR			0x10
++#define QUADSPI_BUF1CR			0x14
++#define QUADSPI_BUF2CR			0x18
++#define QUADSPI_BUFXCR_INVALID_MSTRID	0xe
++
++#define QUADSPI_BUF3CR			0x1c
++#define QUADSPI_BUF3CR_ALLMST_SHIFT	31
++#define QUADSPI_BUF3CR_ALLMST		(1 << QUADSPI_BUF3CR_ALLMST_SHIFT)
++
++#define QUADSPI_BFGENCR			0x20
++#define QUADSPI_BFGENCR_PAR_EN_SHIFT	16
++#define QUADSPI_BFGENCR_PAR_EN_MASK	(1 << (QUADSPI_BFGENCR_PAR_EN_SHIFT))
++#define QUADSPI_BFGENCR_SEQID_SHIFT	12
++#define QUADSPI_BFGENCR_SEQID_MASK	(0xF << QUADSPI_BFGENCR_SEQID_SHIFT)
++
++#define QUADSPI_BUF0IND			0x30
++#define QUADSPI_BUF1IND			0x34
++#define QUADSPI_BUF2IND			0x38
++#define QUADSPI_SFAR			0x100
++
++#define QUADSPI_SMPR			0x108
++#define QUADSPI_SMPR_DDRSMP_SHIFT	16
++#define QUADSPI_SMPR_DDRSMP_MASK	(7 << QUADSPI_SMPR_DDRSMP_SHIFT)
++#define QUADSPI_SMPR_FSDLY_SHIFT	6
++#define QUADSPI_SMPR_FSDLY_MASK		(1 << QUADSPI_SMPR_FSDLY_SHIFT)
++#define QUADSPI_SMPR_FSPHS_SHIFT	5
++#define QUADSPI_SMPR_FSPHS_MASK		(1 << QUADSPI_SMPR_FSPHS_SHIFT)
++#define QUADSPI_SMPR_HSENA_SHIFT	0
++#define QUADSPI_SMPR_HSENA_MASK		(1 << QUADSPI_SMPR_HSENA_SHIFT)
++
++#define QUADSPI_RBSR			0x10c
++#define QUADSPI_RBSR_RDBFL_SHIFT	8
++#define QUADSPI_RBSR_RDBFL_MASK		(0x3F << QUADSPI_RBSR_RDBFL_SHIFT)
++
++#define QUADSPI_RBCT			0x110
++#define QUADSPI_RBCT_WMRK_MASK		0x1F
++#define QUADSPI_RBCT_RXBRD_SHIFT	8
++#define QUADSPI_RBCT_RXBRD_USEIPS	(0x1 << QUADSPI_RBCT_RXBRD_SHIFT)
++
++#define QUADSPI_TBSR			0x150
++#define QUADSPI_TBDR			0x154
++#define QUADSPI_SR			0x15c
++
++#define QUADSPI_FR			0x160
++#define QUADSPI_FR_TFF_MASK		0x1
++
++#define QUADSPI_SFA1AD			0x180
++#define QUADSPI_SFA2AD			0x184
++#define QUADSPI_SFB1AD			0x188
++#define QUADSPI_SFB2AD			0x18c
++#define QUADSPI_RBDR			0x200
++
++#define QUADSPI_LUTKEY			0x300
++#define QUADSPI_LUTKEY_VALUE		0x5AF05AF0
++
++#define QUADSPI_LCKCR			0x304
++#define QUADSPI_LCKER_LOCK		0x1
++#define QUADSPI_LCKER_UNLOCK		0x2
++
++#define QUADSPI_RSER			0x164
++#define QUADSPI_RSER_TFIE       	(0x1 << 0)
++
++#define QUADSPI_LUT_BASE		0x310
++
++/*
++ * The definition of the LUT register shows below:
++ *
++ *  ---------------------------------------------------
++ *  | INSTR1 | PAD1 | OPRND1 | INSTR0 | PAD0 | OPRND0 |
++ *  ---------------------------------------------------
++ */
++#define OPRND0_SHIFT		0
++#define PAD0_SHIFT		8
++#define INSTR0_SHIFT		10
++#define OPRND1_SHIFT		16
++
++/* Instruction set for the LUT register. */
++#define LUT_STOP		0
++#define LUT_CMD			1
++#define LUT_ADDR		2
++#define LUT_DUMMY		3
++#define LUT_MODE		4
++#define LUT_MODE2		5
++#define LUT_MODE4		6
++#define LUT_READ		7
++#define LUT_WRITE		8
++#define LUT_JMP_ON_CS		9
++#define LUT_ADDR_DDR		10
++#define LUT_MODE_DDR		11
++#define LUT_MODE2_DDR		12
++#define LUT_MODE4_DDR		13
++#define LUT_READ_DDR		14
++#define LUT_WRITE_DDR		15
++#define LUT_DATA_LEARN		16
++
++/*
++ * The PAD definitions for LUT register.
++ *
++ * The pad stands for the lines number of IO[0:3].
++ * For example, the Quad read need four IO lines, so you should
++ * set LUT_PAD4 which means we use four IO lines.
++ */
++#define LUT_PAD1		0
++#define LUT_PAD2		1
++#define LUT_PAD4		2
++
++/* Oprands for the LUT register. */
++#define ADDR24BIT		0x18
++#define ADDR32BIT		0x20
++
++/* Macros for constructing the LUT register. */
++#define LUT0(ins, pad, opr)						\
++		(((opr) << OPRND0_SHIFT) | ((LUT_##pad) << PAD0_SHIFT) | \
++		((LUT_##ins) << INSTR0_SHIFT))
++
++#define LUT1(ins, pad, opr)	(LUT0(ins, pad, opr) << OPRND1_SHIFT)
++
++/* other macros for LUT register. */
++#define QUADSPI_LUT(x)          (QUADSPI_LUT_BASE + (x) * 4)
++#define QUADSPI_LUT_NUM		64
++
++/* SEQID -- we can have 16 seqids@most. */
++#define SEQID_QUAD_READ		0
++#define SEQID_WREN		1
++#define SEQID_FAST_READ 	2
++#define SEQID_RDSR		3
++#define SEQID_SE		4
++#define SEQID_CHIP_ERASE	5
++#define SEQID_PP		6
++#define SEQID_RDID		7
++#define SEQID_WRSR		8
++#define SEQID_RDCR		9
++
++enum fsl_qspi_devtype {
++	FSL_QUADSPI_VYBRID,
++	FSL_QUADSPI_IMX6SLX
++};
++
++struct fsl_qspi_devtype_data {
++	enum fsl_qspi_devtype devtype;
++	u32 memmap_base;
++	int rxfifo;
++	int txfifo;
++};
++
++static struct fsl_qspi_devtype_data vybrid_data = {
++	.devtype = FSL_QUADSPI_VYBRID,
++	.memmap_base = 0x20000000,
++	.rxfifo = 128,
++	.txfifo = 64
++};
++
++#define FSL_QSPI_MAX_CHIP	2
++struct fsl_qspi {
++	struct mtd_info mtd[FSL_QSPI_MAX_CHIP];
++	struct spi_nor nor[FSL_QSPI_MAX_CHIP];
++	void __iomem *iobase;
++	struct clk *clk, *clk_en;
++	struct device *dev;
++	struct completion c;
++	struct fsl_qspi_devtype_data *devtype_data;
++	void __iomem *ahb_base; /* Used when read from AHB bus */
++	unsigned int chip_base_addr; /* We may support two chips. */
++	unsigned int addr;
++	u32 nor_size; /* for mapping */
++	u32 nor_num;
++	u32 clk_rate;
++	u8 cmd;
++	unsigned int quad_read_enabled:1;
++};
++
++static inline int is_vybrid_qspi(struct fsl_qspi *q)
++{
++	return q->devtype_data->devtype == FSL_QUADSPI_VYBRID;
++}
++
++/*
++ * An IC bug makes us to re-arrange the 32-bit data.
++ * The following chips, such as IMX6SLX, have fixed this bug.
++ */
++static inline u32 fsl_qspi_endian_xchg(struct fsl_qspi *q, u32 a)
++{
++	return is_vybrid_qspi(q) ? __swab32(a) : a;
++}
++
++static inline void fsl_qspi_unlock_lut(struct fsl_qspi *q)
++{
++	writel(QUADSPI_LUTKEY_VALUE, q->iobase + QUADSPI_LUTKEY);
++	writel(QUADSPI_LCKER_UNLOCK, q->iobase + QUADSPI_LCKCR);
++}
++
++static inline void fsl_qspi_lock_lut(struct fsl_qspi *q)
++{
++	writel(QUADSPI_LUTKEY_VALUE, q->iobase + QUADSPI_LUTKEY);
++	writel(QUADSPI_LCKER_LOCK, q->iobase + QUADSPI_LCKCR);
++}
++
++static irqreturn_t fsl_qspi_irq_handler(int irq, void *dev_id)
++{
++	struct fsl_qspi *q = dev_id;
++	u32 reg;
++
++	/* clear interrupt */
++	reg = readl(q->iobase + QUADSPI_FR);
++	writel(reg, q->iobase + QUADSPI_FR);
++
++	if (reg & QUADSPI_FR_TFF_MASK)
++		complete(&q->c);
++
++	dev_dbg(q->dev, "QUADSPI_FR : 0x%.8x\n", reg);
++	return IRQ_HANDLED;
++}
++
++static void fsl_qspi_init_lut(struct fsl_qspi *q)
++{
++	void *__iomem base = q->iobase;
++	int rxfifo = q->devtype_data->rxfifo;
++	u32 lut_base;
++	u8 cmd, addrlen, dummy;
++	int i;
++
++	fsl_qspi_unlock_lut(q);
++
++	/* Clear all the LUT table */
++	for (i = 0; i < QUADSPI_LUT_NUM; i++)
++		writel(0, base + QUADSPI_LUT_BASE + i * 4);
++
++	/* Quad Read */
++	lut_base = SEQID_QUAD_READ * 4;
++
++	if (q->nor_size <= SZ_16M) {
++		cmd = OPCODE_QUAD_READ;
++		addrlen = ADDR24BIT;
++		dummy = 8;
++	} else {
++		cmd = OPCODE_QUAD_READ_4B;
++		addrlen = ADDR32BIT;
++		dummy = 8;
++	}
++
++	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++			base + QUADSPI_LUT(lut_base));
++	writel(LUT0(DUMMY, PAD1, dummy) | LUT1(READ, PAD4, rxfifo),
++			base + QUADSPI_LUT(lut_base + 1));
++
++	/* Write enable */
++	lut_base = SEQID_WREN * 4;
++	writel(LUT0(CMD, PAD1, OPCODE_WREN), base + QUADSPI_LUT(lut_base));
++
++	/* Fast Read */
++	lut_base = SEQID_FAST_READ * 4;
++
++	if (q->nor_size <= SZ_16M) {
++		cmd = OPCODE_FAST_READ;
++		addrlen = ADDR24BIT;
++		dummy = 8;
++	} else {
++		cmd = OPCODE_FAST_READ_4B;
++		addrlen = ADDR32BIT;
++		dummy = 8;
++	}
++	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++			base + QUADSPI_LUT(lut_base));
++	writel(LUT0(DUMMY, PAD1, dummy) | LUT1(READ, PAD1, rxfifo),
++			base + QUADSPI_LUT(lut_base + 1));
++
++	/* Page Program */
++	lut_base = SEQID_PP * 4;
++
++	if (q->nor_size <= SZ_16M) {
++		cmd = OPCODE_PP;
++		addrlen = ADDR24BIT;
++	} else {
++		cmd = OPCODE_PP_4B;
++		addrlen = ADDR32BIT;
++	}
++
++	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++			base + QUADSPI_LUT(lut_base));
++	writel(LUT0(WRITE, PAD1, 0), base + QUADSPI_LUT(lut_base + 1));
++
++	/* Read Status */
++	lut_base = SEQID_RDSR * 4;
++	writel(LUT0(CMD, PAD1, OPCODE_RDSR) | LUT1(READ, PAD1, 0x1),
++			base + QUADSPI_LUT(lut_base));
++
++	/* Erase a sector */
++	lut_base = SEQID_SE * 4;
++
++	if (q->nor_size <= SZ_16M) {
++		cmd = OPCODE_SE;
++		addrlen = ADDR24BIT;
++	} else {
++		cmd = OPCODE_SE_4B;
++		addrlen = ADDR32BIT;
++	}
++
++	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++			base + QUADSPI_LUT(lut_base));
++
++	/* Erase the whole chip */
++	lut_base = SEQID_CHIP_ERASE * 4;
++	writel(LUT0(CMD, PAD1, OPCODE_CHIP_ERASE),
++			base + QUADSPI_LUT(lut_base));
++
++	/* READ ID */
++	lut_base = SEQID_RDID * 4;
++	writel(LUT0(CMD, PAD1, OPCODE_RDID) | LUT1(READ, PAD1, 0x8),
++			base + QUADSPI_LUT(lut_base));
++
++	/* Write Register */
++	lut_base = SEQID_WRSR * 4;
++	writel(LUT0(CMD, PAD1, OPCODE_WRSR) | LUT1(WRITE, PAD1, 0x2),
++			base + QUADSPI_LUT(lut_base));
++
++	/* Read Configuration Register */
++	lut_base = SEQID_RDCR * 4;
++	writel(LUT0(CMD, PAD1, OPCODE_RDCR) | LUT1(READ, PAD1, 0x1),
++			base + QUADSPI_LUT(lut_base));
++
++	fsl_qspi_lock_lut(q);
++}
++
++/* Get the SEQID for the command */
++static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
++{
++	switch (cmd) {
++	case OPCODE_QUAD_READ:
++	case OPCODE_QUAD_READ_4B:
++		return SEQID_QUAD_READ;
++	case OPCODE_WREN:
++		return SEQID_WREN;
++	case OPCODE_RDSR:
++		return SEQID_RDSR;
++	case OPCODE_SE:
++		return SEQID_SE;
++	case OPCODE_CHIP_ERASE:
++		return SEQID_CHIP_ERASE;
++	case OPCODE_PP:
++	case OPCODE_PP_4B:
++		return SEQID_PP;
++	case OPCODE_RDID:
++		return SEQID_RDID;
++	case OPCODE_WRSR:
++		return SEQID_WRSR;
++	case OPCODE_RDCR:
++		return SEQID_RDCR;
++	default:
++		dev_err(q->dev, "Unsupported cmd 0x%.2x\n", cmd);
++		break;
++	}
++	return -EINVAL;
++}
++
++static int
++fsl_qspi_runcmd(struct fsl_qspi *q, u8 cmd, unsigned int addr, int len)
++{
++	void *__iomem base = q->iobase;
++	int seqid;
++	u32 reg;
++	int err;
++
++	init_completion(&q->c);
++	dev_dbg(q->dev, "to 0x%.8x:0x%.8x, len:%d, cmd:%.2x\n",
++			q->chip_base_addr, addr, len, cmd);
++
++	/* save the reg */
++	reg = readl(base + QUADSPI_MCR);
++
++	writel(q->devtype_data->memmap_base + q->chip_base_addr + addr,
++			base + QUADSPI_SFAR);
++	writel(QUADSPI_RBCT_WMRK_MASK | QUADSPI_RBCT_RXBRD_USEIPS,
++			base + QUADSPI_RBCT);
++	writel(reg | QUADSPI_MCR_CLR_RXF_MASK, base + QUADSPI_MCR);
++
++	/* trigger the LUT now */
++	seqid = fsl_qspi_get_seqid(q, cmd);
++	writel((seqid << QUADSPI_IPCR_SEQID_SHIFT) | len, base + QUADSPI_IPCR);
++
++	/* Wait for the interrupt. */
++	err = wait_for_completion_timeout(&q->c, msecs_to_jiffies(1000));
++	if (!err) {
++		dev_err(q->dev,
++			"cmd 0x%.2x timeout, addr@%.8x, FR:0x%.8x, SR:0x%.8x\n",
++			cmd, addr, readl(base + QUADSPI_FR),
++			readl(base + QUADSPI_SR));
++		err = -ETIMEDOUT;
++	} else {
++		err = 0;
++	}
++
++	/* restore the MCR */
++	writel(reg, base + QUADSPI_MCR);
++
++	return err;
++}
++
++/* Read out the data from the QUADSPI_RBDR buffer registers. */
++static void fsl_qspi_read_data(struct fsl_qspi *q, int len, u32 *rxbuf)
++{
++	u32 tmp;
++	int i = 0;
++
++	while (len > 0) {
++		tmp = readl(q->iobase + QUADSPI_RBDR + i * 4);
++		*rxbuf = fsl_qspi_endian_xchg(q, tmp);
++		dev_dbg(q->dev, "rcv: 0x%.8x, tmp : 0x%.8x\n", *rxbuf, tmp);
++
++		rxbuf++;
++		len -= 4;
++		i++;
++	}
++}
++
++/*
++ * If we have changed the content of the flash by writing or erasing,
++ * we need to invalidate the AHB buffer. If we do not do so, we may read out
++ * the wrong data. The spec tells us reset the AHB domain and Serial Flash
++ * domain at the same time.
++ */
++static inline void fsl_qspi_invalid(struct fsl_qspi *q)
++{
++	u32 reg;
++
++	reg = readl(q->iobase + QUADSPI_MCR);
++	reg |= QUADSPI_MCR_SWRSTHD_MASK | QUADSPI_MCR_SWRSTSD_MASK;
++	writel(reg, q->iobase + QUADSPI_MCR);
++
++	/*
++	 * The minimum delay : 1 AHB + 2 SFCK clocks.
++	 * Delay 1 us is enough.
++	 */
++	udelay(1);
++
++	reg &= ~(QUADSPI_MCR_SWRSTHD_MASK | QUADSPI_MCR_SWRSTSD_MASK);
++	writel(reg, q->iobase + QUADSPI_MCR);
++}
++
++static int fsl_qspi_nor_write(struct fsl_qspi *q, struct spi_nor *nor,
++			u32 *txbuf, unsigned count, size_t *retlen)
++{
++	int ret, i, j;
++	u32 tmp;
++
++	dev_dbg(q->dev, "to 0x%.8x:0x%.8x, len : %d\n",
++		q->chip_base_addr, q->addr, count);
++
++	/* clear the TX FIFO. */
++	tmp = readl(q->iobase + QUADSPI_MCR);
++	writel(tmp | QUADSPI_MCR_CLR_RXF_MASK, q->iobase + QUADSPI_MCR);
++
++	/* fill the TX data to the FIFO */
++	for (j = 0, i = ((count + 3) / 4); j < i; j++) {
++		tmp = fsl_qspi_endian_xchg(q, *txbuf);
++		writel(tmp, q->iobase + QUADSPI_TBDR);
++		txbuf++;
++	}
++
++	/* Trigger it */
++	ret = fsl_qspi_runcmd(q, q->cmd, q->addr, count);
++
++	if (ret == 0 && retlen)
++		*retlen += count;
++
++	return ret;
++}
++
++/* Switch to Quad read or DDR Quad read now. */
++static inline void fsl_qspi_enable_quad_read(struct fsl_qspi *q, u8 cmd)
++{
++	int seqid;
++
++	if (q->quad_read_enabled)
++		return;
++
++	seqid = fsl_qspi_get_seqid(q, cmd);
++	writel(seqid << QUADSPI_BFGENCR_SEQID_SHIFT,
++		q->iobase + QUADSPI_BFGENCR);
++
++	q->quad_read_enabled = 1;
++}
++
++/*
++ * There are two different ways to read out the data from the flash:
++ *  the "IP Command Read" and the "AHB Command Read".
++ *
++ * The IC guy suggests we use the "AHB Command Read" which is faster
++ * then the "IP Command Read". (What's more is that there is a bug in
++ * the "IP Command Read" in the Vybrid.)
++ *
++ * After we set up the registers for the "AHB Command Read", we can use
++ * the memcpy to read the data directly. A "missed" access to the buffer
++ * causes the controller to clear the buffer, and use the sequence pointed
++ * by the QUADSPI_BFGENCR[SEQID] to initiate a read from the flash.
++ */
++static int fsl_qspi_init_abh_read(struct fsl_qspi *q)
++{
++	void __iomem *base = q->iobase;
++	u32 memmap_base = q->devtype_data->memmap_base;
++	int nor_size = q->nor_size;
++	int nor_num = q->nor_num;
++
++	/* Map the SPI NOR to accessiable address */
++	writel(nor_size | memmap_base, base + QUADSPI_SFA1AD);
++	writel(nor_size | memmap_base, base + QUADSPI_SFA2AD);
++	writel((nor_size * nor_num) | memmap_base, base + QUADSPI_SFB1AD);
++	writel((nor_size * nor_num) | memmap_base, base + QUADSPI_SFB2AD);
++
++	/* AHB configuration for access buffer 0/1/2 .*/
++	writel(QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF0CR);
++	writel(QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF1CR);
++	writel(QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF2CR);
++	writel(QUADSPI_BUF3CR_ALLMST, base + QUADSPI_BUF3CR);
++
++	/* We only use the buffer3 */
++	writel(0, base + QUADSPI_BUF0IND);
++	writel(0, base + QUADSPI_BUF1IND);
++	writel(0, base + QUADSPI_BUF2IND);
++
++	/* Set the default lut sequence for AHB Read. */
++	writel(SEQID_FAST_READ << QUADSPI_BFGENCR_SEQID_SHIFT,
++		base + QUADSPI_BFGENCR);
++
++	/* Map the AHB address for read. */
++	q->ahb_base = devm_ioremap(q->dev, memmap_base, nor_size * nor_num);
++	if (!q->ahb_base)
++		return -ENOMEM;
 +	return 0;
- }
- 
--
- /*
-  * board specific setup should have ensured the SPI clock used here
-  * matches what the READ command supports, at least until this driver
-@@ -1078,221 +173,43 @@ static const struct spi_device_id *jedec_probe(struct spi_device *spi)
-  */
- static int m25p_probe(struct spi_device *spi)
- {
--	const struct spi_device_id	*id = spi_get_device_id(spi);
--	struct flash_platform_data	*data;
--	struct m25p			*flash;
--	struct flash_info		*info;
--	unsigned			i;
- 	struct mtd_part_parser_data	ppdata;
--	struct device_node *np = spi->dev.of_node;
-+	struct flash_platform_data	*data;
-+	struct m25p *flash;
-+	struct spi_nor *nor;
-+	enum read_mode mode = SPI_NOR_NORMAL;
- 	int ret;
- 
--	/* Platform data helps sort out which chip type we have, as
--	 * well as how this board partitions it.  If we don't have
--	 * a chip ID, try the JEDEC id commands; they'll work for most
--	 * newer chips, even if we don't recognize the particular chip.
--	 */
--	data = dev_get_platdata(&spi->dev);
--	if (data && data->type) {
--		const struct spi_device_id *plat_id;
--
--		for (i = 0; i < ARRAY_SIZE(m25p_ids) - 1; i++) {
--			plat_id = &m25p_ids[i];
--			if (strcmp(data->type, plat_id->name))
--				continue;
--			break;
--		}
--
--		if (i < ARRAY_SIZE(m25p_ids) - 1)
--			id = plat_id;
--		else
--			dev_warn(&spi->dev, "unrecognized id %s\n", data->type);
--	}
--
--	info = (void *)id->driver_data;
--
--	if (info->jedec_id) {
--		const struct spi_device_id *jid;
--
--		jid = jedec_probe(spi);
--		if (IS_ERR(jid)) {
--			return PTR_ERR(jid);
--		} else if (jid != id) {
--			/*
--			 * JEDEC knows better, so overwrite platform ID. We
--			 * can't trust partitions any longer, but we'll let
--			 * mtd apply them anyway, since some partitions may be
--			 * marked read-only, and we don't want to lose that
--			 * information, even if it's not 100% accurate.
--			 */
--			dev_warn(&spi->dev, "found %s, expected %s\n",
--				 jid->name, id->name);
--			id = jid;
--			info = (void *)jid->driver_data;
--		}
--	}
--
- 	flash = devm_kzalloc(&spi->dev, sizeof(*flash), GFP_KERNEL);
- 	if (!flash)
- 		return -ENOMEM;
- 
--	flash->command = devm_kzalloc(&spi->dev, MAX_CMD_SIZE, GFP_KERNEL);
--	if (!flash->command)
--		return -ENOMEM;
--
--	flash->spi = spi;
--	mutex_init(&flash->lock);
--	spi_set_drvdata(spi, flash);
--
--	/*
--	 * Atmel, SST and Intel/Numonyx serial flash tend to power
--	 * up with the software protection bits set
--	 */
--
--	if (JEDEC_MFR(info->jedec_id) == CFI_MFR_ATMEL ||
--	    JEDEC_MFR(info->jedec_id) == CFI_MFR_INTEL ||
--	    JEDEC_MFR(info->jedec_id) == CFI_MFR_SST) {
--		write_enable(flash);
--		write_sr(flash, 0);
--	}
--
--	if (data && data->name)
--		flash->mtd.name = data->name;
--	else
--		flash->mtd.name = dev_name(&spi->dev);
--
--	flash->mtd.type = MTD_NORFLASH;
--	flash->mtd.writesize = 1;
--	flash->mtd.flags = MTD_CAP_NORFLASH;
--	flash->mtd.size = info->sector_size * info->n_sectors;
--	flash->mtd._erase = m25p80_erase;
--	flash->mtd._read = m25p80_read;
-+	nor = &flash->spi_nor;
- 
--	/* flash protection support for STmicro chips */
--	if (JEDEC_MFR(info->jedec_id) == CFI_MFR_ST) {
--		flash->mtd._lock = m25p80_lock;
--		flash->mtd._unlock = m25p80_unlock;
--	}
-+	/* install the hooks */
-+	nor->read = m25p_read;
-+	nor->write = m25p_write;
-+	nor->erase = m25p_erase;
-+	nor->write_reg = m25p_write_reg;
-+	nor->read_reg = m25p_read_reg;
- 
--	/* sst flash chips use AAI word program */
--	if (info->flags & SST_WRITE)
--		flash->mtd._write = sst_write;
--	else
--		flash->mtd._write = m25p80_write;
-+	nor->dev = &spi->dev;
-+	nor->mtd = &flash->mtd;
-+	nor->priv = flash;
- 
--	/* prefer "small sector" erase if possible */
--	if (info->flags & SECT_4K) {
--		flash->erase_opcode = OPCODE_BE_4K;
--		flash->mtd.erasesize = 4096;
--	} else if (info->flags & SECT_4K_PMC) {
--		flash->erase_opcode = OPCODE_BE_4K_PMC;
--		flash->mtd.erasesize = 4096;
--	} else {
--		flash->erase_opcode = OPCODE_SE;
--		flash->mtd.erasesize = info->sector_size;
--	}
-+	spi_set_drvdata(spi, flash);
-+	flash->mtd.priv = nor;
-+	flash->spi = spi;
- 
--	if (info->flags & M25P_NO_ERASE)
--		flash->mtd.flags |= MTD_NO_ERASE;
-+	if (spi->mode & SPI_RX_QUAD)
-+		mode = SPI_NOR_QUAD;
-+	ret = spi_nor_scan(nor, spi_get_device_id(spi), mode);
++}
++
++static int fsl_qspi_nor_setup(struct fsl_qspi *q)
++{
++	void __iomem *base = q->iobase;
++	u32 reg;
++	int ret;
++
++	ret = clk_set_rate(q->clk, q->clk_rate);
 +	if (ret)
 +		return ret;
- 
-+	data = dev_get_platdata(&spi->dev);
- 	ppdata.of_node = spi->dev.of_node;
--	flash->mtd.dev.parent = &spi->dev;
--	flash->page_size = info->page_size;
--	flash->mtd.writebufsize = flash->page_size;
--
--	if (np) {
--		/* If we were instantiated by DT, use it */
--		if (of_property_read_bool(np, "m25p,fast-read"))
--			flash->flash_read = M25P80_FAST;
--	} else {
--		/* If we weren't instantiated by DT, default to fast-read */
--		flash->flash_read = M25P80_FAST;
--	}
--
--	/* Some devices cannot do fast-read, no matter what DT tells us */
--	if (info->flags & M25P_NO_FR)
--		flash->flash_read = M25P80_NORMAL;
- 
--	/* Quad-read mode takes precedence over fast/normal */
--	if (spi->mode & SPI_RX_QUAD && info->flags & M25P80_QUAD_READ) {
--		ret = set_quad_mode(flash, info->jedec_id);
--		if (ret) {
--			dev_err(&flash->spi->dev, "quad mode not supported\n");
--			return ret;
--		}
--		flash->flash_read = M25P80_QUAD;
--	}
--
--	/* Default commands */
--	switch (flash->flash_read) {
--	case M25P80_QUAD:
--		flash->read_opcode = OPCODE_QUAD_READ;
--		break;
--	case M25P80_FAST:
--		flash->read_opcode = OPCODE_FAST_READ;
--		break;
--	case M25P80_NORMAL:
--		flash->read_opcode = OPCODE_NORM_READ;
--		break;
--	default:
--		dev_err(&flash->spi->dev, "No Read opcode defined\n");
--		return -EINVAL;
--	}
--
--	flash->program_opcode = OPCODE_PP;
--
--	if (info->addr_width)
--		flash->addr_width = info->addr_width;
--	else if (flash->mtd.size > 0x1000000) {
--		/* enable 4-byte addressing if the device exceeds 16MiB */
--		flash->addr_width = 4;
--		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) {
--			/* Dedicated 4-byte command set */
--			switch (flash->flash_read) {
--			case M25P80_QUAD:
--				flash->read_opcode = OPCODE_QUAD_READ;
--				break;
--			case M25P80_FAST:
--				flash->read_opcode = OPCODE_FAST_READ_4B;
--				break;
--			case M25P80_NORMAL:
--				flash->read_opcode = OPCODE_NORM_READ_4B;
--				break;
--			}
--			flash->program_opcode = OPCODE_PP_4B;
--			/* No small sector erase for 4-byte command set */
--			flash->erase_opcode = OPCODE_SE_4B;
--			flash->mtd.erasesize = info->sector_size;
--		} else
--			set_4byte(flash, info->jedec_id, 1);
--	} else {
--		flash->addr_width = 3;
--	}
--
--	dev_info(&spi->dev, "%s (%lld Kbytes)\n", id->name,
--			(long long)flash->mtd.size >> 10);
--
--	pr_debug("mtd .name = %s, .size = 0x%llx (%lldMiB) "
--			".erasesize = 0x%.8x (%uKiB) .numeraseregions = %d\n",
--		flash->mtd.name,
--		(long long)flash->mtd.size, (long long)(flash->mtd.size >> 20),
--		flash->mtd.erasesize, flash->mtd.erasesize / 1024,
--		flash->mtd.numeraseregions);
--
--	if (flash->mtd.numeraseregions)
--		for (i = 0; i < flash->mtd.numeraseregions; i++)
--			pr_debug("mtd.eraseregions[%d] = { .offset = 0x%llx, "
--				".erasesize = 0x%.8x (%uKiB), "
--				".numblocks = %d }\n",
--				i, (long long)flash->mtd.eraseregions[i].offset,
--				flash->mtd.eraseregions[i].erasesize,
--				flash->mtd.eraseregions[i].erasesize / 1024,
--				flash->mtd.eraseregions[i].numblocks);
--
--
--	/* partitions should match sector boundaries; and it may be good to
--	 * use readonly partitions for writeprotected sectors (BP2..BP0).
--	 */
- 	return mtd_device_parse_register(&flash->mtd, NULL, &ppdata,
- 			data ? data->parts : NULL,
- 			data ? data->nr_parts : 0);
-@@ -1313,7 +230,7 @@ static struct spi_driver m25p80_driver = {
- 		.name	= "m25p80",
- 		.owner	= THIS_MODULE,
- 	},
--	.id_table	= m25p_ids,
-+	.id_table	= spi_nor_ids,
- 	.probe	= m25p_probe,
- 	.remove	= m25p_remove,
- 
++
++	/* Init the LUT table. */
++	fsl_qspi_init_lut(q);
++
++	/* Init for AHB read */
++	ret = fsl_qspi_init_abh_read(q);
++	if (ret < 0)
++		return ret;
++
++
++	/* Disable the module */
++	writel(QUADSPI_MCR_MDIS_MASK | QUADSPI_MCR_RESERVED_MASK,
++			base + QUADSPI_MCR);
++
++	reg = readl(base + QUADSPI_SMPR);
++	writel(reg & ~(QUADSPI_SMPR_FSDLY_MASK
++			| QUADSPI_SMPR_FSPHS_MASK
++			| QUADSPI_SMPR_HSENA_MASK
++			| QUADSPI_SMPR_DDRSMP_MASK), base + QUADSPI_SMPR);
++
++	/* Enable the module */
++	writel(QUADSPI_MCR_RESERVED_MASK, base + QUADSPI_MCR);
++
++	/* enable the interrupt */
++	writel(QUADSPI_RSER_TFIE, q->iobase + QUADSPI_RSER);
++
++	return 0;
++}
++
++static struct of_device_id fsl_qspi_dt_ids[] = {
++	{ .compatible = "fsl,vf610-qspi", .data = (void*)&vybrid_data, },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, fsl_qspi_dt_ids);
++
++static int fsl_qspi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
++{
++	int ret;
++	struct fsl_qspi *q = nor->priv;
++
++	ret = fsl_qspi_runcmd(q, opcode, 0, len);
++	if (ret)
++		return ret;
++
++	fsl_qspi_read_data(q, len, (u32 *)buf);
++	return 0;
++}
++
++static int fsl_qspi_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
++			int write_enable)
++{
++	struct fsl_qspi *q = nor->priv;
++	int ret;
++
++	if (!buf) {
++		ret = fsl_qspi_runcmd(q, opcode, 0, 1);
++		if (ret)
++			return ret;
++
++		if (opcode == OPCODE_CHIP_ERASE)
++			fsl_qspi_invalid(q);
++
++	} else if (len > 0) {
++		q->addr = 0;
++		q->cmd = opcode;
++		ret = fsl_qspi_nor_write(q, nor, (u32 *)buf, len, NULL);
++	} else {
++		dev_err(q->dev, "invalid cmd %d\n", opcode);
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++static void fsl_qspi_write(struct spi_nor *nor, loff_t to,
++		size_t len, size_t *retlen, const u_char *buf)
++{
++	struct fsl_qspi *q = nor->priv;
++	int ret;
++
++	q->addr = to;
++	q->cmd = nor->program_opcode;
++	ret = fsl_qspi_nor_write(q, nor, (u32 *)buf, len, retlen);
++
++	/* invalid the data in the AHB buffer. */
++	fsl_qspi_invalid(q);
++}
++
++static int fsl_qspi_read(struct spi_nor *nor, loff_t from,
++		size_t len, size_t *retlen, u_char *buf)
++{
++	struct fsl_qspi *q = nor->priv;
++	u8 cmd = nor->read_opcode;
++
++	dev_dbg(q->dev, "cmd [%x],read from (0x%p, 0x%.8x, 0x%.8x),len:%d\n",
++		cmd, q->ahb_base, q->chip_base_addr, (unsigned int)from, len);
++
++	if (cmd == OPCODE_QUAD_READ || cmd == OPCODE_QUAD_READ_4B)
++		fsl_qspi_enable_quad_read(q, cmd);
++
++	/* Read out the data directly from the AHB buffer.*/
++	memcpy(buf, q->ahb_base + q->chip_base_addr + from, len);
++
++	*retlen += len;
++	return 0;
++}
++
++static int fsl_qspi_erase(struct spi_nor *nor, loff_t offs)
++{
++	struct fsl_qspi *q = nor->priv;
++	int ret;
++
++	dev_dbg(nor->dev, "%dKiB at 0x%08x\n",
++		nor->mtd->erasesize / 1024, (u32)offs);
++
++	/* Wait until finished previous write command. */
++	ret = nor->wait_till_ready(nor);
++	if (ret)
++		return ret;
++
++	/* Send write enable, then erase commands. */
++	ret = nor->write_reg(nor, OPCODE_WREN, NULL, 0, 0);
++	if (ret)
++		return ret;
++
++	ret = fsl_qspi_runcmd(q, nor->erase_opcode, offs, 0);
++	if (ret)
++		return ret;
++
++	fsl_qspi_invalid(q);
++	return 0;
++}
++
++static int fsl_qspi_prep(struct spi_nor *nor, enum spi_nor_ops ops)
++{
++	struct fsl_qspi *q = nor->priv;
++	int ret;
++
++	ret = clk_enable(q->clk_en);
++	if (ret)
++		return ret;
++
++	ret = clk_enable(q->clk);
++	if (ret) {
++		clk_disable(q->clk_en);
++		return ret;
++	}
++
++	q->chip_base_addr = q->nor_size * (nor - q->nor);
++	return 0;
++}
++
++static void fsl_qspi_unprep(struct spi_nor *nor, enum spi_nor_ops ops)
++{
++	struct fsl_qspi *q = nor->priv;
++
++	clk_disable(q->clk);
++	clk_disable(q->clk_en);
++}
++
++static int fsl_qspi_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct mtd_part_parser_data ppdata;
++	struct device *dev = &pdev->dev;
++	struct fsl_qspi *q;
++	struct resource *res;
++	struct spi_nor *nor;
++	struct mtd_info *mtd;
++	int ret, i = 0;
++	const struct of_device_id *of_id =
++			of_match_device(fsl_qspi_dt_ids, &pdev->dev);
++
++	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
++	if (!q)
++		return -ENOMEM;
++
++	ret = of_property_read_u32(np, "fsl,nor-size", &q->nor_size);
++	if (ret < 0)
++		return ret;
++
++	ret = of_property_read_u32(np, "fsl,nor-num", &q->nor_num);
++	if (ret < 0)
++		return ret;
++
++	ret = of_property_read_u32(np, "fsl,max-frequency", &q->clk_rate);
++	if (ret < 0)
++		return ret;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	q->iobase = devm_ioremap_resource(dev, res);
++	if (IS_ERR(q->iobase)) {
++		ret = PTR_ERR(q->iobase);
++		goto map_failed;
++	}
++
++	q->clk_en = devm_clk_get(dev, "qspi_en");
++	if (IS_ERR(q->clk_en)) {
++		ret = PTR_ERR(q->clk_en);
++		goto map_failed;
++	}
++
++	q->clk = devm_clk_get(dev, "qspi");
++	if (IS_ERR(q->clk)) {
++		ret = PTR_ERR(q->clk);
++		goto map_failed;
++	}
++
++	ret = clk_prepare_enable(q->clk_en);
++	if (ret) {
++		dev_err(dev, "can not enable the qspi_en clock\n");
++		goto map_failed;
++	}
++
++	ret = clk_prepare_enable(q->clk);
++	if (ret) {
++		clk_disable_unprepare(q->clk_en);
++		dev_err(dev, "can not enable the qspi clock\n");
++		goto map_failed;
++	}
++
++	ret = platform_get_irq(pdev, 0);
++	if (ret < 0) {
++		dev_err(dev, "failed to get the irq\n");
++		goto irq_failed;
++	}
++
++	ret = devm_request_irq(dev, ret,
++			fsl_qspi_irq_handler, 0, pdev->name, q);
++	if (ret) {
++		dev_err(dev, "failed to request irq.\n");
++		goto irq_failed;
++	}
++
++	q->dev = dev;
++	q->devtype_data = (struct fsl_qspi_devtype_data *)of_id->data;
++	platform_set_drvdata(pdev, q);
++
++	ret = fsl_qspi_nor_setup(q);
++	if (ret)
++		goto irq_failed;
++
++	/* iterate the subnodes. */
++	for_each_available_child_of_node(dev->of_node, np) {
++		const struct spi_device_id *id;
++		char modalias[40];
++
++		nor = &q->nor[i];
++		mtd = &q->mtd[i];
++
++		nor->mtd = mtd;
++		nor->dev = dev;
++		nor->priv = q;
++		mtd->priv = nor;
++
++		/* fill the hooks */
++		nor->read_reg = fsl_qspi_read_reg;
++		nor->write_reg = fsl_qspi_write_reg;
++		nor->read = fsl_qspi_read;
++		nor->write = fsl_qspi_write;
++		nor->erase = fsl_qspi_erase;
++
++		nor->prepare = fsl_qspi_prep;
++		nor->unprepare = fsl_qspi_unprep;
++
++		if (of_modalias_node(np, modalias, sizeof(modalias)) < 0)
++			goto map_failed;
++
++		id = spi_nor_match_id(modalias);
++		if (!id)
++			goto map_failed;
++
++		ret = spi_nor_scan(nor, id, SPI_NOR_QUAD);
++		if (ret)
++			goto map_failed;
++
++		ppdata.of_node = np;
++		ret = mtd_device_parse_register(mtd, NULL, &ppdata, NULL, 0);
++		if (ret)
++			goto map_failed;
++
++		/*
++		 * The TX FIFO is 64 bytes in the Vybrid, but the Page Program
++		 * may writes 265 bytes per time. The write is working in the
++		 * unit of the TX FIFO, not in the unit of the SPI NOR's page
++		 * size.
++		 *
++		 * So shrink the spi_nor->page_size if it is larger then the
++		 * TX FIFO.
++		 */
++		if (nor->page_size > q->devtype_data->txfifo)
++			nor->page_size = q->devtype_data->txfifo;
++
++		i++;
++		if (i == FSL_QSPI_MAX_CHIP)
++			break;
++	}
++	clk_disable(q->clk);
++	clk_disable(q->clk_en);
++	dev_info(dev, "QuadSPI SPI NOR flash driver\n");
++	return 0;
++
++irq_failed:
++	clk_disable_unprepare(q->clk);
++	clk_disable_unprepare(q->clk_en);
++map_failed:
++	dev_err(dev, "Freescale QuadSPI probe failed\n");
++	return ret;
++}
++
++static int fsl_qspi_remove(struct platform_device *pdev)
++{
++	struct fsl_qspi *q = platform_get_drvdata(pdev);
++
++	/* disable the hardware */
++	writel(QUADSPI_MCR_MDIS_MASK, q->iobase + QUADSPI_MCR);
++	writel(0x0, q->iobase + QUADSPI_RSER);
++
++	clk_unprepare(q->clk);
++	clk_unprepare(q->clk_en);
++	return 0;
++}
++
++static struct platform_driver fsl_qspi_driver = {
++	.driver = {
++		.name	= "fsl-quadspi",
++		.bus	= &platform_bus_type,
++		.owner	= THIS_MODULE,
++		.of_match_table = fsl_qspi_dt_ids,
++	},
++	.probe          = fsl_qspi_probe,
++	.remove		= fsl_qspi_remove,
++};
++module_platform_driver(fsl_qspi_driver);
++
++MODULE_DESCRIPTION("Freescale QuadSPI Controller Driver");
++MODULE_AUTHOR("Freescale Semiconductor Inc.");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.2.rc3
