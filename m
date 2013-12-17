@@ -1,36 +1,48 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Mon, 16 Dec 2013 17:40:20 -0800
-Subject: [PATCH 3/3]: Support cpu frequency scaling and power management for
- iMX6SL
-Message-ID: <CACUGKYOKEk9RUVS52gGc=CUNFYm1q+zT6rURnB4hwPkC0GCC1g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 09:40:15 +0800
+Subject: [PATCH 3/4] ARM: imx: add VDDSOC/PU setpoint info into dts
+In-Reply-To: <1387228450-641-1-git-send-email-b20788@freescale.com>
+References: <1387228450-641-1-git-send-email-b20788@freescale.com>
+Message-ID: <20131217014013.GB6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable cpu frequency on imx6 config
+On Mon, Dec 16, 2013 at 04:14:09PM -0500, Anson Huang wrote:
+> i.MX6Q needs to update VDDARM, VDDSOC/PU regulator when CPUFreq
+> is changed, each setpoint has different voltage, so we need to
+> pass VDDARM, VDDSOC/PU's freq-voltage info from dts.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index e7e8332..03da628 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -30,6 +30,13 @@
+>  				792000  1150000
+>  				396000  975000
+>  			>;
+> +			fsl,soc-operating-points = <
+> +			/* ARM kHz  SOC-PU uV */
+> +				1200000	1275000
+> +				996000	1250000
+> +				792000	1175000
+> +				396000	1175000
 
-From: John Tobias <john.tobias.ph@gmail.com>
+Okay.  Now I get it why you're increasing VDDARM_CAP to 975mV in the
+first patch.  You expect VDDSOC_CAP to be 1175mV rather than 1250mV for
+396MHz operating-point, which is hard-coded in cpufreq driver right now.
 
+Shawn
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig
-b/arch/arm/configs/imx_v6_v7_defconfig
-index 8d0c5a0..a56cb2c 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -43,6 +43,17 @@ CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_GOV_COMMON=y
-+CONFIG_CPU_FREQ_STAT=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
-+CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
-+CONFIG_CPU_FREQ_GOV_POWERSAVE=y
-+CONFIG_CPU_FREQ_GOV_USERSPACE=y
-+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-+CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
-+CONFIG_GENERIC_CPUFREQ_CPU0=y
-+CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_BINFMT_MISC=m
+> +			>;
+>  			clock-latency = <61036>; /* two CLK32 periods */
+>  			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
+>  				 <&clks 17>, <&clks 170>;
+> -- 
+> 1.7.9.5
+> 
+> 
