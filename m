@@ -1,48 +1,59 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 16 Dec 2013 16:57:08 -0800
-Subject: [PATCH v2] use -fstack-protector-strong
-In-Reply-To: <CAGXu5j+6_M65pDoJjx1NEUw8SkfpGjH=yhswt-RW=_W97=kkzQ@mail.gmail.com>
-References: <20131126203727.GA352@www.outflux.net>
- <20131127112731.GA10435@gmail.com>
- <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
- <20131127175442.GA28088@gmail.com> <52963223.9080701@zytor.com>
- <CAGXu5j+6_M65pDoJjx1NEUw8SkfpGjH=yhswt-RW=_W97=kkzQ@mail.gmail.com>
-Message-ID: <CAGXu5j+0gjN118RijCinw31g51BZez_oGKFYJwq2T3=yojG_ww@mail.gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 16 Dec 2013 18:12:51 -0700
+Subject: [PATCH V2 01/13] ARM: dts: imx6qdl-sabrelite: move pcie to
+ imx6qdl-sabrelite.dtsi
+In-Reply-To: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387242783-1462-2-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 10:11 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Nov 27, 2013 at 9:55 AM, H. Peter Anvin <hpa@zytor.com> wrote:
->> On 11/27/2013 09:54 AM, Ingo Molnar wrote:
->>>>
->>>> Looks to be 2% for defconfig. That's way better. Shall I send a v3?
->>>
->>> Well, it's better than 9%, but still almost an order of magnitude
->>> higher than the cost is today, and a lot of distros have
->>> CONFIG_CC_STACKPROTECTOR=y.
->>>
->>> So it would be nice to measure how much the instruction count goes up
->>> in some realistic system-bound test. How much does something like
->>> kernel/built-in.o increase, as per 'size' output?
->
->    text    data     bss     dec     hex filename
->  929611   90851  594496 1614958  18a46e built-in.o-gcc-4.9
->  954648   90851  594496 1639995  19063b built-in.o-gcc-4.9+strong
->
-> Looks like 3% for defconfg + CONFIG_CC_STACKPROTECTOR
->
->>
->> Do we need CONFIG_CC_STACKPROTECTOR_STRONG?
->
-> I'm hoping to avoid this since nearly anyone using CC_STACKPROTECTOR
-> would want strong added, but as a fallback, I'm happy to implement it
-> as a separate config item.
+PCIe is common to Quad, Dual, Dual Lite, and Solo variants
+of the processor. So, move enabling from imx6q-sabrelite.dts
+to imx6qdl-sabrelite.dtsi.
 
-Any verdict on this? Should I go with adding ..._STRONG like we used
-to have for ..._ALL, or is defaulting to -strong best?
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
--Kees
+---
+v2: new patch which can be squashed with
+6bbb49ddfa8466a91a2ce1411a2ac969d0d0a614
+ARM: dts: imx: sabrelite: add Dual Lite/Solo support
 
+if desired.
+---
+ arch/arm/boot/dts/imx6q-sabrelite.dts    | 4 ----
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 4 ++++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 8128fb9..96e4688 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -19,10 +19,6 @@
+ 	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+ };
+ 
+-&pcie {
+-	status = "okay";
+-};
+-
+ &sata {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index c4aa504..5394e02 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -187,6 +187,10 @@
+ 	};
+ };
+ 
++&pcie {
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
 -- 
-Kees Cook
-Chrome OS Security
+1.8.1.2
