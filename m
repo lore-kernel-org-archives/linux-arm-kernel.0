@@ -1,31 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 17 Dec 2013 12:27:31 -0800
-Subject: arm-soc: Xilinx Zynq dt changes for v3.14
-In-Reply-To: <52AB0ABD.1050307@monstr.eu>
-References: <52AAC671.6000207@monstr.eu>
- <20131213112659.GD4360@n2100.arm.linux.org.uk>
- <52AB0ABD.1050307@monstr.eu>
-Message-ID: <20131217202731.GA11452@quad.lixom.net>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 17 Dec 2013 21:39:23 +0100
+Subject: [PATCH 2/2] kvmtool/arm: Add option to override Generic Timer
+ frequency
+In-Reply-To: <1387305074-29421-3-git-send-email-robin.murphy@arm.com>
+References: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
+ <1387305074-29421-3-git-send-email-robin.murphy@arm.com>
+Message-ID: <308D5B7E-5BDA-4984-9448-EAD8B5D699CF@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 02:25:17PM +0100, Michal Simek wrote:
-> Hi Russell,
+
+On 17.12.2013, at 19:31, Robin Murphy <robin.murphy@arm.com> wrote:
+
+> Some platforms have secure firmware which does not correctly set the
+> CNTFRQ register on boot, preventing the use of the Generic Timer.
+> This patch allows mirroring the necessary host workaround by specifying
+> the clock-frequency property in the guest DT.
 > 
-> On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
-> > 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
-> >    individually.  The whole point of arm at kernel.org is that it reaches
-> >    the current arm-soc maintainers, whoever they may be at the time that
-> >    you send your email without you needing to know who they are.
-> > 
-> > 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
-> >    a pull request message.
+> This should only be considered a means of KVM bring-up on such systems,
+> such that vendors may be convinced to properly implement their firmware
+> to support the virtualisation capabilities of their hardware.
 > 
-> Thanks, I will keep this in my mind for future. I am just doing what I have done
-> before and this is the first complain I have got.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-I don't think I've noticed it in the past. :-) Either way, see it as a
-friendly pointer from Russell, not a complaint.
+How does it encourage a vendor to properly implement their firmware if there's a workaround?
 
 
--Olof
+Alex
