@@ -1,147 +1,50 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 17 Dec 2013 07:17:01 +0000
-Subject: [PATCH v3 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131217060731.GJ6691@S2101-09.ap.freescale.net>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA56ADC@DBDE04.ent.ti.com>
- <20131217040209.GA27091@shlinux2.ap.freescale.net>
- <20980858CB6D3A4BAE95CA194937D5E73EA56B3A@DBDE04.ent.ti.com>
- <20131217060731.GJ6691@S2101-09.ap.freescale.net>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA56C5B@DBDE04.ent.ti.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 17 Dec 2013 15:19:39 +0800
+Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131216152235.GI3185@sirena.org.uk>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <1386767606-6391-4-git-send-email-broonie@kernel.org>
+ <52AF11FE.70000@linaro.org> <20131216152235.GI3185@sirena.org.uk>
+Message-ID: <52AFFB0B.3010505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 12/16/2013 11:22 PM, Mark Brown wrote:
+> On Mon, Dec 16, 2013 at 10:45:18PM +0800, Alex Shi wrote:
+>> On 12/11/2013 09:13 PM, Mark Brown wrote:
+> 
+>>> +struct cputopo_arm {
+>>> +	int thread_id;
+>>> +	int core_id;
+>>> +	int socket_id;
+> 
+>> Forgive me if I am stupid. :)
+> 
+>> why we don't need a cluster_id? and does one cpu socket include few
+>> clusters?
+> 
+> The ARMv7 code calls a cluster a socket I think because it's trying to
+> maintain similarity with other architectures and the ARMv8 code follows
+> ARMv7 in this regard.  At the minute we're using this ID for whatever
+> the lowest level of grouping is above a core and presenting the
+> scheduler with a flat topology there - the topology binding and MPIDR
+> both allow multiple layers of cluster so you could definitely have
+> multiple clusters in a supercluster.
+> 
+> Without practical examples of such systems or more architecture
+> documentation than I've been able to find it's not clear how to
+> represent them to the scheduler, it will depend on how closely
+> associated the clusters are and what the scheduler's features are,
+> perhaps we should describe such a system as NUMA but it's not clear to
+> me that this would produce the desired results.  I wonder if we may end
+> up figuring this out from other data such as descriptions of caches and
+> interconnects rather than purely from the topology information.
 
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->>On Tue, Dec 17, 2013 at 05:00:53AM +0000, Gupta, Pekon wrote:
->> >From: Huang Shijie [mailto:b32955 at freescale.com]
->>> >On Tue, Dec 17, 2013 at 04:08:33AM +0000, Gupta, Pekon wrote:
-[...]
-
->> >> As much base code is copied from m25p90.c,
->> >> Do you mind keeping the sign-offs of the original contributors of m25p80.c
->> >> at-least in patches where much code is ported ?
->> >I have added the lines in the spi-nor.c:
->> >
->> > " Cloned most of the code from the m25p80.c"
->> >
->> >> This would at-least give some credit to original authors and contributors.
->> >I do not change any authors information of m25p80.c.
->> >
->> >If it is not enough?  Could you remind me what to do ?
->
->In case you clone most of the code from m25p80.c, you need to keep the
->copyright of that file as well, and add yours on top of it.
->
-Agree...
-
-
->> >
->> (1) Add sign-offs of main authors of m25p80, so that original contributors
->>  still remains in path of submission [1].
->
->The sign-off shouldn't be added by anyone than the person himself.  The
->sign-off tag is generally used in the following cases as far as I know.
->
->1. When the patch is authored, the author A should surely add his
->   sign-off in the first place.
->
->2. If person B submits A's patch with some or without any change on the
->   patch, B should add his sign-off.
->
->3. Maintainer C should add his sign-off when he applies the patch.
->
->In any case, one's sign-off shouldn't be added anyone but himself.
->I do not see the need to add sign-off of m25p80 authors at the current
->situation.
->
-Agree..
-So I meant sign-off with permission from the original authors themselves.
-And Sign-offs can be multiple (but with permission of-course).
-OR, you can ask the original author to sign-off for you..
+For topology meaning, it may be better to have cluster concept there.
+And don't know if there will has a real ARM NUMA system for 64bit
+server. If so, socket_id is good in a NUMA system.
 
 
->>
->> (2) Also, please remove following from spi-nor.c
->>   However, you can keep this in fsl-quadspi.c.
->>   +MODULE_AUTHOR("Freescale Semiconductor Inc.");
->>   I'm sure this was _not_ present in original m25p80.c
->>  (m25p80.c was started as ST's driver as per MODULE_DESCRIPTION)
->
->Are you talking about drivers/mtd/devices/m25p80.c?  If so, I'm seeing
->the following lines in the file.
->
->MODULE_LICENSE("GPL");
->MODULE_AUTHOR("Mike Lavender");
->MODULE_DESCRIPTION("MTD SPI driver for ST M25Pxx flash chips");
->
->I think we should keep the original MODULE_LICENSE and MODULE_AUTHOR,
->add a new MODULE_AUTHOR("Huang Shijie <b32955@freescale.com>") line,
->and update MODULE_DESCRIPTION line properly.
->
-As indicated in previous thread also,
-if the engineer's association with the company is broken then the email-id
-in MODULE_AUTHOR becomes invalid. Hence to keep long term tractability
-of the developer I suggested to use 'personal mail-id' here.
-MODULE_AUTHOR should have a email-id which is valid for long term, because
-you might need to at-least loop-in Author in longer time when there are some
-bug-fix or considerable code change.
-(This problem was also pointed out earlier in one of the emails by greg-kh,
- But I'm unable to trace that now).
-
-
->>
->> (3)     +MODULE_LICENSE("GPL");
->> Also, I assume the license version should be "GPLv2" ?
->
->If this is from original m25p80.c, we shouldn't change it, IMO.
->
-As I can understand from general threads on google.
-GPLv2 gives some additional protection to free-software companies from
-patent litigations of proprietary software companies. As this code is not
-exact replica of m25p80.c, so it should be made GPLv2 or better .. 
-But sincerely, I do not have too much knowledge into this, 
-So I'll let maintainers decide if they see benefit in moving to GPLv2 ?
-
-
->>
->> Request you please _not_ to tag generic driver frameworks with any
->> specific company names, and let open-source be independent of any
->> commercial company tags.
->
->Are you sure about that?  Run git grep "redhat" on folder kernel\ and
->see what you get.
->
-Something which may have been done repeatedly in past, may not mean
-it is correct OR the only way to do it. :-)
-
-
->> Otherwise eventually everything generic driver
->> will have some or other company name associated with it.
->
->What's the problem of that?  People are paid to do generic work, and why
->shouldn't their employer's name be mentioned to give the credit.  As
->long as the copyright is GPL, the code can be used, modified and
->distributed freely, and I do not see any problem with having company
->name in there.
->
-It's not about who is taking credit. It's about how will you track the developer
-if after few years you want some significant changes in the code he wrote.
-You would agree, it's difficult to track developers just by their company names
-or company IDs. 
-It's perfectly okay, if you want to give credits of your work to anyone
-(whether any company or individual). But that you can mention in commit logs.
-
-All I said was using company names in Headers or MODULE_AUTHOR of
-*generic frameworks*. A generic framework is maintained and updated
-by community at large. And over course of time other people contribute
-more than the author. So tagging a company name there would sound like
-_repeatedly_ giving credit to company or yourself, even if most of the
-original  code is changed now. Does that make sense ?
-
-So, I just suggested to keep generic framework code free from all these.
-However, You are free to do anything in your controller specific code.
-
-
-with regards, pekon
+-- 
+Thanks
+    Alex
