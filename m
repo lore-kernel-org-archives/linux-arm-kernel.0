@@ -1,83 +1,43 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 17 Dec 2013 17:08:21 -0500
-Subject: [PATCH V2 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
-Message-ID: <1387318102-11070-1-git-send-email-b20788@freescale.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Tue, 17 Dec 2013 12:21:12 +0200
+Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
+In-Reply-To: <20131217092449.GL12034@norris-Latitude-E6410>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131217092449.GL12034@norris-Latitude-E6410>
+Message-ID: <52B02598.5060004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q needs to update vddarm, vddsoc/pu regulators when cpu freq
-is changed, each setpoint has different voltage, so we need to
-pass vddarm, vddsoc/pu's freq-voltage info from dts together.
+On 12/17/2013 11:24 AM, Brian Norris wrote:
+> On Thu, Dec 05, 2013 at 07:25:49PM +0200, Ivan Khoronzhuk wrote:
+>> --- a/drivers/mtd/nand/davinci_nand.c
+>> +++ b/drivers/mtd/nand/davinci_nand.c
+>> @@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
+>>   }
+>>   
+>>   static struct platform_driver nand_davinci_driver = {
+>> +	.probe		= nand_davinci_probe,
+>>   	.remove		= __exit_p(nand_davinci_remove),
+> 
+> I believe you need to drop the __exit_p() here. And now that you're
+> using module_platform_driver(), you need to drop the __init and __exit
+> from the probe() and remove() routines, to avoid section mismatch
+> warnings.
+> 
+>>   	.driver		= {
+>>   		.name	= "davinci_nand",
+> 
+> So on second thought, please resubmit the series with the requested
+> changes.
+> 
+> Thanks,
+> Brian
+> 
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- .../devicetree/bindings/cpufreq/cpufreq-imx6.txt   |   39 ++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi                       |    7 ++++
- 2 files changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+Thanks, Brian.
+Do you want me to drop it in stand alone patch or in this one?
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
-new file mode 100644
-index 0000000..0c71dbf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
-@@ -0,0 +1,39 @@
-+i.MX6 cpufreq driver
-+-------------------
-+
-+i.MX6 SoC cpufreq driver for CPU frequency scaling.
-+
-+Optional properties:
-+-fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
-+ go with cpu0's operating-points.
-+
-+Examples:
-+
-+	cpu at 0 {
-+		compatible = "arm,cortex-a9";
-+		device_type = "cpu";
-+		reg = <0>;
-+		next-level-cache = <&L2>;
-+		operating-points = <
-+			/* kHz    uV */
-+			1200000 1275000
-+			996000  1250000
-+			792000  1150000
-+			396000  975000
-+		>;
-+		fsl,soc-operating-points = <
-+			/* ARM kHz  SOC-PU uV */
-+			1200000 1275000
-+			996000	1250000
-+			792000	1175000
-+			396000	1175000
-+		>;
-+		clock-latency = <61036>; /* two CLK32 periods */
-+		clocks = <&clks 104>, <&clks 6>, <&clks 16>,
-+			 <&clks 17>, <&clks 170>;
-+		clock-names = "arm", "pll2_pfd2_396m", "step",
-+			      "pll1_sw", "pll1_sys";
-+		arm-supply = <&reg_arm>;
-+		pu-supply = <&reg_pu>;
-+		soc-supply = <&reg_soc>;
-+	};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index e7e8332..021e0cb 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -30,6 +30,13 @@
- 				792000  1150000
- 				396000  975000
- 			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz  SOC-PU uV */
-+				1200000 1275000
-+				996000	1250000
-+				792000	1175000
-+				396000	1175000
-+			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
- 			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
- 				 <&clks 17>, <&clks 170>;
 -- 
-1.7.9.5
+Regards,
+Ivan Khoronzhuk
