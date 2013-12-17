@@ -1,43 +1,28 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 17 Dec 2013 19:42:47 +0000
-Subject: [PATCH 2/2] ARM: imx: update imx_v6_v7_defconfig
-In-Reply-To: <20131217194130.GA4360@n2100.arm.linux.org.uk>
-References: <20131217194130.GA4360@n2100.arm.linux.org.uk>
-Message-ID: <E1Vt0XX-0007Bw-Ry@rmk-PC.arm.linux.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 17 Dec 2013 14:43:13 -0500 (EST)
+Subject: [PATCH v2 0/5] net: phy: Ethernet PHY powerdown optimization
+In-Reply-To: <1386926429-28818-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1386926429-28818-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131217.144313.1563516273987934449.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the IMX v6/v7 defconfig for the SolidRun HummingBoard:
-- Add AT803X ethernet phy
-- Add consumer IR devices
-- Add imx-drm HDMI output
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Fri, 13 Dec 2013 10:20:24 +0100
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/configs/imx_v6_v7_defconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> This is v2 of the ethernet PHY power optimization patches to reduce
+> power consumption of network PHYs with link that are either unused or
+> the corresponding netdev is down.
+> 
+> Compared to the last version, this patch set drops a patch to disable
+> unused PHYs after late initcall, as it is not compatible with a modular
+> mdio bus [1]. I'll investigate different ways to have a modular mdio bus
+> driver get notified when driver loading is done.
+> 
+> Again, a branch with v2 applied to v3.13-rc2 can also be found at
+> https://github.com/shesselba/linux-dove.git topic/ethphy-power-v2
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg293028.html
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 8d0c5a018ed7..53a5b521a474 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -118,6 +118,7 @@ CONFIG_SMC91X=y
- CONFIG_SMC911X=y
- CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
-+CONFIG_AT803X_PHY=y
- CONFIG_BRCMFMAC=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
-@@ -164,6 +165,9 @@ CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_MEDIA_RC_SUPPORT=y
-+CONFIG_RC_DEVICES=y
-+CONFIG_IR_GPIO_CIR=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_VIDEO_MX3=y
--- 
-1.7.4.4
+Series applied, thanks.
