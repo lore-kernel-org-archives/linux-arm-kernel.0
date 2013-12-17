@@ -1,47 +1,48 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Wed, 18 Dec 2013 00:00:52 +0800
-Subject: [PATCH v3 2/7] mtd: spi-nor: add the basic data structures
-In-Reply-To: <201312171616.57029.marex@denx.de>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <201312171405.55964.marex@denx.de>
- <20131217134923.GA1220@gmail.com>
- <201312171616.57029.marex@denx.de>
-Message-ID: <20131217160050.GA1279@gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 17 Dec 2013 17:02:01 +0100
+Subject: [PATCH] tty/serial: at91: document clock properties
+Message-ID: <1387296121-7558-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 04:16:56PM +0100, Marek Vasut wrote:
-> On Tuesday, December 17, 2013 at 02:49:25 PM, Huang Shijie wrote:
-> > On Tue, Dec 17, 2013 at 02:05:55PM +0100, Marek Vasut wrote:
-> > > On Monday, December 16, 2013 at 09:58:45 AM, Huang Shijie wrote:
-> > > > +struct spi_nor { > > +	struct mtd_info		*mtd;
-> > > > +	struct mutex		lock;
-> > > > +
-> > > > +	/* pointer to a spi device */
-> > > > +	struct device		*dev;
-> > > > +	u32			page_size;
-> > > > +	u8			addr_width;
-> > > > +	u8			erase_opcode;
-> > > > +	u8			read_opcode;
-> > > > +	u8			read_dummy;
-> > > > +	u8			program_opcode;
-> > > > +	enum read_mode		flash_read;
-> > > > +	bool			sst_write_second;
-> > > > +	struct spi_nor_xfer_cfg	cfg;
-> > > 
-> > > You do want to split the function pointers below and the device
-> > > configuration above into separate structures.
-> > 
-> > sorry, i prefer to keep them in one data structrue, just like the
-> > nand_chip{} does.
-> 
+Document the clock properties required by the at91 i2c bus driver.
 
-Take @read_reg for example, currently, we call it with nor->read_reg();
-If we add a new data structrue for these hooks, we wil call it with
-nor->ops->read_reg().
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ .../devicetree/bindings/serial/atmel-usart.txt     |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-So just like the nand_chip{}, make the code more simple.
-
-
-thanks
-Huang Shijie
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 2191dcb..9c5d19a 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -6,6 +6,9 @@ Required properties:
+   additional mode or an USART new feature.
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt
++- clock-names: tuple listing input clock names.
++	Required elements: "usart"
++- clocks: phandles to input clocks.
+ 
+ Optional properties:
+ - atmel,use-dma-rx: use of PDC or DMA for receiving data
+@@ -26,6 +29,8 @@ Example:
+ 		compatible = "atmel,at91sam9260-usart";
+ 		reg = <0xfff8c000 0x4000>;
+ 		interrupts = <7>;
++		clocks = <&usart0_clk>;
++		clock-names = "usart";
+ 		atmel,use-dma-rx;
+ 		atmel,use-dma-tx;
+ 	};
+@@ -35,6 +40,8 @@ Example:
+ 		compatible = "atmel,at91sam9260-usart";
+ 		reg = <0xf001c000 0x100>;
+ 		interrupts = <12 4 5>;
++		clocks = <&usart0_clk>;
++		clock-names = "usart";
+ 		atmel,use-dma-rx;
+ 		atmel,use-dma-tx;
+ 		dmas = <&dma0 2 0x3>,
+-- 
+1.7.9.5
