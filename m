@@ -1,232 +1,102 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 17 Dec 2013 13:45:12 -0600
-Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
-In-Reply-To: <1386626150-23504-1-git-send-email-nm@ti.com>
-References: <1386626150-23504-1-git-send-email-nm@ti.com>
-Message-ID: <52B0A9C8.7070201@ti.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 17 Dec 2013 20:53:54 +0100
+Subject: [PATCH v4] usb: ohci-at91: fix irq and iomem resource retrieval
+In-Reply-To: <1386514799-6295-1-git-send-email-b.brezillon@overkiz.com>
+References: <1386514799-6295-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52B0ABD2.3080907@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2013 03:55 PM, Nishanth Menon wrote:
-> Craneboard is a hardware development platform based on the Sitara
-> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
-> details. Add basic devices for craneboard as replacement for the board
-> file scheduled for removal as part of device tree conversion
-> 
-> [1] http://craneboard.org
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+Hello Greg,
+
+Just a reminder to let you know this patch fixes a bug in the at91 ohci 
+driver
+which appenrently showed up in 3.13-rc1 release, but is caused by bad
+assumptions on platform device resources order.
+
+Without this patch the ohci usb host controller is completely unusable 
+on at91
+platforms.
+
+Best Regards,
+
+Boris
+
+On 08/12/2013 15:59, Boris BREZILLON wrote:
+> When using dt resources retrieval (interrupts and reg properties) there is
+> no predefined order for these resources in the platform dev resources
+> table.
+>
+> Retrieve resources using platform_get_resource and platform_get_irq
+> functions instead of direct resource table entries to avoid resource type
+> mismatch.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
-
-gentle ping.. had'nt seen a response on this patch. Could we queue
-this up for v3.14-rc1?
-
-> Based on:
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-> branch: omap-for-v3.14/omap3-board-removal 736e812 ARM: OMAP2+: Remove unused platform init code and headers
-> 
-> Bootlog: http://pastebin.mozilla.org/3744412
-> 
->  arch/arm/boot/dts/Makefile              |    1 +
->  arch/arm/boot/dts/am3517-craneboard.dts |  174 +++++++++++++++++++++++++++++++
->  2 files changed, 175 insertions(+)
->  create mode 100644 arch/arm/boot/dts/am3517-craneboard.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index fc37bca..ad155fc 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -205,6 +205,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->  	am335x-boneblack.dtb \
->  	am335x-nano.dtb \
->  	am335x-base0033.dtb \
-> +	am3517-craneboard.dtb \
->  	am3517-evm.dtb \
->  	am3517_mt_ventoux.dtb \
->  	am43x-epos-evm.dtb \
-> diff --git a/arch/arm/boot/dts/am3517-craneboard.dts b/arch/arm/boot/dts/am3517-craneboard.dts
-> new file mode 100644
-> index 0000000..2d40b3f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am3517-craneboard.dts
-> @@ -0,0 +1,174 @@
-> +/*
-> + * See craneboard.org for more details
-> + *
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
+> Changes since v3:
+>   - replace platform_get_resource call with IORESOURCE_IRQ argument by
+>     platform_get_irq
+>
+> Changes since v2:
+>   - split the patch series to isolate the urgent fix provided by this patch
+>
+> Changes since v1:
+>   - none
+>
+>   drivers/usb/host/ohci-at91.c |   26 +++++++++++++++-----------
+>   1 file changed, 15 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 418444e..8c356af 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -136,23 +136,27 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	struct ohci_hcd *ohci;
+>   	int retval;
+>   	struct usb_hcd *hcd = NULL;
+> -
+> -	if (pdev->num_resources != 2) {
+> -		pr_debug("hcd probe: invalid num_resources");
+> -		return -ENODEV;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	int irq;
 > +
-> +#include "am3517.dtsi"
-> +
-> +/ {
-> +	model = "TI AM3517 CraneBoard (TMDSEVM3517)";
-> +	compatible = "ti,am3517-craneboard", "ti,am3517", "ti,omap3";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x10000000>;	/* 256 MB */
-> +	};
-> +
-> +	vbat: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vbat";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +	};
-> +};
-> +
-> +&davinci_emac {
-> +	status = "okay";
-> +};
-> +
-> +&davinci_mdio {
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <2600000>;
-> +
-> +	tps: tps at 2d {
-> +		reg = <0x2d>;
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +	/* goes to expansion connector */
-> +	status = "disabled";
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <400000>;
-> +	/* goes to expansion connector */
-> +	status = "disabled";
-> +};
-> +
-> +&mmc1 {
-> +	vmmc-supply = <&vdd2_reg>;
-> +	bus-width = <8>;
-> +};
-> +
-> +&mmc2 {
-> +	/* goes to expansion connector */
-> +	status = "disabled";
-> +};
-> +
-> +&mmc3 {
-> +	/* goes to expansion connector */
-> +	status = "disabled";
-> +};
-> +
-> +#include "tps65910.dtsi"
-> +
-> +&omap3_pmx_core {
-> +	tps_pins: pinmux_tps_pins {
-> +		pinctrl-single,pins = <
-> +			0x1b0 (PIN_INPUT_PULLUP | MUX_MODE0) /* sys_nirq.sys_nirq */
-> +		>;
-> +	};
-> +};
-> +
-> +&tps {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&tps_pins>;
-> +
-> +	interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +	interrupt-parent = <&intc>;
-> +
-> +	ti,en-ck32k-xtal;
-> +
-> +	vcc1-supply = <&vbat>;
-> +	vcc2-supply = <&vbat>;
-> +	vcc3-supply = <&vbat>;
-> +	vcc4-supply = <&vbat>;
-> +	vcc5-supply = <&vbat>;
-> +	vcc6-supply = <&vbat>;
-> +	vcc7-supply = <&vbat>;
-> +	vccio-supply = <&vbat>;
-> +
-> +	regulators {
-> +		vrtc_reg: regulator at 0 {
-> +			regulator-always-on;
-> +		};
-> +
-> +		vio_reg: regulator at 1 {
-> +			regulator-always-on;
-> +		};
-> +
-> +		/*
-> +		 * Unused:
-> +		 * VDIG1=2.7V,300mA max
-> +		 * VDIG2=1.8V,300mA max
-> +		 */
-> +
-> +		vpll_reg: regulator at 7 {
-> +			/* VDDS_DPLL_1V8 */
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vaux1_reg: regulator at 9 {
-> +			/* VDDS_SRAM_1V8 */
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vaux2_reg: regulator at 10 {
-> +			/* VDDA1P8V_USBPHY */
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		/* VAUX33 unused */
-> +
-> +		vdac_reg: regulator at 8 {
-> +			/* VDDA_DAC_1V8 */
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vmmc_reg: regulator at 12 {
-> +			/* VDDA3P3V_USBPHY */
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vdd1_reg: regulator at 2 {
-> +			/* VDD_CORE */
-> +			regulator-name = "vdd_core";
-> +			regulator-min-microvolt = <1200000>;
-> +			regulator-max-microvolt = <1200000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vdd2_reg: regulator at 3 {
-> +			/* VDDSHV_3V3 */
-> +			regulator-name = "vdd_shv";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		/* VDD3 unused */
-> +	};
-> +};
-> 
-
-
--- 
-Regards,
-Nishanth Menon
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_dbg(dev, "hcd probe: missing memory resource\n");
+> +		return -ENXIO;
+>   	}
+>   
+> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+> -		pr_debug("hcd probe: invalid resource type\n");
+> -		return -ENODEV;
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_dbg(dev, "hcd probe: missing irq resource\n");
+> +		return irq;
+>   	}
+>   
+>   	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
+>   	if (!hcd)
+>   		return -ENOMEM;
+> -	hcd->rsrc_start = pdev->resource[0].start;
+> -	hcd->rsrc_len = resource_size(&pdev->resource[0]);
+> +	hcd->rsrc_start = res->start;
+> +	hcd->rsrc_len = resource_size(res);
+>   
+>   	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+>   		pr_debug("request_mem_region failed\n");
+> @@ -199,7 +203,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	ohci->num_ports = board->ports;
+>   	at91_start_hc(pdev);
+>   
+> -	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
+> +	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>   	if (retval == 0)
+>   		return retval;
+>   
