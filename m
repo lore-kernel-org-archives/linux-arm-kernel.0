@@ -1,53 +1,49 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 17 Dec 2013 16:16:27 +0800
-Subject: [PATCH v2 1/5] mmc: sdhci: add platfrom get_max_timeout_count hook
+Date: Tue, 17 Dec 2013 16:16:28 +0800
+Subject: [PATCH v2 2/5] mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for
+ uSDHC
 In-Reply-To: <1387268191-19859-1-git-send-email-b29396@freescale.com>
 References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
-Message-ID: <1387268191-19859-2-git-send-email-b29396@freescale.com>
+Message-ID: <1387268191-19859-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the max_discard_to is simply got by (1 << 27) / host->timeout_clk
-which is assumed to be the maximum timeout value, however, some platforms
-maximum timeout counter may not be 1 << 27, e.g. i.MX uSDHC is 1 << 28.
-Thus 1 << 27 may not be correct for such platforms.
-
-It is also possible that other platforms may have different problems.
-To be flexible, we add a get_max_timeout_count hook to get the correct
-maximum timeout value for these platforms.
+The default sdhci code use the 1 << 27 as the max timeout counter to
+to calculate the max_discard_to, however it's not correct for uSDHC
+since its the max counter is 1 << 28.
+Implement esdhc_get_max_timeout to handle it correctly.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci.c |    4 +++-
- drivers/mmc/host/sdhci.h |    1 +
- 2 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index cc00bed..7fef3bb 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2942,7 +2942,9 @@ int sdhci_add_host(struct sdhci_host *host)
- 	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
- 		host->timeout_clk = mmc->f_max / 1000;
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index de2655e..5d9b56d 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -880,6 +880,14 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 	return esdhc_change_pinstate(host, uhs);
+ }
  
--	mmc->max_discard_to = (1 << 27) / host->timeout_clk;
-+	mmc->max_discard_to = host->ops->get_max_timeout_count ?
-+			host->ops->get_max_timeout_count(host) : 1 << 27;
-+	mmc->max_discard_to /= host->timeout_clk;
++static unsigned int esdhc_get_max_timeout_count(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++
++	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
++}
++
+ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.read_l = esdhc_readl_le,
+ 	.read_w = esdhc_readw_le,
+@@ -892,6 +900,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.get_ro = esdhc_pltfm_get_ro,
+ 	.platform_bus_width = esdhc_pltfm_bus_width,
+ 	.set_uhs_signaling = esdhc_set_uhs_signaling,
++	.get_max_timeout_count = esdhc_get_max_timeout_count,
+ };
  
- 	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
- 
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 0a3ed01..acba9a7 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -281,6 +281,7 @@ struct sdhci_ops {
- 	unsigned int	(*get_max_clock)(struct sdhci_host *host);
- 	unsigned int	(*get_min_clock)(struct sdhci_host *host);
- 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
-+	unsigned int	(*get_max_timeout_count)(struct sdhci_host *host);
- 	int		(*platform_bus_width)(struct sdhci_host *host,
- 					       int width);
- 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
+ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
 -- 
 1.7.2.rc3
