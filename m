@@ -1,42 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 17 Dec 2013 15:34:18 -0500 (EST)
-Subject: [PATCH 2/2] ARM: kconfig: select HAVE_EFFICIENT_UNALIGNED_ACCESS
- for CPUv6+ && MMU
-In-Reply-To: <1387282577-2753-2-git-send-email-will.deacon@arm.com>
-References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
- <1387282577-2753-2-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.10.1312171528130.7480@knanqh.ubzr>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 17 Dec 2013 12:27:31 -0800
+Subject: arm-soc: Xilinx Zynq dt changes for v3.14
+In-Reply-To: <52AB0ABD.1050307@monstr.eu>
+References: <52AAC671.6000207@monstr.eu>
+ <20131213112659.GD4360@n2100.arm.linux.org.uk>
+ <52AB0ABD.1050307@monstr.eu>
+Message-ID: <20131217202731.GA11452@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Dec 2013, Will Deacon wrote:
-
-> Modern ARM CPUs can perform efficient unaligned memory accesses in
-> hardware and this feature is relied up on by code such as the dcache
-> word-at-a-time name hashing.
+On Fri, Dec 13, 2013 at 02:25:17PM +0100, Michal Simek wrote:
+> Hi Russell,
 > 
-> This patch selects HAVE_EFFICIENT_UNALIGNED_ACCESS for these cores and
-> reworks the kconfig select logic for DCACHE_WORD_ACCESS to use the new
-> symbol.
+> On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
+> > 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
+> >    individually.  The whole point of arm at kernel.org is that it reaches
+> >    the current arm-soc maintainers, whoever they may be at the time that
+> >    you send your email without you needing to know who they are.
+> > 
+> > 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
+> >    a pull request message.
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Thanks, I will keep this in my mind for future. I am just doing what I have done
+> before and this is the first complain I have got.
 
-This symbol could be used in some more places too.  For example this 
-would make the code a bit clearer:
-
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 72abdc541f..12c3a5decc 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -19,7 +19,7 @@
- #include <asm/unified.h>
- #include <asm/compiler.h>
- 
--#if __LINUX_ARM_ARCH__ < 6
-+#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
- #include <asm-generic/uaccess-unaligned.h>
- #else
- #define __get_user_unaligned __get_user
+I don't think I've noticed it in the past. :-) Either way, see it as a
+friendly pointer from Russell, not a complaint.
 
 
-Nicolas
+-Olof
