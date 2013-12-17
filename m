@@ -1,71 +1,84 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Dec 2013 14:28:15 +0100
-Subject: [GIT PULL] get rid of <mach/timex.h>
-In-Reply-To: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
-References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
-Message-ID: <20131217132815.GJ14866@pengutronix.de>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 17 Dec 2013 15:33:50 +0200
+Subject: [PATCH v4 1/9] mtd: nand: davinci: fix driver registration
+In-Reply-To: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1387287230-19693-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When kernel is booted using DT, there is no guarantee that Davinci
+NAND device has been created already at the time when driver init
+function is executed. Therefore, platform_driver_probe() can't be used
+because this may result the Davinci NAND driver will never be probed.
+The driver probing has to be made with core mechanism.
 
-On Fri, Dec 13, 2013 at 11:16:51PM +0100, Uwe Kleine-K?nig wrote:
-> the following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
-> 
-> for you to fetch changes up to c24eb46490c8232c08c82cd591ba332284d257b2:
-> 
->   ARM: drop <mach/timex.h> for !ARCH_MULTIPLATFORM, too (2013-12-07 23:31:28 +0100)
-> 
-> I'd like to get these changes into 3.14-rc1, so it would be great if you
-> could take it into armsoc for some exposure into next.
-> 
-> The kbuild test robot is happy with these changes, and I did several
-> build tests, too, so I don't expect any breakage.
-> 
-> Merging this series will result in a few merge conflicts. I pushed a
-> branch dropmachtimexh-merged into my repository where you can see how I
-> resolved them merging in current next/master into my tag.
-> 
-> ----------------------------------------------------------------
-> This cleanup series gets rid of <mach/timex.h> for platforms not using
-> ARCH_MULTIPLATFORM. (For multi-platform code it's already unused since
-> 387798b (ARM: initial multiplatform support).)
-> 
-> To make this work some code out of arch/arm needed to be adapted. Apart from two
-> changes in drivers/rtc I got the relevant maintainer Acks. For the rtc changes
-> I didn't get any feedback by Alexandro Zummo since I posted the first change 5
-> weeks ago despite pinging it several times. The current state seems to be that
-> Andrew Morton takes odd fixes, but I couldn't get him to give an Ack either.
-> (One of the two patches is in his queue, but I expect him to drop that as soon
-> as the patch makes it in via another path. Didn't get any feedback here, too.)
-In the meantime I got Acks for the rtc changes by apkm. I updated my tag
-to include these two. It now points on
-b5ea554282d15d14270e5a5ff80418d8d6410f85. The tag-log is updated
-accordingly:
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Reviewed-by: Taras Kondratiuk <taras@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/mtd/nand/davinci_nand.c |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-------
-This cleanup series gets rid of <mach/timex.h> for platforms not using
-ARCH_MULTIPLATFORM. (For multi-platform code it's already unused since
-387798b (ARM: initial multiplatform support).)
-
-To make this work some code out of arch/arm needed to be adapted. The
-respective changes got acks by their maintainers to be taken via armsoc
-(with Andrew Morton substituting for Alessandro Zummo as rtc maintainer).
-------
-
-The patches are unchanged.
-
-Please pull for 3.14-rc1.
-
-Thanks
-Uwe
-
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index b77a01e..584c1f4 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -487,7 +487,7 @@ static int nand_davinci_dev_ready(struct mtd_info *mtd)
+  * ten ECC bytes plus the manufacturer's bad block marker byte, and
+  * and not overlapping the default BBT markers.
+  */
+-static struct nand_ecclayout hwecc4_small __initconst = {
++static struct nand_ecclayout hwecc4_small = {
+ 	.eccbytes = 10,
+ 	.eccpos = { 0, 1, 2, 3, 4,
+ 		/* offset 5 holds the badblock marker */
+@@ -503,7 +503,7 @@ static struct nand_ecclayout hwecc4_small __initconst = {
+  * storing ten ECC bytes plus the manufacturer's bad block marker byte,
+  * and not overlapping the default BBT markers.
+  */
+-static struct nand_ecclayout hwecc4_2048 __initconst = {
++static struct nand_ecclayout hwecc4_2048 = {
+ 	.eccbytes = 40,
+ 	.eccpos = {
+ 		/* at the end of spare sector */
+@@ -585,7 +585,7 @@ static struct davinci_nand_pdata
+ }
+ #endif
+ 
+-static int __init nand_davinci_probe(struct platform_device *pdev)
++static int nand_davinci_probe(struct platform_device *pdev)
+ {
+ 	struct davinci_nand_pdata	*pdata;
+ 	struct davinci_nand_info	*info;
+@@ -860,7 +860,7 @@ err_nomem:
+ 	return ret;
+ }
+ 
+-static int __exit nand_davinci_remove(struct platform_device *pdev)
++static int nand_davinci_remove(struct platform_device *pdev)
+ {
+ 	struct davinci_nand_info *info = platform_get_drvdata(pdev);
+ 
+@@ -877,7 +877,8 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
+ }
+ 
+ static struct platform_driver nand_davinci_driver = {
+-	.remove		= __exit_p(nand_davinci_remove),
++	.probe		= nand_davinci_probe,
++	.remove		= nand_davinci_remove,
+ 	.driver		= {
+ 		.name	= "davinci_nand",
+ 		.owner	= THIS_MODULE,
+@@ -886,7 +887,7 @@ static struct platform_driver nand_davinci_driver = {
+ };
+ MODULE_ALIAS("platform:davinci_nand");
+ 
+-module_platform_driver_probe(nand_davinci_driver, nand_davinci_probe);
++module_platform_driver(nand_davinci_driver);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Texas Instruments");
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.9.5
