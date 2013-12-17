@@ -1,32 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Dec 2013 13:44:59 +0100
-Subject: [PATCH v3] ARM: sunxi: fix sun5i-a13 port F multiplexing
-In-Reply-To: <1387197757-6017-1-git-send-email-hdegoede@redhat.com>
-References: <1387197757-6017-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20131217124459.GQ3037@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 17 Dec 2013 13:45:06 +0100
+Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <5295539.cCkPY1PpyC@flatron>
+References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
+ <20131217111020.GF13823@ulmo.nvidia.com>
+ <20131217115136.GT4360@n2100.arm.linux.org.uk>
+ <5295539.cCkPY1PpyC@flatron>
+Message-ID: <20131217124505.GB17210@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 01:42:37PM +0100, Hans de Goede wrote:
-> The correct value for selecting the mmc0 function on port F pins is 2 not 4,
-> as per the data-sheet:
-> http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
+On Tue, Dec 17, 2013 at 01:00:10PM +0100, Tomasz Figa wrote:
+> On Tuesday 17 of December 2013 11:51:36 Russell King - ARM Linux wrote:
+> > On Tue, Dec 17, 2013 at 12:10:22PM +0100, Thierry Reding wrote:
+> > > On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
+> > > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > > > +		const void __iomem *addr)
+> > > > +{
+> > > > +	u32 val;
+> > > > +
+> > > > +	val = __raw_readl(addr);
+> > > > +
+> > > > +	if (likely(fpc->big_endian))
+> > > 
+> > > The likely() probably isn't very useful in this case. But if you want to
+> > > keep it, it should at least be reversed, since little-endian is actually
+> > > the default (you have to specify the big-endian property to activate the
+> > > big endian mode).
+> > > 
+> > > > +		val = be32_to_cpu(val);
+> > > > +	else
+> > > > +		val = le32_to_cpu(val);
+> > 
+> > This will also cause sparse errors, because when sparse is enabled, these
+> > expect __le32 or __be32 arguments, not u32.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> My question is why can't you just create two sets of accessors, one big
+> endian and one little endian, add two function pointers to your
+> fsl_pwm_chip struct and let the driver set the to correct accessors in
+> probe?
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I guess that would be one possibility.
 
-Thanks!
-Maxime
+> This would eliminate the problem with types Russell mentioned and IMHO
+> make the code cleaner.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I fail to see how that would eliminate the problem with the types. That
+said I don't actually see sparse complaining about any type mismatches.
+That's probably because the various macros implicitly cast to u32.
+
+> > > > +	rmb();
+> > > 
+> > > I'd prefer the rmb() to follow the __raw_readl() immediately to make the
+> > > relationship more explicit.
+> > 
+> > A better question to ask is: why is this barrier here?  What memory
+> > ordering operations is it trying to serialise?
+> 
+> I'd also add a question why __raw accessors are used here.
+
+Because both readl() and writel() explicitly perform little endian
+accesses.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/8db62dce/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/4d7e0ae3/attachment.sig>
