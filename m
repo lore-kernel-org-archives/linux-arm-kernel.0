@@ -1,43 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Dec 2013 14:19:07 +0000
-Subject: [PATCH] arm64: Correct virt_addr_valid
-In-Reply-To: <52AF465D.8040000@codeaurora.org>
-References: <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
- <20131211104429.GE26730@mudshark.cambridge.arm.com>
- <20131211110618.GG4360@n2100.arm.linux.org.uk>
- <20131211172635.GJ26730@mudshark.cambridge.arm.com>
- <20131211211333.GI4360@n2100.arm.linux.org.uk>
- <20131212175753.GG3382@arm.com>
- <20131212180249.GV4360@n2100.arm.linux.org.uk>
- <52AA3401.3000004@codeaurora.org> <20131213115757.GC22933@arm.com>
- <52AF465D.8040000@codeaurora.org>
-Message-ID: <20131217141907.GJ32118@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 17 Dec 2013 09:22:22 -0500
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14 (incr. #4)
+Message-ID: <20131217142222.GI2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 06:28:45PM +0000, Laura Abbott wrote:
-> On 12/13/2013 3:57 AM, Catalin Marinas wrote:
-> > OK, I re-read it now.
-> >
-> >> Yes, I believe the point was that if we call virt_addr_valid on a
-> >> not-direct-mapped address it should return false. We still need the
-> >> range check on arm64 systems as well to ensure this.
-> >
-> > On arm64 we don't have highmem, so all RAM would be directly mapped (and
-> > linear). Is there a case on a 64-bit architecture where pfn_valid() is
-> > true but the memory not mapped? We don't unmap any memory which is
-> > pfn_valid().
-> >
-> 
-> We don't have highmem but we still have a vmalloc region. Calling 
-> virt_to_page on a vmalloc address will not give a valid page so 
-> virt_addr_valid should return false on anything in the vmalloc region.
+Guys,
 
-We are talking about pfn_valid(__pa(addr) >> PAGE_SHIFT). The __pa()
-cannot be used on vmalloc addresses, I agree, but from a practical point
-of view it doesn't return valid memory address. I can't think of a
-scenario where it would (and if it does, your v2 patch should first
-check the range before invoking __pa()).
+Here's the fourth round of DT changes in mvebu-land.  This one completes
+a long-standing item on my todo list.  It's been in -next for four days,
+and it's purely a sort.
 
--- 
-Catalin
+As with the previous pull requests, this is an incremental pull on the
+mvebu/dt branch from tags/mvebu-dt-3.14-3 to tags/mvebu-dt-3.14-4.
+
+thx,
+
+Jason.
+
+
+The following changes since commit 69e18e26b5773092276a9702244784faf9b6c65f:
+
+  ARM: mvebu: Enable NAND controller in A370 Reference Design board (2013-12-12 14:04:34 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14-4
+
+for you to fetch changes up to a095b1c78a35f05755ca2f0e106d84792974aef5:
+
+  ARM: mvebu: sort DT nodes by address (2013-12-12 15:00:44 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.14 (incremental #4)
+
+ - mvebu/orion5x/dove/kirkwood
+    - sort nodes on ocp bus by address
+
+----------------------------------------------------------------
+Jason Cooper (4):
+      ARM: kirkwood: sort dt nodes by address
+      ARM: dove: sort DT nodes by address
+      ARM: orion5x: sort DT nodes by address
+      ARM: mvebu: sort DT nodes by address
+
+ arch/arm/boot/dts/armada-370-xp.dtsi | 176 ++++++-------
+ arch/arm/boot/dts/armada-370.dtsi    |  74 +++---
+ arch/arm/boot/dts/armada-xp.dtsi     | 100 +++----
+ arch/arm/boot/dts/dove.dtsi          | 496 +++++++++++++++++------------------
+ arch/arm/boot/dts/kirkwood.dtsi      | 140 +++++-----
+ arch/arm/boot/dts/orion5x.dtsi       | 106 ++++----
+ 6 files changed, 546 insertions(+), 546 deletions(-)
