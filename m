@@ -1,65 +1,64 @@
-From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Mon, 16 Dec 2013 17:16:41 -0700
-Subject: [PATCH v4 5/5] ACPI: do not map/unmap memory regions for FADT entries
- in reduced HW mode
-In-Reply-To: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
-References: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1387239401-13918-6-git-send-email-al.stone@linaro.org>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 16 Dec 2013 16:17:35 -0800
+Subject: [PATCH 05/10] mfd: menelaus: Use for_each_set_bit()
+In-Reply-To: <1387238904-7843-5-git-send-email-balbi@ti.com>
+References: <20131216153936.GQ18769@lee--X1>
+ <1387238904-7843-1-git-send-email-balbi@ti.com>
+ <1387238904-7843-5-git-send-email-balbi@ti.com>
+Message-ID: <1387239455.18217.61.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+On Mon, 2013-12-16 at 18:08 -0600, Felipe Balbi wrote:
+> That macro just helps removing some extra line of code and hides ffs()
+> calls.
+> 
+> While at that, also fix a variable shadowing bug where 'int irq' was
+> being redeclared inside inner loop while it was also argument to
+> interrupt handler.
+> 
+> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/mfd/menelaus.c | 16 +++++++---------
+>  1 file changed, 7 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+> index 87d80a8..d3e3022 100644
+> --- a/drivers/mfd/menelaus.c
+> +++ b/drivers/mfd/menelaus.c
+> @@ -795,24 +795,22 @@ static irqreturn_t menelaus_irq(int irq, void *_menelaus)
+>  {
+>  	struct menelaus_chip *menelaus = _menelaus;
+>  	void (*handler)(struct menelaus_chip *menelaus);
+> -	unsigned isr;
+> +	unsigned long isr;
+> +	unsigned long i;
+>  
+>  	isr = (menelaus_read_reg(MENELAUS_INT_STATUS2)
+>  			& ~menelaus->mask2) << 8;
+>  	isr |= menelaus_read_reg(MENELAUS_INT_STATUS1)
+>  		& ~menelaus->mask1;
+>  
+> -	while (isr) {
+> -		int irq = fls(isr) - 1;
+> -		isr &= ~(1 << irq);
+> -
+> +	for_each_set_bit(i, &isr, 16) {
+>  		mutex_lock(&menelaus->lock);
+> -		menelaus_disable_irq(irq);
+> -		menelaus_ack_irq(irq);
+> -		handler = menelaus->handlers[irq];
+> +		menelaus_disable_irq(i);
+> +		menelaus_ack_irq(i);
+> +		handler = menelaus->handlers[i];
+>  		if (handler)
+>  			handler(menelaus);
+> -		menelaus_enable_irq(irq);
+> +		menelaus_enable_irq(i);
+>  		mutex_unlock(&menelaus->lock);
+>  	}
+>  
 
-Several of the FADT fields are normally kept in specific memory
-regions.  Since these fields are to be ignored in hardware reduced
-ACPI mode, do not map those addresses when in that mode, and of
-course do not release the mappings that have not been made.
-
-The function acpi_os_initialize() could become a stub in the header
-file but is left here in case it can be of further use.
-
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- drivers/acpi/osl.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-index c946a3a..7822821 100644
---- a/drivers/acpi/osl.c
-+++ b/drivers/acpi/osl.c
-@@ -1778,10 +1778,12 @@ __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
- 
- acpi_status __init acpi_os_initialize(void)
- {
--	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
--	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
--	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
--	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
-+	if (!acpi_gbl_reduced_hardware) {
-+		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
-+		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
-+		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
-+		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
-+	}
- 
- 	return AE_OK;
- }
-@@ -1806,10 +1808,12 @@ acpi_status acpi_os_terminate(void)
- 						 acpi_irq_handler);
- 	}
- 
--	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
--	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
--	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
--	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
-+	if (!acpi_gbl_reduced_hardware) {
-+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
-+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
-+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
-+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
-+	}
- 
- 	destroy_workqueue(kacpid_wq);
- 	destroy_workqueue(kacpi_notify_wq);
--- 
-1.8.3.1
+This could handle the irqs in reverse order.
+Does that matter?
