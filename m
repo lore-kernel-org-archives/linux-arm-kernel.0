@@ -1,42 +1,152 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Dec 2013 11:47:34 +0000
-Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20131216151232.GH3185@sirena.org.uk>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <20131216105734.GA8931@e102568-lin.cambridge.arm.com>
- <20131216122948.GF3185@sirena.org.uk>
- <20131216144638.GE8931@e102568-lin.cambridge.arm.com>
- <20131216151232.GH3185@sirena.org.uk>
-Message-ID: <20131217114734.GC32118@arm.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Tue, 17 Dec 2013 20:51:39 +0900
+Subject: [PATCH 01/11] ARM: EXYNOS: cleanup <mach/regs-pmu.h>
+Message-ID: <115f01cefb1e$58e079e0$0aa16da0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 03:12:32PM +0000, Mark Brown wrote:
-> On Mon, Dec 16, 2013 at 02:46:38PM +0000, Lorenzo Pieralisi wrote:
-> > On Mon, Dec 16, 2013 at 12:29:48PM +0000, Mark Brown wrote:
-> [MPIDR parsing]
-> > > Again, this is gone from the current version.  Like I said to Catalin it
-> > > does feel like this is making more work for systems that have done the
-> > > right thing with their MPIDRs which doesn't seem ideal (and note that
-> > > all the DTs that you guys are publishing for your models lack any
-> > > topology information at present).
-> 
-> > This is an age-old question and the problem has always been that the
-> > "right thing" is recommended, not enforced. I do not want to turn this into
-> > bikeshedding, as long as cpu-map node takes priority if present, fine by me.
-> 
-> I already dropped that code, though I could resurrect it (perhaps as a
-> separate patch).  The way the code was written was as you describe as a
-> last resort - MPIDR would only be considered if the explict topology
-> binding was not present, it was done as a last step before reporting if
-> no other topology information was discovered.
-> 
-> Actually now I think about it if we're not going to parse the MPIDR we
-> should probably update the bindings to say that the topology binding is
-> mandatory for any v8 system with more than one core.
+From: Kukjin Kim <kgene.kim@samsung.com>
 
-Do we need such information if only a flat topology is needed?
+Remove useless definitions in the regs-pmu.h file.
 
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |   51
+--------------------------
+ 1 file changed, 51 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 2cdb63e..2c15a8f 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -24,11 +24,7 @@
+ #define S5P_CENTRAL_SEQ_OPTION			S5P_PMUREG(0x0208)
+ 
+ #define S5P_USE_STANDBY_WFI0			(1 << 16)
+-#define S5P_USE_STANDBY_WFI1			(1 << 17)
+-#define S5P_USE_STANDBYWFI_ISP_ARM		(1 << 18)
+ #define S5P_USE_STANDBY_WFE0			(1 << 24)
+-#define S5P_USE_STANDBY_WFE1			(1 << 25)
+-#define S5P_USE_STANDBYWFE_ISP_ARM		(1 << 26)
+ 
+ #define S5P_SWRESET				S5P_PMUREG(0x0400)
+ #define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
+@@ -38,17 +34,8 @@
+ #define S5P_EINT_WAKEUP_MASK			S5P_PMUREG(0x0604)
+ #define S5P_WAKEUP_MASK				S5P_PMUREG(0x0608)
+ 
+-#define S5P_HDMI_PHY_CONTROL			S5P_PMUREG(0x0700)
+-#define S5P_HDMI_PHY_ENABLE			(1 << 0)
+-
+-#define S5P_DAC_PHY_CONTROL			S5P_PMUREG(0x070C)
+-#define S5P_DAC_PHY_ENABLE			(1 << 0)
+-
+ #define S5P_INFORM0				S5P_PMUREG(0x0800)
+ #define S5P_INFORM1				S5P_PMUREG(0x0804)
+-#define S5P_INFORM2				S5P_PMUREG(0x0808)
+-#define S5P_INFORM3				S5P_PMUREG(0x080C)
+-#define S5P_INFORM4				S5P_PMUREG(0x0810)
+ #define S5P_INFORM5				S5P_PMUREG(0x0814)
+ #define S5P_INFORM6				S5P_PMUREG(0x0818)
+ #define S5P_INFORM7				S5P_PMUREG(0x081C)
+@@ -119,23 +106,8 @@
+ #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
+ #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
+ 
+-#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
+-#define S5P_ARM_CORE0_OPTION			S5P_PMUREG(0x2008)
+ #define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
+ #define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
+-#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
+-
+-#define S5P_ARM_COMMON_OPTION			S5P_PMUREG(0x2408)
+-#define S5P_TOP_PWR_OPTION			S5P_PMUREG(0x2C48)
+-#define S5P_CAM_OPTION				S5P_PMUREG(0x3C08)
+-#define S5P_TV_OPTION				S5P_PMUREG(0x3C28)
+-#define S5P_MFC_OPTION				S5P_PMUREG(0x3C48)
+-#define S5P_G3D_OPTION				S5P_PMUREG(0x3C68)
+-#define S5P_LCD0_OPTION				S5P_PMUREG(0x3C88)
+-#define S5P_LCD1_OPTION				S5P_PMUREG(0x3CA8)
+-#define S5P_MAUDIO_OPTION			S5P_PMUREG(0x3CC8)
+-#define S5P_GPS_OPTION				S5P_PMUREG(0x3CE8)
+-#define S5P_GPS_ALIVE_OPTION			S5P_PMUREG(0x3D08)
+ 
+ #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
+ #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
+@@ -145,28 +117,12 @@
+ #define S5P_PAD_RET_EBIA_OPTION			S5P_PMUREG(0x3188)
+ #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
+ 
+-#define S5P_PMU_CAM_CONF			S5P_PMUREG(0x3C00)
+-#define S5P_PMU_TV_CONF				S5P_PMUREG(0x3C20)
+-#define S5P_PMU_MFC_CONF			S5P_PMUREG(0x3C40)
+-#define S5P_PMU_G3D_CONF			S5P_PMUREG(0x3C60)
+-#define S5P_PMU_LCD0_CONF			S5P_PMUREG(0x3C80)
+-#define S5P_PMU_GPS_CONF			S5P_PMUREG(0x3CE0)
+-
+-#define S5P_PMU_SATA_PHY_CONTROL_EN		0x1
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+ #define S5P_INT_LOCAL_PWR_EN			0x7
+ 
+ #define S5P_CHECK_SLEEP				0x00000BAD
+ 
+ /* Only for EXYNOS4210 */
+-#define S5P_USBDEVICE_PHY_CONTROL	S5P_PMUREG(0x0704)
+-#define S5P_USBDEVICE_PHY_ENABLE	(1 << 0)
+-
+-#define S5P_USBHOST_PHY_CONTROL		S5P_PMUREG(0x0708)
+-#define S5P_USBHOST_PHY_ENABLE		(1 << 0)
+-
+-#define S5P_PMU_SATA_PHY_CONTROL	S5P_PMUREG(0x0720)
+-
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
+ #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
+ #define S5P_MODIMIF_MEM_LOWPWR		S5P_PMUREG(0x11C4)
+@@ -174,8 +130,6 @@
+ #define S5P_SATA_MEM_LOWPWR		S5P_PMUREG(0x11E4)
+ #define S5P_LCD1_LOWPWR			S5P_PMUREG(0x1394)
+ 
+-#define S5P_PMU_LCD1_CONF		S5P_PMUREG(0x3CA0)
+-
+ /* Only for EXYNOS4x12 */
+ #define S5P_ISP_ARM_LOWPWR			S5P_PMUREG(0x1050)
+ #define S5P_DIS_IRQ_ISP_ARM_LOCAL_LOWPWR	S5P_PMUREG(0x1054)
+@@ -343,13 +297,9 @@
+ #define EXYNOS5_TOP_PWR_OPTION
+S5P_PMUREG(0x2C48)
+ #define EXYNOS5_TOP_PWR_SYSMEM_OPTION
+S5P_PMUREG(0x2CC8)
+ #define EXYNOS5_JPEG_MEM_OPTION
+S5P_PMUREG(0x2F48)
+-#define EXYNOS5_GSCL_STATUS
+S5P_PMUREG(0x4004)
+-#define EXYNOS5_ISP_STATUS
+S5P_PMUREG(0x4024)
+ #define EXYNOS5_GSCL_OPTION
+S5P_PMUREG(0x4008)
+ #define EXYNOS5_ISP_OPTION
+S5P_PMUREG(0x4028)
+ #define EXYNOS5_MFC_OPTION
+S5P_PMUREG(0x4048)
+-#define EXYNOS5_G3D_CONFIGURATION
+S5P_PMUREG(0x4060)
+-#define EXYNOS5_G3D_STATUS
+S5P_PMUREG(0x4064)
+ #define EXYNOS5_G3D_OPTION
+S5P_PMUREG(0x4068)
+ #define EXYNOS5_DISP1_OPTION
+S5P_PMUREG(0x40A8)
+ #define EXYNOS5_MAU_OPTION
+S5P_PMUREG(0x40C8)
+@@ -357,7 +307,6 @@
+ #define EXYNOS5_USE_SC_FEEDBACK					(1
+<< 1)
+ #define EXYNOS5_USE_SC_COUNTER					(1 << 0)
+ 
+-#define EXYNOS5_MANUAL_L2RSTDISABLE_CONTROL			(1 << 2)
+ #define EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN			(1 << 7)
+ 
+ #define EXYNOS5_OPTION_USE_STANDBYWFE				(1 << 24)
 -- 
-Catalin
+1.7.10.4
