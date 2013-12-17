@@ -1,47 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 22:15:40 +0800
-Subject: [PATCH 3/3]: Support cpu frequency scaling and power management
- for iMX6SL
-In-Reply-To: <CACUGKYOKEk9RUVS52gGc=CUNFYm1q+zT6rURnB4hwPkC0GCC1g@mail.gmail.com>
-References: <CACUGKYOKEk9RUVS52gGc=CUNFYm1q+zT6rURnB4hwPkC0GCC1g@mail.gmail.com>
-Message-ID: <20131217141537.GW6691@S2101-09.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Dec 2013 14:19:07 +0000
+Subject: [PATCH] arm64: Correct virt_addr_valid
+In-Reply-To: <52AF465D.8040000@codeaurora.org>
+References: <1386724982-16997-2-git-send-email-lauraa@codeaurora.org>
+ <20131211104429.GE26730@mudshark.cambridge.arm.com>
+ <20131211110618.GG4360@n2100.arm.linux.org.uk>
+ <20131211172635.GJ26730@mudshark.cambridge.arm.com>
+ <20131211211333.GI4360@n2100.arm.linux.org.uk>
+ <20131212175753.GG3382@arm.com>
+ <20131212180249.GV4360@n2100.arm.linux.org.uk>
+ <52AA3401.3000004@codeaurora.org> <20131213115757.GC22933@arm.com>
+ <52AF465D.8040000@codeaurora.org>
+Message-ID: <20131217141907.GJ32118@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 05:40:20PM -0800, John Tobias wrote:
-> Enable cpu frequency on imx6 config
+On Mon, Dec 16, 2013 at 06:28:45PM +0000, Laura Abbott wrote:
+> On 12/13/2013 3:57 AM, Catalin Marinas wrote:
+> > OK, I re-read it now.
+> >
+> >> Yes, I believe the point was that if we call virt_addr_valid on a
+> >> not-direct-mapped address it should return false. We still need the
+> >> range check on arm64 systems as well to ensure this.
+> >
+> > On arm64 we don't have highmem, so all RAM would be directly mapped (and
+> > linear). Is there a case on a 64-bit architecture where pfn_valid() is
+> > true but the memory not mapped? We don't unmap any memory which is
+> > pfn_valid().
+> >
 > 
-> From: John Tobias <john.tobias.ph@gmail.com>
-> 
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig
-> b/arch/arm/configs/imx_v6_v7_defconfig
-> index 8d0c5a0..a56cb2c 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -43,6 +43,17 @@ CONFIG_PREEMPT_VOLUNTARY=y
->  CONFIG_AEABI=y
->  # CONFIG_OABI_COMPAT is not set
->  CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
-> +CONFIG_CPU_FREQ=y
-> +CONFIG_CPU_FREQ_GOV_COMMON=y
-> +CONFIG_CPU_FREQ_STAT=y
-> +CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
+> We don't have highmem but we still have a vmalloc region. Calling 
+> virt_to_page on a vmalloc address will not give a valid page so 
+> virt_addr_valid should return false on anything in the vmalloc region.
 
-We probably want to set ONDEMAND as the default one.
+We are talking about pfn_valid(__pa(addr) >> PAGE_SHIFT). The __pa()
+cannot be used on vmalloc addresses, I agree, but from a practical point
+of view it doesn't return valid memory address. I can't think of a
+scenario where it would (and if it does, your v2 patch should first
+check the range before invoking __pa()).
 
-> +CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
-> +CONFIG_CPU_FREQ_GOV_POWERSAVE=y
-> +CONFIG_CPU_FREQ_GOV_USERSPACE=y
-> +CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-> +CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
-> +CONFIG_GENERIC_CPUFREQ_CPU0=y
-
-We do not need this one.
-
-Shawn
-
-> +CONFIG_ARM_IMX6Q_CPUFREQ=y
->  CONFIG_VFP=y
->  CONFIG_NEON=y
->  CONFIG_BINFMT_MISC=m
+-- 
+Catalin
