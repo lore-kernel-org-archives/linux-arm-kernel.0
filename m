@@ -1,61 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 Dec 2013 10:57:00 +0100
-Subject: pwm-backlight: 3.13-rc1 regression for old arm machine
-In-Reply-To: <87r49c6bea.fsf@free.fr>
-References: <87r49c6bea.fsf@free.fr>
-Message-ID: <20131217095658.GD13823@ulmo.nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 17 Dec 2013 11:10:15 +0100
+Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
+In-Reply-To: <20131217003107.GF27171@verge.net.au>
+References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
+ <52AEFF56.5010602@cogentembedded.com>
+ <52AF8D57.7010705@cogentembedded.com>
+ <20131217003107.GF27171@verge.net.au>
+Message-ID: <CAMuHMdV7y7GFrswa+f7ui8LSXj723_i5P6gBAG5ZOoMDP5LWyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 04:52:45PM +0100, Robert Jarzmik wrote:
-> Hi Thierry,
+On Tue, Dec 17, 2013 at 1:31 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Dec 17, 2013 at 02:31:35AM +0300, Sergei Shtylyov wrote:
+>> On 12/16/2013 04:25 PM, I wrote:
+>> >>The koelsch board uses has an SH ethernet controller which uses a Micrel
+>> >>phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
+>> >>Micrel-specific phy driver rather than relying on the generic phy driver.
+>>
+>> >    Frankly speaking, I'm seeing no advantages to doing that.
+>>
+>>    Although wait, Geert has reported the absence of Rx FIFO overflow
+>> messages with this PHY driver, IIRC.
 
-Hi Robert,
+I spoke too soon: apparently the statistical relevance of my reporting was
+too low. I still see them from time to time, but I think less than before (no
+numbers available).
 
-Please always Cc the linux-pwm mailing list for PWM related questions.
-I've done that now.
+>> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> >    Analogous changes are needed for BOCK-W and Lager boards since they all
+>> >use the same KSZ8041RNLI PHY chip. I was going to submit such changes with the
+>> >PHY IRQ patches but since no IRQ is generated still, this got delayed...
+>>
+>>    Only I was going to do it via defconfigs...
+>
+> That was my initial approach too. However I have been convinced
+> that Kconfig is a better way forwards.
 
-> Since recently, and probable since last Linus's merge of PWM tree (Merge tag
-> 'pwm/for-3.13-rc1' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm), my
-> platform has its backlight broken.
-> 
-> The particularity of my platform:
->  - arch/arm/mach-pxa/mioa701.c
->  - no device tree
->  - no power supply regulator for backlight
->  - backlight controlled by a PWM
->  - kernel message :
-> [    1.495480] platform pwm-backlight: Driver pwm-backlight requests probe deferral
-> 
-> I think other "old" platforms will suffer from this. Do you have a
-> recommendation ?
+Kconfig has the advantage that the minimal defconfigs will be smaller, so
+less churn there.
+However, it does mean you cannot disable the option anymore via your .config.
 
-I hadn't anticipated that =(. In fact I had been holding this patch back
-for a release cycle because I was waiting for a specific regulator patch
-to land which provides a dummy regulator if one wasn't specified. It
-seems that that patch only works when booting from DT, though.
+In this case it's a bit difficult to decide, as sh_eth will work both
+with and without
+the specific PHY-driver.
 
-The correct way to fix this would be to provide a lookup table with the
-dummy regulator in the board file. I've attached a patch (compile-tested
-only) that might work.
+If no users want to disable it, I'd go for Kconfig.
 
-If it does, please let me know and, if nobody else volunteers, I'll see
-if I can come up with a set of patches to fix this for any other boards
-that have the same issue.
+Gr{oetje,eeting}s,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-pxa-Add-dummy-power-supply-for-backlight-for-Mit.patch
-Type: text/x-diff
-Size: 1813 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/194fd6ef/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/194fd6ef/attachment-0001.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
