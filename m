@@ -1,33 +1,48 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 17 Dec 2013 09:31:07 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
-In-Reply-To: <52AF8D57.7010705@cogentembedded.com>
-References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
- <52AEFF56.5010602@cogentembedded.com>
- <52AF8D57.7010705@cogentembedded.com>
-Message-ID: <20131217003107.GF27171@verge.net.au>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 16 Dec 2013 16:57:08 -0800
+Subject: [PATCH v2] use -fstack-protector-strong
+In-Reply-To: <CAGXu5j+6_M65pDoJjx1NEUw8SkfpGjH=yhswt-RW=_W97=kkzQ@mail.gmail.com>
+References: <20131126203727.GA352@www.outflux.net>
+ <20131127112731.GA10435@gmail.com>
+ <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
+ <20131127175442.GA28088@gmail.com> <52963223.9080701@zytor.com>
+ <CAGXu5j+6_M65pDoJjx1NEUw8SkfpGjH=yhswt-RW=_W97=kkzQ@mail.gmail.com>
+Message-ID: <CAGXu5j+0gjN118RijCinw31g51BZez_oGKFYJwq2T3=yojG_ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 02:31:35AM +0300, Sergei Shtylyov wrote:
-> On 12/16/2013 04:25 PM, I wrote:
-> 
-> >>The koelsch board uses has an SH ethernet controller which uses a Micrel
-> >>phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
-> >>Micrel-specific phy driver rather than relying on the generic phy driver.
-> 
-> >    Frankly speaking, I'm seeing no advantages to doing that.
-> 
->    Although wait, Geert has reported the absence of Rx FIFO overflow
-> messages with this PHY driver, IIRC.
-> 
-> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> >    Analogous changes are needed for BOCK-W and Lager boards since they all
-> >use the same KSZ8041RNLI PHY chip. I was going to submit such changes with the
-> >PHY IRQ patches but since no IRQ is generated still, this got delayed...
-> 
->    Only I was going to do it via defconfigs...
+On Wed, Nov 27, 2013 at 10:11 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Nov 27, 2013 at 9:55 AM, H. Peter Anvin <hpa@zytor.com> wrote:
+>> On 11/27/2013 09:54 AM, Ingo Molnar wrote:
+>>>>
+>>>> Looks to be 2% for defconfig. That's way better. Shall I send a v3?
+>>>
+>>> Well, it's better than 9%, but still almost an order of magnitude
+>>> higher than the cost is today, and a lot of distros have
+>>> CONFIG_CC_STACKPROTECTOR=y.
+>>>
+>>> So it would be nice to measure how much the instruction count goes up
+>>> in some realistic system-bound test. How much does something like
+>>> kernel/built-in.o increase, as per 'size' output?
+>
+>    text    data     bss     dec     hex filename
+>  929611   90851  594496 1614958  18a46e built-in.o-gcc-4.9
+>  954648   90851  594496 1639995  19063b built-in.o-gcc-4.9+strong
+>
+> Looks like 3% for defconfg + CONFIG_CC_STACKPROTECTOR
+>
+>>
+>> Do we need CONFIG_CC_STACKPROTECTOR_STRONG?
+>
+> I'm hoping to avoid this since nearly anyone using CC_STACKPROTECTOR
+> would want strong added, but as a fallback, I'm happy to implement it
+> as a separate config item.
 
-That was my initial approach too. However I have been convinced
-that Kconfig is a better way forwards.
+Any verdict on this? Should I go with adding ..._STRONG like we used
+to have for ..._ALL, or is defaulting to -strong best?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
