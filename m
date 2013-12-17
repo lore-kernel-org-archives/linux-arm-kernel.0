@@ -1,38 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 20:39:48 +0800
-Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
-In-Reply-To: <20131217113705.GP3185@sirena.org.uk>
-References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
- <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
- <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131213125129.GV18380@S2101-09.ap.freescale.net>
- <892cbb07bd064f44b2af45f106aeb479@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131216112910.GB30671@S2101-09.ap.freescale.net>
- <20131217015939.GM3185@sirena.org.uk>
- <20131217021610.GA7172@S2101-09.ap.freescale.net>
- <20131217113705.GP3185@sirena.org.uk>
-Message-ID: <20131217123946.GN6691@S2101-09.ap.freescale.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Dec 2013 13:44:59 +0100
+Subject: [PATCH v3] ARM: sunxi: fix sun5i-a13 port F multiplexing
+In-Reply-To: <1387197757-6017-1-git-send-email-hdegoede@redhat.com>
+References: <1387197757-6017-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20131217124459.GQ3037@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 11:37:05AM +0000, Mark Brown wrote:
-> On Tue, Dec 17, 2013 at 10:16:13AM +0800, Shawn Guo wrote:
-> > On Tue, Dec 17, 2013 at 01:59:39AM +0000, Mark Brown wrote:
+On Mon, Dec 16, 2013 at 01:42:37PM +0100, Hans de Goede wrote:
+> The correct value for selecting the mmc0 function on port F pins is 2 not 4,
+> as per the data-sheet:
+> http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
 > 
-> > > It's something that the platform needs to address - the core has no way
-> > > of figuring out what devices might register in future if the platform
-> > > doesn't tell them.
-> 
-> > Okay.  But is there an established means for platform to tell that?
-> 
-> That's what has_full_constraints() is for.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Hmm, I do not quite follow.  The regulator core needs to know whether a
-regulator device is present or absent, before the regulator is
-registered, so that regulator core can decide to return -EDEFER_PROBE
-or -ENODEV when consumer calls regulator_get_optional() to get the
-regulator.  Are you saying platform can call
-regulator_has_full_constraints() to help regulator core to make this
-decision?  I do not understand how it works.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Shawn
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/8db62dce/attachment.sig>
