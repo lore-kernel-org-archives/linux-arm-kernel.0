@@ -1,37 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 10:16:13 +0800
-Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
-In-Reply-To: <20131217015939.GM3185@sirena.org.uk>
-References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
- <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
- <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131213125129.GV18380@S2101-09.ap.freescale.net>
- <892cbb07bd064f44b2af45f106aeb479@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131216112910.GB30671@S2101-09.ap.freescale.net>
- <20131217015939.GM3185@sirena.org.uk>
-Message-ID: <20131217021610.GA7172@S2101-09.ap.freescale.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Dec 2013 10:17:26 +0800
+Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
+In-Reply-To: <52AF68DB.7090105@elopez.com.ar>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <1386880245-10192-3-git-send-email-dinguyen@altera.com>
+ <201312142233.27143.arnd@arndb.de>
+ <52AD1185.6090501@linaro.org> <20131215045116.23538.4@quantum>
+ <52AF68DB.7090105@elopez.com.ar>
+Message-ID: <CAGb2v67dud7XQSOy4eABX3SZX9pRkm366dodke5-AzdcGuje5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 01:59:39AM +0000, Mark Brown wrote:
-> On Mon, Dec 16, 2013 at 07:29:12PM +0800, Shawn Guo wrote:
-> > On Mon, Dec 16, 2013 at 03:31:29AM +0000, Li.Xiubo at freescale.com wrote:
-> 
-> [Deferring probe in non-DT cases]
-> > > Where should this special handling be dealt with ? Is here or regulator_get_optional()
-> > > will be better ?
-> 
-> > Anyway, this is another issue which should be addressed in regulator
-> > core, IMO.
-> 
-> It's something that the platform needs to address - the core has no way
-> of figuring out what devices might register in future if the platform
-> doesn't tell them.
+Hi,
 
-Okay.  But is there an established means for platform to tell that?
+On Tue, Dec 17, 2013 at 4:55 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> I also saw a similar requirement from the gmac people (on cc too), who
+> needed to set the phy type (or something like that) on one of the clock
 
-Shawn
+The GMAC clock register controls the tx clock source (a mux) and the
+interface type, which is most likely a gate to control the direction
+of the tx clock.
 
-> With DT we can do that because you can't create a
-> device without providing information about what supplies will be made
-> avaialable, other systems may be able to do the same thing.
+So I modeled it as a composite clock source for now.
+I'm open to other options.
+
+> registers; so I'm thinking maybe a generic "tune something" approach that
+> lets users configure some clock-dependent, arbitrary aspect of the clock is
+> the way forward. Otherwise, we're going to end up bloating the clock
+> framework with a lot of callback pointers that are going to be used in one
+> or two clocks out of potentially hundreds on the whole system.
+
+ChenYu
