@@ -1,59 +1,49 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 21:58:09 +0800
-Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
-In-Reply-To: <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
-References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
- <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20131217135804.GT6691@S2101-09.ap.freescale.net>
+Date: Tue, 17 Dec 2013 22:04:58 +0800
+Subject: [PATCH 1/3]: Support cpu frequency scaling and power management
+ for iMX6SL
+In-Reply-To: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+References: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+Message-ID: <20131217140448.GU6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 02:43:03PM +0800, Shawn Guo wrote:
-> Function sgtl5000_enable_regulators() is somehow odd in handling the
-> optional external VDDD supply.  The driver can only enable this supply
-> on SGTL5000 chip before revision 0x11, and of course when this external
-> VDDD is present.  It currently does something like below.
+On Mon, Dec 16, 2013 at 05:40:15PM -0800, John Tobias wrote:
+> iMX6SL device tree doesn't have a configuration settings to enable the
+> frequency scaling and power management.
 > 
-> 1. Check if regulator_bulk_get() on VDDA, VDDIO and VDDD will fail.  If
->    it fails, VDDD must be absent and it falls on internal LDO by calling
->    sgtl5000_replace_vddd_with_ldo().  Otherwise, VDDD is used.  And in
->    either case, regulator_bulk_enable() will be called to enable
->    3 supplies.
-> 
-> 2. In case that SGTL5000 revision is later than 0x11, even if external
->    VDDD is present, it has to roll back the 'enable' and 'get' calls
->    with regulator_bulk_disable() and regulator_bulk_free(), and starts
->    over again by calling sgtl5000_replace_vddd_with_ldo() and
->    regulator_bulk_enable().
-> 
-> Such back and forth calls sequence is complicated and unnecessary.
-> Also, since commit 4ddfebd (regulator: core: Provide a dummy regulator
-> with full constraints), regulator_bulk_get() will always succeeds
-> because of the dummy regulator.  Thus the VDDD detection is broken.
-> 
-> The patch changes the flow to something like the following, which should
-> be more reasonable and clear, and also fix the VDDD detection breakage.
-> 
-> 1. Check if we're running a chip before revision 0x11, on which an
->    external VDDD can possibly be an option.
-> 
-> 2. If it is an early revision, call regulator_get_optional() to detect
->    whether an external VDDD supply is available.
-> 
-> 3. If external VDDD is present, call sgtl5000_replace_vddd_with_ldo() to
->    update sgtl5000->supplies info.
-> 
-> 4. Drop regulator_bulk_get() call in sgtl5000_replace_vddd_with_ldo(),
->    and call it in sgtl5000_enable_regulators() no matter it's an
->    external VDDD or internal LDO.
-> 
-> 5. Call regulator_bulk_enable() to enable these 3 regulators.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> From: John Tobias <john.tobias.ph@gmail.com>
 
-Mark,
-
-Since what Xiubo is concerned by is another issue apart from this patch
-itself and being discussed, can you apply the patch?
+Please use 'git format-patch' and 'git send-email'.  Also, it's never
+been a good idea to use the exactly same patch subject for 3 different
+changes.
 
 Shawn
+
+> 
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 28558f1..0ad2f6a 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -38,6 +38,19 @@
+>                         device_type = "cpu";
+>                         reg = <0x0>;
+>                         next-level-cache = <&L2>;
+> +                       operating-points = <
+> +                               /* kHz    uV */
+> +                               1000000 1275000
+> +                               792000  1150000
+> +                       >;
+> +                       clock-latency = <61036>; /* two CLK32 periods */
+> +                       clocks = <&clks IMX6SL_CLK_ARM>, <&clks
+> IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
+> +                                <&clks IMX6SL_CLK_PLL1_SW>, <&clks
+> IMX6SL_CLK_PLL1_SYS>;
+> +                       clock-names = "arm", "pll2_pfd2_396m", "step",
+> +                                     "pll1_sw", "pll1_sys";
+> +                       arm-supply = <&reg_arm>;
+> +                       pu-supply = <&reg_pu>;
+> +                       soc-supply = <&reg_soc>;
+>                 };
+>         };
