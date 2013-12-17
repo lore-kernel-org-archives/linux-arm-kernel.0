@@ -1,73 +1,53 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 17 Dec 2013 13:36:37 +0800
-Subject: [PATCH 3/3 v2] ARM: dts: sama5d3xcm: add the regulator device node
-In-Reply-To: <1387258597-21866-1-git-send-email-wenyou.yang@atmel.com>
-References: <1387258597-21866-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1387258597-21866-4-git-send-email-wenyou.yang@atmel.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Tue, 17 Dec 2013 05:45:38 +0000
+Subject: [PATCH v3 0/7] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20131217045752.GA15761@shlinux2.ap.freescale.net>
+References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA56ADC@DBDE04.ent.ti.com>
+ <20131217040209.GA27091@shlinux2.ap.freescale.net>
+ <20980858CB6D3A4BAE95CA194937D5E73EA56B3A@DBDE04.ent.ti.com>
+ <20131217045752.GA15761@shlinux2.ap.freescale.net>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA56B8A@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/boot/dts/sama5d3xcm.dtsi |   46 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+>From: Huang Shijie [mailto:b32955 at freescale.com]
+>>From: Pekon Gupta [mailto:pekon at ti.com]
+[...]
+>> (1) Add sign-offs of main authors of m25p80, so that original contributors
+>>  still remains in path of submission [1].
+>Do you mean add the sign-offs in end of the patch 3's commit message?:
+>	Signed-off-by: Mike Lavender <mike@steroidmicros.com>
+>
+I think Mike's  email ID is no-more valid. So you can either find out his
+current email-Id from other sources. OR
+add David's or someone else's ID which has equivalent number of
+contributions in m25p80.c (that you can figure out from either commit
+logs or git blame).
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index 726a0f3..634adf5 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -38,6 +38,52 @@
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
- 			};
-+
-+			i2c1: i2c at f0018000 {
-+				pmic: act8865 at 5b {
-+					compatible = "active-semi,act8865";
-+					reg = <0x5b>;
-+					status = "disabled";
-+
-+					regulators {
-+						vcc_1v8_reg: DCDC_REG1 {
-+							regulator-name = "DCDC_REG1";
-+							regulator-min-microvolt = <1800000>;
-+							regulator-max-microvolt = <1800000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_1v2_reg: DCDC_REG2 {
-+							regulator-name = "DCDC_REG2";
-+							regulator-min-microvolt = <1100000>;
-+							regulator-max-microvolt = <1300000>;
-+							regulator-suspend-mem-microvolt = <1150000>;
-+							regulator-suspend-standby-microvolt = <1150000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_3v3_reg: DCDC_REG3 {
-+							regulator-name = "DCDC_REG3";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddfuse_reg: LDO_REG4 {
-+							regulator-name = "LDO_REG4";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddana_reg: LDO_REG5 {
-+							regulator-name = "LDO_REG5";
-+							regulator-min-microvolt = <2500000>;
-+							regulator-max-microvolt = <2500000>;
-+						};
-+					};
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 60000000 {
--- 
-1.7.9.5
+
+>>
+>> (2) Also, please remove following from spi-nor.c
+>>   However, you can keep this in fsl-quadspi.c.
+>>   +MODULE_AUTHOR("Freescale Semiconductor Inc.");
+>>   I'm sure this was _not_ present in original m25p80.c
+>>  (m25p80.c was started as ST's driver as per MODULE_DESCRIPTION)
+>okay.
+>
+Thanks much.
+You can put your name instead, I don't mind that bcoz you have worked
+to get this framework assembled by joining different pieces.
+
+However, please use a email-id which is valid for long-term (preferably
+your personal ID), so that even if your association with your company ends,
+still there is some way to track you and keep you in loop of future patches
+for this framework.
+
+>>
+>> (3)     +MODULE_LICENSE("GPL");
+>> Also, I assume the license version should be "GPLv2" ?
+>
+>yes. it should be v2.
+>
+
+with regards, pekon
