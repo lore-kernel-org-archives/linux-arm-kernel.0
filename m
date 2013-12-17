@@ -1,64 +1,216 @@
-From: arunkk.samsung@gmail.com (Arun Kumar K)
-Date: Tue, 17 Dec 2013 13:51:13 +0530
-Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
-In-Reply-To: <20131217091456.1af748c3@amdc2363>
-References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
- <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
- <20131209092324.1f8b6502@amdc2363>
- <CALt3h7-25_mW5SnnTbZWjoF0pOZxsU5Gg6FqOdoz1MgdH7gm5w@mail.gmail.com>
- <20131210173208.5083aa1f@amdc2363>
- <CABb+yY0C50va5UAgv5QKGKK6qE1wiDwcUmn54CC7PVQ8vpoEmg@mail.gmail.com>
- <20131217091456.1af748c3@amdc2363>
-Message-ID: <CALt3h78Zoabm+1kDNrEEyQ_Nshi2yOFd57NwOq6zTnVijfngJA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 17 Dec 2013 10:21:54 +0200
+Subject: [PATCHv10 03/41] CLK: ti: add init support for clock IP blocks
+In-Reply-To: <alpine.DEB.2.02.1312170745360.14039@utopia.booyaka.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-4-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1312170745360.14039@utopia.booyaka.com>
+Message-ID: <52B009A2.5000107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+On 12/17/2013 10:14 AM, Paul Walmsley wrote:
+> On Tue, 26 Nov 2013, Tero Kristo wrote:
+>
+>> ti_dt_clk_init_provider() can now be used to initialize the contents of
+>> a single clock IP block. This parses all the clocks under the IP block
+>> and calls the corresponding init function for them.
+>>
+>> This patch also introduces a helper function for the TI clock drivers
+>> to get register info from DT and append the master IP info to this.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>
+> ...
+>
+>> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+>> index ef1a7cd..63f85e9 100644
+>> --- a/drivers/clk/ti/clk.c
+>> +++ b/drivers/clk/ti/clk.c
+>> @@ -19,10 +19,15 @@
+>>   #include <linux/clkdev.h>
+>>   #include <linux/clk/ti.h>
+>>   #include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/list.h>
+>>
+>>   #undef pr_fmt
+>>   #define pr_fmt(fmt) "%s: " fmt, __func__
+>>
+>> +extern struct of_device_id __clk_of_table[];
+>
+> This results in a checkpatch.pl warning:
+>
+> WARNING: externs should be avoided in .c files
+> #33: FILE: drivers/clk/ti/clk.c:28:
+> +extern struct of_device_id __clk_of_table[];
 
-On Tue, Dec 17, 2013 at 1:44 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> Hi Jassi,
->
->> On Tue, Dec 10, 2013 at 10:02 PM, Lukasz Majewski
->> <l.majewski@samsung.com> wrote:
->> >>
->> >> Actually these values are not for PLL, but for the dividers.
->> >> If you see below, the PLL rate setting is done through
->> >> clk_set_rate() going via CCF. But I found an issue if the divider
->> >> values are set via clk_set_rate API.
->> >> What I found is, the system goes into freeze if all the divider
->> >> values are not set in one shot. So we cannot call multiple
->> >> clk_set_rate()'s on each divider. Thats why I continued with
->> >> non-CCF way of setting the divider.
->> >
->> > I see. I'm not an expert on common clock framework (CCF), but for me
->> > conceptually clock dividers setting shall be handled by CCF.
->> >
->> > However, I've poked a bit at CCF. There isn't any out of the box
->> > solutions available.
->> >
->> > A "virtual" clock can be defined and inside its implementation we
->> > can atomically set dividers. Another solution would be to hack the
->> > current CCF to provide atomic clock operations
->> >
->> CCF isn't only for clocks that have single divider or gate control
->> register. One could define a clock that manipulates more than one
->> divider/gate in one CCF callback. It is already abstract enough. So
->> implementing a virtual clock is the solution, imho.
->
-> Thanks for sharing your experience.
->
->>  BTW, on my platform linux needs to send a 'non-atomic' IPC message to
->> a master co-processor to scale up/down cpufreq. I just define a
->> virtual clock and use the generic bL cpufreq driver
->> drivers/cpufreq/arm_big_little.c
->
-> My use case is simpler - cpufreq-cpu0.c or arm_bit_little.c (for bL)
-> driver with maybe two virtual clocks to handle divider's update.
->
+This extern is only needed from this single file, and this code is 
+duplicated from drivers/clk/clk.c.
 
-Is it very simple where 5 different dividers with different divider ratios have
-to be set in one shot. Our clk_set_rate() API as such takes only one freq rate
-argument. How do you think to combine say 5 divider rates?
+> Please make sure your patches are checkpatch.pl-clean, with the exception
+> of the 80-column warnings and any const-related warnings related to the
+> clock framework.
+>
+>> +static int ti_dt_clk_regmap_index;
+>> +
+>>   /**
+>>    * ti_dt_clocks_register - register DT alias clocks during boot
+>>    * @oclks: list of clocks to register
+>> @@ -53,3 +58,96 @@ void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+>>   		}
+>>   	}
+>>   }
+>> +
+>> +typedef int (*ti_of_clk_init_cb_t)(struct device_node *);
+>
+> Normally typedefs should be a red flag to reviewers due to
+> Documentation/CodingStyle chapter 5.  Still it seems this patch is just
+> duplicating the way that the CCF does it, so I'm not too worried about it.
 
-Regards
-Arun
+This will be removed in next rev, and the standard typedef done by CCF 
+will be used instead.
+
+>
+>> +
+>> +struct clk_init_item {
+>> +	int index;
+>> +	struct device_node *np;
+>> +	ti_of_clk_init_cb_t init_cb;
+>> +	struct list_head node;
+>> +};
+>> +
+>> +static LIST_HEAD(retry_list);
+>> +
+>> +/**
+>> + * ti_clk_get_reg_addr - get register address for a clock register
+>> + * @node: device node for the clock
+>> + * @index: register index from the clock node
+>> + *
+>> + * Builds clock register address from device tree information. This
+>> + * is a struct of type clk_omap_reg.
+>> + */
+>> +void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+>> +{
+>> +	struct clk_omap_reg *reg;
+>> +	u32 val;
+>> +	u32 tmp;
+>> +
+>> +	reg = (struct clk_omap_reg *)&tmp;
+>> +	reg->index = ti_dt_clk_regmap_index;
+>> +
+>> +	if (of_property_read_u32_index(node, "reg", index, &val)) {
+>> +		pr_err("%s must have reg[%d]!\n", node->name, index);
+>> +		return NULL;
+>> +	}
+>> +
+>> +	reg->offset = val;
+>> +
+>> +	return (void __iomem *)tmp;
+>> +}
+>> +
+>> +/**
+>> + * ti_dt_clk_init_provider - init master clock provider
+>> + * @parent: master node
+>> + * @index: internal index for clk_reg_ops
+>> + *
+>> + * Initializes a master clock IP block and its child clock nodes.
+>> + * Regmap is provided for accessing the register space for the
+>> + * IP block and all the clocks under it.
+>> + */
+>> +void ti_dt_clk_init_provider(struct device_node *parent, int index)
+>> +{
+>> +	const struct of_device_id *match;
+>> +	struct device_node *np;
+>> +	ti_of_clk_init_cb_t clk_init_cb;
+>> +	struct clk_init_item *retry;
+>> +	struct clk_init_item *tmp;
+>> +	int ret;
+>> +
+>> +	ti_dt_clk_regmap_index = index;
+>> +
+>> +	for_each_child_of_node(parent, np) {
+>> +		match = of_match_node(__clk_of_table, np);
+>> +		if (!match)
+>> +			continue;
+>> +		clk_init_cb = (ti_of_clk_init_cb_t)match->data;
+>> +		pr_debug("%s: initializing: %s\n", __func__, np->name);
+>> +		ret = clk_init_cb(np);
+>> +		if (ret == -EAGAIN) {
+>> +			pr_debug("%s: adding to again list...\n", np->name);
+>> +			retry = kzalloc(sizeof(*retry), GFP_KERNEL);
+>> +			retry->np = np;
+>> +			retry->init_cb = clk_init_cb;
+>> +			list_add(&retry->node, &retry_list);
+>> +		} else if (ret) {
+>> +			pr_err("%s: clock init failed for %s (%d)!\n", __func__,
+>> +			       np->name, ret);
+>> +		}
+>> +	}
+>> +
+>> +	list_for_each_entry_safe(retry, tmp, &retry_list, node) {
+>> +		pr_debug("%s: retry-init: %s\n", __func__, retry->np->name);
+>> +		ti_dt_clk_regmap_index = retry->index;
+>> +		ret = retry->init_cb(retry->np);
+>> +		if (ret == -EAGAIN) {
+>> +			pr_debug("%s failed again?\n", retry->np->name);
+>
+> This is presumably a serious error condition and should be a pr_warn() or
+> pr_err(), right?
+
+Not a serious, I think this can happen still if we have dependencies 
+towards clocks from other IP blocks which provide clocks (e.g. DPLL uses 
+source clocks from both PRM + CM IPs.)
+
+> If retry_list won't be walked again, then it seems best to delete and free
+> the list_entry no matter what the return value is from retry->init_cb(),
+> since it's not like it will be retried.  Otherwise the code will leak
+> memory.
+
+It is actually retried, once the next IP block does its init.
+
+-Tero
+
+>
+>> +		} else {
+>> +			if (ret)
+>> +				pr_err("%s: clock init failed for %s (%d)!\n",
+>> +				       __func__, retry->np->name, ret);
+>> +			list_del(&retry->node);
+>> +			kfree(retry);
+>> +		}
+>> +	}
+>> +}
+>> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+>> index df94c24..d6bf530 100644
+>> --- a/include/linux/clk/ti.h
+>> +++ b/include/linux/clk/ti.h
+>> @@ -36,7 +36,21 @@ struct ti_dt_clk {
+>>   		.node_name = name,	\
+>>   	}
+>>
+>> +/* Maximum number of clock regmaps */
+>> +#define CLK_MAX_REGMAPS			4
+>>
+>> +/**
+>> + * struct clk_omap_reg - OMAP register declaration
+>> + * @offset: offset from the master IP module base address
+>> + * @index: index of the master IP module
+>> + */
+>> +struct clk_omap_reg {
+>> +	u16 offset;
+>> +	u16 index;
+>> +};
+>> +
+>> +void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
+>>   void ti_dt_clocks_register(struct ti_dt_clk *oclks);
+>> +void ti_dt_clk_init_provider(struct device_node *np, int index);
+>>
+>>   #endif
+>> --
+>> 1.7.9.5
+>>
+>
+>
+> - Paul
+>
