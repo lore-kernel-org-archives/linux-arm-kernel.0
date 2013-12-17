@@ -1,55 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Dec 2013 14:16:18 +0100
-Subject: [PATCH v3 7/7] mtd: spi-nor: Add Freescale QuadSpi driver
-In-Reply-To: <1387184330-14448-8-git-send-email-b32955@freescale.com>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <1387184330-14448-8-git-send-email-b32955@freescale.com>
-Message-ID: <201312171416.18560.marex@denx.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 17 Dec 2013 14:17:30 +0100
+Subject: [PATCH 2/2] ARM: device trees for Energy Micro's EFM32 Cortex-M3
+ SoCs
+In-Reply-To: <20131217113750.GB5307@netboy>
+References: <20131216190953.GB14866@pengutronix.de>
+ <1387221123-6794-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131217113750.GB5307@netboy>
+Message-ID: <20131217131730.GI14866@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 16, 2013 at 09:58:50 AM, Huang Shijie wrote:
-[...]
+On Tue, Dec 17, 2013 at 12:37:51PM +0100, Richard Cochran wrote:
+> On Mon, Dec 16, 2013 at 08:12:03PM +0100, Uwe Kleine-K?nig wrote:
+> 
+> > +		cmu: cmu at 400c8000 {
+> > +			compatible = "efm32gg,cmu";
+> 
+> I was able to run this on the EFM32LG without problems.  Are you sure
+> this CMU node is specific to the GG, or can it be shared?
+I remember me being grumpy because I found some differences between the
+GG and some other efm32 device. After looking again I cannot find the
+problem. Maybe the LG is compatible but some other is not.
 
-> +/* Macros for constructing the LUT register. */
-> +#define LUT0(ins, pad, opr)						\
-> +		(((opr) << OPRND0_SHIFT) | ((LUT_##pad) << PAD0_SHIFT) | \
-> +		((LUT_##ins) << INSTR0_SHIFT))
-> +
-> +#define LUT1(ins, pad, opr)	(LUT0(ins, pad, opr) << OPRND1_SHIFT)
+Can I assume your feedback as Tested-by:?
 
-Change this into an inline function, that way you'd get type-checking here.
+Best regards
+Uwe
 
-[...]
-
-> +enum fsl_qspi_devtype {
-> +	FSL_QUADSPI_VYBRID,
-> +	FSL_QUADSPI_IMX6SLX
-
-Will the SLX be only a single-core chip?
-
-> +};
-> +
-> +struct fsl_qspi_devtype_data {
-> +	enum fsl_qspi_devtype devtype;
-> +	u32 memmap_base;
-> +	int rxfifo;
-> +	int txfifo;
-> +};
-> +
-> +static struct fsl_qspi_devtype_data vybrid_data = {
-> +	.devtype = FSL_QUADSPI_VYBRID,
-> +	.memmap_base = 0x20000000,
-
-This memmap_base should come from DT prop.
-
-> +	.rxfifo = 128,
-> +	.txfifo = 64
-
-Ditto for both of these too. They're HW props.
-
-> +};
-[...]
-
-Best regards,
-Marek Vasut
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
