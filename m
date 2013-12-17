@@ -1,83 +1,90 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Tue, 17 Dec 2013 14:42:36 -0500
-Subject: [PATCH v7 9/9] ARM: dts: add usb udc support to bcm281xx
+Date: Tue, 17 Dec 2013 14:42:28 -0500
+Subject: [PATCH v7 1/9] phy: add phy_get_bus_width()/phy_set_bus_width() calls
 In-Reply-To: <1387309356-17195-1-git-send-email-mporter@linaro.org>
 References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
-Message-ID: <1387309356-17195-10-git-send-email-mporter@linaro.org>
+Message-ID: <1387309356-17195-2-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds USB OTG/PHY and clock support to BCM281xx and enables
-UDC support on the bcm11351-brt and bcm28155-ap boards.
+This adds a pair of APIs that allows the generic PHY subsystem to
+provide information on the PHY bus width. The PHY provider driver may
+use phy_set_bus_width() to set the bus width that the PHY supports.
+The controller driver may then use phy_get_bus_width() to fetch the
+PHY bus width in order to properly configure the controller.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/bcm11351-brt.dts |  6 ++++++
- arch/arm/boot/dts/bcm11351.dtsi    | 18 ++++++++++++++++++
- arch/arm/boot/dts/bcm28155-ap.dts  |  8 ++++++++
- 3 files changed, 32 insertions(+)
+ include/linux/phy/phy.h | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-index 23cd16d..396b704 100644
---- a/arch/arm/boot/dts/bcm11351-brt.dts
-+++ b/arch/arm/boot/dts/bcm11351-brt.dts
-@@ -44,5 +44,11 @@
- 		status = "okay";
- 	};
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 6d72269..e273e5a 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -38,6 +38,14 @@ struct phy_ops {
+ };
  
-+	usbotg: usb at 3f120000 {
-+		status = "okay";
-+	};
+ /**
++ * struct phy_attrs - represents phy attributes
++ * @bus_width: Data path width implemented by PHY
++ */
++struct phy_attrs {
++	u32			bus_width;
++};
++
++/**
+  * struct phy - represents the phy device
+  * @dev: phy device
+  * @id: id of the phy device
+@@ -46,6 +54,7 @@ struct phy_ops {
+  * @mutex: mutex to protect phy_ops
+  * @init_count: used to protect when the PHY is used by multiple consumers
+  * @power_count: used to protect when the PHY is used by multiple consumers
++ * @phy_attrs: used to specify PHY specific attributes
+  */
+ struct phy {
+ 	struct device		dev;
+@@ -55,6 +64,7 @@ struct phy {
+ 	struct mutex		mutex;
+ 	int			init_count;
+ 	int			power_count;
++	struct phy_attrs	attrs;
+ };
  
-+	usbphy: usb-phy at 3f130000 {
-+		status = "okay";
-+	};
- };
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 1246885..0fbb455 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -243,4 +243,22 @@
- 			#clock-cells = <0>;
- 		};
- 	};
+ /**
+@@ -127,6 +137,14 @@ int phy_init(struct phy *phy);
+ int phy_exit(struct phy *phy);
+ int phy_power_on(struct phy *phy);
+ int phy_power_off(struct phy *phy);
++static inline int phy_get_bus_width(struct phy *phy)
++{
++	return phy->attrs.bus_width;
++}
++static inline void phy_set_bus_width(struct phy *phy, int bus_width)
++{
++	phy->attrs.bus_width = bus_width;
++}
+ struct phy *phy_get(struct device *dev, const char *string);
+ struct phy *devm_phy_get(struct device *dev, const char *string);
+ void phy_put(struct phy *phy);
+@@ -199,6 +217,16 @@ static inline int phy_power_off(struct phy *phy)
+ 	return -ENOSYS;
+ }
+ 
++static inline int phy_get_bus_width(struct phy *phy)
++{
++	return -ENOSYS;
++}
 +
-+	usbotg: usb at 3f120000 {
-+		compatible = "snps,dwc2";
-+		reg = <0x3f120000 0x10000>;
-+		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&usb_otg_ahb_clk>;
-+		clock-names = "otg";
-+		phys = <&usbphy>;
-+		phy-names = "usb2-phy";
-+		status = "disabled";
-+	};
++static inline void phy_set_bus_width(struct phy *phy, int bus_width)
++{
++	return;
++}
 +
-+	usbphy: usb-phy at 3f130000 {
-+		compatible = "brcm,kona-usb2-phy";
-+		reg = <0x3f130000 0x28>;
-+		#phy-cells = <0>;
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 08e47c2..a3bc436 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -43,4 +43,12 @@
- 		cd-gpios = <&gpio 14 0>;
- 		status = "okay";
- 	};
-+
-+	usbotg: usb at 3f120000 {
-+		status = "okay";
-+	};
-+
-+	usbphy: usb-phy at 3f130000 {
-+		status = "okay";
-+	};
- };
+ static inline struct phy *phy_get(struct device *dev, const char *string)
+ {
+ 	return ERR_PTR(-ENOSYS);
 -- 
 1.8.4
