@@ -1,98 +1,85 @@
 From: kgene@kernel.org (kgene at kernel.org)
-Date: Tue, 17 Dec 2013 20:53:01 +0900
-Subject: [PATCH 09/11] ARM: EXYNOS: local definitions for cpuidle.c into
- mach-exynos dir
-Message-ID: <116701cefb1e$89821f40$9c865dc0$@kernel.org>
+Date: Tue, 17 Dec 2013 20:53:07 +0900
+Subject: [PATCH 10/11] ARM: EXYNOS: remove <mach/regs-clock.h> for exynos
+Message-ID: <116801cefb1e$8d3d5280$a7b7f780$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kukjin Kim <kgene.kim@samsung.com>
 
-This moves definitions for cpuidle into mach-exynos/cpuidle.c,
-because we don't need to keep them in the <mach/regs-clock.h>.
-
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/cpuidle.c                 |   23
-++++++++++++++++++++++-
- arch/arm/mach-exynos/include/mach/regs-clock.h |   21 ---------------------
- 2 files changed, 22 insertions(+), 22 deletions(-)
+ arch/arm/mach-exynos/include/mach/regs-clock.h |   19 -------------------
+ arch/arm/mach-exynos/platsmp.c                 |    1 -
+ arch/arm/mach-exynos/pmu.c                     |    2 +-
+ arch/arm/plat-samsung/pm.c                     |    2 +-
+ 4 files changed, 2 insertions(+), 22 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-clock.h
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 6ba13ea..da65b03 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -22,11 +22,13 @@
- #include <asm/suspend.h>
- #include <asm/unified.h>
- #include <asm/cpuidle.h>
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
+b/arch/arm/mach-exynos/include/mach/regs-clock.h
+deleted file mode 100644
+index cc121a5..0000000
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ /dev/null
+@@ -1,19 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/regs-clock.h
+- *
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS4 - Clock register definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_CLOCK_H
+-#define __ASM_ARCH_REGS_CLOCK_H __FILE__
+-
+-#include <plat/cpu.h>
+-#include <mach/map.h>
+-
+-#endif /* __ASM_ARCH_REGS_CLOCK_H */
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index b5b34f8..474432f 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -27,7 +27,6 @@
+ #include <asm/firmware.h>
+ 
+ #include <mach/hardware.h>
 -#include <mach/regs-clock.h>
  
  #include <plat/cpu.h>
- #include <plat/pm.h>
  
-+#include <mach/pm-core.h>
-+#include <mach/map.h>
-+
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 0116d5b..7f8c5ee 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -13,7 +13,7 @@
+ #include <linux/kernel.h>
+ #include <linux/bug.h>
+ 
+-#include <mach/regs-clock.h>
++#include <plat/cpu.h>
+ 
  #include "common.h"
  #include "regs-pmu.h"
- 
-@@ -39,6 +41,25 @@
- 
- #define S5P_CHECK_AFTR		0xFCBA0D10
- 
-+#define EXYNOS5_PWR_CTRL1			(S5P_VA_CMU + 0x01020)
-+#define EXYNOS5_PWR_CTRL2			(S5P_VA_CMU + 0x01024)
-+
-+#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
-+#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
-+#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
-+#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
-+#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
-+#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
-+#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
-+#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
-+
-+#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
-+#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
-+#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
-+#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
-+#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
-+#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
-+
- static int exynos4_enter_lowpower(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 				int index);
-diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
-b/arch/arm/mach-exynos/include/mach/regs-clock.h
-index 22afe63..cc121a5 100644
---- a/arch/arm/mach-exynos/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
-@@ -16,25 +16,4 @@
- #include <plat/cpu.h>
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 47ec54b..5f2add9 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -28,8 +28,8 @@
+ #ifdef CONFIG_SAMSUNG_ATAGS
+ #include <mach/hardware.h>
  #include <mach/map.h>
- 
--#define EXYNOS_CLKREG(x)			(S5P_VA_CMU + (x))
--
--#define EXYNOS5_PWR_CTRL1			EXYNOS_CLKREG(0x01020)
--#define EXYNOS5_PWR_CTRL2			EXYNOS_CLKREG(0x01024)
--
--#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
--#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
--#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
--#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
--#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
--#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
--#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
--#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
--
--#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
--#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
--#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
--#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
--#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
--#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
--
- #endif /* __ASM_ARCH_REGS_CLOCK_H */
+-#include <mach/regs-clock.h>
+ #ifndef CONFIG_ARCH_EXYNOS
++#include <mach/regs-clock.h>
+ #include <mach/regs-irq.h>
+ #endif
+ #include <mach/irqs.h>
 -- 
 1.7.10.4
