@@ -1,51 +1,52 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 16 Dec 2013 18:12:54 -0700
-Subject: [PATCH V2 04/13] ARM: dts: imx6qdl-sabrelite: move spi-nor CS to
- pinctrl_ecspi1
+Date: Mon, 16 Dec 2013 18:13:01 -0700
+Subject: [PATCH V2 11/13] ARM: dts: imx6qdl-sabrelite: fix ENET group
 In-Reply-To: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387242783-1462-5-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387242783-1462-12-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves pin EIM_D19 (CS) from pinctrl_hog to pinctrl_ecspi1.
-It also explicitly sets the pad to 0x000b1.
-
-Before this patch, it has the value 0x100b1 if using mainline u-boot.
-So this patch also removes hysteresis since the pad is always an output.
+GPIO16 is used for I2C3, not ENET_REF_CLK.
+Replace MX6QDL_ENET_PINGRP1 with explicit list.
+Also, remove pull-ups from tx pins, and ENET_MDIO
+which has an external pull-up.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+Reviewed-by: Marek Vasut <marex@denx.de>
 
 ---
-v2: New patch.. V1 patch to add comments was broken up into
-multiple patches
+v2:  minor change to commit message
 ---
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 96c3902..90d99bf 100644
+index 532a7e0..f1d8b24 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -114,7 +114,6 @@
- 	imx6q-sabrelite {
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
--				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
- 				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
- 				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
-@@ -126,7 +125,10 @@
- 		};
- 
- 		pinctrl_ecspi1: ecspi1grp {
--			fsl,pins = <MX6QDL_ECSPI1_PINGRP1>;
-+			fsl,pins = <
-+				MX6QDL_ECSPI1_PINGRP1
-+				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x000b1	/* CS */
-+			>;
- 		};
+@@ -216,7 +216,21 @@
  
  		pinctrl_enet: enetgrp {
+ 			fsl,pins = <
+-				MX6QDL_ENET_PINGRP1
++				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
++				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
++				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
++				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
++				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
++				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
++				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
++				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
++				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
++				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
++				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
++				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
++				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
++				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
++				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
+ 				/* Phy reset */
+ 				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
+ 			>;
 -- 
 1.8.1.2
