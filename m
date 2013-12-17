@@ -1,184 +1,34 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 17 Dec 2013 23:37:51 +0400
-Subject: [PATCH v3 21/21] misc: support for I-8024 in LP-8x4x
-In-Reply-To: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
-References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1387309071-22382-22-git-send-email-ynvich@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Dec 2013 19:41:30 +0000
+Subject: [PATCH 0/2] Add support for SolidRun's IMX6 board
+Message-ID: <20131217194130.GA4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Status of I-8042 4 analog output channels can be managed via
-sysfs.
+So, this patch series adds support for SolidRun's new platform which
+is similar in size to a well known board named after a type of fruit.
+These two patches add the basic support for the platform, without HDMI.
 
-http://www.icpdas.com/root/product/solutions/remote_io/rs-485/i-8k_i-87k/i-8024w.html
+Having discussed the timing of this with Rabeeh, I have his blessing to
+post this now.
 
-Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
----
-   v2..v3
-   * use usleep_range instead of custom nsleep
-   * number change (16/16 -> 21/21)
+The platform is made up from two boards:
+- A microsom board, which is re-used in the Cubox-I.  This board comes
+  in a couple of different configurations:
+  - AR8035 gigabit ethernet phy fitted
+  - AR8030 fast ethernet phy fitted
+  In order to support these two configurations, I have split the Ethernet
+  support from the rest of the microsom.  When the AR8030 versions are
+  available and known, I'll add the imx6qdl-microsom-ar8030.dtsi file.
+- The base board.
 
-   v0..v2
-   * no changes
+Not many changes are required to the code - the only requirement is the
+need to add AR8035 ethernet phy configuration support to the IMX6Q code.
 
- Documentation/misc-devices/lp8x4x_bus.txt | 15 ++++++
- drivers/misc/lp8x4x_bus.c                 | 78 +++++++++++++++++++++++++++++++
- 2 files changed, 93 insertions(+)
-
-diff --git a/Documentation/misc-devices/lp8x4x_bus.txt b/Documentation/misc-devices/lp8x4x_bus.txt
-index 3ea257d..6076e01 100644
---- a/Documentation/misc-devices/lp8x4x_bus.txt
-+++ b/Documentation/misc-devices/lp8x4x_bus.txt
-@@ -66,3 +66,18 @@ input_status
- output_status
- 	RW - set status of digital output channels on the module in
- 	     the expansion slot. Value can be read back.
-+
-+analog_output
-+	RW - set status of analog output channels on the module in
-+	     the expansion slot. Tested with voltage output. Bits 0-13:
-+	     0x00c0 is -10.0V
-+	     0x2000 is   0.0V
-+	     0x3f40 is +10.0V
-+
-+	     So 1 unit of output is 1.25 mV.
-+
-+	     Bits 15 and 14 determine which channel to apply the value:
-+	     0x0000 is channel 1
-+	     0x4000 is channel 2
-+	     0x8000 is channel 3
-+	     0xc000 is channel 4
-diff --git a/drivers/misc/lp8x4x_bus.c b/drivers/misc/lp8x4x_bus.c
-index 3fb227d..72cd0b2 100644
---- a/drivers/misc/lp8x4x_bus.c
-+++ b/drivers/misc/lp8x4x_bus.c
-@@ -8,6 +8,7 @@
-  *  it under the terms of the GNU General Public License version 2 as
-  *  published by the Free Software Foundation or any later version.
-  */
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/gpio/consumer.h>
- #include <linux/init.h>
-@@ -23,6 +24,7 @@ MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Sergei Ianovich <ynvich@gmail.com>");
- MODULE_DESCRIPTION("ICP DAS LP-8x4x parallel bus driver");
- 
-+#define LP8X4X_MAX_AO_CHANNELS	4
- struct lp8x4x_slot {
- 	void			*data_addr;
- 	unsigned int		model;
-@@ -31,6 +33,8 @@ struct lp8x4x_slot {
- 	u32			DO;
- 	unsigned int		DI_len;
- 	u32			DI;
-+	unsigned int		AO_len;
-+	u32			AO[LP8X4X_MAX_AO_CHANNELS];
- 	struct device		dev;
- };
- 
-@@ -120,6 +124,26 @@ static void lp8x4x_slot_set_DO(struct lp8x4x_slot *s)
- 	mutex_unlock(&s->lock);
- }
- 
-+static void lp8x4x_slot_reset_AO(struct lp8x4x_slot *s)
-+{
-+	int i;
-+	mutex_lock(&s->lock);
-+	for (i = 0; i < s->AO_len; i++)
-+		s->AO[i] = 0x2000;
-+	iowrite8(0x00, s->data_addr);
-+	usleep_range(1, 2);
-+	iowrite8(0xff, s->data_addr);
-+	mutex_unlock(&s->lock);
-+}
-+
-+static void lp8x4x_slot_set_AO(struct lp8x4x_slot *s, u32 val)
-+{
-+	mutex_lock(&s->lock);
-+	iowrite8(val & 0xff, s->data_addr + 2);
-+	iowrite8((val >> 8) & 0xff, s->data_addr + 4);
-+	mutex_unlock(&s->lock);
-+}
-+
- static ssize_t input_status_show(struct device *dev,
- 		struct device_attribute *attr, char *buf)
- {
-@@ -191,6 +215,48 @@ static ssize_t output_status_store(struct device *dev,
- 
- static DEVICE_ATTR_RW(output_status);
- 
-+static ssize_t analog_output_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	struct lp8x4x_slot *s = container_of(dev, struct lp8x4x_slot, dev);
-+	int i, c = 0;
-+
-+	for (i = 0; i < s->AO_len; i++)
-+		c += sprintf(&buf[c], "0x%04x\n", s->AO[i]);
-+	return c;
-+}
-+
-+static ssize_t analog_output_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	struct lp8x4x_slot *s = container_of(dev, struct lp8x4x_slot, dev);
-+	u32 AO;
-+	int i;
-+
-+	if (!buf)
-+		return count;
-+	if (0 == count)
-+		return count;
-+
-+	if (kstrtouint(buf, 16, &AO) != 0) {
-+		dev_err(dev, "bad input\n");
-+		return count;
-+	}
-+
-+	if (AO & 0xffff0000) {
-+		dev_err(dev, "bad input\n");
-+		return count;
-+	}
-+
-+	i = AO >> 14;
-+	s->AO[i] = AO & 0x3fff;
-+	lp8x4x_slot_set_AO(s, AO);
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR_RW(analog_output);
-+
- static ssize_t model_show(struct device *dev,
- 		struct device_attribute *attr, char *buf)
- {
-@@ -222,6 +288,13 @@ static struct attribute *dio_slot_dev_attrs[] = {
- };
- ATTRIBUTE_GROUPS(dio_slot_dev);
- 
-+static struct attribute *ao_slot_dev_attrs[] = {
-+	&dev_attr_model.attr,
-+	&dev_attr_analog_output.attr,
-+	NULL,
-+};
-+ATTRIBUTE_GROUPS(ao_slot_dev);
-+
- static void lp8x4x_master_release(struct device *dev)
- {
- 	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
-@@ -382,6 +455,11 @@ static void __init lp8x4x_bus_probe_slot(struct lp8x4x_master *m, int i,
- 	mutex_init(&s->lock);
- 
- 	switch (model) {
-+	case 24:
-+		s->AO_len = 4;
-+		lp8x4x_slot_reset_AO(s);
-+		s->dev.groups = ao_slot_dev_groups;
-+		break;
- 	case 41:
- 		s->DO_len = 4;
- 		lp8x4x_slot_set_DO(s);
--- 
-1.8.4.2
+ arch/arm/boot/dts/Makefile                     |    1 +
+ arch/arm/boot/dts/imx6dl-hummingboard.dts      |   90 ++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi |   58 +++++++++++++++
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi        |   80 +++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig           |    4 +
+ arch/arm/mach-imx/mach-imx6q.c                 |   35 +++++++++
+ 6 files changed, 268 insertions(+), 0 deletions(-)
