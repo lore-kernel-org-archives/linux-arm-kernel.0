@@ -1,15 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 17 Dec 2013 15:58:59 -0700
-Subject: [PATCH 1/4] ARM: tegra: moving tegra_bct_strapping to tegra-soc.h
- for global visibility
-In-Reply-To: <1387272400-4689-2-git-send-email-josephl@nvidia.com>
+Date: Tue, 17 Dec 2013 16:02:44 -0700
+Subject: [PATCH 4/4] clk: tegra20: enable EMC clock driver
+In-Reply-To: <1387272400-4689-5-git-send-email-josephl@nvidia.com>
 References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-2-git-send-email-josephl@nvidia.com>
-Message-ID: <52B0D733.3030109@wwwdotorg.org>
+ <1387272400-4689-5-git-send-email-josephl@nvidia.com>
+Message-ID: <52B0D814.8040208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/17/2013 02:26 AM, Joseph Lo wrote:
-> This patch moves the tegra_btc_strapping variable to the tegra-soc.h for
+> Re-register the EMC clock to the EMC clock driver in the Tegra CCF
+> driver to support EMC scaling.
 
-s/btc/bct/
+Can't this be squashed into patch 2/4?
