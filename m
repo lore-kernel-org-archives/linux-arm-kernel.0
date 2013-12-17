@@ -1,40 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 17 Dec 2013 18:31:13 +0000
-Subject: [PATCH 1/2] kvmtool: Support unsigned int options
-In-Reply-To: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
-References: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
-Message-ID: <1387305074-29421-2-git-send-email-robin.murphy@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 17 Dec 2013 19:31:21 +0100
+Subject: pwm-backlight: 3.13-rc1 regression for old arm machine
+In-Reply-To: <20131217095658.GD13823@ulmo.nvidia.com> (Thierry Reding's
+ message of "Tue, 17 Dec 2013 10:57:00 +0100")
+References: <87r49c6bea.fsf@free.fr> <20131217095658.GD13823@ulmo.nvidia.com>
+Message-ID: <87iounuy6e.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for unsigned int command-line options by implementing the
-OPT_UINTEGER macro.
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- tools/kvm/include/kvm/parse-options.h |    9 +++++++++
- 1 file changed, 9 insertions(+)
+> I hadn't anticipated that =(. In fact I had been holding this patch back
+> for a release cycle because I was waiting for a specific regulator patch
+> to land which provides a dummy regulator if one wasn't specified. It
+> seems that that patch only works when booting from DT, though.
+>
+> The correct way to fix this would be to provide a lookup table with the
+> dummy regulator in the board file. I've attached a patch (compile-tested
+> only) that might work.
+>
+> If it does, please let me know and, if nobody else volunteers, I'll see
+> if I can come up with a set of patches to fix this for any other boards
+> that have the same issue.
+Actually, it needs a very small "tweak" to work :
+-	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
++	REGULATOR_SUPPLY("power", "pwm-backlight"),
 
-diff --git a/tools/kvm/include/kvm/parse-options.h b/tools/kvm/include/kvm/parse-options.h
-index 09a5fca..b03f151 100644
---- a/tools/kvm/include/kvm/parse-options.h
-+++ b/tools/kvm/include/kvm/parse-options.h
-@@ -109,6 +109,15 @@ struct option {
- 	.help = (h)                         \
- }
- 
-+#define OPT_UINTEGER(s, l, v, h)            \
-+{                                           \
-+	.type = OPTION_UINTEGER,            \
-+	.short_name = (s),                  \
-+	.long_name = (l),                   \
-+	.value = check_vtype(v, unsigned int *), \
-+	.help = (h)                         \
-+}
-+
- #define OPT_U64(s, l, v, h)                 \
- {                                           \
- 	.type = OPTION_U64,                 \
--- 
-1.7.9.5
+Without it regulator_dev_lookup() won't match the device.
+
+Moreover, it requires a config option, CONFIG_REGULATOR_FIXED_VOLTAGE=y. That's
+not a problem for my specific platform, but I haven't seen *any* PXA platform
+with it activated, which means all defconfigs have to be patched, which is
+unfortunate.
+
+As for my specific mioa701, your change with the tweak is perfectly fine and
+tested.
+
+Cheers.
+
+--
+Robert
