@@ -1,280 +1,197 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 Dec 2013 12:10:22 +0100
-Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <1386925027-16288-2-git-send-email-Li.Xiubo@freescale.com>
-References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
- <1386925027-16288-2-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20131217111020.GF13823@ulmo.nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Dec 2013 11:20:20 +0000
+Subject: [PATCH v5] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <52AB6FA5.30104@linaro.org>
+References: <1386941006-23388-1-git-send-email-andre.przywara@linaro.org>
+ <20131213201017.GC2871@cbox> <52AB6FA5.30104@linaro.org>
+Message-ID: <52B03374.9060000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
-[...]
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 8b754e4..9029a12 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -5,6 +5,7 @@ obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
->  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->  obj-$(CONFIG_PWM_EP93XX)	+= pwm-ep93xx.o
->  obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
-> +obj-$(CONFIG_PWM_FSL_FTM)	+= pwm-fsl-ftm.o
+On 13/12/13 20:35, Andre Przywara wrote:
+> On 12/13/2013 09:10 PM, Christoffer Dall wrote:
+>> On Fri, Dec 13, 2013 at 02:23:26PM +0100, Andre Przywara wrote:
+>>> For migration to work we need to save (and later restore) the state of
+>>> each core's virtual generic timer.
+>>> Since this is per VCPU, we can use the [gs]et_one_reg ioctl and export
+>>> the three needed registers (control, counter, compare value).
+>>> Though they live in cp15 space, we don't use the existing list, since
+>>> they need special accessor functions and the arch timer is optional.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>> Changes from v1:
+>>> - move code out of coproc.c and into guest.c and arch_timer.c
+>>> - present the registers with their native CP15 addresses, but without
+>>>    using space in the VCPU's cp15 array
+>>> - do the user space copying in the accessor functions
+>>>
+>>> Changes from v2:
+>>> - fix compilation without CONFIG_ARCH_TIMER
+>>> - fix compilation for arm64 by defining the appropriate registers there
+>>> - move userspace access out of arch_timer.c into coproc.c
+>>> - Christoffer: removed whitespace in function declaration
+>>>
+>>> Changes from v3:
+>>> - adapted Marc's SYSREG macro magic from kvmtool for nicer looking code
+>>>
+>>> Changes from v4:
+>>> - remove ARM64-REG32 type, the ARM ARM defines no 32-bit system registers
+>>>
+>>>   arch/arm/include/asm/kvm_host.h   |  3 ++
+>>>   arch/arm/include/uapi/asm/kvm.h   | 20 +++++++++
+>>>   arch/arm/kvm/guest.c              | 92 ++++++++++++++++++++++++++++++++++++++-
+>>>   arch/arm64/include/uapi/asm/kvm.h | 18 ++++++++
+>>>   virt/kvm/arm/arch_timer.c         | 34 +++++++++++++++
+>>>   5 files changed, 166 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>> index 8a6f6db..098f7dd 100644
+>>> --- a/arch/arm/include/asm/kvm_host.h
+>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>> @@ -225,4 +225,7 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>>>   int kvm_perf_init(void);
+>>>   int kvm_perf_teardown(void);
+>>>
+>>> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>>> +int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>>> +
+>>>   #endif /* __ARM_KVM_HOST_H__ */
+>>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>>> index c498b60..835b867 100644
+>>> --- a/arch/arm/include/uapi/asm/kvm.h
+>>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>>> @@ -119,6 +119,26 @@ struct kvm_arch_memory_slot {
+>>>   #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
+>>>   #define KVM_REG_ARM_32_CRN_SHIFT	11
+>>>
+>>> +#define ARM_CP15_REG_SHIFT_MASK(x,n) \
+>>> +	(((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
+>>> +
+>>> +#define __ARM_CP15_REG(op1,crn,crm,op2) \
+>>> +	(KVM_REG_ARM | (15 << KVM_REG_ARM_COPROC_SHIFT) | \
+>>> +	ARM_CP15_REG_SHIFT_MASK(op1, OPC1) | \
+>>> +	ARM_CP15_REG_SHIFT_MASK(crn, 32_CRN) | \
+>>> +	ARM_CP15_REG_SHIFT_MASK(crm, CRM) | \
+>>> +	ARM_CP15_REG_SHIFT_MASK(op2, 32_OPC2))
+>>> +
+>>> +#define ARM_CP15_REG32(...) (__ARM_CP15_REG(__VA_ARGS__) | KVM_REG_SIZE_U32)
+>>> +
+>>> +#define __ARM_CP15_REG64(op1,crm) \
+>>> +	(__ARM_CP15_REG(op1, 0, crm, 0) | KVM_REG_SIZE_U64)
+>>> +#define ARM_CP15_REG64(...) __ARM_CP15_REG64(__VA_ARGS__)
+>>> +
+>>> +#define KVM_REG_ARM_TIMER_CTL		ARM_CP15_REG32(0, 14, 3, 1)
+>>> +#define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14)
+>>> +#define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14)
+>>> +
+>>>   /* Normal registers are mapped as coprocessor 16. */
+>>>   #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+>>>   #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
+>>> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+>>> index 20f8d97..2786eae 100644
+>>> --- a/arch/arm/kvm/guest.c
+>>> +++ b/arch/arm/kvm/guest.c
+>>> @@ -109,6 +109,83 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+>>>   	return -EINVAL;
+>>>   }
+>>>
+>>> +#ifndef CONFIG_KVM_ARM_TIMER
+>>> +
+>>> +#define NUM_TIMER_REGS 0
+>>> +
+>>> +static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>> +{
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static bool is_timer_reg(u64 index)
+>>> +{
+>>> +	return false;
+>>> +}
+>>> +
+>>> +int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+>>> +{
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+>>> +{
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +#else
+>>> +
+>>> +#define NUM_TIMER_REGS 3
+>>> +
+>>> +static bool is_timer_reg(u64 index)
+>>> +{
+>>> +	switch (index) {
+>>> +	case KVM_REG_ARM_TIMER_CTL:
+>>> +	case KVM_REG_ARM_TIMER_CNT:
+>>> +	case KVM_REG_ARM_TIMER_CVAL:
+>>> +		return true;
+>>> +	}
+>>> +	return false;
+>>> +}
+>>> +
+>>> +static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>> +{
+>>> +	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
+>>> +		return -EFAULT;
+>>> +	uindices++;
+>>> +	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
+>>> +		return -EFAULT;
+>>> +	uindices++;
+>>> +	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
+>>> +		return -EFAULT;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +#endif
+>>> +
+>>> +static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>>> +{
+>>> +	void __user *uaddr = (void __user *)(long)reg->addr;
+>>> +	u64 val;
+>>> +	int ret;
+>>> +
+>>> +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+>>> +	if (ret != 0)
+>>> +		return ret;
+>>> +
+>>> +	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
+>>> +}
+>>> +
+>>> +static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>>> +{
+>>> +	void __user *uaddr = (void __user *)(long)reg->addr;
+>>> +	u64 val;
+>>> +
+>>> +	val = kvm_arm_timer_get_reg(vcpu, reg->id);
+>>> +	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
+>>> +}
+>>> +
+>>
+>> how does any of this code get called for arm64?
+> 
+> Currently not at all. Sorry if there was a misunderstanding regarding 
+> this. I don't have the hardware to test this, so I just did the 32-bit 
+> part. The 64-bit pieces were just to make it _compile_ on 64-bit, which 
+> is needed because of shared code in the arch_timer area.
+> See Marc's comment here:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-June/006133.html
 
-This needs to move up one line to preserve the alphabetical ordering.
+It would have been good if it was done at the same time, but I'm not
+even sure we have the corresponding userspace code to even test it.
 
-> diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
-[...]
-> +struct fsl_pwm_chip {
-[...]
-> +	int big_endian;
+So, assuming that someone will eventually implement it when QEMU/arm64
+reaches the same level as its 32bit counterpart:
 
-This should be of type bool.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> +};
-> +
-> +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> +		const void __iomem *addr)
-> +{
-> +	u32 val;
-> +
-> +	val = __raw_readl(addr);
-> +
-> +	if (likely(fpc->big_endian))
-
-The likely() probably isn't very useful in this case. But if you want to
-keep it, it should at least be reversed, since little-endian is actually
-the default (you have to specify the big-endian property to activate the
-big endian mode).
-
-> +		val = be32_to_cpu(val);
-> +	else
-> +		val = le32_to_cpu(val);
-> +	rmb();
-
-I'd prefer the rmb() to follow the __raw_readl() immediately to make the
-relationship more explicit.
-
-> +
-> +	return val;
-> +}
-> +
-> +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
-> +		u32 val, void __iomem *addr)
-> +{
-> +	wmb();
-> +	if (likely(fpc->big_endian))
-> +		val = cpu_to_be32(val);
-> +	else
-> +		val = cpu_to_le32(val);
-> +
-> +	__raw_writel(val, addr);
-
-Same here. wmb() should precede __raw_writel() immediately.
-
-> +static inline int fsl_pwm_calculate_default_ps(struct fsl_pwm_chip *fpc,
-> +		int index)
-
-Please align arguments on subsequent lines with the first argument on
-the first line. There are a few more of those in this file, please check
-all other functions as well.
-
-Also I think it's better to turn the FSL_PWM_CLK_* enum into a named
-enum and reuse the type here. That way you get proper type-checking.
-
-> +	switch (index) {
-[...]
-> +	default:
-> +		return -EINVAL;
-
-And with proper type checking you don't need this default case anymore.
-
-> +static unsigned long fsl_pwm_calculate_period_cycles(struct fsl_pwm_chip *fpc,
-> +		unsigned long period_ns, int index)
-> +{
-> +	int ret;
-> +	unsigned long cycles;
-> +
-> +	fpc->counter_clk_select = FTM_SC_CLK(index);
-> +
-> +	ret = fsl_pwm_calculate_default_ps(fpc, index);
-> +	if (ret) {
-> +		dev_err(fpc->chip.dev, "failed to calculate default ps.\n");
-
-No need for the terminating fullstop (.) here, but perhaps you could
-write out what "ps" actually stands for. Also including the error code
-in the error message would be good since you're not propagating the
-error to the caller.
-
-> +	cycles = fsl_pwm_calculate_cycles(fpc, period_ns);
-> +
-> +	return cycles;
-
-This can simply be "return fsl_pwm_calculate_cycles(fpc, period_ns);",
-in which case you can get rid of the cycles variable.
-
-> +static unsigned long fsl_pwm_calculate_period(struct fsl_pwm_chip *fpc,
-> +		unsigned long period_ns)
-> +{
-[...]
-> +	if (fix_rate > ext_rate) {
-> +		m0 = FSL_PWM_CLK_FIX;
-> +		m1 = FSL_PWM_CLK_EXT;
-> +	} else {
-> +		m0 = FSL_PWM_CLK_EXT;
-> +		m1 = FSL_PWM_CLK_FIX;
-> +
-> +	}
-
-There's a gratuitous blank line above this one.
-
-> +static int fsl_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			  int duty_ns, int period_ns)
-> +{
-> +	u32 val, period, duty;
-> +	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-> +
-> +	mutex_lock(&fpc->lock);
-> +	if (fpc->period_ns && fpc->period_ns != period_ns) {
-
-There should be a blank line between the above two.
-
-> +		dev_err(fpc->chip.dev, "fail to config pwm%d, the period "
-> +				"time should be the same with the current "
-> +				"running pwm(s).\n", pwm->hwpwm);
-
-I think I'd make this error message more terse and put more information
-into a comment. Perhaps something like this:
-
-	/*
-	 * The FSL FTM controller supports only a single period for all PWM
-	 * channels, therefore incompatible changes need to be refused.
-	 */
-	if (fpc->period_ns && fpc->period_ns != period_ns) {
-		dev_err(fpc->chip.dev,
-			"conflicting period requested for PWM %u\n",
-			pwm->hwpwm);
-		...
-	}
-
-> +		mutex_unlock(&fpc->lock);
-> +		return -EINVAL;
-
-I think something like -EBUSY would be more appropriate here.
-
-> +	if (!fpc->period_ns && duty_ns) {
-> +		period = fsl_pwm_calculate_period(fpc, period_ns);
-> +		if (!period) {
-> +			dev_err(fpc->chip.dev, "fail to calculate the "
-
-"failed"
-
-> +					"period cycles.\n");
-
-And no fullstop either. Also I don't think you need "cycles" here. In
-fact something equally accurate like this:
-
-			dev_err(fpc->chip.dev, "failed to calculate period\n");
-
-Still fits within 80 characters.
-
-> +		fpc->period_ns = period_ns;
-> +	}
-> +	mutex_unlock(&fpc->lock);
-
-This could use a blank line as well.
-
-> +static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				enum pwm_polarity polarity)
-> +{
-> +	u32 val;
-> +	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-> +
-> +	val = fsl_pwm_readl(fpc, fpc->base + FTM_POL);
-> +	if (polarity == PWM_POLARITY_INVERSED)
-
-Blank line between the above.
-
-> +		val |= BIT(pwm->hwpwm);
-> +	else
-> +		val &= ~BIT(pwm->hwpwm);
-> +	fsl_pwm_writel(fpc, val, fpc->base + FTM_POL);
-
-And here.
-
-> +static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	u32 val;
-> +	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-> +
-> +	val = fsl_pwm_readl(fpc, fpc->base + FTM_OUTMASK);
-> +	val |= BIT(pwm->hwpwm);
-> +	fsl_pwm_writel(fpc, val, fpc->base + FTM_OUTMASK);
-> +
-> +	mutex_lock(&fpc->lock);
-> +	fsl_counter_clock_disable(fpc);
-> +
-> +	val = fsl_pwm_readl(fpc, fpc->base + FTM_OUTMASK);
-> +	if ((val & 0xFF) == 0xFF) {
-> +		fpc->period_ns = 0;
-> +		fpc->counter_clk_en = NULL;
-> +	}
-> +	mutex_unlock(&fpc->lock);
-
-Same here.
-
-> +static int fsl_pwm_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct fsl_pwm_chip *fpc;
-> +	struct resource *res;
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
-> +	if (!fpc)
-> +		return -ENOMEM;
-> +
-> +	mutex_init(&fpc->lock);
-> +
-> +	fpc->chip.dev = &pdev->dev;
-> +
-> +	fpc->big_endian = of_property_read_bool(np, "big-endian");
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	fpc->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(fpc->base))
-> +		return PTR_ERR(fpc->base);
-> +
-> +	fpc->sys_clk = devm_clk_get(fpc->chip.dev, "ftm_sys");
-
-For consistency I'd use &pdev->dev here...
-
-> +	if (IS_ERR(fpc->sys_clk)) {
-> +		dev_err(fpc->chip.dev,
-
-... and here.
-
-> +	ret = pwmchip_add(&fpc->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
-
-Perhaps "failed to add PWM chip: %d\n", so that %d isn't confused to
-mean the PWM chip number?
-
-> +static int fsl_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct fsl_pwm_chip *fpc = platform_get_drvdata(pdev);
-> +
-> +	mutex_destroy(&fpc->lock);
-
-I think you can drop this. Once fsl_pwm_remove() exists, the memory
-pointed to by fpc will be freed, so you won't be able to access the
-mutex anyway.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/4343ace0/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
