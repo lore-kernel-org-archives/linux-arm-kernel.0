@@ -1,53 +1,61 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 17 Dec 2013 00:42:38 -0800
-Subject: [PATCH v3 9/9] mtd: nand: davinci: don't request AEMIF address
- range
-In-Reply-To: <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20131217084238.GJ12034@norris-Latitude-E6410>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 17 Dec 2013 16:16:26 +0800
+Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and max_discard_to
+Message-ID: <1387268191-19859-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 07:25:57PM +0200, Ivan Khoronzhuk wrote:
-> The TI AEMIF driver registers are used to setup timings for each chip
-> select. The same registers range is used to setup NAND settings.
-> The AEMIF and NAND drivers not use the same registers in this range.
-> 
-> In case with TI AEMIF driver, the memory address range is requested
-> already by AEMIF, so we cannot request it twice, just ioremap.
-> 
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Reviewed-by: Taras Kondratiuk <taras@ti.com>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->  drivers/mtd/nand/davinci_nand.c |    8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-> index f7b21b8..0cd4dbc 100644
-> --- a/drivers/mtd/nand/davinci_nand.c
-> +++ b/drivers/mtd/nand/davinci_nand.c
-> @@ -636,9 +636,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
->  	if (IS_ERR(vaddr))
->  		return PTR_ERR(vaddr);
->  
-> -	base = devm_ioremap_resource(&pdev->dev, res2);
-> -	if (IS_ERR(base))
-> -		return PTR_ERR(base);
-> +	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
+Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
+1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
+while 3~4 fix setting the max timeout.
+Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
+for those platform which have different timeout setting.
 
-Since it's important that we don't re-introduce the "request resource"
-boilerplate later, can you add a comment describing the situation?
+This issue is firstly reported here by Ed Sutter:
+http://www.spinics.net/lists/linux-mmc/msg23375.html
+The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
+which cause the max_discard_bytes for eMMC is only 512, then the discard operation
+of mkfs.ext3 for an eMMC card is too slow, just like dead.
+With above patches, the issue can be fixed.
 
-> +	if (!base) {
-> +		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
-> +		return -EADDRNOTAVAIL;
-> +	}
->  
->  	info->dev		= &pdev->dev;
->  	info->base		= base;
+Patch 5 adds the capability to calcalute the max_discard_to dynamically
+for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
 
-Thanks,
-Brian
+Originally the max_discard_to for a high speed sdhc card may be:
+mmc1: new high speed SDHC card at address aaaa
+mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
+After fix:
+mmc1: new high speed SDHC card@address aaaa
+mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
+
+It also improves the card discard performance a lot due to max_discard_sectors
+increase a lot.
+
+There's also discussion about remove max_discard_to limit here:
+http://www.spinics.net/lists/linux-mmc/msg23395.html
+But it does not help for uSDHC since we can observe data timeout
+on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
+
+ChangeLog:
+v1->v2:
+ 1. change .get_max_timeout to .get_max_timeout_count to reuse some code
+ 2. some other minor changes based on Shawn's comment.
+ 3. patch 6 in v1 is dropped since not need anymore after change 1
+
+
+
+Dong Aisheng (5):
+  mmc: sdhci: add platfrom get_max_timeout_count hook
+  mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
+  mmc: sdhci: add platform set_timeout hook
+  mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
+  mmc: sdhci: calculate max_discard_to dynamically for
+    SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+
+ drivers/mmc/host/sdhci-esdhc-imx.c |   20 +++++++++++
+ drivers/mmc/host/sdhci.c           |   66 +++++++++++++++++++++++------------
+ drivers/mmc/host/sdhci.h           |    3 ++
+ 3 files changed, 66 insertions(+), 23 deletions(-)
+
+-- 
+1.7.2.rc3
