@@ -1,81 +1,56 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 17 Dec 2013 12:29:31 +0100
-Subject: [PATCH v2] use -fstack-protector-strong
-In-Reply-To: <CAGXu5j+0gjN118RijCinw31g51BZez_oGKFYJwq2T3=yojG_ww@mail.gmail.com>
-References: <20131126203727.GA352@www.outflux.net>
- <20131127112731.GA10435@gmail.com>
- <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
- <20131127175442.GA28088@gmail.com> <52963223.9080701@zytor.com>
- <CAGXu5j+6_M65pDoJjx1NEUw8SkfpGjH=yhswt-RW=_W97=kkzQ@mail.gmail.com>
- <CAGXu5j+0gjN118RijCinw31g51BZez_oGKFYJwq2T3=yojG_ww@mail.gmail.com>
-Message-ID: <20131217112931.GC27791@gmail.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue, 17 Dec 2013 17:05:34 +0530
+Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
+Message-ID: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Power State and Coordination Interface (PSCI) specification defines
+SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
 
-* Kees Cook <keescook@chromium.org> wrote:
+This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+KVM_EXIT_SYSTEM_EVENT exit reason.
 
-> On Wed, Nov 27, 2013 at 10:11 AM, Kees Cook <keescook@chromium.org> wrote:
-> > On Wed, Nov 27, 2013 at 9:55 AM, H. Peter Anvin <hpa@zytor.com> wrote:
-> >> On 11/27/2013 09:54 AM, Ingo Molnar wrote:
-> >>>>
-> >>>> Looks to be 2% for defconfig. That's way better. Shall I send a v3?
-> >>>
-> >>> Well, it's better than 9%, but still almost an order of magnitude
-> >>> higher than the cost is today, and a lot of distros have
-> >>> CONFIG_CC_STACKPROTECTOR=y.
-> >>>
-> >>> So it would be nice to measure how much the instruction count goes up
-> >>> in some realistic system-bound test. How much does something like
-> >>> kernel/built-in.o increase, as per 'size' output?
-> >
-> >    text    data     bss     dec     hex filename
-> >  929611   90851  594496 1614958  18a46e built-in.o-gcc-4.9
-> >  954648   90851  594496 1639995  19063b built-in.o-gcc-4.9+strong
-> >
-> > Looks like 3% for defconfg + CONFIG_CC_STACKPROTECTOR
-> >
-> >>
-> >> Do we need CONFIG_CC_STACKPROTECTOR_STRONG?
-> >
-> > I'm hoping to avoid this since nearly anyone using 
-> > CC_STACKPROTECTOR would want strong added, but as a fallback, I'm 
-> > happy to implement it as a separate config item.
-> 
-> Any verdict on this? Should I go with adding ..._STRONG like we used 
-> to have for ..._ALL, or is defaulting to -strong best?
+To try this patch from guest kernel, we will need PSCI-based restart and
+poweroff support in the guest kenel for both ARM and ARM64.
 
-I'm not opposed to the feature itself, just to the specific structure 
-you presented - as outlined in my review feedback.
+Rob Herring has already submitted patches for PSCI-based restart and
+poweroff in ARM kernel but these are not merged yet due unstable device
+tree bindings of kernel PSCI support. We will be having similar patches
+for PSCI-based restart and poweroff in ARM64 kernel.
+(Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+(Refer http://www.spinics.net/lists/devicetree/msg05348.html)
 
-The cost of the feature itself appears to be significant (this cost 
-should be outlined in the help text btw), while I think the cost of 
-adding this as a new _STRONG option is minimal.
+Change Log:
 
-So I'd go forward with addressing two issues:
+V3:
+ - Simplify handle_hvc() for both ARM and ARM64
+ - Minor fix in comments for kvm_psci_call()
 
-1)
+V2:
+ - Replace KVM_EXIT_RESET with KVM_EXIT_SYSTEM_EVENT
+ - Make kvm_psci_call() return convention to match
+   KVM ARM return convention
 
-I'd add the new STACKPROTECTOR_STRONG option and maybe rename the old 
-one to STACKPROTECTOR_WEAK.
+V1:
+ - Initial revised patch after RFC PATCH.
 
-If in a year or two most distros have switched over to the _STRONG 
-variant, despite its costs, then we can drop the weak variant.
+Anup Patel (2):
+  KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API header
+  ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and SYSTEM_RESET to user
+    space
 
-2)
+ Documentation/virtual/kvm/api.txt |   15 ++++++++++++
+ arch/arm/include/asm/kvm_psci.h   |    2 +-
+ arch/arm/include/uapi/asm/kvm.h   |    2 ++
+ arch/arm/kvm/handle_exit.c        |   11 ++++++---
+ arch/arm/kvm/psci.c               |   47 ++++++++++++++++++++++++++++++-------
+ arch/arm64/include/asm/kvm_psci.h |    2 +-
+ arch/arm64/include/uapi/asm/kvm.h |    2 ++
+ arch/arm64/kvm/handle_exit.c      |   10 +++++---
+ include/uapi/linux/kvm.h          |    8 +++++++
+ 9 files changed, 83 insertions(+), 16 deletions(-)
 
-It would also be nice to see a head to head comparison of the 3 
-variants:
-
-	!STACKPROTECTOR
-	STACKPROTECTOR_LIGHT
-	STACKPROTECTOR_STRONG
-
-of defconfig vmlinux size and estimated number of checks inserted in 
-each case - so people/distros can make an informed decision about the 
-relative quality differences between these variants and whether they 
-want to carry the costs of that.
-
-Thanks,
-
-	Ingo
+-- 
+1.7.9.5
