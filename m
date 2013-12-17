@@ -1,43 +1,41 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 17 Dec 2013 12:21:12 +0200
-Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
-In-Reply-To: <20131217092449.GL12034@norris-Latitude-E6410>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
- <20131217092449.GL12034@norris-Latitude-E6410>
-Message-ID: <52B02598.5060004@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Dec 2013 11:20:07 +0100
+Subject: [PATCH v6 6/6] ARM: davinci: da850 evm: add GPIO pinumux entries
+ DT node
+In-Reply-To: <52ADAB0E.4020800@ti.com>
+References: <1385057731-4348-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1385057731-4348-7-git-send-email-prabhakar.csengg@gmail.com>
+ <52ADAB0E.4020800@ti.com>
+Message-ID: <CACRpkdZQ9Q1SxXZ4FPpTN_swUBCyZd8CzNzVzEm87vjYZsQ2+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2013 11:24 AM, Brian Norris wrote:
-> On Thu, Dec 05, 2013 at 07:25:49PM +0200, Ivan Khoronzhuk wrote:
->> --- a/drivers/mtd/nand/davinci_nand.c
->> +++ b/drivers/mtd/nand/davinci_nand.c
->> @@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
->>   }
->>   
->>   static struct platform_driver nand_davinci_driver = {
->> +	.probe		= nand_davinci_probe,
->>   	.remove		= __exit_p(nand_davinci_remove),
-> 
-> I believe you need to drop the __exit_p() here. And now that you're
-> using module_platform_driver(), you need to drop the __init and __exit
-> from the probe() and remove() routines, to avoid section mismatch
-> warnings.
-> 
->>   	.driver		= {
->>   		.name	= "davinci_nand",
-> 
-> So on second thought, please resubmit the series with the requested
-> changes.
-> 
-> Thanks,
-> Brian
-> 
+On Sun, Dec 15, 2013 at 2:13 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Thursday 21 November 2013 11:45 PM, Prabhakar Lad wrote:
+>> From: KV Sujith <sujithkv@ti.com>
 
-Thanks, Brian.
-Do you want me to drop it in stand alone patch or in this one?
+>> +
+>> +                     gpio_pins: pinmux_gpio_pins {
+>> +                             pinctrl-single,bits = <
+>> +                                     /* GPIO2_4 GPIO2_6 */
+>> +                                     0x18 0x00008080 0x0000f0f0
+>> +                                     /* GPIO2_8 GPIO2_15 */
+>> +                                     0x14 0x80000008 0xf000000f
+>> +                                     /* GPIO3_12 GPIO3_13 */
+>> +                                     0x1C 0x00008800 0x0000ff00
+>> +                                     /* GPIO4_0 GPIO4_1 */
+>> +                                     0x28 0x88000000 0xff000000
+>> +                                     /* GPIO6_9 GPIO6_10 GPIO6_13 */
+>> +                                     0x34 0x08800800 0x0ff00f00
+>> +                             >;
+>> +                     };
+>>               };
+>
+> Shouldn't these pinmux entries be part of actual device
+> node which needs them to be muxed this way?
 
--- 
-Regards,
-Ivan Khoronzhuk
+The usual way to do it is to set up as states for the device,
+or as a hog (on the pin controller itself).
+
+Yours,
+Linus Walleij
