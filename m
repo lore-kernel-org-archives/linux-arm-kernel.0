@@ -1,100 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Dec 2013 10:32:42 +0000
-Subject: [PATCH 07/10] mfd: menelaus: Start to use irqdomain
-In-Reply-To: <1387238904-7843-7-git-send-email-balbi@ti.com>
-References: <20131216153936.GQ18769@lee--X1>
- <1387238904-7843-1-git-send-email-balbi@ti.com>
- <1387238904-7843-7-git-send-email-balbi@ti.com>
-Message-ID: <20131217103242.GB19810@lee--X1>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Tue, 17 Dec 2013 12:33:28 +0200
+Subject: [PATCH v3 9/9] mtd: nand: davinci: don't request AEMIF address
+ range
+In-Reply-To: <20131217084238.GJ12034@norris-Latitude-E6410>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131217084238.GJ12034@norris-Latitude-E6410>
+Message-ID: <52B02878.8090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Dec 2013, Felipe Balbi wrote:
+On 12/17/2013 10:42 AM, Brian Norris wrote:
+> On Thu, Dec 05, 2013 at 07:25:57PM +0200, Ivan Khoronzhuk wrote:
+>> The TI AEMIF driver registers are used to setup timings for each chip
+>> select. The same registers range is used to setup NAND settings.
+>> The AEMIF and NAND drivers not use the same registers in this range.
+>>
+>> In case with TI AEMIF driver, the memory address range is requested
+>> already by AEMIF, so we cannot request it twice, just ioremap.
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Reviewed-by: Taras Kondratiuk <taras@ti.com>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>>   drivers/mtd/nand/davinci_nand.c |    8 +++++---
+>>   1 file changed, 5 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+>> index f7b21b8..0cd4dbc 100644
+>> --- a/drivers/mtd/nand/davinci_nand.c
+>> +++ b/drivers/mtd/nand/davinci_nand.c
+>> @@ -636,9 +636,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+>>   	if (IS_ERR(vaddr))
+>>   		return PTR_ERR(vaddr);
+>>
+>> -	base = devm_ioremap_resource(&pdev->dev, res2);
+>> -	if (IS_ERR(base))
+>> -		return PTR_ERR(base);
+>> +	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
+>
+> Since it's important that we don't re-introduce the "request resource"
+> boilerplate later, can you add a comment describing the situation?
+>
+>> +	if (!base) {
+>> +		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
+>> +		return -EADDRNOTAVAIL;
+>> +	}
+>>
+>>   	info->dev		= &pdev->dev;
+>>   	info->base		= base;
+>
+> Thanks,
+> Brian
+>
 
-> Introduce an irq_chip and irq_domain for menelaus driver. Following
-> patches will convert uses to traditional request_threaded_irq().
-> 
-> While at that, some better error handling had to be added, so we could
-> free irq descs we allocated.
-> 
-> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/mfd/menelaus.c | 123 +++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 119 insertions(+), 4 deletions(-)
-> 
-
-<snip>
-
-> +static void menelaus_irq_ack(struct irq_data *data)
-> +{
-> +	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
-> +	int irq = data->irq - m->irq_base;
-
-Shoudn't this now be?
-  int irq = data->hwirq;
-
-> +	if (irq > 7) {
-> +		m->ack2 |= BIT(irq);
-> +		m->ack2_pending = true;
-> +	} else {
-> +		m->ack1 |= BIT(irq);
-> +		m->ack1_pending = true;
-> +	}
-> +}
-> +
-> +static void menelaus_irq_mask(struct irq_data *data)
-> +{
-> +	struct menelaus_chip *m = irq_data_get_irq_chip_data(data);
-> +	int irq = data->irq - m->irq_base;
-
-Same for here, and all the others.
-
-<snip>
-
-> +	irq_domain_add_legacy(node, MENELAUS_NR_IRQS, irq_base, 0,
-> +			&irq_domain_simple_ops, m);
-
-Please use irq_domain_add_simple() here.
-
-> +	m->irq_base = irq_base;
-
-I don't think you need this.
-
-> +	for (i = irq_base; i < irq_base + MENELAUS_NR_IRQS; i++) {
-> +		irq_set_chip_data(i, m);
-> +		irq_set_chip_and_handler(i, &menelaus_irq_chip,
-> +				handle_simple_irq);
-> +		irq_set_nested_thread(i, 1);
-> +		set_irq_flags(i, IRQF_VALID);
-> +	}
-
-You should put this in the .map() operation and the reverse in .unmap().
-
->  fail:
-> +	irq_free_descs(irq_base, MENELAUS_NR_IRQS);
-
-I don't think you need to do this.
-
->  
->  static int menelaus_remove(struct i2c_client *client)
->  {
-> +	struct menelaus_chip	*m = i2c_get_clientdata(client);
-> +
-> +	irq_free_descs(m->irq_base, MENELAUS_NR_IRQS);
-
-Nor here.
-
->  	the_menelaus = NULL;
-
-Shouldn't this have been removed in patch 6?
-
->  	return 0;
->  }
->  
+Yes, I'll add the comment.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Ivan Khoronzhuk
