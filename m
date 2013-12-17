@@ -1,33 +1,119 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Dec 2013 10:17:26 +0800
-Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
-In-Reply-To: <52AF68DB.7090105@elopez.com.ar>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <1386880245-10192-3-git-send-email-dinguyen@altera.com>
- <201312142233.27143.arnd@arndb.de>
- <52AD1185.6090501@linaro.org> <20131215045116.23538.4@quantum>
- <52AF68DB.7090105@elopez.com.ar>
-Message-ID: <CAGb2v67dud7XQSOy4eABX3SZX9pRkm366dodke5-AzdcGuje5A@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 16 Dec 2013 18:30:47 -0800
+Subject: [PATCH] regmap: Allow regmap_bulk_write() to work for "no-bus" regmaps
+In-Reply-To: <20131216210153.GA3185@sirena.org.uk>
+References: <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
+ <20131210235000.GK11468@sirena.org.uk>
+ <52A7AE1B.3040201@codeaurora.org>
+ <20131211005106.GL11468@sirena.org.uk>
+ <52A7C0C3.2070805@codeaurora.org>
+ <20131211132729.GT11468@sirena.org.uk>
+ <52AA42FD.4040503@codeaurora.org>
+ <20131213104128.GT11044@sirena.org.uk>
+ <20131213213707.GO21983@codeaurora.org>
+ <20131216210153.GA3185@sirena.org.uk>
+Message-ID: <20131217023047.GC31766@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+regmap_bulk_write() should decay to performing individual writes
+if we're using a "no-bus" regmap. Unfortunately, it returns an
+error because there is no map->bus pointer. Fix it.
 
-On Tue, Dec 17, 2013 at 4:55 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> I also saw a similar requirement from the gmac people (on cc too), who
-> needed to set the phy type (or something like that) on one of the clock
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-The GMAC clock register controls the tx clock source (a mux) and the
-interface type, which is most likely a gate to control the direction
-of the tx clock.
+On 12/16, Mark Brown wrote:
+> On Fri, Dec 13, 2013 at 01:37:07PM -0800, Stephen Boyd wrote:
+> 
+> > I came up with this (possibly ugly) patch. It works for my
+> > specific case but I'm not sure if unpacking the val bits into an
+> > unsigned int and passing that to _regmap_write() is sane. What do
+> > you think?
+> 
+> It's not lovely but it's about as good as it gets.  I'd probaly just
+> drop the raw single write case so it's simpler - just either raw write
+> the lot or write a register at a time with unpacking (and so refactor
+> the the loop that does the in place formatting into the raw case only
+> and not bother for the single write).
 
-So I modeled it as a composite clock source for now.
-I'm open to other options.
+Ok how about this?
 
-> registers; so I'm thinking maybe a generic "tune something" approach that
-> lets users configure some clock-dependent, arbitrary aspect of the clock is
-> the way forward. Otherwise, we're going to end up bloating the clock
-> framework with a lot of callback pointers that are going to be used in one
-> or two clocks out of potentially hundreds on the whole system.
+ drivers/base/regmap/regmap.c | 43 ++++++++++++++++++-------------------------
+ 1 file changed, 18 insertions(+), 25 deletions(-)
 
-ChenYu
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index 1ccd61b..12b80f6 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -1514,21 +1514,30 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ {
+ 	int ret = 0, i;
+ 	size_t val_bytes = map->format.val_bytes;
+-	void *wval;
+ 
+-	if (!map->bus)
+-		return -EINVAL;
+-	if (!map->format.parse_inplace)
++	if (map->bus && !map->format.parse_inplace)
+ 		return -EINVAL;
+ 	if (reg % map->reg_stride)
+ 		return -EINVAL;
+ 
+ 	map->lock(map->lock_arg);
++	/*
++	 * Some devices don't support bulk write, for
++	 * them we have a series of single write operations.
++	 */
++	if (!map->bus || map->use_single_rw) {
++		for (i = 0; i < val_count; i++) {
++			unsigned int ival;
+ 
+-	/* No formatting is require if val_byte is 1 */
+-	if (val_bytes == 1) {
+-		wval = (void *)val;
++			ival = *(unsigned int *)(val + (i * val_bytes));
++			ret = _regmap_write(map, reg + (i * map->reg_stride),
++					ival);
++			if (ret != 0)
++				goto out;
++		}
+ 	} else {
++		void *wval;
++
+ 		wval = kmemdup(val, val_count * val_bytes, GFP_KERNEL);
+ 		if (!wval) {
+ 			ret = -ENOMEM;
+@@ -1537,27 +1546,11 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ 		}
+ 		for (i = 0; i < val_count * val_bytes; i += val_bytes)
+ 			map->format.parse_inplace(wval + i);
+-	}
+-	/*
+-	 * Some devices does not support bulk write, for
+-	 * them we have a series of single write operations.
+-	 */
+-	if (map->use_single_rw) {
+-		for (i = 0; i < val_count; i++) {
+-			ret = _regmap_raw_write(map,
+-						reg + (i * map->reg_stride),
+-						val + (i * val_bytes),
+-						val_bytes);
+-			if (ret != 0)
+-				return ret;
+-		}
+-	} else {
++
+ 		ret = _regmap_raw_write(map, reg, wval, val_bytes * val_count);
+-	}
+ 
+-	if (val_bytes != 1)
+ 		kfree(wval);
+-
++	}
+ out:
+ 	map->unlock(map->lock_arg);
+ 	return ret;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
