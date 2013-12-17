@@ -1,43 +1,37 @@
-From: sboyd@codeaurora.org (spamassassin system account)
-Date: Mon, 16 Dec 2013 18:01:51 -0800
-Subject: [PATCH 6/7] Input: pmic8xxx-keypad - Migrate to devm_* APIs
-In-Reply-To: <20131216153726.GB8884@core.coreip.homeip.net>
-References: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
- <1386718996-3733-7-git-send-email-sboyd@codeaurora.org>
- <20131216153726.GB8884@core.coreip.homeip.net>
-Message-ID: <20131217020151.GB31766@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 10:16:13 +0800
+Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
+In-Reply-To: <20131217015939.GM3185@sirena.org.uk>
+References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
+ <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+ <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131213125129.GV18380@S2101-09.ap.freescale.net>
+ <892cbb07bd064f44b2af45f106aeb479@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131216112910.GB30671@S2101-09.ap.freescale.net>
+ <20131217015939.GM3185@sirena.org.uk>
+Message-ID: <20131217021610.GA7172@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16, Dmitry Torokhov wrote:
-> On Tue, Dec 10, 2013 at 03:43:15PM -0800, Stephen Boyd wrote:
-> > -
-> > -static int pmic8xxx_kp_remove(struct platform_device *pdev)
-> > -{
-> > -	struct pmic8xxx_kp *kp = platform_get_drvdata(pdev);
-> > -
-> > -	device_init_wakeup(&pdev->dev, 0);
+On Tue, Dec 17, 2013 at 01:59:39AM +0000, Mark Brown wrote:
+> On Mon, Dec 16, 2013 at 07:29:12PM +0800, Shawn Guo wrote:
+> > On Mon, Dec 16, 2013 at 03:31:29AM +0000, Li.Xiubo at freescale.com wrote:
 > 
-> Why are we removing restoring wakeup capable state?
+> [Deferring probe in non-DT cases]
+> > > Where should this special handling be dealt with ? Is here or regulator_get_optional()
+> > > will be better ?
 > 
+> > Anyway, this is another issue which should be addressed in regulator
+> > core, IMO.
+> 
+> It's something that the platform needs to address - the core has no way
+> of figuring out what devices might register in future if the platform
+> doesn't tell them.
 
-It's the only thing blocking removal of the remove callback and
-as the driver is being unbound it didn't seem like we cared about
-the state of the wakeup of the device. I greped the kernel tree
-and I couldn't see a consistent pattern where driver probe was
-setting the flag and driver remove was clearing it. Do we need to
-keep it?
+Okay.  But is there an established means for platform to tell that?
 
-> > -	free_irq(kp->key_stuck_irq, kp);
-> > -	free_irq(kp->key_sense_irq, kp);
-> > -	input_unregister_device(kp->input);
-> > -	kfree(kp);
-> > -
-> > -	return 0;
-> >  }
-> >  
-> >  #ifdef CONFIG_PM_SLEEP
+Shawn
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> With DT we can do that because you can't create a
+> device without providing information about what supplies will be made
+> avaialable, other systems may be able to do the same thing.
