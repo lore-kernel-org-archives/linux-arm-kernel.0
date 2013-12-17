@@ -1,57 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Dec 2013 11:51:36 +0000
-Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20131217111020.GF13823@ulmo.nvidia.com>
-References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
- <1386925027-16288-2-git-send-email-Li.Xiubo@freescale.com>
- <20131217111020.GF13823@ulmo.nvidia.com>
-Message-ID: <20131217115136.GT4360@n2100.arm.linux.org.uk>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Tue, 17 Dec 2013 20:53:13 +0900
+Subject: [PATCH 11/11] PM / devfreq: use inclusion <mach/map.h> instead of
+ <plat/map-s5p.h>
+Message-ID: <116901cefb1e$90f4b530$b2de1f90$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 12:10:22PM +0100, Thierry Reding wrote:
-> On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
-> > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> > +		const void __iomem *addr)
-> > +{
-> > +	u32 val;
-> > +
-> > +	val = __raw_readl(addr);
-> > +
-> > +	if (likely(fpc->big_endian))
-> 
-> The likely() probably isn't very useful in this case. But if you want to
-> keep it, it should at least be reversed, since little-endian is actually
-> the default (you have to specify the big-endian property to activate the
-> big endian mode).
-> 
-> > +		val = be32_to_cpu(val);
-> > +	else
-> > +		val = le32_to_cpu(val);
+From: Kukjin Kim <kgene.kim@samsung.com>
 
-This will also cause sparse errors, because when sparse is enabled, these
-expect __le32 or __be32 arguments, not u32.
+This fixes follwoing warning:
+In file included from drivers/devfreq/exynos/exynos4_bus.h:15:0,
+                 from drivers/devfreq/exynos/exynos4_bus.c:35:
+arch/arm/mach-exynos/include/mach/map.h:22:0: warning: "S3C_UART_OFFSET"
+redefined [enabled by default]
+In file included from drivers/devfreq/exynos/exynos4_bus.c:33:0:
+arch/arm/plat-samsung/include/plat/map-s5p.h:57:0: note: this is the
+location of the previous definition
 
-> > +	rmb();
-> 
-> I'd prefer the rmb() to follow the __raw_readl() immediately to make the
-> relationship more explicit.
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/devfreq/exynos/exynos4_bus.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-A better question to ask is: why is this barrier here?  What memory
-ordering operations is it trying to serialise?
-
-> > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
-> > +		u32 val, void __iomem *addr)
-> > +{
-> > +	wmb();
-> > +	if (likely(fpc->big_endian))
-> > +		val = cpu_to_be32(val);
-> > +	else
-> > +		val = cpu_to_le32(val);
-> > +
-> > +	__raw_writel(val, addr);
-> 
-> Same here. wmb() should precede __raw_writel() immediately.
-
-Same comments here - what memory operations is the wmb() trying to
-serialise?  Does this PWM driver somehow end up doing DMA?
+diff --git a/drivers/devfreq/exynos/exynos4_bus.c
+b/drivers/devfreq/exynos/exynos4_bus.c
+index 16eb406..1ab8cdd 100644
+--- a/drivers/devfreq/exynos/exynos4_bus.c
++++ b/drivers/devfreq/exynos/exynos4_bus.c
+@@ -30,7 +30,7 @@
+ extern unsigned int exynos_result_of_asv;
+ #endif
+ 
+-#include <plat/map-s5p.h>
++#include <mach/map.h>
+ 
+ #include "exynos4_bus.h"
+ 
+-- 
+1.7.10.4
