@@ -1,33 +1,41 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 17 Dec 2013 01:24:49 -0800
-Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
-In-Reply-To: <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20131217092449.GL12034@norris-Latitude-E6410>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 17 Dec 2013 17:26:36 +0800
+Subject: [PATCH 0/4] ARM: tegra: re-enable EMC scaling function for Tegra20
+Message-ID: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 07:25:49PM +0200, Ivan Khoronzhuk wrote:
-> --- a/drivers/mtd/nand/davinci_nand.c
-> +++ b/drivers/mtd/nand/davinci_nand.c
-> @@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
->  }
->  
->  static struct platform_driver nand_davinci_driver = {
-> +	.probe		= nand_davinci_probe,
->  	.remove		= __exit_p(nand_davinci_remove),
+The EMC scaling function was lost after Tegra deprecated the legacy
+clock driver and switched to CCF driver. In this series, we add the EMC
+clock driver in the Tegra CCF driver. And re-register the EMC driver to
+the EMC clock driver to support EMC scaling again.
 
-I believe you need to drop the __exit_p() here. And now that you're
-using module_platform_driver(), you need to drop the __init and __exit
-from the probe() and remove() routines, to avoid section mismatch
-warnings.
+Verified on Seaboard.
 
->  	.driver		= {
->  		.name	= "davinci_nand",
+Joseph Lo (4):
+  ARM: tegra: moving tegra_bct_strapping to tegra-soc.h for global
+    visibility
+  clk: tegra: add EMC clock driver
+  memory: tegra20-emc: move out Tegra20 EMC driver from mach-tegra
+  clk: tegra20: enable EMC clock driver
 
-So on second thought, please resubmit the series with the requested
-changes.
+ arch/arm/mach-tegra/Makefile                       |   1 -
+ arch/arm/mach-tegra/fuse.h                         |   2 -
+ arch/arm/mach-tegra/tegra20_speedo.c               |   1 +
+ arch/arm/mach-tegra/tegra2_emc.h                   |  24 ---
+ drivers/clk/tegra/Makefile                         |   1 +
+ drivers/clk/tegra/clk-emc.c                        | 183 +++++++++++++++++++++
+ drivers/clk/tegra/clk-tegra20.c                    |  25 +--
+ drivers/clk/tegra/clk.h                            |  19 +++
+ drivers/memory/Kconfig                             |  10 ++
+ drivers/memory/Makefile                            |   1 +
+ .../tegra2_emc.c => drivers/memory/tegra20-emc.c   |  16 +-
+ include/linux/platform_data/tegra_emc.h            |   7 +
+ include/linux/tegra-soc.h                          |   2 +
+ 13 files changed, 250 insertions(+), 42 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/tegra2_emc.h
+ create mode 100644 drivers/clk/tegra/clk-emc.c
+ rename arch/arm/mach-tegra/tegra2_emc.c => drivers/memory/tegra20-emc.c (95%)
 
-Thanks,
-Brian
+-- 
+1.8.5
