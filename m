@@ -1,134 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Dec 2013 21:30:00 -0800
-Subject: [PATCH v5 09/10] KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR
- handlers
-In-Reply-To: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
-References: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1387258201-8738-10-git-send-email-christoffer.dall@linaro.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 17 Dec 2013 13:36:34 +0800
+Subject: [PATCH 0/3 v2] regulator: act8865: add PMIC driver
+Message-ID: <1387258597-21866-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle MMIO accesses to the two registers which should support both the
-case where the VMs want to read/write either of these registers and the
-case where user space reads/writes these registers to do save/restore of
-the VGIC state.
+Hi Mark,
 
-Note that the added complexity compared to simple set/clear enable
-registers stems from the bookkeping of source cpu ids.  It may be
-possible to change the underlying data structure to simplify the
-complexity, but since this is not in the critical path at all, this will
-do.
+Thanks a lot for quickly feedbacks. According to your advice, I prepared the new version.
 
-Also note that reading this register from a live guest will not be
-accurate compared to on hardware, because some state may be living on
-the CPU LRs and the only way to give a consistent read would be to force
-stop all the VCPUs and request them to unqueu the LR state onto the
-distributor.  Until we have an actual user of live reading this
-register, we can live with the difference.
+The patch set is to add act8865 PMIC driver.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 66 insertions(+), 4 deletions(-)
+The active-semi act8865 is designed as a PMIC for Atmel sama5d3x and at91sam9 series.
+Its datasheet is available at: http://www.active-semi.com/sheets/ACT8865_Datasheet.pdf.
 
-Changelog[v3]:
- - Renamed read/write SGI set/clear functions
- - Rely on unqueuing of interrupts from LRs instead of reading LRs
-   directly
- - Deduplicate code
+The patches is based on the branch: for-next of git respository, 
+	git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git
+and [PATCH] regulator: read low power states configuration from device tree from Vincent Palatin
+	https://patchwork.kernel.org/patch/2833667/
 
-Changelog[v2]:
- - Use struct kvm_exit_mmio accessors for ->data field.
+Thanks.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index d08ba28..e59aaa4 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -663,18 +663,80 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
- 	}
- }
- 
--static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
--				  struct kvm_exit_mmio *mmio,
--				  phys_addr_t offset)
-+/* Handle reads of GICD_CPENDSGIRn and GICD_SPENDSGIRn */
-+static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
-+					struct kvm_exit_mmio *mmio,
-+					phys_addr_t offset)
- {
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int sgi;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 reg = 0;
-+
-+	/* Copy source SGIs from distributor side */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		int shift = 8 * (sgi - min_sgi);
-+		reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
-+	}
-+
-+	mmio_data_write(mmio, ~0, reg);
- 	return false;
- }
- 
-+static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
-+					 struct kvm_exit_mmio *mmio,
-+					 phys_addr_t offset, bool set)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int sgi;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 reg;
-+	bool updated = false;
-+
-+	reg = mmio_data_read(mmio, ~0);
-+
-+	/* Clear pending SGIs on the distributor */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		u8 mask = reg >> (8 * (sgi - min_sgi));
-+		if (set) {
-+			if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
-+				updated = true;
-+			dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
-+		} else {
-+			if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
-+				updated = true;
-+			dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
-+		}
-+	}
-+
-+	if (updated)
-+		vgic_update_state(vcpu->kvm);
-+
-+	return updated;
-+}
-+
- static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
- 				struct kvm_exit_mmio *mmio,
- 				phys_addr_t offset)
- {
--	return false;
-+	if (!mmio->is_write)
-+		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-+	else
-+		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, true);
-+}
-+
-+static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
-+				  struct kvm_exit_mmio *mmio,
-+				  phys_addr_t offset)
-+{
-+	if (!mmio->is_write)
-+		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-+	else
-+		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, false);
- }
- 
- /*
+Best Regards,
+Wenyou Yang
+
+v2 changelog:
+ 1./ Using regmap for register I/O instead of i2c function directly.
+ 2./ Using the helpers provided by the core.
+ 3./ Remove noisy logging.
+ 4./ Using the latest regulator register API.
+ 5./ Using module_i2c_driver helper macro replace module_init and module_exit.
+ 6./ Remove the vsel-state-low dt property which is not used now.
+
+Wenyou Yang (3):
+  regulator: act8865: add PMIC act8865 driver
+  regulator: act8865: add device tree binding doc
+  ARM: dts: sama5d3xcm: add the regulator device node
+
+ .../bindings/regulator/act8865-regulator.txt       |   56 +++
+ arch/arm/boot/dts/sama5d3xcm.dtsi                  |   46 +++
+ drivers/regulator/Kconfig                          |    8 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/act8865-regulator.c              |  381 ++++++++++++++++++++
+ include/linux/regulator/act8865.h                  |   55 +++
+ 6 files changed, 547 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+ create mode 100644 drivers/regulator/act8865-regulator.c
+ create mode 100644 include/linux/regulator/act8865.h
+
 -- 
-1.8.5
+1.7.9.5
