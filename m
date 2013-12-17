@@ -1,152 +1,80 @@
 From: kgene@kernel.org (kgene at kernel.org)
-Date: Tue, 17 Dec 2013 20:51:39 +0900
-Subject: [PATCH 01/11] ARM: EXYNOS: cleanup <mach/regs-pmu.h>
-Message-ID: <115f01cefb1e$58e079e0$0aa16da0$@kernel.org>
+Date: Tue, 17 Dec 2013 20:51:51 +0900
+Subject: [PATCH 02/11] ARM: EXYNOS: remove inclusion <mach/regs-pmu.h> into
+ another headers
+Message-ID: <116001cefb1e$600fec50$202fc4f0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kukjin Kim <kgene.kim@samsung.com>
 
-Remove useless definitions in the regs-pmu.h file.
+This is needed to remove dependency of headers.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/regs-pmu.h |   51
---------------------------
- 1 file changed, 51 deletions(-)
+ arch/arm/mach-exynos/include/mach/pm-core.h    |    5 ++++-
+ arch/arm/mach-exynos/include/mach/regs-clock.h |    2 --
+ arch/arm/mach-exynos/include/mach/regs-pmu.h   |    2 --
+ arch/arm/mach-exynos/pmu.c                     |    1 +
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/include/mach/pm-core.h
+b/arch/arm/mach-exynos/include/mach/pm-core.h
+index 2b00833..dc0697c 100644
+--- a/arch/arm/mach-exynos/include/mach/pm-core.h
++++ b/arch/arm/mach-exynos/include/mach/pm-core.h
+@@ -19,7 +19,10 @@
+ #define __ASM_ARCH_PM_CORE_H __FILE__
+ 
+ #include <linux/of.h>
+-#include <mach/regs-pmu.h>
++#include <mach/map.h>
++
++#define S5P_EINT_WAKEUP_MASK			(S5P_VA_PMU + 0x0604)
++#define S5P_WAKEUP_MASK				(S5P_VA_PMU +
+0x0608)
+ 
+ #ifdef CONFIG_PINCTRL_EXYNOS
+ extern u32 exynos_get_eint_wake_mask(void);
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
+b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index d36ad76..93dcf7f 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -365,8 +365,6 @@
+ 
+ /* Compatibility defines and inclusion */
+ 
+-#include <mach/regs-pmu.h>
+-
+ #define S5P_EPLL_CON				EXYNOS4_EPLL_CON0
+ 
+ #endif /* __ASM_ARCH_REGS_CLOCK_H */
 diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h
 b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index 2cdb63e..2c15a8f 100644
+index 2c15a8f..7c029ce 100644
 --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
 +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -24,11 +24,7 @@
- #define S5P_CENTRAL_SEQ_OPTION			S5P_PMUREG(0x0208)
+@@ -31,8 +31,6 @@
+ #define EXYNOS5440_SWRESET			S5P_PMUREG(0x00C4)
  
- #define S5P_USE_STANDBY_WFI0			(1 << 16)
--#define S5P_USE_STANDBY_WFI1			(1 << 17)
--#define S5P_USE_STANDBYWFI_ISP_ARM		(1 << 18)
- #define S5P_USE_STANDBY_WFE0			(1 << 24)
--#define S5P_USE_STANDBY_WFE1			(1 << 25)
--#define S5P_USE_STANDBYWFE_ISP_ARM		(1 << 26)
+ #define S5P_WAKEUP_STAT				S5P_PMUREG(0x0600)
+-#define S5P_EINT_WAKEUP_MASK			S5P_PMUREG(0x0604)
+-#define S5P_WAKEUP_MASK				S5P_PMUREG(0x0608)
  
- #define S5P_SWRESET				S5P_PMUREG(0x0400)
- #define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
-@@ -38,17 +34,8 @@
- #define S5P_EINT_WAKEUP_MASK			S5P_PMUREG(0x0604)
- #define S5P_WAKEUP_MASK				S5P_PMUREG(0x0608)
- 
--#define S5P_HDMI_PHY_CONTROL			S5P_PMUREG(0x0700)
--#define S5P_HDMI_PHY_ENABLE			(1 << 0)
--
--#define S5P_DAC_PHY_CONTROL			S5P_PMUREG(0x070C)
--#define S5P_DAC_PHY_ENABLE			(1 << 0)
--
  #define S5P_INFORM0				S5P_PMUREG(0x0800)
  #define S5P_INFORM1				S5P_PMUREG(0x0804)
--#define S5P_INFORM2				S5P_PMUREG(0x0808)
--#define S5P_INFORM3				S5P_PMUREG(0x080C)
--#define S5P_INFORM4				S5P_PMUREG(0x0810)
- #define S5P_INFORM5				S5P_PMUREG(0x0814)
- #define S5P_INFORM6				S5P_PMUREG(0x0818)
- #define S5P_INFORM7				S5P_PMUREG(0x081C)
-@@ -119,23 +106,8 @@
- #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
- #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 97d6885..9062b58 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -14,6 +14,7 @@
+ #include <linux/bug.h>
  
--#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
--#define S5P_ARM_CORE0_OPTION			S5P_PMUREG(0x2008)
- #define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
- #define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
--#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
--
--#define S5P_ARM_COMMON_OPTION			S5P_PMUREG(0x2408)
--#define S5P_TOP_PWR_OPTION			S5P_PMUREG(0x2C48)
--#define S5P_CAM_OPTION				S5P_PMUREG(0x3C08)
--#define S5P_TV_OPTION				S5P_PMUREG(0x3C28)
--#define S5P_MFC_OPTION				S5P_PMUREG(0x3C48)
--#define S5P_G3D_OPTION				S5P_PMUREG(0x3C68)
--#define S5P_LCD0_OPTION				S5P_PMUREG(0x3C88)
--#define S5P_LCD1_OPTION				S5P_PMUREG(0x3CA8)
--#define S5P_MAUDIO_OPTION			S5P_PMUREG(0x3CC8)
--#define S5P_GPS_OPTION				S5P_PMUREG(0x3CE8)
--#define S5P_GPS_ALIVE_OPTION			S5P_PMUREG(0x3D08)
+ #include <mach/regs-clock.h>
++#include <mach/regs-pmu.h>
  
- #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
- #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
-@@ -145,28 +117,12 @@
- #define S5P_PAD_RET_EBIA_OPTION			S5P_PMUREG(0x3188)
- #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
+ #include "common.h"
  
--#define S5P_PMU_CAM_CONF			S5P_PMUREG(0x3C00)
--#define S5P_PMU_TV_CONF				S5P_PMUREG(0x3C20)
--#define S5P_PMU_MFC_CONF			S5P_PMUREG(0x3C40)
--#define S5P_PMU_G3D_CONF			S5P_PMUREG(0x3C60)
--#define S5P_PMU_LCD0_CONF			S5P_PMUREG(0x3C80)
--#define S5P_PMU_GPS_CONF			S5P_PMUREG(0x3CE0)
--
--#define S5P_PMU_SATA_PHY_CONTROL_EN		0x1
- #define S5P_CORE_LOCAL_PWR_EN			0x3
- #define S5P_INT_LOCAL_PWR_EN			0x7
- 
- #define S5P_CHECK_SLEEP				0x00000BAD
- 
- /* Only for EXYNOS4210 */
--#define S5P_USBDEVICE_PHY_CONTROL	S5P_PMUREG(0x0704)
--#define S5P_USBDEVICE_PHY_ENABLE	(1 << 0)
--
--#define S5P_USBHOST_PHY_CONTROL		S5P_PMUREG(0x0708)
--#define S5P_USBHOST_PHY_ENABLE		(1 << 0)
--
--#define S5P_PMU_SATA_PHY_CONTROL	S5P_PMUREG(0x0720)
--
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
- #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
- #define S5P_MODIMIF_MEM_LOWPWR		S5P_PMUREG(0x11C4)
-@@ -174,8 +130,6 @@
- #define S5P_SATA_MEM_LOWPWR		S5P_PMUREG(0x11E4)
- #define S5P_LCD1_LOWPWR			S5P_PMUREG(0x1394)
- 
--#define S5P_PMU_LCD1_CONF		S5P_PMUREG(0x3CA0)
--
- /* Only for EXYNOS4x12 */
- #define S5P_ISP_ARM_LOWPWR			S5P_PMUREG(0x1050)
- #define S5P_DIS_IRQ_ISP_ARM_LOCAL_LOWPWR	S5P_PMUREG(0x1054)
-@@ -343,13 +297,9 @@
- #define EXYNOS5_TOP_PWR_OPTION
-S5P_PMUREG(0x2C48)
- #define EXYNOS5_TOP_PWR_SYSMEM_OPTION
-S5P_PMUREG(0x2CC8)
- #define EXYNOS5_JPEG_MEM_OPTION
-S5P_PMUREG(0x2F48)
--#define EXYNOS5_GSCL_STATUS
-S5P_PMUREG(0x4004)
--#define EXYNOS5_ISP_STATUS
-S5P_PMUREG(0x4024)
- #define EXYNOS5_GSCL_OPTION
-S5P_PMUREG(0x4008)
- #define EXYNOS5_ISP_OPTION
-S5P_PMUREG(0x4028)
- #define EXYNOS5_MFC_OPTION
-S5P_PMUREG(0x4048)
--#define EXYNOS5_G3D_CONFIGURATION
-S5P_PMUREG(0x4060)
--#define EXYNOS5_G3D_STATUS
-S5P_PMUREG(0x4064)
- #define EXYNOS5_G3D_OPTION
-S5P_PMUREG(0x4068)
- #define EXYNOS5_DISP1_OPTION
-S5P_PMUREG(0x40A8)
- #define EXYNOS5_MAU_OPTION
-S5P_PMUREG(0x40C8)
-@@ -357,7 +307,6 @@
- #define EXYNOS5_USE_SC_FEEDBACK					(1
-<< 1)
- #define EXYNOS5_USE_SC_COUNTER					(1 << 0)
- 
--#define EXYNOS5_MANUAL_L2RSTDISABLE_CONTROL			(1 << 2)
- #define EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN			(1 << 7)
- 
- #define EXYNOS5_OPTION_USE_STANDBYWFE				(1 << 24)
 -- 
 1.7.10.4
