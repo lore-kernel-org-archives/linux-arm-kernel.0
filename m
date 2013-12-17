@@ -1,78 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 16 Dec 2013 18:19:11 -0600
-Subject: [PATCH 05/10] mfd: menelaus: Use for_each_set_bit()
-In-Reply-To: <1387239455.18217.61.camel@joe-AO722>
-References: <20131216153936.GQ18769@lee--X1>
- <1387238904-7843-1-git-send-email-balbi@ti.com>
- <1387238904-7843-5-git-send-email-balbi@ti.com>
- <1387239455.18217.61.camel@joe-AO722>
-Message-ID: <20131217001911.GE29284@saruman.home>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 16 Dec 2013 16:20:59 -0800
+Subject: [PATCH 2/5] arm64: Fix the soft_restart routine
+In-Reply-To: <20131213164646.GN19177@mudshark.cambridge.arm.com>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <fbf47d394de6bd7332b00bc706a9f38cd7a68327.1386879684.git.geoff@infradead.org>
+ <20131213164646.GN19177@mudshark.cambridge.arm.com>
+Message-ID: <1387239659.1002.152.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 04:17:35PM -0800, Joe Perches wrote:
-> On Mon, 2013-12-16 at 18:08 -0600, Felipe Balbi wrote:
-> > That macro just helps removing some extra line of code and hides ffs()
-> > calls.
-> > 
-> > While at that, also fix a variable shadowing bug where 'int irq' was
-> > being redeclared inside inner loop while it was also argument to
-> > interrupt handler.
-> > 
-> > Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  drivers/mfd/menelaus.c | 16 +++++++---------
-> >  1 file changed, 7 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> > index 87d80a8..d3e3022 100644
-> > --- a/drivers/mfd/menelaus.c
-> > +++ b/drivers/mfd/menelaus.c
-> > @@ -795,24 +795,22 @@ static irqreturn_t menelaus_irq(int irq, void *_menelaus)
-> >  {
-> >  	struct menelaus_chip *menelaus = _menelaus;
-> >  	void (*handler)(struct menelaus_chip *menelaus);
-> > -	unsigned isr;
-> > +	unsigned long isr;
-> > +	unsigned long i;
-> >  
-> >  	isr = (menelaus_read_reg(MENELAUS_INT_STATUS2)
-> >  			& ~menelaus->mask2) << 8;
-> >  	isr |= menelaus_read_reg(MENELAUS_INT_STATUS1)
-> >  		& ~menelaus->mask1;
-> >  
-> > -	while (isr) {
-> > -		int irq = fls(isr) - 1;
-> > -		isr &= ~(1 << irq);
-> > -
-> > +	for_each_set_bit(i, &isr, 16) {
-> >  		mutex_lock(&menelaus->lock);
-> > -		menelaus_disable_irq(irq);
-> > -		menelaus_ack_irq(irq);
-> > -		handler = menelaus->handlers[irq];
-> > +		menelaus_disable_irq(i);
-> > +		menelaus_ack_irq(i);
-> > +		handler = menelaus->handlers[i];
-> >  		if (handler)
-> >  			handler(menelaus);
-> > -		menelaus_enable_irq(irq);
-> > +		menelaus_enable_irq(i);
-> >  		mutex_unlock(&menelaus->lock);
-> >  	}
-> >  
+Hi Will,
+
+On Fri, 2013-12-13 at 16:46 +0000, Will Deacon wrote:
+> On Thu, Dec 12, 2013 at 08:39:46PM +0000, Geoff Levand wrote:
+> > +	/*
+> > +	 * cpu_reset turns the MMU off, so must be called at its identity
+> > +	 * mapped physical address.
+> > +	 */
+> > +
+> > +	(*(void(*)(unsigned long))virt_to_phys(cpu_reset))(addr);
 > 
-> This could handle the irqs in reverse order.
-> Does that matter?
+> This isn't right; although cpu_reset *does* need to run from the idmap,
+> actually the idmap only includes __turn_mmu_on. You just get lucky because
+> its section-mapped and happens to include the code you want.
 
-order does not matter with this device.
+OK, I think this is different from fixing the call in soft_restart(), so
+I'll make a separate patch for this.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131216/1dc6fd72/attachment-0001.sig>
+I can see a few ways to do it but am not sure of the ramifications
+of each.  Should we put cpu_reset into the idmap at startup when we add
+__turn_mmu_on, or add cpu_reset on demand from say setup_mm_for_reboot()?
+
+If the former, is all we need something like this?
+
+@@ -438,6 +438,9 @@ __create_page_tables:
+ 	adr	x3, __turn_mmu_on		// virtual/physical address
+ 	create_pgd_entry x25, x0, x3, x5, x6
+ 	create_block_map x0, x7, x3, x5, x5, idmap=1
++	adr	x3, cpu_reset			// virtual/physical address
++	create_pgd_entry x25, x0, x3, x5, x6
++	create_block_map x0, x7, x3, x5, x5, idmap=1
+
+> The cast is also cleaner if you define a phys_reset_t type, like we do for
+> arch/arm/.
+
+I'll send out an updated fix.
+
+-Geoff
