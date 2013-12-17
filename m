@@ -1,43 +1,105 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 17 Dec 2013 22:44:33 +0100
-Subject: [PATCH 0/5] arm: shmobile: r7s72100: add native i2c support
-Message-ID: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+Date: Tue, 17 Dec 2013 22:44:34 +0100
+Subject: [PATCH 1/5] pinctrl: r7s72100: add riic groups
+In-Reply-To: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1387316678-10174-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is a series to support the I2C core of the r7s72100 natively. It has been
-tested with a genmai board where an eeprom is connected. The series can be
-found here:
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/riic
+Tested RIIC2 on a genmai board. Other riic groups are untested but seem
+trivial enough to be added.
 
-It is based on the latest r7s72100 topic branch from Simon and the latest patch
-series from Magnus. Note there is one issue with the current PFC driver which
-needs to be sorted out. Check patch 1/5 for details.
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+---
 
-Comments welcome. Thanks,
+Note: With the current PFC driver as posted by Magnus, it needs another patch
+to work. Yet, I think this is a seperate PFC issue which needs to be sorted out
+seperately and shouldn't affect these declarations. I'll add the needed patch
+as a response to this mail.
 
-   Wolfram
+ drivers/pinctrl/sh-pfc/pfc-r7s72100.c | 45 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-
-Wolfram Sang (5):
-  pinctrl: r7s72100: add riic groups
-  arm: shmobile: r7s72100: add i2c clocks
-  arm: shmobile: r7s72100: add nodes for i2c controllers to dtsi
-  arm: shmobile: genmai: adapt dts to use native i2c driver
-  i2c: riic: add driver
-
- Documentation/devicetree/bindings/i2c/i2c-riic.txt |  29 ++
- arch/arm/boot/dts/r7s72100-genmai-reference.dts    |  29 +-
- arch/arm/boot/dts/r7s72100.dtsi                    | 102 +++++
- arch/arm/mach-shmobile/clock-r7s72100.c            |  12 +-
- drivers/i2c/busses/Kconfig                         |  10 +
- drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-riic.c                      | 426 +++++++++++++++++++++
- drivers/pinctrl/sh-pfc/pfc-r7s72100.c              |  45 +++
- 8 files changed, 635 insertions(+), 19 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-riic.txt
- create mode 100644 drivers/i2c/busses/i2c-riic.c
-
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
+index a662876..2b716d1 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
+@@ -229,6 +229,27 @@ SCIF5(RZ_PIN_AND_MUX)
+ SCIF6(RZ_PIN_AND_MUX)
+ SCIF7(RZ_PIN_AND_MUX)
+ 
++#define RIIC0(fn)			\
++	fn(riic0, scl, 1, 0, 1)		\
++	fn(riic0, sda, 1, 1, 1)
++
++#define RIIC1(fn)			\
++	fn(riic1, scl, 1, 2, 1)		\
++	fn(riic1, sda, 1, 3, 1)
++
++#define RIIC2(fn)			\
++	fn(riic2, scl, 1, 4, 1)		\
++	fn(riic2, sda, 1, 5, 1)
++
++#define RIIC3(fn)			\
++	fn(riic3, scl, 1, 6, 1)		\
++	fn(riic3, sda, 1, 7, 1)
++
++RIIC0(RZ_PIN_AND_MUX)
++RIIC1(RZ_PIN_AND_MUX)
++RIIC2(RZ_PIN_AND_MUX)
++RIIC3(RZ_PIN_AND_MUX)
++
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SCIF0(RZ_PMX_GROUP)
+ 	SCIF1(RZ_PMX_GROUP)
+@@ -238,6 +259,10 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SCIF5(RZ_PMX_GROUP)
+ 	SCIF6(RZ_PMX_GROUP)
+ 	SCIF7(RZ_PMX_GROUP)
++	RIIC0(RZ_PMX_GROUP)
++	RIIC1(RZ_PMX_GROUP)
++	RIIC2(RZ_PMX_GROUP)
++	RIIC3(RZ_PMX_GROUP)
+ };
+ 
+ static const char * const scif0_groups[] = {
+@@ -272,6 +297,22 @@ static const char * const scif7_groups[] = {
+ 	SCIF7(RZ_GROUPS)
+ };
+ 
++static const char * const riic0_groups[] = {
++	RIIC0(RZ_GROUPS)
++};
++
++static const char * const riic1_groups[] = {
++	RIIC1(RZ_GROUPS)
++};
++
++static const char * const riic2_groups[] = {
++	RIIC2(RZ_GROUPS)
++};
++
++static const char * const riic3_groups[] = {
++	RIIC3(RZ_GROUPS)
++};
++
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(scif0),
+ 	SH_PFC_FUNCTION(scif1),
+@@ -281,6 +322,10 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(scif5),
+ 	SH_PFC_FUNCTION(scif6),
+ 	SH_PFC_FUNCTION(scif7),
++	SH_PFC_FUNCTION(riic0),
++	SH_PFC_FUNCTION(riic1),
++	SH_PFC_FUNCTION(riic2),
++	SH_PFC_FUNCTION(riic3),
+ };
+ 
+ #define PFC_REG(idx, name, reg)						\
 -- 
 1.8.4.2
