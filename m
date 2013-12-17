@@ -1,34 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Dec 2013 12:10:33 +0000
-Subject: [PATCH 1/4] arm64: drop redundant macros from read_cpuid()
-In-Reply-To: <20131217120431.GE32118@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Dec 2013 12:11:09 +0000
+Subject: [PATCH 2/4] arm64: Add hwcaps for crypto and CRC32 extensions.
+In-Reply-To: <20131217120831.GF32118@arm.com>
 References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
- <1387227878-30438-2-git-send-email-ard.biesheuvel@linaro.org>
- <20131217120431.GE32118@arm.com>
-Message-ID: <20131217121033.GG7602@mudshark.cambridge.arm.com>
+ <1387227878-30438-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20131217120831.GF32118@arm.com>
+Message-ID: <20131217121108.GG32118@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 12:04:31PM +0000, Catalin Marinas wrote:
-> On Mon, Dec 16, 2013 at 09:04:35PM +0000, Ard Biesheuvel wrote:
-> >  #define read_cpuid(reg) ({						\
-> >  	u64 __val;							\
-> > -	asm("mrs	%0, " reg : "=r" (__val));			\
-> > +	asm("mrs	%0, " #reg : "=r" (__val));			\
-> >  	__val;								\
-> >  })
-> >  
-> > @@ -54,12 +44,12 @@
-> >   */
-> >  static inline u32 __attribute_const__ read_cpuid_id(void)
+On Tue, Dec 17, 2013 at 12:08:31PM +0000, Catalin Marinas wrote:
+> On Mon, Dec 16, 2013 at 09:04:36PM +0000, Ard Biesheuvel wrote:
+> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > index 0bc5e4c..961c961 100644
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -116,6 +116,7 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+> >  static void __init setup_processor(void)
 > >  {
-> > -	return read_cpuid(ID_MIDR_EL1);
-> > +	return read_cpuid(MIDR_EL1);
-> >  }
+> >  	struct cpu_info *cpu_info;
+> > +	u64 features, block;
+> >  
+> >  	/*
+> >  	 * locate processor in the list of supported processor
+> > @@ -136,6 +137,37 @@ static void __init setup_processor(void)
+> >  
+> >  	sprintf(init_utsname()->machine, ELF_PLATFORM);
+> >  	elf_hwcap = 0;
+> > +
+> > +	/*
+> > +	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+> > +	 * The blocks we test below represent incremental functionality
+> > +	 * for non-negative values. Negative values are reserved.
+> > +	 */
+> > +	features = read_cpuid(ID_AA64ISAR0_EL1);
 > 
-> It makes sense. Just nitpick, could you please use lowercase register
-> names for consistency?
+> Have you built this?
 
-Hmm: cputype, hw_breakpoint, perf and kvm are using upper-case names...
+I guess you did, sorry for the noise (got confused with the other ID_*
+macros that you removed). As I keep staring at them, I'm fine with upper
+case as well ;)
 
-Will
+-- 
+Catalin
