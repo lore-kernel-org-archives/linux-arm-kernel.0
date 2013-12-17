@@ -1,51 +1,79 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 17 Dec 2013 00:50:27 -0800
-Subject: [PATCH v3 7/9] mtd: nand: davinci: adjust DT properties to MTD
- generic
-In-Reply-To: <1386264358-9738-8-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386264358-9738-8-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20131217085027.GK12034@norris-Latitude-E6410>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Tue, 17 Dec 2013 10:09:56 +0100
+Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
+In-Reply-To: <CALt3h79iuOnmeCBxHjPN3qAoiuwHYBXAp_eSTDewxc96zqSOOg@mail.gmail.com>
+References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
+ <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
+ <CAKohpo=vkZRSQ5Xk-Tsm9QVy8h2F5Ehpm4Y8JWi5xjx0OD72tw@mail.gmail.com>
+ <20131217090005.1e04ff7b@amdc2363>
+ <CALt3h79iuOnmeCBxHjPN3qAoiuwHYBXAp_eSTDewxc96zqSOOg@mail.gmail.com>
+Message-ID: <20131217100956.6fa5b7e6@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 05, 2013 at 07:25:55PM +0200, Ivan Khoronzhuk wrote:
-> --- a/drivers/mtd/nand/davinci_nand.c
-> +++ b/drivers/mtd/nand/davinci_nand.c
-> @@ -558,6 +557,8 @@ static struct davinci_nand_pdata
->  			"ti,davinci-mask-chipsel", &prop))
->  			pdata->mask_chipsel = prop;
->  		if (!of_property_read_string(pdev->dev.of_node,
-> +			"nand-ecc-mode", &mode) ||
+Hi Arun,
 
-Is it possible to use the of_get_nand_ecc_mode() helper? It's
-unfortunate that davinci_nand had to use custom bindings in the first
-place, making this more difficult... So I can take this patch as-is.
+> Hi Lukasz,
+> 
+> On Tue, Dec 17, 2013 at 1:30 PM, Lukasz Majewski
+> <l.majewski@samsung.com> wrote:
+> > Hi Viresh,
+> >
+> >> On 6 December 2013 15:18, Arun Kumar K <arun.kk@samsung.com> wrote:
+> >> > From: "Arjun.K.V" <arjun.kv@samsung.com>
+> >> >
+> >> > The patch adds cpufreq driver for exynos5420.
+> >> >
+> >> > Signed-off-by: Arjun.K.V <arjun.kv@samsung.com>
+> >> > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> >> > Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> >> > ---
+> >> >  drivers/cpufreq/Kconfig.arm          |   11 ++
+> >> >  drivers/cpufreq/Makefile             |    1 +
+> >> >  drivers/cpufreq/exynos-cpufreq.c     |    2 +
+> >> >  drivers/cpufreq/exynos-cpufreq.h     |    8 +
+> >> >  drivers/cpufreq/exynos5420-cpufreq.c |  346
+> >> > ++++++++++++++++++++++++++++++++++ 5 files changed, 368
+> >> > insertions(+) create mode 100644
+> >> > drivers/cpufreq/exynos5420-cpufreq.c
+> >>
+> >> Hmm.. That's the second big LITTLE SoC after TC2..
+> >> And we already have a generic enough driver for all big LITTLE
+> >> platforms: arm_big_little.c
+> >>
+> >> Please use that with a glue clk and regulator driver if required.
+> >> We don't want to get any new driver for big LITTLE unless there is
+> >> a real limitation.
+> >>
+> >> Also, the generic big LITTLE driver supports IKS (In Kernel
+> >> Switcher) which may or maynot be used by Exynos.
+> >>
+> >> @Lukasz: We can't use cpu0 driver here as we have multiple clusters
+> >> here A7 and A15, and so there are two clock domains instead of one.
+> >> That's why we have written big LITTLE driver.
+> >
+> > When I first looked into the patch - it was almost identical to the
+> > exynos4210-cpufreq.c or exynos4x12-cpufreq.c files.
+> >
+> > Also I didn't spot the code characteristic to IKS. It seems like the
+> > code in this file is not aware if it runs on A7 or A15.
+> >
+> 
+> This initial version was only for A15s and I was planning for an
+> incremental patch for A7s along with common code for the  same. Now
+> that is not needed with the generic implementation in place.
 
-> +		    !of_property_read_string(pdev->dev.of_node,
->  			"ti,davinci-ecc-mode", &mode)) {
->  			if (!strncmp("none", mode, 4))
->  				pdata->ecc_mode = NAND_ECC_NONE;
-> @@ -570,11 +571,15 @@ static struct davinci_nand_pdata
->  			"ti,davinci-ecc-bits", &prop))
->  			pdata->ecc_bits = prop;
->  		if (!of_property_read_u32(pdev->dev.of_node,
-> +			"nand-bus-width", &prop) ||
+Ok. I see.
 
-Similar story here, with of_get_nand_bus_width().
+> 
+> Regards
+> Arun
 
-> +		    !of_property_read_u32(pdev->dev.of_node,
->  			"ti,davinci-nand-buswidth", &prop))
->  			if (prop == 16)
->  				pdata->options |= NAND_BUSWIDTH_16;
-> -		if (of_find_property(pdev->dev.of_node,
-> -			"ti,davinci-nand-use-bbt", &len))
-> +		if (of_property_read_bool(pdev->dev.of_node,
-> +			"nand-on-flash-bbt") ||
-> +		    of_property_read_bool(pdev->dev.of_node,
-> +			"ti,davinci-nand-use-bbt"))
->  			pdata->bbt_options = NAND_BBT_USE_FLASH;
->  	}
->  
 
-Brian
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
