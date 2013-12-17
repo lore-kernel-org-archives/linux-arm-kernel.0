@@ -1,116 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 15:02:21 +0800
-Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
- when cpufreq is changed
-In-Reply-To: <20131217165257.GA27607@ubuntu>
-References: <1387228450-641-1-git-send-email-b20788@freescale.com>
- <1387228450-641-2-git-send-email-b20788@freescale.com>
- <20131217025616.GC6691@S2101-09.ap.freescale.net>
- <20131217165257.GA27607@ubuntu>
-Message-ID: <20131217070219.GK6691@S2101-09.ap.freescale.net>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 17 Dec 2013 12:37:04 +0530
+Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
+In-Reply-To: <20131210173208.5083aa1f@amdc2363>
+References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
+ <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
+ <20131209092324.1f8b6502@amdc2363>
+ <CALt3h7-25_mW5SnnTbZWjoF0pOZxsU5Gg6FqOdoz1MgdH7gm5w@mail.gmail.com>
+ <20131210173208.5083aa1f@amdc2363>
+Message-ID: <CABb+yY0C50va5UAgv5QKGKK6qE1wiDwcUmn54CC7PVQ8vpoEmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 11:52:57AM -0500, Anson Huang wrote:
-> > > @@ -63,29 +68,48 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
-> > >  	rcu_read_unlock();
-> > >  	volt_old = regulator_get_voltage(arm_reg);
-> > >  
-> > > -	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> > > +	/* Find the matching VDDSOC/VDDPU operating voltage */
-> > > +	while (soc_opp_index < soc_opp_count) {
-> > > +		if (new_freq == imx6_soc_opp[soc_opp_index].arm_freq)
-> > > +			break;
-> > > +		soc_opp_index++;
-> > > +	}
-> > 
-> > I'm not comfortable with this lookup every time imx6q_set_target() is
-> > called.  I think we can use the 'index' variable to find VDDSOC/VDDPU
-> > operating voltage from imx6_soc_opp table directly, if we sort the table
-> > in the same order that freq_table is sorted.
-> >
-> 
-> yes, we can use the index passed from OPP, then I will add some comments that
-> the freq/volt table of vddsoc should be sorted in same order.
-
-It's not as easy as adding some comments.  I think we need to ensure the
-order in probe function, probably sorting them in code.  Otherwise, it's
-dangerous if we're running at a frequency with a wrong voltage.
-
-Also, if we sort the table in the same order as freq_table, we do not
-even need to have arm_freq in the soc_opp table.
-
-<snip>
-
-> > > +	dev_dbg(cpu_dev, "%u MHz, arm %ld mV, soc-pu %d mV --> %u MHz, arm %ld mV, soc-pu %d mV\n",
-> > >  		old_freq / 1000, volt_old / 1000,
-> > > -		new_freq / 1000, volt / 1000);
-> > > +		imx6_soc_opp[soc_opp_index].soc_volt / 1000,
-> > > +		new_freq / 1000, volt / 1000,
-> > > +		imx6_soc_opp[soc_opp_index].soc_volt / 1000);
-> > 
-> > You print the same soc_volt for both old and new ones?
-> 
-> this is my mistake, maybe I can leave the original code here to only
-> print out vddarm's voltage? Otherwise, I have to add variable to keep
-> old vddsoc/pu's voltage.
-
-Yea, that's okay with leaving it as the existing code.
-
-<snip>
-
-> > > +	/*
-> > > +	 * Each OPP is a set of tuples consisting of frequency and
-> > > +	 * voltage like <freq-kHz vol-uV>.
-> > > +	 */
-> > > +	nr = prop->length / sizeof(u32);
-> > > +	if (nr % 2) {
-> > > +		dev_err(cpu_dev, "Invalid fsl-soc-operating-points list!\n");
-> > 
-> > fsl,soc-operating-points
-> > 
-> > and
-> > 
-> > 		ret = -EINVAL;
-> 
-> no need to free freq table here?
-
-We're only populating the error code here, and will still goto
-free_freq_table below.
-
-> > > +		goto free_freq_table;
-> > > +	}
-
-<snip>
-
-> > > +	min_volt = max_volt = 0;
-> > > +	for (i = 0; i < nr / 2; i++) {
-> > > +		unsigned long freq = be32_to_cpup(val++);
-> > > +		unsigned long volt = be32_to_cpup(val++);
-> > > +
-> > > +		if (i == 0)
-> > > +			min_volt = max_volt = volt;
-> > > +		if (volt < min_volt)
-> > > +			min_volt = volt;
-> > > +		if (volt > max_volt)
-> > > +			max_volt = volt;
-> > > +		opp = dev_pm_opp_find_freq_exact(cpu_dev, freq * 1000, true);
-> > > +		imx6_soc_opp[i].arm_freq = freq;
-> > > +		imx6_soc_opp[i].soc_volt = volt;
-> > > +		soc_opp_count++;
-> > > +	}
-> > > +	rcu_read_unlock();
-> > 
-> > We may need another sanity check to see if soc_opp_count == num (arm opp
-> > count) here.
-> 
-> yes, will add it, need to make sure soc_opp_count is same as arm opp count,
-> but since we did NOT have 1G2 check, so the soc_opp_count will ">=" arm opp
-> count.
-
-Hmm, this is another problem with the for-loop above.  The soc_volt
-should be added into imx6_soc_opp table and soc_opp_count increases,
-only when dev_pm_opp_find_freq_exact() succeeds (IOW, the freq can be
-found in arm opp table).
-
-Shawn
+On Tue, Dec 10, 2013 at 10:02 PM, Lukasz Majewski
+<l.majewski@samsung.com> wrote:
+>>
+>> Actually these values are not for PLL, but for the dividers.
+>> If you see below, the PLL rate setting is done through clk_set_rate()
+>> going via CCF. But I found an issue if the divider values are set via
+>> clk_set_rate API.
+>> What I found is, the system goes into freeze if all the divider
+>> values are not set in one shot. So we cannot call multiple
+>> clk_set_rate()'s on each divider. Thats why I continued with non-CCF
+>> way of setting the divider.
+>
+> I see. I'm not an expert on common clock framework (CCF), but for me
+> conceptually clock dividers setting shall be handled by CCF.
+>
+> However, I've poked a bit at CCF. There isn't any out of the box
+> solutions available.
+>
+> A "virtual" clock can be defined and inside its implementation we can
+> atomically set dividers. Another solution would be to hack the current
+> CCF to provide atomic clock operations
+>
+CCF isn't only for clocks that have single divider or gate control
+register. One could define a clock that manipulates more than one
+divider/gate in one CCF callback. It is already abstract enough. So
+implementing a virtual clock is the solution, imho.
+ BTW, on my platform linux needs to send a 'non-atomic' IPC message to
+a master co-processor to scale up/down cpufreq. I just define a
+virtual clock and use the generic bL cpufreq driver
+drivers/cpufreq/arm_big_little.c
