@@ -1,77 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Dec 2013 09:15:47 +0100
-Subject: [PATCH] rtc: at91sam9: include <mach/hardware.h> explicitly
-In-Reply-To: <20131216144612.8f33194eb247f81a0741b64a@linux-foundation.org>
-References: <1384524058-20712-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131126134117.GF28642@pengutronix.de>
- <20131126134444.GG28642@pengutronix.de>
- <20131126183629.GK28642@pengutronix.de>
- <20131216001158.0e15e93c.akpm@linux-foundation.org>
- <20131216192816.GC14866@pengutronix.de>
- <20131216144612.8f33194eb247f81a0741b64a@linux-foundation.org>
-Message-ID: <20131217081547.GF14866@pengutronix.de>
+From: arunkk.samsung@gmail.com (Arun Kumar K)
+Date: Tue, 17 Dec 2013 13:51:13 +0530
+Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
+In-Reply-To: <20131217091456.1af748c3@amdc2363>
+References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
+ <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
+ <20131209092324.1f8b6502@amdc2363>
+ <CALt3h7-25_mW5SnnTbZWjoF0pOZxsU5Gg6FqOdoz1MgdH7gm5w@mail.gmail.com>
+ <20131210173208.5083aa1f@amdc2363>
+ <CABb+yY0C50va5UAgv5QKGKK6qE1wiDwcUmn54CC7PVQ8vpoEmg@mail.gmail.com>
+ <20131217091456.1af748c3@amdc2363>
+Message-ID: <CALt3h78Zoabm+1kDNrEEyQ_Nshi2yOFd57NwOq6zTnVijfngJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+Hi Lukasz,
 
-On Mon, Dec 16, 2013 at 02:46:12PM -0800, Andrew Morton wrote:
-> On Mon, 16 Dec 2013 20:28:16 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > Hello Andrew,
-> > 
-> > On Mon, Dec 16, 2013 at 12:11:58AM -0800, Andrew Morton wrote:
-> > > On Tue, 26 Nov 2013 19:36:29 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
-> > > > On Tue, Nov 26, 2013 at 02:44:44PM +0100, Uwe Kleine-K__nig wrote:
-> > > > > On Tue, Nov 26, 2013 at 02:41:17PM +0100, Uwe Kleine-K__nig wrote:
-> > > > > > On Fri, Nov 15, 2013 at 03:00:58PM +0100, Uwe Kleine-K__nig wrote:
-> > > > > > > The driver needs the symbol AT91_SLOW_CLOCK which is defined in
-> > > > > > > arch/arm/mach-at91/include/mach/hardware.h. This file is included
-> > > > > > > implicitly via linux/module.h -> linux/kmod.h -> linux/gfp.h ->
-> > > > > > > linux/mmzone.h -> linux/memory_hotplug.h -> linux/notifier.h ->
-> > > > > > > linux/srcu.h -> linux/workqueue.h -> linux/timer.h -> linux/ktime.h ->
-> > > > > > > linux/jiffies.h -> linux/timex.h -> mach/timex.h -> mach/hardware.h .
-> > > > > > > 
-> > > > > > > So better include it explicitly not only because the last link will go
-> > > > > > > away soon.
-> > > > > > > 
-> > > > > > > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > > > > > Ping. Is this patch ok despite Jean-Christophe's objection?
-> > > > > I saw that akpm already took it into his tree.
-> > > > This patch is one of the last few that are needed to drop <mach/timex.h>
-> > > > alltogether that I don't have an ack from the respective maintainer yet.
-> > > > 
-> > > > Can you give your ack instead of sending the patch to Linus, then I'd
-> > > > take it with the patch dropping <mach/timex.h> to make it easier to
-> > > > merge.
-> > > 
-> > > ack ;)
-> > thanks. There is another rtc change that I didn't receive any feedback
-> > for from a maintainer:
-> > 
-> > 	rtc: pxa: drop unused #define TIMER_FREQ
-> 
-> ack.  Robert Jarzmik also acked that one.
-Thanks, I saw Robert Jarzmik's ack, but for taking a $subsystem1 patch through
-the $subsystem2 tree, I like to have an ack of the maintainer of
-$subsystem1. And in this regard I think yours is better than Robert's
-(who is the original author of the driver).
+On Tue, Dec 17, 2013 at 1:44 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Jassi,
+>
+>> On Tue, Dec 10, 2013 at 10:02 PM, Lukasz Majewski
+>> <l.majewski@samsung.com> wrote:
+>> >>
+>> >> Actually these values are not for PLL, but for the dividers.
+>> >> If you see below, the PLL rate setting is done through
+>> >> clk_set_rate() going via CCF. But I found an issue if the divider
+>> >> values are set via clk_set_rate API.
+>> >> What I found is, the system goes into freeze if all the divider
+>> >> values are not set in one shot. So we cannot call multiple
+>> >> clk_set_rate()'s on each divider. Thats why I continued with
+>> >> non-CCF way of setting the divider.
+>> >
+>> > I see. I'm not an expert on common clock framework (CCF), but for me
+>> > conceptually clock dividers setting shall be handled by CCF.
+>> >
+>> > However, I've poked a bit at CCF. There isn't any out of the box
+>> > solutions available.
+>> >
+>> > A "virtual" clock can be defined and inside its implementation we
+>> > can atomically set dividers. Another solution would be to hack the
+>> > current CCF to provide atomic clock operations
+>> >
+>> CCF isn't only for clocks that have single divider or gate control
+>> register. One could define a clock that manipulates more than one
+>> divider/gate in one CCF callback. It is already abstract enough. So
+>> implementing a virtual clock is the solution, imho.
+>
+> Thanks for sharing your experience.
+>
+>>  BTW, on my platform linux needs to send a 'non-atomic' IPC message to
+>> a master co-processor to scale up/down cpufreq. I just define a
+>> virtual clock and use the generic bL cpufreq driver
+>> drivers/cpufreq/arm_big_little.c
+>
+> My use case is simpler - cpufreq-cpu0.c or arm_bit_little.c (for bL)
+> driver with maybe two virtual clocks to handle divider's update.
+>
 
-> > . In the meantime I send a pull request asking to ignore that I didn't
-> > get any maintainer reply for the rtc changes. Do you think it's sensible
-> > to change the entry in MAINTAINERS? Any combination of:
-> > 
-> > 	a) drop Alessandro's M: line
-> > 	b) add you
-> > 	c) change Status from Maintained to Odd Fixes or Orphan
-> 
-> Yeah, I should have a couple hundred MAINTAINERS entries.  Instead I
-> just lurk on mailing lists ;)
-So only a) and c).
+Is it very simple where 5 different dividers with different divider ratios have
+to be set in one shot. Our clk_set_rate() API as such takes only one freq rate
+argument. How do you think to combine say 5 divider rates?
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Arun
