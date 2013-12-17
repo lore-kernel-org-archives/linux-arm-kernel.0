@@ -1,40 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Dec 2013 17:16:25 +0000
-Subject: [PATCH v3 [resend] 05/18] smp, ARM64: kill SMP single function
- call interrupt
-In-Reply-To: <1387125400-28849-6-git-send-email-liuj97@gmail.com>
-References: <1387125400-28849-1-git-send-email-liuj97@gmail.com>
- <1387125400-28849-6-git-send-email-liuj97@gmail.com>
-Message-ID: <20131217171625.GE349@mudshark.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 17 Dec 2013 09:34:14 -0800
+Subject: [PATCH] serial: pl011: also enable DMA Rx polling with no
+ platform data
+In-Reply-To: <CACRpkdZ2n64EnVaB81bo578jmMzmW+OMGjehVTO=7Pa1zBGAvA@mail.gmail.com>
+References: <1385631664-32607-1-git-send-email-linus.walleij@linaro.org>
+ <Pine.LNX.4.64.1312091229550.30018@axis700.grange>
+ <Pine.LNX.4.64.1312120923160.32185@axis700.grange>
+ <CACRpkdZ2n64EnVaB81bo578jmMzmW+OMGjehVTO=7Pa1zBGAvA@mail.gmail.com>
+Message-ID: <20131217173414.GB15633@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 15, 2013 at 04:36:27PM +0000, Jiang Liu wrote:
-> Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
-> similar to smp_call_function_single()" has unified the way to handle
-> single and multiple cross-CPU function calls. Now only one interrupt
-> is needed for architecture specific code to support generic SMP function
-> call interfaces, so kill the redundant single function call interrupt.
+On Thu, Dec 12, 2013 at 02:24:37PM +0100, Linus Walleij wrote:
+> On Thu, Dec 12, 2013 at 10:18 AM, Guennadi Liakhovetski
+> <g.liakhovetski@gmx.de> wrote:
 > 
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Shaohua Li <shli@kernel.org>
-> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> Cc: Ingo Molnar <mingo@elte.hu>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: Jiri Kosina <trivial@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/include/asm/hardirq.h |  2 +-
->  arch/arm64/kernel/smp.c          | 10 +---------
->  2 files changed, 2 insertions(+), 10 deletions(-)
+> > An addendum to this patch, that might well lead to dropping it and,
+> > possibly, doing the opposite - removing the DMA Rx polling completely.
+> 
+> I agree with your reasoning, but not with dropping the Rx code
+> altogether. However we should also drop my patch so we restore
+> the opt-in-only characteristic until we can rootcause this.
+> 
+> Greg can you please drop or revert
+> commit 17438217a6f5e33d920ed3821a4b857311cc2872
+> "serial: pl011: use DMA RX polling by default"
+> from the TTY tree until this has been sorted out?
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Now reverted.
 
-I assume you're taking this series via some other route (than the arch/
-trees) in order to deal with any core dependencies?
+thanks,
 
-Will
+greg k-h
