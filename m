@@ -1,46 +1,52 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 16 Dec 2013 18:13:00 -0700
-Subject: [PATCH V2 10/13] ARM: dts: imx6qdl-sabrelite: add skews for Micrel phy
-In-Reply-To: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387242783-1462-11-git-send-email-troy.kisky@boundarydevices.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 09:36:09 +0800
+Subject: [PATCH 1/4] ARM: imx: update i.MX6Q dts setting of VDDARM_CAP
+ voltage
+In-Reply-To: <1387228057-349-1-git-send-email-b20788@freescale.com>
+References: <1387228057-349-1-git-send-email-b20788@freescale.com>
+Message-ID: <20131217013607.GA6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the data delays to min, and clock delays to max
-because the traces are equal length on pcb.
+On Mon, Dec 16, 2013 at 04:07:37PM -0500, Anson Huang wrote:
+> According to datasheet, VDD_CACHE_CAP must not exceed VDDARM_CAP
+> by more than 200mV, as all of i.MX6Q boards' VDD_CACHE_CAP currently
+> are connected to VDDSOC_CAP, so we need to follow this rule by
+> increasing VDDARM_CAP's voltage.
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-Reviewed-by: Marek Vasut <marex@denx.de>
+The commit log is a little bit vague, and you should probably make the
+following points clearer.
 
----
-v2: no change
----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+1. This is only a problem for 396MHz operating-point, and the other 3
+   are fine.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 723259f..532a7e0 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -149,6 +149,18 @@
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
- 	phy-reset-gpios = <&gpio3 23 0>;
-+	txen-skew-ps = <0>;
-+	txc-skew-ps = <3000>;
-+	rxdv-skew-ps = <0>;
-+	rxc-skew-ps = <3000>;
-+	rxd0-skew-ps = <0>;
-+	rxd1-skew-ps = <0>;
-+	rxd2-skew-ps = <0>;
-+	rxd3-skew-ps = <0>;
-+	txd0-skew-ps = <0>;
-+	txd1-skew-ps = <0>;
-+	txd2-skew-ps = <0>;
-+	txd3-skew-ps = <0>;
- 	status = "okay";
- };
- 
--- 
-1.8.1.2
+2. What's the VDDSOC_CAP value for 396MHz operating-point right now?
+   From what I read drivers/cpufreq/imx6q-cpufreq.c, it's 1250mV.  Then
+   the obvious question is why we're not increasing VDDARM_CAP to
+   1250 - 200 = 1050mV but 975mV?
+
+Shawn
+
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 101c434..e7e8332 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -28,7 +28,7 @@
+>  				1200000 1275000
+>  				996000  1250000
+>  				792000  1150000
+> -				396000  950000
+> +				396000  975000
+>  			>;
+>  			clock-latency = <61036>; /* two CLK32 periods */
+>  			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
+> -- 
+> 1.7.9.5
+> 
+> 
