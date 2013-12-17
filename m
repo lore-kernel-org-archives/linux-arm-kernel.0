@@ -1,81 +1,38 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Tue, 17 Dec 2013 21:23:46 +0900
-Subject: [GIT PULL 1/7] Samsung fixes for v3.14
-In-Reply-To: <3351204.WyoCcrrZ3X@amdc1227>
-References: <52AE0F41.7050706@samsung.com> <3351204.WyoCcrrZ3X@amdc1227>
-Message-ID: <117101cefb22$d5378b10$7fa6a130$@kernel.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Dec 2013 12:25:19 +0000
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131217122519.GI32118@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+On Mon, Dec 16, 2013 at 09:04:34PM +0000, Ard Biesheuvel wrote:
+> This series is an expansion of the patch posted by Steve Capper about 6 weeks
+> ago that allocates hwcaps bits for CRC and Crypto Extensions instructions so
+> userland can discover whether the current CPU has any of those capabilities.
 > 
-> Hi Kukjin,
+> Patch #1 is a cleanup patch for read_cpuid(), which allowed me to skip adding
+> yet another #define to asm/cputype.h (for ID_ISAR5_EL1)
 > 
-Hi,
+> Patch #2 is Steve's original patch, but slightly tweaked because hwcaps bit 2
+> has been allocated for something else in the mean time.
+> 
+> Patch #3 allocates the capability bits in the arch/arm tree. This is necessary
+> because 32-bit ARM binaries can execute both under ARM and under arm64 kernels,
+> so there should be agreement about the meaning of feature bits, even if those
+> features don't actually exist on systems covered by the arch/arm tree.
+> 
+> @Russell: if this looks ok to you, could you please indicate whether you prefer
+> to take this patch separately, or ack it and let it be merged as part of the
+> series.
+> 
+> Patch #4 advertises the CRC and Crypto Extensions to 32-bit binaries running
+> under an arm64 kernel.
 
-> On Monday 16 of December 2013 05:21:21 Kukjin Kim wrote:
-> > The following changes since commit
-> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> >
-> >    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-fixes
-> >
-> > for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
-> >
-> >    ARM: dts: Update display clock frequency for Origen-4412 (2013-12-16
-> > 04:41:57 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Samsung non-critical fixes for v3.14
-> > - Switch FIFO mode for arch_enable_uart_fifo()
-> > - Add missing op_mode for PMIC on exynos5250-arndale
-> > - Add missing clock-frequency for CPU on exynos5250
-> > - Fix typo samaung to samsung for exynos5420-pinctrl
-> > - Fix display clock-frequency for exynos4210/exynos4412-origen
-> >
-> > ----------------------------------------------------------------
-> > Alexander Shiyan (1):
-> >        ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo
-function
-> >
-> > Sachin Kamat (4):
-> >        ARM: dts: Add missing op_mode property to PMIC on Arndale
-> >        ARM: dts: Add missing frequency property to exynos5250
-> >        ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
-> >        ARM: dts: Update display clock frequency for Origen-4412
-> >
-> > Tushar Behera (1):
-> >        ARM: dts: Update display clock frequency for Origen-4210
-> >
-> >   arch/arm/boot/dts/exynos4210-origen.dts         | 2 +-
-> >   arch/arm/boot/dts/exynos4412-origen.dts         | 2 +-
-> >   arch/arm/boot/dts/exynos5250-arndale.dts        | 2 ++
-> >   arch/arm/boot/dts/exynos5250.dtsi               | 2 ++
-> >   arch/arm/boot/dts/exynos5420-pinctrl.dtsi       | 2 +-
-> >   arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
-> >   6 files changed, 9 insertions(+), 3 deletions(-)
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
-> soc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> I've sent a patch to fix up MMC0 on mini6410 board, when using board file
-> to boot the system:
-> 
-> [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for HSMMC1
-> 
-> Could we get this patch merged?
-> 
-> I know we are moving to DT, but until all boards get converted, board
-> files must be supported too and this bug makes it impossible to test
-> non-DT s3c64xx support on Mini6410, without extra out of tree patches.
-> 
-OK, I see. Let me take that in next round maybe this weekend.
+The series look fine to me. I'm happy to take all the patches if Russell
+Acks the arm one (or it can send it via the patch system).
 
-Thanks,
-Kukjin
+-- 
+Catalin
