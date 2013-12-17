@@ -1,42 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 17 Dec 2013 10:40:21 -0500
-Subject: [GIT PULL] ARM: Initial support for Marvell Berlin SoCs
-In-Reply-To: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131217154021.GM2609@titan.lakedaemon.net>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 17 Dec 2013 16:10:10 +0100
+Subject: [PATCH v3 6/7] Documentation: add the binding file for Quadspi
+ driver
+In-Reply-To: <593AEF6C47F46446852B067021A273D6D9AFB83B@MUCSE039.lantiq.com>
+References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
+ <201312171410.05423.marex@denx.de>
+ <593AEF6C47F46446852B067021A273D6D9AFB83B@MUCSE039.lantiq.com>
+Message-ID: <201312171610.10923.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
-
-On Mon, Dec 16, 2013 at 03:00:44PM +0100, Sebastian Hesselbarth wrote:
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+On Tuesday, December 17, 2013 at 02:36:33 PM, thomas.langer at lantiq.com wrote:
+> Hello Marek,
 > 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> Marek Vasut wrote on 2013-12-17:
+> > On Monday, December 16, 2013 at 09:58:49 AM, Huang Shijie wrote:
+> >> This patch adds the binding file for Freescale Quadspi driver.
+> >> 
+> >> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > 
+> > I might be blind and/or tired, but I don't see devicetree-discuss in the
+> > CC. Next time please CC this ML ( devicetree-discuss AT lists.ozlabs.org
+> > ) so the bindings are reviewed by experts .
 > 
-> are available in the git repository at:
->   https://github.com/shesselba/linux-berlin.git topic/initial-for-v3.14
+> I am sure you talking about the new list at devicetree at vger.kernel.org?
 
-It looks like you didn't use a signed tag here.  I think we ran out of
-time at the mini-summit, so here's a quick howto:
+Yes, thanks for correcting it.
 
-$ git checkout topic/initial-for-v3.14
-$ git tag -s berlin-3.14  # assumes you have gpg key in local keyring
-
-# edit tag msg, enter pw for key
-
-$ git push --tags <remote> topic/initial-for-v3.14:topic/initial-for-v3.14
-$ git request-pull v3.13-rc1 <remote-pub> tags/berlin-3.14
-
-# check if it looks right, if so, pipe it to your email editor
-
-
-I know some are leary of github, and doing the signed tag gives us a
-provable method that what we are pulling is indeed what you created.
-
-I'll send a signed email to Arnd, Olof, and Kevin with the fingerprint
-of the key you created at the ARM mini-summit.
-
-thx,
-
-Jason.
+Best regards,
+Marek Vasut
