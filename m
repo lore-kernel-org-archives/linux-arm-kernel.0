@@ -1,42 +1,22 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 17 Dec 2013 19:31:21 +0100
-Subject: pwm-backlight: 3.13-rc1 regression for old arm machine
-In-Reply-To: <20131217095658.GD13823@ulmo.nvidia.com> (Thierry Reding's
- message of "Tue, 17 Dec 2013 10:57:00 +0100")
-References: <87r49c6bea.fsf@free.fr> <20131217095658.GD13823@ulmo.nvidia.com>
-Message-ID: <87iounuy6e.fsf@free.fr>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 17 Dec 2013 18:31:12 +0000
+Subject: [PATCH 0/2] kvmtool: Enable overriding Generic Timer frequency
+Message-ID: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+This patch series allows (but discourages) overriding the Generic Timer
+frequency for device tree-based guest OSes, to work around systems with
+broken secure firmware that fails to program CNTFRQ correctly.
 
-> I hadn't anticipated that =(. In fact I had been holding this patch back
-> for a release cycle because I was waiting for a specific regulator patch
-> to land which provides a dummy regulator if one wasn't specified. It
-> seems that that patch only works when booting from DT, though.
->
-> The correct way to fix this would be to provide a lookup table with the
-> dummy regulator in the board file. I've attached a patch (compile-tested
-> only) that might work.
->
-> If it does, please let me know and, if nobody else volunteers, I'll see
-> if I can come up with a set of patches to fix this for any other boards
-> that have the same issue.
-Actually, it needs a very small "tweak" to work :
--	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
-+	REGULATOR_SUPPLY("power", "pwm-backlight"),
+Robin Murphy (2):
+  kvmtool: Support unsigned int options
+  kvmtool/arm: Add option to override Generic Timer frequency
 
-Without it regulator_dev_lookup() won't match the device.
+ tools/kvm/arm/include/arm-common/kvm-config-arch.h |   15 ++++++++++-----
+ tools/kvm/arm/timer.c                              |    2 ++
+ tools/kvm/include/kvm/parse-options.h              |    9 +++++++++
+ 3 files changed, 21 insertions(+), 5 deletions(-)
 
-Moreover, it requires a config option, CONFIG_REGULATOR_FIXED_VOLTAGE=y. That's
-not a problem for my specific platform, but I haven't seen *any* PXA platform
-with it activated, which means all defconfigs have to be patched, which is
-unfortunate.
-
-As for my specific mioa701, your change with the tweak is perfectly fine and
-tested.
-
-Cheers.
-
---
-Robert
+-- 
+1.7.9.5
