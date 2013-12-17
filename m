@@ -1,91 +1,125 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 17 Dec 2013 23:37:36 +0400
-Subject: [PATCH v3 06/21] ARM: dts: provide DMA config to pxamci on PXA27x
+Date: Tue, 17 Dec 2013 23:37:37 +0400
+Subject: [PATCH v3 07/21] ARM: dts: parse DMA config in pxamci
 In-Reply-To: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
 References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
  <1387309071-22382-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1387309071-22382-7-git-send-email-ynvich@gmail.com>
+Message-ID: <1387309071-22382-8-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Non-dts implementation supply required DMA channel numbers as
-IORESOURCE_DMA. We can also get them from the device tree, if it
-is present.
+The existing PXA MMC driver cannot get DMA channels in a proper
+way from the respective device tree binding.
 
-This patch updates device tree with the proper dmaengine-based
-"marvell,pdma-1.0" DMA.
+This patch provides temporary workaround which allows using the
+existing driver in DT machines by pointing to the proper
+dmaengine-based "marvell,pdma-1.0" DMA.
 
-There is no actual data handling in this patch, because the existing
-driver cannot get DMA channel number from dmaengine API. The patch
-in the series will provide temporary workaround by manually parsing
-node attributes, until Daniel's series is ready to be merged.
+Even though the new DMA provider is not present we can parse device node
+attributes manually and use channel numbers to acquire DMA channel
+from the existing non-dmaengine provider.
+
+When Daniel's DMA series is merged there will be no need to manually
+parse for "dmas" and this patch can be safely reverted.
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 CC: Daniel Mack <zonque@gmail.com>
 CC: Arnd Bergmann <arnd@arndb.de>
 ---
    v2..v3
-   * split into good (this one) and temporary (PATCH 07/21) parts
+   * split into good (PATCH 07/21) and temporary (this one) parts
 
    v1..v2
    * add binding for next-gen dma controller
    * use correct dma declararion
    * number changed from 5 to 3
 
- Documentation/devicetree/bindings/mmc/pxa-mmc.txt |  5 +++++
- arch/arm/boot/dts/pxa27x.dtsi                     | 14 ++++++++++++++
- 2 files changed, 19 insertions(+)
+ drivers/mmc/host/pxamci.c | 59 ++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 48 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-index b7025de..9f54c69 100644
---- a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
-@@ -5,6 +5,8 @@ Driver bindings for the PXA MCI (MMC/SDIO) interfaces
- Required properties:
- - compatible: Should be "marvell,pxa-mmc".
- - vmmc-supply: A regulator for VMMC
-+- dmas: Should be DMA specifiers for RX and TX
-+- dma-names: Should be "rx" and "tx"
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 32fe113..6b67764 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -613,11 +613,46 @@ static int pxamci_of_init(struct platform_device *pdev)
  
- Optional properties:
- - marvell,detect-delay-ms: sets the detection delay timeout in ms.
-@@ -21,5 +23,8 @@ mmc0: mmc at 41100000 {
- 	interrupts = <23>;
- 	cd-gpios = <&gpio 23 0>;
- 	wp-gpios = <&gpio 24 0>;
-+	dmas = <&dma 21
-+		&dma 22>;
-+	dma-names = "rx", "tx";
- };
- 
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 44df554..c2a90c5 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -11,10 +11,24 @@
- 			marvell,intc-nr-irqs = <34>;
- 		};
- 
-+		dma: dma-controller at 40000000 {
-+			compatible = "marvell,pdma-1.0";
-+			reg = <0x40000000 0x10000>;
-+			interrupts = <25>;
-+			#dma-cells = <1>;
-+			dma-channels = <32>;
-+		};
+         return 0;
+ }
 +
- 		gpio: gpio at 40e00000 {
- 			compatible = "intel,pxa27x-gpio";
- 			interrupts = <8>, <9>, <10>;
- 			interrupt-names = "gpio0", "gpio1", "gpio_mux";
- 		};
++static int pxamci_of_init_dma(struct platform_device *pdev,
++		struct pxamci_host *host)
++{
++	struct device_node *np = pdev->dev.of_node;
++	u32 tmp;
++	int i;
++	int ret;
 +
-+		mmc at 41100000 {
-+			dmas = <&dma 21
-+				&dma 22>;
-+			dma-names = "rx", "tx";
-+		};
- 	};
- };
++	i = of_property_match_string(np, "dma-names", "rx");
++	if (i < 0)
++		return i;
++
++	ret = of_property_read_u32_index(np, "dmas", 2 * i + 1, &tmp);
++	if (ret < 0)
++		return ret;
++	host->dma_drcmrrx = tmp;
++
++	i = of_property_match_string(np, "dma-names", "tx");
++	if (i < 0)
++		return i;
++
++	ret = of_property_read_u32_index(np, "dmas", 2 * i + 1, &tmp);
++	if (ret < 0)
++		return ret;
++	host->dma_drcmrtx = tmp;
++
++	return 0;
++}
+ #else
+ static int pxamci_of_init(struct platform_device *pdev)
+ {
+         return 0;
+ }
++
++static int pxamci_of_init_dma(struct platform_device *pdev,
++		struct pxamci_host *host)
++{
++	return -ENODATA;
++}
+ #endif
+ 
+ static int pxamci_probe(struct platform_device *pdev)
+@@ -741,19 +776,21 @@ static int pxamci_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, mmc);
+ 
+-	dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (!dmarx) {
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-	host->dma_drcmrrx = dmarx->start;
++	if (pxamci_of_init_dma(pdev, host) < 0) {
++		dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++		if (!dmarx) {
++			ret = -ENXIO;
++			goto out;
++		}
++		host->dma_drcmrrx = dmarx->start;
+ 
+-	dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (!dmatx) {
+-		ret = -ENXIO;
+-		goto out;
++		dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++		if (!dmatx) {
++			ret = -ENXIO;
++			goto out;
++		}
++		host->dma_drcmrtx = dmatx->start;
+ 	}
+-	host->dma_drcmrtx = dmatx->start;
+ 
+ 	if (host->pdata) {
+ 		gpio_cd = host->pdata->gpio_card_detect;
 -- 
 1.8.4.2
