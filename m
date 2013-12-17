@@ -1,94 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 17 Dec 2013 15:55:57 -0800
-Subject: [RESEND LIST PATCHv7 1/4] clk: socfpga: Add a clk-phase property
- to the "altr, socfpga-gate-clk"
-In-Reply-To: <52B0554F.1080509@gmail.com>
-References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
- <1387213476-22122-2-git-send-email-dinguyen@altera.com>
- <52B00167.4010903@linaro.org> <52B0554F.1080509@gmail.com>
-Message-ID: <20131217235557.23538.22672@quantum>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 17 Dec 2013 15:57:16 -0800
+Subject: [PATCH v5 2/2] ARM: mach-moxart: add MOXA ART SoC device tree
+ files
+In-Reply-To: <1387294714-12872-3-git-send-email-jonas.jensen@gmail.com>
+References: <1387294714-12872-1-git-send-email-jonas.jensen@gmail.com>
+ <1387294714-12872-3-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <532508e4-1b5f-46ba-9519-7a3e019e251b@CH1EHSMHS014.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dinh Nguyen (2013-12-17 05:44:47)
-> Hi Zhangfei,
+Hi Jonas,
+
+On Tue, Dec 17, 2013 at 04:38:34PM +0100, Jonas Jensen wrote:
+> Add a generic (dtsi) include file for MOXA ART SoCs.
 > 
-> On 12/17/13 1:46 AM, zhangfei wrote:
-> >
-> >
-> > On 12/17/2013 01:04 AM, dinguyen at altera.com wrote:
-> >> From: Dinh Nguyen <dinguyen@altera.com>
-> >
-> >> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
-> >> +{
-> >> +    struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-> >> +    struct regmap *sys_mgr_base_addr;
-> >> +    u32 hs_timing;
-> >> +
-> >> +    if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
-> >> +        sys_mgr_base_addr =
-> >> syscon_regmap_lookup_by_compatible("altr,sys-mgr");
-> >> +        if (IS_ERR(sys_mgr_base_addr)) {
-> >> +            pr_err("%s: failed to find altr,sys-mgr regmap!\n",
-> >> __func__);
-> >> +            return -EINVAL;
-> >> +        }
-> >> +        hs_timing = SYSMGR_SDMMC_CTRL_SET(socfpgaclk->clk_phase[0],
-> >> +                        socfpgaclk->clk_phase[1]);
-> >> +        regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
-> >> +                        hs_timing);
-> >> +    }
-> >> +    return 0;
-> >> +}
-> >
-> > So reusing gate-clk here and check the node of "altr,sys-mgr".
-> > I think it is good and simple.
-> > Also can define new clock combined with node "altr,sys-mgr" with
-> > parent of sdmmc_clk.
-> >
-> > Thanks for the update, it is fine to me.
-> Thanks, can I get an Ack from you for this version?
-
-Dinh,
-
-Will you be spinning another version of this patch? If not I can go
-ahead and take this into clk-next.
-
-Regards,
-Mike
-
+> Also add a file for UC-7112-LX.
 > 
-> Thanks,
-> Dinh
-> >
-> >> +
-> >>   static struct clk_ops gateclk_ops = {
-> >> +    .prepare = socfpga_clk_prepare,
-> >>       .recalc_rate = socfpga_clk_recalc_rate,
-> >>       .get_parent = socfpga_clk_get_parent,
-> >>       .set_parent = socfpga_clk_set_parent,
-> >> @@ -254,6 +283,7 @@ static void __init socfpga_gate_clk_init(struct
-> >> device_node *node,
-> >>   {
-> >>       u32 clk_gate[2];
-> >>       u32 div_reg[3];
-> >> +    u32 clk_phase[2];
-> >>       u32 fixed_div;
-> >>       struct clk *clk;
-> >>       struct socfpga_clk *socfpga_clk;
-> >> @@ -294,6 +324,12 @@ static void __init socfpga_gate_clk_init(struct
-> >> device_node *node,
-> >>           socfpga_clk->div_reg = 0;
-> >>       }
-> >>
-> >> +    rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
-> >> +    if (!rc) {
-> >> +        socfpga_clk->clk_phase[0] = clk_phase[0];
-> >> +        socfpga_clk->clk_phase[1] = clk_phase[1];
-> >> +    }
-> >> +
-> >>       of_property_read_string(node, "clock-output-names", &clk_name);
-> >>
-> >>       init.name = clk_name;
-> >>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/arm/moxart.txt |  12 ++
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/moxart-uc7112lx.dts            |  93 +++++++++++++
+>  arch/arm/boot/dts/moxart.dtsi                    | 167 +++++++++++++++++++++++
+>  4 files changed, 273 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/moxart.txt
+>  create mode 100644 arch/arm/boot/dts/moxart-uc7112lx.dts
+>  create mode 100644 arch/arm/boot/dts/moxart.dtsi
 > 
+> diff --git a/Documentation/devicetree/bindings/arm/moxart.txt b/Documentation/devicetree/bindings/arm/moxart.txt
+> new file mode 100644
+> index 0000000..11087ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/moxart.txt
+> @@ -0,0 +1,12 @@
+> +MOXA ART device tree bindings
+> +
+> +Boards with the MOXA ART SoC shall have the following properties:
+> +
+> +Required root node property:
+> +
+> +compatible = "moxa,moxart";
+> +
+> +Boards:
+> +
+> +- UC-7112-LX: embedded computer
+> +  compatible = "moxa,moxart-uc-7112-lx", "moxa,moxart"
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index c55a22d..ae3d7db 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -319,6 +319,7 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+>  dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+>  	zynq-zc706.dtb \
+>  	zynq-zed.dtb
+> +dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
+I think these targets are sorted alphabetically. You should insert the
+MOXART target at the appropriate location a little further up.
+
+	S?ren
