@@ -1,83 +1,111 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 17 Dec 2013 07:44:47 -0600
-Subject: [RESEND LIST PATCHv7 1/4] clk: socfpga: Add a clk-phase property
- to the "altr,socfpga-gate-clk"
-In-Reply-To: <52B00167.4010903@linaro.org>
-References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
- <1387213476-22122-2-git-send-email-dinguyen@altera.com>
- <52B00167.4010903@linaro.org>
-Message-ID: <52B0554F.1080509@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 21:46:54 +0800
+Subject: [PATCH V2 08/13] ARM: dts: imx6qdl-sabrelite: add gpio-keys
+In-Reply-To: <1387242783-1462-9-git-send-email-troy.kisky@boundarydevices.com>
+References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1387242783-1462-9-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20131217134652.GQ6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhangfei,
+On Mon, Dec 16, 2013 at 06:12:58PM -0700, Troy Kisky wrote:
+> Add power, menu, home, back, volume up, and volume down
+> buttons.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> 
+> ---
+> v2: add #include <dt-bindings/input/input.h>
+> to substitute KEY_POWER for 116
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 54 ++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index 29f0b40..36ffbb2 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> @@ -9,6 +9,8 @@
+>   * http://www.opensource.org/licenses/gpl-license.html
+>   * http://www.gnu.org/copyleft/gpl.html
+>   */
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+>  
+>  / {
+>  	memory {
+> @@ -49,6 +51,46 @@
+>  		};
+>  	};
+>  
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		power {
+> +			label = "Power Button";
+> +			gpios = <&gpio2 3 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_POWER>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		menu {
+> +			label = "Menu";
+> +			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_MENU>;
+> +		};
+> +
+> +		home {
+> +			label = "Home";
+> +			gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_HOME>;
+> +		};
+> +
+> +		back {
+> +			label = "Back";
+> +			gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_BACK>;
+> +		};
+> +
+> +		volume-up {
+> +			label = "Volume Up";
+> +			gpios = <&gpio7 13 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_VOLUMEUP>;
+> +		};
+> +
+> +		volume-down {
+> +			label = "Volume Down";
+> +			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_VOLUMEDOWN>;
+> +		};
+> +	};
+> +
+>  	sound {
+>  		compatible = "fsl,imx6q-sabrelite-sgtl5000",
+>  			     "fsl,imx-audio-sgtl5000";
+> @@ -116,6 +158,18 @@
+>  			fsl,pins = <
+>  				/* SGTL5000 sys_mclk */
+>  				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x030b0
+> +				/* Power Button */
+> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03	0x1b0b0
+> +				/* Menu Button */
+> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01	0x1b0b0
+> +				/* Home Button */
+> +				MX6QDL_PAD_NANDF_D4__GPIO2_IO04	0x1b0b0
+> +				/* Back Button */
+> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02	0x1b0b0
+> +				/* Volume Up Button */
+> +				MX6QDL_PAD_GPIO_18__GPIO7_IO13	0x1b0b0
+> +				/* Volume Down Button */
+> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05	0x1b0b0
 
-On 12/17/13 1:46 AM, zhangfei wrote:
->
->
-> On 12/17/2013 01:04 AM, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->
->> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
->> +{
->> +    struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
->> +    struct regmap *sys_mgr_base_addr;
->> +    u32 hs_timing;
->> +
->> +    if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
->> +        sys_mgr_base_addr =
->> syscon_regmap_lookup_by_compatible("altr,sys-mgr");
->> +        if (IS_ERR(sys_mgr_base_addr)) {
->> +            pr_err("%s: failed to find altr,sys-mgr regmap!\n",
->> __func__);
->> +            return -EINVAL;
->> +        }
->> +        hs_timing = SYSMGR_SDMMC_CTRL_SET(socfpgaclk->clk_phase[0],
->> +                        socfpgaclk->clk_phase[1]);
->> +        regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
->> +                        hs_timing);
->> +    }
->> +    return 0;
->> +}
->
-> So reusing gate-clk here and check the node of "altr,sys-mgr".
-> I think it is good and simple.
-> Also can define new clock combined with node "altr,sys-mgr" with
-> parent of sdmmc_clk.
->
-> Thanks for the update, it is fine to me.
-Thanks, can I get an Ack from you for this version?
+Why don't you create a pingrp for them and add a pinctrl phandle in
+gpio-keys node pointing to it?
 
-Thanks,
-Dinh
->
->> +
->>   static struct clk_ops gateclk_ops = {
->> +    .prepare = socfpga_clk_prepare,
->>       .recalc_rate = socfpga_clk_recalc_rate,
->>       .get_parent = socfpga_clk_get_parent,
->>       .set_parent = socfpga_clk_set_parent,
->> @@ -254,6 +283,7 @@ static void __init socfpga_gate_clk_init(struct
->> device_node *node,
->>   {
->>       u32 clk_gate[2];
->>       u32 div_reg[3];
->> +    u32 clk_phase[2];
->>       u32 fixed_div;
->>       struct clk *clk;
->>       struct socfpga_clk *socfpga_clk;
->> @@ -294,6 +324,12 @@ static void __init socfpga_gate_clk_init(struct
->> device_node *node,
->>           socfpga_clk->div_reg = 0;
->>       }
->>
->> +    rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
->> +    if (!rc) {
->> +        socfpga_clk->clk_phase[0] = clk_phase[0];
->> +        socfpga_clk->clk_phase[1] = clk_phase[1];
->> +    }
->> +
->>       of_property_read_string(node, "clock-output-names", &clk_name);
->>
->>       init.name = clk_name;
->>
+Shawn
+
+>  			>;
+>  		};
+>  
+> -- 
+> 1.8.1.2
+> 
