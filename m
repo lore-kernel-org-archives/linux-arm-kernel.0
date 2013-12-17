@@ -1,44 +1,75 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Mon, 16 Dec 2013 17:16:38 -0700
-Subject: [PATCH v4 2/5] ACPI: bus master reload not supported in reduced HW
- mode
-In-Reply-To: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
-References: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1387239401-13918-3-git-send-email-al.stone@linaro.org>
+Date: Mon, 16 Dec 2013 17:16:36 -0700
+Subject: [PATCH v4 0/5] Hardware Reduced Mode Cleanup for ACPI
+Message-ID: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-Do not save and restore bus master reload registers in suspend/resume
-when in reduced HW mode; according to the spec, no such registers should
-exist
+This series of patches starts with Hanjun's patch to create a kernel
+config item for CONFIG_ACPI_REDUCED_HARDWARE [0].  Building on that, I
+then reviewed all of the code that touched any of several fields in the
+FADT that the OSPM is supposed to ignore when ACPI is in Hardware Reduced
+mode [1].  Any time there was a use of one of the fields to be ignored,
+I evaluated whether or not the code was implementing Hardware Reduced
+mode correctly.  Similarly, for each the flags in the FADT flags field
+that are to be ignored in Hardware Reduced mode, the kernel code was again
+scanned for proper usage.  The remainder of the patches are to fix all of
+the situations I could find where the kernel would not behave correctly
+in this ACPI mode.
 
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- drivers/acpi/processor_idle.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+These seem to work just fine on the RTSM model for ARMv7, both with and
+without ACPI enabled, and with and without ACPI_REDUCED_HARDWARE enabled;
+similarly for the FVP model for ARMv8.  The patches for ACPI on ARM
+hardware have been submitted elsewhere but they presume that reduced HW
+mode is functioning correctly.  In the meantime, there's no way I can think
+of to test all possible scenarios so feedback would be greatly appreciated.
 
-diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
-index 86d11a6..b91dcaa 100644
---- a/drivers/acpi/processor_idle.c
-+++ b/drivers/acpi/processor_idle.c
-@@ -229,12 +229,14 @@ static struct syscore_ops acpi_processor_syscore_ops = {
- 
- void acpi_processor_syscore_init(void)
- {
--	register_syscore_ops(&acpi_processor_syscore_ops);
-+	if (!acpi_gbl_reduced_hardware)
-+		register_syscore_ops(&acpi_processor_syscore_ops);
- }
- 
- void acpi_processor_syscore_exit(void)
- {
--	unregister_syscore_ops(&acpi_processor_syscore_ops);
-+	if (!acpi_gbl_reduced_hardware)
-+		unregister_syscore_ops(&acpi_processor_syscore_ops);
- }
- #endif /* CONFIG_PM_SLEEP */
- 
+
+[0] List at https://wiki.linaro.org/LEG/Engineering/Kernel/ACPI/AcpiReducedHw#Section_5:_ACPI_Software_Programming_Model
+[1] Please see the ACPI Specification v5.0 for details on Hardware Reduced
+    mode (sections 3.11.1, 4.1, 5.2.9, at a minimum).
+
+Changes for v4:
+   -- Given the current state of ACPICA, disable CONFIG_ACPI_REDUCED_HARDWARE
+      for use on anything other than ARM.
+   -- Replaced #ifdefs with run-time checking for hardware reduced mode,
+      whenever possible
+
+Changes for v3:
+   -- Modified enabling ACPI_REDUCED_HARDWARE in ACPICA when using
+      kernel config item CONFIG_ACPI_REDUCED_HARDWARE; now consistent
+      with ACPICA code base where needed
+   -- Enable X86 for CONFIG_ACPI_REDUCED_HARDWARE
+   -- Minimize bus master reload patching
+   -- Remove unneeded patch for dmi_check_system() (was 4/6)
+   -- Correct the patch for removing unneeded map/unmap of FADT fields
+
+Changes for v2:
+   -- Remove patch that was outside of reduced HW mode changes
+   -- Simplify CONFIG_ACPI_REDUCED_HARDWARE in Kconfig
+   -- Simplify use of CONFIG_ACPI_REDUCED_HARDWARE in #ifdefs
+   -- Ensure changelogs are present
+   -- Combine and simplify previous patches 8 & 10
+
+
+Al Stone (5):
+  ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE to enable this ACPI mode
+  ACPI: bus master reload not supported in reduced HW mode
+  ACPI: HW reduced mode does not allow use of the FADT sci_interrupt
+    field
+  ACPI: in HW reduced mode, using FADT PM information is not allowed.
+  ACPI: do not map/unmap memory regions for FADT entries in reduced HW
+    mode
+
+ drivers/acpi/Kconfig            |  8 ++++++++
+ drivers/acpi/bus.c              | 30 ++++++++++++++++--------------
+ drivers/acpi/osl.c              | 38 +++++++++++++++++++-------------------
+ drivers/acpi/pci_link.c         |  2 ++
+ drivers/acpi/processor_idle.c   | 14 ++++++++++++--
+ include/acpi/platform/aclinux.h |  6 ++++++
+ 6 files changed, 63 insertions(+), 35 deletions(-)
+
 -- 
 1.8.3.1
