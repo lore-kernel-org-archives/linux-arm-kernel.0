@@ -1,31 +1,42 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Tue, 17 Dec 2013 14:42:31 -0500
-Subject: [PATCH v7 4/9] usb: gadget: s3c-hsotg: add snps,
- dwc2 compatible string
+Date: Tue, 17 Dec 2013 14:42:34 -0500
+Subject: [PATCH v7 7/9] phy: add Broadcom Kona USB2 PHY DT binding
 In-Reply-To: <1387309356-17195-1-git-send-email-mporter@linaro.org>
 References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
-Message-ID: <1387309356-17195-5-git-send-email-mporter@linaro.org>
+Message-ID: <1387309356-17195-8-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for the dwc2 binding.
+Add a binding that describes the Broadcom Kona USB2 PHY found
+on the BCM281xx family of SoCs.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/usb/gadget/s3c-hsotg.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/phy/bcm-phy.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/bcm-phy.txt
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index db797f2..cbfbf41 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -3726,6 +3726,7 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
- #ifdef CONFIG_OF
- static const struct of_device_id s3c_hsotg_of_ids[] = {
- 	{ .compatible = "samsung,s3c6400-hsotg", },
-+	{ .compatible = "snps,dwc2", },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, s3c_hsotg_of_ids);
+diff --git a/Documentation/devicetree/bindings/phy/bcm-phy.txt b/Documentation/devicetree/bindings/phy/bcm-phy.txt
+new file mode 100644
+index 0000000..3dc8b3d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/bcm-phy.txt
+@@ -0,0 +1,15 @@
++BROADCOM KONA USB2 PHY
++
++Required properties:
++ - compatible: brcm,kona-usb2-phy
++ - reg: offset and length of the PHY registers
++ - #phy-cells: must be 0
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
++
++Example:
++
++	usbphy: usb-phy at 3f130000 {
++		compatible = "brcm,kona-usb2-phy";
++		reg = <0x3f130000 0x28>;
++		#phy-cells = <0>;
++	};
 -- 
 1.8.4
