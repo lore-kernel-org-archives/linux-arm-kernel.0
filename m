@@ -1,46 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Dec 2013 07:26:54 -0800
-Subject: [GIT PULL] make mach-omap2 boot with device tree only for v3.14
-In-Reply-To: <alpine.DEB.2.02.1312170707140.14039@utopia.booyaka.com>
-References: <pull-1386643347-596413>
- <alpine.DEB.2.02.1312101034360.32309@utopia.booyaka.com>
- <20131210185902.GO13171@atomide.com>
- <20131210192726.GR13171@atomide.com>
- <20131210230722.GZ13171@atomide.com>
- <20131213192622.GI28184@atomide.com>
- <alpine.DEB.2.02.1312170707140.14039@utopia.booyaka.com>
-Message-ID: <20131217152653.GM12324@atomide.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 17 Dec 2013 16:31:38 +0100
+Subject: [PATCH 2/2] ARM: device trees for Energy Micro's EFM32 Cortex-M3
+ SoCs
+In-Reply-To: <20131217131730.GI14866@pengutronix.de>
+References: <20131216190953.GB14866@pengutronix.de>
+ <1387221123-6794-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131217113750.GB5307@netboy>
+ <20131217131730.GI14866@pengutronix.de>
+Message-ID: <20131217153136.GA5564@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [131216 23:16]:
-> On Fri, 13 Dec 2013, Tony Lindgren wrote:
-> 
-> > OK posted a patch for the SBC-T3730 with minimal support also for
-> > SBC-3530 and SBC-3517 that should boot far enough to start adding
-> > more devices. Paul, care to try it on the CM-T3517, the patch is:
+On Tue, Dec 17, 2013 at 02:17:30PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Dec 17, 2013 at 12:37:51PM +0100, Richard Cochran wrote:
+> > On Mon, Dec 16, 2013 at 08:12:03PM +0100, Uwe Kleine-K?nig wrote:
 > > 
-> > [PATCH] ARM: dts: Add support for sbc-3xxx with cm-t3730
-> 
-> Didn't get anything out of the serial port:
-> 
-> http://www.pwsan.com/omap/testlogs/test_tonys_conversion_v3.14/20131215235827/boot/cmt3517/cmt3517_log.txt
+> > > +		cmu: cmu at 400c8000 {
+> > > +			compatible = "efm32gg,cmu";
+> > 
+> > I was able to run this on the EFM32LG without problems.  Are you sure
+> > this CMU node is specific to the GG, or can it be shared?
+> I remember me being grumpy because I found some differences between the
+> GG and some other efm32 device. After looking again I cannot find the
+> problem. Maybe the LG is compatible but some other is not.
 
-OK thanks for testing. Looks like the CompuLab guys will need to
-take a look at it. I'll update my patch for SBC-T3730 only with the
-comments from Igor.
+It looked like to me that the only differences are flash and ram
+sizes, and presence or absence of peripherals, but I don't know all of
+the many EM parts that well, just these two.
  
-> As a partial sanity check, AM3517 EVM was included as part of the run 
-> (with a separate uImage+dtb of course) and that seems to boot OK:
-> 
-> http://www.pwsan.com/omap/testlogs/test_tonys_conversion_v3.14/20131215235827/boot/3517evm/3517evm_log.txt
+> Can I assume your feedback as Tested-by:?
 
-Hmm OK, weird that the 3517 EVM boots but not the CM-T3517.
- 
-> In case it's useful, here's a CM-T3517 boot log from v3.13-rc4:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.13-rc4/20131215195251/boot/cmt3517/cmt3517_log.txt
+Yes, by all means, please do.
 
-OK thanks.
-
-Tony
+Thanks,
+Richard
