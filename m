@@ -1,44 +1,45 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Dec 2013 09:46:44 +0000 (UTC)
-Subject: [PATCHv10 23/41] ARM: dts: dra7 clock data
-In-Reply-To: <1385453182-24421-24-git-send-email-t-kristo@ti.com>
+Date: Tue, 17 Dec 2013 09:48:17 +0000 (UTC)
+Subject: [PATCHv10 27/41] ARM: dts: am33xx clock data
+In-Reply-To: <1385453182-24421-28-git-send-email-t-kristo@ti.com>
 References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-24-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.02.1312170946110.14039@utopia.booyaka.com>
+ <1385453182-24421-28-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1312170947160.14039@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 26 Nov 2013, Tero Kristo wrote:
 
-> This patch creates a unique node for each clock in the DRA7 power,
+> This patch creates a unique node for each clock in the AM33xx power,
 > reset and clock manager (PRCM).
 > 
-> TODO: apll_pcie clock node is still a dummy in this version, and
-> proper support for the APLL should be added.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
 ...
 
 > ---
->  arch/arm/boot/dts/dra7.dtsi          |   23 +
->  arch/arm/boot/dts/dra7xx-clocks.dtsi | 1983 ++++++++++++++++++++++++++++++++++
->  2 files changed, 2006 insertions(+)
->  create mode 100644 arch/arm/boot/dts/dra7xx-clocks.dtsi
+>  arch/arm/boot/dts/am33xx-clocks.dtsi |  662 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/am33xx.dtsi        |   16 +
+>  2 files changed, 678 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am33xx-clocks.dtsi
 > 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index d0df4c4..6cf1c76 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -104,6 +104,27 @@
->  		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+
+...
+
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index f6d8ffe..52c46e1 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -102,6 +102,20 @@
+>  		ranges;
+>  		ti,hwmods = "l3_main";
 >  
-> +		prm: prm at 4ae06000 {
+> +		prcm: prcm at 44e00000 {
 > +			compatible = "ti,clock-master";
 
-
-Likewise, same issues here with the compatible strings and
-separating out the clocks and clockdomain data into separate DT
-nodes, as discussed with the OMAP4 data patch.
+Same issues here with the compatible strings and separating out the
+clocks and clockdomain data into separate DT nodes, as discussed with
+the OMAP4 data patch.
 
 
 - Paul
