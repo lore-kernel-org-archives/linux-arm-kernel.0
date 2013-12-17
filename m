@@ -1,81 +1,33 @@
-From: angus.clark@st.com (Angus Clark)
-Date: Tue, 17 Dec 2013 09:17:20 +0000
-Subject: [PATCH v3 09/36] mtd: st_spi_fsm: Provide device look-up table
-In-Reply-To: <20131210220338.GF27149@ld-irv-0074.broadcom.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-10-git-send-email-lee.jones@linaro.org>
- <20131210220338.GF27149@ld-irv-0074.broadcom.com>
-Message-ID: <52B016A0.3080201@st.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Dec 2013 01:24:49 -0800
+Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
+In-Reply-To: <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131217092449.GL12034@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2013 10:03 PM, Brian Norris wrote:
-> On Fri, Nov 29, 2013 at 12:18:58PM +0000, Lee Jones wrote:
->> --- a/drivers/mtd/devices/st_spi_fsm.h
->> +++ b/drivers/mtd/devices/st_spi_fsm.h
->> @@ -253,4 +253,141 @@ struct stfsm_seq {
->>  } __attribute__((__packed__, aligned(4)));
->>  #define STFSM_SEQ_SIZE sizeof(struct stfsm_seq)
->>  
->> +/* SPI Flash Device Table */
->> +struct flash_info {
->> +	char		*name;
->> +	/*
->> +	 * JEDEC id zero means "no ID" (most older chips); otherwise it has
->> +	 * a high byte of zero plus three data bytes: the manufacturer id,
->> +	 * then a two byte device id.
->> +	 */
->> +	u32		jedec_id;
->> +	u16             ext_id;
-> 
-> Will 5 bytes of ID be enough? I think we're running into a need for 6
-> bytes of ID in m25p80.c right about now. Might make sense to start with
-> the right number of bytes.
+On Thu, Dec 05, 2013 at 07:25:49PM +0200, Ivan Khoronzhuk wrote:
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
+>  }
+>  
+>  static struct platform_driver nand_davinci_driver = {
+> +	.probe		= nand_davinci_probe,
+>  	.remove		= __exit_p(nand_davinci_remove),
 
-Yes, we will need 6 bytes of ID.  The "dirty" stm_spi_fsm driver already handles
-arbitrary-length IDs.  This will need to be pulled into the "upstream" version
-at some point.
+I believe you need to drop the __exit_p() here. And now that you're
+using module_platform_driver(), you need to drop the __init and __exit
+from the probe() and remove() routines, to avoid section mismatch
+warnings.
 
->> +	int		(*config)(struct stfsm *);
-> 
-> Do you *really* need a configuration callback? Can the callback be
-> represented as simply a flag for the special configuration behavior that
-> is needed, then your driver calls the appropriate "callback" when it
-> sees the flag?
-> 
-> BTW, your later patches have to introduce static declarations in this
-> header, which seems very ugly to me; you are entwining data with your
-> driver's implementation.
+>  	.driver		= {
+>  		.name	= "davinci_nand",
 
-The config() callback is used to perform device/vendor specific initialisation
-(e.g. how to set the QE bit) and configuration of the read, write, and erase
-operations.  As such, it is related to the device, not to the driver or H/W
-controller.
+So on second thought, please resubmit the series with the requested
+changes.
 
-However, I take your point, it is rather ugly.  In some sense, the callback is
-used to make up for the lack of information in the table that would otherwise
-permit a generic configuration to be made.  One option would be to extend the
-table structure to include the superset of properties required across all
-devices, or perhaps an entry for extended, vendor-specific properties.
-
-In any case, I think this discussion relates more to the spi-nor thread, rather
-than the st_spi_fsm driver.
-
->> +static struct flash_info flash_types[] = {
->> +	/*
->> +	 * ST Microelectronics/Numonyx --
->> +	 * (newer production versions may have feature updates
->> +	 * (eg faster operating frequency)
->> +	 */
->> +#define M25P_FLAG (FLASH_FLAG_READ_WRITE | FLASH_FLAG_READ_FAST)
-> 
-> Please don't define macros in the middle of your table like this. (You
-> have several of these.)
-
-Personally, I think it is easier to read with the flag combinations defined near
-where they are used.  I do not have strong feeling either way though, and it may
-become a moot point if the table structure is changed :-)
-
-Cheers,
-
-Angus
+Thanks,
+Brian
