@@ -1,71 +1,36 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 17 Dec 2013 10:48:53 -0500
-Subject: [PATCH v2 10/10] Kconfig: cleanup SERIO_I8042 dependencies
-In-Reply-To: <1387295333-24684-1-git-send-email-msalter@redhat.com>
-References: <1387295333-24684-1-git-send-email-msalter@redhat.com>
-Message-ID: <1387295333-24684-11-git-send-email-msalter@redhat.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 17 Dec 2013 16:54:04 +0100
+Subject: [PATCH] i2c: at91: document clock properties
+Message-ID: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove messy dependencies from SERIO_I8042 by having it depend on one
-Kconfig symbol (ARCH_MIGHT_HAVE_PC_SERIO) and having architectures
-which need it select ARCH_MIGHT_HAVE_PC_SERIO in arch/*/Kconfig.
-New architectures are unlikely to need SERIO_I8042, so this avoids
-having an ever growing list of architectures to exclude.
+Document the clock properties required by the at91 i2c bus driver.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Acked-by: "H. Peter Anvin" <hpa@zytor.com>
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-CC: Richard Henderson <rth@twiddle.net>
-CC: linux-alpha at vger.kernel.org
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
-CC: linux-mips at linux-mips.org
-CC: Paul Mackerras <paulus@samba.org>
-CC: linuxppc-dev at lists.ozlabs.org
-CC: Paul Mundt <lethal@linux-sh.org>
-CC: linux-sh at vger.kernel.org
-CC: "David S. Miller" <davem@davemloft.net>
-CC: sparclinux at vger.kernel.org
-CC: Guan Xuetao <gxt@mprc.pku.edu.cn>
-CC: Ingo Molnar <mingo@redhat.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: x86 at kernel.org
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/input/serio/Kconfig | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/input/serio/Kconfig b/drivers/input/serio/Kconfig
-index 8541f94..1f5cec2 100644
---- a/drivers/input/serio/Kconfig
-+++ b/drivers/input/serio/Kconfig
-@@ -16,14 +16,19 @@ config SERIO
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called serio.
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+index b689a0d..4fade84 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+@@ -9,6 +9,7 @@ Required properties :
+ - interrupts: interrupt number to the cpu.
+ - #address-cells = <1>;
+ - #size-cells = <0>;
++- clocks: phandles to input clocks.
  
-+config ARCH_MIGHT_HAVE_PC_SERIO
-+	bool
-+	help
-+	  Select this config option from the architecture Kconfig if
-+	  the architecture might use a PC serio device (i8042) to
-+          communicate with keyboard, mouse, etc.
-+
- if SERIO
+ Optional properties:
+ - Child nodes conforming to i2c bus binding
+@@ -21,6 +22,7 @@ i2c0: i2c at fff84000 {
+ 	interrupts = <12 4 6>;
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
++	clocks = <&twi0_clk>;
  
- config SERIO_I8042
- 	tristate "i8042 PC Keyboard controller"
- 	default y
--	depends on !PARISC && (!ARM || FOOTBRIDGE_HOST) && \
--		   (!SUPERH || SH_CAYMAN) && !M68K && !BLACKFIN && !S390 && \
--		   !ARC
-+	depends on ARCH_MIGHT_HAVE_PC_SERIO
- 	help
- 	  i8042 is the chip over which the standard AT keyboard and PS/2
- 	  mouse are connected to the computer. If you use these devices,
+ 	24c512 at 50 {
+ 		compatible = "24c512";
 -- 
-1.8.3.1
+1.7.9.5
