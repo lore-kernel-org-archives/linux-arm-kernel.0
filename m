@@ -1,205 +1,152 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 17 Dec 2013 23:37:47 +0400
-Subject: [PATCH v3 17/21] misc: support for serial slots in LP-8x4x
+Date: Tue, 17 Dec 2013 23:37:49 +0400
+Subject: [PATCH v3 19/21] misc: support for I-8041 in LP-8x4x
 In-Reply-To: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
 References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
  <1387309071-22382-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1387309071-22382-18-git-send-email-ynvich@gmail.com>
+Message-ID: <1387309071-22382-20-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Serial modules (I-870xxW series) implement DCON protocol which
-allows one-master-many-slaves configuration over RS-485. When
-these modules are installed into the device, they could be
-accessed using the 2nd PXA built-in UART port (/dev/ttyS1).
-However, it seems that addresses are not processed by the modules.
-So the parallel bus needs to select which slot is connected.
+Status of I-8041 32 digital output channels can be managed via
+sysfs now.
+
+http://www.icpdas.com/products/Remote_IO/i-8ke/i-8041w.htm
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 ---
    v2..v3
-   * no changes (except number 12/16 -> 17/21)
-
    v0..v2
-   * use device tree
-   * use devm helpers where possible
+   * no changes (except number 14/16 -> 19/21)
 
- .../devicetree/bindings/misc/lp8x4x-bus.txt        |  2 +
- Documentation/misc-devices/lp8x4x_bus.txt          | 15 +++++-
- arch/arm/boot/dts/pxa27x-lp8x4x.dts                |  1 +
- drivers/misc/lp8x4x_bus.c                          | 63 ++++++++++++++++++++++
- 4 files changed, 80 insertions(+), 1 deletion(-)
+ Documentation/misc-devices/lp8x4x_bus.txt |  4 ++
+ drivers/misc/lp8x4x_bus.c                 | 67 ++++++++++++++++++++++++++++++-
+ 2 files changed, 69 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt b/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt
-index b0fb145..24a8c62 100644
---- a/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt
-+++ b/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt
-@@ -8,6 +8,7 @@ Required properties:
- - reg: physical base addresses and region lengths of
-        * the rotary switch
-        * the 8bit DIP switch
-+       * the serial slot select register
-        * the slot count register
- 
- - eeprom-gpios : should point to active-low write enable GPIO
-@@ -18,6 +19,7 @@ Example:
- 		compatible = "icpdas,backplane-lp8x4x";
- 		reg = <0x0 0x2
- 		       0x9002 0x2
-+		       0x9004 0x2
- 		       0x9046 0x2>;
- 		eeprom-gpios = <&gpio 4 0>;
- 	};
 diff --git a/Documentation/misc-devices/lp8x4x_bus.txt b/Documentation/misc-devices/lp8x4x_bus.txt
-index 78ea0a89..7b86797 100644
+index 09380fd..68fefde 100644
 --- a/Documentation/misc-devices/lp8x4x_bus.txt
 +++ b/Documentation/misc-devices/lp8x4x_bus.txt
-@@ -19,13 +19,26 @@ LP-8x4x is an ARM-based industrial computer with a custom parallel bus to
- connect expansion modules with digital input/output, analog input/output,
- serial, CAN and other types of ports.
+@@ -58,3 +58,7 @@ slot_count
  
--The bus is implemented by a FPGA.
-+The bus is implemented by a FPGA. There are two major groups of expansion
-+modules: serial and parallel.
+ model
+ 	RO - shows expansion module model number
 +
-+Serial modules (I-870xxW series) implement DCON protocol which allows one-
-+master-many-slaves configuration over RS-485. When these modules are installed
-+into the device, they could be accessed using the 2nd PXA built-in UART port
-+(/dev/ttyS1). However, it seems that addresses are not processed by
-+the modules. So the parallel bus needs to select which slot is connected.
- 
- SYSFS
- -----
- 
- /sys/bus/icpdas/devices/backplane:
- 
-+active_slot
-+	RW - connects the select slot for serial communications. If there
-+	     is a parallel module in the selected slot, it simply ignores
-+	     incoming packets. So it is safe to activate any available
-+	     slot.
-+
- dip
- 	RO - shows status of LP-8x4x 8bit DIP switch
- 
-diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
-index 52f0036..a6adf45 100644
---- a/arch/arm/boot/dts/pxa27x-lp8x4x.dts
-+++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
-@@ -207,6 +207,7 @@
- 				compatible = "icpdas,backplane-lp8x4x";
- 				reg = <0x0 0x2
- 				       0x9002 0x2
-+				       0x9004 0x2
- 				       0x9046 0x2>;
- 				eeprom-gpios = <&gpio 4 0>;
- 			};
++output_status
++	RW - set status of digital output channels on the module in
++	     the expansion slot. Value can be read back.
 diff --git a/drivers/misc/lp8x4x_bus.c b/drivers/misc/lp8x4x_bus.c
-index 567fe078..e805640 100644
+index 59dc767..5af788d 100644
 --- a/drivers/misc/lp8x4x_bus.c
 +++ b/drivers/misc/lp8x4x_bus.c
-@@ -29,6 +29,8 @@ struct lp8x4x_master {
- 	void			*rotary_addr;
- 	void			*dip_addr;
- 	struct gpio_desc        *eeprom_nWE;
-+	unsigned int		active_slot;
-+	void			*switch_addr;
+@@ -26,6 +26,9 @@ MODULE_DESCRIPTION("ICP DAS LP-8x4x parallel bus driver");
+ struct lp8x4x_slot {
+ 	void			*data_addr;
+ 	unsigned int		model;
++	struct mutex		lock;
++	unsigned int		DO_len;
++	u32			DO;
  	struct device		dev;
  };
  
-@@ -47,6 +49,9 @@ static void lp8x4x_master_release(struct device *dev)
- 	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
- 	WARN_ON(!dev);
- 
-+	/* Disable serial communications */
-+	iowrite8(0xff, m->switch_addr);
-+
- 	kfree(m);
+@@ -91,6 +94,45 @@ static void lp8x4x_slot_release(struct device *dev)
+ {
  }
  
-@@ -114,11 +119,52 @@ static ssize_t dip_show(struct device *dev,
- 
- static DEVICE_ATTR_RO(dip);
- 
-+static ssize_t active_slot_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
++static void lp8x4x_slot_set_DO(struct lp8x4x_slot *s)
 +{
-+	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
-+
-+	return sprintf(buf, "%u\n", m->active_slot);
++	int i;
++	mutex_lock(&s->lock);
++	for (i = 0; i < s->DO_len; i++)
++		iowrite8((s->DO >> (i * 8)) & 0xff, s->data_addr + 2 * i);
++	mutex_unlock(&s->lock);
 +}
 +
-+static ssize_t active_slot_store(struct device *dev,
++static ssize_t output_status_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	struct lp8x4x_slot *s = container_of(dev, struct lp8x4x_slot, dev);
++
++	return sprintf(buf, "0x%08x\n", s->DO);
++}
++
++static ssize_t output_status_store(struct device *dev,
 +		struct device_attribute *attr, const char *buf, size_t count)
 +{
-+	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
-+	unsigned int active_slot = 0;
-+	int err;
++	struct lp8x4x_slot *s = container_of(dev, struct lp8x4x_slot, dev);
 +
 +	if (!buf)
 +		return count;
 +	if (0 == count)
 +		return count;
 +
-+	err = kstrtouint(buf, 10, &active_slot);
-+	if (err != 0 || active_slot > m->slot_count) {
-+		dev_err(dev, "slot number is out of range 1..%u\n",
-+				m->slot_count);
++	if (kstrtouint(buf, 16, &s->DO) != 0) {
++		dev_err(dev, "bad input\n");
 +		return count;
 +	}
 +
-+	if (!active_slot) {
-+		m->active_slot = 0;
-+		iowrite8(0xff, m->switch_addr);
-+		return count;
-+	}
++	lp8x4x_slot_set_DO(s);
 +
-+	m->active_slot = active_slot;
-+	iowrite8((1 << (m->active_slot - 1)) ^ 0xff, m->switch_addr);
 +	return count;
 +}
 +
-+static DEVICE_ATTR_RW(active_slot);
++static DEVICE_ATTR_RW(output_status);
 +
- static struct attribute *master_dev_attrs[] = {
- 	&dev_attr_slot_count.attr,
- 	&dev_attr_rotary.attr,
- 	&dev_attr_eeprom_write_enable.attr,
- 	&dev_attr_dip.attr,
-+	&dev_attr_active_slot.attr,
- 	NULL,
+ static ssize_t model_show(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+ {
+@@ -107,6 +149,13 @@ static struct attribute *slot_dev_attrs[] = {
  };
- ATTRIBUTE_GROUPS(master_dev);
-@@ -181,6 +227,20 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
+ ATTRIBUTE_GROUPS(slot_dev);
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, r++);
- 	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get slot switch address\n");
-+		err = -ENODEV;
-+		goto err_free;
-+	}
++static struct attribute *do_slot_dev_attrs[] = {
++	&dev_attr_model.attr,
++	&dev_attr_output_status.attr,
++	NULL,
++};
++ATTRIBUTE_GROUPS(do_slot_dev);
 +
-+	m->switch_addr = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(m->switch_addr)) {
-+		dev_err(&pdev->dev, "Failed to ioremap switch address\n");
-+		err = PTR_ERR(m->switch_addr);
-+		goto err_free;
-+	}
+ static void lp8x4x_master_release(struct device *dev)
+ {
+ 	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
+@@ -242,8 +291,10 @@ static void devm_lp8x4x_bus_release(struct device *dev, void *res)
+ 	dev_dbg(dev, "releasing devices\n");
+ 	for (i = 0; i < LP8X4X_MAX_SLOT_COUNT; i++) {
+ 		s = &m->slot[i];
+-		if (s->model)
++		if (s->model) {
+ 			device_unregister(&s->dev);
++			mutex_destroy(&s->lock);
++		}
+ 	}
+ 	device_unregister(&m->dev);
+ 	bus_unregister(&lp8x4x_bus_type);
+@@ -261,13 +312,25 @@ static void __init lp8x4x_bus_probe_slot(struct lp8x4x_master *m, int i,
+ 	dev_set_name(&s->dev, "slot%02i", i + 1);
+ 	s->dev.parent = &m->dev;
+ 	s->dev.release = lp8x4x_slot_release;
+-	s->dev.groups = slot_dev_groups;
+ 	s->model = model;
++	mutex_init(&s->lock);
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, r++);
-+	if (!res) {
- 		dev_err(&pdev->dev, "could not get slot count address\n");
- 		err = -ENODEV;
- 		goto err_free;
-@@ -223,6 +283,9 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
++	switch (model) {
++	case 41:
++		s->DO_len = 4;
++		lp8x4x_slot_set_DO(s);
++		s->dev.groups = do_slot_dev_groups;
++		break;
++	default:
++		s->dev.groups = slot_dev_groups;
++		break;
++	};
  
- 	dev_info(&pdev->dev, "found bus with up to %u slots\n", m->slot_count);
- 
-+	/* Disable serial communications until explicitly enabled */
-+	iowrite8(0xff, m->switch_addr);
-+
- 	err = bus_register(&lp8x4x_bus_type);
+ 	err = device_register(&s->dev);
  	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to register bus type\n");
+ 		dev_err(&s->dev, "failed to register device\n");
+ 		s->model = 0;
++		mutex_destroy(&s->lock);
+ 		return;
+ 	}
+ }
 -- 
 1.8.4.2
