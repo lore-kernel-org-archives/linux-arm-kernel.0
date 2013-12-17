@@ -1,35 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Dec 2013 09:30:17 +0000 (UTC)
-Subject: [PATCHv10 12/41] CLK: TI: add omap4 clock init file
-In-Reply-To: <1385453182-24421-13-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-13-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.02.1312170923440.14039@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Dec 2013 10:33:04 +0100
+Subject: [PATCH] clk: at91: fix pmc_clk_ids data type attriubte
+In-Reply-To: <1387229127-7605-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387229127-7605-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52B01A50.4080209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013, Tero Kristo wrote:
+On 16/12/2013 22:25, Boris BREZILLON :
+> Fix pmc_clk_ids data type attribute (__initdata -> __initconst).
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
 
-> clk-44xx.c now contains the clock init functionality for omap4, including
-> DT clock registration and adding of static clkdev entries.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-...
+I take it in at91-3.14-cleanup2 branch and send it upstream through
+arm-soc like any other CCF material for AT91 for the 3.14 release.
 
-> diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
-> new file mode 100644
-> index 0000000..3e2090b
-> --- /dev/null
-> +++ b/drivers/clk/ti/clk-44xx.c
-> @@ -0,0 +1,328 @@
-> +/*
-> + * OMAP4 Clock data
-> + *
-> + * Copyright (C) 2009-2012 Texas Instruments, Inc.
-> + * Copyright (C) 2009-2010 Nokia Corporation
-> + *
-> + * Paul Walmsley (paul at pwsan.com)
+I guess that even without Mike Acked-by, this little fix can follow this
+path.
 
-Please remove my name and E-mail address from this file.
+Bye,
+
+> ---
+>  drivers/clk/at91/pmc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 7b9db60..4c03eda 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -228,7 +228,7 @@ out_free_pmc:
+>  	return NULL;
+>  }
+>  
+> -static const struct of_device_id pmc_clk_ids[] __initdata = {
+> +static const struct of_device_id pmc_clk_ids[] __initconst = {
+>  	/* Main clock */
+>  	{
+>  		.compatible = "atmel,at91rm9200-clk-main",
+> 
 
 
-- Paul
+-- 
+Nicolas Ferre
