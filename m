@@ -1,36 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 15:56:51 +0800
-Subject: [PATCH v3 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA56C5B@DBDE04.ent.ti.com>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA56ADC@DBDE04.ent.ti.com>
- <20131217040209.GA27091@shlinux2.ap.freescale.net>
- <20980858CB6D3A4BAE95CA194937D5E73EA56B3A@DBDE04.ent.ti.com>
- <20131217060731.GJ6691@S2101-09.ap.freescale.net>
- <20980858CB6D3A4BAE95CA194937D5E73EA56C5B@DBDE04.ent.ti.com>
-Message-ID: <20131217075649.GL6691@S2101-09.ap.freescale.net>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Tue, 17 Dec 2013 09:00:05 +0100
+Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
+In-Reply-To: <CAKohpo=vkZRSQ5Xk-Tsm9QVy8h2F5Ehpm4Y8JWi5xjx0OD72tw@mail.gmail.com>
+References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
+ <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
+ <CAKohpo=vkZRSQ5Xk-Tsm9QVy8h2F5Ehpm4Y8JWi5xjx0OD72tw@mail.gmail.com>
+Message-ID: <20131217090005.1e04ff7b@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 07:17:01AM +0000, Gupta, Pekon wrote:
-> All I said was using company names in Headers or MODULE_AUTHOR of
-> *generic frameworks*. A generic framework is maintained and updated
-> by community at large. And over course of time other people contribute
-> more than the author. So tagging a company name there would sound like
-> _repeatedly_ giving credit to company or yourself, even if most of the
-> original  code is changed now. Does that make sense ?
+Hi Viresh,
 
-I could somehow buy in the argument of using person email over company
-one in MODULE_AUTHOR(), but still not the one that do not use company
-name in Headers.
+> On 6 December 2013 15:18, Arun Kumar K <arun.kk@samsung.com> wrote:
+> > From: "Arjun.K.V" <arjun.kv@samsung.com>
+> >
+> > The patch adds cpufreq driver for exynos5420.
+> >
+> > Signed-off-by: Arjun.K.V <arjun.kv@samsung.com>
+> > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> > Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm          |   11 ++
+> >  drivers/cpufreq/Makefile             |    1 +
+> >  drivers/cpufreq/exynos-cpufreq.c     |    2 +
+> >  drivers/cpufreq/exynos-cpufreq.h     |    8 +
+> >  drivers/cpufreq/exynos5420-cpufreq.c |  346
+> > ++++++++++++++++++++++++++++++++++ 5 files changed, 368
+> > insertions(+) create mode 100644
+> > drivers/cpufreq/exynos5420-cpufreq.c
+> 
+> Hmm.. That's the second big LITTLE SoC after TC2..
+> And we already have a generic enough driver for all big LITTLE
+> platforms: arm_big_little.c
+> 
+> Please use that with a glue clk and regulator driver if required. We
+> don't want to get any new driver for big LITTLE unless there is a
+> real limitation.
+> 
+> Also, the generic big LITTLE driver supports IKS (In Kernel Switcher)
+> which may or maynot be used by Exynos.
+> 
+> @Lukasz: We can't use cpu0 driver here as we have multiple clusters
+> here A7 and A15, and so there are two clock domains instead of one.
+> That's why we have written big LITTLE driver.
 
-In this case, Huang works for Freescale and Freescale pays him to do the
-work, so Huang shares the authorship and Freescale shares the copyright.
-There is nothing wrong adding Freescale copyright into the file header,
-based on my understanding.  When other people make significant changes
-and contributions to the file, they are welcomed to add more copyright
-info on top of the existing ones.
+When I first looked into the patch - it was almost identical to the
+exynos4210-cpufreq.c or exynos4x12-cpufreq.c files.
 
-I'm not a lawyer, and more than happy to be corrected if I'm wrong.
+Also I didn't spot the code characteristic to IKS. It seems like the
+code in this file is not aware if it runs on A7 or A15.
 
-Shawn
+That was the rationale on proposing reusing cpufreq-cpu0 code (which I
+plan to use as a replacement for current exynos4xxx-cpufreq code).
+
+> 
+> @Arun: And you logs must be a bit enhanced as well.. I knew 5420 is
+> big LITTLE but others may not.. And hence please provide a summary of
+> your platform whenever you add new drivers..
+> 
+> --
+> viresh
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
