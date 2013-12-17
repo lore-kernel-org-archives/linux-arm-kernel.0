@@ -1,41 +1,44 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 16 Dec 2013 18:12:57 -0700
-Subject: [PATCH V2 07/13] ARM: dts: imx6qdl-sabrelite: explicitly set pad for
- SGTL5000 sys_mclk
-In-Reply-To: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387242783-1462-8-git-send-email-troy.kisky@boundarydevices.com>
+Date: Mon, 16 Dec 2013 18:12:50 -0700
+Subject: [PATCH V2 00/13] Update Sabre Lite
+Message-ID: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Explicitly sets the pad GPIO_0 (sys_mclk) to 0x030b0.
+This series updates the Sabre Lite board
+and then bases a new board Nitrogen6x on it.
 
-Before this patch, it has the value 0x130b0 if using mainline u-boot.
-So this patch also removes hysteresis. The 100k pulldown remains so
-that a disabled clock will be low.
+Eric Nelson created a web page to show the
+differences between the two boards.
+http://boundarydevices.com/differences-sabre-lite-nitrogen6x
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
----
-v2: New patch.. V1 patch to add comments was broken up into
-multiple patches
----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Troy Kisky (13):
+  ARM: dts: imx6qdl-sabrelite: move pcie to imx6qdl-sabrelite.dtsi
+  ARM: dts: imx6qdl-sabrelite: move USDHC4 CD to pinctrl_usdhc4
+  ARM: dts: imx6qdl-sabrelite: move USDHC3 CD/WP to pinctrl_usdhc3
+  ARM: dts: imx6qdl-sabrelite: move spi-nor CS to pinctrl_ecspi1
+  ARM: dts: imx6qdl-sabrelite: move usbotg power enable to
+    pinctrl_usbotg
+  ARM: dts: imx6qdl-sabrelite: move phy reset to pinctrl_enet
+  ARM: dts: imx6qdl-sabrelite: explicitly set pad for SGTL5000 sys_mclk
+  ARM: dts: imx6qdl-sabrelite: add gpio-keys
+  ARM: dts: imx6qdl-sabrelite: add pwms for backlights
+  ARM: dts: imx6qdl-sabrelite: add skews for Micrel phy
+  ARM: dts: imx6qdl-sabrelite: fix ENET group
+  ARM: dts: imx6qdl-sabrelite: Add over-current pin to usbotg
+  ARM: dts: imx: add nitrogen6x board
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index ee3f5c0..29f0b40 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -114,7 +114,8 @@
- 	imx6q-sabrelite {
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x80000000
-+				/* SGTL5000 sys_mclk */
-+				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x030b0
- 			>;
- 		};
- 
+ arch/arm/boot/dts/Makefile                |   2 +
+ arch/arm/boot/dts/imx6dl-nitrogen6x.dts   |  22 ++
+ arch/arm/boot/dts/imx6q-nitrogen6x.dts    |  26 ++
+ arch/arm/boot/dts/imx6q-sabrelite.dts     |   4 -
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 385 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 176 +++++++++++++-
+ 6 files changed, 599 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6dl-nitrogen6x.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6x.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+
 -- 
 1.8.1.2
