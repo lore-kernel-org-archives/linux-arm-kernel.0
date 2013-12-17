@@ -1,34 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Dec 2013 19:41:30 +0000
-Subject: [PATCH 0/2] Add support for SolidRun's IMX6 board
-Message-ID: <20131217194130.GA4360@n2100.arm.linux.org.uk>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 17 Dec 2013 14:42:33 -0500
+Subject: [PATCH v7 6/9] usb: gadget: s3c-hsotg: get phy bus width from phy
+ subsystem
+In-Reply-To: <1387309356-17195-1-git-send-email-mporter@linaro.org>
+References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
+Message-ID: <1387309356-17195-7-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So, this patch series adds support for SolidRun's new platform which
-is similar in size to a well known board named after a type of fruit.
-These two patches add the basic support for the platform, without HDMI.
+Adds support for querying the phy bus width from the generic phy
+subsystem. Configure UTMI bus width in GUSBCFG based on this value.
 
-Having discussed the timing of this with Rabeeh, I have his blessing to
-post this now.
+Signed-off-by: Matt Porter <mporter@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
+ drivers/usb/gadget/s3c-hsotg.h |  1 +
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-The platform is made up from two boards:
-- A microsom board, which is re-used in the Cubox-I.  This board comes
-  in a couple of different configurations:
-  - AR8035 gigabit ethernet phy fitted
-  - AR8030 fast ethernet phy fitted
-  In order to support these two configurations, I have split the Ethernet
-  support from the rest of the microsom.  When the AR8030 versions are
-  available and known, I'll add the imx6qdl-microsom-ar8030.dtsi file.
-- The base board.
-
-Not many changes are required to the code - the only requirement is the
-need to add AR8035 ethernet phy configuration support to the IMX6Q code.
-
- arch/arm/boot/dts/Makefile                     |    1 +
- arch/arm/boot/dts/imx6dl-hummingboard.dts      |   90 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi |   58 +++++++++++++++
- arch/arm/boot/dts/imx6qdl-microsom.dtsi        |   80 +++++++++++++++++++++
- arch/arm/configs/imx_v6_v7_defconfig           |    4 +
- arch/arm/mach-imx/mach-imx6q.c                 |   35 +++++++++
- 6 files changed, 268 insertions(+), 0 deletions(-)
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index 8f9bcdb..93ba8b6 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -146,6 +146,7 @@ struct s3c_hsotg_ep {
+  * @regs: The memory area mapped for accessing registers.
+  * @irq: The IRQ number we are using
+  * @supplies: Definition of USB power supplies
++ * @phyif: PHY interface width
+  * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
+  * @num_of_eps: Number of available EPs (excluding EP0)
+  * @debug_root: root directrory for debugfs.
+@@ -174,6 +175,7 @@ struct s3c_hsotg {
+ 
+ 	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
+ 
++	u32			phyif;
+ 	unsigned int		dedicated_fifos:1;
+ 	unsigned char           num_of_eps;
+ 
+@@ -2279,7 +2281,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
+ 	 */
+ 
+ 	/* set the PLL on, remove the HNP/SRP and set the PHY */
+-	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
++	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
+ 	       (0x5 << 10), hsotg->regs + GUSBCFG);
+ 
+ 	s3c_hsotg_init_fifo(hsotg);
+@@ -3638,6 +3640,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+ 		goto err_supplies;
+ 	}
+ 
++	/* Set default UTMI width */
++	hsotg->phyif = GUSBCFG_PHYIf16;
++
++	/*
++	 * If using the generic PHY framework, check if the PHY bus
++	 * width is 8-bit and set the phyif appropriately.
++	 */
++	if (hsotg->phy && (phy_get_bus_width(phy) == 8))
++		hsotg->phyif = GUSBCFG_PHYIf8;
++
+ 	if (hsotg->phy)
+ 		phy_init(hsotg->phy);
+ 
+diff --git a/drivers/usb/gadget/s3c-hsotg.h b/drivers/usb/gadget/s3c-hsotg.h
+index d650b12..85f549f 100644
+--- a/drivers/usb/gadget/s3c-hsotg.h
++++ b/drivers/usb/gadget/s3c-hsotg.h
+@@ -55,6 +55,7 @@
+ #define GUSBCFG_HNPCap				(1 << 9)
+ #define GUSBCFG_SRPCap				(1 << 8)
+ #define GUSBCFG_PHYIf16			(1 << 3)
++#define GUSBCFG_PHYIf8				(0 << 3)
+ #define GUSBCFG_TOutCal_MASK			(0x7 << 0)
+ #define GUSBCFG_TOutCal_SHIFT			(0)
+ #define GUSBCFG_TOutCal_LIMIT			(0x7)
+-- 
+1.8.4
