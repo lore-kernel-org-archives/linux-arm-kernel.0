@@ -1,42 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Dec 2013 08:40:20 +0000 (UTC)
-Subject: [PATCHv10 04/41] CLK: TI: Add DPLL clock support
-In-Reply-To: <1385453182-24421-5-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-5-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.02.1312170838530.14039@utopia.booyaka.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Dec 2013 00:42:38 -0800
+Subject: [PATCH v3 9/9] mtd: nand: davinci: don't request AEMIF address
+ range
+In-Reply-To: <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386264358-9738-10-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131217084238.GJ12034@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013, Tero Kristo wrote:
-
-> The OMAP clock driver now supports DPLL clock type. This patch also
-> adds support for DT DPLL nodes.
+On Thu, Dec 05, 2013 at 07:25:57PM +0200, Ivan Khoronzhuk wrote:
+> The TI AEMIF driver registers are used to setup timings for each chip
+> select. The same registers range is used to setup NAND settings.
+> The AEMIF and NAND drivers not use the same registers in this range.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> In case with TI AEMIF driver, the memory address range is requested
+> already by AEMIF, so we cannot request it twice, just ioremap.
+> 
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Reviewed-by: Taras Kondratiuk <taras@ti.com>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>  drivers/mtd/nand/davinci_nand.c |    8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> index f7b21b8..0cd4dbc 100644
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -636,9 +636,11 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+>  	if (IS_ERR(vaddr))
+>  		return PTR_ERR(vaddr);
+>  
+> -	base = devm_ioremap_resource(&pdev->dev, res2);
+> -	if (IS_ERR(base))
+> -		return PTR_ERR(base);
+> +	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
 
-...
+Since it's important that we don't re-introduce the "request resource"
+boilerplate later, can you add a comment describing the situation?
 
-> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-> new file mode 100644
-> index 0000000..921a409
-> --- /dev/null
-> +++ b/drivers/clk/ti/dpll.c
-> @@ -0,0 +1,597 @@
+> +	if (!base) {
+> +		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
+> +		return -EADDRNOTAVAIL;
+> +	}
+>  
+>  	info->dev		= &pdev->dev;
+>  	info->base		= base;
 
-...
-
-> +/**
-> + * of_ti_dpll_setup - Setup function for OMAP DPLL clocks
-> + *
-> + * @node: device node containing the DPLL info
-> + * @ops: ops for the DPLL
-> + * @ddt: DPLL data template to use
-> + * @init_flags: flags for controlling init types
-> + */
-
-The kerneldoc-nano for this function isn't right.  The blank line
-before the arguments should be removed.
-
-
-- Paul
+Thanks,
+Brian
