@@ -1,86 +1,92 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 17 Dec 2013 15:27:08 -0500 (EST)
-Subject: [PATCH 1/2] ARM: dcache: select DCACHE_WORD_ACCESS for big-endian
- CPUs
-In-Reply-To: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
-References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.10.1312171519560.7480@knanqh.ubzr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 17 Dec 2013 21:27:16 +0100
+Subject: [PATCH 1/4] Phy: DT binding documentation for Marvell MVEBU SATA
+ phy.
+In-Reply-To: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
+References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20131217202716.GA2071@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Dec 2013, Will Deacon wrote:
+Hi Folks
 
-> With commit 11ec50caedb5 ("word-at-a-time: provide generic big-endian
-> zero_bytemask implementation"), the asm-generic word-at-a-time code now
-> provides a zero_bytemask implementation, allowing us to make use of
-> DCACHE_WORD_ACCESS on big-endian CPUs, providing our
-> load_unaligned_zeropad function is endianness-clean.
+Sorry, forgot the --subject. This is version 3 of the patchset.
+
+       Andrew
+
+
+On Tue, Dec 17, 2013 at 09:21:49PM +0100, Andrew Lunn wrote:
+> Describe the binding for the Marvell MVEBU SATA phy. This driver
+> can be used at least with Kirkwood, Dove and maybe others.
+> Additionally, update the SATA binding with the properties to link
+> to the phy nodes.
 > 
-> This patch reworks the load_unaligned_zeropad fixup code to work for
-> both big- and little-endian CPUs, then removes the !CPU_BIG_ENDIAN check
-> when selecting DCACHE_WORD_ACCESS.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Small comment below.
-
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/Kconfig                      |  2 +-
->  arch/arm/include/asm/word-at-a-time.h | 18 ++++++++++--------
->  2 files changed, 11 insertions(+), 9 deletions(-)
+> v1->v2:
+> Correct #phy-cells
+> Correct number after @ to match first reg address.
+> Rename to phy-mvebu.txt
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 88f726d36a40..38ccfd0adbf9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -11,7 +11,7 @@ config ARM
->  	select BUILDTIME_EXTABLE_SORT if MMU
->  	select CLONE_BACKWARDS
->  	select CPU_PM if (SUSPEND || CPU_IDLE)
-> -	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN && MMU
-> +	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
->  	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
->  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
->  	select GENERIC_IDLE_POLL_SETUP
-> diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
-> index 4d52f92967a6..a6d0a29861e7 100644
-> --- a/arch/arm/include/asm/word-at-a-time.h
-> +++ b/arch/arm/include/asm/word-at-a-time.h
-> @@ -48,10 +48,14 @@ static inline unsigned long find_zero(unsigned long mask)
->  	return ret;
->  }
+> v2->v3:
+> Renamed to mvebu-phy.txt
+> Use "port0", "port1" instead of "0", "1"
+> ---
+>  Documentation/devicetree/bindings/ata/marvell.txt  |  6 ++++++
+>  .../devicetree/bindings/phy/mvebu-phy.txt          | 22 ++++++++++++++++++++++
+>  2 files changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/mvebu-phy.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
+> index b5cdd20cde9c..4c5447f1068d 100644
+> --- a/Documentation/devicetree/bindings/ata/marvell.txt
+> +++ b/Documentation/devicetree/bindings/ata/marvell.txt
+> @@ -6,11 +6,17 @@ Required Properties:
+>  - interrupts    : Interrupt controller is using
+>  - nr-ports      : Number of SATA ports in use.
 >  
-> -#ifdef CONFIG_DCACHE_WORD_ACCESS
-> -
->  #define zero_bytemask(mask) (mask)
+> +Optional Properties:
+> +- phys		: List of phandles to sata phys
+> +- phy-names	: Should be "port0", "port1", etc, one per phandle
+> +
+>  Example:
 >  
-> +#else	/* __ARMEB__ */
-> +#include <asm-generic/word-at-a-time.h>
-> +#endif
+>  	sata at 80000 {
+>  		compatible = "marvell,orion-sata";
+>  		reg = <0x80000 0x5000>;
+>  		interrupts = <21>;
+> +		phys = <&sata_phy0>, <&sata_phy1>;
+> +		phy-names = "port0", "port1";
+>  		nr-ports = <2>;
+>  	}
+> diff --git a/Documentation/devicetree/bindings/phy/mvebu-phy.txt b/Documentation/devicetree/bindings/phy/mvebu-phy.txt
+> new file mode 100644
+> index 000000000000..6cb3364aeafb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/mvebu-phy.txt
+> @@ -0,0 +1,22 @@
+> +* Marvell MVEBU SATA PHY
 > +
-> +#ifdef CONFIG_DCACHE_WORD_ACCESS
+> +Power control for the SATA phy found on Marvell MVEBU SoCs.
 > +
->  /*
->   * Load an unaligned word from kernel space.
->   *
-> @@ -73,7 +77,11 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
->  	"	bic	%2, %2, #0x3\n"
->  	"	ldr	%0, [%2]\n"
->  	"	lsl	%1, %1, #0x3\n"
-> +#ifndef __ARMEB__
->  	"	lsr	%0, %0, %1\n"
-> +#else
-> +	"	lsl	%0, %0, %1\n"
-> +#endif
-
-You could get rid of the #ifdef by using:
-
-		pull	%0, %0, %1
-
-Except this is not a pure assembly file and can't rely on 
-<asm/assembler.h>.  Bah.  In that case...
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+> +This document extends the binding described in phy-bindings.txt
+> +
+> +Required properties :
+> +
+> + - reg		   : Offset and length of the register set for the SATA device
+> + - compatible	   : Should be "marvell,mvebu-sata-phy"
+> + - clocks	   : phandle of clock and specifier that supplies the device
+> + - clock-names	   : Should be "sata"
+> +
+> +Example:
+> +		sata-phy at 84000 {
+> +			compatible = "marvell,mvebu-sata-phy";
+> +			reg = <0x84000 0x0334>;
+> +			clocks = <&gate_clk 15>;
+> +			clock-names = "sata";
+> +			#phy-cells = <0>;
+> +			status = "ok";
+> +		};
+> -- 
+> 1.8.5.1
+> 
