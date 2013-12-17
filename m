@@ -1,22 +1,55 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Dec 2013 14:10:05 +0100
-Subject: [PATCH v3 6/7] Documentation: add the binding file for Quadspi
- driver
-In-Reply-To: <1387184330-14448-7-git-send-email-b32955@freescale.com>
+Date: Tue, 17 Dec 2013 14:16:18 +0100
+Subject: [PATCH v3 7/7] mtd: spi-nor: Add Freescale QuadSpi driver
+In-Reply-To: <1387184330-14448-8-git-send-email-b32955@freescale.com>
 References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <1387184330-14448-7-git-send-email-b32955@freescale.com>
-Message-ID: <201312171410.05423.marex@denx.de>
+ <1387184330-14448-8-git-send-email-b32955@freescale.com>
+Message-ID: <201312171416.18560.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 16, 2013 at 09:58:49 AM, Huang Shijie wrote:
-> This patch adds the binding file for Freescale Quadspi driver.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+On Monday, December 16, 2013 at 09:58:50 AM, Huang Shijie wrote:
+[...]
 
-I might be blind and/or tired, but I don't see devicetree-discuss in the CC. 
-Next time please CC this ML ( devicetree-discuss AT lists.ozlabs.org ) so the 
-bindings are reviewed by experts .
+> +/* Macros for constructing the LUT register. */
+> +#define LUT0(ins, pad, opr)						\
+> +		(((opr) << OPRND0_SHIFT) | ((LUT_##pad) << PAD0_SHIFT) | \
+> +		((LUT_##ins) << INSTR0_SHIFT))
+> +
+> +#define LUT1(ins, pad, opr)	(LUT0(ins, pad, opr) << OPRND1_SHIFT)
+
+Change this into an inline function, that way you'd get type-checking here.
+
+[...]
+
+> +enum fsl_qspi_devtype {
+> +	FSL_QUADSPI_VYBRID,
+> +	FSL_QUADSPI_IMX6SLX
+
+Will the SLX be only a single-core chip?
+
+> +};
+> +
+> +struct fsl_qspi_devtype_data {
+> +	enum fsl_qspi_devtype devtype;
+> +	u32 memmap_base;
+> +	int rxfifo;
+> +	int txfifo;
+> +};
+> +
+> +static struct fsl_qspi_devtype_data vybrid_data = {
+> +	.devtype = FSL_QUADSPI_VYBRID,
+> +	.memmap_base = 0x20000000,
+
+This memmap_base should come from DT prop.
+
+> +	.rxfifo = 128,
+> +	.txfifo = 64
+
+Ditto for both of these too. They're HW props.
+
+> +};
+[...]
 
 Best regards,
 Marek Vasut
