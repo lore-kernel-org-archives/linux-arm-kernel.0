@@ -1,58 +1,59 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Tue, 17 Dec 2013 20:58:57 +0900
-Subject: [PATCH 00/11] ARM: EXYNOS: cleanup <mach/regs-xxx.h>
-Message-ID: <116a01cefb1f$5d841be0$188c53a0$@kernel.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 17 Dec 2013 13:00:10 +0100
+Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131217115136.GT4360@n2100.arm.linux.org.uk>
+References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
+ <20131217111020.GF13823@ulmo.nvidia.com>
+ <20131217115136.GT4360@n2100.arm.linux.org.uk>
+Message-ID: <5295539.cCkPY1PpyC@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is cleanup for <mach/regs-xxx.h>.
+On Tuesday 17 of December 2013 11:51:36 Russell King - ARM Linux wrote:
+> On Tue, Dec 17, 2013 at 12:10:22PM +0100, Thierry Reding wrote:
+> > On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
+> > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > > +		const void __iomem *addr)
+> > > +{
+> > > +	u32 val;
+> > > +
+> > > +	val = __raw_readl(addr);
+> > > +
+> > > +	if (likely(fpc->big_endian))
+> > 
+> > The likely() probably isn't very useful in this case. But if you want to
+> > keep it, it should at least be reversed, since little-endian is actually
+> > the default (you have to specify the big-endian property to activate the
+> > big endian mode).
+> > 
+> > > +		val = be32_to_cpu(val);
+> > > +	else
+> > > +		val = le32_to_cpu(val);
+> 
+> This will also cause sparse errors, because when sparse is enabled, these
+> expect __le32 or __be32 arguments, not u32.
 
-My e-mail client is used for submitting them instead of git send-email
-because of firewall :-( so looks strange format...sorry about that but it
-should be fine when I take them :-)
+My question is why can't you just create two sets of accessors, one big
+endian and one little endian, add two function pointers to your
+fsl_pwm_chip struct and let the driver set the to correct accessors in
+probe?
 
-Kukjin Kim (11):
-      ARM: EXYNOS: cleanup <mach/regs-pmu.h>
-      ARM: EXYNOS: remove inclusion <mach/regs-pmu.h> into another headers
-      ARM: EXYNOS: local regs-pmu.h header file
-      ARM: EXYNOS: cleanup <mach/regs-irq.h>
-      ARM: EXYNOS: cleanup <mach/regs-clock.h>
-      PM / devfreq: move definitions for exynos4_bus into drivers/devfreq
-      ARM: EXYNOS: local definitions for pm.c into mach-exynos dir
-      cpufreq: exynos: move definitions for exynos-cpufreq into
-drivers/cpufreq/
-      ARM: EXYNOS: local definitions for cpuidle.c into mach-exynos dir
-      ARM: EXYNOS: remove <mach/regs-clock.h> for exynos
-      PM / devfreq: use inclusion <mach/map.h> instead of <plat/map-s5p.h>
+This would eliminate the problem with types Russell mentioned and IMHO
+make the code cleaner.
 
- arch/arm/mach-exynos/common.c                      |    5 +-
- arch/arm/mach-exynos/cpuidle.c                     |   25 +++++-
- arch/arm/mach-exynos/hotplug.c                     |    2 +-
- arch/arm/mach-exynos/include/mach/pm-core.h        |    5 +-
- arch/arm/mach-exynos/include/mach/regs-clock.h     |  372
-----------------------------------------------------------------------------
--
- arch/arm/mach-exynos/include/mach/regs-irq.h       |   19 ----
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
- arch/arm/mach-exynos/platsmp.c                     |    3 +-
- arch/arm/mach-exynos/pm.c                          |   29 +++++-
- arch/arm/mach-exynos/pm_domains.c                  |    3 +-
- arch/arm/mach-exynos/pmu.c                         |    3 +-
- arch/arm/mach-exynos/{include/mach => }/regs-pmu.h |   53 -----------
- arch/arm/plat-samsung/pm.c                         |    2 +
- arch/arm/plat-samsung/s5p-irq-pm.c                 |    3 +
- drivers/cpufreq/exynos-cpufreq.h                   |   22 +++++
- drivers/cpufreq/exynos4210-cpufreq.c               |    2 -
- drivers/cpufreq/exynos4x12-cpufreq.c               |    2 -
- drivers/cpufreq/exynos5250-cpufreq.c               |    1 -
- drivers/devfreq/exynos/exynos4_bus.c               |    4 +-
- drivers/devfreq/exynos/exynos4_bus.h               |  110
-+++++++++++++++++++++++
- 20 files changed, 201 insertions(+), 466 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/regs-clock.h
- delete mode 100644 arch/arm/mach-exynos/include/mach/regs-irq.h
- rename arch/arm/mach-exynos/{include/mach => }/regs-pmu.h (88%)
- create mode 100644 drivers/devfreq/exynos/exynos4_bus.h
+Best regards,
+Tomasz
 
-Thanks.
-K-Gene.
+> 
+> > > +	rmb();
+> > 
+> > I'd prefer the rmb() to follow the __raw_readl() immediately to make the
+> > relationship more explicit.
+> 
+> A better question to ask is: why is this barrier here?  What memory
+> ordering operations is it trying to serialise?
+
+I'd also add a question why __raw accessors are used here.
+
+Best regards,
+Tomasz
