@@ -1,119 +1,76 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 16 Dec 2013 18:30:47 -0800
-Subject: [PATCH] regmap: Allow regmap_bulk_write() to work for "no-bus" regmaps
-In-Reply-To: <20131216210153.GA3185@sirena.org.uk>
-References: <1386718523-2587-4-git-send-email-sboyd@codeaurora.org>
- <20131210235000.GK11468@sirena.org.uk>
- <52A7AE1B.3040201@codeaurora.org>
- <20131211005106.GL11468@sirena.org.uk>
- <52A7C0C3.2070805@codeaurora.org>
- <20131211132729.GT11468@sirena.org.uk>
- <52AA42FD.4040503@codeaurora.org>
- <20131213104128.GT11044@sirena.org.uk>
- <20131213213707.GO21983@codeaurora.org>
- <20131216210153.GA3185@sirena.org.uk>
-Message-ID: <20131217023047.GC31766@codeaurora.org>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Mon, 16 Dec 2013 18:37:14 -0800
+Subject: [PATCH 1/3]: Support cpu frequency scaling and power management
+ for iMX6SL
+In-Reply-To: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+References: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+Message-ID: <CACUGKYN_b0x4xg_Me3TXQGKEvz61SDZk4CFk5YHFnVCWT_6GPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-regmap_bulk_write() should decay to performing individual writes
-if we're using a "no-bus" regmap. Unfortunately, it returns an
-error because there is no map->bus pointer. Fix it.
+Need some correction:
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+From: John Tobias <john.tobias.ph@gmail.com>
 
-On 12/16, Mark Brown wrote:
-> On Fri, Dec 13, 2013 at 01:37:07PM -0800, Stephen Boyd wrote:
-> 
-> > I came up with this (possibly ugly) patch. It works for my
-> > specific case but I'm not sure if unpacking the val bits into an
-> > unsigned int and passing that to _regmap_write() is sane. What do
-> > you think?
-> 
-> It's not lovely but it's about as good as it gets.  I'd probaly just
-> drop the raw single write case so it's simpler - just either raw write
-> the lot or write a register at a time with unpacking (and so refactor
-> the the loop that does the in place formatting into the raw case only
-> and not bother for the single write).
 
-Ok how about this?
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..6035e7e 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -38,6 +38,21 @@
+                        device_type = "cpu";
+                        reg = <0x0>;
+                        next-level-cache = <&L2>;
++                       operating-points = <
++                               /* kHz    uV */
++                               1000000 1275000
++                               996000  1250000
++                               792000  1150000
++                               396000  950000
++                       >;
++                       clock-latency = <61036>; /* two CLK32 periods */
++                       clocks = <&clks IMX6SL_CLK_ARM>, <&clks
+IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
++                                <&clks IMX6SL_CLK_PLL1_SW>, <&clks
+IMX6SL_CLK_PLL1_SYS>;
++                       clock-names = "arm", "pll2_pfd2_396m", "step",
++                                     "pll1_sw", "pll1_sys";
++                       arm-supply = <&reg_arm>;
++                       pu-supply = <&reg_pu>;
++                       soc-supply = <&reg_soc>;
+                };
+        };
 
- drivers/base/regmap/regmap.c | 43 ++++++++++++++++++-------------------------
- 1 file changed, 18 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 1ccd61b..12b80f6 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1514,21 +1514,30 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
- {
- 	int ret = 0, i;
- 	size_t val_bytes = map->format.val_bytes;
--	void *wval;
- 
--	if (!map->bus)
--		return -EINVAL;
--	if (!map->format.parse_inplace)
-+	if (map->bus && !map->format.parse_inplace)
- 		return -EINVAL;
- 	if (reg % map->reg_stride)
- 		return -EINVAL;
- 
- 	map->lock(map->lock_arg);
-+	/*
-+	 * Some devices don't support bulk write, for
-+	 * them we have a series of single write operations.
-+	 */
-+	if (!map->bus || map->use_single_rw) {
-+		for (i = 0; i < val_count; i++) {
-+			unsigned int ival;
- 
--	/* No formatting is require if val_byte is 1 */
--	if (val_bytes == 1) {
--		wval = (void *)val;
-+			ival = *(unsigned int *)(val + (i * val_bytes));
-+			ret = _regmap_write(map, reg + (i * map->reg_stride),
-+					ival);
-+			if (ret != 0)
-+				goto out;
-+		}
- 	} else {
-+		void *wval;
-+
- 		wval = kmemdup(val, val_count * val_bytes, GFP_KERNEL);
- 		if (!wval) {
- 			ret = -ENOMEM;
-@@ -1537,27 +1546,11 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
- 		}
- 		for (i = 0; i < val_count * val_bytes; i += val_bytes)
- 			map->format.parse_inplace(wval + i);
--	}
--	/*
--	 * Some devices does not support bulk write, for
--	 * them we have a series of single write operations.
--	 */
--	if (map->use_single_rw) {
--		for (i = 0; i < val_count; i++) {
--			ret = _regmap_raw_write(map,
--						reg + (i * map->reg_stride),
--						val + (i * val_bytes),
--						val_bytes);
--			if (ret != 0)
--				return ret;
--		}
--	} else {
-+
- 		ret = _regmap_raw_write(map, reg, wval, val_bytes * val_count);
--	}
- 
--	if (val_bytes != 1)
- 		kfree(wval);
--
-+	}
- out:
- 	map->unlock(map->lock_arg);
- 	return ret;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+On Mon, Dec 16, 2013 at 5:40 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
+> iMX6SL device tree doesn't have a configuration settings to enable the
+> frequency scaling and power management.
+>
+> From: John Tobias <john.tobias.ph@gmail.com>
+>
+>
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 28558f1..0ad2f6a 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -38,6 +38,19 @@
+>                         device_type = "cpu";
+>                         reg = <0x0>;
+>                         next-level-cache = <&L2>;
+> +                       operating-points = <
+> +                               /* kHz    uV */
+> +                               1000000 1275000
+> +                               792000  1150000
+> +                       >;
+> +                       clock-latency = <61036>; /* two CLK32 periods */
+> +                       clocks = <&clks IMX6SL_CLK_ARM>, <&clks
+> IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
+> +                                <&clks IMX6SL_CLK_PLL1_SW>, <&clks
+> IMX6SL_CLK_PLL1_SYS>;
+> +                       clock-names = "arm", "pll2_pfd2_396m", "step",
+> +                                     "pll1_sw", "pll1_sys";
+> +                       arm-supply = <&reg_arm>;
+> +                       pu-supply = <&reg_pu>;
+> +                       soc-supply = <&reg_soc>;
+>                 };
+>         };
