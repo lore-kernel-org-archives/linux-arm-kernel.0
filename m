@@ -1,189 +1,161 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 17 Dec 2013 23:37:44 +0400
-Subject: [PATCH v3 14/21] misc: support for LP-8x4x rotary switch
+Date: Tue, 17 Dec 2013 23:37:46 +0400
+Subject: [PATCH v3 16/21] misc: support for writing to LP-8x4x EEPROM
 In-Reply-To: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
 References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
  <1387309071-22382-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1387309071-22382-15-git-send-email-ynvich@gmail.com>
+Message-ID: <1387309071-22382-17-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder backplane resources by start address.
-
-Reorder backplane attributes alphabetically.
+at24c128 write protection is implemented by a separate GPIO line.
+EEPROM driver doesn't provide this option, so we implement it
+in the board-specific device.
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 ---
    v2..v3
    * new patch
 
- .../devicetree/bindings/misc/lp8x4x-bus.txt        |  8 ++--
+ .../devicetree/bindings/misc/lp8x4x-bus.txt        |  3 ++
  Documentation/misc-devices/lp8x4x_bus.txt          |  3 ++
- arch/arm/boot/dts/pxa27x-lp8x4x.dts                |  3 +-
- drivers/misc/lp8x4x_bus.c                          | 43 ++++++++++++++++++----
- 4 files changed, 45 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/pxa27x-lp8x4x.dts                |  1 +
+ drivers/misc/lp8x4x_bus.c                          | 50 ++++++++++++++++++++++
+ 4 files changed, 57 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt b/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt
-index 1c87a29..8a55020 100644
+index 1b1776a..b0fb145 100644
 --- a/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt
 +++ b/Documentation/devicetree/bindings/misc/lp8x4x-bus.txt
-@@ -5,12 +5,14 @@ See Documentation/misc-devices/lp8x4x_bus.txt for details.
- Required properties:
- - compatible : should be "icpdas,backplane-lp8x4x"
+@@ -10,6 +10,8 @@ Required properties:
+        * the 8bit DIP switch
+        * the slot count register
  
--- reg: physical base address of the slot count register and the length
--       of the memory mapped region.
-+- reg: physical base addresses and region lengths of
-+       * the rotary switch
-+       * the slot count register
- 
++- eeprom-gpios : should point to active-low write enable GPIO
++
  Example:
  
  	backplane {
- 		compatible = "icpdas,backplane-lp8x4x";
--		reg = <0x17009046 0x2>;
-+		reg = <0x0 0x2
-+		       0x9046 0x2>;
+@@ -17,4 +19,5 @@ Example:
+ 		reg = <0x0 0x2
+ 		       0x9002 0x2
+ 		       0x9046 0x2>;
++		eeprom-gpios = <&gpio 4 0>;
  	};
 diff --git a/Documentation/misc-devices/lp8x4x_bus.txt b/Documentation/misc-devices/lp8x4x_bus.txt
-index f5392b3..bea435b 100644
+index 829781b..78ea0a89 100644
 --- a/Documentation/misc-devices/lp8x4x_bus.txt
 +++ b/Documentation/misc-devices/lp8x4x_bus.txt
-@@ -26,5 +26,8 @@ SYSFS
+@@ -29,6 +29,9 @@ SYSFS
+ dip
+ 	RO - shows status of LP-8x4x 8bit DIP switch
  
- /sys/bus/icpdas/devices/backplane:
- 
-+rotary
-+	RO - shows position of LP-8x4x rotary switch (0-9)
++eeprom_write_enable
++	RW - controls write access to board's EEPROM (1 - enable)
 +
- slot_count
- 	RO - shows total number of expansion slots on the device
+ rotary
+ 	RO - shows position of LP-8x4x rotary switch (0-9)
+ 
 diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
-index 4ea566c..b50ce43 100644
+index 09a6bc9..52f0036 100644
 --- a/arch/arm/boot/dts/pxa27x-lp8x4x.dts
 +++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
-@@ -205,7 +205,8 @@
- 
- 			backplane {
- 				compatible = "icpdas,backplane-lp8x4x";
--				reg = <0x9046 0x2>;
-+				reg = <0x0 0x2
-+				       0x9046 0x2>;
+@@ -208,6 +208,7 @@
+ 				reg = <0x0 0x2
+ 				       0x9002 0x2
+ 				       0x9046 0x2>;
++				eeprom-gpios = <&gpio 4 0>;
  			};
  		};
  	};
 diff --git a/drivers/misc/lp8x4x_bus.c b/drivers/misc/lp8x4x_bus.c
-index 7aa55cf..18ca8f8 100644
+index dfbc8c4..567fe078 100644
 --- a/drivers/misc/lp8x4x_bus.c
 +++ b/drivers/misc/lp8x4x_bus.c
-@@ -25,6 +25,7 @@ MODULE_DESCRIPTION("ICP DAS LP-8x4x parallel bus driver");
- struct lp8x4x_master {
- 	unsigned int		slot_count;
+@@ -9,6 +9,7 @@
+  *  published by the Free Software Foundation or any later version.
+  */
+ #include <linux/err.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/list.h>
+@@ -27,6 +28,7 @@ struct lp8x4x_master {
  	void			*count_addr;
-+	void			*rotary_addr;
+ 	void			*rotary_addr;
+ 	void			*dip_addr;
++	struct gpio_desc        *eeprom_nWE;
  	struct device		dev;
  };
  
-@@ -56,8 +57,19 @@ static ssize_t slot_count_show(struct device *dev,
+@@ -68,6 +70,40 @@ static ssize_t rotary_show(struct device *dev,
  
- static DEVICE_ATTR_RO(slot_count);
+ static DEVICE_ATTR_RO(rotary);
  
-+static ssize_t rotary_show(struct device *dev,
++static ssize_t eeprom_write_enable_show(struct device *dev,
 +		struct device_attribute *attr, char *buf)
 +{
 +	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
 +
-+	return sprintf(buf, "%u\n", (ioread8(m->rotary_addr) ^ 0xf) & 0xf);
++	return sprintf(buf, "%u\n", !gpiod_get_value(m->eeprom_nWE));
 +}
 +
-+static DEVICE_ATTR_RO(rotary);
++static ssize_t eeprom_write_enable_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
++	unsigned int val = 0;
++	int err;
 +
++	if (!buf)
++		return count;
++
++	if (0 == count)
++		return count;
++
++	err = kstrtouint(buf, 10, &val);
++	if (err != 0) {
++		dev_err(dev, "Bad input %s\n", buf);
++		return count;
++	}
++
++	gpiod_set_value(m->eeprom_nWE, !val);
++
++	return count;
++}
++
++static DEVICE_ATTR_RW(eeprom_write_enable);
++
+ static ssize_t dip_show(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+ {
+@@ -81,6 +117,7 @@ static DEVICE_ATTR_RO(dip);
  static struct attribute *master_dev_attrs[] = {
  	&dev_attr_slot_count.attr,
-+	&dev_attr_rotary.attr,
+ 	&dev_attr_rotary.attr,
++	&dev_attr_eeprom_write_enable.attr,
+ 	&dev_attr_dip.attr,
  	NULL,
  };
- ATTRIBUTE_GROUPS(master_dev);
-@@ -76,6 +88,7 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
- {
- 	struct lp8x4x_master *m, **p;
- 	struct resource *res;
-+	int r = 0;
- 	int err = 0;
- 
- 	m = kzalloc(sizeof(*m), GFP_KERNEL);
-@@ -89,18 +102,32 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
+@@ -156,6 +193,19 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
+ 		goto err_free;
  	}
- 	*p = m;
  
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, r++);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get rotary address\n");
-+		err = -ENODEV;
++	m->eeprom_nWE = devm_gpiod_get(&pdev->dev, "eeprom");
++	if (IS_ERR(m->eeprom_nWE)) {
++		err = PTR_ERR(m->eeprom_nWE);
++		dev_err(&pdev->dev, "Failed to get eeprom GPIO\n");
 +		goto err_free;
 +	}
 +
-+	m->rotary_addr = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(m->rotary_addr)) {
-+		dev_err(&pdev->dev, "Failed to ioremap rotary address\n");
-+		err = PTR_ERR(m->rotary_addr);
++	err = gpiod_direction_output(m->eeprom_nWE, 1);
++	if (err < 0) {
++		dev_err(&pdev->dev, "Failed to set eeprom GPIO output\n");
 +		goto err_free;
 +	}
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, r++);
- 	if (!res) {
- 		dev_err(&pdev->dev, "could not get slot count address\n");
- 		err = -ENODEV;
--		goto err2;
-+		goto err_free;
- 	}
- 
- 	m->count_addr = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(m->count_addr)) {
- 		dev_err(&pdev->dev, "Failed to ioremap slot count address\n");
- 		err = PTR_ERR(m->count_addr);
--		goto err2;
-+		goto err_free;
- 	}
- 
  	m->slot_count = ioread8(m->count_addr);
-@@ -115,7 +142,7 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "unexpected slot number(%u)",
- 				m->slot_count);
- 		err = -ENODEV;
--		goto err2;
-+		goto err_free;
- 	};
- 
- 	dev_info(&pdev->dev, "found bus with up to %u slots\n", m->slot_count);
-@@ -123,7 +150,7 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
- 	err = bus_register(&lp8x4x_bus_type);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to register bus type\n");
--		goto err2;
-+		goto err_free;
- 	}
- 
- 	m->dev.bus = &lp8x4x_bus_type;
-@@ -135,15 +162,15 @@ static int __init lp8x4x_bus_probe(struct platform_device *pdev)
- 	err = device_register(&m->dev);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to register backplane device\n");
--		goto err3;
-+		goto err_bus;
- 	}
- 
- 	devres_add(&pdev->dev, p);
- 	return 0;
- 
--err3:
-+err_bus:
- 	bus_unregister(&lp8x4x_bus_type);
--err2:
-+err_free:
- 	devres_free(p);
- err1:
- 	kfree(m);
+ 	switch (m->slot_count) {
+ 	case 1:
 -- 
 1.8.4.2
