@@ -1,28 +1,232 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 17 Dec 2013 14:43:13 -0500 (EST)
-Subject: [PATCH v2 0/5] net: phy: Ethernet PHY powerdown optimization
-In-Reply-To: <1386926429-28818-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386926429-28818-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131217.144313.1563516273987934449.davem@davemloft.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 17 Dec 2013 13:45:12 -0600
+Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
+In-Reply-To: <1386626150-23504-1-git-send-email-nm@ti.com>
+References: <1386626150-23504-1-git-send-email-nm@ti.com>
+Message-ID: <52B0A9C8.7070201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date: Fri, 13 Dec 2013 10:20:24 +0100
+On 12/09/2013 03:55 PM, Nishanth Menon wrote:
+> Craneboard is a hardware development platform based on the Sitara
+> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
+> details. Add basic devices for craneboard as replacement for the board
+> file scheduled for removal as part of device tree conversion
+> 
+> [1] http://craneboard.org
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
 
-> This is v2 of the ethernet PHY power optimization patches to reduce
-> power consumption of network PHYs with link that are either unused or
-> the corresponding netdev is down.
-> 
-> Compared to the last version, this patch set drops a patch to disable
-> unused PHYs after late initcall, as it is not compatible with a modular
-> mdio bus [1]. I'll investigate different ways to have a modular mdio bus
-> driver get notified when driver loading is done.
-> 
-> Again, a branch with v2 applied to v3.13-rc2 can also be found at
-> https://github.com/shesselba/linux-dove.git topic/ethphy-power-v2
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg293028.html
+gentle ping.. had'nt seen a response on this patch. Could we queue
+this up for v3.14-rc1?
 
-Series applied, thanks.
+> Based on:
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> branch: omap-for-v3.14/omap3-board-removal 736e812 ARM: OMAP2+: Remove unused platform init code and headers
+> 
+> Bootlog: http://pastebin.mozilla.org/3744412
+> 
+>  arch/arm/boot/dts/Makefile              |    1 +
+>  arch/arm/boot/dts/am3517-craneboard.dts |  174 +++++++++++++++++++++++++++++++
+>  2 files changed, 175 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am3517-craneboard.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index fc37bca..ad155fc 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -205,6 +205,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>  	am335x-boneblack.dtb \
+>  	am335x-nano.dtb \
+>  	am335x-base0033.dtb \
+> +	am3517-craneboard.dtb \
+>  	am3517-evm.dtb \
+>  	am3517_mt_ventoux.dtb \
+>  	am43x-epos-evm.dtb \
+> diff --git a/arch/arm/boot/dts/am3517-craneboard.dts b/arch/arm/boot/dts/am3517-craneboard.dts
+> new file mode 100644
+> index 0000000..2d40b3f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am3517-craneboard.dts
+> @@ -0,0 +1,174 @@
+> +/*
+> + * See craneboard.org for more details
+> + *
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +#include "am3517.dtsi"
+> +
+> +/ {
+> +	model = "TI AM3517 CraneBoard (TMDSEVM3517)";
+> +	compatible = "ti,am3517-craneboard", "ti,am3517", "ti,omap3";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x10000000>;	/* 256 MB */
+> +	};
+> +
+> +	vbat: fixedregulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vbat";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-boot-on;
+> +	};
+> +};
+> +
+> +&davinci_emac {
+> +	status = "okay";
+> +};
+> +
+> +&davinci_mdio {
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <2600000>;
+> +
+> +	tps: tps at 2d {
+> +		reg = <0x2d>;
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <400000>;
+> +	/* goes to expansion connector */
+> +	status = "disabled";
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <400000>;
+> +	/* goes to expansion connector */
+> +	status = "disabled";
+> +};
+> +
+> +&mmc1 {
+> +	vmmc-supply = <&vdd2_reg>;
+> +	bus-width = <8>;
+> +};
+> +
+> +&mmc2 {
+> +	/* goes to expansion connector */
+> +	status = "disabled";
+> +};
+> +
+> +&mmc3 {
+> +	/* goes to expansion connector */
+> +	status = "disabled";
+> +};
+> +
+> +#include "tps65910.dtsi"
+> +
+> +&omap3_pmx_core {
+> +	tps_pins: pinmux_tps_pins {
+> +		pinctrl-single,pins = <
+> +			0x1b0 (PIN_INPUT_PULLUP | MUX_MODE0) /* sys_nirq.sys_nirq */
+> +		>;
+> +	};
+> +};
+> +
+> +&tps {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&tps_pins>;
+> +
+> +	interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +	interrupt-parent = <&intc>;
+> +
+> +	ti,en-ck32k-xtal;
+> +
+> +	vcc1-supply = <&vbat>;
+> +	vcc2-supply = <&vbat>;
+> +	vcc3-supply = <&vbat>;
+> +	vcc4-supply = <&vbat>;
+> +	vcc5-supply = <&vbat>;
+> +	vcc6-supply = <&vbat>;
+> +	vcc7-supply = <&vbat>;
+> +	vccio-supply = <&vbat>;
+> +
+> +	regulators {
+> +		vrtc_reg: regulator at 0 {
+> +			regulator-always-on;
+> +		};
+> +
+> +		vio_reg: regulator at 1 {
+> +			regulator-always-on;
+> +		};
+> +
+> +		/*
+> +		 * Unused:
+> +		 * VDIG1=2.7V,300mA max
+> +		 * VDIG2=1.8V,300mA max
+> +		 */
+> +
+> +		vpll_reg: regulator at 7 {
+> +			/* VDDS_DPLL_1V8 */
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		vaux1_reg: regulator at 9 {
+> +			/* VDDS_SRAM_1V8 */
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		vaux2_reg: regulator at 10 {
+> +			/* VDDA1P8V_USBPHY */
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		/* VAUX33 unused */
+> +
+> +		vdac_reg: regulator at 8 {
+> +			/* VDDA_DAC_1V8 */
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		vmmc_reg: regulator at 12 {
+> +			/* VDDA3P3V_USBPHY */
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		vdd1_reg: regulator at 2 {
+> +			/* VDD_CORE */
+> +			regulator-name = "vdd_core";
+> +			regulator-min-microvolt = <1200000>;
+> +			regulator-max-microvolt = <1200000>;
+> +			regulator-boot-on;
+> +			regulator-always-on;
+> +		};
+> +
+> +		vdd2_reg: regulator at 3 {
+> +			/* VDDSHV_3V3 */
+> +			regulator-name = "vdd_shv";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		/* VDD3 unused */
+> +	};
+> +};
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
