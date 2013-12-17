@@ -1,16 +1,23 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 11:03:09 +0800
-Subject: [PATCH] ARM: dts: imx6qdl: add spdif support for sabreauto
-In-Reply-To: <1387190268-8041-1-git-send-email-Guangyu.Chen@freescale.com>
-References: <1387190268-8041-1-git-send-email-Guangyu.Chen@freescale.com>
-Message-ID: <20131217030307.GE6691@S2101-09.ap.freescale.net>
+Date: Tue, 17 Dec 2013 11:10:48 +0800
+Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
+ when cpufreq is changed
+In-Reply-To: <1387228450-641-2-git-send-email-b20788@freescale.com>
+References: <1387228450-641-1-git-send-email-b20788@freescale.com>
+ <1387228450-641-2-git-send-email-b20788@freescale.com>
+Message-ID: <20131217031045.GF6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 06:37:48PM +0800, Nicolin Chen wrote:
-> This patch adds spdif support for imx6qdl-sabreauto by inserting the cpu dai
-> node with pinctrl group and its ASoC dai link node.
-> 
-> Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
+On Mon, Dec 16, 2013 at 04:14:10PM -0500, Anson Huang wrote:
+> @@ -201,9 +238,75 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  		goto put_node;
+>  	}
+>  
+> +	prop = of_find_property(np, "fsl,soc-operating-points", NULL);
 
-Applied, thanks.
+This is a new property, and it should be documented in binding doc.
+Remember to copy devicetree at vger.kernel.org when you send a patch with
+binding doc update.
+
+Shawn
