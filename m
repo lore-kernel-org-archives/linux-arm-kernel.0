@@ -1,59 +1,202 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 17 Dec 2013 11:10:15 +0100
-Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
-In-Reply-To: <20131217003107.GF27171@verge.net.au>
-References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
- <52AEFF56.5010602@cogentembedded.com>
- <52AF8D57.7010705@cogentembedded.com>
- <20131217003107.GF27171@verge.net.au>
-Message-ID: <CAMuHMdV7y7GFrswa+f7ui8LSXj723_i5P6gBAG5ZOoMDP5LWyA@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 17 Dec 2013 17:08:22 -0500
+Subject: [PATCH V2 2/2] cpufreq: imx6q: correct VDDSOC/PU voltage scaling when
+ cpufreq is changed
+In-Reply-To: <1387318102-11070-1-git-send-email-b20788@freescale.com>
+References: <1387318102-11070-1-git-send-email-b20788@freescale.com>
+Message-ID: <1387318102-11070-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 1:31 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Dec 17, 2013 at 02:31:35AM +0300, Sergei Shtylyov wrote:
->> On 12/16/2013 04:25 PM, I wrote:
->> >>The koelsch board uses has an SH ethernet controller which uses a Micrel
->> >>phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
->> >>Micrel-specific phy driver rather than relying on the generic phy driver.
->>
->> >    Frankly speaking, I'm seeing no advantages to doing that.
->>
->>    Although wait, Geert has reported the absence of Rx FIFO overflow
->> messages with this PHY driver, IIRC.
+on i.MX6Q, cpu freq change need to follow below flows:
 
-I spoke too soon: apparently the statistical relevance of my reporting was
-too low. I still see them from time to time, but I think less than before (no
-numbers available).
+1. each setpoint has different VDDARM, VDDSOC/PU voltage, get the setpoint
+   table from dts;
+2. when cpu freq is scaling up, need to increase VDDSOC/PU voltage before
+   VDDARM, if VDDPU is off, no need to change it;
+3. when cpu freq is scaling down, need to decrease VDDARM voltage before
+   VDDSOC/PU, if VDDPU is off, no need to change it;
 
->> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> >    Analogous changes are needed for BOCK-W and Lager boards since they all
->> >use the same KSZ8041RNLI PHY chip. I was going to submit such changes with the
->> >PHY IRQ patches but since no IRQ is generated still, this got delayed...
->>
->>    Only I was going to do it via defconfigs...
->
-> That was my initial approach too. However I have been convinced
-> that Kconfig is a better way forwards.
+normally dts will pass vddsoc/pu freq/volt info to kernel, if not, will
+use fixed value for vddsoc/pu voltage setting.
 
-Kconfig has the advantage that the minimal defconfigs will be smaller, so
-less churn there.
-However, it does mean you cannot disable the option anymore via your .config.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ drivers/cpufreq/imx6q-cpufreq.c |  117 +++++++++++++++++++++++++++++----------
+ 1 file changed, 88 insertions(+), 29 deletions(-)
 
-In this case it's a bit difficult to decide, as sh_eth will work both
-with and without
-the specific PHY-driver.
-
-If no users want to disable it, I'd go for Kconfig.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 4b3f18e..65c1df1 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -35,6 +35,9 @@ static struct device *cpu_dev;
+ static struct cpufreq_frequency_table *freq_table;
+ static unsigned int transition_latency;
+ 
++static u32 *imx6_soc_volt;
++static u32 soc_opp_count;
++
+ static unsigned int imx6q_get_speed(unsigned int cpu)
+ {
+ 	return clk_get_rate(arm_clk) / 1000;
+@@ -69,23 +72,24 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 
+ 	/* scaling up?  scale voltage before frequency */
+ 	if (new_freq > old_freq) {
++		if (regulator_is_enabled(pu_reg)) {
++			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
++			if (ret) {
++				dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
++				return ret;
++			}
++		}
++		ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
++		if (ret) {
++			dev_err(cpu_dev, "failed to scale vddsoc up: %d\n", ret);
++			return ret;
++		}
+ 		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+ 		if (ret) {
+ 			dev_err(cpu_dev,
+ 				"failed to scale vddarm up: %d\n", ret);
+ 			return ret;
+ 		}
+-
+-		/*
+-		 * Need to increase vddpu and vddsoc for safety
+-		 * if we are about to run at 1.2 GHz.
+-		 */
+-		if (new_freq == FREQ_1P2_GHZ / 1000) {
+-			regulator_set_voltage_tol(pu_reg,
+-					PU_SOC_VOLTAGE_HIGH, 0);
+-			regulator_set_voltage_tol(soc_reg,
+-					PU_SOC_VOLTAGE_HIGH, 0);
+-		}
+ 	}
+ 
+ 	/*
+@@ -120,12 +124,17 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 				 "failed to scale vddarm down: %d\n", ret);
+ 			ret = 0;
+ 		}
+-
+-		if (old_freq == FREQ_1P2_GHZ / 1000) {
+-			regulator_set_voltage_tol(pu_reg,
+-					PU_SOC_VOLTAGE_NORMAL, 0);
+-			regulator_set_voltage_tol(soc_reg,
+-					PU_SOC_VOLTAGE_NORMAL, 0);
++		ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
++		if (ret) {
++			dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
++			ret = 0;
++		}
++		if (regulator_is_enabled(pu_reg)) {
++			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
++			if (ret) {
++				dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
++				ret = 0;
++			}
+ 		}
+ 	}
+ 
+@@ -153,6 +162,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 	struct dev_pm_opp *opp;
+ 	unsigned long min_volt, max_volt;
+ 	int num, ret;
++	const struct property *prop;
++	const __be32 *val;
++	u32 nr, i, j;
+ 
+ 	cpu_dev = get_cpu_device(0);
+ 	if (!cpu_dev) {
+@@ -201,10 +213,69 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		goto put_node;
+ 	}
+ 
++	/* Make imx6_soc_volt array's size same as arm opp number */
++	imx6_soc_volt = devm_kzalloc(cpu_dev, sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
++	if (imx6_soc_volt == NULL) {
++		dev_warn(cpu_dev, "No valid memory for imx6_soc_volt!\n");
++		ret = -ENOMEM;
++		goto free_freq_table;
++	}
++
++	prop = of_find_property(np, "fsl,soc-operating-points", NULL);
++	if (!prop || !prop->value) {
++		dev_warn(cpu_dev, "No valid fsl,soc-operating-points property is found!\n");
++		goto soc_opp_out;
++	}
++
++	/*
++	 * Each OPP is a set of tuples consisting of frequency and
++	 * voltage like <freq-kHz vol-uV>.
++	 */
++	nr = prop->length / sizeof(u32);
++	if (nr % 2 || (nr / 2) < num) {
++		dev_warn(cpu_dev, "Invalid fsl,soc-operating-points list!\n");
++		goto soc_opp_out;
++	}
++
++	rcu_read_lock();
++	for (j = 0; j < num; j++) {
++		val = prop->value;
++		for (i = 0; i < nr / 2; i++) {
++			unsigned long freq = be32_to_cpup(val++);
++			unsigned long volt = be32_to_cpup(val++);
++			if (freq_table[j].frequency == freq) {
++				imx6_soc_volt[soc_opp_count++] = volt;
++				break;
++			}
++		}
++	}
++	rcu_read_unlock();
++
++soc_opp_out:
++	/* use fixed soc opp volt if no valid soc opp info found in dtb */
++	if (soc_opp_count != num) {
++		dev_warn(cpu_dev, "can NOT find valid soc opp info in dtb, use default value!\n");
++		for (j = 0; j < num; j++)
++			imx6_soc_volt[j] = PU_SOC_VOLTAGE_NORMAL;
++		if (freq_table[num - 1].frequency * 1000 == FREQ_1P2_GHZ)
++			imx6_soc_volt[num - 1] = PU_SOC_VOLTAGE_HIGH;
++	}
++
+ 	if (of_property_read_u32(np, "clock-latency", &transition_latency))
+ 		transition_latency = CPUFREQ_ETERNAL;
+ 
+ 	/*
++	 * Calculate the ramp time for max voltage change in the
++	 * VDDSOC and VDDPU regulators.
++	 */
++	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
++	if (ret > 0)
++		transition_latency += ret * 1000;
++	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
++	if (ret > 0)
++		transition_latency += ret * 1000;
++
++	/*
+ 	 * OPP is maintained in order of increasing frequency, and
+ 	 * freq_table initialised from OPP is therefore sorted in the
+ 	 * same order.
+@@ -221,18 +292,6 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 	if (ret > 0)
+ 		transition_latency += ret * 1000;
+ 
+-	/* Count vddpu and vddsoc latency in for 1.2 GHz support */
+-	if (freq_table[num].frequency == FREQ_1P2_GHZ / 1000) {
+-		ret = regulator_set_voltage_time(pu_reg, PU_SOC_VOLTAGE_NORMAL,
+-						 PU_SOC_VOLTAGE_HIGH);
+-		if (ret > 0)
+-			transition_latency += ret * 1000;
+-		ret = regulator_set_voltage_time(soc_reg, PU_SOC_VOLTAGE_NORMAL,
+-						 PU_SOC_VOLTAGE_HIGH);
+-		if (ret > 0)
+-			transition_latency += ret * 1000;
+-	}
+-
+ 	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
+ 	if (ret) {
+ 		dev_err(cpu_dev, "failed register driver: %d\n", ret);
+-- 
+1.7.9.5
