@@ -1,72 +1,81 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 17 Dec 2013 14:19:12 +0200
-Subject: [PATCH v3 7/9] mtd: nand: davinci: adjust DT properties to MTD
- generic
-In-Reply-To: <20131217085027.GK12034@norris-Latitude-E6410>
-References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386264358-9738-8-git-send-email-ivan.khoronzhuk@ti.com>
- <20131217085027.GK12034@norris-Latitude-E6410>
-Message-ID: <52B04140.1060709@ti.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Tue, 17 Dec 2013 21:23:46 +0900
+Subject: [GIT PULL 1/7] Samsung fixes for v3.14
+In-Reply-To: <3351204.WyoCcrrZ3X@amdc1227>
+References: <52AE0F41.7050706@samsung.com> <3351204.WyoCcrrZ3X@amdc1227>
+Message-ID: <117101cefb22$d5378b10$7fa6a130$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2013 10:50 AM, Brian Norris wrote:
-> On Thu, Dec 05, 2013 at 07:25:55PM +0200, Ivan Khoronzhuk wrote:
->> --- a/drivers/mtd/nand/davinci_nand.c
->> +++ b/drivers/mtd/nand/davinci_nand.c
->> @@ -558,6 +557,8 @@ static struct davinci_nand_pdata
->>   			"ti,davinci-mask-chipsel", &prop))
->>   			pdata->mask_chipsel = prop;
->>   		if (!of_property_read_string(pdev->dev.of_node,
->> +			"nand-ecc-mode", &mode) ||
+Tomasz Figa wrote:
 > 
-> Is it possible to use the of_get_nand_ecc_mode() helper? It's
-> unfortunate that davinci_nand had to use custom bindings in the first
-> place, making this more difficult... So I can take this patch as-is.
+> Hi Kukjin,
 > 
+Hi,
 
-Yes, I will do nothing for that
-
->> +		    !of_property_read_string(pdev->dev.of_node,
->>   			"ti,davinci-ecc-mode", &mode)) {
->>   			if (!strncmp("none", mode, 4))
->>   				pdata->ecc_mode = NAND_ECC_NONE;
->> @@ -570,11 +571,15 @@ static struct davinci_nand_pdata
->>   			"ti,davinci-ecc-bits", &prop))
->>   			pdata->ecc_bits = prop;
->>   		if (!of_property_read_u32(pdev->dev.of_node,
->> +			"nand-bus-width", &prop) ||
+> On Monday 16 of December 2013 05:21:21 Kukjin Kim wrote:
+> > The following changes since commit
+> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> >
+> >    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-fixes
+> >
+> > for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
+> >
+> >    ARM: dts: Update display clock frequency for Origen-4412 (2013-12-16
+> > 04:41:57 +0900)
+> >
+> > ----------------------------------------------------------------
+> > Samsung non-critical fixes for v3.14
+> > - Switch FIFO mode for arch_enable_uart_fifo()
+> > - Add missing op_mode for PMIC on exynos5250-arndale
+> > - Add missing clock-frequency for CPU on exynos5250
+> > - Fix typo samaung to samsung for exynos5420-pinctrl
+> > - Fix display clock-frequency for exynos4210/exynos4412-origen
+> >
+> > ----------------------------------------------------------------
+> > Alexander Shiyan (1):
+> >        ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo
+function
+> >
+> > Sachin Kamat (4):
+> >        ARM: dts: Add missing op_mode property to PMIC on Arndale
+> >        ARM: dts: Add missing frequency property to exynos5250
+> >        ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
+> >        ARM: dts: Update display clock frequency for Origen-4412
+> >
+> > Tushar Behera (1):
+> >        ARM: dts: Update display clock frequency for Origen-4210
+> >
+> >   arch/arm/boot/dts/exynos4210-origen.dts         | 2 +-
+> >   arch/arm/boot/dts/exynos4412-origen.dts         | 2 +-
+> >   arch/arm/boot/dts/exynos5250-arndale.dts        | 2 ++
+> >   arch/arm/boot/dts/exynos5250.dtsi               | 2 ++
+> >   arch/arm/boot/dts/exynos5420-pinctrl.dtsi       | 2 +-
+> >   arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
+> >   6 files changed, 9 insertions(+), 3 deletions(-)
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Similar story here, with of_get_nand_bus_width().
+> I've sent a patch to fix up MMC0 on mini6410 board, when using board file
+> to boot the system:
 > 
-
-It seems for bus width I can replace it on:
-
-prop = of_get_nand_bus_width(pdev->dev.of_node);
-if ( 0 < prop || !of_property_read_u32(pdev->dev.of_node,
-	     "ti,davinci-nand-buswidth", &prop))
-     if (prop == 16)
-	     pdata->options |= NAND_BUSWIDTH_16;
-
-
->> +		    !of_property_read_u32(pdev->dev.of_node,
->>   			"ti,davinci-nand-buswidth", &prop))
->>   			if (prop == 16)
->>   				pdata->options |= NAND_BUSWIDTH_16;
->> -		if (of_find_property(pdev->dev.of_node,
->> -			"ti,davinci-nand-use-bbt", &len))
->> +		if (of_property_read_bool(pdev->dev.of_node,
->> +			"nand-on-flash-bbt") ||
->> +		    of_property_read_bool(pdev->dev.of_node,
->> +			"ti,davinci-nand-use-bbt"))
->>   			pdata->bbt_options = NAND_BBT_USE_FLASH;
->>   	}
->>   
+> [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for HSMMC1
 > 
-> Brian
+> Could we get this patch merged?
 > 
+> I know we are moving to DT, but until all boards get converted, board
+> files must be supported too and this bug makes it impossible to test
+> non-DT s3c64xx support on Mini6410, without extra out of tree patches.
+> 
+OK, I see. Let me take that in next round maybe this weekend.
 
-
--- 
-Regards,
-Ivan Khoronzhuk
+Thanks,
+Kukjin
