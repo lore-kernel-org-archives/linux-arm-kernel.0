@@ -1,48 +1,39 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 17 Dec 2013 17:02:01 +0100
-Subject: [PATCH] tty/serial: at91: document clock properties
-Message-ID: <1387296121-7558-1-git-send-email-b.brezillon@overkiz.com>
+Date: Tue, 17 Dec 2013 17:16:13 +0100
+Subject: [PATCH] iio: at91: document ADC clock properties
+Message-ID: <1387296973-7779-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the clock properties required by the at91 i2c bus driver.
+Document the clock properties required by the at91 ADC driver.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- .../devicetree/bindings/serial/atmel-usart.txt     |    7 +++++++
- 1 file changed, 7 insertions(+)
+ .../devicetree/bindings/arm/atmel-adc.txt          |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 2191dcb..9c5d19a 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -6,6 +6,9 @@ Required properties:
-   additional mode or an USART new feature.
- - reg: Should contain registers location and length
- - interrupts: Should contain interrupt
-+- clock-names: tuple listing input clock names.
-+	Required elements: "usart"
-+- clocks: phandles to input clocks.
- 
- Optional properties:
- - atmel,use-dma-rx: use of PDC or DMA for receiving data
-@@ -26,6 +29,8 @@ Example:
- 		compatible = "atmel,at91sam9260-usart";
- 		reg = <0xfff8c000 0x4000>;
- 		interrupts = <7>;
-+		clocks = <&usart0_clk>;
-+		clock-names = "usart";
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
- 	};
-@@ -35,6 +40,8 @@ Example:
- 		compatible = "atmel,at91sam9260-usart";
- 		reg = <0xf001c000 0x100>;
- 		interrupts = <12 4 5>;
-+		clocks = <&usart0_clk>;
-+		clock-names = "usart";
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
- 		dmas = <&dma0 2 0x3>,
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+index d106146..9a1175b 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -5,6 +5,9 @@ Required properties:
+     <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+   - reg: Should contain ADC registers location and length
+   - interrupts: Should contain the IRQ line for the ADC
++  - clock-names: tuple listing input clock names.
++	Required elements: "adc_clk", "adc_op_clk".
++  - clocks: phandles to input clocks.
+   - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+     device
+   - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+@@ -44,6 +47,8 @@ adc0: adc at fffb0000 {
+ 	compatible = "atmel,at91sam9260-adc";
+ 	reg = <0xfffb0000 0x100>;
+ 	interrupts = <20 4>;
++	clocks = <&adc_clk>, <&adc_op_clk>;
++	clock-names = "adc_clk", "adc_op_clk";
+ 	atmel,adc-channel-base = <0x30>;
+ 	atmel,adc-channels-used = <0xff>;
+ 	atmel,adc-drdy-mask = <0x10000>;
 -- 
 1.7.9.5
