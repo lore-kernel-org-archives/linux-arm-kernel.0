@@ -1,102 +1,71 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 17 Dec 2013 20:53:54 +0100
-Subject: [PATCH v4] usb: ohci-at91: fix irq and iomem resource retrieval
-In-Reply-To: <1386514799-6295-1-git-send-email-b.brezillon@overkiz.com>
-References: <1386514799-6295-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52B0ABD2.3080907@overkiz.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Dec 2013 19:55:19 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
+References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
+ <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
+Message-ID: <20131217195519.GD28455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+On Tue, Dec 17, 2013 at 05:06:25PM +0000, Lorenzo Pieralisi wrote:
+> On Mon, Dec 16, 2013 at 04:49:22PM +0000, Mark Brown wrote:
 
-Just a reminder to let you know this patch fixes a bug in the at91 ohci 
-driver
-which appenrently showed up in 3.13-rc1 release, but is caused by bad
-assumptions on platform device resources order.
+> > +void store_cpu_topology(unsigned int cpuid);
 
-Without this patch the ohci usb host controller is completely unusable 
-on at91
-platforms.
+> I still think this function is not needed at all and therefore should
+> not be exported.
 
-Best Regards,
+> > +static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+> > +{
+> > +	store_cpu_topology(cpuid);
 
-Boris
+> As I mentioned this need not be done here. Parse the topology from DT,
+> (cpu_logical_map or cpu-map) in one go and get rid of store_cpu_topology().
 
-On 08/12/2013 15:59, Boris BREZILLON wrote:
-> When using dt resources retrieval (interrupts and reg properties) there is
-> no predefined order for these resources in the platform dev resources
-> table.
->
-> Retrieve resources using platform_get_resource and platform_get_irq
-> functions instead of direct resource table entries to avoid resource type
-> mismatch.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
-> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
-> Changes since v3:
->   - replace platform_get_resource call with IORESOURCE_IRQ argument by
->     platform_get_irq
->
-> Changes since v2:
->   - split the patch series to isolate the urgent fix provided by this patch
->
-> Changes since v1:
->   - none
->
->   drivers/usb/host/ohci-at91.c |   26 +++++++++++++++-----------
->   1 file changed, 15 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 418444e..8c356af 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -136,23 +136,27 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   	struct ohci_hcd *ohci;
->   	int retval;
->   	struct usb_hcd *hcd = NULL;
-> -
-> -	if (pdev->num_resources != 2) {
-> -		pr_debug("hcd probe: invalid num_resources");
-> -		return -ENODEV;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	int irq;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_dbg(dev, "hcd probe: missing memory resource\n");
-> +		return -ENXIO;
->   	}
->   
-> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
-> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
-> -		pr_debug("hcd probe: invalid resource type\n");
-> -		return -ENODEV;
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_dbg(dev, "hcd probe: missing irq resource\n");
-> +		return irq;
->   	}
->   
->   	hcd = usb_create_hcd(driver, &pdev->dev, "at91");
->   	if (!hcd)
->   		return -ENOMEM;
-> -	hcd->rsrc_start = pdev->resource[0].start;
-> -	hcd->rsrc_len = resource_size(&pdev->resource[0]);
-> +	hcd->rsrc_start = res->start;
-> +	hcd->rsrc_len = resource_size(res);
->   
->   	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
->   		pr_debug("request_mem_region failed\n");
-> @@ -199,7 +203,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   	ohci->num_ports = board->ports;
->   	at91_start_hc(pdev);
->   
-> -	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
-> +	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
->   	if (retval == 0)
->   		return retval;
->   
+That's what we're actually doing for parsing, the parsing all happens at
+once.
+
+I do think it's useful to to have the function there partly just as a
+hook but more for the warning it generates if we manage to boot a core
+that we didn't hook up with the topology information.  This seems like
+it'll be helpful for debugging issues - we'll actively warn if there are
+CPUs that have been omitted from the definition in the firmware.  The
+other things the function does could be done elsewhere I think, it
+didn't seem worth moving them though.
+
+> > + * arch/arm64/kernel/topology.c
+> > + *
+> > + * Copyright (C) 2011,2013 Linaro Limited.
+> > + * Written by: Vincent Guittot
+> 
+> You should probably update the header, just a nitpick though.
+
+Well, most of this still is Vincent's code with the serial numbers filed
+off but yeah.
+
+> > +#include <linux/cpu.h>
+> > +#include <linux/cpumask.h>
+> > +#include <linux/export.h>
+> > +#include <linux/init.h>
+> > +#include <linux/percpu.h>
+> > +#include <linux/node.h>
+> > +#include <linux/nodemask.h>
+> > +#include <linux/sched.h>
+> > +#include <linux/slab.h>
+
+> > +#include <asm/cputype.h>
+> > +#include <asm/smp_plat.h>
+
+> I think that some of these includes are not needed, they were needed in
+> previous versions, but not in this patch as it stands.
+
+Some can probably go.  I don't think some of those were even needed on
+arm.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/e28cb16c/attachment-0001.sig>
