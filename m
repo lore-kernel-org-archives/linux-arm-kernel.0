@@ -1,36 +1,67 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Tue, 17 Dec 2013 11:24:40 +0800
-Subject: [PATCHv3 3/7] ARM: dts: Enable SAI ALSA SoC DAI device for Vybrid
- VF610 TOWER board.
+Date: Tue, 17 Dec 2013 11:24:41 +0800
+Subject: [PATCHv3 4/7] Documentation: Add device tree bindings for Freescale
+ SAI.
 In-Reply-To: <1387250684-23406-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1387250684-23406-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1387250684-23406-4-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1387250684-23406-5-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables the SAI device.
+This adds the Document for Freescale SAI driver under
+Documentation/devicetree/bindings/sound/.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../devicetree/bindings/sound/fsl-sai.txt          | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/fsl-sai.txt
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index c8047ca..e60c20c 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -74,6 +74,12 @@
- 	status = "okay";
- };
- 
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2_1>;
-+	status = "okay";
-+};
+diff --git a/Documentation/devicetree/bindings/sound/fsl-sai.txt b/Documentation/devicetree/bindings/sound/fsl-sai.txt
+new file mode 100644
+index 0000000..ca49ad1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/fsl-sai.txt
+@@ -0,0 +1,40 @@
++Freescale Synchronous Audio Interface (SAI).
 +
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1_1>;
++The SAI is based on I2S module that used communicating with audio codecs,
++which provides a synchronous audio interface that supports fullduplex
++serial interfaces with frame synchronization such as I2S, AC97, TDM, and
++codec/DSP interfaces.
++
++
++Required properties:
++- compatible: Compatible list, contains "fsl,vf610-sai".
++- reg: Offset and length of the register set for the device.
++- clocks: Must contain an entry for each entry in clock-names.
++- clock-names : Must include the "sai" entry.
++- dmas : Generic dma devicetree binding as described in
++  Documentation/devicetree/bindings/dma/dma.txt.
++- dma-names : Two dmas have to be defined, "tx" and "rx".
++- pinctrl-names: Must contain a "default" entry.
++- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
++  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
++- big-endian-regs: If this property is absent, the little endian mode will
++  be in use as default, or the big endian mode will be in use for all the
++  device registers.
++- big-endian-data: If this property is absent, the little endian mode will
++  be in use as default, or the big endian mode will be in use for all the
++  fifo data.
++
++Example:
++sai2: sai at 40031000 {
++	      compatible = "fsl,vf610-sai";
++	      reg = <0x40031000 0x1000>;
++	      pinctrl-names = "default";
++	      pinctrl-0 = <&pinctrl_sai2_1>;
++	      clocks = <&clks VF610_CLK_SAI2>;
++	      clock-names = "sai";
++	      dma-names = "tx", "rx";
++	      dmas = <&edma0 0 VF610_EDMA_MUXID0_SAI2_TX>,
++		   <&edma0 0 VF610_EDMA_MUXID0_SAI2_RX>;
++	      big-endian_regs;
++	      big-endian_data;
++};
 -- 
 1.8.4
