@@ -1,31 +1,114 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Tue, 17 Dec 2013 22:12:00 +0800
-Subject: [PATCH v3 1/7] mtd: spi-nor: copy the SPI NOR commands to a new
- header file
-In-Reply-To: <201312171401.56683.marex@denx.de>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <1387184330-14448-2-git-send-email-b32955@freescale.com>
- <201312171401.56683.marex@denx.de>
-Message-ID: <20131217141158.GA1168@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 22:14:42 +0800
+Subject: [PATCH 2/3]: Support cpu frequency scaling and power management
+ for iMX6SL
+In-Reply-To: <CACUGKYP68joryww1cDreWWd1t_1VmfoNyFb1o2JvekH12_O7iw@mail.gmail.com>
+References: <CACUGKYP68joryww1cDreWWd1t_1VmfoNyFb1o2JvekH12_O7iw@mail.gmail.com>
+Message-ID: <20131217141440.GV6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 02:01:56PM +0100, Marek Vasut wrote:
-> On Monday, December 16, 2013 at 09:58:44 AM, Huang Shijie wrote:
-> > This patch adds a new header :spi-nor.h,
-> > and copies all the SPI NOR commands and relative macros into this new
-> > header.
-> > 
-> > This hearder can be used by the m25p80.c and other spi-nor controller,
-> > such as Freescale's Quadspi.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+On Mon, Dec 16, 2013 at 05:40:18PM -0800, John Tobias wrote:
+> iMX6SL re-using iMX6Q driver in order to enable the cpu frequency
+> scaling and power management
 > 
-> It would be much nicer if you also removed the commands in this same patch from 
-> the m25p80.c file.
-my earlier version did so. :)
+> From: John Tobias <john.tobias.ph@gmail.com>
+> 
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+> index 2f952e3..e66eccf 100644
+> --- a/arch/arm/mach-imx/mach-imx6sl.c
+> +++ b/arch/arm/mach-imx/mach-imx6sl.c
+> @@ -9,7 +9,10 @@
+> 
+>  #include <linux/irqchip.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pm_opp.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+>  #include <linux/regmap.h>
+> @@ -17,6 +20,7 @@
+>  #include <asm/mach/map.h>
+> 
+>  #include "common.h"
+> +#include "cpuidle.h"
+> 
+>  static void __init imx6sl_fec_init(void)
+>  {
+> @@ -34,6 +38,47 @@ static void __init imx6sl_fec_init(void)
+>         }
+>  }
+> 
+> +
 
-So keep it as it is now.
+One blank line is enough.
 
-thanks
-Huang Shijie
+> +static void __init imx6sl_opp_init(void)
+> +{
+> +       struct device_node *np;
+> +       struct device *cpu_dev = get_cpu_device(0);
+> +
+> +       if (!cpu_dev) {
+> +               pr_warn("failed to get cpu0 device\n");
+> +               return;
+> +       }
+> +       np = of_node_get(cpu_dev->of_node);
+> +       if (!np) {
+> +               pr_warn("failed to find cpu0 node\n");
+> +               return;
+> +       }
+> +
+> +       if (of_init_opp_table(cpu_dev)) {
+> +               pr_warn("failed to init OPP table\n");
+> +               goto put_node;
+> +       }
+> +
+> +put_node:
+> +       of_node_put(np);
+> +}
+
+We have this for imx6q, because we need to check 1.2GHz case.  But
+I hope we can improve imx6q-cpufreq driver to invoke of_init_opp_table()
+from there, if platform does not supply an opp table, so that we can
+save these code in platform for most of cases.
+
+> +
+> +static struct platform_device imx6q_cpufreq_pdev = {
+> +       .name = "imx6q-cpufreq",
+> +};
+> +
+> +
+> +static void __init imx6sl_init_late(void)
+> +{
+> +       /* re-use imx6q */
+> +       imx6q_cpuidle_init();
+
+It's not about cpufreq.  The change does not belong to this patch.
+
+> +
+> +       if (IS_ENABLED(CONFIG_ARM_IMX6SQ_CPUFREQ)) {
+
+IMX6SQ?
+
+Shawn
+
+> +               imx6sl_opp_init();
+> +               platform_device_register(&imx6q_cpufreq_pdev);
+> +       }
+> +}
+> +
+>  static void __init imx6sl_init_machine(void)
+>  {
+>         struct device *parent;
+> @@ -70,6 +115,7 @@ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite
+> (Device Tree)")
+>         .map_io         = debug_ll_io_init,
+>         .init_irq       = imx6sl_init_irq,
+>         .init_machine   = imx6sl_init_machine,
+> +       .init_late      = imx6sl_init_late,
+>         .dt_compat      = imx6sl_dt_compat,
+>         .restart        = mxc_restart,
+>  MACHINE_END
