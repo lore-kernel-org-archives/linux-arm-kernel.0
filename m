@@ -1,31 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Dec 2013 12:02:01 +0000
-Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <52AFFB0B.3010505@linaro.org>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <52AF11FE.70000@linaro.org> <20131216152235.GI3185@sirena.org.uk>
- <52AFFB0B.3010505@linaro.org>
-Message-ID: <20131217120201.GR3185@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Dec 2013 12:04:31 +0000
+Subject: [PATCH 1/4] arm64: drop redundant macros from read_cpuid()
+In-Reply-To: <1387227878-30438-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1387227878-30438-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131217120431.GE32118@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 03:19:39PM +0800, Alex Shi wrote:
+On Mon, Dec 16, 2013 at 09:04:35PM +0000, Ard Biesheuvel wrote:
+>  #define read_cpuid(reg) ({						\
+>  	u64 __val;							\
+> -	asm("mrs	%0, " reg : "=r" (__val));			\
+> +	asm("mrs	%0, " #reg : "=r" (__val));			\
+>  	__val;								\
+>  })
+>  
+> @@ -54,12 +44,12 @@
+>   */
+>  static inline u32 __attribute_const__ read_cpuid_id(void)
+>  {
+> -	return read_cpuid(ID_MIDR_EL1);
+> +	return read_cpuid(MIDR_EL1);
+>  }
 
-> For topology meaning, it may be better to have cluster concept there.
-> And don't know if there will has a real ARM NUMA system for 64bit
-> server. If so, socket_id is good in a NUMA system.
+It makes sense. Just nitpick, could you please use lowercase register
+names for consistency?
 
-The scheduler does have a separate NUMA node ID that we're not currently
-using which I'd have expected to be a better fit for actual NUMA stuff;
-looking at the options we've got it's not clear to me that with what the
-scheduler has at the minute sockets aren't a good mapping for what the
-hardware has.  There doesn't seem to be anything between threaded cores
-and physical packages.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/d9dc0ae4/attachment-0001.sig>
+Thanks.
+
+-- 
+Catalin
