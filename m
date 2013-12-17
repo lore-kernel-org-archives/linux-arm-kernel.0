@@ -1,36 +1,49 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 17 Dec 2013 16:31:38 +0100
-Subject: [PATCH 2/2] ARM: device trees for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <20131217131730.GI14866@pengutronix.de>
-References: <20131216190953.GB14866@pengutronix.de>
- <1387221123-6794-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131217113750.GB5307@netboy>
- <20131217131730.GI14866@pengutronix.de>
-Message-ID: <20131217153136.GA5564@netboy>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 17 Dec 2013 16:38:32 +0100
+Subject: [PATCH v5 0/2] ARM: mach-moxart: add MOXA ART SoC support
+Message-ID: <1387294714-12872-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 02:17:30PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Dec 17, 2013 at 12:37:51PM +0100, Richard Cochran wrote:
-> > On Mon, Dec 16, 2013 at 08:12:03PM +0100, Uwe Kleine-K?nig wrote:
-> > 
-> > > +		cmu: cmu at 400c8000 {
-> > > +			compatible = "efm32gg,cmu";
-> > 
-> > I was able to run this on the EFM32LG without problems.  Are you sure
-> > this CMU node is specific to the GG, or can it be shared?
-> I remember me being grumpy because I found some differences between the
-> GG and some other efm32 device. After looking again I cannot find the
-> problem. Maybe the LG is compatible but some other is not.
+Thanks for the replies!
 
-It looked like to me that the only differences are flash and ram
-sizes, and presence or absence of peripherals, but I don't know all of
-the many EM parts that well, just these two.
- 
-> Can I assume your feedback as Tested-by:?
+This should tick the boxes on your feedback.
 
-Yes, by all means, please do.
+Changes since v4:
 
-Thanks,
-Richard
+1. remove all platform specific code
+2. move all SoC common nodes (SDHCI,MAC,UART) to dtsi,
+   enable them in board file
+3. added moxart_defconfig options:
+   CONFIG_PACKET=y
+   CONFIG_IP_MULTICAST=y
+4. removed moxart_defconfig options:
+   # CONFIG_ARM_THUMB is not set
+
+Applies to next-20131217
+
+Jonas Jensen (2):
+  ARM: mach-moxart: add MOXA ART SoC platform files
+  ARM: mach-moxart: add MOXA ART SoC device tree files
+
+ Documentation/devicetree/bindings/arm/moxart.txt |  12 ++
+ arch/arm/Kconfig                                 |   2 +
+ arch/arm/Makefile                                |   1 +
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/moxart-uc7112lx.dts            |  93 +++++++++++++
+ arch/arm/boot/dts/moxart.dtsi                    | 167 +++++++++++++++++++++++
+ arch/arm/configs/moxart_defconfig                | 149 ++++++++++++++++++++
+ arch/arm/mach-moxart/Kconfig                     |  31 +++++
+ arch/arm/mach-moxart/Makefile                    |   3 +
+ arch/arm/mach-moxart/moxart.c                    |  15 ++
+ 10 files changed, 474 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/moxart.txt
+ create mode 100644 arch/arm/boot/dts/moxart-uc7112lx.dts
+ create mode 100644 arch/arm/boot/dts/moxart.dtsi
+ create mode 100644 arch/arm/configs/moxart_defconfig
+ create mode 100644 arch/arm/mach-moxart/Kconfig
+ create mode 100644 arch/arm/mach-moxart/Makefile
+ create mode 100644 arch/arm/mach-moxart/moxart.c
+
+-- 
+1.8.2.1
