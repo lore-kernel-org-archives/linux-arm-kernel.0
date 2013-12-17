@@ -1,41 +1,41 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Tue, 17 Dec 2013 12:26:12 +0000
-Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
- when cpufreq is changed
-In-Reply-To: <20131217121358.GM6691@S2101-09.ap.freescale.net>
-References: <1387228450-641-1-git-send-email-b20788@freescale.com>
- <1387228450-641-2-git-send-email-b20788@freescale.com>
- <20131217025616.GC6691@S2101-09.ap.freescale.net>
- <20131217105347.75954ad3@ipc1.ka-ro>,
- <20131217121358.GM6691@S2101-09.ap.freescale.net>
-Message-ID: <D8D77E89-793D-4A52-AB38-769BC47BAF33@freescale.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Tue, 17 Dec 2013 21:26:49 +0900
+Subject: [GIT PULL 6/7] Samsung DT for v3.14
+In-Reply-To: <20131216171645.GJ3185@sirena.org.uk>
+References: <52AE0F9A.3010407@samsung.com>
+ <20131216171645.GJ3185@sirena.org.uk>
+Message-ID: <117501cefb23$42739020$c75ab060$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Sent from Anson's iPhone
-
-> ? 2013?12?17??20:13?"Shawn Guo" <shawn.guo@linaro.org> ???
+Mark Brown wrote:
 > 
-> On Tue, Dec 17, 2013 at 10:53:47AM +0100, Lothar Wa?mann wrote:
->>>> +    if (soc_opp_index >= soc_opp_count) {
->>> 
->>> Can soc_opp_index be possibly greater than soc_opp_count?  Otherwise,
->>> the condition check below is good enough?
->>> 
->>>    if (soc_opp_index == soc_opp_count)
->> it doen't harm to be on the safe side and use >= anyway!
+> On Mon, Dec 16, 2013 at 05:22:50AM +0900, Kukjin Kim wrote:
 > 
-> Well, it may confuse reader.  At least, it took me some time understand
-> how that ">" condition will happen.  And it turns out never.
-
-it does not matter now, since in V2 patch, i use index passed from
-freq table, no need to look up the soc opp. please help review V2 patch set, thanks.
-
-Anson.
-
-
+> > Samsung DT updates for v3.14
+> > - Add support Octa Cores for exynos5420
+> >   : populate CPU node entries to 8 Cores
+> >   : extend mct to support 8 local interrupts
+> > - Update dwmmc nodes for exynos5250 and exynos5420
+> >   : change status property of dwmmc nodes for exynos5250
+> >   : move dwmmc nodes from exynos5 to exynos5250 because
+> >     it's different between exynos5250 and exynos5420
+> >   : rename mmc nodes from dwmmc for exynos5 SoCs
+> >   : add dwmmc nodes for exynos5420
+> > - Add G-Scaler nodes for exynos5420
+> > - Add HS-i2c nodes in exynos5420
+> >   : High Speed I2C 7 channels (4 to 10)
+> > - Update sysreg binding and node name in exynos4
+> > - Update min voltage on exynos5250-arndale
+> > - Move fifo-depth property from boards to exynos5250 SoC
+> >   : because the fifo-depth property is SoC specific
 > 
-> Shawn
-> 
+> I've been sending updates to disable the I2C and SPI devices by default
+> on 5250 for some time now - is there any chance of getting them
+> included?
+
+Probably, yes and I will send out 2nd round for v3.14 in this weekend before
+rc5 release ;-)
+
+Thanks,
+Kukjin
