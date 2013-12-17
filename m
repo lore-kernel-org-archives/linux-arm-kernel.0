@@ -1,31 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Dec 2013 13:43:19 +0000
-Subject: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC hosts found on
- Allwinner sunxi SoCs
-In-Reply-To: <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20131217134319.GC3185@sirena.org.uk>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 17 Dec 2013 07:44:47 -0600
+Subject: [RESEND LIST PATCHv7 1/4] clk: socfpga: Add a clk-phase property
+ to the "altr,socfpga-gate-clk"
+In-Reply-To: <52B00167.4010903@linaro.org>
+References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
+ <1387213476-22122-2-git-send-email-dinguyen@altera.com>
+ <52B00167.4010903@linaro.org>
+Message-ID: <52B0554F.1080509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 10:58:11PM +0100, Hans de Goede wrote:
+Hi Zhangfei,
 
-> +config MMC_SUNXI
-> +	tristate "Allwinner sunxi SD/MMC Host Controller support"
-> +	depends on ARCH_SUNXI
+On 12/17/13 1:46 AM, zhangfei wrote:
+>
+>
+> On 12/17/2013 01:04 AM, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>
+>> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
+>> +{
+>> +    struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+>> +    struct regmap *sys_mgr_base_addr;
+>> +    u32 hs_timing;
+>> +
+>> +    if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
+>> +        sys_mgr_base_addr =
+>> syscon_regmap_lookup_by_compatible("altr,sys-mgr");
+>> +        if (IS_ERR(sys_mgr_base_addr)) {
+>> +            pr_err("%s: failed to find altr,sys-mgr regmap!\n",
+>> __func__);
+>> +            return -EINVAL;
+>> +        }
+>> +        hs_timing = SYSMGR_SDMMC_CTRL_SET(socfpgaclk->clk_phase[0],
+>> +                        socfpgaclk->clk_phase[1]);
+>> +        regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
+>> +                        hs_timing);
+>> +    }
+>> +    return 0;
+>> +}
+>
+> So reusing gate-clk here and check the node of "altr,sys-mgr".
+> I think it is good and simple.
+> Also can define new clock combined with node "altr,sys-mgr" with
+> parent of sdmmc_clk.
+>
+> Thanks for the update, it is fine to me.
+Thanks, can I get an Ack from you for this version?
 
-This should be ARCH_SUNXI || COMPILE_TEST to increase build coverage
-especially for people doing subsystem or kernel global work.
-
-> +	default y
-
-As others pointed out this shouldn't be here, consider multiplatform
-kernels.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/5b223810/attachment.sig>
+Thanks,
+Dinh
+>
+>> +
+>>   static struct clk_ops gateclk_ops = {
+>> +    .prepare = socfpga_clk_prepare,
+>>       .recalc_rate = socfpga_clk_recalc_rate,
+>>       .get_parent = socfpga_clk_get_parent,
+>>       .set_parent = socfpga_clk_set_parent,
+>> @@ -254,6 +283,7 @@ static void __init socfpga_gate_clk_init(struct
+>> device_node *node,
+>>   {
+>>       u32 clk_gate[2];
+>>       u32 div_reg[3];
+>> +    u32 clk_phase[2];
+>>       u32 fixed_div;
+>>       struct clk *clk;
+>>       struct socfpga_clk *socfpga_clk;
+>> @@ -294,6 +324,12 @@ static void __init socfpga_gate_clk_init(struct
+>> device_node *node,
+>>           socfpga_clk->div_reg = 0;
+>>       }
+>>
+>> +    rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
+>> +    if (!rc) {
+>> +        socfpga_clk->clk_phase[0] = clk_phase[0];
+>> +        socfpga_clk->clk_phase[1] = clk_phase[1];
+>> +    }
+>> +
+>>       of_property_read_string(node, "clock-output-names", &clk_name);
+>>
+>>       init.name = clk_name;
+>>
