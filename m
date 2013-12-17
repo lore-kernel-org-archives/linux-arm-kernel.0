@@ -1,117 +1,51 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 17 Dec 2013 16:16:31 +0800
-Subject: [PATCH v2 5/5] mmc: sdhci: calculate max_discard_to dynamically for
- SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-In-Reply-To: <1387268191-19859-1-git-send-email-b29396@freescale.com>
-References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
-Message-ID: <1387268191-19859-6-git-send-email-b29396@freescale.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Dec 2013 00:50:27 -0800
+Subject: [PATCH v3 7/9] mtd: nand: davinci: adjust DT properties to MTD
+ generic
+In-Reply-To: <1386264358-9738-8-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386264358-9738-8-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131217085027.GK12034@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For host controllers using SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK, since the card
-clock is changed dynamically for different cards, it does not make sense
-to use the maximum host clock to calculate max_discard_to which may lead
-the max_discard_to to be much smaller than its capbility and affect the card
-discard performance a lot.
-e.g. the host clock is 200Mhz, but the card is working on 50Mhz. Then the
-max_discard_to is only 1/4 of its real capbility.
+On Thu, Dec 05, 2013 at 07:25:55PM +0200, Ivan Khoronzhuk wrote:
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -558,6 +557,8 @@ static struct davinci_nand_pdata
+>  			"ti,davinci-mask-chipsel", &prop))
+>  			pdata->mask_chipsel = prop;
+>  		if (!of_property_read_string(pdev->dev.of_node,
+> +			"nand-ecc-mode", &mode) ||
 
-In this patch, it uses the actual_clock to calculate the max_discard_to
-dynamically as long as a new clock speed is set.
+Is it possible to use the of_get_nand_ecc_mode() helper? It's
+unfortunate that davinci_nand had to use custom bindings in the first
+place, making this more difficult... So I can take this patch as-is.
 
-Tested with a high speed SDHC card shows:
-Originally:
-mmc1: new high speed SDHC card at address aaaa
-mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
-Now:
-mmc1: new high speed SDHC card at address aaaa
-mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
-The max_discard_sectors will increase a lot which will also improve discard
-performance a lot.
+> +		    !of_property_read_string(pdev->dev.of_node,
+>  			"ti,davinci-ecc-mode", &mode)) {
+>  			if (!strncmp("none", mode, 4))
+>  				pdata->ecc_mode = NAND_ECC_NONE;
+> @@ -570,11 +571,15 @@ static struct davinci_nand_pdata
+>  			"ti,davinci-ecc-bits", &prop))
+>  			pdata->ecc_bits = prop;
+>  		if (!of_property_read_u32(pdev->dev.of_node,
+> +			"nand-bus-width", &prop) ||
 
-The one known limitation of this approach is that it does not cover the special
-case for user changes the clock via sysfs, since the max_discard_to is only
-initialised for one time during the mmc queue init.
+Similar story here, with of_get_nand_bus_width().
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- drivers/mmc/host/sdhci.c |   47 +++++++++++++++++++++++++++------------------
- 1 files changed, 28 insertions(+), 19 deletions(-)
+> +		    !of_property_read_u32(pdev->dev.of_node,
+>  			"ti,davinci-nand-buswidth", &prop))
+>  			if (prop == 16)
+>  				pdata->options |= NAND_BUSWIDTH_16;
+> -		if (of_find_property(pdev->dev.of_node,
+> -			"ti,davinci-nand-use-bbt", &len))
+> +		if (of_property_read_bool(pdev->dev.of_node,
+> +			"nand-on-flash-bbt") ||
+> +		    of_property_read_bool(pdev->dev.of_node,
+> +			"ti,davinci-nand-use-bbt"))
+>  			pdata->bbt_options = NAND_BBT_USE_FLASH;
+>  	}
+>  
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 47ecf50..a104bb1 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1155,7 +1155,7 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
- 	if (host->ops->set_clock) {
- 		host->ops->set_clock(host, clock);
- 		if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK)
--			return;
-+			goto out;
- 	}
- 
- 	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
-@@ -1254,6 +1254,16 @@ clock_set:
- 
- out:
- 	host->clock = clock;
-+
-+	/* update timeout_clk and max_discard_to once the SDCLK is changed */
-+	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK && clock) {
-+		host->timeout_clk = host->mmc->actual_clock ?
-+					host->mmc->actual_clock / 1000 :
-+					host->clock / 1000;
-+		host->mmc->max_discard_to = host->ops->get_max_timeout_count ?
-+			host->ops->get_max_timeout_count(host) : 1 << 27;
-+		host->mmc->max_discard_to /= host->timeout_clk;
-+	}
- }
- 
- static inline void sdhci_update_clock(struct sdhci_host *host)
-@@ -2933,27 +2943,26 @@ int sdhci_add_host(struct sdhci_host *host)
- 	} else
- 		mmc->f_min = host->max_clk / SDHCI_MAX_DIV_SPEC_200;
- 
--	host->timeout_clk =
--		(caps[0] & SDHCI_TIMEOUT_CLK_MASK) >> SDHCI_TIMEOUT_CLK_SHIFT;
--	if (host->timeout_clk == 0) {
--		if (host->ops->get_timeout_clock) {
--			host->timeout_clk = host->ops->get_timeout_clock(host);
--		} else if (!(host->quirks &
--				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)) {
--			pr_err("%s: Hardware doesn't specify timeout clock "
--			       "frequency.\n", mmc_hostname(mmc));
--			return -ENODEV;
-+	if (!(host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)) {
-+		host->timeout_clk = (caps[0] & SDHCI_TIMEOUT_CLK_MASK) >>
-+				SDHCI_TIMEOUT_CLK_SHIFT;
-+		if (host->timeout_clk == 0) {
-+			if (host->ops->get_timeout_clock) {
-+				host->timeout_clk =
-+					host->ops->get_timeout_clock(host);
-+			} else {
-+				pr_err("%s: Hardware doesn't specify timeout"
-+				       "clock frequency.\n", mmc_hostname(mmc));
-+				return -ENODEV;
-+			}
- 		}
--	}
--	if (caps[0] & SDHCI_TIMEOUT_CLK_UNIT)
--		host->timeout_clk *= 1000;
--
--	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
--		host->timeout_clk = mmc->f_max / 1000;
-+		if (caps[0] & SDHCI_TIMEOUT_CLK_UNIT)
-+			host->timeout_clk *= 1000;
- 
--	mmc->max_discard_to = host->ops->get_max_timeout_count ?
-+		mmc->max_discard_to = host->ops->get_max_timeout_count ?
- 			host->ops->get_max_timeout_count(host) : 1 << 27;
--	mmc->max_discard_to /= host->timeout_clk;
-+		mmc->max_discard_to /= host->timeout_clk;
-+	}
- 
- 	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
- 
--- 
-1.7.2.rc3
+Brian
