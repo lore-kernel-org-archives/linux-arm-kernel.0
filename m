@@ -1,40 +1,42 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Mon, 16 Dec 2013 11:09:59 -0500
-Subject: [PATCH v2] ARM: dts: vf610: make pinctrl nodes board specific
-In-Reply-To: <20131214054455.GB6903@S2101-09.ap.freescale.net> (Shawn Guo's
- message of "Sat, 14 Dec 2013 13:44:57 +0800")
-References: <1386571837-16299-1-git-send-email-shawn.guo@linaro.org>
- <1386686213-13801-1-git-send-email-shawn.guo@linaro.org>
- <87mwk5eugj.fsf@nbsps.com> <87haadesl9.fsf@nbsps.com>
- <20131214054455.GB6903@S2101-09.ap.freescale.net>
-Message-ID: <87ppowydyg.fsf@nbsps.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 16 Dec 2013 16:18:43 -0800
+Subject: [PATCH v3 3/6] pinctrl: Make PINCTRL selectable by
+ defconfig/menuconfig
+In-Reply-To: <CACRpkdY2BExGiL6HBg7zn_szJQMnSNsxOSuo7RyrRmrz=cVe2A@mail.gmail.com>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-4-git-send-email-syin@broadcom.com>
+ <CACRpkdauqYNiby-ta3c_he2ovG__0e6ubmzZ8Bx1cP_OzK4=LQ@mail.gmail.com>
+ <CAEPRUYpsp_FVobY_DeEQU2+rCD7q7T=p7k++XvG-22x-OWHY8Q@mail.gmail.com>
+ <CACRpkdY2BExGiL6HBg7zn_szJQMnSNsxOSuo7RyrRmrz=cVe2A@mail.gmail.com>
+Message-ID: <20131217001842.GB3840@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon 16 Dec 02:01 PST 2013, Linus Walleij wrote:
 
-> On Thu, Dec 12, 2013 at 03:12:50PM -0500, Bill Pringlemeir wrote:
+> On Thu, Dec 12, 2013 at 10:35 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+> 
+> >  I had requested this from Sherman. The reason is so that pinctrl can
+> > be selectable through defconfig, instead of through SoC select
+> > statements. And the reason for that is so that, in the future, some of
+> > these can be switched into loadable modules (which can't be done from
+> > Kconfig). This will become necessary with the move to multiplatform -
+> > we won't be able to have everything static anymore.
+> 
+> Isn't it sufficient to make the pin controller entry tristate rather
+> than bool?
+> 
+> And as mentioned elsewhere this does not at all solve the issue
+> that we still need to have all basic IRQchips and timer drivers
+> compiled into the kernel.
 
->> The SAI might not use 'VF610_PAD_PTB18__EXT_AUDIO_MCLK' nor either
->> 'VF610_PAD_PTA16__SAI2_TX_BCLK' or 'VF610_PAD_PTA21__SAI2_RX_BCLK'.
->> There are some pins that are absolutely needed for a module to function
->> and then there are some optional pins.
->>
->> That said, this is nothing that you have changed.  It was like this to
->> begin with in the generic 'vf610.dtsi' file.
+No matter how we build the individual pinctrl drivers we will always
+need the pinctrl framework in a multi-soc zImage; so I can't see that
+we gain anything from being able to compile PINCTRL as a module.
 
-On 14 Dec 2013, shawn.guo at linaro.org wrote:
+I don't like compiling the individual pinctrl drivers as modules, as
+it leaves us with a waterfall of PROBE_DEFERRs.
 
-> Yea, the PINGRP defined in vf610-pingrp.h should be generic rather than
-> board specific.  It seems that VF610_SAI2_PINGRP1 is used nowhere for
-> now, so we can change it easily.  Patch is welcomed.
-
-Alison Wang and Xiubo Li are working on this driver now,
-
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-November/068060.html
-
-I would wait until after that is accepted.  I just wondered if my
-understanding was correct.  Sorry, I missed all your IMX patches which
-probably explained this.
-
-Thanks,
-Bill Pringlemeir.
+Regards,
+Bjorn
