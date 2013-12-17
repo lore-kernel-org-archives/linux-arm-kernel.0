@@ -1,49 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 22:04:58 +0800
-Subject: [PATCH 1/3]: Support cpu frequency scaling and power management
- for iMX6SL
-In-Reply-To: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
-References: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
-Message-ID: <20131217140448.GU6691@S2101-09.ap.freescale.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Dec 2013 14:10:38 +0000
+Subject: [PATCH] ASoC: kirkwood: Fix the CPU DAI rates
+In-Reply-To: <20131127211024.52e5ae1b@armhf>
+References: <20131127211024.52e5ae1b@armhf>
+Message-ID: <20131217141038.GJ3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 05:40:15PM -0800, John Tobias wrote:
-> iMX6SL device tree doesn't have a configuration settings to enable the
-> frequency scaling and power management.
-> 
-> From: John Tobias <john.tobias.ph@gmail.com>
+On Wed, Nov 27, 2013 at 09:10:24PM +0100, Jean-Francois Moine wrote:
+> This patch fixes the rates declared in the CPU DAI parameters:
+> - SNDRV_PCM_RATE_KNOT and the discrete rates SNDRV_PCM_RATE_xxx should
+>   not be used with SNDRV_PCM_RATE_CONTINUOUS,
+> - SNDRV_PCM_RATE_CONTINUOUS asks for rate_min and rate_max,
+> - the device may do streaming down to 5512Hz.
 
-Please use 'git format-patch' and 'git send-email'.  Also, it's never
-been a good idea to use the exactly same patch subject for 3 different
-changes.
-
-Shawn
-
-> 
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 28558f1..0ad2f6a 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -38,6 +38,19 @@
->                         device_type = "cpu";
->                         reg = <0x0>;
->                         next-level-cache = <&L2>;
-> +                       operating-points = <
-> +                               /* kHz    uV */
-> +                               1000000 1275000
-> +                               792000  1150000
-> +                       >;
-> +                       clock-latency = <61036>; /* two CLK32 periods */
-> +                       clocks = <&clks IMX6SL_CLK_ARM>, <&clks
-> IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
-> +                                <&clks IMX6SL_CLK_PLL1_SW>, <&clks
-> IMX6SL_CLK_PLL1_SYS>;
-> +                       clock-names = "arm", "pll2_pfd2_396m", "step",
-> +                                     "pll1_sw", "pll1_sys";
-> +                       arm-supply = <&reg_arm>;
-> +                       pu-supply = <&reg_pu>;
-> +                       soc-supply = <&reg_soc>;
->                 };
->         };
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/d8f27f05/attachment.sig>
