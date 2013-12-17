@@ -1,51 +1,31 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Tue, 17 Dec 2013 15:38:31 +0200
-Subject: [PATCH v4 9/9] mtd: nand: davinci: don't request AEMIF address range
-In-Reply-To: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1387287511-19975-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Dec 2013 13:43:19 +0000
+Subject: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC hosts found on
+ Allwinner sunxi SoCs
+In-Reply-To: <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <1387058295-20641-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20131217134319.GC3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TI AEMIF driver registers are used to setup timings for each chip
-select. The same registers range is used to setup NAND settings.
-The AEMIF and NAND drivers not use the same registers in this range.
+On Sat, Dec 14, 2013 at 10:58:11PM +0100, Hans de Goede wrote:
 
-In case with TI AEMIF driver, the memory address range is requested
-already by AEMIF, so we cannot request it twice, just ioremap.
+> +config MMC_SUNXI
+> +	tristate "Allwinner sunxi SD/MMC Host Controller support"
+> +	depends on ARCH_SUNXI
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Reviewed-by: Taras Kondratiuk <taras@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- drivers/mtd/nand/davinci_nand.c |   14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+This should be ARCH_SUNXI || COMPILE_TEST to increase build coverage
+especially for people doing subsystem or kernel global work.
 
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 8a61a40..0104d26 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -637,9 +637,17 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	if (IS_ERR(vaddr))
- 		return PTR_ERR(vaddr);
- 
--	base = devm_ioremap_resource(&pdev->dev, res2);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	/*
-+	 * This registers range is used to setup NAND settings. In case with
-+	 * TI AEMIF driver, the same memory address range is requested already
-+	 * by AEMIF, so we cannot request it twice, just ioremap.
-+	 * The AEMIF and NAND drivers not use the same registers in this range.
-+	 */
-+	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
-+	if (!base) {
-+		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
-+		return -EADDRNOTAVAIL;
-+	}
- 
- 	info->dev		= &pdev->dev;
- 	info->base		= base;
--- 
-1.7.9.5
+> +	default y
+
+As others pointed out this shouldn't be here, consider multiplatform
+kernels.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/5b223810/attachment.sig>
