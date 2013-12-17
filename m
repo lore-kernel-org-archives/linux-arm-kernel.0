@@ -1,35 +1,45 @@
-From: thomas.langer@lantiq.com (thomas.langer at lantiq.com)
-Date: Tue, 17 Dec 2013 13:36:33 +0000
-Subject: [PATCH v3 6/7] Documentation: add the binding file for Quadspi
- driver
-In-Reply-To: <201312171410.05423.marex@denx.de>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <1387184330-14448-7-git-send-email-b32955@freescale.com>
- <201312171410.05423.marex@denx.de>
-Message-ID: <593AEF6C47F46446852B067021A273D6D9AFB83B@MUCSE039.lantiq.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 17 Dec 2013 15:36:05 +0200
+Subject: [PATCH v4 2/9] mtd: nand: davinci: return ENOMEM if memory allocation
+ is failed
+In-Reply-To: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1387287365-19731-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+In case when memory allocation is failed the driver should return
+ENOMEM instead of ENODEV.
 
-Marek Vasut wrote on?2013-12-17:
-> On Monday, December 16, 2013 at 09:58:49 AM, Huang Shijie wrote:
->> This patch adds the binding file for Freescale Quadspi driver.
->> 
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> 
-> I might be blind and/or tired, but I don't see devicetree-discuss in the CC.
-> Next time please CC this ML ( devicetree-discuss AT lists.ozlabs.org ) so the
-> bindings are reviewed by experts .
-
-I am sure you talking about the new list at devicetree at vger.kernel.org?
-
-> 
-> Best regards,
-> Marek Vasut
-
-Best Regards,
-Thomas
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Reviewed-by: Taras Kondratiuk <taras@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 ---
-There are two hard things in computer science: cache invalidation, naming things, and off-by-one errors.
----
+ drivers/mtd/nand/davinci_nand.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index 584c1f4..4577fb4 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -541,7 +541,7 @@ static struct davinci_nand_pdata
+ 				GFP_KERNEL);
+ 		pdev->dev.platform_data = pdata;
+ 		if (!pdata)
+-			return NULL;
++			return ERR_PTR(-ENOMEM);
+ 		if (!of_property_read_u32(pdev->dev.of_node,
+ 			"ti,davinci-chipselect", &prop))
+ 			pdev->id = prop;
+@@ -598,6 +598,9 @@ static int nand_davinci_probe(struct platform_device *pdev)
+ 	nand_ecc_modes_t		ecc_mode;
+ 
+ 	pdata = nand_davinci_get_pdata(pdev);
++	if (IS_ERR(pdata))
++		return PTR_ERR(pdata);
++
+ 	/* insist on board-specific configuration */
+ 	if (!pdata)
+ 		return -ENODEV;
+-- 
+1.7.9.5
