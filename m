@@ -1,46 +1,120 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 17 Dec 2013 13:53:33 +0100
-Subject: [PATCH 2/7] iommu/omap: omap_iommu_attach() should return ENODEV,
- not NULL
+Date: Tue, 17 Dec 2013 13:53:38 +0100
+Subject: [PATCH 7/7] ARM: OMAP2+: Remove platform-specific omap-iommu
 In-Reply-To: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1387284818-28739-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1387284818-28739-8-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_iommu_attach() returns NULL or ERR_PTR in case of error, but
-omap_iommu_attach_dev() only checks for IS_ERR. Thus a NULL return value (in
-case driver_find_device fails) will cause the kernel to panic when
-omap_iommu_attach_dev() dereferences the pointer.
-
-In such case, omap_iommu_attach() should return ENODEV, not NULL.
+With full DT boot, the platform specific part of the OMAP iommu
+is not useful anymore.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- drivers/iommu/omap-iommu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/Makefile     |  3 --
+ arch/arm/mach-omap2/omap-iommu.c | 79 ----------------------------------------
+ 2 files changed, 82 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/omap-iommu.c
 
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index ee83bcc..385bf5e 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -863,7 +863,7 @@ static int device_match_by_alias(struct device *dev, void *data)
-  **/
- static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
- {
--	int err = -ENOMEM;
-+	int err = -ENODEV;
- 	struct device *dev;
- 	struct omap_iommu *obj;
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 35be79f..4e01b61 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -219,9 +219,6 @@ obj-$(CONFIG_SOC_DRA7XX)		+= omap_hwmod_7xx_data.o
+ obj-$(CONFIG_OMAP3_EMU)			+= emu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)		+= pmu.o
  
-@@ -871,7 +871,7 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
- 				(void *)name,
- 				device_match_by_alias);
- 	if (!dev)
--		return NULL;
-+		return ERR_PTR(err);
- 
- 	obj = to_iommu(dev);
- 
+-iommu-$(CONFIG_OMAP_IOMMU)		:= omap-iommu.o
+-obj-y					+= $(iommu-m) $(iommu-y)
+-
+ ifneq ($(CONFIG_TIDSPBRIDGE),)
+ obj-y					+= dsp.o
+ endif
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+deleted file mode 100644
+index f1fab56..0000000
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ /dev/null
+@@ -1,79 +0,0 @@
+-/*
+- * omap iommu: omap device registration
+- *
+- * Copyright (C) 2008-2009 Nokia Corporation
+- *
+- * Written by Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/of.h>
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/err.h>
+-#include <linux/slab.h>
+-
+-#include <linux/platform_data/iommu-omap.h>
+-#include "soc.h"
+-#include "omap_hwmod.h"
+-#include "omap_device.h"
+-
+-static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
+-{
+-	struct platform_device *pdev;
+-	struct iommu_platform_data *pdata;
+-	struct omap_mmu_dev_attr *a = (struct omap_mmu_dev_attr *)oh->dev_attr;
+-	static int i;
+-
+-	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+-	if (!pdata)
+-		return -ENOMEM;
+-
+-	pdata->name = oh->name;
+-	pdata->nr_tlb_entries = a->nr_tlb_entries;
+-	pdata->da_start = a->da_start;
+-	pdata->da_end = a->da_end;
+-
+-	if (oh->rst_lines_cnt == 1) {
+-		pdata->reset_name = oh->rst_lines->name;
+-		pdata->assert_reset = omap_device_assert_hardreset;
+-		pdata->deassert_reset = omap_device_deassert_hardreset;
+-	}
+-
+-	pdev = omap_device_build("omap-iommu", i, oh, pdata, sizeof(*pdata));
+-
+-	kfree(pdata);
+-
+-	if (IS_ERR(pdev)) {
+-		pr_err("%s: device build err: %ld\n", __func__, PTR_ERR(pdev));
+-		return PTR_ERR(pdev);
+-	}
+-
+-	i++;
+-
+-	return 0;
+-}
+-
+-static int __init omap_iommu_init(void)
+-{
+-	/* If dtb is there, the devices will be created dynamically */
+-	if (of_have_populated_dt())
+-		return -ENODEV;
+-
+-	return omap_hwmod_for_each_by_class("mmu", omap_iommu_dev_init, NULL);
+-}
+-/* must be ready before omap3isp is probed */
+-omap_subsys_initcall(omap_iommu_init);
+-
+-static void __exit omap_iommu_exit(void)
+-{
+-	/* Do nothing */
+-}
+-module_exit(omap_iommu_exit);
+-
+-MODULE_AUTHOR("Hiroshi DOYU");
+-MODULE_DESCRIPTION("omap iommu: omap device registration");
+-MODULE_LICENSE("GPL v2");
 -- 
 1.8.1.2
