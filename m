@@ -1,86 +1,122 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 17 Dec 2013 11:42:17 +0200
-Subject: [PATCH 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52AF68DA.9000104@ti.com>
-References: <1386784830-15863-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386784830-15863-2-git-send-email-ivan.khoronzhuk@ti.com>
- <52AA65EA.20902@codeaurora.org> <52AEF560.9010603@ti.com>
- <20131216204037.GS21983@codeaurora.org> <52AF68DA.9000104@ti.com>
-Message-ID: <52B01C79.7040508@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 17 Dec 2013 09:44:05 +0000 (UTC)
+Subject: [PATCHv10 21/41] ARM: dts: omap4 clock data
+In-Reply-To: <1385453182-24421-22-git-send-email-t-kristo@ti.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-22-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1312170934180.14039@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2013 10:55 PM, Santosh Shilimkar wrote:
-> On Monday 16 December 2013 03:40 PM, Stephen Boyd wrote:
->> On 12/16, ivan.khoronzhuk wrote:
->>> On 12/13/2013 03:42 AM, Stephen Boyd wrote:
->>>> On 12/11/13 10:00, Ivan Khoronzhuk wrote:
->>>>> +
->>>>> +static inline u32 keystone_timer_readl(unsigned long rg)
->>>>> +{
->>>>> +	return readl(timer.base + rg);
->>>>> +}
->>>>> +
->>>>> +static inline void keystone_timer_writel(u32 val, unsigned long rg)
->>>>> +{
->>>>> +	writel(val, timer.base + rg);
->>>>> +}
->>>>
->>>> It's probably better to use the relaxed variants here to avoid any
->>>> memory barriers that aren't necessary.
->>>>
->>>
->>> Yes, but the code has places where I cannot use relaxed variants.
->>>
->>>  From timer user guide:
->>> "Writes from the configuration bus to the timer registers are not allowed
->>> when the timer is active, except for stopping or resetting the timers.
->>> Registers that are protected by hardware include CNTLO, CNTHI, PRDLO,
->>> PRDHI, TGCR (except the TIMLORS and TIMHIRS bits), and TCR (except the
->>> ENAMODE bits)."
->>>
->>> According to this I have to add keystone readl/write relaxed functions
->>> and use mixed calls of writel/writel_relaxed functions.
->>>
->>> For instance, for keystone_timer_config() which is used by
->>> keystone_set_next_event(), I will do following:
->>> -----
->>> tcr = keystone_timer_readl_relaxed(TCR);
->>>
->>> /* disable timer */
->>> tcr &= ~(TCR_ENAMODE_MASK);
->>> keystone_timer_writel_relaxed(tcr, TCR);
->>> ...
->>> /* reset counter to zero, set new period */
->>> *** here I have to be sure the timer is disabled ***
->>> keystone_timer_writel(0, TIM12);
->>> keystone_timer_writel_relaxed(0, TIM34);
->>> keystone_timer_writel_relaxed(period & 0xffffffff, PRD12);
->>> keystone_timer_writel_relaxed(period >> 32, PRD34);
->>>
->>> /* enable timer */
->>> *** here I have to be sure that TIM and PRD registers are written ***
->>> keystone_timer_writel(tcr, TCR);
->>> ---
->>>
->>> The same for keystone_timer_init().
->>>
->>> Will it be better?
->>
->> Why not just put the explicit memory barriers where you need them
->> and always use the relaxed variants in the mmio wrappers? That
->> way you're always sure the memory barriers are there and that
->> they're properly documented.
->>
-> I agree with Stephen.
->
-> Regards,
-> Santosh
->
+On Tue, 26 Nov 2013, Tero Kristo wrote:
 
-Yes, it will be better
+> This patch creates a unique node for each clock in the OMAP4 power,
+> reset and clock manager (PRCM). OMAP443x and OMAP446x have slightly
+> different clock tree which is taken into account in the data.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
--- 
-Regards,
-Ivan Khoronzhuk
+...
+
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index a1e0585..c2e3993 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -107,6 +107,34 @@
+>  		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+>  			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> +		cm1: cm1 at 4a004000 {
+> +			compatible = "ti,clock-master";
+
+These devices are low-level IP blocks, and should have accurate compatible 
+strings like any other low-level IP block.  At some point in the future, 
+these IP blocks will have device driver code that matches up with these DT 
+nodes, and is probed via these compatible strings.  These should be 
+corrected now, so unnecessary DT data synchronization problems don't 
+appear with later kernels.
+
+So this should be something like:
+
+compatible = "ti,omap4-cm1";
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x4a004000 0x2000>;
+> +		};
+> +
+> +		prm: prm at 4a306000 {
+> +			compatible = "ti,clock-master";
+
+Similarly this should be 
+
+compatible = "ti,omap4-prm";
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x4a306000 0x3000>;
+> +		};
+> +
+> +		cm2: cm2 at 4a008000 {
+> +			compatible = "ti,clock-master";
+
+compatible = "ti,omap4-cm2";
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x4a008000 0x3000>;
+> +		};
+> +
+> +		scrm: scrm at 4a30a000 {
+> +			compatible = "ti,clock-master";
+
+compatible = "ti,omap4-scrm";
+
+
+...
+
+> diff --git a/arch/arm/boot/dts/omap443x-clocks.dtsi b/arch/arm/boot/dts/omap443x-clocks.dtsi
+> new file mode 100644
+> index 0000000..643755b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap443x-clocks.dtsi
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Device Tree Source for OMAP4 clock data
+> + *
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +&prm {
+> +	bandgap_fclk: bandgap_fclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&sys_32k_ck>;
+> +		ti,bit-shift = <8>;
+> +		reg = <0x1888>;
+> +	};
+
+So we've already discussed that clocks should be moved underneath
+separate "clocks {" node in the IP block data.  And similarly...
+
+> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+> new file mode 100644
+> index 0000000..2b59d54
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+
+...
+
+> +	emu_sys_clkdm: emu_sys_clkdm {
+> +		compatible = "ti,clockdomain";
+> +		clocks = <&trace_clk_div_ck>;
+> +	};
+
+... all of the clockdomains should be moved underneath "clockdomains {"
+nodes in the IP block DT data.
+
+
+- Paul
