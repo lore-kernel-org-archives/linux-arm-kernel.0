@@ -1,47 +1,81 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 17 Dec 2013 11:42:58 +0530
-Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
-In-Reply-To: <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
-References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
- <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
-Message-ID: <CAKohpo=vkZRSQ5Xk-Tsm9QVy8h2F5Ehpm4Y8JWi5xjx0OD72tw@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 17 Dec 2013 14:15:59 +0800
+Subject: [PATCH 1/6] mmc: sdhci: add platfrom get_max_timeout hook
+In-Reply-To: <20131211055525.GK18380@S2101-09.ap.freescale.net>
+References: <1386680168-5227-1-git-send-email-b29396@freescale.com>
+ <1386680168-5227-2-git-send-email-b29396@freescale.com>
+ <20131211015640.GA18380@S2101-09.ap.freescale.net>
+ <CAA+hA=ST0fAa2__PaeJqxj2yDWUAr6iaNO4Dj7ABiEWqnYp6Vw@mail.gmail.com>
+ <20131211031254.GF18380@S2101-09.ap.freescale.net>
+ <CAA+hA=QrEiwg8+hmEONgP5u6C0_YwQhEeBfDoFQTv=aCaLhqkQ@mail.gmail.com>
+ <20131211035654.GI18380@S2101-09.ap.freescale.net>
+ <CAA+hA=TjhLKmLucm9R3fkiDQGCxTf_5WCMKbgyBXuuqC6Q0-RQ@mail.gmail.com>
+ <20131211055525.GK18380@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=R-LbEVH0t1PRQJx3C3CrKgv=P8qVhFRXt4JEWtP+HCOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2013 15:18, Arun Kumar K <arun.kk@samsung.com> wrote:
-> From: "Arjun.K.V" <arjun.kv@samsung.com>
+On Wed, Dec 11, 2013 at 1:55 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Dec 11, 2013 at 12:59:55PM +0800, Dong Aisheng wrote:
+>> On Wed, Dec 11, 2013 at 11:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> > On Wed, Dec 11, 2013 at 11:20:59AM +0800, Dong Aisheng wrote:
+>> >> No, the max_to is the max timeout counter value, you need to divide it
+>> >> by the timeout clock
+>> >> to get the timeout time.
+>> >> The defined of this API is return the max timeout value in
+>> >> miliseconds, so you need to
+>> >> divide the clock by 1000.
+>> >> None of these handles the detail bout discard_to.
+>> >
+>> > Let me start it over again.  Here is basically what your patch does.
+>> >
+>> > -     mmc->max_discard_to = (1 << 27) / host->timeout_clk;
+>> > +     if (host->ops->get_max_timeout)
+>> > +             mmc->max_discard_to = host->ops->get_max_timeout(host);
+>> >
+>> > The only thing that does not work for you in the existing code is the
+>> > (1 << 27) part, right?
+>> >
+>> > If so, why not just create a platform hook to return the correct thing
+>> > for you platform, i.e. (1 << 28)?
+>> >
+>> >         if (host->ops->get_max_timeout)
+>> >                 mmc->max_discard_to = host->ops->hook_foo(host);
+>> >
+>> > unsigned int esdhc_hook_foo(struct sdhci_host *host)
+>> > {
+>> >         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> >         struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>> >
+>> >         return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
+>> > }
+>> >
+>> > Such patch will be ease to be understood and less offensive to the
+>> > existing code, no?
+>> >
+>>
+>> The example you give is not correct here.
 >
-> The patch adds cpufreq driver for exynos5420.
+> Sorry.  Yes, there is a error in my example code.  What about this?
 >
-> Signed-off-by: Arjun.K.V <arjun.kv@samsung.com>
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> ---
->  drivers/cpufreq/Kconfig.arm          |   11 ++
->  drivers/cpufreq/Makefile             |    1 +
->  drivers/cpufreq/exynos-cpufreq.c     |    2 +
->  drivers/cpufreq/exynos-cpufreq.h     |    8 +
->  drivers/cpufreq/exynos5420-cpufreq.c |  346 ++++++++++++++++++++++++++++++++++
->  5 files changed, 368 insertions(+)
->  create mode 100644 drivers/cpufreq/exynos5420-cpufreq.c
+>         mmc->max_discard_to = host->ops->hook_foo ? host->ops->hook_foo(host) : 1 << 27;
+>         mmc->max_discard_to /= host->timeout_clk;
+>
 
-Hmm.. That's the second big LITTLE SoC after TC2..
-And we already have a generic enough driver for all big LITTLE platforms:
-arm_big_little.c
+Actually i did like this for FSL internal tree.
+Just because one concern that other SoCs may have different case
+e.g. for imx5, the max count becomes 1 << 26 when DDR is enabled.
+Then this way becomes unwork.
+And i don't know how many other special SoC exists working on different way.
+So i prefer-ed a more flexible way in this patch.
 
-Please use that with a glue clk and regulator driver if required. We don't
-want to get any new driver for big LITTLE unless there is a real limitation.
+However, after one more thought, since the issue of the example i gave
+can be addressed with my patch 5 (able to update max_discard_to when
+DDR enabled).
+And we already have timeout_clk hook, so it seems we could also go this way.
 
-Also, the generic big LITTLE driver supports IKS (In Kernel Switcher)
-which may or maynot be used by Exynos.
+Regards
+Dong Aisheng
 
-@Lukasz: We can't use cpu0 driver here as we have multiple clusters here
-A7 and A15, and so there are two clock domains instead of one. That's why
-we have written big LITTLE driver.
-
-@Arun: And you logs must be a bit enhanced as well.. I knew 5420 is big
-LITTLE but others may not.. And hence please provide a summary of your
-platform whenever you add new drivers..
-
---
-viresh
+> Shawn
+>
