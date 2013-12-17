@@ -1,53 +1,60 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 17 Dec 2013 05:45:38 +0000
-Subject: [PATCH v3 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20131217045752.GA15761@shlinux2.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 17 Dec 2013 13:20:36 +0800
+Subject: [PATCH v3 3/7] mtd: spi-nor: add the framework for SPI NOR
+In-Reply-To: <52AFDEF7.2080604@ti.com>
 References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA56ADC@DBDE04.ent.ti.com>
- <20131217040209.GA27091@shlinux2.ap.freescale.net>
- <20980858CB6D3A4BAE95CA194937D5E73EA56B3A@DBDE04.ent.ti.com>
- <20131217045752.GA15761@shlinux2.ap.freescale.net>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA56B8A@DBDE04.ent.ti.com>
+ <1387184330-14448-4-git-send-email-b32955@freescale.com>
+ <52AF4976.7090305@ti.com>
+ <20131217025646.GD12575@shlinux2.ap.freescale.net>
+ <52AFDEF7.2080604@ti.com>
+Message-ID: <20131217052034.GA15942@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Huang Shijie [mailto:b32955 at freescale.com]
->>From: Pekon Gupta [mailto:pekon at ti.com]
-[...]
->> (1) Add sign-offs of main authors of m25p80, so that original contributors
->>  still remains in path of submission [1].
->Do you mean add the sign-offs in end of the patch 3's commit message?:
->	Signed-off-by: Mike Lavender <mike@steroidmicros.com>
->
-I think Mike's  email ID is no-more valid. So you can either find out his
-current email-Id from other sources. OR
-add David's or someone else's ID which has equivalent number of
-contributions in m25p80.c (that you can figure out from either commit
-logs or git blame).
+On Tue, Dec 17, 2013 at 10:49:51AM +0530, Sourav Poddar wrote:
+> On Tuesday 17 December 2013 08:26 AM, Huang Shijie wrote:
+> >On Tue, Dec 17, 2013 at 12:11:58AM +0530, Sourav Poddar wrote:
+> >>>+static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
+> >>>+			size_t *retlen, u_char *buf)
+> >>>+{
+> >>>+	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+> >>>+	int ret;
+> >>>+
+> >>>+	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
+> >>>+
+> >>>+	ret = spi_nor_lock_and_prep(nor, SPI_NOR_OPS_READ);
+> >>>+	if (ret)
+> >>>+		return ret;
+> >>>+
+> >>>+	/* Wait till previous write/erase is done. */
+> >>>+	ret = wait_till_ready(nor);
+> >>>+	if (ret)
+> >>>+		goto read_err;
+> >>>+
+> >>Can you shift "wait_till_ready" above spi_nor_lock_and_prep?
+> >>One usecase for asking for above change is that I am planning to
+> >>use this _prep api for switching to memory mapped mode for read and once
+> >>I am switched to mmap mode, read_sr calls in wait_till_ready will not
+> >>work for me.
+> >>
+> >you can implement your own wait_till_ready here.
+> I think no point doing this, since it does the same function for me.
+> >Only we have grabbed the lock, then we can do the transactions with the NOR.
+> >
+> >We can not call the wait_till_ready before we grab the lock, it is wrong.
+> >
+> >
+> >If you really can not implement your own wait_till_ready, the final solution
+> >is removing the wait_till_ready in this function, and add the wait_till_ready
+> >in the nor->read() hook.
+> >
+> 
+> Yes, this can be done. So, that if you want to do memcpy do it before this
+> condition is hit.
+ok. 
+
+I can fix it in the next version.
 
 
->>
->> (2) Also, please remove following from spi-nor.c
->>   However, you can keep this in fsl-quadspi.c.
->>   +MODULE_AUTHOR("Freescale Semiconductor Inc.");
->>   I'm sure this was _not_ present in original m25p80.c
->>  (m25p80.c was started as ST's driver as per MODULE_DESCRIPTION)
->okay.
->
-Thanks much.
-You can put your name instead, I don't mind that bcoz you have worked
-to get this framework assembled by joining different pieces.
-
-However, please use a email-id which is valid for long-term (preferably
-your personal ID), so that even if your association with your company ends,
-still there is some way to track you and keep you in loop of future patches
-for this framework.
-
->>
->> (3)     +MODULE_LICENSE("GPL");
->> Also, I assume the license version should be "GPLv2" ?
->
->yes. it should be v2.
->
-
-with regards, pekon
+thanks
+Huang Shijie
