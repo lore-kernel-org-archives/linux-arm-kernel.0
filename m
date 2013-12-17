@@ -1,39 +1,34 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 17 Dec 2013 22:41:09 +0100
-Subject: [RFC PATCH v5 0/4] Dove Cpufreq driver
-In-Reply-To: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
+Date: Tue, 17 Dec 2013 22:41:11 +0100
+Subject: [RFC PATCH v5 2/4] mvebu: Dove: Indicate the architecture supports
+ cpufreq.
+In-Reply-To: <1387316473-3250-1-git-send-email-andrew@lunn.ch>
 References: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
-Message-ID: <1387316473-3250-1-git-send-email-andrew@lunn.ch>
+ <1387316473-3250-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1387316473-3250-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an RFC where i attempt to address Mark Rutland's request for a
-PMU node in DT, and all clocks and interrupts required by the cpufreq
-driver are within this node. I would like to receive comments about
-this binding.
+Enable ARCH_HAS_CPUFREQ so allowing the cpufreq framework to be
+enabled.
 
-This version does not address any other comments made to the code. I
-will fix those issues once the binding is mostly decided.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
-	Andrew
-
-Andrew Lunn (4):
-  cpufreq: Add a cpufreq driver for Marvell Dove
-  mvebu: Dove: Indicate the architecture supports cpufreq.
-  mvebu: Dove: Enable cpufreq driver in defconfig
-  mvebu: Dove: Add PMU node for cpufreq driver
-
- .../devicetree/bindings/cpufreq/cpufreq-dove.txt   |  23 ++
- arch/arm/Kconfig                                   |   1 +
- arch/arm/boot/dts/dove.dtsi                        |  10 +
- arch/arm/configs/dove_defconfig                    |   2 +
- drivers/cpufreq/Kconfig.arm                        |   5 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/dove-cpufreq.c                     | 265 +++++++++++++++++++++
- 7 files changed, 307 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-dove.txt
- create mode 100644 drivers/cpufreq/dove-cpufreq.c
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7eee953..908b02f8d901 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -500,6 +500,7 @@ config ARCH_IXP4XX
+ 
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
++	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_PJ4
+ 	select GENERIC_CLOCKEVENTS
 -- 
 1.8.5.1
