@@ -1,100 +1,116 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Dec 2013 06:54:36 +0000 (UTC)
-Subject: OMAP baseline test results for v3.13-rc4
-Message-ID: <alpine.DEB.2.02.1312170653140.14039@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 15:02:21 +0800
+Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
+ when cpufreq is changed
+In-Reply-To: <20131217165257.GA27607@ubuntu>
+References: <1387228450-641-1-git-send-email-b20788@freescale.com>
+ <1387228450-641-2-git-send-email-b20788@freescale.com>
+ <20131217025616.GC6691@S2101-09.ap.freescale.net>
+ <20131217165257.GA27607@ubuntu>
+Message-ID: <20131217070219.GK6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 17, 2013 at 11:52:57AM -0500, Anson Huang wrote:
+> > > @@ -63,29 +68,48 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+> > >  	rcu_read_unlock();
+> > >  	volt_old = regulator_get_voltage(arm_reg);
+> > >  
+> > > -	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
+> > > +	/* Find the matching VDDSOC/VDDPU operating voltage */
+> > > +	while (soc_opp_index < soc_opp_count) {
+> > > +		if (new_freq == imx6_soc_opp[soc_opp_index].arm_freq)
+> > > +			break;
+> > > +		soc_opp_index++;
+> > > +	}
+> > 
+> > I'm not comfortable with this lookup every time imx6q_set_target() is
+> > called.  I think we can use the 'index' variable to find VDDSOC/VDDPU
+> > operating voltage from imx6_soc_opp table directly, if we sort the table
+> > in the same order that freq_table is sorted.
+> >
+> 
+> yes, we can use the index passed from OPP, then I will add some comments that
+> the freq/volt table of vddsoc should be sorted in same order.
 
-Here are some basic OMAP test results for Linux v3.13-rc4.
-Logs and other details at:
+It's not as easy as adding some comments.  I think we need to ensure the
+order in probe function, probably sorting them in code.  Otherwise, it's
+dangerous if we're running at a frequency with a wrong voltage.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.13-rc4/20131215195251/
+Also, if we sort the table in the same order as freq_table, we do not
+even need to have arm_freq in the soc_opp table.
 
+<snip>
 
-Test summary
-------------
+> > > +	dev_dbg(cpu_dev, "%u MHz, arm %ld mV, soc-pu %d mV --> %u MHz, arm %ld mV, soc-pu %d mV\n",
+> > >  		old_freq / 1000, volt_old / 1000,
+> > > -		new_freq / 1000, volt / 1000);
+> > > +		imx6_soc_opp[soc_opp_index].soc_volt / 1000,
+> > > +		new_freq / 1000, volt / 1000,
+> > > +		imx6_soc_opp[soc_opp_index].soc_volt / 1000);
+> > 
+> > You print the same soc_volt for both old and new ones?
+> 
+> this is my mistake, maybe I can leave the original code here to only
+> print out vddarm's voltage? Otherwise, I have to add variable to keep
+> old vddsoc/pu's voltage.
 
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
+Yea, that's okay with leaving it as the existing code.
 
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+<snip>
 
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
+> > > +	/*
+> > > +	 * Each OPP is a set of tuples consisting of frequency and
+> > > +	 * voltage like <freq-kHz vol-uV>.
+> > > +	 */
+> > > +	nr = prop->length / sizeof(u32);
+> > > +	if (nr % 2) {
+> > > +		dev_err(cpu_dev, "Invalid fsl-soc-operating-points list!\n");
+> > 
+> > fsl,soc-operating-points
+> > 
+> > and
+> > 
+> > 		ret = -EINVAL;
+> 
+> no need to free freq table here?
 
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
+We're only populating the error code here, and will still goto
+free_freq_table below.
 
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+> > > +		goto free_freq_table;
+> > > +	}
 
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+<snip>
 
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
+> > > +	min_volt = max_volt = 0;
+> > > +	for (i = 0; i < nr / 2; i++) {
+> > > +		unsigned long freq = be32_to_cpup(val++);
+> > > +		unsigned long volt = be32_to_cpup(val++);
+> > > +
+> > > +		if (i == 0)
+> > > +			min_volt = max_volt = volt;
+> > > +		if (volt < min_volt)
+> > > +			min_volt = volt;
+> > > +		if (volt > max_volt)
+> > > +			max_volt = volt;
+> > > +		opp = dev_pm_opp_find_freq_exact(cpu_dev, freq * 1000, true);
+> > > +		imx6_soc_opp[i].arm_freq = freq;
+> > > +		imx6_soc_opp[i].soc_volt = volt;
+> > > +		soc_opp_count++;
+> > > +	}
+> > > +	rcu_read_unlock();
+> > 
+> > We may need another sanity check to see if soc_opp_count == num (arm opp
+> > count) here.
+> 
+> yes, will add it, need to make sure soc_opp_count is same as arm opp count,
+> but since we did NOT have 1G2 check, so the soc_opp_count will ">=" arm opp
+> count.
 
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
+Hmm, this is another problem with the for-loop above.  The soc_volt
+should be added into imx6_soc_opp table and soc_opp_count increases,
+only when dev_pm_opp_find_freq_exact() succeeds (IOW, the freq can be
+found in arm opp table).
 
-PM: chip off via suspend:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-
-vmlinux object size
-(delta in bytes from test_v3.13-rc3 (374b105797c3d4f29c685f3be535c35f5689b30e)):
-   text     data      bss    total  kernel
-   -220        0        0     -220  omap1_defconfig
-   -228        0        0     -228  omap1_defconfig_1510innovator_only
-   -156        0        0     -156  omap1_defconfig_5912osk_only
-  +2372      +80      +64    +2516  omap2plus_defconfig
-  +1564      +32        0    +1596  omap2plus_defconfig_2430sdp_only
-  +2300     +208      +64    +2572  omap2plus_defconfig_cpupm
-   +908     +112      +32    +1052  omap2plus_defconfig_n800_multi_omap2xxx
-   +876     +112      +32    +1020  omap2plus_defconfig_n800_only_a
-  +2372     +112        0    +2484  omap2plus_defconfig_no_pm
-  +2348     +104      +64    +2516  omap2plus_defconfig_omap2_4_only
-  +2372      +80      +64    +2516  omap2plus_defconfig_omap3_4_only
-  +2908     +240     -688    +2460  rmk_omap3430_ldp_allnoconfig
-   +828      +64        0     +892  rmk_omap3430_ldp_oldconfig
-  +2740     +168     -608    +2300  rmk_omap4430_sdp_allnoconfig
-   -352        0        0     -352  rmk_omap4430_sdp_oldnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.13-rc3 (374b105797c3d4f29c685f3be535c35f5689b30e))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  37xxevm        omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
-    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
-    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
-    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig
+Shawn
