@@ -1,22 +1,29 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 17 Dec 2013 18:31:12 +0000
-Subject: [PATCH 0/2] kvmtool: Enable overriding Generic Timer frequency
-Message-ID: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue, 17 Dec 2013 11:49:01 -0700
+Subject: [PATCH V2 13/13] ARM: dts: imx: add nitrogen6x board
+In-Reply-To: <20131217134826.GR6691@S2101-09.ap.freescale.net>
+References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1387242783-1462-14-git-send-email-troy.kisky@boundarydevices.com>
+ <20131217134826.GR6691@S2101-09.ap.freescale.net>
+Message-ID: <52B09C9D.3030000@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series allows (but discourages) overriding the Generic Timer
-frequency for device tree-based guest OSes, to work around systems with
-broken secure firmware that fails to program CNTFRQ correctly.
+On 12/17/2013 6:48 AM, Shawn Guo wrote:
+> On Mon, Dec 16, 2013 at 06:13:03PM -0700, Troy Kisky wrote:
+>> +
+> Unnecessary blank line.
+>
+>> +};
+>> +	compatible = "fsl,imx6q-nitrogen6x", "fsl,imx6q";
+>> +
+> Ditto
+>
+> I fixed them up and applied the whole series expect patch #8, which I
+> have a comment on.
+>
+> Shawn
+>
+Thanks a lot!!!
 
-Robin Murphy (2):
-  kvmtool: Support unsigned int options
-  kvmtool/arm: Add option to override Generic Timer frequency
-
- tools/kvm/arm/include/arm-common/kvm-config-arch.h |   15 ++++++++++-----
- tools/kvm/arm/timer.c                              |    2 ++
- tools/kvm/include/kvm/parse-options.h              |    9 +++++++++
- 3 files changed, 21 insertions(+), 5 deletions(-)
-
--- 
-1.7.9.5
+Troy
