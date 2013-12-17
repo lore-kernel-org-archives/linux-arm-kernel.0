@@ -1,62 +1,66 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 17 Dec 2013 22:44:35 +0100
-Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
+Date: Tue, 17 Dec 2013 22:44:37 +0100
+Subject: [PATCH 4/5] arm: shmobile: genmai: adapt dts to use native i2c driver
 In-Reply-To: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
 References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <1387316678-10174-5-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
-Tested with RIIC2 on a genmai board. Others untested but hopefully
-trivial enough to be added.
+Switch from the gpio-driver to the shiny new native driver. Tested by
+accessing the eeprom on the genmai board.
 
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 29 ++++++++++---------------
+ 1 file changed, 11 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 7b457ae..770316d 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -27,6 +27,7 @@
- #define FRQCR2		0xfcfe0014
- #define STBCR3		0xfcfe0420
- #define STBCR4		0xfcfe0424
-+#define STBCR9		0xfcfe0438
- 
- #define PLL_RATE 30
- 
-@@ -144,10 +145,15 @@ struct clk div4_clks[DIV4_NR] = {
- 					| CLK_ENABLE_ON_INIT),
+diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+index ce5da0b..739448a 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+@@ -39,24 +39,6 @@
+ 			gpios = <&port4 11 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+-
+-	i2c at 0 {
+-		compatible = "i2c-gpio";
+-		gpios = <&port1 5 GPIO_ACTIVE_HIGH /* sda */
+-			 &port1 4 GPIO_ACTIVE_HIGH /* scl */
+-			>;
+-		i2c-gpio,sda-open-drain;
+-		i2c-gpio,scl-open-drain;
+-		i2c-gpio,delay-us = <5>;	/* ~100 kHz */
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		flash at 50 {
+-			compatible = "renesas,24c128";
+-			reg = <0x50>;
+-			pagesize = <64>;
+-		};
+-	};
  };
  
--enum { MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
-+enum {	MSTP97, MSTP96, MSTP95, MSTP94,
-+	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
- 	MSTP33,	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
-+	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
-+	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
-+	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
- 	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
- 	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
- 	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
-@@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
- 
- 	/* ICK */
-+	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
-+	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
-+	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
-+	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.0", &mstp_clks[MSTP47]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.1", &mstp_clks[MSTP46]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.2", &mstp_clks[MSTP45]),
+ &pfc {
+@@ -68,3 +50,14 @@
+ 		renesas,function = "scif2";
+ 	};
+ };
++
++&i2c2 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	eeprom: 24c128 at 50 {
++		compatible = "renesas,24c128";
++		reg = <0x50>;
++		pagesize = <64>;
++	};
++};
 -- 
 1.8.4.2
