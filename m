@@ -1,84 +1,156 @@
-From: angus.clark@st.com (Angus Clark)
-Date: Tue, 17 Dec 2013 09:57:06 +0000
-Subject: [PATCH v3 11/36] mtd: st_spi_fsm: Search for preferred FSM message
- sequence configurations
-In-Reply-To: <20131211010636.GH27149@ld-irv-0074.broadcom.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-12-git-send-email-lee.jones@linaro.org>
- <20131211010636.GH27149@ld-irv-0074.broadcom.com>
-Message-ID: <52B01FF2.8010801@st.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 17 Dec 2013 11:57:36 +0200
+Subject: [PATCHv10 21/41] ARM: dts: omap4 clock data
+In-Reply-To: <alpine.DEB.2.02.1312170934180.14039@utopia.booyaka.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-22-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1312170934180.14039@utopia.booyaka.com>
+Message-ID: <52B02010.2060307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2013 01:06 AM, Brian Norris wrote:
-> This process sounds very much like something that is needed for other
-> controllers: a way to match controller capabilties with the opcodes
-> supported by the flash. 
-
-Yes, I think this should be a primary aim of any 'spi-nor' framework".
-
-> But it still isn't quite flexible enough for
-> others, because it doesn't try to abstract the selection criteria -- it
-> just uses lists that you presorted
-
-Sure, the implementation here is very specific to the st_spi_fsm controller.
-However, until there is something better or more generic available, I am not
-sure what else to suggest.  Selecting a configuration based on a presorted list
-is probably a reasonable strategy though; READ_1_4_4 is more efficient that
-READ_1_1_4, and READ_1_1_4 is more efficient than READ_1_1_2 etc.
-
->> +/* Search for preferred configuration based on available flags */
->> +static struct seq_rw_config *
->> +stfsm_search_seq_rw_configs(struct stfsm *fsm,
->> +			    struct seq_rw_config cfgs[])
->> +{
->> +	struct seq_rw_config *config;
->> +	int flags = fsm->info->flags;
+On 12/17/2013 11:44 AM, Paul Walmsley wrote:
+> On Tue, 26 Nov 2013, Tero Kristo wrote:
+>
+>> This patch creates a unique node for each clock in the OMAP4 power,
+>> reset and clock manager (PRCM). OMAP443x and OMAP446x have slightly
+>> different clock tree which is taken into account in the data.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>
+> ...
+>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index a1e0585..c2e3993 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -107,6 +107,34 @@
+>>   		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+>>   			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+>>
+>> +		cm1: cm1 at 4a004000 {
+>> +			compatible = "ti,clock-master";
+>
+> These devices are low-level IP blocks, and should have accurate compatible
+> strings like any other low-level IP block.  At some point in the future,
+> these IP blocks will have device driver code that matches up with these DT
+> nodes, and is probed via these compatible strings.  These should be
+> corrected now, so unnecessary DT data synchronization problems don't
+> appear with later kernels.
+>
+> So this should be something like:
+>
+> compatible = "ti,omap4-cm1";
+>
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x4a004000 0x2000>;
+>> +		};
 >> +
->> +	for (config = cfgs; cfgs->cmd != 0; config++)
-> 
-> This becomes an infinite loop if you can't find a matching config. You
-> probably meant 'config->cmd != 0':
-> 
+>> +		prm: prm at 4a306000 {
+>> +			compatible = "ti,clock-master";
+>
+> Similarly this should be
+>
+> compatible = "ti,omap4-prm";
 
-I will leave Lee to defend himself on this one ;-)
+How about just adding dual compatible strings? Keep the current one and 
+add the other as extra.
 
->> +/* Parameters to configure a READ or WRITE FSM sequence */
->> +struct seq_rw_config {
->> +	uint8_t		mode_data;	/* MODE data */
-> 
-> What does this represent? As far as I can see, all the configurations
-> you provide so far have this entry as 0x00.
-> 
->> +	uint8_t		mode_cycles;	/* No. of MODE cycles */
-> 
-> What are MODE cycles? (Sorry if these are dumb questions.)
+	compatible = "ti,clock-master", "ti,omap4-prm";
 
-Mode data cyles are similar to dummy cycles, except they also transmit some
-extended information on how the device should perform the transfer.  For
-example, Spansion devices use mode data to enter/exit a "continuous read mode"
-where subsequent read operations do not need to issue the read command, just
-supply an address (and further mode/dummy cycles).  In practice, we have only
-used this particular mode during testing; our boot-controller dislikes any form
-of statefull mode!
+Easier to handle it this way.
 
-> 
->> +	uint8_t		dummy_cycles;	/* No. of DUMMY cycles */
->> +};
-> 
-> Several pieces of this sequence struct seems suspiciously similar to
-> what would be needed by several other controllers, while the remaining
-> pieces don't seem to be so special that they cannot be configured
-> beneath a SPI NOR framework. I'm becoming less convinced that your
-> controller/driver is as unique as you say it is.
+>
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x4a306000 0x3000>;
+>> +		};
+>> +
+>> +		cm2: cm2 at 4a008000 {
+>> +			compatible = "ti,clock-master";
+>
+> compatible = "ti,omap4-cm2";
+>
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x4a008000 0x3000>;
+>> +		};
+>> +
+>> +		scrm: scrm at 4a30a000 {
+>> +			compatible = "ti,clock-master";
+>
+> compatible = "ti,omap4-scrm";
+>
+>
+> ...
+>
+>> diff --git a/arch/arm/boot/dts/omap443x-clocks.dtsi b/arch/arm/boot/dts/omap443x-clocks.dtsi
+>> new file mode 100644
+>> index 0000000..643755b
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/omap443x-clocks.dtsi
+>> @@ -0,0 +1,18 @@
+>> +/*
+>> + * Device Tree Source for OMAP4 clock data
+>> + *
+>> + * Copyright (C) 2013 Texas Instruments, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +&prm {
+>> +	bandgap_fclk: bandgap_fclk {
+>> +		#clock-cells = <0>;
+>> +		compatible = "ti,gate-clock";
+>> +		clocks = <&sys_32k_ck>;
+>> +		ti,bit-shift = <8>;
+>> +		reg = <0x1888>;
+>> +	};
+>
+> So we've already discussed that clocks should be moved underneath
+> separate "clocks {" node in the IP block data.  And similarly...
 
-Other controllers/drivers would certainly benefit from something similar.
-However, I thought the point was that no such framework exists at present and
-any spi-nor proposal is going to take time to mature.  In the meantime,
-integrating the st_spi_fsm driver would provide another example of H/W that
-needs to be supported by a spi-nor framework, and maybe give a few ideas along
-the way.
+Yeah, I have actually wip v11 which has this done. I ended up creating 
+this though:
 
-Cheers,
+...
+    prm {
+       prm_clocks: clocks {
 
-Angus
+       };
+    };
+
+... and references like:
+
+&prm_clocks {
+
+};
+
+It seems the references to existing clocks {} nodes is impossible 
+otherwise as I need to add some extra clocks to these.
+
+>
+>> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+>> new file mode 100644
+>> index 0000000..2b59d54
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+>
+> ...
+>
+>> +	emu_sys_clkdm: emu_sys_clkdm {
+>> +		compatible = "ti,clockdomain";
+>> +		clocks = <&trace_clk_div_ck>;
+>> +	};
+>
+> ... all of the clockdomains should be moved underneath "clockdomains {"
+> nodes in the IP block DT data.
+
+Ok that can be done.
+
+>
+>
+> - Paul
+>
