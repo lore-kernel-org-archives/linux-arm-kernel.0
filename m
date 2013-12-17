@@ -1,47 +1,49 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Dec 2013 09:52:14 +0000 (UTC)
-Subject: [PATCHv10 30/41] ARM: dts: am43xx clock data
-In-Reply-To: <1385453182-24421-31-git-send-email-t-kristo@ti.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-31-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.02.1312170951360.14039@utopia.booyaka.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 17 Dec 2013 10:53:47 +0100
+Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
+ when cpufreq is changed
+In-Reply-To: <20131217025616.GC6691@S2101-09.ap.freescale.net>
+References: <1387228450-641-1-git-send-email-b20788@freescale.com>
+ <1387228450-641-2-git-send-email-b20788@freescale.com>
+ <20131217025616.GC6691@S2101-09.ap.freescale.net>
+Message-ID: <20131217105347.75954ad3@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Nov 2013, Tero Kristo wrote:
+Hi,
 
-> This patch creates a unique node for each clock in the AM43xx power,
-> reset and clock manager (PRCM).
+Shawn Guo wrote:
+> On Mon, Dec 16, 2013 at 04:14:10PM -0500, Anson Huang wrote:
+> > on i.MX6Q, cpu freq change need to follow below flows:
+> > 
+> > 1. each setpoint has different VDDARM, VDDSOC/PU voltage, get the setpoint
+> > table from dts;
+> > 2. when cpu freq is scaling up, need to increase VDDSOC/PU voltage before
+> > VDDARM, if VDDPU is off, no need to change it;
+> > 3. when cpu freq is scaling down, need to decrease VDDARM voltage before
+> > VDDSOC/PU, if VDDPU is off, no need to change it;
+> > 
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > ---
+[...]
+> > +	if (soc_opp_index >= soc_opp_count) {
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-
-...
-
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 974d103..18f2401 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -67,6 +67,20 @@
->  		ranges;
->  		ti,hwmods = "l3_main";
->  
-> +		prcm: prcm at 44df0000 {
-> +			compatible = "ti,clock-master";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x44df0000 0x11000>;
-> +		};
-> +
-> +		scrm: scrm at 44e10000 {
-> +			compatible = "ti,clock-master";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x44e10000 0x2000>;
-> +		};
-
-Same issues here with the compatible strings and
-separating out the clocks and clockdomain data into separate DT
-nodes, as discussed with the OMAP4 data patch.
+> Can soc_opp_index be possibly greater than soc_opp_count?  Otherwise,
+> the condition check below is good enough?
+> 
+> 	if (soc_opp_index == soc_opp_count)
+>
+it doen't harm to be on the safe side and use >= anyway!
 
 
-- Paul
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
