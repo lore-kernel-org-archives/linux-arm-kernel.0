@@ -1,56 +1,67 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Dec 2013 21:29:55 -0800
-Subject: [PATCH v5 04/10] irqchip: arm-gic: Define additional MMIO offsets and
- masks
+Date: Mon, 16 Dec 2013 21:29:56 -0800
+Subject: [PATCH v5 05/10] KVM: arm-vgic: Make vgic mmio functions more generic
 In-Reply-To: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
 References: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1387258201-8738-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1387258201-8738-6-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define CPU interface offsets for the GICC_ABPR, GICC_APR, and GICC_IIDR
-registers.  Define distributor registers for the GICD_SPENDSGIR and the
-GICD_CPENDSGIR.  KVM/ARM needs to know about these definitions to fully
-support save/restore of the VGIC.
+Rename the vgic_ranges array to vgic_dist_ranges to be more specific and
+to prepare for handling CPU interface register access as well (for
+save/restore of VGIC state).
 
-Also define some masks and shifts for the various GICH_VMCR fields.
+Pass offset from distributor or interface MMIO base to
+find_matching_range function instead of the physical address of the
+access in the VM memory map.  This allows other callers unaware of the
+VM specifics, but with generic VGIC knowledge to reuse the function.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/linux/irqchip/arm-gic.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ virt/kvm/arm/vgic.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index cac496b..0ceb389 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -17,6 +17,9 @@
- #define GIC_CPU_EOI			0x10
- #define GIC_CPU_RUNNINGPRI		0x14
- #define GIC_CPU_HIGHPRI			0x18
-+#define GIC_CPU_ALIAS_BINPOINT		0x1c
-+#define GIC_CPU_ACTIVEPRIO		0xd0
-+#define GIC_CPU_IDENT			0xfc
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 45db48d..e2596f6 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -602,7 +602,7 @@ struct mmio_range {
+ 			    phys_addr_t offset);
+ };
  
- #define GIC_DIST_CTRL			0x000
- #define GIC_DIST_CTR			0x004
-@@ -56,6 +59,15 @@
- #define GICH_LR_ACTIVE_BIT		(1 << 29)
- #define GICH_LR_EOI			(1 << 19)
+-static const struct mmio_range vgic_ranges[] = {
++static const struct mmio_range vgic_dist_ranges[] = {
+ 	{
+ 		.base		= GIC_DIST_CTRL,
+ 		.len		= 12,
+@@ -669,14 +669,13 @@ static const struct mmio_range vgic_ranges[] = {
+ static const
+ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+ 				       struct kvm_exit_mmio *mmio,
+-				       phys_addr_t base)
++				       phys_addr_t offset)
+ {
+ 	const struct mmio_range *r = ranges;
+-	phys_addr_t addr = mmio->phys_addr - base;
  
-+#define GICH_VMCR_CTRL_SHIFT		0
-+#define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
-+#define GICH_VMCR_PRIMASK_SHIFT		27
-+#define GICH_VMCR_PRIMASK_MASK		(0x1f << GICH_VMCR_PRIMASK_SHIFT)
-+#define GICH_VMCR_BINPOINT_SHIFT	21
-+#define GICH_VMCR_BINPOINT_MASK		(0x7 << GICH_VMCR_BINPOINT_SHIFT)
-+#define GICH_VMCR_ALIAS_BINPOINT_SHIFT	18
-+#define GICH_VMCR_ALIAS_BINPOINT_MASK	(0x7 << GICH_VMCR_ALIAS_BINPOINT_SHIFT)
-+
- #define GICH_MISR_EOI			(1 << 0)
- #define GICH_MISR_U			(1 << 1)
+ 	while (r->len) {
+-		if (addr >= r->base &&
+-		    (addr + mmio->len) <= (r->base + r->len))
++		if (offset >= r->base &&
++		    (offset + mmio->len) <= (r->base + r->len))
+ 			return r;
+ 		r++;
+ 	}
+@@ -713,7 +712,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		return true;
+ 	}
  
+-	range = find_matching_range(vgic_ranges, mmio, base);
++	offset = mmio->phys_addr - base;
++	range = find_matching_range(vgic_dist_ranges, mmio, offset);
+ 	if (unlikely(!range || !range->handle_mmio)) {
+ 		pr_warn("Unhandled access %d %08llx %d\n",
+ 			mmio->is_write, mmio->phys_addr, mmio->len);
 -- 
 1.8.5
