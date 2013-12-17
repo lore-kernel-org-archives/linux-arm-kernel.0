@@ -1,21 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Dec 2013 10:35:11 +0000
-Subject: [PATCH 08/10] mfd: menelaus: Switch all children to threaded_irq
-In-Reply-To: <1387238904-7843-8-git-send-email-balbi@ti.com>
-References: <20131216153936.GQ18769@lee--X1>
- <1387238904-7843-1-git-send-email-balbi@ti.com>
- <1387238904-7843-8-git-send-email-balbi@ti.com>
-Message-ID: <20131217103511.GC19810@lee--X1>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Dec 2013 02:43:24 -0800
+Subject: [PATCH v3 1/9] mtd: nand: davinci: fix driver registration
+In-Reply-To: <52B02598.5060004@ti.com>
+References: <1386264358-9738-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1386264358-9738-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131217092449.GL12034@norris-Latitude-E6410>
+ <52B02598.5060004@ti.com>
+Message-ID: <CAN8TOE-DA8pQC2tt6M8ygGaioiDCvRqnwMU_GtWX6BR45Dvhhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Now that we have our own irq_chip, all children can use traditional
-> request_threaded_irq().
+On Tue, Dec 17, 2013 at 2:21 AM, ivan.khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+> On 12/17/2013 11:24 AM, Brian Norris wrote:
+>> On Thu, Dec 05, 2013 at 07:25:49PM +0200, Ivan Khoronzhuk wrote:
+>>> --- a/drivers/mtd/nand/davinci_nand.c
+>>> +++ b/drivers/mtd/nand/davinci_nand.c
+>>> @@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
+>>>   }
+>>>
+>>>   static struct platform_driver nand_davinci_driver = {
+>>> +    .probe          = nand_davinci_probe,
+>>>      .remove         = __exit_p(nand_davinci_remove),
+>>
+>> I believe you need to drop the __exit_p() here. And now that you're
+>> using module_platform_driver(), you need to drop the __init and __exit
+>> from the probe() and remove() routines, to avoid section mismatch
+>> warnings.
+>
+> Do you want me to drop it in stand alone patch or in this one?
 
-Is it possible to convert these to managed resources (*_devm)?
+I think you can just do the __exit_p()/__init/__exit removal all in
+this same patch. The changes are all inter-related.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Brian
