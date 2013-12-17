@@ -1,40 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Dec 2013 13:48:49 +0000
-Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
-In-Reply-To: <20131217131612.GO6691@S2101-09.ap.freescale.net>
-References: <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131213125129.GV18380@S2101-09.ap.freescale.net>
- <892cbb07bd064f44b2af45f106aeb479@BY2PR03MB505.namprd03.prod.outlook.com>
- <20131216112910.GB30671@S2101-09.ap.freescale.net>
- <20131217015939.GM3185@sirena.org.uk>
- <20131217021610.GA7172@S2101-09.ap.freescale.net>
- <20131217113705.GP3185@sirena.org.uk>
- <20131217123946.GN6691@S2101-09.ap.freescale.net>
- <20131217124657.GW3185@sirena.org.uk>
- <20131217131612.GO6691@S2101-09.ap.freescale.net>
-Message-ID: <20131217134849.GD3185@sirena.org.uk>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Tue, 17 Dec 2013 14:49:07 +0100
+Subject: Spurious timeouts in mvmdio
+In-Reply-To: <a599b2acdb35fa014ed9480f367fe3a7@doppler.thel33t.co.uk>
+References: <529CA42A.3040504@freebox.fr>
+ <20131203122346.GD29282@titan.lakedaemon.net>
+ <20131203124033.GT16735@n2100.arm.linux.org.uk>
+ <abe249f5cba5c267e2c536bd62c57908@doppler.thel33t.co.uk>
+ <529E5F03.8040607@gmail.com>
+ <8d65780eb7bfe49bb0734a09f05f70a6@doppler.thel33t.co.uk>
+ <529E66A4.4050000@gmail.com>
+ <ae69666fd3b61411d7bbd9ac993cec13@doppler.thel33t.co.uk>
+ <20131203234209.GW16735@n2100.arm.linux.org.uk> <52AF4160.9080703@freebox.fr>
+ <a599b2acdb35fa014ed9480f367fe3a7@doppler.thel33t.co.uk>
+Message-ID: <52B05653.1000004@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 09:16:15PM +0800, Shawn Guo wrote:
-> On Tue, Dec 17, 2013 at 12:46:57PM +0000, Mark Brown wrote:
+On 12/16/2013 07:28 PM, Leigh Brown wrote:
 
-> > It tells the core that it now knows about all regulator mappings so it
-> > knows if it's not got a mapping none will ever appear.
+> I prefer this patch (which I think you originally proposed) because it is just as
+> correct and the code size is a bit smaller in arm mode, and the same size in
+> thumb
+> mode (on my compiler gcc 4.7.2, at least).  I coded the loop in that way to
+> make it
+> small.
+>
+> I don't mind submitting it to David as I made the mistake in the first place.
+>
+> Regards,
+>
+> Leigh.
+>
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c
+> b/drivers/net/ethernet/marvell/mvmdio.c
+> index 7354960..a42a750 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -92,6 +92,12 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+>               if (time_is_before_jiffies(end))
+>                   ++timedout;
+>               } else {
+> +            /* wait_event_timeout does not guarantee a delay of at
+> +             * least one whole jiffie, so timeout must be no less
+> +             * than two.
+> +             */
+> +             if (timeout < 2)
+> +                 timeout = 2;
+>               wait_event_timeout(dev->smi_busy_wait,
+>                              orion_mdio_smi_is_done(dev),
+>                              timeout);
 
-> Okay, it sounds like what we need.  But I searched all the occurrences
-> of have_full_constraints() in core.c, and haven't found how it
-> influences the regulator_map_list searching.  I'm looking at function
-> regulator_dev_lookup().  Can you point me the correct place of the code?
+Hi Leigh,
 
-For platform data it can't influence the map searching since we rely on
-the driver registering outbound supplies, all it does is change if we
-defer or error.  Though the erroring code seems to have gone AWOL at
-some point and it'd never have been robust for modular drivers anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/9fe1bf2a/attachment.sig>
+My original patch changed "timeout" before the entering the while loop, but 
+I'm fine with your patch too.
+
+Feel free to add my:
+
+Tested-by: Nicolas Schichan <nschichan@freebox.fr>
+
+Regards,
+
+-- 
+Nicolas Schichan
+Freebox SAS
