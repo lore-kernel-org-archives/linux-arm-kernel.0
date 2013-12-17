@@ -1,43 +1,36 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 17 Dec 2013 12:37:04 +0530
-Subject: [PATCH 3/3] cpufreq: exynos: Add exynos5420 cpufreq driver
-In-Reply-To: <20131210173208.5083aa1f@amdc2363>
-References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
- <1386323284-15646-4-git-send-email-arun.kk@samsung.com>
- <20131209092324.1f8b6502@amdc2363>
- <CALt3h7-25_mW5SnnTbZWjoF0pOZxsU5Gg6FqOdoz1MgdH7gm5w@mail.gmail.com>
- <20131210173208.5083aa1f@amdc2363>
-Message-ID: <CABb+yY0C50va5UAgv5QKGKK6qE1wiDwcUmn54CC7PVQ8vpoEmg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 17 Dec 2013 07:14:57 +0000 (UTC)
+Subject: [GIT PULL] make mach-omap2 boot with device tree only for
+ v3.14
+In-Reply-To: <20131213192622.GI28184@atomide.com>
+References: <pull-1386643347-596413>
+ <alpine.DEB.2.02.1312101034360.32309@utopia.booyaka.com>
+ <20131210185902.GO13171@atomide.com> <20131210192726.GR13171@atomide.com>
+ <20131210230722.GZ13171@atomide.com> <20131213192622.GI28184@atomide.com>
+Message-ID: <alpine.DEB.2.02.1312170707140.14039@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 10:02 PM, Lukasz Majewski
-<l.majewski@samsung.com> wrote:
->>
->> Actually these values are not for PLL, but for the dividers.
->> If you see below, the PLL rate setting is done through clk_set_rate()
->> going via CCF. But I found an issue if the divider values are set via
->> clk_set_rate API.
->> What I found is, the system goes into freeze if all the divider
->> values are not set in one shot. So we cannot call multiple
->> clk_set_rate()'s on each divider. Thats why I continued with non-CCF
->> way of setting the divider.
->
-> I see. I'm not an expert on common clock framework (CCF), but for me
-> conceptually clock dividers setting shall be handled by CCF.
->
-> However, I've poked a bit at CCF. There isn't any out of the box
-> solutions available.
->
-> A "virtual" clock can be defined and inside its implementation we can
-> atomically set dividers. Another solution would be to hack the current
-> CCF to provide atomic clock operations
->
-CCF isn't only for clocks that have single divider or gate control
-register. One could define a clock that manipulates more than one
-divider/gate in one CCF callback. It is already abstract enough. So
-implementing a virtual clock is the solution, imho.
- BTW, on my platform linux needs to send a 'non-atomic' IPC message to
-a master co-processor to scale up/down cpufreq. I just define a
-virtual clock and use the generic bL cpufreq driver
-drivers/cpufreq/arm_big_little.c
+On Fri, 13 Dec 2013, Tony Lindgren wrote:
+
+> OK posted a patch for the SBC-T3730 with minimal support also for
+> SBC-3530 and SBC-3517 that should boot far enough to start adding
+> more devices. Paul, care to try it on the CM-T3517, the patch is:
+> 
+> [PATCH] ARM: dts: Add support for sbc-3xxx with cm-t3730
+
+Didn't get anything out of the serial port:
+
+http://www.pwsan.com/omap/testlogs/test_tonys_conversion_v3.14/20131215235827/boot/cmt3517/cmt3517_log.txt
+
+As a partial sanity check, AM3517 EVM was included as part of the run 
+(with a separate uImage+dtb of course) and that seems to boot OK:
+
+http://www.pwsan.com/omap/testlogs/test_tonys_conversion_v3.14/20131215235827/boot/3517evm/3517evm_log.txt
+
+In case it's useful, here's a CM-T3517 boot log from v3.13-rc4:
+
+http://www.pwsan.com/omap/testlogs/test_v3.13-rc4/20131215195251/boot/cmt3517/cmt3517_log.txt
+
+
+- Paul
