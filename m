@@ -1,48 +1,59 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Tue, 17 Dec 2013 21:49:25 +0800
-Subject: [PATCH v3 2/7] mtd: spi-nor: add the basic data structures
-In-Reply-To: <201312171405.55964.marex@denx.de>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <1387184330-14448-3-git-send-email-b32955@freescale.com>
- <201312171405.55964.marex@denx.de>
-Message-ID: <20131217134923.GA1220@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 21:58:09 +0800
+Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
+In-Reply-To: <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
+ <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20131217135804.GT6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 02:05:55PM +0100, Marek Vasut wrote:
-> On Monday, December 16, 2013 at 09:58:45 AM, Huang Shijie wrote:
-> > +struct spi_nor { > > +	struct mtd_info		*mtd;
-> > +	struct mutex		lock;
-> > +
-> > +	/* pointer to a spi device */
-> > +	struct device		*dev;
-> > +	u32			page_size;
-> > +	u8			addr_width;
-> > +	u8			erase_opcode;
-> > +	u8			read_opcode;
-> > +	u8			read_dummy;
-> > +	u8			program_opcode;
-> > +	enum read_mode		flash_read;
-> > +	bool			sst_write_second;
-> > +	struct spi_nor_xfer_cfg	cfg;
+On Fri, Dec 13, 2013 at 02:43:03PM +0800, Shawn Guo wrote:
+> Function sgtl5000_enable_regulators() is somehow odd in handling the
+> optional external VDDD supply.  The driver can only enable this supply
+> on SGTL5000 chip before revision 0x11, and of course when this external
+> VDDD is present.  It currently does something like below.
 > 
-> You do want to split the function pointers below and the device configuration 
-> above into separate structures.
-
-sorry, i prefer to keep them in one data structrue, just like the
-nand_chip{} does.
-
+> 1. Check if regulator_bulk_get() on VDDA, VDDIO and VDDD will fail.  If
+>    it fails, VDDD must be absent and it falls on internal LDO by calling
+>    sgtl5000_replace_vddd_with_ldo().  Otherwise, VDDD is used.  And in
+>    either case, regulator_bulk_enable() will be called to enable
+>    3 supplies.
 > 
-> > +	/* for write_reg */
-> > +	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
-> > +
-> > +	/*
-> > +	 * Do some work before or after we run these operations:
-> > +	 *   read/write/erese/lock/unlock
+> 2. In case that SGTL5000 revision is later than 0x11, even if external
+>    VDDD is present, it has to roll back the 'enable' and 'get' calls
+>    with regulator_bulk_disable() and regulator_bulk_free(), and starts
+>    over again by calling sgtl5000_replace_vddd_with_ldo() and
+>    regulator_bulk_enable().
 > 
-> Proper kernel-doc style comments for this structure would be nice.
+> Such back and forth calls sequence is complicated and unnecessary.
+> Also, since commit 4ddfebd (regulator: core: Provide a dummy regulator
+> with full constraints), regulator_bulk_get() will always succeeds
+> because of the dummy regulator.  Thus the VDDD detection is broken.
+> 
+> The patch changes the flow to something like the following, which should
+> be more reasonable and clear, and also fix the VDDD detection breakage.
+> 
+> 1. Check if we're running a chip before revision 0x11, on which an
+>    external VDDD can possibly be an option.
+> 
+> 2. If it is an early revision, call regulator_get_optional() to detect
+>    whether an external VDDD supply is available.
+> 
+> 3. If external VDDD is present, call sgtl5000_replace_vddd_with_ldo() to
+>    update sgtl5000->supplies info.
+> 
+> 4. Drop regulator_bulk_get() call in sgtl5000_replace_vddd_with_ldo(),
+>    and call it in sgtl5000_enable_regulators() no matter it's an
+>    external VDDD or internal LDO.
+> 
+> 5. Call regulator_bulk_enable() to enable these 3 regulators.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Do you mean the style used by nand_chip{}?
+Mark,
 
-thanks
-Huang Shijie
+Since what Xiubo is concerned by is another issue apart from this patch
+itself and being discussed, can you apply the patch?
+
+Shawn
