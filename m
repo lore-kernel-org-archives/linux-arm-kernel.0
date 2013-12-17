@@ -1,120 +1,253 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 17 Dec 2013 13:53:38 +0100
-Subject: [PATCH 7/7] ARM: OMAP2+: Remove platform-specific omap-iommu
+Date: Tue, 17 Dec 2013 13:53:32 +0100
+Subject: [PATCH 1/7] iommu/omap: Do bus_set_iommu() only if probe() succeeds
 In-Reply-To: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1387284818-28739-8-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1387284818-28739-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With full DT boot, the platform specific part of the OMAP iommu
-is not useful anymore.
+Currently, bus_set_iommu() is done in omap_iommu_init(). However,
+omap_iommu_probe() can fail in a number of ways, leaving the platform
+bus with a dangling reference to a non-initialized iommu. Perform
+bus_set_iommu() only if omap_iommu_probe() succeed.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/mach-omap2/Makefile     |  3 --
- arch/arm/mach-omap2/omap-iommu.c | 79 ----------------------------------------
- 2 files changed, 82 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/omap-iommu.c
+ drivers/iommu/omap-iommu.c | 207 +++++++++++++++++++++++----------------------
+ 1 file changed, 104 insertions(+), 103 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 35be79f..4e01b61 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -219,9 +219,6 @@ obj-$(CONFIG_SOC_DRA7XX)		+= omap_hwmod_7xx_data.o
- obj-$(CONFIG_OMAP3_EMU)			+= emu.o
- obj-$(CONFIG_HW_PERF_EVENTS)		+= pmu.o
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index bcd78a7..ee83bcc 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -930,107 +930,6 @@ static void omap_iommu_detach(struct omap_iommu *obj)
+ 	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
+ }
  
--iommu-$(CONFIG_OMAP_IOMMU)		:= omap-iommu.o
--obj-y					+= $(iommu-m) $(iommu-y)
--
- ifneq ($(CONFIG_TIDSPBRIDGE),)
- obj-y					+= dsp.o
- endif
-diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
-deleted file mode 100644
-index f1fab56..0000000
---- a/arch/arm/mach-omap2/omap-iommu.c
-+++ /dev/null
-@@ -1,79 +0,0 @@
 -/*
-- * omap iommu: omap device registration
-- *
-- * Copyright (C) 2008-2009 Nokia Corporation
-- *
-- * Written by Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
+- *	OMAP Device MMU(IOMMU) detection
 - */
--
--#include <linux/of.h>
--#include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/err.h>
--#include <linux/slab.h>
--
--#include <linux/platform_data/iommu-omap.h>
--#include "soc.h"
--#include "omap_hwmod.h"
--#include "omap_device.h"
--
--static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
+-static int omap_iommu_probe(struct platform_device *pdev)
 -{
--	struct platform_device *pdev;
--	struct iommu_platform_data *pdata;
--	struct omap_mmu_dev_attr *a = (struct omap_mmu_dev_attr *)oh->dev_attr;
--	static int i;
+-	int err = -ENODEV;
+-	int irq;
+-	struct omap_iommu *obj;
+-	struct resource *res;
+-	struct iommu_platform_data *pdata = pdev->dev.platform_data;
 -
--	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
--	if (!pdata)
+-	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
+-	if (!obj)
 -		return -ENOMEM;
 -
--	pdata->name = oh->name;
--	pdata->nr_tlb_entries = a->nr_tlb_entries;
--	pdata->da_start = a->da_start;
--	pdata->da_end = a->da_end;
+-	obj->nr_tlb_entries = pdata->nr_tlb_entries;
+-	obj->name = pdata->name;
+-	obj->dev = &pdev->dev;
+-	obj->ctx = (void *)obj + sizeof(*obj);
+-	obj->da_start = pdata->da_start;
+-	obj->da_end = pdata->da_end;
 -
--	if (oh->rst_lines_cnt == 1) {
--		pdata->reset_name = oh->rst_lines->name;
--		pdata->assert_reset = omap_device_assert_hardreset;
--		pdata->deassert_reset = omap_device_deassert_hardreset;
+-	spin_lock_init(&obj->iommu_lock);
+-	mutex_init(&obj->mmap_lock);
+-	spin_lock_init(&obj->page_table_lock);
+-	INIT_LIST_HEAD(&obj->mmap);
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		err = -ENODEV;
+-		goto err_mem;
 -	}
 -
--	pdev = omap_device_build("omap-iommu", i, oh, pdata, sizeof(*pdata));
--
--	kfree(pdata);
--
--	if (IS_ERR(pdev)) {
--		pr_err("%s: device build err: %ld\n", __func__, PTR_ERR(pdev));
--		return PTR_ERR(pdev);
+-	res = request_mem_region(res->start, resource_size(res),
+-				 dev_name(&pdev->dev));
+-	if (!res) {
+-		err = -EIO;
+-		goto err_mem;
 -	}
 -
--	i++;
+-	obj->regbase = ioremap(res->start, resource_size(res));
+-	if (!obj->regbase) {
+-		err = -ENOMEM;
+-		goto err_ioremap;
+-	}
 -
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0) {
+-		err = -ENODEV;
+-		goto err_irq;
+-	}
+-	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
+-			  dev_name(&pdev->dev), obj);
+-	if (err < 0)
+-		goto err_irq;
+-	platform_set_drvdata(pdev, obj);
+-
+-	pm_runtime_irq_safe(obj->dev);
+-	pm_runtime_enable(obj->dev);
+-
+-	dev_info(&pdev->dev, "%s registered\n", obj->name);
+-	return 0;
+-
+-err_irq:
+-	iounmap(obj->regbase);
+-err_ioremap:
+-	release_mem_region(res->start, resource_size(res));
+-err_mem:
+-	kfree(obj);
+-	return err;
+-}
+-
+-static int omap_iommu_remove(struct platform_device *pdev)
+-{
+-	int irq;
+-	struct resource *res;
+-	struct omap_iommu *obj = platform_get_drvdata(pdev);
+-
+-	iopgtable_clear_entry_all(obj);
+-
+-	irq = platform_get_irq(pdev, 0);
+-	free_irq(irq, obj);
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(res->start, resource_size(res));
+-	iounmap(obj->regbase);
+-
+-	pm_runtime_disable(obj->dev);
+-
+-	dev_info(&pdev->dev, "%s removed\n", obj->name);
+-	kfree(obj);
 -	return 0;
 -}
 -
--static int __init omap_iommu_init(void)
--{
--	/* If dtb is there, the devices will be created dynamically */
--	if (of_have_populated_dt())
--		return -ENODEV;
+-static struct platform_driver omap_iommu_driver = {
+-	.probe	= omap_iommu_probe,
+-	.remove	= omap_iommu_remove,
+-	.driver	= {
+-		.name	= "omap-iommu",
+-	},
+-};
 -
--	return omap_hwmod_for_each_by_class("mmu", omap_iommu_dev_init, NULL);
--}
--/* must be ready before omap3isp is probed */
--omap_subsys_initcall(omap_iommu_init);
+ static void iopte_cachep_ctor(void *iopte)
+ {
+ 	clean_dcache_area(iopte, IOPTE_TABLE_SIZE);
+@@ -1265,6 +1164,110 @@ static struct iommu_ops omap_iommu_ops = {
+ 	.pgsize_bitmap	= OMAP_IOMMU_PGSIZES,
+ };
+ 
++/*
++ *	OMAP Device MMU(IOMMU) detection
++ */
++static int omap_iommu_probe(struct platform_device *pdev)
++{
++	int err = -ENODEV;
++	int irq;
++	struct omap_iommu *obj;
++	struct resource *res;
++	struct iommu_platform_data *pdata = pdev->dev.platform_data;
++
++	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
++	if (!obj)
++		return -ENOMEM;
++
++	obj->nr_tlb_entries = pdata->nr_tlb_entries;
++	obj->name = pdata->name;
++	obj->dev = &pdev->dev;
++	obj->ctx = (void *)obj + sizeof(*obj);
++	obj->da_start = pdata->da_start;
++	obj->da_end = pdata->da_end;
++
++	spin_lock_init(&obj->iommu_lock);
++	mutex_init(&obj->mmap_lock);
++	spin_lock_init(&obj->page_table_lock);
++	INIT_LIST_HEAD(&obj->mmap);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		err = -ENODEV;
++		goto err_mem;
++	}
++
++	res = request_mem_region(res->start, resource_size(res),
++				 dev_name(&pdev->dev));
++	if (!res) {
++		err = -EIO;
++		goto err_mem;
++	}
++
++	obj->regbase = ioremap(res->start, resource_size(res));
++	if (!obj->regbase) {
++		err = -ENOMEM;
++		goto err_ioremap;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		err = -ENODEV;
++		goto err_irq;
++	}
++
++	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
++			  dev_name(&pdev->dev), obj);
++	if (err < 0)
++		goto err_irq;
++	platform_set_drvdata(pdev, obj);
++
++	bus_set_iommu(&platform_bus_type, &omap_iommu_ops);
++
++	pm_runtime_irq_safe(obj->dev);
++	pm_runtime_enable(obj->dev);
++
++	dev_info(&pdev->dev, "%s registered\n", obj->name);
++	return 0;
++
++err_irq:
++	iounmap(obj->regbase);
++err_ioremap:
++	release_mem_region(res->start, resource_size(res));
++err_mem:
++	kfree(obj);
++	return err;
++}
++
++static int omap_iommu_remove(struct platform_device *pdev)
++{
++	int irq;
++	struct resource *res;
++	struct omap_iommu *obj = platform_get_drvdata(pdev);
++
++	iopgtable_clear_entry_all(obj);
++
++	irq = platform_get_irq(pdev, 0);
++	free_irq(irq, obj);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	release_mem_region(res->start, resource_size(res));
++	iounmap(obj->regbase);
++
++	pm_runtime_disable(obj->dev);
++
++	dev_info(&pdev->dev, "%s removed\n", obj->name);
++	kfree(obj);
++	return 0;
++}
++
++static struct platform_driver omap_iommu_driver = {
++	.probe	= omap_iommu_probe,
++	.remove	= omap_iommu_remove,
++	.driver	= {
++		.name	= "omap-iommu",
++	},
++};
++
+ static int __init omap_iommu_init(void)
+ {
+ 	struct kmem_cache *p;
+@@ -1277,8 +1280,6 @@ static int __init omap_iommu_init(void)
+ 		return -ENOMEM;
+ 	iopte_cachep = p;
+ 
+-	bus_set_iommu(&platform_bus_type, &omap_iommu_ops);
 -
--static void __exit omap_iommu_exit(void)
--{
--	/* Do nothing */
--}
--module_exit(omap_iommu_exit);
--
--MODULE_AUTHOR("Hiroshi DOYU");
--MODULE_DESCRIPTION("omap iommu: omap device registration");
--MODULE_LICENSE("GPL v2");
+ 	return platform_driver_register(&omap_iommu_driver);
+ }
+ /* must be ready before omap3isp is probed */
 -- 
 1.8.1.2
