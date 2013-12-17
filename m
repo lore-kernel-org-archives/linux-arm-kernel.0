@@ -1,104 +1,352 @@
 From: kgene@kernel.org (kgene at kernel.org)
-Date: Tue, 17 Dec 2013 20:52:17 +0900
-Subject: [PATCH 04/11] ARM: EXYNOS: cleanup <mach/regs-irq.h>
-Message-ID: <116201cefb1e$6f9f3ae0$4eddb0a0$@kernel.org>
+Date: Tue, 17 Dec 2013 20:52:28 +0900
+Subject: [PATCH 06/11] PM / devfreq: move definitions for exynos4_bus into
+ drivers/devfreq
+Message-ID: <116401cefb1e$75b83440$61289cc0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kukjin Kim <kgene.kim@samsung.com>
 
-Remove useless inclusion <mach/regs-irq.h> for exynos.
+We don't need to keep the definitions for exynos4_bus into
+mach-exynos/ so this moves them into drviers/devfreq with
+adding header file.
 
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/common.c                |    2 --
- arch/arm/mach-exynos/include/mach/regs-irq.h |   19 -------------------
- arch/arm/mach-exynos/pm.c                    |    1 -
- arch/arm/plat-samsung/pm.c                   |    2 ++
- arch/arm/plat-samsung/s5p-irq-pm.c           |    3 +++
- 5 files changed, 5 insertions(+), 22 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/regs-irq.h
+ arch/arm/mach-exynos/include/mach/regs-clock.h |   94 --------------------
+ drivers/devfreq/exynos/exynos4_bus.c           |    4 +-
+ drivers/devfreq/exynos/exynos4_bus.h           |  110
+++++++++++++++++++++++++
+ 3 files changed, 112 insertions(+), 96 deletions(-)
+ create mode 100644 drivers/devfreq/exynos/exynos4_bus.h
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 1fc0424..52cef6a 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -37,8 +37,6 @@
- #include <asm/mach/irq.h>
- #include <asm/cacheflush.h>
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
+b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index d36a6a2..855f1b2 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -18,12 +18,6 @@
  
--#include <mach/regs-irq.h>
--
- #include <plat/cpu.h>
- #include <plat/pm.h>
- #include <plat/regs-serial.h>
-diff --git a/arch/arm/mach-exynos/include/mach/regs-irq.h
-b/arch/arm/mach-exynos/include/mach/regs-irq.h
-deleted file mode 100644
-index f2b5050..0000000
---- a/arch/arm/mach-exynos/include/mach/regs-irq.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/* linux/arch/arm/mach-exynos4/include/mach/regs-irq.h
-- *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS4 - IRQ register definitions
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_REGS_IRQ_H
--#define __ASM_ARCH_REGS_IRQ_H __FILE__
--
--#include <linux/irqchip/arm-gic.h>
--#include <mach/map.h>
--
--#endif /* __ASM_ARCH_REGS_IRQ_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 717c6a6..d4a3368 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -29,7 +29,6 @@
- #include <plat/pll.h>
- #include <plat/regs-srom.h>
+ #define EXYNOS_CLKREG(x)			(S5P_VA_CMU + (x))
  
--#include <mach/regs-irq.h>
- #include <mach/regs-clock.h>
- #include <mach/pm-core.h>
+-#define EXYNOS4_CLKDIV_LEFTBUS			EXYNOS_CLKREG(0x04500)
+-#define EXYNOS4_CLKDIV_STAT_LEFTBUS		EXYNOS_CLKREG(0x04600)
+-
+-#define EXYNOS4_CLKDIV_RIGHTBUS
+EXYNOS_CLKREG(0x08500)
+-#define EXYNOS4_CLKDIV_STAT_RIGHTBUS		EXYNOS_CLKREG(0x08600)
+-
+ #define EXYNOS4_EPLL_LOCK			EXYNOS_CLKREG(0x0C010)
+ #define EXYNOS4_VPLL_LOCK			EXYNOS_CLKREG(0x0C020)
  
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index d0c2301..47ec54b 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -29,7 +29,9 @@
- #include <mach/hardware.h>
- #include <mach/map.h>
- #include <mach/regs-clock.h>
-+#ifndef CONFIG_ARCH_EXYNOS
- #include <mach/regs-irq.h>
-+#endif
- #include <mach/irqs.h>
+@@ -41,24 +35,7 @@
+ #define EXYNOS4_CLKSRC_MASK_PERIL0		EXYNOS_CLKREG(0x0C350)
+ #define EXYNOS4_CLKSRC_MASK_PERIL1		EXYNOS_CLKREG(0x0C354)
+ 
+-#define EXYNOS4_CLKDIV_TOP			EXYNOS_CLKREG(0x0C510)
+-#define EXYNOS4_CLKDIV_CAM			EXYNOS_CLKREG(0x0C520)
+-#define EXYNOS4_CLKDIV_MFC			EXYNOS_CLKREG(0x0C528)
+-
+-#define EXYNOS4_CLKDIV_STAT_TOP
+EXYNOS_CLKREG(0x0C610)
+-#define EXYNOS4_CLKDIV_STAT_MFC
+EXYNOS_CLKREG(0x0C628)
+-
+-#define EXYNOS4210_CLKGATE_IP_IMAGE		EXYNOS_CLKREG(0x0C930)
+-#define EXYNOS4212_CLKGATE_IP_IMAGE		EXYNOS_CLKREG(0x04930)
+-
+ #define EXYNOS4_CLKSRC_MASK_DMC
+EXYNOS_CLKREG(0x10300)
+-#define EXYNOS4_CLKDIV_DMC0			EXYNOS_CLKREG(0x10500)
+-#define EXYNOS4_CLKDIV_DMC1			EXYNOS_CLKREG(0x10504)
+-#define EXYNOS4_CLKDIV_STAT_DMC0		EXYNOS_CLKREG(0x10600)
+-#define EXYNOS4_CLKDIV_STAT_DMC1		EXYNOS_CLKREG(0x10604)
+-
+-#define EXYNOS4_DMC_PAUSE_CTRL			EXYNOS_CLKREG(0x11094)
+-#define EXYNOS4_DMC_PAUSE_ENABLE		(1 << 0)
+ 
+ #define EXYNOS4_CLKSRC_CPU			EXYNOS_CLKREG(0x14200)
+ #define EXYNOS4_CLKMUX_STATCPU			EXYNOS_CLKREG(0x14400)
+@@ -74,81 +51,10 @@
+ #define EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT	(16)
+ #define EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK	(0x7 <<
+EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT)
+ 
+-#define EXYNOS4_CLKDIV_DMC0_ACP_SHIFT		(0)
+-#define EXYNOS4_CLKDIV_DMC0_ACP_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_ACP_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_ACPPCLK_SHIFT	(4)
+-#define EXYNOS4_CLKDIV_DMC0_ACPPCLK_MASK	(0x7 <<
+EXYNOS4_CLKDIV_DMC0_ACPPCLK_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_DPHY_SHIFT		(8)
+-#define EXYNOS4_CLKDIV_DMC0_DPHY_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DPHY_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_DMC_SHIFT		(12)
+-#define EXYNOS4_CLKDIV_DMC0_DMC_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DMC_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_DMCD_SHIFT		(16)
+-#define EXYNOS4_CLKDIV_DMC0_DMCD_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DMCD_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_DMCP_SHIFT		(20)
+-#define EXYNOS4_CLKDIV_DMC0_DMCP_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DMCP_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_COPY2_SHIFT		(24)
+-#define EXYNOS4_CLKDIV_DMC0_COPY2_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_COPY2_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC0_CORETI_SHIFT	(28)
+-#define EXYNOS4_CLKDIV_DMC0_CORETI_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_CORETI_SHIFT)
+-
+-#define EXYNOS4_CLKDIV_DMC1_G2D_ACP_SHIFT	(0)
+-#define EXYNOS4_CLKDIV_DMC1_G2D_ACP_MASK	(0xf <<
+EXYNOS4_CLKDIV_DMC1_G2D_ACP_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC1_C2C_SHIFT		(4)
+-#define EXYNOS4_CLKDIV_DMC1_C2C_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC1_C2C_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC1_PWI_SHIFT		(8)
+-#define EXYNOS4_CLKDIV_DMC1_PWI_MASK		(0xf <<
+EXYNOS4_CLKDIV_DMC1_PWI_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC1_C2CACLK_SHIFT	(12)
+-#define EXYNOS4_CLKDIV_DMC1_C2CACLK_MASK	(0x7 <<
+EXYNOS4_CLKDIV_DMC1_C2CACLK_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC1_DVSEM_SHIFT		(16)
+-#define EXYNOS4_CLKDIV_DMC1_DVSEM_MASK		(0x7f <<
+EXYNOS4_CLKDIV_DMC1_DVSEM_SHIFT)
+-#define EXYNOS4_CLKDIV_DMC1_DPM_SHIFT		(24)
+-#define EXYNOS4_CLKDIV_DMC1_DPM_MASK		(0x7f <<
+EXYNOS4_CLKDIV_DMC1_DPM_SHIFT)
+-
+-#define EXYNOS4_CLKDIV_MFC_SHIFT		(0)
+-#define EXYNOS4_CLKDIV_MFC_MASK			(0x7 <<
+EXYNOS4_CLKDIV_MFC_SHIFT)
+-
+-#define EXYNOS4_CLKDIV_TOP_ACLK200_SHIFT	(0)
+-#define EXYNOS4_CLKDIV_TOP_ACLK200_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK200_SHIFT)
+-#define EXYNOS4_CLKDIV_TOP_ACLK100_SHIFT	(4)
+-#define EXYNOS4_CLKDIV_TOP_ACLK100_MASK		(0xF <<
+EXYNOS4_CLKDIV_TOP_ACLK100_SHIFT)
+-#define EXYNOS4_CLKDIV_TOP_ACLK160_SHIFT	(8)
+-#define EXYNOS4_CLKDIV_TOP_ACLK160_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK160_SHIFT)
+-#define EXYNOS4_CLKDIV_TOP_ACLK133_SHIFT	(12)
+-#define EXYNOS4_CLKDIV_TOP_ACLK133_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK133_SHIFT)
+-#define EXYNOS4_CLKDIV_TOP_ONENAND_SHIFT	(16)
+-#define EXYNOS4_CLKDIV_TOP_ONENAND_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ONENAND_SHIFT)
+-#define EXYNOS4_CLKDIV_TOP_ACLK266_GPS_SHIFT	(20)
+-#define EXYNOS4_CLKDIV_TOP_ACLK266_GPS_MASK	(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK266_GPS_SHIFT)
+-#define EXYNOS4_CLKDIV_TOP_ACLK400_MCUISP_SHIFT	(24)
+-#define EXYNOS4_CLKDIV_TOP_ACLK400_MCUISP_MASK	(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK400_MCUISP_SHIFT)
+-
+-#define EXYNOS4_CLKDIV_BUS_GDLR_SHIFT		(0)
+-#define EXYNOS4_CLKDIV_BUS_GDLR_MASK		(0x7 <<
+EXYNOS4_CLKDIV_BUS_GDLR_SHIFT)
+-#define EXYNOS4_CLKDIV_BUS_GPLR_SHIFT		(4)
+-#define EXYNOS4_CLKDIV_BUS_GPLR_MASK		(0x7 <<
+EXYNOS4_CLKDIV_BUS_GPLR_SHIFT)
+-
+-#define EXYNOS4_CLKDIV_CAM_FIMC0_SHIFT		(0)
+-#define EXYNOS4_CLKDIV_CAM_FIMC0_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC0_SHIFT)
+-#define EXYNOS4_CLKDIV_CAM_FIMC1_SHIFT		(4)
+-#define EXYNOS4_CLKDIV_CAM_FIMC1_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC1_SHIFT)
+-#define EXYNOS4_CLKDIV_CAM_FIMC2_SHIFT		(8)
+-#define EXYNOS4_CLKDIV_CAM_FIMC2_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC2_SHIFT)
+-#define EXYNOS4_CLKDIV_CAM_FIMC3_SHIFT		(12)
+-#define EXYNOS4_CLKDIV_CAM_FIMC3_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC3_SHIFT)
+-
+ /* Only for EXYNOS4210 */
+ 
+ #define EXYNOS4210_CLKSRC_MASK_LCD1		EXYNOS_CLKREG(0x0C338)
+ 
+-/* Only for EXYNOS4212 */
+-
+-#define EXYNOS4_CLKDIV_CAM1			EXYNOS_CLKREG(0x0C568)
+-
+-#define EXYNOS4_CLKDIV_STAT_CAM1		EXYNOS_CLKREG(0x0C668)
+-
+-#define EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT		(0)
+-#define EXYNOS4_CLKDIV_CAM1_JPEG_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT)
+-
+ /* For EXYNOS5250 */
+ 
+ #define EXYNOS5_APLL_LOCK			EXYNOS_CLKREG(0x00000)
+diff --git a/drivers/devfreq/exynos/exynos4_bus.c
+b/drivers/devfreq/exynos/exynos4_bus.c
+index cede6f7..16eb406 100644
+--- a/drivers/devfreq/exynos/exynos4_bus.c
++++ b/drivers/devfreq/exynos/exynos4_bus.c
+@@ -30,10 +30,10 @@
+ extern unsigned int exynos_result_of_asv;
  #endif
  
-diff --git a/arch/arm/plat-samsung/s5p-irq-pm.c
-b/arch/arm/plat-samsung/s5p-irq-pm.c
-index 7c1e3b7..5914980 100644
---- a/arch/arm/plat-samsung/s5p-irq-pm.c
-+++ b/arch/arm/plat-samsung/s5p-irq-pm.c
-@@ -22,7 +22,10 @@
- #include <mach/map.h>
+-#include <mach/regs-clock.h>
+-
+ #include <plat/map-s5p.h>
  
- #include <mach/regs-gpio.h>
++#include "exynos4_bus.h"
 +
-+#ifndef CONFIG_ARCH_EXYNOS
- #include <mach/regs-irq.h>
-+#endif
+ #define MAX_SAFEVOLT	1200000 /* 1.2V */
  
- /* state for IRQs over sleep */
- 
+ enum exynos4_busf_type {
+diff --git a/drivers/devfreq/exynos/exynos4_bus.h
+b/drivers/devfreq/exynos/exynos4_bus.h
+new file mode 100644
+index 0000000..94c73c1
+--- /dev/null
++++ b/drivers/devfreq/exynos/exynos4_bus.h
+@@ -0,0 +1,110 @@
++/*
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * EXYNOS4 BUS header
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __DEVFREQ_EXYNOS4_BUS_H
++#define __DEVFREQ_EXYNOS4_BUS_H __FILE__
++
++#include <mach/map.h>
++
++#define EXYNOS4_CLKDIV_LEFTBUS			(S5P_VA_CMU + 0x04500)
++#define EXYNOS4_CLKDIV_STAT_LEFTBUS		(S5P_VA_CMU + 0x04600)
++
++#define EXYNOS4_CLKDIV_RIGHTBUS			(S5P_VA_CMU +
+0x08500)
++#define EXYNOS4_CLKDIV_STAT_RIGHTBUS		(S5P_VA_CMU + 0x08600)
++
++#define EXYNOS4_CLKDIV_TOP			(S5P_VA_CMU + 0x0C510)
++#define EXYNOS4_CLKDIV_CAM			(S5P_VA_CMU + 0x0C520)
++#define EXYNOS4_CLKDIV_MFC			(S5P_VA_CMU + 0x0C528)
++
++#define EXYNOS4_CLKDIV_STAT_TOP			(S5P_VA_CMU +
+0x0C610)
++#define EXYNOS4_CLKDIV_STAT_MFC			(S5P_VA_CMU +
+0x0C628)
++
++#define EXYNOS4210_CLKGATE_IP_IMAGE		(S5P_VA_CMU + 0x0C930)
++#define EXYNOS4212_CLKGATE_IP_IMAGE		(S5P_VA_CMU + 0x04930)
++
++#define EXYNOS4_CLKDIV_DMC0			(S5P_VA_CMU + 0x10500)
++#define EXYNOS4_CLKDIV_DMC1			(S5P_VA_CMU + 0x10504)
++#define EXYNOS4_CLKDIV_STAT_DMC0		(S5P_VA_CMU + 0x10600)
++#define EXYNOS4_CLKDIV_STAT_DMC1		(S5P_VA_CMU + 0x10604)
++
++#define EXYNOS4_DMC_PAUSE_CTRL			(S5P_VA_CMU + 0x11094)
++#define EXYNOS4_DMC_PAUSE_ENABLE		(1 << 0)
++
++#define EXYNOS4_CLKDIV_DMC0_ACP_SHIFT		(0)
++#define EXYNOS4_CLKDIV_DMC0_ACP_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_ACP_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_ACPPCLK_SHIFT	(4)
++#define EXYNOS4_CLKDIV_DMC0_ACPPCLK_MASK	(0x7 <<
+EXYNOS4_CLKDIV_DMC0_ACPPCLK_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_DPHY_SHIFT		(8)
++#define EXYNOS4_CLKDIV_DMC0_DPHY_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DPHY_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_DMC_SHIFT		(12)
++#define EXYNOS4_CLKDIV_DMC0_DMC_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DMC_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_DMCD_SHIFT		(16)
++#define EXYNOS4_CLKDIV_DMC0_DMCD_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DMCD_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_DMCP_SHIFT		(20)
++#define EXYNOS4_CLKDIV_DMC0_DMCP_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_DMCP_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_COPY2_SHIFT		(24)
++#define EXYNOS4_CLKDIV_DMC0_COPY2_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_COPY2_SHIFT)
++#define EXYNOS4_CLKDIV_DMC0_CORETI_SHIFT	(28)
++#define EXYNOS4_CLKDIV_DMC0_CORETI_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC0_CORETI_SHIFT)
++
++#define EXYNOS4_CLKDIV_DMC1_G2D_ACP_SHIFT	(0)
++#define EXYNOS4_CLKDIV_DMC1_G2D_ACP_MASK	(0xf <<
+EXYNOS4_CLKDIV_DMC1_G2D_ACP_SHIFT)
++#define EXYNOS4_CLKDIV_DMC1_C2C_SHIFT		(4)
++#define EXYNOS4_CLKDIV_DMC1_C2C_MASK		(0x7 <<
+EXYNOS4_CLKDIV_DMC1_C2C_SHIFT)
++#define EXYNOS4_CLKDIV_DMC1_PWI_SHIFT		(8)
++#define EXYNOS4_CLKDIV_DMC1_PWI_MASK		(0xf <<
+EXYNOS4_CLKDIV_DMC1_PWI_SHIFT)
++#define EXYNOS4_CLKDIV_DMC1_C2CACLK_SHIFT	(12)
++#define EXYNOS4_CLKDIV_DMC1_C2CACLK_MASK	(0x7 <<
+EXYNOS4_CLKDIV_DMC1_C2CACLK_SHIFT)
++#define EXYNOS4_CLKDIV_DMC1_DVSEM_SHIFT		(16)
++#define EXYNOS4_CLKDIV_DMC1_DVSEM_MASK		(0x7f <<
+EXYNOS4_CLKDIV_DMC1_DVSEM_SHIFT)
++#define EXYNOS4_CLKDIV_DMC1_DPM_SHIFT		(24)
++#define EXYNOS4_CLKDIV_DMC1_DPM_MASK		(0x7f <<
+EXYNOS4_CLKDIV_DMC1_DPM_SHIFT)
++
++#define EXYNOS4_CLKDIV_MFC_SHIFT		(0)
++#define EXYNOS4_CLKDIV_MFC_MASK			(0x7 <<
+EXYNOS4_CLKDIV_MFC_SHIFT)
++
++#define EXYNOS4_CLKDIV_TOP_ACLK200_SHIFT	(0)
++#define EXYNOS4_CLKDIV_TOP_ACLK200_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK200_SHIFT)
++#define EXYNOS4_CLKDIV_TOP_ACLK100_SHIFT	(4)
++#define EXYNOS4_CLKDIV_TOP_ACLK100_MASK		(0xF <<
+EXYNOS4_CLKDIV_TOP_ACLK100_SHIFT)
++#define EXYNOS4_CLKDIV_TOP_ACLK160_SHIFT	(8)
++#define EXYNOS4_CLKDIV_TOP_ACLK160_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK160_SHIFT)
++#define EXYNOS4_CLKDIV_TOP_ACLK133_SHIFT	(12)
++#define EXYNOS4_CLKDIV_TOP_ACLK133_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK133_SHIFT)
++#define EXYNOS4_CLKDIV_TOP_ONENAND_SHIFT	(16)
++#define EXYNOS4_CLKDIV_TOP_ONENAND_MASK		(0x7 <<
+EXYNOS4_CLKDIV_TOP_ONENAND_SHIFT)
++#define EXYNOS4_CLKDIV_TOP_ACLK266_GPS_SHIFT	(20)
++#define EXYNOS4_CLKDIV_TOP_ACLK266_GPS_MASK	(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK266_GPS_SHIFT)
++#define EXYNOS4_CLKDIV_TOP_ACLK400_MCUISP_SHIFT	(24)
++#define EXYNOS4_CLKDIV_TOP_ACLK400_MCUISP_MASK	(0x7 <<
+EXYNOS4_CLKDIV_TOP_ACLK400_MCUISP_SHIFT)
++
++#define EXYNOS4_CLKDIV_BUS_GDLR_SHIFT		(0)
++#define EXYNOS4_CLKDIV_BUS_GDLR_MASK		(0x7 <<
+EXYNOS4_CLKDIV_BUS_GDLR_SHIFT)
++#define EXYNOS4_CLKDIV_BUS_GPLR_SHIFT		(4)
++#define EXYNOS4_CLKDIV_BUS_GPLR_MASK		(0x7 <<
+EXYNOS4_CLKDIV_BUS_GPLR_SHIFT)
++
++#define EXYNOS4_CLKDIV_CAM_FIMC0_SHIFT		(0)
++#define EXYNOS4_CLKDIV_CAM_FIMC0_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC0_SHIFT)
++#define EXYNOS4_CLKDIV_CAM_FIMC1_SHIFT		(4)
++#define EXYNOS4_CLKDIV_CAM_FIMC1_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC1_SHIFT)
++#define EXYNOS4_CLKDIV_CAM_FIMC2_SHIFT		(8)
++#define EXYNOS4_CLKDIV_CAM_FIMC2_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC2_SHIFT)
++#define EXYNOS4_CLKDIV_CAM_FIMC3_SHIFT		(12)
++#define EXYNOS4_CLKDIV_CAM_FIMC3_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM_FIMC3_SHIFT)
++
++#define EXYNOS4_CLKDIV_CAM1			(S5P_VA_CMU + 0x0C568)
++
++#define EXYNOS4_CLKDIV_STAT_CAM1		(S5P_VA_CMU + 0x0C668)
++
++#define EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT		(0)
++#define EXYNOS4_CLKDIV_CAM1_JPEG_MASK		(0xf <<
+EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT)
++
++#endif /* __DEVFREQ_EXYNOS4_BUS_H */
 -- 
 1.7.10.4
