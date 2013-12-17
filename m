@@ -1,51 +1,49 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Dec 2013 16:16:56 +0100
-Subject: [PATCH v3 2/7] mtd: spi-nor: add the basic data structures
-In-Reply-To: <20131217134923.GA1220@gmail.com>
-References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
- <201312171405.55964.marex@denx.de> <20131217134923.GA1220@gmail.com>
-Message-ID: <201312171616.57029.marex@denx.de>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 17 Dec 2013 16:47:14 +0100
+Subject: [PATCH] drivers/misc: atmel_tclib: document clock properties
+Message-ID: <1387295234-7123-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 17, 2013 at 02:49:25 PM, Huang Shijie wrote:
-> On Tue, Dec 17, 2013 at 02:05:55PM +0100, Marek Vasut wrote:
-> > On Monday, December 16, 2013 at 09:58:45 AM, Huang Shijie wrote:
-> > > +struct spi_nor { > > +	struct mtd_info		*mtd;
-> > > +	struct mutex		lock;
-> > > +
-> > > +	/* pointer to a spi device */
-> > > +	struct device		*dev;
-> > > +	u32			page_size;
-> > > +	u8			addr_width;
-> > > +	u8			erase_opcode;
-> > > +	u8			read_opcode;
-> > > +	u8			read_dummy;
-> > > +	u8			program_opcode;
-> > > +	enum read_mode		flash_read;
-> > > +	bool			sst_write_second;
-> > > +	struct spi_nor_xfer_cfg	cfg;
-> > 
-> > You do want to split the function pointers below and the device
-> > configuration above into separate structures.
-> 
-> sorry, i prefer to keep them in one data structrue, just like the
-> nand_chip{} does.
+Document the clock properties required by the atmel_tclib driver.
 
-Can you explain why?
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ .../devicetree/bindings/arm/atmel-at91.txt         |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> > > +	/* for write_reg */
-> > > +	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
-> > > +
-> > > +	/*
-> > > +	 * Do some work before or after we run these operations:
-> > > +	 *   read/write/erese/lock/unlock
-> > 
-> > Proper kernel-doc style comments for this structure would be nice.
-> 
-> Do you mean the style used by nand_chip{}?
-
-Yes. See Documentation/kernel-doc-nano-HOWTO.txt
-
-Best regards,
-Marek Vasut
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 1196290..78530e6 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -20,6 +20,10 @@ TC/TCLIB Timer required properties:
+ - interrupts: Should contain all interrupts for the TC block
+   Note that you can specify several interrupt cells if the TC
+   block has one interrupt per channel.
++- clock-names: tuple listing input clock names.
++	Required elements: "t0_clk"
++	Optional elements: "t1_clk", "t2_clk"
++- clocks: phandles to input clocks.
+ 
+ Examples:
+ 
+@@ -28,6 +32,8 @@ One interrupt per TC block:
+ 		compatible = "atmel,at91rm9200-tcb";
+ 		reg = <0xfff7c000 0x100>;
+ 		interrupts = <18 4>;
++		clocks = <&tcb0_clk>;
++		clock-names = "t0_clk";
+ 	};
+ 
+ One interrupt per TC channel in a TC block:
+@@ -35,6 +41,8 @@ One interrupt per TC channel in a TC block:
+ 		compatible = "atmel,at91rm9200-tcb";
+ 		reg = <0xfffdc000 0x100>;
+ 		interrupts = <26 4 27 4 28 4>;
++		clocks = <&tcb1_clk>;
++		clock-names = "t0_clk";
+ 	};
+ 
+ RSTC Reset Controller required properties:
+-- 
+1.7.9.5
