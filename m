@@ -1,72 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 Dec 2013 13:45:06 +0100
-Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <5295539.cCkPY1PpyC@flatron>
-References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
- <20131217111020.GF13823@ulmo.nvidia.com>
- <20131217115136.GT4360@n2100.arm.linux.org.uk>
- <5295539.cCkPY1PpyC@flatron>
-Message-ID: <20131217124505.GB17210@ulmo.nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Dec 2013 12:46:57 +0000
+Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
+In-Reply-To: <20131217123946.GN6691@S2101-09.ap.freescale.net>
+References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
+ <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+ <00a7a941be434caf829f9fd246879c6d@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131213125129.GV18380@S2101-09.ap.freescale.net>
+ <892cbb07bd064f44b2af45f106aeb479@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20131216112910.GB30671@S2101-09.ap.freescale.net>
+ <20131217015939.GM3185@sirena.org.uk>
+ <20131217021610.GA7172@S2101-09.ap.freescale.net>
+ <20131217113705.GP3185@sirena.org.uk>
+ <20131217123946.GN6691@S2101-09.ap.freescale.net>
+Message-ID: <20131217124657.GW3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 01:00:10PM +0100, Tomasz Figa wrote:
-> On Tuesday 17 of December 2013 11:51:36 Russell King - ARM Linux wrote:
-> > On Tue, Dec 17, 2013 at 12:10:22PM +0100, Thierry Reding wrote:
-> > > On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
-> > > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> > > > +		const void __iomem *addr)
-> > > > +{
-> > > > +	u32 val;
-> > > > +
-> > > > +	val = __raw_readl(addr);
-> > > > +
-> > > > +	if (likely(fpc->big_endian))
-> > > 
-> > > The likely() probably isn't very useful in this case. But if you want to
-> > > keep it, it should at least be reversed, since little-endian is actually
-> > > the default (you have to specify the big-endian property to activate the
-> > > big endian mode).
-> > > 
-> > > > +		val = be32_to_cpu(val);
-> > > > +	else
-> > > > +		val = le32_to_cpu(val);
-> > 
-> > This will also cause sparse errors, because when sparse is enabled, these
-> > expect __le32 or __be32 arguments, not u32.
-> 
-> My question is why can't you just create two sets of accessors, one big
-> endian and one little endian, add two function pointers to your
-> fsl_pwm_chip struct and let the driver set the to correct accessors in
-> probe?
+On Tue, Dec 17, 2013 at 08:39:48PM +0800, Shawn Guo wrote:
 
-I guess that would be one possibility.
+> Hmm, I do not quite follow.  The regulator core needs to know whether a
+> regulator device is present or absent, before the regulator is
+> registered, so that regulator core can decide to return -EDEFER_PROBE
+> or -ENODEV when consumer calls regulator_get_optional() to get the
+> regulator.  Are you saying platform can call
+> regulator_has_full_constraints() to help regulator core to make this
+> decision?  I do not understand how it works.
 
-> This would eliminate the problem with types Russell mentioned and IMHO
-> make the code cleaner.
-
-I fail to see how that would eliminate the problem with the types. That
-said I don't actually see sparse complaining about any type mismatches.
-That's probably because the various macros implicitly cast to u32.
-
-> > > > +	rmb();
-> > > 
-> > > I'd prefer the rmb() to follow the __raw_readl() immediately to make the
-> > > relationship more explicit.
-> > 
-> > A better question to ask is: why is this barrier here?  What memory
-> > ordering operations is it trying to serialise?
-> 
-> I'd also add a question why __raw accessors are used here.
-
-Because both readl() and writel() explicitly perform little endian
-accesses.
-
-Thierry
+It tells the core that it now knows about all regulator mappings so it
+knows if it's not got a mapping none will ever appear.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/4d7e0ae3/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/fd201ce3/attachment.sig>
