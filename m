@@ -1,24 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Dec 2013 14:10:38 +0000
-Subject: [PATCH] ASoC: kirkwood: Fix the CPU DAI rates
-In-Reply-To: <20131127211024.52e5ae1b@armhf>
-References: <20131127211024.52e5ae1b@armhf>
-Message-ID: <20131217141038.GJ3185@sirena.org.uk>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Tue, 17 Dec 2013 22:12:00 +0800
+Subject: [PATCH v3 1/7] mtd: spi-nor: copy the SPI NOR commands to a new
+ header file
+In-Reply-To: <201312171401.56683.marex@denx.de>
+References: <1387184330-14448-1-git-send-email-b32955@freescale.com>
+ <1387184330-14448-2-git-send-email-b32955@freescale.com>
+ <201312171401.56683.marex@denx.de>
+Message-ID: <20131217141158.GA1168@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 09:10:24PM +0100, Jean-Francois Moine wrote:
-> This patch fixes the rates declared in the CPU DAI parameters:
-> - SNDRV_PCM_RATE_KNOT and the discrete rates SNDRV_PCM_RATE_xxx should
->   not be used with SNDRV_PCM_RATE_CONTINUOUS,
-> - SNDRV_PCM_RATE_CONTINUOUS asks for rate_min and rate_max,
-> - the device may do streaming down to 5512Hz.
+On Tue, Dec 17, 2013 at 02:01:56PM +0100, Marek Vasut wrote:
+> On Monday, December 16, 2013 at 09:58:44 AM, Huang Shijie wrote:
+> > This patch adds a new header :spi-nor.h,
+> > and copies all the SPI NOR commands and relative macros into this new
+> > header.
+> > 
+> > This hearder can be used by the m25p80.c and other spi-nor controller,
+> > such as Freescale's Quadspi.
+> > 
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> 
+> It would be much nicer if you also removed the commands in this same patch from 
+> the m25p80.c file.
+my earlier version did so. :)
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/d8f27f05/attachment.sig>
+So keep it as it is now.
+
+thanks
+Huang Shijie
