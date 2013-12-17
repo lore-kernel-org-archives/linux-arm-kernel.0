@@ -1,33 +1,71 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Tue, 17 Dec 2013 13:27:13 +0000
-Subject: [PATCH V2 2/2] cpufreq: imx6q: correct VDDSOC/PU voltage
- scaling when cpufreq is changed
-In-Reply-To: <20131217132312.GB3185@sirena.org.uk>
-References: <1387318102-11070-1-git-send-email-b20788@freescale.com>
- <1387318102-11070-2-git-send-email-b20788@freescale.com>,
- <20131217132312.GB3185@sirena.org.uk>
-Message-ID: <4E25F2ED-7CAE-495E-838D-1527184F2159@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 17 Dec 2013 14:28:15 +0100
+Subject: [GIT PULL] get rid of <mach/timex.h>
+In-Reply-To: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
+References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
+Message-ID: <20131217132815.GJ14866@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-
-Sent from Anson's iPhone
-
-> ? 2013?12?17??21:23?"Mark Brown" <broonie@kernel.org> ???
+On Fri, Dec 13, 2013 at 11:16:51PM +0100, Uwe Kleine-K?nig wrote:
+> the following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 > 
->> On Tue, Dec 17, 2013 at 05:08:22PM -0500, Anson Huang wrote:
->> 
->>    if (new_freq > old_freq) {
->> +        if (regulator_is_enabled(pu_reg)) {
->> +            ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 > 
-> As I pointed out while reviewing the regulator driver this is racy,
-> nothing stops the regulator state being changed after you read it and if
-> you skip setting the voltage then when something comes along and enables
-> the regulator later it will be enabled with a possibly incorrect
-> voltage.
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
+> 
+> for you to fetch changes up to c24eb46490c8232c08c82cd591ba332284d257b2:
+> 
+>   ARM: drop <mach/timex.h> for !ARCH_MULTIPLATFORM, too (2013-12-07 23:31:28 +0100)
+> 
+> I'd like to get these changes into 3.14-rc1, so it would be great if you
+> could take it into armsoc for some exposure into next.
+> 
+> The kbuild test robot is happy with these changes, and I did several
+> build tests, too, so I don't expect any breakage.
+> 
+> Merging this series will result in a few merge conflicts. I pushed a
+> branch dropmachtimexh-merged into my repository where you can see how I
+> resolved them merging in current next/master into my tag.
+> 
+> ----------------------------------------------------------------
+> This cleanup series gets rid of <mach/timex.h> for platforms not using
+> ARCH_MULTIPLATFORM. (For multi-platform code it's already unused since
+> 387798b (ARM: initial multiplatform support).)
+> 
+> To make this work some code out of arch/arm needed to be adapted. Apart from two
+> changes in drivers/rtc I got the relevant maintainer Acks. For the rtc changes
+> I didn't get any feedback by Alexandro Zummo since I posted the first change 5
+> weeks ago despite pinging it several times. The current state seems to be that
+> Andrew Morton takes odd fixes, but I couldn't get him to give an Ack either.
+> (One of the two patches is in his queue, but I expect him to drop that as soon
+> as the patch makes it in via another path. Didn't get any feedback here, too.)
+In the meantime I got Acks for the rtc changes by apkm. I updated my tag
+to include these two. It now points on
+b5ea554282d15d14270e5a5ff80418d8d6410f85. The tag-log is updated
+accordingly:
 
-yes, you are correct, I will remove this PU status check in V3 patch.
+------
+This cleanup series gets rid of <mach/timex.h> for platforms not using
+ARCH_MULTIPLATFORM. (For multi-platform code it's already unused since
+387798b (ARM: initial multiplatform support).)
 
-Anson
+To make this work some code out of arch/arm needed to be adapted. The
+respective changes got acks by their maintainers to be taken via armsoc
+(with Andrew Morton substituting for Alessandro Zummo as rtc maintainer).
+------
+
+The patches are unchanged.
+
+Please pull for 3.14-rc1.
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
