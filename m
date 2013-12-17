@@ -1,17 +1,102 @@
-From: ben@datarespons.no (=?iso-8859-1?Q?Bj=F8rn_Erik_Nilsen?=)
-Date: Tue, 17 Dec 2013 19:28:27 +0100
-Subject: imx6 power consumption
-Message-ID: <mailman.18.1387304936.1056.linux-arm-kernel@lists.infradead.org>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Tue, 17 Dec 2013 10:31:14 -0800
+Subject: [PATCH 1/3]: Support cpu frequency scaling and power management
+ for iMX6SL
+In-Reply-To: <52B09856.5050609@tqsc.de>
+References: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+ <CACUGKYN_b0x4xg_Me3TXQGKEvz61SDZk4CFk5YHFnVCWT_6GPg@mail.gmail.com>
+ <52B09856.5050609@tqsc.de>
+Message-ID: <CACUGKYPr=-5m5D2dWFos233zzmY0KV7YhqU-PRk4C-mBxK6aeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Guys,
 
-I have measured power consumption for imx6 in mem mode on the 3.12.4 mainstream kernel vs. 3.0.35 kernel from freescale/boundary devices. I noticed a significant increase going from 3.0 to 3.12 . I have at least identified one big difference: DDR is no longer tri-stated, which accounts for some of the difference.
+Thanks for your input. I will re-submitting my patches later.
 
-I use 'echo mem > /sys/power/state' for my test case.
+Regards,
 
-Do you know if someone is looking into this issue, or if there are pending patches somewhere?
+john
 
-Best regards,
-Bj?rn Erik Nilsen
+On Tue, Dec 17, 2013 at 10:30 AM, Markus Niebel <list-09@tqsc.de> wrote:
+> Am 17.12.2013 03:37, wrote John Tobias:
+>> Need some correction:
+>>
+>> From: John Tobias <john.tobias.ph@gmail.com>
+>>
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+>> index 28558f1..6035e7e 100644
+>> --- a/arch/arm/boot/dts/imx6sl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+>> @@ -38,6 +38,21 @@
+>>                         device_type = "cpu";
+>>                         reg = <0x0>;
+>>                         next-level-cache = <&L2>;
+>> +                       operating-points = <
+>> +                               /* kHz    uV */
+>> +                               1000000 1275000
+>> +                               996000  1250000
+>> +                               792000  1150000
+>> +                               396000  950000
+>> +                       >;
+>> +                       clock-latency = <61036>; /* two CLK32 periods */
+>> +                       clocks = <&clks IMX6SL_CLK_ARM>, <&clks
+>> IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
+>> +                                <&clks IMX6SL_CLK_PLL1_SW>, <&clks
+>> IMX6SL_CLK_PLL1_SYS>;
+>> +                       clock-names = "arm", "pll2_pfd2_396m", "step",
+>> +                                     "pll1_sw", "pll1_sys";
+>> +                       arm-supply = <&reg_arm>;
+>> +                       pu-supply = <&reg_pu>;
+>> +                       soc-supply = <&reg_soc>;
+>>                 };
+>>         };
+>>
+>>
+>> On Mon, Dec 16, 2013 at 5:40 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
+>>> iMX6SL device tree doesn't have a configuration settings to enable the
+>>> frequency scaling and power management.
+>>>
+>>> From: John Tobias <john.tobias.ph@gmail.com>
+>>>
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+>>> index 28558f1..0ad2f6a 100644
+>>> --- a/arch/arm/boot/dts/imx6sl.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+>>> @@ -38,6 +38,19 @@
+>>>                         device_type = "cpu";
+>>>                         reg = <0x0>;
+>>>                         next-level-cache = <&L2>;
+>>> +                       operating-points = <
+>>> +                               /* kHz    uV */
+>>> +                               1000000 1275000
+>>> +                               792000  1150000
+>
+> according to the CPU documentation the following operation points are suggested (at least AFAIK):
+>                                996000  1250000 /* for consumer grade only */
+>                                792000  1150000
+>                                396000  1050000
+> note: AFAIK there is no way to detect at runtime if we  running on industrial / automotive variant
+> so there is a risk to run at too high frequency ...
+>>> +                       >;
+>>> +                       clock-latency = <61036>; /* two CLK32 periods */
+>>> +                       clocks = <&clks IMX6SL_CLK_ARM>, <&clks
+>>> IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
+>>> +                                <&clks IMX6SL_CLK_PLL1_SW>, <&clks
+>>> IMX6SL_CLK_PLL1_SYS>;
+>>> +                       clock-names = "arm", "pll2_pfd2_396m", "step",
+>>> +                                     "pll1_sw", "pll1_sys";
+>>> +                       arm-supply = <&reg_arm>;
+>>> +                       pu-supply = <&reg_pu>;
+>>> +                       soc-supply = <&reg_soc>;
+>>>                 };
+>>>         };
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
