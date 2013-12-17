@@ -1,50 +1,41 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 17 Dec 2013 15:19:39 +0800
-Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20131216152235.GI3185@sirena.org.uk>
-References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
- <1386767606-6391-4-git-send-email-broonie@kernel.org>
- <52AF11FE.70000@linaro.org> <20131216152235.GI3185@sirena.org.uk>
-Message-ID: <52AFFB0B.3010505@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Dec 2013 15:45:52 +0800
+Subject: [PATCH 4/4] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
+ when cpufreq is changed
+In-Reply-To: <20131217025616.GC6691@S2101-09.ap.freescale.net>
+References: <1387228450-641-1-git-send-email-b20788@freescale.com>
+ <1387228450-641-2-git-send-email-b20788@freescale.com>
+ <20131217025616.GC6691@S2101-09.ap.freescale.net>
+Message-ID: <20131217074548.GB7172@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2013 11:22 PM, Mark Brown wrote:
-> On Mon, Dec 16, 2013 at 10:45:18PM +0800, Alex Shi wrote:
->> On 12/11/2013 09:13 PM, Mark Brown wrote:
+On Tue, Dec 17, 2013 at 10:56:18AM +0800, Shawn Guo wrote:
+> > +	rcu_read_lock();
+> > +	val = prop->value;
 > 
->>> +struct cputopo_arm {
->>> +	int thread_id;
->>> +	int core_id;
->>> +	int socket_id;
-> 
->> Forgive me if I am stupid. :)
-> 
->> why we don't need a cluster_id? and does one cpu socket include few
->> clusters?
-> 
-> The ARMv7 code calls a cluster a socket I think because it's trying to
-> maintain similarity with other architectures and the ARMv8 code follows
-> ARMv7 in this regard.  At the minute we're using this ID for whatever
-> the lowest level of grouping is above a core and presenting the
-> scheduler with a flat topology there - the topology binding and MPIDR
-> both allow multiple layers of cluster so you could definitely have
-> multiple clusters in a supercluster.
-> 
-> Without practical examples of such systems or more architecture
-> documentation than I've been able to find it's not clear how to
-> represent them to the scheduler, it will depend on how closely
-> associated the clusters are and what the scheduler's features are,
-> perhaps we should describe such a system as NUMA but it's not clear to
-> me that this would produce the desired results.  I wonder if we may end
-> up figuring this out from other data such as descriptions of caches and
-> interconnects rather than purely from the topology information.
+> What is this assignment used for?
 
-For topology meaning, it may be better to have cluster concept there.
-And don't know if there will has a real ARM NUMA system for 64bit
-server. If so, socket_id is good in a NUMA system.
+Sorry.  This is a brain-dead comment.  Ignore it.
 
+Shawn
 
--- 
-Thanks
-    Alex
+> 
+> > +
+> > +	min_volt = max_volt = 0;
+> > +	for (i = 0; i < nr / 2; i++) {
+> > +		unsigned long freq = be32_to_cpup(val++);
+> > +		unsigned long volt = be32_to_cpup(val++);
+> > +
+> > +		if (i == 0)
+> > +			min_volt = max_volt = volt;
+> > +		if (volt < min_volt)
+> > +			min_volt = volt;
+> > +		if (volt > max_volt)
+> > +			max_volt = volt;
+> > +		opp = dev_pm_opp_find_freq_exact(cpu_dev, freq * 1000, true);
+> > +		imx6_soc_opp[i].arm_freq = freq;
+> > +		imx6_soc_opp[i].soc_volt = volt;
+> > +		soc_opp_count++;
+> > +	}
+> > +	rcu_read_unlock();
