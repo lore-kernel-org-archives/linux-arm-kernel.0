@@ -1,64 +1,45 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 16 Dec 2013 16:17:35 -0800
-Subject: [PATCH 05/10] mfd: menelaus: Use for_each_set_bit()
-In-Reply-To: <1387238904-7843-5-git-send-email-balbi@ti.com>
-References: <20131216153936.GQ18769@lee--X1>
- <1387238904-7843-1-git-send-email-balbi@ti.com>
- <1387238904-7843-5-git-send-email-balbi@ti.com>
-Message-ID: <1387239455.18217.61.camel@joe-AO722>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 16 Dec 2013 16:19:29 -0800
+Subject: [PATCH v2 2/5] arm64: Fix the soft_restart routine
+In-Reply-To: <cover.1386879684.git.geoff@infradead.org>
+References: <cover.1386879684.git.geoff@infradead.org>
+Message-ID: <1387239569.1002.151.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-16 at 18:08 -0600, Felipe Balbi wrote:
-> That macro just helps removing some extra line of code and hides ffs()
-> calls.
-> 
-> While at that, also fix a variable shadowing bug where 'int irq' was
-> being redeclared inside inner loop while it was also argument to
-> interrupt handler.
-> 
-> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/mfd/menelaus.c | 16 +++++++---------
->  1 file changed, 7 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> index 87d80a8..d3e3022 100644
-> --- a/drivers/mfd/menelaus.c
-> +++ b/drivers/mfd/menelaus.c
-> @@ -795,24 +795,22 @@ static irqreturn_t menelaus_irq(int irq, void *_menelaus)
->  {
->  	struct menelaus_chip *menelaus = _menelaus;
->  	void (*handler)(struct menelaus_chip *menelaus);
-> -	unsigned isr;
-> +	unsigned long isr;
-> +	unsigned long i;
->  
->  	isr = (menelaus_read_reg(MENELAUS_INT_STATUS2)
->  			& ~menelaus->mask2) << 8;
->  	isr |= menelaus_read_reg(MENELAUS_INT_STATUS1)
->  		& ~menelaus->mask1;
->  
-> -	while (isr) {
-> -		int irq = fls(isr) - 1;
-> -		isr &= ~(1 << irq);
-> -
-> +	for_each_set_bit(i, &isr, 16) {
->  		mutex_lock(&menelaus->lock);
-> -		menelaus_disable_irq(irq);
-> -		menelaus_ack_irq(irq);
-> -		handler = menelaus->handlers[irq];
-> +		menelaus_disable_irq(i);
-> +		menelaus_ack_irq(i);
-> +		handler = menelaus->handlers[i];
->  		if (handler)
->  			handler(menelaus);
-> -		menelaus_enable_irq(irq);
-> +		menelaus_enable_irq(i);
->  		mutex_unlock(&menelaus->lock);
->  	}
->  
+Change the soft_restart() routine to call cpu_reset() at its identity mapped
+physical address.
 
-This could handle the irqs in reverse order.
-Does that matter?
+The cpu_reset() routine must be called at its identity mapped physical address
+so that when the MMU is turned off the instruction pointer will be at the correct
+location in physical memory.
+
+Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
+---
+v2: Use typecast and variable for call as in arm code.
+
+ arch/arm64/kernel/process.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index de17c89..88e50fc 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -71,8 +71,14 @@ static void setup_restart(void)
+ 
+ void soft_restart(unsigned long addr)
+ {
++	typedef void (*phys_reset_t)(unsigned long);
++	phys_reset_t phys_reset;
++
+ 	setup_restart();
+-	cpu_reset(addr);
++
++	/* Switch to the identity mapping. */
++	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
++	phys_reset(addr);
+ }
+ 
+ /*
+-- 
+1.8.1.2
