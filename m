@@ -1,92 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 17 Dec 2013 21:27:16 +0100
-Subject: [PATCH 1/4] Phy: DT binding documentation for Marvell MVEBU SATA
- phy.
-In-Reply-To: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
-References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20131217202716.GA2071@lunn.ch>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 17 Dec 2013 15:34:18 -0500 (EST)
+Subject: [PATCH 2/2] ARM: kconfig: select HAVE_EFFICIENT_UNALIGNED_ACCESS
+ for CPUv6+ && MMU
+In-Reply-To: <1387282577-2753-2-git-send-email-will.deacon@arm.com>
+References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
+ <1387282577-2753-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.10.1312171528130.7480@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Folks
+On Tue, 17 Dec 2013, Will Deacon wrote:
 
-Sorry, forgot the --subject. This is version 3 of the patchset.
+> Modern ARM CPUs can perform efficient unaligned memory accesses in
+> hardware and this feature is relied up on by code such as the dcache
+> word-at-a-time name hashing.
+> 
+> This patch selects HAVE_EFFICIENT_UNALIGNED_ACCESS for these cores and
+> reworks the kconfig select logic for DCACHE_WORD_ACCESS to use the new
+> symbol.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-       Andrew
+This symbol could be used in some more places too.  For example this 
+would make the code a bit clearer:
+
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 72abdc541f..12c3a5decc 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -19,7 +19,7 @@
+ #include <asm/unified.h>
+ #include <asm/compiler.h>
+ 
+-#if __LINUX_ARM_ARCH__ < 6
++#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+ #include <asm-generic/uaccess-unaligned.h>
+ #else
+ #define __get_user_unaligned __get_user
 
 
-On Tue, Dec 17, 2013 at 09:21:49PM +0100, Andrew Lunn wrote:
-> Describe the binding for the Marvell MVEBU SATA phy. This driver
-> can be used at least with Kirkwood, Dove and maybe others.
-> Additionally, update the SATA binding with the properties to link
-> to the phy nodes.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> v1->v2:
-> Correct #phy-cells
-> Correct number after @ to match first reg address.
-> Rename to phy-mvebu.txt
-> 
-> v2->v3:
-> Renamed to mvebu-phy.txt
-> Use "port0", "port1" instead of "0", "1"
-> ---
->  Documentation/devicetree/bindings/ata/marvell.txt  |  6 ++++++
->  .../devicetree/bindings/phy/mvebu-phy.txt          | 22 ++++++++++++++++++++++
->  2 files changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/mvebu-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
-> index b5cdd20cde9c..4c5447f1068d 100644
-> --- a/Documentation/devicetree/bindings/ata/marvell.txt
-> +++ b/Documentation/devicetree/bindings/ata/marvell.txt
-> @@ -6,11 +6,17 @@ Required Properties:
->  - interrupts    : Interrupt controller is using
->  - nr-ports      : Number of SATA ports in use.
->  
-> +Optional Properties:
-> +- phys		: List of phandles to sata phys
-> +- phy-names	: Should be "port0", "port1", etc, one per phandle
-> +
->  Example:
->  
->  	sata at 80000 {
->  		compatible = "marvell,orion-sata";
->  		reg = <0x80000 0x5000>;
->  		interrupts = <21>;
-> +		phys = <&sata_phy0>, <&sata_phy1>;
-> +		phy-names = "port0", "port1";
->  		nr-ports = <2>;
->  	}
-> diff --git a/Documentation/devicetree/bindings/phy/mvebu-phy.txt b/Documentation/devicetree/bindings/phy/mvebu-phy.txt
-> new file mode 100644
-> index 000000000000..6cb3364aeafb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/mvebu-phy.txt
-> @@ -0,0 +1,22 @@
-> +* Marvell MVEBU SATA PHY
-> +
-> +Power control for the SATA phy found on Marvell MVEBU SoCs.
-> +
-> +This document extends the binding described in phy-bindings.txt
-> +
-> +Required properties :
-> +
-> + - reg		   : Offset and length of the register set for the SATA device
-> + - compatible	   : Should be "marvell,mvebu-sata-phy"
-> + - clocks	   : phandle of clock and specifier that supplies the device
-> + - clock-names	   : Should be "sata"
-> +
-> +Example:
-> +		sata-phy at 84000 {
-> +			compatible = "marvell,mvebu-sata-phy";
-> +			reg = <0x84000 0x0334>;
-> +			clocks = <&gate_clk 15>;
-> +			clock-names = "sata";
-> +			#phy-cells = <0>;
-> +			status = "ok";
-> +		};
-> -- 
-> 1.8.5.1
-> 
+Nicolas
