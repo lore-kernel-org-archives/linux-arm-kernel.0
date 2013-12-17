@@ -1,92 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 17 Dec 2013 17:06:25 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1387212565-12668-1-git-send-email-broonie@kernel.org>
-References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
-Message-ID: <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Dec 2013 17:16:25 +0000
+Subject: [PATCH v3 [resend] 05/18] smp, ARM64: kill SMP single function
+ call interrupt
+In-Reply-To: <1387125400-28849-6-git-send-email-liuj97@gmail.com>
+References: <1387125400-28849-1-git-send-email-liuj97@gmail.com>
+ <1387125400-28849-6-git-send-email-liuj97@gmail.com>
+Message-ID: <20131217171625.GE349@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Sun, Dec 15, 2013 at 04:36:27PM +0000, Jiang Liu wrote:
+> Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
+> similar to smp_call_function_single()" has unified the way to handle
+> single and multiple cross-CPU function calls. Now only one interrupt
+> is needed for architecture specific code to support generic SMP function
+> call interfaces, so kill the redundant single function call interrupt.
+> 
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Shaohua Li <shli@kernel.org>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Ingo Molnar <mingo@elte.hu>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Jiri Kosina <trivial@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/hardirq.h |  2 +-
+>  arch/arm64/kernel/smp.c          | 10 +---------
+>  2 files changed, 2 insertions(+), 10 deletions(-)
 
-On Mon, Dec 16, 2013 at 04:49:22PM +0000, Mark Brown wrote:
-> +void store_cpu_topology(unsigned int cpuid);
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-I still think this function is not needed at all and therefore should
-not be exported.
+I assume you're taking this series via some other route (than the arch/
+trees) in order to deal with any core dependencies?
 
-I understand this patch is there to provide the infrastructure, it is
-not clear to me why store_cpu_topology() should be part of it, even
-if we had to parse affinity levels in the MPIDR bitfields.
-
-[...]
-
-> +static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
-> +{
-> +	store_cpu_topology(cpuid);
-
-As I mentioned this need not be done here. Parse the topology from DT,
-(cpu_logical_map or cpu-map) in one go and get rid of store_cpu_topology().
-
->  /*
->   * This is the secondary CPU boot entry.  We're using this CPUs
->   * idle thread stack, but a set of temporary page tables.
-> @@ -150,6 +155,8 @@ asmlinkage void secondary_start_kernel(void)
->  	 */
->  	notify_cpu_starting(cpu);
->  
-> +	smp_store_cpu_info(cpu);
-> +
->  	/*
->  	 * OK, now it's safe to let the boot CPU continue.  Wait for
->  	 * the CPU migration code to notice that the CPU is online
-> @@ -388,6 +395,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->  	int err;
->  	unsigned int cpu, ncores = num_possible_cpus();
->  
-> +	init_cpu_topology();
-> +
-> +	smp_store_cpu_info(smp_processor_id());
-> +
-> +
->  	/*
->  	 * are we trying to boot more cores than exist?
->  	 */
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> new file mode 100644
-> index 000000000000..b078afa6958d
-> --- /dev/null
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -0,0 +1,95 @@
-> +/*
-> + * arch/arm64/kernel/topology.c
-> + *
-> + * Copyright (C) 2011,2013 Linaro Limited.
-> + * Written by: Vincent Guittot
-
-You should probably update the header, just a nitpick though.
-
-> + * based on arch/sh/kernel/topology.c
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/export.h>
-> +#include <linux/init.h>
-> +#include <linux/percpu.h>
-> +#include <linux/node.h>
-> +#include <linux/nodemask.h>
-> +#include <linux/sched.h>
-> +#include <linux/slab.h>
-> +
-> +#include <asm/cputype.h>
-> +#include <asm/smp_plat.h>
-
-I think that some of these includes are not needed, they were needed in
-previous versions, but not in this patch as it stands.
-
-Lorenzo
+Will
