@@ -1,53 +1,48 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 17 Dec 2013 17:22:20 +0100
-Subject: [PATCH v2] tty/serial: at91: document clock properties
-In-Reply-To: <1387296121-7558-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387296121-7558-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1387297340-8198-1-git-send-email-b.brezillon@overkiz.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 17 Dec 2013 18:22:14 +0200
+Subject: [PATCH v2 0/3] Introduce clocksource driver for Keystone platform
+Message-ID: <1387297337-25493-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the clock properties required by the at91 usart driver.
+Add a broadcast timer64 based clockevent driver for keystone arch.
+This driver uses timer in 64-bit general purpose mode as clock event
+device.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
-Changes since v1:
- - fix commit message
+Documentation:
+    http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
 
- .../devicetree/bindings/serial/atmel-usart.txt     |    7 +++++++
- 1 file changed, 7 insertions(+)
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
 
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 2191dcb..9c5d19a 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -6,6 +6,9 @@ Required properties:
-   additional mode or an USART new feature.
- - reg: Should contain registers location and length
- - interrupts: Should contain interrupt
-+- clock-names: tuple listing input clock names.
-+	Required elements: "usart"
-+- clocks: phandles to input clocks.
- 
- Optional properties:
- - atmel,use-dma-rx: use of PDC or DMA for receiving data
-@@ -26,6 +29,8 @@ Example:
- 		compatible = "atmel,at91sam9260-usart";
- 		reg = <0xfff8c000 0x4000>;
- 		interrupts = <7>;
-+		clocks = <&usart0_clk>;
-+		clock-names = "usart";
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
- 	};
-@@ -35,6 +40,8 @@ Example:
- 		compatible = "atmel,at91sam9260-usart";
- 		reg = <0xf001c000 0x100>;
- 		interrupts = <12 4 5>;
-+		clocks = <&usart0_clk>;
-+		clock-names = "usart";
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
- 		dmas = <&dma0 2 0x3>,
+v1..v2:
+- clocksource: timer-keystone: introduce clocksource driver for
+	renamed timer on "timer-keystone"
+	in keystone_timer_interrupt() evet pointer is passed via "dev_id"
+	used __relaxed variants of writel/readl and added explicit barriers
+	added "keystone_timer_disable()" for using in keystone_set_mode()
+	keystone_timer_config() is not used for disabling the timer any more
+	in case of an unsupported mode the keystone_timer_config() returns -1.
+	used request_irq() instead of setup_irq()
+	assigned irq for event_device in event_dev->irq
+	calculated timer.hz_period for CLOCK_EVT_MODE_PERIODIC at init
+	deleted spare call of keystone_timer_config() in keystone_timer_init()
+
+Ivan Khoronzhuk (3):
+  clocksource: timer-keystone: introduce clocksource driver for
+    Keystone
+  clocksource: keystone: add bindings for keystone timer
+  arm: dts: keystone: add keystone timer entry
+
+ .../bindings/timer/ti,keystone-timer.txt           |   29 +++
+ arch/arm/boot/dts/keystone-clocks.dtsi             |   10 +
+ arch/arm/boot/dts/keystone.dtsi                    |    7 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/timer-keystone.c               |  233 ++++++++++++++++++++
+ 5 files changed, 280 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/ti,keystone-timer.txt
+ create mode 100644 drivers/clocksource/timer-keystone.c
+
 -- 
 1.7.9.5
