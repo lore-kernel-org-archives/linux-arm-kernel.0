@@ -1,22 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Dec 2013 22:30:28 +0800
-Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
- max_discard_to
-In-Reply-To: <1387268191-19859-1-git-send-email-b29396@freescale.com>
-References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
-Message-ID: <20131217143025.GX6691@S2101-09.ap.freescale.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 17 Dec 2013 15:36:21 +0100
+Subject: [PATCH v3 0/2] clk: add clk accuracy support
+Message-ID: <1387290983-6236-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 04:16:26PM +0800, Dong Aisheng wrote:
-> Dong Aisheng (5):
->   mmc: sdhci: add platfrom get_max_timeout_count hook
->   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
->   mmc: sdhci: add platform set_timeout hook
->   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
->   mmc: sdhci: calculate max_discard_to dynamically for
->     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+Hello,
 
-For all,
+This patch series adds support for clock accuracy retrieval in the common clk
+framework.
 
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Best Regards,
+
+Boris
+
+Changes since v2:
+ - fix __clk_recalc_accuracies function comment
+ - modify __clk_get_accuracy to return the current clock accuracy even when the
+   clock is orphan
+ - only recalculate clock accuracy when reparent succeed
+
+Changes since v1:
+ - remove HAVE_CLK_GET_ACCURACY option and enable clk accuracy support only
+   when using the CCF
+ - export __clk_get_accuracy (might be used by clk-providers)
+ - fix documentation (s/recalc_rate/recalc_accuracy/)
+ - move fixed_accuracy field addition (struct clk_fixed_rate) from the 1st
+   patch to the 2nd patch of this series
+
+Boris BREZILLON (2):
+  clk: add clk accuracy retrieval support
+  clk: add accuracy support for fixed clock
+
+ Documentation/clk.txt                              |    4 +
+ .../devicetree/bindings/clock/fixed-clock.txt      |    3 +
+ drivers/clk/clk-fixed-rate.c                       |   43 ++++++--
+ drivers/clk/clk.c                                  |  103 ++++++++++++++++++--
+ include/linux/clk-private.h                        |    1 +
+ include/linux/clk-provider.h                       |   15 +++
+ include/linux/clk.h                                |   17 ++++
+ 7 files changed, 173 insertions(+), 13 deletions(-)
+
+-- 
+1.7.9.5
