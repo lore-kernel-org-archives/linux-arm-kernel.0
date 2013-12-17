@@ -1,46 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Dec 2013 12:16:17 +0000
-Subject: [PATCH 2/2] ARM: kconfig: select HAVE_EFFICIENT_UNALIGNED_ACCESS for
- CPUv6+ && MMU
-In-Reply-To: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
-References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1387282577-2753-2-git-send-email-will.deacon@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Dec 2013 12:17:42 +0000
+Subject: [PATCH 4/6] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131217114734.GC32118@arm.com>
+References: <1386767606-6391-1-git-send-email-broonie@kernel.org>
+ <1386767606-6391-4-git-send-email-broonie@kernel.org>
+ <20131216105734.GA8931@e102568-lin.cambridge.arm.com>
+ <20131216122948.GF3185@sirena.org.uk>
+ <20131216144638.GE8931@e102568-lin.cambridge.arm.com>
+ <20131216151232.GH3185@sirena.org.uk>
+ <20131217114734.GC32118@arm.com>
+Message-ID: <20131217121742.GS3185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARM CPUs can perform efficient unaligned memory accesses in
-hardware and this feature is relied up on by code such as the dcache
-word-at-a-time name hashing.
+On Tue, Dec 17, 2013 at 11:47:34AM +0000, Catalin Marinas wrote:
+> On Mon, Dec 16, 2013 at 03:12:32PM +0000, Mark Brown wrote:
 
-This patch selects HAVE_EFFICIENT_UNALIGNED_ACCESS for these cores and
-reworks the kconfig select logic for DCACHE_WORD_ACCESS to use the new
-symbol.
+> > Actually now I think about it if we're not going to parse the MPIDR we
+> > should probably update the bindings to say that the topology binding is
+> > mandatory for any v8 system with more than one core.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Do we need such information if only a flat topology is needed?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 38ccfd0adbf9..f8c64af7c768 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -11,7 +11,7 @@ config ARM
- 	select BUILDTIME_EXTABLE_SORT if MMU
- 	select CLONE_BACKWARDS
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
--	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
-+	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IDLE_POLL_SETUP
-@@ -35,6 +35,7 @@ config ARM
- 	select HAVE_DMA_ATTRS
- 	select HAVE_DMA_CONTIGUOUS if MMU
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
-+	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
- 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
--- 
-1.8.2.2
+Probably not but it's simpler to specify that rather than saying it's
+mandatory only if you need it and it might be useful to know if
+everything is a flat collection of threads or a flat collection of
+cores, it seems better to get the information in there if we can in case
+the DT is fixed.  Single core systems are the only ones where it's
+definitely never going to be helpful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/2e597e6b/attachment.sig>
