@@ -1,156 +1,61 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 17 Dec 2013 11:57:36 +0200
-Subject: [PATCHv10 21/41] ARM: dts: omap4 clock data
-In-Reply-To: <alpine.DEB.2.02.1312170934180.14039@utopia.booyaka.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-22-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1312170934180.14039@utopia.booyaka.com>
-Message-ID: <52B02010.2060307@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 17 Dec 2013 10:57:00 +0100
+Subject: pwm-backlight: 3.13-rc1 regression for old arm machine
+In-Reply-To: <87r49c6bea.fsf@free.fr>
+References: <87r49c6bea.fsf@free.fr>
+Message-ID: <20131217095658.GD13823@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2013 11:44 AM, Paul Walmsley wrote:
-> On Tue, 26 Nov 2013, Tero Kristo wrote:
->
->> This patch creates a unique node for each clock in the OMAP4 power,
->> reset and clock manager (PRCM). OMAP443x and OMAP446x have slightly
->> different clock tree which is taken into account in the data.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->
-> ...
->
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index a1e0585..c2e3993 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -107,6 +107,34 @@
->>   		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
->>   			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
->>
->> +		cm1: cm1 at 4a004000 {
->> +			compatible = "ti,clock-master";
->
-> These devices are low-level IP blocks, and should have accurate compatible
-> strings like any other low-level IP block.  At some point in the future,
-> these IP blocks will have device driver code that matches up with these DT
-> nodes, and is probed via these compatible strings.  These should be
-> corrected now, so unnecessary DT data synchronization problems don't
-> appear with later kernels.
->
-> So this should be something like:
->
-> compatible = "ti,omap4-cm1";
->
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x4a004000 0x2000>;
->> +		};
->> +
->> +		prm: prm at 4a306000 {
->> +			compatible = "ti,clock-master";
->
-> Similarly this should be
->
-> compatible = "ti,omap4-prm";
+On Mon, Dec 16, 2013 at 04:52:45PM +0100, Robert Jarzmik wrote:
+> Hi Thierry,
 
-How about just adding dual compatible strings? Keep the current one and 
-add the other as extra.
+Hi Robert,
 
-	compatible = "ti,clock-master", "ti,omap4-prm";
+Please always Cc the linux-pwm mailing list for PWM related questions.
+I've done that now.
 
-Easier to handle it this way.
+> Since recently, and probable since last Linus's merge of PWM tree (Merge tag
+> 'pwm/for-3.13-rc1' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm), my
+> platform has its backlight broken.
+> 
+> The particularity of my platform:
+>  - arch/arm/mach-pxa/mioa701.c
+>  - no device tree
+>  - no power supply regulator for backlight
+>  - backlight controlled by a PWM
+>  - kernel message :
+> [    1.495480] platform pwm-backlight: Driver pwm-backlight requests probe deferral
+> 
+> I think other "old" platforms will suffer from this. Do you have a
+> recommendation ?
 
->
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x4a306000 0x3000>;
->> +		};
->> +
->> +		cm2: cm2 at 4a008000 {
->> +			compatible = "ti,clock-master";
->
-> compatible = "ti,omap4-cm2";
->
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x4a008000 0x3000>;
->> +		};
->> +
->> +		scrm: scrm at 4a30a000 {
->> +			compatible = "ti,clock-master";
->
-> compatible = "ti,omap4-scrm";
->
->
-> ...
->
->> diff --git a/arch/arm/boot/dts/omap443x-clocks.dtsi b/arch/arm/boot/dts/omap443x-clocks.dtsi
->> new file mode 100644
->> index 0000000..643755b
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap443x-clocks.dtsi
->> @@ -0,0 +1,18 @@
->> +/*
->> + * Device Tree Source for OMAP4 clock data
->> + *
->> + * Copyright (C) 2013 Texas Instruments, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +&prm {
->> +	bandgap_fclk: bandgap_fclk {
->> +		#clock-cells = <0>;
->> +		compatible = "ti,gate-clock";
->> +		clocks = <&sys_32k_ck>;
->> +		ti,bit-shift = <8>;
->> +		reg = <0x1888>;
->> +	};
->
-> So we've already discussed that clocks should be moved underneath
-> separate "clocks {" node in the IP block data.  And similarly...
+I hadn't anticipated that =(. In fact I had been holding this patch back
+for a release cycle because I was waiting for a specific regulator patch
+to land which provides a dummy regulator if one wasn't specified. It
+seems that that patch only works when booting from DT, though.
 
-Yeah, I have actually wip v11 which has this done. I ended up creating 
-this though:
+The correct way to fix this would be to provide a lookup table with the
+dummy regulator in the board file. I've attached a patch (compile-tested
+only) that might work.
 
-...
-    prm {
-       prm_clocks: clocks {
+If it does, please let me know and, if nobody else volunteers, I'll see
+if I can come up with a set of patches to fix this for any other boards
+that have the same issue.
 
-       };
-    };
-
-... and references like:
-
-&prm_clocks {
-
-};
-
-It seems the references to existing clocks {} nodes is impossible 
-otherwise as I need to add some extra clocks to these.
-
->
->> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
->> new file mode 100644
->> index 0000000..2b59d54
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
->
-> ...
->
->> +	emu_sys_clkdm: emu_sys_clkdm {
->> +		compatible = "ti,clockdomain";
->> +		clocks = <&trace_clk_div_ck>;
->> +	};
->
-> ... all of the clockdomains should be moved underneath "clockdomains {"
-> nodes in the IP block DT data.
-
-Ok that can be done.
-
->
->
-> - Paul
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-pxa-Add-dummy-power-supply-for-backlight-for-Mit.patch
+Type: text/x-diff
+Size: 1813 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/194fd6ef/attachment-0001.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131217/194fd6ef/attachment-0001.sig>
