@@ -1,253 +1,74 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 17 Dec 2013 13:53:32 +0100
-Subject: [PATCH 1/7] iommu/omap: Do bus_set_iommu() only if probe() succeeds
-In-Reply-To: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1387284818-28739-2-git-send-email-florian.vaussard@epfl.ch>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 17 Dec 2013 13:54:35 +0100
+Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131217124505.GB17210@ulmo.nvidia.com>
+References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
+ <5295539.cCkPY1PpyC@flatron> <20131217124505.GB17210@ulmo.nvidia.com>
+Message-ID: <1500339.E8bGm7xZUi@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, bus_set_iommu() is done in omap_iommu_init(). However,
-omap_iommu_probe() can fail in a number of ways, leaving the platform
-bus with a dangling reference to a non-initialized iommu. Perform
-bus_set_iommu() only if omap_iommu_probe() succeed.
+On Tuesday 17 of December 2013 13:45:06 Thierry Reding wrote:
+> On Tue, Dec 17, 2013 at 01:00:10PM +0100, Tomasz Figa wrote:
+> > On Tuesday 17 of December 2013 11:51:36 Russell King - ARM Linux wrote:
+> > > On Tue, Dec 17, 2013 at 12:10:22PM +0100, Thierry Reding wrote:
+> > > > On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
+> > > > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > > > > +		const void __iomem *addr)
+> > > > > +{
+> > > > > +	u32 val;
+> > > > > +
+> > > > > +	val = __raw_readl(addr);
+> > > > > +
+> > > > > +	if (likely(fpc->big_endian))
+> > > > 
+> > > > The likely() probably isn't very useful in this case. But if you want to
+> > > > keep it, it should at least be reversed, since little-endian is actually
+> > > > the default (you have to specify the big-endian property to activate the
+> > > > big endian mode).
+> > > > 
+> > > > > +		val = be32_to_cpu(val);
+> > > > > +	else
+> > > > > +		val = le32_to_cpu(val);
+> > > 
+> > > This will also cause sparse errors, because when sparse is enabled, these
+> > > expect __le32 or __be32 arguments, not u32.
+> > 
+> > My question is why can't you just create two sets of accessors, one big
+> > endian and one little endian, add two function pointers to your
+> > fsl_pwm_chip struct and let the driver set the to correct accessors in
+> > probe?
+> 
+> I guess that would be one possibility.
+> 
+> > This would eliminate the problem with types Russell mentioned and IMHO
+> > make the code cleaner.
+> 
+> I fail to see how that would eliminate the problem with the types. That
+> said I don't actually see sparse complaining about any type mismatches.
+> That's probably because the various macros implicitly cast to u32.
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- drivers/iommu/omap-iommu.c | 207 +++++++++++++++++++++++----------------------
- 1 file changed, 104 insertions(+), 103 deletions(-)
+Well, in BE variant you would read the register using __raw_readl() into
+a __be32 and then get an u32 from be32_to_cpu() and return it. Similarly
+for writes
 
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index bcd78a7..ee83bcc 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -930,107 +930,6 @@ static void omap_iommu_detach(struct omap_iommu *obj)
- 	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
- }
- 
--/*
-- *	OMAP Device MMU(IOMMU) detection
-- */
--static int omap_iommu_probe(struct platform_device *pdev)
--{
--	int err = -ENODEV;
--	int irq;
--	struct omap_iommu *obj;
--	struct resource *res;
--	struct iommu_platform_data *pdata = pdev->dev.platform_data;
--
--	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
--	if (!obj)
--		return -ENOMEM;
--
--	obj->nr_tlb_entries = pdata->nr_tlb_entries;
--	obj->name = pdata->name;
--	obj->dev = &pdev->dev;
--	obj->ctx = (void *)obj + sizeof(*obj);
--	obj->da_start = pdata->da_start;
--	obj->da_end = pdata->da_end;
--
--	spin_lock_init(&obj->iommu_lock);
--	mutex_init(&obj->mmap_lock);
--	spin_lock_init(&obj->page_table_lock);
--	INIT_LIST_HEAD(&obj->mmap);
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		err = -ENODEV;
--		goto err_mem;
--	}
--
--	res = request_mem_region(res->start, resource_size(res),
--				 dev_name(&pdev->dev));
--	if (!res) {
--		err = -EIO;
--		goto err_mem;
--	}
--
--	obj->regbase = ioremap(res->start, resource_size(res));
--	if (!obj->regbase) {
--		err = -ENOMEM;
--		goto err_ioremap;
--	}
--
--	irq = platform_get_irq(pdev, 0);
--	if (irq < 0) {
--		err = -ENODEV;
--		goto err_irq;
--	}
--	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
--			  dev_name(&pdev->dev), obj);
--	if (err < 0)
--		goto err_irq;
--	platform_set_drvdata(pdev, obj);
--
--	pm_runtime_irq_safe(obj->dev);
--	pm_runtime_enable(obj->dev);
--
--	dev_info(&pdev->dev, "%s registered\n", obj->name);
--	return 0;
--
--err_irq:
--	iounmap(obj->regbase);
--err_ioremap:
--	release_mem_region(res->start, resource_size(res));
--err_mem:
--	kfree(obj);
--	return err;
--}
--
--static int omap_iommu_remove(struct platform_device *pdev)
--{
--	int irq;
--	struct resource *res;
--	struct omap_iommu *obj = platform_get_drvdata(pdev);
--
--	iopgtable_clear_entry_all(obj);
--
--	irq = platform_get_irq(pdev, 0);
--	free_irq(irq, obj);
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(res->start, resource_size(res));
--	iounmap(obj->regbase);
--
--	pm_runtime_disable(obj->dev);
--
--	dev_info(&pdev->dev, "%s removed\n", obj->name);
--	kfree(obj);
--	return 0;
--}
--
--static struct platform_driver omap_iommu_driver = {
--	.probe	= omap_iommu_probe,
--	.remove	= omap_iommu_remove,
--	.driver	= {
--		.name	= "omap-iommu",
--	},
--};
--
- static void iopte_cachep_ctor(void *iopte)
- {
- 	clean_dcache_area(iopte, IOPTE_TABLE_SIZE);
-@@ -1265,6 +1164,110 @@ static struct iommu_ops omap_iommu_ops = {
- 	.pgsize_bitmap	= OMAP_IOMMU_PGSIZES,
- };
- 
-+/*
-+ *	OMAP Device MMU(IOMMU) detection
-+ */
-+static int omap_iommu_probe(struct platform_device *pdev)
-+{
-+	int err = -ENODEV;
-+	int irq;
-+	struct omap_iommu *obj;
-+	struct resource *res;
-+	struct iommu_platform_data *pdata = pdev->dev.platform_data;
-+
-+	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
-+	if (!obj)
-+		return -ENOMEM;
-+
-+	obj->nr_tlb_entries = pdata->nr_tlb_entries;
-+	obj->name = pdata->name;
-+	obj->dev = &pdev->dev;
-+	obj->ctx = (void *)obj + sizeof(*obj);
-+	obj->da_start = pdata->da_start;
-+	obj->da_end = pdata->da_end;
-+
-+	spin_lock_init(&obj->iommu_lock);
-+	mutex_init(&obj->mmap_lock);
-+	spin_lock_init(&obj->page_table_lock);
-+	INIT_LIST_HEAD(&obj->mmap);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		err = -ENODEV;
-+		goto err_mem;
-+	}
-+
-+	res = request_mem_region(res->start, resource_size(res),
-+				 dev_name(&pdev->dev));
-+	if (!res) {
-+		err = -EIO;
-+		goto err_mem;
-+	}
-+
-+	obj->regbase = ioremap(res->start, resource_size(res));
-+	if (!obj->regbase) {
-+		err = -ENOMEM;
-+		goto err_ioremap;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		err = -ENODEV;
-+		goto err_irq;
-+	}
-+
-+	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
-+			  dev_name(&pdev->dev), obj);
-+	if (err < 0)
-+		goto err_irq;
-+	platform_set_drvdata(pdev, obj);
-+
-+	bus_set_iommu(&platform_bus_type, &omap_iommu_ops);
-+
-+	pm_runtime_irq_safe(obj->dev);
-+	pm_runtime_enable(obj->dev);
-+
-+	dev_info(&pdev->dev, "%s registered\n", obj->name);
-+	return 0;
-+
-+err_irq:
-+	iounmap(obj->regbase);
-+err_ioremap:
-+	release_mem_region(res->start, resource_size(res));
-+err_mem:
-+	kfree(obj);
-+	return err;
-+}
-+
-+static int omap_iommu_remove(struct platform_device *pdev)
-+{
-+	int irq;
-+	struct resource *res;
-+	struct omap_iommu *obj = platform_get_drvdata(pdev);
-+
-+	iopgtable_clear_entry_all(obj);
-+
-+	irq = platform_get_irq(pdev, 0);
-+	free_irq(irq, obj);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	release_mem_region(res->start, resource_size(res));
-+	iounmap(obj->regbase);
-+
-+	pm_runtime_disable(obj->dev);
-+
-+	dev_info(&pdev->dev, "%s removed\n", obj->name);
-+	kfree(obj);
-+	return 0;
-+}
-+
-+static struct platform_driver omap_iommu_driver = {
-+	.probe	= omap_iommu_probe,
-+	.remove	= omap_iommu_remove,
-+	.driver	= {
-+		.name	= "omap-iommu",
-+	},
-+};
-+
- static int __init omap_iommu_init(void)
- {
- 	struct kmem_cache *p;
-@@ -1277,8 +1280,6 @@ static int __init omap_iommu_init(void)
- 		return -ENOMEM;
- 	iopte_cachep = p;
- 
--	bus_set_iommu(&platform_bus_type, &omap_iommu_ops);
--
- 	return platform_driver_register(&omap_iommu_driver);
- }
- /* must be ready before omap3isp is probed */
--- 
-1.8.1.2
+In LE variant, readl()/writel() could be used directly.
+
+> 
+> > > > > +	rmb();
+> > > > 
+> > > > I'd prefer the rmb() to follow the __raw_readl() immediately to make the
+> > > > relationship more explicit.
+> > > 
+> > > A better question to ask is: why is this barrier here?  What memory
+> > > ordering operations is it trying to serialise?
+> > 
+> > I'd also add a question why __raw accessors are used here.
+> 
+> Because both readl() and writel() explicitly perform little endian
+> accesses.
+
+Right. Thanks for pointing this out.
+
+Best regards,
+Tomasz
