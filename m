@@ -1,37 +1,102 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 16 Dec 2013 18:13:02 -0700
-Subject: [PATCH V2 12/13] ARM: dts: imx6qdl-sabrelite: Add over-current pin to
- usbotg
+Date: Mon, 16 Dec 2013 18:12:59 -0700
+Subject: [PATCH V2 09/13] ARM: dts: imx6qdl-sabrelite: add pwms for backlights
 In-Reply-To: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387242783-1462-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387242783-1462-13-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387242783-1462-10-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KEY_COL4 is over-current for usbotg on Sabre Lite.
+add pwm1 for lcd backlight
+add pwm4 for lvds backlight
+add pwm3 for ov5640 mipi clock
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-Reviewed-by: Marek Vasut <marex@denx.de>
 
 ---
 v2: no change
 ---
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 54 ++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index f1d8b24..b2711ae 100644
+index 36ffbb2..723259f 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -268,7 +268,8 @@
+@@ -104,6 +104,24 @@
+ 		mux-int-port = <1>;
+ 		mux-ext-port = <4>;
+ 	};
++
++	backlight_lcd {
++		compatible = "pwm-backlight";
++		pwms = <&pwm1 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		power-supply = <&reg_3p3v>;
++		status = "okay";
++	};
++
++	backlight_lvds {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		power-supply = <&reg_3p3v>;
++		status = "okay";
++	};
+ };
  
- 		pinctrl_usbotg: usbotggrp {
- 			fsl,pins = <
--				MX6QDL_USBOTG_PINGRP1
-+				MX6QDL_PAD_GPIO_1__USB_OTG_ID	0x17059
-+				MX6QDL_PAD_KEY_COL4__USB_OTG_OC	0x1b0b0
- 				/* power enable, high active */
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x000b0
- 			>;
+ &audmux {
+@@ -196,6 +214,24 @@
+ 			fsl,pins = <MX6QDL_I2C1_PINGRP1>;
+ 		};
+ 
++		pinctrl_pwm1: pwm1grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT1__PWM3_OUT 0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT 0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <MX6QDL_UART1_PINGRP2>;
+ 		};
+@@ -258,6 +294,24 @@
+ 	status = "okay";
+ };
+ 
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
 -- 
 1.8.1.2
