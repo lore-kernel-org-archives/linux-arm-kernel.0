@@ -1,70 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Dec 2013 11:29:14 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core
- running without PCI on ARM64
-In-Reply-To: <20131216205133.GI5617@xora-haswell.xora.org.uk>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312091735.05014.arnd@arndb.de> <20131209165548.GE19163@arm.com>
- <201312091820.23006.arnd@arndb.de> <20131209180155.GG19163@arm.com>
- <20131216205133.GI5617@xora-haswell.xora.org.uk>
-Message-ID: <20131217112914.GB32118@arm.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 17 Dec 2013 12:29:31 +0100
+Subject: [PATCH v2] use -fstack-protector-strong
+In-Reply-To: <CAGXu5j+0gjN118RijCinw31g51BZez_oGKFYJwq2T3=yojG_ww@mail.gmail.com>
+References: <20131126203727.GA352@www.outflux.net>
+ <20131127112731.GA10435@gmail.com>
+ <CAGXu5jLY+AzaB4f92OLA6Orm=Mr9C+G+-mgOmSf-yju+YCmaUg@mail.gmail.com>
+ <20131127175442.GA28088@gmail.com> <52963223.9080701@zytor.com>
+ <CAGXu5j+6_M65pDoJjx1NEUw8SkfpGjH=yhswt-RW=_W97=kkzQ@mail.gmail.com>
+ <CAGXu5j+0gjN118RijCinw31g51BZez_oGKFYJwq2T3=yojG_ww@mail.gmail.com>
+Message-ID: <20131217112931.GC27791@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Graeme,
 
-On Mon, Dec 16, 2013 at 08:51:33PM +0000, Graeme Gregory wrote:
-> So the real question now is how do we progress with these ACPI patches? After
-> repeated incorrect accusations of developing behind closed doors I am loath
-> to dissapear back into linaro with them for another few months.
+* Kees Cook <keescook@chromium.org> wrote:
 
-Well, just follow the Linux community process, no need to disappear
-back. There was feedback that needs to be addressed, work on getting
-acks from maintainers. The first version has only been posted two weeks
-ago, I don't see any reason to panic ;).
+> On Wed, Nov 27, 2013 at 10:11 AM, Kees Cook <keescook@chromium.org> wrote:
+> > On Wed, Nov 27, 2013 at 9:55 AM, H. Peter Anvin <hpa@zytor.com> wrote:
+> >> On 11/27/2013 09:54 AM, Ingo Molnar wrote:
+> >>>>
+> >>>> Looks to be 2% for defconfig. That's way better. Shall I send a v3?
+> >>>
+> >>> Well, it's better than 9%, but still almost an order of magnitude
+> >>> higher than the cost is today, and a lot of distros have
+> >>> CONFIG_CC_STACKPROTECTOR=y.
+> >>>
+> >>> So it would be nice to measure how much the instruction count goes up
+> >>> in some realistic system-bound test. How much does something like
+> >>> kernel/built-in.o increase, as per 'size' output?
+> >
+> >    text    data     bss     dec     hex filename
+> >  929611   90851  594496 1614958  18a46e built-in.o-gcc-4.9
+> >  954648   90851  594496 1639995  19063b built-in.o-gcc-4.9+strong
+> >
+> > Looks like 3% for defconfg + CONFIG_CC_STACKPROTECTOR
+> >
+> >>
+> >> Do we need CONFIG_CC_STACKPROTECTOR_STRONG?
+> >
+> > I'm hoping to avoid this since nearly anyone using 
+> > CC_STACKPROTECTOR would want strong added, but as a fallback, I'm 
+> > happy to implement it as a separate config item.
+> 
+> Any verdict on this? Should I go with adding ..._STRONG like we used 
+> to have for ..._ALL, or is defaulting to -strong best?
 
-> Also as Mark Brown has already pointed out the bigger the patchset gets
-> while developed in Linaro trees the more strain it is going to put on
-> maintainers for review.
+I'm not opposed to the feature itself, just to the specific structure 
+you presented - as outlined in my review feedback.
 
-Yes, that's correct, so just gather maintainer's acks in smaller steps.
+The cost of the feature itself appears to be significant (this cost 
+should be outlined in the help text btw), while I think the cost of 
+adding this as a new _STRONG option is minimal.
 
-> We have worked to try and keep the patchset as self contained as possible
-> and to affect arch/arm64 in a minimal way. It should not affect it at all
-> in the !CONFIG_ACPI case.
+So I'd go forward with addressing two issues:
 
-And this is great, I really don't have any complaints here.
+1)
 
-> Currently Hanjun is busy preparing a v2 PATCH series which contains amendments
-> for all the technical issues found in review so far. Should we continue with
-> this process until all the neccessary Acks are in place?
+I'd add the new STACKPROTECTOR_STRONG option and maybe rename the old 
+one to STACKPROTECTOR_WEAK.
 
-Reviews/acks is the first step and you are on the right track here. The
-following step would be upstreaming with good arguments on why and when
-the code needs to be merged. Code quality on its own is not an argument
-for merging. Backlog in Linaro's trees is not an argument either. You
-could of course start upstreaming clean-up code that is necessary
-whether you have ACPI on arm64 or not.
+If in a year or two most distros have switched over to the _STRONG 
+variant, despite its costs, then we can drop the weak variant.
 
-So while waiting to debate the good arguments for when to merge the code
-(once reviewed), I have several concerns which I want addressed before
-enabling ACPI for arm64:
+2)
 
-- Does anyone have a wider view of how ACPI on ARM looks like? There is
-  a lot of effort going into the next version of ACPI but for now I
-  don't see how we can enable a feature and hope we sort it out later.
-- Who is coordinating the non-standard ACPI descriptors being pushed to
-  various drivers in the kernel? Do we trust the hw vendors to do the
-  right thing (and also talk to each other)?
-- What if two hw vendors have different descriptors for the same device?
-- Have we agreed what we do about clocks, voltage regulators?
-- Do we actually have a real platform which requires ACPI at this point?
+It would also be nice to see a head to head comparison of the 3 
+variants:
 
-Just to be clear, I'm not against ACPI for arm64 and I am aware of
-hardware vendors requiring this. But I'm looking forward to them being
-more open and explain what (rather than why) they need because I don't
-think ACPI solves anything for the ARM kernel community. It's rather a
-favour we do to them and OS distros.
+	!STACKPROTECTOR
+	STACKPROTECTOR_LIGHT
+	STACKPROTECTOR_STRONG
 
--- 
-Catalin
+of defconfig vmlinux size and estimated number of checks inserted in 
+each case - so people/distros can make an informed decision about the 
+relative quality differences between these variants and whether they 
+want to carry the costs of that.
+
+Thanks,
+
+	Ingo
