@@ -1,61 +1,199 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 18 Dec 2013 22:49:44 +0100
-Subject: [PATCH V2 1/5] pinctrl: r7s72100: add riic groups
-In-Reply-To: <1387402321-21866-2-git-send-email-wsa@the-dreams.de>
-References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
- <1387402321-21866-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <20131218214943.GC18645@katana>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 18 Dec 2013 14:51:44 -0700
+Subject: [PATCH V3 1/1] ARM: dts: imx6qdl-sabrelite: add gpio-keys
+Message-ID: <1387403504-26097-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 10:31:57PM +0100, Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Tested RIIC2 on a genmai board. Other riic groups are untested but seem
-> trivial enough to be added.
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
-> V2: keep sorting alphabetical
-> 
-> Note: With the current PFC driver as posted by Magnus, it needs another patch
-> to work. Yet, I think this is a seperate PFC issue which needs to be sorted out
-> seperately and shouldn't affect these declarations. I'll add the needed patch
-> as a response to this mail.
+Add power, menu, home, back, volume up, and volume down
+buttons.
 
-From: Wolfram Sang <wsa@the-dreams.de>
-Subject: [PATCH] HACK: make magnus new driver work
+Also, apply same changes to imx6qdl-nitrogen6x.
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+
 ---
- drivers/pinctrl/sh-pfc/pfc-r7s72100.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+v3: add pinctrl_gpio_keys, make same changes to
+imx6qdl-nitrogen6x.dtsi
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
-index 00f67e8..a662876 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
-@@ -68,11 +68,11 @@ enum {
- #define _P_GPIO(bank, _pin, _name, sfx) _GP_GPIO(16, bank, _pin, _name, sfx)
- 
- #define _P_DATA(bank, pin, name, sfx)					\
--	PINMUX_DATA(name##_DATA, name##_PMC_0, name##_PIPC_0,		\
-+	PINMUX_DATA(name##_DATA, name##_PMC_0,		\
- 		    name##_PIBC_1, name##_PBDC_1)
- 
- #define _P_FN(n, fn, pfcae, pfce, pfc)					\
--	PINMUX_DATA(n##_MARK_FN##fn, n##_PMC_1,	n##_PIPC_1,		\
-+	PINMUX_DATA(n##_MARK_FN##fn, n##_PMC_1,		\
- 		    n##_PFCAE_##pfcae, n##_PFCE_##pfce, n##_PFC_##pfc)
- 
- #define _P_MARK_FN1(bank, pin, name, sfx) _P_FN(name, 1, 0, 0, 0)
+v2: add #include <dt-bindings/input/input.h>
+to substitute KEY_POWER for 116
+---
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 61 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 61 +++++++++++++++++++++++++++++++
+ 2 files changed, 122 insertions(+)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/484522cd/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index eab77df..78fe8b0 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -10,6 +10,8 @@
+  * http://www.opensource.org/licenses/gpl-license.html
+  * http://www.gnu.org/copyleft/gpl.html
+  */
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	memory {
+@@ -50,6 +52,48 @@
+ 		};
+ 	};
+ 
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++		power {
++			label = "Power Button";
++			gpios = <&gpio2 3 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			gpio-key,wakeup;
++		};
++
++		menu {
++			label = "Menu";
++			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_MENU>;
++		};
++
++		home {
++			label = "Home";
++			gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_HOME>;
++		};
++
++		back {
++			label = "Back";
++			gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_BACK>;
++		};
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio7 13 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEUP>;
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEDOWN>;
++		};
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx6q-nitrogen6x-sgtl5000",
+ 			     "fsl,imx-audio-sgtl5000";
+@@ -183,6 +227,23 @@
+ 			>;
+ 		};
+ 
++		pinctrl_gpio_keys: gpio_keysgrp {
++			fsl,pins = <
++				/* Power Button */
++				MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x1b0b0
++				/* Menu Button */
++				MX6QDL_PAD_NANDF_D1__GPIO2_IO01		0x1b0b0
++				/* Home Button */
++				MX6QDL_PAD_NANDF_D4__GPIO2_IO04		0x1b0b0
++				/* Back Button */
++				MX6QDL_PAD_NANDF_D2__GPIO2_IO02		0x1b0b0
++				/* Volume Up Button */
++				MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x1b0b0
++				/* Volume Down Button */
++				MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x1b0b0
++			>;
++		};
++
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <MX6QDL_I2C1_PINGRP1>;
+ 		};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index dbfc040..d28f501 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -9,6 +9,8 @@
+  * http://www.opensource.org/licenses/gpl-license.html
+  * http://www.gnu.org/copyleft/gpl.html
+  */
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	memory {
+@@ -49,6 +51,48 @@
+ 		};
+ 	};
+ 
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++		power {
++			label = "Power Button";
++			gpios = <&gpio2 3 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			gpio-key,wakeup;
++		};
++
++		menu {
++			label = "Menu";
++			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_MENU>;
++		};
++
++		home {
++			label = "Home";
++			gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_HOME>;
++		};
++
++		back {
++			label = "Back";
++			gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_BACK>;
++		};
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio7 13 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEUP>;
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEDOWN>;
++		};
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx6q-sabrelite-sgtl5000",
+ 			     "fsl,imx-audio-sgtl5000";
+@@ -182,6 +226,23 @@
+ 			>;
+ 		};
+ 
++		pinctrl_gpio_keys: gpio_keysgrp {
++			fsl,pins = <
++				/* Power Button */
++				MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x1b0b0
++				/* Menu Button */
++				MX6QDL_PAD_NANDF_D1__GPIO2_IO01		0x1b0b0
++				/* Home Button */
++				MX6QDL_PAD_NANDF_D4__GPIO2_IO04		0x1b0b0
++				/* Back Button */
++				MX6QDL_PAD_NANDF_D2__GPIO2_IO02		0x1b0b0
++				/* Volume Up Button */
++				MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x1b0b0
++				/* Volume Down Button */
++				MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x1b0b0
++			>;
++		};
++
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <MX6QDL_I2C1_PINGRP1>;
+ 		};
+-- 
+1.8.1.2
