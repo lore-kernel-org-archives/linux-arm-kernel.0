@@ -1,128 +1,56 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 18 Dec 2013 11:07:15 +0900
-Subject: [PATCH 01/04] ARM: shmobile: r7s72100 GPIO and PINCTRL device
- nodes
-In-Reply-To: <24775601.3oo6NRXHkY@avalon>
-References: <20131217050232.727.9552.sendpatchset@w520>
- <1836950.NOThFz7jV4@avalon>
- <CANqRtoScxzFUzVcck3tPPb6k35TWDKHgf9J-K+WxkERcmsmrQA@mail.gmail.com>
- <24775601.3oo6NRXHkY@avalon>
-Message-ID: <CANqRtoTdyUJgj+L8goMRW5mELjv16SVxkJqgw8tWpHyQyKzb3Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 18 Dec 2013 10:38:12 +0800
+Subject: [PATCH 1/3]: Support cpu frequency scaling and power management
+ for iMX6SL
+In-Reply-To: <52B09856.5050609@tqsc.de>
+References: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+ <CACUGKYN_b0x4xg_Me3TXQGKEvz61SDZk4CFk5YHFnVCWT_6GPg@mail.gmail.com>
+ <52B09856.5050609@tqsc.de>
+Message-ID: <20131218023808.GZ6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Tue, Dec 17, 2013 at 07:30:46PM +0100, Markus Niebel wrote:
+> >> @@ -38,6 +38,19 @@
+> >>                         device_type = "cpu";
+> >>                         reg = <0x0>;
+> >>                         next-level-cache = <&L2>;
+> >> +                       operating-points = <
+> >> +                               /* kHz    uV */
+> >> +                               1000000 1275000
+> >> +                               792000  1150000
+> 
+> according to the CPU documentation the following operation points are suggested (at least AFAIK):
+>                                996000  1250000 /* for consumer grade only */
+>                                792000  1150000
+>                                396000  1050000
+> note: AFAIK there is no way to detect at runtime if we  running on industrial / automotive variant
+> so there is a risk to run at too high frequency ...
 
-On Wed, Dec 18, 2013 at 9:40 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
->
-> On Wednesday 18 December 2013 07:41:57 Magnus Damm wrote:
->> On Wed, Dec 18, 2013 at 1:29 AM, Laurent Pinchart wrote:
->> > On Tuesday 17 December 2013 14:02:42 Magnus Damm wrote:
->> >> From: Magnus Damm <damm@opensource.se>
->> >>
->> >> Add support for r7s72100 PFC and GPIO device nodes port0 -> port11
->> >> and jtagport0.
->> >>
->> >> Signed-off-by: Magnus Damm <damm@opensource.se>
->> >> ---
->> >>
->> >>  arch/arm/boot/dts/r7s72100.dtsi |  154 +++++++++++++++++++++++++++++++++
->> >>  1 file changed, 154 insertions(+)
->> >>
->> >> --- 0001/arch/arm/boot/dts/r7s72100.dtsi
->> >> +++ work/arch/arm/boot/dts/r7s72100.dtsi      2013-11-27
->> >> 16:06:36.000000000 +0900
->
-> [snip]
->
->> >> +
->> >> +     port0: gpio at fcfe3100 {
->> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
->> >> +             reg = <0xfcfe3100 0x4>, /* PSR */
->> >> +                       <0xfcfe3200 0x2>, /* PPR */
->> >> +                       <0xfcfe3800 0x4>; /* PMSR */
->> >> +             #gpio-cells = <2>;
->> >> +             gpio-controller;
->> >> +             gpio-ranges = <&pfc 0 0 6>;
->> >> +     };
->> >> +
->> >> +     port1: gpio at fcfe3104 {
->> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
->> >> +             reg = <0xfcfe3104 0x4>, /* PSR */
->> >> +                       <0xfcfe3204 0x2>, /* PPR */
->> >> +                       <0xfcfe3804 0x4>; /* PMSR */
->> >> +             #gpio-cells = <2>;
->> >> +             gpio-controller;
->> >> +             gpio-ranges = <&pfc 0 16 16>;
->> >
->> > As P0 has 6 pins only this should ideally be
->> >
->> >                 gpio-ranges = <&pfc 0 6 16>;
->> >
->> > Otherwise the PFC driver will expose pins that don't exist. However, that
->> > would require computing the pin numbers in the PFC driver differently, as
->> > we currently just use the bank * 16 + index formula. Given that we only
->> > have three ports with less than 16 pins we could come up with a not
->> > overly complex formula that can be evaluated at compile time. Something
->> > like this should do.
->> >
->> > #define RZ_PORT_PIN(bank, pin) \
->> >
->> >         (bank) < 1 ? (pin) : \
->> >         (bank) < 6 ? 6 + (((bank) - 1) * 16) + (pin)) : \
->> >         (bank) < 10 ? 6 + 11 + 4 * 16 + (((bank) - 6) * 16) + (pin)) : \
->> >         6 + 11 + 8 + 7 * 16 + (((bank) - 10) * 16) + (pin))
->>
->> Uhm, well, you can make the mapping more compact yes, but I'm not sure
->> if I agree that it becomes any better. Isn't it better to simply
->> follow the per-port setup that the manual defines? Is there an actual
->> problem with having unused GPIOs?
->
-> If I'm not mistaken it's unused pins, not unused GPIOs. They waste memory in
-> data tables, although by a relatively small amount. Oh, and of course, it's
-> not clean ;-)
+I can only find IMX6SLCEC - i.MX 6SoloLite Applications Processors for
+Consumer Products on freescale website.
 
-Yes, you are correct about pins vs GPIOs. Regarding how to implement
-RZ_PORT_PIN(), I believe the only way not to shoot yourself in the
-foot is to keep things simple. I also think that some level of
-redundancy is an acceptable tradeoff if it keeps things simpler. So I
-suppose cleanliness is a matter of taste. =)
+ http://cache.freescale.com/files/32bit/doc/data_sheet/IMX6SLCEC.pdf?fpsp=1
 
-> Speaking of data tables, I'm thinking about simplifying them. The RZ/A1H is a
-> good candidate for that, as each pin is handled individually, and several
-> registers could be handled to with a small amount of code instead of large
-> data tables. It's just a thought for now, I have more urgent tasks to work on.
+In that document, I can see the following in Table 9. Operating Ranges.
 
-Incremental patches to improve the state is always nice, thanks.
+ LDO output set at 1.250V minimum for operation up to 996MHz
+ LDO output set at 1.150V minimum for operation up to 792MHz
+ LDO output set at 0.95V minimum for operation up to 396MHz
 
->> Actually, I prefer going in the opposite direction so I would like to
->> share the simple version of RZ_PORT_PIN() in a header file like we do
->> with RCAR_GP_PIN() in <linux/platform_data/gpio-rcar.h>. This because
->> we would like to use the same macro in the GPIO driver and in the
->> current PFC code (and potentially more PFCs using the same GPIO
->> driver).
->
-> What do you need it for in the GPIO driver ?
+However, if you access Freescale 3.10 kernel tree, you will see there
+are 25mV addition to each operating-point.
 
-Well, I thought I needed it but it turns out that I'm wrong. =)
+	operating-points = <
+		/* kHz   uV */
+		996000  1275000
+		792000  1175000
+		396000  975000
+	>;
 
-Initially I had the following two in the header file:
-+#define RZ_GPIOS_PER_PORT 16
-+#define RZ_PORT_PIN(bank, pin) (((bank) * RZ_GPIOS_PER_PORT) + (pin))
+>From the commit log, it said this 25mV is added to compensate the output
+tolerance from external regulators.
 
-RZ_GPIOS_PER_PORT was used in both the GPIO driver and
-RZ_PORT_PIN() was used in the PFC driver
+I suggest we follow Freescale kernel to set the operating-points.
 
-On a second though, I don't mind duplicating them.
-
-I do however think your version of the RZ_PORT_PIN() is overly
-complex. And that needs to be matched with updated gpio-ranges that
-together seem quite error prone to me.
-
-How would you like me to proceed?
-
-Cheers,
-
-/ magnus
+Shawn
