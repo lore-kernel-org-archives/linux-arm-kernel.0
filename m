@@ -1,52 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 18 Dec 2013 09:53:26 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
-In-Reply-To: <CAMuHMdV7y7GFrswa+f7ui8LSXj723_i5P6gBAG5ZOoMDP5LWyA@mail.gmail.com>
-References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
- <52AEFF56.5010602@cogentembedded.com>
- <52AF8D57.7010705@cogentembedded.com>
- <20131217003107.GF27171@verge.net.au>
- <CAMuHMdV7y7GFrswa+f7ui8LSXj723_i5P6gBAG5ZOoMDP5LWyA@mail.gmail.com>
-Message-ID: <20131218005326.GE18992@verge.net.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 17 Dec 2013 17:05:18 -0800
+Subject: [GIT PULL v4][for 3.14] pull request for hisilicon soc
+In-Reply-To: <52AC0C41.2040607@gmail.com> (Haojian Zhuang's message of "Sat,
+ 14 Dec 2013 15:44:01 +0800")
+References: <52AC0C41.2040607@gmail.com>
+Message-ID: <874n67m0j5.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 11:10:15AM +0100, Geert Uytterhoeven wrote:
-> On Tue, Dec 17, 2013 at 1:31 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Dec 17, 2013 at 02:31:35AM +0300, Sergei Shtylyov wrote:
-> >> On 12/16/2013 04:25 PM, I wrote:
-> >> >>The koelsch board uses has an SH ethernet controller which uses a Micrel
-> >> >>phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
-> >> >>Micrel-specific phy driver rather than relying on the generic phy driver.
-> >>
-> >> >    Frankly speaking, I'm seeing no advantages to doing that.
-> >>
-> >>    Although wait, Geert has reported the absence of Rx FIFO overflow
-> >> messages with this PHY driver, IIRC.
-> 
-> I spoke too soon: apparently the statistical relevance of my reporting was
-> too low. I still see them from time to time, but I think less than before (no
-> numbers available).
-> 
-> >> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>
-> >> >    Analogous changes are needed for BOCK-W and Lager boards since they all
-> >> >use the same KSZ8041RNLI PHY chip. I was going to submit such changes with the
-> >> >PHY IRQ patches but since no IRQ is generated still, this got delayed...
-> >>
-> >>    Only I was going to do it via defconfigs...
-> >
-> > That was my initial approach too. However I have been convinced
-> > that Kconfig is a better way forwards.
-> 
-> Kconfig has the advantage that the minimal defconfigs will be smaller, so
-> less churn there.
-> However, it does mean you cannot disable the option anymore via your .config.
-> 
-> In this case it's a bit difficult to decide, as sh_eth will work both
-> with and without
-> the specific PHY-driver.
-> 
-> If no users want to disable it, I'd go for Kconfig.
+Hi Haojian,
 
-It is indeed a tricky choice. But I think we should try going for Kconfig.
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+
+> Hi Olof/Kevin,
+>
+> Now I fix the wrong pull request. Here's the updated for hisilicon
+> soc. Please help to merge it.
+>
+>    Changes from v2 is in below. Since v3 is wrong, let's drop it.
+>     1. Update the git repository address from ssh:// to git://.
+>     2. Add clock binding in DTS file. This patch is contained in v11
+> & v12 patch sets, and everybody like this binding.
+>     3. Add the GPIOLIB selection by default.
+>
+
+This series still has many issues, and you'll see a handful of comments
+on the individual patches of your v12 series.
+
+Fortunately for you, I'm getting ready to take a couple weeks off and it
+is the season of giving and generosity, so I succumbed to the spirit of
+the holiday season and fixed them all up myself.  (Do note though that
+you only get one gift like this per year.)  ;)
+
+Seriously though, I spent way more time on this pull request (about an
+hour) than I normally spend and I was very close to requesting another
+respin.  I know that you're frustrated also that it's taken so long, but
+I hope you understand that when we keep seeing lots of minor problems
+like we have, it requires us to spend lots of extra time, and then
+forces us to look even closer the next time because we're expecting
+problems.  Please take some extra care next time, and possibly ask some
+colleagues to do the same.
+
+So, with all that... the updated series is now merged into next/soc.
+
+Kevin
