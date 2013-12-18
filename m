@@ -1,58 +1,92 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Wed, 18 Dec 2013 10:55:42 -0500
-Subject: [PATCH v6 7/7] jump_label: use defined macros instead of
- hard-coding for better readability
-In-Reply-To: <52AD8E10.2010904@gmail.com>
-References: <1386691433-6827-1-git-send-email-liuj97@gmail.com>	<1386691433-6827-8-git-send-email-liuj97@gmail.com>
- <20131213112019.751f7946@gandalf.local.home> <52AD8E10.2010904@gmail.com>
-Message-ID: <52B1C57E.7000901@akamai.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 18 Dec 2013 11:01:15 -0500
+Subject: [PATCH V2 2/8] string: fix strncmp function
+In-Reply-To: <20131218125203.GI4360@n2100.arm.linux.org.uk>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
+ <20131218121551.GH4360@n2100.arm.linux.org.uk>
+ <52B193BE.1080206@gmail.com>
+ <20131218125203.GI4360@n2100.arm.linux.org.uk>
+Message-ID: <20131218160114.GP2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2013 06:10 AM, Jiang Liu wrote:
-> On 12/14/2013 12:20 AM, Steven Rostedt wrote:
->> On Wed, 11 Dec 2013 00:03:53 +0800
->> Jiang Liu <liuj97@gmail.com> wrote:
->>
->>> Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
->>> readability.
->> Looks good, just a little nit. (see below)
->>
->>> Signed-off-by: Jiang Liu <liuj97@gmail.com>
->>> ---
->>>  include/linux/jump_label.h | 15 ++++++++++-----
-> ...
->>> @@ -123,9 +126,11 @@ extern void static_key_slow_dec(struct static_key *key);
->>>  extern void jump_label_apply_nops(struct module *mod);
->>>  
->>>  #define STATIC_KEY_INIT_TRUE ((struct static_key) \
->>> -	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
->>> +	{ .enabled = ATOMIC_INIT(1), \
->>> +	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
->>>  #define STATIC_KEY_INIT_FALSE ((struct static_key) \
->>> -	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
->>> +	{ .enabled = ATOMIC_INIT(0), \
->>> +	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
->> Can we prettify the backslashes like:
->>
->> #define STATIC_KEY_INIT_TRUE ((struct static_key)		\
->> 	{ .enabled = ATOMIC_INIT(1),				\
->> 	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
->> #define STATIC_KEY_INIT_FALSE ((struct static_key)		\
->> 	{ .enabled = ATOMIC_INIT(0),				\
->> 	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
->>
->>
->> Other than that.
->>
->> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-> Thanks Steve.
-> Will make this change.
+On Wed, Dec 18, 2013 at 12:52:03PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 18, 2013 at 01:23:26PM +0100, Daniel Mack wrote:
+> > On 12/18/2013 01:15 PM, Russell King - ARM Linux wrote:
+> > > For instance, can you be sure that there aren't any uses of strncmp()
+> > > which already test for less-than-zero etc?
+> > 
+> > In this case, yes. The code as it stands is very small, and users only
+> > check for the return value of these functions to be 0.
+> > 
+> > But I wonder whether that patch is needed at all. At least the rest of
+> > this series does not even seem to introduce new call sites of strcmp()
+> > or strncmp() ...
+> 
+> The implementation appears to be buggy as it stands - all it does is
+> sum up the differences in the whole string.
+> 
+> What if you're comparing two strings:
+> 
+> 	ac
+> 	ca
+> 
+> The first character has a difference of +2, the second has a difference
+> of -2.  Sum those together and you get zero.  Oh, the two strings are
+> identical!
 
-Works for me too, feel free to add:
+Yes, you are correct, the implementation isn't perfect.  I'll correct it
+since I introduced it.
 
-Acked-by: Jason Baron <jbaron@akamai.com>
+> Oh, and the other nitpick with the code is this:
+> 
+> 	*(a++)
+> 
+> Really, are those parens really needed?  If you don't know the precendence
+> there, then you really shouldn't be programming in C, because this might
+> also be buggy:
+> 
+> 	*(a++) - *(b++)
+> 
+> because if we declare that we don't know the precedence rules, it could be
+> that this is evaluated as *((a++) - (*(b++))) which would lead to errors!
+> Maybe some more parens should be added to make it clear!  Or maybe we
+> should just learn the precedence rules and realise that:
+> 
+> 	*a++ - *b++
+> 
+> is correct and clear and there's no need for any stupid idiotic parens
+> here.
+> 
+> Yes, I loath unnecessary parens.
 
-Thanks,
+Ahhh...  Good morning Russell! :)))
 
--Jason
+Yes, this is a bad habit I picked up, no shit, with gcc v2.96.  If you
+recall, 2.96 was fucked up like a soup sandwich [1].  That was right
+as I was starting my first job coding in C and I recall having to work
+around many bugs, including segfaults when passing a double to printf().
+
+The parentheses you caught above are another fallout from that.  iirc,
+v2.96 *actually* did the wrong thing if we had
+
+	*a++ = expr;
+
+After a year or two of maintaining that code on Vermillion [2] (a Redhat
+derivative the lead engineer liked), *(a++) was safe, and *a++ was
+dangerous.
+
+In Redhat's defense, I should've corrected the bad habit once I moved to
+other distros and realized v2.96 was the problem.  But I didn't.  My
+bad.  Patch on the way.
+
+thx,
+
+Jason.
+
+[1] http://gcc.gnu.org/gcc-2.96.html
+[2] "Vermillion is my customized linux distribution based on redhat."
+    was found in $searchengine, but not at a site I want to link to.
+    Apparently, the Internet forgot about this distro...
