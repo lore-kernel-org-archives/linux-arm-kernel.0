@@ -1,45 +1,34 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 17:47:16 +0100
-Subject: [PATCH 0/6] net: cpsw: Support for am335x chip MACIDs
-Message-ID: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
+Date: Wed, 18 Dec 2013 17:47:21 +0100
+Subject: [PATCH 5/6] arm: dts: am33xx, Add device node for cpsw-ctrl-macid
+In-Reply-To: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
+References: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387385242-1161-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This series introduces a driver to read and use the MACIDs stored in the am335x
-control module. These are read-only registers for a unique MACID. At the moment
-the MACIDs are generated randomly or they are set by the bootloader.
-
-A device node is added in am33xx dtsi and used by the cpsw slaves in the bone
-board files.
-
-Regards,
-
-Markus
-
-
-Markus Pargmann (6):
-  DT doc: net: cpsw mac-address is optional
-  net: cpsw: header, Add missing include
-  net: cpsw: Add control-module macid driver
-  net: cpsw: Use cpsw-ctrl-macid driver
-  arm: dts: am33xx, Add device node for cpsw-ctrl-macid
-  arm: dts: am335x beagle bone use processor macids
-
- .../devicetree/bindings/net/cpsw-ctrl-macid.txt    |  31 +++++
- Documentation/devicetree/bindings/net/cpsw.txt     |   7 +-
- arch/arm/boot/dts/am335x-bone.dts                  |   8 ++
- arch/arm/boot/dts/am335x-boneblack.dts             |   8 ++
- arch/arm/boot/dts/am33xx.dtsi                      |   7 ++
- drivers/net/ethernet/ti/Kconfig                    |   8 ++
- drivers/net/ethernet/ti/Makefile                   |   1 +
- drivers/net/ethernet/ti/cpsw-ctrl-macid.c          | 138 +++++++++++++++++++++
- drivers/net/ethernet/ti/cpsw.c                     |  18 ++-
- drivers/net/ethernet/ti/cpsw.h                     |   3 +
- 10 files changed, 224 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/cpsw-ctrl-macid.txt
- create mode 100644 drivers/net/ethernet/ti/cpsw-ctrl-macid.c
-
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index f6d8ffe..4e1bf08 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -676,6 +676,13 @@
+ 				reg= <0x44e10650 0x4>;
+ 				reg-names = "gmii-sel";
+ 			};
++
++			cpsw_ctrl_macid: cpsw-ctrl-macid at 44e10630 {
++				compatible = "ti,am3352-cpsw-ctrl-macid";
++				#ti,mac-address-ctrl-cells = <1>;
++				reg = <0x44e10630 0x16>;
++				reg-names = "ctrl-macid";
++			};
+ 		};
+ 
+ 		ocmcram: ocmcram at 40300000 {
 -- 
 1.8.5.1
