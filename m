@@ -1,67 +1,52 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Dec 2013 15:37:57 +0800
-Subject: [PATCH 1/4] iMX6SL frequency table
-In-Reply-To: <1387329451-17480-1-git-send-email-john.tobias.ph@gmail.com>
+Date: Wed, 18 Dec 2013 15:43:17 +0800
+Subject: [PATCH 2/4] Moving of_init_opp_table
+In-Reply-To: <1387329451-17480-2-git-send-email-john.tobias.ph@gmail.com>
 References: <1387329451-17480-1-git-send-email-john.tobias.ph@gmail.com>
-Message-ID: <20131218073755.GG6691@S2101-09.ap.freescale.net>
+ <1387329451-17480-2-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <20131218074315.GH6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 05:17:28PM -0800, John Tobias wrote:
->     Device tree for iMX6SL doesn't have an existing cpu frequency table.
+On Tue, Dec 17, 2013 at 05:17:29PM -0800, John Tobias wrote:
+>     Moving of_init_opp_table from mach-imx6q.c to imx6q-cpufreq.c in order to avoid adding it to mach-imx6sl.c.
+>     Just incase the cpu frequency scaling is enabled on iMX6SL.
 
-Drop these leading spaces.
+Drop the leading spaces and wrap the lines around 72 column.
 
 > 
 > Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
 > ---
->  arch/arm/boot/dts/imx6sl.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  drivers/cpufreq/imx6q-cpufreq.c | 5 +++++
 
-For such imx6sl dts changes, please put a prefix 'ARM: dts: imx6sl: ...'
-on the patch subject.
+For this patch, a proper patch subject prefix would be 'cpufreq: imx6q: '
+You can use 'git log' to find out what a proper prefix for a file/patch
+should be.
 
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 28558f1..0a2c73c 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -38,6 +38,20 @@
->  			device_type = "cpu";
->  			reg = <0x0>;
->  			next-level-cache = <&L2>;
-> +			operating-points = <
-> +				/* kHz    uV */
-> +				996000  1250000 /* for consumer grade only */
-> +				792000  1150000
-> +				396000  1050000
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index 4b3f18e..2eea3d9 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -166,6 +166,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
+>  
+> +	if (of_init_opp_table(cpu_dev)) {
+> +		dev_err(cpu_dev,"failed to init OPP table\n");
+> +		return -ENODEV;
+> +	}
+> +
 
-Please see my reply to your previous patch.
-
-> +			>;
-> +			clock-latency = <61036>; /* two CLK32 periods */
-> +			clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
-> +				 <&clks IMX6SL_CLK_PLL1_SW>, <&clks IMX6SL_CLK_PLL1_SYS>;
-
-The lines are somehow too long.  The following one might be easier to
-read.
-
-			clocks = <&clks IMX6SL_CLK_ARM>,
-				 <&clks IMX6SL_CLK_PLL2_PFD2>,
-				 <&clks IMX6SL_CLK_STEP>,
-				 <&clks IMX6SL_CLK_PLL1_SW>,
-				 <&clks IMX6SL_CLK_PLL1_SYS>;
+Before doing that in the driver, you should check and make sure that
+platform hasn't supply a opp table.
 
 Shawn
 
-> +			clock-names = "arm", "pll2_pfd2_396m", "step",
-> +				      "pll1_sw", "pll1_sys";
-> +			arm-supply = <&reg_arm>;
-> +			pu-supply = <&reg_pu>;
-> +			soc-supply = <&reg_soc>;
->  		};
->  	};
->  
+>  	arm_clk = devm_clk_get(cpu_dev, "arm");
+>  	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+>  	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
 > -- 
 > 1.8.3.2
 > 
