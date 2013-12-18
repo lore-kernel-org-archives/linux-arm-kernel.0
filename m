@@ -1,78 +1,73 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Dec 2013 21:26:53 +0100
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <alpine.LFD.2.10.1312181449580.7480@knanqh.ubzr>
-References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131217122519.GI32118@arm.com>
- <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
- <20131218100321.GC4360@n2100.arm.linux.org.uk>
- <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
- <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
- <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
- <alpine.LFD.2.10.1312181449580.7480@knanqh.ubzr>
-Message-ID: <CAKv+Gu9jw4RHny3L3L6SWm4anhRguhRe4BkLKAxJeqpPB12igg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 Dec 2013 12:38:47 -0800
+Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
+In-Reply-To: <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
+References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
+ <20131217185154.GN5711@cbox>
+ <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
+ <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
+ <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
+Message-ID: <20131218203847.GP5711@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 December 2013 20:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 18 Dec 2013, Ard Biesheuvel wrote:
->
->> On 18 December 2013 15:27, Christopher Covington <cov@codeaurora.org> wrote:
->> >
->> > I do not think that Russell is the source of the confusion. Ard wrote, "The
->> > idea is that a binary built for ARM will have access to the extended
->> > instructions which ARM64 offers to ARM32 binaries running in 32 bit
->> > compatibility mode (such as AES, SHAx etc)." I think s/ARM64/ARMv8/ is
->> > necessary to make the statement correct, and hopefully less confusing.
->> >
->>
->> My apologies for adding to the confusion (or creating it in the first place).
->>
->> However, the bottom line is that, as the 32 bit and 64 bit kernels are
->> both able to support userland processes running in the execution state
->> that has retroactively been dubbed 'AArch32', they should both honor
->> the same contract with AArch32 userland on how to discover CPU
->> capabilities at runtime. I do understand Russell's reservations about
->> allocating 6 of the remaining 10 hwcaps bits, and I am open to
->> suggestions on a better approach.
->
-> What is the reason for eating a grand total of 6 bits at once in the
-> first place?
->
+On Wed, Dec 18, 2013 at 03:41:27PM +0000, Marc Zyngier wrote:
+> Hi Anup,
+> 
+> On Wed, Dec 18 2013 at 03:03:43 PM, Anup Patel <anup@brainfault.org> wrote:
+> > On Wed, Dec 18, 2013 at 8:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> >>
+> >>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
+> >>>> The Power State and Coordination Interface (PSCI) specification defines
+> >>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
+> >>>>
+> >>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+> >>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+> >>>> KVM_EXIT_SYSTEM_EVENT exit reason.
+> >>>>
+> >>>> To try this patch from guest kernel, we will need PSCI-based restart and
+> >>>> poweroff support in the guest kenel for both ARM and ARM64.
+> >>>>
+> >>>> Rob Herring has already submitted patches for PSCI-based restart and
+> >>>> poweroff in ARM kernel but these are not merged yet due unstable device
+> >>>> tree bindings of kernel PSCI support. We will be having similar patches
+> >>>> for PSCI-based restart and poweroff in ARM64 kernel.
+> >>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+> >>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
+> >>>
+> >>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>>
+> >>> I can merge this series if Marc acks it as well.
+> >>
+> >> The patches themselves are mostly fine. One issue though: They implement
+> >> part of the v0.2 spec, but keep on using the range of function IDs that
+> >> we made up for v0.1.
+> >>
+> >> I just had a chat with the person responsible for the spec, and realized
+> >> that the Function IDs mentionned in the v0.2 spec are not optional, and
+> >> not using them would be in direct violation of the spec (the new numbers
+> >> now come directly from the SMC calling convention).
+> >
+> > Should we emulate PSCI_VERSION call to help Guest determine
+> > the spec version emulated by KVM (i.e. v0.1 or v0.2) ??
+> 
+> I think that'd be a nice to have, but the guest is likely to get its
+> information from the DT anyway. Plus I don't think the original PSCI
+> spec specified PSCI_VERSION, which only make it useful for whatever
+> comes after v0.2.
+> 
+> So I think we need to:
+> - Use the new range for PSCI v0.2 (while still supporting v0.1 and the
+> old range)
+> - Get the kernel and DT bindings into shape
+> - Merge all of that at the same time
+> 
+Don't we also need a way for user space to tell KVM if it should emulate
+v0.1 or v0.2 of PSCI so we don't break backwards compatibility with
+tools that spit out a device tree and use guest kernels based on v0.1?
 
-I wasn't entirely accurate: it's 5 bits not 6 ...
+This could be a new feature for KVM_ARM_VCPU_INIT, but perhaps it should
+be something on the VM level, hmmm.
 
-> Are those capabilities really going to be independently integrated?  In
-> other words, what is the probability for a vendor to integrate some but
-> not the others?  If this probability is low then maybe a smaller set of
-> wider-covering bits would be good enough in practice, and then some
-> kernel emulation could be added for the odd cases.
->
-
-The capabilities in question are:
-* AES
-* 64 bit polynomial (carry-less) multiply
-* SHA1
-* SHA2
-* CRC32
-and it is up to the implementor to choose the combination. To me,
-there are no obviously more likely combinations, but perhaps others
-have other ideas?
-
-The nice thing about hwcaps is that it is already integrated into the
-ifunc resolution done by the loader, which makes it very easy and
-straightforward to offer alternative implementations of library
-functions based on CPU capabilities.
-
-As any kind of emulation in the kernel is likely to be slower than an
-optimized implementation for a CPU without the feature in question,
-trapping SIGILL to infer hwcaps is probably the only viable alternate
-approach that does not require a new kernel interface.
-
-Regards,
-Ard.
+-Christoffer
