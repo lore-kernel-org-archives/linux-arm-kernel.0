@@ -1,42 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Dec 2013 21:58:30 +0800
-Subject: [PATCH v3 9/9] ARM: DTS: imx5* imx6*, use imx51-ssi
-In-Reply-To: <1387367865-26391-10-git-send-email-mpa@pengutronix.de>
-References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
- <1387367865-26391-10-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131218135826.GC7172@S2101-09.ap.freescale.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 18 Dec 2013 18:02:14 +0400
+Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
+In-Reply-To: <20131218134914.GA32664@verge.net.au>
+References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+ <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
+ <52B1892B.1020806@cogentembedded.com> <20131218114351.GD3314@katana>
+ <52B18CC9.8090200@cogentembedded.com> <20131218121541.GE3314@katana>
+ <20131218134914.GA32664@verge.net.au>
+Message-ID: <52B1AAE6.2020400@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 12:57:45PM +0100, Markus Pargmann wrote:
-> imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-> reconfiguration and needs this for correct interaction with SDMA. This
-> patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx51.dtsi   |  3 ++-
->  arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
->  arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
->  arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
->  4 files changed, 27 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index 4bcdd3a..1496421 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -155,7 +155,8 @@
->  				};
->  
->  				ssi2: ssi at 70014000 {
-> -					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-> +					compatible = "fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
+Hello.
 
-This is an unnecessary change.
+On 18-12-2013 17:49, Simon Horman wrote:
 
-Shawn
+>>>>>> @@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
+>>>>>>   	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
 
->  					reg = <0x70014000 0x4000>;
->  					interrupts = <30>;
->  					clocks = <&clks 49>;
+>>>>>>   	/* ICK */
+>>>>>> +	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+>>>>>> +	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+>>>>>> +	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
+>>>>>> +	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+
+>>>>>     These belong to some other place, the group marked by /* ICK */
+>>>>> is only for CLKDEV_ICK_ID().
+
+>>>> So, I'll create a /* DEV */ prefix?
+
+>>>     I really don't know. Other places have /* MSTP */ comment in this
+>>> case despite all clocks, CLKDEV_DEV_ID() and CLKDEV_ICK_ID() are
+>>> really MSTP clocks. I considered the idea of separating
+>>> CLKDEV_ICK_ID() under /* ICK */ comment silly from the very start
+>>> but Simon didn't listen to me.
+
+>> I am puzzled, too. ICK is a type of registration and not a clock domain.
+>> Also, there is 'mtu2_fck' which is under ICK as well as MSTP? Looks
+>> wrong. From what I understand now, removing the /* ICK */ comment would
+>> be easiest and proper?
+
+> I'm not sure that I really understand what all the fuss is about.
+
+> As I understand things the convention that prevails for
+> MSTP clocks under mach-shmobile is as follows:
+
+> 1. Clocks not registered by CLKDEV_ICK_ID() are grouped together
+>     under /* MSTP */ followed by:
+> 2. Clocks registered using CLKDEV_ICK_ID() are grouped together
+>     under /* ICK */
+
+> I am unsure of the historical reason for this
+
+    Recent patches by Morimoto-san.
+
+> but it does seem to be consistent.
+
+    No, it doesn't. These comments are *clearly* not consistent and should be 
+removed at least.
+
+WBR, Sergei
