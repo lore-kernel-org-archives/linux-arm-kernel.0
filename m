@@ -1,68 +1,247 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 18 Dec 2013 08:55:23 -0800
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <20131218154045.GC16227@intel.com>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131128055706.GM8834@intel.com>
- <20131209235035.GA11632@n2100.arm.linux.org.uk>
- <20131210101331.GG29580@intel.com>
- <20131210111449.GY4360@n2100.arm.linux.org.uk>
- <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
- <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
- <20131218154045.GC16227@intel.com>
-Message-ID: <CAPcyv4hiGg6J0sAEy6N=HRsLg_B9PGOc=khaTNR80==pDfNQzQ@mail.gmail.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 18 Dec 2013 17:57:00 +0100
+Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
+In-Reply-To: <52B0A9C8.7070201@ti.com>
+References: <1386626150-23504-1-git-send-email-nm@ti.com>
+ <52B0A9C8.7070201@ti.com>
+Message-ID: <52B1D3DC.1010304@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 7:40 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Thu, Dec 12, 2013 at 11:00:05PM -0800, Dan Williams wrote:
->> On Wed, Dec 11, 2013 at 1:10 AM, Dan Williams <dan.j.williams@intel.com> wrote:
->> > On Tue, Dec 10, 2013 at 3:14 AM, Russell King - ARM Linux
->> > <linux@arm.linux.org.uk> wrote:
->> >> On Tue, Dec 10, 2013 at 03:43:31PM +0530, Vinod Koul wrote:
->> >>> On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
->> >>> > On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
->> >>> > > + Dan
->> >>> > >
->> >>> > > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
->> >>> > > > The following commit:
->> >>> > > >
->> >>> > > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
->> >>> > > >
->> >>> > > > removed the last caller to mv_desc_get_dest_addr(), creating the
->> >>> > > > warning:
->> >>> > > >
->> >>> > > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
->> >>> > > >   but not used [-Wunused-function]
->> >>> > > >
->> >>> > > > Remove it.
->> >>> > > >
->> >>> > > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->> >>> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
->> >>> > >
->> >>> > > This should go thru Dan's tree
->> >>> >
->> >>> > So what's happening with this patch?  I don't see it in -rc yet.
->> >>> Dan has applied this to his next. So this should show us in next rc1
->> >>
->> >> Wrong answer.  This is a compile regression introduced in the last merge
->> >> window, it should be going into an -rc kernel.
->> >
->> > Vinod, if your fixes branch is ready I'll take it along with the rest
->> > of the regression fixes to Linus.
-> Sorry I wasnt well last week, so I just managed to send the PULL on friday
-> morning. Wasnt sure if Linus will cut rc on friday or later, so sent it!
+Hi Nishanth,
 
-Ok, glad you are feeling better.
-
+On 17/12/2013 20:45, Nishanth Menon wrote:
+> On 12/09/2013 03:55 PM, Nishanth Menon wrote:
+>> Craneboard is a hardware development platform based on the Sitara
+>> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
+>> details. Add basic devices for craneboard as replacement for the board
+>> file scheduled for removal as part of device tree conversion
 >>
->> Ok, I see you sent dma-slave/fixes up, I'll follow up with the rest:
-> Okay, did you manage to send it? If not I may have few (i think at least 1 more)
+>> [1] http://craneboard.org
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>
+> gentle ping.. had'nt seen a response on this patch. Could we queue
+> this up for v3.14-rc1?
+
+Yep, it looks good to me.
+But if you don't mind I'll start pushing my branch after Xmas :-).
+
+Thanks,
+Benoit
+
+
+>> Based on:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+>> branch: omap-for-v3.14/omap3-board-removal 736e812 ARM: OMAP2+: Remove unused platform init code and headers
+>>
+>> Bootlog: http://pastebin.mozilla.org/3744412
+>>
+>>   arch/arm/boot/dts/Makefile              |    1 +
+>>   arch/arm/boot/dts/am3517-craneboard.dts |  174 +++++++++++++++++++++++++++++++
+>>   2 files changed, 175 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/am3517-craneboard.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index fc37bca..ad155fc 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -205,6 +205,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>>   	am335x-boneblack.dtb \
+>>   	am335x-nano.dtb \
+>>   	am335x-base0033.dtb \
+>> +	am3517-craneboard.dtb \
+>>   	am3517-evm.dtb \
+>>   	am3517_mt_ventoux.dtb \
+>>   	am43x-epos-evm.dtb \
+>> diff --git a/arch/arm/boot/dts/am3517-craneboard.dts b/arch/arm/boot/dts/am3517-craneboard.dts
+>> new file mode 100644
+>> index 0000000..2d40b3f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/am3517-craneboard.dts
+>> @@ -0,0 +1,174 @@
+>> +/*
+>> + * See craneboard.org for more details
+>> + *
+>> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +/dts-v1/;
+>> +
+>> +#include "am3517.dtsi"
+>> +
+>> +/ {
+>> +	model = "TI AM3517 CraneBoard (TMDSEVM3517)";
+>> +	compatible = "ti,am3517-craneboard", "ti,am3517", "ti,omap3";
+>> +
+>> +	memory {
+>> +		device_type = "memory";
+>> +		reg = <0x80000000 0x10000000>;	/* 256 MB */
+>> +	};
+>> +
+>> +	vbat: fixedregulator at 0 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vbat";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		regulator-boot-on;
+>> +	};
+>> +};
+>> +
+>> +&davinci_emac {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&davinci_mdio {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&i2c1 {
+>> +	clock-frequency = <2600000>;
+>> +
+>> +	tps: tps at 2d {
+>> +		reg = <0x2d>;
+>> +	};
+>> +};
+>> +
+>> +&i2c2 {
+>> +	clock-frequency = <400000>;
+>> +	/* goes to expansion connector */
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&i2c3 {
+>> +	clock-frequency = <400000>;
+>> +	/* goes to expansion connector */
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&mmc1 {
+>> +	vmmc-supply = <&vdd2_reg>;
+>> +	bus-width = <8>;
+>> +};
+>> +
+>> +&mmc2 {
+>> +	/* goes to expansion connector */
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&mmc3 {
+>> +	/* goes to expansion connector */
+>> +	status = "disabled";
+>> +};
+>> +
+>> +#include "tps65910.dtsi"
+>> +
+>> +&omap3_pmx_core {
+>> +	tps_pins: pinmux_tps_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x1b0 (PIN_INPUT_PULLUP | MUX_MODE0) /* sys_nirq.sys_nirq */
+>> +		>;
+>> +	};
+>> +};
+>> +
+>> +&tps {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&tps_pins>;
+>> +
+>> +	interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>> +	interrupt-parent = <&intc>;
+>> +
+>> +	ti,en-ck32k-xtal;
+>> +
+>> +	vcc1-supply = <&vbat>;
+>> +	vcc2-supply = <&vbat>;
+>> +	vcc3-supply = <&vbat>;
+>> +	vcc4-supply = <&vbat>;
+>> +	vcc5-supply = <&vbat>;
+>> +	vcc6-supply = <&vbat>;
+>> +	vcc7-supply = <&vbat>;
+>> +	vccio-supply = <&vbat>;
+>> +
+>> +	regulators {
+>> +		vrtc_reg: regulator at 0 {
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		vio_reg: regulator at 1 {
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		/*
+>> +		 * Unused:
+>> +		 * VDIG1=2.7V,300mA max
+>> +		 * VDIG2=1.8V,300mA max
+>> +		 */
+>> +
+>> +		vpll_reg: regulator at 7 {
+>> +			/* VDDS_DPLL_1V8 */
+>> +			regulator-min-microvolt = <1800000>;
+>> +			regulator-max-microvolt = <1800000>;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		vaux1_reg: regulator at 9 {
+>> +			/* VDDS_SRAM_1V8 */
+>> +			regulator-min-microvolt = <1800000>;
+>> +			regulator-max-microvolt = <1800000>;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		vaux2_reg: regulator at 10 {
+>> +			/* VDDA1P8V_USBPHY */
+>> +			regulator-min-microvolt = <1800000>;
+>> +			regulator-max-microvolt = <1800000>;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		/* VAUX33 unused */
+>> +
+>> +		vdac_reg: regulator at 8 {
+>> +			/* VDDA_DAC_1V8 */
+>> +			regulator-min-microvolt = <1800000>;
+>> +			regulator-max-microvolt = <1800000>;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		vmmc_reg: regulator at 12 {
+>> +			/* VDDA3P3V_USBPHY */
+>> +			regulator-min-microvolt = <3300000>;
+>> +			regulator-max-microvolt = <3300000>;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		vdd1_reg: regulator at 2 {
+>> +			/* VDD_CORE */
+>> +			regulator-name = "vdd_core";
+>> +			regulator-min-microvolt = <1200000>;
+>> +			regulator-max-microvolt = <1200000>;
+>> +			regulator-boot-on;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		vdd2_reg: regulator at 3 {
+>> +			/* VDDSHV_3V3 */
+>> +			regulator-name = "vdd_shv";
+>> +			regulator-min-microvolt = <3300000>;
+>> +			regulator-max-microvolt = <3300000>;
+>> +			regulator-always-on;
+>> +		};
+>> +
+>> +		/* VDD3 unused */
+>> +	};
+>> +};
+>>
+>
 >
 
-Patchwork id(s)?  I want to send it it today.
 
-I was busy tracking down a data corruption report with net_dma.
-
---
-Dan
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
