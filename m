@@ -1,60 +1,39 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Wed, 18 Dec 2013 09:43:51 +0000
-Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20131217130435.GV4360@n2100.arm.linux.org.uk>
-References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
- <5295539.cCkPY1PpyC@flatron> <20131217124505.GB17210@ulmo.nvidia.com>
- <1500339.E8bGm7xZUi@flatron> <20131217130435.GV4360@n2100.arm.linux.org.uk>
-Message-ID: <2e498771546543f18329d2c2e69a6e35@BY2PR03MB505.namprd03.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Dec 2013 10:48:47 +0100
+Subject: [PATCH v2 08/11] ARM: sun4i: dt: mod0 clocks
+In-Reply-To: <1387327503-15651-9-git-send-email-emilio@elopez.com.ar>
+References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+ <1387327503-15651-9-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20131218094847.GD2718@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Emilio,
 
-> On Tue, Dec 17, 2013 at 01:54:35PM +0100, Tomasz Figa wrote:
-> > On Tuesday 17 of December 2013 13:45:06 Thierry Reding wrote:
-> > > I fail to see how that would eliminate the problem with the types.
-> > > That said I don't actually see sparse complaining about any type
-> mismatches.
-> > > That's probably because the various macros implicitly cast to u32.
-> >
-> > Well, in BE variant you would read the register using __raw_readl()
-> > into a __be32 and then get an u32 from be32_to_cpu() and return it.
-> > Similarly for writes
+On Tue, Dec 17, 2013 at 09:45:00PM -0300, Emilio L?pez wrote:
+> This commit adds all the mod0 clocks present on sun4i to its device tree
 > 
-> __raw_readl() returns a u32, so you'll get a warning trying to assign a
-> u32 to a __be32.
-> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-If all are ok about this method.
-How about the following:
+Even though I gave my Acked-by, could you rename the nodes to
+something like: "foo_clk: clk at deadbeef"
 
-+static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-+                               const void __iomem *addr)
-+{
-+       u32 val;
-+
-+       val = __raw_readl(addr);
-+
-+       if (likely(fpc->big_endian))
-+               val = be32_to_cpu((__force __be32)val);
-+       else
-+               val = le32_to_cpu((__force __le32)val);
-+       rmb();
-+
-+       return val;
-+}
-+
-+static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
-+                               u32 val, void __iomem *addr)
-+{
-+       wmb();
-+       if (likely(fpc->big_endian))
-+               val = (__force u32)cpu_to_be32(val);
-+       else
-+               val = (__force u32)cpu_to_le32(val);
-+
-+       __raw_writel(val, addr);
-+}
+The node name is supposed to be the class of devices, and we're likely
+to use all those labels for the actual controllers, and not the clocks
+themselves.
 
-Best Regards,
-Xiubo
+Thanks
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/fc455678/attachment.sig>
