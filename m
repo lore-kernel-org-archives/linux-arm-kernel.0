@@ -1,125 +1,75 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 18 Dec 2013 15:41:32 -0700
-Subject: [PATCH V1 2/7] ARM: dts: imx6qdl: add pingroups for enet with GPIO6
- interrupt
+Date: Wed, 18 Dec 2013 15:41:33 -0700
+Subject: [PATCH V1 3/7] ARM: dts: imx6qdl-sabrelite: use
+ MX6QDL_ENET_PINGRP_RGMII_MD
 In-Reply-To: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387406497-26430-3-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387406497-26430-4-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most boards will want this hardware work-around so
-add new pingroups.
-
-Also, add MX6QDL_ENET_PINGRP_RGMII macro so that other
-pingroups can use this.
+This saves some lines, but should not be a functional change.
+Also, apply same change to imx6qdl-nitrogen6x.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-pingrp.h | 77 ++++++++++++++++----------------------
- 1 file changed, 33 insertions(+), 44 deletions(-)
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 +---------------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 16 +---------------
+ 2 files changed, 2 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-pingrp.h b/arch/arm/boot/dts/imx6qdl-pingrp.h
-index c9dd44c..082f0df 100644
---- a/arch/arm/boot/dts/imx6qdl-pingrp.h
-+++ b/arch/arm/boot/dts/imx6qdl-pingrp.h
-@@ -53,57 +53,37 @@
- 	MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI		0x100b1 \
- 	MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK		0x100b1
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 78fe8b0..ef5ce885 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -207,21 +207,7 @@
  
-+#define MX6QDL_ENET_PINGRP_RGMII(rx_pad, tx_pad) \
-+	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			rx_pad \
-+	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			rx_pad \
-+	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			rx_pad \
-+	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			rx_pad \
-+	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			rx_pad \
-+	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		rx_pad \
-+	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			tx_pad \
-+	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			tx_pad \
-+	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			tx_pad \
-+	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			tx_pad \
-+	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			tx_pad \
-+	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		tx_pad \
-+	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		tx_pad
-+
-+#define MX6QDL_ENET_PINGRP_RGMII_MD(rx_pad, tx_pad)	\
-+	MX6QDL_ENET_PINGRP_RGMII(rx_pad, tx_pad)	\
-+	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			tx_pad \
-+	MX6QDL_PAD_ENET_MDC__ENET_MDC			tx_pad
-+
- #define MX6QDL_ENET_PINGRP1 \
--	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			0x1b0b0 \
--	MX6QDL_PAD_ENET_MDC__ENET_MDC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
--	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
--	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0 \
-+	MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x1b0b0)	\
- 	MX6QDL_PAD_GPIO_16__ENET_REF_CLK		0x4001b0a8
+ 		pinctrl_enet: enetgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
+-				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
+-				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
+-				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
+-				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
+-				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
+-				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
+-				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
+-				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
+-				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
++				MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x100b0)
+ 				/* Phy reset */
+ 				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x000b0
+ 			>;
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index d28f501..db06e40 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -206,21 +206,7 @@
  
- #define MX6QDL_ENET_PINGRP2 \
-+	MX6QDL_ENET_PINGRP_RGMII(0x1b0b0, 0x1b0b0)		\
- 	MX6QDL_PAD_KEY_COL1__ENET_MDIO			0x1b0b0 \
--	MX6QDL_PAD_KEY_COL2__ENET_MDC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
--	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
--	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0
-+	MX6QDL_PAD_KEY_COL2__ENET_MDC			0x1b0b0
- 
- #define MX6QDL_ENET_PINGRP3 \
--	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			0x1b0b0 \
--	MX6QDL_PAD_ENET_MDC__ENET_MDC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
--	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
--	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0 \
-+	MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x1b0b0)	\
- 	MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN		0x1b0b0
- 
- #define MX6QDL_ENET_PINGRP4 \
-@@ -117,6 +97,15 @@
- 	MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1		0x1b0b0	\
- 	MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN		0x1b0b0
- 
-+#define MX6QDL_ENET_PINGRP1_GPIO6	MX6QDL_ENET_PINGRP1 \
-+	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
-+
-+#define MX6QDL_ENET_PINGRP2_GPIO6	MX6QDL_ENET_PINGRP2 \
-+	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
-+
-+#define MX6QDL_ENET_PINGRP3_GPIO6	MX6QDL_ENET_PINGRP3 \
-+	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
-+
- #define MX6QDL_ESAI_PINGRP1 \
- 	MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK		0x1b030 \
- 	MX6QDL_PAD_ENET_CRS_DV__ESAI_TX_CLK		0x1b030 \
+ 		pinctrl_enet: enetgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
+-				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
+-				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
+-				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
+-				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
+-				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
+-				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
+-				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
+-				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
+-				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
++				MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x100b0)
+ 				/* Phy reset */
+ 				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
+ 			>;
 -- 
 1.8.1.2
