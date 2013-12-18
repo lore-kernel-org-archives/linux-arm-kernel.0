@@ -1,49 +1,69 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 18 Dec 2013 09:40:21 -0600
-Subject: [PATCH 0/7] usb: dwc3: pm_runtime implementation
-In-Reply-To: <20131218153614.GB1593@saruman.home>
-References: <1386884325-11440-1-git-send-email-balbi@ti.com>
- <20131217233140.GA21267@psi-dev26.jf.intel.com>
- <20131217233554.GB21267@psi-dev26.jf.intel.com>
- <20131218153614.GB1593@saruman.home>
-Message-ID: <20131218154021.GC1593@saruman.home>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Dec 2013 15:41:27 +0000
+Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
+In-Reply-To: <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
+ (Anup Patel's message of "Wed, 18 Dec 2013 15:03:43 +0000")
+References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
+ <20131217185154.GN5711@cbox>
+ <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
+ <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
+Message-ID: <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 09:36:14AM -0600, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Dec 17, 2013 at 03:35:54PM -0800, David Cohen wrote:
-> > On Tue, Dec 17, 2013 at 03:31:40PM -0800, David Cohen wrote:
-> > > On Thu, Dec 12, 2013 at 03:38:38PM -0600, Felipe Balbi wrote:
-> > > > hi all,
-> > > > 
-> > > > these patches add pm_runtime support for all glue layers.
-> > > > 
-> > > > I plan to add pm_runtime support for dwc3 after these
-> > > > patches are merged upstream.
-> > > > 
-> > > > Please test.
-> > > 
-> > > At first time I failed to notice you were removing #ifdef's around pm
-> > > callback functions. Instead of saying DWC3 will start to have warnings
-> > > when CONFIG_PM is not selected, I'd say your patch set is now a
-> > > dependence of my RFC :)
-> > 
-> > I guess I said it in wrong order :P
-> > Your patch set depends on my RFC.
-> 
-> Or I just modify my patchset a little bit for now ;-)
+Hi Anup,
 
-nah, it looks horrible with all those ifdefs around. I'll delay my
-patch series.
+On Wed, Dec 18 2013 at 03:03:43 PM, Anup Patel <anup@brainfault.org> wrote:
+> On Wed, Dec 18, 2013 at 8:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>>
+>>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
+>>>> The Power State and Coordination Interface (PSCI) specification defines
+>>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
+>>>>
+>>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+>>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+>>>> KVM_EXIT_SYSTEM_EVENT exit reason.
+>>>>
+>>>> To try this patch from guest kernel, we will need PSCI-based restart and
+>>>> poweroff support in the guest kenel for both ARM and ARM64.
+>>>>
+>>>> Rob Herring has already submitted patches for PSCI-based restart and
+>>>> poweroff in ARM kernel but these are not merged yet due unstable device
+>>>> tree bindings of kernel PSCI support. We will be having similar patches
+>>>> for PSCI-based restart and poweroff in ARM64 kernel.
+>>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+>>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
+>>>
+>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>
+>>> I can merge this series if Marc acks it as well.
+>>
+>> The patches themselves are mostly fine. One issue though: They implement
+>> part of the v0.2 spec, but keep on using the range of function IDs that
+>> we made up for v0.1.
+>>
+>> I just had a chat with the person responsible for the spec, and realized
+>> that the Function IDs mentionned in the v0.2 spec are not optional, and
+>> not using them would be in direct violation of the spec (the new numbers
+>> now come directly from the SMC calling convention).
+>
+> Should we emulate PSCI_VERSION call to help Guest determine
+> the spec version emulated by KVM (i.e. v0.1 or v0.2) ??
 
+I think that'd be a nice to have, but the guest is likely to get its
+information from the DT anyway. Plus I don't think the original PSCI
+spec specified PSCI_VERSION, which only make it useful for whatever
+comes after v0.2.
+
+So I think we need to:
+- Use the new range for PSCI v0.2 (while still supporting v0.1 and the
+old range)
+- Get the kernel and DT bindings into shape
+- Merge all of that at the same time
+
+Cheers,
+
+        M.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/80debeb2/attachment.sig>
+Jazz is not dead. It just smells funny.
