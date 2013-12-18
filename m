@@ -1,64 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 18 Dec 2013 16:11:01 +0000
-Subject: [PATCH 2/2] kvmtool/arm: Add option to override Generic Timer
- frequency
-In-Reply-To: <46C11E1C-4EEF-4EAE-9507-21384CE80127@suse.de>
-References: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
- <1387305074-29421-3-git-send-email-robin.murphy@arm.com>
- <308D5B7E-5BDA-4984-9448-EAD8B5D699CF@suse.de> <52B1A6A9.1030107@arm.com>
- <46C11E1C-4EEF-4EAE-9507-21384CE80127@suse.de>
-Message-ID: <52B1C915.7040000@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Dec 2013 17:13:52 +0100
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <52B1B0E0.6030104@codeaurora.org>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131217122519.GI32118@arm.com>
+ <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
+ <20131218100321.GC4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
+ <20131218105541.GE4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
+ <20131218112713.GA28112@arm.com>
+ <20131218114211.GF4360@n2100.arm.linux.org.uk>
+ <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
+Message-ID: <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/13 14:07, Alexander Graf wrote:
-> [...]
->>> How does it encourage a vendor to properly implement their firmware if there's a workaround?
->>>
->>>
->>> Alex
->>>
->>>
->>
->> Hi Alex,
->>
->> In short, by enabling the users to create the demand. Yes, like any workaround there's potential for abuse, but having *something* that makes it work is the difference between "I want virtualisation"[1] and "Dear vendor, I've tried virtualisation on your chip/board and it's great, but it tells me I need new firmware, where do I get that?"
->>
->> Having the specs tell them what to do clearly isn't sufficient, so let's give the integrators and consumers incentive to shout at them too. The sooner proper support is commonplace and we can deprecate clock-frequency hacks altogether, the better.
+On 18 December 2013 15:27, Christopher Covington <cov@codeaurora.org> wrote:
 >
-> Oh, I'm all for hacks. But please don't fall under the illusion that this will push vendors to fix their firmware. It will have the opposite effect - vendors will just point to the workaround and say "but it works" :).
+> I do not think that Russell is the source of the confusion. Ard wrote, "The
+> idea is that a binary built for ARM will have access to the extended
+> instructions which ARM64 offers to ARM32 binaries running in 32 bit
+> compatibility mode (such as AES, SHAx etc)." I think s/ARM64/ARMv8/ is
+> necessary to make the statement correct, and hopefully less confusing.
 >
 
-If vendors already aren't bothering to support functionality available 
-in their flagship hardware, workarounds hardly make that worse, and are 
-a win for the user. If it can drive adoption enough to get vendors to 
-see the value in at least fixing future products, that's only good.
+My apologies for adding to the confusion (or creating it in the first place).
 
-> Either way, this hack is basically required because you can't program CNTFRQ because it's controlled by secure firmware, right? So the host os already needs to know about this and probably does have a "clock-frequency" value in its device tree entry already to know how fast its clock ticks.
->
+However, the bottom line is that, as the 32 bit and 64 bit kernels are
+both able to support userland processes running in the execution state
+that has retroactively been dubbed 'AArch32', they should both honor
+the same contract with AArch32 userland on how to discover CPU
+capabilities at runtime. I do understand Russell's reservations about
+allocating 6 of the remaining 10 hwcaps bits, and I am open to
+suggestions on a better approach. But it is essential that this be
+sorted between ARM and arm64 so that AArch32 userland does not need to
+be aware of the flavor of kernel it is running under. (Tricks like
+trapping SIGILL to infer hwcaps are suboptimal and likely to create
+problems going forward). Also, the suggestion that those hwcaps bits
+are essentially 'wasted' for ARM32 does not make sense considering
+that 32-bit only ARMv8-R CPUs (which may or may not support some or
+all of the Crypto Extensions) will need to be supported by the ARM32
+kernel as well.
 
-In some cases, yes. In others they don't explicitly use the arch timer 
-at all thus have no frequency set anywhere. In the case of the board I 
-have on my desk, it took hacking the non-secure part of the bootloader, 
-writing a shim to throw away the securely-booted non-hyp cpu0 and fire 
-up a secondary, and hacking a timer node into the host DT to even get as 
-far as having an issue with kvmtool.
-
-> Couldn't we search for that host entry and automatically pass it into the guest if it's there? That way the whole thing becomes seamless and even less of an issue.
->
-
-In theory that would be an ideal solution, yes. In practice it means 
-either making KVM dependent on PROC_DEVICETREE (yuck) or cooking up some 
-kernel interface to expose the system timer frequency to userspace 
-(double yuck). Not just "global solution to local problem", but "global 
-solution to local 
-problem-that-shouldn't-even-exist-and-you-want-to-go-away-as-soon-as-possible-without-leaving-a-legacy". 
-Besides, that would probably just reinforce the equally wrong behaviour 
-of putting the frequency in the host DT instead of fixing the firmware ;)
-
-Robin.
-
->
-> Alex
->
->
+Regards,
+Ard.
