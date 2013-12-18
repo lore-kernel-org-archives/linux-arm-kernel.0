@@ -1,52 +1,36 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 15:10:06 +0100
-Subject: [PATCH v3 9/9] ARM: DTS: imx5* imx6*, use imx51-ssi
-In-Reply-To: <20131218135826.GC7172@S2101-09.ap.freescale.net>
-References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
- <1387367865-26391-10-git-send-email-mpa@pengutronix.de>
- <20131218135826.GC7172@S2101-09.ap.freescale.net>
-Message-ID: <20131218141006.GA23493@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Dec 2013 15:10:24 +0100
+Subject: i.MX35 devicetree support
+Message-ID: <1387375826-4018-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 09:58:30PM +0800, Shawn Guo wrote:
-> On Wed, Dec 18, 2013 at 12:57:45PM +0100, Markus Pargmann wrote:
-> > imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-> > reconfiguration and needs this for correct interaction with SDMA. This
-> > patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx51.dtsi   |  3 ++-
-> >  arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
-> >  arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
-> >  4 files changed, 27 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> > index 4bcdd3a..1496421 100644
-> > --- a/arch/arm/boot/dts/imx51.dtsi
-> > +++ b/arch/arm/boot/dts/imx51.dtsi
-> > @@ -155,7 +155,8 @@
-> >  				};
-> >  
-> >  				ssi2: ssi at 70014000 {
-> > -					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-> > +					compatible = "fsl,imx51-ssi",
-> > +							"fsl,imx21-ssi";
-> 
-> This is an unnecessary change.
-> 
-> Shawn
+This adds devicetree support for the i.MX35. This was originally made
+by Steffen Trumtrar and later continued by Denis Carikli. Changes since
+the last posting from Denis (v8, Nov 12 2013):
 
-Thank you, fixed.
+- use CLK_OF_DECLARE as requested by Shawn
+- add usb devicetree nodes
+- add spi devicetree nodes
+- add cpus devicetree node
+- split uart pin groups into txd,rxd / rts,cts
 
-Regards,
+Sascha
 
-Markus
+----------------------------------------------------------------
+Steffen Trumtrar (2):
+      ARM i.MX35: Add devicetree support.
+      ARM: dts: Add support for the i.MX35.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ .../devicetree/bindings/clock/imx35-clock.txt      | 113 +++++++
+ arch/arm/boot/dts/imx35-pingrp.h                   | 104 ++++++
+ arch/arm/boot/dts/imx35.dtsi                       | 375 +++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig                          |   8 +
+ arch/arm/mach-imx/Makefile                         |   1 +
+ arch/arm/mach-imx/clk-imx35.c                      |  14 +
+ arch/arm/mach-imx/imx35-dt.c                       |  57 ++++
+ 7 files changed, 672 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx35-clock.txt
+ create mode 100644 arch/arm/boot/dts/imx35-pingrp.h
+ create mode 100644 arch/arm/boot/dts/imx35.dtsi
+ create mode 100644 arch/arm/mach-imx/imx35-dt.c
