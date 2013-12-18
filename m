@@ -1,95 +1,106 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 12:57:40 +0100
-Subject: [PATCH v3 4/9] ASoC: fsl-ssi: Fix interrupt mapping and release
+Date: Wed, 18 Dec 2013 12:57:39 +0100
+Subject: [PATCH v3 3/9] ASoC: fsl-ssi: Add imx51-ssi and of_device_id matching
 In-Reply-To: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
 References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387367865-26391-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387367865-26391-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irqs should only be requested/released with enabled DMA and not on MX21.
-MX21 has some special register write configurations, so we do not add
-support for statistics on mx21 for the moment.
+There is a small but significant difference between imx21-ssi and
+imx51-ssi and above. imx21-ssi does not allow online reconfiguration of
+some registers. They have to be configured at the beginning.
+
+imx51-ssi has to reconfigure the SSI unit while it is running. Otherwise
+it would not be possible to have two streams in parallel. The new SDMA
+unit in imx51 and above has to be configured before the first DMA
+request arrives. Therefor we need to setup TDMAE/RDMAE just before
+starting the stream.
+
+This patch introduces distinct imx51-ssi as compatible and adds
+of_device_id matching in the probe function.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index a889df5..c361730 100644
+index e949ce5..a889df5 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -150,6 +150,7 @@ struct fsl_ssi_private {
- 	struct snd_soc_dai_driver cpu_dai_drv;
- 	struct platform_device *pdev;
+@@ -122,6 +122,13 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+ 		CCSR_SSI_SIER_TUE0_EN | CCSR_SSI_SIER_TFRC_EN)
+ #define FSLSSI_SISR_MASK (FSLSSI_SIER_DBG_RX_FLAGS | FSLSSI_SIER_DBG_TX_FLAGS)
  
-+	enum fsl_ssi_type hw_type;
- 	bool new_binding;
- 	bool ssi_on_imx;
- 	bool imx_ac97;
-@@ -227,13 +228,15 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 
- 	if (sisr & CCSR_SSI_SISR_RFRC) {
- 		ssi_private->stats.rfrc++;
--		sisr2 |= CCSR_SSI_SISR_RFRC;
-+		if (ssi_private->hw_type != FSL_SSI_MX51)
-+			sisr2 |= CCSR_SSI_SISR_RFRC;
- 		ret = IRQ_HANDLED;
- 	}
- 
- 	if (sisr & CCSR_SSI_SISR_TFRC) {
- 		ssi_private->stats.tfrc++;
--		sisr2 |= CCSR_SSI_SISR_TFRC;
-+		if (ssi_private->hw_type != FSL_SSI_MX51)
-+			sisr2 |= CCSR_SSI_SISR_TFRC;
- 		ret = IRQ_HANDLED;
- 	}
- 
-@@ -925,6 +928,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 
- 	ssi_private->use_dma = !of_property_read_bool(np,
- 			"fsl,fiq-stream-filter");
-+	ssi_private->hw_type = hw_type;
- 
- 	if (ac97) {
- 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
-@@ -1030,7 +1034,14 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
- 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
- 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--	} else if (ssi_private->use_dma) {
-+	}
 +
-+	/*
-+	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
-+	 * different writeable interrupt status registers.
-+	 */
-+	if (ssi_private->use_dma &&
-+			(hw_type == FSL_SSI_MCP8610 || hw_type == FSL_SSI_MX51)) {
- 		/* The 'name' should not have any slashes in it. */
- 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
- 					fsl_ssi_isr, 0, ssi_private->name,
-@@ -1138,8 +1149,8 @@ error_clk:
- 		clk_disable_unprepare(ssi_private->clk);
++enum fsl_ssi_type {
++	FSL_SSI_MCP8610,
++	FSL_SSI_MX21,
++	FSL_SSI_MX51,
++};
++
+ /**
+  * fsl_ssi_private: per-SSI private data
+  *
+@@ -184,6 +191,14 @@ struct fsl_ssi_private {
+ 	char name[1];
+ };
  
- error_irqmap:
--	if (ssi_private->use_dma && !of_device_is_compatible(pdev->dev.of_node,
--				"fsl,imx21-ssi"))
-+	if (ssi_private->use_dma &&
-+			(hw_type == FSL_SSI_MCP8610 || hw_type == FSL_SSI_MX51))
- 		irq_dispose_mapping(ssi_private->irq);
++static const struct of_device_id fsl_ssi_ids[] = {
++	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
++	{ .compatible = "fsl,imx51-ssi", .data = (void *) FSL_SSI_MX51},
++	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
++	{}
++};
++MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
++
+ /**
+  * fsl_ssi_isr: SSI interrupt handler
+  *
+@@ -863,6 +878,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	int ret = 0;
+ 	struct device_attribute *dev_attr = NULL;
+ 	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *of_id;
++	enum fsl_ssi_type hw_type;
+ 	const char *p, *sprop;
+ 	const uint32_t *iprop;
+ 	struct resource res;
+@@ -877,6 +894,11 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	if (!of_device_is_available(np))
+ 		return -ENODEV;
  
- 	return ret;
-@@ -1156,7 +1167,8 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 	snd_soc_unregister_component(&pdev->dev);
- 	if (ssi_private->ssi_on_imx)
- 		clk_disable_unprepare(ssi_private->clk);
--	irq_dispose_mapping(ssi_private->irq);
-+	if (ssi_private->use_dma)
-+		irq_dispose_mapping(ssi_private->irq);
++	of_id = of_match_device(fsl_ssi_ids, &pdev->dev);
++	if (!of_id)
++		return -EINVAL;
++	hw_type = (enum fsl_ssi_type) of_id->data;
++
+ 	/* We only support the SSI in "I2S Slave" mode */
+ 	sprop = of_get_property(np, "fsl,mode", NULL);
+ 	if (!sprop) {
+@@ -953,7 +975,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+                 /* Older 8610 DTs didn't have the fifo-depth property */
+ 		ssi_private->fifo_depth = 8;
  
+-	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx21-ssi")) {
++	if (hw_type == FSL_SSI_MX21 || hw_type == FSL_SSI_MX51) {
+ 		u32 dma_events[2];
+ 		ssi_private->ssi_on_imx = true;
+ 
+@@ -1139,13 +1161,6 @@ static int fsl_ssi_remove(struct platform_device *pdev)
  	return 0;
  }
+ 
+-static const struct of_device_id fsl_ssi_ids[] = {
+-	{ .compatible = "fsl,mpc8610-ssi", },
+-	{ .compatible = "fsl,imx21-ssi", },
+-	{}
+-};
+-MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
+-
+ static struct platform_driver fsl_ssi_driver = {
+ 	.driver = {
+ 		.name = "fsl-ssi-dai",
 -- 
 1.8.5.1
