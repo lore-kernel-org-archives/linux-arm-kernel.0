@@ -1,34 +1,21 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Thu, 19 Dec 2013 00:56:33 +0400
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <201312182150.39037.arnd@arndb.de>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312161856.11384.arnd@arndb.de>
- <1387226300.13062.161.camel@host5.omatika.ru>
- <201312182150.39037.arnd@arndb.de>
-Message-ID: <1387400193.31516.10.camel@host5.omatika.ru>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 18 Dec 2013 13:56:45 -0700
+Subject: [PATCH 1/2] ARM: tegra: fix missing pincontrol configuration
+ for Venice2
+In-Reply-To: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
+References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <52B20C0D.9030200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-18 at 21:50 +0100, Arnd Bergmann wrote:
-> > This is a platform-specific bus (PXA27x). Should it go into pxa27x.dtsi
-> > rather than machine dts?
-> 
-> Yes, that was the idea.
+On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
+> Compare the initial population of default pinmux configuration of Venice2
+> with the chrome branch and add/fix the missing configurations.
 
-Great.
+Wow, that's a big chunk of changes. Are you sure this is correct? Why
+was the original patch (which added the pinctrl nodes) so incorrect?
 
-> > There seems to be none at the moment. However, some machines need to
-> > setup these partitions as a part of their initialization. So complete
-> > migration to DT will require this driver.
-> > 
-> > In LP-8x4x case everything is setup by the bootloader. So "simple-bus"
-> > works for me.
-> 
-> Hmm, this is a bit tricky then. I think it would be best to not
-> use "simple-bus" then, to allow migrating the other platforms later,
-> but that will be a little more work. Maybe you can register a trivial
-> driver in the platform code that only calls of_platform_populate on
-> the device for now?
-
-Could we postpone this until someone needs this functionality?
+Thierry, I thought you had mentioned comparing the pinctrl setup in
+linux-next with the downstream kernel for Venice2 and only found a
+difference in the PWM settings, which you sent a patch for. However,
+this patch is much larger than that. Where's the disconnect?
