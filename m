@@ -1,54 +1,93 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 11:24:30 -0800
-Subject: [PATCH 2/3] clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
-In-Reply-To: <CA+Ln22GD5fr4S6aR-+85bdutkeeHmgutLvRWETEQEt1vJX-Y6Q@mail.gmail.com>
-References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
- <1383905648-23733-2-git-send-email-sachin.kamat@linaro.org>
- <2996623.YXg5JqReYS@flatron>
- <CAK9yfHzs+T0g0qy-EALFkrKFybdJDAQ3ZGAoYovZO8PDaWM4QA@mail.gmail.com>
- <CA+Ln22GD5fr4S6aR-+85bdutkeeHmgutLvRWETEQEt1vJX-Y6Q@mail.gmail.com>
-Message-ID: <20131218192430.23538.93253@quantum>
+Date: Wed, 18 Dec 2013 11:30:36 -0800
+Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
+In-Reply-To: <52B1E950.1040001@wwwdotorg.org>
+References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
+ <1387272400-4689-3-git-send-email-josephl@nvidia.com>
+ <52B0D6FA.2060101@wwwdotorg.org>
+ <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
+ <52B1E950.1040001@wwwdotorg.org>
+Message-ID: <20131218193036.23538.99285@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2013-12-18 10:28:57)
-> Hi Sachin,
+Quoting Stephen Warren (2013-12-18 10:28:32)
+> On 12/18/2013 02:42 AM, Joseph Lo wrote:
+> > On Wed, 2013-12-18 at 06:58 +0800, Stephen Warren wrote:
+> >> On 12/17/2013 02:26 AM, Joseph Lo wrote:
+> >>> Add External Memory Controller (EMC) clock interface for the Tegra CCF
+> >>> driver to support EMC scaling.
+> >>
+> >>> diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
+> >>
+> >>> +static long clk_emc_round_rate(struct clk_hw *hw, unsigned long rate,
+> >>> +                          unsigned long *prate)
+> >>> +{
+> >>> +   struct tegra_clk_emc *emc = to_clk_emc(hw);
+> >>> +   struct clk *parent_clk = __clk_get_parent(hw->clk);
+> >>> +   unsigned long parent_rate = __clk_get_rate(parent_clk);
+> >>> +   unsigned long ret;
+> >>> +
+> >>> +   if (!emc->emc_ops)
+> >>> +           return parent_rate;
+> >>> +
+> >>> +   ret = emc->emc_ops->emc_round_rate(rate);
+> >>> +   if (!ret)
+> >>> +           return parent_rate;
+> >>> +
+> >>> +   return ret;
+> >>> +}
+> >>
+> >> Rather than implementing this custom "emc_ops" feature, isn't there a
+> >> standard clock notifier feature that the EMC driver can use?
+> >>
+> >> Isn't the EMC driver the only thing that will be changing the EMC clock
+> >> rate? If so, why not just have the EMC driver perform the appropriate
+> >> pre-/post-rate-change actions before/after calling clk_set_rate()?
+> > 
+> > We have two HW components needs to be updated when EMC rate change. One
+> > is the EMC clock for tuning the frequency, the other is the EMC for
+> > updating the timing and configuration for external memory (DRAM). So
+> > this question looks like to me is that can we separate the operation of
+> > the two components when rate changing?
+> > 
+> > We have two modes that depend on what memory type (DDR2, LPDDR2,
+> > DDR3/LP) we used on the platform to support EMC scaling.
+> > 1. power down mode (Tegra20 used this mode only.)
+> > In this mode, we update the EMC timing and configurations to EMC shadow
+> > registers. Then updating the rate in the EMC clock register. The HW will
+> > trigger the rate changing and timing/configurations updating for EMC.
+> > 2. self-refresh mode (Tegra30/114/124 if DDR3)
+> > More complicate in this mode. Putting DRAM in self-refresh, updating EMC
+> > settings, updating EMC clock, then we still need auto calibration before
+> > restores DRAM from the self-refresh mode. So the difference was the EMC
+> > clock operation was part of EMC scaling procedures.
+> > 
+> > I guess using the clk_notifier may be OK for the 1st case.
 > 
-> 2013/12/18 Sachin Kamat <sachin.kamat@linaro.org>:
-> > Hi Tomasz,
-> >
-> > On 10 November 2013 22:38, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> >> Hi Sachin, Andrew,
-> >>
-> >> On Friday 08 of November 2013 15:44:07 Sachin Kamat wrote:
-> >>> From: Andrew Bresticker <abrestic@chromium.org>
-> >>>
-> >>> The gate clocks for the MFC sysmmus appear to be flipped, i.e.
-> >>> GATE_IP_MFC[2] gates sysmmu_mfcl and GATE_IP_MFC[1] gates sysmmu_mfcr.
-> >>> Fix this so that the MFC will start up.
-> >>
-> >> Wow, this means that there is a mistake in the documentation. Not that
-> >> I'm surprised, though.
-> >>
-> >> I guess you are sure about this, so:
-> >>
-> >> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> >
-> > I believe you are going to take this through your tree along with a
-> > few others which you have already reviewed?
+> In both cases, isn't the overall operation something like:
 > 
-> Thanks for reminding me about this patch. It's been quite a while
-> since it was posted
-> to the list.
+> a) Do some work before changing the EMC clock
+> b) Change the EMC clock
+> c) Do some work after changing the EMC clock
 > 
-> Yes, I will apply it to samsung-clk tree.
+> Admittedly, the exact definition of "some work" is different for your
+> cases (1) and (2) above, but the overall structure is the same. As such,
+> can't the EMC scaling driver do (a), then do (b) i.e. call
+> clk_set_rate(), then do (c)? Or, in your case (2), do we need to do
+> funny tricks like running from IRAM since we can't access SDRAM during
+> the clock change? If so, I'm not sure how having the EMC clock changing
+> code is going to help your case (2) anyway, since we'll presumably have
+> to code up a custom stub in assembly for the part of the code that runs
+> from IRAM...
 
-Feel free to add my Ack when you apply it. Will these be sent later as a
-pull request for the clk tree?
+Joseph,
+
+Just as a reference, check out how the smp_twd stuff is updated based on
+a clock rate-change notifier in arch/arm/kernel/smp_twd.c, lines
+103-142.
 
 Regards,
 Mike
 
 > 
-> Best regards,
-> Tomasz
