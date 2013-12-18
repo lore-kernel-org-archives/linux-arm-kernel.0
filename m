@@ -1,109 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Dec 2013 15:05:39 +0800
-Subject: [PATCH V2 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
-In-Reply-To: <1387318102-11070-1-git-send-email-b20788@freescale.com>
-References: <1387318102-11070-1-git-send-email-b20788@freescale.com>
-Message-ID: <20131218070538.GE6691@S2101-09.ap.freescale.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Dec 2013 23:12:58 -0800
+Subject: [PATCH] Partially revert "mtd: nand: pxa3xx: Introduce
+ 'marvell,armada370-nand' compatible string"
+In-Reply-To: <20131218004245.GB10369@localhost>
+References: <1386624986-404-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131212230715.GX27149@ld-irv-0074.broadcom.com>
+ <20131218004245.GB10369@localhost>
+Message-ID: <20131218071258.GA5551@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 05:08:21PM -0500, Anson Huang wrote:
-> i.MX6Q needs to update vddarm, vddsoc/pu regulators when cpu freq
-> is changed, each setpoint has different voltage, so we need to
-> pass vddarm, vddsoc/pu's freq-voltage info from dts together.
+Hi Ezequiel,
+
+On Tue, Dec 17, 2013 at 09:42:45PM -0300, Ezequiel Garcia wrote:
+> Just to have some context, this compatible was removed because it was
+> wrongly added and it doesn't belong at v3.12 and v3.13.
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-imx6.txt   |   39 ++++++++++++++++++++
-
-The binding doc changes should generally be part of driver changes or a
-separate patch, but never be part of dts patch.
-
->  arch/arm/boot/dts/imx6q.dtsi                       |    7 ++++
->  2 files changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+> Now the revert is in place in v3.13-rc4 and it should be queued for
+> v3.12.x, so we are good. Thanks for taking care of it!
 > 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
-> new file mode 100644
-> index 0000000..0c71dbf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
-> @@ -0,0 +1,39 @@
-> +i.MX6 cpufreq driver
-> +-------------------
-> +
-> +i.MX6 SoC cpufreq driver for CPU frequency scaling.
-> +
-
-I think you need to either copy the text from cpufreq-cpu0.txt or refer
-to it for some necessary info such as where the properties should be
-defined, what required properties should be defined, and what properties
-are optional etc.
-
-> +Optional properties:
-> +-fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
-> + go with cpu0's operating-points.
-> +
-> +Examples:
-> +
-> +	cpu at 0 {
-> +		compatible = "arm,cortex-a9";
-> +		device_type = "cpu";
-> +		reg = <0>;
-> +		next-level-cache = <&L2>;
-
-Above properties are not related to cpufreq driver, maybe we can save
-them.
-
-> +		operating-points = <
-> +			/* kHz    uV */
-> +			1200000 1275000
-> +			996000  1250000
-> +			792000  1150000
-> +			396000  975000
-> +		>;
-> +		fsl,soc-operating-points = <
-> +			/* ARM kHz  SOC-PU uV */
-> +			1200000 1275000
-> +			996000	1250000
-> +			792000	1175000
-> +			396000	1175000
-> +		>;
-> +		clock-latency = <61036>; /* two CLK32 periods */
-> +		clocks = <&clks 104>, <&clks 6>, <&clks 16>,
-> +			 <&clks 17>, <&clks 170>;
-> +		clock-names = "arm", "pll2_pfd2_396m", "step",
-> +			      "pll1_sw", "pll1_sys";
-> +		arm-supply = <&reg_arm>;
-> +		pu-supply = <&reg_pu>;
-> +		soc-supply = <&reg_soc>;
-
-Any properties in the example that are required for a successful driver
-probe should be documented in 'Required properties', and others are in
-'Optional properties'.
-
-Shawn
-
-> +	};
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index e7e8332..021e0cb 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -30,6 +30,13 @@
->  				792000  1150000
->  				396000  975000
->  			>;
-> +			fsl,soc-operating-points = <
-> +				/* ARM kHz  SOC-PU uV */
-> +				1200000 1275000
-> +				996000	1250000
-> +				792000	1175000
-> +				396000	1175000
-> +			>;
->  			clock-latency = <61036>; /* two CLK32 periods */
->  			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
->  				 <&clks 17>, <&clks 170>;
-> -- 
-> 1.7.9.5
+> On the other side, all the work needed for the driver to work OK on
+> Armada 370/XP SoC is already in l2-mtd.git master, and I have some fixes
+> ready to support 2048B pages.
 > 
-> 
+> In conclusion, I think it's safe to add the compatible on top of such work,
+> and queue it for v3.14.
+
+Let's get any last patches in, and add the compatible string last.
+Please resend any remaining patches, since I think you have at least one
+which you mislabeled as necessary for 3.13.
+
+> How should I send a patch to re-add this compatible? Do you plan to rebase
+> l2-mtd.git master on top of v3.13-rc4 or so?
+
+l2-mtd.git is currently rebased on top of the last changes I sent to
+Linus, so you can send any patches off the current tree. If I rebase
+onto -rc4, that shouldn't make any difference to your changes.
+
+Brian
