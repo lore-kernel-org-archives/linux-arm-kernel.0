@@ -1,33 +1,63 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 18 Dec 2013 16:20:52 +0800
-Subject: [PATCH 1/4] ARM: tegra: moving tegra_bct_strapping to
- tegra-soc.h for global visibility
-In-Reply-To: <52B0D5EF.5090703@wwwdotorg.org>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-2-git-send-email-josephl@nvidia.com>
- <52B0D5EF.5090703@wwwdotorg.org>
-Message-ID: <1387354852.2576.4.camel@jlo-ubuntu-64.nvidia.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 18 Dec 2013 09:21:12 +0100
+Subject: [GIT PULL] Renesas ARM based SoC Clocksource updates for v3.14
+In-Reply-To: <20131218010815.GA2430@verge.net.au>
+References: <cover.1387000863.git.horms+renesas@verge.net.au>
+ <20131218010815.GA2430@verge.net.au>
+Message-ID: <52B15AF8.2040105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-18 at 06:53 +0800, Stephen Warren wrote:
-> On 12/17/2013 02:26 AM, Joseph Lo wrote:
-> > This patch moves the tegra_btc_strapping variable to the tegra-soc.h for
-> > the global visibility that the other Tegra device driver can access it.
-> > It also a preparation that we can move out the Tegra20 EMC driver from
-> > mach-tegra to the drivers folder.
-> 
-> Rather than introduce yet more dependencies between the Tegra tree and
-> other trees for 3.14, I'd like to see the two clock changes in this
-> series taken into the clock tree for 3.14, and the other 2 patches
-> deferred for 3.15.
-> 
-OK, sounds fine to me. So I will just update 2/4 in this series after
-squashing 2/4 and 4/4 into one patch. And resend the other two patches
-when 3.14-rc1 shows up.
+On 12/18/2013 02:08 AM, Simon Horman wrote:
+> On Sat, Dec 14, 2013 at 03:07:31PM +0900, Simon Horman wrote:
+>> Hi Daniel,
+>>
+>> please consider this Renesas ARM based SoC Clocksource update for v3.14.
+>>
+>> I would also like to request that you make a branch available
+>> for me to use as a base for a branch containing SoC changes
+>> targeted at v3.14 that depend on this clocksource update.
+>>
+>> Thanks
+>
+> Hi Daniel,
+>
+> sorry to bother you about this, but if you could take a moment
+> to look at this pull request I would be most grateful. Its
+> rather important for us.
 
-> Joseph, I assume that if patches 2/4 and 4/4 are applied without patches
-> 1/4 and 3/4, there will be no issues?
-Yes. It's OK.
-> 
-> This patch looks fine, I think ...
+Yes, I will take care of it in a moment.
+
+
+>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>
+>>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.14
+>>
+>> for you to fetch changes up to d78e9474459768c9aaf8cfd8bc54957d44771f46:
+>>
+>>    clocksource: sh_cmt: Add clk_prepare/unprepare support (2013-12-14 12:57:36 +0900)
+>>
+>> ----------------------------------------------------------------
+>> Renesas ARM based SoC Clocksource updates for v3.14
+>>
+>> * Add clk_prepare/unprepare support to sh_cmt
+>>
+>> ----------------------------------------------------------------
+>> Laurent Pinchart (1):
+>>        clocksource: sh_cmt: Add clk_prepare/unprepare support
+>>
+>>   drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
+>>   1 file changed, 16 insertions(+), 4 deletions(-)
+>>
+w
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
