@@ -1,33 +1,41 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 15:50:08 +0100
-Subject: [PATCH 2/2] ARM: dts: tps65910 backup battery regulator
-In-Reply-To: <1387378208-26841-1-git-send-email-mpa@pengutronix.de>
-References: <1387378208-26841-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387378208-26841-2-git-send-email-mpa@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 18 Dec 2013 15:53:51 +0100
+Subject: [PATCH v2 3/9] clocksource/cadence_ttc: Store timer frequency
+ in driver data
+In-Reply-To: <5cff3201-db97-4061-a686-bf79ac17d4fe@CO1EHSMHS006.ehs.local>
+References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1385514296-26702-4-git-send-email-soren.brinkmann@xilinx.com>
+ <5cff3201-db97-4061-a686-bf79ac17d4fe@CO1EHSMHS006.ehs.local>
+Message-ID: <52B1B6FF.7000400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a devicetree node for the backup battery regulator.
+On 12/17/2013 08:21 PM, S?ren Brinkmann wrote:
+> Hi Daniel,
+>
+> On Tue, Nov 26, 2013 at 05:04:50PM -0800, Soren Brinkmann wrote:
+>> It is not allowed to call clk_get_rate() from interrupt context. To
+>> avoid such calls the timer input frequency is stored in the driver's
+>> data struct which makes it accessible to the driver in any context.
+>>
+>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>
+> I doubt that we'll resolve all issues with this series before the
+> holidays or even the next merge window. Could you take this patch into
+> your tree for 3.14? It is not directly related to the cpufreq work and
+> fixes an actual issue that triggers a kernel WARN under some condition
+> (I missed preserving the details and the trace). That would take the
+> easy stuff out of the way and we can focus on the more controversial
+> changes.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/tps65910.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+You are asking to take it for 3.14 but shouldn't it go as a 3.13 fix ?
 
-diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
-index 92693a8..b0ac665 100644
---- a/arch/arm/boot/dts/tps65910.dtsi
-+++ b/arch/arm/boot/dts/tps65910.dtsi
-@@ -82,5 +82,10 @@
- 			reg = <12>;
- 			regulator-compatible = "vmmc";
- 		};
-+
-+		vbb_reg: regulator at 13 {
-+			reg = <13>;
-+			regulator-compatible = "vbb";
-+		};
- 	};
- };
+   -- Daniel
+
 -- 
-1.8.5.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
