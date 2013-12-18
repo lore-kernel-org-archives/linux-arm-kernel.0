@@ -1,44 +1,57 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 18 Dec 2013 15:41:36 -0700
-Subject: [PATCH V1 6/7] ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC
- interrupt.
+Date: Wed, 18 Dec 2013 15:41:31 -0700
+Subject: [PATCH V1 1/7] ARM: dts: imx: pinfunc: add MX6QDL_PAD_GPIO_6__ENET_IRQ
 In-Reply-To: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387406497-26430-7-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This works around a hardware bug.
+Quoting from Ranjani Vaidyanathan
+
+All of the interrupts from the ENET block are not routed to
+the GPC block. Hence ENET interrupts are not able to wake
+up the SOC when the system is in WAIT mode. And the ENET
+interrupt gets serviced only when another interrupt causes
+the SOC to exit WAIT mode. This impacts the ENET performance.
+
+Adding MX6QDL_PAD_GPIO_6__ENET_IRQ is the 1st step to
+workaround this problem.
+
+The input reg is set to 0x3c to set IOMUX_OBSRV_MUX1 to ENET_IRQ.
+The mux reg value is 0x11, so that the observable mux is routed to
+this pin and to the gpio controller(sion bit).
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-
+CC: ra5478 at freescale.com
 ---
-This has not been tested.
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
+ arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 26fa0e5..088b0d2 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -44,6 +44,8 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
-+	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
- 
-@@ -77,7 +79,7 @@
- 		};
- 
- 		pinctrl_enet: enetgrp {
--			fsl,pins = <MX6QDL_ENET_PINGRP2>;
-+			fsl,pins = <MX6QDL_ENET_PINGRP2_GPIO6>;
- 		};
- 
- 		pinctrl_gpmi_nand: gpminandgrp {
+diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
+index 7499eee..0ead323 100644
+--- a/arch/arm/boot/dts/imx6dl-pinfunc.h
++++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
+@@ -755,6 +755,7 @@
+ #define MX6QDL_PAD_GPIO_5__I2C3_SCL                 0x230 0x600 0x878 0x6 0x2
+ #define MX6QDL_PAD_GPIO_5__ARM_EVENTI               0x230 0x600 0x000 0x7 0x0
+ #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x234 0x604 0x840 0x0 0x1
++#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x234 0x604 0x03c 0x11 0xff000609
+ #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x234 0x604 0x87c 0x2 0x2
+ #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x234 0x604 0x000 0x5 0x0
+ #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x234 0x604 0x000 0x6 0x0
+diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
+index e5834b2..9fc6120 100644
+--- a/arch/arm/boot/dts/imx6q-pinfunc.h
++++ b/arch/arm/boot/dts/imx6q-pinfunc.h
+@@ -673,6 +673,7 @@
+ #define MX6QDL_PAD_GPIO_3__USB_H1_OC                0x22c 0x5fc 0x948 0x6 0x1
+ #define MX6QDL_PAD_GPIO_3__MLB_CLK                  0x22c 0x5fc 0x900 0x7 0x1
+ #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x230 0x600 0x870 0x0 0x1
++#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x230 0x600 0x03c 0x11 0xff000609
+ #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x230 0x600 0x8ac 0x2 0x1
+ #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x230 0x600 0x000 0x5 0x0
+ #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x230 0x600 0x000 0x6 0x0
 -- 
 1.8.1.2
