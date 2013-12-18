@@ -1,93 +1,52 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 11:30:36 -0800
-Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
-In-Reply-To: <52B1E950.1040001@wwwdotorg.org>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-3-git-send-email-josephl@nvidia.com>
- <52B0D6FA.2060101@wwwdotorg.org>
- <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
- <52B1E950.1040001@wwwdotorg.org>
-Message-ID: <20131218193036.23538.99285@quantum>
+Date: Wed, 18 Dec 2013 11:32:03 -0800
+Subject: [PATCH 3/3] ARM: dts: Fix MDMA0 clock number
+In-Reply-To: <2082327.zpbOvCVe5P@amdc1227>
+References: <1386817322-11265-1-git-send-email-a.kesavan@samsung.com>
+ <1386817322-11265-3-git-send-email-a.kesavan@samsung.com>
+ <2082327.zpbOvCVe5P@amdc1227>
+Message-ID: <20131218193203.23538.30551@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2013-12-18 10:28:32)
-> On 12/18/2013 02:42 AM, Joseph Lo wrote:
-> > On Wed, 2013-12-18 at 06:58 +0800, Stephen Warren wrote:
-> >> On 12/17/2013 02:26 AM, Joseph Lo wrote:
-> >>> Add External Memory Controller (EMC) clock interface for the Tegra CCF
-> >>> driver to support EMC scaling.
-> >>
-> >>> diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
-> >>
-> >>> +static long clk_emc_round_rate(struct clk_hw *hw, unsigned long rate,
-> >>> +                          unsigned long *prate)
-> >>> +{
-> >>> +   struct tegra_clk_emc *emc = to_clk_emc(hw);
-> >>> +   struct clk *parent_clk = __clk_get_parent(hw->clk);
-> >>> +   unsigned long parent_rate = __clk_get_rate(parent_clk);
-> >>> +   unsigned long ret;
-> >>> +
-> >>> +   if (!emc->emc_ops)
-> >>> +           return parent_rate;
-> >>> +
-> >>> +   ret = emc->emc_ops->emc_round_rate(rate);
-> >>> +   if (!ret)
-> >>> +           return parent_rate;
-> >>> +
-> >>> +   return ret;
-> >>> +}
-> >>
-> >> Rather than implementing this custom "emc_ops" feature, isn't there a
-> >> standard clock notifier feature that the EMC driver can use?
-> >>
-> >> Isn't the EMC driver the only thing that will be changing the EMC clock
-> >> rate? If so, why not just have the EMC driver perform the appropriate
-> >> pre-/post-rate-change actions before/after calling clk_set_rate()?
-> > 
-> > We have two HW components needs to be updated when EMC rate change. One
-> > is the EMC clock for tuning the frequency, the other is the EMC for
-> > updating the timing and configuration for external memory (DRAM). So
-> > this question looks like to me is that can we separate the operation of
-> > the two components when rate changing?
-> > 
-> > We have two modes that depend on what memory type (DDR2, LPDDR2,
-> > DDR3/LP) we used on the platform to support EMC scaling.
-> > 1. power down mode (Tegra20 used this mode only.)
-> > In this mode, we update the EMC timing and configurations to EMC shadow
-> > registers. Then updating the rate in the EMC clock register. The HW will
-> > trigger the rate changing and timing/configurations updating for EMC.
-> > 2. self-refresh mode (Tegra30/114/124 if DDR3)
-> > More complicate in this mode. Putting DRAM in self-refresh, updating EMC
-> > settings, updating EMC clock, then we still need auto calibration before
-> > restores DRAM from the self-refresh mode. So the difference was the EMC
-> > clock operation was part of EMC scaling procedures.
-> > 
-> > I guess using the clk_notifier may be OK for the 1st case.
+Quoting Tomasz Figa (2013-12-18 06:49:10)
+> Hi Kukjin,
 > 
-> In both cases, isn't the overall operation something like:
+> On Thursday 12 of December 2013 08:32:02 Abhilash Kesavan wrote:
+> > Fix wrong clock number in mdma0 node.
+> > 
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> > index 9db5047..177becd 100644
+> > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > @@ -559,7 +559,7 @@
+> >                       compatible = "arm,pl330", "arm,primecell";
+> >                       reg = <0x10800000 0x1000>;
+> >                       interrupts = <0 33 0>;
+> > -                     clocks = <&clock 271>;
+> > +                     clocks = <&clock 346>;
+> >                       clock-names = "apb_pclk";
+> >                       #dma-cells = <1>;
+> >                       #dma-channels = <8>;
+> > 
 > 
-> a) Do some work before changing the EMC clock
-> b) Change the EMC clock
-> c) Do some work after changing the EMC clock
+> Can we have your ack for this patch?
 > 
-> Admittedly, the exact definition of "some work" is different for your
-> cases (1) and (2) above, but the overall structure is the same. As such,
-> can't the EMC scaling driver do (a), then do (b) i.e. call
-> clk_set_rate(), then do (c)? Or, in your case (2), do we need to do
-> funny tricks like running from IRAM since we can't access SDRAM during
-> the clock change? If so, I'm not sure how having the EMC clock changing
-> code is going to help your case (2) anyway, since we'll presumably have
-> to code up a custom stub in assembly for the part of the code that runs
-> from IRAM...
+> I'd like to apply the whole series into samsung-clk fixes branch and
+> send a pull request to Mike to get it and one more fix into his tree.
 
-Joseph,
-
-Just as a reference, check out how the smp_twd stuff is updated based on
-a clock rate-change notifier in arch/arm/kernel/smp_twd.c, lines
-103-142.
+Do these fixes need to go into the current -rc fixes cycle or can they
+go for 3.14?
 
 Regards,
 Mike
 
+> 
+> Best regards,
+> Tomasz
 > 
