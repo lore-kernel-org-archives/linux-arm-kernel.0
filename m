@@ -1,47 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 18 Dec 2013 15:38:19 +0400
-Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
-In-Reply-To: <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
-References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
- <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <52B1892B.1020806@cogentembedded.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 18 Dec 2013 08:40:38 -0300
+Subject: [PATCH v2 08/11] ARM: sun4i: dt: mod0 clocks
+In-Reply-To: <20131218094847.GD2718@lukather>
+References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+ <1387327503-15651-9-git-send-email-emilio@elopez.com.ar>
+ <20131218094847.GD2718@lukather>
+Message-ID: <52B189B6.5030807@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Maxime,
 
-On 18-12-2013 1:44, Wolfram Sang wrote:
-
-> From: Wolfram Sang <wsa@sang-engineering.com>
-
-> Tested with RIIC2 on a genmai board. Others untested but hopefully
-> trivial enough to be added.
-
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
-> ---
->   arch/arm/mach-shmobile/clock-r7s72100.c | 12 +++++++++++-
->   1 file changed, 11 insertions(+), 1 deletion(-)
-
-> diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-> index 7b457ae..770316d 100644
-> --- a/arch/arm/mach-shmobile/clock-r7s72100.c
-> +++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-[...]
-> @@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
->   	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+El 18/12/13 06:48, Maxime Ripard escribi?:
+> Hi Emilio,
 >
->   	/* ICK */
-> +	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
-> +	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
-> +	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
-> +	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+> On Tue, Dec 17, 2013 at 09:45:00PM -0300, Emilio L?pez wrote:
+>> This commit adds all the mod0 clocks present on sun4i to its device tree
+>>
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Even though I gave my Acked-by, could you rename the nodes to
+> something like: "foo_clk: clk at deadbeef"
+>
+> The node name is supposed to be the class of devices, and we're likely
+> to use all those labels for the actual controllers, and not the clocks
+> themselves.
 
-    These belong to some other place, the group marked by /* ICK */ is only 
-for CLKDEV_ICK_ID().
+Ok, I'll get that fixed before sending v3.
 
->   	CLKDEV_ICK_ID("sci_fck", "sh-sci.0", &mstp_clks[MSTP47]),
->   	CLKDEV_ICK_ID("sci_fck", "sh-sci.1", &mstp_clks[MSTP46]),
->   	CLKDEV_ICK_ID("sci_fck", "sh-sci.2", &mstp_clks[MSTP45]),
+Thanks!
 
-WBR, Sergei
+Emilio
