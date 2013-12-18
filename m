@@ -1,63 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 18 Dec 2013 10:25:54 -0600
-Subject: [PATCH v7 8/9] phy: add Broadcom Kona USB2 PHY driver
-In-Reply-To: <1387309356-17195-9-git-send-email-mporter@linaro.org>
-References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
- <1387309356-17195-9-git-send-email-mporter@linaro.org>
-Message-ID: <20131218162554.GF4970@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 18 Dec 2013 09:27:29 -0700
+Subject: [PATCHv7 06/12] ARM: tegra: create a DT header defining SWGROUP ID
+In-Reply-To: <52B1568F.1050305@gmail.com>
+References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
+ <1386835033-4701-7-git-send-email-hdoyu@nvidia.com>
+ <52B1568F.1050305@gmail.com>
+Message-ID: <52B1CCF1.2040907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 02:42:35PM -0500, Matt Porter wrote:
-> Add a driver for the internal Broadcom Kona USB 2.0 PHY found
-> on the BCM281xx family of SoCs.
+On 12/18/2013 01:02 AM, Mark Zhang wrote:
+> On 12/12/2013 03:57 PM, Hiroshi Doyu wrote:
+>> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
+>> binding. "swgroup" is a group of H/W clients which a Tegra SoC
+>> supports. This unique ID can be used to calculate MC_SMMU_<swgroup
+>> name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
+>> register bit. This will allow the same header to be used by both
+>> device tree files, and drivers implementing this binding, which
+>> guarantees that the two stay in sync. This also makes device trees
+>> more readable by using names instead of magic numbers. For HOTRESET
+>> bit shifting we need another conversion table, which will come later.
+
+>> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
+
+>> +#define TEGRA_SWGROUP_MPE	11	/* 0x264 */
+>> +#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
 > 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
+> Need to change this to:
+> 
+> #define TEGRA_SWGROUP_MSENC	11
+> 
+> The reason is that, this makes "TEGRA_SWGROUP_BIT" doesn't work. So if I
+> write "TEGRA_SWGROUP_CELLS(MSENC)" in dt, that causes a dt compiling error.
 
-Kishon, are you ok with this driver ?
+I guess it's because TEGRA_SWGROUP_BIT needs to expand its argument
+twice, which can be done.
 
-> +static int bcm_kona_usb2_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct bcm_kona_usb *phy;
-> +	struct resource *res;
-> +	struct phy *gphy;
-> +	struct phy_provider *phy_provider;
-> +
-> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-> +	if (!phy)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	phy->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(phy->regs))
-> +		return PTR_ERR(phy->regs);
-> +
-> +	platform_set_drvdata(pdev, phy);
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev,
-> +			of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider))
-> +		return PTR_ERR(phy_provider);
-> +
-> +	gphy = devm_phy_create(dev, &ops, NULL);
-> +	if (IS_ERR(gphy))
-> +		return PTR_ERR(gphy);
-> +
-> +	/* The Kona PHY supports an 8-bit wide UTMI interface */
-> +	phy_set_bus_width(gphy, 8);
-> +
-> +	phy_set_drvdata(gphy, phy);
-
-I think this set_drvdata() should be done before registering the
-provider, no ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/c2bfae5f/attachment.sig>
+That all said, just defining all the names directly to constants is
+probably the most direct fix.
