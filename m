@@ -1,79 +1,223 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed, 18 Dec 2013 16:21:17 +0900
-Subject: possible regression on 3.13 when calling flush_dcache_page
-In-Reply-To: <20131216144343.GD9627@ldesroches-Latitude-E6320>
-References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
- <20131212143618.GJ12099@ldesroches-Latitude-E6320>
- <20131213015909.GA8845@lge.com>
- <20131216144343.GD9627@ldesroches-Latitude-E6320>
-Message-ID: <20131218072117.GA2383@lge.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 18 Dec 2013 15:33:23 +0800
+Subject: [PATCH V2 2/2] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
+ when cpufreq is changed
+In-Reply-To: <1387318102-11070-2-git-send-email-b20788@freescale.com>
+References: <1387318102-11070-1-git-send-email-b20788@freescale.com>
+ <1387318102-11070-2-git-send-email-b20788@freescale.com>
+Message-ID: <20131218073321.GF6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 03:43:43PM +0100, Ludovic Desroches wrote:
-> Hello,
+On Tue, Dec 17, 2013 at 05:08:22PM -0500, Anson Huang wrote:
+> on i.MX6Q, cpu freq change need to follow below flows:
 > 
-> On Fri, Dec 13, 2013 at 10:59:09AM +0900, Joonsoo Kim wrote:
-> > On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
-> > > fix mmc mailing list address error
-> > > 
-> > > On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
-> > > > Hi,
-> > > > 
-> > > > With v3.13-rc3 I have an error when the atmel-mci driver calls
-> > > > flush_dcache_page (log at the end of the message).
-> > > > 
-> > > > Since I didn't have it before, I did a git bisect and the commit introducing
-> > > > the error is the following one:
-> > > > 
-> > > > 106a74e slab: replace free and inuse in struct slab with newly introduced active
-> > > > 
-> > > > I don't know if this commit has introduced a bug or if it has revealed a bug
-> > > > in the atmel-mci driver.
-> > 
-> > Hello,
-> > 
-> > I think that this commit may not introduce a bug. This patch remove one
-> > variable on slab management structure and replace variable name. So there
-> > is no functional change.
-> > 
+> 1. each setpoint has different VDDARM, VDDSOC/PU voltage, get the setpoint
+>    table from dts;
+> 2. when cpu freq is scaling up, need to increase VDDSOC/PU voltage before
+>    VDDARM, if VDDPU is off, no need to change it;
+> 3. when cpu freq is scaling down, need to decrease VDDARM voltage before
+>    VDDSOC/PU, if VDDPU is off, no need to change it;
 > 
-> If I have reverted this patch and other ones you did on top of it and
-> the issue disappear.
-
-Hello,
-
-Could you give me your '/proc/slabinfo' before/after this commit (106a74e)?
-
-And how about testing with artificially increasing size of struct slab on
-top of this commit (106a74e)?
-
-I really wonder why the problem happens, because this doesn't cause any
-functional change as far as I know. Only side-effect from this patch is
-decreasing size of struct slab.
-
-Thanks.
-
-diff --git a/mm/slab.c b/mm/slab.c
-index 2ec2336..d2240fd 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -174,6 +174,7 @@ struct slab {
-        struct {
-                struct list_head list;
-                void *s_mem;            /* including colour offset */
-+               unsigned int x;
-                unsigned int active;    /* num of objs active in slab */
-        };
- };
-
+> normally dts will pass vddsoc/pu freq/volt info to kernel, if not, will
+> use fixed value for vddsoc/pu voltage setting.
 > 
-> > I doubt that side-effect of this patch reveals a bug in other place.
-> > Side-effect is reduced memory usage for slab management structure. It would
-> > makes some slabs have more objects with more density since slab management
-> > structure is sometimes on the page for objects. So if it diminishes, more
-> > objects can be in the page.
-> > 
-> > Anyway, I will look at it more. If you have any progress, please let me know.
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c |  117 +++++++++++++++++++++++++++++----------
+>  1 file changed, 88 insertions(+), 29 deletions(-)
 > 
-> No progress at the moment.
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index 4b3f18e..65c1df1 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -35,6 +35,9 @@ static struct device *cpu_dev;
+>  static struct cpufreq_frequency_table *freq_table;
+>  static unsigned int transition_latency;
+>  
+> +static u32 *imx6_soc_volt;
+> +static u32 soc_opp_count;
+> +
+>  static unsigned int imx6q_get_speed(unsigned int cpu)
+>  {
+>  	return clk_get_rate(arm_clk) / 1000;
+> @@ -69,23 +72,24 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  
+>  	/* scaling up?  scale voltage before frequency */
+>  	if (new_freq > old_freq) {
+> +		if (regulator_is_enabled(pu_reg)) {
+> +			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> +			if (ret) {
+> +				dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
+> +				return ret;
+> +			}
+> +		}
+> +		ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> +		if (ret) {
+> +			dev_err(cpu_dev, "failed to scale vddsoc up: %d\n", ret);
+> +			return ret;
+> +		}
+>  		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+>  		if (ret) {
+>  			dev_err(cpu_dev,
+>  				"failed to scale vddarm up: %d\n", ret);
+>  			return ret;
+>  		}
+> -
+> -		/*
+> -		 * Need to increase vddpu and vddsoc for safety
+> -		 * if we are about to run at 1.2 GHz.
+> -		 */
+> -		if (new_freq == FREQ_1P2_GHZ / 1000) {
+> -			regulator_set_voltage_tol(pu_reg,
+> -					PU_SOC_VOLTAGE_HIGH, 0);
+> -			regulator_set_voltage_tol(soc_reg,
+> -					PU_SOC_VOLTAGE_HIGH, 0);
+> -		}
+>  	}
+>  
+>  	/*
+> @@ -120,12 +124,17 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  				 "failed to scale vddarm down: %d\n", ret);
+>  			ret = 0;
+>  		}
+> -
+> -		if (old_freq == FREQ_1P2_GHZ / 1000) {
+> -			regulator_set_voltage_tol(pu_reg,
+> -					PU_SOC_VOLTAGE_NORMAL, 0);
+> -			regulator_set_voltage_tol(soc_reg,
+> -					PU_SOC_VOLTAGE_NORMAL, 0);
+> +		ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> +		if (ret) {
+> +			dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+> +			ret = 0;
+> +		}
+> +		if (regulator_is_enabled(pu_reg)) {
+> +			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> +			if (ret) {
+> +				dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
+> +				ret = 0;
+> +			}
+>  		}
+>  	}
+>  
+> @@ -153,6 +162,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  	struct dev_pm_opp *opp;
+>  	unsigned long min_volt, max_volt;
+>  	int num, ret;
+> +	const struct property *prop;
+> +	const __be32 *val;
+> +	u32 nr, i, j;
+>  
+>  	cpu_dev = get_cpu_device(0);
+>  	if (!cpu_dev) {
+> @@ -201,10 +213,69 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  		goto put_node;
+>  	}
+>  
+> +	/* Make imx6_soc_volt array's size same as arm opp number */
+> +	imx6_soc_volt = devm_kzalloc(cpu_dev, sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
+> +	if (imx6_soc_volt == NULL) {
+> +		dev_warn(cpu_dev, "No valid memory for imx6_soc_volt!\n");
+
+Drop this message.  Error code -ENOMEM is enough to tell what's going
+wrong.
+
+> +		ret = -ENOMEM;
+> +		goto free_freq_table;
+> +	}
+> +
+> +	prop = of_find_property(np, "fsl,soc-operating-points", NULL);
+> +	if (!prop || !prop->value) {
+> +		dev_warn(cpu_dev, "No valid fsl,soc-operating-points property is found!\n");
+> +		goto soc_opp_out;
+> +	}
+> +
+> +	/*
+> +	 * Each OPP is a set of tuples consisting of frequency and
+> +	 * voltage like <freq-kHz vol-uV>.
+> +	 */
+> +	nr = prop->length / sizeof(u32);
+> +	if (nr % 2 || (nr / 2) < num) {
+> +		dev_warn(cpu_dev, "Invalid fsl,soc-operating-points list!\n");
+> +		goto soc_opp_out;
+> +	}
+> +
+> +	rcu_read_lock();
+
+You do not need this lock any more.
+
+> +	for (j = 0; j < num; j++) {
+> +		val = prop->value;
+> +		for (i = 0; i < nr / 2; i++) {
+> +			unsigned long freq = be32_to_cpup(val++);
+> +			unsigned long volt = be32_to_cpup(val++);
+> +			if (freq_table[j].frequency == freq) {
+> +				imx6_soc_volt[soc_opp_count++] = volt;
+> +				break;
+> +			}
+> +		}
+> +	}
+> +	rcu_read_unlock();
+> +
+> +soc_opp_out:
+> +	/* use fixed soc opp volt if no valid soc opp info found in dtb */
+> +	if (soc_opp_count != num) {
+> +		dev_warn(cpu_dev, "can NOT find valid soc opp info in dtb, use default value!\n");
+
+It will be a little noisy for old DTB case with print so many warnings.
+Maybe we should drop above two dev_warn() in fsl,soc-operating-points
+property check and do once here.
+
+> +		for (j = 0; j < num; j++)
+> +			imx6_soc_volt[j] = PU_SOC_VOLTAGE_NORMAL;
+> +		if (freq_table[num - 1].frequency * 1000 == FREQ_1P2_GHZ)
+> +			imx6_soc_volt[num - 1] = PU_SOC_VOLTAGE_HIGH;
+> +	}
+> +
+>  	if (of_property_read_u32(np, "clock-latency", &transition_latency))
+>  		transition_latency = CPUFREQ_ETERNAL;
+>  
+>  	/*
+> +	 * Calculate the ramp time for max voltage change in the
+> +	 * VDDSOC and VDDPU regulators.
+> +	 */
+> +	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> +	if (ret > 0)
+> +		transition_latency += ret * 1000;
+> +	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+
+One of the regulator_set_voltage_time() should be for pu_reg.
+
+Shawn
+
+> +	if (ret > 0)
+> +		transition_latency += ret * 1000;
+> +
+> +	/*
+>  	 * OPP is maintained in order of increasing frequency, and
+>  	 * freq_table initialised from OPP is therefore sorted in the
+>  	 * same order.
+> @@ -221,18 +292,6 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  	if (ret > 0)
+>  		transition_latency += ret * 1000;
+>  
+> -	/* Count vddpu and vddsoc latency in for 1.2 GHz support */
+> -	if (freq_table[num].frequency == FREQ_1P2_GHZ / 1000) {
+> -		ret = regulator_set_voltage_time(pu_reg, PU_SOC_VOLTAGE_NORMAL,
+> -						 PU_SOC_VOLTAGE_HIGH);
+> -		if (ret > 0)
+> -			transition_latency += ret * 1000;
+> -		ret = regulator_set_voltage_time(soc_reg, PU_SOC_VOLTAGE_NORMAL,
+> -						 PU_SOC_VOLTAGE_HIGH);
+> -		if (ret > 0)
+> -			transition_latency += ret * 1000;
+> -	}
+> -
+>  	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
+>  	if (ret) {
+>  		dev_err(cpu_dev, "failed register driver: %d\n", ret);
+> -- 
+> 1.7.9.5
+> 
+> 
