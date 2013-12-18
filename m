@@ -1,82 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Dec 2013 18:11:17 +0000
-Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
-In-Reply-To: <CAAhSdy1PEvudWMq__Qt2ZT663LsuF335myZaPyA81uhnqmVKoQ@mail.gmail.com>
- (Anup Patel's message of "Wed, 18 Dec 2013 15:52:29 +0000")
-References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
- <20131217185154.GN5711@cbox>
- <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
- <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1PEvudWMq__Qt2ZT663LsuF335myZaPyA81uhnqmVKoQ@mail.gmail.com>
-Message-ID: <87a9fyowqi.fsf@e102391-lin.cambridge.arm.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 18 Dec 2013 10:20:32 -0800
+Subject: [PATCHv2 2/2] arm64: Correct virt_addr_valid
+In-Reply-To: <20131217120027.GD32118@arm.com>
+References: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
+ <1387220505-9799-2-git-send-email-lauraa@codeaurora.org>
+ <20131217120027.GD32118@arm.com>
+Message-ID: <52B1E770.9060308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18 2013 at 03:52:29 PM, Anup Patel <anup@brainfault.org> wrote:
-> On Wed, Dec 18, 2013 at 9:11 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Hi Anup,
+On 12/17/2013 4:00 AM, Catalin Marinas wrote:
+> On Mon, Dec 16, 2013 at 07:01:45PM +0000, Laura Abbott wrote:
+>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> index 3776217..b8ec776 100644
+>> --- a/arch/arm64/include/asm/memory.h
+>> +++ b/arch/arm64/include/asm/memory.h
+>> @@ -146,8 +146,9 @@ static inline void *phys_to_virt(phys_addr_t x)
+>>   #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
 >>
->> On Wed, Dec 18 2013 at 03:03:43 PM, Anup Patel <anup@brainfault.org> wrote:
->>> On Wed, Dec 18, 2013 at 8:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> Christoffer Dall <christoffer.dall@linaro.org> writes:
->>>>
->>>>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
->>>>>> The Power State and Coordination Interface (PSCI) specification defines
->>>>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
->>>>>>
->>>>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
->>>>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
->>>>>> KVM_EXIT_SYSTEM_EVENT exit reason.
->>>>>>
->>>>>> To try this patch from guest kernel, we will need PSCI-based restart and
->>>>>> poweroff support in the guest kenel for both ARM and ARM64.
->>>>>>
->>>>>> Rob Herring has already submitted patches for PSCI-based restart and
->>>>>> poweroff in ARM kernel but these are not merged yet due unstable device
->>>>>> tree bindings of kernel PSCI support. We will be having similar patches
->>>>>> for PSCI-based restart and poweroff in ARM64 kernel.
->>>>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
->>>>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
->>>>>
->>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>
->>>>> I can merge this series if Marc acks it as well.
->>>>
->>>> The patches themselves are mostly fine. One issue though: They implement
->>>> part of the v0.2 spec, but keep on using the range of function IDs that
->>>> we made up for v0.1.
->>>>
->>>> I just had a chat with the person responsible for the spec, and realized
->>>> that the Function IDs mentionned in the v0.2 spec are not optional, and
->>>> not using them would be in direct violation of the spec (the new numbers
->>>> now come directly from the SMC calling convention).
->>>
->>> Should we emulate PSCI_VERSION call to help Guest determine
->>> the spec version emulated by KVM (i.e. v0.1 or v0.2) ??
->>
->> I think that'd be a nice to have, but the guest is likely to get its
->> information from the DT anyway. Plus I don't think the original PSCI
->> spec specified PSCI_VERSION, which only make it useful for whatever
->> comes after v0.2.
->>
->> So I think we need to:
->> - Use the new range for PSCI v0.2 (while still supporting v0.1 and the
->> old range)
+>>   #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+>> -#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
+>> -				 ((void *)(kaddr) < (void *)high_memory))
+>> +#define virt_addr_valid(kaddr)	(pfn_valid(__pa(kaddr) >> PAGE_SHIFT) && \
+>> +	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory))
+>> +
 >
-> Does this mean we should have first isolate v0.2 ID range
-> from v0.1 ID range?
-
-Yes.
-
-> And then...
+> I still think the original patch was fine for arm64, no need for
+> additional checks since we don't have highmem and __pa() is always
+> linear.
 >
-> Rebase this patchset based on new v0.2 ID range?
 
-Indeed.
+Okay, do you want to go ahead and just take the previous version then?
 
-Thanks,
+Laura
 
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
