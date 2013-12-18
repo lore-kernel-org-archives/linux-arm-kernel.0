@@ -1,95 +1,120 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Dec 2013 17:26:46 -0600
-Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
-In-Reply-To: <8738lqow22.fsf@e102391-lin.cambridge.arm.com>
-References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
- <20131217185154.GN5711@cbox>
- <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
- <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1PEvudWMq__Qt2ZT663LsuF335myZaPyA81uhnqmVKoQ@mail.gmail.com>
- <87a9fyowqi.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1XKBdyXGWGZXwj8+C0_P3CqyzyFuW=HysEps_QByuv4g@mail.gmail.com>
- <8738lqow22.fsf@e102391-lin.cambridge.arm.com>
-Message-ID: <CAL_Jsq+O_wuZN==PObGnGK5no_2Yt2ROp4Q1m5JhH-LnBrY6VA@mail.gmail.com>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Wed, 18 Dec 2013 23:31:47 +0000
+Subject: [PATCH V3 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
+In-Reply-To: <20131218142157.GL6691@S2101-09.ap.freescale.net>
+References: <1387402010-31749-1-git-send-email-b20788@freescale.com>,
+ <20131218142157.GL6691@S2101-09.ap.freescale.net>
+Message-ID: <43A4EB83-ED8F-43F8-A458-4AEEDA886008@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 12:25 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Wed, Dec 18 2013 at 06:18:54 PM, Anup Patel <anup@brainfault.org> wrote:
->> On Wed, Dec 18, 2013 at 11:41 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On Wed, Dec 18 2013 at 03:52:29 PM, Anup Patel <anup@brainfault.org> wrote:
->>>> On Wed, Dec 18, 2013 at 9:11 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> Hi Anup,
->>>>>
->>>>> On Wed, Dec 18 2013 at 03:03:43 PM, Anup Patel <anup@brainfault.org> wrote:
->>>>>> On Wed, Dec 18, 2013 at 8:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>>>> Christoffer Dall <christoffer.dall@linaro.org> writes:
->>>>>>>
->>>>>>>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
->>>>>>>>> The Power State and Coordination Interface (PSCI) specification defines
->>>>>>>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
->>>>>>>>>
->>>>>>>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
->>>>>>>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
->>>>>>>>> KVM_EXIT_SYSTEM_EVENT exit reason.
->>>>>>>>>
->>>>>>>>> To try this patch from guest kernel, we will need PSCI-based restart and
->>>>>>>>> poweroff support in the guest kenel for both ARM and ARM64.
->>>>>>>>>
->>>>>>>>> Rob Herring has already submitted patches for PSCI-based restart and
->>>>>>>>> poweroff in ARM kernel but these are not merged yet due unstable device
->>>>>>>>> tree bindings of kernel PSCI support. We will be having similar patches
->>>>>>>>> for PSCI-based restart and poweroff in ARM64 kernel.
->>>>>>>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
->>>>>>>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
->>>>>>>>
->>>>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>>>>
->>>>>>>> I can merge this series if Marc acks it as well.
->>>>>>>
->>>>>>> The patches themselves are mostly fine. One issue though: They implement
->>>>>>> part of the v0.2 spec, but keep on using the range of function IDs that
->>>>>>> we made up for v0.1.
->>>>>>>
->>>>>>> I just had a chat with the person responsible for the spec, and realized
->>>>>>> that the Function IDs mentionned in the v0.2 spec are not optional, and
->>>>>>> not using them would be in direct violation of the spec (the new numbers
->>>>>>> now come directly from the SMC calling convention).
->>>>>>
->>>>>> Should we emulate PSCI_VERSION call to help Guest determine
->>>>>> the spec version emulated by KVM (i.e. v0.1 or v0.2) ??
->>>>>
->>>>> I think that'd be a nice to have, but the guest is likely to get its
->>>>> information from the DT anyway. Plus I don't think the original PSCI
->>>>> spec specified PSCI_VERSION, which only make it useful for whatever
->>>>> comes after v0.2.
->>>>>
->>>>> So I think we need to:
->>>>> - Use the new range for PSCI v0.2 (while still supporting v0.1 and the
->>>>> old range)
->>>>
->>>> Does this mean we should have first isolate v0.2 ID range
->>>> from v0.1 ID range?
->>>
->>> Yes.
->>
->> Are you planning to do it ?
->> OR
->> Do you expect me to do it because this patchset would depend on that?
->
-> First, I want to understand the objections that were raised against
-> using the Function IDs as defined in the spec.
->
-> Then, assuming we move in that direction, I'd expect you to create a
-> separate range of IDs and update the PSCI code to handle both PSCI
-> versions.
->
-> But as this has direct implication with userspace (DT generation), I'd
-> rather take it slow and first try to understand the issues Mark raised.
 
-Here is the thread where relying on SMC calling convention was discussed:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/188057.html
+Sent from Anson's iPhone
 
-Rob
+> ? 2013?12?18??22:21?"Shawn Guo" <shawn.guo@linaro.org> ???
+> 
+>> On Wed, Dec 18, 2013 at 04:26:49PM -0500, Anson Huang wrote:
+>> i.MX6Q needs to update vddarm, vddsoc/pu regulators when cpu freq
+>> is changed, each setpoint has different voltage, so we need to
+>> pass vddarm, vddsoc/pu's freq-voltage info from dts together.
+>> 
+>> Signed-off-by: Anson Huang <b20788@freescale.com>
+>> ---
+>> .../devicetree/bindings/cpufreq/cpufreq-imx6.txt   |   56 ++++++++++++++++++++
+> 
+> As I said in V2 review, the device tree binding doc change should be
+> part of driver patch (patch #2 in this case) or a separate patch, but
+> never be in the same patch as DTS change.
+
+I missed that one, sorry for that, then I will send out a V4 patch set.
+> 
+> Shawn
+> 
+>> arch/arm/boot/dts/imx6q.dtsi                       |    7 +++
+>> 2 files changed, 63 insertions(+)
+>> create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+>> 
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+>> new file mode 100644
+>> index 0000000..cf1c5f7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+>> @@ -0,0 +1,56 @@
+>> +i.MX6 cpufreq driver
+>> +-------------------
+>> +
+>> +i.MX6 SoC cpufreq driver for CPU frequency scaling.
+>> +
+>> +This binding doc defines properties that must be put in the /cpus/cpu at 0 node,
+>> +please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> +for detail.
+>> +
+>> +Required properties:
+>> +- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
+>> +  for details.
+>> +- clocks: Specify clocks that need to be used when cpu frequency is scaled,
+>> +  refer to Documentation/devicetree/bindings/clock/clock-bindings.txt for
+>> +  details.
+>> +- clock-names: List of clock input name strings sorted in the same order as the
+>> +  clocks property, refer to Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +  for details.
+>> +- xxx-supply: Input voltage supply regulator, refer to
+>> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+>> +  arm-supply: vddarm input.
+>> +  pu-supply: vddpu input.
+>> +  soc-supply: vddsoc input.
+>> +
+>> +Optional properties:
+>> +- fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
+>> +  go with cpu0's operating-points.
+>> +- clock-latency: Specify the possible maximum transition latency for clock,
+>> +  in unit of nanoseconds.
+>> +
+>> +Examples:
+>> +
+>> +    cpu at 0 {
+>> +        operating-points = <
+>> +            /* kHz    uV */
+>> +            1200000 1275000
+>> +            996000  1250000
+>> +            792000  1150000
+>> +            396000  975000
+>> +        >;
+>> +        fsl,soc-operating-points = <
+>> +            /* ARM kHz  SOC-PU uV */
+>> +            1200000 1275000
+>> +            996000    1250000
+>> +            792000    1175000
+>> +            396000    1175000
+>> +        >;
+>> +        clock-latency = <61036>; /* two CLK32 periods */
+>> +        clocks = <&clks 104>, <&clks 6>, <&clks 16>,
+>> +             <&clks 17>, <&clks 170>;
+>> +        clock-names = "arm", "pll2_pfd2_396m", "step",
+>> +                  "pll1_sw", "pll1_sys";
+>> +        arm-supply = <&reg_arm>;
+>> +        pu-supply = <&reg_pu>;
+>> +        soc-supply = <&reg_soc>;
+>> +    };
+>> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+>> index e7e8332..021e0cb 100644
+>> --- a/arch/arm/boot/dts/imx6q.dtsi
+>> +++ b/arch/arm/boot/dts/imx6q.dtsi
+>> @@ -30,6 +30,13 @@
+>>                792000  1150000
+>>                396000  975000
+>>            >;
+>> +            fsl,soc-operating-points = <
+>> +                /* ARM kHz  SOC-PU uV */
+>> +                1200000 1275000
+>> +                996000    1250000
+>> +                792000    1175000
+>> +                396000    1175000
+>> +            >;
+>>            clock-latency = <61036>; /* two CLK32 periods */
+>>            clocks = <&clks 104>, <&clks 6>, <&clks 16>,
+>>                 <&clks 17>, <&clks 170>;
+>> -- 
+>> 1.7.9.5
+> 
