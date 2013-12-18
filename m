@@ -1,43 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 18 Dec 2013 19:50:56 +0100
-Subject: [PATCH 2/2] ARM: dts: mxs: Add iio-hwmon to mx23 soc
-In-Reply-To: <1387392656-28037-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1387392656-28037-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1387392656-28037-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Dec 2013 18:52:36 +0000
+Subject: [PATCH 2/2] ASoC: sgtl5000: clean up sgtl5000_enable_regulators()
+In-Reply-To: <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+References: <1386916983-27832-1-git-send-email-shawn.guo@linaro.org>
+ <1386916983-27832-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20131218185236.GI31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to read the SoC on-die temperature sensor available on the LRADC by
-using:
- cat /sys/class/hwmon/hwmon0/device/temp1_input
+On Fri, Dec 13, 2013 at 02:43:03PM +0800, Shawn Guo wrote:
+> Function sgtl5000_enable_regulators() is somehow odd in handling the
+> optional external VDDD supply.  The driver can only enable this supply
+> on SGTL5000 chip before revision 0x11, and of course when this external
+> VDDD is present.  It currently does something like below.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/imx23.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index c96ceaef7ddf..cd5e662d72f1 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -426,7 +426,7 @@
- 				status = "disabled";
- 			};
- 
--			lradc at 80050000 {
-+			lradc: lradc at 80050000 {
- 				compatible = "fsl,imx23-lradc";
- 				reg = <0x80050000 0x2000>;
- 				interrupts = <36 37 38 39 40 41 42 43 44>;
-@@ -524,4 +524,9 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	iio_hwmon {
-+		compatible = "iio-hwmon";
-+		io-channels = <&lradc 8>;
-+	};
- };
--- 
-1.8.3.2
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/48d33d91/attachment.sig>
