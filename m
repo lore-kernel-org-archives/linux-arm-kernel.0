@@ -1,42 +1,87 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 18 Dec 2013 08:47:52 -0800
-Subject: [PATCH v2 3/9] clocksource/cadence_ttc: Store timer frequency in
- driver data
-In-Reply-To: <52B1B6FF.7000400@linaro.org>
-References: <1385514296-26702-1-git-send-email-soren.brinkmann@xilinx.com>
- <1385514296-26702-4-git-send-email-soren.brinkmann@xilinx.com>
- <5cff3201-db97-4061-a686-bf79ac17d4fe@CO1EHSMHS006.ehs.local>
- <52B1B6FF.7000400@linaro.org>
-Message-ID: <ce29829b-3727-46ba-8c46-54273ce04745@DB8EHSMHS003.ehs.local>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 18 Dec 2013 17:47:20 +0100
+Subject: [PATCH 4/6] net: cpsw: Use cpsw-ctrl-macid driver
+In-Reply-To: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
+References: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387385242-1161-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Use ctrl-macid driver to obtain the macids stored in the processor. This
+is only done when defined in DT.
 
-On Wed, Dec 18, 2013 at 03:53:51PM +0100, Daniel Lezcano wrote:
-> On 12/17/2013 08:21 PM, S?ren Brinkmann wrote:
-> >Hi Daniel,
-> >
-> >On Tue, Nov 26, 2013 at 05:04:50PM -0800, Soren Brinkmann wrote:
-> >>It is not allowed to call clk_get_rate() from interrupt context. To
-> >>avoid such calls the timer input frequency is stored in the driver's
-> >>data struct which makes it accessible to the driver in any context.
-> >>
-> >>Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >>Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >
-> >I doubt that we'll resolve all issues with this series before the
-> >holidays or even the next merge window. Could you take this patch into
-> >your tree for 3.14? It is not directly related to the cpufreq work and
-> >fixes an actual issue that triggers a kernel WARN under some condition
-> >(I missed preserving the details and the trace). That would take the
-> >easy stuff out of the way and we can focus on the more controversial
-> >changes.
-> 
-> You are asking to take it for 3.14 but shouldn't it go as a 3.13 fix ?
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ Documentation/devicetree/bindings/net/cpsw.txt |  5 +++++
+ drivers/net/ethernet/ti/cpsw.c                 | 18 ++++++++++++++----
+ drivers/net/ethernet/ti/cpsw.h                 |  2 ++
+ 3 files changed, 21 insertions(+), 4 deletions(-)
 
-That's also an option. As I remember, the patch fixes a kernel WARN. The
-system still seemed operational though. Up to you whether this is
-considered severe enough for the 3.13 series. I'm happy either way.
-
-	S?ren
+diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+index c39f077..b95c38b 100644
+--- a/Documentation/devicetree/bindings/net/cpsw.txt
++++ b/Documentation/devicetree/bindings/net/cpsw.txt
+@@ -34,6 +34,11 @@ Required properties:
+ Optional properties:
+ - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
+ - mac-address		: Specifies slave MAC address
++- ti,mac-address-ctrl	: When cpsw-ctrl-macid support is compiledin, this can
++			  be set to a phandle with one argument, see
++			  cpsw-ctrl-macid.txt. If this method fails, cpsw falls
++			  back to mac-address or random mac-address.
++
+ 
+ Note: "ti,hwmods" field is used to fetch the base address and irq
+ resources from TI, omap hwmod data base during device registration.
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 5120d9c..382d793 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -1804,9 +1804,16 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+ 		snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+ 			 PHY_ID_FMT, mdio->name, phyid);
+ 
+-		mac_addr = of_get_mac_address(slave_node);
+-		if (mac_addr)
+-			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
++		ret = cpsw_ctrl_macid_read(slave_node, slave_data->mac_addr);
++		if (ret) {
++			if (ret == -EPROBE_DEFER)
++				return ret;
++
++			mac_addr = of_get_mac_address(slave_node);
++			if (mac_addr)
++				memcpy(slave_data->mac_addr, mac_addr,
++						ETH_ALEN);
++		}
+ 
+ 		slave_data->phy_if = of_get_phy_mode(slave_node);
+ 
+@@ -1946,10 +1953,13 @@ static int cpsw_probe(struct platform_device *pdev)
+ 	/* Select default pin state */
+ 	pinctrl_pm_select_default_state(&pdev->dev);
+ 
+-	if (cpsw_probe_dt(&priv->data, pdev)) {
++	ret = cpsw_probe_dt(&priv->data, pdev);
++	if (ret == -EINVAL) {
+ 		pr_err("cpsw: platform data missing\n");
+ 		ret = -ENODEV;
+ 		goto clean_runtime_disable_ret;
++	} else if (ret) {
++		goto clean_runtime_disable_ret;
+ 	}
+ 	data = &priv->data;
+ 
+diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
+index 1b71067..222eebe 100644
+--- a/drivers/net/ethernet/ti/cpsw.h
++++ b/drivers/net/ethernet/ti/cpsw.h
+@@ -42,4 +42,6 @@ struct cpsw_platform_data {
+ 
+ void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave);
+ 
++int cpsw_ctrl_macid_read(struct device_node *np, u8 *mac_addr);
++
+ #endif /* __CPSW_H__ */
+-- 
+1.8.5.1
