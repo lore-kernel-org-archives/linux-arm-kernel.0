@@ -1,36 +1,21 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 18 Dec 2013 08:27:48 -0300
-Subject: [PATCH v2 01/11] clk: sunxi: register factors clocks behind
- composite
-In-Reply-To: <20131218025527.23538.28216@quantum>
-References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
- <1387327503-15651-2-git-send-email-emilio@elopez.com.ar>
- <20131218025527.23538.28216@quantum>
-Message-ID: <52B186B4.6050706@elopez.com.ar>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Dec 2013 11:31:00 +0000
+Subject: [PATCH] ASoC: wm8904: fix DSP mode B configuration
+In-Reply-To: <1387337183-16814-1-git-send-email-voice.shen@atmel.com>
+References: <1387337183-16814-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20131218113100.GJ28455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Wed, Dec 18, 2013 at 11:26:23AM +0800, Bo Shen wrote:
+> When wm8904 work in DSP mode B, we still need to configure it to
+> work in DSP mode. Or else, it will work in Right Justified mode.
 
-Thanks for the prompt review! It's much appreciated.
-
-El 17/12/13 23:55, Mike Turquette escribi?:
-> Quoting Emilio L?pez (2013-12-17 16:44:53)
->> This commit reworks factors clock registration to be done behind a
->> composite clock. This allows us to additionally add a gate, mux or
->> divisors, as it will be needed by some future PLLs.
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
-(...)
-> Seems like 5 is a magic number? I guess this type of clock always has
-> the same number of parents? Might be good to use a preprocessor macro
-> here.
-
-Indeed, these clocks always have less than 5 parents. I'll use a macro 
-to make it clearer.
-
-Cheers,
-
-Emilio
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/12743a85/attachment.sig>
