@@ -1,46 +1,93 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Dec 2013 17:39:42 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20131217195519.GD28455@sirena.org.uk>
-References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
- <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
- <20131217195519.GD28455@sirena.org.uk>
-Message-ID: <20131218173941.GA17594@e102568-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 19 Dec 2013 02:49:50 +0900
+Subject: [GIT PULL 1/7] Samsung fixes for v3.14
+In-Reply-To: <7379738.rMmWN95Wqt@flatron>
+References: <52AE0F41.7050706@samsung.com> <3351204.WyoCcrrZ3X@amdc1227>
+ <117101cefb22$d5378b10$7fa6a130$@kernel.org> <7379738.rMmWN95Wqt@flatron>
+Message-ID: <52B1E03E.5040400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 07:55:19PM +0000, Mark Brown wrote:
-> On Tue, Dec 17, 2013 at 05:06:25PM +0000, Lorenzo Pieralisi wrote:
-> > On Mon, Dec 16, 2013 at 04:49:22PM +0000, Mark Brown wrote:
-> 
-> > > +void store_cpu_topology(unsigned int cpuid);
-> 
-> > I still think this function is not needed at all and therefore should
-> > not be exported.
-> 
-> > > +static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
-> > > +{
-> > > +	store_cpu_topology(cpuid);
-> 
-> > As I mentioned this need not be done here. Parse the topology from DT,
-> > (cpu_logical_map or cpu-map) in one go and get rid of store_cpu_topology().
-> 
-> That's what we're actually doing for parsing, the parsing all happens at
-> once.
-> 
-> I do think it's useful to to have the function there partly just as a
-> hook but more for the warning it generates if we manage to boot a core
-> that we didn't hook up with the topology information.  This seems like
-> it'll be helpful for debugging issues - we'll actively warn if there are
-> CPUs that have been omitted from the definition in the firmware.  The
-> other things the function does could be done elsewhere I think, it
-> didn't seem worth moving them though.
 
-I think you have a point, the question is whether we need that function
-to run the check you mention or not, we can run the check for all possible
-cpus after completing the topology parsing. Actually, we might be
-building topology for cores that do not come online as well, I do not think
-this is a problem, but I have to cast a proper look into that before
-jumping to conclusions, thanks for pointing that out.
 
-Lorenzo
+On 12/17/13 21:27, Tomasz Figa wrote:
+> On Tuesday 17 of December 2013 21:23:46 kgene at kernel.org wrote:
+>> Tomasz Figa wrote:
+>>>
+>>> Hi Kukjin,
+>>>
+>> Hi,
+>>
+>>> On Monday 16 of December 2013 05:21:21 Kukjin Kim wrote:
+>>>> The following changes since commit
+>>> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>>>
+>>>>     Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>     git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>>> tags/samsung-fixes
+>>>>
+>>>> for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
+>>>>
+>>>>     ARM: dts: Update display clock frequency for Origen-4412 (2013-12-16
+>>>> 04:41:57 +0900)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Samsung non-critical fixes for v3.14
+>>>> - Switch FIFO mode for arch_enable_uart_fifo()
+>>>> - Add missing op_mode for PMIC on exynos5250-arndale
+>>>> - Add missing clock-frequency for CPU on exynos5250
+>>>> - Fix typo samaung to samsung for exynos5420-pinctrl
+>>>> - Fix display clock-frequency for exynos4210/exynos4412-origen
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Alexander Shiyan (1):
+>>>>         ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo
+>> function
+>>>>
+>>>> Sachin Kamat (4):
+>>>>         ARM: dts: Add missing op_mode property to PMIC on Arndale
+>>>>         ARM: dts: Add missing frequency property to exynos5250
+>>>>         ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
+>>>>         ARM: dts: Update display clock frequency for Origen-4412
+>>>>
+>>>> Tushar Behera (1):
+>>>>         ARM: dts: Update display clock frequency for Origen-4210
+>>>>
+>>>>    arch/arm/boot/dts/exynos4210-origen.dts         | 2 +-
+>>>>    arch/arm/boot/dts/exynos4412-origen.dts         | 2 +-
+>>>>    arch/arm/boot/dts/exynos5250-arndale.dts        | 2 ++
+>>>>    arch/arm/boot/dts/exynos5250.dtsi               | 2 ++
+>>>>    arch/arm/boot/dts/exynos5420-pinctrl.dtsi       | 2 +-
+>>>>    arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
+>>>>    6 files changed, 9 insertions(+), 3 deletions(-)
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+>>> soc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>> I've sent a patch to fix up MMC0 on mini6410 board, when using board file
+>>> to boot the system:
+>>>
+>>> [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for HSMMC1
+>>>
+>>> Could we get this patch merged?
+>>>
+>>> I know we are moving to DT, but until all boards get converted, board
+>>> files must be supported too and this bug makes it impossible to test
+>>> non-DT s3c64xx support on Mini6410, without extra out of tree patches.
+>>>
+>> OK, I see. Let me take that in next round maybe this weekend.
+>
+> Thanks.
+>
+
+Tomasz, I've applied it into 2nd fixes for v3.14.
+
+If anything else, please let me know.
+
+Thanks,
+Kukjin
