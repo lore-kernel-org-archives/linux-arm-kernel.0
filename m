@@ -1,7 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 18 Dec 2013 19:50:55 +0100
-Subject: [PATCH 1/2] ARM: dts: mxs: Add iio-hwmon to mx28 soc
-Message-ID: <1387392656-28037-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Wed, 18 Dec 2013 19:50:56 +0100
+Subject: [PATCH 2/2] ARM: dts: mxs: Add iio-hwmon to mx23 soc
+In-Reply-To: <1387392656-28037-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1387392656-28037-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1387392656-28037-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,14 +13,23 @@ using:
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx28.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/imx23.dtsi | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 92d9f9e33bf1..3036241c4d57 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -1130,4 +1130,9 @@
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index c96ceaef7ddf..cd5e662d72f1 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -426,7 +426,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			lradc at 80050000 {
++			lradc: lradc at 80050000 {
+ 				compatible = "fsl,imx23-lradc";
+ 				reg = <0x80050000 0x2000>;
+ 				interrupts = <36 37 38 39 40 41 42 43 44>;
+@@ -524,4 +524,9 @@
  			status = "disabled";
  		};
  	};
