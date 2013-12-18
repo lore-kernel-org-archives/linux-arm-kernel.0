@@ -1,60 +1,100 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 18 Dec 2013 10:26:35 +0100
-Subject: [GIT PULL] Xilinx Zynq clk changes for v3.14
-Message-ID: <52B16A4B.1000706@monstr.eu>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 18 Dec 2013 16:26:49 -0500
+Subject: [PATCH V3 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
+Message-ID: <1387402010-31749-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+i.MX6Q needs to update vddarm, vddsoc/pu regulators when cpu freq
+is changed, each setpoint has different voltage, so we need to
+pass vddarm, vddsoc/pu's freq-voltage info from dts together.
 
-As we discussed it is better for you to get pull request with signed tags.
-That's why I am sending you pull request for 2 patches which we have in queue which
-should go to v3.14.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ .../devicetree/bindings/cpufreq/cpufreq-imx6.txt   |   56 ++++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi                       |    7 +++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
 
-Thanks,
-Michal
-
-
-The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
-
-  Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.14
-
-for you to fetch changes up to eda9488d741085f79318884690db139712a1b019:
-
-  arm: dt: zynq: Add fclk-enable property to clkc node (2013-12-11 17:48:48 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq clk patches for v3.14
-
-- Add support for fclk-enable feature
-
-----------------------------------------------------------------
-Soren Brinkmann (2):
-      clk/zynq/clkc: Add 'fclk-enable' feature
-      arm: dt: zynq: Add fclk-enable property to clkc node
-
- Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
- arch/arm/boot/dts/zynq-7000.dtsi                      |  1 +
- drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
- 3 files changed, 20 insertions(+), 3 deletions(-)
-
-
+diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+new file mode 100644
+index 0000000..cf1c5f7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+@@ -0,0 +1,56 @@
++i.MX6 cpufreq driver
++-------------------
++
++i.MX6 SoC cpufreq driver for CPU frequency scaling.
++
++This binding doc defines properties that must be put in the /cpus/cpu at 0 node,
++please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
++for detail.
++
++Required properties:
++- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
++  for details.
++- clocks: Specify clocks that need to be used when cpu frequency is scaled,
++  refer to Documentation/devicetree/bindings/clock/clock-bindings.txt for
++  details.
++- clock-names: List of clock input name strings sorted in the same order as the
++  clocks property, refer to Documentation/devicetree/bindings/clock/clock-bindings.txt
++  for details.
++- xxx-supply: Input voltage supply regulator, refer to
++  Documentation/devicetree/bindings/regulator/regulator.txt for details.
++  arm-supply: vddarm input.
++  pu-supply: vddpu input.
++  soc-supply: vddsoc input.
++
++Optional properties:
++- fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
++  go with cpu0's operating-points.
++- clock-latency: Specify the possible maximum transition latency for clock,
++  in unit of nanoseconds.
++
++Examples:
++
++	cpu at 0 {
++		operating-points = <
++			/* kHz    uV */
++			1200000 1275000
++			996000  1250000
++			792000  1150000
++			396000  975000
++		>;
++		fsl,soc-operating-points = <
++			/* ARM kHz  SOC-PU uV */
++			1200000 1275000
++			996000	1250000
++			792000	1175000
++			396000	1175000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++		clocks = <&clks 104>, <&clks 6>, <&clks 16>,
++			 <&clks 17>, <&clks 170>;
++		clock-names = "arm", "pll2_pfd2_396m", "step",
++			      "pll1_sw", "pll1_sys";
++		arm-supply = <&reg_arm>;
++		pu-supply = <&reg_pu>;
++		soc-supply = <&reg_soc>;
++	};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e7e8332..021e0cb 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -30,6 +30,13 @@
+ 				792000  1150000
+ 				396000  975000
+ 			>;
++			fsl,soc-operating-points = <
++				/* ARM kHz  SOC-PU uV */
++				1200000 1275000
++				996000	1250000
++				792000	1175000
++				396000	1175000
++			>;
+ 			clock-latency = <61036>; /* two CLK32 periods */
+ 			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
+ 				 <&clks 17>, <&clks 170>;
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/1ab529f7/attachment.sig>
+1.7.9.5
