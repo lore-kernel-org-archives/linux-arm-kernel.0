@@ -1,71 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 18 Dec 2013 15:26:53 +0100
-Subject: [PATCH 00/04 v2] ARM: shmobile: r7s72100 and Genmai GPIO /
- PINCTRL V2
-In-Reply-To: <20131217050232.727.9552.sendpatchset@w520>
-References: <20131217050232.727.9552.sendpatchset@w520>
-Message-ID: <CAMuHMdUuG_jiodEvZXGyzK2tz-8BPR6vJA=+zxUw5fBVMVYaNQ@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 18 Dec 2013 09:27:44 -0500
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <20131218120306.GC28112@arm.com>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131217122519.GI32118@arm.com>
+ <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
+ <20131218100321.GC4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
+ <20131218105541.GE4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
+ <20131218112713.GA28112@arm.com>
+ <20131218114211.GF4360@n2100.arm.linux.org.uk>
+ <20131218120306.GC28112@arm.com>
+Message-ID: <52B1B0E0.6030104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On 12/18/2013 07:03 AM, Catalin Marinas wrote:
+> On Wed, Dec 18, 2013 at 11:42:12AM +0000, Russell King - ARM Linux wrote:
+>> On Wed, Dec 18, 2013 at 11:27:14AM +0000, Catalin Marinas wrote:
+>>> On Wed, Dec 18, 2013 at 11:15:45AM +0000, Ard Biesheuvel wrote:
+>>>> On 18 December 2013 11:55, Russell King - ARM Linux
+>>>> <linux@arm.linux.org.uk> wrote:
+>>>>> On Wed, Dec 18, 2013 at 11:25:40AM +0100, Ard Biesheuvel wrote:
+>>>>>> On 18 December 2013 11:03, Russell King - ARM Linux
+>>>>>> <linux@arm.linux.org.uk> wrote:
+>>>>>>> If we allocate the ARM64 private never-will-appear-on-ARM hwcaps in bit
+>>>>>>> 32 and above, they'll be hidden from 32-bit stuff.  Hopefully, glibc
+>>>>>>> doesn't concatenate the HWCAP and HWCAP2 fields though - someone should
+>>>>>>> check that.
+>>>>>>>
+>>>>>>> Since the bits in the ARM64 hwcap are different from the ARM32 hwcap, I
+>>>>>>> don't see any point in defining them for ARM32 - userspace needs to make
+>>>>>>> the definition conditional anyway, and can't interpret the bits as-is
+>>>>>>> because ARM64 already omits many of the ARM32 ones.
+>>>>>>
+>>>>>> Please note that this is about the compat bits, not the ARM64 specific
+>>>>>> ones. These correspond 1:1 with the ARM32 ones. The idea is that a
+>>>>>> binary built for ARM will have access to the extended instructions
+>>>>>> which ARM64 offers to ARM32 binaries running in 32 bit compatibility
+>>>>>> mode (such as AES, SHAx etc).
+>>>>>
+>>>>> This all sounds rather silly IMHO.  As ARM32 natively doesn't support
+>>>>> these instructions, why should running an ARM32 binary under ARM64
+>>>>> end up offering this?
+>>>>>
+>>>>> If the ARM64 additional instructions are to be used, surely it's not
+>>>>> unreasonable to require ARM64 native applications?
+>>>>
+>>>> Well, the ARM architects have decided that there shall be Crypto
+>>>> Extensions instructions not only for ARMv8/Aarch64 but also for
+>>>> ARMv8/Aarch32. This is fully spec'ed in the latest ARM ARM. For
+>>>> instance, previously unused NEON opcodes on ARM32 have been allocated
+>>>> to AES instructions. (for instance, implemented for QEMU here
+>>>> https://git.linaro.org/people/peter.maydell/qemu-arm.git/commitdiff/9d935509)
+>>>
+>>> Indeed. AArch32 is not _dead_ with ARMv8 but getting new features. The
+>>> point of this patch is to have a common set of bits between compat arm64
+>>> and arm kernel. The AArch32 applications running on ARMv8 (most likely
+>>> with an arm64 kernel) may want to make use of the crypto extensions.
+>>>
+>>> If you want a more complete solution, we could add ID_ISAR5 checks on
+>>> the arm kernel.
+>>
+>> The point is that they'll never appear on an ARMv7 implementation because
+>> they're not part of the ARMv7 architecture.  I see no point in needlessly
+>> polluting ARM32 with ARM64 stuff - in exactly the same way that you see
+>> no point in polluting ARM64 with ARM32 stuff.
+> 
+> I'm not sure whether you are confusing architecture versions with
+> instruction sets / exception models or you are simply stating that the
+> 32-bit arm kernel will stop at ARMv7.
 
-On Tue, Dec 17, 2013 at 6:02 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> [PATCH 02/04] ARM: shmobile: Genmai SCIF2 PINCTRL configuration
-> [PATCH 03/04] ARM: shmobile: Genmai LED1 and LED2 support
+I do not think that Russell is the source of the confusion. Ard wrote, "The
+idea is that a binary built for ARM will have access to the extended
+instructions which ARM64 offers to ARM32 binaries running in 32 bit
+compatibility mode (such as AES, SHAx etc)." I think s/ARM64/ARMv8/ is
+necessary to make the statement correct, and hopefully less confusing.
 
-FWIW,  "[PATCH 02/04] ARM: shmobile: Genmai SCIF2 PINCTRL
-configuration" appends to a version of r7s72100-genmai-reference.dts
-that's 60 lines long:
+Christopher
 
---- 0009/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-+++ work/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-2013-11-27 17:13:43.000000000 +0900
-@@ -58,3 +58,13 @@
-        };
-
- };
-+
-+&pfc {
-+       pinctrl-0 = <&scif2_pins>;
-+       pinctrl-names = "default";
-+
-+       scif2_pins: serial2 {
-+               renesas,groups = "scif2_txd_p3_0", "scif2_rxd_p3_2";
-+               renesas,function = "scif2";
-+       };
-+};
-
-while "[PATCH 03/04] ARM: shmobile: Genmai LED1 and LED2 support"
-inserts into a version that has only 31 lines:
-
-@@ -28,4 +29,14 @@
-                #address-cells = <1>;
-                #size-cells = <1>;
-        };
-+
-+       leds {
-+               compatible = "gpio-leds";
-+               led1 {
-+                       gpios = <&port4 10 GPIO_ACTIVE_LOW>;
-+               };
-+               led2 {
-+                       gpios = <&port4 11 GPIO_ACTIVE_LOW>;
-+               };
-+       };
- };
-
-Perhaps you reordered or edited them by hand?
-
-Anyway, I managed to apply them by manually,
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
