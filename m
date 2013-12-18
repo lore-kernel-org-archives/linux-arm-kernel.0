@@ -1,80 +1,98 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 18 Dec 2013 22:01:01 +0530
-Subject: [PATCH v2] dma: pl330: ensure DMA descriptors are zero-initialised
-In-Reply-To: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
-References: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20131218163101.GN16227@intel.com>
+Date: Wed, 18 Dec 2013 22:05:41 +0530
+Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
+In-Reply-To: <20131212235908.GZ4360@n2100.arm.linux.org.uk>
+References: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
+ <20131212224249.GX4360@n2100.arm.linux.org.uk>
+ <CAPcyv4hr2N0kiZabsJJjfmFqTRbT_ntjX4Rdg=THpYg=_2cELg@mail.gmail.com>
+ <20131212234453.GB8754@blackmetal.musicnaut.iki.fi>
+ <20131212235908.GZ4360@n2100.arm.linux.org.uk>
+Message-ID: <20131218163541.GP16227@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 02, 2013 at 06:01:30PM +0000, Will Deacon wrote:
-> I see the following splat with 3.13-rc1 when attempting to perform DMA:
+On Thu, Dec 12, 2013 at 11:59:08PM +0000, Russell King - ARM Linux wrote:
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: [PATCH] dmaengine: mv_xor: fix oops when channels fail to initialise
 > 
-> [  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
-> [  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
-> [  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
-> [  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
-> [  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
-> [  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
-> [  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
-> [  253.005010] LR is at pl330_tasklet+0x3c8/0x550
-> [  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
-> [  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
-> [  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
-> [  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
-> [  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
-> [  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
-> [  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
+> When a channel fails to initialise, we error out and clean up any
+> previously unregistered channels by walking the entire xordev->channels
+> array.  Unfortunately, there are paths which end up storing an error
+> pointer in this array, which we then try and dereference in the cleanup
+> code, which causes an oops.
 > 
-> This is due to desc->txd.unmap containing garbage (uninitialised memory).
+> Fix this by avoiding writing invalid pointers to this array in the first
+> place.
 > 
-> Rather than add another dummy initialisation to _init_desc, instead
-> ensure that the descriptors are zero-initialised during allocation and
-> remove the dummy, per-field initialisation.
-> 
-> Cc: Andriy Shevchenko <andriy.shevchenko@intel.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
+> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Acked-by: Vinod Koul <vinod.koul@intel.com>
 
 --
 ~Vinod
 > ---
->  drivers/dma/pl330.c | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
+>  drivers/dma/mv_xor.c |   24 +++++++++++++-----------
+>  1 files changed, 13 insertions(+), 11 deletions(-)
 > 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 98641eaca080..769f865b71db 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2492,12 +2492,9 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
+> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> index 7807f0ef4e20..a7e91090443e 100644
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -1176,6 +1176,7 @@ static int mv_xor_probe(struct platform_device *pdev)
+>  		int i = 0;
 >  
->  static inline void _init_desc(struct dma_pl330_desc *desc)
->  {
-> -	desc->pchan = NULL;
->  	desc->req.x = &desc->px;
->  	desc->req.token = desc;
->  	desc->rqcfg.swap = SWAP_NO;
-> -	desc->rqcfg.privileged = 0;
-> -	desc->rqcfg.insnaccess = 0;
->  	desc->rqcfg.scctl = SCCTRL0;
->  	desc->rqcfg.dcctl = DCCTRL0;
->  	desc->req.cfg = &desc->rqcfg;
-> @@ -2517,7 +2514,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
->  	if (!pdmac)
->  		return 0;
+>  		for_each_child_of_node(pdev->dev.of_node, np) {
+> +			struct mv_xor_chan *chan;
+>  			dma_cap_mask_t cap_mask;
+>  			int irq;
 >  
-> -	desc = kmalloc(count * sizeof(*desc), flg);
-> +	desc = kcalloc(count, sizeof(*desc), flg);
->  	if (!desc)
->  		return 0;
+> @@ -1193,21 +1194,21 @@ static int mv_xor_probe(struct platform_device *pdev)
+>  				goto err_channel_add;
+>  			}
 >  
-> -- 
-> 1.8.2.2
-> 
+> -			xordev->channels[i] =
+> -				mv_xor_channel_add(xordev, pdev, i,
+> -						   cap_mask, irq);
+> -			if (IS_ERR(xordev->channels[i])) {
+> -				ret = PTR_ERR(xordev->channels[i]);
+> -				xordev->channels[i] = NULL;
+> +			chan = mv_xor_channel_add(xordev, pdev, i,
+> +						  cap_mask, irq);
+> +			if (IS_ERR(chan)) {
+> +				ret = PTR_ERR(chan);
+>  				irq_dispose_mapping(irq);
+>  				goto err_channel_add;
+>  			}
+>  
+> +			xordev->channels[i] = chan;
+>  			i++;
+>  		}
+>  	} else if (pdata && pdata->channels) {
+>  		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+>  			struct mv_xor_channel_data *cd;
+> +			struct mv_xor_chan *chan;
+>  			int irq;
+>  
+>  			cd = &pdata->channels[i];
+> @@ -1222,13 +1223,14 @@ static int mv_xor_probe(struct platform_device *pdev)
+>  				goto err_channel_add;
+>  			}
+>  
+> -			xordev->channels[i] =
+> -				mv_xor_channel_add(xordev, pdev, i,
+> -						   cd->cap_mask, irq);
+> -			if (IS_ERR(xordev->channels[i])) {
+> -				ret = PTR_ERR(xordev->channels[i]);
+> +			chan = mv_xor_channel_add(xordev, pdev, i,
+> +						  cd->cap_mask, irq);
+> +			if (IS_ERR(chan)) {
+> +				ret = PTR_ERR(chan);
+>  				goto err_channel_add;
+>  			}
+> +
+> +			xordev->channels[i] = chan;
+>  		}
+>  	}
+>  
 
 -- 
