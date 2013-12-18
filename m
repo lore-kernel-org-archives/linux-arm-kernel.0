@@ -1,66 +1,86 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 18 Dec 2013 19:13:18 +0400
-Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
-In-Reply-To: <CANqRtoQ953DA-=DFXvkuLMJ6SBvobQdg5LByScPb+x84TJKkCA@mail.gmail.com>
-References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>	<1387316678-10174-3-git-send-email-wsa@the-dreams.de>	<52B1892B.1020806@cogentembedded.com>	<20131218114351.GD3314@katana>	<52B18CC9.8090200@cogentembedded.com>	<20131218121541.GE3314@katana>	<20131218134914.GA32664@verge.net.au>	<52B1AAE6.2020400@cogentembedded.com>
- <CANqRtoQ953DA-=DFXvkuLMJ6SBvobQdg5LByScPb+x84TJKkCA@mail.gmail.com>
-Message-ID: <52B1BB8E.9000008@cogentembedded.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Wed, 18 Dec 2013 16:18:03 +0100
+Subject: [PATCH] watchdog: mach-moxart: add restart handler
+Message-ID: <1387379883-16525-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+mach-moxart lacks a separate register for reset; as a workaround,
+add a function that can be hooked to arm_pm_restart.
 
-On 18-12-2013 18:44, Magnus Damm wrote:
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
->>>>>>>> @@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
->>>>>>>>          CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+Notes:
+    During review of this driver, the restart handler for moxart was
+    removed, and moved to platform code under arch/arm/mach-moxart/.
+    
+    Since then, new considerations arrived,
+    see replies from Arnd and Guenter:
+    
+    "[PATCH v4 1/2] ARM: mach-moxart: add MOXA ART SoC platform files"
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/219175.html
+    
+    I can move this to a new power/restart driver, but first, I want to
+    hear what Wim or others think.
+    
+    Until there is a better solution, my motivation is that this uses
+    the watchdog. The way I see it, the problem is that there is no
+    separate register for reset, this was always a workaround for that.
+    
+    Applies to next-20131218
 
->>>>>>>>          /* ICK */
->>>>>>>> +       CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
->>>>>>>> +       CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
->>>>>>>> +       CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
->>>>>>>> +       CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+ drivers/watchdog/moxart_wdt.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
->>>>>>>      These belong to some other place, the group marked by /* ICK */
->>>>>>> is only for CLKDEV_ICK_ID().
-
->>>>>> So, I'll create a /* DEV */ prefix?
-
->>>>>      I really don't know. Other places have /* MSTP */ comment in this
->>>>> case despite all clocks, CLKDEV_DEV_ID() and CLKDEV_ICK_ID() are
->>>>> really MSTP clocks. I considered the idea of separating
->>>>> CLKDEV_ICK_ID() under /* ICK */ comment silly from the very start
->>>>> but Simon didn't listen to me.
-
->>>> I am puzzled, too. ICK is a type of registration and not a clock domain.
->>>> Also, there is 'mtu2_fck' which is under ICK as well as MSTP? Looks
->>>> wrong. From what I understand now, removing the /* ICK */ comment would
->>>> be easiest and proper?
-
->>> I'm not sure that I really understand what all the fuss is about.
-
->>> As I understand things the convention that prevails for
->>> MSTP clocks under mach-shmobile is as follows:
-
->>> 1. Clocks not registered by CLKDEV_ICK_ID() are grouped together
->>>      under /* MSTP */ followed by:
->>> 2. Clocks registered using CLKDEV_ICK_ID() are grouped together
->>>      under /* ICK */
-
->>> I am unsure of the historical reason for this
-
->>     Recent patches by Morimoto-san.
-
->>> but it does seem to be consistent.
-
->>     No, it doesn't. These comments are *clearly* not consistent and should be
->> removed at least.
-
-> Feel free to contribute patches!
-
-    Of course, in my copious free time. I was against these ICKy comments (and 
-the patches introducing them) in the first place but my opinion didn't count. 
-I'm not sure it will count if I go and submit the patches (but the time will 
-be lost).
-
-WBR, Sergei
+diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
+index 4166e4d..4aa3a8a 100644
+--- a/drivers/watchdog/moxart_wdt.c
++++ b/drivers/watchdog/moxart_wdt.c
+@@ -19,6 +19,8 @@
+ #include <linux/watchdog.h>
+ #include <linux/moduleparam.h>
+ 
++#include <asm/system_misc.h>
++
+ #define REG_COUNT			0x4
+ #define REG_MODE			0x8
+ #define REG_ENABLE			0xC
+@@ -29,8 +31,17 @@ struct moxart_wdt_dev {
+ 	unsigned int clock_frequency;
+ };
+ 
++static struct moxart_wdt_dev *moxart_restart_ctx;
++
+ static int heartbeat;
+ 
++static void moxart_wdt_restart(enum reboot_mode reboot_mode, const char *cmd)
++{
++	writel(1, moxart_restart_ctx->base + REG_COUNT);
++	writel(0x5ab9, moxart_restart_ctx->base + REG_MODE);
++	writel(0x03, moxart_restart_ctx->base + REG_ENABLE);
++}
++
+ static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+ 	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
+@@ -125,6 +136,9 @@ static int moxart_wdt_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
+ 
++	moxart_restart_ctx = moxart_wdt;
++	arm_pm_restart = moxart_wdt_restart;
++
+ 	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
+ 		moxart_wdt->dev.timeout, nowayout);
+ 
+@@ -135,6 +149,7 @@ static int moxart_wdt_remove(struct platform_device *pdev)
+ {
+ 	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
+ 
++	arm_pm_restart = NULL;
+ 	moxart_wdt_stop(&moxart_wdt->dev);
+ 	watchdog_unregister_device(&moxart_wdt->dev);
+ 
+-- 
+1.8.2.1
