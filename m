@@ -1,36 +1,79 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 18 Dec 2013 17:37:23 +0100
-Subject: [PATCH 2/2] ARM: EXYNOS: Add CMU virtual addresses for exynos5260
-In-Reply-To: <1386758416-31065-3-git-send-email-vikas.sajjan@linaro.org>
-References: <1386758416-31065-1-git-send-email-vikas.sajjan@linaro.org>
- <1386758416-31065-3-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <2468420.340ZhVlqCl@amdc1227>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 18 Dec 2013 21:10:45 +0530
+Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
+In-Reply-To: <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
+References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
+ <20131128055706.GM8834@intel.com>
+ <20131209235035.GA11632@n2100.arm.linux.org.uk>
+ <20131210101331.GG29580@intel.com>
+ <20131210111449.GY4360@n2100.arm.linux.org.uk>
+ <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
+ <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
+Message-ID: <20131218154045.GC16227@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas, Young-Gun,
-
-On Wednesday 11 of December 2013 16:25:16 Vikas Sajjan wrote:
-> From: Young-Gun Jang <yg1004.jang@samsung.com>
+On Thu, Dec 12, 2013 at 11:00:05PM -0800, Dan Williams wrote:
+> On Wed, Dec 11, 2013 at 1:10 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> > On Tue, Dec 10, 2013 at 3:14 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Tue, Dec 10, 2013 at 03:43:31PM +0530, Vinod Koul wrote:
+> >>> On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
+> >>> > On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
+> >>> > > + Dan
+> >>> > >
+> >>> > > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
+> >>> > > > The following commit:
+> >>> > > >
+> >>> > > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
+> >>> > > >
+> >>> > > > removed the last caller to mv_desc_get_dest_addr(), creating the
+> >>> > > > warning:
+> >>> > > >
+> >>> > > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
+> >>> > > >   but not used [-Wunused-function]
+> >>> > > >
+> >>> > > > Remove it.
+> >>> > > >
+> >>> > > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> >>> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
+> >>> > >
+> >>> > > This should go thru Dan's tree
+> >>> >
+> >>> > So what's happening with this patch?  I don't see it in -rc yet.
+> >>> Dan has applied this to his next. So this should show us in next rc1
+> >>
+> >> Wrong answer.  This is a compile regression introduced in the last merge
+> >> window, it should be going into an -rc kernel.
+> >
+> > Vinod, if your fixes branch is ready I'll take it along with the rest
+> > of the regression fixes to Linus.
+Sorry I wasnt well last week, so I just managed to send the PULL on friday
+morning. Wasnt sure if Linus will cut rc on friday or later, so sent it!
 > 
-> Adds CMU virtual addresses for exynos5260.
+> Ok, I see you sent dma-slave/fixes up, I'll follow up with the rest:
+Okay, did you manage to send it? If not I may have few (i think at least 1 more)
+
+--
+~Vinod
 > 
-> Change-Id: Ia4f4eda96187d8d9e1edfc1a6b025af56d3bc43e
+> Dan Williams (5):
+>       dma: fix build warnings in ppc4xx
+>       dma: fix fsldma build warnings
+>       dmatest: fix build warning on mips
+>       dma: fix build warnings in txx9
+>       dmaengine: fix enable for high order unmap pools
+> 
+> Ezequiel Garcia (1):
+>       dma: mv_xor: Use dmaengine_unmap_data for the self-tests
+> 
+> Jason Cooper (1):
+>       dma: mv_xor: remove mv_desc_get_dest_addr()
+> 
+> Olof Johansson (1):
+>       dmaengine: at_hdmac: remove unused function
+> 
+> Russell King (1):
+>       dmaengine: mv_xor: fix oops when channels fail to initialise
 
-This line should be dropped.
-
-> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.c                  | 65 ++++++++++++++++++++++++++
->  arch/arm/mach-exynos/include/mach/map.h        | 14 ++++++
->  arch/arm/mach-exynos/include/mach/regs-clock.h | 17 +++++++
->  arch/arm/plat-samsung/include/plat/map-s5p.h   | 16 +++++++
->  4 files changed, 112 insertions(+)
-
-Why do you need those static mappings? Unless there is a reason to map
-those registers very early (before ioremap() and friends are available)
-I'm going to NAK any additions of static mappings.
-
-Best regards,
-Tomasz
+-- 
