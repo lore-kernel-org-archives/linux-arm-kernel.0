@@ -1,55 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 12:10:35 -0800
-Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
-In-Reply-To: <2899559.jbTzDM2qtE@dizzy-6.site>
-References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
- <20131215045116.23538.4@quantum> <52AF68DB.7090105@elopez.com.ar>
- <2899559.jbTzDM2qtE@dizzy-6.site>
-Message-ID: <20131218201035.23538.60602@quantum>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 19 Dec 2013 00:23:43 +0300
+Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <52A620C5.9030600@cogentembedded.com>
+References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>	<201310310219.58963.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoTa6-UP88146KPy9zNXNTRynBVqWZYb1k=0MK03NMJqhw@mail.gmail.com>
+ <5272A98B.3030705@cogentembedded.com> <52A620C5.9030600@cogentembedded.com>
+Message-ID: <52B2125F.2010404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting David Lanzend?rfer (2013-12-16 13:54:21)
-> Hi
-> > that takes the MMC clock (and only the MMC clock) and does the setup
-> > (it's basically configuring two values, "sample" and "output", into the
-> > clock register). I really don't know what does this do/why is it
-> > required/when is it used; I'm cc'ing Hans and David who can hopefully
-> > explain that part.
-> Since the read/write operations have to happen asynchronously and in a manner
-> so that the data provided by the SD-Card can be fetched on time, a specific
-> clock phase shift is required as you can see in the linked picture[1].
-> That's what the function is doing: It accesses the special registers of the
-> MMC clock device and configures this phase offset.
+Hello.
 
-Yeah, clock phase is a fairly common thing to tune but there are two
-things to consider when crafting a new api like clk_set_phase(...):
+On 12/09/2013 10:57 PM, Sergei Shtylyov wrote:
 
-1) are we adjusting the phase of the clock signal or the phase of
-something else related to the clock rate? This is just something to
-think about. Sometimes it would be better to have
-video_signal_set_phase() instead of clk_set_phase().
+>>>> Register Ether platform device and pin data on  the  Koelsch board.
+>>>> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
 
-2) what is the input parameter to clk_set_phase? I guess the two best
-options are degrees (zero to 359), or a fraction of the clock period
-(1/4, 1/2, etc).
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Any thoughts?
+>>> Thanks for your patch. Just like on the Lager board we also need to
+>>> tie in the PHY IRQ pin.
 
-Regards,
-Mike
+>>     Not only on the Lager board, BOCK-W also I think.
 
-> 
-> > I also saw a similar requirement from the gmac people (on cc too), who
-> > needed to set the phy type (or something like that) on one of the clock
-> > registers; so I'm thinking maybe a generic "tune something" approach
-> > that lets users configure some clock-dependent, arbitrary aspect of the
-> > clock is the way forward. Otherwise, we're going to end up bloating the
-> > clock framework with a lot of callback pointers that are going to be
-> > used in one or two clocks out of potentially hundreds on the whole system.
-> It totally makes sense, since GMAC will be doing asynchrous
-> operations as well.
-> 
-> -David
-> 
-> [1] http://www.chipestimate.com/techtalk/images/11022010_fig2_3.JPG
+>>> Polling is not good enough when the hardware
+>>> can do better. Can you please share your PHY IRQ plans with us?
+
+>>     It's on my agenda now -- will start after I do away with the CAN driver
+>> and the current Koelsch Ether support.
+
+>     I have now implemented PHY IRQ support for BOCK-W, Lager, and Koelsch
+> boards (had to extend the Micrel PHY driver to recognize undocumented
+> KSZ8041RNLI PHY ID for that) but I must say that the PHY interrupt doesn't get
+> generated on either of the board and I don't know why yet (I can't rule out
+> the INTC driver issue); that's bad news. Good news is that even this doesn't
+> prevent phylib from working properly as it still polls the PHY once a second.
+
+    Oh yes, it does: phylib fails to recognize link down/up after you 
+disconnect/reconnect the cable since it relies solely on IRQ for the link 
+changes if it's specified.
+    Now for the really good news: I was able to get the PHY IRQs on Koelsch 
+board when I set the trigger mode to falling-edge; that seemed strange as the 
+PHY interrupts are level-sensitive, according to the documentation. And only 
+after we commented out the wild PHY reset done by the 'sh_eth' driver on each 
+open, I was able to get the IRQs in the low-level trigger mode.
+    So, I'm expecting to be able to finally resolve this issue on top of the 
+net-next tree which now contains 2 patchsets that should enable me to finally 
+remove that wild PHY reset for good:
+
+http://marc.info/?l=linux-netdev&m=138636384109141
+http://marc.info/?l=linux-netdev&m=138692649110301
+
+>>> Best,
+
+>>> / magnus
+
+WBR, Sergei
