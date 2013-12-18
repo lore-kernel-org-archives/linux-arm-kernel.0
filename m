@@ -1,45 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 18 Dec 2013 19:28:57 +0100
-Subject: [PATCH 2/3] clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
-In-Reply-To: <CAK9yfHzs+T0g0qy-EALFkrKFybdJDAQ3ZGAoYovZO8PDaWM4QA@mail.gmail.com>
-References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
- <1383905648-23733-2-git-send-email-sachin.kamat@linaro.org>
- <2996623.YXg5JqReYS@flatron>
- <CAK9yfHzs+T0g0qy-EALFkrKFybdJDAQ3ZGAoYovZO8PDaWM4QA@mail.gmail.com>
-Message-ID: <CA+Ln22GD5fr4S6aR-+85bdutkeeHmgutLvRWETEQEt1vJX-Y6Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Dec 2013 18:30:54 +0000
+Subject: [PATCHv2 2/2] arm64: Correct virt_addr_valid
+In-Reply-To: <52B1E770.9060308@codeaurora.org>
+References: <1387220505-9799-1-git-send-email-lauraa@codeaurora.org>
+ <1387220505-9799-2-git-send-email-lauraa@codeaurora.org>
+ <20131217120027.GD32118@arm.com> <52B1E770.9060308@codeaurora.org>
+Message-ID: <20131218183054.GK28112@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+On Wed, Dec 18, 2013 at 06:20:32PM +0000, Laura Abbott wrote:
+> On 12/17/2013 4:00 AM, Catalin Marinas wrote:
+> > On Mon, Dec 16, 2013 at 07:01:45PM +0000, Laura Abbott wrote:
+> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> >> index 3776217..b8ec776 100644
+> >> --- a/arch/arm64/include/asm/memory.h
+> >> +++ b/arch/arm64/include/asm/memory.h
+> >> @@ -146,8 +146,9 @@ static inline void *phys_to_virt(phys_addr_t x)
+> >>   #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
+> >>
+> >>   #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+> >> -#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
+> >> -				 ((void *)(kaddr) < (void *)high_memory))
+> >> +#define virt_addr_valid(kaddr)	(pfn_valid(__pa(kaddr) >> PAGE_SHIFT) && \
+> >> +	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory))
+> >> +
+> >
+> > I still think the original patch was fine for arm64, no need for
+> > additional checks since we don't have highmem and __pa() is always
+> > linear.
+> 
+> Okay, do you want to go ahead and just take the previous version then?
 
-2013/12/18 Sachin Kamat <sachin.kamat@linaro.org>:
-> Hi Tomasz,
->
-> On 10 November 2013 22:38, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Sachin, Andrew,
->>
->> On Friday 08 of November 2013 15:44:07 Sachin Kamat wrote:
->>> From: Andrew Bresticker <abrestic@chromium.org>
->>>
->>> The gate clocks for the MFC sysmmus appear to be flipped, i.e.
->>> GATE_IP_MFC[2] gates sysmmu_mfcl and GATE_IP_MFC[1] gates sysmmu_mfcr.
->>> Fix this so that the MFC will start up.
->>
->> Wow, this means that there is a mistake in the documentation. Not that
->> I'm surprised, though.
->>
->> I guess you are sure about this, so:
->>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->
-> I believe you are going to take this through your tree along with a
-> few others which you have already reviewed?
+I already did (while Will is away ;)). Thanks.
 
-Thanks for reminding me about this patch. It's been quite a while
-since it was posted
-to the list.
-
-Yes, I will apply it to samsung-clk tree.
-
-Best regards,
-Tomasz
+-- 
+Catalin
