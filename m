@@ -1,44 +1,101 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 17 Dec 2013 16:20:07 -0800
-Subject: [PATCH v12 07/08] ARM: dts: enable clock binding on Hi3620
-In-Reply-To: <1386748497-11290-8-git-send-email-haojian.zhuang@gmail.com>
- (Haojian Zhuang's message of "Wed, 11 Dec 2013 15:54:56 +0800")
-References: <1386748497-11290-1-git-send-email-haojian.zhuang@gmail.com>
- <1386748497-11290-8-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <878uvjnh6w.fsf@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 18 Dec 2013 01:40:03 +0100
+Subject: [PATCH 01/04] ARM: shmobile: r7s72100 GPIO and PINCTRL device
+ nodes
+In-Reply-To: <CANqRtoScxzFUzVcck3tPPb6k35TWDKHgf9J-K+WxkERcmsmrQA@mail.gmail.com>
+References: <20131217050232.727.9552.sendpatchset@w520>
+ <1836950.NOThFz7jV4@avalon>
+ <CANqRtoScxzFUzVcck3tPPb6k35TWDKHgf9J-K+WxkERcmsmrQA@mail.gmail.com>
+Message-ID: <24775601.3oo6NRXHkY@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+Hi Magnus,
 
-> Enable clock binding for Hi3620 common clock driver.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  arch/arm/boot/dts/hi3620.dtsi | 79 ++++++++++++++++++++++++-------------------
->  arch/arm/boot/dts/hi4511.dts  |  3 +-
->  2 files changed, 46 insertions(+), 36 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
-> index e311937..ab1116d 100644
-> --- a/arch/arm/boot/dts/hi3620.dtsi
-> +++ b/arch/arm/boot/dts/hi3620.dtsi
-> @@ -11,7 +11,8 @@
->   * publishhed by the Free Software Foundation.
->   */
->  
-> -/include/ "skeleton.dtsi"
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/clock/hi3620-clock.h>
+On Wednesday 18 December 2013 07:41:57 Magnus Damm wrote:
+> On Wed, Dec 18, 2013 at 1:29 AM, Laurent Pinchart wrote:
+> > On Tuesday 17 December 2013 14:02:42 Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >> 
+> >> Add support for r7s72100 PFC and GPIO device nodes port0 -> port11
+> >> and jtagport0.
+> >> 
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> ---
+> >> 
+> >>  arch/arm/boot/dts/r7s72100.dtsi |  154 +++++++++++++++++++++++++++++++++
+> >>  1 file changed, 154 insertions(+)
+> >> 
+> >> --- 0001/arch/arm/boot/dts/r7s72100.dtsi
+> >> +++ work/arch/arm/boot/dts/r7s72100.dtsi      2013-11-27
+> >> 16:06:36.000000000 +0900
 
-This file doesn't exist in this series, so fails to build.  This appears
-to depend on the clock series that Mike has merged into his clk-next
-branch, so I tested the build with clk-next and it works.
+[snip]
 
-In the future, please be sure to mention external dependencies like
-this.  Maintainers don't like to be surprised by this kind of thing.
+> >> +
+> >> +     port0: gpio at fcfe3100 {
+> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> >> +             reg = <0xfcfe3100 0x4>, /* PSR */
+> >> +                       <0xfcfe3200 0x2>, /* PPR */
+> >> +                       <0xfcfe3800 0x4>; /* PMSR */
+> >> +             #gpio-cells = <2>;
+> >> +             gpio-controller;
+> >> +             gpio-ranges = <&pfc 0 0 6>;
+> >> +     };
+> >> +
+> >> +     port1: gpio at fcfe3104 {
+> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+> >> +             reg = <0xfcfe3104 0x4>, /* PSR */
+> >> +                       <0xfcfe3204 0x2>, /* PPR */
+> >> +                       <0xfcfe3804 0x4>; /* PMSR */
+> >> +             #gpio-cells = <2>;
+> >> +             gpio-controller;
+> >> +             gpio-ranges = <&pfc 0 16 16>;
+> > 
+> > As P0 has 6 pins only this should ideally be
+> > 
+> >                 gpio-ranges = <&pfc 0 6 16>;
+> > 
+> > Otherwise the PFC driver will expose pins that don't exist. However, that
+> > would require computing the pin numbers in the PFC driver differently, as
+> > we currently just use the bank * 16 + index formula. Given that we only
+> > have three ports with less than 16 pins we could come up with a not
+> > overly complex formula that can be evaluated at compile time. Something
+> > like this should do.
+> > 
+> > #define RZ_PORT_PIN(bank, pin) \
+> > 
+> >         (bank) < 1 ? (pin) : \
+> >         (bank) < 6 ? 6 + (((bank) - 1) * 16) + (pin)) : \
+> >         (bank) < 10 ? 6 + 11 + 4 * 16 + (((bank) - 6) * 16) + (pin)) : \
+> >         6 + 11 + 8 + 7 * 16 + (((bank) - 10) * 16) + (pin))
+> 
+> Uhm, well, you can make the mapping more compact yes, but I'm not sure
+> if I agree that it becomes any better. Isn't it better to simply
+> follow the per-port setup that the manual defines? Is there an actual
+> problem with having unused GPIOs?
 
-I'll just merge this as is now, but builds for hi3xxx_defconfig will be
-broken until everything hits -next.
+If I'm not mistaken it's unused pins, not unused GPIOs. They waste memory in 
+data tables, although by a relatively small amount. Oh, and of course, it's 
+not clean ;-)
 
-Kevin
+Speaking of data tables, I'm thinking about simplifying them. The RZ/A1H is a 
+good candidate for that, as each pin is handled individually, and several 
+registers could be handled to with a small amount of code instead of large 
+data tables. It's just a thought for now, I have more urgent tasks to work on.
+
+> Actually, I prefer going in the opposite direction so I would like to
+> share the simple version of RZ_PORT_PIN() in a header file like we do
+> with RCAR_GP_PIN() in <linux/platform_data/gpio-rcar.h>. This because
+> we would like to use the same macro in the GPIO driver and in the
+> current PFC code (and potentially more PFCs using the same GPIO
+> driver).
+
+What do you need it for in the GPIO driver ?
+
+> Please let me know what you think.
+
+-- 
+Regards,
+
+Laurent Pinchart
