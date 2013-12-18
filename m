@@ -1,40 +1,80 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 18 Dec 2013 22:03:36 +0530
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <CAPcyv4hiGg6J0sAEy6N=HRsLg_B9PGOc=khaTNR80==pDfNQzQ@mail.gmail.com>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131128055706.GM8834@intel.com>
- <20131209235035.GA11632@n2100.arm.linux.org.uk>
- <20131210101331.GG29580@intel.com>
- <20131210111449.GY4360@n2100.arm.linux.org.uk>
- <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
- <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
- <20131218154045.GC16227@intel.com>
- <CAPcyv4hiGg6J0sAEy6N=HRsLg_B9PGOc=khaTNR80==pDfNQzQ@mail.gmail.com>
-Message-ID: <20131218163336.GO16227@intel.com>
+Date: Wed, 18 Dec 2013 22:01:01 +0530
+Subject: [PATCH v2] dma: pl330: ensure DMA descriptors are zero-initialised
+In-Reply-To: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
+References: <1386007290-13987-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20131218163101.GN16227@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 08:55:23AM -0800, Dan Williams wrote:
-> >> > Vinod, if your fixes branch is ready I'll take it along with the rest
-> >> > of the regression fixes to Linus.
-> > Sorry I wasnt well last week, so I just managed to send the PULL on friday
-> > morning. Wasnt sure if Linus will cut rc on friday or later, so sent it!
+On Mon, Dec 02, 2013 at 06:01:30PM +0000, Will Deacon wrote:
+> I see the following splat with 3.13-rc1 when attempting to perform DMA:
 > 
-> Ok, glad you are feeling better.
-Thanks
+> [  253.004516] Alignment trap: not handling instruction e1902f9f at [<c0204b40>]
+> [  253.004583] Unhandled fault: alignment exception (0x221) at 0xdfdfdfd7
+> [  253.004646] Internal error: : 221 [#1] PREEMPT SMP ARM
+> [  253.004691] Modules linked in: dmatest(+) [last unloaded: dmatest]
+> [  253.004798] CPU: 0 PID: 671 Comm: kthreadd Not tainted 3.13.0-rc1+ #2
+> [  253.004864] task: df9b0900 ti: df03e000 task.ti: df03e000
+> [  253.004937] PC is at dmaengine_unmap_put+0x14/0x34
+> [  253.005010] LR is at pl330_tasklet+0x3c8/0x550
+> [  253.005087] pc : [<c0204b44>]    lr : [<c0207478>]    psr: a00e0193
+> [  253.005087] sp : df03fe48  ip : 00000000  fp : df03bf18
+> [  253.005178] r10: bf00e108  r9 : 00000001  r8 : 00000000
+> [  253.005245] r7 : df837040  r6 : dfb41800  r5 : df837048  r4 : df837000
+> [  253.005316] r3 : dfdfdfcf  r2 : dfb41f80  r1 : df837048  r0 : dfdfdfd7
+> [  253.005384] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> [  253.005459] Control: 30c5387d  Table: 9fb9ba80  DAC: fffffffd
+> [  253.005520] Process kthreadd (pid: 671, stack limit = 0xdf03e248)
+> 
+> This is due to desc->txd.unmap containing garbage (uninitialised memory).
+> 
+> Rather than add another dummy initialisation to _init_desc, instead
+> ensure that the descriptors are zero-initialised during allocation and
+> remove the dummy, per-field initialisation.
+> 
+> Cc: Andriy Shevchenko <andriy.shevchenko@intel.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-> 
-> >>
-> >> Ok, I see you sent dma-slave/fixes up, I'll follow up with the rest:
-> > Okay, did you manage to send it? If not I may have few (i think at least 1 more)
-> >
-> 
-> Patchwork id(s)?  I want to send it it today.
-
-3266451, I have acked it!
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
 --
 ~Vinod
+> ---
+>  drivers/dma/pl330.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 98641eaca080..769f865b71db 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2492,12 +2492,9 @@ static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
+>  
+>  static inline void _init_desc(struct dma_pl330_desc *desc)
+>  {
+> -	desc->pchan = NULL;
+>  	desc->req.x = &desc->px;
+>  	desc->req.token = desc;
+>  	desc->rqcfg.swap = SWAP_NO;
+> -	desc->rqcfg.privileged = 0;
+> -	desc->rqcfg.insnaccess = 0;
+>  	desc->rqcfg.scctl = SCCTRL0;
+>  	desc->rqcfg.dcctl = DCCTRL0;
+>  	desc->req.cfg = &desc->rqcfg;
+> @@ -2517,7 +2514,7 @@ static int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
+>  	if (!pdmac)
+>  		return 0;
+>  
+> -	desc = kmalloc(count * sizeof(*desc), flg);
+> +	desc = kcalloc(count, sizeof(*desc), flg);
+>  	if (!desc)
+>  		return 0;
+>  
+> -- 
+> 1.8.2.2
+> 
 
 -- 
