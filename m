@@ -1,44 +1,69 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 18 Dec 2013 13:23:26 +0100
-Subject: [PATCH V2 2/8] string: fix strncmp function
-In-Reply-To: <20131218121551.GH4360@n2100.arm.linux.org.uk>
-References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
- <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
- <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
- <20131218121551.GH4360@n2100.arm.linux.org.uk>
-Message-ID: <52B193BE.1080206@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Dec 2013 12:24:19 +0000
+Subject: [PATCHv5,RESEND] rtc: Add support for Intersil ISL12057 I2C RTC
+ chip
+In-Reply-To: <28bfd1b8cd4725a70fb713a8b6503e7f5db13d71.1387305663.git.arno@natisbad.org>
+References: <28bfd1b8cd4725a70fb713a8b6503e7f5db13d71.1387305663.git.arno@natisbad.org>
+Message-ID: <20131218122419.GM28455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2013 01:15 PM, Russell King - ARM Linux wrote:
-> On Wed, Dec 18, 2013 at 01:09:05PM +0100, Piotr Wilczek wrote:
->> Now function returns the number of characters that differ in the
->> compared strings.
+On Tue, Dec 17, 2013 at 08:07:28PM +0100, Arnaud Ebalard wrote:
 > 
-> I think this is a mistake.  You're defining a standard C function in
-> a non-standard way.  For strcmp() and strncmp(), the C standard
-> requires:
-> 
-> RETURN VALUE
->        The strcmp() and strncmp() functions return an integer less than, equal
->        to, or greater than zero if s1 (or the first n bytes thereof) is found,
->        respectively, to be less than, to match, or be greater than s2.
-> 
-> If you implement something different to that, don't call it strcmp() or
-> strncmp() but something else, because you're not providing the correct
-> functionality, and that will just confuse people and lead to bugs.
+> Intersil ISL12057 is an I2C RTC chip also supporting two alarms. This
+> patch only adds support for basic RTC functionalities (i.e. getting and
+> setting time). Tests have been performed on NETGEAR ReadyNAS 102 w/
+> startup/shutdown scripts, hwclock, ntpdate and openntpd.
 
-True.
+Reviewed-by: Mark Brown <broonie@linaro.org>
 
-> For instance, can you be sure that there aren't any uses of strncmp()
-> which already test for less-than-zero etc?
+but
 
-In this case, yes. The code as it stands is very small, and users only
-check for the return value of these functions to be 0.
+> +static int isl12057_rtc_proc(struct device *dev, struct seq_file *seq)
+> +{
+> +	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+> +	int reg, ret;
+> +
+> +	mutex_lock(&data->lock);
+> +
+> +	/* Status register */
+> +	ret = regmap_read(data->regmap, ISL12057_REG_SR, &reg);
+> +	if (ret) {
+> +		dev_err(dev, "%s: reading SR failed\n", __func__);
+> +		goto out;
+> +	}
+> +
+> +	seq_printf(seq, "status_reg\t:%s%s%s (0x%.2x)\n",
+> +		   (reg & ISL12057_REG_SR_OSF) ? " OSF" : "",
+> +		   (reg & ISL12057_REG_SR_A1F) ? " A1F" : "",
+> +		   (reg & ISL12057_REG_SR_A2F) ? " A2F" : "", reg);
+> +
+> +	/* Control register */
+> +	ret = regmap_read(data->regmap, ISL12057_REG_INT, &reg);
+> +	if (ret) {
+> +		dev_err(dev, "%s: reading INT failed\n", __func__);
+> +		goto out;
+> +	}
+> +
+> +	seq_printf(seq, "control_reg\t:%s%s%s%s%s%s (0x%.2x)\n",
+> +		   (reg & ISL12057_REG_INT_A1IE) ?  " A1IE"  : "",
+> +		   (reg & ISL12057_REG_INT_A2IE) ?  " A2IE"  : "",
+> +		   (reg & ISL12057_REG_INT_INTCN) ? " INTCN" : "",
+> +		   (reg & ISL12057_REG_INT_RS1) ?   " RS1"   : "",
+> +		   (reg & ISL12057_REG_INT_RS2) ?   " RS2"   : "",
+> +		   (reg & ISL12057_REG_INT_EOSC) ?  " EOSC"  : "", reg);
+> +
+> + out:
+> +	mutex_unlock(&data->lock);
 
-But I wonder whether that patch is needed at all. At least the rest of
-this series does not even seem to introduce new call sites of strcmp()
-or strncmp() ...
-
-
-Daniel
+I'm not sure the lock is achieving anything any more - the only time it
+actualy protects more than one operation is the above but since the
+status register is volatile anyway it might change between it being read
+and the control register being read.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/74207624/attachment-0001.sig>
