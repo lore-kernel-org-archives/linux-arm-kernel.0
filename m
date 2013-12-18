@@ -1,24 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Dec 2013 18:31:06 +0000
-Subject: [PATCHv3 4/7] Documentation: Add device tree bindings for
- Freescale SAI.
-In-Reply-To: <1387250684-23406-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1387250684-23406-1-git-send-email-Li.Xiubo@freescale.com>
- <1387250684-23406-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20131218183106.GF31886@sirena.org.uk>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 18 Dec 2013 10:29:01 -0800
+Subject: [PATCHv4 0/2] CMA for arm64
+In-Reply-To: <1386876513-7199-1-git-send-email-lauraa@codeaurora.org>
+References: <1386876513-7199-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <52B1E96D.1060904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 11:24:41AM +0800, Xiubo Li wrote:
+On 12/12/2013 11:28 AM, Laura Abbott wrote:
+> This adds support for CMA in arm64
+>
+> v4: Minor typos pointed out by Will. Changed the support for NULL devices
+> to be a WARN on NULL device.
+>
+> v3: Fix a missed line to actually set the dma_handle correctly
+>
+> v2: Move the dma contiguous functions from swiotlb to arm64 directly
+>
+>   arch/arm64/Kconfig                      |    1 +
+>   arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++
+>   arch/arm64/mm/dma-mapping.c             |   35 +++++++++++++++++++++++++++++-
+>   arch/arm64/mm/init.c                    |    3 ++
+>   4 files changed, 66 insertions(+), 2 deletions(-)
+>
 
-> +	      big-endian_regs;
-> +	      big-endian_data;
 
-I've applied this and fixed these two typos, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/89c2a4cf/attachment.sig>
+Any further comments on this or is this going to be queued up somewhere?
+
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
