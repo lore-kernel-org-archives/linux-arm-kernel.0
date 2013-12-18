@@ -1,85 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Dec 2013 12:03:06 +0000
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <20131218114211.GF4360@n2100.arm.linux.org.uk>
-References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131217122519.GI32118@arm.com>
- <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
- <20131218100321.GC4360@n2100.arm.linux.org.uk>
- <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
-Message-ID: <20131218120306.GC28112@arm.com>
+From: p.wilczek@samsung.com (Piotr Wilczek)
+Date: Wed, 18 Dec 2013 13:09:03 +0100
+Subject: [PATCH V2 0/8] Impedance matcher for Samsung boards
+In-Reply-To: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+Message-ID: <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 11:42:12AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 18, 2013 at 11:27:14AM +0000, Catalin Marinas wrote:
-> > On Wed, Dec 18, 2013 at 11:15:45AM +0000, Ard Biesheuvel wrote:
-> > > On 18 December 2013 11:55, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > > On Wed, Dec 18, 2013 at 11:25:40AM +0100, Ard Biesheuvel wrote:
-> > > >> On 18 December 2013 11:03, Russell King - ARM Linux
-> > > >> <linux@arm.linux.org.uk> wrote:
-> > > >> > If we allocate the ARM64 private never-will-appear-on-ARM hwcaps in bit
-> > > >> > 32 and above, they'll be hidden from 32-bit stuff.  Hopefully, glibc
-> > > >> > doesn't concatenate the HWCAP and HWCAP2 fields though - someone should
-> > > >> > check that.
-> > > >> >
-> > > >> > Since the bits in the ARM64 hwcap are different from the ARM32 hwcap, I
-> > > >> > don't see any point in defining them for ARM32 - userspace needs to make
-> > > >> > the definition conditional anyway, and can't interpret the bits as-is
-> > > >> > because ARM64 already omits many of the ARM32 ones.
-> > > >>
-> > > >> Please note that this is about the compat bits, not the ARM64 specific
-> > > >> ones. These correspond 1:1 with the ARM32 ones. The idea is that a
-> > > >> binary built for ARM will have access to the extended instructions
-> > > >> which ARM64 offers to ARM32 binaries running in 32 bit compatibility
-> > > >> mode (such as AES, SHAx etc).
-> > > >
-> > > > This all sounds rather silly IMHO.  As ARM32 natively doesn't support
-> > > > these instructions, why should running an ARM32 binary under ARM64
-> > > > end up offering this?
-> > > >
-> > > > If the ARM64 additional instructions are to be used, surely it's not
-> > > > unreasonable to require ARM64 native applications?
-> > > 
-> > > Well, the ARM architects have decided that there shall be Crypto
-> > > Extensions instructions not only for ARMv8/Aarch64 but also for
-> > > ARMv8/Aarch32. This is fully spec'ed in the latest ARM ARM. For
-> > > instance, previously unused NEON opcodes on ARM32 have been allocated
-> > > to AES instructions. (for instance, implemented for QEMU here
-> > > https://git.linaro.org/people/peter.maydell/qemu-arm.git/commitdiff/9d935509)
-> > 
-> > Indeed. AArch32 is not _dead_ with ARMv8 but getting new features. The
-> > point of this patch is to have a common set of bits between compat arm64
-> > and arm kernel. The AArch32 applications running on ARMv8 (most likely
-> > with an arm64 kernel) may want to make use of the crypto extensions.
-> > 
-> > If you want a more complete solution, we could add ID_ISAR5 checks on
-> > the arm kernel.
-> 
-> The point is that they'll never appear on an ARMv7 implementation because
-> they're not part of the ARMv7 architecture.  I see no point in needlessly
-> polluting ARM32 with ARM64 stuff - in exactly the same way that you see
-> no point in polluting ARM64 with ARM32 stuff.
+This patchset implements the impedance-matcher for Samsung Exynos boards
+and does the following:
+ - fix strncmp function;
+ - ensure each DT blob is 4-byte aligned;
+ - port 'atags_to_fdt' form Kernel;
+ - add Exynos specific serial driver;
+ - add support for Samsung boards, Trats and Trats2;
 
-I'm not sure whether you are confusing architecture versions with
-instruction sets / exception models or you are simply stating that the
-32-bit arm kernel will stop at ARMv7.
+This patch set is based on:
+https://github.com/zonque/pxa-impedance-matcher.git
 
-> So, frankly, find a different way to this.  We don't need to needlessly
-> waste HWCAP bits on ARM32.
+Changes for V2:
+ - libfdt moved to libfdt directory
 
-So in your opinion 32-bit only ARMv8-R profile won't be fully supported
-in the mainline kernel.
+TODO:
+Kernel uses some memory space right after uImage, overwriting the very first
+appended device tree blob. As a workaround a fake, 32kB dtb is appended first.
 
-(I mistakenly said uClinux in my previous email; the normal/rich OS part
-of the ARMv8-R is AArch32 MMU capable, the Hyp and real-time
-capabilities are MMU-less, only MPU)
+Piotr Wilczek (8):
+  registers: add write u8 type
+  string: fix strncmp function
+  device tree blob must be 4-bytes alingned
+  Makefile: disable generating Thumb code
+  add memory operations
+  add support to supplement atags to device tree
+  serial: add Exynos specific serial driver
+  board: add Samsung specific board support
+
+ Makefile                       |   16 +-
+ append_dtbs.sh                 |   11 +
+ atags.h                        |    2 +
+ board-exynos.c                 |   77 ++
+ configs/Makefile.config.exynos |   13 +
+ dtbs.c                         |    4 +
+ libfdt.h                       | 1478 ++++++++++++++++++++++++++++++++
+ libfdt/Makefile                |   23 +
+ libfdt/atags_to_fdt.c          |  199 +++++
+ libfdt/fdt.c                   |  224 +++++
+ libfdt/fdt_ro.c                |  576 +++++++++++++
+ libfdt/fdt_rw.c                |  494 +++++++++++
+ libfdt/fdt_wip.c               |  120 +++
+ libfdt/libfdt.a                |  Bin 0 -> 32216 bytes
+ libfdt/libfdt.h                | 1478 ++++++++++++++++++++++++++++++++
+ libfdt/libfdt_env.h            |   13 +
+ libfdt/libfdt_internal.h       |   95 +++
+ libfdt/patch_libfdt.patch      | 1826 ++++++++++++++++++++++++++++++++++++++++
+ libfdt/setup.h                 |  187 ++++
+ main.c                         |    4 +
+ register.c                     |   10 +
+ register.h                     |    3 +
+ serial-exynos.c                |   84 ++
+ string.c                       |  119 ++-
+ string.h                       |   10 +
+ types.h                        |   32 +
+ 26 files changed, 7094 insertions(+), 4 deletions(-)
+ create mode 100644 board-exynos.c
+ create mode 100644 configs/Makefile.config.exynos
+ create mode 100644 libfdt.h
+ create mode 100644 libfdt/Makefile
+ create mode 100644 libfdt/atags_to_fdt.c
+ create mode 100644 libfdt/fdt.c
+ create mode 100644 libfdt/fdt_ro.c
+ create mode 100644 libfdt/fdt_rw.c
+ create mode 100644 libfdt/fdt_wip.c
+ create mode 100644 libfdt/libfdt.a
+ create mode 100644 libfdt/libfdt.h
+ create mode 100644 libfdt/libfdt_env.h
+ create mode 100644 libfdt/libfdt_internal.h
+ create mode 100644 libfdt/patch_libfdt.patch
+ create mode 100644 libfdt/setup.h
+ create mode 100644 serial-exynos.c
 
 -- 
-Catalin
+1.7.9.5
