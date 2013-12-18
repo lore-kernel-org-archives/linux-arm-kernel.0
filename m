@@ -1,235 +1,62 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 17 Dec 2013 18:55:27 -0800
-Subject: [PATCH v2 01/11] clk: sunxi: register factors clocks behind
- composite
-In-Reply-To: <1387327503-15651-2-git-send-email-emilio@elopez.com.ar>
-References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
- <1387327503-15651-2-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20131218025527.23538.28216@quantum>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Tue, 17 Dec 2013 19:03:01 -0800
+Subject: [PATCH 1/3]: Support cpu frequency scaling and power management
+ for iMX6SL
+In-Reply-To: <20131218023808.GZ6691@S2101-09.ap.freescale.net>
+References: <CACUGKYPLSdih0_+Dt5LP2E1JACfU7NbAvtCibWftKbzTf6R8FA@mail.gmail.com>
+ <CACUGKYN_b0x4xg_Me3TXQGKEvz61SDZk4CFk5YHFnVCWT_6GPg@mail.gmail.com>
+ <52B09856.5050609@tqsc.de>
+ <20131218023808.GZ6691@S2101-09.ap.freescale.net>
+Message-ID: <CACUGKYP3u-nu8O2K6op_oSRKHn4ugLuaD2n5cBBJW5473tYVTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-12-17 16:44:53)
-> This commit reworks factors clock registration to be done behind a
-> composite clock. This allows us to additionally add a gate, mux or
-> divisors, as it will be needed by some future PLLs.
-> 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-factors.c | 63 +--------------------------------------
->  drivers/clk/sunxi/clk-factors.h | 16 +++++-----
->  drivers/clk/sunxi/clk-sunxi.c   | 66 ++++++++++++++++++++++++++++++++++++++---
->  3 files changed, 72 insertions(+), 73 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> index f05207a..9e23264 100644
-> --- a/drivers/clk/sunxi/clk-factors.c
-> +++ b/drivers/clk/sunxi/clk-factors.c
-> @@ -30,14 +30,6 @@
->   * parent - fixed parent.  No clk_set_parent support
->   */
->  
-> -struct clk_factors {
-> -       struct clk_hw hw;
-> -       void __iomem *reg;
-> -       struct clk_factors_config *config;
-> -       void (*get_factors) (u32 *rate, u32 parent, u8 *n, u8 *k, u8 *m, u8 *p);
-> -       spinlock_t *lock;
-> -};
-> -
->  #define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
->  
->  #define SETMASK(len, pos)              (((1U << (len)) - 1) << (pos))
-> @@ -120,61 +112,8 @@ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
->         return 0;
->  }
->  
-> -static const struct clk_ops clk_factors_ops = {
-> +const struct clk_ops clk_factors_ops = {
->         .recalc_rate = clk_factors_recalc_rate,
->         .round_rate = clk_factors_round_rate,
->         .set_rate = clk_factors_set_rate,
->  };
-> -
-> -/**
-> - * clk_register_factors - register a factors clock with
-> - * the clock framework
-> - * @dev: device registering this clock
-> - * @name: name of this clock
-> - * @parent_name: name of clock's parent
-> - * @flags: framework-specific flags
-> - * @reg: register address to adjust factors
-> - * @config: shift and width of factors n, k, m and p
-> - * @get_factors: function to calculate the factors for a given frequency
-> - * @lock: shared register lock for this clock
-> - */
-> -struct clk *clk_register_factors(struct device *dev, const char *name,
-> -                                const char *parent_name,
-> -                                unsigned long flags, void __iomem *reg,
-> -                                struct clk_factors_config *config,
-> -                                void (*get_factors)(u32 *rate, u32 parent,
-> -                                                    u8 *n, u8 *k, u8 *m, u8 *p),
-> -                                spinlock_t *lock)
-> -{
-> -       struct clk_factors *factors;
-> -       struct clk *clk;
-> -       struct clk_init_data init;
-> -
-> -       /* allocate the factors */
-> -       factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
-> -       if (!factors) {
-> -               pr_err("%s: could not allocate factors clk\n", __func__);
-> -               return ERR_PTR(-ENOMEM);
-> -       }
-> -
-> -       init.name = name;
-> -       init.ops = &clk_factors_ops;
-> -       init.flags = flags;
-> -       init.parent_names = (parent_name ? &parent_name : NULL);
-> -       init.num_parents = (parent_name ? 1 : 0);
-> -
-> -       /* struct clk_factors assignments */
-> -       factors->reg = reg;
-> -       factors->config = config;
-> -       factors->lock = lock;
-> -       factors->hw.init = &init;
-> -       factors->get_factors = get_factors;
-> -
-> -       /* register the clock */
-> -       clk = clk_register(dev, &factors->hw);
-> -
-> -       if (IS_ERR(clk))
-> -               kfree(factors);
-> -
-> -       return clk;
-> -}
-> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-> index f49851c..02e1a43 100644
-> --- a/drivers/clk/sunxi/clk-factors.h
-> +++ b/drivers/clk/sunxi/clk-factors.h
-> @@ -17,11 +17,13 @@ struct clk_factors_config {
->         u8 pwidth;
->  };
->  
-> -struct clk *clk_register_factors(struct device *dev, const char *name,
-> -                                const char *parent_name,
-> -                                unsigned long flags, void __iomem *reg,
-> -                                struct clk_factors_config *config,
-> -                                void (*get_factors) (u32 *rate, u32 parent_rate,
-> -                                                     u8 *n, u8 *k, u8 *m, u8 *p),
-> -                                spinlock_t *lock);
-> +struct clk_factors {
-> +       struct clk_hw hw;
-> +       void __iomem *reg;
-> +       struct clk_factors_config *config;
-> +       void (*get_factors) (u32 *rate, u32 parent, u8 *n, u8 *k, u8 *m, u8 *p);
-> +       spinlock_t *lock;
-> +};
-> +
-> +extern const struct clk_ops clk_factors_ops;
->  #endif
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 8fc1375..6f756f4 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -255,7 +255,11 @@ static void sun4i_get_apb1_factors(u32 *freq, u32 parent_rate,
->   * sunxi_factors_clk_setup() - Setup function for factor clocks
->   */
->  
-> +#define SUNXI_FACTORS_MUX_MASK 0x3
-> +
->  struct factors_data {
-> +       int enable;
-> +       int mux;
->         struct clk_factors_config *table;
->         void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
->  };
-> @@ -306,16 +310,70 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
->                                            struct factors_data *data)
->  {
->         struct clk *clk;
-> +       struct clk_factors *factors;
-> +       struct clk_gate *gate = NULL;
-> +       struct clk_mux *mux = NULL;
-> +       struct clk_hw *gate_hw = NULL;
-> +       struct clk_hw *mux_hw = NULL;
->         const char *clk_name = node->name;
-> -       const char *parent;
-> +       const char *parents[5];
+I think that's the right way to do it. Follow the Freescale kernel to
+set the operating-points.
 
-Seems like 5 is a magic number? I guess this type of clock always has
-the same number of parents? Might be good to use a preprocessor macro
-here.
-
-Otherwise the patch looks good to me.
-
-Regards,
-Mike
-
->         void *reg;
-> +       int i = 0;
->  
->         reg = of_iomap(node, 0);
->  
-> -       parent = of_clk_get_parent_name(node, 0);
-> +       /* if we have a mux, we will have >1 parents */
-> +       while (i < 5 && (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-> +               i++;
-> +
-> +       factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
-> +       if (!factors)
-> +               return;
->  
-> -       clk = clk_register_factors(NULL, clk_name, parent, 0, reg,
-> -                                  data->table, data->getter, &clk_lock);
-> +       /* Add a gate if this factor clock can be gated */
-> +       if (data->enable) {
-> +               gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-> +               if (!gate) {
-> +                       kfree(factors);
-> +                       return;
-> +               }
-> +
-> +               /* set up gate properties */
-> +               gate->reg = reg;
-> +               gate->bit_idx = data->enable;
-> +               gate->lock = &clk_lock;
-> +               gate_hw = &gate->hw;
-> +       }
-> +
-> +       /* Add a mux if this factor clock can be muxed */
-> +       if (data->mux) {
-> +               mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-> +               if (!mux) {
-> +                       kfree(factors);
-> +                       kfree(gate);
-> +                       return;
-> +               }
-> +
-> +               /* set up gate properties */
-> +               mux->reg = reg;
-> +               mux->shift = data->mux;
-> +               mux->mask = SUNXI_FACTORS_MUX_MASK;
-> +               mux->lock = &clk_lock;
-> +               mux_hw = &mux->hw;
-> +       }
-> +
-> +       /* set up factors properties */
-> +       factors->reg = reg;
-> +       factors->config = data->table;
-> +       factors->get_factors = data->getter;
-> +       factors->lock = &clk_lock;
-> +
-> +       clk = clk_register_composite(NULL, clk_name,
-> +                       parents, i,
-> +                       mux_hw, &clk_mux_ops,
-> +                       &factors->hw, &clk_factors_ops,
-> +                       gate_hw, &clk_gate_ops,
-> +                       i ? 0 : CLK_IS_ROOT);
->  
->         if (!IS_ERR(clk)) {
->                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> -- 
-> 1.8.5.1
-> 
+On Tue, Dec 17, 2013 at 6:38 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Dec 17, 2013 at 07:30:46PM +0100, Markus Niebel wrote:
+>> >> @@ -38,6 +38,19 @@
+>> >>                         device_type = "cpu";
+>> >>                         reg = <0x0>;
+>> >>                         next-level-cache = <&L2>;
+>> >> +                       operating-points = <
+>> >> +                               /* kHz    uV */
+>> >> +                               1000000 1275000
+>> >> +                               792000  1150000
+>>
+>> according to the CPU documentation the following operation points are suggested (at least AFAIK):
+>>                                996000  1250000 /* for consumer grade only */
+>>                                792000  1150000
+>>                                396000  1050000
+>> note: AFAIK there is no way to detect at runtime if we  running on industrial / automotive variant
+>> so there is a risk to run at too high frequency ...
+>
+> I can only find IMX6SLCEC - i.MX 6SoloLite Applications Processors for
+> Consumer Products on freescale website.
+>
+>  http://cache.freescale.com/files/32bit/doc/data_sheet/IMX6SLCEC.pdf?fpsp=1
+>
+> In that document, I can see the following in Table 9. Operating Ranges.
+>
+>  LDO output set at 1.250V minimum for operation up to 996MHz
+>  LDO output set at 1.150V minimum for operation up to 792MHz
+>  LDO output set at 0.95V minimum for operation up to 396MHz
+>
+> However, if you access Freescale 3.10 kernel tree, you will see there
+> are 25mV addition to each operating-point.
+>
+>         operating-points = <
+>                 /* kHz   uV */
+>                 996000  1275000
+>                 792000  1175000
+>                 396000  975000
+>         >;
+>
+> From the commit log, it said this 25mV is added to compensate the output
+> tolerance from external regulators.
+>
+> I suggest we follow Freescale kernel to set the operating-points.
+>
+> Shawn
+>
