@@ -1,79 +1,61 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 18 Dec 2013 21:10:45 +0530
-Subject: [PATCH] dma: mv_xor: remove mv_desc_get_dest_addr()
-In-Reply-To: <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
-References: <1385408365-8072-1-git-send-email-jason@lakedaemon.net>
- <20131128055706.GM8834@intel.com>
- <20131209235035.GA11632@n2100.arm.linux.org.uk>
- <20131210101331.GG29580@intel.com>
- <20131210111449.GY4360@n2100.arm.linux.org.uk>
- <CAPcyv4gAazGS_m6KNfF2_kY3CDzYkvpBQ=kcnPH-pBvcJ0HjAw@mail.gmail.com>
- <CAPcyv4iNOqHSQXj_PTmG-iHajnmHoPhLeFvnnK-JtNykf2W3Ew@mail.gmail.com>
-Message-ID: <20131218154045.GC16227@intel.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Wed, 18 Dec 2013 08:41:52 -0800
+Subject: [PATCH 2/4] Moving of_init_opp_table
+In-Reply-To: <20131218074315.GH6691@S2101-09.ap.freescale.net>
+References: <1387329451-17480-1-git-send-email-john.tobias.ph@gmail.com>
+ <1387329451-17480-2-git-send-email-john.tobias.ph@gmail.com>
+ <20131218074315.GH6691@S2101-09.ap.freescale.net>
+Message-ID: <CACUGKYN+fJFONMr5Mv9NwSkCeW88QkFOsxu1YsUhFwV6EOMPbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 11:00:05PM -0800, Dan Williams wrote:
-> On Wed, Dec 11, 2013 at 1:10 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> > On Tue, Dec 10, 2013 at 3:14 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> On Tue, Dec 10, 2013 at 03:43:31PM +0530, Vinod Koul wrote:
-> >>> On Mon, Dec 09, 2013 at 11:50:35PM +0000, Russell King - ARM Linux wrote:
-> >>> > On Thu, Nov 28, 2013 at 11:27:06AM +0530, Vinod Koul wrote:
-> >>> > > + Dan
-> >>> > >
-> >>> > > On Mon, Nov 25, 2013 at 07:39:25PM +0000, Jason Cooper wrote:
-> >>> > > > The following commit:
-> >>> > > >
-> >>> > > >   54f8d501e842 dmaengine: remove DMA unmap from drivers
-> >>> > > >
-> >>> > > > removed the last caller to mv_desc_get_dest_addr(), creating the
-> >>> > > > warning:
-> >>> > > >
-> >>> > > >   drivers/dma/mv_xor.c:57:12: warning: 'mv_desc_get_dest_addr' defined
-> >>> > > >   but not used [-Wunused-function]
-> >>> > > >
-> >>> > > > Remove it.
-> >>> > > >
-> >>> > > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> >>> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
-> >>> > >
-> >>> > > This should go thru Dan's tree
-> >>> >
-> >>> > So what's happening with this patch?  I don't see it in -rc yet.
-> >>> Dan has applied this to his next. So this should show us in next rc1
-> >>
-> >> Wrong answer.  This is a compile regression introduced in the last merge
-> >> window, it should be going into an -rc kernel.
-> >
-> > Vinod, if your fixes branch is ready I'll take it along with the rest
-> > of the regression fixes to Linus.
-Sorry I wasnt well last week, so I just managed to send the PULL on friday
-morning. Wasnt sure if Linus will cut rc on friday or later, so sent it!
-> 
-> Ok, I see you sent dma-slave/fixes up, I'll follow up with the rest:
-Okay, did you manage to send it? If not I may have few (i think at least 1 more)
+Ahh ok I think I got what you mean here..
 
---
-~Vinod
-> 
-> Dan Williams (5):
->       dma: fix build warnings in ppc4xx
->       dma: fix fsldma build warnings
->       dmatest: fix build warning on mips
->       dma: fix build warnings in txx9
->       dmaengine: fix enable for high order unmap pools
-> 
-> Ezequiel Garcia (1):
->       dma: mv_xor: Use dmaengine_unmap_data for the self-tests
-> 
-> Jason Cooper (1):
->       dma: mv_xor: remove mv_desc_get_dest_addr()
-> 
-> Olof Johansson (1):
->       dmaengine: at_hdmac: remove unused function
-> 
-> Russell King (1):
->       dmaengine: mv_xor: fix oops when channels fail to initialise
+I should call opp_get_opp_count(cpu_dev) to check if the platform
+supplied it. If not, call the of_init_opp_table.
 
--- 
+
+On Tue, Dec 17, 2013 at 11:43 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Dec 17, 2013 at 05:17:29PM -0800, John Tobias wrote:
+>>     Moving of_init_opp_table from mach-imx6q.c to imx6q-cpufreq.c in order to avoid adding it to mach-imx6sl.c.
+>>     Just incase the cpu frequency scaling is enabled on iMX6SL.
+>
+> Drop the leading spaces and wrap the lines around 72 column.
+>
+>>
+>> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+>> ---
+>>  drivers/cpufreq/imx6q-cpufreq.c | 5 +++++
+>
+> For this patch, a proper patch subject prefix would be 'cpufreq: imx6q: '
+> You can use 'git log' to find out what a proper prefix for a file/patch
+> should be.
+>
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+>> index 4b3f18e..2eea3d9 100644
+>> --- a/drivers/cpufreq/imx6q-cpufreq.c
+>> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+>> @@ -166,6 +166,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>>               return -ENOENT;
+>>       }
+>>
+>> +     if (of_init_opp_table(cpu_dev)) {
+>> +             dev_err(cpu_dev,"failed to init OPP table\n");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>
+> Before doing that in the driver, you should check and make sure that
+> platform hasn't supply a opp table.
+>
+> Shawn
+>
+>>       arm_clk = devm_clk_get(cpu_dev, "arm");
+>>       pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+>>       pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
+>> --
+>> 1.8.3.2
+>>
+>
