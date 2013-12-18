@@ -1,190 +1,51 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 18 Dec 2013 10:45:00 +0200
-Subject: [PATCH] ARM: dts: Add support for sbc-3xxx with cm-t3730
-In-Reply-To: <20131217193134.GB27438@atomide.com>
-References: <1386962541-18498-1-git-send-email-tony@atomide.com>
- <52AF065A.4010205@compulab.co.il> <20131216191754.GD26293@atomide.com>
- <52AFF9D0.5080400@compulab.co.il> <20131217193134.GB27438@atomide.com>
-Message-ID: <52B1608C.3010709@compulab.co.il>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 18 Dec 2013 10:06:03 +0100
+Subject: arm-soc: Xilinx Zynq dt changes for v3.14
+In-Reply-To: <20131217202731.GA11452@quad.lixom.net>
+References: <52AAC671.6000207@monstr.eu>
+ <20131213112659.GD4360@n2100.arm.linux.org.uk> <52AB0ABD.1050307@monstr.eu>
+ <20131217202731.GA11452@quad.lixom.net>
+Message-ID: <52B1657B.1030803@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/13 21:31, Tony Lindgren wrote:
-> * Igor Grinberg <grinberg@compulab.co.il> [131216 23:16]:
->> On 12/16/13 21:17, Tony Lindgren wrote:
->>> * Igor Grinberg <grinberg@compulab.co.il> [131216 05:57]:
->>>> On 12/13/13 21:22, Tony Lindgren wrote:
-
-[...]
-
->  
->> I think we can drop the different memory sizes and
->> let boot loader adjust the blob. This will make the list shorter:
->> omap3-cm-t3x.dtsi	- common to cm-t3x cpu boards
->> omap3-cm-t3x30.dtsi	- common to cm-t3730 and cm-t3530
->> omap3-cm-t3730.dtsi	- cm-t3730 specific
->> omap3-cm-t3530.dtsi	- cm-t3530 specific
->> omap3-cm-t3517.dtsi	- cm-t3517 specific
->> omap3-sb-t35.dtsi	- sb-t35 specific
->> omap3-cb-t3.dtsi	- cb-t3 specific
->> omap3-sbc-t3730.dts	- sb-t35 with cm-t3730 and default memory size
->> omap3-sbc-t3530.dts	- sb-t35 with cm-t3530 and default memory size
->> omap3-sbc-t3517.dts	- sb-t35 with cm-t3517 and default memory size
->> omap3-em-t3730.dts	- cb-t3 with cm-t3730 and default memory size
->> omap3-em-t3530.dts	- cb-t3 with cm-t3530 and default memory size
+On 12/17/2013 09:27 PM, Olof Johansson wrote:
+> On Fri, Dec 13, 2013 at 02:25:17PM +0100, Michal Simek wrote:
+>> Hi Russell,
 >>
->> So what do you think?
->  
-> Makes sense to me. I've updated the patch below to use the following:
-> 
-> omap3-cm-t3x30.dtsi	- common to cm-t3730 and cm-t3530
-> omap3-cm-t3730.dts	- cm-t3730 specific, should work on it's own too, not a .dtsi
-> omap3-sb-t35.dtsi	- sb-t35 specific
-> omap3-sbc-t3730.dts	- sb-t35 with cm-t3730 and default memory size
-> 
-> So the only changes compared to your naming are to not use .dtsi
-> extension for omap3-cm-t3730.dts, and I did not add omap3-cm-t3x.dtsi
-> as I don't know the details.
-
-Ok.
-
-> 
-> It's probably best that you guys take over this patch from here and
-> add omap3-cm-t3x30.dtsi if needed.
-
-Ok.
-
-> 
-> I got the basic stuff working for what I need right now for my router
-> to work, which is MMC, both Ethernet controllers and wl12xx. So I'm
-> not going to tweak this patch further. Of course having the battery
-> charging working would be nice for a router to have a backup battery :)
-> 
-> There are still some issues I've noticed:
-> 
-> 1. Removing and reinserting the wl12xx modules seems to kill the
->    WLAN
-> 
-> 2. Ethernet interfaces only come up if there's a cable connected
-
-I see. Ok then, we'll try to figure those things out.
-
-[...]
-
->>>>> +	mmc2_pins: pinmux_mmc2_pins {
->>>>> +		pinctrl-single,pins = <
->>>>> +			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
->>>>> +			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
->>>>> +			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
->>>>> +			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
->>>>> +			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
->>>>> +			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
->>>>
->>>> Here the following is missing:
->>>> 0x134 (PIN_OUTPUT | MUX_MODE1)	/* sdmmc2_dat4.sdmmc2_dir_dat0 */
+>> On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
+>>> 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
+>>>    individually.  The whole point of arm at kernel.org is that it reaches
+>>>    the current arm-soc maintainers, whoever they may be at the time that
+>>>    you send your email without you needing to know who they are.
 >>>
->>> That seems to be used for the wl12xx GPIO, so it's listed at
->>> wl12xx_gpio below.
+>>> 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
+>>>    a pull request message.
 >>
->> Yes, but only on cm-t3730 (and actually starting from revision 1.2),
->> not cm-t3530...
+>> Thanks, I will keep this in my mind for future. I am just doing what I have done
+>> before and this is the first complain I have got.
 > 
-> Sounds like that needs another set of .dts files, or patching in the
-> bootloader. 
+> I don't think I've noticed it in the past. :-) Either way, see it as a
+> friendly pointer from Russell, not a complaint.
 
-Yep, IMO, .dts will be better, as I think pinmux is something
-the kernel should be aware of...
+that's how I take it.
+The point here is just if I should send pull request again.
 
-[...]
-
-> 8< ----------------------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 10 Dec 2013 15:03:34 -0800
-> Subject: [PATCH] ARM: dts: Add support for sbc-3xxx with cm-t3730
-> 
-> This adds support for CompuLab SBC-T3530, also known as cm-t3730:
-> 
-> http://compulab.co.il/products/sbcs/sbc-t3530/
-> 
-> It seems that with the sbc-3xxx mainboard is also used on
-> SBC-T3517 and SBC-T3730 with just a different CPU module:
-> 
-> http://compulab.co.il/products/sbcs/sbc-t3517/
-> http://compulab.co.il/products/sbcs/sbc-t3730/
-> 
-> So let's add a common omap3-sb-t35.dtsi and then separate SoC
-> specific omap3-sbc-t3730.dts, omap3-sbc-t3530.dts and
-> omap3-sbc-t3517.dts.
-> 
-> I've tested this with SBC-T3730 as that's the only one I have.
-> At least serial, both Ethernet controllers, MMC, and wl12xx WLAN
-> work.
-> 
-> Note that WLAN seems to be different for SBC-T3530. And SBC-T3517
-> may need some changes for the EMAC Ethernet if that's used
-> instead of the smsc911x.
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Mike Rapoport <mike@compulab.co.il>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
-This one looks great!
-Really minor comments below (we can fix those later)
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
-> new file mode 100644
-> index 0000000..80cf668
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
-
-[...]
-
-> +&mmc1 {
-> +	vmmc-supply = <&vmmc1>;
-> +	vmmc_aux-supply = <&vsim>;
-
-vsim is not present in TPS65930...
-can be just left empty or set to a fixed voltage regulator.
-
-> +	bus-width = <4>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +};
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-> new file mode 100644
-> index 0000000..bf1b72c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-
-[...]
-
-> +&i2c1 {
-> +	clock-frequency = <2600000>;
-
-There is also an EEPROM on this bus, although we still don't
-have it registered in the dts, but it can be registered from
-userspace and is also accessible using i2c-tools.
-This should be 400KHz max for the EEPROM to work.
-
-> +
-> +	twl: twl at 48 {
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-parent = <&intc>;
-> +	};
-> +};
-
-[...]
-
+Thanks,
+Michal
 
 -- 
-Regards,
-Igor.
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/eef9e1d8/attachment.sig>
