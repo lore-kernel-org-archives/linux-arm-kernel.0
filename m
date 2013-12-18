@@ -1,75 +1,43 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 18 Dec 2013 15:41:33 -0700
-Subject: [PATCH V1 3/7] ARM: dts: imx6qdl-sabrelite: use
- MX6QDL_ENET_PINGRP_RGMII_MD
+Date: Wed, 18 Dec 2013 15:41:37 -0700
+Subject: [PATCH V1 7/7] ARM: dts: imx6q-arm2: use GPIO_6 for FEC interrupt.
 In-Reply-To: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387406497-26430-4-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387406497-26430-8-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This saves some lines, but should not be a functional change.
-Also, apply same change to imx6qdl-nitrogen6x.
+This works around a hardware bug.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 +---------------
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 16 +---------------
- 2 files changed, 2 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index 78fe8b0..ef5ce885 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -207,21 +207,7 @@
+---
+This has not been tested
+---
+ arch/arm/boot/dts/imx6q-arm2.dts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index 9c00b73..631a426 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -75,7 +75,7 @@
+ 		};
  
  		pinctrl_enet: enetgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
--				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
--				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
--				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
--				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
--				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
--				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
--				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
--				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
--				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
--				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
--				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
--				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
--				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
--				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+				MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x100b0)
- 				/* Phy reset */
- 				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x000b0
- 			>;
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index d28f501..db06e40 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -206,21 +206,7 @@
+-			fsl,pins = <MX6QDL_ENET_PINGRP2>;
++			fsl,pins = <MX6QDL_ENET_PINGRP2_GPIO6>;
+ 		};
  
- 		pinctrl_enet: enetgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
--				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
--				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
--				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
--				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
--				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
--				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
--				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
--				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
--				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
--				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
--				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
--				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
--				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
--				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+				MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x100b0)
- 				/* Phy reset */
- 				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
- 			>;
+ 		pinctrl_gpmi_nand: gpminandgrp {
+@@ -115,6 +115,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
++	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
++			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 	status = "okay";
+ };
+ 
 -- 
 1.8.1.2
