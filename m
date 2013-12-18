@@ -1,31 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Dec 2013 17:43:14 +0530
-Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
- dependency on aemif
-In-Reply-To: <52B18C44.2000305@ti.com>
-References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52B18C44.2000305@ti.com>
-Message-ID: <52B1915A.7060309@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 18 Dec 2013 13:15:42 +0100
+Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
+In-Reply-To: <52B18CC9.8090200@cogentembedded.com>
+References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+ <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
+ <52B1892B.1020806@cogentembedded.com>
+ <20131218114351.GD3314@katana>
+ <52B18CC9.8090200@cogentembedded.com>
+Message-ID: <20131218121541.GE3314@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
-> Hi, Sekhar
+
+On Wed, Dec 18, 2013 at 03:53:45PM +0400, Sergei Shtylyov wrote:
+> On 18-12-2013 15:43, Wolfram Sang wrote:
 > 
-> This patch is based on "Reuse davinci-nand driver for Keystone arch" series.
-> The series has passed review at https://lkml.org/lkml/2013/12/17/241
-> and can be found at http://git.infradead.org/l2-mtd.git
+> >>>@@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
+> >>>  	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
 > 
-> This patch can be still applied on top of the series without conflicts. 
+> >>>  	/* ICK */
+> >>>+	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+> >>>+	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+> >>>+	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
+> >>>+	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
 > 
-> Can you please pick up the $subject patch if you are OK with it?
+> >>    These belong to some other place, the group marked by /* ICK */
+> >>is only for CLKDEV_ICK_ID().
+> 
+> >So, I'll create a /* DEV */ prefix?
+> 
+>    I really don't know. Other places have /* MSTP */ comment in this
+> case despite all clocks, CLKDEV_DEV_ID() and CLKDEV_ICK_ID() are
+> really MSTP clocks. I considered the idea of separating
+> CLKDEV_ICK_ID() under /* ICK */ comment silly from the very start
+> but Simon didn't listen to me.
 
-I have no problems with the patch and can pick it too, but need ack from
-MTD maintainer (David) as it touches drivers/mtd/ too.
+I am puzzled, too. ICK is a type of registration and not a clock domain.
+Also, there is 'mtu2_fck' which is under ICK as well as MSTP? Looks
+wrong. From what I understand now, removing the /* ICK */ comment would
+be easiest and proper?
 
-David,
-
-If you do not have the patch, we can resend it.
-
-Thanks,
-Sekhar
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/f0c7f207/attachment.sig>
