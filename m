@@ -1,16 +1,76 @@
-From: tony.luck@intel.com (Luck, Tony)
-Date: Wed, 18 Dec 2013 21:59:49 +0000
-Subject: [PATCH v2 00/10] Kconfig: cleanup SERIO_I8042 dependencies
-In-Reply-To: <1387295333-24684-1-git-send-email-msalter@redhat.com>
-References: <1387295333-24684-1-git-send-email-msalter@redhat.com>
-Message-ID: <3908561D78D1C84285E8C5FCA982C28F31D8CDD5@ORSMSX106.amr.corp.intel.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 18 Dec 2013 14:20:23 -0800
+Subject: [PATCH v1 0/4] powerpc/512x: update COMMON_CLK support for MPC5125
+In-Reply-To: <1386681097-14126-1-git-send-email-gsi@denx.de>
+References: <1386681097-14126-1-git-send-email-gsi@denx.de>
+Message-ID: <20131218222023.23538.99276@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This is v2 of the patch series. Changes from version 1:
->
->  o Added acks. arm, ia64, and sh are only ones without acks.
+Quoting Gerhard Sittig (2013-12-10 05:11:33)
+> this series improves the previously introduced common clock support for
+> MPC512x such that SoC variants 5123 and 5125 get addressed appropriately
+> (MPC5125 turned out to be rather different from MPC5121 than I perceived
+> before -- there is much more than "just two FECs and no MBX")
+> 
+> thus this series depends on "add COMMON_CLK support for PowerPC MPC512x"
+> (v6 sent in <1385851897-23475-1-git-send-email-gsi@denx.de>, applicable
+> on top of v3.13-rc1 or later, currently applied to mpc5xxx -next,
+> available at git://git.denx.de/linux-2.6-agust.git next)
+> 
+> this series does not address the issue of outdated or missing device
+> tree binding documentation for MPC512x peripherals -- that's the scope
+> of a pending separate series
 
-ia64 bits look OK
+For the three clock patches:
 
-Acked-by: Tony Luck <tony.luck@intel.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+> 
+> v1 initial submission (2013-12-10)
+> - enforce an even divider value for SDHC (on all MPC512x variants)
+> - tell 5121/5123/5125 SoC variants apart and only register the
+>   appropriate set of clock items (i.e. refuse to access unused and
+>   reserved bits, and support those components which are only found on
+>   MPC5125)
+> - update the MPC5125 "tower" board DTS (although the code still works in
+>   the absence of device tree clock specs)
+> 
+> the series passes 'checkpatch.pl --strict' except for two warnings which
+> cannot get fixed because <linux/clk-provider.h> dictates the data type
+> and "fixing" the warning would break the build
+> 
+>   WARNING: static const char * array should probably be static const char * const
+>   #256: FILE: arch/powerpc/platforms/512x/clock-commonclk.c:500:
+>   +static const char *parent_names_mux0_spdif[] = {
+> 
+>   WARNING: static const char * array should probably be static const char * const
+>   #260: FILE: arch/powerpc/platforms/512x/clock-commonclk.c:504:
+>   +static const char *parent_names_mux0_canin[] = {
+> 
+>   total: 0 errors, 2 warnings, 0 checks, 495 lines checked
+> 
+> the series was build-tested, and was run-tested on the MPC5121 ADS board
+> 
+> Matteo, can you verify the crystal frequency in the DTS update, please?
+> And that v3.13-rc kernels with v6 of the COMMON_CLK introduction for
+> MPC512x plus this series for MPC5125 operate your peripherals, both with
+> an updated device tree as well as with a former device tree that lacks
+> clock specs?  Thank you!  Setting CONFIG_COMMON_CLK_DEBUG=y in your
+> .config and eyeballing /sys/kernel/debug/clk/clk_summary will help you.
+> 
+> Gerhard Sittig (4):
+>   powerpc/512x: clk: minor comment updates
+>   powerpc/512x: clk: enforce even SDHC divider values
+>   powerpc/512x: clk: support MPC5121/5123/5125 SoC variants
+>   powerpc/512x: dts: add MPC5125 clock specs
+> 
+>  arch/powerpc/boot/dts/mpc5125twr.dts          |   53 +++-
+>  arch/powerpc/include/asm/mpc5121.h            |    7 +-
+>  arch/powerpc/platforms/512x/clock-commonclk.c |  369 +++++++++++++++++++++----
+>  include/dt-bindings/clock/mpc512x-clock.h     |    9 +-
+>  4 files changed, 386 insertions(+), 52 deletions(-)
+> 
+> -- 
+> 1.7.10.4
+> 
