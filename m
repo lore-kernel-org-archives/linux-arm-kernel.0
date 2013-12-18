@@ -1,174 +1,95 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 12:57:42 +0100
-Subject: [PATCH v3 6/9] ASoC: fsl-ssi: Add configuration helper functions
+Date: Wed, 18 Dec 2013 12:57:40 +0100
+Subject: [PATCH v3 4/9] ASoC: fsl-ssi: Fix interrupt mapping and release
 In-Reply-To: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
 References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387367865-26391-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387367865-26391-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a struct 'fsl_ssi_rxtx_reg_val' which holds register
-values necessary to enable rx/tx. Based on those preset register values,
-the added configuration functions will cleanly enable/disable different
-parts of the SSI IP while supporting online/offline configuration.
-Different operating modes can be setup directly as different register
-values in fsl_ssi_reg_val.
-
-These functions and structs will help to cleanup and simplify the
-trigger function to support many different IP versions (online/offline
-configuration) and different operating modes.
+irqs should only be requested/released with enabled DMA and not on MX21.
+MX21 has some special register write configurations, so we do not add
+support for statistics on mx21 for the moment.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 122 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 122 insertions(+)
+ sound/soc/fsl/fsl_ssi.c | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 7a87d06..eabf568 100644
+index a889df5..c361730 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -129,6 +129,18 @@ enum fsl_ssi_type {
- 	FSL_SSI_MX51,
- };
+@@ -150,6 +150,7 @@ struct fsl_ssi_private {
+ 	struct snd_soc_dai_driver cpu_dai_drv;
+ 	struct platform_device *pdev;
  
-+struct fsl_ssi_reg_val {
-+	u32 sier;
-+	u32 srcr;
-+	u32 stcr;
-+	u32 scr;
-+};
-+
-+struct fsl_ssi_rxtx_reg_val {
-+	struct fsl_ssi_reg_val rx;
-+	struct fsl_ssi_reg_val tx;
-+};
-+
- /**
-  * fsl_ssi_private: per-SSI private data
-  *
-@@ -163,6 +175,8 @@ struct fsl_ssi_private {
- 	struct imx_dma_data filter_data_tx;
- 	struct imx_dma_data filter_data_rx;
- 	struct imx_pcm_fiq_params fiq_params;
-+	/* Register values for rx/tx configuration */
-+	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
++	enum fsl_ssi_type hw_type;
+ 	bool new_binding;
+ 	bool ssi_on_imx;
+ 	bool imx_ac97;
+@@ -227,13 +228,15 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
  
- 	struct {
- 		unsigned int rfrc;
-@@ -443,6 +457,114 @@ static void fsl_ssi_debugfs_remove(struct fsl_ssi_private *ssi_private)
+ 	if (sisr & CCSR_SSI_SISR_RFRC) {
+ 		ssi_private->stats.rfrc++;
+-		sisr2 |= CCSR_SSI_SISR_RFRC;
++		if (ssi_private->hw_type != FSL_SSI_MX51)
++			sisr2 |= CCSR_SSI_SISR_RFRC;
+ 		ret = IRQ_HANDLED;
+ 	}
  
- #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
+ 	if (sisr & CCSR_SSI_SISR_TFRC) {
+ 		ssi_private->stats.tfrc++;
+-		sisr2 |= CCSR_SSI_SISR_TFRC;
++		if (ssi_private->hw_type != FSL_SSI_MX51)
++			sisr2 |= CCSR_SSI_SISR_TFRC;
+ 		ret = IRQ_HANDLED;
+ 	}
  
-+/*
-+ * Enable/Disable all rx/tx config flags at once.
-+ */
-+static void fsl_ssi_rxtx_config(struct fsl_ssi_private *ssi_private,
-+		bool enable)
-+{
-+	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-+	struct fsl_ssi_rxtx_reg_val *vals = &ssi_private->rxtx_reg_val;
-+
-+	if (enable) {
-+		write_ssi_mask(&ssi->sier, 0, vals->rx.sier | vals->tx.sier);
-+		write_ssi_mask(&ssi->srcr, 0, vals->rx.srcr | vals->tx.srcr);
-+		write_ssi_mask(&ssi->stcr, 0, vals->rx.stcr | vals->tx.stcr);
-+	} else {
-+		write_ssi_mask(&ssi->srcr, vals->rx.srcr | vals->tx.srcr, 0);
-+		write_ssi_mask(&ssi->stcr, vals->rx.stcr | vals->tx.stcr, 0);
-+		write_ssi_mask(&ssi->sier, vals->rx.sier | vals->tx.sier, 0);
-+	}
-+}
-+
-+/*
-+ * Enable/Disable a ssi configuration. You have to pass either
-+ * ssi_private->rxtx_reg_val.rx or tx as vals parameter.
-+ */
-+static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
-+		struct fsl_ssi_reg_val *vals)
-+{
-+	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-+	struct fsl_ssi_reg_val *avals;
-+	u32 scr_val = read_ssi(&ssi->scr);
-+	int nr_active_streams = !!(scr_val & CCSR_SSI_SCR_TE) +
-+				!!(scr_val & CCSR_SSI_SCR_RE);
-+
-+	/* Find the other direction values rx or tx which we do not want to
-+	 * modify */
-+	if (&ssi_private->rxtx_reg_val.rx == vals)
-+		avals = &ssi_private->rxtx_reg_val.tx;
-+	else
-+		avals = &ssi_private->rxtx_reg_val.rx;
-+
-+	/* If vals should be disabled, start with disabling the unit */
-+	if (!enable) {
-+		u32 scr = vals->scr & (vals->scr ^ avals->scr);
-+		write_ssi_mask(&ssi->scr, scr, 0);
+@@ -925,6 +928,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 
+ 	ssi_private->use_dma = !of_property_read_bool(np,
+ 			"fsl,fiq-stream-filter");
++	ssi_private->hw_type = hw_type;
+ 
+ 	if (ac97) {
+ 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
+@@ -1030,7 +1034,14 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+ 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
+ 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+-	} else if (ssi_private->use_dma) {
 +	}
 +
 +	/*
-+	 * We are running on a SoC which does not support online SSI
-+	 * reconfiguration, so we have to enable all necessary flags at once
-+	 * even if we do not use them later (capture and playback configuration)
++	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
++	 * different writeable interrupt status registers.
 +	 */
-+	if (ssi_private->offline_config) {
-+		if ((enable && !nr_active_streams) ||
-+				(!enable && nr_active_streams == 1))
-+			fsl_ssi_rxtx_config(ssi_private, enable);
-+
-+		goto config_done;
-+	}
-+
-+	/*
-+	 * Configure single direction units while the SSI unit is running
-+	 * (online configuration)
-+	 */
-+	if (enable) {
-+		write_ssi_mask(&ssi->sier, 0, vals->sier);
-+		write_ssi_mask(&ssi->srcr, 0, vals->srcr);
-+		write_ssi_mask(&ssi->stcr, 0, vals->stcr);
-+	} else {
-+		u32 sier;
-+		u32 srcr;
-+		u32 stcr;
-+
-+		/*
-+		 * Disabling the necessary flags for one of rx/tx while the
-+		 * other stream is active is a little bit more difficult. We
-+		 * have to disable only those flags that differ between both
-+		 * streams (rx XOR tx) and that are set in the stream that is
-+		 * disabled now. Otherwise we could alter flags of the other
-+		 * stream
-+		 */
-+
-+		/* These assignments are simply vals without bits set in avals*/
-+		sier = vals->sier & (vals->sier ^ avals->sier);
-+		srcr = vals->srcr & (vals->srcr ^ avals->srcr);
-+		stcr = vals->stcr & (vals->stcr ^ avals->stcr);
-+
-+		write_ssi_mask(&ssi->srcr, srcr, 0);
-+		write_ssi_mask(&ssi->stcr, stcr, 0);
-+		write_ssi_mask(&ssi->sier, sier, 0);
-+	}
-+
-+config_done:
-+	/* Enabling of subunits is done after configuration */
-+	if (enable)
-+		write_ssi_mask(&ssi->scr, 0, vals->scr);
-+}
-+
-+
-+static void fsl_ssi_rx_config(struct fsl_ssi_private *ssi_private, bool enable)
-+{
-+	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.rx);
-+}
-+
-+static void fsl_ssi_tx_config(struct fsl_ssi_private *ssi_private, bool enable)
-+{
-+	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.tx);
-+}
-+
- static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
- {
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	if (ssi_private->use_dma &&
++			(hw_type == FSL_SSI_MCP8610 || hw_type == FSL_SSI_MX51)) {
+ 		/* The 'name' should not have any slashes in it. */
+ 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
+ 					fsl_ssi_isr, 0, ssi_private->name,
+@@ -1138,8 +1149,8 @@ error_clk:
+ 		clk_disable_unprepare(ssi_private->clk);
+ 
+ error_irqmap:
+-	if (ssi_private->use_dma && !of_device_is_compatible(pdev->dev.of_node,
+-				"fsl,imx21-ssi"))
++	if (ssi_private->use_dma &&
++			(hw_type == FSL_SSI_MCP8610 || hw_type == FSL_SSI_MX51))
+ 		irq_dispose_mapping(ssi_private->irq);
+ 
+ 	return ret;
+@@ -1156,7 +1167,8 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 	snd_soc_unregister_component(&pdev->dev);
+ 	if (ssi_private->ssi_on_imx)
+ 		clk_disable_unprepare(ssi_private->clk);
+-	irq_dispose_mapping(ssi_private->irq);
++	if (ssi_private->use_dma)
++		irq_dispose_mapping(ssi_private->irq);
+ 
+ 	return 0;
+ }
 -- 
 1.8.5.1
