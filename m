@@ -1,31 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Dec 2013 09:50:58 -0800
-Subject: [GIT PULL] omap display regression fix against v3.13-rc4
-Message-ID: <20131218175057.GF27438@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 19 Dec 2013 02:54:30 +0900
+Subject: [PATCH 06/11] PM / devfreq: move definitions for exynos4_bus
+ into drivers/devfreq
+In-Reply-To: <CAJ0PZbTH0kga7Gbb87umJpCF_ih3TQrxKS0xBbofDvJq+_wj5Q@mail.gmail.com>
+References: <116401cefb1e$75b83440$61289cc0$@kernel.org>
+ <CAJ0PZbTH0kga7Gbb87umJpCF_ih3TQrxKS0xBbofDvJq+_wj5Q@mail.gmail.com>
+Message-ID: <52B1E156.6030904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
+On 12/18/13 15:11, MyungJoo Ham wrote:
+> On Tue, Dec 17, 2013 at 8:52 PM,<kgene@kernel.org>  wrote:
+>> From: Kukjin Kim<kgene.kim@samsung.com>
+>>
+>> We don't need to keep the definitions for exynos4_bus into
+>> mach-exynos/ so this moves them into drviers/devfreq with
+>> adding header file.
+>
+> Acked-by: MyungJoo Ham<myungjoo.ham@samsung.com>
+>
+> However, how are you going to merge this patch?
+> Do you need me to get this handled or are you going to do it yourself
+> with Samsung-SoC tree?
+>
 
-  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
+Hi MyungJoo,
 
-are available in the git repository at:
+Let me take this into Samsung tree with others if you're OK :-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/display-fix
+Thanks,
+Kukjin
 
-for you to fetch changes up to 130f769e81fc472beb2211320777e26050e3fa15:
-
-  Revert "ARM: OMAP2+: Remove legacy mux code for display.c" (2013-12-17 16:28:34 -0800)
-
-----------------------------------------------------------------
-I accidentally removed some mux code for omap4 that I thought was
-dead code as omap4 has been booting with device tree only since
-v3.10. Turns out I also removed some display related mux code,
-so let's revert that except for the dead code parts.
-
-----------------------------------------------------------------
-Tomi Valkeinen (1):
-      Revert "ARM: OMAP2+: Remove legacy mux code for display.c"
-
- arch/arm/mach-omap2/display.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+> Cheers,
+> MyungJoo.
+>
+>>
+>> Cc: MyungJoo Ham<myungjoo.ham@samsung.com>
+>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/include/mach/regs-clock.h |   94 --------------------
+>>   drivers/devfreq/exynos/exynos4_bus.c           |    4 +-
+>>   drivers/devfreq/exynos/exynos4_bus.h           |  110
+>> ++++++++++++++++++++++++
+>>   3 files changed, 112 insertions(+), 96 deletions(-)
+>>   create mode 100644 drivers/devfreq/exynos/exynos4_bus.h
