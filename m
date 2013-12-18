@@ -1,41 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Dec 2013 18:45:41 +0000
-Subject: [PATCH] regmap: Allow regmap_bulk_write() to work for "no-bus"
- regmaps
-In-Reply-To: <20131217023047.GC31766@codeaurora.org>
-References: <20131210235000.GK11468@sirena.org.uk>
- <52A7AE1B.3040201@codeaurora.org>
- <20131211005106.GL11468@sirena.org.uk>
- <52A7C0C3.2070805@codeaurora.org>
- <20131211132729.GT11468@sirena.org.uk>
- <52AA42FD.4040503@codeaurora.org>
- <20131213104128.GT11044@sirena.org.uk>
- <20131213213707.GO21983@codeaurora.org>
- <20131216210153.GA3185@sirena.org.uk>
- <20131217023047.GC31766@codeaurora.org>
-Message-ID: <20131218184541.GH31886@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Dec 2013 19:50:35 +0100
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <20131218172956.GG28112@arm.com>
+References: <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
+ <20131218100321.GC4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
+ <20131218105541.GE4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
+ <20131218112713.GA28112@arm.com>
+ <20131218114211.GF4360@n2100.arm.linux.org.uk>
+ <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
+ <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
+ <20131218172956.GG28112@arm.com>
+Message-ID: <CAKv+Gu9mzXQ-5V=x=uMmXme6fZCyXvNhYy2oRA1DSkgGjjzYEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 06:30:47PM -0800, Stephen Boyd wrote:
+On 18 December 2013 18:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
 
-> -	/* No formatting is require if val_byte is 1 */
-> -	if (val_bytes == 1) {
-> -		wval = (void *)val;
-> +			ival = *(unsigned int *)(val + (i * val_bytes));
-> +			ret = _regmap_write(map, reg + (i * map->reg_stride),
-> +					ival);
-> +			if (ret != 0)
-> +				goto out;
+> For the time being, I merged the first two patches for AArch64 support.
+> I'm not merging the compat one yet as this should strictly follow the
+> arch/arm support.
+>
 
-This doesn't quite work - val is an array of objects of the size of the
-size of a register not of unsigned integers so you're parsing extra data
-out there.  That possibly wasn't the best choice of API but we have
-quite a few users now so ick.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/035c6bc6/attachment.sig>
+Yeah, I guess that makes sense.
+
+I find this ghetto style drive-by veto'ing less than productive, I
+would much rather have had an informed discussion involving both
+Russell and you and settle on a solution that is acceptable for both
+ARM and arm64.
+
+Thanks,
+Ard.
