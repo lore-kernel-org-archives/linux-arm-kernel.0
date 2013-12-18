@@ -1,25 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Dec 2013 12:46:35 +0000
-Subject: [PATCH 2/2 v2] ARM: s3c64xx: get rid of custom <mach/gpio.h>
-In-Reply-To: <1386939234-12828-1-git-send-email-linus.walleij@linaro.org>
-References: <1386939234-12828-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131218124635.GN28455@sirena.org.uk>
+From: p.wilczek@samsung.com (Piotr Wilczek)
+Date: Wed, 18 Dec 2013 13:50:10 +0100
+Subject: [PATCH V2 2/8] string: fix strncmp function
+In-Reply-To: <20131218121551.GH4360@n2100.arm.linux.org.uk>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
+ <20131218121551.GH4360@n2100.arm.linux.org.uk>
+Message-ID: <000601cefbef$b0795420$116bfc60$%wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 13, 2013 at 01:53:54PM +0100, Linus Walleij wrote:
-> This isolates the custom S3C64xx GPIO definition table to
-> <linux/platform_data/gpio-samsung-s3x64xx.h> as this is
-> used in a few different places in the kernel, removing the
-> need to depend on the implicit inclusion of <mach/gpio.h>
-> from <linux/gpio.h> and thus getting rid of a few nasty
-> cross-dependencies.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Wednesday, December 18, 2013 1:16 PM
+> To: Piotr Wilczek
+> Cc: devicetree-discuss at lists.ozlabs.org; linux-arm-
+> kernel at lists.infradead.org; Kyungmin Park; Nicolas Pitre; Jason Cooper;
+> Daniel Mack
+> Subject: Re: [PATCH V2 2/8] string: fix strncmp function
+> 
+> On Wed, Dec 18, 2013 at 01:09:05PM +0100, Piotr Wilczek wrote:
+> > Now function returns the number of characters that differ in the
+> > compared strings.
+> 
+> I think this is a mistake.  You're defining a standard C function in a
+> non-standard way.  For strcmp() and strncmp(), the C standard
+> requires:
+> 
+> RETURN VALUE
+>        The strcmp() and strncmp() functions return an integer less
+> than, equal
+>        to, or greater than zero if s1 (or the first n bytes thereof) is
+> found,
+>        respectively, to be less than, to match, or be greater than s2.
+> 
+> If you implement something different to that, don't call it strcmp() or
+> strncmp() but something else, because you're not providing the correct
+> functionality, and that will just confuse people and lead to bugs.
+Right, I will copy it from kernel.
 
-Tested-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/4252177e/attachment.sig>
+> 
+> For instance, can you be sure that there aren't any uses of strncmp()
+> which already test for less-than-zero etc?
+There aren't, but can be in future.
+
+Thank you.
+Piotr
