@@ -1,52 +1,76 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 18 Dec 2013 10:08:15 +0900
-Subject: [GIT PULL] Renesas ARM based SoC Clocksource updates for v3.14
-In-Reply-To: <cover.1387000863.git.horms+renesas@verge.net.au>
-References: <cover.1387000863.git.horms+renesas@verge.net.au>
-Message-ID: <20131218010815.GA2430@verge.net.au>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Tue, 17 Dec 2013 21:45:03 -0300
+Subject: [PATCH v2 11/11] ARM: sunxi: dt: add nodes for the mbus clock
+In-Reply-To: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1387327503-15651-12-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 03:07:31PM +0900, Simon Horman wrote:
-> Hi Daniel,
-> 
-> please consider this Renesas ARM based SoC Clocksource update for v3.14.
-> 
-> I would also like to request that you make a branch available
-> for me to use as a base for a branch containing SoC changes
-> targeted at v3.14 that depend on this clocksource update.
-> 
-> Thanks
+mbus is the memory bus clock, and it is present on both sun5i and sun7i
+machines. Its register layout is compatible with the mod0 one.
 
-Hi Daniel,
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 7 +++++++
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 7 +++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 7 +++++++
+ 3 files changed, 21 insertions(+)
 
-sorry to bother you about this, but if you could take a moment
-to look at this pull request I would be most grateful. Its
-rather important for us.
-
-> 
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.14
-> 
-> for you to fetch changes up to d78e9474459768c9aaf8cfd8bc54957d44771f46:
-> 
->   clocksource: sh_cmt: Add clk_prepare/unprepare support (2013-12-14 12:57:36 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM based SoC Clocksource updates for v3.14
-> 
-> * Add clk_prepare/unprepare support to sh_cmt
-> 
-> ----------------------------------------------------------------
-> Laurent Pinchart (1):
->       clocksource: sh_cmt: Add clk_prepare/unprepare support
-> 
->  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
-> 
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 82b5ce6..60bd3f7 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -250,6 +250,13 @@
+ 			reg = <0x01c200b0 0x4>;
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 		};
++
++		mbus: mbus at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 938e6d3..3e616a0 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -247,6 +247,13 @@
+ 			reg = <0x01c200b0 0x4>;
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 		};
++
++		mbus: mbus at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 41df384..8c88f7d 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -279,6 +279,13 @@
+ 			reg = <0x01c200d4 0x4>;
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 		};
++
++		mbus: mbus at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
+-- 
+1.8.5.1
