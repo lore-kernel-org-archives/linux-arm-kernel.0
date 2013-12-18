@@ -1,46 +1,52 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 17 Dec 2013 17:05:18 -0800
-Subject: [GIT PULL v4][for 3.14] pull request for hisilicon soc
-In-Reply-To: <52AC0C41.2040607@gmail.com> (Haojian Zhuang's message of "Sat,
- 14 Dec 2013 15:44:01 +0800")
-References: <52AC0C41.2040607@gmail.com>
-Message-ID: <874n67m0j5.fsf@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 18 Dec 2013 10:08:15 +0900
+Subject: [GIT PULL] Renesas ARM based SoC Clocksource updates for v3.14
+In-Reply-To: <cover.1387000863.git.horms+renesas@verge.net.au>
+References: <cover.1387000863.git.horms+renesas@verge.net.au>
+Message-ID: <20131218010815.GA2430@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+On Sat, Dec 14, 2013 at 03:07:31PM +0900, Simon Horman wrote:
+> Hi Daniel,
+> 
+> please consider this Renesas ARM based SoC Clocksource update for v3.14.
+> 
+> I would also like to request that you make a branch available
+> for me to use as a base for a branch containing SoC changes
+> targeted at v3.14 that depend on this clocksource update.
+> 
+> Thanks
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+Hi Daniel,
 
-> Hi Olof/Kevin,
->
-> Now I fix the wrong pull request. Here's the updated for hisilicon
-> soc. Please help to merge it.
->
->    Changes from v2 is in below. Since v3 is wrong, let's drop it.
->     1. Update the git repository address from ssh:// to git://.
->     2. Add clock binding in DTS file. This patch is contained in v11
-> & v12 patch sets, and everybody like this binding.
->     3. Add the GPIOLIB selection by default.
->
+sorry to bother you about this, but if you could take a moment
+to look at this pull request I would be most grateful. Its
+rather important for us.
 
-This series still has many issues, and you'll see a handful of comments
-on the individual patches of your v12 series.
-
-Fortunately for you, I'm getting ready to take a couple weeks off and it
-is the season of giving and generosity, so I succumbed to the spirit of
-the holiday season and fixed them all up myself.  (Do note though that
-you only get one gift like this per year.)  ;)
-
-Seriously though, I spent way more time on this pull request (about an
-hour) than I normally spend and I was very close to requesting another
-respin.  I know that you're frustrated also that it's taken so long, but
-I hope you understand that when we keep seeing lots of minor problems
-like we have, it requires us to spend lots of extra time, and then
-forces us to look even closer the next time because we're expecting
-problems.  Please take some extra care next time, and possibly ask some
-colleagues to do the same.
-
-So, with all that... the updated series is now merged into next/soc.
-
-Kevin
+> 
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.14
+> 
+> for you to fetch changes up to d78e9474459768c9aaf8cfd8bc54957d44771f46:
+> 
+>   clocksource: sh_cmt: Add clk_prepare/unprepare support (2013-12-14 12:57:36 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM based SoC Clocksource updates for v3.14
+> 
+> * Add clk_prepare/unprepare support to sh_cmt
+> 
+> ----------------------------------------------------------------
+> Laurent Pinchart (1):
+>       clocksource: sh_cmt: Add clk_prepare/unprepare support
+> 
+>  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
