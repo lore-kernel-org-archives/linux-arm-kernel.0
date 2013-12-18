@@ -1,34 +1,35 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 17:47:21 +0100
-Subject: [PATCH 5/6] arm: dts: am33xx, Add device node for cpsw-ctrl-macid
+Date: Wed, 18 Dec 2013 17:47:17 +0100
+Subject: [PATCH 1/6] DT doc: net: cpsw mac-address is optional
 In-Reply-To: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
 References: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387385242-1161-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387385242-1161-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+mac-address is an optional property. If no mac-address is set, a random
+mac-address will be generated.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/net/cpsw.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index f6d8ffe..4e1bf08 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -676,6 +676,13 @@
- 				reg= <0x44e10650 0x4>;
- 				reg-names = "gmii-sel";
- 			};
-+
-+			cpsw_ctrl_macid: cpsw-ctrl-macid at 44e10630 {
-+				compatible = "ti,am3352-cpsw-ctrl-macid";
-+				#ti,mac-address-ctrl-cells = <1>;
-+				reg = <0x44e10630 0x16>;
-+				reg-names = "ctrl-macid";
-+			};
- 		};
+diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+index 05d660e..c39f077 100644
+--- a/Documentation/devicetree/bindings/net/cpsw.txt
++++ b/Documentation/devicetree/bindings/net/cpsw.txt
+@@ -30,10 +30,10 @@ Required properties:
+ - phy_id		: Specifies slave phy id
+ - phy-mode		: The interface between the SoC and the PHY (a string
+ 			  that of_get_phy_mode() can understand)
+-- mac-address		: Specifies slave MAC address
  
- 		ocmcram: ocmcram at 40300000 {
+ Optional properties:
+ - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
++- mac-address		: Specifies slave MAC address
+ 
+ Note: "ti,hwmods" field is used to fetch the base address and irq
+ resources from TI, omap hwmod data base during device registration.
 -- 
 1.8.5.1
