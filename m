@@ -1,73 +1,41 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 18 Dec 2013 13:25:01 +0800
-Subject: [PATCH v3 3/3] ARM: dts: sama5d3xcm: add the regulator device node
-In-Reply-To: <1387343691-18985-1-git-send-email-wenyou.yang@atmel.com>
-References: <1387343691-18985-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1387344301-19843-1-git-send-email-wenyou.yang@atmel.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Wed, 18 Dec 2013 15:11:17 +0900
+Subject: [PATCH 06/11] PM / devfreq: move definitions for exynos4_bus into
+ drivers/devfreq
+In-Reply-To: <116401cefb1e$75b83440$61289cc0$@kernel.org>
+References: <116401cefb1e$75b83440$61289cc0$@kernel.org>
+Message-ID: <CAJ0PZbTH0kga7Gbb87umJpCF_ih3TQrxKS0xBbofDvJq+_wj5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/boot/dts/sama5d3xcm.dtsi |   46 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+On Tue, Dec 17, 2013 at 8:52 PM,  <kgene@kernel.org> wrote:
+> From: Kukjin Kim <kgene.kim@samsung.com>
+>
+> We don't need to keep the definitions for exynos4_bus into
+> mach-exynos/ so this moves them into drviers/devfreq with
+> adding header file.
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index 726a0f3..4571751 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -38,6 +38,52 @@
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
- 			};
-+
-+			i2c1: i2c at f0018000 {
-+				pmic: act8865 at 5b {
-+					compatible = "active-semi,act8865";
-+					reg = <0x5b>;
-+					status = "disabled";
-+
-+					regulators {
-+						vcc_1v8_reg: DCDC_REG1 {
-+							regulator-name = "VCC_1V8";
-+							regulator-min-microvolt = <1800000>;
-+							regulator-max-microvolt = <1800000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_1v2_reg: DCDC_REG2 {
-+							regulator-name = "VCC_1V2";
-+							regulator-min-microvolt = <1100000>;
-+							regulator-max-microvolt = <1300000>;
-+							regulator-suspend-mem-microvolt = <1150000>;
-+							regulator-suspend-standby-microvolt = <1150000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_3v3_reg: DCDC_REG3 {
-+							regulator-name = "VCC_3V3";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddfuse_reg: LDO_REG1 {
-+							regulator-name = "VDDANA";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddana_reg: LDO_REG2 {
-+							regulator-name = "FUSE_2V5";
-+							regulator-min-microvolt = <2500000>;
-+							regulator-max-microvolt = <2500000>;
-+						};
-+					};
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 60000000 {
+Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+
+However, how are you going to merge this patch?
+Do you need me to get this handled or are you going to do it yourself
+with Samsung-SoC tree?
+
+Cheers,
+MyungJoo.
+
+>
+> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos/include/mach/regs-clock.h |   94 --------------------
+>  drivers/devfreq/exynos/exynos4_bus.c           |    4 +-
+>  drivers/devfreq/exynos/exynos4_bus.h           |  110
+> ++++++++++++++++++++++++
+>  3 files changed, 112 insertions(+), 96 deletions(-)
+>  create mode 100644 drivers/devfreq/exynos/exynos4_bus.h
+>
+
 -- 
-1.7.9.5
+MyungJoo Ham, Ph.D.
+System S/W Lab, S/W Center, Samsung Electronics
