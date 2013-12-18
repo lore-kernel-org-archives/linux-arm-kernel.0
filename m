@@ -1,65 +1,107 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 18 Dec 2013 22:31:58 +0100
-Subject: [PATCH V2 2/5] arm: shmobile: r7s72100: add i2c clocks
+Date: Wed, 18 Dec 2013 22:31:57 +0100
+Subject: [PATCH V2 1/5] pinctrl: r7s72100: add riic groups
 In-Reply-To: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
 References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <1387402321-21866-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
-Tested with RIIC2 on a genmai board. Others untested but hopefully
+Tested RIIC2 on a genmai board. Other riic groups are untested but seem
 trivial enough to be added.
 
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 ---
 
-V2: adapt to established sorting
+V2: keep sorting alphabetical
 
- arch/arm/mach-shmobile/clock-r7s72100.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Note: With the current PFC driver as posted by Magnus, it needs another patch
+to work. Yet, I think this is a seperate PFC issue which needs to be sorted out
+seperately and shouldn't affect these declarations. I'll add the needed patch
+as a response to this mail.
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 7b457ae..9cda215 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -27,6 +27,7 @@
- #define FRQCR2		0xfcfe0014
- #define STBCR3		0xfcfe0420
- #define STBCR4		0xfcfe0424
-+#define STBCR9		0xfcfe0438
+ drivers/pinctrl/sh-pfc/pfc-r7s72100.c | 45 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
+index a662876..7ee0442 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
+@@ -117,6 +117,27 @@ static const unsigned int __RZ_STR(pfx, hw, bank, pin, _mux)[] = {	\
+ #define RZ_GROUPS(pfx, hw, bank, pin, fn) \
+ 	__RZ_GROUPS(pfx##_##hw##_p##bank##_##pin),
  
- #define PLL_RATE 30
++#define RIIC0(fn)			\
++	fn(riic0, scl, 1, 0, 1)		\
++	fn(riic0, sda, 1, 1, 1)
++
++#define RIIC1(fn)			\
++	fn(riic1, scl, 1, 2, 1)		\
++	fn(riic1, sda, 1, 3, 1)
++
++#define RIIC2(fn)			\
++	fn(riic2, scl, 1, 4, 1)		\
++	fn(riic2, sda, 1, 5, 1)
++
++#define RIIC3(fn)			\
++	fn(riic3, scl, 1, 6, 1)		\
++	fn(riic3, sda, 1, 7, 1)
++
++RIIC0(RZ_PIN_AND_MUX)
++RIIC1(RZ_PIN_AND_MUX)
++RIIC2(RZ_PIN_AND_MUX)
++RIIC3(RZ_PIN_AND_MUX)
++
+ #define SCIF0(fn)			\
+ 	fn(scif0, clk, 2, 13, 6)	\
+ 	fn(scif0, txd, 2, 14, 6)	\
+@@ -230,6 +251,10 @@ SCIF6(RZ_PIN_AND_MUX)
+ SCIF7(RZ_PIN_AND_MUX)
  
-@@ -144,10 +145,15 @@ struct clk div4_clks[DIV4_NR] = {
- 					| CLK_ENABLE_ON_INIT),
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
++	RIIC0(RZ_PMX_GROUP)
++	RIIC1(RZ_PMX_GROUP)
++	RIIC2(RZ_PMX_GROUP)
++	RIIC3(RZ_PMX_GROUP)
+ 	SCIF0(RZ_PMX_GROUP)
+ 	SCIF1(RZ_PMX_GROUP)
+ 	SCIF2(RZ_PMX_GROUP)
+@@ -240,6 +265,22 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SCIF7(RZ_PMX_GROUP)
  };
  
--enum { MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
-+enum {	MSTP97, MSTP96, MSTP95, MSTP94,
-+	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
- 	MSTP33,	MSTP_NR };
++static const char * const riic0_groups[] = {
++	RIIC0(RZ_GROUPS)
++};
++
++static const char * const riic1_groups[] = {
++	RIIC1(RZ_GROUPS)
++};
++
++static const char * const riic2_groups[] = {
++	RIIC2(RZ_GROUPS)
++};
++
++static const char * const riic3_groups[] = {
++	RIIC3(RZ_GROUPS)
++};
++
+ static const char * const scif0_groups[] = {
+ 	SCIF0(RZ_GROUPS)
+ };
+@@ -273,6 +314,10 @@ static const char * const scif7_groups[] = {
+ };
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
-+	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
-+	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
-+	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
- 	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
- 	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
- 	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
-@@ -170,6 +176,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
- 
- 	/* MSTP clocks */
-+	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
-+	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
-+	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
-+	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
- 	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
- 
- 	/* ICK */
+ static const struct sh_pfc_function pinmux_functions[] = {
++	SH_PFC_FUNCTION(riic0),
++	SH_PFC_FUNCTION(riic1),
++	SH_PFC_FUNCTION(riic2),
++	SH_PFC_FUNCTION(riic3),
+ 	SH_PFC_FUNCTION(scif0),
+ 	SH_PFC_FUNCTION(scif1),
+ 	SH_PFC_FUNCTION(scif2),
 -- 
 1.8.4.2
