@@ -1,53 +1,49 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 18 Dec 2013 18:02:58 +0100
-Subject: [PATCH V2 0/4] socfpga: clk: trivial fixes and cleanup
-Message-ID: <1387386182-30923-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Wed, 18 Dec 2013 18:03:00 +0100
+Subject: [PATCH V2 2/4] ARM: socfpga: clk: fix define typo
+In-Reply-To: <1387386182-30923-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1387386182-30923-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1387386182-30923-3-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+It should be SOCFPGA instead of SOCFGPA.
 
-This series includes two trivial fixes to the code (1/4 and 2/4),
-and a fixes a compile error in 3/4 introduced by the patch
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ drivers/clk/socfpga/clk.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-	clk: socfpga: Look for the GPIO_DB_CLK by its offset
-
-from
-
-	[GIT PULL] clk: socfpga: Clean-ups for 3.14
-
-The series is rebased onto
-
-	git://git.rocketboards.org/linux-socfpga-next.git socfpga-clk-for-3.14
-
-and the patch
-
-	clk: socfpga: Add a clk-phase property to the "altr, socfpga-gate-clk"
-
-from the series
-
-	socfpga: Enable SD/MMC support
-
-Regards,
-Steffen
-
-Steffen Trumtrar (4):
-  ARM: socfpga: clk: remove unused field
-  ARM: socfpga: clk: fix define typo
-  ARM: socfpga: clk: fix compile error
-  ARM: socfpga: clk: split clk code
-
- drivers/clk/socfpga/Makefile     |   3 +
- drivers/clk/socfpga/clk-gate.c   | 223 +++++++++++++++++++++++++
- drivers/clk/socfpga/clk-periph.c |  94 +++++++++++
- drivers/clk/socfpga/clk-pll.c    | 111 +++++++++++++
- drivers/clk/socfpga/clk.c        | 347 +--------------------------------------
- drivers/clk/socfpga/clk.h        |  57 +++++++
- 6 files changed, 490 insertions(+), 345 deletions(-)
- create mode 100644 drivers/clk/socfpga/clk-gate.c
- create mode 100644 drivers/clk/socfpga/clk-periph.c
- create mode 100644 drivers/clk/socfpga/clk-pll.c
- create mode 100644 drivers/clk/socfpga/clk.h
-
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 4503863..f140ece 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -46,7 +46,7 @@
+ #define SOCFPGA_PLL_DIVF_SHIFT	3
+ #define SOCFPGA_PLL_DIVQ_MASK		0x003F0000
+ #define SOCFPGA_PLL_DIVQ_SHIFT	16
+-#define SOCFGPA_MAX_PARENTS	3
++#define SOCFPGA_MAX_PARENTS	3
+ 
+ #define SOCFPGA_L4_MP_CLK		"l4_mp_clk"
+ #define SOCFPGA_L4_SP_CLK		"l4_sp_clk"
+@@ -290,7 +290,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
+ 	struct clk *clk;
+ 	struct socfpga_clk *socfpga_clk;
+ 	const char *clk_name = node->name;
+-	const char *parent_name[SOCFGPA_MAX_PARENTS];
++	const char *parent_name[SOCFPGA_MAX_PARENTS];
+ 	struct clk_init_data init;
+ 	int rc;
+ 	int i = 0;
+@@ -337,7 +337,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
+ 	init.name = clk_name;
+ 	init.ops = ops;
+ 	init.flags = 0;
+-	while (i < SOCFGPA_MAX_PARENTS && (parent_name[i] =
++	while (i < SOCFPGA_MAX_PARENTS && (parent_name[i] =
+ 			of_clk_get_parent_name(node, i)) != NULL)
+ 		i++;
+ 
 -- 
 1.8.5.1
