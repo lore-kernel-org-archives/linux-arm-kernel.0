@@ -1,46 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Dec 2013 22:21:46 +0100
-Subject: [RESEND LIST PATCHv7 1/4] clk: socfpga: Add a clk-phase property
- to the "altr, socfpga-gate-clk"
-In-Reply-To: <20131218205636.23538.50735@quantum>
-References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
- <1387213476-22122-2-git-send-email-dinguyen@altera.com>
- <20131218205636.23538.50735@quantum>
-Message-ID: <201312182221.46506.arnd@arndb.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 18 Dec 2013 22:31:56 +0100
+Subject: [PATCH V2 0/5] arm: shmobile: r7s72100: add native i2c support
+Message-ID: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 December 2013, Mike Turquette wrote:
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index f936476..616d9ee 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -413,6 +413,7 @@
-> >                                                 compatible = "altr,socfpga-gate-clk";
-> >                                                 clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
-> >                                                 clk-gate = <0xa0 8>;
-> > +                                               clk-phase = <0 3>;
-> 
-> Looking at this again, I have a hard time understanding the values in
-> the clk-phase property. You reference some functions in the property
-> definition above, but they are not obvious to me.
-> 
-> Additionally I wonder if the binding would better if the clock-phase
-> property was simply the value in degrees. E.g:
-> 
->         clk-phase = <315>;    // 315 degrees
+Here is a series to support the I2C core of the r7s72100 natively. It has been
+tested with a genmai board where an eeprom is connected. The series can be
+found here:
 
-I would definitely prefer using degrees over an arbitrary enumeration that
-might work on some platforms but not on others.
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/riic
 
-I'm also a bit skeptical about the idea of putting the phase into the clock
-provider rather than the consumer, given the comments about the
-clk_set_phase() interface earlier. Generally we try to avoid having
-consumer-specific settings in a provider node (for any DT binding,
-not just clocks). Can't you have the same numbers in the dw-mshc
-node instead and let the mmc driver call clk_set_phase instead?
-If every clock has a fixed phase for a given piece of hardware, it
-could even be set automatically by making the common clk code read
-the clk-phase attribute at the time a driver calls clk_get.
+It is based on the latest r7s72100 topic branch from Simon and the latest patch
+series from Magnus. Note there is one issue with the current PFC driver which
+needs to be sorted out. Check patch 1/5 for details.
 
-	Arnd
+I've addressed all comments from V1. See patches for details.
+
+Comments welcome. Thanks,
+
+   Wolfram
+
+
+Wolfram Sang (5):
+  pinctrl: r7s72100: add riic groups
+  arm: shmobile: r7s72100: add i2c clocks
+  arm: shmobile: r7s72100: add nodes for i2c controllers to dtsi
+  arm: shmobile: genmai: adapt dts to use native i2c driver
+  i2c: riic: add driver
+
+ Documentation/devicetree/bindings/i2c/i2c-riic.txt |  29 ++
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts    |  29 +-
+ arch/arm/boot/dts/r7s72100.dtsi                    | 102 +++++
+ arch/arm/mach-shmobile/clock-r7s72100.c            |  12 +-
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-riic.c                      | 426 +++++++++++++++++++++
+ drivers/pinctrl/sh-pfc/pfc-r7s72100.c              |  45 +++
+ 8 files changed, 635 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-riic.txt
+ create mode 100644 drivers/i2c/busses/i2c-riic.c
+
+-- 
+1.8.4.2
