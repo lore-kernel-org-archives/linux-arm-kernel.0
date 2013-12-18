@@ -1,48 +1,31 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 18 Dec 2013 18:16:22 +0100
-Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
-In-Reply-To: <52B1D50A.50406@ti.com>
-References: <1386626150-23504-1-git-send-email-nm@ti.com>
- <52B0A9C8.7070201@ti.com> <52B1D3DC.1010304@baylibre.com>
- <52B1D50A.50406@ti.com>
-Message-ID: <52B1D866.7040300@baylibre.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 18 Dec 2013 09:26:10 -0800
+Subject: [PATCH v6 0/2] ARM: mach-moxart: add MOXA ART SoC support
+In-Reply-To: <1387371526-15309-1-git-send-email-jonas.jensen@gmail.com>
+References: <1387371526-15309-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <0e3d482f-0b7c-4654-bb75-d6aa3e209fd7@CH1EHSMHS008.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/2013 18:02, Nishanth Menon wrote:
-> On 12/18/2013 10:57 AM, Benoit Cousson wrote:
->> On 17/12/2013 20:45, Nishanth Menon wrote:
->>> On 12/09/2013 03:55 PM, Nishanth Menon wrote:
->>>> Craneboard is a hardware development platform based on the Sitara
->>>> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
->>>> details. Add basic devices for craneboard as replacement for the board
->>>> file scheduled for removal as part of device tree conversion
->>>>
->>>> [1] http://craneboard.org
->>>>
->>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>> ---
->>>
->>> gentle ping.. had'nt seen a response on this patch. Could we queue
->>> this up for v3.14-rc1?
->>
->> Yep, it looks good to me.
-> Thanks benoit.
->
->> But if you don't mind I'll start pushing my branch after Xmas :-).
->
-> As long as Tony is ok with it, I have no issues either - will be great
-> to have dt only boot in .14-rc1 though.
+Hi Jonas,
 
-Good point, it is already -rc4.
+On Wed, Dec 18, 2013 at 01:58:44PM +0100, Jonas Jensen wrote:
+> Thanks for the replies!
+> 
+> This should tick the boxes on feedback except for one detail
+> on the fixed rate clock:
+> 
+> Moving fixed-clock "ref12" from .dtsi to .dts proved problematic
+> for other clocks, this is why ref12 is still in SoC.
+> 
+> My assertion is that "fixed-clock" clocks are probed later when
+> placed in .dts (see diff and boot log below).
+> of_clk_get() from clk_pll in .dtsi fails, i.e. fixed-clock ref12
+> is not added as a provider in time before clk_pll loads.
 
-OK, I'll just queued it and pushed it to for_3.14/dts.
+I haven't looked into the details, but is of_clk_get_parent_name() an
+alternative? That function does purely rely on DT data to obtain a name
+of a clock which may enable to register your PLL? Then probing oder
+wouldn't matter anymore.
 
-Regards,
-Benoit
-
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+	S?ren
