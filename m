@@ -1,138 +1,50 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 18 Dec 2013 12:07:52 +0200
-Subject: [PATCH v2 2/2] gpio: davinci: reuse for Keystone SoC
-In-Reply-To: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
-References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1387361272-20861-3-git-send-email-grygorii.strashko@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 18 Dec 2013 10:17:16 +0100
+Subject: [GIT PULL] ARM: Initial support for Marvell Berlin SoCs
+In-Reply-To: <20131217154021.GM2609@titan.lakedaemon.net>
+References: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131217154021.GM2609@titan.lakedaemon.net>
+Message-ID: <52B1681C.4040202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The similar GPIO HW block is used by keystone SoCs as
-in Davinci SoCs.
-Hence, reuse Davinci GPIO driver for Keystone taking into
-account that Keystone contains ARM GIC IRQ controller which
-is implemented using IRQ Chip.
+On 12/17/13 16:40, Jason Cooper wrote:
+> Sebastian,
+>
+> On Mon, Dec 16, 2013 at 03:00:44PM +0100, Sebastian Hesselbarth wrote:
+>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>
+>>    Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>
+>> are available in the git repository at:
+>>    https://github.com/shesselba/linux-berlin.git topic/initial-for-v3.14
+>
+> It looks like you didn't use a signed tag here.  I think we ran out of
+> time at the mini-summit, so here's a quick howto:
 
-Documentation:
-	http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+Jason,
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: devicetree at vger.kernel.org
+huge thanks for the summary! I'll keep it under my pillow :)
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
- drivers/gpio/gpio-davinci.c                        |   46 ++++++++++++++++----
- 2 files changed, 40 insertions(+), 10 deletions(-)
+> $ git checkout topic/initial-for-v3.14
+> $ git tag -s berlin-3.14  # assumes you have gpg key in local keyring
+>
+> # edit tag msg, enter pw for key
+>
+> $ git push --tags <remote> topic/initial-for-v3.14:topic/initial-for-v3.14
+> $ git request-pull v3.13-rc1 <remote-pub> tags/berlin-3.14
+>
+> # check if it looks right, if so, pipe it to your email editor
+>
+> I know some are leary of github, and doing the signed tag gives us a
+> provable method that what we are pulling is indeed what you created.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-index a2e839d..4ce9862 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-@@ -1,7 +1,7 @@
--Davinci GPIO controller bindings
-+Davinci/Keystone GPIO controller bindings
- 
- Required Properties:
--- compatible: should be "ti,dm6441-gpio"
-+- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
- 
- - reg: Physical base address of the controller and the size of memory mapped
-        registers.
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index 1b33806..38741cc 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -413,6 +413,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
- 
-+static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
-+{
-+	static struct irq_chip_type gpio_unbanked;
-+
-+	gpio_unbanked = *container_of(irq_get_chip(irq),
-+				      struct irq_chip_type, chip);
-+
-+	return &gpio_unbanked.chip;
-+};
-+
-+static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
-+{
-+	static struct irq_chip gpio_unbanked;
-+
-+	gpio_unbanked = *irq_get_chip(irq);
-+	return &gpio_unbanked;
-+};
-+
-+static const struct of_device_id davinci_gpio_ids[];
-+
- /*
-  * NOTE:  for suspend/resume, probably best to make a platform_device with
-  * suspend_late/resume_resume calls hooking into results of the set_wake()
-@@ -433,6 +453,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
- 	struct davinci_gpio_platform_data *pdata = dev->platform_data;
- 	struct davinci_gpio_regs __iomem *g;
- 	struct irq_domain	*irq_domain = NULL;
-+	const struct of_device_id *match;
-+	struct irq_chip *irq_chip;
-+	struct irq_chip *(*gpio_get_irq_chip)(unsigned int irq);
-+
-+	/*
-+	 * Use davinci_gpio_get_irq_chip by default to handle non DT cases
-+	 */
-+	gpio_get_irq_chip = davinci_gpio_get_irq_chip;
-+	match = of_match_device(of_match_ptr(davinci_gpio_ids),
-+				dev);
-+	if (match)
-+		gpio_get_irq_chip = match->data;
- 
- 	ngpio = pdata->ngpio;
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-@@ -489,8 +521,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
- 	 * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
- 	 */
- 	if (pdata->gpio_unbanked) {
--		static struct irq_chip_type gpio_unbanked;
--
- 		/* pass "bank 0" GPIO IRQs to AINTC */
- 		chips[0].chip.to_irq = gpio_to_irq_unbanked;
- 		chips[0].gpio_irq = bank_irq;
-@@ -499,10 +529,9 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
- 
- 		/* AINTC handles mask/unmask; GPIO handles triggering */
- 		irq = bank_irq;
--		gpio_unbanked = *container_of(irq_get_chip(irq),
--					      struct irq_chip_type, chip);
--		gpio_unbanked.chip.name = "GPIO-AINTC";
--		gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
-+		irq_chip = gpio_get_irq_chip(irq);
-+		irq_chip->name = "GPIO-AINTC";
-+		irq_chip->irq_set_type = gpio_irq_type_unbanked;
- 
- 		/* default trigger: both edges */
- 		g = gpio2regs(0);
-@@ -511,7 +540,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
- 
- 		/* set the direct IRQs up to use that irqchip */
- 		for (gpio = 0; gpio < pdata->gpio_unbanked; gpio++, irq++) {
--			irq_set_chip(irq, &gpio_unbanked.chip);
-+			irq_set_chip(irq, irq_chip);
- 			irq_set_handler_data(irq, &chips[gpio / 32]);
- 			irq_set_status_flags(irq, IRQ_TYPE_EDGE_BOTH);
- 		}
-@@ -554,7 +583,8 @@ done:
- 
- #if IS_ENABLED(CONFIG_OF)
- static const struct of_device_id davinci_gpio_ids[] = {
--	{ .compatible = "ti,dm6441-gpio", },
-+	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
-+	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
- 	{ /* sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
--- 
-1.7.9.5
+Hmm, yeah, I hear about it. I'll hopefully find a different git server
+for the upcoming kernel versions.
+
+> I'll send a signed email to Arnd, Olof, and Kevin with the fingerprint
+> of the key you created at the ARM mini-summit.
+
+Thanks again!
+
+Sebastian
