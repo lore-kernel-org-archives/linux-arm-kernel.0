@@ -1,91 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 18 Dec 2013 15:09:16 +0100
-Subject: [PATCH v5] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <CAOesGMgdd+guHqrCwVjRd+zQ_-LtUb+0XAwCLeD+hL++NgssTQ@mail.gmail.com>
-References: <1386694516-5876-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131212011505.GD21856@quad.lixom.net>
- <20131212212811.GD12238@pengutronix.de>
- <CAOesGMgdd+guHqrCwVjRd+zQ_-LtUb+0XAwCLeD+hL++NgssTQ@mail.gmail.com>
-Message-ID: <20131218140916.GO14866@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 18 Dec 2013 15:10:06 +0100
+Subject: [PATCH v3 9/9] ARM: DTS: imx5* imx6*, use imx51-ssi
+In-Reply-To: <20131218135826.GC7172@S2101-09.ap.freescale.net>
+References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
+ <1387367865-26391-10-git-send-email-mpa@pengutronix.de>
+ <20131218135826.GC7172@S2101-09.ap.freescale.net>
+Message-ID: <20131218141006.GA23493@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 01:55:38PM -0800, Olof Johansson wrote:
-> On Thu, Dec 12, 2013 at 1:28 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Wed, Dec 11, 2013 at 05:15:05PM -0800, Olof Johansson wrote:
-> >> On Tue, Dec 10, 2013 at 05:55:16PM +0100, Uwe Kleine-K?nig wrote:
-> >> > There are still some missing parts (e.g. board support, device trees),
-> >> > but with these bits added on top of this patch I can successfully boot a
-> >> > EFM32GG-DK3750 board that uses an EFM32GG990F1024.
-> >> >
-> >> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >> > ---
-> >> > Hello,
-> >> >
-> >> > I'd like to get this patch in for 3.14. The latest submission (v4,
-> >> > Message-Id:1383562853-17202-4-git-send-email-u.kleine-koenig at pengutronix.de)
-> >> > had some strict dependencies:
-> >> >  - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1
-> >> >    to be able to drop Makefile.boot, this is still in Status=Incoming in
-> >> >    rmk's patch tracker.
-> >> >  - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7890/1
-> >> >    to be able to drop the unused <mach/entry-macro.S>. This is already
-> >> >    applied by rmk in his for-next branch, so it's not stable yet.
-> >> >  - My series to drop <mach/timex.h> for !MULTI_PLATFORM. I'll send a
-> >> >    pull request for that soon.
-> >> >  - Patch "clocksource: time-efm32: Select CLKSRC_MMIO". This is part of
-> >> >    a pull request by Daniel Lezcano that is expected to hit Linus T.'s
-> >> >    tree for the next -rc. It currently sits as
-> >> >    4ff3774e451fefb1781638c76230b3cf9a206b92 in Daniel's tree at
-> >> >    git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/fixes
-> >> >    .
-> >> >
-> >> > To make application a bit easier I added dummy files to drop the
-> >> > dependencies on the first three items of the list above.
-> >> >
-> >> > So it would be great if you could apply this patch when 4ff3774e4 went
-> >> > in. (In case you want to apply it already now, this last dependency
-> >> > could be work arounded, too, by adding a "select CLKSRC_MMIO" to
-> >> > ARCH_EFM32.)
-> >> >
-> >> > Other than that the only change since v4 is that I mention the exact
-> >> > board/processor combo in the changelog now.
-> >> >
-> >> > Thanks for considering this patch, best regards
-> >>
-> >> Applied to next/soc with a slightly tweaked patch subject.
-> > Thanks, but I wonder if it's a problem that the commit doesn't build? (i.e.
-> >
-> >         git checkout f9b9cef1329c74607f33a20dce3f26e9a1f4ae96
-> >         make efm32_defconfig
-> >         make
-> >
-> > fails in
-> >
-> >  - arch/arm/kernel/sigreturn_codes.S with
-> >    "Error: selected processor does not support ARM opcodes" and a few
-> >    variations.
-> >  - drivers/clocksource/time-efm32.o fails to link, because next/soc
-> >    isn't a decendant of 4ff3774e451f.
-> >
-> > You can fix the latter by adding "select CLKSRC_MMIO" to ARCH_EFM32 if
-> > you want. I don't remember what is the current state of the first
-> > problem.)
+On Wed, Dec 18, 2013 at 09:58:30PM +0800, Shawn Guo wrote:
+> On Wed, Dec 18, 2013 at 12:57:45PM +0100, Markus Pargmann wrote:
+> > imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
+> > reconfiguration and needs this for correct interaction with SDMA. This
+> > patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx51.dtsi   |  3 ++-
+> >  arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
+> >  arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
+> >  arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
+> >  4 files changed, 27 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> > index 4bcdd3a..1496421 100644
+> > --- a/arch/arm/boot/dts/imx51.dtsi
+> > +++ b/arch/arm/boot/dts/imx51.dtsi
+> > @@ -155,7 +155,8 @@
+> >  				};
+> >  
+> >  				ssi2: ssi at 70014000 {
+> > -					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
+> > +					compatible = "fsl,imx51-ssi",
+> > +							"fsl,imx21-ssi";
 > 
-> Ok, dropped the patch again. Please let us know when the former has
-> been resolved.
-You did drop it, but when fetching today from armsoc, commit
-f9b9cef1329c74607f made it back into next/soc. There is only a single
-commit on top of it made by khilman (added to Cc:).
+> This is an unnecessary change.
+> 
+> Shawn
 
-Hint: There is an open pull request that you can substitute
-f9b9cef1329c74607f with.
+Thank you, fixed.
 
-Best regards
-Uwe
+Regards,
+
+Markus
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
