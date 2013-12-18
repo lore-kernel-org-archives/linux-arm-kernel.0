@@ -1,98 +1,118 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 18 Dec 2013 22:05:41 +0530
-Subject: [PATCH] dma: mv_xor: fix kernel crash on probe error
-In-Reply-To: <20131212235908.GZ4360@n2100.arm.linux.org.uk>
-References: <1386882715-16433-1-git-send-email-aaro.koskinen@iki.fi>
- <20131212224249.GX4360@n2100.arm.linux.org.uk>
- <CAPcyv4hr2N0kiZabsJJjfmFqTRbT_ntjX4Rdg=THpYg=_2cELg@mail.gmail.com>
- <20131212234453.GB8754@blackmetal.musicnaut.iki.fi>
- <20131212235908.GZ4360@n2100.arm.linux.org.uk>
-Message-ID: <20131218163541.GP16227@intel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 19 Dec 2013 02:38:04 +0900
+Subject: [RESEND] [PATCH V3] ARM: dts: Add DMA controller node info on
+ Exynos5420.
+In-Reply-To: <CAL1wa8d4TebPjfSw1Q3XMzTmUchO=jCbeUbX+STVEq4TG33kzQ@mail.gmail.com>
+References: <1381137944-30503-1-git-send-email-l.krishna@samsung.com>
+ <086601cedf98$2cb9f310$862dd930$@org>
+ <CAL1wa8d4TebPjfSw1Q3XMzTmUchO=jCbeUbX+STVEq4TG33kzQ@mail.gmail.com>
+Message-ID: <52B1DD7C.404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 11:59:08PM +0000, Russell King - ARM Linux wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: [PATCH] dmaengine: mv_xor: fix oops when channels fail to initialise
-> 
-> When a channel fails to initialise, we error out and clean up any
-> previously unregistered channels by walking the entire xordev->channels
-> array.  Unfortunately, there are paths which end up storing an error
-> pointer in this array, which we then try and dereference in the cleanup
-> code, which causes an oops.
-> 
-> Fix this by avoiding writing invalid pointers to this array in the first
-> place.
-> 
-> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+On 12/12/13 20:36, Leela Krishna Amudala wrote:
+> Hi Kukjin,
+>
+> Even though you said it is applied, I didn't see this patch in any of
+> your trees.
+> Can you kindly look into this patch and take necessary action..?
+>
+Applied, thanks.
+Kukjin
 
---
-~Vinod
-> ---
->  drivers/dma/mv_xor.c |   24 +++++++++++++-----------
->  1 files changed, 13 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-> index 7807f0ef4e20..a7e91090443e 100644
-> --- a/drivers/dma/mv_xor.c
-> +++ b/drivers/dma/mv_xor.c
-> @@ -1176,6 +1176,7 @@ static int mv_xor_probe(struct platform_device *pdev)
->  		int i = 0;
->  
->  		for_each_child_of_node(pdev->dev.of_node, np) {
-> +			struct mv_xor_chan *chan;
->  			dma_cap_mask_t cap_mask;
->  			int irq;
->  
-> @@ -1193,21 +1194,21 @@ static int mv_xor_probe(struct platform_device *pdev)
->  				goto err_channel_add;
->  			}
->  
-> -			xordev->channels[i] =
-> -				mv_xor_channel_add(xordev, pdev, i,
-> -						   cap_mask, irq);
-> -			if (IS_ERR(xordev->channels[i])) {
-> -				ret = PTR_ERR(xordev->channels[i]);
-> -				xordev->channels[i] = NULL;
-> +			chan = mv_xor_channel_add(xordev, pdev, i,
-> +						  cap_mask, irq);
-> +			if (IS_ERR(chan)) {
-> +				ret = PTR_ERR(chan);
->  				irq_dispose_mapping(irq);
->  				goto err_channel_add;
->  			}
->  
-> +			xordev->channels[i] = chan;
->  			i++;
->  		}
->  	} else if (pdata && pdata->channels) {
->  		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
->  			struct mv_xor_channel_data *cd;
-> +			struct mv_xor_chan *chan;
->  			int irq;
->  
->  			cd = &pdata->channels[i];
-> @@ -1222,13 +1223,14 @@ static int mv_xor_probe(struct platform_device *pdev)
->  				goto err_channel_add;
->  			}
->  
-> -			xordev->channels[i] =
-> -				mv_xor_channel_add(xordev, pdev, i,
-> -						   cd->cap_mask, irq);
-> -			if (IS_ERR(xordev->channels[i])) {
-> -				ret = PTR_ERR(xordev->channels[i]);
-> +			chan = mv_xor_channel_add(xordev, pdev, i,
-> +						  cd->cap_mask, irq);
-> +			if (IS_ERR(chan)) {
-> +				ret = PTR_ERR(chan);
->  				goto err_channel_add;
->  			}
-> +
-> +			xordev->channels[i] = chan;
->  		}
->  	}
->  
-
--- 
+> Best Wishes,
+> Leela Krishna.
+>
+> On Tue, Nov 12, 2013 at 8:13 PM, Kukjin Kim<kgene@kernel.org>  wrote:
+>> Leela Krishna Amudala wrote:
+>>>
+>> + dt ml.
+>>
+>>> From: Padmavathi Venna<padma.v@samsung.com>
+>>>
+>>> This patch adds dma controller node info on Exynos5420.
+>>> Exynos5420 has adma for audio IPs. As adma clk is dependent
+>>> on audss clk provider that will be added later.
+>>>
+>>> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
+>>> Signed-off-by: Leela Krishna Amudala<l.krishna@samsung.com>
+>>> ---
+>>> Change since V2:
+>>>        - Removed adma node as adma clock is dependent audss clock provider.
+>>>
+>>> Changes since V1:
+>>>          - In V1, dma node common stuff was added in common exynos5.dtsi
+>> file.
+>>>            This was removed as per Kukjin comment and added in
+>>> exynos5420.dtsi.
+>>>
+>>>   arch/arm/boot/dts/exynos5420.dtsi |   52
+>>> +++++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 52 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+>>> b/arch/arm/boot/dts/exynos5420.dtsi
+>>> index d537cd7..15465f8 100644
+>>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>>> @@ -186,6 +186,58 @@
+>>>                status = "okay";
+>>>        };
+>>>
+>>> +     amba {
+>>> +             #address-cells =<1>;
+>>> +             #size-cells =<1>;
+>>> +             compatible = "arm,amba-bus";
+>>> +             interrupt-parent =<&gic>;
+>>> +             ranges;
+>>> +
+>>> +             pdma0: pdma at 121A0000 {
+>>> +                     compatible = "arm,pl330", "arm,primecell";
+>>> +                     reg =<0x121A0000 0x1000>;
+>>> +                     interrupts =<0 34 0>;
+>>> +                     clocks =<&clock 362>;
+>>> +                     clock-names = "apb_pclk";
+>>> +                     #dma-cells =<1>;
+>>> +                     #dma-channels =<8>;
+>>> +                     #dma-requests =<32>;
+>>> +             };
+>>> +
+>>> +             pdma1: pdma at 121B0000 {
+>>> +                     compatible = "arm,pl330", "arm,primecell";
+>>> +                     reg =<0x121B0000 0x1000>;
+>>> +                     interrupts =<0 35 0>;
+>>> +                     clocks =<&clock 363>;
+>>> +                     clock-names = "apb_pclk";
+>>> +                     #dma-cells =<1>;
+>>> +                     #dma-channels =<8>;
+>>> +                     #dma-requests =<32>;
+>>> +             };
+>>> +
+>>> +             mdma0: mdma at 10800000 {
+>>> +                     compatible = "arm,pl330", "arm,primecell";
+>>> +                     reg =<0x10800000 0x1000>;
+>>> +                     interrupts =<0 33 0>;
+>>> +                     clocks =<&clock 473>;
+>>> +                     clock-names = "apb_pclk";
+>>> +                     #dma-cells =<1>;
+>>> +                     #dma-channels =<8>;
+>>> +                     #dma-requests =<1>;
+>>> +             };
+>>> +
+>>> +             mdma1: mdma at 11C10000 {
+>>> +                     compatible = "arm,pl330", "arm,primecell";
+>>> +                     reg =<0x11C10000 0x1000>;
+>>> +                     interrupts =<0 124 0>;
+>>> +                     clocks =<&clock 442>;
+>>> +                     clock-names = "apb_pclk";
+>>> +                     #dma-cells =<1>;
+>>> +                     #dma-channels =<8>;
+>>> +                     #dma-requests =<1>;
+>>> +             };
+>>> +     };
+>>> +
+>>>        serial at 12C00000 {
+>>>                clocks =<&clock 257>,<&clock 128>;
+>>>                clock-names = "uart", "clk_uart_baud0";
+>>> --
+>>> 1.7.10.4
