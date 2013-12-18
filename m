@@ -1,21 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Dec 2013 13:56:45 -0700
-Subject: [PATCH 1/2] ARM: tegra: fix missing pincontrol configuration
- for Venice2
-In-Reply-To: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
-References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <52B20C0D.9030200@wwwdotorg.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 18 Dec 2013 22:00:28 +0100
+Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
+In-Reply-To: <20131218134914.GA32664@verge.net.au>
+References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+ <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
+ <52B1892B.1020806@cogentembedded.com>
+ <20131218114351.GD3314@katana>
+ <52B18CC9.8090200@cogentembedded.com>
+ <20131218121541.GE3314@katana>
+ <20131218134914.GA32664@verge.net.au>
+Message-ID: <20131218210028.GA18645@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
-> Compare the initial population of default pinmux configuration of Venice2
-> with the chrome branch and add/fix the missing configurations.
+> I am unsure of the historical reason for this but it does
+> seem to be consistent.
 
-Wow, that's a big chunk of changes. Are you sure this is correct? Why
-was the original patch (which added the pinctrl nodes) so incorrect?
+Okay, I'll follow that.
 
-Thierry, I thought you had mentioned comparing the pinctrl setup in
-linux-next with the downstream kernel for Venice2 and only found a
-difference in the PWM settings, which you sent a patch for. However,
-this patch is much larger than that. Where's the disconnect?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/fa73b848/attachment.sig>
