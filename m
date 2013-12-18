@@ -1,91 +1,46 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 18 Dec 2013 23:48:54 +0530
-Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
-In-Reply-To: <87a9fyowqi.fsf@e102391-lin.cambridge.arm.com>
-References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
- <20131217185154.GN5711@cbox>
- <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
- <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1PEvudWMq__Qt2ZT663LsuF335myZaPyA81uhnqmVKoQ@mail.gmail.com>
- <87a9fyowqi.fsf@e102391-lin.cambridge.arm.com>
-Message-ID: <CAAhSdy1XKBdyXGWGZXwj8+C0_P3CqyzyFuW=HysEps_QByuv4g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Dec 2013 18:27:31 +0000
+Subject: [PATCHv3 1/7] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <1387250684-23406-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1387250684-23406-1-git-send-email-Li.Xiubo@freescale.com>
+ <1387250684-23406-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20131218182731.GE31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 11:41 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Wed, Dec 18 2013 at 03:52:29 PM, Anup Patel <anup@brainfault.org> wrote:
->> On Wed, Dec 18, 2013 at 9:11 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> Hi Anup,
->>>
->>> On Wed, Dec 18 2013 at 03:03:43 PM, Anup Patel <anup@brainfault.org> wrote:
->>>> On Wed, Dec 18, 2013 at 8:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> Christoffer Dall <christoffer.dall@linaro.org> writes:
->>>>>
->>>>>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
->>>>>>> The Power State and Coordination Interface (PSCI) specification defines
->>>>>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
->>>>>>>
->>>>>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
->>>>>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
->>>>>>> KVM_EXIT_SYSTEM_EVENT exit reason.
->>>>>>>
->>>>>>> To try this patch from guest kernel, we will need PSCI-based restart and
->>>>>>> poweroff support in the guest kenel for both ARM and ARM64.
->>>>>>>
->>>>>>> Rob Herring has already submitted patches for PSCI-based restart and
->>>>>>> poweroff in ARM kernel but these are not merged yet due unstable device
->>>>>>> tree bindings of kernel PSCI support. We will be having similar patches
->>>>>>> for PSCI-based restart and poweroff in ARM64 kernel.
->>>>>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
->>>>>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
->>>>>>
->>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>>
->>>>>> I can merge this series if Marc acks it as well.
->>>>>
->>>>> The patches themselves are mostly fine. One issue though: They implement
->>>>> part of the v0.2 spec, but keep on using the range of function IDs that
->>>>> we made up for v0.1.
->>>>>
->>>>> I just had a chat with the person responsible for the spec, and realized
->>>>> that the Function IDs mentionned in the v0.2 spec are not optional, and
->>>>> not using them would be in direct violation of the spec (the new numbers
->>>>> now come directly from the SMC calling convention).
->>>>
->>>> Should we emulate PSCI_VERSION call to help Guest determine
->>>> the spec version emulated by KVM (i.e. v0.1 or v0.2) ??
->>>
->>> I think that'd be a nice to have, but the guest is likely to get its
->>> information from the DT anyway. Plus I don't think the original PSCI
->>> spec specified PSCI_VERSION, which only make it useful for whatever
->>> comes after v0.2.
->>>
->>> So I think we need to:
->>> - Use the new range for PSCI v0.2 (while still supporting v0.1 and the
->>> old range)
->>
->> Does this mean we should have first isolate v0.2 ID range
->> from v0.1 ID range?
->
-> Yes.
+On Tue, Dec 17, 2013 at 11:24:38AM +0800, Xiubo Li wrote:
 
-Are you planning to do it ?
-OR
-Do you expect me to do it because this patchset would depend on that?
+> This adds Freescale SAI ASoC Audio support.
+> This implementation is only compatible with device tree definition.
 
->
->> And then...
->>
->> Rebase this patchset based on new v0.2 ID range?
->
-> Indeed.
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny.
+This is mostly good, there are two small issues below but I've applied it
+since they don't really affect the driver as a whole.  Please send
+followup patches to fix the issues below.
 
-Regards,
-Anup
+> +static int fsl_sai_dai_probe(struct snd_soc_dai *cpu_dai)
+> +{
+> +	struct fsl_sai *sai = dev_get_drvdata(cpu_dai->dev);
+> +
+> +	cpu_dai->playback_dma_data = &sai->dma_params_tx;
+> +	cpu_dai->capture_dma_data = &sai->dma_params_rx;
+
+You should use snd_soc_dai_init_dma_data() for this.
+
+> +static int fsl_sai_dai_remove(struct snd_soc_dai *cpu_dai)
+> +{
+> +	cpu_dai->playback_dma_data = NULL;
+> +	cpu_dai->capture_dma_data = NULL;
+> +
+> +	snd_soc_dai_set_drvdata(cpu_dai, NULL);
+> +
+> +	return 0;
+> +}
+
+This is all unneeded and this function should be removed entirely.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/0ba92578/attachment-0001.sig>
