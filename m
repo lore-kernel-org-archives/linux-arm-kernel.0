@@ -1,46 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 19 Dec 2013 02:54:30 +0900
-Subject: [PATCH 06/11] PM / devfreq: move definitions for exynos4_bus
- into drivers/devfreq
-In-Reply-To: <CAJ0PZbTH0kga7Gbb87umJpCF_ih3TQrxKS0xBbofDvJq+_wj5Q@mail.gmail.com>
-References: <116401cefb1e$75b83440$61289cc0$@kernel.org>
- <CAJ0PZbTH0kga7Gbb87umJpCF_ih3TQrxKS0xBbofDvJq+_wj5Q@mail.gmail.com>
-Message-ID: <52B1E156.6030904@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Dec 2013 18:00:51 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131218173941.GA17594@e102568-lin.cambridge.arm.com>
+References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
+ <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
+ <20131217195519.GD28455@sirena.org.uk>
+ <20131218173941.GA17594@e102568-lin.cambridge.arm.com>
+Message-ID: <20131218180051.GD31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/13 15:11, MyungJoo Ham wrote:
-> On Tue, Dec 17, 2013 at 8:52 PM,<kgene@kernel.org>  wrote:
->> From: Kukjin Kim<kgene.kim@samsung.com>
->>
->> We don't need to keep the definitions for exynos4_bus into
->> mach-exynos/ so this moves them into drviers/devfreq with
->> adding header file.
->
-> Acked-by: MyungJoo Ham<myungjoo.ham@samsung.com>
->
-> However, how are you going to merge this patch?
-> Do you need me to get this handled or are you going to do it yourself
-> with Samsung-SoC tree?
->
+On Wed, Dec 18, 2013 at 05:39:42PM +0000, Lorenzo Pieralisi wrote:
+> On Tue, Dec 17, 2013 at 07:55:19PM +0000, Mark Brown wrote:
 
-Hi MyungJoo,
+> > I do think it's useful to to have the function there partly just as a
+> > hook but more for the warning it generates if we manage to boot a core
+> > that we didn't hook up with the topology information.  This seems like
 
-Let me take this into Samsung tree with others if you're OK :-)
+> I think you have a point, the question is whether we need that function
+> to run the check you mention or not, we can run the check for all possible
+> cpus after completing the topology parsing. Actually, we might be
 
-Thanks,
-Kukjin
+Yeah, it should be possible to do it elsewhere but then since the SMP
+code is already enumerating all the cores it's going to boot it seemed
+sensible to keep piggybacking on that and not duplicate the logic.
 
-> Cheers,
-> MyungJoo.
->
->>
->> Cc: MyungJoo Ham<myungjoo.ham@samsung.com>
->> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
->> ---
->>   arch/arm/mach-exynos/include/mach/regs-clock.h |   94 --------------------
->>   drivers/devfreq/exynos/exynos4_bus.c           |    4 +-
->>   drivers/devfreq/exynos/exynos4_bus.h           |  110
->> ++++++++++++++++++++++++
->>   3 files changed, 112 insertions(+), 96 deletions(-)
->>   create mode 100644 drivers/devfreq/exynos/exynos4_bus.h
+> building topology for cores that do not come online as well, I do not think
+> this is a problem, but I have to cast a proper look into that before
+> jumping to conclusions, thanks for pointing that out.
+
+I'd expect that could reasonably happen if cores are administratively
+disabled for some reason - that's one of the reasons for the status
+marking in DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/8d42ba70/attachment.sig>
