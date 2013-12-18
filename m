@@ -1,35 +1,59 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 18 Dec 2013 10:29:01 -0800
-Subject: [PATCHv4 0/2] CMA for arm64
-In-Reply-To: <1386876513-7199-1-git-send-email-lauraa@codeaurora.org>
-References: <1386876513-7199-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <52B1E96D.1060904@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 18 Dec 2013 19:36:14 +0100
+Subject: [PATCH v3 6/6] ARM: dts: exynos4: Add missing unit-address of
+ sysreg node
+In-Reply-To: <52B1E838.4030304@samsung.com>
+References: <1386864738-19829-1-git-send-email-t.figa@samsung.com>
+ <1386864738-19829-7-git-send-email-t.figa@samsung.com>
+ <52B1E838.4030304@samsung.com>
+Message-ID: <CA+Ln22Eia=m7EgifE+szALwfzKntsKJOizoCZereV4GWQhBonw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 11:28 AM, Laura Abbott wrote:
-> This adds support for CMA in arm64
->
-> v4: Minor typos pointed out by Will. Changed the support for NULL devices
-> to be a WARN on NULL device.
->
-> v3: Fix a missed line to actually set the dma_handle correctly
->
-> v2: Move the dma contiguous functions from swiotlb to arm64 directly
->
->   arch/arm64/Kconfig                      |    1 +
->   arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++
->   arch/arm64/mm/dma-mapping.c             |   35 +++++++++++++++++++++++++++++-
->   arch/arm64/mm/init.c                    |    3 ++
->   4 files changed, 66 insertions(+), 2 deletions(-)
->
+Hi Kukjin,
 
+2013/12/18 Kukjin Kim <kgene.kim@samsung.com>:
+> On 12/13/13 01:12, Tomasz Figa wrote:
+>>
+>> The node contains reg property, so unit-address suffix should be present
+>> in its name.
+>>
+>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
+>> Reviewed-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos4.dtsi | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4.dtsi
+>> b/arch/arm/boot/dts/exynos4.dtsi
+>> index 4fed2ad..ee173fe 100644
+>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>> @@ -99,7 +99,7 @@
+>>                 reg =<0x10440000 0x1000>;
+>>         };
+>>
+>> -       sys_reg: sysreg {
+>> +       sys_reg: sysreg at 10010000 {
+>>                 compatible = "samsung,exynos4-sysreg", "syscon";
+>>                 reg =<0x10010000 0x400>;
+>>         };
+>
+>
+> Tomasz, I already Sachin's patch for similar changing of sys_reg property
+> with your reviewed tag.
+>
+> ARM: dts: Fix sysreg node name in exynos4.dtsi
+>
+> I've applied whole this series except this one.
+> If any problems, please kindly let me know.
 
-Any further comments on this or is this going to be queued up somewhere?
+Oh, I checked if this isn't already fixed when posting this series and
+I couldn't
+find any related patch. I guess it was posted quite a while ago.
 
-Thanks,
-Laura
+Anyway, it's fine for me, thanks.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Tomasz
