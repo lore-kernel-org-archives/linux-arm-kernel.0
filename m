@@ -1,48 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Dec 2013 17:13:52 +0100
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <52B1B0E0.6030104@codeaurora.org>
-References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131217122519.GI32118@arm.com>
- <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
- <20131218100321.GC4360@n2100.arm.linux.org.uk>
- <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
- <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
-Message-ID: <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Wed, 18 Dec 2013 08:24:00 -0800
+Subject: [PATCH 1/4] iMX6SL frequency table
+In-Reply-To: <20131218073755.GG6691@S2101-09.ap.freescale.net>
+References: <1387329451-17480-1-git-send-email-john.tobias.ph@gmail.com>
+ <20131218073755.GG6691@S2101-09.ap.freescale.net>
+Message-ID: <CACUGKYNJdHoScfXC2DRaeTHxf0pBbnkc3CXLfivKmzsGAy=iOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 December 2013 15:27, Christopher Covington <cov@codeaurora.org> wrote:
+Will update it base on your previous email.
+
+Thanks,
+
+john
+
+On Tue, Dec 17, 2013 at 11:37 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Dec 17, 2013 at 05:17:28PM -0800, John Tobias wrote:
+>>     Device tree for iMX6SL doesn't have an existing cpu frequency table.
 >
-> I do not think that Russell is the source of the confusion. Ard wrote, "The
-> idea is that a binary built for ARM will have access to the extended
-> instructions which ARM64 offers to ARM32 binaries running in 32 bit
-> compatibility mode (such as AES, SHAx etc)." I think s/ARM64/ARMv8/ is
-> necessary to make the statement correct, and hopefully less confusing.
+> Drop these leading spaces.
 >
-
-My apologies for adding to the confusion (or creating it in the first place).
-
-However, the bottom line is that, as the 32 bit and 64 bit kernels are
-both able to support userland processes running in the execution state
-that has retroactively been dubbed 'AArch32', they should both honor
-the same contract with AArch32 userland on how to discover CPU
-capabilities at runtime. I do understand Russell's reservations about
-allocating 6 of the remaining 10 hwcaps bits, and I am open to
-suggestions on a better approach. But it is essential that this be
-sorted between ARM and arm64 so that AArch32 userland does not need to
-be aware of the flavor of kernel it is running under. (Tricks like
-trapping SIGILL to infer hwcaps are suboptimal and likely to create
-problems going forward). Also, the suggestion that those hwcaps bits
-are essentially 'wasted' for ARM32 does not make sense considering
-that 32-bit only ARMv8-R CPUs (which may or may not support some or
-all of the Crypto Extensions) will need to be supported by the ARM32
-kernel as well.
-
-Regards,
-Ard.
+>>
+>> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/imx6sl.dtsi | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>
+> For such imx6sl dts changes, please put a prefix 'ARM: dts: imx6sl: ...'
+> on the patch subject.
+>
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+>> index 28558f1..0a2c73c 100644
+>> --- a/arch/arm/boot/dts/imx6sl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+>> @@ -38,6 +38,20 @@
+>>                       device_type = "cpu";
+>>                       reg = <0x0>;
+>>                       next-level-cache = <&L2>;
+>> +                     operating-points = <
+>> +                             /* kHz    uV */
+>> +                             996000  1250000 /* for consumer grade only */
+>> +                             792000  1150000
+>> +                             396000  1050000
+>
+> Please see my reply to your previous patch.
+>
+>> +                     >;
+>> +                     clock-latency = <61036>; /* two CLK32 periods */
+>> +                     clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
+>> +                              <&clks IMX6SL_CLK_PLL1_SW>, <&clks IMX6SL_CLK_PLL1_SYS>;
+>
+> The lines are somehow too long.  The following one might be easier to
+> read.
+>
+>                         clocks = <&clks IMX6SL_CLK_ARM>,
+>                                  <&clks IMX6SL_CLK_PLL2_PFD2>,
+>                                  <&clks IMX6SL_CLK_STEP>,
+>                                  <&clks IMX6SL_CLK_PLL1_SW>,
+>                                  <&clks IMX6SL_CLK_PLL1_SYS>;
+>
+> Shawn
+>
+>> +                     clock-names = "arm", "pll2_pfd2_396m", "step",
+>> +                                   "pll1_sw", "pll1_sys";
+>> +                     arm-supply = <&reg_arm>;
+>> +                     pu-supply = <&reg_pu>;
+>> +                     soc-supply = <&reg_soc>;
+>>               };
+>>       };
+>>
+>> --
+>> 1.8.3.2
+>>
+>
