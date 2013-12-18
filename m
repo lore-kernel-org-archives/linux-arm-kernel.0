@@ -1,56 +1,49 @@
 From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 18 Dec 2013 15:50:54 -0800
-Subject: [PATCH 2/4] ARM: imx: Add cpu frequency scaling support
+Date: Wed, 18 Dec 2013 15:50:55 -0800
+Subject: [PATCH 3/4] cpufreq: imx6q: add of_init_opp_table
 In-Reply-To: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
 References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
-Message-ID: <1387410656-36053-2-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <1387410656-36053-3-git-send-email-john.tobias.ph@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-using iMX6Q driver for cpu frequency scaling.
+Add a routine check to see if the the platform supplied the OPP table.
+Incase there's no OPP table exist, it will try to initialise it.
 
 Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
 ---
- arch/arm/mach-imx/mach-imx6sl.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ drivers/cpufreq/imx6q-cpufreq.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 2f952e3..a8b1543 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -8,7 +8,6 @@
-  */
- 
- #include <linux/irqchip.h>
--#include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-@@ -34,6 +33,17 @@ static void __init imx6sl_fec_init(void)
- 	}
- }
- 
-+static struct platform_device imx6q_cpufreq_pdev = {
-+	.name = "imx6q-cpufreq",
-+};
-+
-+static void __init imx6sl_init_late(void)
-+{
-+	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-+		platform_device_register(&imx6q_cpufreq_pdev);
-+	}
-+}
-+
- static void __init imx6sl_init_machine(void)
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 4b3f18e..47dbf3c 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -151,6 +151,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
  {
- 	struct device *parent;
-@@ -70,6 +80,7 @@ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
- 	.map_io		= debug_ll_io_init,
- 	.init_irq	= imx6sl_init_irq,
- 	.init_machine	= imx6sl_init_machine,
-+	.init_late      = imx6sl_init_late,
- 	.dt_compat	= imx6sl_dt_compat,
- 	.restart	= mxc_restart,
- MACHINE_END
+ 	struct device_node *np;
+ 	struct dev_pm_opp *opp;
++	struct device_opp *tmp_dev_opp;
+ 	unsigned long min_volt, max_volt;
+ 	int num, ret;
+ 
+@@ -166,6 +167,17 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
++	/* Get the OPP table, if the platform did not supply it. */
++	tmp_dev_opp = find_device_opp(cpu_dev);
++	if (IS_ERR(tmp_dev_opp)) {
++		ret = of_init_opp_table(cpu_dev);
++		if (ret < 0) {
++			dev_err(cpu_dev, "failed to init OPP table\n");
++			ret = -ENODEV;
++			goto put_node;
++		}
++	}
++
+ 	arm_clk = devm_clk_get(cpu_dev, "arm");
+ 	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+ 	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
 -- 
 1.8.3.2
