@@ -1,59 +1,102 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Wed, 18 Dec 2013 06:28:34 +0000
-Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20131217124505.GB17210@ulmo.nvidia.com>
-References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
- <20131217111020.GF13823@ulmo.nvidia.com>
- <20131217115136.GT4360@n2100.arm.linux.org.uk> <5295539.cCkPY1PpyC@flatron>
- <20131217124505.GB17210@ulmo.nvidia.com>
-Message-ID: <803c9e5db83b41ceb593441c5b452be9@BY2PR03MB505.namprd03.prod.outlook.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 18 Dec 2013 12:00:10 +0530
+Subject: [PATCH 3/4] SATA: MV: Add support for the optional PHYs
+In-Reply-To: <1387311713-1926-3-git-send-email-andrew@lunn.ch>
+References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
+ <1387311713-1926-3-git-send-email-andrew@lunn.ch>
+Message-ID: <52B140F2.8070900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tejun,
 
-> On Tue, Dec 17, 2013 at 01:00:10PM +0100, Tomasz Figa wrote:
-> > On Tuesday 17 of December 2013 11:51:36 Russell King - ARM Linux wrote:
-> > > On Tue, Dec 17, 2013 at 12:10:22PM +0100, Thierry Reding wrote:
-> > > > On Fri, Dec 13, 2013 at 04:57:04PM +0800, Xiubo Li wrote:
-> > > > > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
-> > > > > +		const void __iomem *addr)
-> > > > > +{
-> > > > > +	u32 val;
-> > > > > +
-> > > > > +	val = __raw_readl(addr);
-> > > > > +
-> > > > > +	if (likely(fpc->big_endian))
-> > > >
-> > > > The likely() probably isn't very useful in this case. But if you
-> > > > want to keep it, it should at least be reversed, since
-> > > > little-endian is actually the default (you have to specify the
-> > > > big-endian property to activate the big endian mode).
-> > > >
-> > > > > +		val = be32_to_cpu(val);
-> > > > > +	else
-> > > > > +		val = le32_to_cpu(val);
-> > >
-> > > This will also cause sparse errors, because when sparse is enabled,
-> > > these expect __le32 or __be32 arguments, not u32.
-> >
-> > My question is why can't you just create two sets of accessors, one
-> > big endian and one little endian, add two function pointers to your
-> > fsl_pwm_chip struct and let the driver set the to correct accessors in
-> > probe?
+On Wednesday 18 December 2013 01:51 AM, Andrew Lunn wrote:
+> Some Marvell SoCs have a SATA PHY which can be powered off, in order
+> to save power. Make use of the generic phy framework to control these
+> phys.
+
+I can queue this patch along with the other patches in this series if you don't
+expect any merge issues. If you want to take this patch by yourself, you can add my
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+
+Either ways let me know.
+
+Cheers
+Kishon
+
 > 
-> I guess that would be one possibility.
->
-
-Yes, that's one possibility.
-
-If so, it must deference the function pointers and do the C stack push/pop stuff
-every time when doing the accesses. For instance, but for some devices(USB, NET,
-DMA..), we need to do many accesses every time in the frequent interrupt handler,
-and I think the inline type functions will be more efficiency.
-
-In LS-1 series platforms, there are many devices that need to do the same work like
-this, and could these be moved to some global files ?
-
-
---
-Xiubo
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> v2->v3
+> Look for phys using name "port0", "port1", etc.
+> ---
+>  drivers/ata/sata_mv.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+> index 56be31819897..896725bb5e34 100644
+> --- a/drivers/ata/sata_mv.c
+> +++ b/drivers/ata/sata_mv.c
+> @@ -60,6 +60,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/device.h>
+>  #include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/ata_platform.h>
+>  #include <linux/mbus.h>
+> @@ -563,6 +564,12 @@ struct mv_host_priv {
+>  	struct clk		*clk;
+>  	struct clk              **port_clks;
+>  	/*
+> +	 * Some devices have a SATA PHY which can be enabled/disabled
+> +	 * in order to save power. These are optional: if the platform
+> +	 * devices does not have any phy, they won't be used.
+> +	 */
+> +	struct phy		**port_phys;
+> +	/*
+>  	 * These consistent DMA memory pools give us guaranteed
+>  	 * alignment for hardware-accessed data structures,
+>  	 * and less memory waste in accomplishing the alignment.
+> @@ -4076,6 +4083,11 @@ static int mv_platform_probe(struct platform_device *pdev)
+>  					GFP_KERNEL);
+>  	if (!hpriv->port_clks)
+>  		return -ENOMEM;
+> +	hpriv->port_phys = devm_kzalloc(&pdev->dev,
+> +					sizeof(struct phy *) * n_ports,
+> +					GFP_KERNEL);
+> +	if (!hpriv->port_phys)
+> +		return -ENOMEM;
+>  	host->private_data = hpriv;
+>  	hpriv->n_ports = n_ports;
+>  	hpriv->board_idx = chip_soc;
+> @@ -4097,6 +4109,10 @@ static int mv_platform_probe(struct platform_device *pdev)
+>  		hpriv->port_clks[port] = clk_get(&pdev->dev, port_number);
+>  		if (!IS_ERR(hpriv->port_clks[port]))
+>  			clk_prepare_enable(hpriv->port_clks[port]);
+> +		sprintf(port_number, "port%d", port);
+> +		hpriv->port_phys[port] = devm_phy_get(&pdev->dev, port_number);
+> +		if (!IS_ERR(hpriv->port_phys[port]))
+> +			phy_power_on(hpriv->port_phys[port]);
+>  	}
+>  
+>  	/*
+> @@ -4132,6 +4148,8 @@ err:
+>  			clk_disable_unprepare(hpriv->port_clks[port]);
+>  			clk_put(hpriv->port_clks[port]);
+>  		}
+> +		if (!IS_ERR(hpriv->port_phys[port]))
+> +			phy_power_off(hpriv->port_phys[port]);
+>  	}
+>  
+>  	return rc;
+> @@ -4161,6 +4179,8 @@ static int mv_platform_remove(struct platform_device *pdev)
+>  			clk_disable_unprepare(hpriv->port_clks[port]);
+>  			clk_put(hpriv->port_clks[port]);
+>  		}
+> +		if (!IS_ERR(hpriv->port_phys[port]))
+> +			phy_power_off(hpriv->port_phys[port]);
+>  	}
+>  	return 0;
+>  }
+> 
