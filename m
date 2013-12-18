@@ -1,178 +1,86 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 12:57:43 +0100
-Subject: [PATCH v3 7/9] ASoC: fsl-ssi: Move RX/TX configuration to seperate
- functions
-In-Reply-To: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
-References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387367865-26391-8-git-send-email-mpa@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Dec 2013 12:59:24 +0100
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <20131218114211.GF4360@n2100.arm.linux.org.uk>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131217122519.GI32118@arm.com>
+ <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
+ <20131218100321.GC4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
+ <20131218105541.GE4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
+ <20131218112713.GA28112@arm.com>
+ <20131218114211.GF4360@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu-FuohSFpPHdjfphK_CtaFZPYSFSK5eFNfFnLY8Jt_U=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines the appropriate register values for different
-oparation modes and IP versions. We have to handle DMA/FIQ, AC97,
-DEBUG-IRQs and offline/online configuration support.
+On 18 December 2013 12:42, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 18, 2013 at 11:27:14AM +0000, Catalin Marinas wrote:
+>> On Wed, Dec 18, 2013 at 11:15:45AM +0000, Ard Biesheuvel wrote:
+>> > On 18 December 2013 11:55, Russell King - ARM Linux
+>> > <linux@arm.linux.org.uk> wrote:
+>> > > On Wed, Dec 18, 2013 at 11:25:40AM +0100, Ard Biesheuvel wrote:
+>> > >> On 18 December 2013 11:03, Russell King - ARM Linux
+>> > >> <linux@arm.linux.org.uk> wrote:
+>> > >> > If we allocate the ARM64 private never-will-appear-on-ARM hwcaps in bit
+>> > >> > 32 and above, they'll be hidden from 32-bit stuff.  Hopefully, glibc
+>> > >> > doesn't concatenate the HWCAP and HWCAP2 fields though - someone should
+>> > >> > check that.
+>> > >> >
+>> > >> > Since the bits in the ARM64 hwcap are different from the ARM32 hwcap, I
+>> > >> > don't see any point in defining them for ARM32 - userspace needs to make
+>> > >> > the definition conditional anyway, and can't interpret the bits as-is
+>> > >> > because ARM64 already omits many of the ARM32 ones.
+>> > >>
+>> > >> Please note that this is about the compat bits, not the ARM64 specific
+>> > >> ones. These correspond 1:1 with the ARM32 ones. The idea is that a
+>> > >> binary built for ARM will have access to the extended instructions
+>> > >> which ARM64 offers to ARM32 binaries running in 32 bit compatibility
+>> > >> mode (such as AES, SHAx etc).
+>> > >
+>> > > This all sounds rather silly IMHO.  As ARM32 natively doesn't support
+>> > > these instructions, why should running an ARM32 binary under ARM64
+>> > > end up offering this?
+>> > >
+>> > > If the ARM64 additional instructions are to be used, surely it's not
+>> > > unreasonable to require ARM64 native applications?
+>> >
+>> > Well, the ARM architects have decided that there shall be Crypto
+>> > Extensions instructions not only for ARMv8/Aarch64 but also for
+>> > ARMv8/Aarch32. This is fully spec'ed in the latest ARM ARM. For
+>> > instance, previously unused NEON opcodes on ARM32 have been allocated
+>> > to AES instructions. (for instance, implemented for QEMU here
+>> > https://git.linaro.org/people/peter.maydell/qemu-arm.git/commitdiff/9d935509)
+>>
+>> Indeed. AArch32 is not _dead_ with ARMv8 but getting new features. The
+>> point of this patch is to have a common set of bits between compat arm64
+>> and arm kernel. The AArch32 applications running on ARMv8 (most likely
+>> with an arm64 kernel) may want to make use of the crypto extensions.
+>>
+>> If you want a more complete solution, we could add ID_ISAR5 checks on
+>> the arm kernel.
+>
+> The point is that they'll never appear on an ARMv7 implementation because
+> they're not part of the ARMv7 architecture.  I see no point in needlessly
+> polluting ARM32 with ARM64 stuff - in exactly the same way that you see
+> no point in polluting ARM64 with ARM32 stuff.
+>
 
-With this patch we cleanup some driver code that was not reference
-manual conform and try to cleanup the whole trigger function to seperate
-the actual register values from the enable/disable logic, which is now
-hidden in fsl_ssi_config helpers.
+You are assuming ARMv7 == ARM32 and ARMv8 == ARM64, while in reality,
+they are orthogonal.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 94 +++++++++++++++++++++++++------------------------
- 1 file changed, 48 insertions(+), 46 deletions(-)
+The 32-bit kernel you are maintaining can potentially run on 32-bit
+only v8 implementations (as Catalin pointed out), and both the arm64
+and ARM kernels contain implementations for the Aarch32 userland ABI.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index eabf568..26190f9 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -107,13 +107,6 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
- 	 SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S24_LE)
- #endif
- 
--/* SIER bitflag of interrupts to enable */
--#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | CCSR_SSI_SIER_TDMAE | \
--		    CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TUE0_EN | \
--		    CCSR_SSI_SIER_TUE1_EN | CCSR_SSI_SIER_RFRC_EN | \
--		    CCSR_SSI_SIER_RDMAE | CCSR_SSI_SIER_RIE | \
--		    CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_ROE1_EN)
--
- #define FSLSSI_SIER_DBG_RX_FLAGS (CCSR_SSI_SIER_RFF0_EN | \
- 		CCSR_SSI_SIER_RLS_EN | CCSR_SSI_SIER_RFS_EN | \
- 		CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_RFRC_EN)
-@@ -565,6 +558,43 @@ static void fsl_ssi_tx_config(struct fsl_ssi_private *ssi_private, bool enable)
- 	fsl_ssi_config(ssi_private, enable, &ssi_private->rxtx_reg_val.tx);
- }
- 
-+/*
-+ * Setup rx/tx register values used to enable/disable the streams. These will
-+ * be used later in fsl_ssi_config to setup the streams without the need to
-+ * check for all different SSI modes.
-+ */
-+static void fsl_ssi_setup_reg_vals(struct fsl_ssi_private *ssi_private)
-+{
-+	struct fsl_ssi_rxtx_reg_val *reg = &ssi_private->rxtx_reg_val;
-+
-+	reg->rx.sier = CCSR_SSI_SIER_RFF0_EN;
-+	reg->rx.srcr = CCSR_SSI_SRCR_RFEN0;
-+	reg->rx.scr = 0;
-+	reg->tx.sier = CCSR_SSI_SIER_TFE0_EN;
-+	reg->tx.stcr = CCSR_SSI_STCR_TFEN0;
-+	reg->tx.scr = 0;
-+
-+	if (!ssi_private->imx_ac97) {
-+		reg->rx.scr = CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE;
-+		reg->rx.sier |= CCSR_SSI_SIER_RFF0_EN;
-+		reg->tx.scr = CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE;
-+		reg->tx.sier |= CCSR_SSI_SIER_TFE0_EN;
-+	}
-+
-+	if (ssi_private->use_dma) {
-+		reg->rx.sier |= CCSR_SSI_SIER_RDMAE;
-+		reg->tx.sier |= CCSR_SSI_SIER_TDMAE;
-+	} else {
-+		reg->rx.sier |= CCSR_SSI_SIER_RIE;
-+		reg->tx.sier |= CCSR_SSI_SIER_TIE;
-+	}
-+
-+#if IS_ENABLED(CONFIG_DEBUG_FS)
-+	reg->rx.sier |= FSLSSI_SIER_DBG_RX_FLAGS;
-+	reg->tx.sier |= FSLSSI_SIER_DBG_TX_FLAGS;
-+#endif
-+}
-+
- static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
- {
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-@@ -601,6 +631,8 @@ static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
- 	u8 wm;
- 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates;
- 
-+	fsl_ssi_setup_reg_vals(ssi_private);
-+
- 	if (ssi_private->imx_ac97)
- 		ssi_private->i2s_mode = CCSR_SSI_SCR_I2S_MODE_NORMAL | CCSR_SSI_SCR_NET;
- 	else
-@@ -624,13 +656,12 @@ static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
- 		ssi_private->i2s_mode |
- 		(synchronous ? CCSR_SSI_SCR_SYN : 0));
- 
--	write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
--		 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
--		 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
-+	write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFSI |
-+			CCSR_SSI_STCR_TEFS | CCSR_SSI_STCR_TSCKP, &ssi->stcr);
-+
-+	write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFSI |
-+			CCSR_SSI_SRCR_REFS | CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
- 
--	write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
--		 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
--		 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
- 	/*
- 	 * The DC and PM bits are only used if the SSI is the clock master.
- 	 */
-@@ -762,57 +793,28 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
--	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
--	unsigned int sier_bits;
--
--	/*
--	 *  Enable only the interrupts and DMA requests
--	 *  that are needed for the channel. As the fiq
--	 *  is polling for this bits, we have to ensure
--	 *  that this are aligned with the preallocated
--	 *  buffers
--	 */
--
--	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
--		if (ssi_private->use_dma)
--			sier_bits = SIER_FLAGS;
--		else
--			sier_bits = CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN;
--	} else {
--		if (ssi_private->use_dma)
--			sier_bits = SIER_FLAGS;
--		else
--			sier_bits = CCSR_SSI_SIER_RIE | CCSR_SSI_SIER_RFF0_EN;
--	}
- 
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			write_ssi_mask(&ssi->scr, 0,
--				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
-+			fsl_ssi_tx_config(ssi_private, true);
- 		else
--			write_ssi_mask(&ssi->scr, 0,
--				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE);
-+			fsl_ssi_rx_config(ssi_private, true);
- 		break;
- 
- 	case SNDRV_PCM_TRIGGER_STOP:
- 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TE, 0);
-+			fsl_ssi_tx_config(ssi_private, false);
- 		else
--			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_RE, 0);
--
--		if (!ssi_private->imx_ac97 && (read_ssi(&ssi->scr) &
--					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0)
--			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
-+			fsl_ssi_rx_config(ssi_private, false);
- 		break;
- 
- 	default:
- 		return -EINVAL;
- 	}
- 
--	write_ssi(sier_bits, &ssi->sier);
- 
- 	return 0;
- }
--- 
-1.8.5.1
+So if the current proposal is unsuitable in your opinion, could we at
+least have your input on how it should be done instead? Preferably
+using a method that supports ifunc relocations, so the loader can
+automatically resolve the correct implementation for the hardware at
+hand?
+
+Regards,
+Ard.
