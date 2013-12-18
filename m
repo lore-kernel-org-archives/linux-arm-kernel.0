@@ -1,87 +1,45 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 17:47:20 +0100
-Subject: [PATCH 4/6] net: cpsw: Use cpsw-ctrl-macid driver
-In-Reply-To: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
-References: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387385242-1161-5-git-send-email-mpa@pengutronix.de>
+Date: Wed, 18 Dec 2013 17:47:16 +0100
+Subject: [PATCH 0/6] net: cpsw: Support for am335x chip MACIDs
+Message-ID: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use ctrl-macid driver to obtain the macids stored in the processor. This
-is only done when defined in DT.
+Hi,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- Documentation/devicetree/bindings/net/cpsw.txt |  5 +++++
- drivers/net/ethernet/ti/cpsw.c                 | 18 ++++++++++++++----
- drivers/net/ethernet/ti/cpsw.h                 |  2 ++
- 3 files changed, 21 insertions(+), 4 deletions(-)
+This series introduces a driver to read and use the MACIDs stored in the am335x
+control module. These are read-only registers for a unique MACID. At the moment
+the MACIDs are generated randomly or they are set by the bootloader.
 
-diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index c39f077..b95c38b 100644
---- a/Documentation/devicetree/bindings/net/cpsw.txt
-+++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -34,6 +34,11 @@ Required properties:
- Optional properties:
- - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
- - mac-address		: Specifies slave MAC address
-+- ti,mac-address-ctrl	: When cpsw-ctrl-macid support is compiledin, this can
-+			  be set to a phandle with one argument, see
-+			  cpsw-ctrl-macid.txt. If this method fails, cpsw falls
-+			  back to mac-address or random mac-address.
-+
- 
- Note: "ti,hwmods" field is used to fetch the base address and irq
- resources from TI, omap hwmod data base during device registration.
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 5120d9c..382d793 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1804,9 +1804,16 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 		snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
- 			 PHY_ID_FMT, mdio->name, phyid);
- 
--		mac_addr = of_get_mac_address(slave_node);
--		if (mac_addr)
--			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
-+		ret = cpsw_ctrl_macid_read(slave_node, slave_data->mac_addr);
-+		if (ret) {
-+			if (ret == -EPROBE_DEFER)
-+				return ret;
-+
-+			mac_addr = of_get_mac_address(slave_node);
-+			if (mac_addr)
-+				memcpy(slave_data->mac_addr, mac_addr,
-+						ETH_ALEN);
-+		}
- 
- 		slave_data->phy_if = of_get_phy_mode(slave_node);
- 
-@@ -1946,10 +1953,13 @@ static int cpsw_probe(struct platform_device *pdev)
- 	/* Select default pin state */
- 	pinctrl_pm_select_default_state(&pdev->dev);
- 
--	if (cpsw_probe_dt(&priv->data, pdev)) {
-+	ret = cpsw_probe_dt(&priv->data, pdev);
-+	if (ret == -EINVAL) {
- 		pr_err("cpsw: platform data missing\n");
- 		ret = -ENODEV;
- 		goto clean_runtime_disable_ret;
-+	} else if (ret) {
-+		goto clean_runtime_disable_ret;
- 	}
- 	data = &priv->data;
- 
-diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index 1b71067..222eebe 100644
---- a/drivers/net/ethernet/ti/cpsw.h
-+++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -42,4 +42,6 @@ struct cpsw_platform_data {
- 
- void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave);
- 
-+int cpsw_ctrl_macid_read(struct device_node *np, u8 *mac_addr);
-+
- #endif /* __CPSW_H__ */
+A device node is added in am33xx dtsi and used by the cpsw slaves in the bone
+board files.
+
+Regards,
+
+Markus
+
+
+Markus Pargmann (6):
+  DT doc: net: cpsw mac-address is optional
+  net: cpsw: header, Add missing include
+  net: cpsw: Add control-module macid driver
+  net: cpsw: Use cpsw-ctrl-macid driver
+  arm: dts: am33xx, Add device node for cpsw-ctrl-macid
+  arm: dts: am335x beagle bone use processor macids
+
+ .../devicetree/bindings/net/cpsw-ctrl-macid.txt    |  31 +++++
+ Documentation/devicetree/bindings/net/cpsw.txt     |   7 +-
+ arch/arm/boot/dts/am335x-bone.dts                  |   8 ++
+ arch/arm/boot/dts/am335x-boneblack.dts             |   8 ++
+ arch/arm/boot/dts/am33xx.dtsi                      |   7 ++
+ drivers/net/ethernet/ti/Kconfig                    |   8 ++
+ drivers/net/ethernet/ti/Makefile                   |   1 +
+ drivers/net/ethernet/ti/cpsw-ctrl-macid.c          | 138 +++++++++++++++++++++
+ drivers/net/ethernet/ti/cpsw.c                     |  18 ++-
+ drivers/net/ethernet/ti/cpsw.h                     |   3 +
+ 10 files changed, 224 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/cpsw-ctrl-macid.txt
+ create mode 100644 drivers/net/ethernet/ti/cpsw-ctrl-macid.c
+
 -- 
 1.8.5.1
