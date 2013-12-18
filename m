@@ -1,118 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 19 Dec 2013 02:38:04 +0900
-Subject: [RESEND] [PATCH V3] ARM: dts: Add DMA controller node info on
- Exynos5420.
-In-Reply-To: <CAL1wa8d4TebPjfSw1Q3XMzTmUchO=jCbeUbX+STVEq4TG33kzQ@mail.gmail.com>
-References: <1381137944-30503-1-git-send-email-l.krishna@samsung.com>
- <086601cedf98$2cb9f310$862dd930$@org>
- <CAL1wa8d4TebPjfSw1Q3XMzTmUchO=jCbeUbX+STVEq4TG33kzQ@mail.gmail.com>
-Message-ID: <52B1DD7C.404@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 18 Dec 2013 17:39:42 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20131217195519.GD28455@sirena.org.uk>
+References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
+ <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
+ <20131217195519.GD28455@sirena.org.uk>
+Message-ID: <20131218173941.GA17594@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/13 20:36, Leela Krishna Amudala wrote:
-> Hi Kukjin,
->
-> Even though you said it is applied, I didn't see this patch in any of
-> your trees.
-> Can you kindly look into this patch and take necessary action..?
->
-Applied, thanks.
-Kukjin
+On Tue, Dec 17, 2013 at 07:55:19PM +0000, Mark Brown wrote:
+> On Tue, Dec 17, 2013 at 05:06:25PM +0000, Lorenzo Pieralisi wrote:
+> > On Mon, Dec 16, 2013 at 04:49:22PM +0000, Mark Brown wrote:
+> 
+> > > +void store_cpu_topology(unsigned int cpuid);
+> 
+> > I still think this function is not needed at all and therefore should
+> > not be exported.
+> 
+> > > +static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+> > > +{
+> > > +	store_cpu_topology(cpuid);
+> 
+> > As I mentioned this need not be done here. Parse the topology from DT,
+> > (cpu_logical_map or cpu-map) in one go and get rid of store_cpu_topology().
+> 
+> That's what we're actually doing for parsing, the parsing all happens at
+> once.
+> 
+> I do think it's useful to to have the function there partly just as a
+> hook but more for the warning it generates if we manage to boot a core
+> that we didn't hook up with the topology information.  This seems like
+> it'll be helpful for debugging issues - we'll actively warn if there are
+> CPUs that have been omitted from the definition in the firmware.  The
+> other things the function does could be done elsewhere I think, it
+> didn't seem worth moving them though.
 
-> Best Wishes,
-> Leela Krishna.
->
-> On Tue, Nov 12, 2013 at 8:13 PM, Kukjin Kim<kgene@kernel.org>  wrote:
->> Leela Krishna Amudala wrote:
->>>
->> + dt ml.
->>
->>> From: Padmavathi Venna<padma.v@samsung.com>
->>>
->>> This patch adds dma controller node info on Exynos5420.
->>> Exynos5420 has adma for audio IPs. As adma clk is dependent
->>> on audss clk provider that will be added later.
->>>
->>> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
->>> Signed-off-by: Leela Krishna Amudala<l.krishna@samsung.com>
->>> ---
->>> Change since V2:
->>>        - Removed adma node as adma clock is dependent audss clock provider.
->>>
->>> Changes since V1:
->>>          - In V1, dma node common stuff was added in common exynos5.dtsi
->> file.
->>>            This was removed as per Kukjin comment and added in
->>> exynos5420.dtsi.
->>>
->>>   arch/arm/boot/dts/exynos5420.dtsi |   52
->>> +++++++++++++++++++++++++++++++++++++
->>>   1 file changed, 52 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
->>> b/arch/arm/boot/dts/exynos5420.dtsi
->>> index d537cd7..15465f8 100644
->>> --- a/arch/arm/boot/dts/exynos5420.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->>> @@ -186,6 +186,58 @@
->>>                status = "okay";
->>>        };
->>>
->>> +     amba {
->>> +             #address-cells =<1>;
->>> +             #size-cells =<1>;
->>> +             compatible = "arm,amba-bus";
->>> +             interrupt-parent =<&gic>;
->>> +             ranges;
->>> +
->>> +             pdma0: pdma at 121A0000 {
->>> +                     compatible = "arm,pl330", "arm,primecell";
->>> +                     reg =<0x121A0000 0x1000>;
->>> +                     interrupts =<0 34 0>;
->>> +                     clocks =<&clock 362>;
->>> +                     clock-names = "apb_pclk";
->>> +                     #dma-cells =<1>;
->>> +                     #dma-channels =<8>;
->>> +                     #dma-requests =<32>;
->>> +             };
->>> +
->>> +             pdma1: pdma at 121B0000 {
->>> +                     compatible = "arm,pl330", "arm,primecell";
->>> +                     reg =<0x121B0000 0x1000>;
->>> +                     interrupts =<0 35 0>;
->>> +                     clocks =<&clock 363>;
->>> +                     clock-names = "apb_pclk";
->>> +                     #dma-cells =<1>;
->>> +                     #dma-channels =<8>;
->>> +                     #dma-requests =<32>;
->>> +             };
->>> +
->>> +             mdma0: mdma at 10800000 {
->>> +                     compatible = "arm,pl330", "arm,primecell";
->>> +                     reg =<0x10800000 0x1000>;
->>> +                     interrupts =<0 33 0>;
->>> +                     clocks =<&clock 473>;
->>> +                     clock-names = "apb_pclk";
->>> +                     #dma-cells =<1>;
->>> +                     #dma-channels =<8>;
->>> +                     #dma-requests =<1>;
->>> +             };
->>> +
->>> +             mdma1: mdma at 11C10000 {
->>> +                     compatible = "arm,pl330", "arm,primecell";
->>> +                     reg =<0x11C10000 0x1000>;
->>> +                     interrupts =<0 124 0>;
->>> +                     clocks =<&clock 442>;
->>> +                     clock-names = "apb_pclk";
->>> +                     #dma-cells =<1>;
->>> +                     #dma-channels =<8>;
->>> +                     #dma-requests =<1>;
->>> +             };
->>> +     };
->>> +
->>>        serial at 12C00000 {
->>>                clocks =<&clock 257>,<&clock 128>;
->>>                clock-names = "uart", "clk_uart_baud0";
->>> --
->>> 1.7.10.4
+I think you have a point, the question is whether we need that function
+to run the check you mention or not, we can run the check for all possible
+cpus after completing the topology parsing. Actually, we might be
+building topology for cores that do not come online as well, I do not think
+this is a problem, but I have to cast a proper look into that before
+jumping to conclusions, thanks for pointing that out.
+
+Lorenzo
