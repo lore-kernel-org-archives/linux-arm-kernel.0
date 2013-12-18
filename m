@@ -1,93 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 19 Dec 2013 02:49:50 +0900
-Subject: [GIT PULL 1/7] Samsung fixes for v3.14
-In-Reply-To: <7379738.rMmWN95Wqt@flatron>
-References: <52AE0F41.7050706@samsung.com> <3351204.WyoCcrrZ3X@amdc1227>
- <117101cefb22$d5378b10$7fa6a130$@kernel.org> <7379738.rMmWN95Wqt@flatron>
-Message-ID: <52B1E03E.5040400@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Dec 2013 09:50:58 -0800
+Subject: [GIT PULL] omap display regression fix against v3.13-rc4
+Message-ID: <20131218175057.GF27438@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
 
+  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
 
-On 12/17/13 21:27, Tomasz Figa wrote:
-> On Tuesday 17 of December 2013 21:23:46 kgene at kernel.org wrote:
->> Tomasz Figa wrote:
->>>
->>> Hi Kukjin,
->>>
->> Hi,
->>
->>> On Monday 16 of December 2013 05:21:21 Kukjin Kim wrote:
->>>> The following changes since commit
->>> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>>>
->>>>     Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>     git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>>> tags/samsung-fixes
->>>>
->>>> for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
->>>>
->>>>     ARM: dts: Update display clock frequency for Origen-4412 (2013-12-16
->>>> 04:41:57 +0900)
->>>>
->>>> ----------------------------------------------------------------
->>>> Samsung non-critical fixes for v3.14
->>>> - Switch FIFO mode for arch_enable_uart_fifo()
->>>> - Add missing op_mode for PMIC on exynos5250-arndale
->>>> - Add missing clock-frequency for CPU on exynos5250
->>>> - Fix typo samaung to samsung for exynos5420-pinctrl
->>>> - Fix display clock-frequency for exynos4210/exynos4412-origen
->>>>
->>>> ----------------------------------------------------------------
->>>> Alexander Shiyan (1):
->>>>         ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo
->> function
->>>>
->>>> Sachin Kamat (4):
->>>>         ARM: dts: Add missing op_mode property to PMIC on Arndale
->>>>         ARM: dts: Add missing frequency property to exynos5250
->>>>         ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
->>>>         ARM: dts: Update display clock frequency for Origen-4412
->>>>
->>>> Tushar Behera (1):
->>>>         ARM: dts: Update display clock frequency for Origen-4210
->>>>
->>>>    arch/arm/boot/dts/exynos4210-origen.dts         | 2 +-
->>>>    arch/arm/boot/dts/exynos4412-origen.dts         | 2 +-
->>>>    arch/arm/boot/dts/exynos5250-arndale.dts        | 2 ++
->>>>    arch/arm/boot/dts/exynos5250.dtsi               | 2 ++
->>>>    arch/arm/boot/dts/exynos5420-pinctrl.dtsi       | 2 +-
->>>>    arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
->>>>    6 files changed, 9 insertions(+), 3 deletions(-)
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
->>> soc" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>> I've sent a patch to fix up MMC0 on mini6410 board, when using board file
->>> to boot the system:
->>>
->>> [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for HSMMC1
->>>
->>> Could we get this patch merged?
->>>
->>> I know we are moving to DT, but until all boards get converted, board
->>> files must be supported too and this bug makes it impossible to test
->>> non-DT s3c64xx support on Mini6410, without extra out of tree patches.
->>>
->> OK, I see. Let me take that in next round maybe this weekend.
->
-> Thanks.
->
+are available in the git repository at:
 
-Tomasz, I've applied it into 2nd fixes for v3.14.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/display-fix
 
-If anything else, please let me know.
+for you to fetch changes up to 130f769e81fc472beb2211320777e26050e3fa15:
 
-Thanks,
-Kukjin
+  Revert "ARM: OMAP2+: Remove legacy mux code for display.c" (2013-12-17 16:28:34 -0800)
+
+----------------------------------------------------------------
+I accidentally removed some mux code for omap4 that I thought was
+dead code as omap4 has been booting with device tree only since
+v3.10. Turns out I also removed some display related mux code,
+so let's revert that except for the dead code parts.
+
+----------------------------------------------------------------
+Tomi Valkeinen (1):
+      Revert "ARM: OMAP2+: Remove legacy mux code for display.c"
+
+ arch/arm/mach-omap2/display.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
