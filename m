@@ -1,50 +1,38 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Thu, 19 Dec 2013 12:35:36 -0800
-Subject: [PATCH v2 1/3] ARM: dts: imx6sl: Adding cpu frequency and VDDSOC/PU
- table.
-Message-ID: <1387485338-21225-1-git-send-email-john.tobias.ph@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 19 Dec 2013 05:35:12 +0900
+Subject: [PATCH v2 1/1] ARM: dts: add board dts file for EXYNOS4412 based
+ TINY4412 board
+In-Reply-To: <1486025.NpqSQkmkfm@amdc1227>
+References: <1387373039-4738-1-git-send-email-kasimling@gmail.com>
+ <1486025.NpqSQkmkfm@amdc1227>
+Message-ID: <52B20700.9010607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree for iMX6SL doesn't have an existing cpu frequency table
-as well as the VDDSOC/PU.
+On 12/19/13 00:01, Tomasz Figa wrote:
+> Hi Alex,
+>
+Hi,
 
-Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
----
- arch/arm/boot/dts/imx6sl.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+> On Wednesday 18 of December 2013 21:23:59 Alex Ling wrote:
+>> Add a minimal board dts file for EXYNOS4412 based FriendlyARM's
+>> TINY4412 board. This patch including support peripherals like
+>> UART, SD card on SDMMC2 port and GPIO connected LEDs.
+>>
+>> Signed-off-by: Alex Ling<kasimling@gmail.com>
+>> ---
+>> Changes for v2:
+>>    - Clean up patch description
+>>    - Fix LED labels as Tomasz's suggested
+>>    - Fix style issues
+>>
+>>   arch/arm/boot/dts/Makefile                |    1 +
+>>   arch/arm/boot/dts/exynos4412-tiny4412.dts |   93 +++++++++++++++++++++++++++++
+>>   2 files changed, 94 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
+>
+> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>
+Thanks, applied.
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..d097f76 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -38,6 +38,27 @@
- 			device_type = "cpu";
- 			reg = <0x0>;
- 			next-level-cache = <&L2>;
-+			operating-points = <
-+				/* kHz    uV */
-+				996000  1275000
-+				792000  1175000
-+				396000  975000
-+			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz      SOC-PU uV */
-+				996000          1225000
-+				792000          1175000
-+				396000          1175000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>,
-+					<&clks IMX6SL_CLK_STEP>, <&clks IMX6SL_CLK_PLL1_SW>,
-+					<&clks IMX6SL_CLK_PLL1_SYS>;
-+			clock-names = "arm", "pll2_pfd2_396m", "step",
-+				      "pll1_sw", "pll1_sys";
-+			arm-supply = <&reg_arm>;
-+			pu-supply = <&reg_pu>;
-+			soc-supply = <&reg_soc>;
- 		};
- 	};
- 
--- 
-1.8.3.2
+- Kukjin
