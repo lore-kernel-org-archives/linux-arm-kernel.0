@@ -1,34 +1,76 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 18 Dec 2013 08:40:38 -0300
-Subject: [PATCH v2 08/11] ARM: sun4i: dt: mod0 clocks
-In-Reply-To: <20131218094847.GD2718@lukather>
-References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
- <1387327503-15651-9-git-send-email-emilio@elopez.com.ar>
- <20131218094847.GD2718@lukather>
-Message-ID: <52B189B6.5030807@elopez.com.ar>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 18 Dec 2013 15:41:38 +0400
+Subject: [PATCH 4/5] arm: shmobile: genmai: adapt dts to use native i2c
+ driver
+In-Reply-To: <1387316678-10174-5-git-send-email-wsa@the-dreams.de>
+References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+ <1387316678-10174-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <52B189F2.3080604@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hello.
 
-El 18/12/13 06:48, Maxime Ripard escribi?:
-> Hi Emilio,
+On 18-12-2013 1:44, Wolfram Sang wrote:
+
+> From: Wolfram Sang <wsa@sang-engineering.com>
+
+> Switch from the gpio-driver to the shiny new native driver. Tested by
+> accessing the eeprom on the genmai board.
+
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> Acked-by: Magnus Damm <damm@opensource.se>
+> ---
+>   arch/arm/boot/dts/r7s72100-genmai-reference.dts | 29 ++++++++++---------------
+>   1 file changed, 11 insertions(+), 18 deletions(-)
+
+> diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> index ce5da0b..739448a 100644
+> --- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> +++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> @@ -39,24 +39,6 @@
+>   			gpios = <&port4 11 GPIO_ACTIVE_LOW>;
+>   		};
+>   	};
+> -
+> -	i2c at 0 {
+> -		compatible = "i2c-gpio";
+> -		gpios = <&port1 5 GPIO_ACTIVE_HIGH /* sda */
+> -			 &port1 4 GPIO_ACTIVE_HIGH /* scl */
+> -			>;
+> -		i2c-gpio,sda-open-drain;
+> -		i2c-gpio,scl-open-drain;
+> -		i2c-gpio,delay-us = <5>;	/* ~100 kHz */
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+> -		flash at 50 {
+> -			compatible = "renesas,24c128";
+> -			reg = <0x50>;
+> -			pagesize = <64>;
+> -		};
+> -	};
+>   };
 >
-> On Tue, Dec 17, 2013 at 09:45:00PM -0300, Emilio L?pez wrote:
->> This commit adds all the mod0 clocks present on sun4i to its device tree
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->
-> Even though I gave my Acked-by, could you rename the nodes to
-> something like: "foo_clk: clk at deadbeef"
->
-> The node name is supposed to be the class of devices, and we're likely
-> to use all those labels for the actual controllers, and not the clocks
-> themselves.
+>   &pfc {
+> @@ -68,3 +50,14 @@
+>   		renesas,function = "scif2";
+>   	};
+>   };
+> +
+> +&i2c2 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	eeprom: 24c128 at 50 {
 
-Ok, I'll get that fixed before sending v3.
+    The node was called "flash at 50" for a reason: according to ePAPR spec,  for 
+node names the generic device names should be used, not chip-specific.
 
-Thanks!
+> +		compatible = "renesas,24c128";
+> +		reg = <0x50>;
+> +		pagesize = <64>;
+> +	};
+> +};
 
-Emilio
+WBR, Sergei
