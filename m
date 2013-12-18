@@ -1,54 +1,128 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Tue, 17 Dec 2013 18:02:07 -0800
-Subject: [PATCH v3 4/6] pinctrl: Add pinctrl binding for Broadcom Capri
- SoCs
-In-Reply-To: <CACRpkdZ5Cxii48CsVJzEaBhvZOs8JCcR_hJV=RczhHbW4aqG-w@mail.gmail.com>
-References: <1381174108-25168-1-git-send-email-syin@broadcom.com>	<1386787041-6035-1-git-send-email-syin@broadcom.com>	<1386787041-6035-5-git-send-email-syin@broadcom.com>	<CACRpkdY7s+eUFkg0AsaN5B9-1y_mTJ29Y-D9CkRG2GQ3JshP+w@mail.gmail.com>	<52ABB150.1030702@broadcom.com>
- <CACRpkdZ5Cxii48CsVJzEaBhvZOs8JCcR_hJV=RczhHbW4aqG-w@mail.gmail.com>
-Message-ID: <52B1021F.2010708@broadcom.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 18 Dec 2013 11:07:15 +0900
+Subject: [PATCH 01/04] ARM: shmobile: r7s72100 GPIO and PINCTRL device
+ nodes
+In-Reply-To: <24775601.3oo6NRXHkY@avalon>
+References: <20131217050232.727.9552.sendpatchset@w520>
+ <1836950.NOThFz7jV4@avalon>
+ <CANqRtoScxzFUzVcck3tPPb6k35TWDKHgf9J-K+WxkERcmsmrQA@mail.gmail.com>
+ <24775601.3oo6NRXHkY@avalon>
+Message-ID: <CANqRtoTdyUJgj+L8goMRW5mELjv16SVxkJqgw8tWpHyQyKzb3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-12-16 05:17 AM, Linus Walleij wrote:
-> On Sat, Dec 14, 2013 at 2:16 AM, Sherman Yin <syin@broadcom.com> wrote:
+Hi Laurent,
+
+On Wed, Dec 18, 2013 at 9:40 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
 >
->>>> +- bias-pull-up:                        Integer. Pull up strength in Ohm:
->>>> +                                       1: 1.2 kOhm
->>>> +                                       2: 1.8 kOhm
->>>> +                                       3: 720 Ohm
->>>> +                                       4: 2.7 kOhm
->>>> +                                       5: 831 Ohm
->>>> +                                       6: 1.08 kOhm
->>>> +                                       7: 568 Ohm
->>>
->>>
->>> Please do not use these custom enumerators 1 thru 7.
->>> Instead say that the argument is given in ohms, so for
->>> example:
->>>
->>> bias-pull-up = <12000>;
->>>
->>> Then translate this into the proper enumerator in your
->>> driver instead.
+> On Wednesday 18 December 2013 07:41:57 Magnus Damm wrote:
+>> On Wed, Dec 18, 2013 at 1:29 AM, Laurent Pinchart wrote:
+>> > On Tuesday 17 December 2013 14:02:42 Magnus Damm wrote:
+>> >> From: Magnus Damm <damm@opensource.se>
+>> >>
+>> >> Add support for r7s72100 PFC and GPIO device nodes port0 -> port11
+>> >> and jtagport0.
+>> >>
+>> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> >> ---
+>> >>
+>> >>  arch/arm/boot/dts/r7s72100.dtsi |  154 +++++++++++++++++++++++++++++++++
+>> >>  1 file changed, 154 insertions(+)
+>> >>
+>> >> --- 0001/arch/arm/boot/dts/r7s72100.dtsi
+>> >> +++ work/arch/arm/boot/dts/r7s72100.dtsi      2013-11-27
+>> >> 16:06:36.000000000 +0900
+>
+> [snip]
+>
+>> >> +
+>> >> +     port0: gpio at fcfe3100 {
+>> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+>> >> +             reg = <0xfcfe3100 0x4>, /* PSR */
+>> >> +                       <0xfcfe3200 0x2>, /* PPR */
+>> >> +                       <0xfcfe3800 0x4>; /* PMSR */
+>> >> +             #gpio-cells = <2>;
+>> >> +             gpio-controller;
+>> >> +             gpio-ranges = <&pfc 0 0 6>;
+>> >> +     };
+>> >> +
+>> >> +     port1: gpio at fcfe3104 {
+>> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
+>> >> +             reg = <0xfcfe3104 0x4>, /* PSR */
+>> >> +                       <0xfcfe3204 0x2>, /* PPR */
+>> >> +                       <0xfcfe3804 0x4>; /* PMSR */
+>> >> +             #gpio-cells = <2>;
+>> >> +             gpio-controller;
+>> >> +             gpio-ranges = <&pfc 0 16 16>;
+>> >
+>> > As P0 has 6 pins only this should ideally be
+>> >
+>> >                 gpio-ranges = <&pfc 0 6 16>;
+>> >
+>> > Otherwise the PFC driver will expose pins that don't exist. However, that
+>> > would require computing the pin numbers in the PFC driver differently, as
+>> > we currently just use the bank * 16 + index formula. Given that we only
+>> > have three ports with less than 16 pins we could come up with a not
+>> > overly complex formula that can be evaluated at compile time. Something
+>> > like this should do.
+>> >
+>> > #define RZ_PORT_PIN(bank, pin) \
+>> >
+>> >         (bank) < 1 ? (pin) : \
+>> >         (bank) < 6 ? 6 + (((bank) - 1) * 16) + (pin)) : \
+>> >         (bank) < 10 ? 6 + 11 + 4 * 16 + (((bank) - 6) * 16) + (pin)) : \
+>> >         6 + 11 + 8 + 7 * 16 + (((bank) - 10) * 16) + (pin))
 >>
->> Ok.  The 3 bits in this enumeration correspond to enabling the 3 pull up Rs
->> (1.2k, 1.8k, 2.7k) in parallel, so the enum kind of make sense. But sure I
->> can change it to actual ohms and will error out in the driver if specified
->> value is not one of the 7.
+>> Uhm, well, you can make the mapping more compact yes, but I'm not sure
+>> if I agree that it becomes any better. Isn't it better to simply
+>> follow the per-port setup that the manual defines? Is there an actual
+>> problem with having unused GPIOs?
 >
-> Aha, that's how they do it :-)
+> If I'm not mistaken it's unused pins, not unused GPIOs. They waste memory in
+> data tables, although by a relatively small amount. Oh, and of course, it's
+> not clean ;-)
+
+Yes, you are correct about pins vs GPIOs. Regarding how to implement
+RZ_PORT_PIN(), I believe the only way not to shoot yourself in the
+foot is to keep things simple. I also think that some level of
+redundancy is an acceptable tradeoff if it keeps things simpler. So I
+suppose cleanliness is a matter of taste. =)
+
+> Speaking of data tables, I'm thinking about simplifying them. The RZ/A1H is a
+> good candidate for that, as each pin is handled individually, and several
+> registers could be handled to with a small amount of code instead of large
+> data tables. It's just a thought for now, I have more urgent tasks to work on.
+
+Incremental patches to improve the state is always nice, thanks.
+
+>> Actually, I prefer going in the opposite direction so I would like to
+>> share the simple version of RZ_PORT_PIN() in a header file like we do
+>> with RCAR_GP_PIN() in <linux/platform_data/gpio-rcar.h>. This because
+>> we would like to use the same macro in the GPIO driver and in the
+>> current PFC code (and potentially more PFCs using the same GPIO
+>> driver).
 >
-> Please write this in a comment in the driver because it makes
-> it a lot easier to understand what is going on, and e.g. how to
-> fuzz an apropriate resistance.
+> What do you need it for in the GPIO driver ?
 
-Yes, I plan to explain where those odd numbers come from in this file.
+Well, I thought I needed it but it turns out that I'm wrong. =)
 
-> Can you tell me something about how such resistors are produced
-> in silicon?
+Initially I had the following two in the header file:
++#define RZ_GPIOS_PER_PORT 16
++#define RZ_PORT_PIN(bank, pin) (((bank) * RZ_GPIOS_PER_PORT) + (pin))
 
-Sorry I'm not quite sure.  I only know a little bit of the circuitry 
-down to the schematic level...
+RZ_GPIOS_PER_PORT was used in both the GPIO driver and
+RZ_PORT_PIN() was used in the PFC driver
 
-Regards,
-Sherman
+On a second though, I don't mind duplicating them.
+
+I do however think your version of the RZ_PORT_PIN() is overly
+complex. And that needs to be matched with updated gpio-ranges that
+together seem quite error prone to me.
+
+How would you like me to proceed?
+
+Cheers,
+
+/ magnus
