@@ -1,49 +1,309 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Dec 2013 03:33:53 +0000 (UTC)
-Subject: [PATCHv10 01/41] clk: add support for platform specific clock
- I/O wrapper functions
-In-Reply-To: <alpine.DEB.2.02.1312171212170.14039@utopia.booyaka.com>
-References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
- <1385453182-24421-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1312171212170.14039@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1312180332380.14039@utopia.booyaka.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Wed, 18 Dec 2013 03:34:45 +0000
+Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131217111020.GF13823@ulmo.nvidia.com>
+References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
+ <1386925027-16288-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131217111020.GF13823@ulmo.nvidia.com>
+Message-ID: <f63d1e4711ad4643972590c3ceb63fd4@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Dec 2013, Paul Walmsley wrote:
-
-> On Tue, 26 Nov 2013, Tero Kristo wrote:
+> > --- a/drivers/pwm/Makefile
+> > +++ b/drivers/pwm/Makefile
+> > @@ -5,6 +5,7 @@ obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
+> >  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
+> >  obj-$(CONFIG_PWM_EP93XX)	+= pwm-ep93xx.o
+> >  obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
+> > +obj-$(CONFIG_PWM_FSL_FTM)	+= pwm-fsl-ftm.o
 > 
-> > Current clock wrappers assume simple and direct mapped hardware register
-> > access. Improve this support by adding functionality for registering
-> > platform specific clock I/O wrappers, which can be used to support
-> > various features needed like endianess conversions, indexed regmap support,
-> > etc. Default I/O wrapper provided also which uses the existing direct
-> > I/O mapped behavior.
+> This needs to move up one line to preserve the alphabetical ordering.
 > 
-> I think it makes more sense to define per-SoC register read and write 
-> functions,
 
-Sorry, this should have read "per-IP block register read and write 
-functions".
+Yes, it had been. It caused by the rebase operation and after that I
+haven't aware about this. I will revise this.
 
-> for the same reason that I think it makes more sense to define clock 
-> data as part of the IP blocks that contain the clocks' registers.  The 
-> register read and write functions should be implemented by the drivers 
-> for the IP blocks that the clocks are contained in.  That way the 
-> register read and write functions can take whatever steps are necessary 
-> to ensure that the IP block registers are accessible before performing 
-> the read/write; can implement non-MMIO register accesses if needed; and 
-> can operate on register offsets, rather than absolute addresses.
+
+> > diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
+> [...]
+> > +struct fsl_pwm_chip {
+> [...]
+> > +	int big_endian;
 > 
-> Something like the following draft implementation.  Also needed would be a 
-> way for clock providers that rely on the common clock providers (e.g., 
-> divider, mux, etc.) to pass in the struct clk_ll_ops pointer.  I guess the 
-> simplest way to implement this would be to add another set of registration 
-> functions - e.g., clk_register_divider_ipb() or clk_register_divider2() or 
-> something similar.  These functions would be similar to 
-> clk_register_divider(), but would take a pointer to a struct clk_ll_ops 
-> and pass that along to the CCF core.
+> This should be of type bool.
+
+I'll revise it.
+
+> 
+> > +};
+> > +
+> > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
+> > +		const void __iomem *addr)
+> > +{
+> > +	u32 val;
+> > +
+> > +	val = __raw_readl(addr);
+> > +
+> > +	if (likely(fpc->big_endian))
+> 
+> The likely() probably isn't very useful in this case. But if you want to
+> keep it, it should at least be reversed, since little-endian is actually
+> the default (you have to specify the big-endian property to activate the
+> big endian mode).
+> 
+
+So why added the likely() for bit endian mode is that this driver maybe used
+for ARM and like PowerPC architectures, and in PowerPC platforms and LS-1 series
+the big endian mode will be used almostly. Now only VF610-twr is the little
+endian mode devices, and this is also why I added the big endian mode support.
 
 
-- Paul
+> > +		val = be32_to_cpu(val);
+> > +	else
+> > +		val = le32_to_cpu(val);
+> > +	rmb();
+> 
+> I'd prefer the rmb() to follow the __raw_readl() immediately to make the
+> relationship more explicit.
+> 
+
+The fsl_pwm_readl() and fsl_pwm_writel() are almost copied the readl() and
+writel().
+
+For instance:
++ static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
++                 const void __iomem *addr)
++ {
++         u32 val;
++
++         val = __raw_readl(addr);
++ 
++         if (likely(fpc->big_endian))
++                 val = be32_to_cpu(val);
++         else
++                 val = le32_to_cpu(val);
++         rmb();
++
++         return val;
++ }
+As we can see, this is one inline function, if locating the rmb() just follow
+__raw_readl() immediately, I'm not very sure the compiler will do the following
+reorders ?
+
+In some function calls the fsl_pwm_readl(Address1) and little-endain mode is used:
+
+The original code is:
+tmp = fsl_pwm_readl(Address1)
+<Do calculating about the tmp value returned from fsl_pwm_readl here>
+
+Maybe reordered to :
+tmp = raw_readl(addr);
+rmb(); 
+<Do calculating about the tmp value returned from fsl_pwm_readl here>
+tmp = le32_to_cpu(tmp);
+...
+
+As we have known that in the fsl_pwm_readl(), the 'val' used by le32_to_cpu() has
+a dependency on __raw_readl(), so the compiler will grantee the right orders, and
+also the Arch will grantee the right orders too.
+
+This is why I located the rmb() just before 'return val'.
+
+> > +static inline int fsl_pwm_calculate_default_ps(struct fsl_pwm_chip *fpc,
+> > +		int index)
+> 
+> Please align arguments on subsequent lines with the first argument on the
+> first line. There are a few more of those in this file, please check all
+> other functions as well.
+> 
+> Also I think it's better to turn the FSL_PWM_CLK_* enum into a named enum
+> and reuse the type here. That way you get proper type-checking.
+> 
+> > +	switch (index) {
+> [...]
+> > +	default:
+> > +		return -EINVAL;
+> 
+> And with proper type checking you don't need this default case anymore.
+>
+
+I'll revise this.
+
+
+ 
+> > +static unsigned long fsl_pwm_calculate_period_cycles(struct fsl_pwm_chip
+> *fpc,
+> > +		unsigned long period_ns, int index) {
+> > +	int ret;
+> > +	unsigned long cycles;
+> > +
+> > +	fpc->counter_clk_select = FTM_SC_CLK(index);
+> > +
+> > +	ret = fsl_pwm_calculate_default_ps(fpc, index);
+> > +	if (ret) {
+> > +		dev_err(fpc->chip.dev, "failed to calculate default ps.\n");
+> 
+> No need for the terminating fullstop (.) here, but perhaps you could write
+> out what "ps" actually stands for. Also including the error code in the
+> error message would be good since you're not propagating the error to the
+> caller.
+> 
+
+Yes, I will.
+
+> > +	cycles = fsl_pwm_calculate_cycles(fpc, period_ns);
+> > +
+> > +	return cycles;
+> 
+> This can simply be "return fsl_pwm_calculate_cycles(fpc, period_ns);", in
+> which case you can get rid of the cycles variable.
+> 
+
+That's better.
+
+> > +static unsigned long fsl_pwm_calculate_period(struct fsl_pwm_chip *fpc,
+> > +		unsigned long period_ns)
+> > +{
+> [...]
+> > +	if (fix_rate > ext_rate) {
+> > +		m0 = FSL_PWM_CLK_FIX;
+> > +		m1 = FSL_PWM_CLK_EXT;
+> > +	} else {
+> > +		m0 = FSL_PWM_CLK_EXT;
+> > +		m1 = FSL_PWM_CLK_FIX;
+> > +
+> > +	}
+> 
+> There's a gratuitous blank line above this one.
+> 
+I'll remove it.
+
+> > +		dev_err(fpc->chip.dev, "fail to config pwm%d, the period "
+> > +				"time should be the same with the current "
+> > +				"running pwm(s).\n", pwm->hwpwm);
+> 
+> I think I'd make this error message more terse and put more information
+> into a comment. Perhaps something like this:
+> 
+> 	/*
+> 	 * The FSL FTM controller supports only a single period for all PWM
+> 	 * channels, therefore incompatible changes need to be refused.
+> 	 */
+> 	if (fpc->period_ns && fpc->period_ns != period_ns) {
+> 		dev_err(fpc->chip.dev,
+> 			"conflicting period requested for PWM %u\n",
+> 			pwm->hwpwm);
+> 		...
+> 	}
+> 
+> > +		mutex_unlock(&fpc->lock);
+> > +		return -EINVAL;
+> 
+> I think something like -EBUSY would be more appropriate here.
+> 
+
+Agree, I will use this.
+
+> > +	if (!fpc->period_ns && duty_ns) {
+> > +		period = fsl_pwm_calculate_period(fpc, period_ns);
+> > +		if (!period) {
+> > +			dev_err(fpc->chip.dev, "fail to calculate the "
+> 
+> "failed"
+> 
+> > +					"period cycles.\n");
+> 
+> And no fullstop either. Also I don't think you need "cycles" here. In fact
+> something equally accurate like this:
+> 
+> 			dev_err(fpc->chip.dev, "failed to calculate period\n");
+> 
+> Still fits within 80 characters.
+> 
+
+Yes, I will.
+
+> > +		fpc->period_ns = period_ns;
+> > +	}
+> > +	mutex_unlock(&fpc->lock);
+> 
+> This could use a blank line as well.
+> 
+
+I'll add it.
+
+> > +static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device
+> *pwm,
+> > +				enum pwm_polarity polarity)
+> > +{
+> > +	u32 val;
+> > +	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
+> > +
+> > +	val = fsl_pwm_readl(fpc, fpc->base + FTM_POL);
+> > +	if (polarity == PWM_POLARITY_INVERSED)
+> 
+> Blank line between the above.
+>
+I will.
+
+ 
+> > +static int fsl_pwm_probe(struct platform_device *pdev) {
+> > +	int ret;
+> > +	struct fsl_pwm_chip *fpc;
+> > +	struct resource *res;
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +
+> > +	fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
+> > +	if (!fpc)
+> > +		return -ENOMEM;
+> > +
+> > +	mutex_init(&fpc->lock);
+> > +
+> > +	fpc->chip.dev = &pdev->dev;
+> > +
+> > +	fpc->big_endian = of_property_read_bool(np, "big-endian");
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	fpc->base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(fpc->base))
+> > +		return PTR_ERR(fpc->base);
+> > +
+> > +	fpc->sys_clk = devm_clk_get(fpc->chip.dev, "ftm_sys");
+> 
+> For consistency I'd use &pdev->dev here...
+> 
+> > +	if (IS_ERR(fpc->sys_clk)) {
+> > +		dev_err(fpc->chip.dev,
+> 
+> ... and here.
+> 
+
+I will.
+
+> > +	ret = pwmchip_add(&fpc->chip);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
+> 
+> Perhaps "failed to add PWM chip: %d\n", so that %d isn't confused to mean
+> the PWM chip number?
+> 
+Yes, that's better.
+
+> > +static int fsl_pwm_remove(struct platform_device *pdev) {
+> > +	struct fsl_pwm_chip *fpc = platform_get_drvdata(pdev);
+> > +
+> > +	mutex_destroy(&fpc->lock);
+> 
+> I think you can drop this. Once fsl_pwm_remove() exists, the memory pointed
+> to by fpc will be freed, so you won't be able to access the mutex anyway.
+> 
+
+Yes, actually it is.
+Well I think this can make the code more robust and uniform.
+
+
+
+Thanks,
+
+--
+Xiubo
