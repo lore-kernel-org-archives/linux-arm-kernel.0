@@ -1,86 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Dec 2013 12:59:24 +0100
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <20131218114211.GF4360@n2100.arm.linux.org.uk>
-References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131217122519.GI32118@arm.com>
- <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
- <20131218100321.GC4360@n2100.arm.linux.org.uk>
- <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu-FuohSFpPHdjfphK_CtaFZPYSFSK5eFNfFnLY8Jt_U=A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Dec 2013 12:00:23 +0000
+Subject: OMAP display subsystem - does it work?
+Message-ID: <20131218120023.GG4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 December 2013 12:42, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Dec 18, 2013 at 11:27:14AM +0000, Catalin Marinas wrote:
->> On Wed, Dec 18, 2013 at 11:15:45AM +0000, Ard Biesheuvel wrote:
->> > On 18 December 2013 11:55, Russell King - ARM Linux
->> > <linux@arm.linux.org.uk> wrote:
->> > > On Wed, Dec 18, 2013 at 11:25:40AM +0100, Ard Biesheuvel wrote:
->> > >> On 18 December 2013 11:03, Russell King - ARM Linux
->> > >> <linux@arm.linux.org.uk> wrote:
->> > >> > If we allocate the ARM64 private never-will-appear-on-ARM hwcaps in bit
->> > >> > 32 and above, they'll be hidden from 32-bit stuff.  Hopefully, glibc
->> > >> > doesn't concatenate the HWCAP and HWCAP2 fields though - someone should
->> > >> > check that.
->> > >> >
->> > >> > Since the bits in the ARM64 hwcap are different from the ARM32 hwcap, I
->> > >> > don't see any point in defining them for ARM32 - userspace needs to make
->> > >> > the definition conditional anyway, and can't interpret the bits as-is
->> > >> > because ARM64 already omits many of the ARM32 ones.
->> > >>
->> > >> Please note that this is about the compat bits, not the ARM64 specific
->> > >> ones. These correspond 1:1 with the ARM32 ones. The idea is that a
->> > >> binary built for ARM will have access to the extended instructions
->> > >> which ARM64 offers to ARM32 binaries running in 32 bit compatibility
->> > >> mode (such as AES, SHAx etc).
->> > >
->> > > This all sounds rather silly IMHO.  As ARM32 natively doesn't support
->> > > these instructions, why should running an ARM32 binary under ARM64
->> > > end up offering this?
->> > >
->> > > If the ARM64 additional instructions are to be used, surely it's not
->> > > unreasonable to require ARM64 native applications?
->> >
->> > Well, the ARM architects have decided that there shall be Crypto
->> > Extensions instructions not only for ARMv8/Aarch64 but also for
->> > ARMv8/Aarch32. This is fully spec'ed in the latest ARM ARM. For
->> > instance, previously unused NEON opcodes on ARM32 have been allocated
->> > to AES instructions. (for instance, implemented for QEMU here
->> > https://git.linaro.org/people/peter.maydell/qemu-arm.git/commitdiff/9d935509)
->>
->> Indeed. AArch32 is not _dead_ with ARMv8 but getting new features. The
->> point of this patch is to have a common set of bits between compat arm64
->> and arm kernel. The AArch32 applications running on ARMv8 (most likely
->> with an arm64 kernel) may want to make use of the crypto extensions.
->>
->> If you want a more complete solution, we could add ID_ISAR5 checks on
->> the arm kernel.
->
-> The point is that they'll never appear on an ARMv7 implementation because
-> they're not part of the ARMv7 architecture.  I see no point in needlessly
-> polluting ARM32 with ARM64 stuff - in exactly the same way that you see
-> no point in polluting ARM64 with ARM32 stuff.
->
+In my continuing woes with having the OMAP boards I have produce output,
+where things used to work on the LDP, they now do not.  And on the SDP4430
+board, where things were detected, they're no longer detected.
 
-You are assuming ARMv7 == ARM32 and ARMv8 == ARM64, while in reality,
-they are orthogonal.
+I thought this was just a matter of adjusting the configuration, but it
+seems there's much more wrong than just that - so I wasn't too worried.
+Last night, I updated the configuration to ensure that the appropriate
+connector configuration symbols were enabled (see the changelog in the
+configuration seeds.)
 
-The 32-bit kernel you are maintaining can potentially run on 32-bit
-only v8 implementations (as Catalin pointed out), and both the arm64
-and ARM kernels contain implementations for the Aarch32 userland ABI.
+All the time that stuff on OMAP gets broken and/or doesn't work (inspite
+of repeated attempts at reporting problems - I've never seen the displays
+on the SDP4430 board ever work with a mainline kernel in all the years
+I've had the platform - but they have worked with the originally supplied
+TI kernels) I really find myself not really caring very much about OMAP
+and whether it works or not.
 
-So if the current proposal is unsuitable in your opinion, could we at
-least have your input on how it should be done instead? Preferably
-using a method that supports ifunc relocations, so the loader can
-automatically resolve the correct implementation for the hardware at
-hand?
+Quite honestly, I regard OMAP as nothing more than an overly complex toy
+implementation rather than a serious architecture because of this kind
+of stuff - unlike every other ARM platform where stuff like this "just
+works", OMAP stuff is always seems to be much harder to make work, and
+more prone to stuff breaking.
 
-Regards,
-Ard.
+So, here goes.  LDP3430:
+
+OMAP DSS rev 2.0
+omapdss DPI error: can't get VDDS_DSI regulator
+omapfb omapfb: failed to connect default display
+omapfb omapfb: failed to init overlay connections
+omapfb omapfb: failed to setup omapfb
+platform omapfb: Driver omapfb requests probe deferral
+
+I don't see evidence of it being re-probed, but I do see this during boot
+which implies that there's nothing there:
+
+XIO:  fatal IO error 104 (Connection reset by peer) on X server ":0.0"
+      after 0 requests (0 known processed) with 0 events remaining.
+
+
+
+For the SDP4430, it used to detect the displays, even though nothing has
+ever been displayed on them.  Now it just spits out this:
+
+OMAP DSS rev 4.0
+omapdss DSI error: can't get VDDS_DSI regulator
+panel-dsi-cm panel-dsi-cm.0: Failed to connect to video source
+omapfb omapfb: failed to connect default display
+omapfb omapfb: failed to init overlay connections
+omapfb omapfb: failed to setup omapfb
+platform omapfb: Driver omapfb requests probe deferral
+...
+omapdss DSI error: failed to set complexio power state to 1
+panel-dsi-cm panel-dsi-cm.0: failed to enable DSI
+omapfb omapfb: Failed to enable display 'lcd'
+omapfb omapfb: failed to initialize default display
+omapfb omapfb: failed to setup omapfb
+
+Configurations, build and boot logs are all on
+http://www.arm.linux.org.uk/developer/build/
