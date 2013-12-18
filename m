@@ -1,35 +1,37 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 18 Dec 2013 11:02:02 -0600
-Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
-In-Reply-To: <52B1D3DC.1010304@baylibre.com>
-References: <1386626150-23504-1-git-send-email-nm@ti.com>
- <52B0A9C8.7070201@ti.com> <52B1D3DC.1010304@baylibre.com>
-Message-ID: <52B1D50A.50406@ti.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 18 Dec 2013 18:03:01 +0100
+Subject: [PATCH V2 3/4] ARM: socfpga: clk: fix compile error
+In-Reply-To: <1387386182-30923-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1387386182-30923-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1387386182-30923-4-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2013 10:57 AM, Benoit Cousson wrote:
-> On 17/12/2013 20:45, Nishanth Menon wrote:
->> On 12/09/2013 03:55 PM, Nishanth Menon wrote:
->>> Craneboard is a hardware development platform based on the Sitara
->>> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
->>> details. Add basic devices for craneboard as replacement for the board
->>> file scheduled for removal as part of device tree conversion
->>>
->>> [1] http://craneboard.org
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> ---
->>
->> gentle ping.. had'nt seen a response on this patch. Could we queue
->> this up for v3.14-rc1?
->
-> Yep, it looks good to me.
-Thanks benoit.
+Fix the following compile error:
 
-> But if you don't mind I'll start pushing my branch after Xmas :-).
+drivers/clk/socfpga/clk-gate.c:118:27: error: invalid operands to binary & (have 'void *' and 'int')
 
-As long as Tony is ok with it, I have no issues either - will be great 
-to have dt only boot in .14-rc1 though.
-Regards,
-Nishanth Menon
+introduced by:
+
+clk: socfpga: Look for the GPIO_DB_CLK by its offset
+
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ drivers/clk/socfpga/clk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index f140ece..e1284fb 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -244,7 +244,7 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
+ 		val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
+ 		val &= div_mask(socfpgaclk->width);
+ 		/* Check for GPIO_DB_CLK by its offset */
+-		if (socfpgaclk->div_reg & SOCFPGA_GPIO_DB_CLK_OFFSET)
++		if ((int) socfpgaclk->div_reg & SOCFPGA_GPIO_DB_CLK_OFFSET)
+ 			div = val + 1;
+ 		else
+ 			div = (1 << val);
+-- 
+1.8.5.1
