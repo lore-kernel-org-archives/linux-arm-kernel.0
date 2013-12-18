@@ -1,62 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 18 Dec 2013 18:02:14 +0400
-Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
-In-Reply-To: <20131218134914.GA32664@verge.net.au>
-References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
- <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
- <52B1892B.1020806@cogentembedded.com> <20131218114351.GD3314@katana>
- <52B18CC9.8090200@cogentembedded.com> <20131218121541.GE3314@katana>
- <20131218134914.GA32664@verge.net.au>
-Message-ID: <52B1AAE6.2020400@cogentembedded.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 18 Dec 2013 15:07:43 +0100
+Subject: [PATCH 2/2] kvmtool/arm: Add option to override Generic Timer
+ frequency
+In-Reply-To: <52B1A6A9.1030107@arm.com>
+References: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
+ <1387305074-29421-3-git-send-email-robin.murphy@arm.com>
+ <308D5B7E-5BDA-4984-9448-EAD8B5D699CF@suse.de> <52B1A6A9.1030107@arm.com>
+Message-ID: <46C11E1C-4EEF-4EAE-9507-21384CE80127@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
 
-On 18-12-2013 17:49, Simon Horman wrote:
+On 18.12.2013, at 14:44, Robin Murphy <robin.murphy@arm.com> wrote:
 
->>>>>> @@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
->>>>>>   	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+> On 17/12/13 20:39, Alexander Graf wrote:
+>> 
+>> On 17.12.2013, at 19:31, Robin Murphy <robin.murphy@arm.com> wrote:
+>> 
+>>> Some platforms have secure firmware which does not correctly set the
+>>> CNTFRQ register on boot, preventing the use of the Generic Timer.
+>>> This patch allows mirroring the necessary host workaround by specifying
+>>> the clock-frequency property in the guest DT.
+>>> 
+>>> This should only be considered a means of KVM bring-up on such systems,
+>>> such that vendors may be convinced to properly implement their firmware
+>>> to support the virtualisation capabilities of their hardware.
+>>> 
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>> 
+>> How does it encourage a vendor to properly implement their firmware if there's a workaround?
+>> 
+>> 
+>> Alex
+>> 
+>> 
+> 
+> Hi Alex,
+> 
+> In short, by enabling the users to create the demand. Yes, like any workaround there's potential for abuse, but having *something* that makes it work is the difference between "I want virtualisation"[1] and "Dear vendor, I've tried virtualisation on your chip/board and it's great, but it tells me I need new firmware, where do I get that?"
+> 
+> Having the specs tell them what to do clearly isn't sufficient, so let's give the integrators and consumers incentive to shout at them too. The sooner proper support is commonplace and we can deprecate clock-frequency hacks altogether, the better.
 
->>>>>>   	/* ICK */
->>>>>> +	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
->>>>>> +	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
->>>>>> +	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
->>>>>> +	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+Oh, I'm all for hacks. But please don't fall under the illusion that this will push vendors to fix their firmware. It will have the opposite effect - vendors will just point to the workaround and say "but it works" :).
 
->>>>>     These belong to some other place, the group marked by /* ICK */
->>>>> is only for CLKDEV_ICK_ID().
+Either way, this hack is basically required because you can't program CNTFRQ because it's controlled by secure firmware, right? So the host os already needs to know about this and probably does have a "clock-frequency" value in its device tree entry already to know how fast its clock ticks.
 
->>>> So, I'll create a /* DEV */ prefix?
+Couldn't we search for that host entry and automatically pass it into the guest if it's there? That way the whole thing becomes seamless and even less of an issue.
 
->>>     I really don't know. Other places have /* MSTP */ comment in this
->>> case despite all clocks, CLKDEV_DEV_ID() and CLKDEV_ICK_ID() are
->>> really MSTP clocks. I considered the idea of separating
->>> CLKDEV_ICK_ID() under /* ICK */ comment silly from the very start
->>> but Simon didn't listen to me.
 
->> I am puzzled, too. ICK is a type of registration and not a clock domain.
->> Also, there is 'mtu2_fck' which is under ICK as well as MSTP? Looks
->> wrong. From what I understand now, removing the /* ICK */ comment would
->> be easiest and proper?
-
-> I'm not sure that I really understand what all the fuss is about.
-
-> As I understand things the convention that prevails for
-> MSTP clocks under mach-shmobile is as follows:
-
-> 1. Clocks not registered by CLKDEV_ICK_ID() are grouped together
->     under /* MSTP */ followed by:
-> 2. Clocks registered using CLKDEV_ICK_ID() are grouped together
->     under /* ICK */
-
-> I am unsure of the historical reason for this
-
-    Recent patches by Morimoto-san.
-
-> but it does seem to be consistent.
-
-    No, it doesn't. These comments are *clearly* not consistent and should be 
-removed at least.
-
-WBR, Sergei
+Alex
