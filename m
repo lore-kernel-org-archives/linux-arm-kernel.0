@@ -1,23 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 18 Dec 2013 10:45:48 +0800
-Subject: imx6 power consumption
-In-Reply-To: <E1VszO5-00060R-Gp@merlin.infradead.org>
-References: <E1VszO5-00060R-Gp@merlin.infradead.org>
-Message-ID: <20131218024546.GA6691@S2101-09.ap.freescale.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 17 Dec 2013 18:57:22 -0800
+Subject: [PATCH v2 02/11] clk: sunxi: add gating support to PLL1
+In-Reply-To: <1387327503-15651-3-git-send-email-emilio@elopez.com.ar>
+References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+ <1387327503-15651-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20131218025722.23538.49745@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 07:28:27PM +0100, Bj?rn Erik Nilsen wrote:
-> Hi,
+Quoting Emilio L?pez (2013-12-17 16:44:54)
+> This commit adds gating support to PLL1 on the clock driver. This makes
+> the PLL1 implementation fully compatible with PLL4 as well.
 > 
-> I have measured power consumption for imx6 in mem mode on the 3.12.4 mainstream kernel vs. 3.0.35 kernel from freescale/boundary devices. I noticed a significant increase going from 3.0 to 3.12 . I have at least identified one big difference: DDR is no longer tri-stated, which accounts for some of the difference.
-> 
-> I use 'echo mem > /sys/power/state' for my test case.
-> 
-> Do you know if someone is looking into this issue, or if there are pending patches somewhere?
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-It's an unimplemented feature rather than an issue.  There are some
-patches on Freescale 3.10 kernel, and you're welcomed to bring these
-patches to mainline kernel.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Shawn
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 2 +-
+>  drivers/clk/sunxi/clk-sunxi.c                     | 2 ++
+>  2 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 91a748f..b8c6cc4 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -7,7 +7,7 @@ This binding uses the common clock binding[1].
+>  Required properties:
+>  - compatible : shall be one of the following:
+>         "allwinner,sun4i-osc-clk" - for a gatable oscillator
+> -       "allwinner,sun4i-pll1-clk" - for the main PLL clock
+> +       "allwinner,sun4i-pll1-clk" - for the main PLL clock and PLL4
+>         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+>         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+>         "allwinner,sun4i-axi-clk" - for the AXI clock
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 6f756f4..5b86234 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -292,11 +292,13 @@ static struct clk_factors_config sun4i_apb1_config = {
+>  };
+>  
+>  static const struct factors_data sun4i_pll1_data __initconst = {
+> +       .enable = 31,
+>         .table = &sun4i_pll1_config,
+>         .getter = sun4i_get_pll1_factors,
+>  };
+>  
+>  static const struct factors_data sun6i_a31_pll1_data __initconst = {
+> +       .enable = 31,
+>         .table = &sun6i_a31_pll1_config,
+>         .getter = sun6i_a31_get_pll1_factors,
+>  };
+> -- 
+> 1.8.5.1
+> 
