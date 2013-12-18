@@ -1,52 +1,91 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 18 Dec 2013 15:07:43 +0100
-Subject: [PATCH 2/2] kvmtool/arm: Add option to override Generic Timer
- frequency
-In-Reply-To: <52B1A6A9.1030107@arm.com>
-References: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
- <1387305074-29421-3-git-send-email-robin.murphy@arm.com>
- <308D5B7E-5BDA-4984-9448-EAD8B5D699CF@suse.de> <52B1A6A9.1030107@arm.com>
-Message-ID: <46C11E1C-4EEF-4EAE-9507-21384CE80127@suse.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 18 Dec 2013 15:09:16 +0100
+Subject: [PATCH v5] ARM: new platform for Energy Micro's EFM32 Cortex-M3
+ SoCs
+In-Reply-To: <CAOesGMgdd+guHqrCwVjRd+zQ_-LtUb+0XAwCLeD+hL++NgssTQ@mail.gmail.com>
+References: <1386694516-5876-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131212011505.GD21856@quad.lixom.net>
+ <20131212212811.GD12238@pengutronix.de>
+ <CAOesGMgdd+guHqrCwVjRd+zQ_-LtUb+0XAwCLeD+hL++NgssTQ@mail.gmail.com>
+Message-ID: <20131218140916.GO14866@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 18.12.2013, at 14:44, Robin Murphy <robin.murphy@arm.com> wrote:
-
-> On 17/12/13 20:39, Alexander Graf wrote:
->> 
->> On 17.12.2013, at 19:31, Robin Murphy <robin.murphy@arm.com> wrote:
->> 
->>> Some platforms have secure firmware which does not correctly set the
->>> CNTFRQ register on boot, preventing the use of the Generic Timer.
->>> This patch allows mirroring the necessary host workaround by specifying
->>> the clock-frequency property in the guest DT.
->>> 
->>> This should only be considered a means of KVM bring-up on such systems,
->>> such that vendors may be convinced to properly implement their firmware
->>> to support the virtualisation capabilities of their hardware.
->>> 
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> Acked-by: Will Deacon <will.deacon@arm.com>
->> 
->> How does it encourage a vendor to properly implement their firmware if there's a workaround?
->> 
->> 
->> Alex
->> 
->> 
+On Thu, Dec 12, 2013 at 01:55:38PM -0800, Olof Johansson wrote:
+> On Thu, Dec 12, 2013 at 1:28 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > On Wed, Dec 11, 2013 at 05:15:05PM -0800, Olof Johansson wrote:
+> >> On Tue, Dec 10, 2013 at 05:55:16PM +0100, Uwe Kleine-K?nig wrote:
+> >> > There are still some missing parts (e.g. board support, device trees),
+> >> > but with these bits added on top of this patch I can successfully boot a
+> >> > EFM32GG-DK3750 board that uses an EFM32GG990F1024.
+> >> >
+> >> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >> > ---
+> >> > Hello,
+> >> >
+> >> > I'd like to get this patch in for 3.14. The latest submission (v4,
+> >> > Message-Id:1383562853-17202-4-git-send-email-u.kleine-koenig at pengutronix.de)
+> >> > had some strict dependencies:
+> >> >  - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1
+> >> >    to be able to drop Makefile.boot, this is still in Status=Incoming in
+> >> >    rmk's patch tracker.
+> >> >  - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7890/1
+> >> >    to be able to drop the unused <mach/entry-macro.S>. This is already
+> >> >    applied by rmk in his for-next branch, so it's not stable yet.
+> >> >  - My series to drop <mach/timex.h> for !MULTI_PLATFORM. I'll send a
+> >> >    pull request for that soon.
+> >> >  - Patch "clocksource: time-efm32: Select CLKSRC_MMIO". This is part of
+> >> >    a pull request by Daniel Lezcano that is expected to hit Linus T.'s
+> >> >    tree for the next -rc. It currently sits as
+> >> >    4ff3774e451fefb1781638c76230b3cf9a206b92 in Daniel's tree at
+> >> >    git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/fixes
+> >> >    .
+> >> >
+> >> > To make application a bit easier I added dummy files to drop the
+> >> > dependencies on the first three items of the list above.
+> >> >
+> >> > So it would be great if you could apply this patch when 4ff3774e4 went
+> >> > in. (In case you want to apply it already now, this last dependency
+> >> > could be work arounded, too, by adding a "select CLKSRC_MMIO" to
+> >> > ARCH_EFM32.)
+> >> >
+> >> > Other than that the only change since v4 is that I mention the exact
+> >> > board/processor combo in the changelog now.
+> >> >
+> >> > Thanks for considering this patch, best regards
+> >>
+> >> Applied to next/soc with a slightly tweaked patch subject.
+> > Thanks, but I wonder if it's a problem that the commit doesn't build? (i.e.
+> >
+> >         git checkout f9b9cef1329c74607f33a20dce3f26e9a1f4ae96
+> >         make efm32_defconfig
+> >         make
+> >
+> > fails in
+> >
+> >  - arch/arm/kernel/sigreturn_codes.S with
+> >    "Error: selected processor does not support ARM opcodes" and a few
+> >    variations.
+> >  - drivers/clocksource/time-efm32.o fails to link, because next/soc
+> >    isn't a decendant of 4ff3774e451f.
+> >
+> > You can fix the latter by adding "select CLKSRC_MMIO" to ARCH_EFM32 if
+> > you want. I don't remember what is the current state of the first
+> > problem.)
 > 
-> Hi Alex,
-> 
-> In short, by enabling the users to create the demand. Yes, like any workaround there's potential for abuse, but having *something* that makes it work is the difference between "I want virtualisation"[1] and "Dear vendor, I've tried virtualisation on your chip/board and it's great, but it tells me I need new firmware, where do I get that?"
-> 
-> Having the specs tell them what to do clearly isn't sufficient, so let's give the integrators and consumers incentive to shout at them too. The sooner proper support is commonplace and we can deprecate clock-frequency hacks altogether, the better.
+> Ok, dropped the patch again. Please let us know when the former has
+> been resolved.
+You did drop it, but when fetching today from armsoc, commit
+f9b9cef1329c74607f made it back into next/soc. There is only a single
+commit on top of it made by khilman (added to Cc:).
 
-Oh, I'm all for hacks. But please don't fall under the illusion that this will push vendors to fix their firmware. It will have the opposite effect - vendors will just point to the workaround and say "but it works" :).
+Hint: There is an open pull request that you can substitute
+f9b9cef1329c74607f with.
 
-Either way, this hack is basically required because you can't program CNTFRQ because it's controlled by secure firmware, right? So the host os already needs to know about this and probably does have a "clock-frequency" value in its device tree entry already to know how fast its clock ticks.
+Best regards
+Uwe
 
-Couldn't we search for that host entry and automatically pass it into the guest if it's there? That way the whole thing becomes seamless and even less of an issue.
-
-
-Alex
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
