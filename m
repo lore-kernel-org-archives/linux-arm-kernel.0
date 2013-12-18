@@ -1,49 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 18 Dec 2013 13:15:42 +0100
-Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
-In-Reply-To: <52B18CC9.8090200@cogentembedded.com>
-References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
- <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
- <52B1892B.1020806@cogentembedded.com>
- <20131218114351.GD3314@katana>
- <52B18CC9.8090200@cogentembedded.com>
-Message-ID: <20131218121541.GE3314@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Dec 2013 12:15:51 +0000
+Subject: [PATCH V2 2/8] string: fix strncmp function
+In-Reply-To: <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
+Message-ID: <20131218121551.GH4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 18, 2013 at 01:09:05PM +0100, Piotr Wilczek wrote:
+> Now function returns the number of characters that differ in the
+> compared strings.
 
-On Wed, Dec 18, 2013 at 03:53:45PM +0400, Sergei Shtylyov wrote:
-> On 18-12-2013 15:43, Wolfram Sang wrote:
-> 
-> >>>@@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
-> >>>  	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
-> 
-> >>>  	/* ICK */
-> >>>+	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
-> >>>+	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
-> >>>+	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
-> >>>+	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
-> 
-> >>    These belong to some other place, the group marked by /* ICK */
-> >>is only for CLKDEV_ICK_ID().
-> 
-> >So, I'll create a /* DEV */ prefix?
-> 
->    I really don't know. Other places have /* MSTP */ comment in this
-> case despite all clocks, CLKDEV_DEV_ID() and CLKDEV_ICK_ID() are
-> really MSTP clocks. I considered the idea of separating
-> CLKDEV_ICK_ID() under /* ICK */ comment silly from the very start
-> but Simon didn't listen to me.
+I think this is a mistake.  You're defining a standard C function in
+a non-standard way.  For strcmp() and strncmp(), the C standard
+requires:
 
-I am puzzled, too. ICK is a type of registration and not a clock domain.
-Also, there is 'mtu2_fck' which is under ICK as well as MSTP? Looks
-wrong. From what I understand now, removing the /* ICK */ comment would
-be easiest and proper?
+RETURN VALUE
+       The strcmp() and strncmp() functions return an integer less than, equal
+       to, or greater than zero if s1 (or the first n bytes thereof) is found,
+       respectively, to be less than, to match, or be greater than s2.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/f0c7f207/attachment.sig>
+If you implement something different to that, don't call it strcmp() or
+strncmp() but something else, because you're not providing the correct
+functionality, and that will just confuse people and lead to bugs.
+
+For instance, can you be sure that there aren't any uses of strncmp()
+which already test for less-than-zero etc?
