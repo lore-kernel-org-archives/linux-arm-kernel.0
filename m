@@ -1,151 +1,279 @@
 From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 18 Dec 2013 13:58:44 +0100
-Subject: [PATCH v6 0/2] ARM: mach-moxart: add MOXA ART SoC support
-Message-ID: <1387371526-15309-1-git-send-email-jonas.jensen@gmail.com>
+Date: Wed, 18 Dec 2013 13:58:45 +0100
+Subject: [PATCH v6 1/2] ARM: mach-moxart: add MOXA ART SoC platform files
+In-Reply-To: <1387371526-15309-1-git-send-email-jonas.jensen@gmail.com>
+References: <1387371526-15309-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1387371526-15309-2-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the replies!
+The MOXA ART SoC is based on Faraday's FA526. This is a ARMv4 32-bit
+192 MHz CPU with MMU and 16KB/8KB D/I-cache.
 
-This should tick the boxes on feedback except for one detail
-on the fixed rate clock:
+Add platform support for this SoC.
 
-Moving fixed-clock "ref12" from .dtsi to .dts proved problematic
-for other clocks, this is why ref12 is still in SoC.
+Also add UC-7112-LX as a machine.
 
-My assertion is that "fixed-clock" clocks are probed later when
-placed in .dts (see diff and boot log below).
-of_clk_get() from clk_pll in .dtsi fails, i.e. fixed-clock ref12
-is not added as a provider in time before clk_pll loads.
-
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 1ed591a..89dc8ca 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -98,8 +98,10 @@ void of_fixed_clk_setup(struct device_node *node)
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
- 	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
--	if (!IS_ERR(clk))
-+	if (!IS_ERR(clk)) {
-+		pr_info("%s: of_clk_add_provider node=%p\n", __func__, node);
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	}
- }
- EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
- CLK_OF_DECLARE(fixed_clk, "fixed-clock", of_fixed_clk_setup);
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 8312736..bd6c0c6 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2192,13 +2192,21 @@ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
- 	/* Check if we have such a provider in our array */
- 	mutex_lock(&of_clk_lock);
- 	list_for_each_entry(provider, &of_clk_providers, link) {
-+		pr_info("%s: provider->node=%p clkspec->np=%p\n", __func__, provider->node, clkspec->np);
- 		if (provider->node == clkspec->np)
- 			clk = provider->get(clkspec, provider->data);
--		if (!IS_ERR(clk))
-+		if (!IS_ERR(clk)) {
- 			break;
-+		} else {
-+			pr_info("%s: provider->get() failed\n", __func__);
-+		}
- 	}
- 	mutex_unlock(&of_clk_lock);
- 
-+	if (IS_ERR(clk)) {
-+		pr_info("%s: no providers\n", __func__);
-+	}
-+
- 	return clk;
- }
- 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 442a313..57b2fc6 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -36,8 +36,10 @@ struct clk *of_clk_get(struct device_node *np, int index)
- 
- 	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
- 					&clkspec);
--	if (rc)
-+	if (rc) {
-+		pr_info("%s: of_parse_phandle_with_args() failed\n", __func__);
- 		return ERR_PTR(rc);
-+	}
- 
- 	clk = of_clk_get_from_provider(&clkspec);
- 	of_node_put(clkspec.np);
-
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.13.0-rc4-next-20131218+ (i at Ildjarn) (gcc version 4.6.3 (crosstool-NG 1.16.0) ) #1387 PREEMPT Wed Dec 18 12:20:50 CET 2013
-[    0.000000] CPU: FA526 [66015261] revision 1 (ARMv4), cr=0000397f
-[    0.000000] CPU: VIVT data cache, VIVT instruction cache
-[    0.000000] Machine model: MOXA UC-7112-LX
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Memory policy: Data cache writeback
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 8128
-[    0.000000] Kernel command line: console=ttyS0,115200n8 earlyprintk root=/dev/mmcblk0p1 rw rootwait
-[    0.000000] PID hash table entries: 128 (order: -3, 512 bytes)
-[    0.000000] Dentry cache hash table entries: 4096 (order: 2, 16384 bytes)
-[    0.000000] Inode-cache hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.000000] Memory: 29616K/32768K available (2266K kernel code, 71K rwdata, 216K rodata, 103K init, 111K bss, 3152K reserved)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-[    0.000000]     vmalloc : 0xc2800000 - 0xff000000   ( 968 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xc2000000   (  32 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc0274c44   (2484 kB)
-[    0.000000]       .init : 0xc0275000 - 0xc028ed50   ( 104 kB)
-[    0.000000]       .data : 0xc0290000 - 0xc02a1ee0   (  72 kB)
-[    0.000000]        .bss : 0xc02a1eec - 0xc02bdb64   ( 112 kB)
-[    0.000000] SLUB: HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-[    0.000000] Preemptible hierarchical RCU implementation.
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] of_clk_get_from_provider: no providers
-[    0.000000] /soc/clk_pll at 98100000: of_clk_get failed
-[    0.000000] of_clk_get_from_provider: no providers
-[    0.000000] /soc/clk_apb at 98100000: of_clk_get failed
-[    0.000000] of_fixed_clk_setup: of_clk_add_provider node=c02ff5bc
-[    0.000000] of_clk_get_from_provider: provider->node=c02ff5bc clkspec->np=c02fe7dc
-[    0.000000] of_clk_get_from_provider: provider->get() failed
-[    0.000000] of_clk_get_from_provider: no providers
-[    0.000000] Kernel panic - not syncing: /soc/timer at 98400000: of_clk_get failed
-
-Changes since v5:
-
-1. change Makefile objects list order, sort alphabetically
-2. add "clocks = <&ref12>" to clk_pll node in board file,
-   remove it from SoC
-3. move PHY nodes from SoC to board
-
-Applies to next-20131218
-
-Jonas Jensen (2):
-  ARM: mach-moxart: add MOXA ART SoC platform files
-  ARM: mach-moxart: add MOXA ART SoC device tree files
-
- Documentation/devicetree/bindings/arm/moxart.txt |  12 ++
- arch/arm/Kconfig                                 |   2 +
- arch/arm/Makefile                                |   1 +
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/moxart-uc7112lx.dts            | 109 ++++++++++++++++
- arch/arm/boot/dts/moxart.dtsi                    | 154 +++++++++++++++++++++++
- arch/arm/configs/moxart_defconfig                | 149 ++++++++++++++++++++++
- arch/arm/mach-moxart/Kconfig                     |  31 +++++
- arch/arm/mach-moxart/Makefile                    |   3 +
- arch/arm/mach-moxart/moxart.c                    |  15 +++
- 10 files changed, 477 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/moxart.txt
- create mode 100644 arch/arm/boot/dts/moxart-uc7112lx.dts
- create mode 100644 arch/arm/boot/dts/moxart.dtsi
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
+ arch/arm/Kconfig                  |   2 +
+ arch/arm/Makefile                 |   1 +
+ arch/arm/configs/moxart_defconfig | 149 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-moxart/Kconfig      |  31 ++++++++
+ arch/arm/mach-moxart/Makefile     |   3 +
+ arch/arm/mach-moxart/moxart.c     |  15 ++++
+ 6 files changed, 201 insertions(+)
  create mode 100644 arch/arm/configs/moxart_defconfig
  create mode 100644 arch/arm/mach-moxart/Kconfig
  create mode 100644 arch/arm/mach-moxart/Makefile
  create mode 100644 arch/arm/mach-moxart/moxart.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e462c5d..1835956 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -948,6 +948,8 @@ source "arch/arm/mach-ks8695/Kconfig"
+ 
+ source "arch/arm/mach-msm/Kconfig"
+ 
++source "arch/arm/mach-moxart/Kconfig"
++
+ source "arch/arm/mach-mv78xx0/Kconfig"
+ 
+ source "arch/arm/mach-imx/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index aa791d1..35ff8aa 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -167,6 +167,7 @@ machine-$(CONFIG_ARCH_KIRKWOOD)		+= kirkwood
+ machine-$(CONFIG_ARCH_KS8695)		+= ks8695
+ machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
+ machine-$(CONFIG_ARCH_MMP)		+= mmp
++machine-$(CONFIG_ARCH_MOXART)		+= moxart
+ machine-$(CONFIG_ARCH_MSM)		+= msm
+ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+ machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+diff --git a/arch/arm/configs/moxart_defconfig b/arch/arm/configs/moxart_defconfig
+new file mode 100644
+index 0000000..a3cb76c
+--- /dev/null
++++ b/arch/arm/configs/moxart_defconfig
+@@ -0,0 +1,149 @@
++# CONFIG_LOCALVERSION_AUTO is not set
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_SYSCTL_SYSCALL=y
++# CONFIG_ELF_CORE is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_TIMERFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_COMPAT_BRK is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_ARCH_MULTI_V4T=y
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_KEYBOARD_GPIO_POLLED=y
++CONFIG_ARCH_MOXART=y
++CONFIG_MACH_UC7112LX=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++# CONFIG_ATAGS is not set
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FW_LOADER is not set
++CONFIG_MTD=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_COMPLEX_MAPPINGS=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_PROC_DEVICETREE=y
++CONFIG_NETDEVICES=y
++CONFIG_NETCONSOLE=y
++CONFIG_NETCONSOLE_DYNAMIC=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++CONFIG_ARM_MOXART_ETHER=y
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_REALTEK_PHY=y
++CONFIG_MDIO_MOXART=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++CONFIG_INPUT_EVDEV=y
++CONFIG_INPUT_EVBUG=y
++# CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=1
++CONFIG_SERIAL_8250_RUNTIME_UARTS=1
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_DEBUG_GPIO=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_MOXART=y
++CONFIG_POWER_SUPPLY=y
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_GPIO=y
++# CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_CORE=y
++CONFIG_WATCHDOG_NOWAYOUT=y
++CONFIG_MOXART_WDT=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI_MOXART=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_ONESHOT=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_MOXART=y
++CONFIG_DMADEVICES=y
++CONFIG_MOXART_DMA=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT3_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++CONFIG_JFFS2_FS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_PAGEALLOC=y
++CONFIG_DEBUG_OBJECTS=y
++CONFIG_DEBUG_KMEMLEAK=y
++CONFIG_DEBUG_STACK_USAGE=y
++CONFIG_DEBUG_MEMORY_INIT=y
++CONFIG_DEBUG_SHIRQ=y
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_PREEMPT is not set
++CONFIG_PROVE_LOCKING=y
++CONFIG_DMA_API_DEBUG=y
++CONFIG_KGDB=y
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_8250=y
++CONFIG_DEBUG_UART_PHYS=0x98200000
++CONFIG_DEBUG_UART_VIRT=0xf9820000
++CONFIG_EARLY_PRINTK=y
++CONFIG_KEYS=y
++CONFIG_CRC32_BIT=y
+diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
+new file mode 100644
+index 0000000..ba470d6
+--- /dev/null
++++ b/arch/arm/mach-moxart/Kconfig
+@@ -0,0 +1,31 @@
++config ARCH_MOXART
++	bool "MOXA ART SoC" if ARCH_MULTI_V4T
++	select CPU_FA526
++	select ARM_DMA_MEM_BUFFERABLE
++	select DMA_OF
++	select USE_OF
++	select CLKSRC_OF
++	select CLKSRC_MMIO
++	select HAVE_CLK
++	select COMMON_CLK
++	select GENERIC_IRQ_CHIP
++	select ARCH_REQUIRE_GPIOLIB
++	select GENERIC_CLOCKEVENTS
++	select PHYLIB if NETDEVICES
++	help
++	  Say Y here if you want to run your kernel on hardware with a
++	  MOXA ART SoC.
++	  The MOXA ART SoC is based on a Faraday FA526 ARMv4 32-bit
++	  192 MHz CPU with MMU and 16KB/8KB D/I-cache (UC-7112-LX).
++	  Used on models UC-7101, UC-7112/UC-7110, IA240/IA241, IA3341.
++
++if ARCH_MOXART
++
++config MACH_UC7112LX
++	bool "MOXA UC-7112-LX"
++	depends on ARCH_MOXART
++	help
++	  Say Y here if you intend to run this kernel on a MOXA
++	  UC-7112-LX embedded computer.
++
++endif
+diff --git a/arch/arm/mach-moxart/Makefile b/arch/arm/mach-moxart/Makefile
+new file mode 100644
+index 0000000..fa022eb
+--- /dev/null
++++ b/arch/arm/mach-moxart/Makefile
+@@ -0,0 +1,3 @@
++# Object file lists.
++
++obj-$(CONFIG_MACH_UC7112LX)	+= moxart.o
+diff --git a/arch/arm/mach-moxart/moxart.c b/arch/arm/mach-moxart/moxart.c
+new file mode 100644
+index 0000000..86b6d9b
+--- /dev/null
++++ b/arch/arm/mach-moxart/moxart.c
+@@ -0,0 +1,15 @@
++/*
++ * arch/arm/mach-moxart/moxart.c
++ *
++ * (C) Copyright 2013, Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 -- 
 1.8.2.1
