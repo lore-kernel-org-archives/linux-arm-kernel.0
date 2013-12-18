@@ -1,67 +1,48 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 18 Dec 2013 12:15:35 -0500
-Subject: [PATCH v7 8/9] phy: add Broadcom Kona USB2 PHY driver
-In-Reply-To: <20131218162554.GF4970@saruman.home>
-References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
- <1387309356-17195-9-git-send-email-mporter@linaro.org>
- <20131218162554.GF4970@saruman.home>
-Message-ID: <20131218171535.GF15814@beef>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 18 Dec 2013 18:16:22 +0100
+Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
+In-Reply-To: <52B1D50A.50406@ti.com>
+References: <1386626150-23504-1-git-send-email-nm@ti.com>
+ <52B0A9C8.7070201@ti.com> <52B1D3DC.1010304@baylibre.com>
+ <52B1D50A.50406@ti.com>
+Message-ID: <52B1D866.7040300@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 10:25:54AM -0600, Felipe Balbi wrote:
-> On Tue, Dec 17, 2013 at 02:42:35PM -0500, Matt Porter wrote:
-> > Add a driver for the internal Broadcom Kona USB 2.0 PHY found
-> > on the BCM281xx family of SoCs.
-> > 
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> 
-> Kishon, are you ok with this driver ?
+On 18/12/2013 18:02, Nishanth Menon wrote:
+> On 12/18/2013 10:57 AM, Benoit Cousson wrote:
+>> On 17/12/2013 20:45, Nishanth Menon wrote:
+>>> On 12/09/2013 03:55 PM, Nishanth Menon wrote:
+>>>> Craneboard is a hardware development platform based on the Sitara
+>>>> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
+>>>> details. Add basic devices for craneboard as replacement for the board
+>>>> file scheduled for removal as part of device tree conversion
+>>>>
+>>>> [1] http://craneboard.org
+>>>>
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> ---
+>>>
+>>> gentle ping.. had'nt seen a response on this patch. Could we queue
+>>> this up for v3.14-rc1?
+>>
+>> Yep, it looks good to me.
+> Thanks benoit.
+>
+>> But if you don't mind I'll start pushing my branch after Xmas :-).
+>
+> As long as Tony is ok with it, I have no issues either - will be great
+> to have dt only boot in .14-rc1 though.
 
-Kishon did mention he was fine with this if I addressed a couple
-comments a couple versions ago, I neglected solicit his ack though.
+Good point, it is already -rc4.
 
-> > +static int bcm_kona_usb2_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct bcm_kona_usb *phy;
-> > +	struct resource *res;
-> > +	struct phy *gphy;
-> > +	struct phy_provider *phy_provider;
-> > +
-> > +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-> > +	if (!phy)
-> > +		return -ENOMEM;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	phy->regs = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (IS_ERR(phy->regs))
-> > +		return PTR_ERR(phy->regs);
-> > +
-> > +	platform_set_drvdata(pdev, phy);
-> > +
-> > +	phy_provider = devm_of_phy_provider_register(dev,
-> > +			of_phy_simple_xlate);
-> > +	if (IS_ERR(phy_provider))
-> > +		return PTR_ERR(phy_provider);
-> > +
-> > +	gphy = devm_phy_create(dev, &ops, NULL);
-> > +	if (IS_ERR(gphy))
-> > +		return PTR_ERR(gphy);
-> > +
-> > +	/* The Kona PHY supports an 8-bit wide UTMI interface */
-> > +	phy_set_bus_width(gphy, 8);
-> > +
-> > +	phy_set_drvdata(gphy, phy);
-> 
-> I think this set_drvdata() should be done before registering the
-> provider, no ?
+OK, I'll just queued it and pushed it to for_3.14/dts.
 
-It seems so, given that we wouldn't want the provider on on the
-provider list until the phy has been allocated and configured.
+Regards,
+Benoit
 
-Interestingly, this also needs to be addressed in the four phy
-drivers already upstream...they all do the same thing before the
-generic phy is created.
-
--Matt
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
