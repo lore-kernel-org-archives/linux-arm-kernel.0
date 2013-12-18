@@ -1,108 +1,239 @@
-From: nvmarkzhang@gmail.com (Mark Zhang)
-Date: Wed, 18 Dec 2013 16:02:23 +0800
-Subject: [PATCHv7 06/12] ARM: tegra: create a DT header defining SWGROUP ID
-In-Reply-To: <1386835033-4701-7-git-send-email-hdoyu@nvidia.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-7-git-send-email-hdoyu@nvidia.com>
-Message-ID: <52B1568F.1050305@gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 18 Dec 2013 15:10:57 -0500
+Subject: [PATCH V2 2/2] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
+ when cpufreq is changed
+In-Reply-To: <20131218073321.GF6691@S2101-09.ap.freescale.net>
+References: <1387318102-11070-1-git-send-email-b20788@freescale.com>
+ <1387318102-11070-2-git-send-email-b20788@freescale.com>
+ <20131218073321.GF6691@S2101-09.ap.freescale.net>
+Message-ID: <20131218201057.GA20579@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2013 03:57 PM, Hiroshi Doyu wrote:
-> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> binding. "swgroup" is a group of H/W clients which a Tegra SoC
-> supports. This unique ID can be used to calculate MC_SMMU_<swgroup
-> name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
-> register bit. This will allow the same header to be used by both
-> device tree files, and drivers implementing this binding, which
-> guarantees that the two stay in sync. This also makes device trees
-> more readable by using names instead of magic numbers. For HOTRESET
-> bit shifting we need another conversion table, which will come later.
+On Wed, Dec 18, 2013 at 03:33:23PM +0800, Shawn Guo wrote:
+> On Tue, Dec 17, 2013 at 05:08:22PM -0500, Anson Huang wrote:
+> > on i.MX6Q, cpu freq change need to follow below flows:
+> > 
+> > 1. each setpoint has different VDDARM, VDDSOC/PU voltage, get the setpoint
+> >    table from dts;
+> > 2. when cpu freq is scaling up, need to increase VDDSOC/PU voltage before
+> >    VDDARM, if VDDPU is off, no need to change it;
+> > 3. when cpu freq is scaling down, need to decrease VDDARM voltage before
+> >    VDDSOC/PU, if VDDPU is off, no need to change it;
+> > 
+> > normally dts will pass vddsoc/pu freq/volt info to kernel, if not, will
+> > use fixed value for vddsoc/pu voltage setting.
+> > 
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > ---
+> >  drivers/cpufreq/imx6q-cpufreq.c |  117 +++++++++++++++++++++++++++++----------
+> >  1 file changed, 88 insertions(+), 29 deletions(-)
+> > 
+> > diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> > index 4b3f18e..65c1df1 100644
+> > --- a/drivers/cpufreq/imx6q-cpufreq.c
+> > +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> > @@ -35,6 +35,9 @@ static struct device *cpu_dev;
+> >  static struct cpufreq_frequency_table *freq_table;
+> >  static unsigned int transition_latency;
+> >  
+> > +static u32 *imx6_soc_volt;
+> > +static u32 soc_opp_count;
+> > +
+> >  static unsigned int imx6q_get_speed(unsigned int cpu)
+> >  {
+> >  	return clk_get_rate(arm_clk) / 1000;
+> > @@ -69,23 +72,24 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+> >  
+> >  	/* scaling up?  scale voltage before frequency */
+> >  	if (new_freq > old_freq) {
+> > +		if (regulator_is_enabled(pu_reg)) {
+> > +			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> > +			if (ret) {
+> > +				dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
+> > +				return ret;
+> > +			}
+> > +		}
+> > +		ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> > +		if (ret) {
+> > +			dev_err(cpu_dev, "failed to scale vddsoc up: %d\n", ret);
+> > +			return ret;
+> > +		}
+> >  		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> >  		if (ret) {
+> >  			dev_err(cpu_dev,
+> >  				"failed to scale vddarm up: %d\n", ret);
+> >  			return ret;
+> >  		}
+> > -
+> > -		/*
+> > -		 * Need to increase vddpu and vddsoc for safety
+> > -		 * if we are about to run at 1.2 GHz.
+> > -		 */
+> > -		if (new_freq == FREQ_1P2_GHZ / 1000) {
+> > -			regulator_set_voltage_tol(pu_reg,
+> > -					PU_SOC_VOLTAGE_HIGH, 0);
+> > -			regulator_set_voltage_tol(soc_reg,
+> > -					PU_SOC_VOLTAGE_HIGH, 0);
+> > -		}
+> >  	}
+> >  
+> >  	/*
+> > @@ -120,12 +124,17 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+> >  				 "failed to scale vddarm down: %d\n", ret);
+> >  			ret = 0;
+> >  		}
+> > -
+> > -		if (old_freq == FREQ_1P2_GHZ / 1000) {
+> > -			regulator_set_voltage_tol(pu_reg,
+> > -					PU_SOC_VOLTAGE_NORMAL, 0);
+> > -			regulator_set_voltage_tol(soc_reg,
+> > -					PU_SOC_VOLTAGE_NORMAL, 0);
+> > +		ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> > +		if (ret) {
+> > +			dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+> > +			ret = 0;
+> > +		}
+> > +		if (regulator_is_enabled(pu_reg)) {
+> > +			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> > +			if (ret) {
+> > +				dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
+> > +				ret = 0;
+> > +			}
+> >  		}
+> >  	}
+> >  
+> > @@ -153,6 +162,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+> >  	struct dev_pm_opp *opp;
+> >  	unsigned long min_volt, max_volt;
+> >  	int num, ret;
+> > +	const struct property *prop;
+> > +	const __be32 *val;
+> > +	u32 nr, i, j;
+> >  
+> >  	cpu_dev = get_cpu_device(0);
+> >  	if (!cpu_dev) {
+> > @@ -201,10 +213,69 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+> >  		goto put_node;
+> >  	}
+> >  
+> > +	/* Make imx6_soc_volt array's size same as arm opp number */
+> > +	imx6_soc_volt = devm_kzalloc(cpu_dev, sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
+> > +	if (imx6_soc_volt == NULL) {
+> > +		dev_warn(cpu_dev, "No valid memory for imx6_soc_volt!\n");
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
-> v6:
-> Use 0xffffffff instead of ~0UL since dtc expand this to ~0ULL.
+> Drop this message.  Error code -ENOMEM is enough to tell what's going
+> wrong.
+
+Oh, sorry, I forget this one, you have told me in last patch's comment. Will drop it in V3.
+
+
 > 
-> v5:
-> Added new macro TEGRA_SWGROUP_CELLS() and WO_U32_OF_U64().
+> > +		ret = -ENOMEM;
+> > +		goto free_freq_table;
+> > +	}
+> > +
+> > +	prop = of_find_property(np, "fsl,soc-operating-points", NULL);
+> > +	if (!prop || !prop->value) {
+> > +		dev_warn(cpu_dev, "No valid fsl,soc-operating-points property is found!\n");
+> > +		goto soc_opp_out;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Each OPP is a set of tuples consisting of frequency and
+> > +	 * voltage like <freq-kHz vol-uV>.
+> > +	 */
+> > +	nr = prop->length / sizeof(u32);
+> > +	if (nr % 2 || (nr / 2) < num) {
+> > +		dev_warn(cpu_dev, "Invalid fsl,soc-operating-points list!\n");
+> > +		goto soc_opp_out;
+> > +	}
+> > +
+> > +	rcu_read_lock();
 > 
-> v4:
-> This is almost same as the previous v3. Just TEGRA_SWGROUP_MAX is
-> added.
->   [PATCHv3 15/19] ARM: tegra: Create a DT header defining SWGROUP ID
+> You do not need this lock any more.
+
+Right, the lock is only required by opp_find_freq_exact routine, will remove it in V3.
+
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  include/dt-bindings/memory/tegra-swgroup.h | 50 ++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 include/dt-bindings/memory/tegra-swgroup.h
+> > +	for (j = 0; j < num; j++) {
+> > +		val = prop->value;
+> > +		for (i = 0; i < nr / 2; i++) {
+> > +			unsigned long freq = be32_to_cpup(val++);
+> > +			unsigned long volt = be32_to_cpup(val++);
+> > +			if (freq_table[j].frequency == freq) {
+> > +				imx6_soc_volt[soc_opp_count++] = volt;
+> > +				break;
+> > +			}
+> > +		}
+> > +	}
+> > +	rcu_read_unlock();
+> > +
+> > +soc_opp_out:
+> > +	/* use fixed soc opp volt if no valid soc opp info found in dtb */
+> > +	if (soc_opp_count != num) {
+> > +		dev_warn(cpu_dev, "can NOT find valid soc opp info in dtb, use default value!\n");
 > 
-> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-> new file mode 100644
-> index 0000000..9c279f1
-> --- /dev/null
-> +++ b/include/dt-bindings/memory/tegra-swgroup.h
-> @@ -0,0 +1,50 @@
-> +/*
-> + * This header provides constants for binding nvidia,swgroup ID
-> + */
-> +
-> +#ifndef _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
-> +#define _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
-> +
-> +#define TEGRA_SWGROUP_AFI	0	/* 0x238 */
-> +#define TEGRA_SWGROUP_AVPC	1	/* 0x23c */
-> +#define TEGRA_SWGROUP_DC	2	/* 0x240 */
-> +#define TEGRA_SWGROUP_DCB	3	/* 0x244 */
-> +#define TEGRA_SWGROUP_EPP	4	/* 0x248 */
-> +#define TEGRA_SWGROUP_G2	5	/* 0x24c */
-> +#define TEGRA_SWGROUP_HC	6	/* 0x250 */
-> +#define TEGRA_SWGROUP_HDA	7	/* 0x254 */
-> +#define TEGRA_SWGROUP_ISP	8	/* 0x258 */
-> +#define TEGRA_SWGROUP_ISP2	SWGROUP_ISP
-> +#define TEGRA_SWGROUP_DC14	9	/* 0x490 *//* Exceptional non-linear */
-> +#define TEGRA_SWGROUP_DC12	10	/* 0xa88 *//* Exceptional non-linear */
-> +#define TEGRA_SWGROUP_MPE	11	/* 0x264 */
-> +#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
+> It will be a little noisy for old DTB case with print so many warnings.
+> Maybe we should drop above two dev_warn() in fsl,soc-operating-points
+> property check and do once here.
 
-Need to change this to:
+Agreed, will do that in V3.
 
-#define TEGRA_SWGROUP_MSENC	11
+> 
+> > +		for (j = 0; j < num; j++)
+> > +			imx6_soc_volt[j] = PU_SOC_VOLTAGE_NORMAL;
+> > +		if (freq_table[num - 1].frequency * 1000 == FREQ_1P2_GHZ)
+> > +			imx6_soc_volt[num - 1] = PU_SOC_VOLTAGE_HIGH;
+> > +	}
+> > +
+> >  	if (of_property_read_u32(np, "clock-latency", &transition_latency))
+> >  		transition_latency = CPUFREQ_ETERNAL;
+> >  
+> >  	/*
+> > +	 * Calculate the ramp time for max voltage change in the
+> > +	 * VDDSOC and VDDPU regulators.
+> > +	 */
+> > +	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> > +	if (ret > 0)
+> > +		transition_latency += ret * 1000;
+> > +	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> 
+> One of the regulator_set_voltage_time() should be for pu_reg.
 
-The reason is that, this makes "TEGRA_SWGROUP_BIT" doesn't work. So if I
-write "TEGRA_SWGROUP_CELLS(MSENC)" in dt, that causes a dt compiling error.
+Yes, I saw this right after sending out V2 patch set, will do that in V3.
 
-"TEGRA_SWGROUP_ISP2" has the same issue.
-
-Mark
-> +#define TEGRA_SWGROUP_NV	12	/* 0x268 */
-> +#define TEGRA_SWGROUP_NV2	13	/* 0x26c */
-> +#define TEGRA_SWGROUP_PPCS	14	/* 0x270 */
-> +#define TEGRA_SWGROUP_SATA2	15	/* 0x274 */
-> +#define TEGRA_SWGROUP_SATA	16	/* 0x278 */
-> +#define TEGRA_SWGROUP_VDE	17	/* 0x27c */
-> +#define TEGRA_SWGROUP_VI	18	/* 0x280 */
-> +#define TEGRA_SWGROUP_VIC	19	/* 0x284 */
-> +#define TEGRA_SWGROUP_XUSB_HOST	20	/* 0x288 */
-> +#define TEGRA_SWGROUP_XUSB_DEV	21	/* 0x28c */
-> +#define TEGRA_SWGROUP_A9AVP	22	/* 0x290 */
-> +#define TEGRA_SWGROUP_TSEC	23	/* 0x294 */
-> +#define TEGRA_SWGROUP_PPCS1	24	/* 0x298 */
-> +#define TEGRA_SWGROUP_SDMMC1A	25	/* 0xa94 *//* Linear shift again */
-> +#define TEGRA_SWGROUP_SDMMC2A	26	/* 0xa98 */
-> +#define TEGRA_SWGROUP_SDMMC3A	27	/* 0xa9c */
-> +#define TEGRA_SWGROUP_SDMMC4A	28	/* 0xaa0 */
-> +#define TEGRA_SWGROUP_ISP2B	29	/* 0xaa4 */
-> +#define TEGRA_SWGROUP_GPU	30	/* 0xaa8 */
-> +#define TEGRA_SWGROUP_GPUB	31	/* 0xaac */
-> +#define TEGRA_SWGROUP_PPCS2	32	/* 0xab0 */
-> +
-> +#define TWO_U32_OF_U64(x)	((x) & 0xffffffff) ((x) >> 32)
-> +#define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
-> +#define TEGRA_SWGROUP_CELLS(x)	TWO_U32_OF_U64(TEGRA_SWGROUP_BIT(x))
-> +
-> +#define TEGRA_SWGROUP_MAX	64
-> +
-> +#endif /* _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H */
+> 
+> Shawn
+> 
+> > +	if (ret > 0)
+> > +		transition_latency += ret * 1000;
+> > +
+> > +	/*
+> >  	 * OPP is maintained in order of increasing frequency, and
+> >  	 * freq_table initialised from OPP is therefore sorted in the
+> >  	 * same order.
+> > @@ -221,18 +292,6 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+> >  	if (ret > 0)
+> >  		transition_latency += ret * 1000;
+> >  
+> > -	/* Count vddpu and vddsoc latency in for 1.2 GHz support */
+> > -	if (freq_table[num].frequency == FREQ_1P2_GHZ / 1000) {
+> > -		ret = regulator_set_voltage_time(pu_reg, PU_SOC_VOLTAGE_NORMAL,
+> > -						 PU_SOC_VOLTAGE_HIGH);
+> > -		if (ret > 0)
+> > -			transition_latency += ret * 1000;
+> > -		ret = regulator_set_voltage_time(soc_reg, PU_SOC_VOLTAGE_NORMAL,
+> > -						 PU_SOC_VOLTAGE_HIGH);
+> > -		if (ret > 0)
+> > -			transition_latency += ret * 1000;
+> > -	}
+> > -
+> >  	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
+> >  	if (ret) {
+> >  		dev_err(cpu_dev, "failed register driver: %d\n", ret);
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
 > 
