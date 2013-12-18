@@ -1,35 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Dec 2013 19:50:35 +0100
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <20131218172956.GG28112@arm.com>
-References: <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
- <20131218100321.GC4360@n2100.arm.linux.org.uk>
- <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
- <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
- <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
- <20131218172956.GG28112@arm.com>
-Message-ID: <CAKv+Gu9mzXQ-5V=x=uMmXme6fZCyXvNhYy2oRA1DSkgGjjzYEQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 18 Dec 2013 13:50:58 -0500
+Subject: [PATCH V2 2/8] string: fix strncmp function
+In-Reply-To: <20131218160114.GP2609@titan.lakedaemon.net>
+References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
+ <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
+ <20131218121551.GH4360@n2100.arm.linux.org.uk>
+ <52B193BE.1080206@gmail.com>
+ <20131218125203.GI4360@n2100.arm.linux.org.uk>
+ <20131218160114.GP2609@titan.lakedaemon.net>
+Message-ID: <20131218185058.GR2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 December 2013 18:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
+On Wed, Dec 18, 2013 at 11:01:15AM -0500, Jason Cooper wrote:
+> On Wed, Dec 18, 2013 at 12:52:03PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Dec 18, 2013 at 01:23:26PM +0100, Daniel Mack wrote:
+> > > On 12/18/2013 01:15 PM, Russell King - ARM Linux wrote:
+> > > > For instance, can you be sure that there aren't any uses of strncmp()
+> > > > which already test for less-than-zero etc?
+> > > 
+> > > In this case, yes. The code as it stands is very small, and users only
+> > > check for the return value of these functions to be 0.
+> > > 
+> > > But I wonder whether that patch is needed at all. At least the rest of
+> > > this series does not even seem to introduce new call sites of strcmp()
+> > > or strncmp() ...
+> > 
+> > The implementation appears to be buggy as it stands - all it does is
+> > sum up the differences in the whole string.
+> > 
+> > What if you're comparing two strings:
+> > 
+> > 	ac
+> > 	ca
+> > 
+> > The first character has a difference of +2, the second has a difference
+> > of -2.  Sum those together and you get zero.  Oh, the two strings are
+> > identical!
+> 
+> Yes, you are correct, the implementation isn't perfect.  I'll correct it
+> since I introduced it.
 
-> For the time being, I merged the first two patches for AArch64 support.
-> I'm not merging the compat one yet as this should strictly follow the
-> arch/arm support.
->
+I've pushed the following:
 
-Yeah, I guess that makes sense.
+-------8<---------------------------------
+commit c3da82f0caa50c0efadbd6f129a326dda3fe3dec
+Author: Jason Cooper <jason@lakedaemon.net>
+Date:   Wed Dec 18 18:24:43 2013 +0000
 
-I find this ghetto style drive-by veto'ing less than productive, I
-would much rather have had an informed discussion involving both
-Russell and you and settle on a solution that is acceptable for both
-ARM and arm64.
+    string: use kernel version of strncmp()
+    
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-Thanks,
-Ard.
+diff --git a/string.c b/string.c
+index 5105490143c8..629c281f3abd 100644
+--- a/string.c
++++ b/string.c
+@@ -18,14 +18,18 @@ int strlen(const char *str)
+ 
+ int strncmp(const char *stra, const char *strb, int len)
+ {
+-	int diff=0;
+-	const char *a = stra;
+-	const char *b = strb;
+-
+-	while ((a - stra) < len)
+-		diff += *a++ - *b++;
+-
+-	return diff;
++	unsigned char c1, c2;
++
++	while (len) {
++		c1 = *stra++;
++		c2 = *strb++;
++		if (c1 != c2)
++			return c1 < c2 ? -1 : 1;
++		if (!c1)
++			break;
++		len--;
++	}
++	return 0;
+ }
+ 
+ void *gethexaddr(const char *str, const char **end)
