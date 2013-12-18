@@ -1,35 +1,57 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 17:47:17 +0100
-Subject: [PATCH 1/6] DT doc: net: cpsw mac-address is optional
+Date: Wed, 18 Dec 2013 17:47:22 +0100
+Subject: [PATCH 6/6] arm: dts: am335x beagle bone use processor macids
 In-Reply-To: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
 References: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387385242-1161-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387385242-1161-7-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mac-address is an optional property. If no mac-address is set, a random
-mac-address will be generated.
+Use macids stored in the am335x chip.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- Documentation/devicetree/bindings/net/cpsw.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/am335x-bone.dts      | 8 ++++++++
+ arch/arm/boot/dts/am335x-boneblack.dts | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index 05d660e..c39f077 100644
---- a/Documentation/devicetree/bindings/net/cpsw.txt
-+++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -30,10 +30,10 @@ Required properties:
- - phy_id		: Specifies slave phy id
- - phy-mode		: The interface between the SoC and the PHY (a string
- 			  that of_get_phy_mode() can understand)
--- mac-address		: Specifies slave MAC address
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index 94ee427..9b65a62 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -10,6 +10,14 @@
+ #include "am33xx.dtsi"
+ #include "am335x-bone-common.dtsi"
  
- Optional properties:
- - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
-+- mac-address		: Specifies slave MAC address
++&cpsw_emac0 {
++	ti,mac-address-ctrl = <&cpsw_ctrl_macid 0>;
++};
++
++&cpsw_emac1 {
++	ti,mac-address-ctrl = <&cpsw_ctrl_macid 1>;
++};
++
+ &ldo3_reg {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+index 6b71ad9..f6f0b40 100644
+--- a/arch/arm/boot/dts/am335x-boneblack.dts
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -10,6 +10,14 @@
+ #include "am33xx.dtsi"
+ #include "am335x-bone-common.dtsi"
  
- Note: "ti,hwmods" field is used to fetch the base address and irq
- resources from TI, omap hwmod data base during device registration.
++&cpsw_emac0 {
++	ti,mac-address-ctrl = <&cpsw_ctrl_macid 0>;
++};
++
++&cpsw_emac1 {
++	ti,mac-address-ctrl = <&cpsw_ctrl_macid 1>;
++};
++
+ &ldo3_reg {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
 -- 
 1.8.5.1
