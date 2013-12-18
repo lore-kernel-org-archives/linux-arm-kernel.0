@@ -1,51 +1,80 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 18 Dec 2013 10:06:03 +0100
-Subject: arm-soc: Xilinx Zynq dt changes for v3.14
-In-Reply-To: <20131217202731.GA11452@quad.lixom.net>
-References: <52AAC671.6000207@monstr.eu>
- <20131213112659.GD4360@n2100.arm.linux.org.uk> <52AB0ABD.1050307@monstr.eu>
- <20131217202731.GA11452@quad.lixom.net>
-Message-ID: <52B1657B.1030803@monstr.eu>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 18 Dec 2013 10:08:01 +0100
+Subject: [GIT PULL v2] ARM: Initial support for Marvell Berlin SoCs
+In-Reply-To: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1387357681-30730-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2013 09:27 PM, Olof Johansson wrote:
-> On Fri, Dec 13, 2013 at 02:25:17PM +0100, Michal Simek wrote:
->> Hi Russell,
->>
->> On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
->>> 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
->>>    individually.  The whole point of arm at kernel.org is that it reaches
->>>    the current arm-soc maintainers, whoever they may be at the time that
->>>    you send your email without you needing to know who they are.
->>>
->>> 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
->>>    a pull request message.
->>
->> Thanks, I will keep this in my mind for future. I am just doing what I have done
->> before and this is the first complain I have got.
-> 
-> I don't think I've noticed it in the past. :-) Either way, see it as a
-> friendly pointer from Russell, not a complaint.
+Dear ARM maintainers,
 
-that's how I take it.
-The point here is just if I should send pull request again.
+please pull the initial support patches for Marvell Berlin SoCs.
+While this is the initial PR, it is not yet split up into the
+usual sub-branches. If you require it, please request it.
 
-Thanks,
-Michal
+Compared to the last patch set sent on list, the branch below:
+- does not contain Tauros3 patch which has been submitted to
+  rmk's patch system separately.
+- went back to soc-board.dts[i] naming as mentioned by Olof.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Thanks to Jason Cooper, this PR now uses a signed tag.
 
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/eef9e1d8/attachment.sig>
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  https://github.com/shesselba/linux-berlin.git tags/berlin-3.14
+
+for you to fetch changes up to 1c37fa10b275d3e5b6285066b5b27c8feae688c8:
+
+  ARM: add initial support for Marvell Berlin SoCs (2013-12-13 16:31:07 +0100)
+
+----------------------------------------------------------------
+Initial support for Marvell Berlin SoCs, e.g. Armada 1500 and
+Armada 1500-mini, found on various consumer devices like Google Chromecast
+and GoogleTV.
+
+----------------------------------------------------------------
+Sebastian Hesselbarth (8):
+      irqchip: add DesignWare APB ICTL interrupt controller
+      MAINTAINERS: add ARM Marvell Berlin SoC
+      ARM: add Marvell Berlin SoC familiy to Marvell doc
+      ARM: add Marvell Berlin SoCs to multi_v7_defconfig
+      ARM: add Marvell Berlin UART0 lowlevel debug
+      ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
+      ARM: add Armada 1500-mini and Chromecast device tree files
+      ARM: add initial support for Marvell Berlin SoCs
+
+ Documentation/arm/Marvell/README                   |   24 +++
+ .../devicetree/bindings/arm/marvell,berlin.txt     |   24 +++
+ .../interrupt-controller/snps,dw-apb-ictl.txt      |   32 +++
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   10 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    3 +
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
+ arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts  |   29 +++
+ arch/arm/boot/dts/berlin2cd.dtsi                   |  210 ++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |    3 +
+ arch/arm/mach-berlin/Kconfig                       |   29 +++
+ arch/arm/mach-berlin/Makefile                      |    1 +
+ arch/arm/mach-berlin/berlin.c                      |   39 ++++
+ drivers/irqchip/Kconfig                            |    4 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-dw-apb-ictl.c                  |  150 +++++++++++++
+ 19 files changed, 824 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+ create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+ create mode 100644 arch/arm/boot/dts/berlin2.dtsi
+ create mode 100644 arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+ create mode 100644 arch/arm/boot/dts/berlin2cd.dtsi
+ create mode 100644 arch/arm/mach-berlin/Kconfig
+ create mode 100644 arch/arm/mach-berlin/Makefile
+ create mode 100644 arch/arm/mach-berlin/berlin.c
+ create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
