@@ -1,61 +1,95 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Dec 2013 09:42:09 -0600
-Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
-In-Reply-To: <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
-References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>	<20131217185154.GN5711@cbox>
- <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
-Message-ID: <52B1C251.9040801@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 18 Dec 2013 07:45:59 -0800
+Subject: [PATCH v5] ARM: new platform for Energy Micro's EFM32 Cortex-M3
+ SoCs
+In-Reply-To: <20131218140916.GO14866@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
+ =?utf-8?Q?e-K=C3=B6nig=22's?=
+ message of "Wed, 18 Dec 2013 15:09:16 +0100")
+References: <1386694516-5876-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131212011505.GD21856@quad.lixom.net>
+ <20131212212811.GD12238@pengutronix.de>
+ <CAOesGMgdd+guHqrCwVjRd+zQ_-LtUb+0XAwCLeD+hL++NgssTQ@mail.gmail.com>
+ <20131218140916.GO14866@pengutronix.de>
+Message-ID: <87lhzikvrc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Mark Rutland.
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
 
-On 12/18/2013 08:38 AM, Marc Zyngier wrote:
-> Christoffer Dall <christoffer.dall@linaro.org> writes:
-> 
->> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
->>> The Power State and Coordination Interface (PSCI) specification defines
->>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
->>>
->>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
->>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
->>> KVM_EXIT_SYSTEM_EVENT exit reason.
->>>
->>> To try this patch from guest kernel, we will need PSCI-based restart and
->>> poweroff support in the guest kenel for both ARM and ARM64.
->>>
->>> Rob Herring has already submitted patches for PSCI-based restart and
->>> poweroff in ARM kernel but these are not merged yet due unstable device
->>> tree bindings of kernel PSCI support. We will be having similar patches
->>> for PSCI-based restart and poweroff in ARM64 kernel.
->>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
->>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
->>
->> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->>
->> I can merge this series if Marc acks it as well.
-> 
-> The patches themselves are mostly fine. One issue though: They implement
-> part of the v0.2 spec, but keep on using the range of function IDs that
-> we made up for v0.1.
-> 
-> I just had a chat with the person responsible for the spec, and realized
-> that the Function IDs mentionned in the v0.2 spec are not optional, and
-> not using them would be in direct violation of the spec (the new numbers
-> now come directly from the SMC calling convention).
+> On Thu, Dec 12, 2013 at 01:55:38PM -0800, Olof Johansson wrote:
+>> On Thu, Dec 12, 2013 at 1:28 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>> > On Wed, Dec 11, 2013 at 05:15:05PM -0800, Olof Johansson wrote:
+>> >> On Tue, Dec 10, 2013 at 05:55:16PM +0100, Uwe Kleine-K?nig wrote:
+>> >> > There are still some missing parts (e.g. board support, device trees),
+>> >> > but with these bits added on top of this patch I can successfully boot a
+>> >> > EFM32GG-DK3750 board that uses an EFM32GG990F1024.
+>> >> >
+>> >> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> >> > ---
+>> >> > Hello,
+>> >> >
+>> >> > I'd like to get this patch in for 3.14. The latest submission (v4,
+>> >> > Message-Id:1383562853-17202-4-git-send-email-u.kleine-koenig at pengutronix.de)
+>> >> > had some strict dependencies:
+>> >> >  - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1
+>> >> >    to be able to drop Makefile.boot, this is still in Status=Incoming in
+>> >> >    rmk's patch tracker.
+>> >> >  - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7890/1
+>> >> >    to be able to drop the unused <mach/entry-macro.S>. This is already
+>> >> >    applied by rmk in his for-next branch, so it's not stable yet.
+>> >> >  - My series to drop <mach/timex.h> for !MULTI_PLATFORM. I'll send a
+>> >> >    pull request for that soon.
+>> >> >  - Patch "clocksource: time-efm32: Select CLKSRC_MMIO". This is part of
+>> >> >    a pull request by Daniel Lezcano that is expected to hit Linus T.'s
+>> >> >    tree for the next -rc. It currently sits as
+>> >> >    4ff3774e451fefb1781638c76230b3cf9a206b92 in Daniel's tree at
+>> >> >    git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/fixes
+>> >> >    .
+>> >> >
+>> >> > To make application a bit easier I added dummy files to drop the
+>> >> > dependencies on the first three items of the list above.
+>> >> >
+>> >> > So it would be great if you could apply this patch when 4ff3774e4 went
+>> >> > in. (In case you want to apply it already now, this last dependency
+>> >> > could be work arounded, too, by adding a "select CLKSRC_MMIO" to
+>> >> > ARCH_EFM32.)
+>> >> >
+>> >> > Other than that the only change since v4 is that I mention the exact
+>> >> > board/processor combo in the changelog now.
+>> >> >
+>> >> > Thanks for considering this patch, best regards
+>> >>
+>> >> Applied to next/soc with a slightly tweaked patch subject.
+>> > Thanks, but I wonder if it's a problem that the commit doesn't build? (i.e.
+>> >
+>> >         git checkout f9b9cef1329c74607f33a20dce3f26e9a1f4ae96
+>> >         make efm32_defconfig
+>> >         make
+>> >
+>> > fails in
+>> >
+>> >  - arch/arm/kernel/sigreturn_codes.S with
+>> >    "Error: selected processor does not support ARM opcodes" and a few
+>> >    variations.
+>> >  - drivers/clocksource/time-efm32.o fails to link, because next/soc
+>> >    isn't a decendant of 4ff3774e451f.
+>> >
+>> > You can fix the latter by adding "select CLKSRC_MMIO" to ARCH_EFM32 if
+>> > you want. I don't remember what is the current state of the first
+>> > problem.)
+>> 
+>> Ok, dropped the patch again. Please let us know when the former has
+>> been resolved.
+> You did drop it, but when fetching today from armsoc, commit
+> f9b9cef1329c74607f made it back into next/soc. There is only a single
+> commit on top of it made by khilman (added to Cc:).
 
-News to me. That is exactly the opposite of what Mark Rutland told me.
-This would certainly simplify things since the SMC calling convention
-IDs encode the size and there would be no reason to put the IDs into DT.
+OK, I rebuild next/soc with it *really* dropped this time. :)
 
-> So I rekon we need to create a separate range for those. Also, I'd like
-> to progress the DT and kernel side of things as well (otherwise this is
-> all a bit pointless).
-> 
-> Rob: what are your plans regarding your PSCI v0.2 patches?
+> Hint: There is an open pull request that you can substitute
+> f9b9cef1329c74607f with.
 
-My plan was to simply add 2 optional properties for reset/off and be
-done with it like is done here. I'll leave it to ARM to sort out all of
-v0.2 ID and 32-bit vs. 64-bit issues.
+Yeah, it's in the queue.
 
-Rob
+Kevin
