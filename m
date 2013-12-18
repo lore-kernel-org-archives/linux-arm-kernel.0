@@ -1,52 +1,105 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 18 Dec 2013 14:57:00 -0500 (EST)
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
-References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131217122519.GI32118@arm.com>
- <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
- <20131218100321.GC4360@n2100.arm.linux.org.uk>
- <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
- <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
- <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.10.1312181449580.7480@knanqh.ubzr>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 18 Dec 2013 13:06:45 -0700
+Subject: [PATCH V2 1/7] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <1386885004-10252-1-git-send-email-marex@denx.de>
+References: <1386885004-10252-1-git-send-email-marex@denx.de>
+Message-ID: <20131218200645.GF15119@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Dec 2013, Ard Biesheuvel wrote:
-
-> On 18 December 2013 15:27, Christopher Covington <cov@codeaurora.org> wrote:
-> >
-> > I do not think that Russell is the source of the confusion. Ard wrote, "The
-> > idea is that a binary built for ARM will have access to the extended
-> > instructions which ARM64 offers to ARM32 binaries running in 32 bit
-> > compatibility mode (such as AES, SHAx etc)." I think s/ARM64/ARMv8/ is
-> > necessary to make the statement correct, and hopefully less confusing.
-> >
+On Thu, Dec 12, 2013 at 10:49:58PM +0100, Marek Vasut wrote:
+> Some boards do not have a PCIe reset GPIO. To avoid probe
+> failure on these boards, make the reset GPIO optional as
+> well.
 > 
-> My apologies for adding to the confusion (or creating it in the first place).
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Frank Li <lznuaa@gmail.com>
+> Cc: Harro Haan <hrhaan@gmail.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> Cc: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Sean Cross <xobs@kosagi.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> Cc: Tim Harvey <tharvey@gateworks.com>
+> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> Cc: Yinghai Lu <yinghai@kernel.org>
+> ---
+>  .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
+>  drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
+>  2 files changed, 17 insertions(+), 14 deletions(-)
+
+Richard or Shawn, can you ack/nak these (patches 1-6)?  I'd like to dispose
+of them one way or the other.
+
 > 
-> However, the bottom line is that, as the 32 bit and 64 bit kernels are
-> both able to support userland processes running in the execution state
-> that has retroactively been dubbed 'AArch32', they should both honor
-> the same contract with AArch32 userland on how to discover CPU
-> capabilities at runtime. I do understand Russell's reservations about
-> allocating 6 of the remaining 10 hwcaps bits, and I am open to
-> suggestions on a better approach.
-
-What is the reason for eating a grand total of 6 bits at once in the 
-first place?
-
-Are those capabilities really going to be independently integrated?  In 
-other words, what is the probability for a vendor to integrate some but 
-not the others?  If this probability is low then maybe a smaller set of 
-wider-covering bits would be good enough in practice, and then some 
-kernel emulation could be added for the odd cases.
-
-
-Nicolas
+> V2: Make the 'reset-gpio' prop shared between imx6 and exynos
+>     Rebase on top of pci/host-imx6
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> index d5d26d4..d6fae13 100644
+> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> @@ -19,6 +19,8 @@ Required properties:
+>  	to define the mapping of the PCIe interface to interrupt
+>  	numbers.
+>  - num-lanes: number of lanes to use
+> +
+> +Optional properties:
+>  - reset-gpio: gpio pin number of power good signal
+>  
+>  Optional properties for fsl,imx6q-pcie
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 9fc1cb6..c247602 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -214,9 +214,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+>  			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+>  
+> -	gpio_set_value(imx6_pcie->reset_gpio, 0);
+> -	msleep(100);
+> -	gpio_set_value(imx6_pcie->reset_gpio, 1);
+> +	/* Some boards don't have PCIe reset GPIO. */
+> +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+> +		gpio_set_value(imx6_pcie->reset_gpio, 0);
+> +		msleep(100);
+> +		gpio_set_value(imx6_pcie->reset_gpio, 1);
+> +	}
+>  
+>  	return 0;
+>  }
+> @@ -432,17 +435,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  
+>  	/* Fetch GPIOs */
+>  	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+> -	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
+> -		dev_err(&pdev->dev, "no reset-gpio defined\n");
+> -		ret = -ENODEV;
+> -	}
+> -	ret = devm_gpio_request_one(&pdev->dev,
+> -				imx6_pcie->reset_gpio,
+> -				GPIOF_OUT_INIT_LOW,
+> -				"PCIe reset");
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "unable to get reset gpio\n");
+> -		return ret;
+> +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+> +		ret = devm_gpio_request_one(&pdev->dev,
+> +					imx6_pcie->reset_gpio,
+> +					GPIOF_OUT_INIT_LOW,
+> +					"PCIe reset");
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "unable to get reset gpio\n");
+> +			return ret;
+> +		}
+>  	}
+>  
+>  	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
+> -- 
+> 1.8.4.3
+> 
