@@ -1,31 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 18 Dec 2013 09:08:12 -0200
-Subject: [PATCH V3 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
-In-Reply-To: <1387402010-31749-1-git-send-email-b20788@freescale.com>
-References: <1387402010-31749-1-git-send-email-b20788@freescale.com>
-Message-ID: <CAOMZO5DCGOkUtWmEok-uEFsUpGLF+93Vhm9XFs02yH9Z+eV0uQ@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Wed, 18 Dec 2013 13:09:25 +0200
+Subject: [PATCH v4 0/9] Reuse davinci-nand driver for Keystone arch
+In-Reply-To: <20131218071457.GB5551@norris-Latitude-E6410>
+References: <1387285155-19182-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131218071457.GB5551@norris-Latitude-E6410>
+Message-ID: <52B18265.5090404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+On 12/18/2013 09:14 AM, Brian Norris wrote:
+> On Tue, Dec 17, 2013 at 02:59:06PM +0200, Ivan Khoronzhuk wrote:
+>> This series contains fixes and updates of Davinci nand driver in
+>> order to reuse it for Keystone platform.
+>>
+>> v3..v4:
+>> - mtd: nand: davinci: fix driver registration
+>> 	dropped __init/__exit/__exit_p as module_platform_driver() is used
+>> - mtd: nand: davinci: adjust DT properties to MTD generic
+>> 	used of_get_nand_bus_width() helper
+>> - mtd: nand: davinci: don't request AEMIF address range
+>> 	added comment at code change
+>
+> Pushed the series to l2-mtd.git. Thanks!
+>
+> Brian
+>
 
-On Wed, Dec 18, 2013 at 7:26 PM, Anson Huang <b20788@freescale.com> wrote:
+Thanks
 
-> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
-> +  arm-supply: vddarm input.
-> +  pu-supply: vddpu input.
-> +  soc-supply: vddsoc input.
-
-I found these messages confusing, as someone may think that you are
-referring to the VDD_ARM_IN/VDD_ARM23_IN and VDD_SOC_IN, which are
-really inputs.
-
-What about doing this instead?
-
-arm-supply: VDDARM LDO output
-pu-supply:  VDDPU LDO output
-soc-supply: VDDSOC LDO output
-
+-- 
 Regards,
-
-Fabio Estevam
+Ivan Khoronzhuk
