@@ -1,42 +1,138 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 18 Dec 2013 15:49:10 +0100
-Subject: [PATCH 3/3] ARM: dts: Fix MDMA0 clock number
-In-Reply-To: <1386817322-11265-3-git-send-email-a.kesavan@samsung.com>
-References: <1386817322-11265-1-git-send-email-a.kesavan@samsung.com>
- <1386817322-11265-3-git-send-email-a.kesavan@samsung.com>
-Message-ID: <2082327.zpbOvCVe5P@amdc1227>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 18 Dec 2013 15:50:07 +0100
+Subject: [PATCH 1/2] regulator: tps65910: Add backup battery regulator
+Message-ID: <1387378208-26841-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+tps65910 has a backup battery charger with a configurable voltage. This
+patch adds a regulator for the backup battery.
 
-On Thursday 12 of December 2013 08:32:02 Abhilash Kesavan wrote:
-> Fix wrong clock number in mdma0 node.
-> 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 9db5047..177becd 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -559,7 +559,7 @@
->  			compatible = "arm,pl330", "arm,primecell";
->  			reg = <0x10800000 0x1000>;
->  			interrupts = <0 33 0>;
-> -			clocks = <&clock 271>;
-> +			clocks = <&clock 346>;
->  			clock-names = "apb_pclk";
->  			#dma-cells = <1>;
->  			#dma-channels = <8>;
-> 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/regulator/tps65910-regulator.c | 32 ++++++++++++++++++++++++++++++--
+ include/linux/mfd/tps65910.h           |  3 ++-
+ 2 files changed, 32 insertions(+), 3 deletions(-)
 
-Can we have your ack for this patch?
-
-I'd like to apply the whole series into samsung-clk fixes branch and
-send a pull request to Mike to get it and one more fix into his tree.
-
-Best regards,
-Tomasz
+diff --git a/drivers/regulator/tps65910-regulator.c b/drivers/regulator/tps65910-regulator.c
+index a00132e..74f5e05 100644
+--- a/drivers/regulator/tps65910-regulator.c
++++ b/drivers/regulator/tps65910-regulator.c
+@@ -88,6 +88,11 @@ static const unsigned int VMMC_VSEL_table[] = {
+ 	1800000, 2800000, 3000000, 3300000,
+ };
+ 
++/* supported BBCH voltages in microvolts */
++static const unsigned int VBB_VSEL_table[] = {
++	3000000, 2520000, 3150000, 5000000,
++};
++
+ struct tps_info {
+ 	const char *name;
+ 	const char *vin_name;
+@@ -183,6 +188,12 @@ static struct tps_info tps65910_regs[] = {
+ 		.voltage_table = VMMC_VSEL_table,
+ 		.enable_time_us = 100,
+ 	},
++	{
++		.name = "vbb",
++		.vin_name = "vcc7",
++		.n_voltages = ARRAY_SIZE(VBB_VSEL_table),
++		.voltage_table = VBB_VSEL_table,
++	},
+ };
+ 
+ static struct tps_info tps65911_regs[] = {
+@@ -339,6 +350,8 @@ static int tps65910_get_ctrl_register(int id)
+ 		return TPS65910_VAUX33;
+ 	case TPS65910_REG_VMMC:
+ 		return TPS65910_VMMC;
++	case TPS65910_REG_VBB:
++		return TPS65910_BBCH;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -528,6 +541,10 @@ static int tps65910_get_voltage_sel(struct regulator_dev *dev)
+ 		value &= LDO_SEL_MASK;
+ 		value >>= LDO_SEL_SHIFT;
+ 		break;
++	case TPS65910_REG_VBB:
++		value &= BBCH_BBSEL_MASK;
++		value >>= BBCH_BBSEL_SHIFT;
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -638,6 +655,9 @@ static int tps65910_set_voltage_sel(struct regulator_dev *dev,
+ 	case TPS65910_REG_VMMC:
+ 		return tps65910_reg_update_bits(pmic->mfd, reg, LDO_SEL_MASK,
+ 						selector << LDO_SEL_SHIFT);
++	case TPS65910_REG_VBB:
++		return tps65910_reg_update_bits(pmic->mfd, reg, BBCH_BBSEL_MASK,
++						selector << BBCH_BBSEL_SHIFT);
+ 	}
+ 
+ 	return -EINVAL;
+@@ -669,6 +689,9 @@ static int tps65911_set_voltage_sel(struct regulator_dev *dev,
+ 	case TPS65910_REG_VIO:
+ 		return tps65910_reg_update_bits(pmic->mfd, reg, LDO_SEL_MASK,
+ 						selector << LDO_SEL_SHIFT);
++	case TPS65910_REG_VBB:
++		return tps65910_reg_update_bits(pmic->mfd, reg, BBCH_BBSEL_MASK,
++						selector << BBCH_BBSEL_SHIFT);
+ 	}
+ 
+ 	return -EINVAL;
+@@ -771,7 +794,7 @@ static struct regulator_ops tps65910_ops = {
+ 	.get_voltage_sel	= tps65910_get_voltage_sel,
+ 	.set_voltage_sel	= tps65910_set_voltage_sel,
+ 	.list_voltage		= regulator_list_voltage_table,
+-	.map_voltage		= regulator_map_voltage_ascend,
++	.map_voltage		= regulator_map_voltage_iterate,
+ };
+ 
+ static struct regulator_ops tps65911_ops = {
+@@ -944,6 +967,7 @@ static struct of_regulator_match tps65910_matches[] = {
+ 	{ .name = "vaux2",	.driver_data = (void *) &tps65910_regs[10] },
+ 	{ .name = "vaux33",	.driver_data = (void *) &tps65910_regs[11] },
+ 	{ .name = "vmmc",	.driver_data = (void *) &tps65910_regs[12] },
++	{ .name = "vbb",	.driver_data = (void *) &tps65910_regs[13] },
+ };
+ 
+ static struct of_regulator_match tps65911_matches[] = {
+@@ -1167,7 +1191,11 @@ static int tps65910_probe(struct platform_device *pdev)
+ 		pmic->desc[i].type = REGULATOR_VOLTAGE;
+ 		pmic->desc[i].owner = THIS_MODULE;
+ 		pmic->desc[i].enable_reg = pmic->get_ctrl_reg(i);
+-		pmic->desc[i].enable_mask = TPS65910_SUPPLY_STATE_ENABLED;
++		if (tps65910_chip_id(tps65910) == TPS65910 &&
++				i == TPS65910_REG_VBB)
++			pmic->desc[i].enable_mask = BBCH_BBCHEN_MASK;
++		else
++			pmic->desc[i].enable_mask = TPS65910_SUPPLY_STATE_ENABLED;
+ 
+ 		config.dev = tps65910->dev;
+ 		config.init_data = reg_data;
+diff --git a/include/linux/mfd/tps65910.h b/include/linux/mfd/tps65910.h
+index 20e433e..1adeee1 100644
+--- a/include/linux/mfd/tps65910.h
++++ b/include/linux/mfd/tps65910.h
+@@ -833,6 +833,7 @@
+ #define TPS65910_REG_VAUX2				10
+ #define TPS65910_REG_VAUX33				11
+ #define TPS65910_REG_VMMC				12
++#define TPS65910_REG_VBB				13
+ 
+ #define TPS65911_REG_VDDCTRL				4
+ #define TPS65911_REG_LDO1				5
+@@ -845,7 +846,7 @@
+ #define TPS65911_REG_LDO8				12
+ 
+ /* Max number of TPS65910/11 regulators */
+-#define TPS65910_NUM_REGS				13
++#define TPS65910_NUM_REGS				14
+ 
+ /* External sleep controls through EN1/EN2/EN3/SLEEP inputs */
+ #define TPS65910_SLEEP_CONTROL_EXT_INPUT_EN1		0x1
+-- 
+1.8.5.1
