@@ -1,41 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Dec 2013 18:00:51 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20131218173941.GA17594@e102568-lin.cambridge.arm.com>
-References: <1387212565-12668-1-git-send-email-broonie@kernel.org>
- <20131217170625.GB9831@e102568-lin.cambridge.arm.com>
- <20131217195519.GD28455@sirena.org.uk>
- <20131218173941.GA17594@e102568-lin.cambridge.arm.com>
-Message-ID: <20131218180051.GD31886@sirena.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 19 Dec 2013 03:06:24 +0900
+Subject: [PATCH 3/3] ARM: dts: Fix MDMA0 clock number
+In-Reply-To: <2082327.zpbOvCVe5P@amdc1227>
+References: <1386817322-11265-1-git-send-email-a.kesavan@samsung.com>
+ <1386817322-11265-3-git-send-email-a.kesavan@samsung.com>
+ <2082327.zpbOvCVe5P@amdc1227>
+Message-ID: <52B1E420.3080000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 05:39:42PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Dec 17, 2013 at 07:55:19PM +0000, Mark Brown wrote:
+On 12/18/13 23:49, Tomasz Figa wrote:
+> Hi Kukjin,
+>
+Hi,
 
-> > I do think it's useful to to have the function there partly just as a
-> > hook but more for the warning it generates if we manage to boot a core
-> > that we didn't hook up with the topology information.  This seems like
+> On Thursday 12 of December 2013 08:32:02 Abhilash Kesavan wrote:
+>> Fix wrong clock number in mdma0 node.
+>>
+>> Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos5250.dtsi |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 9db5047..177becd 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -559,7 +559,7 @@
+>>   			compatible = "arm,pl330", "arm,primecell";
+>>   			reg =<0x10800000 0x1000>;
+>>   			interrupts =<0 33 0>;
+>> -			clocks =<&clock 271>;
+>> +			clocks =<&clock 346>;
+>>   			clock-names = "apb_pclk";
+>>   			#dma-cells =<1>;
+>>   			#dma-channels =<8>;
+>>
+>
+> Can we have your ack for this patch?
+>
+Sure, please feel free to add my ack on this series.
 
-> I think you have a point, the question is whether we need that function
-> to run the check you mention or not, we can run the check for all possible
-> cpus after completing the topology parsing. Actually, we might be
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Yeah, it should be possible to do it elsewhere but then since the SMP
-code is already enumerating all the cores it's going to boot it seemed
-sensible to keep piggybacking on that and not duplicate the logic.
+> I'd like to apply the whole series into samsung-clk fixes branch and
+> send a pull request to Mike to get it and one more fix into his tree.
+>
+I'm fine, thanks.
 
-> building topology for cores that do not come online as well, I do not think
-> this is a problem, but I have to cast a proper look into that before
-> jumping to conclusions, thanks for pointing that out.
-
-I'd expect that could reasonably happen if cores are administratively
-disabled for some reason - that's one of the reasons for the status
-marking in DT.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/8d42ba70/attachment.sig>
+- Kukjin
