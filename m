@@ -1,51 +1,35 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 17 Dec 2013 21:42:45 -0300
-Subject: [PATCH] Partially revert "mtd: nand: pxa3xx: Introduce
- 'marvell,armada370-nand' compatible string"
-In-Reply-To: <20131212230715.GX27149@ld-irv-0074.broadcom.com>
-References: <1386624986-404-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131212230715.GX27149@ld-irv-0074.broadcom.com>
-Message-ID: <20131218004245.GB10369@localhost>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 17 Dec 2013 16:38:18 -0800
+Subject: [PATCH v12 05/08] ARM: hi3xxx: add smp support
+In-Reply-To: <1386748497-11290-6-git-send-email-haojian.zhuang@gmail.com>
+ (Haojian Zhuang's message of "Wed, 11 Dec 2013 15:54:54 +0800")
+References: <1386748497-11290-1-git-send-email-haojian.zhuang@gmail.com>
+ <1386748497-11290-6-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <87y53jm1s5.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Haojian Zhuang <haojian.zhuang@linaro.org> writes:
 
-On Thu, Dec 12, 2013 at 03:07:15PM -0800, Brian Norris wrote:
-> On Mon, Dec 09, 2013 at 06:36:26PM -0300, Ezequiel Garcia wrote:
-> > This reverts c0f3b8643a6fa2461d70760ec49d21d2b031d611.
-> 
-> Modified to say "partially reverts".
-> 
-> > 
-> > The "armada370-nand" compatible support is not complete, and it was mistake
-> > to add it. Revert it and pospone the support until the infrastructure is
-> > in place.
-> > 
-> > Cc: stable at vger.kernel.org
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > Note this won't apply to v3.12 as it is, although fixing it should be easy.
-> 
-> Pushed this patch to linux-mtd.git, noting -stable for 3.12+.
-> 
+> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+>
+> Enable SMP support on hi3xxx platform
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
+> Tested-by: Li Xin <li.xin@linaro.org>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Just to have some context, this compatible was removed because it was
-wrongly added and it doesn't belong at v3.12 and v3.13.
+This one has checkpatch errors too:
 
-Now the revert is in place in v3.13-rc4 and it should be queued for
-v3.12.x, so we are good. Thanks for taking care of it!
+ERROR: do not initialise statics to 0 or NULL
+#267: FILE: arch/arm/mach-hi3xxx/platsmp.c:20:
++static void __iomem *ctrl_base = NULL;
 
-On the other side, all the work needed for the driver to work OK on
-Armada 370/XP SoC is already in l2-mtd.git master, and I have some fixes
-ready to support 2048B pages.
+ERROR: space prohibited before that close parenthesis ')'
+#282: FILE: arch/arm/mach-hi3xxx/platsmp.c:35:
++	return readl_relaxed(ctrl_base + ((cpu - 1 ) << 2));
 
-In conclusion, I think it's safe to add the compatible on top of such work,
-and queue it for v3.14.
+I fixed these up locally too, but my generosity is running out.
 
-How should I send a patch to re-add this compatible? Do you plan to rebase
-l2-mtd.git master on top of v3.13-rc4 or so?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Kevin
