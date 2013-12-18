@@ -1,69 +1,64 @@
 From: p.wilczek@samsung.com (Piotr Wilczek)
-Date: Wed, 18 Dec 2013 13:09:04 +0100
-Subject: [PATCH V2 1/8] registers: add write u8 type
+Date: Wed, 18 Dec 2013 13:09:06 +0100
+Subject: [PATCH V2 3/8] device tree blob must be 4-bytes alingned
 In-Reply-To: <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
 References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
  <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
-Message-ID: <1387368551-18958-2-git-send-email-p.wilczek@samsung.com>
+Message-ID: <1387368551-18958-4-git-send-email-p.wilczek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Each appended device tree blob must be 4-bytes aligned.
+This patch modifies append_dtbs script to append bytes to each device tree
+file so the size is multiple of 4.
+When finding dtb the addres of next dtb is also aligned to 4-bytes.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Piotr Wilczek <p.wilczek@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
 Changes for V2:
  - none
 
- register.c |   10 ++++++++++
- register.h |    3 +++
- types.h    |    1 +
- 3 files changed, 14 insertions(+)
+ append_dtbs.sh |   11 +++++++++++
+ dtbs.c         |    4 ++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/register.c b/register.c
-index dfbe145..af992ec 100644
---- a/register.c
-+++ b/register.c
-@@ -1,5 +1,15 @@
- #include "types.h"
+diff --git a/append_dtbs.sh b/append_dtbs.sh
+index 82bb463..a8a7cda 100755
+--- a/append_dtbs.sh
++++ b/append_dtbs.sh
+@@ -4,5 +4,16 @@ OUT="$1"
+ shift
+ DTBS="$*"
  
-+inline void writeb(u8 val, u32 addr)
-+{
-+	*(volatile u32 *)addr = val;
-+}
++while [ -n "$*" ]
++do
++	SIZE=`stat $1 -c %s`
++	MOD=`expr $SIZE % 4`
++	if [ $MOD -ne 0 ]; then
++		PADDING=`expr 4 - $MOD`
++		dd if=/dev/zero count=$PADDING bs=1 >> $1 2> /dev/null
++	fi
++	shift
++done
 +
-+inline u8 readb(u32 addr)
-+{
-+	return *(volatile u32 *)addr;
-+}
+ cat $DTBS >>$OUT
+ dd if=/dev/zero of=$OUT oflag=append conv=notrunc bs=1 count=8 #sentinel
+diff --git a/dtbs.c b/dtbs.c
+index 812c2ef..26e3b83 100644
+--- a/dtbs.c
++++ b/dtbs.c
+@@ -30,6 +30,10 @@ void *find_dtb(void *dtbs, const char *compat)
+ 			return d;
+ 
+ 		d = (struct fdt_header *)((char *)d + be_to_cpu(d->totalsize));
 +
- inline void writel(u32 val, u32 addr)
- {
- 	*(volatile u32 *) addr = val;
-diff --git a/register.h b/register.h
-index b7831eb..5a89802 100644
---- a/register.h
-+++ b/register.h
-@@ -3,6 +3,9 @@
- 
- #include "types.h"
- 
-+void writeb(u8, u32);
-+u8 readb(u32);
++		/* align to 4-bytes */
++		d = (struct fdt_header *)((((unsigned int)d + 0x3) & ~0x3));
 +
- void writel(u32, u32);
- u32 readl(u32);
+ 	}
  
-diff --git a/types.h b/types.h
-index 1e6c56a..636f95b 100644
---- a/types.h
-+++ b/types.h
-@@ -1,6 +1,7 @@
- #ifndef _TYPES_H
- #define _TYPES_H
- 
-+typedef unsigned char u8;
- typedef unsigned int u32;
- typedef unsigned long long u64;
- #define NULL	((void *) 0)
+ 	return NULL;
 -- 
 1.7.9.5
