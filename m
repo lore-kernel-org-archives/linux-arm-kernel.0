@@ -1,146 +1,58 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Dec 2013 12:57:45 +0100
-Subject: [PATCH v3 9/9] ARM: DTS: imx5* imx6*, use imx51-ssi
+Date: Wed, 18 Dec 2013 12:57:37 +0100
+Subject: [PATCH v3 1/9] ASoC: fsl-ssi: Fix probe error handling
 In-Reply-To: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
 References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387367865-26391-10-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387367865-26391-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-reconfiguration and needs this for correct interaction with SDMA. This
-patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
+This patch fixes the error handling in the fsl-ssi probe function.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi   |  3 ++-
- arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
- arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
- arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
- 4 files changed, 27 insertions(+), 10 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 4bcdd3a..1496421 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -155,7 +155,8 @@
- 				};
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index f9f4569..cd9ad8c 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -1007,11 +1007,11 @@ static int fsl_ssi_probe(struct platform_device *pdev)
  
- 				ssi2: ssi at 70014000 {
--					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-+					compatible = "fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x70014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 4307e80..034b8b0 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -149,7 +149,9 @@
- 				};
+ 			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
+ 			if (ret)
+-				goto error_dev;
++				goto error_pcm;
+ 		} else {
+ 			ret = imx_pcm_dma_init(pdev);
+ 			if (ret)
+-				goto error_dev;
++				goto error_pcm;
+ 		}
+ 	}
  
- 				ssi2: ssi at 50014000 {
--					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+					compatible = "fsl,imx53-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
-@@ -1049,7 +1051,8 @@
- 			};
+@@ -1053,6 +1053,10 @@ done:
+ 	return 0;
  
- 			ssi1: ssi at 63fcc000 {
--				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x63fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks 48>;
-@@ -1076,7 +1079,8 @@
- 			};
+ error_dai:
++	if (ssi_private->ssi_on_imx && !ssi_private->use_dma)
++		imx_pcm_fiq_exit(pdev);
++
++error_pcm:
+ 	snd_soc_unregister_component(&pdev->dev);
  
- 			ssi3: ssi at 63fe8000 {
--				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x63fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks 50>;
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 59154dc..c51440b 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -232,7 +232,9 @@
- 				};
+ error_dev:
+@@ -1063,7 +1067,9 @@ error_clk:
+ 		clk_disable_unprepare(ssi_private->clk);
  
- 				ssi1: ssi at 02028000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks 178>;
-@@ -245,7 +247,9 @@
- 				};
+ error_irqmap:
+-	irq_dispose_mapping(ssi_private->irq);
++	if (ssi_private->use_dma && !of_device_is_compatible(pdev->dev.of_node,
++				"fsl,imx21-ssi"))
++		irq_dispose_mapping(ssi_private->irq);
  
- 				ssi2: ssi at 0202c000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks 179>;
-@@ -258,7 +262,9 @@
- 				};
- 
- 				ssi3: ssi at 02030000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks 180>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..1e7b712 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -195,7 +195,9 @@
- 				};
- 
- 				ssi1: ssi at 02028000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI1>;
-@@ -207,7 +209,9 @@
- 				};
- 
- 				ssi2: ssi at 0202c000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI2>;
-@@ -219,7 +223,9 @@
- 				};
- 
- 				ssi3: ssi at 02030000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI3>;
+ 	return ret;
+ }
 -- 
 1.8.5.1
