@@ -1,40 +1,31 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 18 Dec 2013 07:13:13 -0500
-Subject: [PATCH 3/4] SATA: MV: Add support for the optional PHYs
-In-Reply-To: <52B140F2.8070900@ti.com>
-References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
- <1387311713-1926-3-git-send-email-andrew@lunn.ch>
- <52B140F2.8070900@ti.com>
-Message-ID: <20131218121313.GC4324@htj.dyndns.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 18 Dec 2013 17:43:14 +0530
+Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
+ dependency on aemif
+In-Reply-To: <52B18C44.2000305@ti.com>
+References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <52B18C44.2000305@ti.com>
+Message-ID: <52B1915A.7060309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
+> Hi, Sekhar
+> 
+> This patch is based on "Reuse davinci-nand driver for Keystone arch" series.
+> The series has passed review at https://lkml.org/lkml/2013/12/17/241
+> and can be found at http://git.infradead.org/l2-mtd.git
+> 
+> This patch can be still applied on top of the series without conflicts. 
+> 
+> Can you please pick up the $subject patch if you are OK with it?
 
-On Wed, Dec 18, 2013 at 12:00:10PM +0530, Kishon Vijay Abraham I wrote:
-> > @@ -4097,6 +4109,10 @@ static int mv_platform_probe(struct platform_device *pdev)
-> >  		hpriv->port_clks[port] = clk_get(&pdev->dev, port_number);
-> >  		if (!IS_ERR(hpriv->port_clks[port]))
-> >  			clk_prepare_enable(hpriv->port_clks[port]);
-> > +		sprintf(port_number, "port%d", port);
-> > +		hpriv->port_phys[port] = devm_phy_get(&pdev->dev, port_number);
-> > +		if (!IS_ERR(hpriv->port_phys[port]))
-> > +			phy_power_on(hpriv->port_phys[port]);
+I have no problems with the patch and can pick it too, but need ack from
+MTD maintainer (David) as it touches drivers/mtd/ too.
 
-Shouldn't it distinguish between failures and at least produce
-warning?  ie. phy not available and phy init failed due to memory
-pressure or whatnot shouldn't be handled the same.
+David,
 
-> > @@ -4132,6 +4148,8 @@ err:
-> >  			clk_disable_unprepare(hpriv->port_clks[port]);
-> >  			clk_put(hpriv->port_clks[port]);
-> >  		}
-> > +		if (!IS_ERR(hpriv->port_phys[port]))
-> > +			phy_power_off(hpriv->port_phys[port]);
+If you do not have the patch, we can resend it.
 
-And I'd much prefer the array holds either NULL or valid pointer.
-
-Thanks.
-
--- 
-tejun
+Thanks,
+Sekhar
