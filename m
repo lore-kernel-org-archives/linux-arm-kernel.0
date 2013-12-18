@@ -1,52 +1,81 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 11:32:03 -0800
-Subject: [PATCH 3/3] ARM: dts: Fix MDMA0 clock number
-In-Reply-To: <2082327.zpbOvCVe5P@amdc1227>
-References: <1386817322-11265-1-git-send-email-a.kesavan@samsung.com>
- <1386817322-11265-3-git-send-email-a.kesavan@samsung.com>
- <2082327.zpbOvCVe5P@amdc1227>
-Message-ID: <20131218193203.23538.30551@quantum>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 18 Dec 2013 20:34:33 +0100
+Subject: [PATCHv5,
+ RESEND] rtc: Add support for Intersil ISL12057 I2C RTC chip
+In-Reply-To: <20131218122419.GM28455@sirena.org.uk> (Mark Brown's message of
+ "Wed, 18 Dec 2013 12:24:19 +0000")
+References: <28bfd1b8cd4725a70fb713a8b6503e7f5db13d71.1387305663.git.arno@natisbad.org>
+ <20131218122419.GM28455@sirena.org.uk>
+Message-ID: <87eh5a7y2e.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2013-12-18 06:49:10)
-> Hi Kukjin,
-> 
-> On Thursday 12 of December 2013 08:32:02 Abhilash Kesavan wrote:
-> > Fix wrong clock number in mdma0 node.
-> > 
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> > index 9db5047..177becd 100644
-> > --- a/arch/arm/boot/dts/exynos5250.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> > @@ -559,7 +559,7 @@
-> >                       compatible = "arm,pl330", "arm,primecell";
-> >                       reg = <0x10800000 0x1000>;
-> >                       interrupts = <0 33 0>;
-> > -                     clocks = <&clock 271>;
-> > +                     clocks = <&clock 346>;
-> >                       clock-names = "apb_pclk";
-> >                       #dma-cells = <1>;
-> >                       #dma-channels = <8>;
-> > 
-> 
-> Can we have your ack for this patch?
-> 
-> I'd like to apply the whole series into samsung-clk fixes branch and
-> send a pull request to Mike to get it and one more fix into his tree.
+Hi,
 
-Do these fixes need to go into the current -rc fixes cycle or can they
-go for 3.14?
+Mark Brown <broonie@kernel.org> writes:
 
-Regards,
-Mike
+> On Tue, Dec 17, 2013 at 08:07:28PM +0100, Arnaud Ebalard wrote:
+>> 
+>> Intersil ISL12057 is an I2C RTC chip also supporting two alarms. This
+>> patch only adds support for basic RTC functionalities (i.e. getting and
+>> setting time). Tests have been performed on NETGEAR ReadyNAS 102 w/
+>> startup/shutdown scripts, hwclock, ntpdate and openntpd.
+>
+> Reviewed-by: Mark Brown <broonie@linaro.org>
 
-> 
-> Best regards,
-> Tomasz
-> 
+Thanks, Mark!
+
+>> +static int isl12057_rtc_proc(struct device *dev, struct seq_file *seq)
+>> +{
+>> +	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+>> +	int reg, ret;
+>> +
+>> +	mutex_lock(&data->lock);
+>> +
+>> +	/* Status register */
+>> +	ret = regmap_read(data->regmap, ISL12057_REG_SR, &reg);
+>> +	if (ret) {
+>> +		dev_err(dev, "%s: reading SR failed\n", __func__);
+>> +		goto out;
+>> +	}
+>> +
+>> +	seq_printf(seq, "status_reg\t:%s%s%s (0x%.2x)\n",
+>> +		   (reg & ISL12057_REG_SR_OSF) ? " OSF" : "",
+>> +		   (reg & ISL12057_REG_SR_A1F) ? " A1F" : "",
+>> +		   (reg & ISL12057_REG_SR_A2F) ? " A2F" : "", reg);
+>> +
+>> +	/* Control register */
+>> +	ret = regmap_read(data->regmap, ISL12057_REG_INT, &reg);
+>> +	if (ret) {
+>> +		dev_err(dev, "%s: reading INT failed\n", __func__);
+>> +		goto out;
+>> +	}
+>> +
+>> +	seq_printf(seq, "control_reg\t:%s%s%s%s%s%s (0x%.2x)\n",
+>> +		   (reg & ISL12057_REG_INT_A1IE) ?  " A1IE"  : "",
+>> +		   (reg & ISL12057_REG_INT_A2IE) ?  " A2IE"  : "",
+>> +		   (reg & ISL12057_REG_INT_INTCN) ? " INTCN" : "",
+>> +		   (reg & ISL12057_REG_INT_RS1) ?   " RS1"   : "",
+>> +		   (reg & ISL12057_REG_INT_RS2) ?   " RS2"   : "",
+>> +		   (reg & ISL12057_REG_INT_EOSC) ?  " EOSC"  : "", reg);
+>> +
+>> + out:
+>> +	mutex_unlock(&data->lock);
+>
+> I'm not sure the lock is achieving anything any more - the only time it
+> actualy protects more than one operation is the above but since the
+> status register is volatile anyway it might change between it being read
+> and the control register being read.
+
+Well, I guess the lock will be more useful when alarm code will be added
+back, even if it does not hurt above. Now, regarding protection of
+regmap_bulk_write/read() calls in set/read time helpers, I also
+protected those because I thought it was good practice in general to
+serialize concurrent accesses to both the regmap structure and the
+device *in the driver*. But looking at the internals of regmap functions
+in more details, I guess I could have relied on those (they acquire an
+internal lock before action).
+
+Cheers,
+
+a+
