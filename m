@@ -1,56 +1,71 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 18 Dec 2013 17:04:14 +0100
-Subject: [PATCH V2 2/8] string: fix strncmp function
-In-Reply-To: <20131218160318.GQ2609@titan.lakedaemon.net>
-References: <1386767259-15693-1-git-send-email-p.wilczek@samsung.com>
- <1387368551-18958-1-git-send-email-p.wilczek@samsung.com>
- <1387368551-18958-3-git-send-email-p.wilczek@samsung.com>
- <20131218121551.GH4360@n2100.arm.linux.org.uk> <52B193BE.1080206@gmail.com>
- <20131218160318.GQ2609@titan.lakedaemon.net>
-Message-ID: <52B1C77E.6080708@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 18 Dec 2013 10:06:11 -0600
+Subject: [RFC 5/5] usb: dwc3: enable async suspend/resume
+In-Reply-To: <1387363174-25942-5-git-send-email-yuvaraj.cd@samsung.com>
+References: <1387363174-25942-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1387363174-25942-5-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <20131218160611.GC4970@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2013 05:03 PM, Jason Cooper wrote:
-> Daniel,
+On Wed, Dec 18, 2013 at 04:09:34PM +0530, Yuvaraj Kumar C D wrote:
+> From: Andrew Bresticker <abrestic@chromium.org>
 > 
-> On Wed, Dec 18, 2013 at 01:23:26PM +0100, Daniel Mack wrote:
->> On 12/18/2013 01:15 PM, Russell King - ARM Linux wrote:
->>> On Wed, Dec 18, 2013 at 01:09:05PM +0100, Piotr Wilczek wrote:
->>>> Now function returns the number of characters that differ in the
->>>> compared strings.
->>>
->>> I think this is a mistake.  You're defining a standard C function in
->>> a non-standard way.  For strcmp() and strncmp(), the C standard
->>> requires:
->>>
->>> RETURN VALUE
->>>        The strcmp() and strncmp() functions return an integer less than, equal
->>>        to, or greater than zero if s1 (or the first n bytes thereof) is found,
->>>        respectively, to be less than, to match, or be greater than s2.
->>>
->>> If you implement something different to that, don't call it strcmp() or
->>> strncmp() but something else, because you're not providing the correct
->>> functionality, and that will just confuse people and lead to bugs.
->>
->> True.
->>
->>> For instance, can you be sure that there aren't any uses of strncmp()
->>> which already test for less-than-zero etc?
->>
->> In this case, yes. The code as it stands is very small, and users only
->> check for the return value of these functions to be 0.
->>
->> But I wonder whether that patch is needed at all. At least the rest of
->> this series does not even seem to introduce new call sites of strcmp()
->> or strncmp() ...
+> In addition to enabling async suspend/resume on the xhci-plat device,
+> we must enable it for the dwc3 device (the parent of xhci-plat) in order
+> to make the full USB stack resume asynchronously.  Like the xhci-plat,
+> ehci-s5p, and ohci-exynos drivers, there are no outside dependencies
+> which would make resuming the dwc3 driver asynchronously unsafe.
 > 
-> Go ahead and drop this one.  I'll do a patch to fix this and remove
-> those heinous parentheses.  :)
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Reviewed-by: Julius Werner <jwerner@chromium.org>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> ---
+>  drivers/usb/dwc3/core.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> index 59bb8d2..9c8a273 100644
+> --- a/drivers/usb/dwc3/core.c
+> +++ b/drivers/usb/dwc3/core.c
+> @@ -586,6 +586,8 @@ static int dwc3_probe(struct platform_device *pdev)
+>  
+>  	pm_runtime_allow(dev);
+>  
+> +	device_enable_async_suspend(dev);
 
-:)
+how has this series been tested ? Let me rephrase this: was this series
+tested at all ? Note that if we are in gadget mode, we will disable
+physical endpoints 0 and 1, which will break USB communication requiring
+a new enumeration later. On top of that, for versions of the core which
+are configured without hibernation support - in fact for all cores
+currently, since we don't have hibernation support implemented in this
+driver -, we will loose communication with the far end (be it a host or
+a device).
 
-Ok, I'll pick up the rest of this series then.
+You mention there are no external dependencies to make async suspend
+work on this driver, but that's far from the truth. As it is today, this
+driver needs a lot of work to learn about all the details about all
+different versions of this IP when it comes to supporting async PM.
 
-Thanks!
-Daniel
+I suppose this was tested with 500 other out-of-tree patches and you
+simply cherry-picked this patch to send upstream ? Am I right ? It
+certainly looks like it.
+
+Please let us know how has this been tested ? Did you run USB30CV ? Did
+you make sure to run through USB Certification interoperability tests ?
+
+Did you leave some stress test running for weeks before sending this
+patch out ? Is Exynos 5 working fine out of mainline ?
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/5dd983bd/attachment-0001.sig>
