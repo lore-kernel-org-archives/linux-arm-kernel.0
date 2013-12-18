@@ -1,76 +1,49 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 18 Dec 2013 08:24:00 -0800
-Subject: [PATCH 1/4] iMX6SL frequency table
-In-Reply-To: <20131218073755.GG6691@S2101-09.ap.freescale.net>
-References: <1387329451-17480-1-git-send-email-john.tobias.ph@gmail.com>
- <20131218073755.GG6691@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYNJdHoScfXC2DRaeTHxf0pBbnkc3CXLfivKmzsGAy=iOw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Dec 2013 16:24:52 +0000
+Subject: [PATCH 1/2] regulator: tps65910: Add backup battery regulator
+In-Reply-To: <1387378208-26841-1-git-send-email-mpa@pengutronix.de>
+References: <1387378208-26841-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131218162452.GX28455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will update it base on your previous email.
+On Wed, Dec 18, 2013 at 03:50:07PM +0100, Markus Pargmann wrote:
 
-Thanks,
+> @@ -771,7 +794,7 @@ static struct regulator_ops tps65910_ops = {
+>  	.get_voltage_sel	= tps65910_get_voltage_sel,
+>  	.set_voltage_sel	= tps65910_set_voltage_sel,
+>  	.list_voltage		= regulator_list_voltage_table,
+> -	.map_voltage		= regulator_map_voltage_ascend,
+> +	.map_voltage		= regulator_map_voltage_iterate,
+>  };
 
-john
+You should make separate ops for this rather than make all the other
+regulators take the performance hit.
 
-On Tue, Dec 17, 2013 at 11:37 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Dec 17, 2013 at 05:17:28PM -0800, John Tobias wrote:
->>     Device tree for iMX6SL doesn't have an existing cpu frequency table.
->
-> Drop these leading spaces.
->
->>
->> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
->> ---
->>  arch/arm/boot/dts/imx6sl.dtsi | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->
-> For such imx6sl dts changes, please put a prefix 'ARM: dts: imx6sl: ...'
-> on the patch subject.
->
->>
->> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
->> index 28558f1..0a2c73c 100644
->> --- a/arch/arm/boot/dts/imx6sl.dtsi
->> +++ b/arch/arm/boot/dts/imx6sl.dtsi
->> @@ -38,6 +38,20 @@
->>                       device_type = "cpu";
->>                       reg = <0x0>;
->>                       next-level-cache = <&L2>;
->> +                     operating-points = <
->> +                             /* kHz    uV */
->> +                             996000  1250000 /* for consumer grade only */
->> +                             792000  1150000
->> +                             396000  1050000
->
-> Please see my reply to your previous patch.
->
->> +                     >;
->> +                     clock-latency = <61036>; /* two CLK32 periods */
->> +                     clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>, <&clks IMX6SL_CLK_STEP>,
->> +                              <&clks IMX6SL_CLK_PLL1_SW>, <&clks IMX6SL_CLK_PLL1_SYS>;
->
-> The lines are somehow too long.  The following one might be easier to
-> read.
->
->                         clocks = <&clks IMX6SL_CLK_ARM>,
->                                  <&clks IMX6SL_CLK_PLL2_PFD2>,
->                                  <&clks IMX6SL_CLK_STEP>,
->                                  <&clks IMX6SL_CLK_PLL1_SW>,
->                                  <&clks IMX6SL_CLK_PLL1_SYS>;
->
-> Shawn
->
->> +                     clock-names = "arm", "pll2_pfd2_396m", "step",
->> +                                   "pll1_sw", "pll1_sys";
->> +                     arm-supply = <&reg_arm>;
->> +                     pu-supply = <&reg_pu>;
->> +                     soc-supply = <&reg_soc>;
->>               };
->>       };
->>
->> --
->> 1.8.3.2
->>
->
+>  static struct regulator_ops tps65911_ops = {
+> @@ -944,6 +967,7 @@ static struct of_regulator_match tps65910_matches[] = {
+>  	{ .name = "vaux2",	.driver_data = (void *) &tps65910_regs[10] },
+>  	{ .name = "vaux33",	.driver_data = (void *) &tps65910_regs[11] },
+>  	{ .name = "vmmc",	.driver_data = (void *) &tps65910_regs[12] },
+> +	{ .name = "vbb",	.driver_data = (void *) &tps65910_regs[13] },
+>  };
+
+Ugh, these numbered tables aren't good.  Not a problem from this patch
+though.
+
+> -		pmic->desc[i].enable_mask = TPS65910_SUPPLY_STATE_ENABLED;
+> +		if (tps65910_chip_id(tps65910) == TPS65910 &&
+> +				i == TPS65910_REG_VBB)
+> +			pmic->desc[i].enable_mask = BBCH_BBCHEN_MASK;
+> +		else
+> +			pmic->desc[i].enable_mask = TPS65910_SUPPLY_STATE_ENABLED;
+
+switch statements please - it means if additional things need
+customising they can drop right in.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131218/7e36be7e/attachment.sig>
