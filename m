@@ -1,105 +1,55 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 18 Dec 2013 13:06:45 -0700
-Subject: [PATCH V2 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <1386885004-10252-1-git-send-email-marex@denx.de>
-References: <1386885004-10252-1-git-send-email-marex@denx.de>
-Message-ID: <20131218200645.GF15119@google.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 18 Dec 2013 12:10:35 -0800
+Subject: [PATCHv6 2/5] clk: socfpga: Add a clock type for the SD/MMC driver
+In-Reply-To: <2899559.jbTzDM2qtE@dizzy-6.site>
+References: <1386880245-10192-1-git-send-email-dinguyen@altera.com>
+ <20131215045116.23538.4@quantum> <52AF68DB.7090105@elopez.com.ar>
+ <2899559.jbTzDM2qtE@dizzy-6.site>
+Message-ID: <20131218201035.23538.60602@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 10:49:58PM +0100, Marek Vasut wrote:
-> Some boards do not have a PCIe reset GPIO. To avoid probe
-> failure on these boards, make the reset GPIO optional as
-> well.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Harro Haan <hrhaan@gmail.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
-> ---
->  .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
->  drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
->  2 files changed, 17 insertions(+), 14 deletions(-)
+Quoting David Lanzend?rfer (2013-12-16 13:54:21)
+> Hi
+> > that takes the MMC clock (and only the MMC clock) and does the setup
+> > (it's basically configuring two values, "sample" and "output", into the
+> > clock register). I really don't know what does this do/why is it
+> > required/when is it used; I'm cc'ing Hans and David who can hopefully
+> > explain that part.
+> Since the read/write operations have to happen asynchronously and in a manner
+> so that the data provided by the SD-Card can be fetched on time, a specific
+> clock phase shift is required as you can see in the linked picture[1].
+> That's what the function is doing: It accesses the special registers of the
+> MMC clock device and configures this phase offset.
 
-Richard or Shawn, can you ack/nak these (patches 1-6)?  I'd like to dispose
-of them one way or the other.
+Yeah, clock phase is a fairly common thing to tune but there are two
+things to consider when crafting a new api like clk_set_phase(...):
+
+1) are we adjusting the phase of the clock signal or the phase of
+something else related to the clock rate? This is just something to
+think about. Sometimes it would be better to have
+video_signal_set_phase() instead of clk_set_phase().
+
+2) what is the input parameter to clk_set_phase? I guess the two best
+options are degrees (zero to 359), or a fraction of the clock period
+(1/4, 1/2, etc).
+
+Any thoughts?
+
+Regards,
+Mike
 
 > 
-> V2: Make the 'reset-gpio' prop shared between imx6 and exynos
->     Rebase on top of pci/host-imx6
+> > I also saw a similar requirement from the gmac people (on cc too), who
+> > needed to set the phy type (or something like that) on one of the clock
+> > registers; so I'm thinking maybe a generic "tune something" approach
+> > that lets users configure some clock-dependent, arbitrary aspect of the
+> > clock is the way forward. Otherwise, we're going to end up bloating the
+> > clock framework with a lot of callback pointers that are going to be
+> > used in one or two clocks out of potentially hundreds on the whole system.
+> It totally makes sense, since GMAC will be doing asynchrous
+> operations as well.
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index d5d26d4..d6fae13 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -19,6 +19,8 @@ Required properties:
->  	to define the mapping of the PCIe interface to interrupt
->  	numbers.
->  - num-lanes: number of lanes to use
-> +
-> +Optional properties:
->  - reset-gpio: gpio pin number of power good signal
->  
->  Optional properties for fsl,imx6q-pcie
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 9fc1cb6..c247602 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -214,9 +214,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
->  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->  			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
->  
-> -	gpio_set_value(imx6_pcie->reset_gpio, 0);
-> -	msleep(100);
-> -	gpio_set_value(imx6_pcie->reset_gpio, 1);
-> +	/* Some boards don't have PCIe reset GPIO. */
-> +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> +		gpio_set_value(imx6_pcie->reset_gpio, 0);
-> +		msleep(100);
-> +		gpio_set_value(imx6_pcie->reset_gpio, 1);
-> +	}
->  
->  	return 0;
->  }
-> @@ -432,17 +435,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  
->  	/* Fetch GPIOs */
->  	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> -	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
-> -		dev_err(&pdev->dev, "no reset-gpio defined\n");
-> -		ret = -ENODEV;
-> -	}
-> -	ret = devm_gpio_request_one(&pdev->dev,
-> -				imx6_pcie->reset_gpio,
-> -				GPIOF_OUT_INIT_LOW,
-> -				"PCIe reset");
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "unable to get reset gpio\n");
-> -		return ret;
-> +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> +		ret = devm_gpio_request_one(&pdev->dev,
-> +					imx6_pcie->reset_gpio,
-> +					GPIOF_OUT_INIT_LOW,
-> +					"PCIe reset");
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "unable to get reset gpio\n");
-> +			return ret;
-> +		}
->  	}
->  
->  	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
-> -- 
-> 1.8.4.3
+> -David
 > 
+> [1] http://www.chipestimate.com/techtalk/images/11022010_fig2_3.JPG
