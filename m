@@ -1,81 +1,60 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 18 Dec 2013 17:42:38 +0800
-Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
-In-Reply-To: <52B0D6FA.2060101@wwwdotorg.org>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-3-git-send-email-josephl@nvidia.com>
- <52B0D6FA.2060101@wwwdotorg.org>
-Message-ID: <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Wed, 18 Dec 2013 09:43:51 +0000
+Subject: [PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20131217130435.GV4360@n2100.arm.linux.org.uk>
+References: <1386925027-16288-1-git-send-email-Li.Xiubo@freescale.com>
+ <5295539.cCkPY1PpyC@flatron> <20131217124505.GB17210@ulmo.nvidia.com>
+ <1500339.E8bGm7xZUi@flatron> <20131217130435.GV4360@n2100.arm.linux.org.uk>
+Message-ID: <2e498771546543f18329d2c2e69a6e35@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-18 at 06:58 +0800, Stephen Warren wrote:
-> On 12/17/2013 02:26 AM, Joseph Lo wrote:
-> > Add External Memory Controller (EMC) clock interface for the Tegra CCF
-> > driver to support EMC scaling.
-> 
-> > diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
-> 
-> > +static long clk_emc_round_rate(struct clk_hw *hw, unsigned long rate,
-> > +			       unsigned long *prate)
-> > +{
-> > +	struct tegra_clk_emc *emc = to_clk_emc(hw);
-> > +	struct clk *parent_clk = __clk_get_parent(hw->clk);
-> > +	unsigned long parent_rate = __clk_get_rate(parent_clk);
-> > +	unsigned long ret;
-> > +
-> > +	if (!emc->emc_ops)
-> > +		return parent_rate;
-> > +
-> > +	ret = emc->emc_ops->emc_round_rate(rate);
-> > +	if (!ret)
-> > +		return parent_rate;
-> > +
-> > +	return ret;
-> > +}
-> 
-> Rather than implementing this custom "emc_ops" feature, isn't there a
-> standard clock notifier feature that the EMC driver can use?
-> 
-> Isn't the EMC driver the only thing that will be changing the EMC clock
-> rate? If so, why not just have the EMC driver perform the appropriate
-> pre-/post-rate-change actions before/after calling clk_set_rate()?
 
-We have two HW components needs to be updated when EMC rate change. One
-is the EMC clock for tuning the frequency, the other is the EMC for
-updating the timing and configuration for external memory (DRAM). So
-this question looks like to me is that can we separate the operation of
-the two components when rate changing?
-
-We have two modes that depend on what memory type (DDR2, LPDDR2,
-DDR3/LP) we used on the platform to support EMC scaling.
-1. power down mode (Tegra20 used this mode only.)
-In this mode, we update the EMC timing and configurations to EMC shadow
-registers. Then updating the rate in the EMC clock register. The HW will
-trigger the rate changing and timing/configurations updating for EMC.
-2. self-refresh mode (Tegra30/114/124 if DDR3)
-More complicate in this mode. Putting DRAM in self-refresh, updating EMC
-settings, updating EMC clock, then we still need auto calibration before
-restores DRAM from the self-refresh mode. So the difference was the EMC
-clock operation was part of EMC scaling procedures.
-
-I guess using the clk_notifier may be OK for the 1st case.
-
-I suggest create a EMC clock driver to work closely with EMC driver.
-That would help us to represent fully clock function of EMC clock.
-
+> On Tue, Dec 17, 2013 at 01:54:35PM +0100, Tomasz Figa wrote:
+> > On Tuesday 17 of December 2013 13:45:06 Thierry Reding wrote:
+> > > I fail to see how that would eliminate the problem with the types.
+> > > That said I don't actually see sparse complaining about any type
+> mismatches.
+> > > That's probably because the various macros implicitly cast to u32.
+> >
+> > Well, in BE variant you would read the register using __raw_readl()
+> > into a __be32 and then get an u32 from be32_to_cpu() and return it.
+> > Similarly for writes
 > 
-> > +void tegra_register_emc_clk_ops(struct clk *emc_clk,
-> > +				const struct emc_clk_ops *emc_ops)
-> > +{
-> > +	struct clk_hw *hw;
-> > +	struct tegra_clk_emc *emc;
-> > +
-> > +	if (IS_ERR_OR_NULL(emc_clk))
-> > +		return;
+> __raw_readl() returns a u32, so you'll get a warning trying to assign a
+> u32 to a __be32.
 > 
-> IS_ERROR_OR_NULL() shouldn't be used. "struct clk *" is either IS_ERR()
-> on error, or it's NULL on error, not both. The body of clk_get() implies
-> you need to use IS_ERR().
 
-True, will fix.
+If all are ok about this method.
+How about the following:
+
++static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc,
++                               const void __iomem *addr)
++{
++       u32 val;
++
++       val = __raw_readl(addr);
++
++       if (likely(fpc->big_endian))
++               val = be32_to_cpu((__force __be32)val);
++       else
++               val = le32_to_cpu((__force __le32)val);
++       rmb();
++
++       return val;
++}
++
++static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc,
++                               u32 val, void __iomem *addr)
++{
++       wmb();
++       if (likely(fpc->big_endian))
++               val = (__force u32)cpu_to_be32(val);
++       else
++               val = (__force u32)cpu_to_le32(val);
++
++       __raw_writel(val, addr);
++}
+
+Best Regards,
+Xiubo
