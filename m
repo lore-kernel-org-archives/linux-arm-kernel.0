@@ -1,37 +1,46 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Thu, 19 Dec 2013 01:20:46 +0400
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <201312182210.30544.arnd@arndb.de>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312182150.39037.arnd@arndb.de>
- <1387400193.31516.10.camel@host5.omatika.ru>
- <201312182210.30544.arnd@arndb.de>
-Message-ID: <1387401646.31516.14.camel@host5.omatika.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Dec 2013 22:21:46 +0100
+Subject: [RESEND LIST PATCHv7 1/4] clk: socfpga: Add a clk-phase property
+ to the "altr, socfpga-gate-clk"
+In-Reply-To: <20131218205636.23538.50735@quantum>
+References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
+ <1387213476-22122-2-git-send-email-dinguyen@altera.com>
+ <20131218205636.23538.50735@quantum>
+Message-ID: <201312182221.46506.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-12-18 at 22:10 +0100, Arnd Bergmann wrote:
-> On Wednesday 18 December 2013, Sergei Ianovich wrote:
-> > Could we postpone this until someone needs this functionality?
+On Wednesday 18 December 2013, Mike Turquette wrote:
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index f936476..616d9ee 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -413,6 +413,7 @@
+> >                                                 compatible = "altr,socfpga-gate-clk";
+> >                                                 clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> >                                                 clk-gate = <0xa0 8>;
+> > +                                               clk-phase = <0 3>;
 > 
-> We have to be sure that any device tree files you write now can remain
-> compatible with future kernels if we add it later. My reasoning at first
-> was that this wouldn't work if we had to change the "compatible" string
-> for the bus node, but after re-thinking it now I believe that it's fine.
+> Looking at this again, I have a hard time understanding the values in
+> the clk-phase property. You reference some functions in the property
+> definition above, but they are not obvious to me.
+> 
+> Additionally I wonder if the binding would better if the clock-phase
+> property was simply the value in degrees. E.g:
+> 
+>         clk-phase = <315>;    // 315 degrees
 
-Great.
+I would definitely prefer using degrees over an arbitrary enumeration that
+might work on some platforms but not on others.
 
-> You would still be able to boot a kernel with an old dts file on a new
-> kernel if it just contains a "simple-bus" node here, as long as it doesn't
-> need any boot-time setup at the bus controller. We can change the dts
-> file later if we need to add this functionality, which would break booting
-> old kernels with the new dts files, which isn't much of a problem in
-> general.
+I'm also a bit skeptical about the idea of putting the phase into the clock
+provider rather than the consumer, given the comments about the
+clk_set_phase() interface earlier. Generally we try to avoid having
+consumer-specific settings in a provider node (for any DT binding,
+not just clocks). Can't you have the same numbers in the dw-mshc
+node instead and let the mmc driver call clk_set_phase instead?
+If every clock has a fixed phase for a given piece of hardware, it
+could even be set automatically by making the common clk code read
+the clk-phase attribute at the time a driver calls clk_get.
 
-It should actually only break old kernels which require new
-functionally. Otherwise, dts can have
-
-compatible = "marvell,pxa-extbus", "simple-bus";
-
-and an older kernel will be happy with "simple-bus". Please correct me
-if I'm wrong.
+	Arnd
