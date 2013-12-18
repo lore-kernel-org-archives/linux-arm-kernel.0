@@ -1,52 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 18 Dec 2013 13:44:09 +0000
-Subject: [PATCH 2/2] kvmtool/arm: Add option to override Generic Timer
- frequency
-In-Reply-To: <308D5B7E-5BDA-4984-9448-EAD8B5D699CF@suse.de>
-References: <1387305074-29421-1-git-send-email-robin.murphy@arm.com>
- <1387305074-29421-3-git-send-email-robin.murphy@arm.com>
- <308D5B7E-5BDA-4984-9448-EAD8B5D699CF@suse.de>
-Message-ID: <52B1A6A9.1030107@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 18 Dec 2013 22:49:18 +0900
+Subject: [PATCH 2/5] arm: shmobile: r7s72100: add i2c clocks
+In-Reply-To: <20131218121541.GE3314@katana>
+References: <1387316678-10174-1-git-send-email-wsa@the-dreams.de>
+ <1387316678-10174-3-git-send-email-wsa@the-dreams.de>
+ <52B1892B.1020806@cogentembedded.com>
+ <20131218114351.GD3314@katana>
+ <52B18CC9.8090200@cogentembedded.com>
+ <20131218121541.GE3314@katana>
+Message-ID: <20131218134914.GA32664@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/13 20:39, Alexander Graf wrote:
->
-> On 17.12.2013, at 19:31, Robin Murphy <robin.murphy@arm.com> wrote:
->
->> Some platforms have secure firmware which does not correctly set the
->> CNTFRQ register on boot, preventing the use of the Generic Timer.
->> This patch allows mirroring the necessary host workaround by specifying
->> the clock-frequency property in the guest DT.
->>
->> This should only be considered a means of KVM bring-up on such systems,
->> such that vendors may be convinced to properly implement their firmware
->> to support the virtualisation capabilities of their hardware.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> How does it encourage a vendor to properly implement their firmware if there's a workaround?
->
->
-> Alex
->
->
+On Wed, Dec 18, 2013 at 01:15:42PM +0100, Wolfram Sang wrote:
+> 
+> On Wed, Dec 18, 2013 at 03:53:45PM +0400, Sergei Shtylyov wrote:
+> > On 18-12-2013 15:43, Wolfram Sang wrote:
+> > 
+> > >>>@@ -173,6 +179,10 @@ static struct clk_lookup lookups[] = {
+> > >>>  	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+> > 
+> > >>>  	/* ICK */
+> > >>>+	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+> > >>>+	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+> > >>>+	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
+> > >>>+	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+> > 
+> > >>    These belong to some other place, the group marked by /* ICK */
+> > >>is only for CLKDEV_ICK_ID().
+> > 
+> > >So, I'll create a /* DEV */ prefix?
+> > 
+> >    I really don't know. Other places have /* MSTP */ comment in this
+> > case despite all clocks, CLKDEV_DEV_ID() and CLKDEV_ICK_ID() are
+> > really MSTP clocks. I considered the idea of separating
+> > CLKDEV_ICK_ID() under /* ICK */ comment silly from the very start
+> > but Simon didn't listen to me.
+> 
+> I am puzzled, too. ICK is a type of registration and not a clock domain.
+> Also, there is 'mtu2_fck' which is under ICK as well as MSTP? Looks
+> wrong. From what I understand now, removing the /* ICK */ comment would
+> be easiest and proper?
 
-Hi Alex,
+I'm not sure that I really understand what all the fuss is about.
 
-In short, by enabling the users to create the demand. Yes, like any 
-workaround there's potential for abuse, but having *something* that 
-makes it work is the difference between "I want virtualisation"[1] and 
-"Dear vendor, I've tried virtualisation on your chip/board and it's 
-great, but it tells me I need new firmware, where do I get that?"
+As I understand things the convention that prevails for
+MSTP clocks under mach-shmobile is as follows:
 
-Having the specs tell them what to do clearly isn't sufficient, so let's 
-give the integrators and consumers incentive to shout at them too. The 
-sooner proper support is commonplace and we can deprecate 
-clock-frequency hacks altogether, the better.
+1. Clocks not registered by CLKDEV_ICK_ID() are grouped together
+   under /* MSTP */ followed by:
+2. Clocks registered using CLKDEV_ICK_ID() are grouped together
+   under /* ICK */
 
-Robin.
-
-[1] 
-http://www.theregister.co.uk/2013/12/12/virtualisation_on_mobile_phones_is_coming/
+I am unsure of the historical reason for this but it does
+seem to be consistent.
