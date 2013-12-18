@@ -1,39 +1,49 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 18 Dec 2013 03:12:34 +0000
-Subject: [PATCH 2/3 v2] regulator: act8865: add device tree binding doc
-In-Reply-To: <20131217124750.GX3185@sirena.org.uk>
-References: <1387258597-21866-1-git-send-email-wenyou.yang@atmel.com>
- <1387258597-21866-3-git-send-email-wenyou.yang@atmel.com>
- <20131217124750.GX3185@sirena.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A24364172F1838F@penmbx01>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 18 Dec 2013 03:33:53 +0000 (UTC)
+Subject: [PATCHv10 01/41] clk: add support for platform specific clock
+ I/O wrapper functions
+In-Reply-To: <alpine.DEB.2.02.1312171212170.14039@utopia.booyaka.com>
+References: <1385453182-24421-1-git-send-email-t-kristo@ti.com>
+ <1385453182-24421-2-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1312171212170.14039@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1312180332380.14039@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tue, 17 Dec 2013, Paul Walmsley wrote:
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Tuesday, December 17, 2013 8:48 PM
-> To: Yang, Wenyou
-> Cc: lgirdwood at gmail.com; linux-kernel at vger.kernel.org;
-> grant.likely at linaro.org; rob.herring at calxeda.com; linux-
-> doc at vger.kernel.org; vpalatin at chromium.org; Ferre, Nicolas;
-> plagnioj at jcrosoft.com; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH 2/3 v2] regulator: act8865: add device tree binding
-> doc
+> On Tue, 26 Nov 2013, Tero Kristo wrote:
 > 
-> On Tue, Dec 17, 2013 at 01:36:36PM +0800, Wenyou Yang wrote:
+> > Current clock wrappers assume simple and direct mapped hardware register
+> > access. Improve this support by adding functionality for registering
+> > platform specific clock I/O wrappers, which can be used to support
+> > various features needed like endianess conversions, indexed regmap support,
+> > etc. Default I/O wrapper provided also which uses the existing direct
+> > I/O mapped behavior.
 > 
-> > +Required properties:
-> > +- compatible: "active-semi,act8865"
-> > +- reg: I2C slave address
-> 
-> This needs to also document the regulators property, for example all the
-> regulator names.
-Add all the regulator name:
-The valid names for regulators are:
-       DCDC_REG1, DCDC_REG2, DCDC_REG3, LDO_REG1, LDO_REG2, LDO_REG3, LDO_REG4.
+> I think it makes more sense to define per-SoC register read and write 
+> functions,
 
-Best Regards,
-Wenyou Yang
+Sorry, this should have read "per-IP block register read and write 
+functions".
+
+> for the same reason that I think it makes more sense to define clock 
+> data as part of the IP blocks that contain the clocks' registers.  The 
+> register read and write functions should be implemented by the drivers 
+> for the IP blocks that the clocks are contained in.  That way the 
+> register read and write functions can take whatever steps are necessary 
+> to ensure that the IP block registers are accessible before performing 
+> the read/write; can implement non-MMIO register accesses if needed; and 
+> can operate on register offsets, rather than absolute addresses.
+> 
+> Something like the following draft implementation.  Also needed would be a 
+> way for clock providers that rely on the common clock providers (e.g., 
+> divider, mux, etc.) to pass in the struct clk_ll_ops pointer.  I guess the 
+> simplest way to implement this would be to add another set of registration 
+> functions - e.g., clk_register_divider_ipb() or clk_register_divider2() or 
+> something similar.  These functions would be similar to 
+> clk_register_divider(), but would take a pointer to a struct clk_ll_ops 
+> and pass that along to the CCF core.
+
+
+- Paul
