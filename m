@@ -1,164 +1,178 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 20:50:50 -0800
-Subject: [PATCH v3 04/12] clk: Add regmap core helpers for
- enable/disable/is_enabled
-In-Reply-To: <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
-References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
- <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20131219045050.23538.94293@quantum>
+Date: Wed, 18 Dec 2013 20:59:05 -0800
+Subject: [PATCH v2 05/11] clk: sunxi: add PLL5 and PLL6 support
+In-Reply-To: <1387327503-15651-6-git-send-email-emilio@elopez.com.ar>
+References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+ <1387327503-15651-6-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20131219045905.23538.99955@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2013-10-16 00:40:06)
-> The clock framework already has support for simple gate clocks
-> but if drivers want to use the gate clock functionality they need
-> to wrap the gate clock in another struct and chain the ops by
-> calling the gate ops from their own custom ops. Plus the gate
-> clock implementation only supports MMIO accessors so other bus
-> type clocks don't benefit from the potential code reuse. Add some
-> simple regmap helpers for enable/disable/is_enabled that drivers
-> can use as drop in replacements for their clock ops or as simple
-> functions they call from their own custom ops.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clk.c            | 70 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk-provider.h | 13 ++++++++
->  2 files changed, 83 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 8042c00..7cc8cb0 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -742,6 +742,76 @@ out:
->         return best;
->  }
->  
+Quoting Emilio L?pez (2013-12-17 16:44:57)
 > +/**
-> + * clk_is_enabled_regmap - standard is_enabled() for regmap users
+> + * sunxi_divs_clk_setup() - Setup function for leaf divisors on clocks
 > + *
-> + * @hw: clk to operate on
-> + *
-> + * Clocks that use regmap for their register I/O can set the
-> + * enable_reg and enable_mask fields in their struct clk_hw and then use
-> + * this as their is_enabled operation, saving some code.
+> + * These clocks look something like this
+> + *            ________________________
+> + *           |         ___divisor 1---|----> to consumer
+> + * parent >--|  pll___/___divisor 2---|----> to consumer
+> + *           |        \_______________|____> to consumer
+> + *           |________________________|
 > + */
-> +int clk_is_enabled_regmap(struct clk_hw *hw)
+
++1 for ASCII art.
+
+> +
+> +static void __init sunxi_divs_clk_setup(struct device_node *node,
+> +                                       struct divs_data *data)
 > +{
-> +       unsigned int val;
-> +       int ret;
+> +       struct clk_onecell_data *clk_data;
+> +       const char *parent  = node->name;
+> +       const char *clk_name;
+> +       struct clk **clks, *pclk;
+> +       struct clk_hw *gate_hw, *rate_hw;
+> +       const struct clk_ops *rate_ops;
+> +       struct clk_gate *gate = NULL;
+> +       struct clk_fixed_factor *fix_factor;
+> +       struct clk_divider *divider;
+> +       void *reg;
+> +       int i = 0;
+> +       int flags, clkflags;
 > +
-> +       ret = regmap_read(hw->regmap, hw->enable_reg, &val);
-> +       if (ret != 0)
-> +               return ret;
+> +       /* Set up factor clock that we will be dividing */
+> +       pclk = sunxi_factors_clk_setup(node, data->factors);
 > +
-> +       if (hw->enable_is_inverted)
-> +               return (val & hw->enable_mask) == 0;
-> +       else
-> +               return (val & hw->enable_mask) != 0;
+> +       reg = of_iomap(node, 0);
+> +
+> +       clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+> +       if (!clk_data)
+> +               return;
+> +
+> +       clks = kzalloc(SUNXI_DIVS_MAX_QTY * sizeof(struct clk *), GFP_KERNEL);
+> +       if (!clks)
+> +               goto free_clkdata;
+> +
+> +       clk_data->clks = clks;
+> +
+> +       /* It's not a good idea to have automatic reparenting changing
+> +        * our RAM clock! */
+> +       clkflags = !strcmp("pll5", parent) ? 0 : CLK_SET_RATE_PARENT;
+
+Just out of curiosity, did you hit this problem in testing?
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+> +
+> +       for (i = 0; i < SUNXI_DIVS_MAX_QTY; i++) {
+> +               if (of_property_read_string_index(node, "clock-output-names",
+> +                                                 i, &clk_name) != 0)
+> +                       break;
+> +
+> +               gate_hw = NULL;
+> +               rate_hw = NULL;
+> +               rate_ops = NULL;
+> +
+> +               /* If this leaf clock can be gated, create a gate */
+> +               if (data->div[i].gate) {
+> +                       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> +                       if (!gate)
+> +                               goto free_clks;
+> +
+> +                       gate->reg = reg;
+> +                       gate->bit_idx = data->div[i].gate;
+> +                       gate->lock = &clk_lock;
+> +
+> +                       gate_hw = &gate->hw;
+> +               }
+> +
+> +               /* Leaves can be fixed or configurable divisors */
+> +               if (data->div[i].fixed) {
+> +                       fix_factor = kzalloc(sizeof(*fix_factor), GFP_KERNEL);
+> +                       if (!fix_factor)
+> +                               goto free_gate;
+> +
+> +                       fix_factor->mult = 1;
+> +                       fix_factor->div = data->div[i].fixed;
+> +
+> +                       rate_hw = &fix_factor->hw;
+> +                       rate_ops = &clk_fixed_factor_ops;
+> +               } else {
+> +                       divider = kzalloc(sizeof(*divider), GFP_KERNEL);
+> +                       if (!divider)
+> +                               goto free_gate;
+> +
+> +                       flags = data->div[i].pow ? CLK_DIVIDER_POWER_OF_TWO : 0;
+> +
+> +                       divider->reg = reg;
+> +                       divider->shift = data->div[i].shift;
+> +                       divider->width = SUNXI_DIVISOR_WIDTH;
+> +                       divider->flags = flags;
+> +                       divider->lock = &clk_lock;
+> +                       divider->table = data->div[i].table;
+> +
+> +                       rate_hw = &divider->hw;
+> +                       rate_ops = &clk_divider_ops;
+> +               }
+> +
+> +               /* Wrap the (potential) gate and the divisor on a composite
+> +                * clock to unify them */
+> +               clks[i] = clk_register_composite(NULL, clk_name, &parent, 1,
+> +                                                NULL, NULL,
+> +                                                rate_hw, rate_ops,
+> +                                                gate_hw, &clk_gate_ops,
+> +                                                clkflags);
+> +
+> +               WARN_ON(IS_ERR(clk_data->clks[i]));
+> +               clk_register_clkdev(clks[i], clk_name, NULL);
+> +       }
+> +
+> +       /* The last clock available on the getter is the parent */
+> +       clks[i++] = pclk;
+> +
+> +       /* Adjust to the real max */
+> +       clk_data->clk_num = i;
+> +
+> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +
+> +       return;
+> +
+> +free_gate:
+> +       kfree(gate);
+> +free_clks:
+> +       kfree(clks);
+> +free_clkdata:
+> +       kfree(clk_data);
 > +}
-> +EXPORT_SYMBOL_GPL(clk_is_enabled_regmap);
 > +
-> +/**
-> + * clk_enable_regmap - standard enable() for regmap users
-> + *
-> + * @hw: clk to operate on
-> + *
-> + * Clocks that use regmap for their register I/O can set the
-> + * enable_reg and enable_mask fields in their struct clk_hw and then use
-> + * this as their enable() operation, saving some code.
-> + */
-> +int clk_enable_regmap(struct clk_hw *hw)
-> +{
-> +       unsigned int val;
 > +
-> +       if (hw->enable_is_inverted)
-> +               val = 0;
-> +       else
-> +               val = hw->enable_mask;
 > +
-> +       return regmap_update_bits(hw->regmap, hw->enable_reg,
-> +                                 hw->enable_mask, val);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_enable_regmap);
-> +
-> +/**
-> + * clk_disable_regmap - standard disable() for regmap users
-> + *
-> + * @hw: clk to operate on
-> + *
-> + * Clocks that use regmap for their register I/O can set the
-> + * enable_reg and enable_mask fields in their struct clk_hw and then use
-> + * this as their disable() operation, saving some code.
-> + */
-> +void clk_disable_regmap(struct clk_hw *hw)
-> +{
-> +       unsigned int val;
-> +
-> +       if (hw->enable_is_inverted)
-> +               val = hw->enable_mask;
-> +       else
-> +               val = 0;
-> +
-> +       regmap_update_bits(hw->regmap, hw->enable_reg, hw->enable_mask, val);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_disable_regmap);
-> +
->  /***        clk api        ***/
->  
->  void __clk_unprepare(struct clk *clk)
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 6ed62f1..4087a9b 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -177,11 +177,21 @@ struct clk_init_data {
->   * with the common clock framework.
->   *
->   * @regmap: regmap to use for regmap helpers and/or by providers
-> + *
-> + * @enable_reg: register when using regmap enable/disable ops
-> + *
-> + * @enable_mask: mask when using regmap enable/disable ops
-> + *
-> + * @enable_is_inverted: flag to indicate set enable_mask bits to disable
-> + *                      when using clock_enable_regmap and friends APIs.
->   */
->  struct clk_hw {
->         struct clk *clk;
->         const struct clk_init_data *init;
->         struct regmap *regmap;
-> +       unsigned int enable_reg;
-> +       unsigned int enable_mask;
-> +       bool enable_is_inverted;
-
-Thanks for submitting this patch.
-
-Adding all of this stuff to struct clk_hw makes me a sad panda. You are
-essentially sharing a common set of ops for clocks that use regmap as
-their io operation back-end, and that is a good thing.
-
-However, why not just do this as drivers/clk/clk-regmap.c, or
-drivers/clk/clk-gate-regmap.c? Putting the clk_ops callback functions in
-drivers/clk/clk.c is a little weird and putting those struct members
-into struct clk_hw is definitely strange.
-
-Regards,
-Mike
-
+>  /* Matches for factors clocks */
+>  static const struct of_device_id clk_factors_match[] __initconst = {
+>         {.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
+> @@ -637,6 +857,13 @@ static const struct of_device_id clk_div_match[] __initconst = {
+>         {}
 >  };
 >  
->  /*
-> @@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
->  long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
->                               unsigned long *best_parent_rate,
->                               struct clk **best_parent_p);
-> +int clk_is_enabled_regmap(struct clk_hw *hw);
-> +int clk_enable_regmap(struct clk_hw *hw);
-> +void clk_disable_regmap(struct clk_hw *hw);
+> +/* Matches for divided outputs */
+> +static const struct of_device_id clk_divs_match[] __initconst = {
+> +       {.compatible = "allwinner,sun4i-pll5-clk", .data = &pll5_divs_data,},
+> +       {.compatible = "allwinner,sun4i-pll6-clk", .data = &pll6_divs_data,},
+> +       {}
+> +};
+> +
+>  /* Matches for mux clocks */
+>  static const struct of_device_id clk_mux_match[] __initconst = {
+>         {.compatible = "allwinner,sun4i-cpu-clk", .data = &sun4i_cpu_mux_data,},
+> @@ -714,6 +941,9 @@ static void __init sunxi_init_clocks(struct device_node *np)
+>         /* Register divider clocks */
+>         of_sunxi_table_clock_setup(clk_div_match, sunxi_divider_clk_setup);
 >  
->  /*
->   * FIXME clock api without lock protection
+> +       /* Register divided output clocks */
+> +       of_sunxi_table_clock_setup(clk_divs_match, sunxi_divs_clk_setup);
+> +
+>         /* Register mux clocks */
+>         of_sunxi_table_clock_setup(clk_mux_match, sunxi_mux_clk_setup);
+>  
 > -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> 1.8.5.1
 > 
