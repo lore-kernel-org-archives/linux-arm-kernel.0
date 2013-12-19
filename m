@@ -1,32 +1,32 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 19 Dec 2013 14:23:57 +0530
-Subject: [PATCH Resend 3/7] clk: socfpga: Use NULL instead of 0
+Date: Thu, 19 Dec 2013 14:23:58 +0530
+Subject: [PATCH Resend 4/7] clk: versatile: Staticize
+ clk_sp810_timerclken_of_get
 In-Reply-To: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
 References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1387443241-5694-3-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1387443241-5694-4-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'div_reg' is a pointer. Assign NULL instead of 0.
+clk_sp810_timerclken_of_get is used only in this file. Make it static.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Acked-by: Dinh Nguyen <dinguyen@altera.com>
 ---
- drivers/clk/socfpga/clk.c |    2 +-
+ drivers/clk/versatile/clk-sp810.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index c3784899f002..5983a26a8c5f 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -290,7 +290,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
- 		socfpga_clk->shift = div_reg[1];
- 		socfpga_clk->width = div_reg[2];
- 	} else {
--		socfpga_clk->div_reg = 0;
-+		socfpga_clk->div_reg = NULL;
- 	}
+diff --git a/drivers/clk/versatile/clk-sp810.c b/drivers/clk/versatile/clk-sp810.c
+index bf9b15a585e1..c6e86a9a2aa3 100644
+--- a/drivers/clk/versatile/clk-sp810.c
++++ b/drivers/clk/versatile/clk-sp810.c
+@@ -123,7 +123,7 @@ static const struct clk_ops clk_sp810_timerclken_ops = {
+ 	.set_parent = clk_sp810_timerclken_set_parent,
+ };
  
- 	of_property_read_string(node, "clock-output-names", &clk_name);
+-struct clk *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
++static struct clk *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
+ 		void *data)
+ {
+ 	struct clk_sp810 *sp810 = data;
 -- 
 1.7.9.5
