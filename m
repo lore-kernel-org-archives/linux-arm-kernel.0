@@ -1,93 +1,68 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 19 Dec 2013 14:21:08 +0000
-Subject: [PATCH V4 3/3] cpufreq: imx6: Add device tree binding document
-In-Reply-To: <1387462609-13013-3-git-send-email-b20788@freescale.com>
-References: <1387462609-13013-1-git-send-email-b20788@freescale.com>
- <1387462609-13013-3-git-send-email-b20788@freescale.com>
-Message-ID: <52B300D4.4090309@arm.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Thu, 19 Dec 2013 09:25:36 -0500
+Subject: [PATCH v7 8/9] phy: add Broadcom Kona USB2 PHY driver
+In-Reply-To: <52B288EF.1040006@ti.com>
+References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
+ <1387309356-17195-9-git-send-email-mporter@linaro.org>
+ <20131218162554.GF4970@saruman.home> <52B288EF.1040006@ti.com>
+Message-ID: <20131219142536.GG15814@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/13 14:16, Anson Huang wrote:
-> This device tree binding document describes the imx6 cpufreq
-> DT bindings. This document lists all required and optional properties
-> for imx6 cpufreq.
+On Thu, Dec 19, 2013 at 11:19:35AM +0530, Kishon Vijay Abraham I wrote:
+> Hi Felipe,
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-imx6.txt   |   56 ++++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
+> On Wednesday 18 December 2013 09:55 PM, Felipe Balbi wrote:
+> > On Tue, Dec 17, 2013 at 02:42:35PM -0500, Matt Porter wrote:
+> >> Add a driver for the internal Broadcom Kona USB 2.0 PHY found
+> >> on the BCM281xx family of SoCs.
+> >>
+> >> Signed-off-by: Matt Porter <mporter@linaro.org>
+> > 
+> > Kishon, are you ok with this driver ?
 > 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
-> new file mode 100644
-> index 0000000..a14b895
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
-> @@ -0,0 +1,56 @@
-> +i.MX6 cpufreq driver
-> +-------------------
-> +
-> +i.MX6 SoC cpufreq driver for CPU frequency scaling.
-> +
-> +This binding doc defines properties that must be put in the /cpus/cpu at 0 node,
-> +please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> +for detail.
-> +
-> +Required properties:
-> +- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
-> +  for details.
-> +- clocks: Specify clocks that need to be used when cpu frequency is scaled,
-> +  refer to Documentation/devicetree/bindings/clock/clock-bindings.txt for
-> +  details.
-> +- clock-names: List of clock input name strings sorted in the same order as the
-> +  clocks property, refer to Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +  for details.
-> +- xxx-supply: Input voltage supply regulator, refer to
-> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
-> +  arm-supply: regulator node supplying arm.
-> +  pu-supply: regulator node supplying pu.
-> +  soc-supply: regulator node supplying soc.
-> +
-> +Optional properties:
-> +- fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
-> +  go with cpu0's operating-points.
-> +- clock-latency: Specify the possible maximum transition latency for clock,
-> +  in unit of nanoseconds.
-> +
-
-Sorry if I am missing something obvious as I have not followed the previous
-versions and corresponding comments.
-
-Should these SoC properties be part of cpu node ? If so which cpu or why cpu0 ?
-IIUC it's more a SoC properties which also influences ARM CPU OPPs. IOW other
-regulators may depend on pu/soc-supply. In that case it would be cleaner if that
-dependency is setup through regulators framework.
-
-> +Examples:
-> +
-> +	cpu at 0 {
-> +		operating-points = <
-> +			/* kHz    uV */
-> +			1200000 1275000
-> +			996000  1250000
-> +			792000  1150000
-> +			396000  975000
-> +		>;
-> +		fsl,soc-operating-points = <
-> +			/* ARM kHz  SOC-PU uV */
-> +			1200000 1275000
-> +			996000	1250000
-> +			792000	1175000
-> +			396000	1175000
-> +		>;
-> +		clock-latency = <61036>; /* two CLK32 periods */
-> +		clocks = <&clks 104>, <&clks 6>, <&clks 16>,
-> +			 <&clks 17>, <&clks 170>;
-> +		clock-names = "arm", "pll2_pfd2_396m", "step",
-> +			      "pll1_sw", "pll1_sys";
-> +		arm-supply = <&reg_arm>;
-> +		pu-supply = <&reg_pu>;
-> +		soc-supply = <&reg_soc>;
-> +	};
+> yeah. Since this patch touches phy/Kconfig (and Makefile) and there is one more
+> PHY driver to be merged that also modifies Kconfig there might be conflicts. So
+> thought I should be taking this patch?
+> > 
+> >> +static int bcm_kona_usb2_probe(struct platform_device *pdev)
+> >> +{
+> >> +	struct device *dev = &pdev->dev;
+> >> +	struct bcm_kona_usb *phy;
+> >> +	struct resource *res;
+> >> +	struct phy *gphy;
+> >> +	struct phy_provider *phy_provider;
+> >> +
+> >> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+> >> +	if (!phy)
+> >> +		return -ENOMEM;
+> >> +
+> >> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >> +	phy->regs = devm_ioremap_resource(&pdev->dev, res);
+> >> +	if (IS_ERR(phy->regs))
+> >> +		return PTR_ERR(phy->regs);
+> >> +
+> >> +	platform_set_drvdata(pdev, phy);
+> >> +
+> >> +	phy_provider = devm_of_phy_provider_register(dev,
+> >> +			of_phy_simple_xlate);
+> >> +	if (IS_ERR(phy_provider))
+> >> +		return PTR_ERR(phy_provider);
+> >> +
+> >> +	gphy = devm_phy_create(dev, &ops, NULL);
+> >> +	if (IS_ERR(gphy))
+> >> +		return PTR_ERR(gphy);
+> >> +
+> >> +	/* The Kona PHY supports an 8-bit wide UTMI interface */
+> >> +	phy_set_bus_width(gphy, 8);
+> >> +
+> >> +	phy_set_drvdata(gphy, phy);
+> > 
+> > I think this set_drvdata() should be done before registering the
+> > provider, no ?
 > 
+> hmm, right.
+
+I sent a v8 series update that addresses this issue.
+
+-Matt
