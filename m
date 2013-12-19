@@ -1,142 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 19 Dec 2013 01:15:43 +0100
-Subject: [PATCH 01/04] ARM: shmobile: r7s72100 GPIO and PINCTRL device
- nodes
-In-Reply-To: <CANqRtoTdyUJgj+L8goMRW5mELjv16SVxkJqgw8tWpHyQyKzb3Q@mail.gmail.com>
-References: <20131217050232.727.9552.sendpatchset@w520>
- <24775601.3oo6NRXHkY@avalon>
- <CANqRtoTdyUJgj+L8goMRW5mELjv16SVxkJqgw8tWpHyQyKzb3Q@mail.gmail.com>
-Message-ID: <2318501.G71aXxrBQH@avalon>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 19 Dec 2013 01:36:11 +0100
+Subject: [PATCH 2/3] clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
+In-Reply-To: <20131218192430.23538.93253@quantum>
+References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
+ <CA+Ln22GD5fr4S6aR-+85bdutkeeHmgutLvRWETEQEt1vJX-Y6Q@mail.gmail.com>
+ <20131218192430.23538.93253@quantum>
+Message-ID: <2195944.NGxsB7RHkr@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus (and Linus, as there's a question for your below),
-
-On Wednesday 18 December 2013 11:07:15 Magnus Damm wrote:
-> On Wed, Dec 18, 2013 at 9:40 AM, Laurent Pinchart wrote:
-> > On Wednesday 18 December 2013 07:41:57 Magnus Damm wrote:
-> >> On Wed, Dec 18, 2013 at 1:29 AM, Laurent Pinchart wrote:
-> >> > On Tuesday 17 December 2013 14:02:42 Magnus Damm wrote:
-> >> >> From: Magnus Damm <damm@opensource.se>
-> >> >> 
-> >> >> Add support for r7s72100 PFC and GPIO device nodes port0 -> port11
-> >> >> and jtagport0.
-> >> >> 
-> >> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> >> ---
-> >> >> 
-> >> >>  arch/arm/boot/dts/r7s72100.dtsi |  154 ++++++++++++++++++++++++++++++
-> >> >>  1 file changed, 154 insertions(+)
-> >> >> 
-> >> >> --- 0001/arch/arm/boot/dts/r7s72100.dtsi
-> >> >> +++ work/arch/arm/boot/dts/r7s72100.dtsi      2013-11-27
-> >> >> 16:06:36.000000000 +0900
+On Wednesday 18 of December 2013 11:24:30 Mike Turquette wrote:
+> Quoting Tomasz Figa (2013-12-18 10:28:57)
+> > Hi Sachin,
 > > 
-> > [snip]
+> > 2013/12/18 Sachin Kamat <sachin.kamat@linaro.org>:
+> > > Hi Tomasz,
+> > >
+> > > On 10 November 2013 22:38, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > >> Hi Sachin, Andrew,
+> > >>
+> > >> On Friday 08 of November 2013 15:44:07 Sachin Kamat wrote:
+> > >>> From: Andrew Bresticker <abrestic@chromium.org>
+> > >>>
+> > >>> The gate clocks for the MFC sysmmus appear to be flipped, i.e.
+> > >>> GATE_IP_MFC[2] gates sysmmu_mfcl and GATE_IP_MFC[1] gates sysmmu_mfcr.
+> > >>> Fix this so that the MFC will start up.
+> > >>
+> > >> Wow, this means that there is a mistake in the documentation. Not that
+> > >> I'm surprised, though.
+> > >>
+> > >> I guess you are sure about this, so:
+> > >>
+> > >> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > >
+> > > I believe you are going to take this through your tree along with a
+> > > few others which you have already reviewed?
 > > 
-> >> >> +
-> >> >> +     port0: gpio at fcfe3100 {
-> >> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
-> >> >> +             reg = <0xfcfe3100 0x4>, /* PSR */
-> >> >> +                       <0xfcfe3200 0x2>, /* PPR */
-> >> >> +                       <0xfcfe3800 0x4>; /* PMSR */
-> >> >> +             #gpio-cells = <2>;
-> >> >> +             gpio-controller;
-> >> >> +             gpio-ranges = <&pfc 0 0 6>;
-> >> >> +     };
-> >> >> +
-> >> >> +     port1: gpio at fcfe3104 {
-> >> >> +             compatible = "renesas,gpio-r7s72100", "renesas,gpio-rz";
-> >> >> +             reg = <0xfcfe3104 0x4>, /* PSR */
-> >> >> +                       <0xfcfe3204 0x2>, /* PPR */
-> >> >> +                       <0xfcfe3804 0x4>; /* PMSR */
-> >> >> +             #gpio-cells = <2>;
-> >> >> +             gpio-controller;
-> >> >> +             gpio-ranges = <&pfc 0 16 16>;
-> >> > 
-> >> > As P0 has 6 pins only this should ideally be
-> >> > 
-> >> >                 gpio-ranges = <&pfc 0 6 16>;
-> >> > 
-> >> > Otherwise the PFC driver will expose pins that don't exist. However,
-> >> > that would require computing the pin numbers in the PFC driver
-> >> > differently, as we currently just use the bank * 16 + index formula.
-> >> > Given that we only have three ports with less than 16 pins we could
-> >> > come up with a not overly complex formula that can be evaluated at
-> >> > compile time. Something like this should do.
-> >> > 
-> >> > #define RZ_PORT_PIN(bank, pin) \
-> >> > 
-> >> >         (bank) < 1 ? (pin) : \
-> >> >         (bank) < 6 ? 6 + (((bank) - 1) * 16) + (pin)) : \
-> >> >         (bank) < 10 ? 6 + 11 + 4 * 16 + (((bank) - 6) * 16) + (pin)) :
-> >> >         \
-> >> >         6 + 11 + 8 + 7 * 16 + (((bank) - 10) * 16) + (pin))
-> >> 
-> >> Uhm, well, you can make the mapping more compact yes, but I'm not sure
-> >> if I agree that it becomes any better. Isn't it better to simply
-> >> follow the per-port setup that the manual defines? Is there an actual
-> >> problem with having unused GPIOs?
+> > Thanks for reminding me about this patch. It's been quite a while
+> > since it was posted
+> > to the list.
 > > 
-> > If I'm not mistaken it's unused pins, not unused GPIOs. They waste memory
-> > in data tables, although by a relatively small amount. Oh, and of course,
-> > it's not clean ;-)
+> > Yes, I will apply it to samsung-clk tree.
 > 
-> Yes, you are correct about pins vs GPIOs. Regarding how to implement
-> RZ_PORT_PIN(), I believe the only way not to shoot yourself in the foot is
-> to keep things simple. I also think that some level of redundancy is an
-> acceptable tradeoff if it keeps things simpler. So I suppose cleanliness is
-> a matter of taste. =)
+> Feel free to add my Ack when you apply it. Will these be sent later as a
+> pull request for the clk tree?
 
-Absolutely, and there's no universal reason why my cleanliness would be better 
-than yours :-)
+Yes. That's the plan. :)
 
-> > Speaking of data tables, I'm thinking about simplifying them. The RZ/A1H
-> > is a good candidate for that, as each pin is handled individually, and
-> > several registers could be handled to with a small amount of code instead
-> > of large data tables. It's just a thought for now, I have more urgent
-> > tasks to work on.
->
-> Incremental patches to improve the state is always nice, thanks.
-
-You're welcome.
-
-> >> Actually, I prefer going in the opposite direction so I would like to
-> >> share the simple version of RZ_PORT_PIN() in a header file like we do
-> >> with RCAR_GP_PIN() in <linux/platform_data/gpio-rcar.h>. This because
-> >> we would like to use the same macro in the GPIO driver and in the
-> >> current PFC code (and potentially more PFCs using the same GPIO
-> >> driver).
-> > 
-> > What do you need it for in the GPIO driver ?
-> 
-> Well, I thought I needed it but it turns out that I'm wrong. =)
-> 
-> Initially I had the following two in the header file:
-> +#define RZ_GPIOS_PER_PORT 16
-> +#define RZ_PORT_PIN(bank, pin) (((bank) * RZ_GPIOS_PER_PORT) + (pin))
-> 
-> RZ_GPIOS_PER_PORT was used in both the GPIO driver and
-> RZ_PORT_PIN() was used in the PFC driver
-> 
-> On a second though, I don't mind duplicating them.
-
-I agree here, I don't think we need to share RZ_GPIOS_PER_PORT between the two 
-drivers.
-
-> I do however think your version of the RZ_PORT_PIN() is overly complex. And
-> that needs to be matched with updated gpio-ranges that together seem quite
-> error prone to me.
-> 
-> How would you like me to proceed?
-
-I have mixed feelings about this, and understand your concern about 
-complexity. I usually tend to favor correctness over complexity (without 
-reaching the overcomplexity level). In this case I'd like to hear Linus' point 
-of view. If he's fine with your version of the code I'll be fine as well. Is 
-that OK ?
-
--- 
-Regards,
-
-Laurent Pinchart
+Best regards,
+Tomasz
