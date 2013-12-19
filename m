@@ -1,40 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 19 Dec 2013 08:33:56 -0600
-Subject: [PATCH v7 8/9] phy: add Broadcom Kona USB2 PHY driver
-In-Reply-To: <52B288EF.1040006@ti.com>
-References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
- <1387309356-17195-9-git-send-email-mporter@linaro.org>
- <20131218162554.GF4970@saruman.home> <52B288EF.1040006@ti.com>
-Message-ID: <20131219143356.GE3985@saruman.home>
+From: levex@linux.com (Levente Kurusa)
+Date: Thu, 19 Dec 2013 16:03:18 +0100
+Subject: [PATCH 07/38] arm: locomo: add missing put_device call
+In-Reply-To: <1387465429-3568-2-git-send-email-levex@linux.com>
+References: <1387465429-3568-2-git-send-email-levex@linux.com>
+Message-ID: <1387465429-3568-8-git-send-email-levex@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is required so that we give up the last reference to the device.
 
-On Thu, Dec 19, 2013 at 11:19:35AM +0530, Kishon Vijay Abraham I wrote:
-> On Wednesday 18 December 2013 09:55 PM, Felipe Balbi wrote:
-> > On Tue, Dec 17, 2013 at 02:42:35PM -0500, Matt Porter wrote:
-> >> Add a driver for the internal Broadcom Kona USB 2.0 PHY found
-> >> on the BCM281xx family of SoCs.
-> >>
-> >> Signed-off-by: Matt Porter <mporter@linaro.org>
-> > 
-> > Kishon, are you ok with this driver ?
-> 
-> yeah. Since this patch touches phy/Kconfig (and Makefile) and there is
-> one more PHY driver to be merged that also modifies Kconfig there
-> might be conflicts. So thought I should be taking this patch?
+Also, rework error path to remove the out label by return -ENOMEM explicitly if
+kzalloc fails.
 
-this PHY driver depends on the new ->get_bus_width()/->set_bus_width()
-methods which Matt just added. There's no easy way to make sure we avoid
-conflicts and/or build errors.
+Signed-off-by: Levente Kurusa <levex@linux.com>
+---
+ arch/arm/common/locomo.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index b55c362..e17d02c 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -224,10 +224,8 @@ locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
+ 	int ret;
+ 
+ 	dev = kzalloc(sizeof(struct locomo_dev), GFP_KERNEL);
+-	if (!dev) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
++	if (!dev)
++		return -ENOMEM;
+ 
+ 	/*
+ 	 * If the parent device has a DMA mask associated with it,
+@@ -256,8 +254,7 @@ locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
+ 
+ 	ret = device_register(&dev->dev);
+ 	if (ret) {
+- out:
+-		kfree(dev);
++ 		put_device(&dev->dev);
+ 	}
+ 	return ret;
+ }
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/44ca1c6e/attachment.sig>
+1.8.3.1
