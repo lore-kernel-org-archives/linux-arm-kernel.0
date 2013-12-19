@@ -1,43 +1,34 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 19 Dec 2013 15:10:41 +0100
-Subject: [PATCH 2/3] clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
-In-Reply-To: <CAK9yfHzs+T0g0qy-EALFkrKFybdJDAQ3ZGAoYovZO8PDaWM4QA@mail.gmail.com>
-References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
- <2996623.YXg5JqReYS@flatron>
- <CAK9yfHzs+T0g0qy-EALFkrKFybdJDAQ3ZGAoYovZO8PDaWM4QA@mail.gmail.com>
-Message-ID: <3552349.yKrGzNhczA@amdc1227>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 19 Dec 2013 15:17:41 +0100
+Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
+In-Reply-To: <20131218203847.GP5711@cbox>
+References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
+ <20131217185154.GN5711@cbox> <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
+ <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
+ <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com> <20131218203847.GP5711@cbox>
+Message-ID: <52B30005.6060509@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin, Andrew,
-
-On Wednesday 18 of December 2013 23:39:58 Sachin Kamat wrote:
-> Hi Tomasz,
+Il 18/12/2013 21:38, Christoffer Dall ha scritto:
+>> > 
+>> > So I think we need to:
+>> > - Use the new range for PSCI v0.2 (while still supporting v0.1 and the
+>> > old range)
+>> > - Get the kernel and DT bindings into shape
+>> > - Merge all of that at the same time
+>> > 
+> Don't we also need a way for user space to tell KVM if it should emulate
+> v0.1 or v0.2 of PSCI so we don't break backwards compatibility with
+> tools that spit out a device tree and use guest kernels based on v0.1?
 > 
-> On 10 November 2013 22:38, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > Hi Sachin, Andrew,
-> >
-> > On Friday 08 of November 2013 15:44:07 Sachin Kamat wrote:
-> >> From: Andrew Bresticker <abrestic@chromium.org>
-> >>
-> >> The gate clocks for the MFC sysmmus appear to be flipped, i.e.
-> >> GATE_IP_MFC[2] gates sysmmu_mfcl and GATE_IP_MFC[1] gates sysmmu_mfcr.
-> >> Fix this so that the MFC will start up.
-> >
-> > Wow, this means that there is a mistake in the documentation. Not that
-> > I'm surprised, though.
-> >
-> > I guess you are sure about this, so:
-> >
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> I believe you are going to take this through your tree along with a
-> few others which you have already reviewed?
+> This could be a new feature for KVM_ARM_VCPU_INIT, but perhaps it should
+> be something on the VM level, hmmm.
 
-This patch seems to depend on my Exynos 5250 clock clean-up series, which
-will be merged for 3.14. Are you okay with this patch being merged for
-3.14 as well or this fix is needed for earlier kernel versions too?
-(It is not a regression introduced in 3.13, though.)
+You can use KVM_ENABLE_CAP.  It is currently documented as a VCPU ioctl,
+but you can reuse it for VMs.  However, it is best if you also add a new
+capability KVM_CAP_VM_ENABLE_CAP.  Then rename the old
+KVM_CAP_ENABLE_CAP to KVM_CAP_VCPU_ENABLE_CAP, while leaving the old
+name for backwards compatibility.
 
-Best regards,
-Tomasz
+Paolo
