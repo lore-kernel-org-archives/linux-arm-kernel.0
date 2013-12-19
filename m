@@ -1,43 +1,35 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Thu, 19 Dec 2013 11:13:09 +0000
-Subject: [PATCH] net: mvmdio: fix interrupt timeout handling
-Message-ID: <1387451589-15491-1-git-send-email-leigh@solinno.co.uk>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Thu, 19 Dec 2013 13:18:48 +0200
+Subject: [PATCH v3 12/21] serial: support for 16550A serial ports on
+ LP-8x4x
+In-Reply-To: <1387309071-22382-13-git-send-email-ynvich@gmail.com>
+References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-13-git-send-email-ynvich@gmail.com>
+Message-ID: <20131219111848.GD20686@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-orion_mdio_wait_ready uses wait_event_timeout to wait for the
-SMI interrupt to fire.  wait_event_timeout waits for between
-"timeout - 1" and "timeout" jiffies.  In this case a 1ms timeout
-when HZ is 1000 results in a wait of 0 to 1 jiffies, causing
-premature timeouts.
+Hi,
 
-This fix ensures a minimum timeout of 2 jiffies, ensuring
-wait_event_timeout will always wait at least 1 jiffie.
+On Tue, Dec 17, 2013 at 11:37:42PM +0400, Sergei Ianovich wrote:
+> The patch adds support for 3 additional LP-8x4x built-in serial
+> ports.
+> 
+> The device can also host up to 8 extension cards with 4 serial ports
+> on each card for a total of 35 ports. However, I don't have
+> the hardware to test extension cards, so they are not supported, yet.
+> 
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 
-Issue reported by Nicolas Schichan.
+Looks OK to me, though normally I would prefer the arch code and the
+driver to be handled in separate patches. FWIW...
 
-Tested-by: Nicolas Schichan <nschichan@freebox.fr>
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
----
- drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 7354960..a42a750 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -92,6 +92,12 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
- 			if (time_is_before_jiffies(end))
- 				++timedout;
- 	        } else {
-+			/* wait_event_timeout does not guarantee a delay of at
-+			 * least one whole jiffie, so timeout must be no less
-+			 * than two.
-+			 */
-+			 if (timeout < 2)
-+			 	timeout = 2;
- 			wait_event_timeout(dev->smi_busy_wait,
- 				           orion_mdio_smi_is_done(dev),
- 				           timeout);
+
+Thanks,
+
 -- 
-1.8.5.1
+heikki
