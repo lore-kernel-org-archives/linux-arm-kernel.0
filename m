@@ -1,154 +1,106 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:23:47 +0200
-Subject: [PATCHv11 16/49] clk: ti: add support for TI fixed factor clock
+Date: Thu, 19 Dec 2013 13:23:39 +0200
+Subject: [PATCHv11 08/49] clk: gate: add support for low level ops
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-17-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This behaves exactly in similar manner to basic fixed-factor-clock, but
-adds a few properties on top for handling clock hardware autoidling.
+Gate clock can now be registered to use low level register access ops.
+Preferred initialization method is via clock description.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- .../bindings/clock/ti/fixed-factor-clock.txt       |   43 +++++++++++++
- drivers/clk/ti/Makefile                            |    2 +-
- drivers/clk/ti/fixed-factor.c                      |   66 ++++++++++++++++++++
- 3 files changed, 110 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
- create mode 100644 drivers/clk/ti/fixed-factor.c
+ drivers/clk/clk-gate.c       |   11 ++++++++---
+ include/linux/clk-provider.h |    4 ++++
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
-new file mode 100644
-index 0000000..662b36d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
-@@ -0,0 +1,43 @@
-+Binding for TI fixed factor rate clock sources.
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 3ec61d2..18731b4 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -62,7 +62,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+ 	} else {
+-		reg = clk_readl(gate->reg);
++		reg = gate->ll_ops->clk_readl(gate->reg);
+ 
+ 		if (set)
+ 			reg |= BIT(gate->bit_idx);
+@@ -70,7 +70,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 			reg &= ~BIT(gate->bit_idx);
+ 	}
+ 
+-	clk_writel(reg, gate->reg);
++	gate->ll_ops->clk_writel(reg, gate->reg);
+ 
+ 	if (gate->lock)
+ 		spin_unlock_irqrestore(gate->lock, flags);
+@@ -93,7 +93,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 	u32 reg;
+ 	struct clk_gate *gate = to_clk_gate(hw);
+ 
+-	reg = clk_readl(gate->reg);
++	reg = gate->ll_ops->clk_readl(gate->reg);
+ 
+ 	/* if a set bit disables this clk, flip it before masking */
+ 	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+@@ -157,6 +157,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 	gate->flags = clk_gate_flags;
+ 	gate->lock = lock;
+ 	gate->hw.init = &init;
++	gate->ll_ops = &clk_ll_ops_default;
+ 
+ 	clk = clk_register(dev, &gate->hw);
+ 
+@@ -184,6 +185,10 @@ struct clk_hw *clk_register_gate_desc(struct device *dev, struct clk_desc *desc)
+ 	gate->bit_idx = hw_desc->bit_idx;
+ 	gate->flags = hw_desc->flags;
+ 	gate->lock = hw_desc->lock;
++	gate->ll_ops = hw_desc->ll_ops;
 +
-+Binding status: Unstable - ABI compatibility may be broken in the future
-+
-+This binding uses the common clock binding[1], and also uses the autoidle
-+support from TI autoidle clock [2].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/clock/ti/autoidle.txt
-+
-+Required properties:
-+- compatible : shall be "ti,fixed-factor-clock".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- ti,clock-div: fixed divider.
-+- ti,clock-mult: fixed multiplier.
-+- clocks: parent clock.
-+
-+Optional properties:
-+- ti,autoidle-shift: bit shift of the autoidle enable bit for the clock,
-+  see [2]
-+- reg: offset for the autoidle register of this clock, see [2]
-+- ti,invert-autoidle-bit: autoidle is enabled by setting the bit to 0, see [2]
-+- ti,set-rate-parent: clk_set_rate is propagated to parent
-+
-+Example:
-+	clock {
-+		compatible = "ti,fixed-factor-clock";
-+		clocks = <&parentclk>;
-+		#clock-cells = <0>;
-+		ti,clock-div = <2>;
-+		ti,clock-mult = <1>;
-+	};
-+
-+	dpll_usb_clkdcoldo_ck: dpll_usb_clkdcoldo_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,fixed-factor-clock";
-+		clocks = <&dpll_usb_ck>;
-+		ti,clock-div = <1>;
-+		ti,autoidle-shift = <8>;
-+		reg = <0x01b4>;
-+		ti,clock-mult = <1>;
-+		ti,invert-autoidle-bit;
-+	};
-diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 640ebf9..f57fc4b 100644
---- a/drivers/clk/ti/Makefile
-+++ b/drivers/clk/ti/Makefile
-@@ -1,4 +1,4 @@
- ifneq ($(CONFIG_OF),)
- obj-y					+= clk.o dpll.o autoidle.o divider.o \
--					   composite.o
-+					   fixed-factor.o composite.o
- endif
-diff --git a/drivers/clk/ti/fixed-factor.c b/drivers/clk/ti/fixed-factor.c
-new file mode 100644
-index 0000000..c2c8a28
---- /dev/null
-+++ b/drivers/clk/ti/fixed-factor.c
-@@ -0,0 +1,66 @@
-+/*
-+ * TI Fixed Factor Clock
-+ *
-+ * Copyright (C) 2013 Texas Instruments, Inc.
-+ *
-+ * Tero Kristo <t-kristo@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/clk/ti.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt) "%s: " fmt, __func__
-+
-+/**
-+ * of_ti_fixed_factor_clk_setup - Setup function for TI fixed factor clock
-+ * @node: device node for this clock
-+ *
-+ * Sets up a simple fixed factor clock based on device tree info.
-+ */
-+static void __init of_ti_fixed_factor_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	const char *clk_name = node->name;
-+	const char *parent_name;
-+	u32 div, mult;
-+	u32 flags = 0;
-+
-+	if (of_property_read_u32(node, "ti,clock-div", &div)) {
-+		pr_err("%s must have a clock-div property\n", node->name);
-+		return;
-+	}
-+
-+	if (of_property_read_u32(node, "ti,clock-mult", &mult)) {
-+		pr_err("%s must have a clock-mult property\n", node->name);
-+		return;
-+	}
-+
-+	if (of_property_read_bool(node, "ti,set-rate-parent"))
-+		flags |= CLK_SET_RATE_PARENT;
-+
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
-+					mult, div);
-+
-+	if (!IS_ERR(clk)) {
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+		of_ti_clk_autoidle_setup(node);
-+	}
-+}
-+CLK_OF_DECLARE(ti_fixed_factor_clk, "ti,fixed-factor-clock",
-+	       of_ti_fixed_factor_clk_setup);
++	if (!gate->ll_ops)
++		gate->ll_ops = &clk_ll_ops_default;
+ 
+ 	if (!desc->ops)
+ 		desc->ops = &clk_gate_ops;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 3a88346..0bbf231 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -259,6 +259,7 @@ void of_fixed_clk_setup(struct device_node *np);
+  *
+  * @hw:		handle between common and hardware-specific interfaces
+  * @reg:	register controlling gate
++ * @ll_ops:	low-level ops for accessing the register
+  * @bit_idx:	single bit controlling gate
+  * @flags:	hardware-specific flags
+  * @lock:	register lock
+@@ -277,6 +278,7 @@ void of_fixed_clk_setup(struct device_node *np);
+ struct clk_gate {
+ 	struct clk_hw hw;
+ 	void __iomem	*reg;
++	struct clk_ll_ops	*ll_ops;
+ 	u8		bit_idx;
+ 	u8		flags;
+ 	spinlock_t	*lock;
+@@ -287,6 +289,7 @@ struct clk_gate {
+  *
+  * @desc:	handle between common and hardware-specific interfaces
+  * @reg:	register controlling gate
++ * @ll_ops:	low-level ops for accessing the register
+  * @bit_idx:	single bit controlling gate
+  * @flags:	hardware-specific flags
+  * @lock:	register lock
+@@ -294,6 +297,7 @@ struct clk_gate {
+ struct clk_gate_desc {
+ 	struct clk_desc	desc;
+ 	void __iomem	*reg;
++	struct clk_ll_ops	*ll_ops;
+ 	u8		bit_idx;
+ 	u8		flags;
+ 	spinlock_t	*lock;
 -- 
 1.7.9.5
