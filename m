@@ -1,41 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Dec 2013 15:29:24 +0800
-Subject: [PATCH 2/3] thermal: imx: add necessary clk operation
-In-Reply-To: <d067cdecda2046f5998302deed320c2a@DM2PR03MB317.namprd03.prod.outlook.com>
-References: <1387477045-19037-1-git-send-email-b20788@freescale.com>
- <1387477045-19037-2-git-send-email-b20788@freescale.com>
- <20131219065915.GB6691@S2101-09.ap.freescale.net>
- <d067cdecda2046f5998302deed320c2a@DM2PR03MB317.namprd03.prod.outlook.com>
-Message-ID: <20131219072922.GD6691@S2101-09.ap.freescale.net>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 19 Dec 2013 12:58:29 +0530
+Subject: [PATCH V2 2/2] ARM: tegra: add ams AS3722 device to Venice2 DT
+In-Reply-To: <52B20BB4.50506@wwwdotorg.org>
+References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
+ <1387371179-16725-2-git-send-email-ldewangan@nvidia.com>
+ <52B20BB4.50506@wwwdotorg.org>
+Message-ID: <52B2A01D.2000207@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 07:08:16AM +0000, Anson.Huang at freescale.com wrote:
-> >On Thu, Dec 19, 2013 at 01:17:24PM -0500, Anson Huang wrote:
-> >> @@ -427,6 +429,13 @@ static int imx_thermal_probe(struct platform_device
-> >*pdev)
-> >>  		return ret;
-> >>  	}
-> >>
-> >> +	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
-> >> +	if (IS_ERR(data->thermal_clk)) {
-> >> +		ret = IS_ERR(data->thermal_clk);
-> >> +		dev_err(&pdev->dev, "failed to get thermal clk!\n");
-> >> +		return ret;
-> >> +	}
-> >> +
-> >
-> >So when the new kernel runs on a board with an old DTB installed, thermal
-> >driver will be broken.
-> >
-> Yes, I thought about this case, but the previous implement is incorrect, if
-> the PLL3 is not enabled by other drivers, thermal driver will not work, so
-> this patch is a bug fix, not enhancement. So we still need to consider old
-> dts case? 
+On Thursday 19 December 2013 02:25 AM, Stephen Warren wrote:
+> On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
+>> Add ams AS3722 entry for gpio/pincontrol and regulators
+>> to venice2 DT.
+> This patch still causes:
+>
+>> [    0.726545] as3722-pinctrl as3722-pinctrl: pin gpio0 already requested by as3722-pinctrl; cannot claim for as3722-regulator
+>> [    0.737681] as3722-pinctrl as3722-pinctrl: pin-0 (as3722-regulator) status -22
+>> [    0.744895] as3722-pinctrl as3722-pinctrl: could not request pin 0 (gpio0) from group gpio0  on device as3722-pinctrl
+>> [    0.755500] as3722-regulator as3722-regulator: Error applying setting, reverse things back
 
-The thing is mainline kernel runs on many board with thermal driver
-being functional today.  That said, PLL3 is already enabled on these
-platforms when thermal driver is running.  You cannot fix a bug but
-meanwhile break these users who use old DTB.
+This error is nothing related to the ams dt or driver. This came from 
+the framework from the driver/base for adding pinmux call before calling 
+any diver's probe.
+Here is my finding:
+Frameworks calls the pinctrl_bind_pins() before calls the driver's probe 
+(drivers/base/dd.c) and pinctrl_bind_pins() calls the pinmux mapping and 
+try to set the default (drvers/base/pinctrl.c).
 
-Shawn
+AMS AS3722 DT is flat type on which all sub devices of AS3722 have the 
+property on parent node only, there is no subnode for each sub driver 
+like palmas. In this case all sub drivers of_node is initialized as 
+parent->of_node in mfd-core.c (mfd_add_devices).
+
+mfd-core.c: mfd_add_device()
+        if (!pdev->dev.of_node)
+                 pdev->dev.of_node = parent->of_node;
+
+So all sub devices of AS3722 has the parent node.
+This node has the default pinmux configuration and so it tries to set 
+the default pinmux before sud-driver's probe get called.
+The first one (for pinmux driver) it is success but for regulator and 
+rtc, it is failed as pins are owned by the pinmux drivers.
+
+This does not have any side impact as currently, pinctrl_bind_pins() 
+only return the success or ERPOBE_DEFER
+
+I was testing the patch with linux-next-common of your branch and 
+chrome-os/kernel-next with linux-next's pinctrl/regulator/mfd and not 
+able to repro this because driver/base changes was not there.
