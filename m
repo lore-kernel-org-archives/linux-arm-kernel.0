@@ -1,81 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Dec 2013 10:22:53 -0800
-Subject: OMAP display subsystem - does it work?
-In-Reply-To: <20131219175644.GE32243@n2100.arm.linux.org.uk>
-References: <20131218120023.GG4360@n2100.arm.linux.org.uk>
- <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
- <20131219175644.GE32243@n2100.arm.linux.org.uk>
-Message-ID: <20131219182252.GP27438@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 11:23:02 -0700
+Subject: [PATCH V2 2/2] ARM: tegra: add ams AS3722 device to Venice2 DT
+In-Reply-To: <52B2A01D.2000207@nvidia.com>
+References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
+ <1387371179-16725-2-git-send-email-ldewangan@nvidia.com>
+ <52B20BB4.50506@wwwdotorg.org> <52B2A01D.2000207@nvidia.com>
+Message-ID: <52B33986.5020508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [131219 09:58]:
-> On Wed, Dec 18, 2013 at 10:23:54AM -0800, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [131218 05:56]:
-> > > I don't have an LDP board at hand, and I wasn't able to find out anything from
-> > > the logs.
-> > > 
-> > > I think I should change omapfb to print something if it's probed succesfully,
-> > > as the deferred probing makes finding out if something is probed fine or not
-> > > quite murky. Without deferred probing, it was simpler: no errors -> the driver
-> > > must be (most likely) ok.
-> > > 
-> > > Although... In an earlier log, where there was no panel driver, the log has
-> > > these errors:
-> > > 
-> > > Error opening /dev/fb0: No such device
-> > > 
-> > > There are none in the latest log, which makes me guess the omapfb has been
-> > > probed, and fb0 is actually there. But the X is still dying for some reason...
-> > > 
-> > > I'll look at this more. Maybe someone in our team can find a board to test.
-> > 
-> > Hmm I had the framebuffer working with DT on LDP after fixing the twl4030
-> > gpio regression with 0b2aa8bed3e1 (gpio: twl4030: Fix regression for twl
-> > gpio output) using this pdata quirks patch:
-> > 
-> > [PATCH 3/5] ARM: OMAP2+: Add DT init code for DPI displays and make omap3 LDP to use it
-> > 
-> > AFAIK the pdata hack above should not be needed now, but I have not tried
-> > with Tomi's DSS DT patches yet.
-> > 
-> > Tomi do you have some sample panel dpi .dts entry somewhere for the LDP I
-> > could try at some point?
-> > 
-> > Russell, maybe all you're missing is just omapfb.vram=0:2M,1:5M or similar
-> > from your kernel cmdline?
+On 12/19/2013 12:28 AM, Laxman Dewangan wrote:
+> On Thursday 19 December 2013 02:25 AM, Stephen Warren wrote:
+>> On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
+>>> Add ams AS3722 entry for gpio/pincontrol and regulators
+>>> to venice2 DT.
+>> This patch still causes:
+>>
+>>> [    0.726545] as3722-pinctrl as3722-pinctrl: pin gpio0 already
+>>> requested by as3722-pinctrl; cannot claim for as3722-regulator
+>>> [    0.737681] as3722-pinctrl as3722-pinctrl: pin-0
+>>> (as3722-regulator) status -22
+>>> [    0.744895] as3722-pinctrl as3722-pinctrl: could not request pin 0
+>>> (gpio0) from group gpio0  on device as3722-pinctrl
+>>> [    0.755500] as3722-regulator as3722-regulator: Error applying
+>>> setting, reverse things back
 > 
-> Note that I'm trying to get non-DT stuff working properly here first, in
-> such a state that it has done in the past with mainline kernels.  This is
-> quite an old regression, but it's still a regression nevertheless.
+> This error is nothing related to the ams dt or driver. This came from
+> the framework from the driver/base for adding pinmux call before calling
+> any diver's probe.
 
-Yeah that should just work now.
- 
-> I've just built and booted a kernel with the backlight support in.  No
-> change.
+OK, after reverting the problematic MFD commit (which I assume will
+happen upstream too), I see no errors caused by this patch.
 
-I just tried it here with v3.13-rc4 in legacy mode using omap2plus_defconfig
-with the following test script and seems to work just fine for producing a
-nice random color pattern on the LCD:
+As such, I've applied the series to Tegra's for-3.14/dt branch.
 
-#!/bin/sh
-mount -o rw,remount /
-depmod -a
-modprobe panel-generic-dpi
-modprobe panel-dpi
-modprobe omapfb vram=0:2M,1:5M
-if [ -c /dev/fb0 ]; then
-        dd if=/dev/urandom of=/dev/fb0;
-fi
-
-Note that as the panel name has changed recently so my script tries to
-load both panel modules.
-
-Maybe you're missing something from your .config file still?
-
-BTW, I'm seeing MMC errors with my LDP here though, does that work
-for you?
-
-Regards,
-
-Tony
+Note that I couldn't verify if the pinctrl setup in patch 1/2 matched
+the ChromeOS kernel, since the node order is different there, and the
+property values don't use named constants there. I'll have to trust you.
+I'll be annoyed if it turns out we need to churn the pinctrl
+configuration in the future...
