@@ -1,118 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 Dec 2013 11:48:16 +0000
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <20131219084816.7247b1c7@i7>
-References: <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
- <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
- <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
- <alpine.LFD.2.10.1312181449580.7480@knanqh.ubzr>
- <CAKv+Gu9jw4RHny3L3L6SWm4anhRguhRe4BkLKAxJeqpPB12igg@mail.gmail.com>
- <alpine.LFD.2.10.1312181550271.7480@knanqh.ubzr>
- <CAKv+Gu-1=7ZU+C3NL2_C0BBFkAcOhyZn8UvPtXHUtvwW6PKNYw@mail.gmail.com>
- <20131219084816.7247b1c7@i7>
-Message-ID: <20131219114816.GB30398@arm.com>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Thu, 19 Dec 2013 17:20:48 +0530
+Subject: [PATCH v6 0/3] AArch64: KGDB support
+Message-ID: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 06:48:16AM +0000, Siarhei Siamashka wrote:
-> On Wed, 18 Dec 2013 22:57:33 +0100
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> 
-> > On 18 December 2013 22:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > On Wed, 18 Dec 2013, Ard Biesheuvel wrote:
-> > >> The nice thing about hwcaps is that it is already integrated into the
-> > >> ifunc resolution done by the loader, which makes it very easy and
-> > >> straightforward to offer alternative implementations of library
-> > >> functions based on CPU capabilities.
-> > >
-> > > The library may as well implement its own ifunc that tests the
-> > > instruction while trapping SIGILL.  On those systems with the supported
-> > > instruction there will be no trap.  On those that traps then the
-> > > alternative implementation is going to be much slower anyway.
-> > >
-> > 
-> > True. And the trap still only occurs at load time. But I think we
-> > agree it is essentially a poor man's hwcaps.
-> 
-> And the hwcaps is essentially a poor man's replacement for a userspace
-> accessible CPUID instruction enjoyed by x86.
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-hwcaps has its value but I agree that some quicker access would be good
-in certain cases. However, simply exposing the CPUID scheme to user
-space may look nice initially but has other problems. All the
-discussions we had (in ARM) basically ended up with having some scratch
-registers that could be accessed from user via mrs and the kernel would
-either copy the CPUID registers or hwcap-like bits (but basically it is
-just an ABI between user and kernel).
+Based on the step-handler and break-handler hooks patch from
+Sandeepa, KGDB debugging support is added for EL1
+debug in AArch64 mode. Any updates that come for Patch 1 from
+Sandeepa will be rebased in next version
 
-> So there is no really good alternative to /proc/cpuinfo parsing. But
-> text parsing is relatively cumbersome to implement. And this method is
-> obviously not blazingly fast. Also the big.LITTLE systems introduce
-> an interesting new challenge. How do we know whether we are running
-> the code on Cortex-A7 or Cortex-A15 at any arbitrary moment? We might
-> want to have several different assembly optimized functions, one
-> optimized for Cortex-A15 pipeline and another one optimized for
-> Cortex-A7. It would be nice to be able to frequently poll for the CPU
-> features of the currently running CPU core (for example, once per
-> frame in a video encoder/decoder) to select the fastest code path.
-> With /proc/cpuinfo text parsing this is not going to work nicely.
+With second patch,register layout is updated to be inline with GDB tool.
+Basic GDB connection, break point set/clear and info commands
+are supported except step/next debugging
 
-With big.LITTLE user-space can't tell on which CPU it is running. Even
-if it could, it needs to cope with preemption and migration to another
-CPU. If we assume the that the same features are present on both, some
-routines may occasionally be unoptimal but it shouldn't be that bad.
+With third patch, step/next debugging support is added, where in
+pc is updated to point to the instruction to be stepped and
+stopped.
 
-Anyway, for such A7/A15 combinations, the idea is to optimise for A7's
-pipeline since A15 execution is more out of order and tolerant to
-instruction order.
+With fourth patch, the compile time breakpoint instruction
+reordering is fixed by making kgbd_breakpoint() as noinline
 
-> The best solution would be in my opinion a userspace accessible (and
-> guaranteed not to trap) CPUID instruction. This has proven to work
-> nicely for x86, so why inventing something overly complicated instead?
-> In the case if the OS wants to conceal the CPU features from the
-> userspace application, some special "I don't want to tell you,
-> please use the slowest code path possible" value could be defined
-> and returned by this instruction.
+Tested with ARM64 simulator
 
-As I said above, just raw access to the CPUID registers may not always
-be desirable. Some features require kernel support (like FP register
-saving/restoring), so if you run an older kernel on a newer CPU you
-shouldn't really use such feature.
+v6:
+ - Change pstate register to 8 bytes to make endian nuetral.
+   Use GDB below GDB patch to display pstate in Big endian mode.
+   https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
+   Thanks to Andrew.
 
-(I'm also not entirely sure about crypto stuff and export regulations,
-whether a mobile vendor may want to disable some hwcap bits in kernel
-even though the hardware supports it)
+v5:
+ - Updated BRK #imm16 value to 0x400 & 0x401 as per recommendation
+   as per Marcus recommendataion
+   http://patchwork.ozlabs.org/patch/290801/
+ - Rebased to 3.13 AArch64 kernel
 
-> Well, if it's not desired (and already too late) to change how the
-> hardware works, another solution would be to have runtime CPU
-> features detection supported as part of the run-time ABI. For example,
-> make it mandatory for any EABI conforming system to provide some helper
-> functions like __aeabi_read_midr() or __aeabi_read_hwcaps(). They could
-> be implemented for ARM Linux via the kernel-provided user helpers, VDSO
-> or whatever other method that is appropriate. If this works for the
-> things like TLS (__aeabi_read_tp), why can't it work for runtime CPU
-> features detection too? The recent gcc versions also have some nice
-> built-in functions for runtime cpu features detection on x86
-> such as __builtin_cpu_is(), __builtin_cpu_supports():
->     http://gcc.gnu.org/gcc-4.8/changes.html
+v4:
+ - Updated kgdb_single_step and kgdb_cpu_doing_single_step
+   variables properly based on gdb state
 
-We discussed this in ARM with the toolchain guys and I'm fine with the
-idea. But for backwards compatibility, we would need a way for newer
-software to work on older kernels. On arm64, with VDSO is easier since
-glibc could have a weak function that returns not-implemented. I would
-rather have a VDSO on arm as well rather than abusing the vectors page.
+v3:
+ - Rebased to v4 version of Sandeepa Prabhu's patch (patch 1)
+ - Made dynamic break point instruction encoding generic
+ - Made ESR value encoding generic for dynamic and compile break point
+ - Used memcpy and memset to copy register contents to gdb buffer
+ - Fixed reordering of break point instruction by compiler with
+   patch 3
+ - Rebased against AAach64 upstream kernel
 
-If you want to distinguish between CPUs, we can use one of the unused
-TLS registers as offset into a VDSO data array with per-CPU information
-(all handled via the VDSO code, so user shouldn't really know the
-meaning). We have a user read-only thread register unused on arm64 (and
-that's what we had in mind when using the read/write register for user
-TLS).
+v2:
+ - Moved break instruction encoding to debug-monitors.h file
+ - Fixed endianess of compile break instruction encoding
+ - Updated I/O buffer sizes
+ - Updated register buffer size
+ - Remove changes to debug_exception handler in entry.S for
+ - ELR update and step debugging with update pc instead of ELR
+ - Rebased against AArch64 upstream kernel
 
-However, that's an optimisation and I don't think it should replace
-hwcap bits for new features.
+v1:
+ - Initial patch-set
+
+Vijaya Kumar K (3):
+  AArch64: KGDB: Add Basic KGDB support
+  AArch64: KGDB: Add step debugging support
+  KGDB: make kgdb_breakpoint() as noinline
+
+ arch/arm64/include/asm/debug-monitors.h |   47 +++++
+ arch/arm64/include/asm/kgdb.h           |   86 ++++++++
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/kgdb.c                |  341 +++++++++++++++++++++++++++++++
+ kernel/debug/debug_core.c               |    2 +-
+ 5 files changed, 476 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/kgdb.h
+ create mode 100644 arch/arm64/kernel/kgdb.c
 
 -- 
-Catalin
+1.7.9.5
