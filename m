@@ -1,43 +1,35 @@
-From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
-Date: Thu, 19 Dec 2013 18:48:54 +0900
-Subject: [PATCH Resend 7/7] clk: max77686: Remove redundant break
-In-Reply-To: <1387443241-5694-7-git-send-email-sachin.kamat@linaro.org>
-References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
- <1387443241-5694-7-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <52B2C106.3070309@samsung.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Thu, 19 Dec 2013 14:01:36 +0400
+Subject: [PATCH v3 01/21 resend] serial: rewrite pxa2xx-uart to use
+ 8250_core
+In-Reply-To: <1387445713.31516.30.camel@host5.omatika.ru>
+References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-2-git-send-email-ynvich@gmail.com>
+ <20131219085145.GB20686@xps8300>
+ <1387445713.31516.30.camel@host5.omatika.ru>
+Message-ID: <1387447296.31516.37.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013? 12? 19? 17:54, Sachin Kamat wrote:
-
-> 'break' after 'goto' is redundant. Remove it.
+On Thu, 2013-12-19 at 13:35 +0400, Sergei Ianovich wrote:
+> Hi Heikki,
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> ---
->  drivers/clk/clk-max77686.c |    2 --
->  1 file changed, 2 deletions(-)
+> On Thu, 2013-12-19 at 10:51 +0200, Heikki Krogerus wrote:
+> > I noticed one more thing. I'm sorry about commenting this late.
+> > 
+> > Since you set the type PORT_XSCALE, don's you want to use
+> > UPF_FIXED_TYPE flag instead of the UPF_SKIP_TEST here? Otherwise the
+> > type will just get overridden and autoconfig() will be executed.
 > 
-> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-> index 9f57bc37cd60..b4a1a9719ab0 100644
-> --- a/drivers/clk/clk-max77686.c
-> +++ b/drivers/clk/clk-max77686.c
-> @@ -157,11 +157,9 @@ static int max77686_clk_probe(struct platform_device *pdev)
->  			case MAX77686_CLK_AP:
->  				dev_err(&pdev->dev, "Fail to register CLK_AP\n");
->  				goto err_clk_ap;
-> -				break;
->  			case MAX77686_CLK_CP:
->  				dev_err(&pdev->dev, "Fail to register CLK_CP\n");
->  				goto err_clk_cp;
-> -				break;
->  			case MAX77686_CLK_PMIC:
->  				dev_err(&pdev->dev, "Fail to register CLK_PMIC\n");
->  				goto err_clk_pmic;
+> UPF_FIXED_PORT was my first guess. However, it didn't work.
+> 
+> I've also tried to do ioremap in serial_pxa_probe instead of using
+> UPF_IOREMAP. This didn't work as well.
 
+I didn't clarify properly.
 
-Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-
-
-Thanks,
-Jonghwa
+UPF_SKIP_TEST skips only the loopback test. This test could work on PXA,
+but requires PXA-specific pre-initialization. There are more test after
+the loopback one, which will fail if we are not on PXA. So I decided
+that skipping it is easier than tricky rewriting of autoconfig().
