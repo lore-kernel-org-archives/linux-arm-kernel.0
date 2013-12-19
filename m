@@ -1,42 +1,44 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Thu, 19 Dec 2013 13:05:02 +0200
-Subject: [PATCH v3 01/21 resend] serial: rewrite pxa2xx-uart to use
- 8250_core
-In-Reply-To: <1387447296.31516.37.camel@host5.omatika.ru>
-References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-2-git-send-email-ynvich@gmail.com>
- <20131219085145.GB20686@xps8300>
- <1387445713.31516.30.camel@host5.omatika.ru>
- <1387447296.31516.37.camel@host5.omatika.ru>
-Message-ID: <20131219110502.GC20686@xps8300>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Thu, 19 Dec 2013 11:58:57 +0100
+Subject: [PATCH v6 2/2] ARM: mach-moxart: add MOXA ART SoC device tree
+ files
+In-Reply-To: <CAEgOgz4sxg6khQwKtj5owPrm_Jsz+i-bV9-u7Wh9U_YBWvNtmw@mail.gmail.com>
+References: <1387371526-15309-1-git-send-email-jonas.jensen@gmail.com>
+ <1387371526-15309-3-git-send-email-jonas.jensen@gmail.com>
+ <CAEgOgz4sxg6khQwKtj5owPrm_Jsz+i-bV9-u7Wh9U_YBWvNtmw@mail.gmail.com>
+Message-ID: <CACmBeS2WaRDwvq=WvDgK_eodw90AGbjK3+OiV6Ts03d5h4wtCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 02:01:36PM +0400, Sergei Ianovich wrote:
-> On Thu, 2013-12-19 at 13:35 +0400, Sergei Ianovich wrote:
-> > On Thu, 2013-12-19 at 10:51 +0200, Heikki Krogerus wrote:
-> > > I noticed one more thing. I'm sorry about commenting this late.
-> > > 
-> > > Since you set the type PORT_XSCALE, don's you want to use
-> > > UPF_FIXED_TYPE flag instead of the UPF_SKIP_TEST here? Otherwise the
-> > > type will just get overridden and autoconfig() will be executed.
-> > 
-> > UPF_FIXED_PORT was my first guess. However, it didn't work.
-> > 
-> > I've also tried to do ioremap in serial_pxa_probe instead of using
-> > UPF_IOREMAP. This didn't work as well.
-> 
-> I didn't clarify properly.
-> 
-> UPF_SKIP_TEST skips only the loopback test. This test could work on PXA,
-> but requires PXA-specific pre-initialization. There are more test after
-> the loopback one, which will fail if we are not on PXA. So I decided
-> that skipping it is easier than tricky rewriting of autoconfig().
+On 19 December 2013 00:41, Peter Crosthwaite
+<peter.crosthwaite@xilinx.com> wrote:
+>> +       clocks {
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +
+>> +               ref12: ref12M {
+>> +                       compatible = "fixed-clock";
+>
+> Is the correct split to perhaps have the fixed-clock node in dtsi as
+> you have here but ...
+>
+>> +                       #clock-cells = <0>;
+>> +                       clock-frequency = <12000000>;
+>
+> The board is responsible for the frequency?
+>
+> I guess in this schema,
+>
+> 1. the "fixed-clock" node corresponds to the existence of clock input
+> pins on the SoC level - hence the node is DTSI.
+> 2. setting the clock-frequency corresponds to populatation of those
+> input pins with a soldered crystal - hence done in DTS
 
-OK. So there is no problem here. Sorry about the noise.
+Yes, the soldered crystal belongs to board. Changes in v7 should reflect that.
+
+I tried to doing what you said above, it didn't quite work, I got the
+same error from of_clk_get() / of_clk_get_by_name(), but came up with
+another solution please have a look at v7.
 
 Thanks,
-
--- 
-heikki
+Jonas
