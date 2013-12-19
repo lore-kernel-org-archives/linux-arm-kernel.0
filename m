@@ -1,60 +1,43 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Dec 2013 16:47:06 +0100
-Subject: [PATCH] clk: at91: fix pmc_clk_ids data type attriubte
-In-Reply-To: <20131219075725.18119.80803@quantum>
-References: <1387229127-7605-1-git-send-email-b.brezillon@overkiz.com>
- <52B01A50.4080209@atmel.com> <20131219075725.18119.80803@quantum>
-Message-ID: <52B314FA.6090206@atmel.com>
+Date: Thu, 19 Dec 2013 16:50:12 +0100
+Subject: [PATCH] i2c: at91: document clock properties
+In-Reply-To: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52B315B4.6000906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/2013 08:57, Mike Turquette :
-> Quoting Nicolas Ferre (2013-12-17 01:33:04)
->> On 16/12/2013 22:25, Boris BREZILLON :
->>> Fix pmc_clk_ids data type attribute (__initdata -> __initconst).
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> I take it in at91-3.14-cleanup2 branch and send it upstream through
->> arm-soc like any other CCF material for AT91 for the 3.14 release.
->>
->> I guess that even without Mike Acked-by, this little fix can follow this
->> path.
+On 17/12/2013 16:54, Boris BREZILLON :
+> Document the clock properties required by the at91 i2c bus driver.
 > 
-> I can take it into the clk tree if you prefer.
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Do not bother Mike, I take this little one for having all CCF AT91
-material in one place before 3.14-rc1.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-After that milestone, we will take the usual patch using your tree.
-
-Bye,
-
->>> ---
->>>  drivers/clk/at91/pmc.c |    2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
->>> index 7b9db60..4c03eda 100644
->>> --- a/drivers/clk/at91/pmc.c
->>> +++ b/drivers/clk/at91/pmc.c
->>> @@ -228,7 +228,7 @@ out_free_pmc:
->>>       return NULL;
->>>  }
->>>  
->>> -static const struct of_device_id pmc_clk_ids[] __initdata = {
->>> +static const struct of_device_id pmc_clk_ids[] __initconst = {
->>>       /* Main clock */
->>>       {
->>>               .compatible = "atmel,at91rm9200-clk-main",
->>>
->>
->>
->> -- 
->> Nicolas Ferre
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+> index b689a0d..4fade84 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+> @@ -9,6 +9,7 @@ Required properties :
+>  - interrupts: interrupt number to the cpu.
+>  - #address-cells = <1>;
+>  - #size-cells = <0>;
+> +- clocks: phandles to input clocks.
+>  
+>  Optional properties:
+>  - Child nodes conforming to i2c bus binding
+> @@ -21,6 +22,7 @@ i2c0: i2c at fff84000 {
+>  	interrupts = <12 4 6>;
+>  	#address-cells = <1>;
+>  	#size-cells = <0>;
+> +	clocks = <&twi0_clk>;
+>  
+>  	24c512 at 50 {
+>  		compatible = "24c512";
 > 
 
 
