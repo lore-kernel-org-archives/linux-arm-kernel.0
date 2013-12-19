@@ -1,42 +1,28 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 19 Dec 2013 09:02:42 +0100
-Subject: [PATCH] i2c: at91: document clock properties
-In-Reply-To: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131219080242.GA3842@ldesroches-Latitude-E6320>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 19 Dec 2013 00:07:29 -0800
+Subject: [RESEND PATCH v7 1/5] omap3isp: Modify clocks registration to
+ avoid circular references
+In-Reply-To: <52AF7B4D.2010305@gmail.com>
+References: <1386177127-2894-1-git-send-email-s.nawrocki@samsung.com>
+ <1386177127-2894-2-git-send-email-s.nawrocki@samsung.com>
+ <52AF7B4D.2010305@gmail.com>
+Message-ID: <20131219080729.18119.42456@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 04:54:04PM +0100, Boris BREZILLON wrote:
-> Document the clock properties required by the at91 i2c bus driver.
+Quoting Sylwester Nawrocki (2013-12-16 14:14:37)
+> Hi Mike,
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Laurent has already taken this patch into his tree, could you apply
+> the remaining ones to your clk tree so this series has enough exposure
+> in -next ?
 
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
->  1 file changed, 2 insertions(+)
+I've taken this in privately to do a little testing. If all goes well
+then I'll push it out to clk-next very soon.
+
+Thanks!
+Mike
+
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> index b689a0d..4fade84 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> @@ -9,6 +9,7 @@ Required properties :
->  - interrupts: interrupt number to the cpu.
->  - #address-cells = <1>;
->  - #size-cells = <0>;
-> +- clocks: phandles to input clocks.
->  
->  Optional properties:
->  - Child nodes conforming to i2c bus binding
-> @@ -21,6 +22,7 @@ i2c0: i2c at fff84000 {
->  	interrupts = <12 4 6>;
->  	#address-cells = <1>;
->  	#size-cells = <0>;
-> +	clocks = <&twi0_clk>;
->  
->  	24c512 at 50 {
->  		compatible = "24c512";
-> -- 
-> 1.7.9.5
-> 
+> Thanks,
+> Sylwester
