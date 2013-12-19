@@ -1,48 +1,92 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Dec 2013 15:54:59 +0000
-Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
+Date: Thu, 19 Dec 2013 15:54:58 +0000
+Subject: [PATCH 01/11] ARM: ux500: Don't use enums for MSP IDs - for easy DT
+ conversion
 In-Reply-To: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
 References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1387468508-12286-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
-rather carelessly converts find_next_bit() to fls() (find last
-bit set), which are not the same.
-
-Although this implementation may not be portable, the alternative
-breaks audio on anything using the AB8500 CODEC, which is a much
-greater evil. Besides, this driver will never run on anything
-else.
-
-Cc: Takashi Iwai <tiwai@suse.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/codecs/ab8500-codec.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/board-mop500-audio.c     | 8 ++++----
+ include/linux/platform_data/asoc-ux500-msp.h | 9 +--------
+ sound/soc/ux500/ux500_msp_i2s.h              | 2 +-
+ 3 files changed, 6 insertions(+), 13 deletions(-)
 
-diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-index 1ad92cb..51ae3e9 100644
---- a/sound/soc/codecs/ab8500-codec.c
-+++ b/sound/soc/codecs/ab8500-codec.c
-@@ -2322,7 +2322,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
- 		slot = ffs(tx_mask);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
--		slot = fls(tx_mask);
-+		slot = find_next_bit((unsigned long *)&tx_mask, 32, slot + 1);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
- 		break;
-@@ -2364,7 +2364,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
- 				AB8500_ADSLOTSEL(slot),
- 				AB8500_MASK_SLOT(slot),
- 				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
--		slot = fls(rx_mask);
-+		slot = find_next_bit((unsigned long *)&rx_mask, 32, slot + 1);
- 		snd_soc_update_bits(codec,
- 				AB8500_ADSLOTSEL(slot),
- 				AB8500_MASK_SLOT(slot),
+diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
+index 154e15f..43d6cb8 100644
+--- a/arch/arm/mach-ux500/board-mop500-audio.c
++++ b/arch/arm/mach-ux500/board-mop500-audio.c
+@@ -31,7 +31,7 @@ static struct stedma40_chan_cfg msp0_dma_tx = {
+ };
+ 
+ struct msp_i2s_platform_data msp0_platform_data = {
+-	.id = MSP_I2S_0,
++	.id = 0,
+ 	.msp_i2s_dma_rx = &msp0_dma_rx,
+ 	.msp_i2s_dma_tx = &msp0_dma_tx,
+ };
+@@ -49,7 +49,7 @@ static struct stedma40_chan_cfg msp1_dma_tx = {
+ };
+ 
+ struct msp_i2s_platform_data msp1_platform_data = {
+-	.id = MSP_I2S_1,
++	.id = 1,
+ 	.msp_i2s_dma_rx = NULL,
+ 	.msp_i2s_dma_tx = &msp1_dma_tx,
+ };
+@@ -69,13 +69,13 @@ static struct stedma40_chan_cfg msp2_dma_tx = {
+ };
+ 
+ struct msp_i2s_platform_data msp2_platform_data = {
+-	.id = MSP_I2S_2,
++	.id = 2,
+ 	.msp_i2s_dma_rx = &msp2_dma_rx,
+ 	.msp_i2s_dma_tx = &msp2_dma_tx,
+ };
+ 
+ struct msp_i2s_platform_data msp3_platform_data = {
+-	.id		= MSP_I2S_3,
++	.id		= 3,
+ 	.msp_i2s_dma_rx	= &msp1_dma_rx,
+ 	.msp_i2s_dma_tx	= NULL,
+ };
+diff --git a/include/linux/platform_data/asoc-ux500-msp.h b/include/linux/platform_data/asoc-ux500-msp.h
+index 9991aea..2f34bb9 100644
+--- a/include/linux/platform_data/asoc-ux500-msp.h
++++ b/include/linux/platform_data/asoc-ux500-msp.h
+@@ -10,16 +10,9 @@
+ 
+ #include <linux/platform_data/dma-ste-dma40.h>
+ 
+-enum msp_i2s_id {
+-	MSP_I2S_0 = 0,
+-	MSP_I2S_1,
+-	MSP_I2S_2,
+-	MSP_I2S_3,
+-};
+-
+ /* Platform data structure for a MSP I2S-device */
+ struct msp_i2s_platform_data {
+-	enum msp_i2s_id id;
++	int id;
+ 	struct stedma40_chan_cfg *msp_i2s_dma_rx;
+ 	struct stedma40_chan_cfg *msp_i2s_dma_tx;
+ };
+diff --git a/sound/soc/ux500/ux500_msp_i2s.h b/sound/soc/ux500/ux500_msp_i2s.h
+index 258d0bce..875de0f 100644
+--- a/sound/soc/ux500/ux500_msp_i2s.h
++++ b/sound/soc/ux500/ux500_msp_i2s.h
+@@ -475,7 +475,7 @@ struct ux500_msp_dma_params {
+ };
+ 
+ struct ux500_msp {
+-	enum msp_i2s_id id;
++	int id;
+ 	void __iomem *registers;
+ 	struct device *dev;
+ 	struct ux500_msp_dma_params playback_dma_data;
 -- 
 1.8.3.2
