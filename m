@@ -1,30 +1,67 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:24:18 +0200
-Subject: [PATCHv11 47/49] ARM: AM43xx: Enable clock init
+Date: Thu, 19 Dec 2013 13:24:20 +0200
+Subject: [PATCHv11 49/49] ARM: OMAP3: use DT clock init if DT data is available
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-48-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-50-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initializes clock data from device tree.
+OMAP3 platforms support both DT and non-DT boot at the moment, make
+the clock init work according to the used setup.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/io.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-omap2/io.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 628a7f5..36817d1 100644
+index 8aa34ee..f76355c 100644
 --- a/arch/arm/mach-omap2/io.c
 +++ b/arch/arm/mach-omap2/io.c
-@@ -606,6 +606,7 @@ void __init am43xx_init_early(void)
- 	am43xx_clockdomains_init();
- 	am43xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
-+	omap_clk_soc_init = am43xx_dt_clk_init;
+@@ -488,21 +488,29 @@ void __init omap3_init_early(void)
+ void __init omap3430_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_soc_init = omap3430_dt_clk_init;
  }
  
- void __init am43xx_init_late(void)
+ void __init omap35xx_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_soc_init = omap3430_dt_clk_init;
+ }
+ 
+ void __init omap3630_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_soc_init = omap3630_dt_clk_init;
+ }
+ 
+ void __init am35xx_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_soc_init = am35xx_dt_clk_init;
+ }
+ 
+ void __init ti81xx_init_early(void)
+@@ -520,7 +528,10 @@ void __init ti81xx_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_soc_init = omap3xxx_clk_init;
++	if (of_have_populated_dt())
++		omap_clk_soc_init = ti81xx_dt_clk_init;
++	else
++		omap_clk_soc_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3_init_late(void)
 -- 
 1.7.9.5
