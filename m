@@ -1,41 +1,72 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Dec 2013 16:59:31 +0100
-Subject: [PATCH 07/10] ARM: tegra: Add Tegra114 gr3d support
+Date: Thu, 19 Dec 2013 16:59:29 +0100
+Subject: [PATCH 05/10] ARM: tegra: Add Tegra114 DSI support
 In-Reply-To: <1387468774-14216-1-git-send-email-treding@nvidia.com>
 References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
-Message-ID: <1387468774-14216-8-git-send-email-treding@nvidia.com>
+Message-ID: <1387468774-14216-6-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the gr3d device tree node. The gr3d block on Tegra114 is backwards-
-compatible with the one on Tegra20.
+Add device tree nodes for the DSI controllers found on Tegra114 SoCs.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
-Changes in v2:
+Changes in v4:
 - add reset and reset-names properties
 
- arch/arm/boot/dts/tegra114.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Changes in v3:
+- add #address-cells and #size-cells properties for DSI bus
+- update for revised MIPI calibration bindings
+- add low-power clocks
+
+Changes in v2:
+- use a comment to describe which pads need calibration
+
+ arch/arm/boot/dts/tegra114.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 3dd7b50d8f93..bac5b231ff42 100644
+index 65e34e7fe6f2..28d2eea46b52 100644
 --- a/arch/arm/boot/dts/tegra114.dtsi
 +++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -39,6 +39,14 @@
- 			reset-names = "2d";
+@@ -71,6 +71,38 @@
+ 			reset-names = "hdmi";
+ 			status = "disabled";
  		};
- 
-+		gr3d at 54180000 {
-+			compatible = "nvidia,tegra114-gr3d", "nvidia,tegra20-gr3d";
-+			reg = <0x54180000 0x00040000>;
-+			clocks = <&tegra_car TEGRA114_CLK_GR3D>;
-+			resets = <&tegra_car 24>;
-+			reset-names = "3d";
++
++		dsi at 54300000 {
++			compatible = "nvidia,tegra114-dsi";
++			reg = <0x54300000 0x00040000>;
++			clocks = <&tegra_car TEGRA114_CLK_DSIA>,
++				 <&tegra_car TEGRA114_CLK_DSIALP>,
++				 <&tegra_car TEGRA114_CLK_PLL_D_OUT0>;
++			clock-names = "dsi", "lp", "parent";
++			resets = <&tegra_car 48>;
++			reset-names = "dsi";
++			nvidia,mipi-calibrate = <&mipi 0x060>; /* DSIA & DSIB pads */
++			status = "disabled";
++
++			#address-cells = <1>;
++			#size-cells = <0>;
 +		};
 +
- 		dc at 54200000 {
- 			compatible = "nvidia,tegra114-dc", "nvidia,tegra20-dc";
- 			reg = <0x54200000 0x00040000>;
++		dsi at 54400000 {
++			compatible = "nvidia,tegra114-dsi";
++			reg = <0x54400000 0x00040000>;
++			clocks = <&tegra_car TEGRA114_CLK_DSIB>,
++				 <&tegra_car TEGRA114_CLK_DSIBLP>,
++				 <&tegra_car TEGRA114_CLK_PLL_D2_OUT0>;
++			clock-names = "dsi", "lp", "parent";
++			resets = <&tegra_car 82>;
++			reset-names = "dsi";
++			nvidia,mipi-calibrate = <&mipi 0x180>; /* DSIC & DSID pads */
++			status = "disabled";
++
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
+ 	};
+ 
+ 	gic: interrupt-controller at 50041000 {
 -- 
 1.8.4.2
