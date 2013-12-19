@@ -1,45 +1,32 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 19 Dec 2013 14:42:37 -0500
-Subject: [PATCH 3/4] SATA: MV: Add support for the optional PHYs
-In-Reply-To: <20131219191027.GI4143@lunn.ch>
-References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
- <1387311713-1926-3-git-send-email-andrew@lunn.ch>
- <52B140F2.8070900@ti.com> <20131218121313.GC4324@htj.dyndns.org>
- <20131219191027.GI4143@lunn.ch>
-Message-ID: <20131219194237.GC22725@htj.dyndns.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 19 Dec 2013 11:43:40 -0800
+Subject: [PATCH 2/6] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <52B346E1.2030508@wwwdotorg.org>
+References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
+ <1387468474-26521-3-git-send-email-pdeschrijver@nvidia.com>
+ <20131219175931.GA18004@kroah.com> <52B346E1.2030508@wwwdotorg.org>
+Message-ID: <20131219194340.GB1443@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Dec 19, 2013 at 08:10:27PM +0100, Andrew Lunn wrote:
-> > Shouldn't it distinguish between failures and at least produce
-> > warning?  ie. phy not available and phy init failed due to memory
-> > pressure or whatnot shouldn't be handled the same.
+On Thu, Dec 19, 2013 at 12:20:01PM -0700, Stephen Warren wrote:
+> On 12/19/2013 10:59 AM, Greg KH wrote:
+> > On Thu, Dec 19, 2013 at 05:54:30PM +0200, Peter De Schrijver wrote:
 > 
-> Phy not available is not an error, since not all variants of the SATA
-                          ^
-			 always
-
-> IP block have the ability to control the phy. I can however add a
-> warning for real errors.
-
-Yes, please.
-
-> > > > @@ -4132,6 +4148,8 @@ err:
-> > > >  			clk_disable_unprepare(hpriv->port_clks[port]);
-> > > >  			clk_put(hpriv->port_clks[port]);
-> > > >  		}
-> > > > +		if (!IS_ERR(hpriv->port_phys[port]))
-> > > > +			phy_power_off(hpriv->port_phys[port]);
+> >> +	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+> >> +		tegra_revision_name[sku_info->revision],
+> >> +		sku_info->sku_id, sku_info->cpu_process_id,
+> >> +		sku_info->core_process_id);
 > > 
-> > And I'd much prefer the array holds either NULL or valid pointer.
+> > Why pollute the kernel log with this type of thing?  Who really needs
+> > it?
 > 
-> I was trying to keep the code similar to the clk handling. However now
-> that it is diverging more and more from how clk is handled, i can add
-> yet more divergence and overwrite the error with a NULL.
+> We already print this; I guess this series is just moving where that
+> happens. It has proved useful to me in the past so I know which chip rev
+> I'm using, but I guess if this all gets exported to sysfs somewhere else
+> in this series, I could just go read those files in the future...
 
-Thanks.
+I don't see this being exported anywhere else, or at least, if it is, it
+sure isn't being documented...
 
--- 
-tejun
+greg k-h
