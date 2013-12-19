@@ -1,30 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 19 Dec 2013 12:50:17 -0500
-Subject: Can someone Ack and queue a patch for RTC subsytem?
-In-Reply-To: <87sitoka39.fsf@natisbad.org>
-References: <87siton6ke.fsf@natisbad.org>
- <20131219164624.GV2609@titan.lakedaemon.net>
- <87sitoka39.fsf@natisbad.org>
-Message-ID: <20131219175017.GW2609@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Dec 2013 17:53:36 +0000
+Subject: OMAP display subsystem - does it work?
+In-Reply-To: <52B1A922.6020901@ti.com>
+References: <20131218120023.GG4360@n2100.arm.linux.org.uk>
+ <52B1A922.6020901@ti.com>
+Message-ID: <20131219175336.GD32243@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 06:46:18PM +0100, Arnaud Ebalard wrote:
-> Jason Cooper <jason@lakedaemon.net> writes:
-> > On Thu, Dec 19, 2013 at 05:34:09PM +0100, Arnaud Ebalard wrote:
-...
-> >> I wonder if someone (Andrew? Stephen? Jason?) would be kind enough to
-> >> take care of the v6 I just sent [1].
-> >
-> > I don't mind routing it though mvebu/arm-soc since the only consumers
-> > are currently mvebu boards, but I'd like to hear from Andrew that this
-> > is ok.
+On Wed, Dec 18, 2013 at 03:54:42PM +0200, Tomi Valkeinen wrote:
+> On 2013-12-18 14:00, Russell King - ARM Linux wrote:
 > 
-> I will do what you think is the best.
+> > So, here goes.  LDP3430:
+> > 
+> > OMAP DSS rev 2.0
+> > omapdss DPI error: can't get VDDS_DSI regulator
+> > omapfb omapfb: failed to connect default display
+> > omapfb omapfb: failed to init overlay connections
+> > omapfb omapfb: failed to setup omapfb
+> > platform omapfb: Driver omapfb requests probe deferral
+> > 
+> > I don't see evidence of it being re-probed, but I do see this during boot
+> > which implies that there's nothing there:
+> > 
+> > XIO:  fatal IO error 104 (Connection reset by peer) on X server ":0.0"
+> >       after 0 requests (0 known processed) with 0 events remaining.
+> 
+> I don't have an LDP board at hand, and I wasn't able to find out anything
+> from the logs.
 
-It sounds like once you address Alessandro's concerns about /proc
-entries, we should be able to take v7 through mvebu/arm-soc.
+Well, the X server dies because of some issue with tslib.  No idea
+about that.  However, disabling touschreen stuff, the X server comes
+up, but the LCD remains blank.
 
-thx,
-
-Jason.
+Since the LDP has openembedded stuff on it, it normally would boot
+with a progress splash - that also is never displayed.  Maybe there's
+something up with the backlight support?  This used to work with
+mainline kernels I don't know how long ago.
