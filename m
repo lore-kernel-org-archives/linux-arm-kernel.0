@@ -1,64 +1,27 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Thu, 19 Dec 2013 15:38:45 +0530
-Subject: [PATCH v5 2/4] AArch64: KGDB: Add Basic KGDB support
-In-Reply-To: <CALicx6towYZrV30yVUxzNzUY17H5PsebDm_vB7pUtXP5R-xUqQ@mail.gmail.com>
-References: <1385793148-28979-1-git-send-email-vijay.kilari@gmail.com>
- <1385793148-28979-3-git-send-email-vijay.kilari@gmail.com>
- <20131203101637.GA7552@e106331-lin.cambridge.arm.com>
- <20131203112139.GC1169@mudshark.cambridge.arm.com>
- <20131203133843.GH1169@mudshark.cambridge.arm.com>
- <CALicx6towYZrV30yVUxzNzUY17H5PsebDm_vB7pUtXP5R-xUqQ@mail.gmail.com>
-Message-ID: <CALicx6sLWpLXThbbKktFpEdHxwhCFqw4DJostuTWJ2WBhkZ96A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Dec 2013 10:25:21 +0000
+Subject: [PATCHv3 5/7] ASoC: fsl: Add SGTL5000 based audio machine driver.
+In-Reply-To: <f9a19c59bfaf4844bbeaca1aeb91e305@DM2PR03MB509.namprd03.prod.outlook.com>
+References: <1387250684-23406-1-git-send-email-Li.Xiubo@freescale.com>
+ <1387250684-23406-6-git-send-email-Li.Xiubo@freescale.com>
+ <20131218183743.GG31886@sirena.org.uk>
+ <f9a19c59bfaf4844bbeaca1aeb91e305@DM2PR03MB509.namprd03.prod.outlook.com>
+Message-ID: <20131219102521.GS31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 4, 2013 at 11:29 AM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> On Tue, Dec 3, 2013 at 7:08 PM, Will Deacon <will.deacon@arm.com> wrote:
->> On Tue, Dec 03, 2013 at 11:21:39AM +0000, Will Deacon wrote:
->>> On Tue, Dec 03, 2013 at 10:16:37AM +0000, Mark Rutland wrote:
->>> > I think that there's a slight problem with this on BE systems.
->>>
->>> [...]
->>>
->>> > On Sat, Nov 30, 2013 at 06:32:26AM +0000, vijay.kilari at gmail.com wrote:
->>> > > +       { "pstate", 4, offsetof(struct pt_regs, pstate)},
->>> >
->>> > As pt_regs::pstate is a u64, we're only describing half of the field
->>> > here (to match GDB's expectations). While we happen to get the half
->>> > we're interested in on an LE system, on a BE system this will point at
->>> > the zeroed half.
->>>
->>> Yup, I think you're right. It's almost as if this hasn't been tested on a BE
->>> system.
->>>
->>> Given that a large proportion of this CC list *do* actually care about BE,
->>> I'd like to see a tested-by from one of them before this gets merged. I'm
->>> pretty sure GDB has a testsuite which might be of some use.
->>
->> Having said that, our ptrace interface (built around regsets) treats pstate
->> as 64-bit, so we should do the same thing for kgdb and let GDB work out
->> which bits it's interested in.
->>
->> So: make pstate 8 bytes and test/fix GDB to deal with that (like it should
->> do for userspace already).
->>
->
-> I have tested with BE & LE. it works fine except displaying 'pstate' contents
-> in BE is wrong
->
-> If I change pstate offset as below, it works
->
-> #ifdef __AARCH64EB__
->         { "pstate", 4, offsetof(struct pt_regs, pstate) + 4},
-> #else
->         { "pstate", 4, offsetof(struct pt_regs, pstate)},
-> #endif
->
-> I am checking with tool chain guy to patch GDB to make pstate as 8 bytes.
-> After that, I will re-send the patch series
->
+On Thu, Dec 19, 2013 at 05:19:26AM +0000, Li.Xiubo at freescale.com wrote:
 
-    Thanks to Andrew, GDB tool was patched here to interpret pstate as 8 bytes
-    https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
+> In this series of patches, the PATCH1~PATCH4 are about SAI only, and can be
+> apart from VF610-twr sound driver, I will sent the SAI driver and VF610-twr
+> sound driver separately. Could you apply the SAI's first if they are all fine?
 
->> Will
+What are you asking me to apply here?  I already applied your first
+patch as I said, is that not everything?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/45b1a6fd/attachment.sig>
