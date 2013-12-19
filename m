@@ -1,102 +1,183 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:23:40 +0200
-Subject: [PATCHv11 09/49] clk: mux: add support for low level ops
+Date: Thu, 19 Dec 2013 13:23:42 +0200
+Subject: [PATCHv11 11/49] CLK: ti: add init support for clock IP blocks
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiplexer clock can now be registered to use low level register access ops.
-Preferred initialization method is via clock description.
+ti_dt_clk_init_provider() can now be used to initialize the contents of
+a single clock IP block. This parses all the clocks under the IP block
+and calls the corresponding init function for them.
+
+This patch also introduces a helper function for the TI clock drivers
+to get register info from DT and append the master IP info to this.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk-mux.c        |   11 ++++++++---
- include/linux/clk-provider.h |    4 ++++
- 2 files changed, 12 insertions(+), 3 deletions(-)
+ drivers/clk/ti/clk.c   |  108 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/ti.h |   20 +++++++++
+ 2 files changed, 128 insertions(+)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 2cbed08..1a603f3 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -46,7 +46,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
- 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
- 	 * val = 0x4 really means "bit 2, index starts at bit 0"
- 	 */
--	val = clk_readl(mux->reg) >> mux->shift;
-+	val = mux->ll_ops->clk_readl(mux->reg) >> mux->shift;
- 	val &= mux->mask;
+diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+index ef1a7cd..32a65d0 100644
+--- a/drivers/clk/ti/clk.c
++++ b/drivers/clk/ti/clk.c
+@@ -19,10 +19,16 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/ti.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/list.h>
  
- 	if (mux->table) {
-@@ -93,11 +93,11 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
- 		val = mux->mask << (mux->shift + 16);
- 	} else {
--		val = clk_readl(mux->reg);
-+		val = mux->ll_ops->clk_readl(mux->reg);
- 		val &= ~(mux->mask << mux->shift);
- 	}
- 	val |= index << mux->shift;
--	clk_writel(val, mux->reg);
-+	mux->ll_ops->clk_writel(val, mux->reg);
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
  
- 	if (mux->lock)
- 		spin_unlock_irqrestore(mux->lock, flags);
-@@ -159,6 +159,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 	mux->lock = lock;
- 	mux->table = table;
- 	mux->hw.init = &init;
-+	mux->ll_ops = &clk_ll_ops_default;
- 
- 	clk = clk_register(dev, &mux->hw);
- 
-@@ -201,6 +202,10 @@ struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc)
- 	mux->shift = hw_desc->shift;
- 	mux->flags = hw_desc->flags;
- 	mux->lock = hw_desc->lock;
-+	mux->ll_ops = hw_desc->ll_ops;
++extern struct of_device_id __clk_of_table[];
++static int ti_dt_clk_memmap_index;
++struct clk_ll_ops *ti_clk_ll_ops;
 +
-+	if (!mux->ll_ops)
-+		mux->ll_ops = &clk_ll_ops_default;
+ /**
+  * ti_dt_clocks_register - register DT alias clocks during boot
+  * @oclks: list of clocks to register
+@@ -53,3 +59,105 @@ void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+ 		}
+ 	}
+ }
++
++struct clk_init_item {
++	struct device_node *node;
++	struct clk_hw *hw;
++	ti_of_clk_init_cb_t func;
++	struct list_head link;
++};
++
++static LIST_HEAD(retry_list);
++
++/**
++ * ti_clk_retry_init - retries a failed clock init at later phase
++ * @node: device not for the clock
++ * @hw: partially initialized clk_hw struct for the clock
++ * @func: init function to be called for the clock
++ *
++ * Adds a failed clock init to the retry list. The retry list is parsed
++ * once all the other clocks have been initialized.
++ */
++void __init ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
++			      ti_of_clk_init_cb_t func)
++{
++	struct clk_init_item *retry;
++
++	pr_debug("%s: adding to retry list...\n", node->name);
++	retry = kzalloc(sizeof(*retry), GFP_KERNEL);
++	retry->node = node;
++	retry->func = func;
++	retry->hw = hw;
++	list_add(&retry->link, &retry_list);
++}
++
++/**
++ * ti_clk_get_reg_addr - get register address for a clock register
++ * @node: device node for the clock
++ * @index: register index from the clock node
++ *
++ * Builds clock register address from device tree information. This
++ * is a struct of type clk_omap_reg.
++ */
++void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
++{
++	struct clk_omap_reg *reg;
++	u32 val;
++	u32 tmp;
++
++	reg = (struct clk_omap_reg *)&tmp;
++	reg->index = ti_dt_clk_memmap_index;
++
++	if (of_property_read_u32_index(node, "reg", index, &val)) {
++		pr_err("%s must have reg[%d]!\n", node->name, index);
++		return NULL;
++	}
++
++	reg->offset = val;
++
++	return (void __iomem *)tmp;
++}
++
++/**
++ * ti_dt_clk_init_provider - init master clock provider
++ * @parent: master node
++ * @index: internal index for clk_reg_ops
++ *
++ * Initializes a master clock IP block and its child clock nodes.
++ * Regmap is provided for accessing the register space for the
++ * IP block and all the clocks under it.
++ */
++void ti_dt_clk_init_provider(struct device_node *parent, int index)
++{
++	const struct of_device_id *match;
++	struct device_node *np;
++	struct device_node *clocks;
++	of_clk_init_cb_t clk_init_cb;
++	struct clk_init_item *retry;
++	struct clk_init_item *tmp;
++
++	ti_dt_clk_memmap_index = index;
++
++	/* get clocks for this parent */
++	clocks = of_get_child_by_name(parent, "clocks");
++	if (!clocks) {
++		pr_err("%s missing 'clocks' child node.\n", parent->name);
++		return;
++	}
++
++	for_each_child_of_node(clocks, np) {
++		match = of_match_node(__clk_of_table, np);
++		if (!match)
++			continue;
++		clk_init_cb = (of_clk_init_cb_t)match->data;
++		pr_debug("%s: initializing: %s\n", __func__, np->name);
++		clk_init_cb(np);
++	}
++
++	list_for_each_entry_safe(retry, tmp, &retry_list, link) {
++		pr_debug("retry-init: %s\n", retry->node->name);
++		retry->func(retry->hw, retry->node);
++		list_del(&retry->link);
++		kfree(retry);
++	}
++}
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index df94c24..6a2e497 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -36,7 +36,27 @@ struct ti_dt_clk {
+ 		.node_name = name,	\
+ 	}
  
- 	if (!desc->ops) {
- 		if (mux->flags & CLK_MUX_READ_ONLY)
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 0bbf231..8b46a7b 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -407,6 +407,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  *
-  * @hw:		handle between common and hardware-specific interfaces
-  * @reg:	register controlling multiplexer
-+ * @ll_ops:	low-level ops for accessing the register
-  * @shift:	shift to multiplexer bit field
-  * @width:	width of mutliplexer bit field
-  * @flags:	hardware-specific flags
-@@ -426,6 +427,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
- struct clk_mux {
- 	struct clk_hw	hw;
- 	void __iomem	*reg;
-+	struct clk_ll_ops	*ll_ops;
- 	u32		*table;
- 	u32		mask;
- 	u8		shift;
-@@ -438,6 +440,7 @@ struct clk_mux {
-  *
-  * @desc:	handle between common and hardware-specific interfaces
-  * @reg:	register controlling multiplexer
-+ * @ll_ops:	low-level ops for accesing the register
-  * @shift:	shift to multiplexer bit field
-  * @width:	width of multiplexer bit field
-  * @flags:	hardware-specific flags
-@@ -446,6 +449,7 @@ struct clk_mux {
- struct clk_mux_desc {
- 	struct clk_desc	desc;
- 	void __iomem	*reg;
-+	struct clk_ll_ops	*ll_ops;
- 	u32		*table;
- 	u32		mask;
- 	u8		shift;
++/* Maximum number of clock memmaps */
++#define CLK_MAX_MEMMAPS			4
+ 
++typedef void (*ti_of_clk_init_cb_t)(struct clk_hw *, struct device_node *);
++
++/**
++ * struct clk_omap_reg - OMAP register declaration
++ * @offset: offset from the master IP module base address
++ * @index: index of the master IP module
++ */
++struct clk_omap_reg {
++	u16 offset;
++	u16 index;
++};
++
++extern struct clk_ll_ops *ti_clk_ll_ops;
++
++void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
+ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
++void ti_dt_clk_init_provider(struct device_node *np, int index);
++void ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
++		       ti_of_clk_init_cb_t func);
+ 
+ #endif
 -- 
 1.7.9.5
