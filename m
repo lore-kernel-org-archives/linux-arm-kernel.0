@@ -1,86 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Dec 2013 06:50:17 +0100
-Subject: [RESEND LIST PATCHv7 1/4] clk: socfpga: Add a clk-phase property
- to the "altr, socfpga-gate-clk"
-In-Reply-To: <52B2703A.8090001@gmail.com>
-References: <1387213476-22122-1-git-send-email-dinguyen@altera.com>
- <201312182221.46506.arnd@arndb.de> <52B2703A.8090001@gmail.com>
-Message-ID: <201312190650.17806.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 18 Dec 2013 21:43:20 -0800
+Subject: [PATCH] clk: remove CONFIG_COMMON_CLK_DEBUG
+Message-ID: <1387431800-10092-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 December 2013, Dinh Nguyen wrote:
-> On 12/18/13 3:21 PM, Arnd Bergmann wrote:
-> > On Wednesday 18 December 2013, Mike Turquette wrote:
-> > I would definitely prefer using degrees over an arbitrary enumeration that
-> > might work on some platforms but not on others.
-> >
-> > I'm also a bit skeptical about the idea of putting the phase into the clock
-> > provider rather than the consumer, given the comments about the
-> > clk_set_phase() interface earlier. Generally we try to avoid having
-> > consumer-specific settings in a provider node (for any DT binding,
-> > not just clocks). Can't you have the same numbers in the dw-mshc
-> > node instead and let the mmc driver call clk_set_phase instead?
-> > If every clock has a fixed phase for a given piece of hardware, it
-> > could even be set automatically by making the common clk code read
-> > the clk-phase attribute at the time a driver calls clk_get.
-> 
-> So I think this is what you're suggesting:
-> clocks = <&sdmmc_clk 0 135>, this would specify 0 and 135 degrees phase.
+Populate ${DEBUGS_MOUNT_POINT}/clk if CONFIG_DEBUG_FS is set. This
+eliminates the extra (annoying) step of enabling the config option
+manually.
 
-It's not what I meant in the paragraph above, but I have suggested this
-method in the past, and I think that would solve the problem very nicely
-as well, if Mike agrees. 
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/Kconfig         | 10 ----------
+ drivers/clk/clk.c           |  2 +-
+ include/linux/clk-private.h |  2 +-
+ 3 files changed, 2 insertions(+), 12 deletions(-)
 
-> The clock-bindings document is stating that the integer in the clocks
-> property is
-> specifying the output number of the clock. Would this approach cause a
-> conflict and would
-> need an update to that document/approach?
-
-I don't think we have to change the common binding. While it lists the
-use of the integer for multiple clock outputs, that's not necessarily
-the only possible use, and specific bindings can always override the
-generic ones in a compatible way.
-
-You would certainly have to update the binding of your clock controller
-to do this, in particular because #clock-cells is now <1>. You will
-probably need to add a new "compatible" string for a clock that has
-a phase setting rather than just a gate, and document what the argument
-is for. If possible, try to model the hardware the way it actually
-is implemented. If the clock controller supports both the gate and
-the phase in the same block, then make it one clock device node, but
-if you have one block generating the clock and another one to shift the
-phase, it may be best to model that second clock in a separate node
-so you can split the driver code according to the registers, like
-
-	mmcclock-shifted {
-		compatible = "altr,socfpga-clk-shift";
-		reg = <0xabcd>;
-		clocks = <&mmcclock>;
-		#clock-cells = <1>
-	};
-
-	mshc {
-		...
-		clocks = <&/clocks/mmcclock-shifted 135>;
-		clock-names = "ciu";
-	};
-
-Coming back to what I actually tried to suggest above was 
-
-	mshc {
-		...
-		clocks = <&/clocks/mmcclock>;
-		clock-names = "ciu";
-		clock-phases = <135>;
-	};
-
-This would keep the phase setting out of the specific binding and
-move it to the generic clock binding. In Linux we could implement
-this either by making the mshc driver read the phase value and
-call clock_set_phase() on it, or the common clock code could look
-up the clock-phases property at the same time it looks up clock-names
-and clocks, and set this behind the back of the driver.
-
-	Arnd
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 3089f05..407cffb 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -23,16 +23,6 @@ config COMMON_CLK
+ menu "Common Clock Framework"
+ 	depends on COMMON_CLK
+ 
+-config COMMON_CLK_DEBUG
+-	bool "DebugFS representation of clock tree"
+-	select DEBUG_FS
+-	---help---
+-	  Creates a directory hierarchy in debugfs for visualizing the clk
+-	  tree structure.  Each directory contains read-only members
+-	  that export information specific to that clk node: clk_rate,
+-	  clk_flags, clk_prepare_count, clk_enable_count &
+-	  clk_notifier_count.
+-
+ config COMMON_CLK_WM831X
+ 	tristate "Clock driver for WM831x/2x PMICs"
+ 	depends on MFD_WM831X
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8312736..41e46df 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -92,7 +92,7 @@ static void clk_enable_unlock(unsigned long flags)
+ 
+ /***        debugfs support        ***/
+ 
+-#ifdef CONFIG_COMMON_CLK_DEBUG
++#ifdef CONFIG_DEBUG_FS
+ #include <linux/debugfs.h>
+ 
+ static struct dentry *rootdir;
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 8138c94..98f8614 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -44,7 +44,7 @@ struct clk {
+ 	struct hlist_head	children;
+ 	struct hlist_node	child_node;
+ 	unsigned int		notifier_count;
+-#ifdef CONFIG_COMMON_CLK_DEBUG
++#ifdef CONFIG_DEBUG_FS
+ 	struct dentry		*dentry;
+ #endif
+ };
+-- 
+1.8.3.2
