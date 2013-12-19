@@ -1,47 +1,111 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Thu, 19 Dec 2013 13:09:48 +0000
-Subject: [PATCH v2] net: mvmdio: fix interrupt timeout handling
-In-Reply-To: <52B2D97F.4070200@gmail.com>
-References: <52B2D97F.4070200@gmail.com>
-Message-ID: <1387458588-17231-1-git-send-email-leigh@solinno.co.uk>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 19 Dec 2013 09:12:57 -0400
+Subject: [PATCH V3 2/2] thermal: imx: add necessary clk operation
+In-Reply-To: <1387487791-3259-1-git-send-email-b20788@freescale.com>
+References: <1387487791-3259-1-git-send-email-b20788@freescale.com>
+Message-ID: <52B2F0D9.2020704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This version corrects the whitespace issue.
+On 19-12-2013 17:16, Anson Huang wrote:
+> Thermal sensor needs pll3_usb_otg when measuring temperature,
+> otherwise the temperature read will be incorrect, so need to
+> enable this clk before sensor working, for alarm function,
+> as hardware will take measurement periodically, so we should
+> keep this clk always on once alarm function is enabled.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  .../devicetree/bindings/thermal/imx-thermal.txt    |    4 ++++
+>  drivers/thermal/imx_thermal.c                      |   18 ++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> index 541c25e..1f0f672 100644
+> --- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> @@ -8,10 +8,14 @@ Required properties:
+>    calibration data, e.g. OCOTP on imx6q.  The details about calibration data
+>    can be found in SoC Reference Manual.
+>  
+> +Optional properties:
+> +- clocks : thermal sensor's clock source.
+> +
+>  Example:
+>  
+>  tempmon {
+>  	compatible = "fsl,imx6q-tempmon";
+>  	fsl,tempmon = <&anatop>;
+>  	fsl,tempmon-data = <&ocotp>;
+> +	clocks = <&clks 172>;
+>  };
+> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+> index 1d6c801..c2b8173 100644
+> --- a/drivers/thermal/imx_thermal.c
+> +++ b/drivers/thermal/imx_thermal.c
+> @@ -7,6 +7,7 @@
+>   *
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/cpu_cooling.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/delay.h>
+> @@ -73,6 +74,7 @@ struct imx_thermal_data {
+>  	unsigned long last_temp;
+>  	bool irq_enabled;
+>  	int irq;
+> +	struct clk *thermal_clk;
+>  };
+>  
+>  static void imx_set_alarm_temp(struct imx_thermal_data *data,
+> @@ -457,6 +459,22 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
 
-orion_mdio_wait_ready uses wait_event_timeout to wait for the
-SMI interrupt to fire.  wait_event_timeout waits for between
-"timeout - 1" and "timeout" jiffies.  In this case a 1ms timeout
-when HZ is 1000 results in a wait of 0 to 1 jiffies, causing
-premature timeouts.
+There are several reg writes before this point. Are you sure you won't
+need this clock for performing those operations?
 
-This fix ensures a minimum timeout of 2 jiffies, ensuring
-wait_event_timeout will always wait at least 1 jiffie.
+> +	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->thermal_clk)) {
+> +		dev_warn(&pdev->dev, "failed to get thermal clk!\n");
+> +	} else {
+> +		/*
+> +		 * Thermal sensor needs clk on to get correct value, normally
+> +		 * we should enable its clk before taking measurement and disable
+> +		 * clk after measurement is done, but if alarm function is enabled,
+> +		 * hardware will auto measure the temperature periodically, so we
+> +		 * need to keep the clk always on for alarm function.
+> +		 */
+> +		ret = clk_prepare_enable(data->thermal_clk);
+> +		if (ret)
+> +			dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+> +	}
+> +
+>  	/* Enable measurements at ~ 10 Hz */
+>  	regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
+>  	measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
+> 
 
-Issue reported by Nicolas Schichan.
+Don't you need to release the clock when .remove is called either on
+driver or device removal?
 
-Tested-by: Nicolas Schichan <nschichan@freebox.fr>
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
----
- drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+What about suspend / resume path? Do you want to keep this clock on when
+suspending? Is it gonna work or prevent your system to enter low power
+states?
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 7354960..c4eeb69 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -92,6 +92,12 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
- 			if (time_is_before_jiffies(end))
- 				++timedout;
- 	        } else {
-+			/* wait_event_timeout does not guarantee a delay of at
-+			 * least one whole jiffie, so timeout must be no less
-+			 * than two.
-+			 */
-+			if (timeout < 2)
-+				timeout = 2;
- 			wait_event_timeout(dev->smi_busy_wait,
- 				           orion_mdio_smi_is_done(dev),
- 				           timeout);
+
+
 -- 
-1.8.5.1
+You have got to be excited about what you are doing. (L. Lamport)
+
+Eduardo Valentin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/0435bd46/attachment.sig>
