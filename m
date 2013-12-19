@@ -1,55 +1,66 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 19 Dec 2013 11:46:24 -0500
-Subject: Can someone Ack and queue a patch for RTC subsytem?
-In-Reply-To: <87siton6ke.fsf@natisbad.org>
-References: <87siton6ke.fsf@natisbad.org>
-Message-ID: <20131219164624.GV2609@titan.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 19 Dec 2013 16:48:24 +0000
+Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
+In-Reply-To: <s5hd2kssu4g.wl%tiwai@suse.de>
+References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+ <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
+ <s5hd2kssu4g.wl%tiwai@suse.de>
+Message-ID: <20131219164824.GA16145@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
-
-On Thu, Dec 19, 2013 at 05:34:09PM +0100, Arnaud Ebalard wrote:
-> I have a very simple driver (support for reading and setting the time)
-> for a RTC chip (Intersil ISL 12057) but cannot find anyone to get it
-> Acked and queued for v3.14. In v3.14, there should be at least three
-> users of the driver (ReadyNAS 102, 104 and 2120) if I meet -rc5 cutoff
-> for associated .dts changes.
-
-The -rc5 cutoff isn't a hard line.  It's also mvebu-specific.  eg, We
-need things _posted_ a week or so before arm-soc's cutoff of -rc6 so we
-have time to get the pull request in.  If it needs to go through
-mvebu/arm-soc, once it's posted, you're good.
-
-The rtc driver shouldn't go through mvebu/arm-soc.  It should go through
-the rtc maintainer's tree.
-
-> I never heard of *listed* RTC maintainer during all the review process
-> on rtc-linux list (v0 sent in october); I dug the list archives and when
-> this previously happened, someone else (e.g. Andrew Morton) was kind
-> enough to handle the patches:
+> > Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
+> > rather carelessly converts find_next_bit() to fls() (find last
+> > bit set), which are not the same.
 > 
->   http://www.spinics.net/lists/arm-kernel/msg292187.html
+> Does it break on the real machines?
 
-Unfortunately, it doesn't look like Alessandro has been active for a
-while and Andrew Morton has indeed been picking up the slack.  S-o-B's
-confirm this.
+It does, that's how I found the bug.
 
-I haven't worked with Andrew enough to know his workflow, but I imagine
-he can take patches much closer to the merge window than we can.
+> fls() behaves differently from find_next_bit(), of course, but in this
+> case, it should work same in the end, since there are at most two
+> bits.
 
-> I wonder if someone (Andrew? Stephen? Jason?) would be kind enough to
-> take care of the v6 I just sent [1].
+Unfortunately it doesn't work at all. This patch brings audio back to
+a working state. It took me the best part of a day to track down the
+issue. :(
 
-I don't mind routing it though mvebu/arm-soc since the only consumers
-are currently mvebu boards, but I'd like to hear from Andrew that this
-is ok.
+> > Although this implementation may not be portable, the alternative
+> > breaks audio on anything using the AB8500 CODEC, which is a much
+> > greater evil. Besides, this driver will never run on anything
+> > else.
+> > 
+> > Cc: Takashi Iwai <tiwai@suse.de>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  sound/soc/codecs/ab8500-codec.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+> > index 1ad92cb..51ae3e9 100644
+> > --- a/sound/soc/codecs/ab8500-codec.c
+> > +++ b/sound/soc/codecs/ab8500-codec.c
+> > @@ -2322,7 +2322,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+> >  		slot = ffs(tx_mask);
+> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
+> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
+> > -		slot = fls(tx_mask);
+> > +		slot = find_next_bit((unsigned long *)&tx_mask, 32, slot + 1);
+> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
+> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
+> >  		break;
+> > @@ -2364,7 +2364,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+> >  				AB8500_ADSLOTSEL(slot),
+> >  				AB8500_MASK_SLOT(slot),
+> >  				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
+> > -		slot = fls(rx_mask);
+> > +		slot = find_next_bit((unsigned long *)&rx_mask, 32, slot + 1);
+> >  		snd_soc_update_bits(codec,
+> >  				AB8500_ADSLOTSEL(slot),
+> >  				AB8500_MASK_SLOT(slot),
 
-In the long term, should we seek out a co-maintainer for drivers/rtc?
-Can anyone get a hold of Alessandro to get his opinion on this?
-
-thx,
-
-Jason.
-
-> [1]: http://patchwork.ozlabs.org/patch/303616/
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
