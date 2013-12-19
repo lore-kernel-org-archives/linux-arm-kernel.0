@@ -1,93 +1,45 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Dec 2013 16:59:26 +0100
-Subject: [PATCH 02/10] ARM: tegra: Enable LVDS on Cardhu
+Date: Thu, 19 Dec 2013 16:59:27 +0100
+Subject: [PATCH 03/10] ARM: tegra: Add MIPI calibration DT entries for Tegra114
 In-Reply-To: <1387468774-14216-1-git-send-email-treding@nvidia.com>
 References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
-Message-ID: <1387468774-14216-3-git-send-email-treding@nvidia.com>
+Message-ID: <1387468774-14216-4-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add backlight and panel nodes for the Cardhu 10.1" WXGA TFT LCD panel.
+Add a device node for the MIPI calibration block on Tegra114. There is
+no need to disable it by default because it only enables the clock while
+performing calibration and therefore shouldn't be consuming any power
+when unused.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
 Changes in v3:
-- split HDMI support into a separate patch
+- update for revised bindings
 
 Changes in v2:
-- remove backlight-boot-off property for now
+- remove include/dt-bindings/gpu/host1x/tegra114-mipi.h
 
- arch/arm/boot/dts/tegra30-cardhu.dtsi | 37 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra114.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index dfcc18adcfd7..9104224124ee 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -56,6 +56,16 @@
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index ae855ec60bbd..9a40a3fc37ec 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -480,6 +480,13 @@
  		};
  	};
  
-+	host1x at 50000000 {
-+		dc at 54200000 {
-+			rgb {
-+				status = "okay";
-+
-+				nvidia,panel = <&panel>;
-+			};
-+		};
++	mipi: mipi {
++		compatible = "nvidia,tegra114-mipi";
++		reg = <0x700e3000 0x100>;
++		clocks = <&tegra_car TEGRA114_CLK_MIPI_CAL>;
++		#nvidia,mipi-calibrate-cells = <1>;
 +	};
 +
- 	pinmux at 70000868 {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&state_default>;
-@@ -152,7 +162,11 @@
- 		status = "okay";
- 	};
- 
--	i2c at 7000c000 {
-+	pwm at 7000a000 {
-+		status = "okay";
-+	};
-+
-+	panelddc: i2c at 7000c000 {
- 		status = "okay";
- 		clock-frequency = <100000>;
- 	};
-@@ -372,6 +386,17 @@
- 		status = "okay";
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+
-+		enable-gpios = <&gpio TEGRA_GPIO(H, 2) GPIO_ACTIVE_HIGH>;
-+		power-supply = <&vdd_bl_reg>;
-+		pwms = <&pwm 0 5000000>;
-+
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+
- 	clocks {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -385,6 +410,16 @@
- 		};
- 	};
- 
-+	panel: panel {
-+		compatible = "chunghwa,claa101wb01", "simple-panel";
-+		ddc-i2c-bus = <&panelddc>;
-+
-+		power-supply = <&vdd_pnl1_reg>;
-+		enable-gpios = <&gpio TEGRA_GPIO(L, 2) GPIO_ACTIVE_HIGH>;
-+
-+		backlight = <&backlight>;
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+ 	sdhci at 78000000 {
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000000 0x200>;
 -- 
 1.8.4.2
