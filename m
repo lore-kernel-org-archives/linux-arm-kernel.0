@@ -1,82 +1,30 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 19 Dec 2013 15:53:22 -0500
-Subject: [PATCH V2 2/2] thermal: imx: add necessary clk operation
-Message-ID: <1387486402-30777-1-git-send-email-b20788@freescale.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 19 Dec 2013 14:23:55 +0530
+Subject: [PATCH Resend 1/7] clk: SPEAr: Staticize clk_frac_ops
+Message-ID: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thermal sensor needs pll3_usb_otg when measuring temperature,
-otherwise the temperature read will be incorrect, so need to
-enable this clk before sensor working, for alarm function,
-as hardware will take measurement periodically, so we should
-keep this clk always on once alarm function is enabled.
+clk_frac_ops is local to this file. Make it static.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- .../devicetree/bindings/thermal/imx-thermal.txt    |    2 ++
- drivers/thermal/imx_thermal.c                      |   18 ++++++++++++++++++
- 2 files changed, 20 insertions(+)
+ drivers/clk/spear/clk-frac-synth.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-index 541c25e..e518c6e 100644
---- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-@@ -7,6 +7,7 @@ Required properties:
- - fsl,tempmon-data : phandle pointer to fuse controller that contains TEMPMON
-   calibration data, e.g. OCOTP on imx6q.  The details about calibration data
-   can be found in SoC Reference Manual.
-+- clocks : thermal sensor's clock source.
+diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
+index 958aa3ad1d60..dffd4ce6c8b5 100644
+--- a/drivers/clk/spear/clk-frac-synth.c
++++ b/drivers/clk/spear/clk-frac-synth.c
+@@ -116,7 +116,7 @@ static int clk_frac_set_rate(struct clk_hw *hw, unsigned long drate,
+ 	return 0;
+ }
  
- Example:
- 
-@@ -14,4 +15,5 @@ tempmon {
- 	compatible = "fsl,imx6q-tempmon";
- 	fsl,tempmon = <&anatop>;
- 	fsl,tempmon-data = <&ocotp>;
-+	clocks = <&clks 172>;
- };
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index 1d6c801..c2b8173 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -7,6 +7,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/cpu_cooling.h>
- #include <linux/cpufreq.h>
- #include <linux/delay.h>
-@@ -73,6 +74,7 @@ struct imx_thermal_data {
- 	unsigned long last_temp;
- 	bool irq_enabled;
- 	int irq;
-+	struct clk *thermal_clk;
- };
- 
- static void imx_set_alarm_temp(struct imx_thermal_data *data,
-@@ -457,6 +459,22 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->thermal_clk)) {
-+		dev_warn(&pdev->dev, "failed to get thermal clk!\n");
-+	} else {
-+		/*
-+		 * Thermal sensor needs clk on to get correct value, normally
-+		 * we should enable its clk before taking measurement and disable
-+		 * clk after measurement is done, but if alarm function is enabled,
-+		 * hardware will auto measure the temperature periodically, so we
-+		 * need to keep the clk always on for alarm function.
-+		 */
-+		ret = clk_prepare_enable(data->thermal_clk);
-+		if (ret)
-+			dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-+	}
-+
- 	/* Enable measurements at ~ 10 Hz */
- 	regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
- 	measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
+-struct clk_ops clk_frac_ops = {
++static struct clk_ops clk_frac_ops = {
+ 	.recalc_rate = clk_frac_recalc_rate,
+ 	.round_rate = clk_frac_round_rate,
+ 	.set_rate = clk_frac_set_rate,
 -- 
 1.7.9.5
