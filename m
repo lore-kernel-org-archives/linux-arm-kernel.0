@@ -1,51 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 19 Dec 2013 01:36:11 +0100
-Subject: [PATCH 2/3] clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
-In-Reply-To: <20131218192430.23538.93253@quantum>
-References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
- <CA+Ln22GD5fr4S6aR-+85bdutkeeHmgutLvRWETEQEt1vJX-Y6Q@mail.gmail.com>
- <20131218192430.23538.93253@quantum>
-Message-ID: <2195944.NGxsB7RHkr@flatron>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Thu, 19 Dec 2013 04:50:41 +0400
+Subject: [PATCH v3 07/21] ARM: dts: parse DMA config in pxamci
+In-Reply-To: <1387309071-22382-8-git-send-email-ynvich@gmail.com>
+References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-8-git-send-email-ynvich@gmail.com>
+Message-ID: <1387414241.31516.19.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 of December 2013 11:24:30 Mike Turquette wrote:
-> Quoting Tomasz Figa (2013-12-18 10:28:57)
-> > Hi Sachin,
-> > 
-> > 2013/12/18 Sachin Kamat <sachin.kamat@linaro.org>:
-> > > Hi Tomasz,
-> > >
-> > > On 10 November 2013 22:38, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > >> Hi Sachin, Andrew,
-> > >>
-> > >> On Friday 08 of November 2013 15:44:07 Sachin Kamat wrote:
-> > >>> From: Andrew Bresticker <abrestic@chromium.org>
-> > >>>
-> > >>> The gate clocks for the MFC sysmmus appear to be flipped, i.e.
-> > >>> GATE_IP_MFC[2] gates sysmmu_mfcl and GATE_IP_MFC[1] gates sysmmu_mfcr.
-> > >>> Fix this so that the MFC will start up.
-> > >>
-> > >> Wow, this means that there is a mistake in the documentation. Not that
-> > >> I'm surprised, though.
-> > >>
-> > >> I guess you are sure about this, so:
-> > >>
-> > >> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > >
-> > > I believe you are going to take this through your tree along with a
-> > > few others which you have already reviewed?
-> > 
-> > Thanks for reminding me about this patch. It's been quite a while
-> > since it was posted
-> > to the list.
-> > 
-> > Yes, I will apply it to samsung-clk tree.
+Daniel,
+
+On Tue, 2013-12-17 at 23:37 +0400, Sergei Ianovich wrote:
+> The existing PXA MMC driver cannot get DMA channels in a proper
+> way from the respective device tree binding.
 > 
-> Feel free to add my Ack when you apply it. Will these be sent later as a
-> pull request for the clk tree?
+> This patch provides temporary workaround which allows using the
+> existing driver in DT machines by pointing to the proper
+> dmaengine-based "marvell,pdma-1.0" DMA.
+> 
+> Even though the new DMA provider is not present we can parse device node
+> attributes manually and use channel numbers to acquire DMA channel
+> from the existing non-dmaengine provider.
+> 
+> When Daniel's DMA series is merged there will be no need to manually
+> parse for "dmas" and this patch can be safely reverted.
+> 
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Daniel Mack <zonque@gmail.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> ---
+>    v2..v3
+>    * split into good (PATCH 07/21) and temporary (this one) parts
+> 
+>    v1..v2
+>    * add binding for next-gen dma controller
+>    * use correct dma declararion
+>    * number changed from 5 to 3
 
-Yes. That's the plan. :)
+Could you please comment on this solution for PXA DMA?
 
-Best regards,
-Tomasz
+There may appear new, but it remains the last open review comment for
+the series at the moment.
