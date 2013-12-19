@@ -1,21 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Dec 2013 15:54:57 +0000
-Subject: [PATCH 00/10] ASoC: ARM: ux500: Better prepare for full Device Tree
-Message-ID: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 19 Dec 2013 17:06:23 +0100
+Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
+In-Reply-To: <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
+References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+ <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <s5hd2kssu4g.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At this moment in time the Ux500 ASoC driver obtains its DMA information
-via AUXDATA platform data passing. To make the driver more independent
-we have to start extracting it from the Device Tree. This patch-set goes
-some way to ensure the ux500 Audio driver is ready for the switch over.
+At Thu, 19 Dec 2013 15:54:59 +0000,
+Lee Jones wrote:
+> 
+> Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
+> rather carelessly converts find_next_bit() to fls() (find last
+> bit set), which are not the same.
 
- arch/arm/mach-ux500/board-mop500-audio.c     |   8 +++----
- include/linux/platform_data/asoc-ux500-msp.h |   9 +-------
- sound/soc/codecs/ab8500-codec.c              |   4 ++--
- sound/soc/ux500/mop500.c                     |   2 ++
- sound/soc/ux500/ux500_msp_dai.c              | 146 +++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------------------
- sound/soc/ux500/ux500_msp_i2s.c              |  56 ++++++++++++++++++++++++++++++++------------
- sound/soc/ux500/ux500_msp_i2s.h              |   2 +-
- sound/soc/ux500/ux500_pcm.c                  |  50 ++++++++++++++++++++++++++--------------
- 8 files changed, 144 insertions(+), 133 deletions(-)
+Does it break on the real machines?
+
+fls() behaves differently from find_next_bit(), of course, but in this
+case, it should work same in the end, since there are at most two
+bits.
+
+
+Takashi
+
+
+> Although this implementation may not be portable, the alternative
+> breaks audio on anything using the AB8500 CODEC, which is a much
+> greater evil. Besides, this driver will never run on anything
+> else.
+> 
+> Cc: Takashi Iwai <tiwai@suse.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  sound/soc/codecs/ab8500-codec.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+> index 1ad92cb..51ae3e9 100644
+> --- a/sound/soc/codecs/ab8500-codec.c
+> +++ b/sound/soc/codecs/ab8500-codec.c
+> @@ -2322,7 +2322,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+>  		slot = ffs(tx_mask);
+>  		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
+>  		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
+> -		slot = fls(tx_mask);
+> +		slot = find_next_bit((unsigned long *)&tx_mask, 32, slot + 1);
+>  		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
+>  		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
+>  		break;
+> @@ -2364,7 +2364,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+>  				AB8500_ADSLOTSEL(slot),
+>  				AB8500_MASK_SLOT(slot),
+>  				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
+> -		slot = fls(rx_mask);
+> +		slot = find_next_bit((unsigned long *)&rx_mask, 32, slot + 1);
+>  		snd_soc_update_bits(codec,
+>  				AB8500_ADSLOTSEL(slot),
+>  				AB8500_MASK_SLOT(slot),
+> -- 
+> 1.8.3.2
+> 
