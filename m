@@ -1,59 +1,97 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Dec 2013 15:55:07 +0000
-Subject: [PATCH 10/11] ASoC: ux500_pcm: Differentiate between pdata and DT
- initialisation
-In-Reply-To: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1387468508-12286-11-git-send-email-lee.jones@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 19 Dec 2013 17:54:31 +0200
+Subject: [PATCH 3/6] ARM: tegra: Add efuse bindings
+In-Reply-To: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1387468474-26521-4-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If booting with full DT support (i.e. DMA too, the last piece of the
-puzzle), then we don't need to use the compatible_request_channel call
-back or require some of the historical bumph which probably isn't
-required by a platform data start-up now either. This will also be
-ripped out in upcoming commits.
+Add efuse bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- sound/soc/ux500/ux500_pcm.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/tegra114.dtsi |    6 ++++++
+ arch/arm/boot/dts/tegra124.dtsi |    6 ++++++
+ arch/arm/boot/dts/tegra20.dtsi  |    7 +++++++
+ arch/arm/boot/dts/tegra30.dtsi  |    6 ++++++
+ 4 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
-index 3d1c342..55a8634 100644
---- a/sound/soc/ux500/ux500_pcm.c
-+++ b/sound/soc/ux500/ux500_pcm.c
-@@ -145,15 +145,25 @@ static const struct snd_dmaengine_pcm_config ux500_dmaengine_pcm_config = {
- 	.prepare_slave_config = ux500_pcm_prepare_slave_config,
- };
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 8d42787..09a69bf 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -316,6 +316,12 @@
+ 		clock-names = "pclk", "clk32k_in";
+ 	};
  
-+static const struct snd_dmaengine_pcm_config ux500_dmaengine_of_pcm_config = {
-+	.compat_request_channel = ux500_pcm_request_chan,
-+	.prepare_slave_config = ux500_pcm_prepare_slave_config,
-+};
++	efuse at 7000f800 {
++		compatible = "nvidia,tegra114-efuse";
++		reg = <0x7000f800 0x400>;
++		clocks = <&tegra_car TEGRA114_CLK_FUSE>;
++	};
 +
- int ux500_pcm_register_platform(struct platform_device *pdev)
- {
-+	const struct snd_dmaengine_pcm_config *pcm_config;
-+	struct device_node *np = pdev->dev.of_node;
- 	int ret;
+ 	iommu {
+ 		compatible = "nvidia,tegra114-smmu", "nvidia,tegra30-smmu";
+ 		reg = <0x70019010 0x02c
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index b741300..5e82956 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -106,6 +106,12 @@
+ 		reg = <0x7000e400 0x400>;
+ 	};
  
--	ret = snd_dmaengine_pcm_register(&pdev->dev,
--			&ux500_dmaengine_pcm_config,
--			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
--			SND_DMAENGINE_PCM_FLAG_COMPAT |
--			SND_DMAENGINE_PCM_FLAG_NO_DT);
-+	if (np)
-+		pcm_config = &ux500_dmaengine_of_pcm_config;
-+	else
-+		pcm_config = &ux500_dmaengine_pcm_config;
++	efuse at 7000f800 {
++		compatible = "nvidia,tegra124-efuse";
++		reg = <0x7000f800 0x400>;
++		clocks = <&tegra_car TEGRA124_CLK_FUSE>;
++	};
 +
-+	ret = snd_dmaengine_pcm_register(&pdev->dev, pcm_config,
-+					 SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
-+					 SND_DMAENGINE_PCM_FLAG_COMPAT);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev,
- 			"%s: ERROR: Failed to register platform '%s' (%d)!\n",
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index df40b54..85daed6 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -121,6 +121,7 @@
+ 		};
+ 	};
+ 
++
+ 	timer at 50004600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
+@@ -455,6 +456,12 @@
+ 		#size-cells = <0>;
+ 	};
+ 
++	efuse at 7000F800 {
++		compatible = "nvidia,tegra20-efuse";
++		reg = <0x7000F800 0x400>;
++		clocks = <&tegra_car TEGRA20_CLK_FUSE>;
++	};
++
+ 	pcie-controller {
+ 		compatible = "nvidia,tegra20-pcie";
+ 		device_type = "pci";
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 2bd55cf..da1b998 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -535,6 +535,12 @@
+ 		nvidia,ahb = <&ahb>;
+ 	};
+ 
++	efuse at 7000f800 {
++		compatible = "nvidia,tegra30-efuse";
++		reg = <0x7000f800 0x400>;
++		clocks = <&tegra_car TEGRA30_CLK_FUSE>;
++	};
++
+ 	ahub {
+ 		compatible = "nvidia,tegra30-ahub";
+ 		reg = <0x70080000 0x200
 -- 
-1.8.3.2
+1.7.7.rc0.72.g4b5ea.dirty
