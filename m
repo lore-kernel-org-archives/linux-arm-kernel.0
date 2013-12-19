@@ -1,89 +1,123 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:24:10 +0200
-Subject: [PATCHv11 39/49] ARM: OMAP2+: clock: add support for indexed memmaps
+Date: Thu, 19 Dec 2013 13:24:14 +0200
+Subject: [PATCHv11 43/49] ARM: OMAP2+: PRM: add support for initializing PRCM
+ clock modules from DT
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-40-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-44-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using indexed memmaps is required for isolating the actual memory access
-from the clock code. Now, the driver providing the support for the clock IP
-block provides the low level routines for reading/writing clock registers
-also.
+This patch provides top level functionality for the DT clock initialization.
+Clock tree is initialized hierarchically starting from IP modules (CM/PRM/PRCM)
+going down towards individual clock nodes, and finally initializing
+clockdomains once all the clocks are ready.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock.c |   26 +++++++++++++++++++++++++-
- arch/arm/mach-omap2/clock.h |    5 +++++
- 2 files changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/prm.h        |    1 +
+ arch/arm/mach-omap2/prm_common.c |   66 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 238be3f..c6da55f 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -26,7 +26,6 @@
- #include <linux/clk-private.h>
- #include <asm/cpu.h>
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index ac25ae6..623db40 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -18,6 +18,7 @@
+ # ifndef __ASSEMBLER__
+ extern void __iomem *prm_base;
+ extern void omap2_set_globals_prm(void __iomem *prm);
++int of_prcm_init(void);
+ # endif
  
--
- #include <trace/events/power.h>
+ 
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index a2e1174..835eb7d 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -23,6 +23,10 @@
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/clk-provider.h>
++#include <linux/clk/ti.h>
  
  #include "soc.h"
-@@ -56,6 +55,31 @@ u16 cpu_mask;
- static bool clkdm_control = true;
- 
- static LIST_HEAD(clk_hw_omap_clocks);
-+void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
-+
-+void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
-+{
-+	if (clk->flags & MEMMAP_ADDRESSING) {
-+		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
-+		__raw_writel(val, clk_memmaps[r->index] + r->offset);
-+	} else {
-+		__raw_writel(val, reg);
-+	}
-+}
-+
-+u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
-+{
-+	u32 val;
-+
-+	if (clk->flags & MEMMAP_ADDRESSING) {
-+		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
-+		val = __raw_readl(clk_memmaps[r->index] + r->offset);
-+	} else {
-+		val = __raw_readl(reg);
-+	}
-+
-+	return val;
-+}
+ #include "prm2xxx_3xxx.h"
+@@ -30,6 +34,7 @@
+ #include "prm3xxx.h"
+ #include "prm44xx.h"
+ #include "common.h"
++#include "clock.h"
  
  /*
-  * Used for clocks that have the same value as the parent clock,
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index cbe5ff7..bda767a 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -254,6 +254,9 @@ void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
- 			       const char *core_ck_name,
- 			       const char *mpu_ck_name);
+  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
+@@ -464,3 +469,64 @@ int prm_unregister(struct prm_ll_data *pld)
  
-+u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg);
-+void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg);
+ 	return 0;
+ }
 +
- extern u16 cpu_mask;
- 
- extern const struct clkops clkops_omap2_dflt_wait;
-@@ -288,6 +291,8 @@ extern const struct clksel_rate div_1_3_rates[];
- extern const struct clksel_rate div_1_4_rates[];
- extern const struct clksel_rate div31_1to31_rates[];
- 
-+extern void __iomem *clk_memmaps[];
++static struct of_device_id omap_prcm_dt_match_table[] = {
++	{ .compatible = "ti,am3-prcm" },
++	{ .compatible = "ti,am3-scrm" },
++	{ .compatible = "ti,am4-prcm" },
++	{ .compatible = "ti,am4-scrm" },
++	{ .compatible = "ti,omap3-prm" },
++	{ .compatible = "ti,omap3-cm" },
++	{ .compatible = "ti,omap3-scrm" },
++	{ .compatible = "ti,omap4-cm1" },
++	{ .compatible = "ti,omap4-prm" },
++	{ .compatible = "ti,omap4-cm2" },
++	{ .compatible = "ti,omap4-scrm" },
++	{ .compatible = "ti,omap5-prm" },
++	{ .compatible = "ti,omap5-cm-core-aon" },
++	{ .compatible = "ti,omap5-scrm" },
++	{ .compatible = "ti,omap5-cm-core" },
++	{ .compatible = "ti,dra7-prm" },
++	{ .compatible = "ti,dra7-cm-core-aon" },
++	{ .compatible = "ti,dra7-cm-core" },
++	{ }
++};
 +
- extern int am33xx_clk_init(void);
- 
- extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
++static struct clk_hw_omap memmap_dummy_ck = {
++	.flags = MEMMAP_ADDRESSING,
++};
++
++static u32 prm_clk_readl(u32 *reg)
++{
++	return omap2_clk_readl(&memmap_dummy_ck, reg);
++}
++
++static void prm_clk_writel(u32 val, u32 *reg)
++{
++	omap2_clk_writel(val, &memmap_dummy_ck, reg);
++}
++
++static struct clk_ll_ops omap_clk_ll_ops = {
++	.clk_readl = prm_clk_readl,
++	.clk_writel = prm_clk_writel,
++};
++
++int __init of_prcm_init(void)
++{
++	struct device_node *np;
++	void __iomem *mem;
++	int memmap_index = 0;
++
++	ti_clk_ll_ops = &omap_clk_ll_ops;
++
++	for_each_matching_node(np, omap_prcm_dt_match_table) {
++		mem = of_iomap(np, 0);
++		clk_memmaps[memmap_index] = mem;
++		ti_dt_clk_init_provider(np, memmap_index);
++		memmap_index++;
++	}
++
++	ti_dt_clockdomains_setup();
++
++	return 0;
++}
 -- 
 1.7.9.5
