@@ -1,66 +1,116 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 19 Dec 2013 15:58:35 +0400
-Subject: [PATCH v2 2/3] ARM: dts: clps711x: Add bindings documentation for
- CLPS711X irqchip driver
-Message-ID: <1387454315-1302-1-git-send-email-shc_work@mail.ru>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 19 Dec 2013 13:01:18 +0100
+Subject: [PATCH 5/7] clk/samsung: add support for pll2550xx
+In-Reply-To: <1386345391-23482-6-git-send-email-rahul.sharma@samsung.com>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1386345391-23482-6-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1450803.Oy1I8miDAj@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OF document for Cirrus Logic CLPS711X irqchip driver.
+Hi Pankaj, Rahul, Arun,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- .../interrupt-controller/cirrus,clps711x-intc.txt  | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+On Friday 06 of December 2013 21:26:29 Rahul Sharma wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> exynos5260 use pll2520xx and it has different bitfields
+> for P,M,S values as compared to pll2550xx. Support for
+> pll2520xx is added here.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-pll.c |  107 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/samsung/clk-pll.h |    1 +
+>  2 files changed, 108 insertions(+)
+> 
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index e8e8953..237a889 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -710,6 +710,107 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
+>  	return clk;
+>  }
+>  
+> +/*
+> + * PLL2550xx Clock Type
+> + */
+> +
+> +/* Maximum lock time can be 270 * PDIV cycles */
+> +#define PLL2550XX_LOCK_FACTOR (270)
+> +
+> +#define PLL2550XX_MDIV_MASK		(0x3FF)
+> +#define PLL2550XX_PDIV_MASK		(0x3F)
+> +#define PLL2550XX_SDIV_MASK		(0x7)
+> +#define PLL2550XX_LOCK_STAT_MASK	(0x1)
+> +#define PLL2550XX_MDIV_SHIFT		(9)
+> +#define PLL2550XX_PDIV_SHIFT		(3)
+> +#define PLL2550XX_SDIV_SHIFT		(0)
+> +#define PLL2550XX_LOCK_STAT_SHIFT	(21)
+> +
+> +static unsigned long samsung_pll2550xx_recalc_rate(struct clk_hw *hw,
+> +				unsigned long parent_rate)
+> +{
+> +	struct samsung_clk_pll *pll = to_clk_pll(hw);
+> +	u32 mdiv, pdiv, sdiv, pll_con;
+> +	u64 fvco = parent_rate;
+> +
+> +	pll_con = __raw_readl(pll->con_reg);
+> +	mdiv = (pll_con >> PLL2550XX_MDIV_SHIFT) & PLL2550XX_MDIV_MASK;
+> +	pdiv = (pll_con >> PLL2550XX_PDIV_SHIFT) & PLL2550XX_PDIV_MASK;
+> +	sdiv = (pll_con >> PLL2550XX_SDIV_SHIFT) & PLL2550XX_SDIV_MASK;
+> +
+> +	fvco *= mdiv;
+> +	do_div(fvco, (pdiv << sdiv));
+> +
+> +	return (unsigned long)fvco;
+> +}
+> +
+> +static inline bool samsung_pll2550xx_mp_change(u32 mdiv, u32 pdiv, u32 pll_con)
+> +{
+> +	if ((mdiv != ((pll_con >> PLL2550XX_MDIV_SHIFT) &
+> +				PLL2550XX_MDIV_MASK)) ||
+> +		(pdiv != ((pll_con >> PLL2550XX_PDIV_SHIFT) &
+> +				PLL2550XX_PDIV_MASK)))
+> +		return 1;
+> +	else
+> +		return 0;
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-new file mode 100644
-index 0000000..759339c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-@@ -0,0 +1,41 @@
-+Cirrus Logic CLPS711X Interrupt Controller
-+
-+Required properties:
-+
-+- compatible: Should be "cirrus,clps711x-intc".
-+- reg: Specifies base physical address of the registers set.
-+- interrupt-controller: Identifies the node as an interrupt controller.
-+- #interrupt-cells: Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 1.
-+
-+The interrupt sources are as follows:
-+ID	Name	Description
-+---------------------------
-+1:	BLINT	Battery low (FIQ)
-+3:	MCINT	Media changed (FIQ)
-+4:	CSINT	CODEC sound
-+5:	EINT1	External 1
-+6:	EINT2	External 2
-+7:	EINT3	External 3
-+8:	TC1OI	TC1 under flow
-+9:	TC2OI	TC2 under flow
-+10:	RTCMI	RTC compare match
-+11:	TINT	64Hz tick
-+12:	UTXINT1	UART1 transmit FIFO half empty
-+13:	URXINT1	UART1 receive FIFO half full
-+14:	UMSINT	UART1 modem status changed
-+15:	SSEOTI	SSI1 end of transfer
-+16:	KBDINT	Keyboard
-+17:	SS2RX	SSI2 receive FIFO half or greater full
-+18:	SS2TX	SSI2 transmit FIFO less than half empty
-+28:	UTXINT2	UART2 transmit FIFO half empty
-+29:	URXINT2	UART2 receive FIFO half full
-+32:	DAIINT	DAI interface (FIQ)
-+
-+Example:
-+	intc: interrupt-controller {
-+		compatible = "cirrus,clps711x-intc";
-+		reg = <0x80000000 0x4000>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
--- 
-1.8.3.2
+This doesn't look too good. Can you make this consistent with
+implementations of this helper for other PLLs, such as
+samsung_pll35xx_mp_change()?
+
+> +}
+> +
+> +static int samsung_pll2550xx_set_rate(struct clk_hw *hw, unsigned long drate,
+> +					unsigned long prate)
+> +{
+> +	struct samsung_clk_pll *pll = to_clk_pll(hw);
+> +	const struct samsung_pll_rate_table *rate;
+> +	u32 tmp;
+> +
+> +	/* Get required rate settings from table */
+> +	rate = samsung_get_pll_settings(pll, drate);
+> +	if (!rate) {
+> +		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
+> +			drate, __clk_get_name(hw->clk));
+> +		return -EINVAL;
+> +	}
+> +
+> +	tmp = __raw_readl(pll->con_reg);
+> +
+> +	if (!(samsung_pll2550xx_mp_change(rate->mdiv, rate->pdiv, tmp))) {
+> +		/* If only s change, change just s value only*/
+> +		tmp &= ~(PLL2550XX_SDIV_MASK << PLL2550XX_SDIV_SHIFT);
+> +		tmp |= rate->sdiv << PLL2550XX_SDIV_SHIFT;
+> +		__raw_writel(tmp, pll->con_reg);
+> +	} else {
+
+Please make coding style of this function consistent with implementations
+of this operation for other PLLs, such as samsung_pll35xx_set_rate().
+
+Otherwise the patch looks fine.
+
+Best regards,
+Tomasz
