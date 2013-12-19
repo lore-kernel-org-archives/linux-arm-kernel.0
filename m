@@ -1,67 +1,83 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 21:43:20 -0800
-Subject: [PATCH] clk: remove CONFIG_COMMON_CLK_DEBUG
-Message-ID: <1387431800-10092-1-git-send-email-mturquette@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Dec 2013 13:54:11 +0800
+Subject: [PATCH 4/4] PM / OPP: export symbol find_device_opp
+In-Reply-To: <1387410656-36053-4-git-send-email-john.tobias.ph@gmail.com>
+References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
+ <1387410656-36053-4-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <20131219055410.GV6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate ${DEBUGS_MOUNT_POINT}/clk if CONFIG_DEBUG_FS is set. This
-eliminates the extra (annoying) step of enabling the config option
-manually.
+On Wed, Dec 18, 2013 at 03:50:56PM -0800, John Tobias wrote:
+> imx6q-cpufreq.c need to have access to find_device_opp function, in order
+> to verify if the platform supplied an OPP table or not.
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/Kconfig         | 10 ----------
- drivers/clk/clk.c           |  2 +-
- include/linux/clk-private.h |  2 +-
- 3 files changed, 2 insertions(+), 12 deletions(-)
+I think we can figure it out by checking the return of
+dev_pm_opp_get_opp_count() call, so that we can save this patch
+completely.
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 3089f05..407cffb 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -23,16 +23,6 @@ config COMMON_CLK
- menu "Common Clock Framework"
- 	depends on COMMON_CLK
- 
--config COMMON_CLK_DEBUG
--	bool "DebugFS representation of clock tree"
--	select DEBUG_FS
--	---help---
--	  Creates a directory hierarchy in debugfs for visualizing the clk
--	  tree structure.  Each directory contains read-only members
--	  that export information specific to that clk node: clk_rate,
--	  clk_flags, clk_prepare_count, clk_enable_count &
--	  clk_notifier_count.
--
- config COMMON_CLK_WM831X
- 	tristate "Clock driver for WM831x/2x PMICs"
- 	depends on MFD_WM831X
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 8312736..41e46df 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -92,7 +92,7 @@ static void clk_enable_unlock(unsigned long flags)
- 
- /***        debugfs support        ***/
- 
--#ifdef CONFIG_COMMON_CLK_DEBUG
-+#ifdef CONFIG_DEBUG_FS
- #include <linux/debugfs.h>
- 
- static struct dentry *rootdir;
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 8138c94..98f8614 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -44,7 +44,7 @@ struct clk {
- 	struct hlist_head	children;
- 	struct hlist_node	child_node;
- 	unsigned int		notifier_count;
--#ifdef CONFIG_COMMON_CLK_DEBUG
-+#ifdef CONFIG_DEBUG_FS
- 	struct dentry		*dentry;
- #endif
- };
--- 
-1.8.3.2
+Note, imx6q-cpufreq driver already calls dev_pm_opp_get_opp_count().
+You need to change the way how it handles the return.
+
+Shawn
+
+> 
+> As an example here are the imx6q and imx6sl.
+> imx6q supplied the opp table due to some board specific requirement.
+> While, imx6sl doesn't have an opp table defined.
+> 
+> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+> ---
+>  drivers/base/power/opp.c | 3 ++-
+>  include/linux/pm_opp.h   | 7 +++++++
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index fa41874..d758e42 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+> @@ -116,7 +116,7 @@ static DEFINE_MUTEX(dev_opp_list_lock);
+>   * is a RCU protected pointer. This means that device_opp is valid as long
+>   * as we are under RCU lock.
+>   */
+> -static struct device_opp *find_device_opp(struct device *dev)
+> +struct device_opp *find_device_opp(struct device *dev)
+>  {
+>  	struct device_opp *tmp_dev_opp, *dev_opp = ERR_PTR(-ENODEV);
+>  
+> @@ -134,6 +134,7 @@ static struct device_opp *find_device_opp(struct device *dev)
+>  
+>  	return dev_opp;
+>  }
+> +EXPORT_SYMBOL_GPL(find_device_opp);
+>  
+>  /**
+>   * dev_pm_opp_get_voltage() - Gets the voltage corresponding to an available opp
+> diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
+> index 5151b00..cd13385 100644
+> --- a/include/linux/pm_opp.h
+> +++ b/include/linux/pm_opp.h
+> @@ -27,6 +27,8 @@ enum dev_pm_opp_event {
+>  
+>  #if defined(CONFIG_PM_OPP)
+>  
+> +struct device_opp *find_device_opp(struct device *dev);
+> +
+>  unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp);
+>  
+>  unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp);
+> @@ -52,6 +54,11 @@ int dev_pm_opp_disable(struct device *dev, unsigned long freq);
+>  
+>  struct srcu_notifier_head *dev_pm_opp_get_notifier(struct device *dev);
+>  #else
+> +static inline struct device_opp *find_device_opp(struct device *dev)
+> +{
+> +	return ERR_PTR(-EINVAL);
+> +}
+> +
+>  static inline unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
+>  {
+>  	return 0;
+> -- 
+> 1.8.3.2
+> 
