@@ -1,72 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Dec 2013 13:48:00 +0800
-Subject: [PATCH 2/4] ARM: imx: Add cpu frequency scaling support
-In-Reply-To: <1387410656-36053-2-git-send-email-john.tobias.ph@gmail.com>
-References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
- <1387410656-36053-2-git-send-email-john.tobias.ph@gmail.com>
-Message-ID: <20131219054758.GU6691@S2101-09.ap.freescale.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 19 Dec 2013 11:19:35 +0530
+Subject: [PATCH v7 8/9] phy: add Broadcom Kona USB2 PHY driver
+In-Reply-To: <20131218162554.GF4970@saruman.home>
+References: <1387309356-17195-1-git-send-email-mporter@linaro.org>
+ <1387309356-17195-9-git-send-email-mporter@linaro.org>
+ <20131218162554.GF4970@saruman.home>
+Message-ID: <52B288EF.1040006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 03:50:54PM -0800, John Tobias wrote:
-> Re-using iMX6Q driver for cpu frequency scaling.
+Hi Felipe,
+
+On Wednesday 18 December 2013 09:55 PM, Felipe Balbi wrote:
+> On Tue, Dec 17, 2013 at 02:42:35PM -0500, Matt Porter wrote:
+>> Add a driver for the internal Broadcom Kona USB 2.0 PHY found
+>> on the BCM281xx family of SoCs.
+>>
+>> Signed-off-by: Matt Porter <mporter@linaro.org>
 > 
-> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
-> ---
->  arch/arm/mach-imx/mach-imx6sl.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+> Kishon, are you ok with this driver ?
+
+yeah. Since this patch touches phy/Kconfig (and Makefile) and there is one more
+PHY driver to be merged that also modifies Kconfig there might be conflicts. So
+thought I should be taking this patch?
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-> index 2f952e3..a8b1543 100644
-> --- a/arch/arm/mach-imx/mach-imx6sl.c
-> +++ b/arch/arm/mach-imx/mach-imx6sl.c
-> @@ -8,7 +8,6 @@
->   */
->  
->  #include <linux/irqchip.h>
-> -#include <linux/of.h>
-
-This is an unrelated change to the patch.
-
->  #include <linux/of_platform.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-> @@ -34,6 +33,17 @@ static void __init imx6sl_fec_init(void)
->  	}
->  }
->  
-> +static struct platform_device imx6q_cpufreq_pdev = {
-> +	.name = "imx6q-cpufreq",
-> +};
-> +
-> +static void __init imx6sl_init_late(void)
-> +{
-> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-
-Unnecessary braces.
-
-> +		platform_device_register(&imx6q_cpufreq_pdev);
-
-Register the device in the following way will save imx6q_cpufreq_pdev.
-
-	platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
-
-Shawn
-
-> +	}
-> +}
-> +
->  static void __init imx6sl_init_machine(void)
->  {
->  	struct device *parent;
-> @@ -70,6 +80,7 @@ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
->  	.map_io		= debug_ll_io_init,
->  	.init_irq	= imx6sl_init_irq,
->  	.init_machine	= imx6sl_init_machine,
-> +	.init_late      = imx6sl_init_late,
->  	.dt_compat	= imx6sl_dt_compat,
->  	.restart	= mxc_restart,
->  MACHINE_END
-> -- 
-> 1.8.3.2
+>> +static int bcm_kona_usb2_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct bcm_kona_usb *phy;
+>> +	struct resource *res;
+>> +	struct phy *gphy;
+>> +	struct phy_provider *phy_provider;
+>> +
+>> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+>> +	if (!phy)
+>> +		return -ENOMEM;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	phy->regs = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(phy->regs))
+>> +		return PTR_ERR(phy->regs);
+>> +
+>> +	platform_set_drvdata(pdev, phy);
+>> +
+>> +	phy_provider = devm_of_phy_provider_register(dev,
+>> +			of_phy_simple_xlate);
+>> +	if (IS_ERR(phy_provider))
+>> +		return PTR_ERR(phy_provider);
+>> +
+>> +	gphy = devm_phy_create(dev, &ops, NULL);
+>> +	if (IS_ERR(gphy))
+>> +		return PTR_ERR(gphy);
+>> +
+>> +	/* The Kona PHY supports an 8-bit wide UTMI interface */
+>> +	phy_set_bus_width(gphy, 8);
+>> +
+>> +	phy_set_drvdata(gphy, phy);
 > 
+> I think this set_drvdata() should be done before registering the
+> provider, no ?
+
+hmm, right.
+
+Thanks
+Kishon
