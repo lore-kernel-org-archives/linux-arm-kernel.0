@@ -1,93 +1,56 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 19 Dec 2013 16:57:23 +0800
-Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
-In-Reply-To: <20131218193036.23538.99285@quantum>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-3-git-send-email-josephl@nvidia.com>
- <52B0D6FA.2060101@wwwdotorg.org>
- <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
- <52B1E950.1040001@wwwdotorg.org> <20131218193036.23538.99285@quantum>
-Message-ID: <1387443443.13057.0.camel@jlo-ubuntu-64.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Dec 2013 18:04:20 +0900
+Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
+In-Reply-To: <20131218005326.GE18992@verge.net.au>
+References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
+ <52AEFF56.5010602@cogentembedded.com>
+ <52AF8D57.7010705@cogentembedded.com>
+ <20131217003107.GF27171@verge.net.au>
+ <CAMuHMdV7y7GFrswa+f7ui8LSXj723_i5P6gBAG5ZOoMDP5LWyA@mail.gmail.com>
+ <20131218005326.GE18992@verge.net.au>
+Message-ID: <20131219090420.GD12239@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-19 at 03:30 +0800, Mike Turquette wrote:
-> Quoting Stephen Warren (2013-12-18 10:28:32)
-> > On 12/18/2013 02:42 AM, Joseph Lo wrote:
-> > > On Wed, 2013-12-18 at 06:58 +0800, Stephen Warren wrote:
-> > >> On 12/17/2013 02:26 AM, Joseph Lo wrote:
-> > >>> Add External Memory Controller (EMC) clock interface for the Tegra CCF
-> > >>> driver to support EMC scaling.
+On Wed, Dec 18, 2013 at 09:53:26AM +0900, Simon Horman wrote:
+> On Tue, Dec 17, 2013 at 11:10:15AM +0100, Geert Uytterhoeven wrote:
+> > On Tue, Dec 17, 2013 at 1:31 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Tue, Dec 17, 2013 at 02:31:35AM +0300, Sergei Shtylyov wrote:
+> > >> On 12/16/2013 04:25 PM, I wrote:
+> > >> >>The koelsch board uses has an SH ethernet controller which uses a Micrel
+> > >> >>phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
+> > >> >>Micrel-specific phy driver rather than relying on the generic phy driver.
 > > >>
-> > >>> diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
+> > >> >    Frankly speaking, I'm seeing no advantages to doing that.
 > > >>
-> > >>> +static long clk_emc_round_rate(struct clk_hw *hw, unsigned long rate,
-> > >>> +                          unsigned long *prate)
-> > >>> +{
-> > >>> +   struct tegra_clk_emc *emc = to_clk_emc(hw);
-> > >>> +   struct clk *parent_clk = __clk_get_parent(hw->clk);
-> > >>> +   unsigned long parent_rate = __clk_get_rate(parent_clk);
-> > >>> +   unsigned long ret;
-> > >>> +
-> > >>> +   if (!emc->emc_ops)
-> > >>> +           return parent_rate;
-> > >>> +
-> > >>> +   ret = emc->emc_ops->emc_round_rate(rate);
-> > >>> +   if (!ret)
-> > >>> +           return parent_rate;
-> > >>> +
-> > >>> +   return ret;
-> > >>> +}
-> > >>
-> > >> Rather than implementing this custom "emc_ops" feature, isn't there a
-> > >> standard clock notifier feature that the EMC driver can use?
-> > >>
-> > >> Isn't the EMC driver the only thing that will be changing the EMC clock
-> > >> rate? If so, why not just have the EMC driver perform the appropriate
-> > >> pre-/post-rate-change actions before/after calling clk_set_rate()?
-> > > 
-> > > We have two HW components needs to be updated when EMC rate change. One
-> > > is the EMC clock for tuning the frequency, the other is the EMC for
-> > > updating the timing and configuration for external memory (DRAM). So
-> > > this question looks like to me is that can we separate the operation of
-> > > the two components when rate changing?
-> > > 
-> > > We have two modes that depend on what memory type (DDR2, LPDDR2,
-> > > DDR3/LP) we used on the platform to support EMC scaling.
-> > > 1. power down mode (Tegra20 used this mode only.)
-> > > In this mode, we update the EMC timing and configurations to EMC shadow
-> > > registers. Then updating the rate in the EMC clock register. The HW will
-> > > trigger the rate changing and timing/configurations updating for EMC.
-> > > 2. self-refresh mode (Tegra30/114/124 if DDR3)
-> > > More complicate in this mode. Putting DRAM in self-refresh, updating EMC
-> > > settings, updating EMC clock, then we still need auto calibration before
-> > > restores DRAM from the self-refresh mode. So the difference was the EMC
-> > > clock operation was part of EMC scaling procedures.
-> > > 
-> > > I guess using the clk_notifier may be OK for the 1st case.
+> > >>    Although wait, Geert has reported the absence of Rx FIFO overflow
+> > >> messages with this PHY driver, IIRC.
 > > 
-> > In both cases, isn't the overall operation something like:
+> > I spoke too soon: apparently the statistical relevance of my reporting was
+> > too low. I still see them from time to time, but I think less than before (no
+> > numbers available).
 > > 
-> > a) Do some work before changing the EMC clock
-> > b) Change the EMC clock
-> > c) Do some work after changing the EMC clock
+> > >> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > >>
+> > >> >    Analogous changes are needed for BOCK-W and Lager boards since they all
+> > >> >use the same KSZ8041RNLI PHY chip. I was going to submit such changes with the
+> > >> >PHY IRQ patches but since no IRQ is generated still, this got delayed...
+> > >>
+> > >>    Only I was going to do it via defconfigs...
+> > >
+> > > That was my initial approach too. However I have been convinced
+> > > that Kconfig is a better way forwards.
 > > 
-> > Admittedly, the exact definition of "some work" is different for your
-> > cases (1) and (2) above, but the overall structure is the same. As such,
-> > can't the EMC scaling driver do (a), then do (b) i.e. call
-> > clk_set_rate(), then do (c)? Or, in your case (2), do we need to do
-> > funny tricks like running from IRAM since we can't access SDRAM during
-> > the clock change? If so, I'm not sure how having the EMC clock changing
-> > code is going to help your case (2) anyway, since we'll presumably have
-> > to code up a custom stub in assembly for the part of the code that runs
-> > from IRAM...
+> > Kconfig has the advantage that the minimal defconfigs will be smaller, so
+> > less churn there.
+> > However, it does mean you cannot disable the option anymore via your .config.
+> > 
+> > In this case it's a bit difficult to decide, as sh_eth will work both
+> > with and without
+> > the specific PHY-driver.
+> > 
+> > If no users want to disable it, I'd go for Kconfig.
 > 
-> Joseph,
-> 
-> Just as a reference, check out how the smp_twd stuff is updated based on
-> a clock rate-change notifier in arch/arm/kernel/smp_twd.c, lines
-> 103-142.
-> 
-Thanks.
+> It is indeed a tricky choice. But I think we should try going for Kconfig.
 
-Joseph
+I have decided to queue this up.
