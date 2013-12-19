@@ -1,55 +1,45 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 19 Dec 2013 20:41:23 +0100
-Subject: [PATCH v3 1/2] clk: add clk accuracy retrieval support
-In-Reply-To: <20131219193633.18119.57678@quantum>
-References: <1387290983-6236-1-git-send-email-b.brezillon@overkiz.com>
- <1387290983-6236-2-git-send-email-b.brezillon@overkiz.com>
- <20131219060431.18119.64699@quantum> <52B2B42F.9010202@overkiz.com>
- <20131219193633.18119.57678@quantum>
-Message-ID: <52B34BE3.7000208@overkiz.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 19 Dec 2013 14:42:37 -0500
+Subject: [PATCH 3/4] SATA: MV: Add support for the optional PHYs
+In-Reply-To: <20131219191027.GI4143@lunn.ch>
+References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
+ <1387311713-1926-3-git-send-email-andrew@lunn.ch>
+ <52B140F2.8070900@ti.com> <20131218121313.GC4324@htj.dyndns.org>
+ <20131219191027.GI4143@lunn.ch>
+Message-ID: <20131219194237.GC22725@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/12/2013 20:36, Mike Turquette a ?crit :
-> Quoting boris brezillon (2013-12-19 00:54:07)
->> Hello Mike,
->>
->> On 19/12/2013 07:04, Mike Turquette wrote:
->>> Quoting Boris BREZILLON (2013-12-17 06:36:22)
->>>> +unsigned long __clk_get_accuracy(struct clk *clk)
->>>> +{
->>>> +       unsigned long ret;
->>>> +
->>>> +       if (!clk)
->>>> +               return 0;
->>>> +
->>>> +       return clk->accuracy;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(__clk_get_accuracy);
->>> Any reason for exporting this?
->> This might be used by clk drivers to choose the most accurate clk
->> among its parent clks (within the determinate_rate callback).
->>
->> And as some clk drivers might be compiled as modules we need
->> to export the symbol (__clk_get_name helper function is exported
->> too).
-> Does your driver need this or is this just following the existing
-> __clk_get_rate / clk_get_rate model?
+Hello,
 
-No, I don't need this for my driver, at least for the moment.
+On Thu, Dec 19, 2013 at 08:10:27PM +0100, Andrew Lunn wrote:
+> > Shouldn't it distinguish between failures and at least produce
+> > warning?  ie. phy not available and phy init failed due to memory
+> > pressure or whatnot shouldn't be handled the same.
+> 
+> Phy not available is not an error, since not all variants of the SATA
+                          ^
+			 always
 
-Do you want me to drop this EXPORT_SYMBOL ?
->
-> Regards,
-> Mike
->
->> Best Regards,
->>
->> Boris
->>> Regards,
->>> Mike
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> IP block have the ability to control the phy. I can however add a
+> warning for real errors.
+
+Yes, please.
+
+> > > > @@ -4132,6 +4148,8 @@ err:
+> > > >  			clk_disable_unprepare(hpriv->port_clks[port]);
+> > > >  			clk_put(hpriv->port_clks[port]);
+> > > >  		}
+> > > > +		if (!IS_ERR(hpriv->port_phys[port]))
+> > > > +			phy_power_off(hpriv->port_phys[port]);
+> > 
+> > And I'd much prefer the array holds either NULL or valid pointer.
+> 
+> I was trying to keep the code similar to the clk handling. However now
+> that it is diverging more and more from how clk is handled, i can add
+> yet more divergence and overwrite the error with a NULL.
+
+Thanks.
+
+-- 
+tejun
