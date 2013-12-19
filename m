@@ -1,42 +1,32 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 19 Dec 2013 10:11:26 +0900
-Subject: [PATCH V2 3/7] PCI: imx6: Split away the PHY reset
-In-Reply-To: <1386757818-5154-3-git-send-email-marex@denx.de>
-References: <1386757818-5154-1-git-send-email-marex@denx.de>
- <1386757818-5154-3-git-send-email-marex@denx.de>
-Message-ID: <001f01cefc57$3d77d1a0$b86774e0$%han@samsung.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Wed, 18 Dec 2013 17:27:49 -0800
+Subject: [PATCH 1/2] gpio: msm: Fix irq mask/unmask by writing bits instead
+ of numbers
+In-Reply-To: <CACRpkdY8W8tGVH-Os5neeFfHWjojdB5fBbjgWcsWkiMyJj=YAA@mail.gmail.com>
+References: <1386717544-478-1-git-send-email-sboyd@codeaurora.org>
+ <CACRpkdY8W8tGVH-Os5neeFfHWjojdB5fBbjgWcsWkiMyJj=YAA@mail.gmail.com>
+Message-ID: <52B24B95.8010004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 11, 2013 7:30 PM, Marek Vasut wrote:
-> 
-> Split the PCIe PHY reset from the link up function to make
-> the code a little more structured.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Harro Haan <hrhaan@gmail.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
+On 12/12/2013 11:02 AM, Linus Walleij wrote:
+> On Wed, Dec 11, 2013 at 12:19 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>
+>> We should be writing bits here but instead we're writing the
+>> numbers that correspond to the bits we want to write. Fix it by
+>> wrapping the numbers in the BIT() macro. This fixes gpios acting
+>> as interrupts.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> I've applied this for fixes and tagged for stable.
+> Bj?rn, Rohit: OK?
+>
+> Yours,
+> Linus Walleij
+Acked-by: Rohit Vaswani <rvaswani@codeaurora.org>
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+Thanks,
+Rohit Vaswani
 
-Best regards,
-Jingoo Han
-
-> ---
->  drivers/pci/host/pci-imx6.c | 35 +++++++++++++++++++----------------
->  1 file changed, 19 insertions(+), 16 deletions(-)
-> 
-> V2: Drop unused 'temp' variable.
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
