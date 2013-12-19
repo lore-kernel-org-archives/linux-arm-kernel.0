@@ -1,32 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Dec 2013 10:35:02 -0800
-Subject: [PATCH] ARM: dts: Add support for sbc-3xxx with cm-t3730
-In-Reply-To: <52B2A3E0.8040405@compulab.co.il>
-References: <1386962541-18498-1-git-send-email-tony@atomide.com>
- <52AF065A.4010205@compulab.co.il>
- <20131216191754.GD26293@atomide.com>
- <52AFF9D0.5080400@compulab.co.il>
- <20131217193134.GB27438@atomide.com>
- <52B1608C.3010709@compulab.co.il>
- <20131218211641.GI27438@atomide.com>
- <52B2A3E0.8040405@compulab.co.il>
-Message-ID: <20131219183502.GT27438@atomide.com>
+Date: Thu, 19 Dec 2013 10:48:15 -0800
+Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
+In-Reply-To: <1384970958-4118-1-git-send-email-balbi@ti.com>
+References: <1384970958-4118-1-git-send-email-balbi@ti.com>
+Message-ID: <20131219184815.GU27438@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [131218 23:46]:
-> On 12/18/13 23:16, Tony Lindgren wrote:
-> 
-> [...]
-> 
-> > 
-> > I've kept your Ack as the changes were minor. If no other
-> > comments, I will apply this into omap-for-v3.14/dt probably
-> > on Thursday.
-> 
-> Looks great! Thanks!
+* Felipe Balbi <balbi@ti.com> [131120 10:10]:
+> Afte these patches, we're very close to being able
+> to move arch/arm/mach-omap2/irq.c to drivers/irqchip/irq-intc.c
 
-Thanks for your comments, I've pushed it out to omap-for-v3.14/dt now.
+That would be nice :)
+ 
+> All which would be missing is for Tony to drop all OMAP2/3 board
+> files so we remove the few pending bits and pieces left in
+> for legacy boot.
+
+That may still need to wait a while, but let's see.
+ 
+> Note that I have only boot tested these on AM335x Bone Black
+> (with a small fix for fixed regulator which should be in
+> the mailing list already), so I'd need help testing all
+> other impacted platforms, specially when it comes to PM.
+
+Sorry have not had much of a chance to test these with PM with
+all the fixes needed for omap3 DT mode. Tried testing these
+just now, but I get:
+
+arch/arm/mach-omap2/board-generic.c:134: error: ?omap_intc_of_init? undeclared here (not in a function)
 
 Regards,
 
