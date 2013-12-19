@@ -1,45 +1,83 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 19 Dec 2013 21:15:39 +0100
-Subject: [PATCH 22/41] clk: ux500: Copy u8500_clk_init() ready for DT
- enablement
-In-Reply-To: <20131213015158.11981.27135@quantum>
-References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
- <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
- <20131213015158.11981.27135@quantum>
-Message-ID: <CAPDyKFoVDP=wcV0FcKYMtf-y8uq2ob2Ahge2y9_HL-bVojTcgQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 13:24:12 -0700
+Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
+In-Reply-To: <1387469182-14398-2-git-send-email-treding@nvidia.com>
+References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
+ <1387469182-14398-2-git-send-email-treding@nvidia.com>
+Message-ID: <52B355EC.9040306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2013 02:51, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Linus Walleij (2013-09-20 13:59:46)
->> On Wed, Sep 18, 2013 at 2:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > Here we're using the old clock initialisation function as a template.
->> > It's necessary to remove all of the clk_register_clkdev() calls as
->> > they don't make sense when booting with Device Tree.
->> >
->> > Cc: Mike Turquette <mturquette@linaro.org>
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> I *really* like the looks of this! Mike can we have your ACK on this?
->
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+On 12/19/2013 09:06 AM, Thierry Reding wrote:
+> This also adds the vmmc-supply property to the SDMMC node on Venice2.
+> Otherwise the core will turn the regulator off automatically because it
+> is unused.
 
-Hi Mike,
+Laxman sent a version of this patch first, which I have already applied.
+His version is almost a pure subset of yours. I've pointed out the
+differences (other than simple naming) below so you two can work
+together to resolve them.
 
-This went in through arm soc a while ago, it is present in 3.13 rc.
-Thanks for your ack, anyway.
+(Laxman, as an aside, I'm not sure why you're upstreaming patches that
+don't exactly match the existing kernel support for this board...)
 
-Kind regards
-Uffe
+> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
 
->
->>
->> Yours,
->> Linus Walleij
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> +				sd0 {
+> +					regulator-name = "vdd_cpu";
+> +					regulator-min-microvolt = <700000>;
+> +					regulator-max-microvolt = <1350000>;
+
+Laxman's patch has:
+
+ 					regulator-max-microvolt = <1400000>;
+
+
+> +					regulator-always-on;
+> +					ams,ext-control = <2>;
+> +				};
+
+Laxman's patch adds:
+
+ 					regulator-min-microamp = <3500000>;
+ 					regulator-max-microamp = <3500000>;
+ 					regulator-boot-on;
+
+Those properties (with various values) are added to quite a few nodes; I
+won't bother pointing them out elsewhere.
+
+
+> +				sd1 {
+...
+> +					regulator-max-microamp = <3500000>;
+
+Laxman's patch has:
+
+ 					regulator-max-microamp = <2500000>;
+
+Laxman's patch adds the following node:
+
+ 				sd3 {
+ 					regulator-name = "vddio-ddr-2phase";
+ 					regulator-min-microvolt = <1350000>;
+ 					regulator-max-microvolt = <1350000>;
+ 					regulator-always-on;
+ 					regulator-boot-on;
+ 				};
+
+
+> +				sd6 {
+...
+> +					regulator-min-microvolt = <800000>;
+
+Laxman's patch has:
+
+ 					regulator-min-microvolt = <650000>;
+
+> +				ldo6 {
+...
+> +					regulator-min-microvolt = <3300000>;
+
+Laxman's patch has:
+
+ 					regulator-min-microvolt = <1800000>;
