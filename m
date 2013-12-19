@@ -1,69 +1,54 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Thu, 19 Dec 2013 07:33:20 +0000
-Subject: [PATCH 2/3] thermal: imx: add necessary clk operation
-In-Reply-To: <20131219072922.GD6691@S2101-09.ap.freescale.net>
-References: <1387477045-19037-1-git-send-email-b20788@freescale.com>
- <1387477045-19037-2-git-send-email-b20788@freescale.com>
- <20131219065915.GB6691@S2101-09.ap.freescale.net>
- <d067cdecda2046f5998302deed320c2a@DM2PR03MB317.namprd03.prod.outlook.com>
- <20131219072922.GD6691@S2101-09.ap.freescale.net>
-Message-ID: <4b50b52c774c4e99970b7c07a4edba94@DM2PR03MB317.namprd03.prod.outlook.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 19 Dec 2013 08:37:17 +0100
+Subject: [GIT PULL] Xilinx Zynq clk changes for v3.14
+In-Reply-To: <20131219051219.18119.26127@quantum>
+References: <52B16A4B.1000706@monstr.eu> <20131219051219.18119.26127@quantum>
+Message-ID: <52B2A22D.6080304@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike,
+
+On 12/19/2013 06:12 AM, Mike Turquette wrote:
+> Quoting Michal Simek (2013-12-18 01:26:35)
+>> Hi Mike,
+>>
+>> As we discussed it is better for you to get pull request with signed tags.
+>> That's why I am sending you pull request for 2 patches which we have in queue which
+>> should go to v3.14.
+> 
+> Michal,
+> 
+> Thanks much for the pull request. In the future it is a bit easier if
+> you base your pull request on the tip of clk-next, but it's not a big
+> deal.
+
+ok. No problem to do.
+
+> 
+> Shouldn't the change to zynq-7000.dtsi go through the arm-soc tree
+> instead of the clk tree?
+
+It is here because it is related to clock and there is no conflict
+with others DT changes we made for 3.14.
+But if you prefer not to have this change here I have no problem
+to add it to our zynq/clk branch and go through arm-soc tree.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
 
-Best Regards.
-Anson huang ???
-?
-Freescale Semiconductor Shanghai
-?????????192?A?2?
-201203
-Tel:021-28937058
-
-
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Thursday, December 19, 2013 3:29 PM
->To: Huang Yongcai-B20788
->Cc: kernel at pengutronix.de; rui.zhang at intel.com; eduardo.valentin at ti.com;
->devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-
->kernel at lists.infradead.org; linux-pm at vger.kernel.org
->Subject: Re: [PATCH 2/3] thermal: imx: add necessary clk operation
->
->On Thu, Dec 19, 2013 at 07:08:16AM +0000, Anson.Huang at freescale.com wrote:
->> >On Thu, Dec 19, 2013 at 01:17:24PM -0500, Anson Huang wrote:
->> >> @@ -427,6 +429,13 @@ static int imx_thermal_probe(struct
->> >> platform_device
->> >*pdev)
->> >>  		return ret;
->> >>  	}
->> >>
->> >> +	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
->> >> +	if (IS_ERR(data->thermal_clk)) {
->> >> +		ret = IS_ERR(data->thermal_clk);
->> >> +		dev_err(&pdev->dev, "failed to get thermal clk!\n");
->> >> +		return ret;
->> >> +	}
->> >> +
->> >
->> >So when the new kernel runs on a board with an old DTB installed,
->> >thermal driver will be broken.
->> >
->> Yes, I thought about this case, but the previous implement is
->> incorrect, if the PLL3 is not enabled by other drivers, thermal driver
->> will not work, so this patch is a bug fix, not enhancement. So we
->> still need to consider old dts case?
->
->The thing is mainline kernel runs on many board with thermal driver being
->functional today.  That said, PLL3 is already enabled on these platforms when
->thermal driver is running.  You cannot fix a bug but meanwhile break these
->users who use old DTB.
-
-Okay, got it, I will replace the return with one warning message in V2.
-
-Anson 
-
-
->
->Shawn
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/9c8b2985/attachment.sig>
