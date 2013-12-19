@@ -1,47 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Dec 2013 11:03:39 +0800
-Subject: [PATCH 1/4] ARM: imx: update i.MX6Q dts setting of VDDARM_CAP
- voltage
-In-Reply-To: <1387228057-349-1-git-send-email-b20788@freescale.com>
-References: <1387228057-349-1-git-send-email-b20788@freescale.com>
-Message-ID: <20131219030337.GP6691@S2101-09.ap.freescale.net>
+From: b20788@freescale.com (Anson Huang)
+Date: Thu, 19 Dec 2013 10:02:10 -0500
+Subject: [PATCH] ARM: imx: enable cpufreq for i.mx6dl
+Message-ID: <1387465330-15667-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 04:07:37PM -0500, Anson Huang wrote:
-> According to datasheet, VDD_CACHE_CAP must not exceed VDDARM_CAP
-> by more than 200mV, as all of i.MX6Q boards' VDD_CACHE_CAP currently
-> are connected to VDDSOC_CAP, so we need to follow this rule by
-> increasing VDDARM_CAP's voltage.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+This patch adds cpufreq dts for i.mx6dl to support cpufreq driver.
 
-Applied after reword the patch subject as 'ARM: dts: imx6q: update
-setting of VDDARM_CAP voltage'.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Note, for IMX dts changes, we generally use 'ARM: dts: imxXXX:' as
-prefix in patch subject.
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6q.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 101c434..e7e8332 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -28,7 +28,7 @@
->  				1200000 1275000
->  				996000  1250000
->  				792000  1150000
-> -				396000  950000
-> +				396000  975000
->  			>;
->  			clock-latency = <61036>; /* two CLK32 periods */
->  			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index b2f2699..e2ec0fb 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -23,6 +23,26 @@
+ 			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
++			operating-points = <
++				/* kHz    uV */
++				996000  1275000
++				792000  1175000
++				396000  1075000
++			>;
++			fsl,soc-operating-points = <
++				/* ARM kHz  SOC-PU uV */
++				996000	1175000
++				792000	1175000
++				396000	1175000
++			>;
++			clock-latency = <61036>; /* two CLK32 periods */
++			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
++				 <&clks 17>, <&clks 170>;
++			clock-names = "arm", "pll2_pfd2_396m", "step",
++				      "pll1_sw", "pll1_sys";
++			arm-supply = <&reg_arm>;
++			pu-supply = <&reg_pu>;
++			soc-supply = <&reg_soc>;
+ 		};
+ 
+ 		cpu at 1 {
+-- 
+1.7.9.5
