@@ -1,79 +1,69 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Dec 2013 13:04:32 +0800
-Subject: [PATCH V1 1/7] ARM: dts: imx: pinfunc: add
- MX6QDL_PAD_GPIO_6__ENET_IRQ
-In-Reply-To: <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
-References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
- <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20131219050430.GS6691@S2101-09.ap.freescale.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 18 Dec 2013 21:12:19 -0800
+Subject: [GIT PULL] Xilinx Zynq clk changes for v3.14
+In-Reply-To: <52B16A4B.1000706@monstr.eu>
+References: <52B16A4B.1000706@monstr.eu>
+Message-ID: <20131219051219.18119.26127@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 03:41:31PM -0700, Troy Kisky wrote:
-> Quoting from Ranjani Vaidyanathan
+Quoting Michal Simek (2013-12-18 01:26:35)
+> Hi Mike,
 > 
-> All of the interrupts from the ENET block are not routed to
-> the GPC block. Hence ENET interrupts are not able to wake
-> up the SOC when the system is in WAIT mode. And the ENET
-> interrupt gets serviced only when another interrupt causes
-> the SOC to exit WAIT mode. This impacts the ENET performance.
+> As we discussed it is better for you to get pull request with signed tags.
+> That's why I am sending you pull request for 2 patches which we have in queue which
+> should go to v3.14.
 
-We should probably also quote the IMX6Q errata document below.
+Michal,
 
- http://cache.freescale.com/files/32bit/doc/errata/IMX6DQCE.pdf?fpsp=1
+Thanks much for the pull request. In the future it is a bit easier if
+you base your pull request on the tip of clk-next, but it's not a big
+deal.
 
-ERR006687 ENET: Only the ENET wake-up interrupt request can wake the
-system from Wait mode.
+Shouldn't the change to zynq-7000.dtsi go through the arm-soc tree
+instead of the clk tree?
+
+Regards,
+Mike
 
 > 
-> Adding MX6QDL_PAD_GPIO_6__ENET_IRQ is the 1st step to
-> workaround this problem.
+> Thanks,
+> Michal
 > 
-> The input reg is set to 0x3c to set IOMUX_OBSRV_MUX1 to ENET_IRQ.
-
-It seems this is an undocumented register?  Is the info available
-somewhere?
-
-> The mux reg value is 0x11, so that the observable mux is routed to
-> this pin and to the gpio controller(sion bit).
 > 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> CC: ra5478 at freescale.com
-
-When having people in the tag, please put their name in there as well,
-so Ranjani Vaidyanathan <ra5478@freescale.com> please.
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
->  arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
->  2 files changed, 2 insertions(+)
+> The following changes since commit dc1ccc48159d63eca5089e507c82c7d22ef60839:
 > 
-> diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
-> index 7499eee..0ead323 100644
-> --- a/arch/arm/boot/dts/imx6dl-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
-> @@ -755,6 +755,7 @@
->  #define MX6QDL_PAD_GPIO_5__I2C3_SCL                 0x230 0x600 0x878 0x6 0x2
->  #define MX6QDL_PAD_GPIO_5__ARM_EVENTI               0x230 0x600 0x000 0x7 0x0
->  #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x234 0x604 0x840 0x0 0x1
-> +#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x234 0x604 0x03c 0x11 0xff000609
->  #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x234 0x604 0x87c 0x2 0x2
->  #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x234 0x604 0x000 0x5 0x0
->  #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x234 0x604 0x000 0x6 0x0
-> diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
-> index e5834b2..9fc6120 100644
-> --- a/arch/arm/boot/dts/imx6q-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-> @@ -673,6 +673,7 @@
->  #define MX6QDL_PAD_GPIO_3__USB_H1_OC                0x22c 0x5fc 0x948 0x6 0x1
->  #define MX6QDL_PAD_GPIO_3__MLB_CLK                  0x22c 0x5fc 0x900 0x7 0x1
->  #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x230 0x600 0x870 0x0 0x1
-> +#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x230 0x600 0x03c 0x11 0xff000609
->  #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x230 0x600 0x8ac 0x2 0x1
->  #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x230 0x600 0x000 0x5 0x0
->  #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x230 0x600 0x000 0x6 0x0
+>   Linux 3.13-rc2 (2013-11-29 12:57:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.14
+> 
+> for you to fetch changes up to eda9488d741085f79318884690db139712a1b019:
+> 
+>   arm: dt: zynq: Add fclk-enable property to clkc node (2013-12-11 17:48:48 +0100)
+> 
+> ----------------------------------------------------------------
+> arm: Xilinx Zynq clk patches for v3.14
+> 
+> - Add support for fclk-enable feature
+> 
+> ----------------------------------------------------------------
+> Soren Brinkmann (2):
+>       clk/zynq/clkc: Add 'fclk-enable' feature
+>       arm: dt: zynq: Add fclk-enable property to clkc node
+> 
+>  Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
+>  arch/arm/boot/dts/zynq-7000.dtsi                      |  1 +
+>  drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
+>  3 files changed, 20 insertions(+), 3 deletions(-)
+> 
+> 
 > -- 
-> 1.8.1.2
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> 
 > 
