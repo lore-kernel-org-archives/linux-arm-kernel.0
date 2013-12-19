@@ -1,36 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Dec 2013 15:55:01 +0000
-Subject: [PATCH 04/11] ASoC: Ux500: Match platform by device node when booting
- Device Tree
+Date: Thu, 19 Dec 2013 15:55:02 +0000
+Subject: [PATCH 05/11] ASoC: ux500_pcm: Stop pretending that we support
+ varying address widths
 In-Reply-To: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
 References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1387468508-12286-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1387468508-12286-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're getting closer to fully enabling the Ux500 ASoC driver for Device
-Tree. When we switch over from using AUXDATA we'll need to match platform
-by only Device Tree nodes. In this patch we NULL out the platform_name,
-and supply nodes for each platform device.
+The Slave Config's addr_width attribute is populated by data_width of
+dma_cfg, which in turn is derived from dma_params' data_size attribute
+and that comes from the slot_width which is always 16 bits (2 Bytes).
+We're cutting out the middle man here and just setting the DMA Slave
+Config directly.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/ux500/mop500.c | 2 ++
- 1 file changed, 2 insertions(+)
+ sound/soc/ux500/ux500_pcm.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-index 178d1ba..b3b66aa 100644
---- a/sound/soc/ux500/mop500.c
-+++ b/sound/soc/ux500/mop500.c
-@@ -91,6 +91,8 @@ static int mop500_of_probe(struct platform_device *pdev,
- 	for (i = 0; i < 2; i++) {
- 		mop500_dai_links[i].cpu_of_node = msp_np[i];
- 		mop500_dai_links[i].cpu_dai_name = NULL;
-+		mop500_dai_links[i].platform_of_node = msp_np[i];
-+		mop500_dai_links[i].platform_name = NULL;
- 		mop500_dai_links[i].codec_of_node = codec_np;
- 		mop500_dai_links[i].codec_name = NULL;
- 	}
+diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+index ce554de..32d4572 100644
+--- a/sound/soc/ux500/ux500_pcm.c
++++ b/sound/soc/ux500/ux500_pcm.c
+@@ -109,20 +109,19 @@ static int ux500_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct ux500_msp_dma_params *dma_params;
+-	struct stedma40_chan_cfg *dma_cfg;
+ 	int ret;
+ 
+ 	dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+-	dma_cfg = dma_params->dma_cfg;
+ 
+ 	ret = snd_hwparams_to_dma_slave_config(substream, params, slave_config);
+ 	if (ret)
+ 		return ret;
+ 
+ 	slave_config->dst_maxburst = 4;
+-	slave_config->dst_addr_width = dma_cfg->dst_info.data_width;
+ 	slave_config->src_maxburst = 4;
+-	slave_config->src_addr_width = dma_cfg->src_info.data_width;
++
++	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+ 
+ 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+ 		slave_config->dst_addr = dma_params->tx_rx_addr;
 -- 
 1.8.3.2
