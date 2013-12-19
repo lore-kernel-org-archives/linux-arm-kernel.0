@@ -1,48 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Dec 2013 16:54:17 +0100
-Subject: [PATCH] iio: at91: document ADC clock properties
-In-Reply-To: <1387296973-7779-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387296973-7779-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52B316A9.1060407@atmel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 19 Dec 2013 17:54:28 +0200
+Subject: [PATCH 0/6] efuse driver for Tegra
+Message-ID: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/2013 17:16, Boris BREZILLON :
-> Document the clock properties required by the at91 ADC driver.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+This driver allows userspace to read the raw efuse data. Its userspace
+interface is modelled after the sunxi_sid driver which provides similar
+functionality for some Allwinner SoCs. It has been tested on
+Tegra20 (ventana), Tegra30 (beaverboard) and Tegra114 (dalmore).
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+TODO:
+* test on Tegra124 (venice2)
 
-> ---
->  .../devicetree/bindings/arm/atmel-adc.txt          |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> index d106146..9a1175b 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> @@ -5,6 +5,9 @@ Required properties:
->      <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
->    - reg: Should contain ADC registers location and length
->    - interrupts: Should contain the IRQ line for the ADC
-> +  - clock-names: tuple listing input clock names.
-> +	Required elements: "adc_clk", "adc_op_clk".
-> +  - clocks: phandles to input clocks.
->    - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
->      device
->    - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
-> @@ -44,6 +47,8 @@ adc0: adc at fffb0000 {
->  	compatible = "atmel,at91sam9260-adc";
->  	reg = <0xfffb0000 0x100>;
->  	interrupts = <20 4>;
-> +	clocks = <&adc_clk>, <&adc_op_clk>;
-> +	clock-names = "adc_clk", "adc_op_clk";
->  	atmel,adc-channel-base = <0x30>;
->  	atmel,adc-channels-used = <0xff>;
->  	atmel,adc-drdy-mask = <0x10000>;
-> 
+Peter De Schrijver (6):
+  ARM: tegra: export apb dma readl/writel
+  misc: fuse: Add efuse driver for Tegra
+  ARM: tegra: Add efuse bindings
+  ARM: tegra: rework fuse.c
+  ARM: Tegra: remove speedo files
+  misc: enable fuse drivers
 
+ arch/arm/boot/dts/tegra114.dtsi           |    6 +
+ arch/arm/boot/dts/tegra124.dtsi           |    6 +
+ arch/arm/boot/dts/tegra20.dtsi            |    7 +
+ arch/arm/boot/dts/tegra30.dtsi            |    6 +
+ arch/arm/mach-tegra/Makefile              |    3 -
+ arch/arm/mach-tegra/apbio.c               |   51 +++--
+ arch/arm/mach-tegra/fuse.c                |  121 ++-----------
+ arch/arm/mach-tegra/tegra114_speedo.c     |  104 ----------
+ arch/arm/mach-tegra/tegra20_speedo.c      |  109 -----------
+ arch/arm/mach-tegra/tegra30_speedo.c      |  292 ----------------------------
+ drivers/misc/Kconfig                      |    1 +
+ drivers/misc/Makefile                     |    1 +
+ drivers/misc/fuse/Kconfig                 |   12 ++
+ drivers/misc/fuse/Makefile                |    1 +
+ drivers/misc/fuse/tegra/Makefile          |    7 +
+ drivers/misc/fuse/tegra/fuse-tegra.c      |   96 ++++++++++
+ drivers/misc/fuse/tegra/fuse-tegra20.c    |  152 +++++++++++++++
+ drivers/misc/fuse/tegra/fuse-tegra30.c    |  192 +++++++++++++++++++
+ drivers/misc/fuse/tegra/fuse.h            |   79 ++++++++
+ drivers/misc/fuse/tegra/tegra114_speedo.c |  108 +++++++++++
+ drivers/misc/fuse/tegra/tegra124_speedo.c |  163 ++++++++++++++++
+ drivers/misc/fuse/tegra/tegra20_speedo.c  |  110 +++++++++++
+ drivers/misc/fuse/tegra/tegra30_speedo.c  |  293 +++++++++++++++++++++++++++++
+ include/linux/tegra-soc.h                 |   17 ++
+ 24 files changed, 1301 insertions(+), 636 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/tegra114_speedo.c
+ delete mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
+ delete mode 100644 arch/arm/mach-tegra/tegra30_speedo.c
+ create mode 100644 drivers/misc/fuse/Kconfig
+ create mode 100644 drivers/misc/fuse/Makefile
+ create mode 100644 drivers/misc/fuse/tegra/Makefile
+ create mode 100644 drivers/misc/fuse/tegra/fuse-tegra.c
+ create mode 100644 drivers/misc/fuse/tegra/fuse-tegra20.c
+ create mode 100644 drivers/misc/fuse/tegra/fuse-tegra30.c
+ create mode 100644 drivers/misc/fuse/tegra/fuse.h
+ create mode 100644 drivers/misc/fuse/tegra/tegra114_speedo.c
+ create mode 100644 drivers/misc/fuse/tegra/tegra124_speedo.c
+ create mode 100644 drivers/misc/fuse/tegra/tegra20_speedo.c
+ create mode 100644 drivers/misc/fuse/tegra/tegra30_speedo.c
 
 -- 
-Nicolas Ferre
+1.7.7.rc0.72.g4b5ea.dirty
