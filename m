@@ -1,156 +1,30 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:24:15 +0200
-Subject: [PATCHv11 44/49] ARM: OMAP2+: io: use new clock init API
+Date: Thu, 19 Dec 2013 13:24:17 +0200
+Subject: [PATCHv11 46/49] ARM: OMAP: DRA7: Enable clock init
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-45-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-47-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_init is now separated to a common function which gets called for all
-SoC:s, which initializes the DT clocks and calls the SoC specific clock init.
+Initializes clock data from device tree.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/common.h |    2 +-
- arch/arm/mach-omap2/io.c     |   32 +++++++++++++++++++++++---------
- arch/arm/mach-omap2/timer.c  |    6 ++----
- 3 files changed, 26 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap2/io.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index e30ef67..5ccf36d 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -305,7 +305,7 @@ struct omap_hwmod;
- extern int omap_dss_reset(struct omap_hwmod *);
- 
- /* SoC specific clock initializer */
--extern int (*omap_clk_init)(void);
-+int omap_clk_init(void);
- 
- #endif /* __ASSEMBLER__ */
- #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
 diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 3d9b3fc..7a394d7 100644
+index 5854677..628a7f5 100644
 --- a/arch/arm/mach-omap2/io.c
 +++ b/arch/arm/mach-omap2/io.c
-@@ -55,10 +55,10 @@
- #include "prm44xx.h"
- 
- /*
-- * omap_clk_init: points to a function that does the SoC-specific
-+ * omap_clk_soc_init: points to a function that does the SoC-specific
-  * clock initializations
-  */
--int (*omap_clk_init)(void);
-+int (*omap_clk_soc_init)(void);
- 
- /*
-  * The machine specific code may provide the extra mapping besides the
-@@ -419,7 +419,7 @@ void __init omap2420_init_early(void)
- 	omap242x_clockdomains_init();
- 	omap2420_hwmod_init();
+@@ -692,6 +692,7 @@ void __init dra7xx_init_early(void)
+ 	dra7xx_clockdomains_init();
+ 	dra7xx_hwmod_init();
  	omap_hwmod_init_postsetup();
--	omap_clk_init = omap2420_clk_init;
-+	omap_clk_soc_init = omap2420_clk_init;
++	omap_clk_soc_init = dra7xx_dt_clk_init;
  }
  
- void __init omap2420_init_late(void)
-@@ -448,7 +448,7 @@ void __init omap2430_init_early(void)
- 	omap243x_clockdomains_init();
- 	omap2430_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = omap2430_clk_init;
-+	omap_clk_soc_init = omap2430_clk_init;
- }
- 
- void __init omap2430_init_late(void)
-@@ -482,7 +482,7 @@ void __init omap3_init_early(void)
- 	omap3xxx_clockdomains_init();
- 	omap3xxx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = omap3xxx_clk_init;
-+	omap_clk_soc_init = omap3xxx_clk_init;
- }
- 
- void __init omap3430_init_early(void)
-@@ -520,7 +520,7 @@ void __init ti81xx_init_early(void)
- 	omap3xxx_clockdomains_init();
- 	omap3xxx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = omap3xxx_clk_init;
-+	omap_clk_soc_init = omap3xxx_clk_init;
- }
- 
- void __init omap3_init_late(void)
-@@ -581,7 +581,7 @@ void __init am33xx_init_early(void)
- 	am33xx_clockdomains_init();
- 	am33xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = am33xx_clk_init;
-+	omap_clk_soc_init = am33xx_clk_init;
- }
- 
- void __init am33xx_init_late(void)
-@@ -635,7 +635,7 @@ void __init omap4430_init_early(void)
- 	omap44xx_clockdomains_init();
- 	omap44xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = omap4xxx_clk_init;
-+	omap_clk_soc_init = omap4xxx_clk_init;
- }
- 
- void __init omap4430_init_late(void)
-@@ -666,7 +666,7 @@ void __init omap5_init_early(void)
- 	omap54xx_clockdomains_init();
- 	omap54xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = omap5xxx_dt_clk_init;
-+	omap_clk_soc_init = omap5xxx_dt_clk_init;
- }
- 
- void __init omap5_init_late(void)
-@@ -711,3 +711,17 @@ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
- 		_omap2_init_reprogram_sdrc();
- 	}
- }
-+
-+int __init omap_clk_init(void)
-+{
-+	int ret = 0;
-+
-+	if (!omap_clk_soc_init)
-+		return 0;
-+
-+	ret = of_prcm_init();
-+	if (!ret)
-+		ret = omap_clk_soc_init();
-+
-+	return ret;
-+}
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 3ca81e0..60e5fc9 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -570,8 +570,7 @@ static inline void __init realtime_counter_init(void)
- 			       clksrc_nr, clksrc_src, clksrc_prop)	\
- void __init omap##name##_gptimer_timer_init(void)			\
- {									\
--	if (omap_clk_init)						\
--		omap_clk_init();					\
-+	omap_clk_init();					\
- 	omap_dmtimer_init();						\
- 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
- 	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,		\
-@@ -582,8 +581,7 @@ void __init omap##name##_gptimer_timer_init(void)			\
- 				clksrc_nr, clksrc_src, clksrc_prop)	\
- void __init omap##name##_sync32k_timer_init(void)		\
- {									\
--	if (omap_clk_init)						\
--		omap_clk_init();					\
-+	omap_clk_init();					\
- 	omap_dmtimer_init();						\
- 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
- 	/* Enable the use of clocksource="gp_timer" kernel parameter */	\
+ void __init dra7xx_init_late(void)
 -- 
 1.7.9.5
