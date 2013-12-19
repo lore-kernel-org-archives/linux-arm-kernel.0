@@ -1,37 +1,38 @@
 From: levex@linux.com (Levente Kurusa)
-Date: Thu, 19 Dec 2013 16:03:21 +0100
-Subject: [PATCH 10/38] arm: exynos: add missing put_device call
+Date: Thu, 19 Dec 2013 16:03:23 +0100
+Subject: [PATCH 12/38] arm: s5pv210: add missing put_device call
 In-Reply-To: <1387465429-3568-2-git-send-email-levex@linux.com>
 References: <1387465429-3568-2-git-send-email-levex@linux.com>
-Message-ID: <1387465429-3568-11-git-send-email-levex@linux.com>
+Message-ID: <1387465429-3568-13-git-send-email-levex@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required so that we give up the last reference to the device.
+This is required so that give up the last reference to the device.
 
 Signed-off-by: Levente Kurusa <levex@linux.com>
 ---
- arch/arm/mach-exynos/common.c | 8 +++++++-
+ arch/arm/mach-s5pv210/common.c | 8 +++++++-
  1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 61d2906..8b58829 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -407,7 +407,13 @@ early_initcall(exynos4_l2x0_cache_init);
+diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
+index 26027a2..81f43ae 100644
+--- a/arch/arm/mach-s5pv210/common.c
++++ b/arch/arm/mach-s5pv210/common.c
+@@ -267,8 +267,14 @@ core_initcall(s5pv210_core_init);
  
- static int __init exynos_init(void)
+ int __init s5pv210_init(void)
  {
 +	int rc = 0;
 +
- 	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
- 
--	return device_register(&exynos4_dev);
-+	rc = device_register(&exynos4_dev);
+ 	printk(KERN_INFO "S5PV210: Initializing architecture\n");
+-	return device_register(&s5pv210_dev);
++	rc = device_register(&s5pv210_dev);
 +	if (rc)
-+		put_device(&exynos4_dev);
-+	
++		put_device(&s5pv210_dev);
++
 +	return rc;
  }
+ 
+ /* uart registration process */
 -- 
 1.8.3.1
