@@ -1,35 +1,22 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Thu, 19 Dec 2013 12:43:28 +0100
-Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
-In-Reply-To: <20131219100557.GE17188@tbergstrom-lnx.Nvidia.com>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-3-git-send-email-josephl@nvidia.com>
- <52B0D6FA.2060101@wwwdotorg.org>
- <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
- <52B1E950.1040001@wwwdotorg.org>
- <20131219100557.GE17188@tbergstrom-lnx.Nvidia.com>
-Message-ID: <1387453408.1712.3.camel@tellur>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 19 Dec 2013 12:45:07 +0100
+Subject: [PATCH 6/7] clk/samsung: add support for pll2650xx
+In-Reply-To: <1386345391-23482-7-git-send-email-rahul.sharma@samsung.com>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1386345391-23482-7-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1419145.DZQg0ZkHVU@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 19.12.2013, 12:05 +0200 schrieb Peter De Schrijver:
-[...]
-> 
-> > funny tricks like running from IRAM since we can't access SDRAM during
-> > the clock change? If so, I'm not sure how having the EMC clock changing
-> > code is going to help your case (2) anyway, since we'll presumably have
-> > to code up a custom stub in assembly for the part of the code that runs
-> > from IRAM...
-> > 
-> 
-> There is no need for assembler or running from IRAM (at least from Tegra30
-> onwards, I don't know about Tegra20).
-> 
-Tegra20 doesn't need any IRAM trickery, the sequence is just:
-1. set up EMC shadow registers for new clock frequency
-2. change EMC divider in CAR module
+Hi Rahul,
 
-This was known working on Colibri T20 before the CCF change.
+On Friday 06 of December 2013 21:26:30 Rahul Sharma wrote:
+> Add support for pll2650xx in samsung pll file. This pll variant
+> is close to pll36xx but uses CON2 registers instead of CON1.
 
-Regards,
-Lucas
+If the ops are otherwise idential, why not reuse the ops for pll36xx
+and use CON1 or CON2 register conditionally based on pll->type field?
+(Just as it is already done for pll4600, 4650 and 4650c.)
+
+Best regards,
+Tomasz
