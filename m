@@ -1,36 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 Dec 2013 18:33:08 +0000
-Subject: [GIT PULL] arm64 ptrace fix for 3.13
-Message-ID: <20131219183303.GA12876@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Dec 2013 10:35:02 -0800
+Subject: [PATCH] ARM: dts: Add support for sbc-3xxx with cm-t3730
+In-Reply-To: <52B2A3E0.8040405@compulab.co.il>
+References: <1386962541-18498-1-git-send-email-tony@atomide.com>
+ <52AF065A.4010205@compulab.co.il>
+ <20131216191754.GD26293@atomide.com>
+ <52AFF9D0.5080400@compulab.co.il>
+ <20131217193134.GB27438@atomide.com>
+ <52B1608C.3010709@compulab.co.il>
+ <20131218211641.GI27438@atomide.com>
+ <52B2A3E0.8040405@compulab.co.il>
+Message-ID: <20131219183502.GT27438@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+* Igor Grinberg <grinberg@compulab.co.il> [131218 23:46]:
+> On 12/18/13 23:16, Tony Lindgren wrote:
+> 
+> [...]
+> 
+> > 
+> > I've kept your Ack as the changes were minor. If no other
+> > comments, I will apply this into omap-for-v3.14/dt probably
+> > on Thursday.
+> 
+> Looks great! Thanks!
 
-Please pull the arm64 patch below. Thanks.
+Thanks for your comments, I've pushed it out to omap-for-v3.14/dt now.
 
+Regards,
 
-The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
-
-  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to cdc27c27843248ae7eb0df5fc261dd004eaa5670:
-
-  arm64: ptrace: avoid using HW_BREAKPOINT_EMPTY for disabled events (2013-12-19 17:41:25 +0000)
-
-----------------------------------------------------------------
-- arm64 ptrace fix.
-
-----------------------------------------------------------------
-Will Deacon (1):
-      arm64: ptrace: avoid using HW_BREAKPOINT_EMPTY for disabled events
-
- arch/arm64/kernel/ptrace.c | 38 ++++++++++++++++++--------------------
- 1 file changed, 18 insertions(+), 20 deletions(-)
-
--- 
-Catalin
+Tony
