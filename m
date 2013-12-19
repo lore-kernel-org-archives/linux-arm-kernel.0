@@ -1,43 +1,46 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Dec 2013 16:50:12 +0100
-Subject: [PATCH] i2c: at91: document clock properties
-In-Reply-To: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52B315B4.6000906@atmel.com>
+Date: Thu, 19 Dec 2013 16:53:03 +0100
+Subject: [PATCH] spi/atmel: document clock properties
+In-Reply-To: <1387278095-5118-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387278095-5118-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52B3165F.8090206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/2013 16:54, Boris BREZILLON :
-> Document the clock properties required by the at91 i2c bus driver.
+On 17/12/2013 12:01, Boris BREZILLON :
+> Document the clock properties required by the spi-atmel driver.
 > 
 > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
->  1 file changed, 2 insertions(+)
+>  .../devicetree/bindings/spi/spi_atmel.txt          |    5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> index b689a0d..4fade84 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> @@ -9,6 +9,7 @@ Required properties :
->  - interrupts: interrupt number to the cpu.
->  - #address-cells = <1>;
->  - #size-cells = <0>;
+> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> index 07e04cd..4f8184d 100644
+> --- a/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> @@ -5,6 +5,9 @@ Required properties:
+>  - reg: Address and length of the register set for the device
+>  - interrupts: Should contain spi interrupt
+>  - cs-gpios: chipselects
+> +- clock-names: tuple listing input clock names.
+> +	Required elements: "spi_clk"
 > +- clocks: phandles to input clocks.
 >  
->  Optional properties:
->  - Child nodes conforming to i2c bus binding
-> @@ -21,6 +22,7 @@ i2c0: i2c at fff84000 {
->  	interrupts = <12 4 6>;
+>  Example:
+>  
+> @@ -14,6 +17,8 @@ spi1: spi at fffcc000 {
+>  	interrupts = <13 4 5>;
 >  	#address-cells = <1>;
 >  	#size-cells = <0>;
-> +	clocks = <&twi0_clk>;
+> +	clocks = <&spi1_clk>;
+> +	clock-names = "spi_clk";
+>  	cs-gpios = <&pioB 3 0>;
+>  	status = "okay";
 >  
->  	24c512 at 50 {
->  		compatible = "24c512";
 > 
 
 
