@@ -1,106 +1,102 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:23:39 +0200
-Subject: [PATCHv11 08/49] clk: gate: add support for low level ops
+Date: Thu, 19 Dec 2013 13:23:40 +0200
+Subject: [PATCHv11 09/49] clk: mux: add support for low level ops
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gate clock can now be registered to use low level register access ops.
+Multiplexer clock can now be registered to use low level register access ops.
 Preferred initialization method is via clock description.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk-gate.c       |   11 ++++++++---
+ drivers/clk/clk-mux.c        |   11 ++++++++---
  include/linux/clk-provider.h |    4 ++++
  2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 3ec61d2..18731b4 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -62,7 +62,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
- 		if (set)
- 			reg |= BIT(gate->bit_idx);
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 2cbed08..1a603f3 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -46,7 +46,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+ 	 * val = 0x4 really means "bit 2, index starts at bit 0"
+ 	 */
+-	val = clk_readl(mux->reg) >> mux->shift;
++	val = mux->ll_ops->clk_readl(mux->reg) >> mux->shift;
+ 	val &= mux->mask;
+ 
+ 	if (mux->table) {
+@@ -93,11 +93,11 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
+ 		val = mux->mask << (mux->shift + 16);
  	} else {
--		reg = clk_readl(gate->reg);
-+		reg = gate->ll_ops->clk_readl(gate->reg);
- 
- 		if (set)
- 			reg |= BIT(gate->bit_idx);
-@@ -70,7 +70,7 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
- 			reg &= ~BIT(gate->bit_idx);
+-		val = clk_readl(mux->reg);
++		val = mux->ll_ops->clk_readl(mux->reg);
+ 		val &= ~(mux->mask << mux->shift);
  	}
+ 	val |= index << mux->shift;
+-	clk_writel(val, mux->reg);
++	mux->ll_ops->clk_writel(val, mux->reg);
  
--	clk_writel(reg, gate->reg);
-+	gate->ll_ops->clk_writel(reg, gate->reg);
+ 	if (mux->lock)
+ 		spin_unlock_irqrestore(mux->lock, flags);
+@@ -159,6 +159,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 	mux->lock = lock;
+ 	mux->table = table;
+ 	mux->hw.init = &init;
++	mux->ll_ops = &clk_ll_ops_default;
  
- 	if (gate->lock)
- 		spin_unlock_irqrestore(gate->lock, flags);
-@@ -93,7 +93,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
- 	u32 reg;
- 	struct clk_gate *gate = to_clk_gate(hw);
+ 	clk = clk_register(dev, &mux->hw);
  
--	reg = clk_readl(gate->reg);
-+	reg = gate->ll_ops->clk_readl(gate->reg);
- 
- 	/* if a set bit disables this clk, flip it before masking */
- 	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
-@@ -157,6 +157,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 	gate->flags = clk_gate_flags;
- 	gate->lock = lock;
- 	gate->hw.init = &init;
-+	gate->ll_ops = &clk_ll_ops_default;
- 
- 	clk = clk_register(dev, &gate->hw);
- 
-@@ -184,6 +185,10 @@ struct clk_hw *clk_register_gate_desc(struct device *dev, struct clk_desc *desc)
- 	gate->bit_idx = hw_desc->bit_idx;
- 	gate->flags = hw_desc->flags;
- 	gate->lock = hw_desc->lock;
-+	gate->ll_ops = hw_desc->ll_ops;
+@@ -201,6 +202,10 @@ struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc)
+ 	mux->shift = hw_desc->shift;
+ 	mux->flags = hw_desc->flags;
+ 	mux->lock = hw_desc->lock;
++	mux->ll_ops = hw_desc->ll_ops;
 +
-+	if (!gate->ll_ops)
-+		gate->ll_ops = &clk_ll_ops_default;
++	if (!mux->ll_ops)
++		mux->ll_ops = &clk_ll_ops_default;
  
- 	if (!desc->ops)
- 		desc->ops = &clk_gate_ops;
+ 	if (!desc->ops) {
+ 		if (mux->flags & CLK_MUX_READ_ONLY)
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 3a88346..0bbf231 100644
+index 0bbf231..8b46a7b 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -259,6 +259,7 @@ void of_fixed_clk_setup(struct device_node *np);
+@@ -407,6 +407,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
   *
   * @hw:		handle between common and hardware-specific interfaces
-  * @reg:	register controlling gate
+  * @reg:	register controlling multiplexer
 + * @ll_ops:	low-level ops for accessing the register
-  * @bit_idx:	single bit controlling gate
+  * @shift:	shift to multiplexer bit field
+  * @width:	width of mutliplexer bit field
   * @flags:	hardware-specific flags
-  * @lock:	register lock
-@@ -277,6 +278,7 @@ void of_fixed_clk_setup(struct device_node *np);
- struct clk_gate {
- 	struct clk_hw hw;
+@@ -426,6 +427,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
+ struct clk_mux {
+ 	struct clk_hw	hw;
  	void __iomem	*reg;
 +	struct clk_ll_ops	*ll_ops;
- 	u8		bit_idx;
- 	u8		flags;
- 	spinlock_t	*lock;
-@@ -287,6 +289,7 @@ struct clk_gate {
+ 	u32		*table;
+ 	u32		mask;
+ 	u8		shift;
+@@ -438,6 +440,7 @@ struct clk_mux {
   *
   * @desc:	handle between common and hardware-specific interfaces
-  * @reg:	register controlling gate
-+ * @ll_ops:	low-level ops for accessing the register
-  * @bit_idx:	single bit controlling gate
+  * @reg:	register controlling multiplexer
++ * @ll_ops:	low-level ops for accesing the register
+  * @shift:	shift to multiplexer bit field
+  * @width:	width of multiplexer bit field
   * @flags:	hardware-specific flags
-  * @lock:	register lock
-@@ -294,6 +297,7 @@ struct clk_gate {
- struct clk_gate_desc {
+@@ -446,6 +449,7 @@ struct clk_mux {
+ struct clk_mux_desc {
  	struct clk_desc	desc;
  	void __iomem	*reg;
 +	struct clk_ll_ops	*ll_ops;
- 	u8		bit_idx;
- 	u8		flags;
- 	spinlock_t	*lock;
+ 	u32		*table;
+ 	u32		mask;
+ 	u8		shift;
 -- 
 1.7.9.5
