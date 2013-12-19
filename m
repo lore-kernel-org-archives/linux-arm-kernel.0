@@ -1,132 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 19 Dec 2013 16:10:26 +0900
-Subject: [PATCH v4 0/5] Renesas R-Car Gen2 Common Clock Framework arch/
- support
-In-Reply-To: <20131214035054.GA24421@verge.net.au>
-References: <1386770716-21610-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131214021113.GA22927@verge.net.au>
- <20131214021900.GB22927@verge.net.au> <1565505.MyhvH9DDk2@avalon>
- <20131214035054.GA24421@verge.net.au>
-Message-ID: <20131219071025.GF10230@verge.net.au>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 19 Dec 2013 12:44:24 +0530
+Subject: [PATCH 1/2] ARM: tegra: fix missing pincontrol configuration
+ for Venice2
+In-Reply-To: <52B20C0D.9030200@wwwdotorg.org>
+References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
+ <52B20C0D.9030200@wwwdotorg.org>
+Message-ID: <52B29CD0.1000801@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 12:50:58PM +0900, Simon Horman wrote:
-> On Sat, Dec 14, 2013 at 03:27:23AM +0100, Laurent Pinchart wrote:
-> > Hi Simon,
-> > 
-> > On Saturday 14 December 2013 11:19:01 Simon Horman wrote:
-> > > On Sat, Dec 14, 2013 at 11:11:14AM +0900, Simon Horman wrote:
-> > > > On Sat, Dec 14, 2013 at 02:41:44AM +0100, Laurent Pinchart wrote:
-> > > > > On Saturday 14 December 2013 10:26:24 Simon Horman wrote:
-> > > > > > [ CC Magnus ]
-> > > > > > 
-> > > > > > On Wed, Dec 11, 2013 at 03:05:11PM +0100, Laurent Pinchart wrote:
-> > > > > > > Hello,
-> > > > > > > 
-> > > > > > > This is a repost of the arch patches from the "[PATCH v3 0/8]
-> > > > > > > Renesas R-Car Gen2 Common Clock Framework support" patch series. The
-> > > > > > > first three patches in that series have been reposted separately in
-> > > > > > > the "[PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework
-> > > > > > > drivers" series to get merged through Mike Turquette's tree, while
-> > > > > > > this series will go through the ARM SoC tree.
-> > > > > > > 
-> > > > > > > I've asked Mike to provide a stable branch when merging the CCF
-> > > > > > > driver patches.
-> > > > > > > 
-> > > > > > > Laurent Pinchart (5):
-> > > > > > >   ARM: shmobile: r8a7790: Add clock index macros for DT sources
-> > > > > > >   ARM: shmobile: r8a7791: Add clock index macros for DT sources
-> > > > > > >   ARM: shmobile: r8a7790: Add clocks
-> > > > > > >   ARM: shmobile: r8a7790: Reference clocks
-> > > > > > >   ARM: shmobile: r8a7791: Add clocks
-> > > > > > >  
-> > > > > > >  arch/arm/boot/dts/r8a7790.dtsi            | 328 +++++++++++++++++++
-> > > > > > >  arch/arm/boot/dts/r8a7791.dtsi            | 313 +++++++++++++++++++
-> > > > > > >  include/dt-bindings/clock/r8a7790-clock.h | 100 +++++++++
-> > > > > > >  include/dt-bindings/clock/r8a7791-clock.h | 105 ++++++++++
-> > > > > > >  4 files changed, 846 insertions(+)
-> > > > > > >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-> > > > > > >  create mode 100644 include/dt-bindings/clock/r8a7791-clock.h
-> > > > > > 
-> > > > > > Hi Laurent,
-> > > > > > 
-> > > > > > I would like to confirm the dependencies of this series with you.
-> > > > > > As I understand things the dependencies that were not present
-> > > > > > in renesas-devel-v3.13-rc2-20131211 are as follows.
-> > > > > > 
-> > > > > > If any of the patches below can be skipped without breaking this
-> > > > > > series or the followup series "[PATCH v4 00/16] Lager and Koelsch
-> > > > > > multiplatform support" then I am all for not treating them as
-> > > > > > dependencies at all.
-> > > > > > 
-> > > > > > 
-> > > > > > * [PATCH v4 0/3] Renesas R-Car Gen2 Common Clock Framework drivers
-> > > > > >   Status: Waiting for response from Mike Turquette
-> > > > > 
-> > > > > The dependency is correct, but the status has changed. Mike has merged
-> > > > > the patches in his tree in the clk-next-shmobile branch
-> > > > > (https://git.linaro.org/people/mike.turquette/linux.git/shortlog/refs/he
-> > > > > ads/clk-next-shmobile).
-> > > >
-> > > > Great!
-> > > > 
-> > > > > > * mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
-> > > > > >   Status: Merged by Chris Ball. I believe we need a stable branch from
-> > > > > >   him.
-> > > > > 
-> > > > > You can drop this dependency as the koelsch reference boards lack SDHI
-> > > > > support and the lager reference board has the SDHI devices disabled.
-> > > > 
-> > > > Thanks, got it.
-> > > > 
-> > > > > > * spi: sh-msiof: Convert to clk_prepare/unprepare
-> > > > > >   spi: sh-msiof: Use devm_* managed allocators
-> > > > > >   Status: Merged by Mark Brown. I believe we need a stable branch from
-> > > > > >   him.
-> > > > > 
-> > > > > You can drop this dependency as the lager and koelsch reference boards
-> > > > > lack SPI support.
-> > > > > 
-> > > > > > * usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
-> > > > > >   Status: In Felipe Balbi's next branch. It is stable, right?
-> > > > > 
-> > > > > Correct, but you can drop this dependency as the lager and koelsch
-> > > > > reference boards lack USB support.
-> > > > 
-> > > > Understood.
-> > > > 
-> > > > > > * clocksource: sh_tmu: Add clk_prepare/unprepare support
-> > > > > >   clocksource: sh_tmu: Release clock when sh_tmu_register() fails
-> > > > > >   clocksource: sh_mtu2: Add clk_prepare/unprepare support
-> > > > > >   clocksource: sh_mtu2: Release clock when sh_mtu2_register() fails
-> > > > > >   Status: Present in v3.13-rc3. No problem!
-> > > > > > 
-> > > > > > * clocksource: sh_cmt: Add clk_prepare/unprepare support
-> > > > > >   Status: I think I have dropped the ball here.
-> > > > > >           Regardless, I think it it needs to be accepted by Daniel
-> > > > > >           Lezcano
-> > > > > 
-> > > > > That's the only missing one. Do you plan to handle this with Daniel ?
-> > > > 
-> > > > Yes, I will ask him to pick it up ASAP. Sorry for the mess there.
-> > > 
-> > > Hi,
-> > > 
-> > > I think I may have found the reason that I dropped the ball,
-> > > which is that I was waiting for v2 of the patch but never saw it.
-> > > 
-> > > In order to stop me making a further mess of this would
-> > > you be able to re-post it to Daniel directly?
-> > 
-> > When I mentioned v2 for the clocksource patches ("Re: [PATCH 01/12] 
-> > clocksource: sh_cmt: Add clk_prepare/unprepare support", Date: 30/10/2013 
-> > 01:13) I meant v2 of the whole series. The sh_tmu and sh_mtu2 patches required 
-> > a v2, but the sh_tmu patch didn't. v1 is thus the correct one. Do I need to 
-> > resend it, or can you take it from the list ?
-> 
-> I can take it.
+On Thursday 19 December 2013 02:26 AM, Stephen Warren wrote:
+> On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
+>> Compare the initial population of default pinmux configuration of Venice2
+>> with the chrome branch and add/fix the missing configurations.
+> Wow, that's a big chunk of changes. Are you sure this is correct? Why
+> was the original patch (which added the pinctrl nodes) so incorrect?
 
-Daniel has taken the patch and provided a branch.
+The pinmux which got added is based on the venice2 pinmux spreadsheet 
+where I covered only the SFIO pin groups.
 
-I will queue up this series accordingly.
+https://wiki.nvidia.com/engwiki/index.php/Platform_Design_Center/Projects_Archive/PM371#pinmux
+
+
+After comparing with the chrome, I also added the pinmux for all pins 
+which are used as GPIO and hence the change is big.
+This is complete pinmux based on chrome kernel-next.
+I booted chrome with this pinmux and not observe any behavioral change.
+
+> Thierry, I thought you had mentioned comparing the pinctrl setup in
+> linux-next with the downstream kernel for Venice2 and only found a
+> difference in the PWM settings, which you sent a patch for. However,
+> this patch is much larger than that. Where's the disconnect?
