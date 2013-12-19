@@ -1,38 +1,76 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 19 Dec 2013 09:16:48 -0500
-Subject: [PATCH V4 2/3] ARM: imx: add vddsoc/pu setpoint info into dts
-In-Reply-To: <1387462609-13013-1-git-send-email-b20788@freescale.com>
-References: <1387462609-13013-1-git-send-email-b20788@freescale.com>
-Message-ID: <1387462609-13013-2-git-send-email-b20788@freescale.com>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Thu, 19 Dec 2013 02:28:08 +0000
+Subject: imx6 power consumption
+In-Reply-To: <20131218113240.GK6691@S2101-09.ap.freescale.net>
+References: <E1VszO5-00060R-Gp@merlin.infradead.org>
+ <20131218024546.GA6691@S2101-09.ap.freescale.net>
+ <E1VtF3I-0002MQ-Ra@merlin.infradead.org>
+ <20131218113240.GK6691@S2101-09.ap.freescale.net>
+Message-ID: <b43eb01926cf4b1f9413a66cc5791d9b@DM2PR03MB317.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q needs to update vddarm, vddsoc/pu regulators when cpu freq
-is changed, each setpoint has different voltage, so we need to
-pass vddarm, vddsoc/pu's freq-voltage info from dts together.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/boot/dts/imx6q.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index e7e8332..021e0cb 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -30,6 +30,13 @@
- 				792000  1150000
- 				396000  975000
- 			>;
-+			fsl,soc-operating-points = <
-+				/* ARM kHz  SOC-PU uV */
-+				1200000 1275000
-+				996000	1250000
-+				792000	1175000
-+				396000	1175000
-+			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
- 			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
- 				 <&clks 17>, <&clks 170>;
--- 
-1.7.9.5
+Best Regards.
+Anson huang ???
+?
+Freescale Semiconductor Shanghai
+?????????192?A?2?
+201203
+Tel:021-28937058
+
+
+>-----Original Message-----
+>From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+>On Behalf Of Shawn Guo
+>Sent: Wednesday, December 18, 2013 7:33 PM
+>To: Bj?rn Erik Nilsen
+>Cc: linux-arm-kernel at lists.infradead.org
+>Subject: Re: imx6 power consumption
+>
+>On Wed, Dec 18, 2013 at 12:12:05PM +0100, Bj?rn Erik Nilsen wrote:
+>> As far as I can tell, commit e95dddb34c8 "ARM: imx: enable anatop
+>> suspend/resume" is the common ancestor for mainline and freescale, and
+>> from there pm-imx6q.c starts to diverge.
+>>
+>> I haven not looked at it in great detail yet, but it seems there are
+>> not too many patches missing in mainline. Any idea why remaining
+>> patches haven't been upstreamed?
+>
+>Probably because no one cares and would spend time to upstream these patches.
+
+This root cause is we did NOT put the DSM code in IRAM and free DDR IO in DSM.
+We have done this in our internal v3.10 kernel, so I will do the upstream soon,
+Below is the DSM number of i.MX6Q SabreSD we got on v3.10 release:
+
+VDDARM_IN(R27)             0mA at 0.97V
+VDDSOC_IN(R21)             4.2 at 0.97V
+DDR(R25)                   14.8mA at 1.5V
+VDDHIGH_IN + SNVS(SH17)    0.35mA at 2.98V, 0.9mA
+
+Anson 
+
+
+>
+>Shawn
+>
+>>
+>> If it is just a matter of someone doing the work, what would be the
+>> recommended approach?
+>>
+>>
+>> Best regards,
+>> Bj?rn Erik Nilsen
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
