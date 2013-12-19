@@ -1,38 +1,35 @@
 From: levex@linux.com (Levente Kurusa)
-Date: Thu, 19 Dec 2013 16:03:20 +0100
-Subject: [PATCH 09/38] arm: mach-imx: add missing put_device calls
+Date: Thu, 19 Dec 2013 16:03:22 +0100
+Subject: [PATCH 11/38] arm: mach-integrator: add missing put_device call
 In-Reply-To: <1387465429-3568-2-git-send-email-levex@linux.com>
 References: <1387465429-3568-2-git-send-email-levex@linux.com>
-Message-ID: <1387465429-3568-10-git-send-email-levex@linux.com>
+Message-ID: <1387465429-3568-12-git-send-email-levex@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is required so that we give up the last reference to the device.
+Calling put_device on the failed device will allow lm_device_release to be
+called which will kfree() the struct lm_device.
 
 Signed-off-by: Levente Kurusa <levex@linux.com>
 ---
- arch/arm/mach-imx/devices/devices.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-integrator/lm.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
-index 1b4366a..0b17c89 100644
---- a/arch/arm/mach-imx/devices/devices.c
-+++ b/arch/arm/mach-imx/devices/devices.c
-@@ -37,11 +37,14 @@ int __init mxc_device_init(void)
- 	int ret;
- 
- 	ret = device_register(&mxc_aips_bus);
--	if (ret < 0)
-+	if (ret < 0) {
-+		put_device(&mxc_aips_bus);
- 		goto done;
-+	}
- 
- 	ret = device_register(&mxc_ahb_bus);
--
-+	if(ret < 0)
-+		put_device(&mxc_ahb_bus);
- done:
+diff --git a/arch/arm/mach-integrator/lm.c b/arch/arm/mach-integrator/lm.c
+index f52c7af..1199f38 100644
+--- a/arch/arm/mach-integrator/lm.c
++++ b/arch/arm/mach-integrator/lm.c
+@@ -89,8 +89,10 @@ int lm_device_register(struct lm_device *dev)
+ 	ret = request_resource(&iomem_resource, &dev->resource);
+ 	if (ret == 0) {
+ 		ret = device_register(&dev->dev);
+-		if (ret)
++		if (ret) {
+ 			release_resource(&dev->resource);
++			put_device(&dev->dev);
++		}
+ 	}
  	return ret;
  }
 -- 
