@@ -1,38 +1,35 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 19 Dec 2013 09:14:16 +0530
-Subject: [PATCH 3/3] clk: exynos5250: register APLL rate table
-In-Reply-To: <1713728.JoffI8rva3@flatron>
-References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
- <1383905648-23733-3-git-send-email-sachin.kamat@linaro.org>
- <1713728.JoffI8rva3@flatron>
-Message-ID: <CAK9yfHwTgKW55-ChHNToLGZZ-frd4OJF5Zi5Djt5NzxhOZvcrg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 19 Dec 2013 11:59:15 +0800
+Subject: [PATCH 0/3] ARM: at91: add PWM clock and device node
+Message-ID: <1387425558-8589-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+This patch series add PWM clock and device node
+  - The sama5d3 has transfer to CCF, so only it uses CCF, all others
+    still use old clock method.
+Switch gpio control leds to PWM control leds on at91sam9m10g45ek board.
 
-On 10 November 2013 22:44, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Sachin, Andrew,
->
-> On Friday 08 of November 2013 15:44:08 Sachin Kamat wrote:
->> From: Andrew Bresticker <abrestic@chromium.org>
->>
->> Register the APLL rate table so that we can set the APLL rate from
->> the cpufreq driver.
->>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> ---
->>  drivers/clk/samsung/clk-exynos5250.c |   25 ++++++++++++++++++++++++-
->>  1 file changed, 24 insertions(+), 1 deletion(-)
->
-> You know that you still need to fix the cpufreq driver to use these,
-> don't you? Anyway:
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+This patch series depends on Atmel PWM driver which has in PWM subsystem.
 
-This one too needs to be applied to your tree.
+
+Bo Shen (3):
+  ARM: at91: add PWM clock
+  ARM: at91: add PWM device node
+  arm: at91: at91sam9m10g45ek: switch to PWM leds
+
+ arch/arm/boot/dts/at91sam9263.dtsi     |    9 +++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi     |    9 +++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   25 +++++++++++++++++++++++--
+ arch/arm/boot/dts/at91sam9n12.dtsi     |    9 +++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi      |    9 +++++++++
+ arch/arm/boot/dts/sama5d3.dtsi         |   10 ++++++++++
+ arch/arm/mach-at91/at91sam9263.c       |    1 +
+ arch/arm/mach-at91/at91sam9g45.c       |    1 +
+ arch/arm/mach-at91/at91sam9n12.c       |    1 +
+ arch/arm/mach-at91/at91sam9rl.c        |    1 +
+ arch/arm/mach-at91/at91sam9x5.c        |    1 +
+ 11 files changed, 74 insertions(+), 2 deletions(-)
 
 -- 
-With warm regards,
-Sachin
+1.7.9.5
