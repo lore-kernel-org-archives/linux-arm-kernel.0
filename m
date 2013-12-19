@@ -1,60 +1,38 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Thu, 19 Dec 2013 16:55:57 -0500
-Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com> (Xiubo
- Li's message of "Tue, 12 Nov 2013 09:36:55 +0800")
-References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
- <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <87y53gy07m.fsf@nbsps.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 19 Dec 2013 23:02:05 +0100
+Subject: [PATCHv1 1/3] ARM: mvebu: Enable ISL12057 RTC chip in ReadyNAS 102
+ .dts file
+In-Reply-To: <cover.1387490258.git.arno@natisbad.org>
+References: <cover.1387490258.git.arno@natisbad.org>
+Message-ID: <5c21f480d74ce66956ba2cc201b2f88a3448f338.1387490258.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Nov 2013, Li.Xiubo at freescale.com wrote:
 
-> +static int fsl_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			  int duty_ns, int period_ns)
-> +{
-> +	unsigned long period_cycles, duty_cycles;
-> +	unsigned long cntin = FTM_CNTIN_VAL;
-> +	struct fsl_pwm_chip *fpc;
-> +
-> +	fpc = to_fsl_chip(chip);
-> +
-> +	period_cycles = fsl_rate_to_cycles(fpc, period_ns);
-> +	if (period_cycles > 0xFFFF) {
-> +		dev_err(chip->dev, "required PWM period cycles(%lu) overflow "
-> +				"16-bits counter!\n", period_cycles);
-> +		return -EINVAL;
-> +	}
-> +
-> +	duty_cycles = fsl_rate_to_cycles(fpc, duty_ns);
-> +	if (duty_cycles >= 0xFFFF) {
-> +		dev_err(chip->dev, "required PWM duty cycles(%lu) overflow "
-> +				"16-bits counter!\n", duty_cycles);
-> +		return -EINVAL;
-> +	}
-> +
-> +	writel(FTMCnSC_MSB | FTMCnSC_ELSB, fpc->base + FTM_CSC(pwm->hwpwm));
-> +
-> +	writel(0xF0, fpc->base + FTM_OUTMASK);
-> +	writel(0x0F, fpc->base + FTM_OUTINIT);
-> +	writel(FTM_CNTIN_VAL, fpc->base + FTM_CNTIN);
-> +
-> +	writel(period_cycles + cntin - 1, fpc->base + FTM_MOD);
-> +	writel(duty_cycles + cntin, fpc->base + FTM_CV(pwm->hwpwm));
-> +
-> +	return 0;
-> +}
+Now that support for Intersil ISL12057 RTC chip is available
+upstream, let's enable it in NETGEAR ReadyNAS 102 .dts file
+so that the device stop believing it's the 70's.
 
-Even though the module can support eight channels, the FTM_MOD is global
-and is updated in each 'config'.  So, if we have two PWMs, and both call
-'config' with different periods, the last one to call will win?  There
-doesn't seem to be any locking/inspection of 'MOD'.  I think this is
-global to the FTM, while 'FTM_CV()' is per channel.
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-So we may have 8 PWMs, all with the same period, but with different duty
-cycles.  Is this correct?  Or are we only supporting one channel per
-FTM/PWM?
-
-Thanks,
-Bill Pringlemeir.
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 6a7383f..651aeb5 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -122,6 +122,11 @@
+ 				clock-frequency = <100000>;
+ 				status = "okay";
+ 
++				isl12057: isl12057 at 68 {
++					compatible = "isl,isl12057";
++					reg = <0x68>;
++				};
++
+ 				g762: g762 at 3e {
+ 					compatible = "gmt,g762";
+ 					reg = <0x3e>;
+-- 
+1.8.4.4
