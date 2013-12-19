@@ -1,98 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Dec 2013 15:55:05 +0000
-Subject: [PATCH 08/11] ASoC: ux500: Store DMA data in the DAI differently in
- the pdata and DT case
+Date: Thu, 19 Dec 2013 15:55:06 +0000
+Subject: [PATCH 09/11] ASoC: ux500_pcm: Take out pointless dev_dbg() call
 In-Reply-To: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
 References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1387468508-12286-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1387468508-12286-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-In this patch we do two things. Firstly, instead of open coding the
-store of DMA data in to the DAI for later use, we use the API provided.
-Secondly we create and store similar DMA data for the DT case, only
-this time we use 'struct snd_dmaengine_dai_dma_data' which is provided
-by the core for this very reason.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/ux500/ux500_msp_dai.c | 42 +++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 40 insertions(+), 2 deletions(-)
+ sound/soc/ux500/ux500_pcm.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index bc042cc..f4d607a 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -17,12 +17,14 @@
- #include <linux/bitops.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
- #include <linux/regulator/consumer.h>
- #include <linux/mfd/dbx500-prcmu.h>
- #include <linux/platform_data/asoc-ux500-msp.h>
- 
- #include <sound/soc.h>
- #include <sound/soc-dai.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include "ux500_msp_i2s.h"
- #include "ux500_msp_dai.h"
-@@ -654,16 +656,52 @@ static int ux500_msp_dai_trigger(struct snd_pcm_substream *substream,
- 	return ret;
- }
- 
-+static int ux500_msp_dai_of_probe(struct snd_soc_dai *dai)
-+{
-+	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(dai->dev);
-+	struct snd_dmaengine_dai_dma_data *playback_dma_data;
-+	struct snd_dmaengine_dai_dma_data *capture_dma_data;
-+
-+	playback_dma_data = devm_kzalloc(dai->dev,
-+					 sizeof(*playback_dma_data),
-+					 GFP_KERNEL);
-+	if (!playback_dma_data)
-+		return -ENOMEM;
-+
-+	capture_dma_data = devm_kzalloc(dai->dev,
-+					sizeof(*capture_dma_data),
-+					GFP_KERNEL);
-+	if (!capture_dma_data)
-+		return -ENOMEM;
-+
-+	playback_dma_data->addr = drvdata->msp->playback_dma_data.tx_rx_addr;
-+	capture_dma_data->addr = drvdata->msp->capture_dma_data.tx_rx_addr;
-+
-+	playback_dma_data->maxburst = 4;
-+	capture_dma_data->maxburst = 4;
-+
-+	snd_soc_dai_init_dma_data(dai, playback_dma_data, capture_dma_data);
-+
-+	return 0;
-+}
-+
- static int ux500_msp_dai_probe(struct snd_soc_dai *dai)
+diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+index 8b53f22..3d1c342 100644
+--- a/sound/soc/ux500/ux500_pcm.c
++++ b/sound/soc/ux500/ux500_pcm.c
+@@ -65,14 +65,10 @@ static struct dma_chan *ux500_pcm_request_chan(struct snd_soc_pcm_runtime *rtd,
+ 	struct snd_pcm_substream *substream)
  {
- 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(dai->dev);
-+	struct msp_i2s_platform_data *pdata = dai->dev->platform_data;
-+	int ret;
+ 	struct snd_soc_dai *dai = rtd->cpu_dai;
+-	struct device *dev = dai->dev;
+ 	u16 per_data_width, mem_data_width;
+ 	struct stedma40_chan_cfg *dma_cfg;
+ 	struct ux500_msp_dma_params *dma_params;
  
--	dai->playback_dma_data = &drvdata->msp->playback_dma_data;
--	dai->capture_dma_data = &drvdata->msp->capture_dma_data;
-+	if (!pdata) {
-+		ret = ux500_msp_dai_of_probe(dai);
-+		return ret;
-+	}
- 
- 	drvdata->msp->playback_dma_data.data_size = drvdata->slot_width;
- 	drvdata->msp->capture_dma_data.data_size = drvdata->slot_width;
- 
-+	snd_soc_dai_init_dma_data(dai,
-+				  &drvdata->msp->playback_dma_data,
-+				  &drvdata->msp->capture_dma_data);
- 	return 0;
- }
+-	dev_dbg(dev, "%s: MSP %d (%s): Enter.\n", __func__, dai->id,
+-		snd_pcm_stream_str(substream));
+-
+ 	dma_params = snd_soc_dai_get_dma_data(dai, substream);
+ 	dma_cfg = dma_params->dma_cfg;
  
 -- 
 1.8.3.2
