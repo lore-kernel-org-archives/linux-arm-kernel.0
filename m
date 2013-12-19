@@ -1,50 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 19 Dec 2013 12:53:45 -0600
-Subject: [PATCH] MAINTAINERS: Update Rob Herring's email address
-Message-ID: <1387479225-927-1-git-send-email-robherring2@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 19 Dec 2013 21:02:42 +0200
+Subject: [PATCHv11 07/49] clk: divider: add support for low level ops
+In-Reply-To: <20131219182620.GQ27438@atomide.com>
+References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+ <1387452260-23276-8-git-send-email-t-kristo@ti.com>
+ <20131219182620.GQ27438@atomide.com>
+Message-ID: <52B342D2.1010301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 12/19/2013 08:26 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [131219 03:26]:
+>> Divider clock can now be registered to use low level register access ops.
+>> Preferred initialization method is via clock description.
+>
+> This seems to make omap2 not boot for me. No output whatsoever even with
+> DEBUG_LL and earlyprintk.
 
-My Calxeda email address is going away.
+Thats weird... I was kind of afraid something like this might happen 
+though as these patches touch the clock low level routines globally, but 
+I can't see what could be broken...
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- MAINTAINERS | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7243336..f6387b5 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -783,7 +783,7 @@ F:	arch/arm/boot/dts/sama*.dts
- F:	arch/arm/boot/dts/sama*.dtsi
- 
- ARM/CALXEDA HIGHBANK ARCHITECTURE
--M:	Rob Herring <rob.herring@calxeda.com>
-+M:	Rob Herring <robh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-highbank/
-@@ -6223,7 +6223,7 @@ F:	drivers/i2c/busses/i2c-ocores.c
- 
- OPEN FIRMWARE AND FLATTENED DEVICE TREE
- M:	Grant Likely <grant.likely@linaro.org>
--M:	Rob Herring <rob.herring@calxeda.com>
-+M:	Rob Herring <robh+dt@kernel.org>
- L:	devicetree at vger.kernel.org
- W:	http://fdt.secretlab.ca
- T:	git git://git.secretlab.ca/git/linux-2.6.git
-@@ -6235,7 +6235,7 @@ K:	of_get_property
- K:	of_match_table
- 
- OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
--M:	Rob Herring <rob.herring@calxeda.com>
-+M:	Rob Herring <robh+dt@kernel.org>
- M:	Pawel Moll <pawel.moll@arm.com>
- M:	Mark Rutland <mark.rutland@arm.com>
- M:	Ian Campbell <ijc+devicetree@hellion.org.uk>
--- 
-1.8.3.2
+-Tero
