@@ -1,333 +1,140 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Thu, 19 Dec 2013 11:47:44 +0100
-Subject: [PATCH v7 2/2] ARM: mach-moxart: add MOXA ART SoC device tree files
-In-Reply-To: <1387450064-6598-1-git-send-email-jonas.jensen@gmail.com>
-References: <1387450064-6598-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1387450064-6598-3-git-send-email-jonas.jensen@gmail.com>
+From: kevin.bracey@broadcom.com (kevin.bracey at broadcom.com)
+Date: Thu, 19 Dec 2013 10:49:46 +0000
+Subject: pinctrl - detailed gpio-mode pinconf design
+In-Reply-To: <CACRpkdYQyxsCWAhp9rFa3ZyfWuBqtoiMysRUEhi81XmevZjBGA@mail.gmail.com>
+References: <EB2BCA6A838C7B4FB238C534ED5D770422395F79@renexmb02.roe2.renesasmobile.com>
+ <CACRpkdbpv3Vjt-=3_1XbrGaiEYqCgtJCGppvoL48gad+7Licdg@mail.gmail.com>
+ <10664958.tMCNRkOk1E@avalon>
+ <EB2BCA6A838C7B4FB238C534ED5D77042239D2A9@renexmb02.roe2.renesasmobile.com>
+ <CACRpkdbzGokHHhR3GhLvF7KCFdAV=b0VHwUE4eHVfNFEGhx_Jg@mail.gmail.com>
+ <EB2BCA6A838C7B4FB238C534ED5D7704223A3799@renexmb02.roe2.renesasmobile.com>
+ <CACRpkdYQyxsCWAhp9rFa3ZyfWuBqtoiMysRUEhi81XmevZjBGA@mail.gmail.com>
+Message-ID: <EB2BCA6A838C7B4FB238C534ED5D77045E001472@renexmb02.roe2.renesasmobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic (dtsi) include file for MOXA ART SoCs.
+> Linus Walleij wrote:
+> On Fri, Dec 13, 2013 at 9:48 AM,  <kevin.bracey@broadcom.com> wrote:
+> > Personally, I can see the merits of both approaches -
+> >
+> >  a) pinconf settings forcing mux to achieve the requested pin state - 
+> > working to emulate orthogonality on non-orthogonal hardware;
+> >  b) pinconf settings requiring an appropriate mux to be explicitly set 
+> > for them to be available - machines/DT need to know about the mux/conf 
+> > interactions.
+> >
+> > Main problem with (a) - how do you get back to "normal" mux, and is  
+> > emulation just obfuscation?
+> > Main problem with (b) - can you guarantee mux/conf ordering?
+> 
+> I'm not very fond of either solution really. Can we think of a third alternative
+> where the pin control core is aware of the constraints and tries to verify and/or
+> solve the situation?
 
-Also add a file for UC-7112-LX.
+I've realised there's one existing design issue that complicates this - I'd managed to miss it up until just now, when I tried to add some fixed ties to some pins in my DT.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
- Documentation/devicetree/bindings/arm/moxart.txt |  12 ++
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/moxart-uc7112lx.dts            | 117 ++++++++++++++++++
- arch/arm/boot/dts/moxart.dtsi                    | 148 +++++++++++++++++++++++
- 4 files changed, 278 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/moxart.txt
- create mode 100644 arch/arm/boot/dts/moxart-uc7112lx.dts
- create mode 100644 arch/arm/boot/dts/moxart.dtsi
+Pinmux is per-group only, while pinconf is per-pin. So there's no way for consumers to request "gpio-mode" for a loose pin, and the core currently couldn't do it either.
 
-diff --git a/Documentation/devicetree/bindings/arm/moxart.txt b/Documentation/devicetree/bindings/arm/moxart.txt
-new file mode 100644
-index 0000000..11087ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/moxart.txt
-@@ -0,0 +1,12 @@
-+MOXA ART device tree bindings
-+
-+Boards with the MOXA ART SoC shall have the following properties:
-+
-+Required root node property:
-+
-+compatible = "moxa,moxart";
-+
-+Boards:
-+
-+- UC-7112-LX: embedded computer
-+  compatible = "moxa,moxart-uc-7112-lx", "moxa,moxart"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 40e13e3..99a730f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -111,6 +111,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-ts219-6281.dtb \
- 	kirkwood-ts219-6282.dtb
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
-+dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
- dtb-$(CONFIG_ARCH_MSM) += qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
-diff --git a/arch/arm/boot/dts/moxart-uc7112lx.dts b/arch/arm/boot/dts/moxart-uc7112lx.dts
-new file mode 100644
-index 0000000..10d088d
---- /dev/null
-+++ b/arch/arm/boot/dts/moxart-uc7112lx.dts
-@@ -0,0 +1,117 @@
-+/* moxart-uc7112lx.dts - Device Tree file for MOXA UC-7112-LX
-+ *
-+ * Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/dts-v1/;
-+/include/ "moxart.dtsi"
-+
-+/ {
-+	model = "MOXA UC-7112-LX";
-+	compatible = "moxa,moxart-uc-7112-lx", "moxa,moxart";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x2000000>;
-+	};
-+
-+	clocks {
-+		ref12: ref12M {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	flash at 80000000,0 {
-+		compatible = "numonyx,js28f128", "cfi-flash";
-+		reg = <0x80000000 0x1000000>;
-+		bank-width = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		partition at 0 {
-+			label = "bootloader";
-+			reg = <0x0 0x40000>;
-+		};
-+		partition at 40000 {
-+			label = "linux kernel";
-+			reg = <0x40000 0x1C0000>;
-+		};
-+		partition at 200000 {
-+			label = "root filesystem";
-+			reg = <0x200000 0x800000>;
-+		};
-+		partition at a00000 {
-+			label = "user filesystem";
-+			reg = <0xa00000 0x600000>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		user-led {
-+			label = "ready-led";
-+			gpios = <&gpio 27 0x1>;
-+			default-state = "on";
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	gpio_keys_polled {
-+		compatible = "gpio-keys-polled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <500>;
-+		button at 25 {
-+			label = "GPIO Reset";
-+			linux,code = <116>;
-+			gpios = <&gpio 25 1>;
-+		};
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/mmcblk0p1 rw rootwait";
-+	};
-+};
-+
-+&clk_pll {
-+	clocks = <&ref12>;
-+};
-+
-+&sdhci {
-+	status = "okay";
-+};
-+
-+&mdio0 {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 1 {
-+		device_type = "ethernet-phy";
-+		compatible = "moxa,moxart-rtl8201cp", "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
-+&mdio1 {
-+	status = "okay";
-+
-+	ethphy1: ethernet-phy at 1 {
-+		device_type = "ethernet-phy";
-+		compatible = "moxa,moxart-rtl8201cp", "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
-+&mac0 {
-+	status = "okay";
-+};
-+
-+&mac1 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
-new file mode 100644
-index 0000000..1fd27ed
---- /dev/null
-+++ b/arch/arm/boot/dts/moxart.dtsi
-@@ -0,0 +1,148 @@
-+/* moxart.dtsi - Device Tree Include file for MOXA ART family SoC
-+ *
-+ * Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "moxa,moxart";
-+	model = "MOXART";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "faraday,fa526";
-+			reg = <0>;
-+		};
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x90000000 0x10000000>;
-+		ranges;
-+
-+		intc: interrupt-controller at 98800000 {
-+			compatible = "moxa,moxart-ic";
-+			reg = <0x98800000 0x38>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupt-mask = <0x00080000>;
-+		};
-+
-+		clk_pll: clk_pll at 98100000 {
-+			compatible = "moxa,moxart-pll-clock";
-+			#clock-cells = <0>;
-+			reg = <0x98100000 0x34>;
-+		};
-+
-+		clk_apb: clk_apb at 98100000 {
-+			compatible = "moxa,moxart-apb-clock";
-+			#clock-cells = <0>;
-+			reg = <0x98100000 0x34>;
-+			clocks = <&clk_pll>;
-+		};
-+
-+		timer: timer at 98400000 {
-+			compatible = "moxa,moxart-timer";
-+			reg = <0x98400000 0x42>;
-+			interrupts = <19 1>;
-+			clocks = <&clk_apb>;
-+		};
-+
-+		gpio: gpio at 98700000 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			compatible = "moxa,moxart-gpio";
-+			reg = <0x98700000 0xC>;
-+		};
-+
-+		rtc: rtc {
-+			compatible = "moxa,moxart-rtc";
-+			gpio-rtc-sclk = <&gpio 5 0>;
-+			gpio-rtc-data = <&gpio 6 0>;
-+			gpio-rtc-reset = <&gpio 7 0>;
-+		};
-+
-+		dma: dma at 90500000 {
-+			compatible = "moxa,moxart-dma";
-+			reg = <0x90500080 0x40>;
-+			interrupts = <24 0>;
-+			#dma-cells = <1>;
-+		};
-+
-+		watchdog: watchdog at 98500000 {
-+			compatible = "moxa,moxart-watchdog";
-+			reg = <0x98500000 0x10>;
-+			clocks = <&clk_apb>;
-+		};
-+
-+		sdhci: sdhci at 98e00000 {
-+			compatible = "moxa,moxart-sdhci";
-+			reg = <0x98e00000 0x5C>;
-+			interrupts = <5 0>;
-+			clocks = <&clk_apb>;
-+			dmas =  <&dma 5>,
-+				<&dma 5>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		mdio0: mdio at 90900090 {
-+			compatible = "moxa,moxart-mdio";
-+			reg = <0x90900090 0x8>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		mdio1: mdio at 92000090 {
-+			compatible = "moxa,moxart-mdio";
-+			reg = <0x92000090 0x8>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		mac0: mac at 90900000 {
-+			compatible = "moxa,moxart-mac";
-+			reg = <0x90900000 0x90>;
-+			interrupts = <25 0>;
-+			phy-handle = <&ethphy0>;
-+			phy-mode = "mii";
-+			status = "disabled";
-+		};
-+
-+		mac1: mac at 92000000 {
-+			compatible = "moxa,moxart-mac";
-+			reg = <0x92000000 0x90>;
-+			interrupts = <27 0>;
-+			phy-handle = <&ethphy1>;
-+			phy-mode = "mii";
-+			status = "disabled";
-+		};
-+
-+		uart0: uart at 98200000 {
-+			compatible = "ns16550a";
-+			reg = <0x98200000 0x20>;
-+			interrupts = <31 8>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clock-frequency = <14745600>;
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-1.8.2.1
+So far this has been not been an issue for all my "sleep" states which manually flip the entirety of a function group to gpio-mode, but it can't handle an odd pin hog. (And the "default no-driver states" that have also been discussed recently in another thread would also need to be applied per-pin to mop up driverless gaps in pins).
+
+That certainly does push me away from option (b) of requiring explicit gpio-mode function selection - it rules out per-pin operation. And this problem also limits what the core could do to solve conf/mux constraints; which leaves just verification.
+
+Maybe we just have to make do with:
+
+c) pinconf settings that would require the driver to internally select GPIO mux can only be selected if no pinmux function (or GPIO API?) is enabled on the pin.
+
+I don't think there's a benefit to that test being enforced by the core - you'd have to have a way for the driver to specify the restrictions, and I don't think that's any easier or more reliable than the driver checking in pinconf_ops::pin_config_set.
+
+That would then make this pair valid for my case:
+
+	default {
+		renesas,group="foo";
+		renesas,function="bar";
+	};
+	sleep {
+		renesas,group="foo";
+		output-high;
+	};
+
+as the core will disable the group's function when it selects sleep state, helpfully before processing the new state's configs; and if the pinmux_ops::disable is electrically a no-op, as it currently is for sh-pfc, then that's good for glitch-free handover.
+
+Now, on some other pinctrl driver, where the output isn't behind the mux, they might require a pinconf setting in the default state to undo the output-high; I guess they might need to explicitly put "drive-xxx" or "bias-high-impedance" properties. But in this case, I rely on it being implied/forced by the function select. (And neither property would be accepted anyway - drive-xxx isn't implemented at all, and bias-high-impedance would be refused with a function, as we have no control).
+
+That now feels relatively neat and logical to me.
+
+> > Now, going back to the pinconfs. The naming of the configs still 
+> > throws me a little. Particularly all the "bias" settings. "BIAS_HIGH_IMPEDANCE"
+> > doesn't feel like a "bias" to me. What does it mean to "BIAS_DISABLE"
+> > a "BIAS_HIGH_IMPEDANCE"?
+> 
+[snip]
+> Being able to disable biasing on a pin, i.e. by disconnecting any pull-up/pull-downs
+> through software does not imply that it is necessarily in high-Z mode after that -
+> this depends on any additional hardwired electronics, especially if the pin has been
+> tailored for a specific purpose. It may very often be high-Z but this is a simplified
+> view of the world and we cannot guarantee that. Not always are all aspects of a pin
+> under software control.
+
+Makes sense, thanks.
+
+> > Should "BIAS_HIGH_IMPEDANCE" turn off "BIAS_PULL_UP"?
+>
+> It is *currently* up to the driver not to allow things that make no electrical sense, or take evasive action.
+
+But does that make electrical sense or not? Is this a meaningfuly request to internally combine a pull with an otherwise-high-impedance (ie non-output) pin, or nonsense because overall, an external pin can't both be pulling up and high-impedance? Are they orthogonal settings, or exclusive?
+
+Because all these settings are booleans, (mostly) without "disables", they can't be used to toggle between states without a definition of the exclusive sets (at least as of 3.10; 3.12 has changed things - see below). I think that's what needs to be pinned down here. There will some settings that will be mutually exclusive because of hardware limitations. But some of the exclusion has to be by definition. At least before 3.12, where we have to rely on exclusion to turn off the previous state.
+
+I'm still not fully understanding the definitions here. I just don't have a feel for what pinconf state descriptions for the "ideal" maximally-flexible hardware with the "ideal" driver should look like.
+
+Here's the possible implementation of the pinconfs on our hardware:
+
+bias-disable:        PU:=0 PD:=0                                   (PU/D=Pull Up/Down)
+bias-pull-up:        PU:=1 PD:=0 (MUX:=GPIO OE:=0 if no func?)     (OE=Output Enable)
+bias-pull-down:      PU:=0 PD:=1 (MUX:=GPIO OE:=0 if no func?)
+bias-high-impedance: MUX:=GPIO OE:=0         (PU:=0 PD:=0?) 
+output-low:          MUX:=GPIO OE:=1 DATA:=0 (PU:=0 PD:=0?)
+output-high:         MUX:=GPIO OE:=1 DATA:=1 (PU:=0 PD:=0?)
+
+but I still can't figure out whether setting the controls in parentheses is desirable. Either with or without all the bits in brackets we would get a logically consistent and useable system, but they're two different possible "APIs" for our hardware, and I don't know which API is intended. They lead to two different DT descriptions.
+
+Say I wanted two pinconf-only states that switched between driving low, and weakly pulling up. Should that be expressed in the DT/pinctrl tables like:
+
+	state_a {
+		output-low;	 // OE:=1
+	};
+	state_b {
+		bias-pull-up; // OE:=0 implied by bias-pull-up? Pulling implies not driving?
+		// Or is OE:=0 implied by lack of output-xxx in this state (possible from 3.12)?
+	};
+
+Or should it look like
+
+	state_a {
+		bias-disable;  // output-low won't touch the pulls
+		output-low;    // OE:=1
+	};
+	state_b {
+		bias-pull-up;        // only sets PU/PD - pulls are orthogonal to OE
+		bias-high-impedance; // necessary to set OE:=0
+	};
+
+I genuinely have no idea whether combining those two bias settings in state_b is necessary or nonsense. The former feels neater as a consumer, but the latter's orthogonality is also compelling, despite the odd-looking "bias" combo.
+
+> If you want to enforce such a semantic in a certain pin config driver - i.e.
+> looking for forbidden states in the set_config() callback when looping over
+> the requested settings - this is of course perfectly fine.
+
+Hmm, this is an interesting point.
+
+Up to now I've been viewing configs as being applied one-at-a-time, with no indication to the driver as to when the core has actually started selecting a new state. (Which is the way it is in 3.10, which is where I'm currently working). So there the driver can't tell if seeing "pull-up" followed by "pull-down" is an illegal combination within one state, or if it's a valid switch between two states.
+
+It also means the need for exclusions to be part of the defined API is important, as we have to know how to make sure the configs in state B override all the configs in state A.
+
+However, since commits ad42fc6c8 ("rip out the direct pinconf API") in 3.11 and 03b054e96 ("Pass all configs to driver on pin_config_set()") in 3.12, we now have the possibility that the driver could assume each pin_config_set() call represents a complete, new state.
+
+So implicitly, any array that lacked "output-xxx" could be interpreted to mean "output not required", rather than needing to worry about which configs actually turn off the "output-xxx" from the previous state.
+
+Corollary - given that view, it would seem logical for the core to automatically set an empty config array if the old state had a config array for a pin/group and the new one doesn't, akin to what it does for functions.
+
+Kevin
