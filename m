@@ -1,158 +1,82 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 19 Dec 2013 11:59:17 +0800
-Subject: [PATCH 2/3] ARM: at91: add PWM device node
+Date: Thu, 19 Dec 2013 11:59:16 +0800
+Subject: [PATCH 1/3] ARM: at91: add PWM clock
 In-Reply-To: <1387425558-8589-1-git-send-email-voice.shen@atmel.com>
 References: <1387425558-8589-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1387425558-8589-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <1387425558-8589-2-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PWM device node for AT91 series SoC.
+Add PWM clock for AT91 series SoC which include PWM controller.
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
- arch/arm/boot/dts/at91sam9263.dtsi |    9 +++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |    9 +++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |    9 +++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |    9 +++++++++
- arch/arm/boot/dts/sama5d3.dtsi     |   10 ++++++++++
- 5 files changed, 46 insertions(+)
+ arch/arm/mach-at91/at91sam9263.c |    1 +
+ arch/arm/mach-at91/at91sam9g45.c |    1 +
+ arch/arm/mach-at91/at91sam9n12.c |    1 +
+ arch/arm/mach-at91/at91sam9rl.c  |    1 +
+ arch/arm/mach-at91/at91sam9x5.c  |    1 +
+ 5 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index d5bd65f..94de2f8 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -30,6 +30,7 @@
- 		i2c0 = &i2c0;
- 		ssc0 = &ssc0;
- 		ssc1 = &ssc1;
-+		pwm0 = &pwm0;
- 	};
- 	cpus {
- 		#address-cells = <0>;
-@@ -547,6 +548,14 @@
- 				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
-+
-+			pwm0: pwm at fffb8000 {
-+				compatible = "atmel,at91sam9rl-pwm";
-+				reg = <0xfffb8000 0x300>;
-+				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				status = "disabled";
-+			};
- 		};
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 37b90f4..fbd771d 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -223,6 +223,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioCDE_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
+ };
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index c3e5148..d2b29be 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -37,6 +37,7 @@
- 		i2c1 = &i2c1;
- 		ssc0 = &ssc0;
- 		ssc1 = &ssc1;
-+		pwm0 = &pwm0;
- 	};
- 	cpus {
- 		#address-cells = <0>;
-@@ -725,6 +726,14 @@
- 					atmel,can-isoc;
- 				};
- 			};
-+
-+			pwm0: pwm at fffb8000 {
-+				compatible = "atmel,at91sam9rl-pwm";
-+				reg = <0xfffb8000 0x300>;
-+				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				status = "disabled";
-+			};
- 		};
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 2f455ce..e9ba934 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -284,6 +284,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioE", &pioDE_clk),
+ 	/* Fake adc clock */
+ 	CLKDEV_CON_ID("adc_clk", &tsc_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
+ };
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 6224f9f..7248270 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -33,6 +33,7 @@
- 		i2c0 = &i2c0;
- 		i2c1 = &i2c1;
- 		ssc0 = &ssc0;
-+		pwm0 = &pwm0;
- 	};
- 	cpus {
- 		#address-cells = <0>;
-@@ -542,6 +543,14 @@
- 				reg = <0xfffffe40 0x10>;
- 				status = "disabled";
- 			};
-+
-+			pwm0: pwm at f8034000 {
-+				compatible = "atmel,at91sam9rl-pwm";
-+				reg = <0xf8034000 0x300>;
-+				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				status = "disabled";
-+			};
- 		};
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index 4ef088c..f2ea7b0 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -182,6 +182,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	/* additional fake clock for macb_hclk */
+ 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &uhp_clk),
+ 	CLKDEV_CON_DEV_ID("ohci_clk", "500000.ohci", &uhp_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8034000.pwm", &pwm_clk),
+ };
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 40267a1..6e5e9cf 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -35,6 +35,7 @@
- 		i2c1 = &i2c1;
- 		i2c2 = &i2c2;
- 		ssc0 = &ssc0;
-+		pwm0 = &pwm0;
- 	};
- 	cpus {
- 		#address-cells = <0>;
-@@ -762,6 +763,14 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				status = "disabled";
- 			};
-+
-+			pwm0: pwm at f8034000 {
-+				compatible = "atmel,at91sam9rl-pwm";
-+				reg = <0xf8034000 0x300>;
-+				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				status = "disabled";
-+			};
- 		};
+ /*
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 3651517..e577d37 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -196,6 +196,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioB", &pioB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioC_clk),
+ 	CLKDEV_CON_ID("pioD", &pioD_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffc8000.pwm", &pwm_clk),
+ };
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index de9fece..02cca2e 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -37,6 +37,7 @@
- 		i2c2 = &i2c2;
- 		ssc0 = &ssc0;
- 		ssc1 = &ssc1;
-+		pwm0 = &pwm0;
- 	};
- 	cpus {
- 		#address-cells = <1>;
-@@ -179,6 +180,15 @@
- 				status = "disabled";
- 			};
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 3e8ec26..9ad781d 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "500000.gadget", &utmi_clk),
+ 	CLKDEV_CON_DEV_ID("pclk", "500000.gadget", &udphs_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8034000.pwm", &pwm_clk),
+ };
  
-+			pwm0: pwm at f002c000 {
-+				compatible = "atmel,sama5d3-pwm";
-+				reg = <0xf002c000 0x300>;
-+				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
-+				status = "disabled";
-+			};
-+
- 			isi: isi at f0034000 {
- 				compatible = "atmel,at91sam9g45-isi";
- 				reg = <0xf0034000 0x4000>;
+ /*
 -- 
 1.7.9.5
