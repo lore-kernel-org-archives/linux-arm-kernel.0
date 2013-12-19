@@ -1,97 +1,215 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 19 Dec 2013 17:54:31 +0200
-Subject: [PATCH 3/6] ARM: tegra: Add efuse bindings
+Date: Thu, 19 Dec 2013 17:54:32 +0200
+Subject: [PATCH 4/6] ARM: tegra: rework fuse.c
 In-Reply-To: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1387468474-26521-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1387468474-26521-5-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add efuse bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
+Reduce fuse.c to the minimum functionality required for the early bootstages.
+Also export tegra_read_straps() for use by the fuse driver.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi |    6 ++++++
- arch/arm/boot/dts/tegra124.dtsi |    6 ++++++
- arch/arm/boot/dts/tegra20.dtsi  |    7 +++++++
- arch/arm/boot/dts/tegra30.dtsi  |    6 ++++++
- 4 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/fuse.c |  121 +++++---------------------------------------
+ include/linux/tegra-soc.h  |    1 +
+ 2 files changed, 14 insertions(+), 108 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 8d42787..09a69bf 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -316,6 +316,12 @@
- 		clock-names = "pclk", "clk32k_in";
- 	};
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index d4639c5..2b42037 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -28,35 +28,14 @@
+ #include "iomap.h"
+ #include "apbio.h"
  
-+	efuse at 7000f800 {
-+		compatible = "nvidia,tegra114-efuse";
-+		reg = <0x7000f800 0x400>;
-+		clocks = <&tegra_car TEGRA114_CLK_FUSE>;
-+	};
-+
- 	iommu {
- 		compatible = "nvidia,tegra114-smmu", "nvidia,tegra30-smmu";
- 		reg = <0x70019010 0x02c
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index b741300..5e82956 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -106,6 +106,12 @@
- 		reg = <0x7000e400 0x400>;
- 	};
+-/* Tegra20 only */
+ #define FUSE_UID_LOW		0x108
+ #define FUSE_UID_HIGH		0x10c
  
-+	efuse at 7000f800 {
-+		compatible = "nvidia,tegra124-efuse";
-+		reg = <0x7000f800 0x400>;
-+		clocks = <&tegra_car TEGRA124_CLK_FUSE>;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index df40b54..85daed6 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -121,6 +121,7 @@
- 		};
- 	};
+-/* Tegra30 and later */
+-#define FUSE_VENDOR_CODE	0x200
+-#define FUSE_FAB_CODE		0x204
+-#define FUSE_LOT_CODE_0		0x208
+-#define FUSE_LOT_CODE_1		0x20c
+-#define FUSE_WAFER_ID		0x210
+-#define FUSE_X_COORDINATE	0x214
+-#define FUSE_Y_COORDINATE	0x218
+-
+-#define FUSE_SKU_INFO		0x110
+-
+ #define TEGRA20_FUSE_SPARE_BIT		0x200
+-#define TEGRA30_FUSE_SPARE_BIT		0x244
  
-+
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
-@@ -455,6 +456,12 @@
- 		#size-cells = <0>;
- 	};
+-int tegra_sku_id;
+-int tegra_cpu_process_id;
+-int tegra_core_process_id;
+ int tegra_chip_id;
+-int tegra_cpu_speedo_id;		/* only exist in Tegra30 and later */
+-int tegra_soc_speedo_id;
+ enum tegra_revision tegra_revision;
  
-+	efuse at 7000F800 {
-+		compatible = "nvidia,tegra20-efuse";
-+		reg = <0x7000F800 0x400>;
-+		clocks = <&tegra_car TEGRA20_CLK_FUSE>;
-+	};
-+
- 	pcie-controller {
- 		compatible = "nvidia,tegra20-pcie";
- 		device_type = "pci";
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 2bd55cf..da1b998 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -535,6 +535,12 @@
- 		nvidia,ahb = <&ahb>;
- 	};
+-static int tegra_fuse_spare_bit;
+-static void (*tegra_init_speedo_data)(void);
+-
+ /* The BCT to use at boot is specified by board straps that can be read
+  * through a APB misc register and decoded. 2 bits, i.e. 4 possible BCTs.
+  */
+@@ -68,15 +47,6 @@ int tegra_bct_strapping;
+ #define RAM_ID_MASK (GMI_AD0 | GMI_AD1)
+ #define RAM_CODE_SHIFT 4
  
-+	efuse at 7000f800 {
-+		compatible = "nvidia,tegra30-efuse";
-+		reg = <0x7000f800 0x400>;
-+		clocks = <&tegra_car TEGRA30_CLK_FUSE>;
-+	};
-+
- 	ahub {
- 		compatible = "nvidia,tegra30-ahub";
- 		reg = <0x70080000 0x200
+-static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
+-	[TEGRA_REVISION_UNKNOWN] = "unknown",
+-	[TEGRA_REVISION_A01]     = "A01",
+-	[TEGRA_REVISION_A02]     = "A02",
+-	[TEGRA_REVISION_A03]     = "A03",
+-	[TEGRA_REVISION_A03p]    = "A03 prime",
+-	[TEGRA_REVISION_A04]     = "A04",
+-};
+-
+ u32 tegra_fuse_readl(unsigned long offset)
+ {
+ 	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
+@@ -84,7 +54,7 @@ u32 tegra_fuse_readl(unsigned long offset)
+ 
+ bool tegra_spare_fuse(int bit)
+ {
+-	return tegra_fuse_readl(tegra_fuse_spare_bit + bit * 4);
++	return tegra_fuse_readl(TEGRA20_FUSE_SPARE_BIT + bit * 4);
+ }
+ 
+ static enum tegra_revision tegra_get_revision(u32 id)
+@@ -109,14 +79,9 @@ static enum tegra_revision tegra_get_revision(u32 id)
+ 	}
+ }
+ 
+-static void tegra_get_process_id(void)
++u32 tegra_read_straps(void)
+ {
+-	u32 reg;
+-
+-	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
+-	tegra_cpu_process_id = (reg >> 6) & 3;
+-	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
+-	tegra_core_process_id = (reg >> 12) & 3;
++	return tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+ }
+ 
+ u32 tegra_read_chipid(void)
+@@ -124,90 +89,30 @@ u32 tegra_read_chipid(void)
+ 	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
+ }
+ 
+-static void __init tegra20_fuse_init_randomness(void)
+-{
+-	u32 randomness[2];
+-
+-	randomness[0] = tegra_fuse_readl(FUSE_UID_LOW);
+-	randomness[1] = tegra_fuse_readl(FUSE_UID_HIGH);
+-
+-	add_device_randomness(randomness, sizeof(randomness));
+-}
+-
+-/* Applies to Tegra30 or later */
+-static void __init tegra30_fuse_init_randomness(void)
+-{
+-	u32 randomness[7];
+-
+-	randomness[0] = tegra_fuse_readl(FUSE_VENDOR_CODE);
+-	randomness[1] = tegra_fuse_readl(FUSE_FAB_CODE);
+-	randomness[2] = tegra_fuse_readl(FUSE_LOT_CODE_0);
+-	randomness[3] = tegra_fuse_readl(FUSE_LOT_CODE_1);
+-	randomness[4] = tegra_fuse_readl(FUSE_WAFER_ID);
+-	randomness[5] = tegra_fuse_readl(FUSE_X_COORDINATE);
+-	randomness[6] = tegra_fuse_readl(FUSE_Y_COORDINATE);
+-
+-	add_device_randomness(randomness, sizeof(randomness));
+-}
+-
+ void __init tegra_init_fuse(void)
+ {
+ 	u32 id;
+-	u32 randomness[5];
++	u32 reg;
+ 
+-	u32 reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
++	reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
+ 	reg |= 1 << 28;
+ 	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
+ 
+-	reg = tegra_fuse_readl(FUSE_SKU_INFO);
+-	randomness[0] = reg;
+-	tegra_sku_id = reg & 0xFF;
++	/*
++	 * Enable FUSE clock. This needs to be hardcoded because the clock
++	 * subsystem is not active during early boot.
++	 */
++	reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x14));
++	reg |= 1 << 7;
++	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x14));
+ 
+-	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+-	randomness[1] = reg;
++	reg = tegra_read_straps();
+ 	tegra_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
+ 
+ 	id = tegra_read_chipid();
+-	randomness[2] = id;
+ 	tegra_chip_id = (id >> 8) & 0xff;
+ 
+-	switch (tegra_chip_id) {
+-	case TEGRA20:
+-		tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
+-		tegra_init_speedo_data = &tegra20_init_speedo_data;
+-		break;
+-	case TEGRA30:
+-		tegra_fuse_spare_bit = TEGRA30_FUSE_SPARE_BIT;
+-		tegra_init_speedo_data = &tegra30_init_speedo_data;
+-		break;
+-	case TEGRA114:
+-		tegra_init_speedo_data = &tegra114_init_speedo_data;
+-		break;
+-	default:
+-		pr_warn("Tegra: unknown chip id %d\n", tegra_chip_id);
+-		tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
+-		tegra_init_speedo_data = &tegra_get_process_id;
+-	}
+-
+ 	tegra_revision = tegra_get_revision(id);
+-	tegra_init_speedo_data();
+-	randomness[3] = (tegra_cpu_process_id << 16) | tegra_core_process_id;
+-	randomness[4] = (tegra_cpu_speedo_id << 16) | tegra_soc_speedo_id;
+-
+-	add_device_randomness(randomness, sizeof(randomness));
+-	switch (tegra_chip_id) {
+-	case TEGRA20:
+-		tegra20_fuse_init_randomness();
+-	case TEGRA30:
+-	case TEGRA114:
+-	default:
+-		tegra30_fuse_init_randomness();
+-	}
+-
+-	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+-		tegra_revision_name[tegra_revision],
+-		tegra_sku_id, tegra_cpu_process_id,
+-		tegra_core_process_id);
+ }
+ 
+ unsigned long long tegra_chip_uid(void)
+diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
+index f53fe9c..8805f3f 100644
+--- a/include/linux/tegra-soc.h
++++ b/include/linux/tegra-soc.h
+@@ -17,6 +17,7 @@
+ #ifndef __LINUX_TEGRA_SOC_H_
+ #define __LINUX_TEGRA_SOC_H_
+ 
++u32 tegra_read_straps(void);
+ u32 tegra_read_chipid(void);
+ 
+ 
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
