@@ -1,52 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 19 Dec 2013 17:21:53 -0600
-Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
-In-Reply-To: <20131219184815.GU27438@atomide.com>
-References: <1384970958-4118-1-git-send-email-balbi@ti.com>
- <20131219184815.GU27438@atomide.com>
-Message-ID: <20131219232153.GE707@saruman.home>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 19 Dec 2013 15:55:34 -0800
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14 (incr. #4)
+In-Reply-To: <20131217142222.GI2609@titan.lakedaemon.net> (Jason Cooper's
+ message of "Tue, 17 Dec 2013 09:22:22 -0500")
+References: <20131217142222.GI2609@titan.lakedaemon.net>
+Message-ID: <87haa4iefd.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 10:48:15AM -0800, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [131120 10:10]:
-> > Afte these patches, we're very close to being able
-> > to move arch/arm/mach-omap2/irq.c to drivers/irqchip/irq-intc.c
-> 
-> That would be nice :)
->  
-> > All which would be missing is for Tony to drop all OMAP2/3 board
-> > files so we remove the few pending bits and pieces left in
-> > for legacy boot.
-> 
-> That may still need to wait a while, but let's see.
->  
-> > Note that I have only boot tested these on AM335x Bone Black
-> > (with a small fix for fixed regulator which should be in
-> > the mailing list already), so I'd need help testing all
-> > other impacted platforms, specially when it comes to PM.
-> 
-> Sorry have not had much of a chance to test these with PM with
-> all the fixes needed for omap3 DT mode. Tried testing these
-> just now, but I get:
-> 
-> arch/arm/mach-omap2/board-generic.c:134: error: ?omap_intc_of_init? undeclared here (not in a function)
+Jason Cooper <jason@lakedaemon.net> writes:
 
-some of your other changes messed it up, I have not references of
-omap_intc_of_init() in my branch, because that's one of the things I'm
-dropping from DT-based boots.
+> Guys,
+>
+> Here's the fourth round of DT changes in mvebu-land.  This one completes
+> a long-standing item on my todo list.  It's been in -next for four days,
+> and it's purely a sort.
+>
+> As with the previous pull requests, this is an incremental pull on the
+> mvebu/dt branch from tags/mvebu-dt-3.14-3 to tags/mvebu-dt-3.14-4.
+>
+> thx,
+>
+> Jason.
+>
+>
+> The following changes since commit 69e18e26b5773092276a9702244784faf9b6c65f:
+>
+>   ARM: mvebu: Enable NAND controller in A370 Reference Design board (2013-12-12 14:04:34 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14-4
+>
+> for you to fetch changes up to a095b1c78a35f05755ca2f0e106d84792974aef5:
+>
+>   ARM: mvebu: sort DT nodes by address (2013-12-12 15:00:44 +0000)
+>
+> ----------------------------------------------------------------
+> mvebu DT changes for v3.14 (incremental #4)
+>
+>  - mvebu/orion5x/dove/kirkwood
+>     - sort nodes on ocp bus by address
+>
+> ----------------------------------------------------------------
 
-Can you see which patch added a new omap_intc_of_init() call ? Or maybe
-tell me which branch I should rebase on top of ?
+Pulled into next/dt.
 
-cheers
+Thanks,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/6397427f/attachment.sig>
+Kevin
