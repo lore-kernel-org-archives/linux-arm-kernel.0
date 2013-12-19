@@ -1,43 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Dec 2013 17:06:57 +0800
-Subject: [PATCH 2/2] ARM: dts: Add support for the i.MX35.
-In-Reply-To: <20131219073843.GV24559@pengutronix.de>
-References: <1387375826-4018-1-git-send-email-s.hauer@pengutronix.de>
- <1387375826-4018-3-git-send-email-s.hauer@pengutronix.de>
- <20131219064957.GZ6691@S2101-09.ap.freescale.net>
- <20131219073843.GV24559@pengutronix.de>
-Message-ID: <20131219090655.GE6691@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Dec 2013 18:06:26 +0900
+Subject: [PATCH 0/2] ARM: shmobile: koelsch: defconfig updates
+In-Reply-To: <1387154049-9105-1-git-send-email-horms+renesas@verge.net.au>
+References: <1387154049-9105-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20131219090626.GE12239@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 08:38:44AM +0100, Sascha Hauer wrote:
-> On Thu, Dec 19, 2013 at 02:49:59PM +0800, Shawn Guo wrote:
-> > On Wed, Dec 18, 2013 at 03:10:26PM +0100, Sascha Hauer wrote:
-> > > +	clocks {
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <0>;
-> > > +
-> > > +		ckil {
-> > > +			compatible = "fsl,imx-ckil", "fixed-clock";
-> > > +			clock-frequency = <32768>;
-> > > +		};
-> > > +
-> > > +		osc {
-> > > +			compatible = "fsl,imx-osc", "fixed-clock";
-> > > +			clock-frequency = <24000000>;
-> > > +		};
-> > 
-> > I asked the question in the last round, but did not get any answer.  Do
-> > these two clocks exist on imx35?  At least from the imx35 clock code,
-> > I do not see them.
+On Mon, Dec 16, 2013 at 09:34:07AM +0900, Simon Horman wrote:
+> Updates for Koelsch defconfig to allow it to boot
+> a Debian armhf userspace and to bring it into line
+> with other shmobile defconfigs.
 > 
-> ckil does exist, but it's optional, so I think if we specify it in the
-> dtsi then the rate should be 0. It's unused in the code though and noone
-> ever seemed to miss it, so we can equally well just drop it.
-> osc does exist aswell, but in the code it's unused and a hardcoded 24MHz
-> value is used, so specifying it in the devicetree is bogus.
-> I think we should just drop the nodes.
+> Based on the renesas-devel-v3.13-rc3-20131214v2 tag
+> of my renesas tree.
+> 
+> Simon Horman (2):
+>   ARM: shmobile: koelsch: Enable CONFIG_PACKET in defconfig
+>   ARM: shmobile: koelsch: Do not disable CONFIG_{INOTIFY_USER,UNIX} in
+>     defconfig
+> 
+>  arch/arm/configs/koelsch_defconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-Ok, I will fixed it up and apply.
-
-Shawn
+I have queued these up.
