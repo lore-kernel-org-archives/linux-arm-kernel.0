@@ -1,35 +1,66 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 19 Dec 2013 15:56:54 +0400
-Subject: [PATCH v2 0/3] ARM: clps711x: IRQCHIP driver
-Message-ID: <1387454214-1171-1-git-send-email-shc_work@mail.ru>
+Date: Thu, 19 Dec 2013 15:58:35 +0400
+Subject: [PATCH v2 2/3] ARM: dts: clps711x: Add bindings documentation for
+ CLPS711X irqchip driver
+Message-ID: <1387454315-1302-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is devoted to new CLPS711X irqchip driver.
-The driver designed for booting from ATAGS and devicetree.
+Add OF document for Cirrus Logic CLPS711X irqchip driver.
 
-Alexander Shiyan (3):
-  ARM: clps711x: Add CLPS711X irqchip driver
-  ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
-    driver
-  ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
-
- .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
- arch/arm/Kconfig                                   |   2 -
- arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
- arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
- arch/arm/mach-clps711x/board-clep7312.c            |   2 -
- arch/arm/mach-clps711x/board-edb7211.c             |   2 -
- arch/arm/mach-clps711x/board-p720t.c               |   2 -
- arch/arm/mach-clps711x/common.c                    | 201 +----------------
- arch/arm/mach-clps711x/common.h                    |   5 +-
- arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
- drivers/irqchip/Kconfig                            |   8 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-clps711x.c                     | 243 +++++++++++++++++++++
- 13 files changed, 299 insertions(+), 228 deletions(-)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ .../interrupt-controller/cirrus,clps711x-intc.txt  | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
- create mode 100644 drivers/irqchip/irq-clps711x.c
 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+new file mode 100644
+index 0000000..759339c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+@@ -0,0 +1,41 @@
++Cirrus Logic CLPS711X Interrupt Controller
++
++Required properties:
++
++- compatible: Should be "cirrus,clps711x-intc".
++- reg: Specifies base physical address of the registers set.
++- interrupt-controller: Identifies the node as an interrupt controller.
++- #interrupt-cells: Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 1.
++
++The interrupt sources are as follows:
++ID	Name	Description
++---------------------------
++1:	BLINT	Battery low (FIQ)
++3:	MCINT	Media changed (FIQ)
++4:	CSINT	CODEC sound
++5:	EINT1	External 1
++6:	EINT2	External 2
++7:	EINT3	External 3
++8:	TC1OI	TC1 under flow
++9:	TC2OI	TC2 under flow
++10:	RTCMI	RTC compare match
++11:	TINT	64Hz tick
++12:	UTXINT1	UART1 transmit FIFO half empty
++13:	URXINT1	UART1 receive FIFO half full
++14:	UMSINT	UART1 modem status changed
++15:	SSEOTI	SSI1 end of transfer
++16:	KBDINT	Keyboard
++17:	SS2RX	SSI2 receive FIFO half or greater full
++18:	SS2TX	SSI2 transmit FIFO less than half empty
++28:	UTXINT2	UART2 transmit FIFO half empty
++29:	URXINT2	UART2 receive FIFO half full
++32:	DAIINT	DAI interface (FIQ)
++
++Example:
++	intc: interrupt-controller {
++		compatible = "cirrus,clps711x-intc";
++		reg = <0x80000000 0x4000>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
 -- 
 1.8.3.2
