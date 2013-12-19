@@ -1,83 +1,33 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 18 Dec 2013 22:36:45 -0800
-Subject: [PATCH 2/4] ARM: imx: Add cpu frequency scaling support
-In-Reply-To: <20131219054758.GU6691@S2101-09.ap.freescale.net>
-References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
- <1387410656-36053-2-git-send-email-john.tobias.ph@gmail.com>
- <20131219054758.GU6691@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYMQsb-eaDa1oXt38hsKzWVV=5xbNi-5-v0r8cWAMu_Rrg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Dec 2013 15:40:52 +0900
+Subject: [PATCH 00/10] sh-pfc: Fix GPIO to IRQ mapping
+In-Reply-To: <20131213001456.GB32101@verge.net.au>
+References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131212131139.GE30624@verge.net.au>
+ <CACRpkdZnqzAWdnmjo6cNakwOZcLjZ2Mt_LtM1Vf-L9=b_0_p4g@mail.gmail.com>
+ <20131213001456.GB32101@verge.net.au>
+Message-ID: <20131219064052.GE10230@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for checking again. I should carefully check the unnecessary
-braces and exercise the tools available in script.
-Will re-submit again tomorrow.
+On Fri, Dec 13, 2013 at 09:14:56AM +0900, Simon Horman wrote:
+> On Thu, Dec 12, 2013 at 10:05:55PM +0100, Linus Walleij wrote:
+> > On Thu, Dec 12, 2013 at 2:11 PM, Simon Horman <horms@verge.net.au> wrote:
+> > 
+> > > It seems to me that if Linus applies the pfc changes the
+> > > shmobile changes could be applied independently. Am I missing
+> > > and do the shmobile patches have build-dependencies on the pfc patches?
+> > 
+> > I've applied the PFC changes to the pin control tree and will push
+> > to kernelorg shortly, then allow it to stablilze before you attempt to
+> > pull that into the SH mobile tree please, and notify me before
+> > doing so and make sure to just pick the top commit you need.
+> 
+> Thanks, I understand.
+> 
+> I'll re-visit this next week.
 
-Regards,
+Hi Linus,
 
-john
-
-On Wed, Dec 18, 2013 at 9:48 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Dec 18, 2013 at 03:50:54PM -0800, John Tobias wrote:
->> Re-using iMX6Q driver for cpu frequency scaling.
->>
->> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
->> ---
->>  arch/arm/mach-imx/mach-imx6sl.c | 13 ++++++++++++-
->>  1 file changed, 12 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
->> index 2f952e3..a8b1543 100644
->> --- a/arch/arm/mach-imx/mach-imx6sl.c
->> +++ b/arch/arm/mach-imx/mach-imx6sl.c
->> @@ -8,7 +8,6 @@
->>   */
->>
->>  #include <linux/irqchip.h>
->> -#include <linux/of.h>
->
-> This is an unrelated change to the patch.
->
->>  #include <linux/of_platform.h>
->>  #include <linux/mfd/syscon.h>
->>  #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
->> @@ -34,6 +33,17 @@ static void __init imx6sl_fec_init(void)
->>       }
->>  }
->>
->> +static struct platform_device imx6q_cpufreq_pdev = {
->> +     .name = "imx6q-cpufreq",
->> +};
->> +
->> +static void __init imx6sl_init_late(void)
->> +{
->> +     if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
->
-> Unnecessary braces.
->
->> +             platform_device_register(&imx6q_cpufreq_pdev);
->
-> Register the device in the following way will save imx6q_cpufreq_pdev.
->
->         platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
->
-> Shawn
->
->> +     }
->> +}
->> +
->>  static void __init imx6sl_init_machine(void)
->>  {
->>       struct device *parent;
->> @@ -70,6 +80,7 @@ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
->>       .map_io         = debug_ll_io_init,
->>       .init_irq       = imx6sl_init_irq,
->>       .init_machine   = imx6sl_init_machine,
->> +     .init_late      = imx6sl_init_late,
->>       .dt_compat      = imx6sl_dt_compat,
->>       .restart        = mxc_restart,
->>  MACHINE_END
->> --
->> 1.8.3.2
->>
->
+just to let you know I am planning to use
+70c8f01a357ac74d ("sh-pfc: Support GPIO to IRQ mapping specified IRQ resources")
