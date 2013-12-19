@@ -1,56 +1,32 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Dec 2013 16:59:33 +0100
-Subject: [PATCH 09/10] ARM: tegra: Enable HDMI support on Dalmore
+Date: Thu, 19 Dec 2013 16:59:34 +0100
+Subject: [PATCH 10/10] ARM: tegra: Enable DRM panel support
 In-Reply-To: <1387468774-14216-1-git-send-email-treding@nvidia.com>
 References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
-Message-ID: <1387468774-14216-10-git-send-email-treding@nvidia.com>
+Message-ID: <1387468774-14216-11-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mikko Perttunen <mperttunen@nvidia.com>
+Enable DRM panel core support along with support for various simple
+panels.
 
-Add HDMI node to the Dalmore device tree and hook up the VDD and PLL
-regulators as well as the I2C adapter used for DDC and the GPIO used
-for hotplug detection.
-
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114-dalmore.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/configs/tegra_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index 512922f049c3..73aecfb57ccb 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -17,6 +17,17 @@
- 	};
- 
- 	host1x at 50000000 {
-+		hdmi at 54280000 {
-+			status = "okay";
-+
-+			vdd-supply = <&vdd_hdmi_reg>;
-+			pll-supply = <&palmas_smps3_reg>;
-+
-+			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
-+			nvidia,hpd-gpio =
-+				<&gpio TEGRA_GPIO(N, 7) GPIO_ACTIVE_HIGH>;
-+		};
-+
- 		dsi at 54300000 {
- 			status = "okay";
- 
-@@ -773,6 +784,10 @@
- 		};
- 	};
- 
-+	hdmi_ddc: i2c at 7000c700 {
-+		status = "okay";
-+	};
-+
- 	i2c at 7000d000 {
- 		status = "okay";
- 		clock-frequency = <400000>;
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index f5050fd75dda..5fdc9a09d339 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -169,6 +169,8 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_DRM=y
++CONFIG_DRM_PANEL=y
++CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_TEGRA=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ # CONFIG_LCD_CLASS_DEVICE is not set
 -- 
 1.8.4.2
