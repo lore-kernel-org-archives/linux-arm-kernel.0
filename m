@@ -1,66 +1,47 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 18 Dec 2013 22:54:07 -0800
-Subject: [PATCH 1/4] ARM: dts: imx6sl: Adding cpu frequency table
-In-Reply-To: <20131219054213.GT6691@S2101-09.ap.freescale.net>
-References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
- <20131219054213.GT6691@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYMZxL04=BgqtRUKLJYQpPLwYz3oZQ0+YizE9LUVuj3czQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Dec 2013 14:57:06 +0800
+Subject: [PATCH 3/3] thermal: imx: add clk info for thermal sensor
+In-Reply-To: <1387477045-19037-3-git-send-email-b20788@freescale.com>
+References: <1387477045-19037-1-git-send-email-b20788@freescale.com>
+ <1387477045-19037-3-git-send-email-b20788@freescale.com>
+Message-ID: <20131219065704.GA6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Great! I will add it.
+On Thu, Dec 19, 2013 at 01:17:25PM -0500, Anson Huang wrote:
+> thermal sensor needs dedicated clock to work in correct way,
+> so we need to add necessary clock info in dts.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  .../devicetree/bindings/thermal/imx-thermal.txt    |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> index 541c25e..e518c6e 100644
+> --- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> @@ -7,6 +7,7 @@ Required properties:
+>  - fsl,tempmon-data : phandle pointer to fuse controller that contains TEMPMON
+>    calibration data, e.g. OCOTP on imx6q.  The details about calibration data
+>    can be found in SoC Reference Manual.
+> +- clocks : thermal sensor's clock source.
 
-John
+For such binding update, it can just be merged into driver patch.  Also,
+it has to be an optional property.  See my reply to the driver patch.
 
-On Wed, Dec 18, 2013 at 9:42 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Dec 18, 2013 at 03:50:53PM -0800, John Tobias wrote:
->> Device tree for iMX6SL doesn't have an existing cpu frequency table.
->>
->> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
->> ---
->>  arch/arm/boot/dts/imx6sl.dtsi | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
->> index 28558f1..473d54b 100644
->> --- a/arch/arm/boot/dts/imx6sl.dtsi
->> +++ b/arch/arm/boot/dts/imx6sl.dtsi
->> @@ -38,6 +38,21 @@
->>                       device_type = "cpu";
->>                       reg = <0x0>;
->>                       next-level-cache = <&L2>;
->> +                     operating-points = <
->> +                             /* kHz    uV */
->> +                             996000  1275000
->> +                             792000  1175000
->> +                             396000  975000
->> +                     >;
->
-> Anson is pushing VDDSOC/PU voltage settings upstream.  We may want to
-> add the following VDDSOC/PU operating-points as well.
->
->         fsl,soc-operating-points = <
->                 /* ARM kHz      SOC-PU uV */
->                 996000          1225000
->                 792000          1175000
->                 396000          1175000
->         >;
->
-> Shawn
->
->> +                     clock-latency = <61036>; /* two CLK32 periods */
->> +                     clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>,
->> +                                     <&clks IMX6SL_CLK_STEP>, <&clks IMX6SL_CLK_PLL1_SW>,
->> +                                     <&clks IMX6SL_CLK_PLL1_SYS>;
->> +                     clock-names = "arm", "pll2_pfd2_396m", "step",
->> +                                   "pll1_sw", "pll1_sys";
->> +                     arm-supply = <&reg_arm>;
->> +                     pu-supply = <&reg_pu>;
->> +                     soc-supply = <&reg_soc>;
->>               };
->>       };
->>
->> --
->> 1.8.3.2
->>
->
+Shawn
+
+>  
+>  Example:
+>  
+> @@ -14,4 +15,5 @@ tempmon {
+>  	compatible = "fsl,imx6q-tempmon";
+>  	fsl,tempmon = <&anatop>;
+>  	fsl,tempmon-data = <&ocotp>;
+> +	clocks = <&clks 172>;
+>  };
+> -- 
+> 1.7.9.5
+> 
+> 
