@@ -1,156 +1,48 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 19 Dec 2013 17:54:29 +0200
-Subject: [PATCH 1/6] ARM: tegra: export apb dma readl/writel
-In-Reply-To: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1387468474-26521-2-git-send-email-pdeschrijver@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 19 Dec 2013 15:54:59 +0000
+Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
+In-Reply-To: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export APB DMA readl and writel. These are needed because we can't access
-the fuses directly on Tegra20 without potentially causing a system hang.
+Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
+rather carelessly converts find_next_bit() to fls() (find last
+bit set), which are not the same.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Although this implementation may not be portable, the alternative
+breaks audio on anything using the AB8500 CODEC, which is a much
+greater evil. Besides, this driver will never run on anything
+else.
+
+Cc: Takashi Iwai <tiwai@suse.de>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-tegra/apbio.c |   51 ++++++++++++++++++++++++++----------------
- include/linux/tegra-soc.h   |   16 +++++++++++++
- 2 files changed, 47 insertions(+), 20 deletions(-)
+ sound/soc/codecs/ab8500-codec.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
-index bc47197..e0bf49d 100644
---- a/arch/arm/mach-tegra/apbio.c
-+++ b/arch/arm/mach-tegra/apbio.c
-@@ -32,8 +32,8 @@ static u32 *tegra_apb_bb;
- static dma_addr_t tegra_apb_bb_phys;
- static DECLARE_COMPLETION(tegra_apb_wait);
- 
--static u32 tegra_apb_readl_direct(unsigned long offset);
--static void tegra_apb_writel_direct(u32 value, unsigned long offset);
-+static int tegra_apb_readl_direct(unsigned long offset, u32 *value);
-+static int tegra_apb_writel_direct(u32 value, unsigned long offset);
- 
- static struct dma_chan *tegra_apb_dma_chan;
- static struct dma_slave_config dma_sconfig;
-@@ -128,58 +128,64 @@ static int do_dma_transfer(unsigned long apb_add,
- 	return 0;
- }
- 
--static u32 tegra_apb_readl_using_dma(unsigned long offset)
-+int tegra_apb_readl_using_dma(unsigned long offset, u32 *value)
- {
- 	int ret;
- 
- 	if (!tegra_apb_dma_chan && !tegra_apb_dma_init())
--		return tegra_apb_readl_direct(offset);
-+		return tegra_apb_readl_direct(offset, value);
- 
- 	mutex_lock(&tegra_apb_dma_lock);
- 	ret = do_dma_transfer(offset, DMA_DEV_TO_MEM);
--	if (ret < 0) {
-+	if (ret < 0)
- 		pr_err("error in reading offset 0x%08lx using dma\n", offset);
--		*(u32 *)tegra_apb_bb = 0;
--	}
-+	else
-+		*value = *tegra_apb_bb;
-+
- 	mutex_unlock(&tegra_apb_dma_lock);
--	return *((u32 *)tegra_apb_bb);
-+
-+	return ret;
- }
- 
--static void tegra_apb_writel_using_dma(u32 value, unsigned long offset)
-+int tegra_apb_writel_using_dma(u32 value, unsigned long offset)
- {
- 	int ret;
- 
--	if (!tegra_apb_dma_chan && !tegra_apb_dma_init()) {
--		tegra_apb_writel_direct(value, offset);
--		return;
--	}
-+	if (!tegra_apb_dma_chan && !tegra_apb_dma_init())
-+		return tegra_apb_writel_direct(value, offset);
- 
- 	mutex_lock(&tegra_apb_dma_lock);
- 	*((u32 *)tegra_apb_bb) = value;
- 	ret = do_dma_transfer(offset, DMA_MEM_TO_DEV);
-+	mutex_unlock(&tegra_apb_dma_lock);
- 	if (ret < 0)
- 		pr_err("error in writing offset 0x%08lx using dma\n", offset);
--	mutex_unlock(&tegra_apb_dma_lock);
-+
-+	return ret;
- }
- #else
- #define tegra_apb_readl_using_dma tegra_apb_readl_direct
- #define tegra_apb_writel_using_dma tegra_apb_writel_direct
- #endif
- 
--typedef u32 (*apbio_read_fptr)(unsigned long offset);
--typedef void (*apbio_write_fptr)(u32 value, unsigned long offset);
-+typedef int (*apbio_read_fptr)(unsigned long offset, u32 *value);
-+typedef int (*apbio_write_fptr)(u32 value, unsigned long offset);
- 
- static apbio_read_fptr apbio_read;
- static apbio_write_fptr apbio_write;
- 
--static u32 tegra_apb_readl_direct(unsigned long offset)
-+static int tegra_apb_readl_direct(unsigned long offset, u32 *value)
- {
--	return readl(IO_ADDRESS(offset));
-+	*value = readl(IO_ADDRESS(offset));
-+
-+	return 0;
- }
- 
--static void tegra_apb_writel_direct(u32 value, unsigned long offset)
-+static int tegra_apb_writel_direct(u32 value, unsigned long offset)
- {
- 	writel(value, IO_ADDRESS(offset));
-+
-+	return 0;
- }
- 
- void tegra_apb_io_init(void)
-@@ -197,7 +203,12 @@ void tegra_apb_io_init(void)
- 
- u32 tegra_apb_readl(unsigned long offset)
- {
--	return apbio_read(offset);
-+	u32 val;
-+
-+	if (apbio_read(offset, &val) < 0)
-+		return 0;
-+	else
-+		return val;
- }
- 
- void tegra_apb_writel(u32 value, unsigned long offset)
-diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
-index 95f611d..f53fe9c 100644
---- a/include/linux/tegra-soc.h
-+++ b/include/linux/tegra-soc.h
-@@ -19,4 +19,20 @@
- 
- u32 tegra_read_chipid(void);
- 
-+
-+#if defined(CONFIG_TEGRA20_APB_DMA)
-+void tegra_apb_io_init(void);
-+int tegra_apb_readl_using_dma(unsigned long offset, u32 *value);
-+int tegra_apb_writel_using_dma(u32 value, unsigned long offset);
-+#else
-+static inline void tegra_apb_io_init(void) {}
-+static inline int tegra_apb_readl_using_dma(unsigned long offset, u32 *value)
-+{
-+	return -EINVAL;
-+}
-+static inline int tegra_apb_writel_using_dma(u32 value, unsigned long offset)
-+{
-+	return -EINVAL;
-+}
-+#endif
- #endif /* __LINUX_TEGRA_SOC_H_ */
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index 1ad92cb..51ae3e9 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -2322,7 +2322,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+ 		slot = ffs(tx_mask);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
+-		slot = fls(tx_mask);
++		slot = find_next_bit((unsigned long *)&tx_mask, 32, slot + 1);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
+ 		break;
+@@ -2364,7 +2364,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+ 				AB8500_ADSLOTSEL(slot),
+ 				AB8500_MASK_SLOT(slot),
+ 				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
+-		slot = fls(rx_mask);
++		slot = find_next_bit((unsigned long *)&rx_mask, 32, slot + 1);
+ 		snd_soc_update_bits(codec,
+ 				AB8500_ADSLOTSEL(slot),
+ 				AB8500_MASK_SLOT(slot),
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.8.3.2
