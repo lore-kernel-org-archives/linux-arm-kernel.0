@@ -1,15 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 13:38:28 -0700
-Subject: [PATCH 06/10] ARM: tegra: Add SPI controller nodes for Tegra124
-In-Reply-To: <1387469182-14398-7-git-send-email-treding@nvidia.com>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-7-git-send-email-treding@nvidia.com>
-Message-ID: <52B35944.8090307@wwwdotorg.org>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Thu, 19 Dec 2013 12:35:37 -0800
+Subject: [PATCH v2 2/3] ARM: imx: Add cpu frequency scaling support
+In-Reply-To: <1387485338-21225-1-git-send-email-john.tobias.ph@gmail.com>
+References: <1387485338-21225-1-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <1387485338-21225-2-git-send-email-john.tobias.ph@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 09:06 AM, Thierry Reding wrote:
-> The SPI controllers on Tegra124 are compatible with those found on the
-> Tegra114 SoC.
+Re-using iMX6Q driver for cpu frequency scaling.
 
-This patch is already in Tegra's for-3.14/dt branch.
+Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+---
+ arch/arm/mach-imx/mach-imx6sl.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 2f952e3..2ba3a7a 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -34,6 +34,12 @@ static void __init imx6sl_fec_init(void)
+ 	}
+ }
+ 
++static void __init imx6sl_init_late(void)
++{
++	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
++		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
++}
++
+ static void __init imx6sl_init_machine(void)
+ {
+ 	struct device *parent;
+@@ -70,6 +76,7 @@ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
+ 	.map_io		= debug_ll_io_init,
+ 	.init_irq	= imx6sl_init_irq,
+ 	.init_machine	= imx6sl_init_machine,
++	.init_late      = imx6sl_init_late,
+ 	.dt_compat	= imx6sl_dt_compat,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+-- 
+1.8.3.2
