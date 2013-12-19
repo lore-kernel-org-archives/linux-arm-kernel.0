@@ -1,36 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Dec 2013 06:30:10 +0100
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <1387401646.31516.14.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>
- <201312182210.30544.arnd@arndb.de>
- <1387401646.31516.14.camel@host5.omatika.ru>
-Message-ID: <201312190630.11087.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Dec 2013 13:42:15 +0800
+Subject: [PATCH 1/4] ARM: dts: imx6sl: Adding cpu frequency table
+In-Reply-To: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
+References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <20131219054213.GT6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 December 2013, Sergei Ianovich wrote:
-> > You would still be able to boot a kernel with an old dts file on a new
-> > kernel if it just contains a "simple-bus" node here, as long as it doesn't
-> > need any boot-time setup at the bus controller. We can change the dts
-> > file later if we need to add this functionality, which would break booting
-> > old kernels with the new dts files, which isn't much of a problem in
-> > general.
+On Wed, Dec 18, 2013 at 03:50:53PM -0800, John Tobias wrote:
+> Device tree for iMX6SL doesn't have an existing cpu frequency table.
 > 
-> It should actually only break old kernels which require new
-> functionally. Otherwise, dts can have
+> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx6sl.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
-> compatible = "marvell,pxa-extbus", "simple-bus";
-> 
-> and an older kernel will be happy with "simple-bus". Please correct me
-> if I'm wrong.
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 28558f1..473d54b 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -38,6 +38,21 @@
+>  			device_type = "cpu";
+>  			reg = <0x0>;
+>  			next-level-cache = <&L2>;
+> +			operating-points = <
+> +				/* kHz    uV */
+> +				996000  1275000
+> +				792000  1175000
+> +				396000  975000
+> +			>;
 
-This would work only if we can probe the devices behind the external
-bus controller before the controller itsef has been set up, since
-the initialization order can depend on a number of things but not
-the bus hierarchy. It will also work if the code setting up the
-bus controller can be guaranteed to run before we call
-of_platform_populate for the regular devices, which is probably
-the best solution here.
+Anson is pushing VDDSOC/PU voltage settings upstream.  We may want to
+add the following VDDSOC/PU operating-points as well.
 
-	Arnd
+	fsl,soc-operating-points = <
+		/* ARM kHz	SOC-PU uV */
+		996000		1225000
+		792000		1175000
+		396000		1175000
+	>;
+
+Shawn
+
+> +			clock-latency = <61036>; /* two CLK32 periods */
+> +			clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>,
+> +					<&clks IMX6SL_CLK_STEP>, <&clks IMX6SL_CLK_PLL1_SW>,
+> +					<&clks IMX6SL_CLK_PLL1_SYS>;
+> +			clock-names = "arm", "pll2_pfd2_396m", "step",
+> +				      "pll1_sw", "pll1_sys";
+> +			arm-supply = <&reg_arm>;
+> +			pu-supply = <&reg_pu>;
+> +			soc-supply = <&reg_soc>;
+>  		};
+>  	};
+>  
+> -- 
+> 1.8.3.2
+> 
