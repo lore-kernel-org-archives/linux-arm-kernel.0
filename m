@@ -1,31 +1,32 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 19 Dec 2013 14:23:56 +0530
-Subject: [PATCH Resend 2/7] clk: tegra: Staticize tegra_clk_periph_nodiv_ops
+Date: Thu, 19 Dec 2013 14:23:57 +0530
+Subject: [PATCH Resend 3/7] clk: socfpga: Use NULL instead of 0
 In-Reply-To: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
 References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1387443241-5694-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1387443241-5694-3-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra_clk_periph_nodiv_ops is used only in this file. Make it static.
+'div_reg' is a pointer. Assign NULL instead of 0.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
 ---
- drivers/clk/tegra/clk-periph.c |    2 +-
+ drivers/clk/socfpga/clk.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
-index c534043c0481..356e9b804421 100644
---- a/drivers/clk/tegra/clk-periph.c
-+++ b/drivers/clk/tegra/clk-periph.c
-@@ -122,7 +122,7 @@ const struct clk_ops tegra_clk_periph_ops = {
- 	.disable = clk_periph_disable,
- };
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index c3784899f002..5983a26a8c5f 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -290,7 +290,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
+ 		socfpga_clk->shift = div_reg[1];
+ 		socfpga_clk->width = div_reg[2];
+ 	} else {
+-		socfpga_clk->div_reg = 0;
++		socfpga_clk->div_reg = NULL;
+ 	}
  
--const struct clk_ops tegra_clk_periph_nodiv_ops = {
-+static const struct clk_ops tegra_clk_periph_nodiv_ops = {
- 	.get_parent = clk_periph_get_parent,
- 	.set_parent = clk_periph_set_parent,
- 	.is_enabled = clk_periph_is_enabled,
+ 	of_property_read_string(node, "clock-output-names", &clk_name);
 -- 
 1.7.9.5
