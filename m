@@ -1,110 +1,75 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Thu, 19 Dec 2013 15:42:28 +0000
-Subject: [PATCH V4 3/3] cpufreq: imx6: Add device tree binding document
-In-Reply-To: <52B300D4.4090309@arm.com>
-References: <1387462609-13013-1-git-send-email-b20788@freescale.com>
- <1387462609-13013-3-git-send-email-b20788@freescale.com>,
- <52B300D4.4090309@arm.com>
-Message-ID: <DAA70643-C5BE-404A-93A7-0CCDDE2C3050@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 19 Dec 2013 15:43:13 +0000
+Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core
+ running without PCI on ARM64
+In-Reply-To: <201312191501.26362.arnd@arndb.de>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <20131217112914.GB32118@arm.com>
+ <20131219113051.GL2736@xora-haswell.xora.org.uk>
+ <201312191501.26362.arnd@arndb.de>
+Message-ID: <20131219154313.GF30398@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 19, 2013 at 02:01:26PM +0000, Arnd Bergmann wrote:
+> On Thursday 19 December 2013, Graeme Gregory wrote:
+> > Hopefully the documenation of what real armv8 server architecture will look
+> > like will come in the new year. Things like regulators and clocks I do not
+> > have answers to yet as obviously in Intel world these things are hidden
+> > from view, I do not know what the plan is for armv8 silicon/motherboards.
+> 
+> The clocks and regulators (and a handful of other subsystems) are
+> the key thing to work out IMHO. For all I know these are either completely
+> static (turned on by firmware at boot time) on current servers, or they
+> are done in a way that each device can manage itself using power states
+> in the PCI configuration space. If you have on-chip devices that do not
+> look like PCI devices to software, or that interact with other on-chip
+> controllers at run-time as on typical arm32 embedded SoCs, you are in
+> trouble to start with, and there are two possible ways to deal with this
+> in theory:
+> 
+> a) Hide all the register-level setup behind AML code and make Linux only
+>    aware of the possible device states that it can ask for, which would
+>    make this look similar to today's servers.
+> 
+> b) Model all the soc-internal registers as devices and write OS-specific
+>    SoC-specific device drivers for them, using yet-to-be-defined ACPI
+>    extensions to describe the interactions between devices. This would
+>    be modeled along the lines of what we do today with DT, and what Intel
+>    wants to do on their embedded SoCs with ACPI in the future.
+> 
+> I think anybody would agree that we should not try to mix the two models
+> in a single system, as that would create an endless source of bugs when
+> you have two drivers fighting over the same hardware. There is also a
+> rough consensus that we really only want a) and not b) on ARM, but there
+> have been indications that people are already working on b), which I
+> think is a bit worrying. I would argue that anyone who wants b) on 
+> ARM should not use ACPI at all but rather describe the hardware using
+> DT as we do today. This could possibly change if someone shows that a)
+> is actually not a realistic model at all, but I also think that doing b)
+> properly will depend on doing a major ACPI-6.0 or ACPI-7.0 release
+> to actually specify a standard model for the extra subsystems.
 
+I'm inclined to say that (ARM) Linux should only support stuff captured
+in an ACPI spec but I'm not familiar enough with this to assess its
+feasibility.
 
-Sent from Anson's iPhone
+Choosing between a) and b) depends when where you place the maintenance
+burden. Point a) pretty much leaves this with the hw vendors. They get a
+distro with a kernel supporting ACPI-x and (PCI) device drivers they
+need but other SoC specific is handled by firmware or AML. It is their
+responsibility to work on firmware and AML until getting it right
+without changing the kernel (well, unless they find genuine bugs with
+the code).
 
-> ? 2013?12?19??22:21?"Sudeep KarkadaNagesha" <Sudeep.KarkadaNagesha@arm.com> ???
-> 
->> On 19/12/13 14:16, Anson Huang wrote:
->> This device tree binding document describes the imx6 cpufreq
->> DT bindings. This document lists all required and optional properties
->> for imx6 cpufreq.
->> 
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->> ---
->> .../devicetree/bindings/cpufreq/cpufreq-imx6.txt   |   56 ++++++++++++++++++++
->> 1 file changed, 56 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
->> new file mode 100644
->> index 0000000..a14b895
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-imx6.txt
->> @@ -0,0 +1,56 @@
->> +i.MX6 cpufreq driver
->> +-------------------
->> +
->> +i.MX6 SoC cpufreq driver for CPU frequency scaling.
->> +
->> +This binding doc defines properties that must be put in the /cpus/cpu at 0 node,
->> +please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
->> +for detail.
->> +
->> +Required properties:
->> +- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
->> +  for details.
->> +- clocks: Specify clocks that need to be used when cpu frequency is scaled,
->> +  refer to Documentation/devicetree/bindings/clock/clock-bindings.txt for
->> +  details.
->> +- clock-names: List of clock input name strings sorted in the same order as the
->> +  clocks property, refer to Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +  for details.
->> +- xxx-supply: Input voltage supply regulator, refer to
->> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
->> +  arm-supply: regulator node supplying arm.
->> +  pu-supply: regulator node supplying pu.
->> +  soc-supply: regulator node supplying soc.
->> +
->> +Optional properties:
->> +- fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
->> +  go with cpu0's operating-points.
->> +- clock-latency: Specify the possible maximum transition latency for clock,
->> +  in unit of nanoseconds.
->> +
-> 
-> Sorry if I am missing something obvious as I have not followed the previous
-> versions and corresponding comments.
-> 
-> Should these SoC properties be part of cpu node ? If so which cpu or why cpu0 ?
-yes, these properties are for cpufreq function, as on SMP system, all CPUs are running at same freq, cpufreq is tied to cpu0, so we put them in cpu0's node. 
+Point b) is simpler for kernel developers as we know how to debug and
+maintain kernel code but I agree with you that we should rather use FDT
+here than duplicate the effort just for the sake of ACPI.
 
+Waiting for OS distros and vendors to clarify but I think RH are mainly
+looking at a). My (mis)understanding is based based on pro-ACPI
+arguments I heard like being able to use newer hardware with older
+kernels (and b) would always require new SoC drivers and bindings).
 
-> IIUC it's more a SoC properties which also influences ARM CPU OPPs. IOW other
-> regulators may depend on pu/soc-supply. In that case it would be cleaner if that
-> dependency is setup through regulators framework.
-
-the truth is that arm power domain has no level shift with sic/pu domain, so when arm domain voltage is changed, soc/pu domain need to be changed too, more like multi OPP concept. there is no other regulators depend on soc/pu supply.
-
-anson.
-> 
->> +Examples:
->> +
->> +    cpu at 0 {
->> +        operating-points = <
->> +            /* kHz    uV */
->> +            1200000 1275000
->> +            996000  1250000
->> +            792000  1150000
->> +            396000  975000
->> +        >;
->> +        fsl,soc-operating-points = <
->> +            /* ARM kHz  SOC-PU uV */
->> +            1200000 1275000
->> +            996000    1250000
->> +            792000    1175000
->> +            396000    1175000
->> +        >;
->> +        clock-latency = <61036>; /* two CLK32 periods */
->> +        clocks = <&clks 104>, <&clks 6>, <&clks 16>,
->> +             <&clks 17>, <&clks 170>;
->> +        clock-names = "arm", "pll2_pfd2_396m", "step",
->> +                  "pll1_sw", "pll1_sys";
->> +        arm-supply = <&reg_arm>;
->> +        pu-supply = <&reg_pu>;
->> +        soc-supply = <&reg_soc>;
->> +    };
-> 
-> 
-> 
-> 
+-- 
+Catalin
