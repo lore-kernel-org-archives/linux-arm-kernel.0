@@ -1,20 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 13:12:54 -0700
-Subject: [PATCH 00/10] ARM: tegra: DSI and panel support
-In-Reply-To: <1387468774-14216-1-git-send-email-treding@nvidia.com>
-References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
-Message-ID: <52B35346.1070202@wwwdotorg.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 19 Dec 2013 21:15:39 +0100
+Subject: [PATCH 22/41] clk: ux500: Copy u8500_clk_init() ready for DT
+ enablement
+In-Reply-To: <20131213015158.11981.27135@quantum>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+ <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
+ <20131213015158.11981.27135@quantum>
+Message-ID: <CAPDyKFoVDP=wcV0FcKYMtf-y8uq2ob2Ahge2y9_HL-bVojTcgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 08:59 AM, Thierry Reding wrote:
-> This series of patches add support for Tegra114 display, DSI, HDMI, gr2d
-> and gr3d. Both DSI and HDMI outputs are enabled on Dalmore.
-> 
-> The LVDS panels on Harmony and Cardhu are added to the corresponding DTS
-> files and support for panels is enabled in the Tegra defconfig.
+On 13 December 2013 02:51, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Linus Walleij (2013-09-20 13:59:46)
+>> On Wed, Sep 18, 2013 at 2:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > Here we're using the old clock initialisation function as a template.
+>> > It's necessary to remove all of the clk_register_clkdev() calls as
+>> > they don't make sense when booting with Device Tree.
+>> >
+>> > Cc: Mike Turquette <mturquette@linaro.org>
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> I *really* like the looks of this! Mike can we have your ACK on this?
+>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Very nice, and it all works and applies without conflicts:-) :-) :-)
+Hi Mike,
 
-Now I must run off and do the panels for Seaboard, Ventana, and the
-AC100 sometime.
+This went in through arm soc a while ago, it is present in 3.13 rc.
+Thanks for your ack, anyway.
+
+Kind regards
+Uffe
+
+>
+>>
+>> Yours,
+>> Linus Walleij
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
