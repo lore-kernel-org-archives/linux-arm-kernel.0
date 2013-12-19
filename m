@@ -1,46 +1,127 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 19 Dec 2013 21:55:27 +0100
-Subject: [PATCH Resend 6/7] clk: ux500: Remove extra semicolon
-In-Reply-To: <1387443241-5694-6-git-send-email-sachin.kamat@linaro.org>
-References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
- <1387443241-5694-6-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CAPDyKFoa37Y1wUA0kP+HyWA4--=-1hf2FsB+2_nRxj3QFKGB2g@mail.gmail.com>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Thu, 19 Dec 2013 16:06:17 -0500
+Subject: [RFC] pwm: Add Freescale FTM PWM driver support
+References: <1385979309-10505-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <87eh58zh2u.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2013 09:54, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Extra semicolon is redundant. Remove it.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+On  2 Dec 2013, Li.Xiubo at freescale.com wrote:
 
-Applied to my clk-next-ux500 branch.
+> The FTM PWM device can be found on Vybrid VF610 Tower and
+> Layerscape LS-1 SoCs.
 
-Thanks!
-Ulf Hansson
+[snip]
 
-> ---
->  drivers/clk/ux500/clk-prcmu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-> index 293a28854417..e2d63bc47436 100644
-> --- a/drivers/clk/ux500/clk-prcmu.c
-> +++ b/drivers/clk/ux500/clk-prcmu.c
-> @@ -36,7 +36,7 @@ static int clk_prcmu_prepare(struct clk_hw *hw)
->         if (!ret)
->                 clk->is_prepared = 1;
->
-> -       return ret;;
-> +       return ret;
->  }
->
->  static void clk_prcmu_unprepare(struct clk_hw *hw)
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> In Vybird VF610 Tower, all the IP blocks expect LE data. In the LS-1, some of
+> the IP blocks expect LE data, while others expect BE data. And the CPU always
+> operates in LE mode in these two platforms.
+
+[snip]
+
+> +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc, void __iomem *reg)
+> +{
+> +	u32 val;
+> +
+> +	val = __raw_readl(reg);
+> +
+> +	if (fpc->endianess == FTM_BIG)
+> +		return be32_to_cpu(val);
+> +	else
+> +		return le32_to_cpu(val);
+> +}
+> +
+> +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc, u32 val,
+> +		void __iomem *reg)
+> +{
+> +	if (fpc->endianess == FTM_BIG)
+> +		val = cpu_to_be32(val);
+> +	else
+> +		val = cpu_to_le32(val);
+> +
+> +	__raw_writel(val, reg);
+> +}
+
+Remove above and alter as below,
+
+static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+				enum pwm_polarity polarity)
+{
+	u32 val;
+	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
+
+	val = readl(fpc, fpc->base + FTM_POL);
+	if (polarity == PWM_POLARITY_INVERSED)
+-		val |= BIT(pwm->hwpwm);
++		val |= BIT(fpc->chn_bit);
+	else
+-		val &= ~BIT(pwm->hwpwm);
++		val &= ~BIT(fpc->chn_bit);
+	writel(fpc, val, fpc->base + FTM_POL);
+
+	return 0;
+}
+ 
+static int fsl_counter_clock_enable(struct fsl_pwm_chip *fpc)
+{
+	int ret;
+	u32 val;
+
+	if (fpc->counter_clk_enable++)
+		return 0;
+
+	ret = clk_prepare_enable(fpc->counter_clk);
+	if (ret) {
+		fpc->counter_clk_enable--;
+		return ret;
+	}
+
+	val = readl(fpc, fpc->base + FTM_SC);
++	val |= val >> 24; /* get value on big-endian. */
+	val &= ~((FTM_SC_CLK_MASK << FTM_SC_CLK_SHIFT) |
+			(FTM_SC_PS_MASK << FTM_SC_PS_SHIFT));
+
+	/* select counter clock source */
+	switch (fpc->counter_clk_select) {
+	case VF610_CLK_FTM0:
+		val |= FTM_SC_CLK_SYS;
+		break;
+	case VF610_CLK_FTM0_FIX_SEL:
+		val |= FTM_SC_CLK_FIX;
+		break;
+	case VF610_CLK_FTM0_EXT_SEL:
+		val |= FTM_SC_CLK_EXT;
+		break;
+	default:
+		fpc->counter_clk_enable--;
+		return -EINVAL;
+	}
+
+	val |= fpc->clk_ps;
++	val |= val << 24; /* modify to high byte for big-endian. */
+	writel(fpc, val, fpc->base + FTM_SC);
+
+	return 0;
+}
+
+That is instead of modifying the low level accessor, you can alter the
+driver masks based on the OF selected endian.  Many of the registers are
+already accessed as run-time fields because each channel is in a
+different bit position.  There are only two registers with fields that
+cross a byte boundary; COUNT and MOD.  These two must be swapped.  The
+others are either a byte or are accessed base on a channel number.
+
+For example in fsl_pwm_set_polarity(), we would read the memory, swap
+the value, calculate a bit to set, clear or set the bit and then write
+back the swapped value all on the 'big_endian' condition.  This way, you
+just read a bit shift which is conditional on the endian at probe time
+and don't double swap.
+
+In the fsl_counter_clock_enable(), the example is using 'write ignored
+bits' and duplicating the value in both big/little bytes.  An
+alternative is to parameterize all the mask/values in 'const struct' and
+have a different pointer for big/little and store this in-place (or via
+a pointer) in fsl_pwm_chip.
+
+Fwiw,
+Bill Pringlemeir.
