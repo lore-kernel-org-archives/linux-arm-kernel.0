@@ -1,43 +1,74 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 18 Dec 2013 17:32:04 -0800
-Subject: [PATCHv3] arm: Correct virt_addr_valid
-Message-ID: <1387416724-17868-1-git-send-email-lauraa@codeaurora.org>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Thu, 19 Dec 2013 02:13:21 +0000
+Subject: [PATCH V3 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
+In-Reply-To: <ADD49D66-30FE-4D87-88D6-F8AE07376F3F@freescale.com>
+References: <1387402010-31749-1-git-send-email-b20788@freescale.com>,
+ <CAOMZO5DCGOkUtWmEok-uEFsUpGLF+93Vhm9XFs02yH9Z+eV0uQ@mail.gmail.com>
+ <ADD49D66-30FE-4D87-88D6-F8AE07376F3F@freescale.com>
+Message-ID: <112fab48e08c43749c0797328b1f1ee1@DM2PR03MB317.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of virt_addr_valid is that virt_addr_valid should
-return true if and only if virt_to_page returns a valid pointer.
-The current definition of virt_addr_valid only checks against the
-virtual address range. There's no guarantee that just because a
-virtual address falls bewteen PAGE_OFFSET and high_memory the
-associated physical memory has a valid backing struct page. Follow
-the example of other architectures and convert to pfn_valid to
-verify that the virtual address is actually valid. The check for
-an address between PAGE_OFFSET and high_memory is still necessary
-as vmalloc/highmem addresses are not valid with virt_to_page.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/include/asm/memory.h |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Best Regards.
+Anson huang ???
+?
+Freescale Semiconductor Shanghai
+?????????192?A?2?
+201203
+Tel:021-28937058
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 9ecccc8..35a8511 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -350,7 +350,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
- 
- #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
--#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
-+#define virt_addr_valid(kaddr)	(((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory) \
-+					&& pfn_valid(__pa(kaddr) >> PAGE_SHIFT) )
- 
- #endif
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+
+>-----Original Message-----
+>From: Huang Yongcai-B20788
+>Sent: Wednesday, December 18, 2013 8:01 PM
+>To: Fabio Estevam
+>Cc: Huang Yongcai-B20788; Shawn Guo; rjw at rjwysocki.net; Viresh Kumar;
+>devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>cpufreq at vger.kernel.org; linux-pm at vger.kernel.org
+>Subject: Re: [PATCH V3 1/2] ARM: imx: add vddsoc/pu setpoint info into dts
+>
+>
+>
+>Sent from Anson's iPhone
+>
+>> ? 2013?12?18??19:08?"Fabio Estevam" <festevam@gmail.com> ???
+>>
+>> Hi Anson,
+>>
+>>> On Wed, Dec 18, 2013 at 7:26 PM, Anson Huang <b20788@freescale.com> wrote:
+>>>
+>>> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+>>> +  arm-supply: vddarm input.
+>>> +  pu-supply: vddpu input.
+>>> +  soc-supply: vddsoc input.
+>>
+>> I found these messages confusing, as someone may think that you are
+>> referring to the VDD_ARM_IN/VDD_ARM23_IN and VDD_SOC_IN, which are
+>> really inputs.
+>>
+>> What about doing this instead?
+>>
+>> arm-supply: VDDARM LDO output
+>> pu-supply:  VDDPU LDO output
+>> soc-supply: VDDSOC LDO output
+>
+>I think they should know these regulators mean the arm, soc/pu's real working
+>voltage, as you know, our i.MX6 also support LDO bypass mode, then these
+>regulators can be VDDXXX_IN. that is why I use vddxxx input, not vddxxx LDO
+>input.Thanks!
+
+After re-consideration, I think below should be better:
+arm-supply: regulator node supplying arm.
+pu-supply: regulator node supplying pu.
+soc-supply: regulator node supplying soc.
+
+Anson 
+
+
+>>
+>> Regards,
+>>
+>> Fabio Estevam
+>>
+>>
