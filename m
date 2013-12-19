@@ -1,82 +1,77 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 19 Dec 2013 11:59:16 +0800
-Subject: [PATCH 1/3] ARM: at91: add PWM clock
+Date: Thu, 19 Dec 2013 11:59:18 +0800
+Subject: [PATCH 3/3] arm: at91: at91sam9m10g45ek: switch to PWM leds
 In-Reply-To: <1387425558-8589-1-git-send-email-voice.shen@atmel.com>
 References: <1387425558-8589-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1387425558-8589-2-git-send-email-voice.shen@atmel.com>
+Message-ID: <1387425558-8589-4-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PWM clock for AT91 series SoC which include PWM controller.
+The d6 and d7 is connected to PWM, we can use PWM to control it,
+so switch to PWM leds.
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
- arch/arm/mach-at91/at91sam9263.c |    1 +
- arch/arm/mach-at91/at91sam9g45.c |    1 +
- arch/arm/mach-at91/at91sam9n12.c |    1 +
- arch/arm/mach-at91/at91sam9rl.c  |    1 +
- arch/arm/mach-at91/at91sam9x5.c  |    1 +
- 5 files changed, 5 insertions(+)
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 37b90f4..fbd771d 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -223,6 +223,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
- };
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index a4b00e5..96059e6 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -105,6 +105,14 @@
+ 							 AT91_PIOD 29 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;	/* PD29 gpio WP pin pull up */
+ 					};
+ 				};
++
++				pwm0 {
++					pinctrl_pwm_leds: pwm-led {
++						atmel,pins =
++							<AT91_PIOD 0  AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* PD0 periph B */
++							 AT91_PIOD 31 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;	/* PD31 periph B */
++					};
++				};
+ 			};
  
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 2f455ce..e9ba934 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -284,6 +284,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioE", &pioDE_clk),
- 	/* Fake adc clock */
- 	CLKDEV_CON_ID("adc_clk", &tsc_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
- };
+ 			spi0: spi at fffa4000{
+@@ -121,6 +129,13 @@
+ 				atmel,vbus-gpio = <&pioB 19 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
+ 			};
++
++			pwm0: pwm at fffb8000 {
++				status = "okay";
++
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_pwm_leds>;
++			};
+ 		};
  
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 4ef088c..f2ea7b0 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -182,6 +182,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	/* additional fake clock for macb_hclk */
- 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &uhp_clk),
- 	CLKDEV_CON_DEV_ID("ohci_clk", "500000.ohci", &uhp_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8034000.pwm", &pwm_clk),
- };
+ 		nand0: nand at 40000000 {
+@@ -165,16 +180,22 @@
+ 			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
++	};
++
++	pwmleds {
++		compatible = "pwm-leds";
  
- /*
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 3651517..e577d37 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -196,6 +196,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
- 	CLKDEV_CON_ID("pioD", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffc8000.pwm", &pwm_clk),
- };
+ 		d6 {
+ 			label = "d6";
+-			gpios = <&pioD 0 GPIO_ACTIVE_LOW>;
++			pwms = <&pwm0 3 5000 0>;
++			max-brightness = <255>;
+ 			linux,default-trigger = "nand-disk";
+ 		};
  
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 3e8ec26..9ad781d 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "500000.gadget", &utmi_clk),
- 	CLKDEV_CON_DEV_ID("pclk", "500000.gadget", &udphs_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8034000.pwm", &pwm_clk),
- };
- 
- /*
+ 		d7 {
+ 			label = "d7";
+-			gpios = <&pioD 31 GPIO_ACTIVE_LOW>;
++			pwms = <&pwm0 1 5000 0>;
++			max-brightness = <255>;
+ 			linux,default-trigger = "mmc0";
+ 		};
+ 	};
 -- 
 1.7.9.5
