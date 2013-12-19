@@ -1,54 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Dec 2013 00:03:18 +0100
-Subject: [GIT PULL] at91: dt for 3.14 #2
-Message-ID: <1387494198-20329-1-git-send-email-nicolas.ferre@atmel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Dec 2013 21:08:52 -0200
+Subject: [PATCH] ARM: dts: imx6qdl: Use 'vddarm' as the regulator name
+Message-ID: <1387494532-25752-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Some more DT material for 3.14 based on top of what I already sent (in
-your at91/dt branch). Nothing really surprising...
+Instead of calling the regulator for the ARM core as 'cpu', let's rename it
+as 'vddarm', so that we keep a better consistency with the other internal
+regulators:
 
-Thanks, best regards,
+vdd1p1: 800 <--> 1375 mV at 1100 mV                                             
+vdd3p0: 2800 <--> 3150 mV at 3000 mV                                            
+vdd2p5: 2000 <--> 2750 mV at 2400 mV                                            
+vddarm: 725 <--> 1450 mV at 1150 mV                                             
+vddpu: 725 <--> 1450 mV at 1150 mV                                              
+vddsoc: 725 <--> 1450 mV at 1200 mV
 
-The following changes since commit ca594844e4a53f778811c06feef60bdf36bc5fec:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  ARM: at91/at91rm9200ek.dts: rearrange nodes in address ascending order (2013-12-09 15:08:57 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt2
-
-for you to fetch changes up to 45e5c2cb6bc1c52c7134f898ea326a422dd75761:
-
-  ARM: at91/dt: add clk properties to sama5d3 TDES device node (2013-12-19 23:00:06 +0100)
-
-----------------------------------------------------------------
-Second DT pull-request for 3.14
-- now that PWM driver is on its way to mainline,
-  we can integrate the DT entries
-- As an example, use PWM for at91sam9m10g45ek leds
-- Addition of clock specification for newly introduced
-  crypto DT entries
-
-----------------------------------------------------------------
-Bo Shen (2):
-      ARM: at91: add PWM device node
-      ARM: at91: at91sam9m10g45ek: switch to PWM leds
-
-Boris BREZILLON (3):
-      ARM: at91/dt: add clk properties to sama5d3 SHA device node
-      ARM: at91/dt: add clk properties to sama5d3 AES device node
-      ARM: at91/dt: add clk properties to sama5d3 TDES device node
-
- arch/arm/boot/dts/at91sam9263.dtsi     |  9 +++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi     |  9 +++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts | 25 +++++++++++++++++++++++--
- arch/arm/boot/dts/at91sam9n12.dtsi     |  9 +++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi      |  9 +++++++++
- arch/arm/boot/dts/sama5d3.dtsi         | 16 ++++++++++++++++
- 6 files changed, 75 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 858ecd7..4f5647e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -513,7 +513,7 @@
+ 
+ 				reg_arm: regulator-vddcore at 140 {
+ 					compatible = "fsl,anatop-regulator";
+-					regulator-name = "cpu";
++					regulator-name = "vddarm";
+ 					regulator-min-microvolt = <725000>;
+ 					regulator-max-microvolt = <1450000>;
+ 					regulator-always-on;
 -- 
-Nicolas Ferre
+1.8.1.2
