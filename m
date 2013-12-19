@@ -1,83 +1,85 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 19 Dec 2013 16:16:31 -0500
-Subject: [PATCH V3 2/2] thermal: imx: add necessary clk operation
-Message-ID: <1387487791-3259-1-git-send-email-b20788@freescale.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Dec 2013 18:18:41 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790 - fix shdi resource sizes
+In-Reply-To: <87sitsnygu.wl%kuninori.morimoto.gx@gmail.com>
+References: <1387197528-1177-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1387197528-1177-2-git-send-email-ben.dooks@codethink.co.uk>
+ <87sitsnygu.wl%kuninori.morimoto.gx@gmail.com>
+Message-ID: <20131219091839.GA27244@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thermal sensor needs pll3_usb_otg when measuring temperature,
-otherwise the temperature read will be incorrect, so need to
-enable this clk before sensor working, for alarm function,
-as hardware will take measurement periodically, so we should
-keep this clk always on once alarm function is enabled.
+On Mon, Dec 16, 2013 at 03:54:47PM -0800, Kuninori Morimoto wrote:
+> 
+> Hi
+> 
+> > The r8a7790.dtsi file has four sdhi nodes which the first two have the wrong
+> > resource size for their register block. This causes the sh_modbile_sdhi driver
+> > to fail to communicate with card at-all.
+> > 
+> > Change sdhi{0,1} node size from 0x100 to 0x200 to correct these nodes
+> > as per Kuninori Morimoto's response to the original patch where all four
+> > nodes where changed. sdhi{2,3} are the correct size.
+> > 
+> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: Simon Horman <horms@verge.net.au>
+> > Cc: Linux SH <linux-sh@vger.kernel.org>
+> > Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
+> > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> > Tested-by: William Towle <william.towle@codethink.co.uk>
+> > ---
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
+Thanks. I will queue up the following as a fix for v3.13.
+
+From: Ben Dooks <ben.dooks@codethink.co.uk>
+
+ARM: shmobile: r8a7790: fix shdi resource sizes
+
+The r8a7790.dtsi file has four sdhi nodes which the first two have the wrong
+resource size for their register block. This causes the sh_modbile_sdhi driver
+to fail to communicate with card at-all.
+
+Change sdhi{0,1} node size from 0x100 to 0x200 to correct these nodes
+as per Kuninori Morimoto's response to the original patch where all four
+nodes where changed. sdhi{2,3} are the correct size.
+
+This bug has been present since sdhi resources were added to the r8a7790 by
+8c9b1aa41853272a ("ARM: shmobile: r8a7790: add MMCIF and SDHI DT
+templates") in v3.11-rc2.
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Tested-by: William Towle <william.towle@codethink.co.uk>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../devicetree/bindings/thermal/imx-thermal.txt    |    4 ++++
- drivers/thermal/imx_thermal.c                      |   18 ++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-index 541c25e..1f0f672 100644
---- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-@@ -8,10 +8,14 @@ Required properties:
-   calibration data, e.g. OCOTP on imx6q.  The details about calibration data
-   can be found in SoC Reference Manual.
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 46e1d7e..9987dd0e 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -241,7 +241,7 @@
  
-+Optional properties:
-+- clocks : thermal sensor's clock source.
-+
- Example:
+ 	sdhi0: sdhi at ee100000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee100000 0 0x100>;
++		reg = <0 0xee100000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 4>;
+ 		cap-sd-highspeed;
+@@ -250,7 +250,7 @@
  
- tempmon {
- 	compatible = "fsl,imx6q-tempmon";
- 	fsl,tempmon = <&anatop>;
- 	fsl,tempmon-data = <&ocotp>;
-+	clocks = <&clks 172>;
- };
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index 1d6c801..c2b8173 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -7,6 +7,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/cpu_cooling.h>
- #include <linux/cpufreq.h>
- #include <linux/delay.h>
-@@ -73,6 +74,7 @@ struct imx_thermal_data {
- 	unsigned long last_temp;
- 	bool irq_enabled;
- 	int irq;
-+	struct clk *thermal_clk;
- };
- 
- static void imx_set_alarm_temp(struct imx_thermal_data *data,
-@@ -457,6 +459,22 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->thermal_clk)) {
-+		dev_warn(&pdev->dev, "failed to get thermal clk!\n");
-+	} else {
-+		/*
-+		 * Thermal sensor needs clk on to get correct value, normally
-+		 * we should enable its clk before taking measurement and disable
-+		 * clk after measurement is done, but if alarm function is enabled,
-+		 * hardware will auto measure the temperature periodically, so we
-+		 * need to keep the clk always on for alarm function.
-+		 */
-+		ret = clk_prepare_enable(data->thermal_clk);
-+		if (ret)
-+			dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-+	}
-+
- 	/* Enable measurements at ~ 10 Hz */
- 	regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
- 	measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
+ 	sdhi1: sdhi at ee120000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee120000 0 0x100>;
++		reg = <0 0xee120000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 4>;
+ 		cap-sd-highspeed;
 -- 
-1.7.9.5
+1.8.4
