@@ -1,29 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Dec 2013 13:03:34 +0000
-Subject: [PATCH v3 1/9] ASoC: fsl-ssi: Fix probe error handling
-In-Reply-To: <1387367865-26391-2-git-send-email-mpa@pengutronix.de>
-References: <1387367865-26391-1-git-send-email-mpa@pengutronix.de>
- <1387367865-26391-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131219130334.GZ31886@sirena.org.uk>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Thu, 19 Dec 2013 13:09:48 +0000
+Subject: [PATCH v2] net: mvmdio: fix interrupt timeout handling
+In-Reply-To: <52B2D97F.4070200@gmail.com>
+References: <52B2D97F.4070200@gmail.com>
+Message-ID: <1387458588-17231-1-git-send-email-leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 12:57:37PM +0100, Markus Pargmann wrote:
-> This patch fixes the error handling in the fsl-ssi probe function.
+This version corrects the whitespace issue.
 
-This doesn't apply against current code, please check and resend.
+orion_mdio_wait_ready uses wait_event_timeout to wait for the
+SMI interrupt to fire.  wait_event_timeout waits for between
+"timeout - 1" and "timeout" jiffies.  In this case a 1ms timeout
+when HZ is 1000 results in a wait of 0 to 1 jiffies, causing
+premature timeouts.
 
->  error_irqmap:
-> -	irq_dispose_mapping(ssi_private->irq);
-> +	if (ssi_private->use_dma && !of_device_is_compatible(pdev->dev.of_node,
-> +				"fsl,imx21-ssi"))
-> +		irq_dispose_mapping(ssi_private->irq);
+This fix ensures a minimum timeout of 2 jiffies, ensuring
+wait_event_timeout will always wait at least 1 jiffie.
 
-This test is icky, a flag set when we create the mapping would be neter.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/d4b71001/attachment.sig>
+Issue reported by Nicolas Schichan.
+
+Tested-by: Nicolas Schichan <nschichan@freebox.fr>
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 7354960..c4eeb69 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -92,6 +92,12 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+ 			if (time_is_before_jiffies(end))
+ 				++timedout;
+ 	        } else {
++			/* wait_event_timeout does not guarantee a delay of at
++			 * least one whole jiffie, so timeout must be no less
++			 * than two.
++			 */
++			if (timeout < 2)
++				timeout = 2;
+ 			wait_event_timeout(dev->smi_busy_wait,
+ 				           orion_mdio_smi_is_done(dev),
+ 				           timeout);
+-- 
+1.8.5.1
