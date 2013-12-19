@@ -1,125 +1,141 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:23:50 +0200
-Subject: [PATCHv11 19/49] clk: ti: add support for basic mux clock
+Date: Thu, 19 Dec 2013 13:23:48 +0200
+Subject: [PATCHv11 17/49] CLK: TI: add support for gate clock
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-20-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-18-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ti,mux-clock provides now a binding for basic mux support. This is just
-using the basic clock type.
+This patch adds support for TI specific gate clocks. These behave as basic
+gate-clock, but have different ops / hw-ops for controlling the actual
+gate, for example waiting until the clock is ready. Several sub-types
+are supported:
+- ti,gate-clock: basic gate clock with default ops/hwops
+- ti,clkdm-gate-clock: clockdomain level gate control
+- ti,dss-gate-clock: gate clock with DSS specific hardware handling
+- ti,am35xx-gate-clock: gate clock with AM35xx specific hardware handling
+- ti,hsdiv-gate-clock: gate clock with OMAP36xx hardware errata handling
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- Documentation/devicetree/bindings/clock/ti/mux.txt |   76 +++++++++++
+ .../devicetree/bindings/clock/ti/gate.txt          |   85 +++++++
  drivers/clk/ti/Makefile                            |    2 +-
- drivers/clk/ti/mux.c                               |  137 ++++++++++++++++++++
- 3 files changed, 214 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/mux.txt
- create mode 100644 drivers/clk/ti/mux.c
+ drivers/clk/ti/gate.c                              |  245 ++++++++++++++++++++
+ include/linux/clk/ti.h                             |    6 +
+ 4 files changed, 337 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/gate.txt
+ create mode 100644 drivers/clk/ti/gate.c
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/mux.txt b/Documentation/devicetree/bindings/clock/ti/mux.txt
+diff --git a/Documentation/devicetree/bindings/clock/ti/gate.txt b/Documentation/devicetree/bindings/clock/ti/gate.txt
 new file mode 100644
-index 0000000..2d0d170
+index 0000000..125281a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/mux.txt
-@@ -0,0 +1,76 @@
-+Binding for TI mux clock.
++++ b/Documentation/devicetree/bindings/clock/ti/gate.txt
+@@ -0,0 +1,85 @@
++Binding for Texas Instruments gate clock.
 +
 +Binding status: Unstable - ABI compatibility may be broken in the future
 +
-+This binding uses the common clock binding[1].  It assumes a
-+register-mapped multiplexer with multiple input clock signals or
-+parents, one of which can be selected as output.  This clock does not
-+gate or adjust the parent rate via a divider or multiplier.
-+
-+By default the "clocks" property lists the parents in the same order
-+as they are programmed into the regster.  E.g:
-+
-+	clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
-+
-+results in programming the register as follows:
-+
-+register value		selected parent clock
-+0			foo_clock
-+1			bar_clock
-+2			baz_clock
-+
-+Some clock controller IPs do not allow a value of zero to be programmed
-+into the register, instead indexing begins at 1.  The optional property
-+"index-starts-at-one" modified the scheme as follows:
-+
-+register value		selected clock parent
-+1			foo_clock
-+2			bar_clock
-+3			baz_clock
-+
-+The binding must provide the register to control the mux. Optionally
-+the number of bits to shift the control field in the register can be
-+supplied. If the shift value is missing it is the same as supplying
-+a zero shift.
++This binding uses the common clock binding[1]. This clock is
++quite much similar to the basic gate-clock [2], however,
++it supports a number of additional features. If no register
++is provided for this clock, the code assumes that a clockdomain
++will be controlled instead and the corresponding hw-ops for
++that is used.
 +
 +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/clock/gate-clock.txt
++[3] Documentation/devicetree/bindings/clock/ti/clockdomain.txt
 +
 +Required properties:
-+- compatible : shall be "ti,mux-clock" or "ti,composite-mux-clock".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : link phandles of parent clocks
-+- reg : register offset for register controlling adjustable mux
++- compatible : shall be one of:
++  "ti,gate-clock" - basic gate clock
++  "ti,wait-gate-clock" - gate clock which waits until clock is active before
++			 returning from clk_enable()
++  "ti,dss-gate-clock" - gate clock with DSS specific hardware handling
++  "ti,am35xx-gate-clock" - gate clock with AM35xx specific hardware handling
++  "ti,clkdm-gate-clock" - clockdomain gate clock, which derives its functional
++			  clock directly from a clockdomain, see [3] how
++			  to map clockdomains properly
++  "ti,hsdiv-gate-clock" - gate clock with OMAP36xx specific hardware handling,
++			  required for a hardware errata
++- #clock-cells : from common clock binding; shall be set to 0
++- clocks : link to phandle of parent clock
++- reg : offset for register controlling adjustable gate, not needed for
++	ti,clkdm-gate-clock type
 +
 +Optional properties:
-+- ti,bit-shift : number of bits to shift the bit-mask, defaults to
-+  0 if not present
-+- ti,index-starts-at-one : valid input select programming starts at 1, not
-+  zero
-+- ti,set-rate-parent : clk_set_rate is propagated to parent clock,
-+  not supported by the composite-mux-clock subtype
++- ti,bit-shift : bit shift for programming the clock gate, invalid for
++		 ti,clkdm-gate-clock type
++- ti,set-bit-to-disable : inverts default gate programming. Setting the bit
++  gates the clock and clearing the bit ungates the clock.
 +
 +Examples:
++	mmchs2_fck: mmchs2_fck at 48004a00 {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&core_96m_fck>;
++		reg = <0x48004a00 0x4>;
++		ti,bit-shift = <25>;
++	};
 +
-+sys_clkin_ck: sys_clkin_ck at 4a306110 {
-+	#clock-cells = <0>;
-+	compatible = "ti,mux-clock";
-+	clocks = <&virt_12000000_ck>, <&virt_13000000_ck>, <&virt_16800000_ck>, <&virt_19200000_ck>, <&virt_26000000_ck>, <&virt_27000000_ck>, <&virt_38400000_ck>;
-+	reg = <0x0110>;
-+	ti,index-starts-at-one;
-+};
++	uart4_fck_am35xx: uart4_fck_am35xx {
++		#clock-cells = <0>;
++		compatible = "ti,wait-gate-clock";
++		clocks = <&core_48m_fck>;
++		reg = <0x0a00>;
++		ti,bit-shift = <23>;
++	};
 +
-+abe_dpll_bypass_clk_mux_ck: abe_dpll_bypass_clk_mux_ck at 4a306108 {
-+	#clock-cells = <0>;
-+	compatible = "ti,mux-clock";
-+	clocks = <&sys_clkin_ck>, <&sys_32k_ck>;
-+	ti,bit-shift = <24>;
-+	reg = <0x0108>;
-+};
++	dss1_alwon_fck_3430es2: dss1_alwon_fck_3430es2 at 48004e00 {
++		#clock-cells = <0>;
++		compatible = "ti,dss-gate-clock";
++		clocks = <&dpll4_m4x2_ck>;
++		reg = <0x48004e00 0x4>;
++		ti,bit-shift = <0>;
++	};
 +
-+mcbsp5_mux_fck: mcbsp5_mux_fck {
-+	#clock-cells = <0>;
-+	compatible = "ti,composite-mux-clock";
-+	clocks = <&core_96m_fck>, <&mcbsp_clks>;
-+	ti,bit-shift = <4>;
-+	reg = <0x02d8>;
-+};
++	emac_ick: emac_ick at 4800259c {
++		#clock-cells = <0>;
++		compatible = "ti,am35xx-gate-clock";
++		clocks = <&ipss_ick>;
++		reg = <0x4800259c 0x4>;
++		ti,bit-shift = <1>;
++	};
++
++	emu_src_ck: emu_src_ck {
++		#clock-cells = <0>;
++		compatible = "ti,clkdm-gate-clock";
++		clocks = <&emu_src_mux_ck>;
++	};
++
++	dpll4_m2x2_ck: dpll4_m2x2_ck at 48004d00 {
++		#clock-cells = <0>;
++		compatible = "ti,hsdiv-gate-clock";
++		clocks = <&dpll4_m2x2_mul_ck>;
++		ti,bit-shift = <0x1b>;
++		reg = <0x48004d00 0x4>;
++		ti,set-bit-to-disable;
++	};
 diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 67056fb..ef61d39 100644
+index f57fc4b..7cba389 100644
 --- a/drivers/clk/ti/Makefile
 +++ b/drivers/clk/ti/Makefile
-@@ -1,5 +1,5 @@
+@@ -1,4 +1,4 @@
  ifneq ($(CONFIG_OF),)
  obj-y					+= clk.o dpll.o autoidle.o divider.o \
- 					   fixed-factor.o gate.o clockdomain.o \
--					   composite.o
-+					   composite.o mux.o
+-					   fixed-factor.o composite.o
++					   fixed-factor.o gate.o composite.o
  endif
-diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
+diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
 new file mode 100644
-index 0000000..8d0d18a
+index 0000000..3f74911
 --- /dev/null
-+++ b/drivers/clk/ti/mux.c
-@@ -0,0 +1,137 @@
++++ b/drivers/clk/ti/gate.c
+@@ -0,0 +1,245 @@
 +/*
-+ * TI Multiplexer Clock
++ * OMAP gate clock support
 + *
 + * Copyright (C) 2013 Texas Instruments, Inc.
 + *
@@ -137,123 +153,254 @@ index 0000000..8d0d18a
 +
 +#include <linux/clk-provider.h>
 +#include <linux/slab.h>
-+#include <linux/err.h>
++#include <linux/io.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/clk/ti.h>
 +
++#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
++
 +#undef pr_fmt
 +#define pr_fmt(fmt) "%s: " fmt, __func__
 +
++static int omap36xx_gate_clk_enable_with_hsdiv_restore(struct clk_hw *clk);
++
++static const struct clk_ops omap_gate_clkdm_clk_ops = {
++	.init		= &omap2_init_clk_clkdm,
++	.enable		= &omap2_clkops_enable_clkdm,
++	.disable	= &omap2_clkops_disable_clkdm,
++};
++
++static const struct clk_ops omap_gate_clk_ops = {
++	.init		= &omap2_init_clk_clkdm,
++	.enable		= &omap2_dflt_clk_enable,
++	.disable	= &omap2_dflt_clk_disable,
++	.is_enabled	= &omap2_dflt_clk_is_enabled,
++};
++
++static const struct clk_ops omap_gate_clk_hsdiv_restore_ops = {
++	.init		= &omap2_init_clk_clkdm,
++	.enable		= &omap36xx_gate_clk_enable_with_hsdiv_restore,
++	.disable	= &omap2_dflt_clk_disable,
++	.is_enabled	= &omap2_dflt_clk_is_enabled,
++};
++
 +/**
-+ * of_mux_clk_setup - Setup function for simple mux rate clock
-+ * @node: DT node for the clock
++ * omap36xx_gate_clk_enable_with_hsdiv_restore - enable clocks suffering
++ *         from HSDivider PWRDN problem Implements Errata ID: i556.
++ * @clk: DPLL output struct clk
 + *
-+ * Sets up a basic clock multiplexer.
++ * 3630 only: dpll3_m3_ck, dpll4_m2_ck, dpll4_m3_ck, dpll4_m4_ck,
++ * dpll4_m5_ck & dpll4_m6_ck dividers gets loaded with reset
++ * valueafter their respective PWRDN bits are set.  Any dummy write
++ * (Any other value different from the Read value) to the
++ * corresponding CM_CLKSEL register will refresh the dividers.
 + */
-+static void of_mux_clk_setup(struct device_node *node)
++static int omap36xx_gate_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
++{
++	struct clk_divider *parent;
++	struct clk_hw *parent_hw;
++	u32 dummy_v, orig_v;
++	int ret;
++
++	/* Clear PWRDN bit of HSDIVIDER */
++	ret = omap2_dflt_clk_enable(clk);
++
++	/* Parent is the x2 node, get parent of parent for the m2 div */
++	parent_hw = __clk_get_hw(__clk_get_parent(__clk_get_parent(clk->clk)));
++	parent = to_clk_divider(parent_hw);
++
++	/* Restore the dividers */
++	if (!ret) {
++		orig_v = ti_clk_ll_ops->clk_readl(parent->reg);
++		dummy_v = orig_v;
++
++		/* Write any other value different from the Read value */
++		dummy_v ^= (1 << parent->shift);
++		ti_clk_ll_ops->clk_writel(dummy_v, parent->reg);
++
++		/* Write the original divider */
++		ti_clk_ll_ops->clk_writel(orig_v, parent->reg);
++	}
++
++	return ret;
++}
++
++static void __init _of_ti_gate_clk_setup(struct device_node *node,
++					 const struct clk_ops *ops,
++					 const struct clk_hw_omap_ops *hw_ops)
 +{
 +	struct clk *clk;
-+	const char **parent_names;
-+	int i;
-+	struct clk_mux_desc *desc;
++	struct clk_init_data init = { NULL };
++	struct clk_hw_omap *clk_hw;
++	const char *clk_name = node->name;
++	const char *parent_name;
 +	u32 val;
 +
-+	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
++	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
++	if (!clk_hw)
 +		return;
 +
-+	desc->desc.num_parents = of_clk_get_parent_count(node);
-+	if (desc->desc.num_parents < 2) {
-+		pr_err("mux-clock %s must have parents\n", node->name);
-+		goto cleanup;
++	clk_hw->hw.init = &init;
++
++	init.name = clk_name;
++	init.ops = ops;
++
++	if (ops != &omap_gate_clkdm_clk_ops) {
++		clk_hw->enable_reg = ti_clk_get_reg_addr(node, 0);
++		if (!clk_hw->enable_reg)
++			return;
++
++		if (!of_property_read_u32(node, "ti,bit-shift", &val))
++			clk_hw->enable_bit = val;
 +	}
-+	parent_names = kzalloc((sizeof(char *) * desc->desc.num_parents),
-+			       GFP_KERNEL);
-+	if (!parent_names)
-+		goto cleanup;
 +
-+	for (i = 0; i < desc->desc.num_parents; i++)
-+		parent_names[i] = of_clk_get_parent_name(node, i);
++	clk_hw->ops = hw_ops;
 +
-+	desc->desc.parent_names = parent_names;
-+	desc->desc.name = node->name;
-+	desc->desc.register_func = clk_register_mux_desc;
++	clk_hw->flags = MEMMAP_ADDRESSING;
 +
-+	desc->reg = ti_clk_get_reg_addr(node, 0);
++	if (of_clk_get_parent_count(node) != 1) {
++		pr_err("%s must have 1 parent\n", clk_name);
++		return;
++	}
 +
-+	if (!desc->reg)
-+		goto cleanup;
-+
-+	desc->ll_ops = ti_clk_ll_ops;
-+
-+	if (!of_property_read_u32(node, "ti,bit-shift", &val))
-+		desc->shift = val;
-+
-+	if (of_property_read_bool(node, "ti,index-starts-at-one"))
-+		desc->flags |= CLK_MUX_INDEX_ONE;
++	parent_name = of_clk_get_parent_name(node, 0);
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
 +
 +	if (of_property_read_bool(node, "ti,set-rate-parent"))
-+		desc->desc.flags |= CLK_SET_RATE_PARENT;
++		init.flags |= CLK_SET_RATE_PARENT;
 +
-+	/* Generate bit-mask based on parent info */
-+	desc->mask = desc->desc.num_parents;
-+	if (!(desc->flags & CLK_MUX_INDEX_ONE))
-+		desc->mask--;
++	if (of_property_read_bool(node, "ti,set-bit-to-disable"))
++		clk_hw->flags |= INVERT_ENABLE;
 +
-+	desc->mask = (1 << fls(desc->mask)) - 1;
++	clk = clk_register(NULL, &clk_hw->hw);
 +
-+	clk = clk_register_desc(NULL, &desc->desc);
-+
-+	if (!IS_ERR(clk))
++	if (!IS_ERR(clk)) {
 +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+
-+cleanup:
-+	kfree(desc->desc.parent_names);
-+	kfree(desc);
-+}
-+CLK_OF_DECLARE(mux_clk, "ti,mux-clock", of_mux_clk_setup);
-+
-+static void __init of_ti_composite_mux_clk_setup(struct device_node *node)
-+{
-+	struct clk_mux *mux;
-+	int num_parents;
-+	u32 val;
-+
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
 +		return;
-+
-+	mux->reg = ti_clk_get_reg_addr(node, 0);
-+
-+	if (!mux->reg)
-+		goto cleanup;
-+
-+	mux->ll_ops = ti_clk_ll_ops;
-+
-+	if (!of_property_read_u32(node, "ti,bit-shift", &val))
-+		mux->shift = val;
-+
-+	if (of_property_read_bool(node, "ti,index-starts-at-one"))
-+		mux->flags |= CLK_MUX_INDEX_ONE;
-+
-+	num_parents = of_clk_get_parent_count(node);
-+
-+	if (num_parents < 2) {
-+		pr_err("%s must have parents\n", node->name);
-+		goto cleanup;
 +	}
 +
-+	mux->mask = num_parents - 1;
-+	mux->mask = (1 << fls(mux->mask)) - 1;
++	kfree(clk_hw);
++}
 +
-+	if (!ti_clk_add_component(node, &mux->hw, CLK_COMPONENT_TYPE_MUX))
++static void __init
++_of_ti_composite_gate_clk_setup(struct device_node *node,
++				const struct clk_hw_omap_ops *hw_ops)
++{
++	struct clk_hw_omap *gate;
++	u32 val = 0;
++
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
 +		return;
 +
-+cleanup:
-+	kfree(mux);
++	gate->enable_reg = ti_clk_get_reg_addr(node, 0);
++	if (!gate->enable_reg)
++		return;
++
++	of_property_read_u32(node, "ti,bit-shift", &val);
++
++	gate->enable_bit = val;
++	gate->ops = hw_ops;
++	gate->flags = MEMMAP_ADDRESSING;
++
++	if (!ti_clk_add_component(node, &gate->hw, CLK_COMPONENT_TYPE_GATE))
++		return;
++
++	kfree(gate);
 +}
-+CLK_OF_DECLARE(ti_composite_mux_clk_setup, "ti,composite-mux-clock",
-+	       of_ti_composite_mux_clk_setup);
++
++static void __init
++of_ti_composite_no_wait_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_composite_gate_clk_setup(node, NULL);
++}
++CLK_OF_DECLARE(ti_composite_no_wait_gate_clk, "ti,composite-no-wait-gate-clock",
++	       of_ti_composite_no_wait_gate_clk_setup);
++
++static void __init of_ti_composite_interface_clk_setup(struct device_node *node)
++{
++	_of_ti_composite_gate_clk_setup(node, &clkhwops_iclk_wait);
++}
++CLK_OF_DECLARE(ti_composite_interface_clk, "ti,composite-interface-clock",
++	       of_ti_composite_interface_clk_setup);
++
++static void __init of_ti_composite_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_composite_gate_clk_setup(node, &clkhwops_wait);
++}
++CLK_OF_DECLARE(ti_composite_gate_clk, "ti,composite-gate-clock",
++	       of_ti_composite_gate_clk_setup);
++
++
++static void __init of_ti_clkdm_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_gate_clk_setup(node, &omap_gate_clkdm_clk_ops, NULL);
++}
++CLK_OF_DECLARE(ti_clkdm_gate_clk, "ti,clkdm-gate-clock",
++	       of_ti_clkdm_gate_clk_setup);
++
++static void __init of_ti_hsdiv_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_gate_clk_setup(node, &omap_gate_clk_hsdiv_restore_ops,
++			      &clkhwops_wait);
++}
++CLK_OF_DECLARE(ti_hsdiv_gate_clk, "ti,hsdiv-gate-clock",
++	       of_ti_hsdiv_gate_clk_setup);
++
++static void __init of_ti_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_gate_clk_setup(node, &omap_gate_clk_ops, NULL);
++}
++CLK_OF_DECLARE(ti_gate_clk, "ti,gate-clock", of_ti_gate_clk_setup)
++
++static void __init of_ti_wait_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_gate_clk_setup(node, &omap_gate_clk_ops, &clkhwops_wait);
++}
++CLK_OF_DECLARE(ti_wait_gate_clk, "ti,wait-gate-clock",
++	       of_ti_wait_gate_clk_setup);
++
++#ifdef CONFIG_ARCH_OMAP3
++static void __init of_ti_am35xx_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_gate_clk_setup(node, &omap_gate_clk_ops,
++			      &clkhwops_am35xx_ipss_module_wait);
++}
++CLK_OF_DECLARE(ti_am35xx_gate_clk, "ti,am35xx-gate-clock",
++	       of_ti_am35xx_gate_clk_setup);
++
++static void __init of_ti_dss_gate_clk_setup(struct device_node *node)
++{
++	_of_ti_gate_clk_setup(node, &omap_gate_clk_ops,
++			      &clkhwops_omap3430es2_dss_usbhost_wait);
++}
++CLK_OF_DECLARE(ti_dss_gate_clk, "ti,dss-gate-clock",
++	       of_ti_dss_gate_clk_setup);
++#endif
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index e1b504c..a52495d 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -227,6 +227,8 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ void omap2_init_clk_clkdm(struct clk_hw *clk);
+ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 				    unsigned long parent_rate);
++int omap2_clkops_enable_clkdm(struct clk_hw *hw);
++void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
+ 			 unsigned long parent_rate);
+ int omap2_dflt_clk_enable(struct clk_hw *hw);
+@@ -251,5 +253,9 @@ static inline void of_ti_clk_deny_autoidle_all(void) { }
+ 
+ extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
+ extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
++extern const struct clk_hw_omap_ops clkhwops_wait;
++extern const struct clk_hw_omap_ops clkhwops_omap3430es2_dss_usbhost_wait;
++extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_module_wait;
++extern const struct clk_hw_omap_ops clkhwops_iclk_wait;
+ 
+ #endif
 -- 
 1.7.9.5
