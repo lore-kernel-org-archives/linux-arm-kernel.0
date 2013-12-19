@@ -1,36 +1,39 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 Dec 2013 16:09:45 +0000
-Subject: [PATCHv4 0/2] CMA for arm64
-In-Reply-To: <52B1E96D.1060904@codeaurora.org>
-References: <1386876513-7199-1-git-send-email-lauraa@codeaurora.org>
- <52B1E96D.1060904@codeaurora.org>
-Message-ID: <20131219160943.GA29174@localhost>
+Date: Thu, 19 Dec 2013 16:14:25 +0000
+Subject: [PATCH 4/6] arm64: lib: Implement optimized memcmp routine
+In-Reply-To: <CAK2p4sL7ao7rdhkZv1gFL163XShvvTJr9j=hx5vZAs50Q6RJTw@mail.gmail.com>
+References: <1386743082-5231-1-git-send-email-zhichang.yuan@linaro.org>
+ <1386743082-5231-5-git-send-email-zhichang.yuan@linaro.org>
+ <20131216165647.GH20193@mudshark.cambridge.arm.com>
+ <CAK2p4sL7ao7rdhkZv1gFL163XShvvTJr9j=hx5vZAs50Q6RJTw@mail.gmail.com>
+Message-ID: <20131219161424.GB29174@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 06:29:01PM +0000, Laura Abbott wrote:
-> On 12/12/2013 11:28 AM, Laura Abbott wrote:
-> > This adds support for CMA in arm64
+On Thu, Dec 19, 2013 at 08:18:59AM +0000, Deepak Saxena wrote:
+> On 16 December 2013 08:56, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Dec 11, 2013 at 06:24:40AM +0000, zhichang.yuan at linaro.org wrote:
+> >> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+> >>
+> >> This patch, based on Linaro's Cortex Strings library, adds
+> >> an assembly optimized memcmp() function.
 > >
-> > v4: Minor typos pointed out by Will. Changed the support for NULL devices
-> > to be a WARN on NULL device.
+> > [...]
 > >
-> > v3: Fix a missed line to actually set the dma_handle correctly
+> >> +#ifndef      __ARM64EB__
+> >> +     rev     diff, diff
+> >> +     rev     data1, data1
+> >> +     rev     data2, data2
+> >> +#endif
 > >
-> > v2: Move the dma contiguous functions from swiotlb to arm64 directly
-> >
-> >   arch/arm64/Kconfig                      |    1 +
-> >   arch/arm64/include/asm/dma-contiguous.h |   29 +++++++++++++++++++++++++
-> >   arch/arm64/mm/dma-mapping.c             |   35 +++++++++++++++++++++++++++++-
-> >   arch/arm64/mm/init.c                    |    3 ++
-> >   4 files changed, 66 insertions(+), 2 deletions(-)
+> > Given that I can't see you defining __ARM64EB__, I'd take a guess at you
+> > never having tested this code on a big-endian machine.
 > 
-> Any further comments on this or is this going to be queued up somewhere?
+> We'll test it, but I believe __ARM64BE__ is a compiler constant that
+> is automagically present when building big endian, similar to
+> __ARMBE__
 
-I'll queue them for the next merging window. I hope to get them into
-linux-next by the end of the week.
-
-Thanks.
+It's __AARCH64EB__ (that's how we spot people not testing on big-endian ;)).
 
 -- 
 Catalin
