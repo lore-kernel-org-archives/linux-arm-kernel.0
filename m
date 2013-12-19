@@ -1,58 +1,47 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 19 Dec 2013 23:17:44 +0100
-Subject: [rtc-linux] Re: Can someone Ack and queue a patch for RTC
- subsytem?
-In-Reply-To: <20131219175738.1dad3ade@linux.lan.towertech.it> (Alessandro
- Zummo's message of "Thu, 19 Dec 2013 17:57:38 +0100")
-References: <87siton6ke.fsf@natisbad.org>
- <20131219164624.GV2609@titan.lakedaemon.net>
- <20131219175738.1dad3ade@linux.lan.towertech.it>
-Message-ID: <8761qk32pj.fsf@natisbad.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Dec 2013 02:19:30 +0300
+Subject: [PATCH 1/2] ARM: shmobile: Lager: pass Ether PHY IRQ
+In-Reply-To: <201312200218.08076.sergei.shtylyov@cogentembedded.com>
+References: <201312200218.08076.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201312200219.31121.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
+trigger type to be low-level as per the Micrel PHY driver's setup.
 
-Alessandro Zummo <a.zummo@towertech.it> writes:
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> On Thu, 19 Dec 2013 11:46:24 -0500
-> Jason Cooper <jason@lakedaemon.net> wrote:
->
->> In the long term, should we seek out a co-maintainer for drivers/rtc?
->> Can anyone get a hold of Alessandro to get his opinion on this?
->
->  I'd surely appreciate if someone can take some time to give
->  a look to the patches. Most of them go thru subsystem's tree and, as
->  far as I can see, I saw very relevant comments and fixes in all those
->  years.
+---
+ arch/arm/mach-shmobile/board-lager.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-While I am at it, I wonder if you can give me some directions on the
-following to add back alarm support to the ISL12057 on the specific
-hardware I have.
-
-All NETGEAR ReadyNAS 102, 104 and 2120 have an ISL 12057 RTC chip which
-is used as main RTC clock but can also provide alarm. But the alarm
-interrupt line of the chip is *not* connected to the SoC. It is
-connected to some power component and can be used to wake up the NAS
-when it is completely off and the alarm rings.
-
-To me this kind of setup seems logical but it does not seem to be
-directly supported by current RTC logic:
-
- - first, I cannot test an interrupt handler implementation I had
-   written as the SoC will never receive any interrupt. This limits
-   my ability to provide one to the driver.
- - what can/should be done in my .dts file to indicate that the
-   device does not have any IRQ line connected (and hence no interrupt
-   handler) to the SoC but still supports an alarm.
-
-As a side note, the implementation I had was a working one on my
-hardware (i.e. was able to wake up the device at a given time) but I had
-to remove alarm code to get a basic driver accepted upstream.
-
-To be honest, I tried and understand what RTC subsystem expects from
-documentation and code w/o success. Any help appreciated on that topic.
-
-Cheers,
-
-a+
+Index: renesas/arch/arm/mach-shmobile/board-lager.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-lager.c
++++ renesas/arch/arm/mach-shmobile/board-lager.c
+@@ -22,6 +22,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
++#include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
+ #include <linux/mmc/host.h>
+@@ -228,6 +229,7 @@ static const struct resource mmcif1_reso
+ /* Ether */
+ static const struct sh_eth_plat_data ether_pdata __initconst = {
+ 	.phy			= 0x1,
++	.phy_irq		= irq_pin(0),
+ 	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
+ 	.phy_interface		= PHY_INTERFACE_MODE_RMII,
+ 	.ether_link_active_low	= 1,
+@@ -391,6 +393,8 @@ static void __init lager_init(void)
+ {
+ 	lager_add_standard_devices();
+ 
++	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
++
+ 	if (IS_ENABLED(CONFIG_PHYLIB))
+ 		phy_register_fixup_for_id("r8a7790-ether-ff:01",
+ 					  lager_ksz8041_fixup);
