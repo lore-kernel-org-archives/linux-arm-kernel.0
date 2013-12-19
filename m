@@ -1,39 +1,118 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 19 Dec 2013 13:46:59 +0200
-Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
-In-Reply-To: <1387453408.1712.3.camel@tellur>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-3-git-send-email-josephl@nvidia.com>
- <52B0D6FA.2060101@wwwdotorg.org>
- <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
- <52B1E950.1040001@wwwdotorg.org>
- <20131219100557.GE17188@tbergstrom-lnx.Nvidia.com>
- <1387453408.1712.3.camel@tellur>
-Message-ID: <20131219114659.GF17188@tbergstrom-lnx.Nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 19 Dec 2013 11:48:16 +0000
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <20131219084816.7247b1c7@i7>
+References: <20131218112713.GA28112@arm.com>
+ <20131218114211.GF4360@n2100.arm.linux.org.uk>
+ <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
+ <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
+ <alpine.LFD.2.10.1312181449580.7480@knanqh.ubzr>
+ <CAKv+Gu9jw4RHny3L3L6SWm4anhRguhRe4BkLKAxJeqpPB12igg@mail.gmail.com>
+ <alpine.LFD.2.10.1312181550271.7480@knanqh.ubzr>
+ <CAKv+Gu-1=7ZU+C3NL2_C0BBFkAcOhyZn8UvPtXHUtvwW6PKNYw@mail.gmail.com>
+ <20131219084816.7247b1c7@i7>
+Message-ID: <20131219114816.GB30398@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 12:43:28PM +0100, Lucas Stach wrote:
-> Am Donnerstag, den 19.12.2013, 12:05 +0200 schrieb Peter De Schrijver:
-> [...]
-> > 
-> > > funny tricks like running from IRAM since we can't access SDRAM during
-> > > the clock change? If so, I'm not sure how having the EMC clock changing
-> > > code is going to help your case (2) anyway, since we'll presumably have
-> > > to code up a custom stub in assembly for the part of the code that runs
-> > > from IRAM...
-> > > 
-> > 
-> > There is no need for assembler or running from IRAM (at least from Tegra30
-> > onwards, I don't know about Tegra20).
-> > 
-> Tegra20 doesn't need any IRAM trickery, the sequence is just:
-> 1. set up EMC shadow registers for new clock frequency
-> 2. change EMC divider in CAR module
+On Thu, Dec 19, 2013 at 06:48:16AM +0000, Siarhei Siamashka wrote:
+> On Wed, 18 Dec 2013 22:57:33 +0100
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 > 
+> > On 18 December 2013 22:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > On Wed, 18 Dec 2013, Ard Biesheuvel wrote:
+> > >> The nice thing about hwcaps is that it is already integrated into the
+> > >> ifunc resolution done by the loader, which makes it very easy and
+> > >> straightforward to offer alternative implementations of library
+> > >> functions based on CPU capabilities.
+> > >
+> > > The library may as well implement its own ifunc that tests the
+> > > instruction while trapping SIGILL.  On those systems with the supported
+> > > instruction there will be no trap.  On those that traps then the
+> > > alternative implementation is going to be much slower anyway.
+> > >
+> > 
+> > True. And the trap still only occurs at load time. But I think we
+> > agree it is essentially a poor man's hwcaps.
+> 
+> And the hwcaps is essentially a poor man's replacement for a userspace
+> accessible CPUID instruction enjoyed by x86.
 
-Nothing needs to be done after the divider change?
+hwcaps has its value but I agree that some quicker access would be good
+in certain cases. However, simply exposing the CPUID scheme to user
+space may look nice initially but has other problems. All the
+discussions we had (in ARM) basically ended up with having some scratch
+registers that could be accessed from user via mrs and the kernel would
+either copy the CPUID registers or hwcap-like bits (but basically it is
+just an ABI between user and kernel).
 
-Cheers,
+> So there is no really good alternative to /proc/cpuinfo parsing. But
+> text parsing is relatively cumbersome to implement. And this method is
+> obviously not blazingly fast. Also the big.LITTLE systems introduce
+> an interesting new challenge. How do we know whether we are running
+> the code on Cortex-A7 or Cortex-A15 at any arbitrary moment? We might
+> want to have several different assembly optimized functions, one
+> optimized for Cortex-A15 pipeline and another one optimized for
+> Cortex-A7. It would be nice to be able to frequently poll for the CPU
+> features of the currently running CPU core (for example, once per
+> frame in a video encoder/decoder) to select the fastest code path.
+> With /proc/cpuinfo text parsing this is not going to work nicely.
 
-Peter.
+With big.LITTLE user-space can't tell on which CPU it is running. Even
+if it could, it needs to cope with preemption and migration to another
+CPU. If we assume the that the same features are present on both, some
+routines may occasionally be unoptimal but it shouldn't be that bad.
+
+Anyway, for such A7/A15 combinations, the idea is to optimise for A7's
+pipeline since A15 execution is more out of order and tolerant to
+instruction order.
+
+> The best solution would be in my opinion a userspace accessible (and
+> guaranteed not to trap) CPUID instruction. This has proven to work
+> nicely for x86, so why inventing something overly complicated instead?
+> In the case if the OS wants to conceal the CPU features from the
+> userspace application, some special "I don't want to tell you,
+> please use the slowest code path possible" value could be defined
+> and returned by this instruction.
+
+As I said above, just raw access to the CPUID registers may not always
+be desirable. Some features require kernel support (like FP register
+saving/restoring), so if you run an older kernel on a newer CPU you
+shouldn't really use such feature.
+
+(I'm also not entirely sure about crypto stuff and export regulations,
+whether a mobile vendor may want to disable some hwcap bits in kernel
+even though the hardware supports it)
+
+> Well, if it's not desired (and already too late) to change how the
+> hardware works, another solution would be to have runtime CPU
+> features detection supported as part of the run-time ABI. For example,
+> make it mandatory for any EABI conforming system to provide some helper
+> functions like __aeabi_read_midr() or __aeabi_read_hwcaps(). They could
+> be implemented for ARM Linux via the kernel-provided user helpers, VDSO
+> or whatever other method that is appropriate. If this works for the
+> things like TLS (__aeabi_read_tp), why can't it work for runtime CPU
+> features detection too? The recent gcc versions also have some nice
+> built-in functions for runtime cpu features detection on x86
+> such as __builtin_cpu_is(), __builtin_cpu_supports():
+>     http://gcc.gnu.org/gcc-4.8/changes.html
+
+We discussed this in ARM with the toolchain guys and I'm fine with the
+idea. But for backwards compatibility, we would need a way for newer
+software to work on older kernels. On arm64, with VDSO is easier since
+glibc could have a weak function that returns not-implemented. I would
+rather have a VDSO on arm as well rather than abusing the vectors page.
+
+If you want to distinguish between CPUs, we can use one of the unused
+TLS registers as offset into a VDSO data array with per-CPU information
+(all handled via the VDSO code, so user shouldn't really know the
+meaning). We have a user read-only thread register unused on arm64 (and
+that's what we had in mind when using the read/write register for user
+TLS).
+
+However, that's an optimisation and I don't think it should replace
+hwcap bits for new features.
+
+-- 
+Catalin
