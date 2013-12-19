@@ -1,134 +1,79 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 20:59:40 -0800
-Subject: [PATCH v2 07/11] clk: sunxi: mod0 support
-In-Reply-To: <1387327503-15651-8-git-send-email-emilio@elopez.com.ar>
-References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
- <1387327503-15651-8-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20131219045940.23538.57052@quantum>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Dec 2013 13:04:32 +0800
+Subject: [PATCH V1 1/7] ARM: dts: imx: pinfunc: add
+ MX6QDL_PAD_GPIO_6__ENET_IRQ
+In-Reply-To: <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
+References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20131219050430.GS6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-12-17 16:44:59)
-> This commit implements support for the "module 0" type of clocks, as
-> used by MMC, IR, NAND, SATA and other components.
+On Wed, Dec 18, 2013 at 03:41:31PM -0700, Troy Kisky wrote:
+> Quoting from Ranjani Vaidyanathan
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> All of the interrupts from the ENET block are not routed to
+> the GPC block. Hence ENET interrupts are not able to wake
+> up the SOC when the system is in WAIT mode. And the ENET
+> interrupt gets serviced only when another interrupt causes
+> the SOC to exit WAIT mode. This impacts the ENET performance.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+We should probably also quote the IMX6Q errata document below.
+
+ http://cache.freescale.com/files/32bit/doc/errata/IMX6DQCE.pdf?fpsp=1
+
+ERR006687 ENET: Only the ENET wake-up interrupt request can wake the
+system from Wait mode.
+
+> 
+> Adding MX6QDL_PAD_GPIO_6__ENET_IRQ is the 1st step to
+> workaround this problem.
+> 
+> The input reg is set to 0x3c to set IOMUX_OBSRV_MUX1 to ENET_IRQ.
+
+It seems this is an undocumented register?  Is the info available
+somewhere?
+
+> The mux reg value is 0x11, so that the observable mux is routed to
+> this pin and to the gpio controller(sion bit).
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> CC: ra5478 at freescale.com
+
+When having people in the tag, please put their name in there as well,
+so Ranjani Vaidyanathan <ra5478@freescale.com> please.
+
+Shawn
 
 > ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  5 +-
->  drivers/clk/sunxi/clk-sunxi.c                     | 57 +++++++++++++++++++++++
->  2 files changed, 61 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
+>  arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 80b2a39..46d8433 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -35,10 +35,13 @@ Required properties:
->         "allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
->         "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
->         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
-> +       "allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
->  
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
-> -- clocks : shall be the input parent clock(s) phandle for the clock
-> +- clocks : shall be the input parent clock(s) phandle for the clock. For
-> +       multiplexed clocks, the list order must match the hardware
-> +       programming order.
->  - #clock-cells : from common clock binding; shall be set to 0 except for
->         "allwinner,*-gates-clk" where it shall be set to 1
->  
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 84e2186..b40cf30 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -286,6 +286,47 @@ static void sun4i_get_apb1_factors(u32 *freq, u32 parent_rate,
->  
->  
->  /**
-> + * sun4i_get_mod0_factors() - calculates m, n factors for MOD0-style clocks
-> + * MMC rate is calculated as follows
-> + * rate = (parent_rate >> p) / (m + 1);
-> + */
-> +
-> +static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
-> +                                  u8 *n, u8 *k, u8 *m, u8 *p)
-> +{
-> +       u8 div, calcm, calcp;
-> +
-> +       /* These clocks can only divide, so we will never be able to achieve
-> +        * frequencies higher than the parent frequency */
-> +       if (*freq > parent_rate)
-> +               *freq = parent_rate;
-> +
-> +       div = parent_rate / *freq;
-> +
-> +       if (div < 16)
-> +               calcp = 0;
-> +       else if (div / 2 < 16)
-> +               calcp = 1;
-> +       else if (div / 4 < 16)
-> +               calcp = 2;
-> +       else
-> +               calcp = 3;
-> +
-> +       calcm = DIV_ROUND_UP(div, 1 << calcp);
-> +
-> +       *freq = (parent_rate >> calcp) / calcm;
-> +
-> +       /* we were called to round the frequency, we can now return */
-> +       if (n == NULL)
-> +               return;
-> +
-> +       *m = calcm - 1;
-> +       *p = calcp;
-> +}
-> +
-> +
-> +
-> +/**
->   * sunxi_factors_clk_setup() - Setup function for factor clocks
->   */
->  
-> @@ -332,6 +373,14 @@ static struct clk_factors_config sun4i_apb1_config = {
->         .pwidth = 2,
->  };
->  
-> +/* user manual says "n" but it's really "p" */
-> +static struct clk_factors_config sun4i_mod0_config = {
-> +       .mshift = 0,
-> +       .mwidth = 4,
-> +       .pshift = 16,
-> +       .pwidth = 2,
-> +};
-> +
->  static const struct factors_data sun4i_pll1_data __initconst = {
->         .enable = 31,
->         .table = &sun4i_pll1_config,
-> @@ -355,6 +404,13 @@ static const struct factors_data sun4i_apb1_data __initconst = {
->         .getter = sun4i_get_apb1_factors,
->  };
->  
-> +static const struct factors_data sun4i_mod0_data __initconst = {
-> +       .enable = 31,
-> +       .mux = 24,
-> +       .table = &sun4i_mod0_config,
-> +       .getter = sun4i_get_mod0_factors,
-> +};
-> +
->  static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
->                                                 const struct factors_data *data)
->  {
-> @@ -845,6 +901,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
->         {.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
->         {.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
->         {.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
-> +       {.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
->         {}
->  };
->  
+> diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
+> index 7499eee..0ead323 100644
+> --- a/arch/arm/boot/dts/imx6dl-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
+> @@ -755,6 +755,7 @@
+>  #define MX6QDL_PAD_GPIO_5__I2C3_SCL                 0x230 0x600 0x878 0x6 0x2
+>  #define MX6QDL_PAD_GPIO_5__ARM_EVENTI               0x230 0x600 0x000 0x7 0x0
+>  #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x234 0x604 0x840 0x0 0x1
+> +#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x234 0x604 0x03c 0x11 0xff000609
+>  #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x234 0x604 0x87c 0x2 0x2
+>  #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x234 0x604 0x000 0x5 0x0
+>  #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x234 0x604 0x000 0x6 0x0
+> diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
+> index e5834b2..9fc6120 100644
+> --- a/arch/arm/boot/dts/imx6q-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx6q-pinfunc.h
+> @@ -673,6 +673,7 @@
+>  #define MX6QDL_PAD_GPIO_3__USB_H1_OC                0x22c 0x5fc 0x948 0x6 0x1
+>  #define MX6QDL_PAD_GPIO_3__MLB_CLK                  0x22c 0x5fc 0x900 0x7 0x1
+>  #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x230 0x600 0x870 0x0 0x1
+> +#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x230 0x600 0x03c 0x11 0xff000609
+>  #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x230 0x600 0x8ac 0x2 0x1
+>  #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x230 0x600 0x000 0x5 0x0
+>  #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x230 0x600 0x000 0x6 0x0
 > -- 
-> 1.8.5.1
+> 1.8.1.2
 > 
