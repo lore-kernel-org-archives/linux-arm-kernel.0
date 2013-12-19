@@ -1,44 +1,41 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Thu, 19 Dec 2013 04:50:41 +0400
-Subject: [PATCH v3 07/21] ARM: dts: parse DMA config in pxamci
-In-Reply-To: <1387309071-22382-8-git-send-email-ynvich@gmail.com>
-References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-8-git-send-email-ynvich@gmail.com>
-Message-ID: <1387414241.31516.19.camel@host5.omatika.ru>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 19 Dec 2013 10:04:26 +0900
+Subject: [PATCH V2 1/7] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <1386885004-10252-1-git-send-email-marex@denx.de>
+References: <1386885004-10252-1-git-send-email-marex@denx.de>
+Message-ID: <001e01cefc56$438a7ee0$ca9f7ca0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On Friday, December 13, 2013 6:50 AM, Marek Vasut wrote:
+> 
+> Some boards do not have a PCIe reset GPIO. To avoid probe
+> failure on these boards, make the reset GPIO optional as
+> well.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Frank Li <lznuaa@gmail.com>
+> Cc: Harro Haan <hrhaan@gmail.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> Cc: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Sean Cross <xobs@kosagi.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> Cc: Tim Harvey <tharvey@gateworks.com>
+> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> Cc: Yinghai Lu <yinghai@kernel.org>
 
-On Tue, 2013-12-17 at 23:37 +0400, Sergei Ianovich wrote:
-> The existing PXA MMC driver cannot get DMA channels in a proper
-> way from the respective device tree binding.
-> 
-> This patch provides temporary workaround which allows using the
-> existing driver in DT machines by pointing to the proper
-> dmaengine-based "marvell,pdma-1.0" DMA.
-> 
-> Even though the new DMA provider is not present we can parse device node
-> attributes manually and use channel numbers to acquire DMA channel
-> from the existing non-dmaengine provider.
-> 
-> When Daniel's DMA series is merged there will be no need to manually
-> parse for "dmas" and this patch can be safely reverted.
-> 
-> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> CC: Daniel Mack <zonque@gmail.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+
+Best regards,
+Jingoo Han
+
 > ---
->    v2..v3
->    * split into good (PATCH 07/21) and temporary (this one) parts
-> 
->    v1..v2
->    * add binding for next-gen dma controller
->    * use correct dma declararion
->    * number changed from 5 to 3
-
-Could you please comment on this solution for PXA DMA?
-
-There may appear new, but it remains the last open review comment for
-the series at the moment.
+>  .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
+>  drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
+>  2 files changed, 17 insertions(+), 14 deletions(-)
