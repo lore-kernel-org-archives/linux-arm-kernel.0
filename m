@@ -1,38 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 19 Dec 2013 05:35:12 +0900
-Subject: [PATCH v2 1/1] ARM: dts: add board dts file for EXYNOS4412 based
- TINY4412 board
-In-Reply-To: <1486025.NpqSQkmkfm@amdc1227>
-References: <1387373039-4738-1-git-send-email-kasimling@gmail.com>
- <1486025.NpqSQkmkfm@amdc1227>
-Message-ID: <52B20700.9010607@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 13:46:13 -0700
+Subject: [PATCH 04/10] ARM: tegra: Add Tegra124 eDP support
+In-Reply-To: <1387469182-14398-5-git-send-email-treding@nvidia.com>
+References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
+ <1387469182-14398-5-git-send-email-treding@nvidia.com>
+Message-ID: <52B35B15.4090008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/13 00:01, Tomasz Figa wrote:
-> Hi Alex,
->
-Hi,
+On 12/19/2013 09:06 AM, Thierry Reding wrote:
 
-> On Wednesday 18 of December 2013 21:23:59 Alex Ling wrote:
->> Add a minimal board dts file for EXYNOS4412 based FriendlyARM's
->> TINY4412 board. This patch including support peripherals like
->> UART, SD card on SDMMC2 port and GPIO connected LEDs.
->>
->> Signed-off-by: Alex Ling<kasimling@gmail.com>
->> ---
->> Changes for v2:
->>    - Clean up patch description
->>    - Fix LED labels as Tomasz's suggested
->>    - Fix style issues
->>
->>   arch/arm/boot/dts/Makefile                |    1 +
->>   arch/arm/boot/dts/exynos4412-tiny4412.dts |   93 +++++++++++++++++++++++++++++
->>   2 files changed, 94 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
->
-> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->
-Thanks, applied.
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
 
-- Kukjin
+> +		sor at 54540000 {
+> +			compatible = "nvidia,tegra124-sor";
+
+I don't see a binding document for that compatible value anywhere in
+next-20131219, nor in your drm/for-next branch. Still, the DT
+content/schema is essentially identical to many others that already
+exist, so I won't block applying the series because of that. Please do
+write a binding document though!
+
+> +		dpaux at 545c0000 {
+> +			compatible = "nvidia,tegra124-dpaux";
+
+Same comment.
