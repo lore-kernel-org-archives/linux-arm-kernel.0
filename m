@@ -1,36 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 12:57:54 -0700
-Subject: [PATCH 05/10] ARM: tegra: Add Tegra114 DSI support
-In-Reply-To: <1387468774-14216-6-git-send-email-treding@nvidia.com>
-References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
- <1387468774-14216-6-git-send-email-treding@nvidia.com>
-Message-ID: <52B34FC2.5010409@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Dec 2013 20:06:11 +0000
+Subject: [PATCH 0/4] arm64 topology support
+Message-ID: <1387483575-11430-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 08:59 AM, Thierry Reding wrote:
-> Add device tree nodes for the DSI controllers found on Tegra114 SoCs.
+From: Mark Brown <broonie@linaro.org>
 
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+Another spin of the arm64 topology work - this should incorporate most
+of the feedback from Lorenzo, there's a few things that were still under
+discussion the main ones being:
 
-> +		dsi at 54300000 {
-> +			compatible = "nvidia,tegra114-dsi";
-> +			reg = <0x54300000 0x00040000>;
-> +			clocks = <&tegra_car TEGRA114_CLK_DSIA>,
-> +				 <&tegra_car TEGRA114_CLK_DSIALP>,
-> +				 <&tegra_car TEGRA114_CLK_PLL_D_OUT0>;
-> +			clock-names = "dsi", "lp", "parent";
+ - Should we have a smp_store_cpu_info(); like I say I like the errors
+   it generates for omitted cores and the reuse of the SMP enumeration
+   code (and cross-check with that I guess - make sure we don't get
+   confused about which CPUs are getting enabled).
 
-The binding document
-Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt doesn't
-mention an "lp" clock:
+ - Should we update the binding to allow cores in the root cpu_map node
+   (since it's less effort in code and not a meaningful difference
+   semantically), warn if we find cores in the cpu_map node or actively
+   reject such DTs?
 
-  - clock-names: Must include the following entries:
-    - dsi
-      This MUST be the first entry.
-    - parent
+In both cases I don't much mind but I think what's there is reasonable
+so I've left the code as-is pending further feedback.  I also didn't
+update the code to get more reuse of the iteration code, like I said I
+did look at that when writing the code but couldn't find anything that
+actually made things more pleasant but if someone has some ideas...
 
-I assume this is simply an oversight, since this is an obvious extension
-of the binding, and that the DT binding will be updated to include that
-clock in the list, and hence won't block applying the series because of
-this.
+Everything else raised should be addressed I think.
+
+Mark Brown (4):
+  arm64: topology: Implement basic CPU topology support
+  arm64: topology: Add support for topology DT bindings
+  arm64: topology: Tell the scheduler about the relative power of cores
+  arm64: topology: Provide relative power numbers for cores
+
+ arch/arm64/Kconfig                |  24 +++
+ arch/arm64/include/asm/topology.h |  39 ++++
+ arch/arm64/kernel/Makefile        |   1 +
+ arch/arm64/kernel/smp.c           |  12 ++
+ arch/arm64/kernel/topology.c      | 384 ++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 460 insertions(+)
+ create mode 100644 arch/arm64/include/asm/topology.h
+ create mode 100644 arch/arm64/kernel/topology.c
+
+-- 
+1.8.5.2
