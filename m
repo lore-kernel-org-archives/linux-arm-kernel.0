@@ -1,103 +1,164 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 Dec 2013 20:30:26 -0800
-Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
-In-Reply-To: <CAL_Jsq+O_wuZN==PObGnGK5no_2Yt2ROp4Q1m5JhH-LnBrY6VA@mail.gmail.com>
-References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
- <20131217185154.GN5711@cbox>
- <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1BenCt+tuBYVR2Kzbrt0Ev59SFG8kaguOwj2Dug7Be4A@mail.gmail.com>
- <87txe6p3o8.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1PEvudWMq__Qt2ZT663LsuF335myZaPyA81uhnqmVKoQ@mail.gmail.com>
- <87a9fyowqi.fsf@e102391-lin.cambridge.arm.com>
- <CAAhSdy1XKBdyXGWGZXwj8+C0_P3CqyzyFuW=HysEps_QByuv4g@mail.gmail.com>
- <8738lqow22.fsf@e102391-lin.cambridge.arm.com>
- <CAL_Jsq+O_wuZN==PObGnGK5no_2Yt2ROp4Q1m5JhH-LnBrY6VA@mail.gmail.com>
-Message-ID: <20131219043026.GQ5711@cbox>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 18 Dec 2013 20:50:50 -0800
+Subject: [PATCH v3 04/12] clk: Add regmap core helpers for
+ enable/disable/is_enabled
+In-Reply-To: <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
+References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
+ <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131219045050.23538.94293@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 05:26:46PM -0600, Rob Herring wrote:
-> On Wed, Dec 18, 2013 at 12:25 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On Wed, Dec 18 2013 at 06:18:54 PM, Anup Patel <anup@brainfault.org> wrote:
-> >> On Wed, Dec 18, 2013 at 11:41 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>> On Wed, Dec 18 2013 at 03:52:29 PM, Anup Patel <anup@brainfault.org> wrote:
-> >>>> On Wed, Dec 18, 2013 at 9:11 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>>>> Hi Anup,
-> >>>>>
-> >>>>> On Wed, Dec 18 2013 at 03:03:43 PM, Anup Patel <anup@brainfault.org> wrote:
-> >>>>>> On Wed, Dec 18, 2013 at 8:08 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>>>>>> Christoffer Dall <christoffer.dall@linaro.org> writes:
-> >>>>>>>
-> >>>>>>>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
-> >>>>>>>>> The Power State and Coordination Interface (PSCI) specification defines
-> >>>>>>>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
-> >>>>>>>>>
-> >>>>>>>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
-> >>>>>>>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
-> >>>>>>>>> KVM_EXIT_SYSTEM_EVENT exit reason.
-> >>>>>>>>>
-> >>>>>>>>> To try this patch from guest kernel, we will need PSCI-based restart and
-> >>>>>>>>> poweroff support in the guest kenel for both ARM and ARM64.
-> >>>>>>>>>
-> >>>>>>>>> Rob Herring has already submitted patches for PSCI-based restart and
-> >>>>>>>>> poweroff in ARM kernel but these are not merged yet due unstable device
-> >>>>>>>>> tree bindings of kernel PSCI support. We will be having similar patches
-> >>>>>>>>> for PSCI-based restart and poweroff in ARM64 kernel.
-> >>>>>>>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
-> >>>>>>>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
-> >>>>>>>>
-> >>>>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>>>>>>
-> >>>>>>>> I can merge this series if Marc acks it as well.
-> >>>>>>>
-> >>>>>>> The patches themselves are mostly fine. One issue though: They implement
-> >>>>>>> part of the v0.2 spec, but keep on using the range of function IDs that
-> >>>>>>> we made up for v0.1.
-> >>>>>>>
-> >>>>>>> I just had a chat with the person responsible for the spec, and realized
-> >>>>>>> that the Function IDs mentionned in the v0.2 spec are not optional, and
-> >>>>>>> not using them would be in direct violation of the spec (the new numbers
-> >>>>>>> now come directly from the SMC calling convention).
-> >>>>>>
-> >>>>>> Should we emulate PSCI_VERSION call to help Guest determine
-> >>>>>> the spec version emulated by KVM (i.e. v0.1 or v0.2) ??
-> >>>>>
-> >>>>> I think that'd be a nice to have, but the guest is likely to get its
-> >>>>> information from the DT anyway. Plus I don't think the original PSCI
-> >>>>> spec specified PSCI_VERSION, which only make it useful for whatever
-> >>>>> comes after v0.2.
-> >>>>>
-> >>>>> So I think we need to:
-> >>>>> - Use the new range for PSCI v0.2 (while still supporting v0.1 and the
-> >>>>> old range)
-> >>>>
-> >>>> Does this mean we should have first isolate v0.2 ID range
-> >>>> from v0.1 ID range?
-> >>>
-> >>> Yes.
-> >>
-> >> Are you planning to do it ?
-> >> OR
-> >> Do you expect me to do it because this patchset would depend on that?
-> >
-> > First, I want to understand the objections that were raised against
-> > using the Function IDs as defined in the spec.
-> >
-> > Then, assuming we move in that direction, I'd expect you to create a
-> > separate range of IDs and update the PSCI code to handle both PSCI
-> > versions.
-> >
-> > But as this has direct implication with userspace (DT generation), I'd
-> > rather take it slow and first try to understand the issues Mark raised.
+Quoting Stephen Boyd (2013-10-16 00:40:06)
+> The clock framework already has support for simple gate clocks
+> but if drivers want to use the gate clock functionality they need
+> to wrap the gate clock in another struct and chain the ops by
+> calling the gate ops from their own custom ops. Plus the gate
+> clock implementation only supports MMIO accessors so other bus
+> type clocks don't benefit from the potential code reuse. Add some
+> simple regmap helpers for enable/disable/is_enabled that drivers
+> can use as drop in replacements for their clock ops or as simple
+> functions they call from their own custom ops.
 > 
-> Here is the thread where relying on SMC calling convention was discussed:
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/clk.c            | 70 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h | 13 ++++++++
+>  2 files changed, 83 insertions(+)
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/188057.html
-> 
->From reading that thread and the PSCI and SMC calling convention docs I
-don't see anything that suggests that PSCI v0.2 should not follow the
-function IDs in the PSCI document.
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 8042c00..7cc8cb0 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -742,6 +742,76 @@ out:
+>         return best;
+>  }
+>  
+> +/**
+> + * clk_is_enabled_regmap - standard is_enabled() for regmap users
+> + *
+> + * @hw: clk to operate on
+> + *
+> + * Clocks that use regmap for their register I/O can set the
+> + * enable_reg and enable_mask fields in their struct clk_hw and then use
+> + * this as their is_enabled operation, saving some code.
+> + */
+> +int clk_is_enabled_regmap(struct clk_hw *hw)
+> +{
+> +       unsigned int val;
+> +       int ret;
+> +
+> +       ret = regmap_read(hw->regmap, hw->enable_reg, &val);
+> +       if (ret != 0)
+> +               return ret;
+> +
+> +       if (hw->enable_is_inverted)
+> +               return (val & hw->enable_mask) == 0;
+> +       else
+> +               return (val & hw->enable_mask) != 0;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_is_enabled_regmap);
+> +
+> +/**
+> + * clk_enable_regmap - standard enable() for regmap users
+> + *
+> + * @hw: clk to operate on
+> + *
+> + * Clocks that use regmap for their register I/O can set the
+> + * enable_reg and enable_mask fields in their struct clk_hw and then use
+> + * this as their enable() operation, saving some code.
+> + */
+> +int clk_enable_regmap(struct clk_hw *hw)
+> +{
+> +       unsigned int val;
+> +
+> +       if (hw->enable_is_inverted)
+> +               val = 0;
+> +       else
+> +               val = hw->enable_mask;
+> +
+> +       return regmap_update_bits(hw->regmap, hw->enable_reg,
+> +                                 hw->enable_mask, val);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_enable_regmap);
+> +
+> +/**
+> + * clk_disable_regmap - standard disable() for regmap users
+> + *
+> + * @hw: clk to operate on
+> + *
+> + * Clocks that use regmap for their register I/O can set the
+> + * enable_reg and enable_mask fields in their struct clk_hw and then use
+> + * this as their disable() operation, saving some code.
+> + */
+> +void clk_disable_regmap(struct clk_hw *hw)
+> +{
+> +       unsigned int val;
+> +
+> +       if (hw->enable_is_inverted)
+> +               val = hw->enable_mask;
+> +       else
+> +               val = 0;
+> +
+> +       regmap_update_bits(hw->regmap, hw->enable_reg, hw->enable_mask, val);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_disable_regmap);
+> +
+>  /***        clk api        ***/
+>  
+>  void __clk_unprepare(struct clk *clk)
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 6ed62f1..4087a9b 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -177,11 +177,21 @@ struct clk_init_data {
+>   * with the common clock framework.
+>   *
+>   * @regmap: regmap to use for regmap helpers and/or by providers
+> + *
+> + * @enable_reg: register when using regmap enable/disable ops
+> + *
+> + * @enable_mask: mask when using regmap enable/disable ops
+> + *
+> + * @enable_is_inverted: flag to indicate set enable_mask bits to disable
+> + *                      when using clock_enable_regmap and friends APIs.
+>   */
+>  struct clk_hw {
+>         struct clk *clk;
+>         const struct clk_init_data *init;
+>         struct regmap *regmap;
+> +       unsigned int enable_reg;
+> +       unsigned int enable_mask;
+> +       bool enable_is_inverted;
 
-Am I missing something?
+Thanks for submitting this patch.
 
--Christoffer
+Adding all of this stuff to struct clk_hw makes me a sad panda. You are
+essentially sharing a common set of ops for clocks that use regmap as
+their io operation back-end, and that is a good thing.
+
+However, why not just do this as drivers/clk/clk-regmap.c, or
+drivers/clk/clk-gate-regmap.c? Putting the clk_ops callback functions in
+drivers/clk/clk.c is a little weird and putting those struct members
+into struct clk_hw is definitely strange.
+
+Regards,
+Mike
+
+>  };
+>  
+>  /*
+> @@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
+>  long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
+>                               unsigned long *best_parent_rate,
+>                               struct clk **best_parent_p);
+> +int clk_is_enabled_regmap(struct clk_hw *hw);
+> +int clk_enable_regmap(struct clk_hw *hw);
+> +void clk_disable_regmap(struct clk_hw *hw);
+>  
+>  /*
+>   * FIXME clock api without lock protection
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
