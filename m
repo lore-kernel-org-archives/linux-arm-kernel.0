@@ -1,31 +1,32 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 19 Dec 2013 09:25:25 +0100
-Subject: [PATCH 2/2] ARM: dts: tps65910 backup battery regulator
-In-Reply-To: <20131218162546.GY28455@sirena.org.uk>
-References: <1387378208-26841-1-git-send-email-mpa@pengutronix.de>
- <1387378208-26841-2-git-send-email-mpa@pengutronix.de>
- <20131218162546.GY28455@sirena.org.uk>
-Message-ID: <20131219082525.GE23493@pengutronix.de>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 19 Dec 2013 14:03:39 +0530
+Subject: [PATCH Resend 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag to
+ mout_apll
+Message-ID: <1387442019-2445-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 04:25:46PM +0000, Mark Brown wrote:
-> On Wed, Dec 18, 2013 at 03:50:08PM +0100, Markus Pargmann wrote:
-> > This patch adds a devicetree node for the backup battery regulator.
-> 
-> Your previous patch missed an update to the binding documentation for
-> the regulator driver.
+Add CLK_SET_RATE_PARENT flag to mout_apll clock. This will let us set the
+clock rate in the cpufreq driver.
 
-Right, thank you, I added vbb to the tps65910 mfd binding documentation.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/samsung/clk-exynos5250.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Regards,
-
-Markus
-
-
-
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 80f652053cb5..11178b1ad735 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -303,7 +303,8 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+ 	/*
+ 	 * CMU_CPU
+ 	 */
+-	MUX_A(none, "mout_apll", mout_apll_p, SRC_CPU, 0, 1, "mout_apll"),
++	MUX_FA(none, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
++					CLK_SET_RATE_PARENT, 0, "mout_apll"),
+ 	MUX_A(none, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1, "mout_cpu"),
+ 
+ 	/*
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
