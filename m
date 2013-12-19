@@ -1,95 +1,107 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 18 Dec 2013 22:47:25 -0800
-Subject: [PATCH 4/4] PM / OPP: export symbol find_device_opp
-In-Reply-To: <20131219055410.GV6691@S2101-09.ap.freescale.net>
-References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
- <1387410656-36053-4-git-send-email-john.tobias.ph@gmail.com>
- <20131219055410.GV6691@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYO7eg8-RfRbL2Uvxbz5p3+28eNbC6MKjQfgzZQa5eauXA@mail.gmail.com>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Thu, 19 Dec 2013 08:48:16 +0200
+Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <CAKv+Gu-1=7ZU+C3NL2_C0BBFkAcOhyZn8UvPtXHUtvwW6PKNYw@mail.gmail.com>
+References: <1387227878-30438-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131217122519.GI32118@arm.com>
+ <CAKv+Gu824T1vx=O9taLaDSB-HE3OLSpwnpWMn4z+x8YdmLuM+A@mail.gmail.com>
+ <20131218100321.GC4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
+ <20131218105541.GE4360@n2100.arm.linux.org.uk>
+ <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
+ <20131218112713.GA28112@arm.com>
+ <20131218114211.GF4360@n2100.arm.linux.org.uk>
+ <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
+ <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
+ <alpine.LFD.2.10.1312181449580.7480@knanqh.ubzr>
+ <CAKv+Gu9jw4RHny3L3L6SWm4anhRguhRe4BkLKAxJeqpPB12igg@mail.gmail.com>
+ <alpine.LFD.2.10.1312181550271.7480@knanqh.ubzr>
+ <CAKv+Gu-1=7ZU+C3NL2_C0BBFkAcOhyZn8UvPtXHUtvwW6PKNYw@mail.gmail.com>
+Message-ID: <20131219084816.7247b1c7@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My first implementation was to call dev_pm_opp_get_opp_count. But,
-looking at the opp.c code, find_device_opp
-was the most relevant function than dev_pm_opp_get_opp_count. I will
-re-submit the patch using dev_pm_opp_get_opp_count.
+On Wed, 18 Dec 2013 22:57:33 +0100
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Thanks,
+> On 18 December 2013 22:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Wed, 18 Dec 2013, Ard Biesheuvel wrote:
+> >> The nice thing about hwcaps is that it is already integrated into the
+> >> ifunc resolution done by the loader, which makes it very easy and
+> >> straightforward to offer alternative implementations of library
+> >> functions based on CPU capabilities.
+> >
+> > The library may as well implement its own ifunc that tests the
+> > instruction while trapping SIGILL.  On those systems with the supported
+> > instruction there will be no trap.  On those that traps then the
+> > alternative implementation is going to be much slower anyway.
+> >
+> 
+> True. And the trap still only occurs at load time. But I think we
+> agree it is essentially a poor man's hwcaps.
 
-john
+And the hwcaps is essentially a poor man's replacement for a userspace
+accessible CPUID instruction enjoyed by x86.
 
-On Wed, Dec 18, 2013 at 9:54 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Dec 18, 2013 at 03:50:56PM -0800, John Tobias wrote:
->> imx6q-cpufreq.c need to have access to find_device_opp function, in order
->> to verify if the platform supplied an OPP table or not.
->
-> I think we can figure it out by checking the return of
-> dev_pm_opp_get_opp_count() call, so that we can save this patch
-> completely.
->
-> Note, imx6q-cpufreq driver already calls dev_pm_opp_get_opp_count().
-> You need to change the way how it handles the return.
->
-> Shawn
->
->>
->> As an example here are the imx6q and imx6sl.
->> imx6q supplied the opp table due to some board specific requirement.
->> While, imx6sl doesn't have an opp table defined.
->>
->> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
->> ---
->>  drivers/base/power/opp.c | 3 ++-
->>  include/linux/pm_opp.h   | 7 +++++++
->>  2 files changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->> index fa41874..d758e42 100644
->> --- a/drivers/base/power/opp.c
->> +++ b/drivers/base/power/opp.c
->> @@ -116,7 +116,7 @@ static DEFINE_MUTEX(dev_opp_list_lock);
->>   * is a RCU protected pointer. This means that device_opp is valid as long
->>   * as we are under RCU lock.
->>   */
->> -static struct device_opp *find_device_opp(struct device *dev)
->> +struct device_opp *find_device_opp(struct device *dev)
->>  {
->>       struct device_opp *tmp_dev_opp, *dev_opp = ERR_PTR(-ENODEV);
->>
->> @@ -134,6 +134,7 @@ static struct device_opp *find_device_opp(struct device *dev)
->>
->>       return dev_opp;
->>  }
->> +EXPORT_SYMBOL_GPL(find_device_opp);
->>
->>  /**
->>   * dev_pm_opp_get_voltage() - Gets the voltage corresponding to an available opp
->> diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
->> index 5151b00..cd13385 100644
->> --- a/include/linux/pm_opp.h
->> +++ b/include/linux/pm_opp.h
->> @@ -27,6 +27,8 @@ enum dev_pm_opp_event {
->>
->>  #if defined(CONFIG_PM_OPP)
->>
->> +struct device_opp *find_device_opp(struct device *dev);
->> +
->>  unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp);
->>
->>  unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp);
->> @@ -52,6 +54,11 @@ int dev_pm_opp_disable(struct device *dev, unsigned long freq);
->>
->>  struct srcu_notifier_head *dev_pm_opp_get_notifier(struct device *dev);
->>  #else
->> +static inline struct device_opp *find_device_opp(struct device *dev)
->> +{
->> +     return ERR_PTR(-EINVAL);
->> +}
->> +
->>  static inline unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
->>  {
->>       return 0;
->> --
->> 1.8.3.2
->>
->
+It's sad to see that the runtime CPU features detection still remains
+a PITA with AArch64. Basically, it's not enough to know if the
+instruction is supported or not. Different microarchitectures may
+various performance quirks for certain instructions. For example,
+VFPLite in Cortex-A8 is non-pipelined and slow. Cortex-A15 can
+dual-issue NEON instructions (nice for the code which can enjoy
+high ILP), but Cortex-A15 NEON instructions have relatively high
+latency (bad for the code, which is essentially a long dependency
+chain). The fastest way to read uncached memory for most ARM
+processors is to use the VFP load multiple instruction with as
+many registers as possible, but this is slow on Marvell PJ4. And
+so on.
+
+The information, usable for basic microarchitecture identification
+(the value from MIDR register) is only exposed in /proc/cpuinfo, which
+makes it an overall winner for the runtime CPU features detection
+method. Additionally, reading /proc/self/auxv for retrieving hwcaps has
+issues when run under qemu or valgrind. Instructions trapping is a very
+bad idea for multiple reasons (one of them is the fact that we can't
+easily distinguish between trapped&emulated and natively supported
+by hardware, think about FP instructions emulation for example).
+
+So there is no really good alternative to /proc/cpuinfo parsing. But
+text parsing is relatively cumbersome to implement. And this method is
+obviously not blazingly fast. Also the big.LITTLE systems introduce
+an interesting new challenge. How do we know whether we are running
+the code on Cortex-A7 or Cortex-A15 at any arbitrary moment? We might
+want to have several different assembly optimized functions, one
+optimized for Cortex-A15 pipeline and another one optimized for
+Cortex-A7. It would be nice to be able to frequently poll for the CPU
+features of the currently running CPU core (for example, once per
+frame in a video encoder/decoder) to select the fastest code path.
+With /proc/cpuinfo text parsing this is not going to work nicely.
+
+The best solution would be in my opinion a userspace accessible (and
+guaranteed not to trap) CPUID instruction. This has proven to work
+nicely for x86, so why inventing something overly complicated instead?
+In the case if the OS wants to conceal the CPU features from the
+userspace application, some special "I don't want to tell you,
+please use the slowest code path possible" value could be defined
+and returned by this instruction.
+
+Well, if it's not desired (and already too late) to change how the
+hardware works, another solution would be to have runtime CPU
+features detection supported as part of the run-time ABI. For example,
+make it mandatory for any EABI conforming system to provide some helper
+functions like __aeabi_read_midr() or __aeabi_read_hwcaps(). They could
+be implemented for ARM Linux via the kernel-provided user helpers, VDSO
+or whatever other method that is appropriate. If this works for the
+things like TLS (__aeabi_read_tp), why can't it work for runtime CPU
+features detection too? The recent gcc versions also have some nice
+built-in functions for runtime cpu features detection on x86
+such as __builtin_cpu_is(), __builtin_cpu_supports():
+    http://gcc.gnu.org/gcc-4.8/changes.html
+
+Please, could we finally have something sane for the runtime CPU
+features detection on ARM hardware?
+
+-- 
+Best regards,
+Siarhei Siamashka
