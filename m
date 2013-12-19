@@ -1,80 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 19 Dec 2013 09:07:04 +0900
-Subject: [GIT PULL] Renesas ARM based SoC Clocksource updates for v3.14
-In-Reply-To: <52B1B11D.7080904@linaro.org>
-References: <cover.1387000863.git.horms+renesas@verge.net.au>
- <20131218010815.GA2430@verge.net.au> <52B1B11D.7080904@linaro.org>
-Message-ID: <20131219000704.GB11060@verge.net.au>
+From: syin@broadcom.com (Sherman Yin)
+Date: Wed, 18 Dec 2013 16:12:30 -0800
+Subject: [PATCH v3 5/6] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <20131213102252.GS11044@sirena.org.uk>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1386787041-6035-6-git-send-email-syin@broadcom.com>
+ <CACRpkdaeZCodKv6R+4ZS3o-5u=QQuV3JidEp7uaLsN9aYG7bqA@mail.gmail.com>
+ <20131213102252.GS11044@sirena.org.uk>
+Message-ID: <52B239EE.6010601@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 03:28:45PM +0100, Daniel Lezcano wrote:
-> On 12/18/2013 02:08 AM, Simon Horman wrote:
-> >On Sat, Dec 14, 2013 at 03:07:31PM +0900, Simon Horman wrote:
-> >>Hi Daniel,
-> >>
-> >>please consider this Renesas ARM based SoC Clocksource update for v3.14.
-> >>
-> >>I would also like to request that you make a branch available
-> >>for me to use as a base for a branch containing SoC changes
-> >>targeted at v3.14 that depend on this clocksource update.
-> 
-> Hi Simon,
-> 
-> patch applied for 3.14.
-> 
-> The branch is available at:
-> 
-> git://git.linaro.org/people/daniel.lezcano/linux.git
-> clockevents/for-Simon-3.13-rc2
+On 13-12-13 02:22 AM, Mark Brown wrote:
+> On Thu, Dec 12, 2013 at 09:54:50PM +0100, Linus Walleij wrote:
+>
+>> This is a reimplementation of regmap for MMIO.
+>> See drivers/base/regmap/regmap-mmio.c
+>> Notice how regmap_update_bits() is used throughout the
+>> kernel.
+>
+>> If you want to do this, use regmap.
+>
+> Or if this is very performance sensitive (which I'd not expect for
+> pinctrl) there's a helper in review at the minute which just uses a
+> spinlock.
+>
 
-Great, thanks!
+Thanks Mark.  It's not expected to be performance sensitive, so I'll 
+probably go with regmap.
 
-> 
-> Thanks
->   -- Daniel
-> 
-> >>
-> >>Thanks
-> >
-> >Hi Daniel,
-> >
-> >sorry to bother you about this, but if you could take a moment
-> >to look at this pull request I would be most grateful. Its
-> >rather important for us.
-> >
-> >>
-> >>
-> >>The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> >>
-> >>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> >>
-> >>are available in the git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.14
-> >>
-> >>for you to fetch changes up to d78e9474459768c9aaf8cfd8bc54957d44771f46:
-> >>
-> >>   clocksource: sh_cmt: Add clk_prepare/unprepare support (2013-12-14 12:57:36 +0900)
-> >>
-> >>----------------------------------------------------------------
-> >>Renesas ARM based SoC Clocksource updates for v3.14
-> >>
-> >>* Add clk_prepare/unprepare support to sh_cmt
-> >>
-> >>----------------------------------------------------------------
-> >>Laurent Pinchart (1):
-> >>       clocksource: sh_cmt: Add clk_prepare/unprepare support
-> >>
-> >>  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
-> >>  1 file changed, 16 insertions(+), 4 deletions(-)
-> >>
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
+Regards,
+Sherman
