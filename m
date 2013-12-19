@@ -1,54 +1,45 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 19 Dec 2013 08:37:17 +0100
-Subject: [GIT PULL] Xilinx Zynq clk changes for v3.14
-In-Reply-To: <20131219051219.18119.26127@quantum>
-References: <52B16A4B.1000706@monstr.eu> <20131219051219.18119.26127@quantum>
-Message-ID: <52B2A22D.6080304@monstr.eu>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 Dec 2013 08:38:44 +0100
+Subject: [PATCH 2/2] ARM: dts: Add support for the i.MX35.
+In-Reply-To: <20131219064957.GZ6691@S2101-09.ap.freescale.net>
+References: <1387375826-4018-1-git-send-email-s.hauer@pengutronix.de>
+ <1387375826-4018-3-git-send-email-s.hauer@pengutronix.de>
+ <20131219064957.GZ6691@S2101-09.ap.freescale.net>
+Message-ID: <20131219073843.GV24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On 12/19/2013 06:12 AM, Mike Turquette wrote:
-> Quoting Michal Simek (2013-12-18 01:26:35)
->> Hi Mike,
->>
->> As we discussed it is better for you to get pull request with signed tags.
->> That's why I am sending you pull request for 2 patches which we have in queue which
->> should go to v3.14.
+On Thu, Dec 19, 2013 at 02:49:59PM +0800, Shawn Guo wrote:
+> On Wed, Dec 18, 2013 at 03:10:26PM +0100, Sascha Hauer wrote:
+> > +	clocks {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		ckil {
+> > +			compatible = "fsl,imx-ckil", "fixed-clock";
+> > +			clock-frequency = <32768>;
+> > +		};
+> > +
+> > +		osc {
+> > +			compatible = "fsl,imx-osc", "fixed-clock";
+> > +			clock-frequency = <24000000>;
+> > +		};
 > 
-> Michal,
-> 
-> Thanks much for the pull request. In the future it is a bit easier if
-> you base your pull request on the tip of clk-next, but it's not a big
-> deal.
+> I asked the question in the last round, but did not get any answer.  Do
+> these two clocks exist on imx35?  At least from the imx35 clock code,
+> I do not see them.
 
-ok. No problem to do.
+ckil does exist, but it's optional, so I think if we specify it in the
+dtsi then the rate should be 0. It's unused in the code though and noone
+ever seemed to miss it, so we can equally well just drop it.
+osc does exist aswell, but in the code it's unused and a hardcoded 24MHz
+value is used, so specifying it in the devicetree is bogus.
+I think we should just drop the nodes.
 
-> 
-> Shouldn't the change to zynq-7000.dtsi go through the arm-soc tree
-> instead of the clk tree?
-
-It is here because it is related to clock and there is no conflict
-with others DT changes we made for 3.14.
-But if you prefer not to have this change here I have no problem
-to add it to our zynq/clk branch and go through arm-soc tree.
-
-Thanks,
-Michal
+Sascha
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/9c8b2985/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
