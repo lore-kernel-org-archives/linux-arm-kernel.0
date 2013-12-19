@@ -1,32 +1,38 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Thu, 19 Dec 2013 17:57:38 +0100
-Subject: [rtc-linux] Re: Can someone Ack and queue a patch for RTC
- subsytem?
-In-Reply-To: <20131219164624.GV2609@titan.lakedaemon.net>
-References: <87siton6ke.fsf@natisbad.org>
- <20131219164624.GV2609@titan.lakedaemon.net>
-Message-ID: <20131219175738.1dad3ade@linux.lan.towertech.it>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 10:01:19 -0700
+Subject: [PATCH Resend 2/7] clk: tegra: Staticize
+ tegra_clk_periph_nodiv_ops
+In-Reply-To: <1387443241-5694-2-git-send-email-sachin.kamat@linaro.org>
+References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
+ <1387443241-5694-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <52B3265F.8080901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Dec 2013 11:46:24 -0500
-Jason Cooper <jason@lakedaemon.net> wrote:
+On 12/19/2013 01:53 AM, Sachin Kamat wrote:
+> tegra_clk_periph_nodiv_ops is used only in this file. Make it static.
 
-> In the long term, should we seek out a co-maintainer for drivers/rtc?
-> Can anyone get a hold of Alessandro to get his opinion on this?
+I believe that Peter De Schrijver is picking up patches for
+drivers/clk/tegra and sending pull requests to Mike. Hence, I'm CC'ing
+him in here.
 
- I'd surely appreciate if someone can take some time to give
- a look to the patches. Most of them go thru subsystem's tree and, as far as I
- can see, I saw very relevant comments and fixes in all those years.
-
- I'd love to devote more time to Linux but I'd need to find
- someone that hires me just to do that the whole day :)
-
--- 
-
- Best regards,
-
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>  drivers/clk/tegra/clk-periph.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
+> index c534043c0481..356e9b804421 100644
+> --- a/drivers/clk/tegra/clk-periph.c
+> +++ b/drivers/clk/tegra/clk-periph.c
+> @@ -122,7 +122,7 @@ const struct clk_ops tegra_clk_periph_ops = {
+>  	.disable = clk_periph_disable,
+>  };
+>  
+> -const struct clk_ops tegra_clk_periph_nodiv_ops = {
+> +static const struct clk_ops tegra_clk_periph_nodiv_ops = {
+>  	.get_parent = clk_periph_get_parent,
+>  	.set_parent = clk_periph_set_parent,
+>  	.is_enabled = clk_periph_is_enabled,
+> 
