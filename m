@@ -1,51 +1,52 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 19 Dec 2013 15:14:03 -0800
-Subject: [GIT PULL 3/3] ARM: MAINTAINERS: SOC updates for 3.14
-In-Reply-To: <1387230397-14338-3-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Mon, 16 Dec 2013 16:46:37 -0500")
-References: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
- <1387230397-14338-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87mwjwigck.fsf@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 19 Dec 2013 17:21:53 -0600
+Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
+In-Reply-To: <20131219184815.GU27438@atomide.com>
+References: <1384970958-4118-1-git-send-email-balbi@ti.com>
+ <20131219184815.GU27438@atomide.com>
+Message-ID: <20131219232153.GE707@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Thu, Dec 19, 2013 at 10:48:15AM -0800, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [131120 10:10]:
+> > Afte these patches, we're very close to being able
+> > to move arch/arm/mach-omap2/irq.c to drivers/irqchip/irq-intc.c
+> 
+> That would be nice :)
+>  
+> > All which would be missing is for Tony to drop all OMAP2/3 board
+> > files so we remove the few pending bits and pieces left in
+> > for legacy boot.
+> 
+> That may still need to wait a while, but let's see.
+>  
+> > Note that I have only boot tested these on AM335x Bone Black
+> > (with a small fix for fixed regulator which should be in
+> > the mailing list already), so I'd need help testing all
+> > other impacted platforms, specially when it comes to PM.
+> 
+> Sorry have not had much of a chance to test these with PM with
+> all the fixes needed for omap3 DT mode. Tried testing these
+> just now, but I get:
+> 
+> arch/arm/mach-omap2/board-generic.c:134: error: ?omap_intc_of_init? undeclared here (not in a function)
 
-> Arnd, Olof, Kevin,
->
-> Please pull below couple of updates to MAINTAINERS file for Keystone
->
-> Regards,
-> Santosh
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone/maintainer-file
->
-> for you to fetch changes up to cffa8e3b5c7dcf7617268561397eb236651446f8:
->
->   MAINTAINERS: Add keystone clock drivers (2013-12-16 16:01:14 -0500)
->
-> ----------------------------------------------------------------
-> Couple of updates to MAINTAINERS file for Keystone
->
-> - Add git tree information
-> - Add clock drivers entry
->
-> ----------------------------------------------------------------
+some of your other changes messed it up, I have not references of
+omap_intc_of_init() in my branch, because that's one of the things I'm
+dropping from DT-based boots.
 
-Applied to fixes.
+Can you see which patch added a new omap_intc_of_init() call ? Or maybe
+tell me which branch I should rebase on top of ?
 
-Kevin
+cheers
 
-> Santosh Shilimkar (2):
->       MAINTAINERS: Add keystone git tree information
->       MAINTAINERS: Add keystone clock drivers
->
->  MAINTAINERS |    2 ++
->  1 file changed, 2 insertions(+)
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/6397427f/attachment.sig>
