@@ -1,120 +1,98 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Dec 2013 17:06:18 +0100
-Subject: [PATCH 06/10] ARM: tegra: Add SPI controller nodes for Tegra124
+Date: Thu, 19 Dec 2013 17:06:22 +0100
+Subject: [PATCH 10/10] ARM: tegra: Enable USB on Venice2
 In-Reply-To: <1387469182-14398-1-git-send-email-treding@nvidia.com>
 References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
-Message-ID: <1387469182-14398-7-git-send-email-treding@nvidia.com>
+Message-ID: <1387469182-14398-11-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI controllers on Tegra124 are compatible with those found on the
-Tegra114 SoC.
+USB1 and USB3 are routed to two external connectors, while USB2 is used
+for the integrated webcam.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/boot/dts/tegra124.dtsi | 90 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 90 insertions(+)
+Note: connecting a USB mouse to USB3 works properly and lsusb also detects
+the integrated webcam, though I haven't tested whether the camera actually
+works.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 39d77aa936f9..cf4558257e8c 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -430,6 +430,96 @@
- 		status = "disabled";
+USB1 doesn't seem to work, but I suspect that might just be because it's
+used for recovery mode and we can't switch it around at runtime yet.
+---
+ arch/arm/boot/dts/tegra124-venice2.dts | 47 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index b770e903fabb..efdf93e6f5cc 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -534,7 +534,7 @@
+ 					ams,enable-tracking;
+ 				};
+ 
+-				ldo4 {
++				cam_2v8_reg: ldo4 {
+ 					regulator-name = "avdd_cam";
+ 					regulator-min-microvolt = <2800000>;
+ 					regulator-max-microvolt = <2800000>;
+@@ -715,6 +715,33 @@
+ 		};
  	};
  
-+	spi at 7000d400 {
-+		compatible = "nvidia,tegra124-spi", "nvidia,tegra114-spi";
-+		reg = <0x7000d400 0x200>;
-+		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_SBC1>;
-+		clock-names = "spi";
-+		resets = <&tegra_car 41>;
-+		reset-names = "spi";
-+		dmas = <&apbdma 15>, <&apbdma 15>;
-+		dma-names = "rx", "tx";
-+		status = "disabled";
++	usb at 7d000000 {
++		status = "okay";
 +	};
 +
-+	spi at 7000d600 {
-+		compatible = "nvidia,tegra124-spi", "nvidia,tegra114-spi";
-+		reg = <0x7000d600 0x200>;
-+		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_SBC2>;
-+		clock-names = "spi";
-+		resets = <&tegra_car 44>;
-+		reset-names = "spi";
-+		dmas = <&apbdma 16>, <&apbdma 16>;
-+		dma-names = "rx", "tx";
-+		status = "disabled";
++	usb-phy at 7d000000 {
++		status = "okay";
++		vbus-supply = <&usb1_vbus_reg>;
 +	};
 +
-+	spi at 7000d800 {
-+		compatible = "nvidia,tegra124-spi", "nvidia,tegra114-spi";
-+		reg = <0x7000d800 0x200>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_SBC3>;
-+		clock-names = "spi";
-+		resets = <&tegra_car 46>;
-+		reset-names = "spi";
-+		dmas = <&apbdma 17>, <&apbdma 17>;
-+		dma-names = "rx", "tx";
-+		status = "disabled";
++	usb at 7d004000 {
++		status = "okay";
 +	};
 +
-+	spi at 7000da00 {
-+		compatible = "nvidia,tegra124-spi", "nvidia,tegra114-spi";
-+		reg = <0x7000da00 0x200>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_SBC4>;
-+		clock-names = "spi";
-+		resets = <&tegra_car 68>;
-+		reset-names = "spi";
-+		dmas = <&apbdma 18>, <&apbdma 18>;
-+		dma-names = "rx", "tx";
-+		status = "disabled";
++	usb-phy at 7d004000 {
++		status = "okay";
++		vbus-supply = <&cam_2v8_reg>;
 +	};
 +
-+	spi at 7000dc00 {
-+		compatible = "nvidia,tegra124-spi", "nvidia,tegra114-spi";
-+		reg = <0x7000dc00 0x200>;
-+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_SBC5>;
-+		clock-names = "spi";
-+		resets = <&tegra_car 104>;
-+		reset-names = "spi";
-+		dmas = <&apbdma 27>, <&apbdma 27>;
-+		dma-names = "rx", "tx";
-+		status = "disabled";
++	usb at 7d008000 {
++		status = "okay";
 +	};
 +
-+	spi at 7000de00 {
-+		compatible = "nvidia,tegra124-spi", "nvidia,tegra114-spi";
-+		reg = <0x7000de00 0x200>;
-+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_SBC6>;
-+		clock-names = "spi";
-+		resets = <&tegra_car 105>;
-+		reset-names = "spi";
-+		dmas = <&apbdma 28>, <&apbdma 28>;
-+		dma-names = "rx", "tx";
-+		status = "disabled";
++	usb-phy at 7d008000 {
++		status = "okay";
++		vbus-supply = <&usb3_vbus_reg>;
 +	};
 +
- 	rtc at 7000e000 {
- 		compatible = "nvidia,tegra124-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
+ 	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 
+@@ -788,6 +815,24 @@
+ 			gpio = <&gpio TEGRA_GPIO(P, 2) 0 GPIO_ACTIVE_HIGH>;
+ 			enable-active-high;
+ 		};
++
++		usb1_vbus_reg: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-boot-on;
++		};
++
++		usb3_vbus_reg: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			regulator-name = "usb3_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-boot-on;
++		};
+ 	};
+ 
+ 	sound {
 -- 
 1.8.4.2
