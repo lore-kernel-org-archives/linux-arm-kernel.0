@@ -1,51 +1,62 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 19 Dec 2013 12:58:29 +0530
-Subject: [PATCH V2 2/2] ARM: tegra: add ams AS3722 device to Venice2 DT
-In-Reply-To: <52B20BB4.50506@wwwdotorg.org>
-References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
- <1387371179-16725-2-git-send-email-ldewangan@nvidia.com>
- <52B20BB4.50506@wwwdotorg.org>
-Message-ID: <52B2A01D.2000207@nvidia.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Thu, 19 Dec 2013 16:29:03 +0900
+Subject: [PATCH 06/11] PM / devfreq: move definitions for exynos4_bus into
+ drivers/devfreq
+In-Reply-To: <52B1E156.6030904@samsung.com>
+References: <116401cefb1e$75b83440$61289cc0$@kernel.org>
+ <CAJ0PZbTH0kga7Gbb87umJpCF_ih3TQrxKS0xBbofDvJq+_wj5Q@mail.gmail.com>
+ <52B1E156.6030904@samsung.com>
+Message-ID: <CAJ0PZbSQaDy13BO=nrorMt1O16X7VEqAfs_h6dAeF+Gekgrfdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 December 2013 02:25 AM, Stephen Warren wrote:
-> On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
->> Add ams AS3722 entry for gpio/pincontrol and regulators
->> to venice2 DT.
-> This patch still causes:
+On Thu, Dec 19, 2013 at 2:54 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 12/18/13 15:11, MyungJoo Ham wrote:
+>>
+>> On Tue, Dec 17, 2013 at 8:52 PM,<kgene@kernel.org>  wrote:
+>>>
+>>> From: Kukjin Kim<kgene.kim@samsung.com>
+>>>
+>>> We don't need to keep the definitions for exynos4_bus into
+>>> mach-exynos/ so this moves them into drviers/devfreq with
+>>> adding header file.
+>>
+>>
+>> Acked-by: MyungJoo Ham<myungjoo.ham@samsung.com>
+>>
+>> However, how are you going to merge this patch?
+>> Do you need me to get this handled or are you going to do it yourself
+>> with Samsung-SoC tree?
+>>
 >
->> [    0.726545] as3722-pinctrl as3722-pinctrl: pin gpio0 already requested by as3722-pinctrl; cannot claim for as3722-regulator
->> [    0.737681] as3722-pinctrl as3722-pinctrl: pin-0 (as3722-regulator) status -22
->> [    0.744895] as3722-pinctrl as3722-pinctrl: could not request pin 0 (gpio0) from group gpio0  on device as3722-pinctrl
->> [    0.755500] as3722-regulator as3722-regulator: Error applying setting, reverse things back
+> Hi MyungJoo,
+>
+> Let me take this into Samsung tree with others if you're OK :-)
 
-This error is nothing related to the ams dt or driver. This came from 
-the framework from the driver/base for adding pinmux call before calling 
-any diver's probe.
-Here is my finding:
-Frameworks calls the pinctrl_bind_pins() before calls the driver's probe 
-(drivers/base/dd.c) and pinctrl_bind_pins() calls the pinmux mapping and 
-try to set the default (drvers/base/pinctrl.c).
+Yes, Ok. Please go ahead.
 
-AMS AS3722 DT is flat type on which all sub devices of AS3722 have the 
-property on parent node only, there is no subnode for each sub driver 
-like palmas. In this case all sub drivers of_node is initialized as 
-parent->of_node in mfd-core.c (mfd_add_devices).
+>
+> Thanks,
+> Kukjin
+>
+>
+>> Cheers,
+>> MyungJoo.
+>>
+>>>
+>>> Cc: MyungJoo Ham<myungjoo.ham@samsung.com>
+>>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+>>> ---
+>>>   arch/arm/mach-exynos/include/mach/regs-clock.h |   94
+>>> --------------------
+>>>   drivers/devfreq/exynos/exynos4_bus.c           |    4 +-
+>>>   drivers/devfreq/exynos/exynos4_bus.h           |  110
+>>> ++++++++++++++++++++++++
+>>>   3 files changed, 112 insertions(+), 96 deletions(-)
+>>>   create mode 100644 drivers/devfreq/exynos/exynos4_bus.h
 
-mfd-core.c: mfd_add_device()
-        if (!pdev->dev.of_node)
-                 pdev->dev.of_node = parent->of_node;
 
-So all sub devices of AS3722 has the parent node.
-This node has the default pinmux configuration and so it tries to set 
-the default pinmux before sud-driver's probe get called.
-The first one (for pinmux driver) it is success but for regulator and 
-rtc, it is failed as pins are owned by the pinmux drivers.
 
-This does not have any side impact as currently, pinctrl_bind_pins() 
-only return the success or ERPOBE_DEFER
-
-I was testing the patch with linux-next-common of your branch and 
-chrome-os/kernel-next with linux-next's pinctrl/regulator/mfd and not 
-able to repro this because driver/base changes was not there.
+-- 
+MyungJoo Ham, Ph.D.
+System S/W Lab, S/W Center, Samsung Electronics
