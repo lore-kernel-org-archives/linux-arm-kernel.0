@@ -1,51 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 19 Dec 2013 00:00:22 -0800
-Subject: [PATCH 2/3] clk: exynos5420: Add alias names for cpu clocks
-In-Reply-To: <1386323284-15646-3-git-send-email-arun.kk@samsung.com>
-References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
- <1386323284-15646-3-git-send-email-arun.kk@samsung.com>
-Message-ID: <20131219080022.18119.20692@quantum>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 19 Dec 2013 09:02:42 +0100
+Subject: [PATCH] i2c: at91: document clock properties
+In-Reply-To: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131219080242.GA3842@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arun Kumar K (2013-12-06 01:48:03)
-> Adds alias names for cpu clocks to be used in the cpufreq driver.
+On Tue, Dec 17, 2013 at 04:54:04PM +0100, Boris BREZILLON wrote:
+> Document the clock properties required by the at91 i2c bus driver.
 > 
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-
-Acked-by: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 > ---
->  drivers/clk/samsung/clk-exynos5420.c |    9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
+>  Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 48c4a93..c65c040 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -316,9 +316,10 @@ static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initda
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+> index b689a0d..4fade84 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+> @@ -9,6 +9,7 @@ Required properties :
+>  - interrupts: interrupt number to the cpu.
+>  - #address-cells = <1>;
+>  - #size-cells = <0>;
+> +- clocks: phandles to input clocks.
 >  
->  static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->         MUX(none, "mout_mspll_kfc", mspll_cpu_p, SRC_TOP7, 8, 2),
-> -       MUX(none, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2),
-> -       MUX(none, "mout_apll", apll_p, SRC_CPU, 0, 1),
-> -       MUX(none, "mout_cpu", cpu_p, SRC_CPU, 16, 1),
-> +       MUX_A(none, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2,
-> +                       "mout_mspll_cpu"),
-> +       MUX_A(none, "mout_apll", apll_p, SRC_CPU, 0, 1, "mout_apll"),
-> +       MUX_A(none, "mout_cpu", cpu_p, SRC_CPU, 16, 1, "mout_cpu"),
->         MUX(none, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
->         MUX(none, "mout_cpu_kfc", kfc_p, SRC_KFC, 16, 1),
+>  Optional properties:
+>  - Child nodes conforming to i2c bus binding
+> @@ -21,6 +22,7 @@ i2c0: i2c at fff84000 {
+>  	interrupts = <12 4 6>;
+>  	#address-cells = <1>;
+>  	#size-cells = <0>;
+> +	clocks = <&twi0_clk>;
 >  
-> @@ -373,7 +374,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->  
->         MUX(none, "sclk_mpll", mpll_p, SRC_TOP6, 0, 1),
->         MUX(none, "sclk_vpll", vpll_p, SRC_TOP6, 4, 1),
-> -       MUX(none, "sclk_spll", spll_p, SRC_TOP6, 8, 1),
-> +       MUX_A(none, "sclk_spll", spll_p, SRC_TOP6, 8, 1, "mout_spll"),
->         MUX(none, "sclk_ipll", ipll_p, SRC_TOP6, 12, 1),
->         MUX(none, "sclk_rpll", rpll_p, SRC_TOP6, 16, 1),
->         MUX(none, "sclk_epll", epll_p, SRC_TOP6, 20, 1),
+>  	24c512 at 50 {
+>  		compatible = "24c512";
 > -- 
 > 1.7.9.5
 > 
