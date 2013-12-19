@@ -1,66 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Dec 2013 16:48:24 +0000
-Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
-In-Reply-To: <s5hd2kssu4g.wl%tiwai@suse.de>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
- <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
- <s5hd2kssu4g.wl%tiwai@suse.de>
-Message-ID: <20131219164824.GA16145@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Dec 2013 17:47:40 +0100
+Subject: [PATCH 0/3] ARM: at91/dt: add clock properties to sama5d3 crypto
+ devs
+In-Reply-To: <1387465875-4548-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387465875-4548-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52B3232C.3000400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
-> > rather carelessly converts find_next_bit() to fls() (find last
-> > bit set), which are not the same.
+On 19/12/2013 16:11, Boris BREZILLON :
+> Hello,
 > 
-> Does it break on the real machines?
+> This series adds missing clock properties in sama5d3 crypto devices nodes.
 
-It does, that's how I found the bug.
+Fine, thanks Boris. On the whole series:
 
-> fls() behaves differently from find_next_bit(), of course, but in this
-> case, it should work same in the end, since there are at most two
-> bits.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Unfortunately it doesn't work at all. This patch brings audio back to
-a working state. It took me the best part of a day to track down the
-issue. :(
+and integrated in the at91-3.14-dt2 branch.
 
-> > Although this implementation may not be portable, the alternative
-> > breaks audio on anything using the AB8500 CODEC, which is a much
-> > greater evil. Besides, this driver will never run on anything
-> > else.
-> > 
-> > Cc: Takashi Iwai <tiwai@suse.de>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  sound/soc/codecs/ab8500-codec.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-> > index 1ad92cb..51ae3e9 100644
-> > --- a/sound/soc/codecs/ab8500-codec.c
-> > +++ b/sound/soc/codecs/ab8500-codec.c
-> > @@ -2322,7 +2322,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
-> >  		slot = ffs(tx_mask);
-> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
-> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
-> > -		slot = fls(tx_mask);
-> > +		slot = find_next_bit((unsigned long *)&tx_mask, 32, slot + 1);
-> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
-> >  		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
-> >  		break;
-> > @@ -2364,7 +2364,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
-> >  				AB8500_ADSLOTSEL(slot),
-> >  				AB8500_MASK_SLOT(slot),
-> >  				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
-> > -		slot = fls(rx_mask);
-> > +		slot = find_next_bit((unsigned long *)&rx_mask, 32, slot + 1);
-> >  		snd_soc_update_bits(codec,
-> >  				AB8500_ADSLOTSEL(slot),
-> >  				AB8500_MASK_SLOT(slot),
+Bye,
+
+> Best Regards,
+> 
+> Boris
+> 
+> Boris BREZILLON (3):
+>   ARM: at91/dt: add clk properties to sama5d3 SHA device node
+>   ARM: at91/dt: add clk properties to sama5d3 AES device node
+>   ARM: at91/dt: add clk properties to sama5d3 TDES device node
+> 
+>  arch/arm/boot/dts/sama5d3.dtsi |    6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
