@@ -1,123 +1,115 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:24:14 +0200
-Subject: [PATCHv11 43/49] ARM: OMAP2+: PRM: add support for initializing PRCM
- clock modules from DT
-In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-44-git-send-email-t-kristo@ti.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 19 Dec 2013 13:29:33 +0100
+Subject: [PATCH v4 2/2] provide -fstack-protector-strong build option
+In-Reply-To: <1387390796-5860-3-git-send-email-keescook@chromium.org>
+References: <1387390796-5860-1-git-send-email-keescook@chromium.org>
+ <1387390796-5860-3-git-send-email-keescook@chromium.org>
+Message-ID: <20131219122933.GB18110@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides top level functionality for the DT clock initialization.
-Clock tree is initialized hierarchically starting from IP modules (CM/PRM/PRCM)
-going down towards individual clock nodes, and finally initializing
-clockdomains once all the clocks are ready.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/prm.h        |    1 +
- arch/arm/mach-omap2/prm_common.c |   66 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+)
+* Kees Cook <keescook@chromium.org> wrote:
 
-diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
-index ac25ae6..623db40 100644
---- a/arch/arm/mach-omap2/prm.h
-+++ b/arch/arm/mach-omap2/prm.h
-@@ -18,6 +18,7 @@
- # ifndef __ASSEMBLER__
- extern void __iomem *prm_base;
- extern void omap2_set_globals_prm(void __iomem *prm);
-+int of_prcm_init(void);
- # endif
- 
- 
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index a2e1174..835eb7d 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -23,6 +23,10 @@
- #include <linux/irq.h>
- #include <linux/interrupt.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clk/ti.h>
- 
- #include "soc.h"
- #include "prm2xxx_3xxx.h"
-@@ -30,6 +34,7 @@
- #include "prm3xxx.h"
- #include "prm44xx.h"
- #include "common.h"
-+#include "clock.h"
- 
- /*
-  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
-@@ -464,3 +469,64 @@ int prm_unregister(struct prm_ll_data *pld)
- 
- 	return 0;
- }
-+
-+static struct of_device_id omap_prcm_dt_match_table[] = {
-+	{ .compatible = "ti,am3-prcm" },
-+	{ .compatible = "ti,am3-scrm" },
-+	{ .compatible = "ti,am4-prcm" },
-+	{ .compatible = "ti,am4-scrm" },
-+	{ .compatible = "ti,omap3-prm" },
-+	{ .compatible = "ti,omap3-cm" },
-+	{ .compatible = "ti,omap3-scrm" },
-+	{ .compatible = "ti,omap4-cm1" },
-+	{ .compatible = "ti,omap4-prm" },
-+	{ .compatible = "ti,omap4-cm2" },
-+	{ .compatible = "ti,omap4-scrm" },
-+	{ .compatible = "ti,omap5-prm" },
-+	{ .compatible = "ti,omap5-cm-core-aon" },
-+	{ .compatible = "ti,omap5-scrm" },
-+	{ .compatible = "ti,omap5-cm-core" },
-+	{ .compatible = "ti,dra7-prm" },
-+	{ .compatible = "ti,dra7-cm-core-aon" },
-+	{ .compatible = "ti,dra7-cm-core" },
-+	{ }
-+};
-+
-+static struct clk_hw_omap memmap_dummy_ck = {
-+	.flags = MEMMAP_ADDRESSING,
-+};
-+
-+static u32 prm_clk_readl(u32 *reg)
-+{
-+	return omap2_clk_readl(&memmap_dummy_ck, reg);
-+}
-+
-+static void prm_clk_writel(u32 val, u32 *reg)
-+{
-+	omap2_clk_writel(val, &memmap_dummy_ck, reg);
-+}
-+
-+static struct clk_ll_ops omap_clk_ll_ops = {
-+	.clk_readl = prm_clk_readl,
-+	.clk_writel = prm_clk_writel,
-+};
-+
-+int __init of_prcm_init(void)
-+{
-+	struct device_node *np;
-+	void __iomem *mem;
-+	int memmap_index = 0;
-+
-+	ti_clk_ll_ops = &omap_clk_ll_ops;
-+
-+	for_each_matching_node(np, omap_prcm_dt_match_table) {
-+		mem = of_iomap(np, 0);
-+		clk_memmaps[memmap_index] = mem;
-+		ti_dt_clk_init_provider(np, memmap_index);
-+		memmap_index++;
-+	}
-+
-+	ti_dt_clockdomains_setup();
-+
-+	return 0;
-+}
--- 
-1.7.9.5
+> This changes the stack protector config option into a choice of "None",
+> "Regular", and "Strong". For "Strong", the kernel is built with
+> -fstack-protector-strong (gcc 4.9 and later). This options increases
+> the coverage of the stack protector without the heavy performance hit
+> of -fstack-protector-all.
+> 
+> For reference, the stack protector options available in gcc are:
+> 
+> -fstack-protector-all:
+> Adds the stack-canary saving prefix and stack-canary checking suffix to
+> _all_ function entry and exit. Results in substantial use of stack space
+> for saving the canary for deep stack users (e.g. historically xfs), and
+> measurable (though shockingly still low) performance hit due to all the
+> saving/checking. Really not suitable for sane systems, and was entirely
+> removed as an option from the kernel many years ago.
+> 
+> -fstack-protector:
+> Adds the canary save/check to functions that define an 8
+> (--param=ssp-buffer-size=N, N=8 by default) or more byte local char
+> array. Traditionally, stack overflows happened with string-based
+> manipulations, so this was a way to find those functions. Very few
+> total functions actually get the canary; no measurable performance or
+> size overhead.
+> 
+> -fstack-protector-strong
+> Adds the canary for a wider set of functions, since it's not just those
+> with strings that have ultimately been vulnerable to stack-busting. With
+> this superset, more functions end up with a canary, but it still
+> remains small compared to all functions with no measurable change in
+> performance. Based on the original design document, a function gets the
+> canary when it contains any of:
+> - local variable's address used as part of the RHS of an assignment or
+>   function argument
+> - local variable is an array (or union containing an array), regardless
+>   of array type or length
+> - uses register local variables
+> https://docs.google.com/a/google.com/document/d/1xXBH6rRZue4f296vGt9YQcuLVQHeE516stHwt8M9xyU
+> 
+> Comparison of "size" and "objdump" output when built with gcc-4.9 in
+> three configurations:
+> - defconfig
+> 	11430641 text size
+> 	36110 function bodies
+> - defconfig + CONFIG_CC_STACKPROTECTOR
+> 	11468490 text size (+0.33%)
+> 	1015 of 36110 functions stack-protected (2.81%)
+> - defconfig + CONFIG_CC_STACKPROTECTOR_STRONG via this patch
+> 	11692790 text size (+2.24%)
+> 	7401 of 36110 functions stack-protected (20.5%)
+
+Ok, these patches now look pretty good to me.
+
+One final detail is that I think the information about the percentage 
+of functions affected should be propagated into the help text:
+
+> +config CC_STACKPROTECTOR_REGULAR
+> +	bool "Regular"
+> +	select CC_STACKPROTECTOR
+> +	help
+> +	  Functions will have the stack-protector canary logic added if they
+> +	  have an 8-byte or larger character array on the stack.
+> +
+>  	  This feature requires gcc version 4.2 or above, or a distribution
+>  	  gcc with the feature backported.
+>  
+> +	  On an x86 "defconfig" build, this increases the kernel text by 0.3%.
+> +
+> +config CC_STACKPROTECTOR_STRONG
+> +	bool "Strong"
+> +	select CC_STACKPROTECTOR
+> +	help
+> +	  Functions will have the stack-protector canary logic added in any
+> +	  of the following conditions:
+> +	  - local variable's address used as part of the RHS of an
+> +	    assignment or function argument
+> +	  - local variable is an array (or union containing an array),
+> +	    regardless of array type or length
+> +	  - uses register local variables
+> +
+> +	  This feature requires gcc version 4.9 or above, or a distribution
+> +	  gcc with the feature backported.
+> +
+> +	  On an x86 "defconfig" build, this increases the kernel text by 2%.
+
+It should say something like:
+
+	  On an x86 "defconfig" build, this feature adds canary checks 
+	  to about 3% of all kernel functions, which increases kernel
+	  code size by about 0.3%.
+
+and for the _STRONG option:
+
+	  On an x86 "defconfig" build, this feature adds canary checks 
+	  to ~20% of all kernel functions, which increases kernel code 
+	  size by ~2%.
+
+this way distibutions and users can make an informed decision about 
+the level of checks they want to employ.
+
+Thanks,
+
+	Ingo
