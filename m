@@ -1,59 +1,72 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Dec 2013 13:42:15 +0800
-Subject: [PATCH 1/4] ARM: dts: imx6sl: Adding cpu frequency table
-In-Reply-To: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
+Date: Thu, 19 Dec 2013 13:48:00 +0800
+Subject: [PATCH 2/4] ARM: imx: Add cpu frequency scaling support
+In-Reply-To: <1387410656-36053-2-git-send-email-john.tobias.ph@gmail.com>
 References: <1387410656-36053-1-git-send-email-john.tobias.ph@gmail.com>
-Message-ID: <20131219054213.GT6691@S2101-09.ap.freescale.net>
+ <1387410656-36053-2-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <20131219054758.GU6691@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 03:50:53PM -0800, John Tobias wrote:
-> Device tree for iMX6SL doesn't have an existing cpu frequency table.
+On Wed, Dec 18, 2013 at 03:50:54PM -0800, John Tobias wrote:
+> Re-using iMX6Q driver for cpu frequency scaling.
 > 
 > Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
 > ---
->  arch/arm/boot/dts/imx6sl.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+>  arch/arm/mach-imx/mach-imx6sl.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 28558f1..473d54b 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -38,6 +38,21 @@
->  			device_type = "cpu";
->  			reg = <0x0>;
->  			next-level-cache = <&L2>;
-> +			operating-points = <
-> +				/* kHz    uV */
-> +				996000  1275000
-> +				792000  1175000
-> +				396000  975000
-> +			>;
+> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+> index 2f952e3..a8b1543 100644
+> --- a/arch/arm/mach-imx/mach-imx6sl.c
+> +++ b/arch/arm/mach-imx/mach-imx6sl.c
+> @@ -8,7 +8,6 @@
+>   */
+>  
+>  #include <linux/irqchip.h>
+> -#include <linux/of.h>
 
-Anson is pushing VDDSOC/PU voltage settings upstream.  We may want to
-add the following VDDSOC/PU operating-points as well.
+This is an unrelated change to the patch.
 
-	fsl,soc-operating-points = <
-		/* ARM kHz	SOC-PU uV */
-		996000		1225000
-		792000		1175000
-		396000		1175000
-	>;
+>  #include <linux/of_platform.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+> @@ -34,6 +33,17 @@ static void __init imx6sl_fec_init(void)
+>  	}
+>  }
+>  
+> +static struct platform_device imx6q_cpufreq_pdev = {
+> +	.name = "imx6q-cpufreq",
+> +};
+> +
+> +static void __init imx6sl_init_late(void)
+> +{
+> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+
+Unnecessary braces.
+
+> +		platform_device_register(&imx6q_cpufreq_pdev);
+
+Register the device in the following way will save imx6q_cpufreq_pdev.
+
+	platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
 
 Shawn
 
-> +			clock-latency = <61036>; /* two CLK32 periods */
-> +			clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>,
-> +					<&clks IMX6SL_CLK_STEP>, <&clks IMX6SL_CLK_PLL1_SW>,
-> +					<&clks IMX6SL_CLK_PLL1_SYS>;
-> +			clock-names = "arm", "pll2_pfd2_396m", "step",
-> +				      "pll1_sw", "pll1_sys";
-> +			arm-supply = <&reg_arm>;
-> +			pu-supply = <&reg_pu>;
-> +			soc-supply = <&reg_soc>;
->  		};
->  	};
->  
+> +	}
+> +}
+> +
+>  static void __init imx6sl_init_machine(void)
+>  {
+>  	struct device *parent;
+> @@ -70,6 +80,7 @@ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
+>  	.map_io		= debug_ll_io_init,
+>  	.init_irq	= imx6sl_init_irq,
+>  	.init_machine	= imx6sl_init_machine,
+> +	.init_late      = imx6sl_init_late,
+>  	.dt_compat	= imx6sl_dt_compat,
+>  	.restart	= mxc_restart,
+>  MACHINE_END
 > -- 
 > 1.8.3.2
 > 
