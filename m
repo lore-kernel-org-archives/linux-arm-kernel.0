@@ -1,45 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 Dec 2013 11:11:48 +0000
-Subject: [PATCH 0/4] arm64: advertise availability of CRC and crypto
- instructions
-In-Reply-To: <CAKv+Gu9mzXQ-5V=x=uMmXme6fZCyXvNhYy2oRA1DSkgGjjzYEQ@mail.gmail.com>
-References: <CAKv+Gu87zHkxKKyH0-jEcBKcdbWTahN2bgWRDpPog5bds_ukYg@mail.gmail.com>
- <20131218105541.GE4360@n2100.arm.linux.org.uk>
- <CAKv+Gu_M56pXD8N6rANkYWLxXk=iLe3qpwt7zoBo_h6YuBgHTA@mail.gmail.com>
- <20131218112713.GA28112@arm.com>
- <20131218114211.GF4360@n2100.arm.linux.org.uk>
- <20131218120306.GC28112@arm.com> <52B1B0E0.6030104@codeaurora.org>
- <CAKv+Gu_zCQkF2hYf_kWiD8mt_S3Due=Wz1SOqw_hBibSkgWtOA@mail.gmail.com>
- <20131218172956.GG28112@arm.com>
- <CAKv+Gu9mzXQ-5V=x=uMmXme6fZCyXvNhYy2oRA1DSkgGjjzYEQ@mail.gmail.com>
-Message-ID: <20131219111147.GA30398@arm.com>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Thu, 19 Dec 2013 11:13:09 +0000
+Subject: [PATCH] net: mvmdio: fix interrupt timeout handling
+Message-ID: <1387451589-15491-1-git-send-email-leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 06:50:35PM +0000, Ard Biesheuvel wrote:
-> On 18 December 2013 18:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> > For the time being, I merged the first two patches for AArch64 support.
-> > I'm not merging the compat one yet as this should strictly follow the
-> > arch/arm support.
-> 
-> Yeah, I guess that makes sense.
-> 
-> I find this ghetto style drive-by veto'ing less than productive,
+orion_mdio_wait_ready uses wait_event_timeout to wait for the
+SMI interrupt to fire.  wait_event_timeout waits for between
+"timeout - 1" and "timeout" jiffies.  In this case a 1ms timeout
+when HZ is 1000 results in a wait of 0 to 1 jiffies, causing
+premature timeouts.
 
-LOL. That's how we add a bit of excitement to our monotonous maintainer
-life ;).
+This fix ensures a minimum timeout of 2 jiffies, ensuring
+wait_event_timeout will always wait at least 1 jiffie.
 
-> I would much rather have had an informed discussion involving both
-> Russell and you and settle on a solution that is acceptable for both
-> ARM and arm64.
+Issue reported by Nicolas Schichan.
 
-I think we first need to get clarification from Russell whether the
-problem is the number of hwcap bits used or just not willing to take new
-ARMv8/AArch32 features in the 32-bit kernel.
+Tested-by: Nicolas Schichan <nschichan@freebox.fr>
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-If the latter, we can wait until AArch32 user space people start working
-on optimised crypto libraries and restart the discussion at the time.
-
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 7354960..a42a750 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -92,6 +92,12 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+ 			if (time_is_before_jiffies(end))
+ 				++timedout;
+ 	        } else {
++			/* wait_event_timeout does not guarantee a delay of at
++			 * least one whole jiffie, so timeout must be no less
++			 * than two.
++			 */
++			 if (timeout < 2)
++			 	timeout = 2;
+ 			wait_event_timeout(dev->smi_busy_wait,
+ 				           orion_mdio_smi_is_done(dev),
+ 				           timeout);
 -- 
-Catalin
+1.8.5.1
