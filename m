@@ -1,55 +1,31 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Thu, 19 Dec 2013 09:23:04 -0500
-Subject: [PATCH v8 3/9] usb: gadget: s3c-hsotg: enable build for other
- platforms
+Date: Thu, 19 Dec 2013 09:23:05 -0500
+Subject: [PATCH v8 4/9] usb: gadget: s3c-hsotg: add snps,
+ dwc2 compatible string
 In-Reply-To: <1387462990-12039-1-git-send-email-mporter@linaro.org>
 References: <1387462990-12039-1-git-send-email-mporter@linaro.org>
-Message-ID: <1387462990-12039-4-git-send-email-mporter@linaro.org>
+Message-ID: <1387462990-12039-5-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused Samsung-specific machine include and Kconfig
-dependency on S3C.
+Enable support for the dwc2 binding.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 ---
- drivers/usb/gadget/Kconfig     | 7 +++----
- drivers/usb/gadget/s3c-hsotg.c | 2 --
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ drivers/usb/gadget/s3c-hsotg.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index a91e642..181e760 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -294,11 +294,10 @@ config USB_PXA27X
- 	   gadget drivers to also be dynamically linked.
- 
- config USB_S3C_HSOTG
--	tristate "S3C HS/OtG USB Device controller"
--	depends on S3C_DEV_USB_HSOTG
-+	tristate "Designware/S3C HS/OtG USB Device controller"
- 	help
--	  The Samsung S3C64XX USB2.0 high-speed gadget controller
--	  integrated into the S3C64XX series SoC.
-+	  The Designware USB2.0 high-speed gadget controller
-+	  integrated into many SoCs.
- 
- config USB_S3C2410
- 	tristate "S3C2410 USB Device Controller"
 diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 9875d9c..db797f2 100644
+index db797f2..cbfbf41 100644
 --- a/drivers/usb/gadget/s3c-hsotg.c
 +++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -36,8 +36,6 @@
- #include <linux/usb/phy.h>
- #include <linux/platform_data/s3c-hsotg.h>
- 
--#include <mach/map.h>
--
- #include "s3c-hsotg.h"
- 
- static const char * const s3c_hsotg_supply_names[] = {
+@@ -3726,6 +3726,7 @@ static int s3c_hsotg_remove(struct platform_device *pdev)
+ #ifdef CONFIG_OF
+ static const struct of_device_id s3c_hsotg_of_ids[] = {
+ 	{ .compatible = "samsung,s3c6400-hsotg", },
++	{ .compatible = "snps,dwc2", },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, s3c_hsotg_of_ids);
 -- 
 1.8.4
