@@ -1,109 +1,89 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 19 Dec 2013 13:06:47 +0100
-Subject: [PATCH V2 5/5] i2c: riic: add driver
-In-Reply-To: <1407973.m5fTNuo5v5@avalon>
-References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
- <1387402321-21866-6-git-send-email-wsa@the-dreams.de>
- <1407973.m5fTNuo5v5@avalon>
-Message-ID: <20131219120646.GA2563@katana>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 19 Dec 2013 13:24:10 +0200
+Subject: [PATCHv11 39/49] ARM: OMAP2+: clock: add support for indexed memmaps
+In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-40-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Using indexed memmaps is required for isolating the actual memory access
+from the clock code. Now, the driver providing the support for the clock IP
+block provides the low level routines for reading/writing clock registers
+also.
 
-thanks for the review!
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/clock.c |   26 +++++++++++++++++++++++++-
+ arch/arm/mach-omap2/clock.h |    5 +++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
 
-
-> > +/*
-> > + * This i2c core has a lot of interrupts, namely 8. We use their chaining
-> > as
-> > + * some kind of state machine.
-> 
-> I have mixed feelings about this. Wouldn't it be more efficient to have an 
-> internal state machine (which you partially have already, using RIIC_INIT_MSG 
-> for instance) instead of relying on enabling/disabling interrupts ? The latter 
-> has a larger overhead.
-
-I am not sure I get you here. I need the interrupts anyhow. For example,
-after the last byte has been written to the 1-byte-FIFO in the
-transmission_irq, I need to wait for the transmission_end_irq to ensure
-the bits are already on the wire before I mark the message completed.
-
-Polling for that condition is more overhead than just enabling the
-proper interrupt (one write to ICIER). I don't need to switch ISR since
-all the interrupts are seperate and have dedicated ISR.
-
-> > +static int riic_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int
-> > num)
-> > +{
-> > +	struct riic_dev *riic = i2c_get_adapdata(adap);
-> > +	int i, ret;
-> 
-> One of my favorite bikeshedding comments is to ask for unsigned int when the 
-> variable can't be negative :-)
-
-OK.
-
-> > +	/*
-> > +	 * TODO: Implement formula to calculate the timing values depending on
-> > +	 * variable parent clock rate and arbitrary bus speed
-> > +	 */
-> > +	rate = clk_get_rate(riic->clk);
-> > +	if (rate != 33325000) {
-> > +		dev_err(&riic->adapter.dev,
-> > +			"invalid parent clk (%lu). Must be 33325000Hz\n", rate);
-> 
-> What about a "goto done;" here and below to avoid repeating the 
-> clk_disable_unprepare() call ?
-
-Yeah, can be argued that way. I was fine with both.
-
-> 
-> > +		clk_disable_unprepare(riic->clk);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	/* Changing the order of accessing IICRST and ICE may break things! */
-> > +	writeb(ICCR1_IICRST | ICCR1_SOWP, riic->base + RIIC_ICCR1);
-> > +	riic_clear_set_bit(riic, 0, ICCR1_ICE, RIIC_ICCR1);
-> > +
-> > +	switch (spd) {
-> > +	case 100000:
-> > +		writeb(ICMR1_CKS(3), riic->base + RIIC_ICMR1);
-> > +		writeb(ICBRH_SP100K, riic->base + RIIC_ICBRH);
-> > +		writeb(ICBRL_SP100K, riic->base + RIIC_ICBRL);
-> > +		break;
-> > +	case 400000:
-> > +		writeb(ICMR1_CKS(1), riic->base + RIIC_ICMR1);
-> > +		writeb(ICBRH_SP400K, riic->base + RIIC_ICBRH);
-> > +		writeb(ICBRL_SP400K, riic->base + RIIC_ICBRL);
-> 
-> Couldn't you compute the ICMR1, ICBRH and ICBRL values at runtime instead ?
-
-As mentioned in the TODO above, this is scheduled for an incremental
-update to this driver.
-
-> > +	of_property_read_u32(np, "clock-frequency", &bus_rate);
-> 
-> As the property is mandatory, shouldn't you check the return value of this 
-> function ? Another option would be to make the clock-frequency property 
-> optional and use a default value. What do the other I2C bus drivers usually do 
-> ?
-
-bus_rate is initialized to 0 and if read_u32 fails, it will stay this
-way. Then, the call to riic_init_hw() will fail and report the error.
-
-There is no standard behaviour (use sane default or fail) yet. It is
-somewhere on the I2C todo list :/
-
-Regards,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131219/76f366bf/attachment.sig>
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 238be3f..c6da55f 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -26,7 +26,6 @@
+ #include <linux/clk-private.h>
+ #include <asm/cpu.h>
+ 
+-
+ #include <trace/events/power.h>
+ 
+ #include "soc.h"
+@@ -56,6 +55,31 @@ u16 cpu_mask;
+ static bool clkdm_control = true;
+ 
+ static LIST_HEAD(clk_hw_omap_clocks);
++void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
++
++void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
++{
++	if (clk->flags & MEMMAP_ADDRESSING) {
++		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++		__raw_writel(val, clk_memmaps[r->index] + r->offset);
++	} else {
++		__raw_writel(val, reg);
++	}
++}
++
++u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
++{
++	u32 val;
++
++	if (clk->flags & MEMMAP_ADDRESSING) {
++		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++		val = __raw_readl(clk_memmaps[r->index] + r->offset);
++	} else {
++		val = __raw_readl(reg);
++	}
++
++	return val;
++}
+ 
+ /*
+  * Used for clocks that have the same value as the parent clock,
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index cbe5ff7..bda767a 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -254,6 +254,9 @@ void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+ 			       const char *core_ck_name,
+ 			       const char *mpu_ck_name);
+ 
++u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg);
++void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg);
++
+ extern u16 cpu_mask;
+ 
+ extern const struct clkops clkops_omap2_dflt_wait;
+@@ -288,6 +291,8 @@ extern const struct clksel_rate div_1_3_rates[];
+ extern const struct clksel_rate div_1_4_rates[];
+ extern const struct clksel_rate div31_1to31_rates[];
+ 
++extern void __iomem *clk_memmaps[];
++
+ extern int am33xx_clk_init(void);
+ 
+ extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+-- 
+1.7.9.5
