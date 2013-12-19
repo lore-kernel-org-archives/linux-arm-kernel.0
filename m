@@ -1,32 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 19 Dec 2013 18:22:18 +0900
-Subject: [PATCH] arm: shmobile: clks: remove duplicated clock from r7s72100
-In-Reply-To: <1387403317-24485-1-git-send-email-wsa@the-dreams.de>
-References: <1387403317-24485-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <20131219092218.GB27244@verge.net.au>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Thu, 19 Dec 2013 13:35:13 +0400
+Subject: [PATCH v3 01/21 resend] serial: rewrite pxa2xx-uart to use
+ 8250_core
+In-Reply-To: <20131219085145.GB20686@xps8300>
+References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-2-git-send-email-ynvich@gmail.com>
+ <20131219085145.GB20686@xps8300>
+Message-ID: <1387445713.31516.30.camel@host5.omatika.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 10:48:37PM +0100, Wolfram Sang wrote:
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  arch/arm/mach-shmobile/clock-r7s72100.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-> index 9cda215..dd8ce87 100644
-> --- a/arch/arm/mach-shmobile/clock-r7s72100.c
-> +++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-> @@ -191,7 +191,6 @@ static struct clk_lookup lookups[] = {
->  	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
->  	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
->  	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
-> -	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
->  };
->  
->  void __init r7s72100_clock_init(void)
-> -- 
-> 1.8.4.2
-> 
+Hi Heikki,
 
-Thanks, I will queue this up.
+On Thu, 2013-12-19 at 10:51 +0200, Heikki Krogerus wrote:
+> I noticed one more thing. I'm sorry about commenting this late.
+> 
+> Since you set the type PORT_XSCALE, don's you want to use
+> UPF_FIXED_TYPE flag instead of the UPF_SKIP_TEST here? Otherwise the
+> type will just get overridden and autoconfig() will be executed.
+
+UPF_FIXED_PORT was my first guess. However, it didn't work.
+
+I've also tried to do ioremap in serial_pxa_probe instead of using
+UPF_IOREMAP. This didn't work as well.
+
+I've left this
+
+uart.port.type = PORT_XSCALE;
+
+as an indicator that 8250_pxa depends on this port type, and anyone
+changing its specific code paths should test with 8250_pxa. This line
+could be safely removed or commented out, if you feel strongly about
+that.
+
+> I'm guessing you also want to prevent things like the irq and the
+> uartclk from being changed by anybody by using the flag
+> UPF_FIXED_PORT, right?
+
+IIRC, autoprobing doesn't change irq or uartclk.
