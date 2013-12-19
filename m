@@ -1,35 +1,46 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Thu, 19 Dec 2013 13:18:48 +0200
-Subject: [PATCH v3 12/21] serial: support for 16550A serial ports on
- LP-8x4x
-In-Reply-To: <1387309071-22382-13-git-send-email-ynvich@gmail.com>
-References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-13-git-send-email-ynvich@gmail.com>
-Message-ID: <20131219111848.GD20686@xps8300>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 19 Dec 2013 13:23:31 +0200
+Subject: [PATCHv11 00/49] ARM: TI SoC clock DT conversion
+Message-ID: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Dec 17, 2013 at 11:37:42PM +0400, Sergei Ianovich wrote:
-> The patch adds support for 3 additional LP-8x4x built-in serial
-> ports.
-> 
-> The device can also host up to 8 extension cards with 4 serial ports
-> on each card for a total of 35 ports. However, I don't have
-> the hardware to test extension cards, so they are not supported, yet.
-> 
-> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> CC: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+So, once again new series. I guess I should have addressed all comments
+for v10 except the extern sharing of __clk_of_table. Based on discussion
+with Mike, this should be fine to fix later.
 
-Looks OK to me, though normally I would prefer the arch code and the
-driver to be handled in separate patches. FWIW...
+Main changes compared to v10:
+- rebased on top of 3.13-rc4
+- applied clk_desc support from Mike, did some cleanups and additions to that
+  * needed for below item, clk_ll_ops
+- added support for clk_ll_ops, and removed SoC wide clock ops
+  * used for wrapping the IP block specific register access routines now
+- removed need for separate init function types because of above two points,
+  TI clocks also use the standard prototype now, no return value needed
+- cleaned up the init retry logic for TI clocks a bit (DPLL/APLL)
+- added clocks {} and clockdomains {} nodes under the master clock IP nodes,
+  which are used to group clocks and domains accordingly
+- changed compatible strings for clock master IPs from ti,clock-master to
+  something of form ti,omap4-prm etc.
 
-Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+omap3 legacy clock data is not removed with this series, this can be done
+later (basically I want someone to test all the possible omap3 boards out
+there with DT boot before attempting this.)
 
+Testing done:
+- omap3-beagle: boot, suspend-resume (ret), suspend-resume (off)
+- omap4-panda-es: boot, suspend-resume (ret)
+- omap5-uevm: boot
+- dra7-evm: boot
+- am335x-bone: boot
 
-Thanks,
+Branches again available here:
+https://github.com/t-kristo/linux-pm.git
 
--- 
-heikki
+branch: 3.13-rc4-dt-clks-v11 : contains everything, shall me merged last
+branch: 3.13-rc4-dt-clks-v11-for-mike : drivers/clk changes
+branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only
+
+-Tero
