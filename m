@@ -1,83 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 13:24:12 -0700
-Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
-In-Reply-To: <1387469182-14398-2-git-send-email-treding@nvidia.com>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-2-git-send-email-treding@nvidia.com>
-Message-ID: <52B355EC.9040306@wwwdotorg.org>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 19 Dec 2013 21:24:19 +0100
+Subject: [PATCH v3 04/12] clk: Add regmap core helpers for
+ enable/disable/is_enabled
+In-Reply-To: <20131219045050.23538.94293@quantum>
+References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
+ <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
+ <20131219045050.23538.94293@quantum>
+Message-ID: <20131219202419.GS8064@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 09:06 AM, Thierry Reding wrote:
-> This also adds the vmmc-supply property to the SDMMC node on Venice2.
-> Otherwise the core will turn the regulator off automatically because it
-> is unused.
+On Wed, Dec 18, 2013 at 20:50 -0800, Mike Turquette wrote:
+> 
+> Adding all of this stuff to struct clk_hw makes me a sad panda. You are
+> essentially sharing a common set of ops for clocks that use regmap as
+> their io operation back-end, and that is a good thing.
+> 
+> However, why not just do this as drivers/clk/clk-regmap.c, or
+> drivers/clk/clk-gate-regmap.c? Putting the clk_ops callback functions in
+> drivers/clk/clk.c is a little weird and putting those struct members
+> into struct clk_hw is definitely strange.
 
-Laxman sent a version of this patch first, which I have already applied.
-His version is almost a pure subset of yours. I've pointed out the
-differences (other than simple naming) below so you two can work
-together to resolve them.
+Wasn't the idea to extend the set of register accessor routines
+in <linux/clk-provider.h> such that memory mapped I/O as well as
+regmap style becomes possible?  This is what I understood from
+past iterations of discussing this approach.
 
-(Laxman, as an aside, I'm not sure why you're upstreaming patches that
-don't exactly match the existing kernel support for this board...)
+I agree that duplicating the clock gate's implementation just to
+access the register in a different way feels strange and somehow
+unfortunate.
 
-> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-
-> +				sd0 {
-> +					regulator-name = "vdd_cpu";
-> +					regulator-min-microvolt = <700000>;
-> +					regulator-max-microvolt = <1350000>;
-
-Laxman's patch has:
-
- 					regulator-max-microvolt = <1400000>;
-
-
-> +					regulator-always-on;
-> +					ams,ext-control = <2>;
-> +				};
-
-Laxman's patch adds:
-
- 					regulator-min-microamp = <3500000>;
- 					regulator-max-microamp = <3500000>;
- 					regulator-boot-on;
-
-Those properties (with various values) are added to quite a few nodes; I
-won't bother pointing them out elsewhere.
+There still may be the issue of expensive operations only being
+allowed within prepare and unprepare, while enable and disable
+are supposed to be "cheap and straight forward", and should not
+block and thus may not use external communication.  But that
+appears to be orthogonal to the API which wraps register access.
 
 
-> +				sd1 {
-...
-> +					regulator-max-microamp = <3500000>;
-
-Laxman's patch has:
-
- 					regulator-max-microamp = <2500000>;
-
-Laxman's patch adds the following node:
-
- 				sd3 {
- 					regulator-name = "vddio-ddr-2phase";
- 					regulator-min-microvolt = <1350000>;
- 					regulator-max-microvolt = <1350000>;
- 					regulator-always-on;
- 					regulator-boot-on;
- 				};
-
-
-> +				sd6 {
-...
-> +					regulator-min-microvolt = <800000>;
-
-Laxman's patch has:
-
- 					regulator-min-microvolt = <650000>;
-
-> +				ldo6 {
-...
-> +					regulator-min-microvolt = <3300000>;
-
-Laxman's patch has:
-
- 					regulator-min-microvolt = <1800000>;
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
