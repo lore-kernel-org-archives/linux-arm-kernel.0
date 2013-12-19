@@ -1,127 +1,27 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Thu, 19 Dec 2013 16:06:17 -0500
-Subject: [RFC] pwm: Add Freescale FTM PWM driver support
-References: <1385979309-10505-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <87eh58zh2u.fsf@nbsps.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 19 Dec 2013 22:15:33 +0100
+Subject: [PATCH] clk: remove CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <1387431800-10092-1-git-send-email-mturquette@linaro.org>
+References: <1387431800-10092-1-git-send-email-mturquette@linaro.org>
+Message-ID: <20131219211533.GT8064@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On  2 Dec 2013, Li.Xiubo at freescale.com wrote:
+On Wed, Dec 18, 2013 at 21:43 -0800, Mike Turquette wrote:
+> 
+> Populate ${DEBUGS_MOUNT_POINT}/clk if CONFIG_DEBUG_FS is set. This
+> eliminates the extra (annoying) step of enabling the config option
+> manually.
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
 
-> The FTM PWM device can be found on Vybrid VF610 Tower and
-> Layerscape LS-1 SoCs.
+Yes, please!  The debugfs information is just too useful to hide
+behind another option that requires manual enabling. :)
 
-[snip]
 
-> In Vybird VF610 Tower, all the IP blocks expect LE data. In the LS-1, some of
-> the IP blocks expect LE data, while others expect BE data. And the CPU always
-> operates in LE mode in these two platforms.
-
-[snip]
-
-> +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc, void __iomem *reg)
-> +{
-> +	u32 val;
-> +
-> +	val = __raw_readl(reg);
-> +
-> +	if (fpc->endianess == FTM_BIG)
-> +		return be32_to_cpu(val);
-> +	else
-> +		return le32_to_cpu(val);
-> +}
-> +
-> +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc, u32 val,
-> +		void __iomem *reg)
-> +{
-> +	if (fpc->endianess == FTM_BIG)
-> +		val = cpu_to_be32(val);
-> +	else
-> +		val = cpu_to_le32(val);
-> +
-> +	__raw_writel(val, reg);
-> +}
-
-Remove above and alter as below,
-
-static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-				enum pwm_polarity polarity)
-{
-	u32 val;
-	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-
-	val = readl(fpc, fpc->base + FTM_POL);
-	if (polarity == PWM_POLARITY_INVERSED)
--		val |= BIT(pwm->hwpwm);
-+		val |= BIT(fpc->chn_bit);
-	else
--		val &= ~BIT(pwm->hwpwm);
-+		val &= ~BIT(fpc->chn_bit);
-	writel(fpc, val, fpc->base + FTM_POL);
-
-	return 0;
-}
- 
-static int fsl_counter_clock_enable(struct fsl_pwm_chip *fpc)
-{
-	int ret;
-	u32 val;
-
-	if (fpc->counter_clk_enable++)
-		return 0;
-
-	ret = clk_prepare_enable(fpc->counter_clk);
-	if (ret) {
-		fpc->counter_clk_enable--;
-		return ret;
-	}
-
-	val = readl(fpc, fpc->base + FTM_SC);
-+	val |= val >> 24; /* get value on big-endian. */
-	val &= ~((FTM_SC_CLK_MASK << FTM_SC_CLK_SHIFT) |
-			(FTM_SC_PS_MASK << FTM_SC_PS_SHIFT));
-
-	/* select counter clock source */
-	switch (fpc->counter_clk_select) {
-	case VF610_CLK_FTM0:
-		val |= FTM_SC_CLK_SYS;
-		break;
-	case VF610_CLK_FTM0_FIX_SEL:
-		val |= FTM_SC_CLK_FIX;
-		break;
-	case VF610_CLK_FTM0_EXT_SEL:
-		val |= FTM_SC_CLK_EXT;
-		break;
-	default:
-		fpc->counter_clk_enable--;
-		return -EINVAL;
-	}
-
-	val |= fpc->clk_ps;
-+	val |= val << 24; /* modify to high byte for big-endian. */
-	writel(fpc, val, fpc->base + FTM_SC);
-
-	return 0;
-}
-
-That is instead of modifying the low level accessor, you can alter the
-driver masks based on the OF selected endian.  Many of the registers are
-already accessed as run-time fields because each channel is in a
-different bit position.  There are only two registers with fields that
-cross a byte boundary; COUNT and MOD.  These two must be swapped.  The
-others are either a byte or are accessed base on a channel number.
-
-For example in fsl_pwm_set_polarity(), we would read the memory, swap
-the value, calculate a bit to set, clear or set the bit and then write
-back the swapped value all on the 'big_endian' condition.  This way, you
-just read a bit shift which is conditional on the endian at probe time
-and don't double swap.
-
-In the fsl_counter_clock_enable(), the example is using 'write ignored
-bits' and duplicating the value in both big/little bytes.  An
-alternative is to parameterize all the mask/values in 'const struct' and
-have a different pointer for big/little and store this in-place (or via
-a pointer) in fsl_pwm_chip.
-
-Fwiw,
-Bill Pringlemeir.
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
