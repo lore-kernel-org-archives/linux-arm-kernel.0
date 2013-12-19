@@ -1,289 +1,103 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 19 Dec 2013 11:35:58 -0800
-Subject: [PATCH v5 1/2] create HAVE_CC_STACKPROTECTOR for centralized use
-In-Reply-To: <1387481759-14535-1-git-send-email-keescook@chromium.org>
-References: <1387481759-14535-1-git-send-email-keescook@chromium.org>
-Message-ID: <1387481759-14535-2-git-send-email-keescook@chromium.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 12:41:19 -0700
+Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
+In-Reply-To: <1387446199.13057.26.camel@jlo-ubuntu-64.nvidia.com>
+References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>	
+ <1387272400-4689-3-git-send-email-josephl@nvidia.com>	
+ <52B0D6FA.2060101@wwwdotorg.org>	
+ <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>	
+ <52B1E950.1040001@wwwdotorg.org>
+ <1387446199.13057.26.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <52B34BDF.7010200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of duplicating the CC_STACKPROTECTOR Kconfig and Makefile logic
-in each architecture, switch to using HAVE_CC_STACKPROTECTOR and keep
-everything in one place. This retains the x86-specific bug verification
-scripts.
+On 12/19/2013 02:43 AM, Joseph Lo wrote:
+> On Thu, 2013-12-19 at 02:28 +0800, Stephen Warren wrote:
+>> On 12/18/2013 02:42 AM, Joseph Lo wrote:
+>>> On Wed, 2013-12-18 at 06:58 +0800, Stephen Warren wrote:
+>>>> On 12/17/2013 02:26 AM, Joseph Lo wrote:
+>>>>> Add External Memory Controller (EMC) clock interface for the Tegra CCF
+>>>>> driver to support EMC scaling.
+>>>>
+>>>>> diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
+>>>>
+>>>>> +static long clk_emc_round_rate(struct clk_hw *hw, unsigned long rate,
+>>>>> +			       unsigned long *prate)
+>>>>> +{
+>>>>> +	struct tegra_clk_emc *emc = to_clk_emc(hw);
+>>>>> +	struct clk *parent_clk = __clk_get_parent(hw->clk);
+>>>>> +	unsigned long parent_rate = __clk_get_rate(parent_clk);
+>>>>> +	unsigned long ret;
+>>>>> +
+>>>>> +	if (!emc->emc_ops)
+>>>>> +		return parent_rate;
+>>>>> +
+>>>>> +	ret = emc->emc_ops->emc_round_rate(rate);
+>>>>> +	if (!ret)
+>>>>> +		return parent_rate;
+>>>>> +
+>>>>> +	return ret;
+>>>>> +}
+>>>>
+>>>> Rather than implementing this custom "emc_ops" feature, isn't there a
+>>>> standard clock notifier feature that the EMC driver can use?
+>>>>
+>>>> Isn't the EMC driver the only thing that will be changing the EMC clock
+>>>> rate? If so, why not just have the EMC driver perform the appropriate
+>>>> pre-/post-rate-change actions before/after calling clk_set_rate()?
+>>>
+>>> We have two HW components needs to be updated when EMC rate change. One
+>>> is the EMC clock for tuning the frequency, the other is the EMC for
+>>> updating the timing and configuration for external memory (DRAM). So
+>>> this question looks like to me is that can we separate the operation of
+>>> the two components when rate changing?
+>>>
+>>> We have two modes that depend on what memory type (DDR2, LPDDR2,
+>>> DDR3/LP) we used on the platform to support EMC scaling.
+>>> 1. power down mode (Tegra20 used this mode only.)
+>>> In this mode, we update the EMC timing and configurations to EMC shadow
+>>> registers. Then updating the rate in the EMC clock register. The HW will
+>>> trigger the rate changing and timing/configurations updating for EMC.
+>>> 2. self-refresh mode (Tegra30/114/124 if DDR3)
+>>> More complicate in this mode. Putting DRAM in self-refresh, updating EMC
+>>> settings, updating EMC clock, then we still need auto calibration before
+>>> restores DRAM from the self-refresh mode. So the difference was the EMC
+>>> clock operation was part of EMC scaling procedures.
+>>>
+>>> I guess using the clk_notifier may be OK for the 1st case.
+>>
+>> In both cases, isn't the overall operation something like:
+>>
+>> a) Do some work before changing the EMC clock
+>> b) Change the EMC clock
+>> c) Do some work after changing the EMC clock
+>>
+> Roughly say, yes. But ...
+> 
+> We still need an EMC clock driver. Currently there is no clock function
+> in Tegra clock driver can just support it.
+> 
+> For example,
+> 
+> * the set_rate function
+> We had an EMC table that includes whole the rates, EMC settings and EMC
+> clock settings that we should run at the rate of MC/2 or same with MC.
+> We can't just set the EMC clock rate without the info came from the
+> table. It's pre-define, pre-setup for the platform and SDRAM module. So
+> the operation can't be separated into PRE_RATE_CHANGE or
+> POST_RATE_CHANGE.
+> 
+> * the round_rate function
+> We also need to get a supported rate for the EMC/EMC clock from the EMC
+> table.
+> 
+> If we ignore the case above, then we need a totally new EMC table that
+> only supports fixed rate of MC rate and only support one mode for rate
+> changing. That means only Tegra20 support it currently.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-v5:
- - switch from Makefile error to warning to not kill silentoldconfig
----
- Makefile           |   14 +++++++++++---
- arch/Kconfig       |   22 ++++++++++++++++++++++
- arch/arm/Kconfig   |   13 +------------
- arch/arm/Makefile  |    4 ----
- arch/mips/Kconfig  |   14 +-------------
- arch/mips/Makefile |    4 ----
- arch/sh/Kconfig    |   15 +--------------
- arch/sh/Makefile   |    4 ----
- arch/x86/Kconfig   |   17 +----------------
- arch/x86/Makefile  |    8 +++-----
- 10 files changed, 40 insertions(+), 75 deletions(-)
-
-diff --git a/Makefile b/Makefile
-index 858a147fd836..84fb5cd092d2 100644
---- a/Makefile
-+++ b/Makefile
-@@ -595,10 +595,18 @@ ifneq ($(CONFIG_FRAME_WARN),0)
- KBUILD_CFLAGS += $(call cc-option,-Wframe-larger-than=${CONFIG_FRAME_WARN})
- endif
- 
--# Force gcc to behave correct even for buggy distributions
--ifndef CONFIG_CC_STACKPROTECTOR
--KBUILD_CFLAGS += $(call cc-option, -fno-stack-protector)
-+# Handle stack protector mode.
-+ifdef CONFIG_CC_STACKPROTECTOR
-+  stackp-flag := -fstack-protector
-+  ifeq ($(call cc-option, $(stackp-flag)),)
-+    $(warning Cannot use CONFIG_CC_STACKPROTECTOR: \
-+	      -fstack-protector not supported by compiler))
-+  endif
-+else
-+  # Force off for distro compilers that enable stack protector by default.
-+  stackp-flag := $(call cc-option, -fno-stack-protector)
- endif
-+KBUILD_CFLAGS += $(stackp-flag)
- 
- # This warning generated too much noise in a regular build.
- # Use make W=1 to enable this warning (see scripts/Makefile.build)
-diff --git a/arch/Kconfig b/arch/Kconfig
-index f1cf895c040f..24e026d83072 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -336,6 +336,28 @@ config SECCOMP_FILTER
- 
- 	  See Documentation/prctl/seccomp_filter.txt for details.
- 
-+config HAVE_CC_STACKPROTECTOR
-+	bool
-+	help
-+	  An arch should select this symbol if:
-+	  - its compiler supports the -fstack-protector option
-+	  - it has implemented a stack canary (e.g. __stack_chk_guard)
-+
-+config CC_STACKPROTECTOR
-+	bool "Enable -fstack-protector buffer overflow detection"
-+	depends on HAVE_CC_STACKPROTECTOR
-+	help
-+	  This option turns on the -fstack-protector GCC feature. This
-+	  feature puts, at the beginning of functions, a canary value on
-+	  the stack just before the return address, and validates
-+	  the value just before actually returning.  Stack based buffer
-+	  overflows (that need to overwrite this return address) now also
-+	  overwrite the canary, which gets detected and the attack is then
-+	  neutralized via a kernel panic.
-+
-+	  This feature requires gcc version 4.2 or above, or a distribution
-+	  gcc with the feature backported.
-+
- config HAVE_CONTEXT_TRACKING
- 	bool
- 	help
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7eee953..9c909fc29272 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -30,6 +30,7 @@ config ARM
- 	select HAVE_BPF_JIT
- 	select HAVE_CONTEXT_TRACKING
- 	select HAVE_C_RECORDMCOUNT
-+	select HAVE_CC_STACKPROTECTOR
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_ATTRS
-@@ -1856,18 +1857,6 @@ config SECCOMP
- 	  and the task is only allowed to execute a few safe syscalls
- 	  defined by each seccomp mode.
- 
--config CC_STACKPROTECTOR
--	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
--	help
--	  This option turns on the -fstack-protector GCC feature. This
--	  feature puts, at the beginning of functions, a canary value on
--	  the stack just before the return address, and validates
--	  the value just before actually returning.  Stack based buffer
--	  overflows (that need to overwrite this return address) now also
--	  overwrite the canary, which gets detected and the attack is then
--	  neutralized via a kernel panic.
--	  This feature requires gcc version 4.2 or above.
--
- config SWIOTLB
- 	def_bool y
- 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c99b1086d83d..55b4255ad6ed 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -40,10 +40,6 @@ ifeq ($(CONFIG_FRAME_POINTER),y)
- KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
- endif
- 
--ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
--KBUILD_CFLAGS	+=-fstack-protector
--endif
--
- ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- AS		+= -EB
-diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-index 650de3976e7a..c93d92beb3d6 100644
---- a/arch/mips/Kconfig
-+++ b/arch/mips/Kconfig
-@@ -47,6 +47,7 @@ config MIPS
- 	select MODULES_USE_ELF_RELA if MODULES && 64BIT
- 	select CLONE_BACKWARDS
- 	select HAVE_DEBUG_STACKOVERFLOW
-+	select HAVE_CC_STACKPROTECTOR
- 
- menu "Machine selection"
- 
-@@ -2322,19 +2323,6 @@ config SECCOMP
- 
- 	  If unsure, say Y. Only embedded should say N here.
- 
--config CC_STACKPROTECTOR
--	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
--	help
--	  This option turns on the -fstack-protector GCC feature. This
--	  feature puts, at the beginning of functions, a canary value on
--	  the stack just before the return address, and validates
--	  the value just before actually returning.  Stack based buffer
--	  overflows (that need to overwrite this return address) now also
--	  overwrite the canary, which gets detected and the attack is then
--	  neutralized via a kernel panic.
--
--	  This feature requires gcc version 4.2 or above.
--
- config USE_OF
- 	bool
- 	select OF
-diff --git a/arch/mips/Makefile b/arch/mips/Makefile
-index de300b993607..efe50787cd89 100644
---- a/arch/mips/Makefile
-+++ b/arch/mips/Makefile
-@@ -232,10 +232,6 @@ bootvars-y	= VMLINUX_LOAD_ADDRESS=$(load-y) \
- 
- LDFLAGS			+= -m $(ld-emul)
- 
--ifdef CONFIG_CC_STACKPROTECTOR
--  KBUILD_CFLAGS += -fstack-protector
--endif
--
- ifdef CONFIG_MIPS
- CHECKFLAGS += $(shell $(CC) $(KBUILD_CFLAGS) -dM -E -x c /dev/null | \
- 	egrep -vw '__GNUC_(|MINOR_|PATCHLEVEL_)_' | \
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 9b0979f4df7a..ce298317a73e 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -66,6 +66,7 @@ config SUPERH32
- 	select PERF_EVENTS
- 	select ARCH_HIBERNATION_POSSIBLE if MMU
- 	select SPARSE_IRQ
-+	select HAVE_CC_STACKPROTECTOR
- 
- config SUPERH64
- 	def_bool ARCH = "sh64"
-@@ -695,20 +696,6 @@ config SECCOMP
- 
- 	  If unsure, say N.
- 
--config CC_STACKPROTECTOR
--	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
--	depends on SUPERH32
--	help
--	  This option turns on the -fstack-protector GCC feature. This
--	  feature puts, at the beginning of functions, a canary value on
--	  the stack just before the return address, and validates
--	  the value just before actually returning.  Stack based buffer
--	  overflows (that need to overwrite this return address) now also
--	  overwrite the canary, which gets detected and the attack is then
--	  neutralized via a kernel panic.
--
--	  This feature requires gcc version 4.2 or above.
--
- config SMP
- 	bool "Symmetric multi-processing support"
- 	depends on SYS_SUPPORTS_SMP
-diff --git a/arch/sh/Makefile b/arch/sh/Makefile
-index aed701c7b11b..d4d16e4be07c 100644
---- a/arch/sh/Makefile
-+++ b/arch/sh/Makefile
-@@ -199,10 +199,6 @@ ifeq ($(CONFIG_DWARF_UNWINDER),y)
-   KBUILD_CFLAGS += -fasynchronous-unwind-tables
- endif
- 
--ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
--  KBUILD_CFLAGS += -fstack-protector
--endif
--
- libs-$(CONFIG_SUPERH32)		:= arch/sh/lib/	$(libs-y)
- libs-$(CONFIG_SUPERH64)		:= arch/sh/lib64/ $(libs-y)
- 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index e903c71f7e69..4a814e6c526b 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -124,6 +124,7 @@ config X86
- 	select RTC_LIB
- 	select HAVE_DEBUG_STACKOVERFLOW
- 	select HAVE_IRQ_EXIT_ON_IRQ_STACK if X86_64
-+	select HAVE_CC_STACKPROTECTOR
- 
- config INSTRUCTION_DECODER
- 	def_bool y
-@@ -1616,22 +1617,6 @@ config SECCOMP
- 
- 	  If unsure, say Y. Only embedded should say N here.
- 
--config CC_STACKPROTECTOR
--	bool "Enable -fstack-protector buffer overflow detection"
--	---help---
--	  This option turns on the -fstack-protector GCC feature. This
--	  feature puts, at the beginning of functions, a canary value on
--	  the stack just before the return address, and validates
--	  the value just before actually returning.  Stack based buffer
--	  overflows (that need to overwrite this return address) now also
--	  overwrite the canary, which gets detected and the attack is then
--	  neutralized via a kernel panic.
--
--	  This feature requires gcc version 4.2 or above, or a distribution
--	  gcc with the feature backported. Older versions are automatically
--	  detected and for those versions, this configuration option is
--	  ignored. (and a warning is printed during bootup)
--
- source kernel/Kconfig.hz
- 
- config KEXEC
-diff --git a/arch/x86/Makefile b/arch/x86/Makefile
-index 57d021507120..13b22e0f681d 100644
---- a/arch/x86/Makefile
-+++ b/arch/x86/Makefile
-@@ -89,13 +89,11 @@ else
-         KBUILD_CFLAGS += -maccumulate-outgoing-args
- endif
- 
-+# Make sure compiler does not have buggy stack-protector support.
- ifdef CONFIG_CC_STACKPROTECTOR
- 	cc_has_sp := $(srctree)/scripts/gcc-x86_$(BITS)-has-stack-protector.sh
--        ifeq ($(shell $(CONFIG_SHELL) $(cc_has_sp) $(CC) $(KBUILD_CPPFLAGS) $(biarch)),y)
--                stackp-y := -fstack-protector
--                KBUILD_CFLAGS += $(stackp-y)
--        else
--                $(warning stack protector enabled but no compiler support)
-+        ifneq ($(shell $(CONFIG_SHELL) $(cc_has_sp) $(CC) $(KBUILD_CPPFLAGS) $(biarch)),y)
-+                $(warning stack-protector enabled but compiler support broken)
-         endif
- endif
- 
--- 
-1.7.9.5
+Isn't the EMC scaling driver the only driver that will call
+clk_set_rate() on the EMC clock? As such, can't we assume that any value
+passed to set_rate/round_rate for this one clock have already been
+validated by the EMC driver, and hence the clock driver should just
+blindly accept/apply it?
