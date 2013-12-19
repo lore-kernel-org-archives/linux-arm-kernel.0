@@ -1,17 +1,17 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 19 Dec 2013 10:04:26 +0900
-Subject: [PATCH V2 1/7] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <1386885004-10252-1-git-send-email-marex@denx.de>
-References: <1386885004-10252-1-git-send-email-marex@denx.de>
-Message-ID: <001e01cefc56$438a7ee0$ca9f7ca0$%han@samsung.com>
+Date: Thu, 19 Dec 2013 10:11:26 +0900
+Subject: [PATCH V2 3/7] PCI: imx6: Split away the PHY reset
+In-Reply-To: <1386757818-5154-3-git-send-email-marex@denx.de>
+References: <1386757818-5154-1-git-send-email-marex@denx.de>
+ <1386757818-5154-3-git-send-email-marex@denx.de>
+Message-ID: <001f01cefc57$3d77d1a0$b86774e0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 13, 2013 6:50 AM, Marek Vasut wrote:
+On Wednesday, December 11, 2013 7:30 PM, Marek Vasut wrote:
 > 
-> Some boards do not have a PCIe reset GPIO. To avoid probe
-> failure on these boards, make the reset GPIO optional as
-> well.
+> Split the PCIe PHY reset from the link up function to make
+> the code a little more structured.
 > 
 > Signed-off-by: Marek Vasut <marex@denx.de>
 > Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -36,6 +36,7 @@ Best regards,
 Jingoo Han
 
 > ---
->  .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
->  drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
->  2 files changed, 17 insertions(+), 14 deletions(-)
+>  drivers/pci/host/pci-imx6.c | 35 +++++++++++++++++++----------------
+>  1 file changed, 19 insertions(+), 16 deletions(-)
+> 
+> V2: Drop unused 'temp' variable.
