@@ -1,41 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 11:23:02 -0700
-Subject: [PATCH V2 2/2] ARM: tegra: add ams AS3722 device to Venice2 DT
-In-Reply-To: <52B2A01D.2000207@nvidia.com>
-References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
- <1387371179-16725-2-git-send-email-ldewangan@nvidia.com>
- <52B20BB4.50506@wwwdotorg.org> <52B2A01D.2000207@nvidia.com>
-Message-ID: <52B33986.5020508@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 19 Dec 2013 10:25:36 -0800
+Subject: [GIT PULL v2] ARM: Initial support for Marvell Berlin SoCs
+In-Reply-To: <1387357681-30730-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ (Sebastian Hesselbarth's message of "Wed, 18 Dec 2013 10:08:01 +0100")
+References: <1387202444-7270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1387357681-30730-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <87pposk89r.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 12:28 AM, Laxman Dewangan wrote:
-> On Thursday 19 December 2013 02:25 AM, Stephen Warren wrote:
->> On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
->>> Add ams AS3722 entry for gpio/pincontrol and regulators
->>> to venice2 DT.
->> This patch still causes:
->>
->>> [    0.726545] as3722-pinctrl as3722-pinctrl: pin gpio0 already
->>> requested by as3722-pinctrl; cannot claim for as3722-regulator
->>> [    0.737681] as3722-pinctrl as3722-pinctrl: pin-0
->>> (as3722-regulator) status -22
->>> [    0.744895] as3722-pinctrl as3722-pinctrl: could not request pin 0
->>> (gpio0) from group gpio0  on device as3722-pinctrl
->>> [    0.755500] as3722-regulator as3722-regulator: Error applying
->>> setting, reverse things back
-> 
-> This error is nothing related to the ams dt or driver. This came from
-> the framework from the driver/base for adding pinmux call before calling
-> any diver's probe.
+Hi Sebastian,
 
-OK, after reverting the problematic MFD commit (which I assume will
-happen upstream too), I see no errors caused by this patch.
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
 
-As such, I've applied the series to Tegra's for-3.14/dt branch.
+> Dear ARM maintainers,
+>
+> please pull the initial support patches for Marvell Berlin SoCs.
+> While this is the initial PR, it is not yet split up into the
+> usual sub-branches. If you require it, please request it.
 
-Note that I couldn't verify if the pinctrl setup in patch 1/2 matched
-the ChromeOS kernel, since the node order is different there, and the
-property values don't use named constants there. I'll have to trust you.
-I'll be annoyed if it turns out we need to churn the pinctrl
-configuration in the future...
+In the future, please split things up into the usual branches.  However,
+for new SoC support like this, where it's new files being added, the
+risk of conflicts is low so I'm OK keeping it all together.
+
+In particular, normally the drivers/* stuff should go through the
+driver/subsystem maintainer, but I see that tglx reviewed this one so
+I'm assuming that means he's OK with it going through our tree along
+with the DT binding.
+
+> Compared to the last patch set sent on list, the branch below:
+> - does not contain Tauros3 patch which has been submitted to
+>   rmk's patch system separately.
+> - went back to soc-board.dts[i] naming as mentioned by Olof.
+>
+> Thanks to Jason Cooper, this PR now uses a signed tag.
+
+Excellent, thanks!
+
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   https://github.com/shesselba/linux-berlin.git tags/berlin-3.14
+>
+> for you to fetch changes up to 1c37fa10b275d3e5b6285066b5b27c8feae688c8:
+>
+>   ARM: add initial support for Marvell Berlin SoCs (2013-12-13 16:31:07 +0100)
+>
+> ----------------------------------------------------------------
+> Initial support for Marvell Berlin SoCs, e.g. Armada 1500 and
+> Armada 1500-mini, found on various consumer devices like Google Chromecast
+> and GoogleTV.
+>
+> ----------------------------------------------------------------
+
+Looks like it's finally time to pry open the Chromecast and build myself
+a serial cable. :)
+
+Pulled into next/soc.
+
+Thanks,
+
+Kevin
