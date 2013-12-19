@@ -1,38 +1,68 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 19 Dec 2013 18:29:09 +0100
-Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
-In-Reply-To: <20131219164824.GA16145@lee--X1>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
- <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
- <s5hd2kssu4g.wl%tiwai@suse.de> <20131219164824.GA16145@lee--X1>
-Message-ID: <s5hzjnwrbq2.wl%tiwai@suse.de>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Thu, 19 Dec 2013 18:40:24 +0100
+Subject: Can someone Ack and queue a patch for RTC subsytem?
+In-Reply-To: <87d2kslphr.fsf@natisbad.org>
+References: <87siton6ke.fsf@natisbad.org>
+ <20131219173857.0a546b99@linux.lan.towertech.it>
+ <87d2kslphr.fsf@natisbad.org>
+Message-ID: <20131219184024.2a649328@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Thu, 19 Dec 2013 16:48:24 +0000,
-Lee Jones wrote:
-> 
-> > > Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
-> > > rather carelessly converts find_next_bit() to fls() (find last
-> > > bit set), which are not the same.
-> > 
-> > Does it break on the real machines?
-> 
-> It does, that's how I found the bug.
-> 
-> > fls() behaves differently from find_next_bit(), of course, but in this
-> > case, it should work same in the end, since there are at most two
-> > bits.
-> 
-> Unfortunately it doesn't work at all. This patch brings audio back to
-> a working state. It took me the best part of a day to track down the
-> issue. :(
+On Thu, 19 Dec 2013 18:28:16 +0100
+arno at natisbad.org (Arnaud Ebalard) wrote:
 
-Hmm, then isn't the original code rather buggy?
+> >  Yes, Andrew usually pick those.   
+>
+> I guess he should be put in the MAINTAINERS file then. Otherwise,
+> get_maintainer.pl script can not do its job correctly and people
+> end up thinking you should be the one handling those.
 
-Check the values set there by ffs(), fls() and the original
-find_next_bit(), especially whether find_next_bit() gives a valid
-value fitting with the mask bits.
+ That makes sense, I'll leave the decision add his email to Andrew. 
 
 
-Takashi
+> > I do not maintain a separate tree due to most RTCs being specifit to a
+> > subsytem.   
+> 
+> I do not understand: the chip is generic, i.e. this is not a RTC chip
+> specific to a given SoC (like rtc-mv.c is for instance). Can you be
+> more specific?
+
+ Yes, this chip is generic, but most aren't. Some of those who
+ are generic, are strictly connected to a particular system/board, 
+ and they end up in that system's tree. Most of the drivers
+ are pretty small.
+ 
+
+> >  Regarding your patch, please do not add entries to /proc.
+> >  Use sysfs if you need.  
+> 
+> Well, this is what is currently described in the documentation
+> (Documentation/rtc.txt), in drivers/rtc/rtc-test.c driver and what
+> many drivers do (AFAICT, 22/125).
+
+ This needs to be fixed as well. Documentation.txt does not suggest
+ to add arbitrary values to the procfs. "many do" does not apply.
+
+
+> Additionally, I only provide some additional info for an existing
+> file: the /proc entry is created by the drivers/rtc/class.c as
+> soon as someone selects CONFIG_RTC_INTF_PROC.
+
+ I know, but that makes the procfs entry a mess. sysfs is the way,
+
+
+> Do you want me to send a v7 w/ the .proc helper removed or leave
+> things as they are and Ack the patch as is?
+
+ Unless absolutely needed, I'd prefer if you can remove them
+ or move to sysfs.
+
+-- 
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
