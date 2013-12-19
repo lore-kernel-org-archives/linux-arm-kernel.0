@@ -1,36 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 16:09:09 -0700
-Subject: [PATCH 1/6] ARM: tegra: fuse: add functions to read speedo ID
- and process ID
-In-Reply-To: <20131219123639.3226.75285.stgit@tamien>
-References: <20131219122857.3226.42830.stgit@tamien>
- <20131219123639.3226.75285.stgit@tamien>
-Message-ID: <52B37C95.6030904@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 19 Dec 2013 15:10:58 -0800
+Subject: [GIT PULL 2/3] ARM: keystone: SOC updates for 3.14
+In-Reply-To: <1387230397-14338-2-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Mon, 16 Dec 2013 16:46:36 -0500")
+References: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
+ <1387230397-14338-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87sitoighp.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 05:36 AM, Paul Walmsley wrote:
-> From: Danny Huang <dahuang@nvidia.com>
-> 
-> Add functions to read the speedo and process id of both the CPU and the SoC.
-> There might be some drivers need the information as well.
+Hi Santosh,
 
-> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> +int tegra_get_cpu_process_id(void)
-> +{
-> +	return tegra_cpu_process_id;
-> +}
-> +EXPORT_SYMBOL(tegra_get_cpu_process_id);
-> +
-> +int tegra_get_cpu_speedo_id(void)
-> +{
-> +	if (tegra_chip_id == TEGRA20)
-> +		return -EINVAL;
-> +
-> +	return tegra_cpu_speedo_id;
-> +}
+> Arnd, Olof, Kevin,
+>
+> Please pull below keystone SOC updates for 3.14
+>
+> Regards,
+> Santosh
+>
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14/soc
+>
+> for you to fetch changes up to 8aad10f656470369b5802da422f68d4d31fcb865:
+>
+>   ARM: keystone: defconfig: enable USB support (2013-12-16 16:03:36 -0500)
+>
+> ----------------------------------------------------------------
 
-Olof specifically went through the code and removed such functions in
-the past. He argued that consumers of this data should just read those
-tegra_cpu_process_id/... variables directly instead.
+Any (good) reason you're not using signed tags?
+
+> Keystone SOC updates for 3.14
+>
+> - Allow keystone kernel to be build in BE mode
+> - Enabling DMA zone support
+> - Removal of double of_clk_init
+> - Enabling USB driver support in defconfig
+>
+> ----------------------------------------------------------------
+
+Pulled into next/soc.  
+
+Thanks,
+
+Kevin
