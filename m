@@ -1,25 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Dec 2013 22:24:01 +0100
-Subject: Could you include clockevents/clocksource tree in linux-next ?
-Message-ID: <52B363F1.2080209@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 14:37:36 -0700
+Subject: [PATCH 10/10] ARM: tegra: Enable USB on Venice2
+In-Reply-To: <1387469182-14398-11-git-send-email-treding@nvidia.com>
+References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
+ <1387469182-14398-11-git-send-email-treding@nvidia.com>
+Message-ID: <52B36720.8080205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/19/2013 09:06 AM, Thierry Reding wrote:
+> USB1 and USB3 are routed to two external connectors, while USB2 is used
+> for the integrated webcam.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Note: connecting a USB mouse to USB3 works properly and lsusb also detects
+> the integrated webcam, though I haven't tested whether the camera actually
+> works.
+> 
+> USB1 doesn't seem to work, but I suspect that might just be because it's
+> used for recovery mode and we can't switch it around at runtime yet.
 
-Hi Stephen,
+The two regulators you added don't actually hook up to any GPIOs for
+control of VBUS, so perhaps this isn't surprising. The regulators added
+for VBUS control by Laxman's patch (which I already applied) *do* have
+some gpio properties. However, testing indicates:
 
-is it possible to add the clockevents/clocksource tree in linux-next.
+* With Laxman's patch applied, and your patch 1/10 not applied since
+it's a duplicate, this patch doesn't work, i.e. I see no USB devices.
 
-git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/next
+* With Laxman's patch reverted and your patch 1/10 replacing it, I do
+see USB devices, and they work. However, then we're not actually
+controlling VBUS, so USB1 doesn't work.
 
-It will be based on top of tip/timers/core.
-
-Thanks
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Can you please rebase this whole series on the latest Tegra for-3.14/dt
+and sort out the issues? Thanks.
