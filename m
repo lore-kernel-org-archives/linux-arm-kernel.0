@@ -1,46 +1,93 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:23:31 +0200
-Subject: [PATCHv11 00/49] ARM: TI SoC clock DT conversion
-Message-ID: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+Date: Thu, 19 Dec 2013 13:23:33 +0200
+Subject: [PATCHv11 02/49] clk: fixed-rate: add support for registering
+ fixed-rate clock from descriptor
+In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Mike Turquette <mturquette@linaro.org>
 
-So, once again new series. I guess I should have addressed all comments
-for v10 except the extern sharing of __clk_of_table. Based on discussion
-with Mike, this should be fine to fix later.
+New clk_register_desc() call can be used to register this clock type now.
 
-Main changes compared to v10:
-- rebased on top of 3.13-rc4
-- applied clk_desc support from Mike, did some cleanups and additions to that
-  * needed for below item, clk_ll_ops
-- added support for clk_ll_ops, and removed SoC wide clock ops
-  * used for wrapping the IP block specific register access routines now
-- removed need for separate init function types because of above two points,
-  TI clocks also use the standard prototype now, no return value needed
-- cleaned up the init retry logic for TI clocks a bit (DPLL/APLL)
-- added clocks {} and clockdomains {} nodes under the master clock IP nodes,
-  which are used to group clocks and domains accordingly
-- changed compatible strings for clock master IPs from ti,clock-master to
-  something of form ti,omap4-prm etc.
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ drivers/clk/clk-fixed-rate.c |   24 ++++++++++++++++++++++++
+ include/linux/clk-provider.h |   15 +++++++++++++++
+ 2 files changed, 39 insertions(+)
 
-omap3 legacy clock data is not removed with this series, this can be done
-later (basically I want someone to test all the possible omap3 boards out
-there with DT boot before attempting this.)
-
-Testing done:
-- omap3-beagle: boot, suspend-resume (ret), suspend-resume (off)
-- omap4-panda-es: boot, suspend-resume (ret)
-- omap5-uevm: boot
-- dra7-evm: boot
-- am335x-bone: boot
-
-Branches again available here:
-https://github.com/t-kristo/linux-pm.git
-
-branch: 3.13-rc4-dt-clks-v11 : contains everything, shall me merged last
-branch: 3.13-rc4-dt-clks-v11-for-mike : drivers/clk changes
-branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only
-
--Tero
+diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+index 1ed591a..d7aa01e 100644
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -26,8 +26,12 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
++/* resolve struct clk_fixed_rate from inner struct clk_hw member */
+ #define to_clk_fixed_rate(_hw) container_of(_hw, struct clk_fixed_rate, hw)
+ 
++/* resolve struct clk_fixed_rate_desc from inner struct clk_desc member */
++#define to_hw_desc(_desc) container_of(_desc, struct clk_fixed_rate_desc, desc)
++
+ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
+ 		unsigned long parent_rate)
+ {
+@@ -82,6 +86,26 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ }
+ EXPORT_SYMBOL_GPL(clk_register_fixed_rate);
+ 
++struct clk_hw *clk_register_fixed_rate_desc(struct device *dev,
++					    struct clk_desc *desc)
++{
++	struct clk_fixed_rate *fixed;
++	struct clk_fixed_rate_desc *hw_desc;
++
++	hw_desc = to_hw_desc(desc);
++
++	/* allocate fixed-rate clock */
++	fixed = kzalloc(sizeof(*fixed), GFP_KERNEL);
++	if (!fixed)
++		return ERR_PTR(-ENOMEM);
++
++	/* populate struct clk_fixed_rate assignments */
++	fixed->fixed_rate = hw_desc->fixed_rate;
++
++	return &fixed->hw;
++}
++EXPORT_SYMBOL_GPL(clk_register_fixed_rate_desc);
++
+ #ifdef CONFIG_OF
+ /**
+  * of_fixed_clk_setup() - Setup function for simple fixed rate clock
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 7fddcb3..82dfe84 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -219,6 +219,21 @@ struct clk_fixed_rate {
+ 	u8		flags;
+ };
+ 
++/**
++ * struct clk_fixed_rate_desc - fixed-rate clock description
++ * @desc:	handle between common and hardware-specific interfaces
++ * @fixed_rate: constant frequency of clock
++ * @flags:	hardware-specific flags
++ */
++struct clk_fixed_rate_desc {
++	struct clk_desc	desc;
++	unsigned long	fixed_rate;
++	u8		flags;
++};
++
++struct clk_hw *clk_register_fixed_rate_desc(struct device *dev,
++					    struct clk_desc *desc);
++
+ extern const struct clk_ops clk_fixed_rate_ops;
+ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+-- 
+1.7.9.5
