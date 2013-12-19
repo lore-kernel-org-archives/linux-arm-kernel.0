@@ -1,19 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 12:22:50 -0700
-Subject: [PATCH] clk: tegra: Add missing Tegra20 fuse clks
-In-Reply-To: <1387469676-17693-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1387469676-17693-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <52B3478A.2030405@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 19 Dec 2013 11:26:57 -0800
+Subject: [GIT PULL] Xilinx Zynq clk changes for v3.14
+In-Reply-To: <52B2A22D.6080304@monstr.eu>
+References: <52B16A4B.1000706@monstr.eu> <20131219051219.18119.26127@quantum>
+ <52B2A22D.6080304@monstr.eu>
+Message-ID: <20131219192657.18119.4291@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 09:14 AM, Peter De Schrijver wrote:
+Quoting Michal Simek (2013-12-18 23:37:17)
+> Hi Mike,
+> 
+> On 12/19/2013 06:12 AM, Mike Turquette wrote:
+> > Quoting Michal Simek (2013-12-18 01:26:35)
+> >> Hi Mike,
+> >>
+> >> As we discussed it is better for you to get pull request with signed tags.
+> >> That's why I am sending you pull request for 2 patches which we have in queue which
+> >> should go to v3.14.
+> > 
+> > Michal,
+> > 
+> > Thanks much for the pull request. In the future it is a bit easier if
+> > you base your pull request on the tip of clk-next, but it's not a big
+> > deal.
+> 
+> ok. No problem to do.
+> 
+> > 
+> > Shouldn't the change to zynq-7000.dtsi go through the arm-soc tree
+> > instead of the clk tree?
+> 
+> It is here because it is related to clock and there is no conflict
+> with others DT changes we made for 3.14.
+> But if you prefer not to have this change here I have no problem
+> to add it to our zynq/clk branch and go through arm-soc tree.
 
-A patch description would be nice.
+I think it is better to take the dts patch through arm-soc. Merge
+conflicts seem unlikely now, but it's best to err on the side of caution
+and send that patch through the correct tree.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Regards,
+Mike
 
-I assume this is going through the clock tree, and there aren't any
-dependencies between this patch and the other series touching fuses that
-showed up today? (or the dependencies will be resolved by deferring
-dependant patches to 3.15...)
+> 
+> Thanks,
+> Michal
+> 
+> -- 
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> 
+> 
