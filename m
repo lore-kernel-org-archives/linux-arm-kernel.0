@@ -1,55 +1,51 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Dec 2013 23:57:25 -0800
-Subject: [PATCH] clk: at91: fix pmc_clk_ids data type attriubte
-In-Reply-To: <52B01A50.4080209@atmel.com>
-References: <1387229127-7605-1-git-send-email-b.brezillon@overkiz.com>
- <52B01A50.4080209@atmel.com>
-Message-ID: <20131219075725.18119.80803@quantum>
+Date: Thu, 19 Dec 2013 00:00:22 -0800
+Subject: [PATCH 2/3] clk: exynos5420: Add alias names for cpu clocks
+In-Reply-To: <1386323284-15646-3-git-send-email-arun.kk@samsung.com>
+References: <1386323284-15646-1-git-send-email-arun.kk@samsung.com>
+ <1386323284-15646-3-git-send-email-arun.kk@samsung.com>
+Message-ID: <20131219080022.18119.20692@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nicolas Ferre (2013-12-17 01:33:04)
-> On 16/12/2013 22:25, Boris BREZILLON :
-> > Fix pmc_clk_ids data type attribute (__initdata -> __initconst).
-> > 
-> > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> > Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Quoting Arun Kumar K (2013-12-06 01:48:03)
+> Adds alias names for cpu clocks to be used in the cpufreq driver.
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> I take it in at91-3.14-cleanup2 branch and send it upstream through
-> arm-soc like any other CCF material for AT91 for the 3.14 release.
-> 
-> I guess that even without Mike Acked-by, this little fix can follow this
-> path.
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 
-I can take it into the clk tree if you prefer.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Regards,
-Mike
-
+> ---
+>  drivers/clk/samsung/clk-exynos5420.c |    9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
 > 
-> Bye,
-> 
-> > ---
-> >  drivers/clk/at91/pmc.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-> > index 7b9db60..4c03eda 100644
-> > --- a/drivers/clk/at91/pmc.c
-> > +++ b/drivers/clk/at91/pmc.c
-> > @@ -228,7 +228,7 @@ out_free_pmc:
-> >       return NULL;
-> >  }
-> >  
-> > -static const struct of_device_id pmc_clk_ids[] __initdata = {
-> > +static const struct of_device_id pmc_clk_ids[] __initconst = {
-> >       /* Main clock */
-> >       {
-> >               .compatible = "atmel,at91rm9200-clk-main",
-> > 
-> 
-> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 48c4a93..c65c040 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -316,9 +316,10 @@ static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initda
+>  
+>  static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>         MUX(none, "mout_mspll_kfc", mspll_cpu_p, SRC_TOP7, 8, 2),
+> -       MUX(none, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2),
+> -       MUX(none, "mout_apll", apll_p, SRC_CPU, 0, 1),
+> -       MUX(none, "mout_cpu", cpu_p, SRC_CPU, 16, 1),
+> +       MUX_A(none, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2,
+> +                       "mout_mspll_cpu"),
+> +       MUX_A(none, "mout_apll", apll_p, SRC_CPU, 0, 1, "mout_apll"),
+> +       MUX_A(none, "mout_cpu", cpu_p, SRC_CPU, 16, 1, "mout_cpu"),
+>         MUX(none, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
+>         MUX(none, "mout_cpu_kfc", kfc_p, SRC_KFC, 16, 1),
+>  
+> @@ -373,7 +374,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>  
+>         MUX(none, "sclk_mpll", mpll_p, SRC_TOP6, 0, 1),
+>         MUX(none, "sclk_vpll", vpll_p, SRC_TOP6, 4, 1),
+> -       MUX(none, "sclk_spll", spll_p, SRC_TOP6, 8, 1),
+> +       MUX_A(none, "sclk_spll", spll_p, SRC_TOP6, 8, 1, "mout_spll"),
+>         MUX(none, "sclk_ipll", ipll_p, SRC_TOP6, 12, 1),
+>         MUX(none, "sclk_rpll", rpll_p, SRC_TOP6, 16, 1),
+>         MUX(none, "sclk_epll", epll_p, SRC_TOP6, 20, 1),
 > -- 
-> Nicolas Ferre
+> 1.7.9.5
+> 
