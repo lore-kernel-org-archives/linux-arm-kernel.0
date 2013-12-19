@@ -1,53 +1,64 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 19 Dec 2013 12:05:57 +0200
-Subject: [PATCH 2/4] clk: tegra: add EMC clock driver
-In-Reply-To: <52B1E950.1040001@wwwdotorg.org>
-References: <1387272400-4689-1-git-send-email-josephl@nvidia.com>
- <1387272400-4689-3-git-send-email-josephl@nvidia.com>
- <52B0D6FA.2060101@wwwdotorg.org>
- <1387359758.2576.38.camel@jlo-ubuntu-64.nvidia.com>
- <52B1E950.1040001@wwwdotorg.org>
-Message-ID: <20131219100557.GE17188@tbergstrom-lnx.Nvidia.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Thu, 19 Dec 2013 15:38:45 +0530
+Subject: [PATCH v5 2/4] AArch64: KGDB: Add Basic KGDB support
+In-Reply-To: <CALicx6towYZrV30yVUxzNzUY17H5PsebDm_vB7pUtXP5R-xUqQ@mail.gmail.com>
+References: <1385793148-28979-1-git-send-email-vijay.kilari@gmail.com>
+ <1385793148-28979-3-git-send-email-vijay.kilari@gmail.com>
+ <20131203101637.GA7552@e106331-lin.cambridge.arm.com>
+ <20131203112139.GC1169@mudshark.cambridge.arm.com>
+ <20131203133843.GH1169@mudshark.cambridge.arm.com>
+ <CALicx6towYZrV30yVUxzNzUY17H5PsebDm_vB7pUtXP5R-xUqQ@mail.gmail.com>
+Message-ID: <CALicx6sLWpLXThbbKktFpEdHxwhCFqw4DJostuTWJ2WBhkZ96A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I guess using the clk_notifier may be OK for the 1st case.
-> 
-> In both cases, isn't the overall operation something like:
-> 
-> a) Do some work before changing the EMC clock
-> b) Change the EMC clock
-> c) Do some work after changing the EMC clock
-> 
+On Wed, Dec 4, 2013 at 11:29 AM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+> On Tue, Dec 3, 2013 at 7:08 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Tue, Dec 03, 2013 at 11:21:39AM +0000, Will Deacon wrote:
+>>> On Tue, Dec 03, 2013 at 10:16:37AM +0000, Mark Rutland wrote:
+>>> > I think that there's a slight problem with this on BE systems.
+>>>
+>>> [...]
+>>>
+>>> > On Sat, Nov 30, 2013 at 06:32:26AM +0000, vijay.kilari at gmail.com wrote:
+>>> > > +       { "pstate", 4, offsetof(struct pt_regs, pstate)},
+>>> >
+>>> > As pt_regs::pstate is a u64, we're only describing half of the field
+>>> > here (to match GDB's expectations). While we happen to get the half
+>>> > we're interested in on an LE system, on a BE system this will point at
+>>> > the zeroed half.
+>>>
+>>> Yup, I think you're right. It's almost as if this hasn't been tested on a BE
+>>> system.
+>>>
+>>> Given that a large proportion of this CC list *do* actually care about BE,
+>>> I'd like to see a tested-by from one of them before this gets merged. I'm
+>>> pretty sure GDB has a testsuite which might be of some use.
+>>
+>> Having said that, our ptrace interface (built around regsets) treats pstate
+>> as 64-bit, so we should do the same thing for kgdb and let GDB work out
+>> which bits it's interested in.
+>>
+>> So: make pstate 8 bytes and test/fix GDB to deal with that (like it should
+>> do for userspace already).
+>>
+>
+> I have tested with BE & LE. it works fine except displaying 'pstate' contents
+> in BE is wrong
+>
+> If I change pstate offset as below, it works
+>
+> #ifdef __AARCH64EB__
+>         { "pstate", 4, offsetof(struct pt_regs, pstate) + 4},
+> #else
+>         { "pstate", 4, offsetof(struct pt_regs, pstate)},
+> #endif
+>
+> I am checking with tool chain guy to patch GDB to make pstate as 8 bytes.
+> After that, I will re-send the patch series
+>
 
-There is hw interaction between the EMC controller and the CAR module.
-Writing to the EMC clock source register in CAR will trigger a state machine
-in the EMC controller to handle the change of memory clock. The details
-of the state machine and how it needs to be setup are different for
-each Tegra variant. This means we need to be sure of the exact sequence
-of CAR and EMC register accesses for this to work. In theory this could
-be done with pre and post rate change notifiers, but I'm afraid this would
-be quite fragile.
+    Thanks to Andrew, GDB tool was patched here to interpret pstate as 8 bytes
+    https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
 
-> Admittedly, the exact definition of "some work" is different for your
-> cases (1) and (2) above, but the overall structure is the same. As such,
-> can't the EMC scaling driver do (a), then do (b) i.e. call
-> clk_set_rate(), then do (c)? Or, in your case (2), do we need to do
-
-We would need to be very sure clk_set_rate() doesn't access any other register
-besides the EMC clock source register before returning to the EMC scaling
-driver.
-
-> funny tricks like running from IRAM since we can't access SDRAM during
-> the clock change? If so, I'm not sure how having the EMC clock changing
-> code is going to help your case (2) anyway, since we'll presumably have
-> to code up a custom stub in assembly for the part of the code that runs
-> from IRAM...
-> 
-
-There is no need for assembler or running from IRAM (at least from Tegra30
-onwards, I don't know about Tegra20).
-
-Cheers,
-
-Peter.
+>> Will
