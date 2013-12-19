@@ -1,48 +1,156 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Dec 2013 13:24:13 +0200
-Subject: [PATCHv11 42/49] ARM: OMAP3: hwmod: initialize clkdm from clkdm_name
+Date: Thu, 19 Dec 2013 13:24:15 +0200
+Subject: [PATCHv11 44/49] ARM: OMAP2+: io: use new clock init API
 In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387452260-23276-43-git-send-email-t-kristo@ti.com>
+Message-ID: <1387452260-23276-45-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT clocks are mostly missing clkdm info now, and this causes an issue with
-counter32k which makes its slave idlemode wrong and prevents core idle.
-
-Fixed by initializing the hwmod clkdm pointers for omap3 also which makes
-sure the clkdm flag matching logic works properly.
-
-This patch also changes the return value for _init_clkdm to 0 for
-incorrect clkdm_name, as this a warning, not a fatal error.
+clk_init is now separated to a common function which gets called for all
+SoC:s, which initializes the DT clocks and calls the SoC specific clock init.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/common.h |    2 +-
+ arch/arm/mach-omap2/io.c     |   32 +++++++++++++++++++++++---------
+ arch/arm/mach-omap2/timer.c  |    6 ++----
+ 3 files changed, 26 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index b292116..c5b042a 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1578,7 +1578,7 @@ static int _init_clkdm(struct omap_hwmod *oh)
- 	if (!oh->clkdm) {
- 		pr_warning("omap_hwmod: %s: could not associate to clkdm %s\n",
- 			oh->name, oh->clkdm_name);
--		return -EINVAL;
-+		return 0;
- 	}
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index e30ef67..5ccf36d 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -305,7 +305,7 @@ struct omap_hwmod;
+ extern int omap_dss_reset(struct omap_hwmod *);
  
- 	pr_debug("omap_hwmod: %s: associated to clkdm %s\n",
-@@ -4237,6 +4237,7 @@ void __init omap_hwmod_init(void)
- 		soc_ops.assert_hardreset = _omap2_assert_hardreset;
- 		soc_ops.deassert_hardreset = _omap2_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap2_is_hardreset_asserted;
-+		soc_ops.init_clkdm = _init_clkdm;
- 	} else if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx()) {
- 		soc_ops.enable_module = _omap4_enable_module;
- 		soc_ops.disable_module = _omap4_disable_module;
+ /* SoC specific clock initializer */
+-extern int (*omap_clk_init)(void);
++int omap_clk_init(void);
+ 
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 3d9b3fc..7a394d7 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -55,10 +55,10 @@
+ #include "prm44xx.h"
+ 
+ /*
+- * omap_clk_init: points to a function that does the SoC-specific
++ * omap_clk_soc_init: points to a function that does the SoC-specific
+  * clock initializations
+  */
+-int (*omap_clk_init)(void);
++int (*omap_clk_soc_init)(void);
+ 
+ /*
+  * The machine specific code may provide the extra mapping besides the
+@@ -419,7 +419,7 @@ void __init omap2420_init_early(void)
+ 	omap242x_clockdomains_init();
+ 	omap2420_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap2420_clk_init;
++	omap_clk_soc_init = omap2420_clk_init;
+ }
+ 
+ void __init omap2420_init_late(void)
+@@ -448,7 +448,7 @@ void __init omap2430_init_early(void)
+ 	omap243x_clockdomains_init();
+ 	omap2430_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap2430_clk_init;
++	omap_clk_soc_init = omap2430_clk_init;
+ }
+ 
+ void __init omap2430_init_late(void)
+@@ -482,7 +482,7 @@ void __init omap3_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap3xxx_clk_init;
++	omap_clk_soc_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3430_init_early(void)
+@@ -520,7 +520,7 @@ void __init ti81xx_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap3xxx_clk_init;
++	omap_clk_soc_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3_init_late(void)
+@@ -581,7 +581,7 @@ void __init am33xx_init_early(void)
+ 	am33xx_clockdomains_init();
+ 	am33xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = am33xx_clk_init;
++	omap_clk_soc_init = am33xx_clk_init;
+ }
+ 
+ void __init am33xx_init_late(void)
+@@ -635,7 +635,7 @@ void __init omap4430_init_early(void)
+ 	omap44xx_clockdomains_init();
+ 	omap44xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap4xxx_clk_init;
++	omap_clk_soc_init = omap4xxx_clk_init;
+ }
+ 
+ void __init omap4430_init_late(void)
+@@ -666,7 +666,7 @@ void __init omap5_init_early(void)
+ 	omap54xx_clockdomains_init();
+ 	omap54xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap5xxx_dt_clk_init;
++	omap_clk_soc_init = omap5xxx_dt_clk_init;
+ }
+ 
+ void __init omap5_init_late(void)
+@@ -711,3 +711,17 @@ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 		_omap2_init_reprogram_sdrc();
+ 	}
+ }
++
++int __init omap_clk_init(void)
++{
++	int ret = 0;
++
++	if (!omap_clk_soc_init)
++		return 0;
++
++	ret = of_prcm_init();
++	if (!ret)
++		ret = omap_clk_soc_init();
++
++	return ret;
++}
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 3ca81e0..60e5fc9 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -570,8 +570,7 @@ static inline void __init realtime_counter_init(void)
+ 			       clksrc_nr, clksrc_src, clksrc_prop)	\
+ void __init omap##name##_gptimer_timer_init(void)			\
+ {									\
+-	if (omap_clk_init)						\
+-		omap_clk_init();					\
++	omap_clk_init();					\
+ 	omap_dmtimer_init();						\
+ 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+ 	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,		\
+@@ -582,8 +581,7 @@ void __init omap##name##_gptimer_timer_init(void)			\
+ 				clksrc_nr, clksrc_src, clksrc_prop)	\
+ void __init omap##name##_sync32k_timer_init(void)		\
+ {									\
+-	if (omap_clk_init)						\
+-		omap_clk_init();					\
++	omap_clk_init();					\
+ 	omap_dmtimer_init();						\
+ 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+ 	/* Enable the use of clocksource="gp_timer" kernel parameter */	\
 -- 
 1.7.9.5
