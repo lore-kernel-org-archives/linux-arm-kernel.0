@@ -1,59 +1,90 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 20 Dec 2013 15:52:01 +0800
-Subject: [PATCH v7 05/14] ARM: dts: imx6: add anatop phandle for usbphy
+Date: Fri, 20 Dec 2013 15:52:02 +0800
+Subject: [PATCH v7 06/14] usb: phy-mxs: Add anatop regmap
 In-Reply-To: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
 References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1387525930-27313-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1387525930-27313-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add anatop phandle for usbphy
+It is needed by imx6 SoC series, but not for imx23 and imx28.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
- arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   23 +++++++++++++++++++++--
+ 1 files changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 59154dc..4e74962 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -557,6 +557,7 @@
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 				clocks = <&clks 182>;
-+				fsl,anatop = <&anatop>;
- 			};
+diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+index 0c6f3bc..0ef930a 100644
+--- a/drivers/usb/phy/phy-mxs-usb.c
++++ b/drivers/usb/phy/phy-mxs-usb.c
+@@ -21,6 +21,8 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/of_device.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
  
- 			usbphy2: usbphy at 020ca000 {
-@@ -564,6 +565,7 @@
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 				clocks = <&clks 183>;
-+				fsl,anatop = <&anatop>;
- 			};
+ #define DRIVER_NAME "mxs_phy"
  
- 			snvs at 020cc000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..30322b5 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -489,6 +489,7 @@
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
-+				fsl,anatop = <&anatop>;
- 			};
+@@ -58,6 +60,9 @@
+  */
+ #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
  
- 			usbphy2: usbphy at 020ca000 {
-@@ -496,6 +497,7 @@
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
-+				fsl,anatop = <&anatop>;
- 			};
++/* The SoCs who have anatop module */
++#define MXS_PHY_HAS_ANATOP			BIT(3)
++
+ struct mxs_phy_data {
+ 	unsigned int flags;
+ };
+@@ -68,11 +73,13 @@ static const struct mxs_phy_data imx23_phy_data = {
  
- 			snvs at 020cc000 {
+ static const struct mxs_phy_data imx6q_phy_data = {
+ 	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
+-		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
++		MXS_PHY_HAS_ANATOP,
+ };
+ 
+ static const struct mxs_phy_data imx6sl_phy_data = {
+-	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
++		MXS_PHY_HAS_ANATOP,
+ };
+ 
+ static const struct of_device_id mxs_phy_dt_ids[] = {
+@@ -87,6 +94,7 @@ struct mxs_phy {
+ 	struct usb_phy phy;
+ 	struct clk *clk;
+ 	const struct mxs_phy_data *data;
++	struct regmap *regmap_anatop;
+ };
+ 
+ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+@@ -190,6 +198,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	int ret;
+ 	const struct of_device_id *of_id =
+ 			of_match_device(mxs_phy_dt_ids, &pdev->dev);
++	struct device_node *np = pdev->dev.of_node;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(&pdev->dev, res);
+@@ -226,6 +235,16 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, mxs_phy);
+ 
++	if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
++		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
++			(np, "fsl,anatop");
++		if (IS_ERR(mxs_phy->regmap_anatop)) {
++			dev_dbg(&pdev->dev,
++				"failed to find regmap for anatop\n");
++			return PTR_ERR(mxs_phy->regmap_anatop);
++		}
++	}
++
+ 	ret = usb_add_phy_dev(&mxs_phy->phy);
+ 	if (ret)
+ 		return ret;
 -- 
 1.7.8
