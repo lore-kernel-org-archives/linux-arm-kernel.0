@@ -1,74 +1,134 @@
-From: jilin@nvidia.com (Jim Lin)
-Date: Fri, 20 Dec 2013 10:59:44 +0800
-Subject: [PATCH 10/10] ARM: tegra: Enable USB on Venice2
-In-Reply-To: <52B36720.8080205@wwwdotorg.org>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-11-git-send-email-treding@nvidia.com>
- <52B36720.8080205@wwwdotorg.org>
-Message-ID: <1387508384.26603.42.camel@jilin-desktop>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Fri, 20 Dec 2013 03:00:48 +0000
+Subject: [PATCH V2] ARM: dts: imx6qdl-sabresd: Add power key support
+In-Reply-To: <20131220022821.GJ7172@S2101-09.ap.freescale.net>
+References: <1387487244-2749-1-git-send-email-b20788@freescale.com>
+ <20131220022821.GJ7172@S2101-09.ap.freescale.net>
+Message-ID: <276922cfe7a844c3b7f9f7c18bf86f77@BY2PR03MB315.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-About USB1 issue, for chips after Tegra30 (including Tegra30), BIASPD is
-controlled by USB1 controller.
-In ehci-tegra.c probe phase, we assert reset and deassert reset on
-controller clock.
-If initializing sequence follows USB1 and then USB2, we are safe.
-If initializing sequence follows USB2 and then USB1, then in
-phy-tegra-usb.c a counter utmip_pad_count which has been increased for
-USB2 will prevent UTMIP_BIASPD from being cleared while initializing for
-USB1 controller (UTMIP_BIASPD will be set again after asserting and
-deasserting reset on USB1 controller clock in ehci-tegra.c probe for
-USB1 controller).
 
-There are several ways to fix.
-The local workaround I use is as following in phy-tegra-usb.c.
 
-static void utmip_pad_power_on(struct tegra_usb_phy *phy)
-{
-	unsigned long val, flags;
-	void __iomem *base = phy->pad_regs;
-	struct tegra_utmip_config *config = phy->config;
+Best Regards.
+Anson huang ???
+?
+Freescale Semiconductor Shanghai
+?????????192?A?2?
+201203
+Tel:021-28937058
 
-	clk_prepare_enable(phy->pad_clk);
 
-	spin_lock_irqsave(&utmip_pad_lock, flags);
+>-----Original Message-----
+>From: Shawn Guo [mailto:shawn.guo at linaro.org]
+>Sent: Friday, December 20, 2013 10:28 AM
+>To: Huang Yongcai-B20788
+>Cc: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+>devicetree at vger.kernel.org
+>Subject: Re: [PATCH V2] ARM: dts: imx6qdl-sabresd: Add power key support
+>
+>On Thu, Dec 19, 2013 at 04:07:24PM -0500, Anson Huang wrote:
+>> This patch adds support for imx6qdl-sabresd board's power key, the key
+>> is named "SW1" on board, press it can wake up system from suspend.
+>>
+>> Add a new pinctrl entry for gpio keys and move all gpio keys pin to
+>> this entry.
+>>
+>> Signed-off-by: Anson Huang <b20788@freescale.com>
+>
+>There are a couple of minor things below.  Nothing major, so I just fixed them
+>up and applied the patch.
+>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   26 ++++++++++++++++++++++----
+>>  1 file changed, 22 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> index e75e11b..b545895 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> @@ -10,6 +10,7 @@
+>>   * http://www.gnu.org/copyleft/gpl.html
+>>   */
+>>
+>> +#include <dt-bindings/input/input.h>
+>
+>Have a blank line here.
+>
+>>  / {
+>>  	memory {
+>>  		reg = <0x10000000 0x40000000>;
+>> @@ -46,19 +47,28 @@
+>>
+>>  	gpio-keys {
+>>  		compatible = "gpio-keys";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_gpio_keys>;
+>> +
+>> +		power {
+>> +			label = "Power Button";
+>> +			gpios = <&gpio3 29 0>;
+>> +			gpio-key,wakeup;
+>> +			linux,code = <KEY_POWER>;
+>> +		};
+>>
+>>  		volume-up {
+>>  			label = "Volume Up";
+>>  			gpios = <&gpio1 4 0>;
+>>  			gpio-key,wakeup;
+>> -			linux,code = <115>; /* KEY_VOLUMEUP */
+>> +			linux,code = <KEY_VOLUMEUP>;
+>>  		};
+>>
+>>  		volume-down {
+>>  			label = "Volume Down";
+>>  			gpios = <&gpio1 5 0>;
+>>  			gpio-key,wakeup;
+>> -			linux,code = <114>; /* KEY_VOLUMEDOWN */
+>> +			linux,code = <KEY_VOLUMEDOWN>;
+>>  		};
+>>  	};
+>>
+>> @@ -171,8 +181,6 @@
+>>  	hog {
+>>  		pinctrl_hog: hoggrp {
+>>  			fsl,pins = <
+>> -				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
+>> -				MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
+>>  				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
+>>  				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
+>>  				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000 @@ -185,6
+>+193,16 @@
+>>  			>;
+>>  		};
+>>  	};
+>> +
+>> +	gpio-keys {
+>
+>We now use one pinctrl container 'imx6qdl-sabresd' for all pinctrl groups, so
+>we can move pinctrl_gpio_keys into above and save this gpio-keys container.
+>
 
-	val = readl(base + UTMIP_BIAS_CFG0);
-	if ((utmip_pad_count++ == 0) || (val & UTMIP_BIASPD)) {
-		val &= ~(UTMIP_OTGPD | UTMIP_BIASPD)
+Understood, thanks, just put this group in the hog node, no need to add a new gpio-keys.
+[Anson] 
 
-On Fri, 2013-12-20 at 05:37 +0800, Stephen Warren wrote:
-> On 12/19/2013 09:06 AM, Thierry Reding wrote:
-> > USB1 and USB3 are routed to two external connectors, while USB2 is used
-> > for the integrated webcam.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > Note: connecting a USB mouse to USB3 works properly and lsusb also detects
-> > the integrated webcam, though I haven't tested whether the camera actually
-> > works.
-> > 
-> > USB1 doesn't seem to work, but I suspect that might just be because it's
-> > used for recovery mode and we can't switch it around at runtime yet.
-> 
-> The two regulators you added don't actually hook up to any GPIOs for
-> control of VBUS, so perhaps this isn't surprising. The regulators added
-> for VBUS control by Laxman's patch (which I already applied) *do* have
-> some gpio properties. However, testing indicates:
-> 
-> * With Laxman's patch applied, and your patch 1/10 not applied since
-> it's a duplicate, this patch doesn't work, i.e. I see no USB devices.
-> 
-> * With Laxman's patch reverted and your patch 1/10 replacing it, I do
-> see USB devices, and they work. However, then we're not actually
-> controlling VBUS, so USB1 doesn't work.
-> 
-> Can you please rebase this whole series on the latest Tegra for-3.14/dt
-> and sort out the issues? Thanks.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
---nvpublic 
+
+>Shawn
+>
+>> +		pinctrl_gpio_keys: gpio_keysgrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x80000000
+>> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
+>> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
+>> +			>;
+>> +		};
+>> +	};
+>>  };
+>>
+>>  &ldb {
+>> --
+>> 1.7.9.5
+>>
+>>
