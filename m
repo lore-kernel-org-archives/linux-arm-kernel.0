@@ -1,34 +1,35 @@
 From: jsarha@ti.com (Jyri Sarha)
-Date: Fri, 20 Dec 2013 12:42:35 +0200
-Subject: [PATCH RFC v2 REPOST 7/8] ARM: OMAP2+: omap2plus_defconfig: Enable
- tilcdc and TDA998X HDMI support
+Date: Fri, 20 Dec 2013 12:43:07 +0200
+Subject: [PATCH RFC v2 REPOST 8/8] ARM: OMAP2+: omap2plus_defconfig: Enable
+ BeagleBone Black HDMI audio support
 In-Reply-To: <cover.1387535299.git.jsarha@ti.com>
 References: <cover.1387535299.git.jsarha@ti.com>
-Message-ID: <356519246c8bea1ef776924810b824255f166bae.1387535303.git.jsarha@ti.com>
+Message-ID: <e278754ab32a2fdd25e2a7e90cedbdbcd146c1e4.1387535303.git.jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables HDMI video support on Beaglebone-Black.
+Select following:
+CONFIG_SND_DAVINCI_SOC=m
+CONFIG_SND_AM335X_SOC_NXPTDA_EVM=m
 
 Signed-off-by: Jyri Sarha <jsarha@ti.com>
 cc: tony at atomide.com
 ---
- arch/arm/configs/omap2plus_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/omap2plus_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 254cf05..52b0d92 100644
+index 52b0d92..c1a9730 100644
 --- a/arch/arm/configs/omap2plus_defconfig
 +++ b/arch/arm/configs/omap2plus_defconfig
-@@ -176,6 +176,9 @@ CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
- CONFIG_REGULATOR_TPS65217=y
- CONFIG_REGULATOR_TPS65910=y
-+CONFIG_DRM=m
-+CONFIG_DRM_I2C_NXP_TDA998X=m
-+CONFIG_DRM_TILCDC=m
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
+@@ -216,6 +216,8 @@ CONFIG_SND_OMAP_SOC=m
+ CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
+ CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
+ CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
++CONFIG_SND_DAVINCI_SOC=m
++CONFIG_SND_AM335X_SOC_NXPTDA_EVM=m
+ CONFIG_USB=y
+ CONFIG_USB_DEBUG=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
 -- 
 1.7.9.5
