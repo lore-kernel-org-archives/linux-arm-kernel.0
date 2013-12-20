@@ -1,125 +1,49 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 20 Dec 2013 11:47:08 -0700
-Subject: [PATCH V2 2/7] ARM: dts: imx6qdl: add pingroups for enet with GPIO6
- interrupt
-In-Reply-To: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387565233-16144-3-git-send-email-troy.kisky@boundarydevices.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 20 Dec 2013 19:47:15 +0100
+Subject: [GIT PULL] get rid of <mach/timex.h>
+In-Reply-To: <20131219221758.GS14866@pengutronix.de>
+References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
+ <87bo0clved.fsf@linaro.org> <20131219221758.GS14866@pengutronix.de>
+Message-ID: <20131220184715.GT14866@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most boards will want this hardware work-around so
-add new pingroups.
+Hello again,
 
-Also, add MX6QDL_ENET_PINGRP_RGMII macro so that other
-pingroups can use this.
+On Thu, Dec 19, 2013 at 11:17:58PM +0100, Uwe Kleine-K?nig wrote:
+> On Thu, Dec 19, 2013 at 07:20:42AM -0800, Kevin Hilman wrote:
+> > Looks like there are still several users of LATCH, which references CLOCK_TICK_RATE
+> > and is causing failures on lots of defconfigs.
+> darn, I missed these because my compile testing was done without
+> removing the dummy value of CLOCK_TICK_RATE in <asm/timex.h> and I then
+> relied on the 0day bot who obviously didn't build the critical configs.
+> :-\
+> 
+> The problems are fixed by:
+>  - "ARM: rpc: stop using <mach/timex.h>" which I just sent in this
+>    thread.
+>  - "ARM: u300: fix timekeeping when periodic mode is used", a patch I
+>    sent earlier and that Linus W. wanted to merge. It's not yet in
+>    -next. Maybe I can take it instead into this series? Linus?
+>  - The patch pasted below distributed on the respective commits.
+>    Apart from the netx patch these don't have any affected acks. Sascha,
+>    I assume I can keep your Ack?
+> 
+> I'll update my tree when I have feedback by Linus and Sascha.
+I just did that. I squashed the changes into the respective commits,
+rebased on Linus W.'s latest pull request and added the rpc change. Now
+all defconfigs build.
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl-pingrp.h | 77 ++++++++++++++++----------------------
- 1 file changed, 33 insertions(+), 44 deletions(-)
+Please pull
 
-diff --git a/arch/arm/boot/dts/imx6qdl-pingrp.h b/arch/arm/boot/dts/imx6qdl-pingrp.h
-index c9dd44c..082f0df 100644
---- a/arch/arm/boot/dts/imx6qdl-pingrp.h
-+++ b/arch/arm/boot/dts/imx6qdl-pingrp.h
-@@ -53,57 +53,37 @@
- 	MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI		0x100b1 \
- 	MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK		0x100b1
- 
-+#define MX6QDL_ENET_PINGRP_RGMII(rx_pad, tx_pad) \
-+	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			rx_pad \
-+	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			rx_pad \
-+	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			rx_pad \
-+	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			rx_pad \
-+	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			rx_pad \
-+	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		rx_pad \
-+	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			tx_pad \
-+	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			tx_pad \
-+	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			tx_pad \
-+	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			tx_pad \
-+	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			tx_pad \
-+	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		tx_pad \
-+	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		tx_pad
-+
-+#define MX6QDL_ENET_PINGRP_RGMII_MD(rx_pad, tx_pad)	\
-+	MX6QDL_ENET_PINGRP_RGMII(rx_pad, tx_pad)	\
-+	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			tx_pad \
-+	MX6QDL_PAD_ENET_MDC__ENET_MDC			tx_pad
-+
- #define MX6QDL_ENET_PINGRP1 \
--	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			0x1b0b0 \
--	MX6QDL_PAD_ENET_MDC__ENET_MDC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
--	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
--	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0 \
-+	MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x1b0b0)	\
- 	MX6QDL_PAD_GPIO_16__ENET_REF_CLK		0x4001b0a8
- 
- #define MX6QDL_ENET_PINGRP2 \
-+	MX6QDL_ENET_PINGRP_RGMII(0x1b0b0, 0x1b0b0)		\
- 	MX6QDL_PAD_KEY_COL1__ENET_MDIO			0x1b0b0 \
--	MX6QDL_PAD_KEY_COL2__ENET_MDC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
--	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
--	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0
-+	MX6QDL_PAD_KEY_COL2__ENET_MDC			0x1b0b0
- 
- #define MX6QDL_ENET_PINGRP3 \
--	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			0x1b0b0 \
--	MX6QDL_PAD_ENET_MDC__ENET_MDC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
--	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
--	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
--	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0 \
-+	MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x1b0b0)	\
- 	MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN		0x1b0b0
- 
- #define MX6QDL_ENET_PINGRP4 \
-@@ -117,6 +97,15 @@
- 	MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1		0x1b0b0	\
- 	MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN		0x1b0b0
- 
-+#define MX6QDL_ENET_PINGRP1_GPIO6	MX6QDL_ENET_PINGRP1 \
-+	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
-+
-+#define MX6QDL_ENET_PINGRP2_GPIO6	MX6QDL_ENET_PINGRP2 \
-+	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
-+
-+#define MX6QDL_ENET_PINGRP3_GPIO6	MX6QDL_ENET_PINGRP3 \
-+	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
-+
- #define MX6QDL_ESAI_PINGRP1 \
- 	MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK		0x1b030 \
- 	MX6QDL_PAD_ENET_CRS_DV__ESAI_TX_CLK		0x1b030 \
+	git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
+
+which points to 79f08d9ed217318b4f325b7fcf8f26dcd0e41689 now provided
+you are happy with Linus W.'s series, too.
+
+Best regards
+Uwe
+
 -- 
-1.8.1.2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
