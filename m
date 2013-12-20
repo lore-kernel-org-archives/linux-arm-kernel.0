@@ -1,30 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 20 Dec 2013 16:29:38 -0200
-Subject: [PATCH 1/2] spi: spi-imx: enable dma support for escpi controller
-In-Reply-To: <1387561378-2683-1-git-send-email-Frank.Li@freescale.com>
-References: <1387561378-2683-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAOMZO5Au233myeoS0BVweJGTuAx91uBWU9QpiOHkiBSfC7KLsw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Dec 2013 18:30:50 +0000
+Subject: [rtc-linux] Re: Can someone Ack and queue a patch for RTC
+ subsytem?
+In-Reply-To: <8761qk32pj.fsf@natisbad.org>
+References: <87siton6ke.fsf@natisbad.org>
+ <20131219164624.GV2609@titan.lakedaemon.net>
+ <20131219175738.1dad3ade@linux.lan.towertech.it>
+ <8761qk32pj.fsf@natisbad.org>
+Message-ID: <20131220183050.GB31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 3:42 PM, Frank Li <Frank.Li@freescale.com> wrote:
-> After enable DMA
->
-> spi-nor read speed is
-> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
-> 1+0 records in
-> 1+0 records out
-> 1048576 bytes (1.0 MB) copied, 0.720402 s, 1.5 MB/s
+On Thu, Dec 19, 2013 at 11:17:44PM +0100, Arnaud Ebalard wrote:
 
-Good job, Frank!
->
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> All NETGEAR ReadyNAS 102, 104 and 2120 have an ISL 12057 RTC chip which
+> is used as main RTC clock but can also provide alarm. But the alarm
+> interrupt line of the chip is *not* connected to the SoC. It is
+> connected to some power component and can be used to wake up the NAS
+> when it is completely off and the alarm rings.
 
-You need to check if res is NULL here.
-
-> +       spi_imx->mapbase = res->start;
->         spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
-
-Regards,
-
-Fabio Estevam
+Can the PMIC or whatever function as an interrupt controller and report
+the interrupt on to the SoC?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/53c4ab39/attachment.sig>
