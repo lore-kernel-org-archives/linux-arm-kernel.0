@@ -1,37 +1,59 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 20 Dec 2013 15:52:00 +0800
-Subject: [PATCH v7 04/14] usb: doc: phy-mxs: update binding for adding anatop
- phandle
+Date: Fri, 20 Dec 2013 15:52:01 +0800
+Subject: [PATCH v7 05/14] ARM: dts: imx6: add anatop phandle for usbphy
 In-Reply-To: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
 References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1387525930-27313-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1387525930-27313-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add anatop phandle which is used to access anatop registers to
-control PHY's power and other USB operations.
+Add anatop phandle for usbphy
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-index b43d4c9e..fc6659d 100644
---- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-@@ -5,10 +5,12 @@ Required properties:
-   for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
- - reg: Should contain registers location and length
- - interrupts: Should contain phy interrupt
-+- fsl,anatop: phandle for anatop register, it is only for imx6 SoC series
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 59154dc..4e74962 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -557,6 +557,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks 182>;
++				fsl,anatop = <&anatop>;
+ 			};
  
- Example:
- usbphy1: usbphy at 020c9000 {
- 	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 	reg = <0x020c9000 0x1000>;
- 	interrupts = <0 44 0x04>;
-+	fsl,anatop = <&anatop>;
- };
+ 			usbphy2: usbphy at 020ca000 {
+@@ -564,6 +565,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks 183>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			snvs at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..30322b5 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -489,6 +489,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			usbphy2: usbphy at 020ca000 {
+@@ -496,6 +497,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			snvs at 020cc000 {
 -- 
 1.7.8
