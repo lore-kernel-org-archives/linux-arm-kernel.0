@@ -1,24 +1,73 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Fri, 20 Dec 2013 13:51:43 +0200
-Subject: [alsa-devel] [PATCH RFC v2 REPOST 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <20131220113058.GN31886@sirena.org.uk>
-References: <cover.1384862950.git.jsarha@ti.com>
- <cover.1387535299.git.jsarha@ti.com> <20131220113058.GN31886@sirena.org.uk>
-Message-ID: <52B42F4F.8080004@ti.com>
+From: sjoshi.open@gmail.com (sunil joshi)
+Date: Fri, 20 Dec 2013 17:23:27 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
+In-Reply-To: <CAM4voamD4Cj594fbkciNS32U7PSkByxakZmjPnhFo0mpCj8hug@mail.gmail.com>
+References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
+ <2459303.277Jr8aotM@amdc1032>
+ <CAM4voamU5hc7uC5MTOA7OtYuqpsis7cTX3sx0UrmpdZx7_TpzA@mail.gmail.com>
+ <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
+ <CAM4voamD4Cj594fbkciNS32U7PSkByxakZmjPnhFo0mpCj8hug@mail.gmail.com>
+Message-ID: <CANruHrSeNym+y=3iBBRZ9vxTdsGAApe304N2z6CK40SOaiXbfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2013 01:30 PM, Mark Brown wrote:
-> On Fri, Dec 20, 2013 at 12:36:56PM +0200, Jyri Sarha wrote:
->> Changes since the first RFC version of the patches:
->
-> Please don't bury your e-mails in the middle of old threads, that's a
-> good way of getting them missed.
->
+Hi Abhilash,
 
-I have done it for my own convenience to find the history of the patch 
-set when ever someone is commenting it. But I'll stop doing that from 
-now on.
+On Fri, Dec 20, 2013 at 5:08 PM, Abhilash Kesavan
+<kesavan.abhilash@gmail.com> wrote:
+> Hi Sunil,
+>
+> On Fri, Dec 20, 2013 at 3:56 PM, sunil joshi <sjoshi.open@gmail.com> wrote:
+>> Hi Abhilash,
+>> I saw another patch in chrome tree ..by Andrew Bresticker
+>> which may be relevant here ..
+>>
+>> Just wondering if you missed adding this ? or this is not needed ?
+>> You did not face any issue in getting core to suspend ?
+>
+> This has not been added for Exynos5250 in mainline yet. We did notice
+> that the system would fail to suspend on the rare occasion (~1% of the
+> time on exynos5250) when we repeatedly suspended and resumed the
+> system.
+>
+> I have not run s2r stress tests, but have had no issues suspending the
+> system in my limited testing. We can probably let this be for now as
+> the system would resume fine even on a failed suspend. I will do some
+> stress testing and then post if needed.
+>>
 
-Best regards,
-Jyri
+Ok. Sure .. Thanks for details !
+
+>> ------------------------------------------------------------------------------------------
+>> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
+>> Author: Andrew Bresticker <abrestic@chromium.org>
+>> Date:   Mon Jul 15 13:14:36 2013 -0700
+>>
+>>     arm: exynos: disable all interrupts on Exynos5420 before suspend
+>>
+>>     Disable all interrupts from the GIC before entering suspend on
+>>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
+>>     may receive an interrupt after entering WFI but before the PMU has
+>>     suspended the system, causing suspend to fail.
+>>
+>>     BUG=chrome-os-partner:20523
+>>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
+>>     no longer occasionally fails with the "Failed to suspend the system"
+>>     error in exynos_cpu_suspend().
+>>
+>>     Change-Id: Ia2d963191f4e5485beb295b28f128f2ce256f987
+>>     Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>>     Reviewed-on: https://gerrit.chromium.org/gerrit/61948
+>>     Reviewed-by: Simon Glass <sjg@chromium.org>
+>>
+>
+> Regards,
+> Abhilash
+> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
