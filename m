@@ -1,79 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 19 Dec 2013 22:32:57 -0500
-Subject: [RFC PATCH v5 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <1387316473-3250-2-git-send-email-andrew@lunn.ch>
-References: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
- <1387316473-3250-1-git-send-email-andrew@lunn.ch>
- <1387316473-3250-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20131220033257.GF2609@titan.lakedaemon.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 19 Dec 2013 19:40:04 -0800
+Subject: [PATCH 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
+ Manager/Traffic Manager
+In-Reply-To: <CAN1v_PsibDTwQ9_ZxRnBtJA46BPne6fTuS_9TddWPZt6ewwgQQ@mail.gmail.com>
+References: <1387507503-7565-1-git-send-email-rapatel@apm.com>
+ <20131220032217.GC32310@kroah.com>
+ <CAN1v_PsibDTwQ9_ZxRnBtJA46BPne6fTuS_9TddWPZt6ewwgQQ@mail.gmail.com>
+Message-ID: <20131220034004.GA8160@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 10:41:10PM +0100, Andrew Lunn wrote:
-> The Marvell Dove SoC can run the CPU at two frequencies. The high
-> frequencey is from a PLL, while the lower is the same as the DDR
-> clock. Add a cpufreq driver to swap between these frequences.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> Sort header files
-> Remove unneeded header files
-> Notify only on change
-> Use get_cpu_device(0), devm_clk_get()
-> Use platform_get_resource_byname()
-> Error check clk_prepare_enable()
-> Comment the interrupt handler
-> 
-> rebase onto 3.13-rc2 linux-next
-> use target_index
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-dove.txt   |  23 ++
->  drivers/cpufreq/Kconfig.arm                        |   5 +
->  drivers/cpufreq/Makefile                           |   1 +
->  drivers/cpufreq/dove-cpufreq.c                     | 265 +++++++++++++++++++++
->  4 files changed, 294 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-dove.txt
->  create mode 100644 drivers/cpufreq/dove-cpufreq.c
-> 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-dove.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-dove.txt
-> new file mode 100644
-> index 000000000000..f95cc2234fc1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-dove.txt
-> @@ -0,0 +1,23 @@
-> +Dove cpufreq driver
-> +-------------------
-> +
-> +The Dove cpufreq driver makes use of the pmu node in the device tree.
 
-I would prefer to reword this to make it OS-agnostic.  The cpufreq
-driver is Linux-specific.
+A: No.
+Q: Should I include quotations after my reply?
 
-> +
-> +Required properties:
-> +- compatibility: Must be "marvell,dove-pmu"
-> +- interrupts:	 Interrupt to know the completion of cpu frequency change.
-> +- clocks:	 phandles and clock specifiers pairs for CPU and DDR clock
-> +- clock-names: 	 "cpu" and "ddr"
-> +- reg: 		 Address ranges of the PMU. Two ranges are expected.
+http://daringfireball.net/2007/07/on_top
 
-Shall we define the two ranges?
+On Thu, Dec 19, 2013 at 07:27:35PM -0800, Ravi Patel wrote:
+> APM X-Gene SoC Ethernet driver is planned to be submitted on Dec 20 2013.
+> Ethernet driver will be using these exported API's from QMTM driver.
 
-> +
-> +Example:
-> +
-> +	pmu: pmu at d0000 {
-> +		compatible = "marvell,dove-pmu";
-> +		reg = <0xd0000 0x0700>,
-> +		      <0xd8000 0x0140>;
-> +		clocks = <&core_clk 1>, <&core_clk 3>;
-> +		clock-names = "cpu", "ddr";
-> +		interrupt-parent = <&pmu_intc>;
-> +		interrupts = <0>;
-> +	};
+Please submit a user of the api as part of the series, otherwise we
+can't evaluate if it's really the correct thing to do or not.
 
-thx,
+> The APM X-Gene SoC Ethernet driver is going to live in?drivers/net/ethernet/apm
+> /xgene.
 
-Jason.
+So this is a "bus"?  How is the ethernet device going to show up in
+sysfs as a parent of what as this isn't part of the driver model?
+
+greg k-h
