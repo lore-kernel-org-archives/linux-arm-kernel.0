@@ -1,88 +1,101 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Dec 2013 18:34:24 +0200
-Subject: [PATCHv12 06/49] clk: add support for low level register ops
+Date: Fri, 20 Dec 2013 18:34:23 +0200
+Subject: [PATCHv12 05/49] clk: gate: add support for registering gate clock
+ from descriptor
 In-Reply-To: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
 References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387557274-22583-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1387557274-22583-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Low level register ops are needed for providing SoC or IP block specific
-access routines to clock registers. Subsequent patches add support for
-the low level ops for the individual clock drivers.
+New clk_register_desc() call can be used to register this clock type now.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk.c            |   28 ++++++++++++++++++++++++++++
- include/linux/clk-provider.h |   17 +++++++++++++++++
- 2 files changed, 45 insertions(+)
+ drivers/clk/clk-gate.c       |   31 +++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |   18 ++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 29281f6..8bcd1e0 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -34,6 +34,34 @@ static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 4a58c55..3ec61d2 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -26,8 +26,12 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
  
-+/**
-+ * clk_readl_default - default clock register read support function
-+ * @reg: register to read
-+ *
-+ * Default implementation for reading a clock register.
-+ */
-+static u32 clk_readl_default(void __iomem *reg)
++/* resolve struct clk_gate from inner struct clk_hw member */
+ #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+ 
++/* resolve struct clk_gate_desc from inner struct clk_desc member */
++#define to_hw_desc(_desc) container_of(_desc, struct clk_gate_desc, desc)
++
+ /*
+  * It works on following logic:
+  *
+@@ -162,3 +166,30 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 	return clk;
+ }
+ EXPORT_SYMBOL_GPL(clk_register_gate);
++
++struct clk_hw *clk_register_gate_desc(struct device *dev, struct clk_desc *desc)
 +{
-+	return readl(reg);
++	struct clk_gate *gate;
++	struct clk_gate_desc *hw_desc;
++
++	hw_desc = to_hw_desc(desc);
++
++	/* allocate mux clock */
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		return ERR_PTR(-ENOMEM);
++
++	/* populate struct clk_gate assignments */
++	gate->reg = hw_desc->reg;
++	gate->bit_idx = hw_desc->bit_idx;
++	gate->flags = hw_desc->flags;
++	gate->lock = hw_desc->lock;
++
++	if (!desc->ops)
++		desc->ops = &clk_gate_ops;
++
++	desc->flags |= CLK_IS_BASIC;
++
++	return &gate->hw;
 +}
-+
-+/**
-+ * clk_writel_default - default clock register write support function
-+ * @val: value to write
-+ * @reg: register to write to
-+ *
-+ * Default implementation for writing a clock register.
-+ */
-+static void clk_writel_default(u32 val, void __iomem *reg)
-+{
-+	writel(val, reg);
-+}
-+
-+struct clk_ll_ops clk_ll_ops_default = {
-+	.clk_readl = clk_readl_default,
-+	.clk_writel = clk_writel_default
-+};
-+
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
++EXPORT_SYMBOL_GPL(clk_register_gate_desc);
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index a4f14ae..671dff4 100644
+index ea5281c..a4f14ae 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -198,6 +198,23 @@ struct clk_hw {
- 	const struct clk_init_data *init;
+@@ -268,10 +268,28 @@ struct clk_gate {
+ 	spinlock_t	*lock;
  };
  
 +/**
-+ * struct clk_ll_ops - low-level register access ops for a clock
-+ * @clk_readl: pointer to register read function
-+ * @clk_writel: pointer to register write function
-+ *
-+ * Low-level register access ops are generally used by the basic clock types
-+ * (clk-gate, clk-mux, clk-divider etc.) to provide support for various
-+ * low-level hardware interfaces (direct MMIO, regmap etc.), but can also be
-+ * used by other hardware-specific clock drivers if needed.
++ * struct clk_gate_desc - init descriptor for gating clock
++ * @desc:	handle between common and hardware-specific interfaces
++ * @reg:	register controlling gate
++ * @bit_idx:	single bit controlling gate
++ * @flags:	hardware-specific flags
++ * @lock:	register lock
 + */
-+struct clk_ll_ops {
-+	u32	(*clk_readl)(void __iomem *reg);
-+	void	(*clk_writel)(u32 val, void __iomem *reg);
++struct clk_gate_desc {
++	struct clk_desc	desc;
++	void __iomem	*reg;
++	u8		bit_idx;
++	u8		flags;
++	spinlock_t	*lock;
 +};
 +
-+extern struct clk_ll_ops clk_ll_ops_default;
-+
- /*
-  * DOC: Basic clock implementations common to many platforms
-  *
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+ #define CLK_GATE_HIWORD_MASK		BIT(1)
+ 
+ extern const struct clk_ops clk_gate_ops;
++struct clk_hw *clk_register_gate_desc(struct device *dev,
++				      struct clk_desc *desc);
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
 -- 
 1.7.9.5
