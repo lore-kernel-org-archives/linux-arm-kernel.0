@@ -1,69 +1,62 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 20 Dec 2013 22:55:52 +0530
-Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
-In-Reply-To: <52B476EA.2040401@wwwdotorg.org>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-2-git-send-email-treding@nvidia.com>
- <52B355EC.9040306@wwwdotorg.org> <52B3E968.8090906@nvidia.com>
- <20131220102542.GJ27787@ulmo.nvidia.com> <52B41FEA.7020608@nvidia.com>
- <52B476EA.2040401@wwwdotorg.org>
-Message-ID: <52B47DA0.6040708@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Dec 2013 17:28:27 +0000
+Subject: Possible arm64 patches for stable
+Message-ID: <20131220172827.GZ31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013 10:27 PM, Stephen Warren wrote:
-> On 12/20/2013 03:46 AM, Laxman Dewangan wrote:
->> On Friday 20 December 2013 03:55 PM, Thierry Reding wrote:
->>> * PGP Signed by an unknown key
->>>
->>> On Fri, Dec 20, 2013 at 12:23:28PM +0530, Laxman Dewangan wrote:
->>>> On Friday 20 December 2013 01:54 AM, Stephen Warren wrote:
->>>>> On 12/19/2013 09:06 AM, Thierry Reding wrote:
->>>>> (Laxman, as an aside, I'm not sure why you're upstreaming patches that
->>>>> don't exactly match the existing kernel support for this board...)
->>>> I did not get this based on what context it is. Can you please elaborate
->>>> where I am missing the stuff?
->>>>
->>>>
->>>>>> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts
->>>>>> b/arch/arm/boot/dts/tegra124-venice2.dts
->>>>>> +                sd0 {
->>>>>> +                    regulator-name = "vdd_cpu";
->>>>>> +                    regulator-min-microvolt = <700000>;
->>>>>> +                    regulator-max-microvolt = <1350000>;
->>>>> Laxman's patch has:
->>>>>
->>>>>                        regulator-max-microvolt = <1400000>;
->>>> We have the Laguna platform on which Android and L4T is running fine.
->>>> This
->>>> is based on same PMIC used for Venice2. As we are running the more cpu
->>>> stress on Laguna, I took this parameter from the Laguna Power tree
->>>> where it
->>>> is maximum 1.4V. Chrome have maximum as 1.35mV.
->>> Whether this is used on Android, ChromeOS or L4T doesn't matter at all.
->>> It specifies hardware constraints and thus must be agnostic of the OS
->>> and workload.
->>>
->>> Also this file describes the power tree for Venice2, so using values
->>> from Laguna is wrong, no matter how similar they are.
->>>
->> Here, I used term "similar" means the which rail is feeding to Tegra's
->> which vdd?
->> So by this, if AMS SD0 is feeding to Tegra vdd-cpu then it should be
->> same for Laguna.
-> Look, this situation is very simple. This file describe Venice2. It
-> doesn't matter whether Laguna "should be" similar to Venice2 or not, the
-> file needs to describe Venice2 and not Laguna.
->
-> Equally, we have a downstream kernel that fully supports Venice2. There
-> is therefore absolutely ZERO reason why we should use the downstream
-> Laguna board support to create the upstream Venice2 board support,
-> rather than using the downstream Venice2 board support to create the
-> upstream Venice2 board support.
->
-> Please do let me know that you fully understand this issue. If not,
-> future patches from you are going to need a heck of a lot more detailed
-> review and manual checking, rather than my trusting you got it right.
+Hi,
 
-I like to continue this discussion internally so that we can have proper 
-expectations before sending patches.
+While reading the kernel logs for arm64 (as one does) I noticed a few
+patches that seemed like candidates for either LTS or LTSI.  I've also
+had a couple of others mentioned via other routes.  What do you think of
+these?
+
+  4ecf7ccb1973 arm64: spinlock: retry trylock operation if strex fails on free lock
+
+This seems like a correctness fix for spinlocks, though since the
+callers should cope with failure it's arguably just an optimisation.
+
+  53ae3acd4390 arm64: Only enable local interrupts after the CPU is marked online
+  82b2f495fba3 arm64: virt: ensure visibility of __boot_cpu_mode
+  845ad05ec31e arm64: Change kernel stack size to 16K
+  6db83cea1c97 arm64: fix possible invalid FPSIMD initialization state
+  7b22c03536a5 arm64: check for number of arguments in syscall_get/set_arguments()
+  df503ba7f653 arm64: dts: Reserve the memory used for secondary CPU release address
+  
+These all look like correctness fixes of one kind or another; the change
+to 16K stacks is poorly explained but it looks like it's fixing failures
+of some kind.
+
+  f0dd718090ae arm64: Remove unused cpu_name ascii in arch/arm64/mm/proc.S
+
+A user was reporting that this caused build failures due to alignment
+issues with some of the debug options turned on.  I've not fully
+investigated yet, this might be a toolchain issue though given how
+simple the change is.
+
+  0d651e4e65e9 clocksource: arch_timer: use virtual counters
+
+This is as mentioned in the changelog a correctness fix for avoiding
+clocks going backwards and has also been found to be required to avoid
+boot hangs with CONFIG_PROVE_RCU_DELAY enabled.
+
+There were also a few others that aren't entirely -stable material but
+might be a fit for LTSI (and the above might be if not -stable in
+themselves):
+
+  b5b6c9e9149d arm64: Avoid cache flushing in flush_dcache_page()
+  7249b79f6b4c arm64: Do not flush the D-cache for anonymous pages
+  4f00130b70e5 arm64: Use Normal NonCacheable memory for writecombine
+
+These look like simple, localised optimisations.
+
+Thanks,
+Mark
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/bd0efc1b/attachment.sig>
