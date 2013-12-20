@@ -1,150 +1,112 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 20 Dec 2013 14:11:31 +0100
-Subject: [PATCH v4 4/9] ASoC: fsl-ssi: Fix interrupt stats for imx
+Date: Fri, 20 Dec 2013 14:11:35 +0100
+Subject: [PATCH v4 8/9] ASoC: fsl-ssi: Drop ac97 specific trigger function
 In-Reply-To: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
 References: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387545096-2334-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387545096-2334-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irqs should only be requested/released with enabled DMA. Previously
-interrupt statistics where disabled for IMX Processors because of
-different writeable SISR bits.
-
-This patch introduces support for irqstats on imx processors again by
-creating a sisr writeback mask and introducing a imx35-ssi compatible.
+The normal trigger function can now be used for AC97. Drop AC97 trigger
+function.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 40 ++++++++++++++++++++++++++++++++--------
- 1 file changed, 32 insertions(+), 8 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 61 +++++++------------------------------------------
+ 1 file changed, 8 insertions(+), 53 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 39ad516..f37bcbe 100644
+index c25f593..e40bce1 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -127,6 +127,7 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
- enum fsl_ssi_type {
- 	FSL_SSI_MCP8610,
- 	FSL_SSI_MX21,
-+	FSL_SSI_MX35,
- 	FSL_SSI_MX51,
- };
+@@ -1052,6 +1052,7 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 	unsigned long flags;
  
-@@ -151,6 +152,7 @@ struct fsl_ssi_private {
- 	struct snd_soc_dai_driver cpu_dai_drv;
- 	struct platform_device *pdev;
+ 	switch (cmd) {
+@@ -1082,6 +1083,12 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		return -EINVAL;
+ 	}
  
-+	enum fsl_ssi_type hw_type;
- 	bool new_binding;
- 	bool ssi_on_imx;
- 	bool imx_ac97;
-@@ -199,6 +201,7 @@ struct fsl_ssi_private {
- static const struct of_device_id fsl_ssi_ids[] = {
- 	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
- 	{ .compatible = "fsl,imx51-ssi", .data = (void *) FSL_SSI_MX51},
-+	{ .compatible = "fsl,imx35-ssi", .data = (void *) FSL_SSI_MX35},
- 	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
- 	{}
- };
-@@ -222,7 +225,26 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
- 	irqreturn_t ret = IRQ_NONE;
- 	__be32 sisr;
--	__be32 sisr2 = 0;
-+	__be32 sisr2;
-+	__be32 sisr_write_mask = 0;
-+
-+	switch (ssi_private->hw_type) {
-+	case FSL_SSI_MX21:
-+		sisr_write_mask = 0;
-+		break;
-+
-+	case FSL_SSI_MCP8610:
-+	case FSL_SSI_MX35:
-+		sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
-+			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
-+			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
-+		break;
-+
-+	case FSL_SSI_MX51:
-+		sisr_write_mask = CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
-+			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
-+		break;
++	if (ssi_private->imx_ac97) {
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++			write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
++		else
++			write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
 +	}
  
- 	/* We got an interrupt, so read the status register to see what we
- 	   were interrupted for.  We mask it with the Interrupt Enable register
-@@ -232,13 +254,11 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	return 0;
+ }
+@@ -1129,58 +1136,6 @@ static const struct snd_soc_component_driver fsl_ssi_component = {
+ 	.name		= "fsl-ssi",
+ };
  
- 	if (sisr & CCSR_SSI_SISR_RFRC) {
- 		ssi_private->stats.rfrc++;
--		sisr2 |= CCSR_SSI_SISR_RFRC;
- 		ret = IRQ_HANDLED;
- 	}
+-/**
+- * fsl_ssi_ac97_trigger: start and stop the AC97 receive/transmit.
+- *
+- * This function is called by ALSA to start, stop, pause, and resume the
+- * transfer of data.
+- */
+-static int fsl_ssi_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+-			   struct snd_soc_dai *dai)
+-{
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(
+-			rtd->cpu_dai);
+-	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+-
+-	switch (cmd) {
+-	case SNDRV_PCM_TRIGGER_START:
+-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_TIE |
+-					CCSR_SSI_SIER_TFE0_EN);
+-		else
+-			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_RIE |
+-					CCSR_SSI_SIER_RFF0_EN);
+-		break;
+-
+-	case SNDRV_PCM_TRIGGER_STOP:
+-	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_TIE |
+-					CCSR_SSI_SIER_TFE0_EN, 0);
+-		else
+-			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_RIE |
+-					CCSR_SSI_SIER_RFF0_EN, 0);
+-		break;
+-
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-		write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
+-	else
+-		write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
+-
+-	return 0;
+-}
+-
+-static const struct snd_soc_dai_ops fsl_ssi_ac97_dai_ops = {
+-	.startup	= fsl_ssi_startup,
+-	.trigger	= fsl_ssi_ac97_trigger,
+-};
+-
+ static struct snd_soc_dai_driver fsl_ssi_ac97_dai = {
+ 	.ac97_control = 1,
+ 	.playback = {
+@@ -1197,7 +1152,7 @@ static struct snd_soc_dai_driver fsl_ssi_ac97_dai = {
+ 		.rates = SNDRV_PCM_RATE_48000,
+ 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+ 	},
+-	.ops = &fsl_ssi_ac97_dai_ops,
++	.ops = &fsl_ssi_dai_ops,
+ };
  
- 	if (sisr & CCSR_SSI_SISR_TFRC) {
- 		ssi_private->stats.tfrc++;
--		sisr2 |= CCSR_SSI_SISR_TFRC;
- 		ret = IRQ_HANDLED;
- 	}
  
-@@ -279,25 +299,21 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 
- 	if (sisr & CCSR_SSI_SISR_ROE1) {
- 		ssi_private->stats.roe1++;
--		sisr2 |= CCSR_SSI_SISR_ROE1;
- 		ret = IRQ_HANDLED;
- 	}
- 
- 	if (sisr & CCSR_SSI_SISR_ROE0) {
- 		ssi_private->stats.roe0++;
--		sisr2 |= CCSR_SSI_SISR_ROE0;
- 		ret = IRQ_HANDLED;
- 	}
- 
- 	if (sisr & CCSR_SSI_SISR_TUE1) {
- 		ssi_private->stats.tue1++;
--		sisr2 |= CCSR_SSI_SISR_TUE1;
- 		ret = IRQ_HANDLED;
- 	}
- 
- 	if (sisr & CCSR_SSI_SISR_TUE0) {
- 		ssi_private->stats.tue0++;
--		sisr2 |= CCSR_SSI_SISR_TUE0;
- 		ret = IRQ_HANDLED;
- 	}
- 
-@@ -341,6 +357,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 		ret = IRQ_HANDLED;
- 	}
- 
-+	sisr2 = sisr & sisr_write_mask;
- 	/* Clear the bits that we set */
- 	if (sisr2)
- 		write_ssi(sisr2, &ssi->sisr);
-@@ -1180,6 +1197,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 
- 	ssi_private->use_dma = !of_property_read_bool(np,
- 			"fsl,fiq-stream-filter");
-+	ssi_private->hw_type = hw_type;
- 
- 	if (ac97) {
- 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
-@@ -1298,7 +1316,13 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
- 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
- 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--	} else if (ssi_private->use_dma) {
-+	}
-+
-+	/*
-+	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
-+	 * different writeable interrupt status registers.
-+	 */
-+	if (ssi_private->use_dma) {
- 		/* The 'name' should not have any slashes in it. */
- 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
- 					fsl_ssi_isr, 0, ssi_private->name,
 -- 
 1.8.5.1
