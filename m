@@ -1,35 +1,60 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 20 Dec 2013 02:37:46 +0000
-Subject: [PATCHv3 5/7] ASoC: fsl: Add SGTL5000 based audio machine driver.
-In-Reply-To: <20131219102521.GS31886@sirena.org.uk>
-References: <1387250684-23406-1-git-send-email-Li.Xiubo@freescale.com>
- <1387250684-23406-6-git-send-email-Li.Xiubo@freescale.com>
- <20131218183743.GG31886@sirena.org.uk>
- <f9a19c59bfaf4844bbeaca1aeb91e305@DM2PR03MB509.namprd03.prod.outlook.com>
- <20131219102521.GS31886@sirena.org.uk>
-Message-ID: <7945c514f0a04a5a96d31ace69cea3a8@BY2PR03MB505.namprd03.prod.outlook.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Thu, 19 Dec 2013 18:41:27 -0800
+Subject: [PATCH v2 3/3] cpufreq: imx6q: add of_init_opp_table
+In-Reply-To: <20131220015555.GH7172@S2101-09.ap.freescale.net>
+References: <1387485338-21225-1-git-send-email-john.tobias.ph@gmail.com>
+ <1387485338-21225-3-git-send-email-john.tobias.ph@gmail.com>
+ <20131220015555.GH7172@S2101-09.ap.freescale.net>
+Message-ID: <CACUGKYN+3j_D1SVj=jHKq22CuYmJ90JzQAi-VHGL+2zg06oYrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+That's correct. I tested it. I will send another patch.
 
-> On Thu, Dec 19, 2013 at 05:19:26AM +0000, Li.Xiubo at freescale.com wrote:
-> 
-> > In this series of patches, the PATCH1~PATCH4 are about SAI only, and can be
-> > apart from VF610-twr sound driver, I will sent the SAI driver and VF610-twr
-> > sound driver separately. Could you apply the SAI's first if they are all
-> fine?
-> 
-> What are you asking me to apply here?  I already applied your first
-> patch as I said, is that not everything?
 
-Sorry for understanding.
 
-Please ignore the series of patches for v4.
-
-I will send the followed patch to fix that issues you have pointed.
-
-Thanks,
-
-Best Regards,
-Xiubo
+On Thu, Dec 19, 2013 at 5:55 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Dec 19, 2013 at 12:35:38PM -0800, John Tobias wrote:
+>> Add a routine check to see if the platform supplied the OPP table.
+>> Incase there's no OPP table exist, it will try to initialise it.
+>>
+>> It's been tested on iMX6SL board where the platform doesn't have
+>> an OPP table.
+>>
+>> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+>> ---
+>>  drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+>> index 4b3f18e..8c56898 100644
+>> --- a/drivers/cpufreq/imx6q-cpufreq.c
+>> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+>> @@ -166,6 +166,17 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>>               return -ENOENT;
+>>       }
+>>
+>> +     /* Get the OPP table, if the platform did not supply it. */
+>> +     num = dev_pm_opp_get_opp_count(cpu_dev);
+>> +     if (num < 0) {
+>> +             ret = of_init_opp_table(cpu_dev);
+>> +             if (ret < 0) {
+>> +                     dev_err(cpu_dev, "failed to init OPP table\n");
+>> +                     ret = -ENODEV;
+>> +                     goto put_node;
+>> +             }
+>> +     }
+>> +
+>
+> Oh, no.  dev_pm_opp_get_opp_count() is already being called in
+> imx6q_cpufreq_probe().  Why don't you just plug your code into there?
+>
+> Shawn
+>
+>>       arm_clk = devm_clk_get(cpu_dev, "arm");
+>>       pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+>>       pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
+>> --
+>> 1.8.3.2
+>>
+>
