@@ -1,112 +1,153 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 20 Dec 2013 14:11:35 +0100
-Subject: [PATCH v4 8/9] ASoC: fsl-ssi: Drop ac97 specific trigger function
-In-Reply-To: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
-References: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1387545096-2334-9-git-send-email-mpa@pengutronix.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Dec 2013 15:12:42 +0200
+Subject: [PATCHv11 43/49] ARM: OMAP2+: PRM: add support for initializing
+ PRCM clock modules from DT
+In-Reply-To: <alpine.DEB.2.02.1312201147060.20802@utopia.booyaka.com>
+References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+ <1387452260-23276-44-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1312201147060.20802@utopia.booyaka.com>
+Message-ID: <52B4424A.8040003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The normal trigger function can now be used for AC97. Drop AC97 trigger
-function.
+On 12/20/2013 01:49 PM, Paul Walmsley wrote:
+> On Thu, 19 Dec 2013, Tero Kristo wrote:
+>
+>> This patch provides top level functionality for the DT clock initialization.
+>> Clock tree is initialized hierarchically starting from IP modules (CM/PRM/PRCM)
+>> going down towards individual clock nodes, and finally initializing
+>> clockdomains once all the clocks are ready.
+>
+> So just to flag this as something we'll want to deal with later.
+> The low-level CM* drivers should be responsible for registering CM* clocks
+> and clockdomains.  Similarly the PRM* low-level drivers should only
+> register PRM* clocks and clockdomains.  But it looks to me like we can
+> rearrange this code later without any significant impact, unless you
+> foresee any issues with that?  If not, in the interests of expediency,
+> let's take that up in future patches.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 61 +++++++------------------------------------------
- 1 file changed, 8 insertions(+), 53 deletions(-)
+Yeah, this can be split under cm/prm later on once we implement proper 
+drivers for each block. DT data won't be changed, just kernel side 
+implementation will be modified, and this modification is relatively 
+simple to do also.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index c25f593..e40bce1 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -1052,6 +1052,7 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
-+	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
- 	unsigned long flags;
- 
- 	switch (cmd) {
-@@ -1082,6 +1083,12 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- 		return -EINVAL;
- 	}
- 
-+	if (ssi_private->imx_ac97) {
-+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+			write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
-+		else
-+			write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
-+	}
- 
- 	return 0;
- }
-@@ -1129,58 +1136,6 @@ static const struct snd_soc_component_driver fsl_ssi_component = {
- 	.name		= "fsl-ssi",
- };
- 
--/**
-- * fsl_ssi_ac97_trigger: start and stop the AC97 receive/transmit.
-- *
-- * This function is called by ALSA to start, stop, pause, and resume the
-- * transfer of data.
-- */
--static int fsl_ssi_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
--			   struct snd_soc_dai *dai)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(
--			rtd->cpu_dai);
--	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
--
--	switch (cmd) {
--	case SNDRV_PCM_TRIGGER_START:
--	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
--		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_TIE |
--					CCSR_SSI_SIER_TFE0_EN);
--		else
--			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_RIE |
--					CCSR_SSI_SIER_RFF0_EN);
--		break;
--
--	case SNDRV_PCM_TRIGGER_STOP:
--	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
--		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_TIE |
--					CCSR_SSI_SIER_TFE0_EN, 0);
--		else
--			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_RIE |
--					CCSR_SSI_SIER_RFF0_EN, 0);
--		break;
--
--	default:
--		return -EINVAL;
--	}
--
--	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--		write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
--	else
--		write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
--
--	return 0;
--}
--
--static const struct snd_soc_dai_ops fsl_ssi_ac97_dai_ops = {
--	.startup	= fsl_ssi_startup,
--	.trigger	= fsl_ssi_ac97_trigger,
--};
--
- static struct snd_soc_dai_driver fsl_ssi_ac97_dai = {
- 	.ac97_control = 1,
- 	.playback = {
-@@ -1197,7 +1152,7 @@ static struct snd_soc_dai_driver fsl_ssi_ac97_dai = {
- 		.rates = SNDRV_PCM_RATE_48000,
- 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
- 	},
--	.ops = &fsl_ssi_ac97_dai_ops,
-+	.ops = &fsl_ssi_dai_ops,
- };
- 
- 
--- 
-1.8.5.1
+-Tero
+
+>
+>
+> - Paul
+>
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/prm.h        |    1 +
+>>   arch/arm/mach-omap2/prm_common.c |   66 ++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 67 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+>> index ac25ae6..623db40 100644
+>> --- a/arch/arm/mach-omap2/prm.h
+>> +++ b/arch/arm/mach-omap2/prm.h
+>> @@ -18,6 +18,7 @@
+>>   # ifndef __ASSEMBLER__
+>>   extern void __iomem *prm_base;
+>>   extern void omap2_set_globals_prm(void __iomem *prm);
+>> +int of_prcm_init(void);
+>>   # endif
+>>
+>>
+>> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+>> index a2e1174..835eb7d 100644
+>> --- a/arch/arm/mach-omap2/prm_common.c
+>> +++ b/arch/arm/mach-omap2/prm_common.c
+>> @@ -23,6 +23,10 @@
+>>   #include <linux/irq.h>
+>>   #include <linux/interrupt.h>
+>>   #include <linux/slab.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clk/ti.h>
+>>
+>>   #include "soc.h"
+>>   #include "prm2xxx_3xxx.h"
+>> @@ -30,6 +34,7 @@
+>>   #include "prm3xxx.h"
+>>   #include "prm44xx.h"
+>>   #include "common.h"
+>> +#include "clock.h"
+>>
+>>   /*
+>>    * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
+>> @@ -464,3 +469,64 @@ int prm_unregister(struct prm_ll_data *pld)
+>>
+>>   	return 0;
+>>   }
+>> +
+>> +static struct of_device_id omap_prcm_dt_match_table[] = {
+>> +	{ .compatible = "ti,am3-prcm" },
+>> +	{ .compatible = "ti,am3-scrm" },
+>> +	{ .compatible = "ti,am4-prcm" },
+>> +	{ .compatible = "ti,am4-scrm" },
+>> +	{ .compatible = "ti,omap3-prm" },
+>> +	{ .compatible = "ti,omap3-cm" },
+>> +	{ .compatible = "ti,omap3-scrm" },
+>> +	{ .compatible = "ti,omap4-cm1" },
+>> +	{ .compatible = "ti,omap4-prm" },
+>> +	{ .compatible = "ti,omap4-cm2" },
+>> +	{ .compatible = "ti,omap4-scrm" },
+>> +	{ .compatible = "ti,omap5-prm" },
+>> +	{ .compatible = "ti,omap5-cm-core-aon" },
+>> +	{ .compatible = "ti,omap5-scrm" },
+>> +	{ .compatible = "ti,omap5-cm-core" },
+>> +	{ .compatible = "ti,dra7-prm" },
+>> +	{ .compatible = "ti,dra7-cm-core-aon" },
+>> +	{ .compatible = "ti,dra7-cm-core" },
+>> +	{ }
+>> +};
+>> +
+>> +static struct clk_hw_omap memmap_dummy_ck = {
+>> +	.flags = MEMMAP_ADDRESSING,
+>> +};
+>> +
+>> +static u32 prm_clk_readl(u32 *reg)
+>> +{
+>> +	return omap2_clk_readl(&memmap_dummy_ck, reg);
+>> +}
+>> +
+>> +static void prm_clk_writel(u32 val, u32 *reg)
+>> +{
+>> +	omap2_clk_writel(val, &memmap_dummy_ck, reg);
+>> +}
+>> +
+>> +static struct clk_ll_ops omap_clk_ll_ops = {
+>> +	.clk_readl = prm_clk_readl,
+>> +	.clk_writel = prm_clk_writel,
+>> +};
+>> +
+>> +int __init of_prcm_init(void)
+>> +{
+>> +	struct device_node *np;
+>> +	void __iomem *mem;
+>> +	int memmap_index = 0;
+>> +
+>> +	ti_clk_ll_ops = &omap_clk_ll_ops;
+>> +
+>> +	for_each_matching_node(np, omap_prcm_dt_match_table) {
+>> +		mem = of_iomap(np, 0);
+>> +		clk_memmaps[memmap_index] = mem;
+>> +		ti_dt_clk_init_provider(np, memmap_index);
+>> +		memmap_index++;
+>> +	}
+>> +
+>> +	ti_dt_clockdomains_setup();
+>> +
+>> +	return 0;
+>> +}
+>> --
+>> 1.7.9.5
+>>
+>
+>
+> - Paul
+>
