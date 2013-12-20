@@ -1,37 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 19 Dec 2013 22:21:15 -0500
-Subject: [PATCH 1/4] Phy: DT binding documentation for Marvell MVEBU
- SATA phy.
-In-Reply-To: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
-References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20131220032115.GD2609@titan.lakedaemon.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 19 Dec 2013 19:21:33 -0800
+Subject: [PATCH 2/4] misc: xgene: Add base driver for APM X-Gene SoC
+ Queue Manager/Traffic Manager
+In-Reply-To: <1387507503-7565-3-git-send-email-rapatel@apm.com>
+References: <1387507503-7565-1-git-send-email-rapatel@apm.com>
+ <1387507503-7565-3-git-send-email-rapatel@apm.com>
+Message-ID: <20131220032133.GB32310@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 09:21:49PM +0100, Andrew Lunn wrote:
-> Describe the binding for the Marvell MVEBU SATA phy. This driver
-> can be used at least with Kirkwood, Dove and maybe others.
-> Additionally, update the SATA binding with the properties to link
-> to the phy nodes.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> v1->v2:
-> Correct #phy-cells
-> Correct number after @ to match first reg address.
-> Rename to phy-mvebu.txt
-> 
-> v2->v3:
-> Renamed to mvebu-phy.txt
-> Use "port0", "port1" instead of "0", "1"
-> ---
->  Documentation/devicetree/bindings/ata/marvell.txt  |  6 ++++++
->  .../devicetree/bindings/phy/mvebu-phy.txt          | 22 ++++++++++++++++++++++
->  2 files changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/mvebu-phy.txt
+On Thu, Dec 19, 2013 at 06:45:01PM -0800, Ravi Patel wrote:
+> This patch adds APM X-Gene SoC Queue Manager/Traffic Manager base driver.
+>  QMTM is requried by Ethernet, PktDMA and Security Engine subsystems.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+How does this driver talk to userspace?  Or is it just a "bus" for
+devices to attach to and use to talk to the real devices in the system?
+If so, why isn't it represented in the driver model?
 
-thx,
+thanks,
 
-Jason.
+greg k-h
