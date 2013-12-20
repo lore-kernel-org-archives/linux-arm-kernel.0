@@ -1,50 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Dec 2013 08:21:13 +0800
-Subject: [PATCH V1 1/7] ARM: dts: imx: pinfunc: add
- MX6QDL_PAD_GPIO_6__ENET_IRQ
-In-Reply-To: <52B34079.4000302@boundarydevices.com>
-References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
- <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
- <20131219050430.GS6691@S2101-09.ap.freescale.net>
- <52B34079.4000302@boundarydevices.com>
-Message-ID: <20131220002111.GE7172@S2101-09.ap.freescale.net>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 19 Dec 2013 19:21:36 -0500 (EST)
+Subject: [PATCH v2] net: mvmdio: fix interrupt timeout handling
+In-Reply-To: <1387458588-17231-1-git-send-email-leigh@solinno.co.uk>
+References: <52B2D97F.4070200@gmail.com>
+ <1387458588-17231-1-git-send-email-leigh@solinno.co.uk>
+Message-ID: <20131219.192136.1089859619183118911.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 11:52:41AM -0700, Troy Kisky wrote:
-> On 12/18/2013 10:04 PM, Shawn Guo wrote:
-> >On Wed, Dec 18, 2013 at 03:41:31PM -0700, Troy Kisky wrote:
-> >>Quoting from Ranjani Vaidyanathan
-> >>
-> >>All of the interrupts from the ENET block are not routed to
-> >>the GPC block. Hence ENET interrupts are not able to wake
-> >>up the SOC when the system is in WAIT mode. And the ENET
-> >>interrupt gets serviced only when another interrupt causes
-> >>the SOC to exit WAIT mode. This impacts the ENET performance.
-> >We should probably also quote the IMX6Q errata document below.
-> >
-> >  http://cache.freescale.com/files/32bit/doc/errata/IMX6DQCE.pdf?fpsp=1
-> >
-> >ERR006687 ENET: Only the ENET wake-up interrupt request can wake the
-> >system from Wait mode.
+From: Leigh Brown <leigh@solinno.co.uk>
+Date: Thu, 19 Dec 2013 13:09:48 +0000
+
+> This version corrects the whitespace issue.
 > 
-> Thanks for the link, I didn't know about rev 3. But since they say
-> pretty much the same
-> things, should I only quote the manual ?
-
-Sounds good.
-
+> orion_mdio_wait_ready uses wait_event_timeout to wait for the
+> SMI interrupt to fire.  wait_event_timeout waits for between
+> "timeout - 1" and "timeout" jiffies.  In this case a 1ms timeout
+> when HZ is 1000 results in a wait of 0 to 1 jiffies, causing
+> premature timeouts.
 > 
-> >>Adding MX6QDL_PAD_GPIO_6__ENET_IRQ is the 1st step to
-> >>workaround this problem.
-> >>
-> >>The input reg is set to 0x3c to set IOMUX_OBSRV_MUX1 to ENET_IRQ.
-> >It seems this is an undocumented register?  Is the info available
-> >somewhere?
+> This fix ensures a minimum timeout of 2 jiffies, ensuring
+> wait_event_timeout will always wait at least 1 jiffie.
 > 
-> I'm the wrong person to ask. The only reference I've seen are patches.
-> Mode 1 for GPIO_6 isn't documented either.
+> Issue reported by Nicolas Schichan.
+> 
+> Tested-by: Nicolas Schichan <nschichan@freebox.fr>
+> Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
 
-Ok.  Just make sure I do not miss any public document.
+Applied, and queued up for -stable.
 
-Shawn
+I wonder how many other wait_event_timeout() users potentially have
+this problem.
