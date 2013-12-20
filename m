@@ -1,176 +1,53 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 20 Dec 2013 11:45:41 +0100
-Subject: [PATCH 2/2] clocksource: TCLIB: Allow higher clock rates for clock
- events
-In-Reply-To: <1387536341-7452-1-git-send-email-bigeasy@linutronix.de>
-References: <1387536341-7452-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1387536341-7452-3-git-send-email-bigeasy@linutronix.de>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 20 Dec 2013 16:16:02 +0530
+Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
+In-Reply-To: <20131220102542.GJ27787@ulmo.nvidia.com>
+References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
+ <1387469182-14398-2-git-send-email-treding@nvidia.com>
+ <52B355EC.9040306@wwwdotorg.org> <52B3E968.8090906@nvidia.com>
+ <20131220102542.GJ27787@ulmo.nvidia.com>
+Message-ID: <52B41FEA.7020608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benedikt Spranger <b.spranger@linutronix.de>
+On Friday 20 December 2013 03:55 PM, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Fri, Dec 20, 2013 at 12:23:28PM +0530, Laxman Dewangan wrote:
+>> On Friday 20 December 2013 01:54 AM, Stephen Warren wrote:
+>>> On 12/19/2013 09:06 AM, Thierry Reding wrote:
+>>> (Laxman, as an aside, I'm not sure why you're upstreaming patches that
+>>> don't exactly match the existing kernel support for this board...)
+>> I did not get this based on what context it is. Can you please elaborate
+>> where I am missing the stuff?
+>>
+>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+>>>> +				sd0 {
+>>>> +					regulator-name = "vdd_cpu";
+>>>> +					regulator-min-microvolt = <700000>;
+>>>> +					regulator-max-microvolt = <1350000>;
+>>> Laxman's patch has:
+>>>
+>>>   					regulator-max-microvolt = <1400000>;
+>> We have the Laguna platform on which Android and L4T is running fine. This
+>> is based on same PMIC used for Venice2. As we are running the more cpu
+>> stress on Laguna, I took this parameter from the Laguna Power tree where it
+>> is maximum 1.4V. Chrome have maximum as 1.35mV.
+> Whether this is used on Android, ChromeOS or L4T doesn't matter at all.
+> It specifies hardware constraints and thus must be agnostic of the OS
+> and workload.
+>
+> Also this file describes the power tree for Venice2, so using values
+> from Laguna is wrong, no matter how similar they are.
+>
 
-As default the TCLIB uses the 32KiHz base clock rate for clock events.
-Add a compile time selection to allow higher clock resulution.
-
-(fixed up by Sami Pietik?inen <Sami.Pietikainen@wapice.com> around v3.12)
-
-Signed-off-by: Benedikt Spranger <b.spranger@linutronix.de>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-[bigeasy: update against v3.13-rc4]
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- drivers/clocksource/tcb_clksrc.c | 37 ++++++++++++++++++++++---------------
- drivers/misc/Kconfig             | 12 ++++++++++--
- 2 files changed, 32 insertions(+), 17 deletions(-)
-
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 00fdd11..df62eaa 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -23,8 +23,7 @@
-  *     this 32 bit free-running counter. the second channel is not used.
-  *
-  *   - The third channel may be used to provide a 16-bit clockevent
-- *     source, used in either periodic or oneshot mode.  This runs
-- *     at 32 KiHZ, and can handle delays of up to two seconds.
-+ *     source, used in either periodic or oneshot mode.
-  *
-  * A boot clocksource and clockevent source are also currently needed,
-  * unless the relevant platforms (ARM/AT91, AVR32/AT32) are changed so
-@@ -74,6 +73,7 @@ static struct clocksource clksrc = {
- struct tc_clkevt_device {
- 	struct clock_event_device	clkevt;
- 	struct clk			*clk;
-+	u32				freq;
- 	void __iomem			*regs;
- };
- 
-@@ -82,13 +82,6 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
- 	return container_of(clkevt, struct tc_clkevt_device, clkevt);
- }
- 
--/* For now, we always use the 32K clock ... this optimizes for NO_HZ,
-- * because using one of the divided clocks would usually mean the
-- * tick rate can never be less than several dozen Hz (vs 0.5 Hz).
-- *
-- * A divided clock could be good for high resolution timers, since
-- * 30.5 usec resolution can seem "low".
-- */
- static u32 timer_clock;
- 
- static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
-@@ -111,11 +104,12 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		clk_prepare_enable(tcd->clk);
- 
--		/* slow clock, count up to RC, then irq and restart */
-+		/* count up to RC, then irq and restart */
- 		__raw_writel(timer_clock
- 				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
- 				regs + ATMEL_TC_REG(2, CMR));
--		__raw_writel((32768 + HZ/2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-+		__raw_writel((tcd->freq + HZ / 2) / HZ,
-+				tcaddr + ATMEL_TC_REG(2, RC));
- 
- 		/* Enable clock and interrupts on RC compare */
- 		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-@@ -128,7 +122,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		clk_prepare_enable(tcd->clk);
- 
--		/* slow clock, count up to RC, then irq and stop */
-+		/* count up to RC, then irq and stop */
- 		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
- 				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
- 				regs + ATMEL_TC_REG(2, CMR));
-@@ -157,8 +151,12 @@ static struct tc_clkevt_device clkevt = {
- 		.name		= "tc_clkevt",
- 		.features	= CLOCK_EVT_FEAT_PERIODIC
- 					| CLOCK_EVT_FEAT_ONESHOT,
-+#ifdef CONFIG_ATMEL_TCB_CLKSRC_USE_SLOW_CLOCK
- 		/* Should be lower than at91rm9200's system timer */
- 		.rating		= 125,
-+#else
-+		.rating		= 200,
-+#endif
- 		.set_next_event	= tc_next_event,
- 		.set_mode	= tc_mode,
- 	},
-@@ -184,8 +182,9 @@ static struct irqaction tc_irqaction = {
- 	.handler	= ch2_irq,
- };
- 
--static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
-+static int __init setup_clkevents(struct atmel_tc *tc, int divisor_idx)
- {
-+	unsigned divisor = atmel_tc_divisors[divisor_idx];
- 	int ret;
- 	struct clk *t2_clk = tc->clk[2];
- 	int irq = tc->irq[2];
-@@ -200,7 +199,11 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- 	clkevt.clk = t2_clk;
- 	tc_irqaction.dev_id = &clkevt;
- 
--	timer_clock = clk32k_divisor_idx;
-+	timer_clock = divisor_idx;
-+	if (!divisor)
-+		clkevt.freq = 32768;
-+	else
-+		clkevt.freq = clk_get_rate(t2_clk) / divisor;
- 
- 	clkevt.clkevt.cpumask = cpumask_of(0);
- 
-@@ -208,7 +211,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- 	if (ret)
- 		return ret;
- 
--	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
-+	clockevents_config_and_register(&clkevt.clkevt, clkevt.freq, 1, 0xffff);
- 
- 	return ret;
- }
-@@ -345,7 +348,11 @@ static int __init tcb_clksrc_init(void)
- 		goto err_disable_t1;
- 
- 	/* channel 2:  periodic and oneshot timer support */
-+#ifdef CONFIG_ATMEL_TCB_CLKSRC_USE_SLOW_CLOCK
- 	ret = setup_clkevents(tc, clk32k_divisor_idx);
-+#else
-+	ret = setup_clkevents(tc, best_divisor_idx);
-+#endif
- 	if (ret)
- 		goto err_unregister_clksrc;
- 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index a3e291d..4a7d7d6 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -78,8 +78,7 @@ config ATMEL_TCB_CLKSRC
- 	  are combined to make a single 32-bit timer.
- 
- 	  When GENERIC_CLOCKEVENTS is defined, the third timer channel
--	  may be used as a clock event device supporting oneshot mode
--	  (delays of up to two seconds) based on the 32 KiHz clock.
-+	  may be used as a clock event device supporting oneshot mode.
- 
- config ATMEL_TCB_CLKSRC_BLOCK
- 	int
-@@ -93,6 +92,15 @@ config ATMEL_TCB_CLKSRC_BLOCK
- 	  TC can be used for other purposes, such as PWM generation and
- 	  interval timing.
- 
-+config ATMEL_TCB_CLKSRC_USE_SLOW_CLOCK
-+	bool "TC Block use 32 KiHz clock"
-+	depends on ATMEL_TCB_CLKSRC
-+	default y
-+	help
-+	  Select this to use 32 KiHz base clock rate as TC block clock
-+	  source for clock events.
-+
-+
- config DUMMY_IRQ
- 	tristate "Dummy IRQ handler"
- 	default n
--- 
-1.8.5.1
+Here, I used term "similar" means the which rail is feeding to Tegra's 
+which vdd?
+So by this, if AMS SD0 is feeding to Tegra vdd-cpu then it should be 
+same for Laguna.
+This is maximum possible for Tegra cpu  from PMIC. Tegra can use desired 
+voltage limited to this max based on their sku for going to maximum 
+frequency.
+If we program less voltage as maximum then Tegra will not go to higher 
+frequency assuming PMIC limitation which is not correct.
