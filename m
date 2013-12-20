@@ -1,53 +1,62 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 20 Dec 2013 12:02:30 +0530
-Subject: [PATCH V2 2/2] ARM: tegra: add ams AS3722 device to Venice2 DT
-In-Reply-To: <52B33986.5020508@wwwdotorg.org>
-References: <1387371179-16725-1-git-send-email-ldewangan@nvidia.com>
- <1387371179-16725-2-git-send-email-ldewangan@nvidia.com>
- <52B20BB4.50506@wwwdotorg.org> <52B2A01D.2000207@nvidia.com>
- <52B33986.5020508@wwwdotorg.org>
-Message-ID: <52B3E47E.7070508@nvidia.com>
+From: a0393675@ti.com (Keerthy)
+Date: Fri, 20 Dec 2013 12:22:16 +0530
+Subject: [PATCHv11 00/49] ARM: TI SoC clock DT conversion
+In-Reply-To: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+Message-ID: <52B3E920.5090305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 December 2013 11:53 PM, Stephen Warren wrote:
-> On 12/19/2013 12:28 AM, Laxman Dewangan wrote:
->> On Thursday 19 December 2013 02:25 AM, Stephen Warren wrote:
->>> On 12/18/2013 05:52 AM, Laxman Dewangan wrote:
->>>> Add ams AS3722 entry for gpio/pincontrol and regulators
->>>> to venice2 DT.
->>> This patch still causes:
->>>
->>>> [    0.726545] as3722-pinctrl as3722-pinctrl: pin gpio0 already
->>>> requested by as3722-pinctrl; cannot claim for as3722-regulator
->>>> [    0.737681] as3722-pinctrl as3722-pinctrl: pin-0
->>>> (as3722-regulator) status -22
->>>> [    0.744895] as3722-pinctrl as3722-pinctrl: could not request pin 0
->>>> (gpio0) from group gpio0  on device as3722-pinctrl
->>>> [    0.755500] as3722-regulator as3722-regulator: Error applying
->>>> setting, reverse things back
->> This error is nothing related to the ams dt or driver. This came from
->> the framework from the driver/base for adding pinmux call before calling
->> any diver's probe.
-> OK, after reverting the problematic MFD commit (which I assume will
-> happen upstream too), I see no errors caused by this patch.
+Hi Tero,
+
+On Thursday 19 December 2013 04:53 PM, Tero Kristo wrote:
+> Hi,
 >
-> As such, I've applied the series to Tegra's for-3.14/dt branch.
-Thanks for taking care.
-
+> So, once again new series. I guess I should have addressed all comments
+> for v10 except the extern sharing of __clk_of_table. Based on discussion
+> with Mike, this should be fine to fix later.
 >
-> Note that I couldn't verify if the pinctrl setup in patch 1/2 matched
-> the ChromeOS kernel, since the node order is different there, and the
-> property values don't use named constants there. I'll have to trust you.
-> I'll be annoyed if it turns out we need to churn the pinctrl
-> configuration in the future...
+> Main changes compared to v10:
+> - rebased on top of 3.13-rc4
+> - applied clk_desc support from Mike, did some cleanups and additions to that
+>    * needed for below item, clk_ll_ops
+> - added support for clk_ll_ops, and removed SoC wide clock ops
+>    * used for wrapping the IP block specific register access routines now
+> - removed need for separate init function types because of above two points,
+>    TI clocks also use the standard prototype now, no return value needed
+> - cleaned up the init retry logic for TI clocks a bit (DPLL/APLL)
+> - added clocks {} and clockdomains {} nodes under the master clock IP nodes,
+>    which are used to group clocks and domains accordingly
+> - changed compatible strings for clock master IPs from ti,clock-master to
+>    something of form ti,omap4-prm etc.
+>
+> omap3 legacy clock data is not removed with this series, this can be done
+> later (basically I want someone to test all the possible omap3 boards out
+> there with DT boot before attempting this.)
+>
+> Testing done:
+> - omap3-beagle: boot, suspend-resume (ret), suspend-resume (off)
+> - omap4-panda-es: boot, suspend-resume (ret)
+> - omap5-uevm: boot
+> - dra7-evm: boot
+> - am335x-bone: boot
 
-I referred the configuration from chrome branch. I assume that good 
-amount of testing has already been done on this configuration.
-I manually check all configuration and run chrome on this change which 
-works properly. Did not see any abnormal behavior.
-So if something missed then it is just human error which did not catch 
-on 2 level of self review.
+I boot tested the branch '3.13-rc4-dt-clks-v11' on am43x-epos-evm
+and it boots fine after enabling am43x system type.
 
-Again  any change on this configuration can be expected based on new 
-testing or bringung new modules.
+> Branches again available here:
+> https://github.com/t-kristo/linux-pm.git
+>
+> branch: 3.13-rc4-dt-clks-v11 : contains everything, shall me merged last
+> branch: 3.13-rc4-dt-clks-v11-for-mike : drivers/clk changes
+> branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only
+>
+> -Tero
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Regards,
+Keerthy
