@@ -1,41 +1,26 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 20 Dec 2013 11:50:17 +0800
-Subject: [PATCH RESEND] clk: divider: read before write for HIWORD mask
-Message-ID: <1387511417-8573-1-git-send-email-haojian.zhuang@gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 20 Dec 2013 09:28:24 +0530
+Subject: [PATCH Resend 01/10] clk: bcm2835: Remove duplicate inclusion of
+ clk-provider.h
+In-Reply-To: <20131220015900.18119.89845@quantum>
+References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHwSQd-Gd5dMPYib8FswdutkpaFxfpe2wezGh1Vu7pm7JQ@mail.gmail.com>
+ <20131220015900.18119.89845@quantum>
+Message-ID: <CAK9yfHwq5yWgtpGzKiWTMTJc5RwXE8Vs583ueX6X0Q1uyKYZMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When multiple dividers share one register, we need to read & mask
-register fist. Then we set the right value.
+On 20 December 2013 07:29, Mike Turquette <mturquette@linaro.org> wrote:
+>>
+>> Mike,
+>>
+>> Any chance getting this series picked up?
+>
+> Thanks for re-ping me on this! Taken into clk-next.
 
-For example, there're two mmc clock dividers shared in one registers.
-The clock register is HIWORD type.
+Thanks Mike. But the below patch seems missing in your tree.
+http://permalink.gmane.org/gmane.linux.ports.arm.kernel/271627
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/clk/clk-divider.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 8d3009e..e1ea289 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -227,12 +227,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (divider->lock)
- 		spin_lock_irqsave(divider->lock, flags);
- 
--	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
--		val = div_mask(divider) << (divider->shift + 16);
--	} else {
--		val = clk_readl(divider->reg);
--		val &= ~(div_mask(divider) << divider->shift);
--	}
-+	val = clk_readl(divider->reg);
-+	val &= ~(div_mask(divider) << divider->shift);
-+	if (divider->flags & CLK_DIVIDER_HIWORD_MASK)
-+		val |= div_mask(divider) << (divider->shift + 16);
- 	val |= value << divider->shift;
- 	clk_writel(val, divider->reg);
- 
 -- 
-1.8.3.2
+With warm regards,
+Sachin
