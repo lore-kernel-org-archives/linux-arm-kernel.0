@@ -1,54 +1,20 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 20 Dec 2013 20:04:08 +0800
-Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
-In-Reply-To: <1386703583-8386-1-git-send-email-marex@denx.de>
-References: <1386703583-8386-1-git-send-email-marex@denx.de>
-Message-ID: <20131220120408.GA31738@gondor.apana.org.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 Dec 2013 12:05:35 +0000
+Subject: [PATCH v2 1/5] arm64: Remove unused __data_loc variable
+In-Reply-To: <1386980413.1002.94.camel@smoke>
+References: <cover.1386879684.git.geoff@infradead.org>
+ <1386980413.1002.94.camel@smoke>
+Message-ID: <20131220120535.GI25477@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
-> When finishing the ahash request, the ahash_op_unaligned_done() will
-> call complete() on the request. Yet, this will not call the correct
-> complete callback. The correct complete callback was previously stored
-> in the requests' private data, as seen in ahash_op_unaligned(). This
-> patch restores the correct complete callback and .data field of the
-> request before calling complete() on it.
+On Sat, Dec 14, 2013 at 12:20:13AM +0000, Geoff Levand wrote:
+> The __data_loc variable is an unused left over from the 32 bit arm implementation.
+> Remove that variable and adjust the __mmap_switched startup routine accordingly.
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: linux-crypto at vger.kernel.org
-> ---
->  crypto/ahash.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/crypto/ahash.c b/crypto/ahash.c
-> index 793a27f..a92dc38 100644
-> --- a/crypto/ahash.c
-> +++ b/crypto/ahash.c
-> @@ -213,7 +213,10 @@ static void ahash_op_unaligned_done(struct crypto_async_request *req, int err)
->  
->  	ahash_op_unaligned_finish(areq, err);
->  
-> -	complete(data, err);
-> +	areq->base.complete = complete;
-> +	areq->base.data = data;
-> +
-> +	complete(&areq->base, err);
+> Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
 
-This looks completely bogus.  While restoring areq isn't wrong per
-se, calling complete with &areq->base makes no sense.  The original
-completion data is in the variable "data".
+Applied. Thanks.
 
-Which driver relies on this behaviour?
-
-Also, does your subsequent patches rely on this?
-
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Catalin
