@@ -1,17 +1,89 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 20 Dec 2013 09:11:42 -0700
-Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
-In-Reply-To: <20131220142530.GK3709@lee--X1>
-References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
- <20131211092435.GC16780@lee--X1> <52B32C05.5010204@wwwdotorg.org>
- <20131220142530.GK3709@lee--X1>
-Message-ID: <52B46C3E.7010201@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 20 Dec 2013 11:16:12 -0500
+Subject: [GIT PULL 1/3] ARM: keystone: device tree updates for 3.14
+In-Reply-To: <87a9fvikqt.fsf@linaro.org>
+References: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
+ <8761qkjvf5.fsf@linaro.org> <52B38968.5070509@ti.com>
+ <87a9fvikqt.fsf@linaro.org>
+Message-ID: <52B46D4C.7030908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2013 07:25 AM, Lee Jones wrote:
-> Hi Stephen,
+On Friday 20 December 2013 10:51 AM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> Please let me know if this is suitable and I can keep your Ack.
-
-Yes, that patch is good. Thanks.
+>> Kevin,
+>>
+>> On Thursday 19 December 2013 06:03 PM, Kevin Hilman wrote:
+>>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>>
+>>>> Arnd, Olof, Kevin,
+>>>>
+>>>> Please pull below keystone device tree updates for 3.14
+>>>>
+>>>> Regards,
+>>>> Santosh
+>>>>
+>>>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>>>
+>>>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
+>>>>
+>>>> for you to fetch changes up to 732079567da4942b7b4929deff8f236926d0b3eb:
+>>>>
+>>>>   ARM: dts: keystone: Add usb devicetree bindings (2013-12-12 20:29:17 -0500)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Keystone DTS updates for 3.14
+>>>>
+>>>> - ddr3 pll clock node typo fixup.
+>>>> - EVM specific clock setting with board k2hk-evm.dts.
+>>>> - GIC node updates for missing virtualisation info.
+>>>> - Adding USB dwc3 and phy nodes.
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Murali Karicheri (3):
+>>>>       ARM: keystone: dts: add a k2hk-evm specific dts file
+>>>>       ARM: keystone: dts: fix typo in the ddr3 pllclk node name
+>>>>       ARM: keystone: dts: add paclk divider clock node
+>>>>
+>>>> Santosh Shilimkar (2):
+>>>>       ARM: dts: keystone: Add the GICV and GICH address space
+>>>>       ARM: dts: keystone: Add guestos maintenance interrupt
+>>>>
+>>>> WingMan Kwok (2):
+>>>>       ARM: dts: keystone: Add usb phy devicetree bindings
+>>>>       ARM: dts: keystone: Add usb devicetree bindings
+>>>
+>>> I'm not willing to pull these new bindings.
+>>>
+>>> These new bindings don't have an ack from DT maintainers, and from a
+>>> quick scan of the archives, don't appear to have ever been posted to the
+>>> DT list.  If they had been posted to the DT list, and hadn't had a
+>>> response after 2 weeks, it would've been OK for you to queue them up for
+>>> us, but as it stands they haven't even been posted for the attention of
+>>> the DT maintainers.  Please remedy that.  Thanks.
+>>>
+>> Not sure if you got confused because of the subject line on couple
+>> of patches. There are no new dt bindings in $subject pull request.
+>> Its all just updating the machine dts files for existing bindings.
+>> And hence explicitly not sent for device tree list.
+>>
+>> I have some more dt patches which adds new bindings which has been
+>> getting reviewed with dt folks. And since they are not yet acked,
+>> i haven't included them in the series.
+>>
+>> Can you please check one more time and let me know if I am missing
+>> something ?
+> 
+> It was the creation of new files in Documentation/devicetree/bindings
+> that I saw with no review/ack etc. that I was referring to.  Having a
+> closer look, I see they're just adding documentation for SoC specific
+> parts of existing bindings, so we can merge those.
+> 
+> Pulled into next/dt.
+> 
+Thanks Kevin !!
