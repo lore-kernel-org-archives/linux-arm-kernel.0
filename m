@@ -1,81 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 Dec 2013 19:35:22 +0800
-Subject: [PATCH 1/2] ARM: AT91: PIT: Remove irq handler when clock event
- is unused
-In-Reply-To: <1387536341-7452-2-git-send-email-bigeasy@linutronix.de>
-References: <1387536341-7452-1-git-send-email-bigeasy@linutronix.de>
- <1387536341-7452-2-git-send-email-bigeasy@linutronix.de>
-Message-ID: <BB6D8A98-942B-4B2E-A668-5D47DDC0DBF7@jcrosoft.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 20 Dec 2013 17:08:48 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
+In-Reply-To: <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
+References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
+ <2459303.277Jr8aotM@amdc1032>
+ <CAM4voamU5hc7uC5MTOA7OtYuqpsis7cTX3sx0UrmpdZx7_TpzA@mail.gmail.com>
+ <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
+Message-ID: <CAM4voamD4Cj594fbkciNS32U7PSkByxakZmjPnhFo0mpCj8hug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACK
-On Dec 20, 2013, at 6:45 PM, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+Hi Sunil,
 
-> From: Benedikt Spranger <b.spranger@linutronix.de>
-> 
-> Setup and remove the interrupt handler in clock event mode selection.
-> This avoids calling the (shared) interrupt handler when the device is
-> not used.
-> 
-> Signed-off-by: Benedikt Spranger <b.spranger@linutronix.de>
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> [bigeasy: redo the patch with NR_IRQS_LEGACY which is probably required since
-> commit 8fe82a55 ("ARM: at91: sparse irq support") which is included since v3.6.
-> Patch based on what Sami Pietik?inen <Sami.Pietikainen@wapice.com> suggested].
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
-> arch/arm/mach-at91/at91rm9200_time.c  | 1 +
-> arch/arm/mach-at91/at91sam926x_time.c | 5 ++++-
-> 2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> index bc7b363..fd34d55 100644
-> --- a/arch/arm/mach-at91/at91rm9200_time.c
-> +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> @@ -134,6 +134,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-> 		break;
-> 	case CLOCK_EVT_MODE_SHUTDOWN:
-> 	case CLOCK_EVT_MODE_UNUSED:
-> +		remove_irq(NR_IRQS_LEGACY + AT91_ID_SYS, &at91rm9200_timer_irq);
+On Fri, Dec 20, 2013 at 3:56 PM, sunil joshi <sjoshi.open@gmail.com> wrote:
+> Hi Abhilash,
+> I saw another patch in chrome tree ..by Andrew Bresticker
+> which may be relevant here ..
+>
+> Just wondering if you missed adding this ? or this is not needed ?
+> You did not face any issue in getting core to suspend ?
 
-I?m a fan of copy and paste NR_IRQS_LEGACY + AT91_ID_SYS but ok
+This has not been added for Exynos5250 in mainline yet. We did notice
+that the system would fail to suspend on the rare occasion (~1% of the
+time on exynos5250) when we repeatedly suspended and resumed the
+system.
 
-Best Regards,
-J.
-> 	case CLOCK_EVT_MODE_RESUME:
-> 		irqmask = 0;
-> 		break;
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index bb39232..1c4c487 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -77,7 +77,7 @@ static struct clocksource pit_clk = {
-> 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> };
-> 
-> -
-> +static struct irqaction at91sam926x_pit_irq;
-> /*
->  * Clockevent device:  interrupts every 1/HZ (== pit_cycles * MCK/16)
->  */
-> @@ -86,6 +86,8 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-> {
-> 	switch (mode) {
-> 	case CLOCK_EVT_MODE_PERIODIC:
-> +		/* Set up irq handler */
-> +		setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
-> 		/* update clocksource counter */
-> 		pit_cnt += pit_cycle * PIT_PICNT(pit_read(AT91_PIT_PIVR));
-> 		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN
-> @@ -98,6 +100,7 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-> 	case CLOCK_EVT_MODE_UNUSED:
-> 		/* disable irq, leaving the clocksource active */
-> 		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-> +		remove_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
-> 		break;
-> 	case CLOCK_EVT_MODE_RESUME:
-> 		break;
-> -- 
-> 1.8.5.1
-> 
+I have not run s2r stress tests, but have had no issues suspending the
+system in my limited testing. We can probably let this be for now as
+the system would resume fine even on a failed suspend. I will do some
+stress testing and then post if needed.
+>
+> ------------------------------------------------------------------------------------------
+> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
+> Author: Andrew Bresticker <abrestic@chromium.org>
+> Date:   Mon Jul 15 13:14:36 2013 -0700
+>
+>     arm: exynos: disable all interrupts on Exynos5420 before suspend
+>
+>     Disable all interrupts from the GIC before entering suspend on
+>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
+>     may receive an interrupt after entering WFI but before the PMU has
+>     suspended the system, causing suspend to fail.
+>
+>     BUG=chrome-os-partner:20523
+>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
+>     no longer occasionally fails with the "Failed to suspend the system"
+>     error in exynos_cpu_suspend().
+>
+>     Change-Id: Ia2d963191f4e5485beb295b28f128f2ce256f987
+>     Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>     Reviewed-on: https://gerrit.chromium.org/gerrit/61948
+>     Reviewed-by: Simon Glass <sjg@chromium.org>
+>
+
+Regards,
+Abhilash
+_______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
