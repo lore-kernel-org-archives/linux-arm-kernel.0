@@ -1,48 +1,46 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Dec 2013 12:53:03 +0100
-Subject: [PATCH 10/10] ARM: tegra: Enable USB on Venice2
-In-Reply-To: <52B36720.8080205@wwwdotorg.org>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-11-git-send-email-treding@nvidia.com>
- <52B36720.8080205@wwwdotorg.org>
-Message-ID: <20131220115302.GN27787@ulmo.nvidia.com>
+Date: Fri, 20 Dec 2013 12:54:26 +0100
+Subject: [PATCH 05/10] ARM: tegra: Add Tegra114 DSI support
+In-Reply-To: <52B34FC2.5010409@wwwdotorg.org>
+References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
+ <1387468774-14216-6-git-send-email-treding@nvidia.com>
+ <52B34FC2.5010409@wwwdotorg.org>
+Message-ID: <20131220115426.GO27787@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 02:37:36PM -0700, Stephen Warren wrote:
-> On 12/19/2013 09:06 AM, Thierry Reding wrote:
-> > USB1 and USB3 are routed to two external connectors, while USB2 is used
-> > for the integrated webcam.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > Note: connecting a USB mouse to USB3 works properly and lsusb also detects
-> > the integrated webcam, though I haven't tested whether the camera actually
-> > works.
-> > 
-> > USB1 doesn't seem to work, but I suspect that might just be because it's
-> > used for recovery mode and we can't switch it around at runtime yet.
+On Thu, Dec 19, 2013 at 12:57:54PM -0700, Stephen Warren wrote:
+> On 12/19/2013 08:59 AM, Thierry Reding wrote:
+> > Add device tree nodes for the DSI controllers found on Tegra114 SoCs.
 > 
-> The two regulators you added don't actually hook up to any GPIOs for
-> control of VBUS, so perhaps this isn't surprising. The regulators added
-> for VBUS control by Laxman's patch (which I already applied) *do* have
-> some gpio properties. However, testing indicates:
+> > diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
 > 
-> * With Laxman's patch applied, and your patch 1/10 not applied since
-> it's a duplicate, this patch doesn't work, i.e. I see no USB devices.
+> > +		dsi at 54300000 {
+> > +			compatible = "nvidia,tegra114-dsi";
+> > +			reg = <0x54300000 0x00040000>;
+> > +			clocks = <&tegra_car TEGRA114_CLK_DSIA>,
+> > +				 <&tegra_car TEGRA114_CLK_DSIALP>,
+> > +				 <&tegra_car TEGRA114_CLK_PLL_D_OUT0>;
+> > +			clock-names = "dsi", "lp", "parent";
 > 
-> * With Laxman's patch reverted and your patch 1/10 replacing it, I do
-> see USB devices, and they work. However, then we're not actually
-> controlling VBUS, so USB1 doesn't work.
+> The binding document
+> Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt doesn't
+> mention an "lp" clock:
 > 
-> Can you please rebase this whole series on the latest Tegra for-3.14/dt
-> and sort out the issues? Thanks.
+>   - clock-names: Must include the following entries:
+>     - dsi
+>       This MUST be the first entry.
+>     - parent
+> 
+> I assume this is simply an oversight, since this is an obvious extension
+> of the binding, and that the DT binding will be updated to include that
+> clock in the list, and hence won't block applying the series because of
+> this.
 
-I've looked into this a bit, but I don't see why it isn't working. The
-PN4 and PN5 are the correct GPIOs for USB1 and USB3 VBUS, but hooking
-them up indeed breaks things. For some reason adding those even causes
-the camera on USB2 to not work properly.
+Yes, that was merely an oversight. I've updated the DT binding to
+include the lp clock.
 
+Thanks,
 Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -50,4 +48,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/5f19b4d9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/95b2315e/attachment.sig>
