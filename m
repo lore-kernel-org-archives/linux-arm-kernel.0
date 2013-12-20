@@ -1,130 +1,125 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 20 Dec 2013 11:47:11 -0700
-Subject: [PATCH V2 5/7] ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
- interrupt.
+Date: Fri, 20 Dec 2013 11:47:08 -0700
+Subject: [PATCH V2 2/7] ARM: dts: imx6qdl: add pingroups for enet with GPIO6
+ interrupt
 In-Reply-To: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387565233-16144-6-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387565233-16144-3-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This works around a hardware bug.
->From "Chip Errata for the i.MX 6Dual/6Quad"
+Most boards will want this hardware work-around so
+add new pingroups.
 
-ERR006687 ENET: Only the ENET wake-up interrupt request can wake the
-system from Wait mode.
-
-The ENET block generates many interrupts. Only one of these interrupt lines
-is connected to the General Power Controller (GPC) block, but a logical OR
-of all of the ENET interrupts is connected to the General Interrupt Controller
-(GIC). When the system enters Wait mode, a normal RX Done or TX Done does not
-wake up the system because the GPC cannot see this interrupt. This impacts
-performance of the ENET block because its interrupts are serviced only when
-the chip exits Wait mode due to an interrupt from some other wake-up source.
-
-Before this patch, ping times of a Sabre Lite board are quite
-random:
-ping 192.168.0.13 -i.5 -c5
-PING 192.168.0.13 (192.168.0.13) 56(84) bytes of data.
-64 bytes from 192.168.0.13: icmp_req=1 ttl=64 time=15.7 ms
-64 bytes from 192.168.0.13: icmp_req=2 ttl=64 time=14.4 ms
-64 bytes from 192.168.0.13: icmp_req=3 ttl=64 time=13.4 ms
-64 bytes from 192.168.0.13: icmp_req=4 ttl=64 time=12.4 ms
-64 bytes from 192.168.0.13: icmp_req=5 ttl=64 time=11.4 ms
-
---- 192.168.0.13 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 2004ms
-rtt min/avg/max/mdev = 11.431/13.501/15.746/1.508 ms
-____________________________________________________
-After this patch:
-
-ping 192.168.0.13 -i.5 -c5
-PING 192.168.0.13 (192.168.0.13) 56(84) bytes of data.
-64 bytes from 192.168.0.13: icmp_req=1 ttl=64 time=0.120 ms
-64 bytes from 192.168.0.13: icmp_req=2 ttl=64 time=0.175 ms
-64 bytes from 192.168.0.13: icmp_req=3 ttl=64 time=0.169 ms
-64 bytes from 192.168.0.13: icmp_req=4 ttl=64 time=0.168 ms
-64 bytes from 192.168.0.13: icmp_req=5 ttl=64 time=0.172 ms
-
---- 192.168.0.13 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 1999ms
-rtt min/avg/max/mdev = 0.120/0.160/0.175/0.026 ms
-____________________________________________________
-
-Also, apply same change to imx6qdl-nitrogen6x.
-
-This change may not be appropriate for all boards.
-Sabre Lite uses GPIO6 as a power down output for a ov5642
-camera. As this expansion board does not yet work with mainline,
-this is not yet a conflict. It would be nice to have an alternative
-fix for boards where this is a problem.
-
-For example Sabre SD uses GPIO6 for I2C3_SDA. It also
-has long ping times currently. But cannot use this fix
-without giving up a touchscreen.
-
-Its ping times are also random.
-
-ping 192.168.0.19 -i.5 -c5
-PING 192.168.0.19 (192.168.0.19) 56(84) bytes of data.
-64 bytes from 192.168.0.19: icmp_req=1 ttl=64 time=16.0 ms
-64 bytes from 192.168.0.19: icmp_req=2 ttl=64 time=15.4 ms
-64 bytes from 192.168.0.19: icmp_req=3 ttl=64 time=14.4 ms
-64 bytes from 192.168.0.19: icmp_req=4 ttl=64 time=13.4 ms
-64 bytes from 192.168.0.19: icmp_req=5 ttl=64 time=12.4 ms
-
---- 192.168.0.19 ping statistics ---
-5 packets transmitted, 5 received, 0% packet loss, time 2003ms
-rtt min/avg/max/mdev = 12.451/14.369/16.057/1.316 ms
+Also, add MX6QDL_ENET_PINGRP_RGMII macro so that other
+pingroups can use this.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-CC: ra5478 at freescale.com
 ---
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 3 +++
- 2 files changed, 6 insertions(+)
+ arch/arm/boot/dts/imx6qdl-pingrp.h | 77 ++++++++++++++++----------------------
+ 1 file changed, 33 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index 34145d1..e83ffc7 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -165,6 +165,8 @@
- 	txd1-skew-ps = <0>;
- 	txd2-skew-ps = <0>;
- 	txd3-skew-ps = <0>;
-+	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/imx6qdl-pingrp.h b/arch/arm/boot/dts/imx6qdl-pingrp.h
+index c9dd44c..082f0df 100644
+--- a/arch/arm/boot/dts/imx6qdl-pingrp.h
++++ b/arch/arm/boot/dts/imx6qdl-pingrp.h
+@@ -53,57 +53,37 @@
+ 	MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI		0x100b1 \
+ 	MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK		0x100b1
  
-@@ -211,6 +213,7 @@
- 				MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x100b0)
- 				/* Phy reset */
- 				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x000b0
-+				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
- 			>;
- 		};
++#define MX6QDL_ENET_PINGRP_RGMII(rx_pad, tx_pad) \
++	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			rx_pad \
++	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			rx_pad \
++	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			rx_pad \
++	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			rx_pad \
++	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			rx_pad \
++	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		rx_pad \
++	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			tx_pad \
++	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			tx_pad \
++	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			tx_pad \
++	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			tx_pad \
++	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			tx_pad \
++	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		tx_pad \
++	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		tx_pad
++
++#define MX6QDL_ENET_PINGRP_RGMII_MD(rx_pad, tx_pad)	\
++	MX6QDL_ENET_PINGRP_RGMII(rx_pad, tx_pad)	\
++	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			tx_pad \
++	MX6QDL_PAD_ENET_MDC__ENET_MDC			tx_pad
++
+ #define MX6QDL_ENET_PINGRP1 \
+-	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			0x1b0b0 \
+-	MX6QDL_PAD_ENET_MDC__ENET_MDC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
+-	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0 \
++	MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x1b0b0)	\
+ 	MX6QDL_PAD_GPIO_16__ENET_REF_CLK		0x4001b0a8
  
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 4d156f5..24c2c1b 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -164,6 +164,8 @@
- 	txd1-skew-ps = <0>;
- 	txd2-skew-ps = <0>;
- 	txd3-skew-ps = <0>;
-+	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+ #define MX6QDL_ENET_PINGRP2 \
++	MX6QDL_ENET_PINGRP_RGMII(0x1b0b0, 0x1b0b0)		\
+ 	MX6QDL_PAD_KEY_COL1__ENET_MDIO			0x1b0b0 \
+-	MX6QDL_PAD_KEY_COL2__ENET_MDC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
+-	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0
++	MX6QDL_PAD_KEY_COL2__ENET_MDC			0x1b0b0
  
-@@ -210,6 +212,7 @@
- 				MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x100b0)
- 				/* Phy reset */
- 				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
-+				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
- 			>;
- 		};
+ #define MX6QDL_ENET_PINGRP3 \
+-	MX6QDL_PAD_ENET_MDIO__ENET_MDIO			0x1b0b0 \
+-	MX6QDL_PAD_ENET_MDC__ENET_MDC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TXC__RGMII_TXC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD0__RGMII_TD0			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD1__RGMII_TD1			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD2__RGMII_TD2			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TD3__RGMII_TD3			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL		0x1b0b0 \
+-	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK		0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RXC__RGMII_RXC			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD0__RGMII_RD0			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD1__RGMII_RD1			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD2__RGMII_RD2			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RD3__RGMII_RD3			0x1b0b0 \
+-	MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL		0x1b0b0 \
++	MX6QDL_ENET_PINGRP_RGMII_MD(0x1b0b0, 0x1b0b0)	\
+ 	MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN		0x1b0b0
  
+ #define MX6QDL_ENET_PINGRP4 \
+@@ -117,6 +97,15 @@
+ 	MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1		0x1b0b0	\
+ 	MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN		0x1b0b0
+ 
++#define MX6QDL_ENET_PINGRP1_GPIO6	MX6QDL_ENET_PINGRP1 \
++	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
++
++#define MX6QDL_ENET_PINGRP2_GPIO6	MX6QDL_ENET_PINGRP2 \
++	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
++
++#define MX6QDL_ENET_PINGRP3_GPIO6	MX6QDL_ENET_PINGRP3 \
++	MX6QDL_PAD_GPIO_6__ENET_IRQ	0x000b1
++
+ #define MX6QDL_ESAI_PINGRP1 \
+ 	MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK		0x1b030 \
+ 	MX6QDL_PAD_ENET_CRS_DV__ESAI_TX_CLK		0x1b030 \
 -- 
 1.8.1.2
