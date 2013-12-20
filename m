@@ -1,98 +1,152 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 20 Dec 2013 09:08:51 +0100
-Subject: possible regression on 3.13 when calling flush_dcache_page
-In-Reply-To: <20131218072117.GA2383@lge.com>
-References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
- <20131212143618.GJ12099@ldesroches-Latitude-E6320>
- <20131213015909.GA8845@lge.com>
- <20131216144343.GD9627@ldesroches-Latitude-E6320>
- <20131218072117.GA2383@lge.com>
-Message-ID: <20131220080851.GC16592@ldesroches-Latitude-E6320>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 20 Dec 2013 00:12:07 -0800
+Subject: [PATCH 0/5] armv7 BE kvm support
+In-Reply-To: <1387524419-4216-1-git-send-email-victor.kamensky@linaro.org>
+References: <1387524419-4216-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131220081207.GA12233@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Dec 19, 2013 at 11:26:54PM -0800, Victor Kamensky wrote:
+> Hi Guys,
 
-On Wed, Dec 18, 2013 at 04:21:17PM +0900, Joonsoo Kim wrote:
-> On Mon, Dec 16, 2013 at 03:43:43PM +0100, Ludovic Desroches wrote:
-> > Hello,
-> > 
-> > On Fri, Dec 13, 2013 at 10:59:09AM +0900, Joonsoo Kim wrote:
-> > > On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
-> > > > fix mmc mailing list address error
-> > > > 
-> > > > On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > With v3.13-rc3 I have an error when the atmel-mci driver calls
-> > > > > flush_dcache_page (log at the end of the message).
-> > > > > 
-> > > > > Since I didn't have it before, I did a git bisect and the commit introducing
-> > > > > the error is the following one:
-> > > > > 
-> > > > > 106a74e slab: replace free and inuse in struct slab with newly introduced active
-> > > > > 
-> > > > > I don't know if this commit has introduced a bug or if it has revealed a bug
-> > > > > in the atmel-mci driver.
-> > > 
-> > > Hello,
-> > > 
-> > > I think that this commit may not introduce a bug. This patch remove one
-> > > variable on slab management structure and replace variable name. So there
-> > > is no functional change.
-> > > 
-> > 
-> > If I have reverted this patch and other ones you did on top of it and
-> > the issue disappear.
-> 
-> Hello,
-> 
-> Could you give me your '/proc/slabinfo' before/after this commit (106a74e)?
-> 
-> And how about testing with artificially increasing size of struct slab on
-> top of this commit (106a74e)?
-> 
-> I really wonder why the problem happens, because this doesn't cause any
-> functional change as far as I know. Only side-effect from this patch is
-> decreasing size of struct slab.
-
-Sorry I am not at the office, I have tried to reproduce it with a
-different device and a different sdcard but without success. I'll test
-it on Monday.
-
-Regards
-
-Ludovic
+Hi Victor,
 
 > 
-> Thanks.
+> Here is series that enables KVM support for V7 big endian kernels. Mostly
+> it deals with BE KVM host support. Marc Zyngier showed before with his patches
+> how BE guest could run on top LE host. With these patches BE guest runs on 
+> top of BE host. If Marc's kvmtool is used with few additional changes I tested
+> that BE host could run LE guest. Also I verified that there were no 
+> regressions in BE guest on top of LE host case.
+
+Can you please cc the kvmarm list as per the MAINTAINERS files for
+patches to kvm/arm in the future?
+
+Looking forward to reading your code!
+
+-Christoffer
+
 > 
-> diff --git a/mm/slab.c b/mm/slab.c
-> index 2ec2336..d2240fd 100644
-> --- a/mm/slab.c
-> +++ b/mm/slab.c
-> @@ -174,6 +174,7 @@ struct slab {
->         struct {
->                 struct list_head list;
->                 void *s_mem;            /* including colour offset */
-> +               unsigned int x;
->                 unsigned int active;    /* num of objs active in slab */
->         };
->  };
+> Note that posted series covers only kernel side changes. The changes were
+> tested inside of bigger setup with additional changes in qemu and kvmtool.
+> I will post those changes separately in proper aliases but for completeness 
+> sake Appendix A gives pointers to git repositories and branches with all
+> needed changes.
 > 
-> > 
-> > > I doubt that side-effect of this patch reveals a bug in other place.
-> > > Side-effect is reduced memory usage for slab management structure. It would
-> > > makes some slabs have more objects with more density since slab management
-> > > structure is sometimes on the page for objects. So if it diminishes, more
-> > > objects can be in the page.
-> > > 
-> > > Anyway, I will look at it more. If you have any progress, please let me know.
-> > 
-> > No progress at the moment.
+> Please note first patch is not related to BE KVM per se. I've run
+> into an issue of conflicting 'push' identifier use while trying to include 
+> assembler.h into KVM .S files. Details of an issue I observed covered in
+> Appendix B. The first patch is my take on solving it.
 > 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> Victor Kamensky (5):
+>   ARM: kvm: replace push and pop with stdmb and ldmia instrs to enable
+>     assembler.h inclusion
+>   ARM: fix KVM assembler files to work in BE case
+>   ARM: kvm one_reg coproc set and get BE fixes
+>   ARM: kvm vgic mmio should return data in BE format in BE case
+>   ARM: kvm MMIO support BE host running LE code
+> 
+>  arch/arm/include/asm/assembler.h   |  7 +++
+>  arch/arm/include/asm/kvm_asm.h     |  4 +-
+>  arch/arm/include/asm/kvm_emulate.h | 22 +++++++--
+>  arch/arm/kvm/coproc.c              | 94 ++++++++++++++++++++++++++++----------
+>  arch/arm/kvm/init.S                |  7 ++-
+>  arch/arm/kvm/interrupts.S          | 50 +++++++++++---------
+>  arch/arm/kvm/interrupts_head.S     | 61 +++++++++++++++----------
+>  virt/kvm/arm/vgic.c                |  4 +-
+>  8 files changed, 168 insertions(+), 81 deletions(-)
+> 
+> -- 
+> 1.8.1.4
+> 
+> Thanks,
+> Victor
+> 
+>       Appendix A: Testing and Full Setup Description
+>       ----------------------------------------------
+> 
+> I) No mixed mode setup - i.e BE guest on BE host; and LE guest
+> on LE host tested to make sure no regressions.
+> 
+> KVM host and guest kernels:
+>   TC2 on top of Linus 3.13-rc4 (this patch series):
+>       git: git://git.linaro.org/people/victor.kamensky/linux-linaro-tracking-be.git
+>       branch: armv7be-kvm-3.13-rc4
+>       
+>   TC2 and Arndale on top of Linaro BE tree:
+>       git: git://git.linaro.org/people/victor.kamensky/linux-linaro-tracking-be.git
+>       branch: llct-be-20131216-kvm
+> 
+> - TC1 kernels used as guests
+> 
+> qemu:
+>       git: git://git.linaro.org/people/victor.kamensky/qemu-be.git 
+>       branch: armv7be-v1
+>       description: changes to run qemu on armeb target; and other
+>       changes to work with be image on top of be host
+> 
+> kvmtool:
+>       git: git://git.linaro.org/people/victor.kamensky/linux-linaro-tracking-be.git
+>       branch: kvmtool-armv7be-v1
+>       desciption: minimal changes to build kvmtool for armeb target; and
+>       tiny change with virtio magic
+> 
+> II) Mixed mode setup all possible combinations within V7 (LE guest on BE host;
+> BE guest on LE host as Marc's setup tested to make sure no regressions) only
+> with kvmtool.
+> 
+> This work is based on Marc Zyngier's work that made BE guest to run on top
+> of LE host. For this setup special version of kvmtool should be used and
+> in addition I had to apply patch to guest kernel that would switch reading
+> virtio configs reads to be LE only, that is made on top of previous Rusty
+> Russell's changes. Effectively I just had to do very minor addition to make
+> LE guest to work on BE host, most of heavy lifting was done before by Marc.
+> 
+> KVM host kernels: as in previous setup
+> 
+> Guest TC1 kernels with LE virtio config patch:
+>       git: git://git.linaro.org/people/victor.kamensky/linux-linaro-tracking-be.git
+>       branch: virtio-leconfig-3.13-rc4
+> 
+> kvmtool:
+>       git: git://git.linaro.org/people/victor.kamensky/linux-linaro-tracking-be.git
+>       branch: kvmtool-mixed-v1
+>       description: based on git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>       branch kvm-arm64/kvmtool-be-on-le; adds missing include fix; above armeb target
+>       build patches; and one fix related to BE mode
+> 
+> qemu:
+>       git: git://git.linaro.org/people/victor.kamensky/qemu-be.git
+>       branch: armv7be-leconfig-v1
+>       description: change virtio-blk that so qemu could work with guest image
+>       where virtio leconfig is made; note it does not work in mixed mode; to do
+>       so qemu would need bunch of similar changes that Marc did in kvmtool
+> 
+> 
+>       Appendix B: kvm asm file and asm/assembler.h file issue
+>       -------------------------------------------------------
+> 
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index ddc1553..5d3b511 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -25,6 +25,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/vfpmacros.h>
+> +#include <asm/assembler.h>
+>  #include "interrupts_head.S"
+>  
+>         .text
+> 
+> produce the following compilation errors:
+> 
+> /run/media/kamensky/wd/linaro/linux-linaro-core-tracking/092913/linux-linaro-tracking-be/arch/arm/kvm/interrupts.S: Assembler messages:
+> /run/media/kamensky/wd/linaro/linux-linaro-core-tracking/092913/linux-linaro-tracking-be/arch/arm/kvm/interrupts.S:51: Error: ARM register expected -- `lsr {r2,r3}'
+> /run/media/kamensky/wd/linaro/linux-linaro-core-tracking/092913/linux-linaro-tracking-be/arch/arm/kvm/interrupts.S:100: Error: ARM register expected -- `lsr {r2}'
+> /run/media/kamensky/wd/linaro/linux-linaro-core-tracking/092913/linux-linaro-tracking-be/arch/arm/kvm/interrupts.S:100: Error: ARM register expected -- `lsr {r4-r12}'
+> 
+
+-- 
+Christoffer
