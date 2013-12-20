@@ -1,27 +1,44 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 20 Dec 2013 16:47:46 +0100
-Subject: [PATCH V2 5/5] i2c: riic: add driver
-In-Reply-To: <2069590.SA4Ef3s3BZ@avalon>
-References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
- <1407973.m5fTNuo5v5@avalon> <20131219120646.GA2563@katana>
- <2069590.SA4Ef3s3BZ@avalon>
-Message-ID: <20131220154746.GA9017@katana>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 20 Dec 2013 09:49:58 -0600
+Subject: [PATCH] usb: musb: Remove USB_GADGET driver dependency
+In-Reply-To: <1387502448-11041-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1387502448-11041-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131220154958.GA5957@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 19, 2013 at 10:20:48PM -0300, Ezequiel Garcia wrote:
+> This USB controller is dual-role, but can also work in host-only mode.
+> There's no reason to condition the entire driver to USB_GADGET. Fix this by
+> removing the dependency.
+> 
+> Tested on a Beaglebone black (AM335x) using a regular USB mass storage
+> device.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/usb/musb/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+> index 57dfc0c..2119370 100644
+> --- a/drivers/usb/musb/Kconfig
+> +++ b/drivers/usb/musb/Kconfig
+> @@ -6,7 +6,6 @@
+>  # (M)HDRC = (Multipoint) Highspeed Dual-Role Controller
+>  config USB_MUSB_HDRC
+>  	tristate 'Inventra Highspeed Dual Role Controller (TI, ADI, ...)'
+> -	depends on USB_GADGET
 
-> disable interrupts at runtime and use that as a state machine, while I was 
-> wondering whether it wouldn't be simpler to keep all interrupts enabled at all 
-> time and handle the synchronization explicitly.
+the correct patch would be to turn this into (USB || USB_GADGET) and fix
+the mode selection just like dwc3 is doing.
 
-If I do this, I'll get another "spurious" interrupt telling me the transmit
-register is empty again, even after I wrote the last byte. I don't like
-this.
-
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/6415bb9c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/cb68bbdc/attachment.sig>
