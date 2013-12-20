@@ -1,64 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 20 Dec 2013 21:21:59 +0100
-Subject: [PATCH v2] MAINTAINERS: take maintainership for Energy Micro efm32
- SoCs
-In-Reply-To: <1387569330.616105313@f421.i.mail.ru>
-References: <1387569330.616105313@f421.i.mail.ru>
-Message-ID: <1387570919-13627-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Fri, 20 Dec 2013 21:23:46 +0100
+Subject: [rtc-linux] Re: Can someone Ack and queue a patch for RTC
+ subsytem?
+In-Reply-To: <20131220183050.GB31886@sirena.org.uk> (Mark Brown's message of
+ "Fri, 20 Dec 2013 18:30:50 +0000")
+References: <87siton6ke.fsf@natisbad.org>
+ <20131219164624.GV2609@titan.lakedaemon.net>
+ <20131219175738.1dad3ade@linux.lan.towertech.it>
+ <8761qk32pj.fsf@natisbad.org> <20131220183050.GB31886@sirena.org.uk>
+Message-ID: <8738lnl19p.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Acked-by: Mark Brown <broonie@linaro.org>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+Hi,
 
-On Fri, Dec 20, 2013 at 11:55:30PM +0400, Alexander Shiyan wrote:
-> [...]
-> > +F: arch/arm/boot/dts/efm32*
-> > +F: arch/arm/configs/efm32_defconfig
-> > +F: arch/arm/include/debug/efm32.S
-> > +F: arch/arm/mach-efm32/
-> > +F: drivers/clk/clk-efm32gg.c
-> > +F: drivers/clocksource/time-efm32.c
-> > +F: drivers/spi/spi-efm32.c
-> > +F: drivers/tty/serial/efm32-uart.c
-> > +F: include/dt-bindings/clock/efm32-cmu.h
-> > +F: include/linux/platform_data/efm32-*
-> 
-> Maybe "N" keyword with "efm32" is better here?
-ah, didn't know about that. Nice.
+Mark Brown <broonie@kernel.org> writes:
 
-So the changes since v1 are:
- - use N: efm32
- - add acks from Greg and Mark
-   I assume it's ok to keep them for v2 assuming they mean them being OK with
-   me maintaining the efm32 stuff and not the way to express that in
-   MAINTAINERS.
+> On Thu, Dec 19, 2013 at 11:17:44PM +0100, Arnaud Ebalard wrote:
+>
+>> All NETGEAR ReadyNAS 102, 104 and 2120 have an ISL 12057 RTC chip which
+>> is used as main RTC clock but can also provide alarm. But the alarm
+>> interrupt line of the chip is *not* connected to the SoC. It is
+>> connected to some power component and can be used to wake up the NAS
+>> when it is completely off and the alarm rings.
+>
+> Can the PMIC or whatever function as an interrupt controller and report
+> the interrupt on to the SoC?
 
-Thanks
-Uwe
+I do not even know to which specific component the irq line of the chip
+is connected. You can take a look at [1] to see what's on the PCB; if
+you have an idea about which one could be a good candidate (TPS65251?),
+I can try and check with an ohmmeter which pin is connected to confirm
+your guess. Then, I could look at the datasheet (if any) to see if it
+can relay the interrupt to the SoC (if the component is supported by
+Linux kernel).
 
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+But, except if we can do what you propose, there are two problems at
+hand:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 95648eb..6ea1fb2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -867,6 +867,12 @@ S:	Maintained
- F:	arch/arm/mach-ebsa110/
- F:	drivers/net/ethernet/amd/am79c961a.*
- 
-+ARM/ENERGY MICRO (SILICON LABS) EFM32 SUPPORT
-+M:	Uwe Kleine-K?nig <kernel@pengutronix.de>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+N:	efm32
-+
- ARM/EZX SMARTPHONES (A780, A910, A1200, E680, ROKR E2 and ROKR E6)
- M:	Daniel Ribeiro <drwyrm@gmail.com>
- M:	Stefan Schmidt <stefan@openezx.org>
--- 
-1.8.5.1
+ 1) I cannot currently test the IRQ handler my changes would bring
+ because it is not connected to the SoC on my platforms
+
+ 2) even if I find a solution for 1), noone ever provided any directions
+ on what should be required to make some program like rtc-test.c happy on
+ my platforms (alarm support but no interrupt from the RTC). e.g. some 
+ refinements like the one introduced by c9f5c7e7a84f1b7 (rtc: rtc-spear:
+ Provide flag for no support of UIE mode). I guess it should be fairly
+ simple for someone w/ good knowledge of the RTC subsystem to tell what
+ is needed. I do not have that knowledge and the documentation does not
+ help.
+
+Regarding 1), I am starting to wonder if the best way out would not be
+for me to connect the interrupt line of the ISL12057 to one of the GPIO
+line currently connected to the LCD on my RN104 (after having
+disconnected the LCD) and change the function of the associated MPP on
+the SoC to make it an interrupt line. Could that work w/o additional
+hardware modification? What are my chances of killing the board?
+
+But this is pointless if I do not get any clear directions about 2).
+
+Cheers,
+
+a+
+
+[1]: http://natisbad.org/NAS2/index.html#hw
