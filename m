@@ -1,65 +1,84 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 20 Dec 2013 22:53:13 +0100
-Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
-In-Reply-To: <CAOesGMi7cGZyHLBMpc7UTBbQkiRBij6rDyuA+E+9tUmsb131zw@mail.gmail.com>
-References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
- <346894265.CPBN0v9Elj@flatron>
- <CAOesGMi7cGZyHLBMpc7UTBbQkiRBij6rDyuA+E+9tUmsb131zw@mail.gmail.com>
-Message-ID: <4034332.29qpdhiElM@flatron>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Dec 2013 22:53:07 +0100
+Subject: [PATCH 2/2] ARM: sun4i: dt: Remove chosen nodes
+In-Reply-To: <1387576387-22122-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1387576387-22122-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1387576387-22122-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 of December 2013 13:37:36 Olof Johansson wrote:
-> On Fri, Dec 20, 2013 at 1:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > Hi,
-> >
-> > On Friday 20 of December 2013 15:56:38 sunil joshi wrote:
-> >> Hi Abhilash,
-> >> I saw another patch in chrome tree ..by Andrew Bresticker
-> >> which may be relevant here ..
-> >>
-> >> Just wondering if you missed adding this ? or this is not needed ?
-> >> You did not face any issue in getting core to suspend ?
-> >>
-> >> ------------------------------------------------------------------------------------------
-> >> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
-> >> Author: Andrew Bresticker <abrestic@chromium.org>
-> >> Date:   Mon Jul 15 13:14:36 2013 -0700
-> >>
-> >>     arm: exynos: disable all interrupts on Exynos5420 before suspend
-> >>
-> >>     Disable all interrupts from the GIC before entering suspend on
-> >>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
-> >>     may receive an interrupt after entering WFI but before the PMU has
-> >>     suspended the system, causing suspend to fail.
-> >>
-> >>     BUG=chrome-os-partner:20523
-> >>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
-> >>     no longer occasionally fails with the "Failed to suspend the system"
-> >>     error in exynos_cpu_suspend().
-> >
-> > A question about this for Chromium and LSI guys:
-> >
-> > If you find out that there is already a pending interrupt before you enter
-> > the sleep mode, isn't it more reasonable to cancel the process ASAP and
-> > handle the event instead of entering the sleep just to leave it?
-> >
-> > I believe this should be both more efficient with respect to power usage
-> > and latency, because sleep-wakeup transition takes time and power.
-> >
-> > Do you have any reason to think the opposite?
-> 
-> If it's expected to be a rare or very rare event, it's not a given
-> that the added complexity of dealing with the aborted suspend that
-> late is worth it.
+The chosen nodes are nowadays pretty useless, since they will be overriden by
+the bootloader anyway.
 
-I think that the code to support this is already in place, just printing
-an unfortunate message about "suspend failures". It doesn't add any
-significant complexity too.
+We can thus safely remove them.
 
-I'm not sure about the frequency of such events, though, and any real
-effect of this or the other behavior in such case and so there is my
-question about this.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 4 ----
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts  | 4 ----
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 4 ----
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts  | 4 ----
+ 4 files changed, 16 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index f1c77e0..b139ee6 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -17,10 +17,6 @@
+ 	model = "Cubietech Cubieboard";
+ 	compatible = "cubietech,a10-cubieboard", "allwinner,sun4i-a10";
+ 
+-	chosen {
+-		bootargs = "earlyprintk console=ttyS0,115200";
+-	};
+-
+ 	soc at 01c00000 {
+ 		emac: ethernet at 01c0b000 {
+ 			pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index b3ae51f..3a1595f 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -18,10 +18,6 @@
+ 	model = "Miniand Hackberry";
+ 	compatible = "miniand,hackberry", "allwinner,sun4i-a10";
+ 
+-	chosen {
+-		bootargs = "earlyprintk console=ttyS0,115200";
+-	};
+-
+ 	soc at 01c00000 {
+ 		emac: ethernet at 01c0b000 {
+ 			pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+index 0c1447c..70b3323 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+@@ -18,10 +18,6 @@
+ 	model = "PineRiver Mini X-Plus";
+ 	compatible = "pineriver,mini-xplus", "allwinner,sun4i-a10";
+ 
+-	chosen {
+-		bootargs = "earlyprintk console=ttyS0,115200";
+-	};
+-
+ 	soc at 01c00000 {
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 9e508dc..a4ba5ff 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -18,10 +18,6 @@
+ 	model = "Olimex A13-Olinuxino";
+ 	compatible = "olimex,a13-olinuxino", "allwinner,sun5i-a13";
+ 
+-	chosen {
+-		bootargs = "earlyprintk console=ttyS0,115200";
+-	};
+-
+ 	soc at 01c00000 {
+ 		pinctrl at 01c20800 {
+ 			led_pins_olinuxino: led_pins at 0 {
+-- 
+1.8.4.2
