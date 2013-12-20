@@ -1,53 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 20 Dec 2013 18:05:15 -0500
-Subject: [PATCH] mm/ARM: fix ARMs __ffs() to conform to avoid warning
- with NO_BOOTMEM
-In-Reply-To: <20131220225541.GN4360@n2100.arm.linux.org.uk>
-References: <1386981486-3173-1-git-send-email-santosh.shilimkar@ti.com>
- <52B4C71D.9030904@ti.com> <20131220225541.GN4360@n2100.arm.linux.org.uk>
-Message-ID: <52B4CD2B.3080100@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 21 Dec 2013 08:09:36 +0900
+Subject: [PATCH 3/3] ARM: dts: Rename Exynos5250 ChromeOS common file
+ to have exynos prefix
+In-Reply-To: <1385381710-5212-3-git-send-email-broonie@kernel.org>
+References: <1385381710-5212-1-git-send-email-broonie@kernel.org>
+ <1385381710-5212-3-git-send-email-broonie@kernel.org>
+Message-ID: <52B4CE30.6030205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013 05:55 PM, Russell King - ARM Linux wrote:
-> On Fri, Dec 20, 2013 at 05:39:25PM -0500, Santosh Shilimkar wrote:
->> Russell,
->>
->> On Friday 13 December 2013 07:38 PM, Santosh Shilimkar wrote:
->>> Building ARM with NO_BOOTMEM generates below warning.
->>>
->>> mm/nobootmem.c: In function _____free_pages_memory___:
->>> mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
->>>
->>> 	order = min(MAX_ORDER - 1UL, __ffs(start));
->>>
->>> ARM's __ffs() differs from other architectures in that it ends up being
->>> an int, whereas almost everyone else is unsigned long.
->>>
->>> So fix ARMs __ffs() to conform to other architectures. Suggested by
->>> Russell King <linux@arm.linux.org.uk>
->>>
->>> Some more details in below thread -
->>> 	https://lkml.org/lkml/2013/12/9/807
->>>
->>> Cc: Andrew Morton <akpm@linux-foundation.org>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> ---
->> Is this patch inline with what we discussed off-list ?
-> 
-> It is.
-> 
->> If you ack it, it can go into the Andrews tree to kill that one last
->> warning with the memblock series. Thanks
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 11/25/13 21:15, Mark Brown wrote:
+> From: Mark Brown<broonie@linaro.org>
 >
-Great !!
- 
-Andrew,
-Can you please pick the $subject patch as well in your
-mm tree ? Thanks
+> Make it easier to notice the common file for ChromeOS devices based on
+> the Exynos5250 by giving it the exynos5250 prefix that the boards have.
+>
+> Signed-off-by: Mark Brown<broonie@linaro.org>
+> Acked-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/boot/dts/{cros5250-common.dtsi =>  exynos5250-cros-common.dtsi} | 0
+>   arch/arm/boot/dts/exynos5250-snow.dts                                   | 2 +-
+>   2 files changed, 1 insertion(+), 1 deletion(-)
+>   rename arch/arm/boot/dts/{cros5250-common.dtsi =>  exynos5250-cros-common.dtsi} (100%)
+>
+> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> similarity index 100%
+> rename from arch/arm/boot/dts/cros5250-common.dtsi
+> rename to arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index fd711e245e8d..7e2669c6f7f5 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -10,7 +10,7 @@
+>
+>   /dts-v1/;
+>   #include "exynos5250.dtsi"
+> -#include "cros5250-common.dtsi"
+> +#include "exynos5250-cros-common.dtsi"
+>
+>   / {
+>   	model = "Google Snow";
 
-regards,
-Santosh
++ Doug and Olof.
+
+Doug and Olof,
+
+I need your ack on this. How do you think?
+
+Thanks,
+Kukjin
