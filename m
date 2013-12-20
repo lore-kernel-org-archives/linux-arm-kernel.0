@@ -1,37 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 20 Dec 2013 08:50:26 -0800
-Subject: [PATCH 1/3] ARM: hisi: rename hi3xxx to hisi
-In-Reply-To: <1387507978-4485-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1387507978-4485-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CAOesGMjaJVWoMWgywkHfeD+0TMw3pze40CAvTcuC7+NavMq22w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Dec 2013 08:55:03 -0800
+Subject: OMAP display subsystem - does it work?
+In-Reply-To: <20131220160432.GZ27438@atomide.com>
+References: <20131218120023.GG4360@n2100.arm.linux.org.uk>
+ <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
+ <20131219175644.GE32243@n2100.arm.linux.org.uk>
+ <20131219182252.GP27438@atomide.com>
+ <20131220112700.GF32243@n2100.arm.linux.org.uk>
+ <20131220114837.GH32243@n2100.arm.linux.org.uk>
+ <52B44982.4020501@ti.com> <20131220160432.GZ27438@atomide.com>
+Message-ID: <20131220165456.GD27438@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 6:52 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> Since some new Hisilicon SoCs are not named as hi3xxx, rename mach-hi3xxx
-> to mach-hisi instead. And the pronounciation of "hisi" is similar to the
-> chinese pronounciation of Hisilicon. So Hisilicon guys like this name.
->
-> ARCH_HI3xxx will be renamed later since other drivers are using it and
-> they are still in linux-next git tree. So rename ARCH_HI3xxx later.
->
+* Tony Lindgren <tony@atomide.com> [131220 08:06]:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [131220 05:45]:
+> > On 2013-12-20 13:48, Russell King - ARM Linux wrote:
+> > 
+> > > Or maybe this is getting buggered by the idiotic deferred probing...  It
+> > > seems that the GPIOs for controlling the LCD and backlight aren't even
+> > > getting claimed if the DSS modules are built in:
+> > > 
+> > > # cat /sys/kernel/debug/gpio
+> > > ...
+> > > GPIOs 238-255, platform/twl4030_gpio, twl4030, can sleep:
+> > > # echo panel-dpi.0 > /sys/bus/platform/drivers/panel-dpi/unbind
+> > > # echo panel-dpi.0 > /sys/bus/platform/drivers/panel-dpi/bind
+> > > # cat /sys/kernel/debug/gpio
+> > > ...
+> > > GPIOs 238-255, platform/twl4030_gpio, twl4030, can sleep:
+> > >  gpio-245 (panel enable        ) out lo
+> > >  gpio-253 (panel backlight     ) out lo
+> > 
+> > This looks odd... Presuming the panel device was probed successfully, it
+> > should always get the gpios or return an error. Only if gpio_is_valid()
+> > returns false for the gpio, it skips it and continues. But in this case,
+> > the gpio number comes from the platform data, so it should always be valid.
+> > 
+> > And if it wasn't probed successfully, then there shouldn't be a fb0.
+> 
+> I bet that's it though. If the display is probed before twl4030 GPIO
+> is initialized, the GPIO numbers will be 0. I'm using omap2plus_defconfig
+> which has DSS built as modules.
 
-Are you kidding me? We JUST merge your platform after a very painful
-review with many fumbly cycles, and the very first thing you do is
-rename it?
+Yeah this seems to do the trick for me for the built-in DSS on LDP.
 
-I even complained about the crazy numbering and naming, and you didn't
-fix it while we were in review, and now just days after we merge the
-patches this one comes out?
+Tony
 
-For now, we'll drop your original branch and fold in these patches
-with the original ones. There's no point in checking in a platform
-just to rename it, so we'll do the fixups.
+8< -----------------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 20 Dec 2013 08:53:27 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
 
-No further action is required on your behalf right now but it will be
-a while until we sort this out. It's at the back of the queue of
-things to deal with right now.
+Looks like the LCD panel on LDP has been broken quite a while, and
+recently got fixed. However, there's still an issue where the panel
+backlight does not come on if the LCD drivers are built into the
+kernel.
 
+Fix the issue by registering the DPI LCD panel only after the twl4030
+GPIO has probed.
 
--Olof
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -248,7 +248,7 @@ static int ldp_twl_gpio_setup(struct device *dev, unsigned gpio, unsigned ngpio)
+ 	/* Backlight enable GPIO */
+ 	ldp_lcd_pdata.backlight_gpio = gpio + 15;
+ 
+-	return 0;
++	return platform_device_register(&ldp_lcd_device);
+ }
+ 
+ static struct twl4030_gpio_platform_data ldp_gpio_data = {
+@@ -346,7 +346,6 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
+ 
+ static struct platform_device *ldp_devices[] __initdata = {
+ 	&ldp_gpio_keys_device,
+-	&ldp_lcd_device,
+ };
+ 
+ #ifdef CONFIG_OMAP_MUX
