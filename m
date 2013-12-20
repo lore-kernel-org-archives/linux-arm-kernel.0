@@ -1,62 +1,68 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Dec 2013 13:35:55 +0100
-Subject: [PATCHv7 06/12] ARM: tegra: create a DT header defining SWGROUP ID
-In-Reply-To: <52B1CCF1.2040907@wwwdotorg.org>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-7-git-send-email-hdoyu@nvidia.com>
- <52B1568F.1050305@gmail.com> <52B1CCF1.2040907@wwwdotorg.org>
-Message-ID: <20131220123554.GQ27787@ulmo.nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Dec 2013 12:42:14 +0000
+Subject: [PATCH] arm64: cmpxchg: update macros to prevent warnings
+Message-ID: <1387543334-14036-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 09:27:29AM -0700, Stephen Warren wrote:
-> On 12/18/2013 01:02 AM, Mark Zhang wrote:
-> > On 12/12/2013 03:57 PM, Hiroshi Doyu wrote:
-> >> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
-> >> binding. "swgroup" is a group of H/W clients which a Tegra SoC
-> >> supports. This unique ID can be used to calculate MC_SMMU_<swgroup
-> >> name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
-> >> register bit. This will allow the same header to be used by both
-> >> device tree files, and drivers implementing this binding, which
-> >> guarantees that the two stay in sync. This also makes device trees
-> >> more readable by using names instead of magic numbers. For HOTRESET
-> >> bit shifting we need another conversion table, which will come later.
-> 
-> >> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
-> 
-> >> +#define TEGRA_SWGROUP_MPE	11	/* 0x264 */
-> >> +#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
-> > 
-> > Need to change this to:
-> > 
-> > #define TEGRA_SWGROUP_MSENC	11
-> > 
-> > The reason is that, this makes "TEGRA_SWGROUP_BIT" doesn't work. So if I
-> > write "TEGRA_SWGROUP_CELLS(MSENC)" in dt, that causes a dt compiling error.
-> 
-> I guess it's because TEGRA_SWGROUP_BIT needs to expand its argument
-> twice, which can be done.
-> 
-> That all said, just defining all the names directly to constants is
-> probably the most direct fix.
+From: Mark Hambleton <mahamble@broadcom.com>
 
-Erm... isn't this simply a typo, where:
+Make sure the value we are going to return is referenced in order to
+avoid warnings from newer GCCs such as:
 
-	#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
+arch/arm64/include/asm/cmpxchg.h:162:3: warning: value computed is not used [-Wunused-value]
+  ((__typeof__(*(ptr)))__cmpxchg_mb((ptr),   \
+   ^
+net/netfilter/nf_conntrack_core.c:674:2: note: in expansion of macro ?cmpxchg?
+  cmpxchg(&nf_conntrack_hash_rnd, 0, rand);
 
-should simply be
+[Modified to use the current underlying implementation as current
+mainline for both cmpxchg() and cmpxchg_local() does -- broonie]
 
-	#define TEGRA_SWGROUP_MSENC	TEGRA_SWGROUP_MPE
+Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/include/asm/cmpxchg.h | 28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
 
-?
-
-That certainly works for me.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/6ffb6516/attachment.sig>
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 3914c0dcd09c..c558da59989e 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -158,17 +158,23 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	return ret;
+ }
+ 
+-#define cmpxchg(ptr,o,n)						\
+-	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
+-					  (unsigned long)(o),		\
+-					  (unsigned long)(n),		\
+-					  sizeof(*(ptr))))
+-
+-#define cmpxchg_local(ptr,o,n)						\
+-	((__typeof__(*(ptr)))__cmpxchg((ptr),				\
+-				       (unsigned long)(o),		\
+-				       (unsigned long)(n),		\
+-				       sizeof(*(ptr))))
++#define cmpxchg(ptr, o, n) \
++({ \
++	__typeof__(*(ptr)) __ret; \
++	__ret = (__typeof__(*(ptr))) \
++	__cmpxchg_mb((ptr), (unsigned long)(o), (unsigned long)(n), \
++		sizeof(*(ptr))); \
++	__ret; \
++})
++
++#define cmpxchg_local(ptr, o, n) \
++({ \
++	__typeof__(*(ptr)) __ret; \
++	__ret = (__typeof__(*(ptr))) \
++	__cmpxchg((ptr), (unsigned long)(o), \
++		(unsigned long)(n), sizeof(*(ptr))); \
++	__ret; \
++})
+ 
+ #define cmpxchg64(ptr,o,n)		cmpxchg((ptr),(o),(n))
+ #define cmpxchg64_local(ptr,o,n)	cmpxchg_local((ptr),(o),(n))
+-- 
+1.8.5.2
