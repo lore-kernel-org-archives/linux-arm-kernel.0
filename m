@@ -1,67 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Dec 2013 09:43:16 +0100
-Subject: [PATCH V2 0/3] PM: Enable option of re-use runtime PM callbacks
- at system suspend
-In-Reply-To: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
-References: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFrS6k1Zd5=XQX4ODk2=obo89bk-Z6aJvv+3WsrHw3nGbg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Dec 2013 10:03:04 +0100
+Subject: Can someone Ack and queue a patch for RTC subsytem?
+In-Reply-To: <20131219184924.13a12247@linux.lan.towertech.it>
+References: <87siton6ke.fsf@natisbad.org>
+ <20131219164624.GV2609@titan.lakedaemon.net>
+ <87sitoka39.fsf@natisbad.org>
+ <20131219184924.13a12247@linux.lan.towertech.it>
+Message-ID: <20131220090304.GA3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 December 2013 14:37, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> To put devices into low power state during system suspend, it is convenient
-> for some runtime PM supported power domains, subsystems and drivers to have
-> the option of re-using and invoking the runtime PM callbacks from their system
-> PM callbacks.
->
-> The benefit is that we don't need to implement wrapper functions which
-> handles runtime PM resourses, typically called from both runtime PM and system
-> PM callbacks.
->
-> Some new helper macros for defining the PM callbacks are added.
->
-> SET_PM_RUNTIME_PM_OPS; to define runtime PM callbacks for CONFIG_PM instead of
-> CONFIG_PM_RUNTIME.
->
-> SET_LATE_SYSTEM_SLEEP_PM_OPS; to define common late/early system PM callbacks,
-> same approach is applicable to the existing SET_SYSTEM_SLEEP_PM_OPS which
-> defines common suspend/resume system PM callbacks.
->
-> A minor fix was needed for the platform bus, which runtime PM callbacks are set
-> to the pm_generic_runtime_suspend|resume functions. These were implemented only
-> for CONFIG_PM_RUNTIME and thus the platform bus prevented driver's runtime PM
-> callbacks to be invoked when only CONFIG_PM_SLEEP was used. We move them into
-> CONFIG_PM to resolve the problem.
->
-> Changes in v2:
->         Updated commit messages to try to better reflect the changes.
->         Removed the below patches from this patch set. Let's leave those to be
->         addressed separately, if needed.
->         - PM / Sleep: Add pm_generic functions to re-use runtime PM callbacks
->         - drm/exynos: Convert to suspend_late/resume_early callbacks for fimc
->
->
-> Ulf Hansson (3):
->   PM / Runtime: Add second macro for definition of runtime PM callbacks
->   PM / Runtime: Implement the pm_generic_runtime functions for
->     CONFIG_PM
->   PM / Sleep: Add macro to define common late/early system PM callbacks
->
->  drivers/base/power/generic_ops.c |    4 ++--
->  include/linux/pm.h               |   21 +++++++++++++++++++++
->  include/linux/pm_runtime.h       |   12 ++++++++----
->  3 files changed, 31 insertions(+), 6 deletions(-)
->
-> --
-> 1.7.9.5
->
+Hi Alessandro,
 
-Hi,
+On Thu, Dec 19, 2013 at 06:49:24PM +0100, Alessandro Zummo wrote:
+> On Thu, 19 Dec 2013 18:46:18 +0100
+> arno at natisbad.org (Arnaud Ebalard) wrote:
+> 
+> > > I don't mind routing it though mvebu/arm-soc since the only consumers
+> > > are currently mvebu boards, but I'd like to hear from Andrew that this
+> > > is ok.  
+> > 
+> > I will do what you think is the best.
+> 
+>  If the only consumers are mvebu boards, I believe it is correct to
+>  route though that tree. imho.
 
-Just wanted to send a kind ping on this patchset.
+We're pretty much in the same situation for the Allwinner RTC driver
 
-Would be nice to try to conclude on the way forward after the quite
-long and good discussions we had around this topic.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/211849.html
 
-Kind regards
-Uffe
+I'm fine with merging it through my tree, however, we still need some
+reviews and an Acked-by from you.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/1d53aebe/attachment.sig>
