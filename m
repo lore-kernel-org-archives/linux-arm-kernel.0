@@ -1,22 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Dec 2013 08:16:22 -0800
-Subject: [PATCHv11 07/49] clk: divider: add support for low level ops
-In-Reply-To: <52B41E4B.8040808@ti.com>
-References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
- <1387452260-23276-8-git-send-email-t-kristo@ti.com>
- <20131219182620.GQ27438@atomide.com> <52B342D2.1010301@ti.com>
- <52B416E8.8070006@ti.com> <52B41C15.8040304@ti.com>
- <52B41E4B.8040808@ti.com>
-Message-ID: <20131220161622.GC27438@atomide.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 20 Dec 2013 08:33:26 -0800
+Subject: [GIT PULL] omap display regression fix against v3.13-rc4
+In-Reply-To: <20131218175057.GF27438@atomide.com> (Tony Lindgren's message of
+ "Wed, 18 Dec 2013 09:50:58 -0800")
+References: <20131218175057.GF27438@atomide.com>
+Message-ID: <8761qjiisp.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [131220 02:40]:
-> 
-> yeah, the crash was indeed when ll_ops was dereferenced despite being NULL.
+Tony Lindgren <tony@atomide.com> writes:
 
-Might be also worth checking if the gate and mux patches have a similar issue.
+> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
+>
+>   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/display-fix
+>
+> for you to fetch changes up to 130f769e81fc472beb2211320777e26050e3fa15:
+>
+>   Revert "ARM: OMAP2+: Remove legacy mux code for display.c" (2013-12-17 16:28:34 -0800)
+>
+> ----------------------------------------------------------------
+> I accidentally removed some mux code for omap4 that I thought was
+> dead code as omap4 has been booting with device tree only since
+> v3.10. Turns out I also removed some display related mux code,
+> so let's revert that except for the dead code parts.
+>
+> ----------------------------------------------------------------
 
-Regards,
+Pulled into fixes,
 
-Tony
+Thanks,
+
+Kevin
