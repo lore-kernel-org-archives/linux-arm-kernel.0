@@ -1,72 +1,122 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Dec 2013 22:41:08 +0100
-Subject: [PATCH 2/3] clocksource: sun5i: Add support for reset controller
+Date: Fri, 20 Dec 2013 22:41:07 +0100
+Subject: [PATCH 1/3] reset: Add of_reset_control_get
 In-Reply-To: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1387575669-21253-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 that uses this timer has the timer IP asserted in reset.
-Add an optional reset property to the DT, and deassert the timer from reset if
-it's there.
+In some cases, you might need to deassert from reset an hardware block that
+doesn't associated to a struct device (CPUs, timers, etc.).
+
+Add a small helper to retrieve the reset controller from the device tree
+without the need to pass a struct device.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt       | 4 ++++
- drivers/clocksource/timer-sun5i.c                                   | 6 ++++++
- 2 files changed, 10 insertions(+)
+ drivers/reset/core.c  | 39 ++++++++++++++++++++++++++++++---------
+ include/linux/reset.h |  4 ++++
+ 2 files changed, 34 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-index 7c26154..27cfc7d 100644
---- a/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-+++ b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-@@ -9,6 +9,9 @@ Required properties:
- 		one)
- - clocks: phandle to the source clock (usually the AHB clock)
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+index d1b6089..4f3dda7 100644
+--- a/drivers/reset/core.c
++++ b/drivers/reset/core.c
+@@ -127,15 +127,16 @@ int reset_control_deassert(struct reset_control *rstc)
+ EXPORT_SYMBOL_GPL(reset_control_deassert);
  
-+Optionnal properties:
-+- resets: phandle to a reset controller asserting the timer
-+
- Example:
- 
- timer at 01c60000 {
-@@ -19,4 +22,5 @@ timer at 01c60000 {
- 		     <0 53 1>,
- 		     <0 54 1>;
- 	clocks = <&ahb1_gates 19>;
-+	resets = <&ahb1rst 19>;
- };
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index bddc522..f74d75e 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -16,6 +16,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqreturn.h>
-+#include <linux/reset.h>
- #include <linux/sched_clock.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -143,6 +144,7 @@ static u32 sun5i_timer_sched_read(void)
- 
- static void __init sun5i_timer_init(struct device_node *node)
+ /**
+- * reset_control_get - Lookup and obtain a reference to a reset controller.
+- * @dev: device to be reset by the controller
++ * of_reset_control_get - Lookup and obtain a reference to a reset controller.
++ * @node: device to be reset by the controller
+  * @id: reset line name
+  *
+  * Returns a struct reset_control or IS_ERR() condition containing errno.
+  *
+  * Use of id names is optional.
+  */
+-struct reset_control *reset_control_get(struct device *dev, const char *id)
++struct reset_control *of_reset_control_get(struct device_node *node,
++					   const char *id)
  {
-+	struct reset_control *rstc;
- 	unsigned long rate;
- 	struct clk *clk;
- 	int ret, irq;
-@@ -162,6 +164,10 @@ static void __init sun5i_timer_init(struct device_node *node)
- 	clk_prepare_enable(clk);
- 	rate = clk_get_rate(clk);
+ 	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
+ 	struct reset_controller_dev *r, *rcdev;
+@@ -144,13 +145,10 @@ struct reset_control *reset_control_get(struct device *dev, const char *id)
+ 	int rstc_id;
+ 	int ret;
  
-+	rstc = of_reset_control_get(node, NULL);
-+	if (!IS_ERR(rstc))
-+		reset_control_deassert(rstc);
+-	if (!dev)
+-		return ERR_PTR(-EINVAL);
+-
+ 	if (id)
+-		index = of_property_match_string(dev->of_node,
++		index = of_property_match_string(node,
+ 						 "reset-names", id);
+-	ret = of_parse_phandle_with_args(dev->of_node, "resets", "#reset-cells",
++	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
+ 					 index, &args);
+ 	if (ret)
+ 		return ERR_PTR(ret);
+@@ -185,12 +183,35 @@ struct reset_control *reset_control_get(struct device *dev, const char *id)
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	rstc->dev = dev;
+ 	rstc->rcdev = rcdev;
+ 	rstc->id = rstc_id;
+ 
+ 	return rstc;
+ }
++EXPORT_SYMBOL_GPL(of_reset_control_get);
 +
- 	writel(~0, timer_base + TIMER_INTVAL_LO_REG(1));
- 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
- 	       timer_base + TIMER_CTL_REG(1));
++/**
++ * reset_control_get - Lookup and obtain a reference to a reset controller.
++ * @dev: device to be reset by the controller
++ * @id: reset line name
++ *
++ * Returns a struct reset_control or IS_ERR() condition containing errno.
++ *
++ * Use of id names is optional.
++ */
++struct reset_control *reset_control_get(struct device *dev, const char *id)
++{
++	struct reset_control *rstc;
++
++	if (!dev)
++		return ERR_PTR(-EINVAL);
++
++	rstc = of_reset_control_get(dev->of_node, id);
++	if (!IS_ERR(rstc))
++		rstc->dev = dev;
++
++	return rstc;
++}
+ EXPORT_SYMBOL_GPL(reset_control_get);
+ 
+ /**
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index 6082247..a398025 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -1,6 +1,8 @@
+ #ifndef _LINUX_RESET_H_
+ #define _LINUX_RESET_H_
+ 
++#include <linux/of.h>
++
+ struct device;
+ struct reset_control;
+ 
+@@ -8,6 +10,8 @@ int reset_control_reset(struct reset_control *rstc);
+ int reset_control_assert(struct reset_control *rstc);
+ int reset_control_deassert(struct reset_control *rstc);
+ 
++struct reset_control *of_reset_control_get(struct device_node *node,
++					   const char *id);
+ struct reset_control *reset_control_get(struct device *dev, const char *id);
+ void reset_control_put(struct reset_control *rstc);
+ struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
 -- 
 1.8.4.2
