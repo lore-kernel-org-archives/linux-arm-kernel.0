@@ -1,57 +1,57 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Dec 2013 10:46:52 +0100
-Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio A701
-Message-ID: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
+Date: Fri, 20 Dec 2013 10:47:03 +0100
+Subject: pwm-backlight: 3.13-rc1 regression for old arm machine
+In-Reply-To: <87iounuy6e.fsf@free.fr>
+References: <87r49c6bea.fsf@free.fr> <20131217095658.GD13823@ulmo.nvidia.com>
+ <87iounuy6e.fsf@free.fr>
+Message-ID: <20131220094702.GD27787@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent changes to the pwm-backlight driver have made the power supply
-mandatory. There is code in the regulator core to deal with situations
-where no regulator is specified and provide a dummy, but that works on
-DT-based boards only.
+On Tue, Dec 17, 2013 at 07:31:21PM +0100, Robert Jarzmik wrote:
+> Thierry Reding <thierry.reding@gmail.com> writes:
+> 
+> > I hadn't anticipated that =(. In fact I had been holding this patch back
+> > for a release cycle because I was waiting for a specific regulator patch
+> > to land which provides a dummy regulator if one wasn't specified. It
+> > seems that that patch only works when booting from DT, though.
+> >
+> > The correct way to fix this would be to provide a lookup table with the
+> > dummy regulator in the board file. I've attached a patch (compile-tested
+> > only) that might work.
+> >
+> > If it does, please let me know and, if nobody else volunteers, I'll see
+> > if I can come up with a set of patches to fix this for any other boards
+> > that have the same issue.
+> Actually, it needs a very small "tweak" to work :
+> -	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
+> +	REGULATOR_SUPPLY("power", "pwm-backlight"),
+> 
+> Without it regulator_dev_lookup() won't match the device.
+> 
+> Moreover, it requires a config option, CONFIG_REGULATOR_FIXED_VOLTAGE=y. That's
+> not a problem for my specific platform,
 
-The situation can be remedied by adding a dummy regulator during board
-initialization.
+Okay. I'll submit a patch with that tweak of yours rolled in and Haojian
+can merge that via the PXA tree.
 
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
----
- arch/arm/mach-pxa/mioa701.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> but I haven't seen *any* PXA platform
+> with it activated, which means all defconfigs have to be patched, which is
+> unfortunate.
 
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index f70583fee59f..29997bde277d 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -38,6 +38,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/usb/gpio_vbus.h>
- #include <linux/reboot.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/regulator/max1586.h>
- #include <linux/slab.h>
- #include <linux/i2c/pxa-i2c.h>
-@@ -714,6 +715,10 @@ static struct gpio global_gpios[] = {
- 	{ GPIO56_MT9M111_nOE, GPIOF_OUT_INIT_LOW, "Camera nOE" },
- };
- 
-+static struct regulator_consumer_supply fixed_5v0_consumers[] = {
-+	REGULATOR_SUPPLY("power", "pwm-backlight"),
-+};
-+
- static void __init mioa701_machine_init(void)
- {
- 	int rc;
-@@ -753,6 +758,10 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_i2c_info(&i2c_pdata);
- 	pxa27x_set_i2c_power_info(NULL);
- 	pxa_set_camera_info(&mioa701_pxacamera_platform_data);
-+
-+	regulator_register_always_on(0, "fixed-5.0V", fixed_5v0_consumers,
-+				     ARRAY_SIZE(fixed_5v0_consumers),
-+				     5000000);
- }
- 
- static void mioa701_machine_exit(void)
--- 
-1.8.4.2
+Unfortunate indeed!
+
+> As for my specific mioa701, your change with the tweak is perfectly fine and
+> tested.
+
+Great, I'll add your Tested-by.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/4349c1b7/attachment-0001.sig>
