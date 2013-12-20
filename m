@@ -1,45 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 21 Dec 2013 06:08:51 +0900
-Subject: [PATCH 2/3] ARM: dts: Add the missing "\" key in non-US keyboards
- for exynos5250-snow
-In-Reply-To: <1387492578-22068-2-git-send-email-dianders@chromium.org>
-References: <1387492578-22068-1-git-send-email-dianders@chromium.org>
- <1387492578-22068-2-git-send-email-dianders@chromium.org>
-Message-ID: <52B4B1E3.2020108@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 20 Dec 2013 22:08:38 +0100
+Subject: [PATCH] ARM: dts: add clock provider for mshc node for Exynos4412
+ SOC
+In-Reply-To: <52B4AC28.3070404@samsung.com>
+References: <1358764755-21470-1-git-send-email-thomas.abraham@linaro.org>
+ <000201cefd7f$d8b7c840$8a2758c0$%jun@samsung.com>
+ <52B4AC28.3070404@samsung.com>
+Message-ID: <1610394.o1Af0FOyXz@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/13 07:36, Doug Anderson wrote:
-> When the exynos5250 device tree was sent upstream the keyboard mapping
-> was missing the 2nd instance of the "\" key.  There are two copies of
-> the "\" because it simply has a different row and column on US and
-> non-US keyboards.
->
-> For more details, see the previous patch in this series: (mkbp: Fix
-> problems with backslash).
->
-> Signed-off-by: Doug Anderson<dianders@chromium.org>
-> ---
->   arch/arm/boot/dts/exynos5250-snow.dts | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index fd711e2..28fe2e2 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -130,6 +130,7 @@
->   							0x04060024	/* J */
->   							0x04080027	/* ; */
->   							0x04090026	/* L */
-> +							0x040a002b	/* \ */
->   							0x040b001c	/* ENTER */
->
->   							0x0501002c	/* Z */
+Hi Kukjin,
 
-OK, Applied this(2/3) and next one(3/3) into fixes for v3.14.
+On Saturday 21 of December 2013 05:44:24 Kukjin Kim wrote:
+> On 12/20/13 21:34, Seungwon Jeon wrote:
+> > Clock lookup information is required as driver can manipulate
+> > clock rate properly.
+> >
+> > Signed-off-by: Seungwon Jeon<tgih.jun@samsung.com>
+> > ---
+> >   arch/arm/boot/dts/exynos4412.dtsi |    2 ++
+> >   1 files changed, 2 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> > index ec1b166..9cbe59a 100644
+> > --- a/arch/arm/boot/dts/exynos4412.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> > @@ -41,5 +41,7 @@
+> >   		interrupts =<0 77 0>;
+> >   		#address-cells =<1>;
+> >   		#size-cells =<0>;
+> > +		clocks =<&clock 301>,<&clock 149>;
+> > +		clock-name = "biu", "ciu";
+> >   	};
+> >   };
+> 
+> Applied, thanks.
 
-If these patches should be sent for 3.13 or before, please let me know.
+I'm afraid you should not have applied this patch. More than this is
+needed for correct support of DW-MSHC on Exynos 4x12 and I already
+posted a series doing so more than a week ago.
 
-Thanks and Merry Christmas ;-)
+Please refer to this thread:
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/25493
 
-- Kukjin
+Best regards,
+Tomasz
