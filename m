@@ -1,42 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Dec 2013 12:56:13 +0100
-Subject: [PATCH 03/10] ARM: tegra: Add MIPI calibration DT entries for
- Tegra114
-In-Reply-To: <52B38B14.8080605@wwwdotorg.org>
-References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
- <1387468774-14216-4-git-send-email-treding@nvidia.com>
- <52B38B14.8080605@wwwdotorg.org>
-Message-ID: <20131220115613.GP27787@ulmo.nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 Dec 2013 11:57:35 +0000
+Subject: [PATCH RFC v3 04/12] arm64: kernel: cpu_{suspend/resume}
+ implementation
+In-Reply-To: <52B42A48.5090202@marvell.com>
+References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1385033059-25896-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <52B42A48.5090202@marvell.com>
+Message-ID: <20131220115735.GH25477@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 05:11:00PM -0700, Stephen Warren wrote:
-> On 12/19/2013 08:59 AM, Thierry Reding wrote:
-> > Add a device node for the MIPI calibration block on Tegra114. There is
-> > no need to disable it by default because it only enables the clock while
-> > performing calibration and therefore shouldn't be consuming any power
-> > when unused.
+On Fri, Dec 20, 2013 at 11:30:16AM +0000, Leo Yan wrote:
+> On 11/21/2013 07:24 PM, Lorenzo Pieralisi wrote:
+> > +/*
+> > + * x0 must contain the sctlr value retrieved from restored context
+> > + */
+> > +ENTRY(cpu_resume_mmu)
+> > +	ldr	x3, =cpu_resume_after_mmu
+> > +	msr	sctlr_el1, x0		// restore sctlr_el1
+> > +	isb
+> > +	br	x3			// global jump to virtual address
+> > +ENDPROC(cpu_resume_mmu)
+> > +cpu_resume_after_mmu:
+> > +	mov	x0, #0			// return zero on success
+> > +	ldp	x19, x20, [sp, #16]
+> > +	ldp	x21, x22, [sp, #32]
+> > +	ldp	x23, x24, [sp, #48]
+> > +	ldp	x25, x26, [sp, #64]
+> > +	ldp	x27, x28, [sp, #80]
+> > +	ldp	x29, lr, [sp], #96
+> > +	ret
+> > +ENDPROC(cpu_resume_after_mmu)
+> > +
+> > +	.data
+> > +ENTRY(cpu_resume)
+> > +	bl	el2_setup		// if in EL2 drop to EL1 cleanly
 > 
-> > diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+> Compare to v2's patch set, here remove the calculation fro the offset 
+> b/t PHYS_OFFSET - PAGE_OFFSET; so when i verify the patch set, i saw x28 
+> is zero and finally introduce the EL2's sync exception. Below are pasted 
+> v2's code for reference.
 > 
-> > +	mipi: mipi {
+> do u want use firmware to set the x28 for the offset value? :-) IMHO, 
+> v2's implementation is more reasonable and it's better keep the code.
 > 
-> That should be:
-> 
-> 	mipi: mipi at 700e3000 {
-> 
-> I fixed it up for you.
+> ENTRY(cpu_resume)
+>            adr     x4, sleep_save_sp
+>            ldr     x5, =sleep_save_sp
+>            sub     x28, x4, x5             // x28 = PHYS_OFFSET - 
+> PAGE_OFFSET
+>            /*
+>             * make sure el2 is sane, el2_setup expects:
+>             * x28 = PHYS_OFFSET - PAGE_OFFSET
+>             */
+>            bl      el2_setup               // if in EL2 drop to EL1 cleanly
 
-Right. Many of the patches I'm carrying locally predate the unit number
-requirement change. I did make a pass to update all, but this must have
-slipped through the cracks.
+With commit 85cc00eaa81d (arm64: kernel: add code to set cpu boot mode
+to secondary_entry shim) we no longer compute the phys-page offset
+before el2_setup.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/16b0d536/attachment.sig>
+Where does the fault happen?
+
+-- 
+Catalin
