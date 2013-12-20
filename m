@@ -1,127 +1,92 @@
 From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 20 Dec 2013 12:46:02 +0000
-Subject: [PATCH v4 04/16] ARM: move generic thumb instruction parsing
- code to new files for use by other feature
-In-Reply-To: <1387166930-13182-5-git-send-email-dave.long@linaro.org>
+Date: Fri, 20 Dec 2013 12:46:08 +0000
+Subject: [PATCH v4 02/16] ARM: move shared uprobe/kprobe definitions
+ into new include file
+In-Reply-To: <1387166930-13182-3-git-send-email-dave.long@linaro.org>
 References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
- <1387166930-13182-5-git-send-email-dave.long@linaro.org>
-Message-ID: <1387543562.3404.35.camel@linaro1.home>
+ <1387166930-13182-3-git-send-email-dave.long@linaro.org>
+Message-ID: <1387543568.3404.36.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
 > From: "David A. Long" <dave.long@linaro.org>
 > 
-> Move the thumb version of the kprobes instruction parsing code into more generic
-> files from where it can be used by uprobes and possibly other subsystems. The
-> symbol names will be made more generic in a subsequent part of this patchset.
+> Separate the kprobe-only definitions from the definitions needed by
+> both kprobes and uprobes.
 > 
 > Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
+>  arch/arm/include/asm/kprobes.h | 15 +--------------
+>  arch/arm/include/asm/probes.h  | 18 ++++++++++++++++++
+>  2 files changed, 19 insertions(+), 14 deletions(-)
+>  create mode 100644 arch/arm/include/asm/probes.h
+> 
+> diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+> index f82ec22..30fc11b 100644
+> --- a/arch/arm/include/asm/kprobes.h
+> +++ b/arch/arm/include/asm/kprobes.h
+> @@ -28,21 +28,8 @@
+>  #define kretprobe_blacklist_size	0
+>  
+>  typedef u32 kprobe_opcode_t;
+> -
+>  struct kprobe;
+> -typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+> -typedef unsigned long (kprobe_check_cc)(unsigned long);
+> -typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+> -typedef void (kprobe_insn_fn_t)(void);
+> -
+> -/* Architecture specific copy of original instruction. */
+> -struct arch_specific_insn {
+> -	kprobe_opcode_t			*insn;
+> -	kprobe_insn_handler_t		*insn_handler;
+> -	kprobe_check_cc			*insn_check_cc;
+> -	kprobe_insn_singlestep_t	*insn_singlestep;
+> -	kprobe_insn_fn_t		*insn_fn;
+> -};
+> +#include <asm/probes.h>
+>  
+>  struct prev_kprobe {
+>  	struct kprobe *kp;
+> diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+> new file mode 100644
+> index 0000000..21da148
+> --- /dev/null
+> +++ b/arch/arm/include/asm/probes.h
+> @@ -0,0 +1,18 @@
 
-I just have two comments about probes-thumb.h ...
+This new file doesn't have any copyright/license notice, I suggest you
+copy the one from kprobes.h and include a note to say this new files
+contents were copied, e.g. start it like...
 
+/*
+ * arch/arm/include/asm/probes.h
+ *
+ * Original contents copied from arch/arm/include/asm/kprobes.h
+ * which contains the following notice...
+ *
+ * Copyright (C) 2006, 2007 Motorola Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
 [...]
 
-> diff --git a/arch/arm/kernel/probes-thumb.h b/arch/arm/kernel/probes-thumb.h
-> new file mode 100644
-> index 0000000..3f39210
-> --- /dev/null
-> +++ b/arch/arm/kernel/probes-thumb.h
-> @@ -0,0 +1,136 @@
-> +/*
-> + * arch/arm/kernel/probes-arm.h
-> + *
-> + * Copyright 2013 Linaro Ltd.
-> + * Written by: David A. Long
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#ifndef _ARM_KERNEL_PROBES_THUMB_H
-> +#define  _ARM_KERNEL_PROBES_THUMB_H
-> +
-> +/*
-> + * True if current instruction is in an IT block.
-> + */
-> +#define in_it_block(cpsr)	((cpsr & 0x06000c00) != 0x00000000)
-> +
-> +/*
-> + * Return the condition code to check for the currently executing instruction.
-> + * This is in ITSTATE<7:4> which is in CPSR<15:12> but is only valid if
-> + * in_it_block returns true.
-> + */
-> +#define current_cond(cpsr)	((cpsr >> 12) & 0xf)
 
-Looks like you forgot to remove above two #defines from kprobes-thumb.c
-when you moved them to this header file.
-
-Also...
-
-> +enum probes_t32_action {
-> +	PROBES_T32_EMULATE_NONE,
-> +	PROBES_T32_SIMULATE_NOP,
-> +	PROBES_T32_LDMSTM,
-> +	PROBES_T32_LDRDSTRD,
-> +	PROBES_T32_TABLE_BRANCH,
-> +	PROBES_T32_TST,
-> +	PROBES_T32_CMP,
-> +	PROBES_T32_MOV,
-> +	PROBES_T32_ADDSUB,
-> +	PROBES_T32_LOGICAL,
-> +	PROBES_T32_ADDWSUBW_PC,
-> +	PROBES_T32_ADDWSUBW,
-> +	PROBES_T32_MOVW,
-> +	PROBES_T32_SAT,
-> +	PROBES_T32_BITFIELD,
-> +	PROBES_T32_SEV,
-> +	PROBES_T32_WFE,
-> +	PROBES_T32_MRS,
-> +	PROBES_T32_BRANCH_COND,
-> +	PROBES_T32_BRANCH,
-> +	PROBES_T32_PLDI,
-> +	PROBES_T32_LDR_LIT,
-> +	PROBES_T32_LDRSTR,
-> +	PROBES_T32_SIGN_EXTEND,
-> +	PROBES_T32_MEDIA,
-> +	PROBES_T32_REVERSE,
-> +	PROBES_T32_MUL_ADD,
-> +	PROBES_T32_MUL_ADD2,
-> +	PROBES_T32_MUL_ADD_LONG
+> +#ifndef _ASM_PROBES_H
+> +#define _ASM_PROBES_H
+> +
+> +typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+> +typedef unsigned long (kprobe_check_cc)(unsigned long);
+> +typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+> +typedef void (kprobe_insn_fn_t)(void);
+> +
+> +/* Architecture specific copy of original instruction. */
+> +struct arch_specific_insn {
+> +	kprobe_opcode_t			*insn;
+> +	kprobe_insn_handler_t		*insn_handler;
+> +	kprobe_check_cc			*insn_check_cc;
+> +	kprobe_insn_singlestep_t	*insn_singlestep;
+> +	kprobe_insn_fn_t		*insn_fn;
 > +};
 > +
-> +enum probes_t16_action {
-> +	PROBES_T16_ADD_SP,
-> +	PROBES_T16_CBZ,
-> +	PROBES_T16_SIGN_EXTEND,
-> +	PROBES_T16_PUSH,
-> +	PROBES_T16_POP,
-> +	PROBES_T16_SEV,
-> +	PROBES_T16_WFE,
-> +	PROBES_T16_IT,
-> +	PROBES_T16_CMP,
-> +	PROBES_T16_ADDSUB,
-> +	PROBES_T16_LOGICAL,
-> +	PROBES_T16_BLX,
-> +	PROBES_T16_HIREGOPS,
-> +	PROBES_T16_LDR_LIT,
-> +	PROBES_T16_LDRHSTRH,
-> +	PROBES_T16_LDRSTR,
-> +	PROBES_T16_ADR,
-> +	PROBES_T16_LDMSTM,
-> +	PROBES_T16_BRANCH_COND,
-> +	PROBES_T16_BRANCH
-> +};
-> +
-
-I think the above two enums belong in the next patch in the series, i.e.
-"[PATCH v4 05/16] ARM: use a function table for determining instruction
-interpreter actions"
-
--- 
-Tixy
+> +#endif
