@@ -1,66 +1,110 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 20 Dec 2013 12:16:32 -0800
-Subject: [PATCH] ARM: multi_v7: copy most options from tegra_defconfig
-In-Reply-To: <1387569848-16563-1-git-send-email-swarren@wwwdotorg.org>
-References: <1387569848-16563-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAOesGMh4PkdTh8EP1WS9-_5cVe1NWuNQPbkskk7hJhtbBEPWBg@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 20 Dec 2013 12:22:04 -0800
+Subject: [GIT PULL 00/69] Renesas ARM based SoC DT updates for v3.14
+In-Reply-To: <cover.1386901186.git.horms+renesas@verge.net.au> (Simon Horman's
+ message of "Fri, 13 Dec 2013 11:31:12 +0900")
+References: <cover.1386901186.git.horms+renesas@verge.net.au>
+Message-ID: <878uvfgtn7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 12:04 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+Simon Horman <horms+renesas@verge.net.au> writes:
 
-> @@ -165,21 +276,47 @@ CONFIG_DW_DMAC=y
->  CONFIG_TEGRA20_APB_DMA=y
->  CONFIG_STE_DMA40=y
->  CONFIG_SIRF_DMA=y
-> -CONFIG_TI_EDMA=y
->  CONFIG_PL330_DMA=y
->  CONFIG_IMX_SDMA=y
->  CONFIG_IMX_DMA=y
->  CONFIG_MXS_DMA=y
->  CONFIG_DMA_OMAP=y
-> +CONFIG_STAGING=y
-> +CONFIG_SENSORS_ISL29018=y
-> +CONFIG_SENSORS_ISL29028=y
-> +CONFIG_MFD_NVEC=y
-> +CONFIG_KEYBOARD_NVEC=y
-> +CONFIG_SERIO_NVEC_PS2=y
-> +CONFIG_NVEC_POWER=y
-> +CONFIG_NVEC_PAZ00=y
-> +CONFIG_TEGRA_IOMMU_GART=y
-> +CONFIG_TEGRA_IOMMU_SMMU=y
-> +CONFIG_MEMORY=y
-> +CONFIG_IIO=y
-> +CONFIG_AK8975=y
->  CONFIG_PWM=y
-> +CONFIG_PWM_TEGRA=y
->  CONFIG_PWM_VT8500=y
-> +CONFIG_OMAP_USB2=y
-> +CONFIG_EXT2_FS=y
-> +CONFIG_EXT2_FS_XATTR=y
-> +CONFIG_EXT2_FS_POSIX_ACL=y
-> +CONFIG_EXT2_FS_SECURITY=y
-> +CONFIG_EXT3_FS=y
-> +CONFIG_EXT3_FS_POSIX_ACL=y
-> +CONFIG_EXT3_FS_SECURITY=y
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please consider these Renesas ARM based SoC DT updates for v3.14.
+>
+> This pull request is based on renesas-soc-for-v3.14 (v2) which I
+> also sent a pull request for today.
+>
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.14
+>
+> for you to fetch changes up to 1fd219561a4afc51b5f257692f3581546434db5b:
+>
+>   ARM: shmobile: marzen: enable HSPI0 in DTS (2013-12-10 17:27:25 +0900)
+>
+> ----------------------------------------------------------------
+> Renesas ARM based SoC DT updates for v3.14
+>
+> * Global
+>   - Use interrupt macros
+>   - Use #include in device tree sources
+>   - Tidyup DT node naming
+>
+> * emev2 (Emma Mobile EV2) SoC
+>   - Setup internal peripheral interrupts as level high
+>   - Use interrupt macros in DT files
+>   - Add clock tree description in DT
+>
+> * r8a7791 (R-Car M2) SoC
+>   - Correct GPIO resources
+>
+> * r8a7791 (R-Car M2) based Koelsch board
+>   - Configure PFC and GPO
+>   - Use r8a7791 suffix for IRQC compat string
+>   - Add DT reference
+>
+> * r8a7790 (R-Car H2) based Lager board
+>   - Include all 4 GiB of memory
+>   - Use r8a7790 suffix for IRQC and MMCIF compat strings
+>   - Enable MMCIF
+>   - Add default PFC settings
+>
+> * r8a7778 (R-Car M1) SoC
+>   - Suffix for INTC compat string
+>   - Add HSPI, MMCIF, SDHI and I2C suppport on DTSI
+>   - Correct pin control device addresses
+>
+> * r8a7778 (R-Car M1) based Bock-W board
+>   - Use falling edge IRQ for LAN9221 in DT reference
+>   - Enable I2C, HSPI0, MMCIF and SDHI
+>   - Correct MMC pin conflict
+>   - Remove manual PFC settings from DT reference
+>   - Add default PFC settings
+>
+> * r8a7779 (R-Car H1) SoC
+>   - Add HSPI and SDHI support
+>   - Suffix for INTC compat string
+>
+> * r8a7779 (R-Car H1) based Marzen board
+>   - Enable HSPI0 and SDHI in DTS
+>   - Remove SDHI0 WP pin setting
+>   - Use falling edge IRQ for LAN9221 in DT reference
+>   - Add SDHI support
+>
+> * r8a7740 (R-Mobile A1) SoC
+>   - Suffix for INTC compat string
+>   - Add FSI support via DTSI
+>   - Use interrupt macros
+>
+> * r8a7740 based Armadillo board
+>   - Add FSI support for DTS
+>   - Use low level IRQ for ST1231 in DT reference
+>
+> * r8a73a4 (SH-Mobile APE6) SoC
+>   - Use interrupt macros in DT files
+>
+> * r8a73a4 (R-Mobile APE6) based ape6evm board
+>   - Include all 2 GiB of memory
+>
+> * r8a73a0 (SH-Mobile AG5) SoC
+>   - Correct SDHI compat string
+>
+> * r8a73a0 (SH-Mobile AG5) based kzm9d board
+>   - Add GPIO keys and Add PCF8575 GPIO extender to DT
+>   - Enable DSW2 with gpio-keys
+>   - Use falling edge IRQ for LAN9221 in DT reference
+>
+> ----------------------------------------------------------------
 
-I think it makes sense to just enable EXT4_USE_FOR_EXT23 instead.
+Pulled into next/dt,
 
->  CONFIG_EXT4_FS=y
-> +CONFIG_VFAT_FS=y
->  CONFIG_TMPFS=y
-> +CONFIG_SQUASHFS=y
-> +CONFIG_SQUASHFS_LZO=y
-> +CONFIG_SQUASHFS_XZ=y
->  CONFIG_NFS_FS=y
->  CONFIG_NFS_V3_ACL=y
->  CONFIG_NFS_V4=y
->  CONFIG_ROOT_NFS=y
->  CONFIG_PRINTK_TIME=y
->  CONFIG_DEBUG_FS=y
-> -CONFIG_DEBUG_KERNEL=y
+Thanks,
 
-Why are you disabling DEBUG_KERNEL?
-
-
--Olof
+Kevin
