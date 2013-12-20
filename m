@@ -1,99 +1,54 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 20 Dec 2013 12:23:28 +0530
-Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
-In-Reply-To: <52B355EC.9040306@wwwdotorg.org>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-2-git-send-email-treding@nvidia.com>
- <52B355EC.9040306@wwwdotorg.org>
-Message-ID: <52B3E968.8090906@nvidia.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Thu, 19 Dec 2013 22:56:28 -0800
+Subject: [PATCH v3] cpufreq: imx6q: add of_init_opp_table
+Message-ID: <1387522588-13114-1-git-send-email-john.tobias.ph@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013 01:54 AM, Stephen Warren wrote:
-> On 12/19/2013 09:06 AM, Thierry Reding wrote:
+Add a routine check to see if the platform supplied the OPP table.
+Incase there's no OPP table exist, it will try to initialise it.
 
-> (Laxman, as an aside, I'm not sure why you're upstreaming patches that
-> don't exactly match the existing kernel support for this board...)
+It's been tested on iMX6SL board where the platform doesn't have
+an OPP table.
 
-I did not get this based on what context it is. Can you please elaborate 
-where I am missing the stuff?
+Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+---
+ drivers/cpufreq/imx6q-cpufreq.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
 
-
->
->> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
->> +				sd0 {
->> +					regulator-name = "vdd_cpu";
->> +					regulator-min-microvolt = <700000>;
->> +					regulator-max-microvolt = <1350000>;
-> Laxman's patch has:
->
->   					regulator-max-microvolt = <1400000>;
-
-We have the Laguna platform on which Android and L4T is running fine. 
-This is based on same PMIC used for Venice2. As we are running the more 
-cpu stress on Laguna, I took this parameter from the Laguna Power tree 
-where it is maximum 1.4V. Chrome have maximum as 1.35mV.
-
-
-
->
->> +					regulator-always-on;
->> +					ams,ext-control = <2>;
->> +				};
-> Laxman's patch adds:
->
->   					regulator-min-microamp = <3500000>;
->   					regulator-max-microamp = <3500000>;
->   					regulator-boot-on;
->
-> Those properties (with various values) are added to quite a few nodes; I
-> won't bother pointing them out elsewhere.
-
-
-All rails does not support the current configuration. SD0, SD1 and SD6 
-supports this. We have configured these value on Laguna as per system 
-eng recommendation for this rails. As the power tree s almost same, I 
-configured same here for Venice2. SD0 and SD6 on 3500mA and SD1 is on 
-2500mA.
-
-
-
->
->> +				sd1 {
-> ...
->> +					regulator-max-microamp = <3500000>;
-> Laxman's patch has:
->
->   					regulator-max-microamp = <2500000>;
->
-> Laxman's patch adds the following node:
->
->   				sd3 {
->   					regulator-name = "vddio-ddr-2phase";
->   					regulator-min-microvolt = <1350000>;
->   					regulator-max-microvolt = <1350000>;
->   					regulator-always-on;
->   					regulator-boot-on;
->   				};
-As per schematic, SD2 and SD3 make 2 phase supply for the DDR. I added 
-SD3 so that it should not get disabled at time of unused regulator 
-disabled by regulator framework.
->
->> +				sd6 {
-> ...
->> +					regulator-min-microvolt = <800000>;
-> Laxman's patch has:
->
->   					regulator-min-microvolt = <650000>;
-
-Again from downstream Laguna platform.
-
->
->> +				ldo6 {
-> ...
->> +					regulator-min-microvolt = <3300000>;
-> Laxman's patch has:
->
->   					regulator-min-microvolt = <1800000>;
-VDDIO SDMMC and I think it is for SD3.0 (UHS) which switches voltage 
-from 3.3 to 1.8 on UHS mode by sdmmc driver.
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 4b3f18e..e125aed 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -187,12 +187,25 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		goto put_node;
+ 	}
+ 
+-	/* We expect an OPP table supplied by platform */
++	/*
++	 * We expect an OPP table supplied by platform.
++	 * Just, incase the platform did not supply the OPP
++	 * table, it will try to get it.
++	 */
+ 	num = dev_pm_opp_get_opp_count(cpu_dev);
+ 	if (num < 0) {
+-		ret = num;
+-		dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
+-		goto put_node;
++		ret = of_init_opp_table(cpu_dev);
++		if (ret < 0) {
++			dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
++			goto put_node;
++		}
++
++		num = dev_pm_opp_get_opp_count(cpu_dev);
++		if (num < 0) {
++			ret = num;
++			dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
++			goto put_node;
++		}
+ 	}
+ 
+ 	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+-- 
+1.8.3.2
