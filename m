@@ -1,88 +1,81 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Fri, 20 Dec 2013 19:30:16 +0800
-Subject: [PATCH RFC v3 04/12] arm64: kernel: cpu_{suspend/resume}
- implementation
-In-Reply-To: <1385033059-25896-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1385033059-25896-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <52B42A48.5090202@marvell.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 20 Dec 2013 19:35:22 +0800
+Subject: [PATCH 1/2] ARM: AT91: PIT: Remove irq handler when clock event
+ is unused
+In-Reply-To: <1387536341-7452-2-git-send-email-bigeasy@linutronix.de>
+References: <1387536341-7452-1-git-send-email-bigeasy@linutronix.de>
+ <1387536341-7452-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <BB6D8A98-942B-4B2E-A668-5D47DDC0DBF7@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2013 07:24 PM, Lorenzo Pieralisi wrote:
+ACK
+On Dec 20, 2013, at 6:45 PM, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
 
-> +/*
-> + * x0 must contain the sctlr value retrieved from restored context
-> + */
-> +ENTRY(cpu_resume_mmu)
-> +	ldr	x3, =cpu_resume_after_mmu
-> +	msr	sctlr_el1, x0		// restore sctlr_el1
-> +	isb
-> +	br	x3			// global jump to virtual address
-> +ENDPROC(cpu_resume_mmu)
-> +cpu_resume_after_mmu:
-> +	mov	x0, #0			// return zero on success
-> +	ldp	x19, x20, [sp, #16]
-> +	ldp	x21, x22, [sp, #32]
-> +	ldp	x23, x24, [sp, #48]
-> +	ldp	x25, x26, [sp, #64]
-> +	ldp	x27, x28, [sp, #80]
-> +	ldp	x29, lr, [sp], #96
-> +	ret
-> +ENDPROC(cpu_resume_after_mmu)
-> +
-> +	.data
-> +ENTRY(cpu_resume)
-> +	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+> From: Benedikt Spranger <b.spranger@linutronix.de>
+> 
+> Setup and remove the interrupt handler in clock event mode selection.
+> This avoids calling the (shared) interrupt handler when the device is
+> not used.
+> 
+> Signed-off-by: Benedikt Spranger <b.spranger@linutronix.de>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> [bigeasy: redo the patch with NR_IRQS_LEGACY which is probably required since
+> commit 8fe82a55 ("ARM: at91: sparse irq support") which is included since v3.6.
+> Patch based on what Sami Pietik?inen <Sami.Pietikainen@wapice.com> suggested].
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+> arch/arm/mach-at91/at91rm9200_time.c  | 1 +
+> arch/arm/mach-at91/at91sam926x_time.c | 5 ++++-
+> 2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+> index bc7b363..fd34d55 100644
+> --- a/arch/arm/mach-at91/at91rm9200_time.c
+> +++ b/arch/arm/mach-at91/at91rm9200_time.c
+> @@ -134,6 +134,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+> 		break;
+> 	case CLOCK_EVT_MODE_SHUTDOWN:
+> 	case CLOCK_EVT_MODE_UNUSED:
+> +		remove_irq(NR_IRQS_LEGACY + AT91_ID_SYS, &at91rm9200_timer_irq);
 
-Compare to v2's patch set, here remove the calculation fro the offset 
-b/t PHYS_OFFSET - PAGE_OFFSET; so when i verify the patch set, i saw x28 
-is zero and finally introduce the EL2's sync exception. Below are pasted 
-v2's code for reference.
+I?m a fan of copy and paste NR_IRQS_LEGACY + AT91_ID_SYS but ok
 
-do u want use firmware to set the x28 for the offset value? :-) IMHO, 
-v2's implementation is more reasonable and it's better keep the code.
-
-ENTRY(cpu_resume)
-           adr     x4, sleep_save_sp
-           ldr     x5, =sleep_save_sp
-           sub     x28, x4, x5             // x28 = PHYS_OFFSET - 
-PAGE_OFFSET
-           /*
-            * make sure el2 is sane, el2_setup expects:
-            * x28 = PHYS_OFFSET - PAGE_OFFSET
-            */
-           bl      el2_setup               // if in EL2 drop to EL1 cleanly
-
-
-> +#ifdef CONFIG_SMP
-> +	mrs	x1, mpidr_el1
-> +	adr	x4, mpidr_hash_ptr
-> +	ldr	x5, [x4]
-> +	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
-> +        /* retrieve mpidr_hash members to compute the hash */
-> +	ldr	x2, [x8, #MPIDR_HASH_MASK]
-> +	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
-> +	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
-> +	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
-> +        /* x7 contains hash index, let's use it to grab context pointer */
-> +#else
-> +	mov	x7, xzr
-> +#endif
-> +	adr	x0, sleep_save_sp
-> +	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
-> +	ldr	x0, [x0, x7, lsl #3]
-> +	/* load sp from context */
-> +	ldr	x2, [x0, #CPU_CTX_SP]
-> +	adr	x1, sleep_idmap_phys
-> +	/* load physical address of identity map page table in x1 */
-> +	ldr	x1, [x1]
-> +	mov	sp, x2
-> +	/*
-> +	 * cpu_do_resume expects x0 to contain context physical address
-> +	 * pointer and x1 to contain physical address of 1:1 page tables
-> +	 */
-> +	bl	cpu_do_resume		// PC relative jump, MMU off
-> +	b	cpu_resume_mmu		// Resume MMU, never returns
-> +ENDPROC(cpu_resume)
-> +
+Best Regards,
+J.
+> 	case CLOCK_EVT_MODE_RESUME:
+> 		irqmask = 0;
+> 		break;
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index bb39232..1c4c487 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -77,7 +77,7 @@ static struct clocksource pit_clk = {
+> 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+> };
+> 
+> -
+> +static struct irqaction at91sam926x_pit_irq;
+> /*
+>  * Clockevent device:  interrupts every 1/HZ (== pit_cycles * MCK/16)
+>  */
+> @@ -86,6 +86,8 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+> {
+> 	switch (mode) {
+> 	case CLOCK_EVT_MODE_PERIODIC:
+> +		/* Set up irq handler */
+> +		setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
+> 		/* update clocksource counter */
+> 		pit_cnt += pit_cycle * PIT_PICNT(pit_read(AT91_PIT_PIVR));
+> 		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN
+> @@ -98,6 +100,7 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+> 	case CLOCK_EVT_MODE_UNUSED:
+> 		/* disable irq, leaving the clocksource active */
+> 		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+> +		remove_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
+> 		break;
+> 	case CLOCK_EVT_MODE_RESUME:
+> 		break;
+> -- 
+> 1.8.5.1
+> 
