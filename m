@@ -1,61 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Dec 2013 08:04:33 -0800
-Subject: OMAP display subsystem - does it work?
-In-Reply-To: <52B44982.4020501@ti.com>
-References: <20131218120023.GG4360@n2100.arm.linux.org.uk>
- <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
- <20131219175644.GE32243@n2100.arm.linux.org.uk>
- <20131219182252.GP27438@atomide.com>
- <20131220112700.GF32243@n2100.arm.linux.org.uk>
- <20131220114837.GH32243@n2100.arm.linux.org.uk>
- <52B44982.4020501@ti.com>
-Message-ID: <20131220160432.GZ27438@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Dec 2013 16:05:22 +0000
+Subject: [PATCH 2/2] arm64: dts: Reduce size of virtio block device for
+ foundation model
+In-Reply-To: <20131220142524.GB11954@localhost>
+References: <1387543964-15057-1-git-send-email-broonie@kernel.org>
+ <1387543964-15057-2-git-send-email-broonie@kernel.org>
+ <20131220142524.GB11954@localhost>
+Message-ID: <20131220160522.GX31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [131220 05:45]:
-> On 2013-12-20 13:48, Russell King - ARM Linux wrote:
-> > On Fri, Dec 20, 2013 at 11:27:01AM +0000, Russell King - ARM Linux wrote:
-> >> Maybe, but that's the problem - finding out what is missing.  This is the
-> >> endless problem where things keep changing - it's very difficult to keep
-> >> a "working configuration" working because the config symbols keep changing.
-> >>
-> >> Also, bear in mind that there's many different variants of the LDP hardware
-> >> with stuff connected up in different ways (I'm aware that the keypad is
-> >> just randomly allocated).  I wouldn't be surprised if this also applied
-> >> to how the backlight on the LCD was done.
-> 
-> I need to cook up a patch for the gpio active-low problem. I tried to
-> figure out how to do it with the old GPIO API, but as far as I
-> understand, I have to do it manually in the driver (as it was done in
-> the old driver).
-> 
-> > Or maybe this is getting buggered by the idiotic deferred probing...  It
-> > seems that the GPIOs for controlling the LCD and backlight aren't even
-> > getting claimed if the DSS modules are built in:
-> > 
-> > # cat /sys/kernel/debug/gpio
-> > ...
-> > GPIOs 238-255, platform/twl4030_gpio, twl4030, can sleep:
-> > # echo panel-dpi.0 > /sys/bus/platform/drivers/panel-dpi/unbind
-> > # echo panel-dpi.0 > /sys/bus/platform/drivers/panel-dpi/bind
-> > # cat /sys/kernel/debug/gpio
-> > ...
-> > GPIOs 238-255, platform/twl4030_gpio, twl4030, can sleep:
-> >  gpio-245 (panel enable        ) out lo
-> >  gpio-253 (panel backlight     ) out lo
-> 
-> This looks odd... Presuming the panel device was probed successfully, it
-> should always get the gpios or return an error. Only if gpio_is_valid()
-> returns false for the gpio, it skips it and continues. But in this case,
-> the gpio number comes from the platform data, so it should always be valid.
-> 
-> And if it wasn't probed successfully, then there shouldn't be a fb0.
+On Fri, Dec 20, 2013 at 02:25:24PM +0000, Catalin Marinas wrote:
+> On Fri, Dec 20, 2013 at 12:52:44PM +0000, Mark Brown wrote:
+> > From: Mark Brown <broonie@linaro.org>
 
-I bet that's it though. If the display is probed before twl4030 GPIO
-is initialized, the GPIO numbers will be 0. I'm using omap2plus_defconfig
-which has DSS built as modules.
+> > Will Deacon observed that kvmtool uses a size of 0x200 for virtio
+> > block memory region and that the virtio block spec only uses 31 bytes in
+> > the device specific region at 0x100 so reduce the region to a less
+> > wasteful 0x200.
 
-Regards,
+> What do we waste by keeping it at 4K? That's ioremap'ed, so we use a
+> full page anyway.
 
-Tony
+This was done for consistency with the same change made in RTSM
+motherboard patch so that we register the same device in the same way.  
+That change was at Will's request, he did point out that we might use
+16K pages in some systems IIRC but personally I'm not sure it makes a
+huge difference either way - I do think we should keep all registrations
+of the device consistent though to avoid user confusion about how to use
+it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/656f6dec/attachment.sig>
