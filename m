@@ -1,44 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 20 Dec 2013 09:49:58 -0600
-Subject: [PATCH] usb: musb: Remove USB_GADGET driver dependency
-In-Reply-To: <1387502448-11041-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1387502448-11041-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131220154958.GA5957@saruman.home>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 20 Dec 2013 16:51:15 +0100
+Subject: [PATCH v2 0/2] ARM: omap3: Split the pinmux core device
+Message-ID: <1387554677-21100-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 10:20:48PM -0300, Ezequiel Garcia wrote:
-> This USB controller is dual-role, but can also work in host-only mode.
-> There's no reason to condition the entire driver to USB_GADGET. Fix this by
-> removing the dependency.
-> 
-> Tested on a Beaglebone black (AM335x) using a regular USB mass storage
-> device.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/usb/musb/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-> index 57dfc0c..2119370 100644
-> --- a/drivers/usb/musb/Kconfig
-> +++ b/drivers/usb/musb/Kconfig
-> @@ -6,7 +6,6 @@
->  # (M)HDRC = (Multipoint) Highspeed Dual-Role Controller
->  config USB_MUSB_HDRC
->  	tristate 'Inventra Highspeed Dual Role Controller (TI, ADI, ...)'
-> -	depends on USB_GADGET
+Hello,
 
-the correct patch would be to turn this into (USB || USB_GADGET) and fix
-the mode selection just like dwc3 is doing.
+While working on the OMAP3 ISP driver I've run into a failure to request a
+memory region already requested by the pinctrl-single driver. This patch set
+is an attempt to fix the problem.
+
+Changes since v1:
+
+- Rebased on top of Tony's master branch
+- Handle IGEP LEDs
+- Added Tony's PINCTRL macros
+- Fixed unbalanced parentheses in Tony's PINCTRL macros ;-)
+
+Laurent Pinchart (1):
+  ARM: omap3: Split the pinmux core device
+
+Tony Lindgren (1):
+  ARM: dts: Add omap specific pinctrl defines to use padconf addresses
+
+ arch/arm/boot/dts/omap3-beagle-xm.dts | 40 +++++++++++++++++----------
+ arch/arm/boot/dts/omap3-beagle.dts    | 40 +++++++++++++++++----------
+ arch/arm/boot/dts/omap3-igep.dtsi     |  2 --
+ arch/arm/boot/dts/omap3-igep0020.dts  | 52 +++++++++++++++++++----------------
+ arch/arm/boot/dts/omap3-igep0030.dts  | 10 ++++---
+ arch/arm/boot/dts/omap3-zoom3.dts     | 23 ++++++++++------
+ arch/arm/boot/dts/omap3.dtsi          | 13 ++++++++-
+ include/dt-bindings/pinctrl/omap.h    | 19 +++++++++++++
+ 8 files changed, 133 insertions(+), 66 deletions(-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/cb68bbdc/attachment.sig>
+Regards,
+
+Laurent Pinchart
