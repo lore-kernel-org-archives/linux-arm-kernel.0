@@ -1,48 +1,51 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 20 Dec 2013 22:08:38 +0100
-Subject: [PATCH] ARM: dts: add clock provider for mshc node for Exynos4412
- SOC
-In-Reply-To: <52B4AC28.3070404@samsung.com>
-References: <1358764755-21470-1-git-send-email-thomas.abraham@linaro.org>
- <000201cefd7f$d8b7c840$8a2758c0$%jun@samsung.com>
- <52B4AC28.3070404@samsung.com>
-Message-ID: <1610394.o1Af0FOyXz@flatron>
+Date: Fri, 20 Dec 2013 22:19:02 +0100
+Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
+In-Reply-To: <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
+References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voamU5hc7uC5MTOA7OtYuqpsis7cTX3sx0UrmpdZx7_TpzA@mail.gmail.com>
+ <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
+Message-ID: <346894265.CPBN0v9Elj@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi,
 
-On Saturday 21 of December 2013 05:44:24 Kukjin Kim wrote:
-> On 12/20/13 21:34, Seungwon Jeon wrote:
-> > Clock lookup information is required as driver can manipulate
-> > clock rate properly.
-> >
-> > Signed-off-by: Seungwon Jeon<tgih.jun@samsung.com>
-> > ---
-> >   arch/arm/boot/dts/exynos4412.dtsi |    2 ++
-> >   1 files changed, 2 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> > index ec1b166..9cbe59a 100644
-> > --- a/arch/arm/boot/dts/exynos4412.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> > @@ -41,5 +41,7 @@
-> >   		interrupts =<0 77 0>;
-> >   		#address-cells =<1>;
-> >   		#size-cells =<0>;
-> > +		clocks =<&clock 301>,<&clock 149>;
-> > +		clock-name = "biu", "ciu";
-> >   	};
-> >   };
+On Friday 20 of December 2013 15:56:38 sunil joshi wrote:
+> Hi Abhilash,
+> I saw another patch in chrome tree ..by Andrew Bresticker
+> which may be relevant here ..
 > 
-> Applied, thanks.
+> Just wondering if you missed adding this ? or this is not needed ?
+> You did not face any issue in getting core to suspend ?
+> 
+> ------------------------------------------------------------------------------------------
+> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
+> Author: Andrew Bresticker <abrestic@chromium.org>
+> Date:   Mon Jul 15 13:14:36 2013 -0700
+> 
+>     arm: exynos: disable all interrupts on Exynos5420 before suspend
+> 
+>     Disable all interrupts from the GIC before entering suspend on
+>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
+>     may receive an interrupt after entering WFI but before the PMU has
+>     suspended the system, causing suspend to fail.
+> 
+>     BUG=chrome-os-partner:20523
+>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
+>     no longer occasionally fails with the "Failed to suspend the system"
+>     error in exynos_cpu_suspend().
 
-I'm afraid you should not have applied this patch. More than this is
-needed for correct support of DW-MSHC on Exynos 4x12 and I already
-posted a series doing so more than a week ago.
+A question about this for Chromium and LSI guys:
 
-Please refer to this thread:
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/25493
+If you find out that there is already a pending interrupt before you enter
+the sleep mode, isn't it more reasonable to cancel the process ASAP and
+handle the event instead of entering the sleep just to leave it?
+
+I believe this should be both more efficient with respect to power usage
+and latency, because sleep-wakeup transition takes time and power.
+
+Do you have any reason to think the opposite?
 
 Best regards,
 Tomasz
