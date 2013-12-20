@@ -1,49 +1,34 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 20 Dec 2013 22:08:45 +0000
-Subject: [RFC 0/2] clk: dt: generic DT preset clock frequency bindings
-Message-ID: <1387577327-5007-1-git-send-email-james.hogan@imgtec.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 21 Dec 2013 07:16:14 +0900
+Subject: [PATCH 0/3] DW-MSHC support on Exynos4412-TRATS2 board
+In-Reply-To: <1386865083-20082-1-git-send-email-t.figa@samsung.com>
+References: <1386865083-20082-1-git-send-email-t.figa@samsung.com>
+Message-ID: <52B4C1AE.4000506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add a property "clock-N-frequency" to the clock consumer
-bindings to specify the frequency that a clock should be configured to
-when it is made use of. N is the index of a clock specifier in the
-clocks property, starting at 0.
+On 12/13/13 01:18, Tomasz Figa wrote:
+> This series fixes spotted issues with DW-MSHC support on Exynos4x12
+> SoCs and then enables DW-MSHC controller to handle eMMC memory on
+> Exynos4412-TRATS2 board. As opposed to using sdhci-s3c for eMMC,
+> MMC 4.4 extensions can be used and in general performance is improved.
+>
+> Tested on Exynos4412-TRATS2 board.
+>
+> Tomasz Figa (3):
+>    clk: samsung: exynos4: Fix definition of div_mmc_pre4 divider
+>    ARM: dts: exynos4x12: Fix definition of MSHC device tree nodes
+>    ARM: dts: exynos4412-trats2: Use MSHC controller for eMMC memory
+>
+>   arch/arm/boot/dts/exynos4412-odroidx.dts |  5 +----
+>   arch/arm/boot/dts/exynos4412-origen.dts  |  5 +----
+>   arch/arm/boot/dts/exynos4412-trats2.dts  | 20 ++++++++++++++++----
+>   arch/arm/boot/dts/exynos4412.dtsi        |  8 --------
+>   arch/arm/boot/dts/exynos4x12.dtsi        | 13 +++++++++++++
+>   drivers/clk/samsung/clk-exynos4.c        |  3 ++-
+>   6 files changed, 33 insertions(+), 21 deletions(-)
+>
+Looks good to me, applied.
 
-It's RFC since there are plenty of ways it could be handled, I've pretty
-much just tried the simplest, but I'd like to get some thoughts from
-others:
- - Adding such properties to individual device drivers / bindings. The
-   bindings could be standardised and handled generically like in this
-   patch, although it's not very nicely extensible to more complex
-   settings (e.g. setting a particular clock's parent up the hierarchy a
-   bit).
- - Adding named phandles like pinctrl clients do for pin configuration
-   but to describe clock configuration, the "default" of which is set up
-   automatically when a device is probed. This is more extensible, and
-   certainly more complex. I suspect it may be overkill.
-
-The point is to avoid the need to add clock-frequency properties to
-individual device bindings or modify drivers to set the frequency of
-clocks to that requested in device tree. Instead the driver can just
-read the rate of the clock as if it was fixed without needing to know
-how it has been configured.
-
-This is aimed at devices where it's difficult for drivers to determine
-what a clock should be set to, and either there is a recommended
-frequency for the particular system or a chosen frequency for the
-particular application of the system (which makes it essentially
-configuration data).
-
-James Hogan (2):
-  dt: binding: add clock-N-frequency to common clock bindings
-  clk: implement generic DT preset clock frequency
-
- .../devicetree/bindings/clock/clock-bindings.txt   |  3 ++
- drivers/clk/clk.c                                  | 34 ++++++++++++++++++++++
- drivers/clk/clkdev.c                               |  3 ++
- include/linux/clk.h                                |  5 ++++
- 4 files changed, 45 insertions(+)
-
--- 
-1.8.3.2
+Thanks,
+Kukjin
