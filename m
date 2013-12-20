@@ -1,115 +1,102 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Dec 2013 18:25:12 +0100
-Subject: [PATCH 1/5] ARM: versatile: move GPIO2 and GPIO3 to core
-Message-ID: <1387560312-21425-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 20 Dec 2013 18:25:25 +0100
+Subject: [PATCH 2/5] ARM: versatile: update defconfig
+Message-ID: <1387560325-21462-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move GPIO2 and GPIO3 to be registered from the core as this is
-certainly available on Versatile AB as well, not just the PB.
-GPIO2 is used for reading board status and GPIO3 is unused,
-but it does not hurt to register it anyway.
+This updates the Versatile defconfig to the thing saved by
+savedefconfig so we don't get confusing diffs when trying to
+modify other options.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-versatile/core.c         | 16 ++++++++++++++++
- arch/arm/mach-versatile/versatile_pb.c | 21 ---------------------
- 2 files changed, 16 insertions(+), 21 deletions(-)
+ arch/arm/configs/versatile_defconfig | 19 +++++--------------
+ 1 file changed, 5 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 3b0572f30d56..a335126ae18f 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -570,6 +570,16 @@ static struct pl061_platform_data gpio1_plat_data = {
- 	.irq_base	= IRQ_GPIO1_START,
- };
- 
-+static struct pl061_platform_data gpio2_plat_data = {
-+	.gpio_base	= 16,
-+	.irq_base	= IRQ_GPIO2_START,
-+};
-+
-+static struct pl061_platform_data gpio3_plat_data = {
-+	.gpio_base	= 24,
-+	.irq_base	= IRQ_GPIO3_START,
-+};
-+
- static struct pl022_ssp_controller ssp0_plat_data = {
- 	.bus_id = 0,
- 	.enable_dma = 0,
-@@ -596,6 +606,8 @@ static struct pl022_ssp_controller ssp0_plat_data = {
- #define WATCHDOG_IRQ	{ IRQ_WDOGINT }
- #define GPIO0_IRQ	{ IRQ_GPIOINT0 }
- #define GPIO1_IRQ	{ IRQ_GPIOINT1 }
-+#define GPIO2_IRQ	{ IRQ_GPIOINT2 }
-+#define GPIO3_IRQ	{ IRQ_GPIOINT3 }
- #define RTC_IRQ		{ IRQ_RTCINT }
- 
- /*
-@@ -622,6 +634,8 @@ APB_DEVICE(sctl,  "dev:e0",  SCTL,     NULL);
- APB_DEVICE(wdog,  "dev:e1",  WATCHDOG, NULL);
- APB_DEVICE(gpio0, "dev:e4",  GPIO0,    &gpio0_plat_data);
- APB_DEVICE(gpio1, "dev:e5",  GPIO1,    &gpio1_plat_data);
-+APB_DEVICE(gpio2, "dev:e6",  GPIO2,    &gpio2_plat_data);
-+APB_DEVICE(gpio3, "dev:e7",  GPIO3,    &gpio3_plat_data);
- APB_DEVICE(rtc,   "dev:e8",  RTC,      NULL);
- APB_DEVICE(sci0,  "dev:f0",  SCI,      NULL);
- APB_DEVICE(uart0, "dev:f1",  UART0,    NULL);
-@@ -641,6 +655,8 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&wdog_device,
- 	&gpio0_device,
- 	&gpio1_device,
-+	&gpio2_device,
-+	&gpio3_device,
- 	&rtc_device,
- 	&sci0_device,
- 	&ssp0_device,
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index 611d140c8695..9a53d0bd9144 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -47,27 +47,11 @@ static struct mmci_platform_data mmc1_plat_data = {
- 	.gpio_cd	= -1,
- };
- 
--static struct pl061_platform_data gpio2_plat_data = {
--	.gpio_base	= 16,
--	.irq_base	= IRQ_GPIO2_START,
--};
--
--static struct pl061_platform_data gpio3_plat_data = {
--	.gpio_base	= 24,
--	.irq_base	= IRQ_GPIO3_START,
--};
--
- #define UART3_IRQ	{ IRQ_SIC_UART3 }
- #define SCI1_IRQ	{ IRQ_SIC_SCI3 }
- #define MMCI1_IRQ	{ IRQ_MMCI1A, IRQ_SIC_MMCI1B }
- 
- /*
-- * These devices are connected via the core APB bridge
-- */
--#define GPIO2_IRQ	{ IRQ_GPIOINT2 }
--#define GPIO3_IRQ	{ IRQ_GPIOINT3 }
--
--/*
-  * These devices are connected via the DMA APB bridge
-  */
- 
-@@ -76,14 +60,9 @@ APB_DEVICE(uart3, "fpga:09", UART3,    NULL);
- APB_DEVICE(sci1,  "fpga:0a", SCI1,     NULL);
- APB_DEVICE(mmc1,  "fpga:0b", MMCI1,    &mmc1_plat_data);
- 
--/* DevChip Primecells */
--APB_DEVICE(gpio2, "dev:e6",  GPIO2,    &gpio2_plat_data);
--APB_DEVICE(gpio3, "dev:e7",  GPIO3,    &gpio3_plat_data);
- 
- static struct amba_device *amba_devs[] __initdata = {
- 	&uart3_device,
--	&gpio2_device,
--	&gpio3_device,
- 	&sci1_device,
- 	&mmc1_device,
- };
+diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
+index 2ba9e63d0f17..0756efd8b554 100644
+--- a/arch/arm/configs/versatile_defconfig
++++ b/arch/arm/configs/versatile_defconfig
+@@ -1,5 +1,3 @@
+-CONFIG_ARCH_VERSATILE=y
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+@@ -7,15 +5,14 @@ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_ARCH_VERSATILE=y
+ CONFIG_MACH_VERSATILE_AB=y
+-CONFIG_LEDS=y
+-CONFIG_LEDS_CPU=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=1f03 mem=32M"
+ CONFIG_FPE_NWFPE=y
+ CONFIG_VFP=y
+-CONFIG_PM=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -26,9 +23,7 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+@@ -37,10 +32,10 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_EEPROM_LEGACY=m
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_SMC91X=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_AMBAKMI=y
++CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_8250=m
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_MANY_PORTS=y
+@@ -48,15 +43,12 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
+ CONFIG_SERIAL_8250_RSA=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=m
+ # CONFIG_HWMON is not set
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FONTS=y
+-CONFIG_FONT_ACORN_8x8=y
+ CONFIG_SOUND=y
+ CONFIG_SND=m
+ CONFIG_SND_MIXER_OSS=m
+@@ -71,15 +63,14 @@ CONFIG_CRAMFS=y
+ CONFIG_MINIX_FS=y
+ CONFIG_ROMFS_FS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NFSD=y
+ CONFIG_NFSD_V3=y
+-CONFIG_PARTITION_ADVANCED=y
+ CONFIG_NLS_CODEPAGE_850=m
+ CONFIG_NLS_ISO8859_1=m
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
++CONFIG_FONTS=y
++CONFIG_FONT_ACORN_8x8=y
 -- 
 1.8.3.1
