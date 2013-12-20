@@ -1,75 +1,150 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 20 Dec 2013 14:11:27 +0100
-Subject: [PATCH v4 0/9] ASoC: fsl-ssi: offline/online configuration and
- cleanups
-Message-ID: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
+Date: Fri, 20 Dec 2013 14:11:31 +0100
+Subject: [PATCH v4 4/9] ASoC: fsl-ssi: Fix interrupt stats for imx
+In-Reply-To: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
+References: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1387545096-2334-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+irqs should only be requested/released with enabled DMA. Previously
+interrupt statistics where disabled for IMX Processors because of
+different writeable SISR bits.
 
-This patch series fixes some fsl-ssi code that does not act exactly as it is
-described in the reference manuals.
+This patch introduces support for irqstats on imx processors again by
+creating a sisr writeback mask and introducing a imx35-ssi compatible.
 
-The reference manuals before imx51 do mention that some register bits,
-including TDMAE/RDMAE, should not be changed while the SSI unit is enabled
-(SSIEN). At the same time the SDMA unit has a undefined request handling if
-there are DMA requests before the SDMA engine and its channel is configured.
-The reference manual states that SSI DMA requests are sent as soon as the FIFO
-and the DMAE bits are enabled. It does not mention a dependency to SCR's TE/RE
-bit.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/fsl/fsl_ssi.c | 40 ++++++++++++++++++++++++++++++++--------
+ 1 file changed, 32 insertions(+), 8 deletions(-)
 
-To avoid sending DMA requests before a channel is configured, we have to
-seperate the fsl-ssi behavior into offline and online configuration. SoCs
-before imx51 have to use offline configuration while later SoC versions can use
-online reconfiguration.
-
-This series adds support for online configuration and cleans up the
-configuration register code especially in fsl_ssi_trigger. At the end we have a
-seperation between enable/disable logic and the actual configuration register
-values used to enable/disable TX/RX.
-
-v4 is another rebase onto latest topic/fsl branch. It includes the DAI master
-mode changes from Nicolin.
-
-@Nicolin: Could you please test this series with your hardware to verify that
-your patch still works?
-
-I tested this series on mx53.
-
-The series is based on Mark Brown's topic/fsl branch.
-
-Regards,
-
-Markus
-
-Changes in v4:
- - Support for irqstats on all imx SoCs
- - Fix offline_config and use switch statement
- - Introduce ssi_private->irq_stats bool
-
-Changes in v3:
- - Rebase on latest topic/fsl
- - Added patch to cleanup probe function error handling
- - Fix interrupt stats for imx53
- - Replace imx50-ssi by imx51-ssi
-
-Markus Pargmann (9):
-  ASoC: fsl-ssi: Fix probe error handling
-  ASoC: fsl-ssi: Move sysfs stats to debugfs
-  ASoC: fsl-ssi: Add imx51-ssi and of_device_id matching
-  ASoC: fsl-ssi: Fix interrupt stats for imx
-  ASoC: fsl-ssi: Add offline_config flag
-  ASoC: fsl-ssi: Add configuration helper functions
-  ASoC: fsl-ssi: Move RX/TX configuration to seperate functions
-  ASoC: fsl-ssi: Drop ac97 specific trigger function
-  ARM: DTS: imx5* imx6*, use imx51-ssi
-
- arch/arm/boot/dts/imx53.dtsi   |  10 +-
- arch/arm/boot/dts/imx6qdl.dtsi |  12 +-
- arch/arm/boot/dts/imx6sl.dtsi  |  12 +-
- sound/soc/fsl/fsl_ssi.c        | 567 ++++++++++++++++++++++++++++-------------
- 4 files changed, 411 insertions(+), 190 deletions(-)
-
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 39ad516..f37bcbe 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -127,6 +127,7 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+ enum fsl_ssi_type {
+ 	FSL_SSI_MCP8610,
+ 	FSL_SSI_MX21,
++	FSL_SSI_MX35,
+ 	FSL_SSI_MX51,
+ };
+ 
+@@ -151,6 +152,7 @@ struct fsl_ssi_private {
+ 	struct snd_soc_dai_driver cpu_dai_drv;
+ 	struct platform_device *pdev;
+ 
++	enum fsl_ssi_type hw_type;
+ 	bool new_binding;
+ 	bool ssi_on_imx;
+ 	bool imx_ac97;
+@@ -199,6 +201,7 @@ struct fsl_ssi_private {
+ static const struct of_device_id fsl_ssi_ids[] = {
+ 	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
+ 	{ .compatible = "fsl,imx51-ssi", .data = (void *) FSL_SSI_MX51},
++	{ .compatible = "fsl,imx35-ssi", .data = (void *) FSL_SSI_MX35},
+ 	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
+ 	{}
+ };
+@@ -222,7 +225,26 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 	irqreturn_t ret = IRQ_NONE;
+ 	__be32 sisr;
+-	__be32 sisr2 = 0;
++	__be32 sisr2;
++	__be32 sisr_write_mask = 0;
++
++	switch (ssi_private->hw_type) {
++	case FSL_SSI_MX21:
++		sisr_write_mask = 0;
++		break;
++
++	case FSL_SSI_MCP8610:
++	case FSL_SSI_MX35:
++		sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
++			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
++			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
++		break;
++
++	case FSL_SSI_MX51:
++		sisr_write_mask = CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
++			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
++		break;
++	}
+ 
+ 	/* We got an interrupt, so read the status register to see what we
+ 	   were interrupted for.  We mask it with the Interrupt Enable register
+@@ -232,13 +254,11 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 
+ 	if (sisr & CCSR_SSI_SISR_RFRC) {
+ 		ssi_private->stats.rfrc++;
+-		sisr2 |= CCSR_SSI_SISR_RFRC;
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+ 	if (sisr & CCSR_SSI_SISR_TFRC) {
+ 		ssi_private->stats.tfrc++;
+-		sisr2 |= CCSR_SSI_SISR_TFRC;
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+@@ -279,25 +299,21 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 
+ 	if (sisr & CCSR_SSI_SISR_ROE1) {
+ 		ssi_private->stats.roe1++;
+-		sisr2 |= CCSR_SSI_SISR_ROE1;
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+ 	if (sisr & CCSR_SSI_SISR_ROE0) {
+ 		ssi_private->stats.roe0++;
+-		sisr2 |= CCSR_SSI_SISR_ROE0;
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+ 	if (sisr & CCSR_SSI_SISR_TUE1) {
+ 		ssi_private->stats.tue1++;
+-		sisr2 |= CCSR_SSI_SISR_TUE1;
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+ 	if (sisr & CCSR_SSI_SISR_TUE0) {
+ 		ssi_private->stats.tue0++;
+-		sisr2 |= CCSR_SSI_SISR_TUE0;
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
+@@ -341,6 +357,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 		ret = IRQ_HANDLED;
+ 	}
+ 
++	sisr2 = sisr & sisr_write_mask;
+ 	/* Clear the bits that we set */
+ 	if (sisr2)
+ 		write_ssi(sisr2, &ssi->sisr);
+@@ -1180,6 +1197,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 
+ 	ssi_private->use_dma = !of_property_read_bool(np,
+ 			"fsl,fiq-stream-filter");
++	ssi_private->hw_type = hw_type;
+ 
+ 	if (ac97) {
+ 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
+@@ -1298,7 +1316,13 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+ 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
+ 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+-	} else if (ssi_private->use_dma) {
++	}
++
++	/*
++	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
++	 * different writeable interrupt status registers.
++	 */
++	if (ssi_private->use_dma) {
+ 		/* The 'name' should not have any slashes in it. */
+ 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
+ 					fsl_ssi_isr, 0, ssi_private->name,
 -- 
 1.8.5.1
