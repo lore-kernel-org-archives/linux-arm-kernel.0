@@ -1,46 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 20 Dec 2013 14:25:30 +0000
-Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
-In-Reply-To: <52B32C05.5010204@wwwdotorg.org>
-References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
- <20131211092435.GC16780@lee--X1> <52B32C05.5010204@wwwdotorg.org>
-Message-ID: <20131220142530.GK3709@lee--X1>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 20 Dec 2013 09:36:41 -0500
+Subject: [PATCH v2 0/2] gpio: davinci: reuse for keystone arch
+In-Reply-To: <CACRpkdYcvtWNgJ=JCgpZFdZmypLu7UmtpyTQusRshSGT=EqsVg@mail.gmail.com>
+References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdYcvtWNgJ=JCgpZFdZmypLu7UmtpyTQusRshSGT=EqsVg@mail.gmail.com>
+Message-ID: <52B455F9.8070707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Friday 20 December 2013 04:40 AM, Linus Walleij wrote:
+> On Wed, Dec 18, 2013 at 11:07 AM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+> 
+>> This series is intended to update Davinci GPIO driver and reuse
+>> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
+>> Keystone GPIO IP: supports:
+>> - up to 32 GPIO lines;
+>> - only unbanked irqs;
+>>
+>> See Documentation:
+>> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>
+>> This series based on:
+>> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/gpio
+>>
+>> Changes in v2:
+>> - minor comments applied, no functional changes
+>>
+>> v1: https://lkml.org/lkml/2013/12/12/366
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+Great !!
 
-Please let me know if this is suitable and I can keep your Ack.
+> For this v2 series.
+> 
+> Expecting this to go in through the DaVinci tree!
+> 
+Sekhar, Can you please include these to your DaVinci gpio branch ?
 
-----
-
-mfd: Revert "mfd: Always assign of_node in mfd_add_device()"
-
-This reverts commit 68044bee13770918e0b28dd44aa98c889ec7558f.
-
-We've had confirmed reports of this patch causing unforeseen issues
-with existing MFD users. It has been agreed by the original author
-and myself that reversion is the best solution.
-
-Acked-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-index 32e8d47..2676492 100644
---- a/drivers/mfd/mfd-core.c
-+++ b/drivers/mfd/mfd-core.c
-@@ -117,8 +117,6 @@ static int mfd_add_device(struct device *parent, int id,
- 			}
- 		}
- 	}
--	if (!pdev->dev.of_node)
--		pdev->dev.of_node = parent->of_node;
- 
- 	if (cell->pdata_size) {
- 		ret = platform_device_add_data(pdev,
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Santosh
