@@ -1,113 +1,115 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Dec 2013 18:34:25 +0200
-Subject: [PATCHv12 07/49] clk: divider: add support for low level ops
+Date: Fri, 20 Dec 2013 18:34:27 +0200
+Subject: [PATCHv12 09/49] clk: mux: add support for low level ops
 In-Reply-To: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
 References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387557274-22583-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1387557274-22583-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Divider clock can now be registered to use low level register access ops.
+Multiplexer clock can now be registered to use low level register access ops.
 Preferred initialization method is via clock description.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk-divider.c    |   22 +++++++++++++++++++---
+ drivers/clk/clk-mux.c        |   24 +++++++++++++++++++++---
  include/linux/clk-provider.h |    4 ++++
- 2 files changed, 23 insertions(+), 3 deletions(-)
+ 2 files changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 8cfed5c..887e2d8 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -108,7 +108,12 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
- 	struct clk_divider *divider = to_clk_divider(hw);
- 	unsigned int div, val;
- 
--	val = clk_readl(divider->reg) >> divider->shift;
-+	if (divider->ll_ops)
-+		val = divider->ll_ops->clk_readl(divider->reg);
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 2cbed08..ed3bc36 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -46,7 +46,12 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+ 	 * val = 0x4 really means "bit 2, index starts at bit 0"
+ 	 */
+-	val = clk_readl(mux->reg) >> mux->shift;
++	if (mux->ll_ops)
++		val = mux->ll_ops->clk_readl(mux->reg);
 +	else
-+		val = clk_readl(divider->reg);
++		val = clk_readl(mux->reg);
 +
-+	val >>= divider->shift;
- 	val &= div_mask(divider);
++	val >>= mux->shift;
+ 	val &= mux->mask;
  
- 	div = _get_div(divider, val);
-@@ -234,11 +239,17 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
- 		val = div_mask(divider) << (divider->shift + 16);
+ 	if (mux->table) {
+@@ -93,11 +98,19 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
+ 		val = mux->mask << (mux->shift + 16);
  	} else {
--		val = clk_readl(divider->reg);
-+		if (divider->ll_ops)
-+			val = divider->ll_ops->clk_readl(divider->reg);
+-		val = clk_readl(mux->reg);
++		if (mux->ll_ops)
++			val = mux->ll_ops->clk_readl(mux->reg);
 +		else
-+			val = clk_readl(divider->reg);
- 		val &= ~(div_mask(divider) << divider->shift);
- 	}
- 	val |= value << divider->shift;
--	clk_writel(val, divider->reg);
-+	if (divider->ll_ops)
-+		divider->ll_ops->clk_writel(val, divider->reg);
-+	else
-+		clk_writel(val, divider->reg);
- 
- 	if (divider->lock)
- 		spin_unlock_irqrestore(divider->lock, flags);
-@@ -291,6 +302,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
- 	div->lock = lock;
- 	div->hw.init = &init;
- 	div->table = table;
-+	div->ll_ops = &clk_ll_ops_default;
- 
- 	/* register the clock */
- 	clk = clk_register(dev, &div->hw);
-@@ -368,6 +380,10 @@ struct clk_hw *clk_register_divider_desc(struct device *dev,
- 	divider->flags = hw_desc->flags;
- 	divider->table = hw_desc->table;
- 	divider->lock = hw_desc->lock;
-+	divider->ll_ops = hw_desc->ll_ops;
++			val = clk_readl(mux->reg);
 +
-+	if (!divider->ll_ops)
-+		divider->ll_ops = &clk_ll_ops_default;
+ 		val &= ~(mux->mask << mux->shift);
+ 	}
+ 	val |= index << mux->shift;
+-	clk_writel(val, mux->reg);
++
++	if (mux->ll_ops)
++		mux->ll_ops->clk_writel(val, mux->reg);
++	else
++		clk_writel(val, mux->reg);
  
- 	if (!desc->ops)
- 		desc->ops = &clk_divider_ops;
+ 	if (mux->lock)
+ 		spin_unlock_irqrestore(mux->lock, flags);
+@@ -159,6 +172,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 	mux->lock = lock;
+ 	mux->table = table;
+ 	mux->hw.init = &init;
++	mux->ll_ops = &clk_ll_ops_default;
+ 
+ 	clk = clk_register(dev, &mux->hw);
+ 
+@@ -201,6 +215,10 @@ struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc)
+ 	mux->shift = hw_desc->shift;
+ 	mux->flags = hw_desc->flags;
+ 	mux->lock = hw_desc->lock;
++	mux->ll_ops = hw_desc->ll_ops;
++
++	if (!mux->ll_ops)
++		mux->ll_ops = &clk_ll_ops_default;
+ 
+ 	if (!desc->ops) {
+ 		if (mux->flags & CLK_MUX_READ_ONLY)
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 671dff4..f082a89 100644
+index 3923d46..629163c 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -322,6 +322,7 @@ struct clk_div_table {
+@@ -408,6 +408,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
   *
   * @hw:		handle between common and hardware-specific interfaces
-  * @reg:	register containing the divider
+  * @reg:	register controlling multiplexer
 + * @ll_ops:	low-level ops for accessing the register
-  * @shift:	shift to the divider bit field
-  * @width:	width of the divider bit field
-  * @table:	array of value/divider pairs, last entry should have div = 0
-@@ -350,6 +351,7 @@ struct clk_div_table {
- struct clk_divider {
+  * @shift:	shift to multiplexer bit field
+  * @width:	width of mutliplexer bit field
+  * @flags:	hardware-specific flags
+@@ -427,6 +428,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
+ struct clk_mux {
  	struct clk_hw	hw;
  	void __iomem	*reg;
 +	struct clk_ll_ops	*ll_ops;
+ 	u32		*table;
+ 	u32		mask;
  	u8		shift;
- 	u8		width;
- 	u8		flags;
-@@ -361,6 +363,7 @@ struct clk_divider {
-  * struct clk_divider_desc - init descriptor for divider clock
+@@ -438,6 +440,7 @@ struct clk_mux {
+  * struct clk_mux_desc - init descriptor for multiplexer clock
   * @desc:	handle between common and hardware-specific interfaces
-  * @reg:	register containing the divider
-+ * @ll_ops:	low-level ops for accessing the register
-  * @shift:	shift to the divider bit field
-  * @width:	width of the divider bit field
-  * @table:	array of value/divider pairs, last entry should have div = 0
-@@ -369,6 +372,7 @@ struct clk_divider {
- struct clk_divider_desc {
+  * @reg:	register controlling multiplexer
++ * @ll_ops:	low-level ops for accesing the register
+  * @shift:	shift to multiplexer bit field
+  * @width:	width of multiplexer bit field
+  * @flags:	hardware-specific flags
+@@ -446,6 +449,7 @@ struct clk_mux {
+ struct clk_mux_desc {
  	struct clk_desc	desc;
  	void __iomem	*reg;
 +	struct clk_ll_ops	*ll_ops;
+ 	u32		*table;
+ 	u32		mask;
  	u8		shift;
- 	u8		width;
- 	u8		flags;
 -- 
 1.7.9.5
