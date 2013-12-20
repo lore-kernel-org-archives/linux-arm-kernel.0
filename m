@@ -1,99 +1,71 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 19 Dec 2013 17:53:04 -0800
-Subject: [PATCH 03/10] clk: tegra: Staticize local variables in clk-pll.c
-In-Reply-To: <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
-References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
- <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20131220015304.18119.81485@quantum>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Dec 2013 10:10:18 +0800
+Subject: [PATCH v2 3/3] cpufreq: imx6q: add of_init_opp_table
+In-Reply-To: <1387485338-21225-3-git-send-email-john.tobias.ph@gmail.com>
+References: <1387485338-21225-1-git-send-email-john.tobias.ph@gmail.com>
+ <1387485338-21225-3-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <20131220021017.GI7172@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sachin Kamat (2013-10-08 04:17:41)
-> Local variables used only in this file are made static.
+On Thu, Dec 19, 2013 at 12:35:38PM -0800, John Tobias wrote:
+> Add a routine check to see if the platform supplied the OPP table.
+> Incase there's no OPP table exist, it will try to initialise it.
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Stephen Warren <swarren@nvidia.com>
+> It's been tested on iMX6SL board where the platform doesn't have
+> an OPP table.
+> 
+> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++++
 
-I updated this patch to staticize tegra_clk_pllxc_ops after taking
-Peter's Tegra pull request. Refreshed patch has been applied to clk-next
-and a copy is found below. Let me know if you have any comments.
+Running get_maintainer.pl on the patch, you will see you should copy the
+following person and lists on the patch.
 
-Regards,
-Mike
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>
+ Viresh Kumar <viresh.kumar@linaro.org>
+ cpufreq at vger.kernel.org
+ linux-pm at vger.kernel.org
 
+This can also be found in file MAINTAINERS.
 
+CPU FREQUENCY DRIVERS
+M:      Rafael J. Wysocki <rjw@rjwysocki.net>
+M:      Viresh Kumar <viresh.kumar@linaro.org>
+L:      cpufreq at vger.kernel.org
+L:      linux-pm at vger.kernel.org
+S:      Maintained
+T:      git git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
+T:      git git://git.linaro.org/people/vireshk/linux.git (For ARM Updates)
+F:      drivers/cpufreq/
+F:      include/linux/cpufreq.h
 
-From: Sachin Kamat <sachin.kamat@linaro.org>
-Date: Tue, 8 Oct 2013 16:47:41 +0530
-Subject: [PATCH] clk: tegra: Staticize local variables in clk-pll.c
+Shawn
 
-Local variables used only in this file are made static.
-
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-[mturquette at linaro.org: staticize struct clk_ops tegra_clk_pllxc_ops]
----
- drivers/clk/tegra/clk-pll.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index 2dd4322..0d20241 100644
---- a/drivers/clk/tegra/clk-pll.c
-+++ b/drivers/clk/tegra/clk-pll.c
-@@ -1433,7 +1433,7 @@ struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
- }
- 
- #if defined(CONFIG_ARCH_TEGRA_114_SOC) || defined(CONFIG_ARCH_TEGRA_124_SOC)
--const struct clk_ops tegra_clk_pllxc_ops = {
-+static const struct clk_ops tegra_clk_pllxc_ops = {
- 	.is_enabled = clk_pll_is_enabled,
- 	.enable = clk_pll_iddq_enable,
- 	.disable = clk_pll_iddq_disable,
-@@ -1442,7 +1442,7 @@ const struct clk_ops tegra_clk_pllxc_ops = {
- 	.set_rate = clk_pllxc_set_rate,
- };
- 
--const struct clk_ops tegra_clk_pllm_ops = {
-+static const struct clk_ops tegra_clk_pllm_ops = {
- 	.is_enabled = clk_pll_is_enabled,
- 	.enable = clk_pll_iddq_enable,
- 	.disable = clk_pll_iddq_disable,
-@@ -1451,7 +1451,7 @@ const struct clk_ops tegra_clk_pllm_ops = {
- 	.set_rate = clk_pllm_set_rate,
- };
- 
--const struct clk_ops tegra_clk_pllc_ops = {
-+static const struct clk_ops tegra_clk_pllc_ops = {
- 	.is_enabled = clk_pll_is_enabled,
- 	.enable = clk_pllc_enable,
- 	.disable = clk_pllc_disable,
-@@ -1460,7 +1460,7 @@ const struct clk_ops tegra_clk_pllc_ops = {
- 	.set_rate = clk_pllc_set_rate,
- };
- 
--const struct clk_ops tegra_clk_pllre_ops = {
-+static const struct clk_ops tegra_clk_pllre_ops = {
- 	.is_enabled = clk_pll_is_enabled,
- 	.enable = clk_pll_iddq_enable,
- 	.disable = clk_pll_iddq_disable,
-@@ -1469,7 +1469,7 @@ const struct clk_ops tegra_clk_pllre_ops = {
- 	.set_rate = clk_pllre_set_rate,
- };
- 
--const struct clk_ops tegra_clk_plle_tegra114_ops = {
-+static const struct clk_ops tegra_clk_plle_tegra114_ops = {
- 	.is_enabled =  clk_pll_is_enabled,
- 	.enable = clk_plle_tegra114_enable,
- 	.disable = clk_plle_tegra114_disable,
-@@ -1731,7 +1731,7 @@ struct clk *tegra_clk_register_plle_tegra114(const char *name,
- #endif
- 
- #ifdef CONFIG_ARCH_TEGRA_124_SOC
--const struct clk_ops tegra_clk_pllss_ops = {
-+static const struct clk_ops tegra_clk_pllss_ops = {
- 	.is_enabled = clk_pll_is_enabled,
- 	.enable = clk_pll_iddq_enable,
- 	.disable = clk_pll_iddq_disable,
--- 
-1.8.3.2
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index 4b3f18e..8c56898 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -166,6 +166,17 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
+>  
+> +	/* Get the OPP table, if the platform did not supply it. */
+> +	num = dev_pm_opp_get_opp_count(cpu_dev);
+> +	if (num < 0) {
+> +		ret = of_init_opp_table(cpu_dev);
+> +		if (ret < 0) {
+> +			dev_err(cpu_dev, "failed to init OPP table\n");
+> +			ret = -ENODEV;
+> +			goto put_node;
+> +		}
+> +	}
+> +
+>  	arm_clk = devm_clk_get(cpu_dev, "arm");
+>  	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+>  	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
+> -- 
+> 1.8.3.2
+> 
