@@ -1,42 +1,43 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 19 Dec 2013 21:47:55 -0300
-Subject: [PATCH] ARM: configs: Select USB PHY for AM335x SoC
-In-Reply-To: <1386861269-28949-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1386861269-28949-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131220004754.GB12803@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 19 Dec 2013 19:57:58 -0500
+Subject: Can someone Ack and queue a patch for RTC subsytem?
+In-Reply-To: <87sitoka39.fsf@natisbad.org>
+References: <87siton6ke.fsf@natisbad.org>
+ <20131219164624.GV2609@titan.lakedaemon.net>
+ <87sitoka39.fsf@natisbad.org>
+Message-ID: <20131220005758.GA2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 12:14:29PM -0300, Ezequiel Garcia wrote:
-> Enable this option as it's required to use USB on AM335x SoC.
+On Thu, Dec 19, 2013 at 06:46:18PM +0100, Arnaud Ebalard wrote:
+> Hi,
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/configs/omap2plus_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> Jason Cooper <jason@lakedaemon.net> writes:
 > 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index 12c848e..e427b95 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -223,6 +223,7 @@ CONFIG_USB_TEST=y
->  CONFIG_NOP_USB_XCEIV=y
->  CONFIG_OMAP_USB2=y
->  CONFIG_OMAP_USB3=y
-> +CONFIG_AM335X_PHY_USB=y
->  CONFIG_USB_GADGET=y
->  CONFIG_USB_GADGET_DEBUG=y
->  CONFIG_USB_GADGET_DEBUG_FILES=y
-> -- 
-> 1.8.1.5
+> > On Thu, Dec 19, 2013 at 05:34:09PM +0100, Arnaud Ebalard wrote:
+> >> I have a very simple driver (support for reading and setting the time)
+> >> for a RTC chip (Intersil ISL 12057) but cannot find anyone to get it
+> >> Acked and queued for v3.14. In v3.14, there should be at least three
+> >> users of the driver (ReadyNAS 102, 104 and 2120) if I meet -rc5 cutoff
+> >> for associated .dts changes.
+> >
+> > The -rc5 cutoff isn't a hard line.  It's also mvebu-specific.  eg, We
+> > need things _posted_ a week or so before arm-soc's cutoff of -rc6 so we
+> > have time to get the pull request in.  If it needs to go through
+> > mvebu/arm-soc, once it's posted, you're good.
 > 
+> I understand. But I guess you will not (for valid reason) accept .dts
+> changes to reference a rtc driver that is not on good track towards
+> -next. This is the issue I try and solve.
 
-Ping?
+Just a subtle note here.  If the binding is stabilized, I don't mind
+taking the dts changes.  However, if we have time, I prefer to wait for
+the whole series to be hashed out.  You never know which resolutions
+will end up revisiting the bindings you thought were good. :)
 
-This is just a simple fix, is it possible to merge it for v3.14?
+So, it's technically not a requirement for the whole driver to be
+settled, but it is a good idea.
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+thx,
+
+Jason.
