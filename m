@@ -1,84 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Dec 2013 08:55:03 -0800
-Subject: OMAP display subsystem - does it work?
-In-Reply-To: <20131220160432.GZ27438@atomide.com>
-References: <20131218120023.GG4360@n2100.arm.linux.org.uk>
- <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
- <20131219175644.GE32243@n2100.arm.linux.org.uk>
- <20131219182252.GP27438@atomide.com>
- <20131220112700.GF32243@n2100.arm.linux.org.uk>
- <20131220114837.GH32243@n2100.arm.linux.org.uk>
- <52B44982.4020501@ti.com> <20131220160432.GZ27438@atomide.com>
-Message-ID: <20131220165456.GD27438@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 20 Dec 2013 09:57:14 -0700
+Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
+In-Reply-To: <52B41FEA.7020608@nvidia.com>
+References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
+ <1387469182-14398-2-git-send-email-treding@nvidia.com>
+ <52B355EC.9040306@wwwdotorg.org> <52B3E968.8090906@nvidia.com>
+ <20131220102542.GJ27787@ulmo.nvidia.com> <52B41FEA.7020608@nvidia.com>
+Message-ID: <52B476EA.2040401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131220 08:06]:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [131220 05:45]:
-> > On 2013-12-20 13:48, Russell King - ARM Linux wrote:
-> > 
-> > > Or maybe this is getting buggered by the idiotic deferred probing...  It
-> > > seems that the GPIOs for controlling the LCD and backlight aren't even
-> > > getting claimed if the DSS modules are built in:
-> > > 
-> > > # cat /sys/kernel/debug/gpio
-> > > ...
-> > > GPIOs 238-255, platform/twl4030_gpio, twl4030, can sleep:
-> > > # echo panel-dpi.0 > /sys/bus/platform/drivers/panel-dpi/unbind
-> > > # echo panel-dpi.0 > /sys/bus/platform/drivers/panel-dpi/bind
-> > > # cat /sys/kernel/debug/gpio
-> > > ...
-> > > GPIOs 238-255, platform/twl4030_gpio, twl4030, can sleep:
-> > >  gpio-245 (panel enable        ) out lo
-> > >  gpio-253 (panel backlight     ) out lo
-> > 
-> > This looks odd... Presuming the panel device was probed successfully, it
-> > should always get the gpios or return an error. Only if gpio_is_valid()
-> > returns false for the gpio, it skips it and continues. But in this case,
-> > the gpio number comes from the platform data, so it should always be valid.
-> > 
-> > And if it wasn't probed successfully, then there shouldn't be a fb0.
+On 12/20/2013 03:46 AM, Laxman Dewangan wrote:
+> On Friday 20 December 2013 03:55 PM, Thierry Reding wrote:
+>> * PGP Signed by an unknown key
+>>
+>> On Fri, Dec 20, 2013 at 12:23:28PM +0530, Laxman Dewangan wrote:
+>>> On Friday 20 December 2013 01:54 AM, Stephen Warren wrote:
+>>>> On 12/19/2013 09:06 AM, Thierry Reding wrote:
+>>>> (Laxman, as an aside, I'm not sure why you're upstreaming patches that
+>>>> don't exactly match the existing kernel support for this board...)
+>>> I did not get this based on what context it is. Can you please elaborate
+>>> where I am missing the stuff?
+>>>
+>>>
+>>>>> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts
+>>>>> b/arch/arm/boot/dts/tegra124-venice2.dts
+>>>>> +                sd0 {
+>>>>> +                    regulator-name = "vdd_cpu";
+>>>>> +                    regulator-min-microvolt = <700000>;
+>>>>> +                    regulator-max-microvolt = <1350000>;
+>>>> Laxman's patch has:
+>>>>
+>>>>                       regulator-max-microvolt = <1400000>;
+>>> We have the Laguna platform on which Android and L4T is running fine.
+>>> This
+>>> is based on same PMIC used for Venice2. As we are running the more cpu
+>>> stress on Laguna, I took this parameter from the Laguna Power tree
+>>> where it
+>>> is maximum 1.4V. Chrome have maximum as 1.35mV.
+>> Whether this is used on Android, ChromeOS or L4T doesn't matter at all.
+>> It specifies hardware constraints and thus must be agnostic of the OS
+>> and workload.
+>>
+>> Also this file describes the power tree for Venice2, so using values
+>> from Laguna is wrong, no matter how similar they are.
+>>
 > 
-> I bet that's it though. If the display is probed before twl4030 GPIO
-> is initialized, the GPIO numbers will be 0. I'm using omap2plus_defconfig
-> which has DSS built as modules.
+> Here, I used term "similar" means the which rail is feeding to Tegra's
+> which vdd?
+> So by this, if AMS SD0 is feeding to Tegra vdd-cpu then it should be
+> same for Laguna.
 
-Yeah this seems to do the trick for me for the built-in DSS on LDP.
+Look, this situation is very simple. This file describe Venice2. It
+doesn't matter whether Laguna "should be" similar to Venice2 or not, the
+file needs to describe Venice2 and not Laguna.
 
-Tony
+Equally, we have a downstream kernel that fully supports Venice2. There
+is therefore absolutely ZERO reason why we should use the downstream
+Laguna board support to create the upstream Venice2 board support,
+rather than using the downstream Venice2 board support to create the
+upstream Venice2 board support.
 
-8< -----------------------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Fri, 20 Dec 2013 08:53:27 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
-
-Looks like the LCD panel on LDP has been broken quite a while, and
-recently got fixed. However, there's still an issue where the panel
-backlight does not come on if the LCD drivers are built into the
-kernel.
-
-Fix the issue by registering the DPI LCD panel only after the twl4030
-GPIO has probed.
-
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -248,7 +248,7 @@ static int ldp_twl_gpio_setup(struct device *dev, unsigned gpio, unsigned ngpio)
- 	/* Backlight enable GPIO */
- 	ldp_lcd_pdata.backlight_gpio = gpio + 15;
- 
--	return 0;
-+	return platform_device_register(&ldp_lcd_device);
- }
- 
- static struct twl4030_gpio_platform_data ldp_gpio_data = {
-@@ -346,7 +346,6 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
- 
- static struct platform_device *ldp_devices[] __initdata = {
- 	&ldp_gpio_keys_device,
--	&ldp_lcd_device,
- };
- 
- #ifdef CONFIG_OMAP_MUX
+Please do let me know that you fully understand this issue. If not,
+future patches from you are going to need a heck of a lot more detailed
+review and manual checking, rather than my trusting you got it right.
