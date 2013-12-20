@@ -1,63 +1,98 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 20 Dec 2013 07:47:24 +0000
-Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <87y53gy07m.fsf@nbsps.com>
-References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
- <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
- <87y53gy07m.fsf@nbsps.com>
-Message-ID: <ef4b36fcabc7492390834857d5250598@BY2PR03MB505.namprd03.prod.outlook.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 20 Dec 2013 09:08:51 +0100
+Subject: possible regression on 3.13 when calling flush_dcache_page
+In-Reply-To: <20131218072117.GA2383@lge.com>
+References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
+ <20131212143618.GJ12099@ldesroches-Latitude-E6320>
+ <20131213015909.GA8845@lge.com>
+ <20131216144343.GD9627@ldesroches-Latitude-E6320>
+ <20131218072117.GA2383@lge.com>
+Message-ID: <20131220080851.GC16592@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +static int fsl_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> > +			  int duty_ns, int period_ns)
-> > +{
-> > +	unsigned long period_cycles, duty_cycles;
-> > +	unsigned long cntin = FTM_CNTIN_VAL;
-> > +	struct fsl_pwm_chip *fpc;
-> > +
-> > +	fpc = to_fsl_chip(chip);
-> > +
-> > +	period_cycles = fsl_rate_to_cycles(fpc, period_ns);
-> > +	if (period_cycles > 0xFFFF) {
-> > +		dev_err(chip->dev, "required PWM period cycles(%lu) overflow "
-> > +				"16-bits counter!\n", period_cycles);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	duty_cycles = fsl_rate_to_cycles(fpc, duty_ns);
-> > +	if (duty_cycles >= 0xFFFF) {
-> > +		dev_err(chip->dev, "required PWM duty cycles(%lu) overflow "
-> > +				"16-bits counter!\n", duty_cycles);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	writel(FTMCnSC_MSB | FTMCnSC_ELSB, fpc->base + FTM_CSC(pwm->hwpwm));
-> > +
-> > +	writel(0xF0, fpc->base + FTM_OUTMASK);
-> > +	writel(0x0F, fpc->base + FTM_OUTINIT);
-> > +	writel(FTM_CNTIN_VAL, fpc->base + FTM_CNTIN);
-> > +
-> > +	writel(period_cycles + cntin - 1, fpc->base + FTM_MOD);
-> > +	writel(duty_cycles + cntin, fpc->base + FTM_CV(pwm->hwpwm));
-> > +
-> > +	return 0;
-> > +}
-> 
-> Even though the module can support eight channels, the FTM_MOD is global and
-> is updated in each 'config'.  So, if we have two PWMs, and both call 'config'
-> with different periods, the last one to call will win?  There doesn't seem to
-> be any locking/inspection of 'MOD'.  I think this is global to the FTM, while
-> 'FTM_CV()' is per channel.
-> 
-> So we may have 8 PWMs, all with the same period, but with different duty
-> cycles.  Is this correct?  Or are we only supporting one channel per FTM/PWM?
-> 
+Hello,
 
-Yes, that's right.
+On Wed, Dec 18, 2013 at 04:21:17PM +0900, Joonsoo Kim wrote:
+> On Mon, Dec 16, 2013 at 03:43:43PM +0100, Ludovic Desroches wrote:
+> > Hello,
+> > 
+> > On Fri, Dec 13, 2013 at 10:59:09AM +0900, Joonsoo Kim wrote:
+> > > On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
+> > > > fix mmc mailing list address error
+> > > > 
+> > > > On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > With v3.13-rc3 I have an error when the atmel-mci driver calls
+> > > > > flush_dcache_page (log at the end of the message).
+> > > > > 
+> > > > > Since I didn't have it before, I did a git bisect and the commit introducing
+> > > > > the error is the following one:
+> > > > > 
+> > > > > 106a74e slab: replace free and inuse in struct slab with newly introduced active
+> > > > > 
+> > > > > I don't know if this commit has introduced a bug or if it has revealed a bug
+> > > > > in the atmel-mci driver.
+> > > 
+> > > Hello,
+> > > 
+> > > I think that this commit may not introduce a bug. This patch remove one
+> > > variable on slab management structure and replace variable name. So there
+> > > is no functional change.
+> > > 
+> > 
+> > If I have reverted this patch and other ones you did on top of it and
+> > the issue disappear.
+> 
+> Hello,
+> 
+> Could you give me your '/proc/slabinfo' before/after this commit (106a74e)?
+> 
+> And how about testing with artificially increasing size of struct slab on
+> top of this commit (106a74e)?
+> 
+> I really wonder why the problem happens, because this doesn't cause any
+> functional change as far as I know. Only side-effect from this patch is
+> decreasing size of struct slab.
 
-And in "[PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support" patch, this has
-been fixed.
+Sorry I am not at the office, I have tried to reproduce it with a
+different device and a different sdcard but without success. I'll test
+it on Monday.
 
-Best Regards,
-Xiubo
+Regards
+
+Ludovic
+
+> 
+> Thanks.
+> 
+> diff --git a/mm/slab.c b/mm/slab.c
+> index 2ec2336..d2240fd 100644
+> --- a/mm/slab.c
+> +++ b/mm/slab.c
+> @@ -174,6 +174,7 @@ struct slab {
+>         struct {
+>                 struct list_head list;
+>                 void *s_mem;            /* including colour offset */
+> +               unsigned int x;
+>                 unsigned int active;    /* num of objs active in slab */
+>         };
+>  };
+> 
+> > 
+> > > I doubt that side-effect of this patch reveals a bug in other place.
+> > > Side-effect is reduced memory usage for slab management structure. It would
+> > > makes some slabs have more objects with more density since slab management
+> > > structure is sometimes on the page for objects. So if it diminishes, more
+> > > objects can be in the page.
+> > > 
+> > > Anyway, I will look at it more. If you have any progress, please let me know.
+> > 
+> > No progress at the moment.
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
