@@ -1,11 +1,11 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 20 Dec 2013 10:55:00 +0000 (UTC)
-Subject: [PATCHv11 04/49] clk: mux: add support for registering mux clock
- from descriptor
-In-Reply-To: <1387452260-23276-5-git-send-email-t-kristo@ti.com>
+Date: Fri, 20 Dec 2013 10:56:02 +0000 (UTC)
+Subject: [PATCHv11 05/49] clk: gate: add support for registering gate
+ clock from descriptor
+In-Reply-To: <1387452260-23276-6-git-send-email-t-kristo@ti.com>
 References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
- <1387452260-23276-5-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.02.1312201054390.20802@utopia.booyaka.com>
+ <1387452260-23276-6-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1312201055110.20802@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,19 +18,19 @@ On Thu, 19 Dec 2013, Tero Kristo wrote:
 ...
 
 > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 9fa279d..7dd6842 100644
+> index 7dd6842..27a9765 100644
 > --- a/include/linux/clk-provider.h
 > +++ b/include/linux/clk-provider.h
-> @@ -393,6 +393,26 @@ struct clk_mux {
+> @@ -269,10 +269,29 @@ struct clk_gate {
 >  	spinlock_t	*lock;
 >  };
 >  
 > +/**
-> + * struct clk_mux_desc - init descriptor for multiplexer clock
+> + * struct clk_gate_desc - init descriptor for gating clock
 > + *
 > + * @desc:	handle between common and hardware-specific interfaces
 
-As mentioned in
+I like the kernel-doc-nano, but as mentioned in
 
 http://patchwork.ozlabs.org/patch/294253/
 
