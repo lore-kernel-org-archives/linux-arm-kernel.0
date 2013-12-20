@@ -1,62 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 20 Dec 2013 17:28:27 +0000
-Subject: Possible arm64 patches for stable
-Message-ID: <20131220172827.GZ31886@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Dec 2013 17:29:07 +0000
+Subject: [PATCH RFC v3 08/12] arm64: kernel: implement HW breakpoints CPU
+ PM notifier
+In-Reply-To: <1385033059-25896-9-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1385033059-25896-9-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20131220172907.GF16829@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Lorenzo,
 
-While reading the kernel logs for arm64 (as one does) I noticed a few
-patches that seemed like candidates for either LTS or LTSI.  I've also
-had a couple of others mentioned via other routes.  What do you think of
-these?
+On Thu, Nov 21, 2013 at 11:24:15AM +0000, Lorenzo Pieralisi wrote:
+> When a CPU is shutdown either through CPU idle or suspend to RAM, the
+> content of HW breakpoint registers must be reset or restored to proper
+> values when CPU resume from low power states. This patch adds debug register
+> restore operations to the HW breakpoint control function and implements a
+> CPU PM notifier that allows to restore the content of HW breakpoint registers
+> to allow proper suspend/resume operations.
 
-  4ecf7ccb1973 arm64: spinlock: retry trylock operation if strex fails on free lock
+This looks mostly fine to me, but I have one questions you might be able to
+answer...
 
-This seems like a correctness fix for spinlocks, though since the
-callers should cope with failure it's arguably just an optimisation.
+> @@ -840,18 +847,36 @@ void hw_breakpoint_thread_switch(struct task_struct *next)
+>  /*
+>   * CPU initialisation.
+>   */
+> -static void reset_ctrl_regs(void *unused)
+> +static void hw_breakpoint_reset(void *unused)
+>  {
+>  	int i;
+> -
+> -	for (i = 0; i < core_num_brps; ++i) {
+> -		write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
+> -		write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
+> +	struct perf_event **slots;
+> +	/*
+> +	 * When a CPU goes through cold-boot, it does not have any installed
+> +	 * slot, so it is safe to share the same function for restoring and
+> +	 * resetting breakpoints; when a CPU is hotplugged in, it goes
+> +	 * through the slots, which are all empty, hence it just resets control
+> +	 * and value for debug registers.
+> +	 * When this function is triggered on warm-boot through a CPU PM
+> +	 * notifier some slots might be initialized; if so they are
+> +	 * reprogrammed according to the debug slots content.
+> +	 */
+> +	for (slots = this_cpu_ptr(bp_on_reg), i = 0; i < core_num_brps; ++i) {
+> +		if (slots[i]) {
+> +			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
+> +		} else {
+> +			write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
+> +			write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
+> +		}
 
-  53ae3acd4390 arm64: Only enable local interrupts after the CPU is marked online
-  82b2f495fba3 arm64: virt: ensure visibility of __boot_cpu_mode
-  845ad05ec31e arm64: Change kernel stack size to 16K
-  6db83cea1c97 arm64: fix possible invalid FPSIMD initialization state
-  7b22c03536a5 arm64: check for number of arguments in syscall_get/set_arguments()
-  df503ba7f653 arm64: dts: Reserve the memory used for secondary CPU release address
-  
-These all look like correctness fixes of one kind or another; the change
-to 16K stacks is poorly explained but it looks like it's fixing failures
-of some kind.
+When this runs on warm-boot and starts restoring debug state, are debug
+exceptions guaranteed to be masked? I think that the debug restoration
+should appear atomic to a debugger (i.e. you can't take a debug exception
+half-way through the restore).
 
-  f0dd718090ae arm64: Remove unused cpu_name ascii in arch/arm64/mm/proc.S
+Providing that's the case:
 
-A user was reporting that this caused build failures due to alignment
-issues with some of the debug options turned on.  I've not fully
-investigated yet, this might be a toolchain issue though given how
-simple the change is.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-  0d651e4e65e9 clocksource: arch_timer: use virtual counters
-
-This is as mentioned in the changelog a correctness fix for avoiding
-clocks going backwards and has also been found to be required to avoid
-boot hangs with CONFIG_PROVE_RCU_DELAY enabled.
-
-There were also a few others that aren't entirely -stable material but
-might be a fit for LTSI (and the above might be if not -stable in
-themselves):
-
-  b5b6c9e9149d arm64: Avoid cache flushing in flush_dcache_page()
-  7249b79f6b4c arm64: Do not flush the D-cache for anonymous pages
-  4f00130b70e5 arm64: Use Normal NonCacheable memory for writecombine
-
-These look like simple, localised optimisations.
-
-Thanks,
-Mark
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/bd0efc1b/attachment.sig>
+Will
