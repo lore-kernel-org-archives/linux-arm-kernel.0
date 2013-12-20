@@ -1,37 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Dec 2013 10:12:16 +0800
-Subject: [PATCH] cpufreq: imx6q-cpufreq driver is reused on i.MX6 series SoCs
-Message-ID: <1387505536-22720-1-git-send-email-shawn.guo@linaro.org>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 20 Dec 2013 10:21:54 +0800
+Subject: [PATCH -next] spi: nuc900: remove redundant return value check of
+ platform_get_resource()
+Message-ID: <CAPgLHd9rWo=vAa5xiPhi_FFheGNMOTEvt_0_AFaxMyYEJ8TBrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6q-cpufreq driver nowadays is not only running on imx6q but also
-other i.MX6 series SoCs like imx6dl and imx6sl.  Update Kconfig prompt
-and help text to make it clear to users.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Remove unneeded error handling on the result of a call
+to platform_get_resource() when the value is passed to
+devm_ioremap_resource().
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/cpufreq/Kconfig.arm |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/spi/spi-nuc900.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index ce52ed9..3ba5dcc 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -79,11 +79,11 @@ config ARM_HIGHBANK_CPUFREQ
- 	  If in doubt, say N.
+diff --git a/drivers/spi/spi-nuc900.c b/drivers/spi/spi-nuc900.c
+index 43d340c..5040630 100644
+--- a/drivers/spi/spi-nuc900.c
++++ b/drivers/spi/spi-nuc900.c
+@@ -368,12 +368,6 @@ static int nuc900_spi_probe(struct platform_device *pdev)
+ 	hw->bitbang.txrx_bufs      = nuc900_spi_txrx;
  
- config ARM_IMX6Q_CPUFREQ
--	tristate "Freescale i.MX6Q cpufreq support"
--	depends on SOC_IMX6Q
-+	tristate "Freescale i.MX6 cpufreq support"
-+	depends on ARCH_MXC
- 	depends on REGULATOR_ANATOP
- 	help
--	  This adds cpufreq driver support for Freescale i.MX6Q SOC.
-+	  This adds cpufreq driver support for Freescale i.MX6 series SoCs.
- 
- 	  If in doubt, say N.
- 
--- 
-1.7.9.5
+ 	hw->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (hw->res == NULL) {
+-		dev_err(&pdev->dev, "Cannot get IORESOURCE_MEM\n");
+-		err = -ENOENT;
+-		goto err_pdata;
+-	}
+-
+ 	hw->regs = devm_ioremap_resource(&pdev->dev, hw->res);
+ 	if (IS_ERR(hw->regs)) {
+ 		err = PTR_ERR(hw->regs);
