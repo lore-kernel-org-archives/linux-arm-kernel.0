@@ -1,48 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 20 Dec 2013 20:39:03 +0100
-Subject: [PATCH] MAINTAINERS: take maintainership for Energy Micro efm32 SoCs
-Message-ID: <1387568343-8754-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 20 Dec 2013 11:41:12 -0800
+Subject: [GIT PULL 0/3] Renesas ARM based SoC fixes for v3.13
+In-Reply-To: <cover.1386899269.git.horms+renesas@verge.net.au> (Simon Horman's
+ message of "Fri, 13 Dec 2013 11:30:24 +0900")
+References: <cover.1386899269.git.horms+renesas@verge.net.au>
+Message-ID: <87d2krgvjb.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+Simon Horman <horms+renesas@verge.net.au> writes:
 
-I think this can best go in via armsoc, but needs acks for clk, clocksource,
-spi and tty/serial.
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> please consider these Renesas ARM based SoC fixes for v3.13.
+>
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.13
+>
+> for you to fetch changes up to 23de2278ebc3a2f971ce45ca5e5e35c9d5a74040:
+>
+>   ARM: shmobile: r8a7790: Fix GPIO resources in DTS (2013-11-28 17:04:39 +0900)
+>
+> ----------------------------------------------------------------
+> Renesas ARM based SoC fixes for v3.13
+>
+> * r8a7790 (R-Car H1) SoC
+>   - Correct GPIO resources in DT.
+>
+>     This problem has been present since GPIOs were added to the r8a7790 SoC
+>     by f98e10c88aa95bf7 ("ARM: shmobile: r8a7790: Add GPIO controller
+>     devices to device tree") in v3.12-rc1.
+>
+> * irqchip renesas-intc-irqpin
+>   - Correct register bitfield shift calculation
+>
+>     This bug has been present since the renesas-intc-irqpin driver was
+>     introduced by 443580486e3b9657 ("irqchip: Renesas INTC External IRQ pin
+>     driver") in v3.10-rc1
+>
+> * Lager board
+>   - Do not build the phy fixup unless CONFIG_PHYLIB is enabled
+>
+>     This problem was introduced by 48c8b96f21817aad
+>
+> ----------------------------------------------------------------
 
-Best regards
-Uwe
+Pulled into fixes.
 
- MAINTAINERS | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Thanks,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 95648eb..28c69a6 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -867,6 +867,21 @@ S:	Maintained
- F:	arch/arm/mach-ebsa110/
- F:	drivers/net/ethernet/amd/am79c961a.*
- 
-+ARM/ENERGY MICRO (SILICON LABS) EFM32 SUPPORT
-+M:	Uwe Kleine-K?nig <kernel@pengutronix.de>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/boot/dts/efm32*
-+F:	arch/arm/configs/efm32_defconfig
-+F:	arch/arm/include/debug/efm32.S
-+F:	arch/arm/mach-efm32/
-+F:	drivers/clk/clk-efm32gg.c
-+F:	drivers/clocksource/time-efm32.c
-+F:	drivers/spi/spi-efm32.c
-+F:	drivers/tty/serial/efm32-uart.c
-+F:	include/dt-bindings/clock/efm32-cmu.h
-+F:	include/linux/platform_data/efm32-*
-+
- ARM/EZX SMARTPHONES (A780, A910, A1200, E680, ROKR E2 and ROKR E6)
- M:	Daniel Ribeiro <drwyrm@gmail.com>
- M:	Stefan Schmidt <stefan@openezx.org>
--- 
-1.8.5.1
+Kevin
