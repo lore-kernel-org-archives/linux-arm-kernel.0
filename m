@@ -1,115 +1,224 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Dec 2013 18:34:27 +0200
-Subject: [PATCHv12 09/49] clk: mux: add support for low level ops
+Date: Fri, 20 Dec 2013 18:34:28 +0200
+Subject: [PATCHv12 11/49] CLK: ti: add init support for clock IP blocks
 In-Reply-To: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
 References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387557274-22583-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1387557274-22583-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiplexer clock can now be registered to use low level register access ops.
-Preferred initialization method is via clock description.
+ti_dt_clk_init_provider() can now be used to initialize the contents of
+a single clock IP block. This parses all the clocks under the IP block
+and calls the corresponding init function for them.
+
+This patch also introduces a helper function for the TI clock drivers
+to get register info from DT and append the master IP info to this.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk-mux.c        |   24 +++++++++++++++++++++---
- include/linux/clk-provider.h |    4 ++++
- 2 files changed, 25 insertions(+), 3 deletions(-)
+ drivers/clk/clk.c            |    4 +-
+ drivers/clk/ti/clk.c         |  112 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |    2 +
+ include/linux/clk/ti.h       |   20 ++++++++
+ 4 files changed, 135 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 2cbed08..ed3bc36 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -46,7 +46,12 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
- 	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
- 	 * val = 0x4 really means "bit 2, index starts at bit 0"
- 	 */
--	val = clk_readl(mux->reg) >> mux->shift;
-+	if (mux->ll_ops)
-+		val = mux->ll_ops->clk_readl(mux->reg);
-+	else
-+		val = clk_readl(mux->reg);
-+
-+	val >>= mux->shift;
- 	val &= mux->mask;
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8bcd1e0..c0521be 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2203,8 +2203,6 @@ struct of_clk_provider {
+ 	void *data;
+ };
  
- 	if (mux->table) {
-@@ -93,11 +98,19 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (mux->flags & CLK_MUX_HIWORD_MASK) {
- 		val = mux->mask << (mux->shift + 16);
- 	} else {
--		val = clk_readl(mux->reg);
-+		if (mux->ll_ops)
-+			val = mux->ll_ops->clk_readl(mux->reg);
-+		else
-+			val = clk_readl(mux->reg);
+-extern struct of_device_id __clk_of_table[];
+-
+ static const struct of_device_id __clk_of_table_sentinel
+ 	__used __section(__clk_of_table_end);
+ 
+@@ -2344,7 +2342,7 @@ void __init of_clk_init(const struct of_device_id *matches)
+ 	struct device_node *np;
+ 
+ 	if (!matches)
+-		matches = __clk_of_table;
++		matches = &__clk_of_table;
+ 
+ 	for_each_matching_node_and_match(np, matches, &match) {
+ 		of_clk_init_cb_t clk_init_cb = match->data;
+diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+index ef1a7cd..e16da3a 100644
+--- a/drivers/clk/ti/clk.c
++++ b/drivers/clk/ti/clk.c
+@@ -19,10 +19,15 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/ti.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/list.h>
+ 
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
++static int ti_dt_clk_memmap_index;
++struct clk_ll_ops *ti_clk_ll_ops;
 +
- 		val &= ~(mux->mask << mux->shift);
+ /**
+  * ti_dt_clocks_register - register DT alias clocks during boot
+  * @oclks: list of clocks to register
+@@ -53,3 +58,110 @@ void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+ 		}
  	}
- 	val |= index << mux->shift;
--	clk_writel(val, mux->reg);
+ }
 +
-+	if (mux->ll_ops)
-+		mux->ll_ops->clk_writel(val, mux->reg);
-+	else
-+		clk_writel(val, mux->reg);
- 
- 	if (mux->lock)
- 		spin_unlock_irqrestore(mux->lock, flags);
-@@ -159,6 +172,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 	mux->lock = lock;
- 	mux->table = table;
- 	mux->hw.init = &init;
-+	mux->ll_ops = &clk_ll_ops_default;
- 
- 	clk = clk_register(dev, &mux->hw);
- 
-@@ -201,6 +215,10 @@ struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc)
- 	mux->shift = hw_desc->shift;
- 	mux->flags = hw_desc->flags;
- 	mux->lock = hw_desc->lock;
-+	mux->ll_ops = hw_desc->ll_ops;
++struct clk_init_item {
++	struct device_node *node;
++	struct clk_hw *hw;
++	ti_of_clk_init_cb_t func;
++	struct list_head link;
++};
 +
-+	if (!mux->ll_ops)
-+		mux->ll_ops = &clk_ll_ops_default;
- 
- 	if (!desc->ops) {
- 		if (mux->flags & CLK_MUX_READ_ONLY)
++static LIST_HEAD(retry_list);
++
++/**
++ * ti_clk_retry_init - retries a failed clock init at later phase
++ * @node: device not for the clock
++ * @hw: partially initialized clk_hw struct for the clock
++ * @func: init function to be called for the clock
++ *
++ * Adds a failed clock init to the retry list. The retry list is parsed
++ * once all the other clocks have been initialized.
++ */
++int __init ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
++			      ti_of_clk_init_cb_t func)
++{
++	struct clk_init_item *retry;
++
++	pr_debug("%s: adding to retry list...\n", node->name);
++	retry = kzalloc(sizeof(*retry), GFP_KERNEL);
++	if (!retry)
++		return -ENOMEM;
++
++	retry->node = node;
++	retry->func = func;
++	retry->hw = hw;
++	list_add(&retry->link, &retry_list);
++
++	return 0;
++}
++
++/**
++ * ti_clk_get_reg_addr - get register address for a clock register
++ * @node: device node for the clock
++ * @index: register index from the clock node
++ *
++ * Builds clock register address from device tree information. This
++ * is a struct of type clk_omap_reg.
++ */
++void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
++{
++	struct clk_omap_reg *reg;
++	u32 val;
++	u32 tmp;
++
++	reg = (struct clk_omap_reg *)&tmp;
++	reg->index = ti_dt_clk_memmap_index;
++
++	if (of_property_read_u32_index(node, "reg", index, &val)) {
++		pr_err("%s must have reg[%d]!\n", node->name, index);
++		return NULL;
++	}
++
++	reg->offset = val;
++
++	return (void __iomem *)tmp;
++}
++
++/**
++ * ti_dt_clk_init_provider - init master clock provider
++ * @parent: master node
++ * @index: internal index for clk_reg_ops
++ *
++ * Initializes a master clock IP block and its child clock nodes.
++ * Regmap is provided for accessing the register space for the
++ * IP block and all the clocks under it.
++ */
++void ti_dt_clk_init_provider(struct device_node *parent, int index)
++{
++	const struct of_device_id *match;
++	struct device_node *np;
++	struct device_node *clocks;
++	of_clk_init_cb_t clk_init_cb;
++	struct clk_init_item *retry;
++	struct clk_init_item *tmp;
++
++	ti_dt_clk_memmap_index = index;
++
++	/* get clocks for this parent */
++	clocks = of_get_child_by_name(parent, "clocks");
++	if (!clocks) {
++		pr_err("%s missing 'clocks' child node.\n", parent->name);
++		return;
++	}
++
++	for_each_child_of_node(clocks, np) {
++		match = of_match_node(&__clk_of_table, np);
++		if (!match)
++			continue;
++		clk_init_cb = (of_clk_init_cb_t)match->data;
++		pr_debug("%s: initializing: %s\n", __func__, np->name);
++		clk_init_cb(np);
++	}
++
++	list_for_each_entry_safe(retry, tmp, &retry_list, link) {
++		pr_debug("retry-init: %s\n", retry->node->name);
++		retry->func(retry->hw, retry->node);
++		list_del(&retry->link);
++		kfree(retry);
++	}
++}
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 3923d46..629163c 100644
+index 629163c..2d2c03d 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -408,6 +408,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  *
-  * @hw:		handle between common and hardware-specific interfaces
-  * @reg:	register controlling multiplexer
-+ * @ll_ops:	low-level ops for accessing the register
-  * @shift:	shift to multiplexer bit field
-  * @width:	width of mutliplexer bit field
-  * @flags:	hardware-specific flags
-@@ -427,6 +428,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
- struct clk_mux {
- 	struct clk_hw	hw;
- 	void __iomem	*reg;
-+	struct clk_ll_ops	*ll_ops;
- 	u32		*table;
- 	u32		mask;
- 	u8		shift;
-@@ -438,6 +440,7 @@ struct clk_mux {
-  * struct clk_mux_desc - init descriptor for multiplexer clock
-  * @desc:	handle between common and hardware-specific interfaces
-  * @reg:	register controlling multiplexer
-+ * @ll_ops:	low-level ops for accesing the register
-  * @shift:	shift to multiplexer bit field
-  * @width:	width of multiplexer bit field
-  * @flags:	hardware-specific flags
-@@ -446,6 +449,7 @@ struct clk_mux {
- struct clk_mux_desc {
- 	struct clk_desc	desc;
- 	void __iomem	*reg;
-+	struct clk_ll_ops	*ll_ops;
- 	u32		*table;
- 	u32		mask;
- 	u8		shift;
+@@ -584,6 +584,8 @@ struct clk_onecell_data {
+ 	unsigned int clk_num;
+ };
+ 
++extern struct of_device_id __clk_of_table;
++
+ #define CLK_OF_DECLARE(name, compat, fn)			\
+ 	static const struct of_device_id __clk_of_table_##name	\
+ 		__used __section(__clk_of_table)		\
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index df94c24..6750d25 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -36,7 +36,27 @@ struct ti_dt_clk {
+ 		.node_name = name,	\
+ 	}
+ 
++/* Maximum number of clock memmaps */
++#define CLK_MAX_MEMMAPS			4
+ 
++typedef void (*ti_of_clk_init_cb_t)(struct clk_hw *, struct device_node *);
++
++/**
++ * struct clk_omap_reg - OMAP register declaration
++ * @offset: offset from the master IP module base address
++ * @index: index of the master IP module
++ */
++struct clk_omap_reg {
++	u16 offset;
++	u16 index;
++};
++
++extern struct clk_ll_ops *ti_clk_ll_ops;
++
++void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
+ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
++void ti_dt_clk_init_provider(struct device_node *np, int index);
++int ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
++		      ti_of_clk_init_cb_t func);
+ 
+ #endif
 -- 
 1.7.9.5
