@@ -1,56 +1,24 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 20 Dec 2013 15:23:22 +0100
-Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
-In-Reply-To: <20131220140211.GG3709@lee--X1>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
- <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
- <s5hd2kssu4g.wl%tiwai@suse.de> <20131219164824.GA16145@lee--X1>
- <s5hzjnwrbq2.wl%tiwai@suse.de> <20131220140211.GG3709@lee--X1>
-Message-ID: <s5hpporr485.wl%tiwai@suse.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 Dec 2013 14:25:24 +0000
+Subject: [PATCH 2/2] arm64: dts: Reduce size of virtio block device for
+ foundation model
+In-Reply-To: <1387543964-15057-2-git-send-email-broonie@kernel.org>
+References: <1387543964-15057-1-git-send-email-broonie@kernel.org>
+ <1387543964-15057-2-git-send-email-broonie@kernel.org>
+Message-ID: <20131220142524.GB11954@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 20 Dec 2013 14:02:11 +0000,
-Lee Jones wrote:
+On Fri, Dec 20, 2013 at 12:52:44PM +0000, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> > > > > Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
-> > > > > rather carelessly converts find_next_bit() to fls() (find last
-> > > > > bit set), which are not the same.
-> > > > 
-> > > > Does it break on the real machines?
-> > > 
-> > > It does, that's how I found the bug.
-> > > 
-> > > > fls() behaves differently from find_next_bit(), of course, but in this
-> > > > case, it should work same in the end, since there are at most two
-> > > > bits.
-> > > 
-> > > Unfortunately it doesn't work at all. This patch brings audio back to
-> > > a working state. It took me the best part of a day to track down the
-> > > issue. :(
-> > 
-> > Hmm, then isn't the original code rather buggy?
-> > 
-> > Check the values set there by ffs(), fls() and the original
-> > find_next_bit(), especially whether find_next_bit() gives a valid
-> > value fitting with the mask bits.
-> 
-> I wish I had the time to delve into exactly what's happening. All I
-> can tell you is your patch broke audio and this one fixes it again. If
-> you have time for a deep dive and produce a permanent solution I'd be
-> much obliged and will of course test anything you send me. In the mean
-> time, this patch should definitely be applied, as sound is crippled
-> without it. 
+> Will Deacon observed that kvmtool uses a size of 0x200 for virtio
+> block memory region and that the virtio block spec only uses 31 bytes in
+> the device specific region at 0x100 so reduce the region to a less
+> wasteful 0x200.
 
-The driver code was buggy from the beginning, but it looked as if
-casually working in stereo mode.  May patch corrected things to what
-it should be :)
+What do we waste by keeping it at 4K? That's ioremap'ed, so we use a
+full page anyway.
 
-I already have a fix patch, but need to check the information above at
-first to see whether it can be used as is.  So, check the value set
-there, and ffs(), fls() and find_next_bit() values.  Also, check
-whether the stereo left/right channels are really output as expected
-with the original driver code.
-
-
-Takashi
+-- 
+Catalin
