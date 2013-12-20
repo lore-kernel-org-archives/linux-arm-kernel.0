@@ -1,39 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Dec 2013 21:34:41 +0100
-Subject: [PATCH 2/7] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <1387566560-23948-3-git-send-email-davidb@codeaurora.org>
-References: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
- <1387566560-23948-3-git-send-email-davidb@codeaurora.org>
-Message-ID: <201312202134.42027.arnd@arndb.de>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 21 Dec 2013 09:35:50 +1300
+Subject: [PATCH Resend 5/7] clk: vt8500: Staticize vtwm_pll_ops
+In-Reply-To: <1387443241-5694-5-git-send-email-sachin.kamat@linaro.org>
+References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
+ <1387443241-5694-5-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <52B4AA26.6080401@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013, David Brown wrote:
-> diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
-> index 16e6183..1f11d93 100644
-> --- a/arch/arm/mach-msm/board-dt.c
-> +++ b/arch/arm/mach-msm/board-dt.c
-> @@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
->         NULL
->  };
->  
-> +static const char * const apq8074_dt_match[] __initconst = {
-> +       "qcom,apq8074-dragonboard",
-> +       NULL
-> +};
-> +
->  DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
->         .smp = smp_ops(msm_smp_ops),
->         .dt_compat = msm_dt_match,
->  MACHINE_END
-> +
-> +DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
-> +       .dt_compat = apq8074_dt_match,
-> +MACHINE_END
-> -- 
+On 19/12/13 21:53, Sachin Kamat wrote:
+> 'vtwm_pll_ops' is local to this file. Make it static.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>   drivers/clk/clk-vt8500.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+> index 7fd5c5e9e25d..37e928846ec5 100644
+> --- a/drivers/clk/clk-vt8500.c
+> +++ b/drivers/clk/clk-vt8500.c
+> @@ -641,7 +641,7 @@ static unsigned long vtwm_pll_recalc_rate(struct clk_hw *hw,
+>   	return pll_freq;
+>   }
+>   
+> -const struct clk_ops vtwm_pll_ops = {
+> +static const struct clk_ops vtwm_pll_ops = {
+>   	.round_rate = vtwm_pll_round_rate,
+>   	.set_rate = vtwm_pll_set_rate,
+>   	.recalc_rate = vtwm_pll_recalc_rate,
+I thought I had already ack'd this but if not:
 
-Why can't you reuse the MSM_DT definition and just add the dragonboard
-to the list of compatible machines? The presence of the smp_ops pointer
-should not matter if you don't support SMP.
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
 
-	Arnd
+Regards
+Tony Prisk
