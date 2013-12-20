@@ -1,24 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 Dec 2013 18:07:06 +0000
-Subject: [PATCH 0/4] arm64 topology support
-In-Reply-To: <1387483575-11430-1-git-send-email-broonie@kernel.org>
-References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
-Message-ID: <20131220180706.GQ25477@arm.com>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Sat, 21 Dec 2013 01:42:58 +0800
+Subject: [PATCH 2/2] ARM: dts: imx: enable dma for spi
+In-Reply-To: <1387561378-2683-1-git-send-email-Frank.Li@freescale.com>
+References: <1387561378-2683-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1387561378-2683-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Enable dma support for espci controller
 
-On Thu, Dec 19, 2013 at 08:06:11PM +0000, Mark Brown wrote:
-> Another spin of the arm64 topology work - this should incorporate most
-> of the feedback from Lorenzo, there's a few things that were still under
-> discussion the main ones being:
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-We'll have to leave this patchset for early January, hopefully we have a
-bit of time to review before the merging window. I (and Will, Lorenzo)
-am on holiday until around 6th of January.
-
-Have a Good Christmas!
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 858ecd7..6b29f56 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -184,6 +184,8 @@
+ 					interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 112>, <&clks 112>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -195,6 +197,8 @@
+ 					interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 113>, <&clks 113>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -206,6 +210,8 @@
+ 					interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 114>, <&clks 114>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -217,6 +223,8 @@
+ 					interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 115>, <&clks 115>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
 -- 
-Catalin
+1.7.8
