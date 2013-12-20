@@ -1,63 +1,29 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 20 Dec 2013 19:51:24 +0000
-Subject: [PATCH] MAINTAINERS: take maintainership for Energy Micro efm32
- SoCs
-In-Reply-To: <1387568343-8754-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1387568343-8754-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131220195124.GD31886@sirena.org.uk>
+Date: Fri, 20 Dec 2013 19:55:09 +0000
+Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
+ without PCI on ARM64
+In-Reply-To: <20131217112914.GB32118@arm.com>
+References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
+ <201312091735.05014.arnd@arndb.de> <20131209165548.GE19163@arm.com>
+ <201312091820.23006.arnd@arndb.de> <20131209180155.GG19163@arm.com>
+ <20131216205133.GI5617@xora-haswell.xora.org.uk>
+ <20131217112914.GB32118@arm.com>
+Message-ID: <20131220195509.GE31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 08:39:03PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Tue, Dec 17, 2013 at 11:29:14AM +0000, Catalin Marinas wrote:
 
-Acked-by: Mark Brown <broonie@linaro.org>
+> - What if two hw vendors have different descriptors for the same device?
 
-> Hello,
-> 
-> I think this can best go in via armsoc, but needs acks for clk, clocksource,
-> spi and tty/serial.
-> 
-> Best regards
-> Uwe
-> 
->  MAINTAINERS | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 95648eb..28c69a6 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -867,6 +867,21 @@ S:	Maintained
->  F:	arch/arm/mach-ebsa110/
->  F:	drivers/net/ethernet/amd/am79c961a.*
->  
-> +ARM/ENERGY MICRO (SILICON LABS) EFM32 SUPPORT
-> +M:	Uwe Kleine-K?nig <kernel@pengutronix.de>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	arch/arm/boot/dts/efm32*
-> +F:	arch/arm/configs/efm32_defconfig
-> +F:	arch/arm/include/debug/efm32.S
-> +F:	arch/arm/mach-efm32/
-> +F:	drivers/clk/clk-efm32gg.c
-> +F:	drivers/clocksource/time-efm32.c
-> +F:	drivers/spi/spi-efm32.c
-> +F:	drivers/tty/serial/efm32-uart.c
-> +F:	include/dt-bindings/clock/efm32-cmu.h
-> +F:	include/linux/platform_data/efm32-*
-> +
->  ARM/EZX SMARTPHONES (A780, A910, A1200, E680, ROKR E2 and ROKR E6)
->  M:	Daniel Ribeiro <drwyrm@gmail.com>
->  M:	Stefan Schmidt <stefan@openezx.org>
-> -- 
-> 1.8.5.1
-> 
-> 
+This one at least is already handled - ACPI ID tables are lists of IDs
+just the same as everything else so we can have as many different
+bindings for the same device as the hardware vendors see fit to bless us
+with.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/3c904048/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/33d8ac0c/attachment.sig>
