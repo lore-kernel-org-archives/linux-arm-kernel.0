@@ -1,31 +1,44 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Fri, 20 Dec 2013 17:46:16 +0000
-Subject: [PATCH 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <1387507503-7565-1-git-send-email-rapatel@apm.com>
-References: <1387507503-7565-1-git-send-email-rapatel@apm.com>
-Message-ID: <1387561576.1549.5.camel@bwh-desktop.uk.level5networks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Dec 2013 17:45:43 +0000
+Subject: [PATCHv3] arm: Correct virt_addr_valid
+In-Reply-To: <1387416724-17868-1-git-send-email-lauraa@codeaurora.org>
+References: <1387416724-17868-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20131220174543.GJ16829@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-> is for the sole use of the intended recipient(s) and contains information
-> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-> It is to be used solely for the purpose of furthering the parties' business relationship. 
-> All unauthorized review, use, disclosure or distribution is prohibited. 
-> If you are not the intended recipient, please contact the sender by reply e-mail 
-> and destroy all copies of the original message.
+On Thu, Dec 19, 2013 at 01:32:04AM +0000, Laura Abbott wrote:
+> The definition of virt_addr_valid is that virt_addr_valid should
+> return true if and only if virt_to_page returns a valid pointer.
+> The current definition of virt_addr_valid only checks against the
+> virtual address range. There's no guarantee that just because a
+> virtual address falls bewteen PAGE_OFFSET and high_memory the
+> associated physical memory has a valid backing struct page. Follow
+> the example of other architectures and convert to pfn_valid to
+> verify that the virtual address is actually valid. The check for
+> an address between PAGE_OFFSET and high_memory is still necessary
+> as vmalloc/highmem addresses are not valid with virt_to_page.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm/include/asm/memory.h |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 9ecccc8..35a8511 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -350,7 +350,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+>  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
+>  
+>  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+> -#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+> +#define virt_addr_valid(kaddr)	(((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory) \
+> +					&& pfn_valid(__pa(kaddr) >> PAGE_SHIFT) )
 
-Well this definitely has nothing to do with any business relationship
-that may exist between AMCC and Solarflare, so please don't send any
-more of these messages either directly or via netdev.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-David, you'd better let all the netdev archives know to delete these
-messages... ;-)
-
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Will
