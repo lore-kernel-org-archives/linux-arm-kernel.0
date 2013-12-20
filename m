@@ -1,41 +1,62 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 20 Dec 2013 11:09:13 -0800
-Subject: [PATCH 0/7] MSM patches for 3.14
-Message-ID: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
+Date: Fri, 20 Dec 2013 11:09:17 -0800
+Subject: [PATCH 4/7] ARM: msm: Simplify ARCH_MSM_DT config
+In-Reply-To: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
+References: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1387566560-23948-5-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series contains a warning fix, a bit of cleanup, adds a
-few more boards.  There are still numerous patches floating with
-issues, but things seem to be moving in the right direction.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-These have all been sent previously to the lists, and received reviews
-and necessary acks.
+This doesn't need to be a def_bool y. Instead we can have every
+DT supported platform select ARCH_MSM_DT and we achieve the same
+thing with less chance of conflicts.
 
-Josh Cartwright (1):
-  ARM: msm: trout: fix uninit var warning
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+ arch/arm/mach-msm/Kconfig | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Rohit Vaswani (2):
-  ARM: msm: Add support for APQ8074 Dragonboard
-  defconfig: msm_defconfig: Enable CONFIG_ARCH_MSM8974
-
-Stephen Boyd (4):
-  ARM: msm: Simplify ARCH_MSM_DT config
-  ARM: dts: MSM8974: Add restart node
-  ARM: dts: MSM8974: Add MMIO architected timer node
-  ARM: msm_defconfig: Enable restart driver
-
- arch/arm/boot/dts/Makefile                     |  3 +-
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 ++
- arch/arm/boot/dts/qcom-msm8974.dtsi            | 97 ++++++++++++++++++++++++++
- arch/arm/configs/msm_defconfig                 |  3 +
- arch/arm/mach-msm/Kconfig                      | 15 +++-
- arch/arm/mach-msm/board-dt.c                   |  9 +++
- arch/arm/mach-msm/board-trout.c                | 12 ++--
- 7 files changed, 136 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
- create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
-
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 5e5782d..702553b 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -44,6 +44,7 @@ endchoice
+ 
+ config ARCH_MSM8X60
+ 	bool "MSM8X60"
++	select ARCH_MSM_DT
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select GPIO_MSM_V2
+@@ -52,6 +53,7 @@ config ARCH_MSM8X60
+ 
+ config ARCH_MSM8960
+ 	bool "MSM8960"
++	select ARCH_MSM_DT
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select HAVE_SMP
+@@ -60,6 +62,7 @@ config ARCH_MSM8960
+ 
+ config ARCH_MSM8974
+ 	bool "MSM8974"
++	select ARCH_MSM_DT
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select HAVE_ARM_ARCH_TIMER
+@@ -68,8 +71,7 @@ config ARCH_MSM8974
+ 	select USE_OF
+ 
+ config ARCH_MSM_DT
+-	def_bool y
+-	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
++	bool
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
