@@ -1,26 +1,41 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Fri, 20 Dec 2013 09:17:33 +0530
-Subject: [PATCH 08/12] pcie: designware: Fix IO transfers
-In-Reply-To: <002401cef6d7$e6d89c00$b489d400$%han@samsung.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <6b4282b9e793ec89ba0c20f3362d41f6133a8132.1386752447.git.mohit.kumar@st.com>
- <201312111103.28568.marex@denx.de>
- <CAD6G_RSBhHoXMdw=pK_riXN6ozUtK32uUeAJH5uuox_PQxmi7g@mail.gmail.com>
- <002401cef6d7$e6d89c00$b489d400$%han@samsung.com>
-Message-ID: <20131220034733.GA2291@pratyush-vbox>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 20 Dec 2013 11:50:17 +0800
+Subject: [PATCH RESEND] clk: divider: read before write for HIWORD mask
+Message-ID: <1387511417-8573-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+When multiple dividers share one register, we need to read & mask
+register fist. Then we set the right value.
 
-On Thu, Dec 12, 2013 at 09:17:19AM +0800, Jingoo Han wrote:
-> On Wednesday, December 11, 2013 8:30 PM, Jagan Teki wrote:
-> > On Wed, Dec 11, 2013 at 3:33 PM, Marek Vasut <marex@denx.de> wrote:
-> > > On Wednesday, December 11, 2013 at 10:38:33 AM, Mohit Kumar wrote:
-> > >> From: Pratyush Anand <pratyush.anand@st.com>
+For example, there're two mmc clock dividers shared in one registers.
+The clock register is HIWORD type.
 
-May be you can apply this patch along with 07/12 of this series.
-V2 of other patches might get delayed because of vacations.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ drivers/clk/clk-divider.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-Regards
-Pratyush
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 8d3009e..e1ea289 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -227,12 +227,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (divider->lock)
+ 		spin_lock_irqsave(divider->lock, flags);
+ 
+-	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+-		val = div_mask(divider) << (divider->shift + 16);
+-	} else {
+-		val = clk_readl(divider->reg);
+-		val &= ~(div_mask(divider) << divider->shift);
+-	}
++	val = clk_readl(divider->reg);
++	val &= ~(div_mask(divider) << divider->shift);
++	if (divider->flags & CLK_DIVIDER_HIWORD_MASK)
++		val |= div_mask(divider) << (divider->shift + 16);
+ 	val |= value << divider->shift;
+ 	clk_writel(val, divider->reg);
+ 
+-- 
+1.8.3.2
