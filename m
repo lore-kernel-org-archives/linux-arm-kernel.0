@@ -1,13 +1,12 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Dec 2013 18:25:34 +0100
-Subject: [PATCH 3/5] ARM: versatile: enable GPIOLIB and PL061 by default
-Message-ID: <1387560334-21499-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 20 Dec 2013 18:25:49 +0100
+Subject: [PATCH 4/5] ARM: versatile: build using EABI
+Message-ID: <1387560349-21536-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the GPIOLIB and PL061 in the Versatile defconfig, as this
-is present on all boards, and so we get compile and test coverage
-for this.
+This should work just fine on this purely v5 platform, so let's
+config it for EABI by default.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
@@ -15,17 +14,17 @@ Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
  1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
-index 0756efd8b554..bb83c099d5a6 100644
+index bb83c099d5a6..6d4c2df44c9c 100644
 --- a/arch/arm/configs/versatile_defconfig
 +++ b/arch/arm/configs/versatile_defconfig
-@@ -45,6 +45,8 @@ CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=m
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_PL061=y
- # CONFIG_HWMON is not set
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
+@@ -8,6 +8,8 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_VERSATILE=y
+ CONFIG_MACH_VERSATILE_AB=y
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=1f03 mem=32M"
 -- 
 1.8.3.1
