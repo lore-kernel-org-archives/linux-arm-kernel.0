@@ -1,59 +1,22 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 20 Dec 2013 11:30:43 +0000
-Subject: [PATCHv4 3/4] ARM: dts: Enable SAI ALSA SoC DAI device for
- Vybrid VF610 TOWER board.
-In-Reply-To: <1387501387-2151-3-git-send-email-Li.Xiubo@freescale.com>
-References: <1387501387-2151-1-git-send-email-Li.Xiubo@freescale.com>
- <1387501387-2151-3-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <e130ad7ed4b64bc198d69762edbd8d4b@BY2PR03MB505.namprd03.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Dec 2013 11:30:58 +0000
+Subject: [alsa-devel] [PATCH RFC v2 REPOST 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <cover.1387535299.git.jsarha@ti.com>
+References: <cover.1384862950.git.jsarha@ti.com>
+ <cover.1387535299.git.jsarha@ti.com>
+Message-ID: <20131220113058.GN31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 20, 2013 at 12:36:56PM +0200, Jyri Sarha wrote:
+> Changes since the first RFC version of the patches:
 
-  Could someone help review and merge this DTS patch please ?
-
-  Thanks very much!
-
-Best Regards,
-Xiubo
-
-
-
-> Subject: [PATCHv4 3/4] ARM: dts: Enable SAI ALSA SoC DAI device for Vybrid
-> VF610 TOWER board.
-> 
-> This patch adds and enables the SAI device.
-> 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index c8047ca..e60c20c 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -74,6 +74,12 @@
->  	status = "okay";
->  };
-> 
-> +&sai2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_sai2_1>;
-> +	status = "okay";
-> +};
-> +
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart1_1>;
-> --
-> 1.8.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Please don't bury your e-mails in the middle of old threads, that's a
+good way of getting them missed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/188117f8/attachment.sig>
