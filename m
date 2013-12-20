@@ -1,102 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Dec 2013 18:25:25 +0100
-Subject: [PATCH 2/5] ARM: versatile: update defconfig
-Message-ID: <1387560325-21462-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 20 Dec 2013 18:25:34 +0100
+Subject: [PATCH 3/5] ARM: versatile: enable GPIOLIB and PL061 by default
+Message-ID: <1387560334-21499-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the Versatile defconfig to the thing saved by
-savedefconfig so we don't get confusing diffs when trying to
-modify other options.
+Select the GPIOLIB and PL061 in the Versatile defconfig, as this
+is present on all boards, and so we get compile and test coverage
+for this.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/versatile_defconfig | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+ arch/arm/configs/versatile_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
-index 2ba9e63d0f17..0756efd8b554 100644
+index 0756efd8b554..bb83c099d5a6 100644
 --- a/arch/arm/configs/versatile_defconfig
 +++ b/arch/arm/configs/versatile_defconfig
-@@ -1,5 +1,3 @@
--CONFIG_ARCH_VERSATILE=y
--CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
-@@ -7,15 +5,14 @@ CONFIG_BLK_DEV_INITRD=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_ARCH_VERSATILE=y
- CONFIG_MACH_VERSATILE_AB=y
--CONFIG_LEDS=y
--CONFIG_LEDS_CPU=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=1f03 mem=32M"
- CONFIG_FPE_NWFPE=y
- CONFIG_VFP=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -26,9 +23,7 @@ CONFIG_IP_PNP_BOOTP=y
- # CONFIG_INET_DIAG is not set
- # CONFIG_IPV6 is not set
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
-@@ -37,10 +32,10 @@ CONFIG_MTD_PHYSMAP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_EEPROM_LEGACY=m
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_SMC91X=y
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_SERIO_AMBAKMI=y
-+CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_MANY_PORTS=y
-@@ -48,15 +43,12 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
- CONFIG_SERIAL_8250_RSA=y
- CONFIG_SERIAL_AMBA_PL011=y
+@@ -45,6 +45,8 @@ CONFIG_SERIAL_AMBA_PL011=y
  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--CONFIG_LEGACY_PTY_COUNT=16
  CONFIG_I2C=y
  CONFIG_I2C_CHARDEV=m
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_PL061=y
  # CONFIG_HWMON is not set
  CONFIG_FB=y
  CONFIG_FB_ARMCLCD=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FONTS=y
--CONFIG_FONT_ACORN_8x8=y
- CONFIG_SOUND=y
- CONFIG_SND=m
- CONFIG_SND_MIXER_OSS=m
-@@ -71,15 +63,14 @@ CONFIG_CRAMFS=y
- CONFIG_MINIX_FS=y
- CONFIG_ROMFS_FS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
- CONFIG_NFSD=y
- CONFIG_NFSD_V3=y
--CONFIG_PARTITION_ADVANCED=y
- CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=m
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
-+CONFIG_FONTS=y
-+CONFIG_FONT_ACORN_8x8=y
 -- 
 1.8.3.1
