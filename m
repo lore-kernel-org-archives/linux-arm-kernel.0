@@ -1,43 +1,151 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 20 Dec 2013 09:36:41 -0500
-Subject: [PATCH v2 0/2] gpio: davinci: reuse for keystone arch
-In-Reply-To: <CACRpkdYcvtWNgJ=JCgpZFdZmypLu7UmtpyTQusRshSGT=EqsVg@mail.gmail.com>
-References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdYcvtWNgJ=JCgpZFdZmypLu7UmtpyTQusRshSGT=EqsVg@mail.gmail.com>
-Message-ID: <52B455F9.8070707@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 20 Dec 2013 14:58:02 +0000
+Subject: [PATCH v4 13/16] ARM: Add an emulate flag to the
+ kprobes/uprobes instruction decode functions
+In-Reply-To: <1387166930-13182-14-git-send-email-dave.long@linaro.org>
+References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
+ <1387166930-13182-14-git-send-email-dave.long@linaro.org>
+Message-ID: <1387551482.3404.63.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013 04:40 AM, Linus Walleij wrote:
-> On Wed, Dec 18, 2013 at 11:07 AM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
+On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
 > 
->> This series is intended to update Davinci GPIO driver and reuse
->> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
->> Keystone GPIO IP: supports:
->> - up to 32 GPIO lines;
->> - only unbanked irqs;
->>
->> See Documentation:
->> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->>
->> This series based on:
->> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/gpio
->>
->> Changes in v2:
->> - minor comments applied, no functional changes
->>
->> v1: https://lkml.org/lkml/2013/12/12/366
+> Add an emulate flag into the instruction interpreter, primarily for uprobes
+> support.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm/kernel/kprobes.c      |  3 ++-
+>  arch/arm/kernel/kprobes.h      |  1 +
+>  arch/arm/kernel/probes-arm.c   |  4 ++--
+>  arch/arm/kernel/probes-arm.h   |  2 +-
+>  arch/arm/kernel/probes-thumb.c |  8 ++++----
+>  arch/arm/kernel/probes-thumb.h |  4 ++--
+>  arch/arm/kernel/probes.c       | 32 +++++++++++++++++++++++---------
+>  arch/arm/kernel/probes.h       |  2 +-
+>  8 files changed, 36 insertions(+), 20 deletions(-)
 > 
-Great !!
+> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> index 0d9d49b..04690f9 100644
+> --- a/arch/arm/kernel/kprobes.c
+> +++ b/arch/arm/kernel/kprobes.c
+> @@ -87,7 +87,8 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  	p->opcode = insn;
+>  	p->ainsn.insn = tmp_insn;
+>  
+> -	switch ((*decode_insn)(insn, &p->ainsn, actions)) {
+> +	switch ((*decode_insn)(insn, &p->ainsn,
+> +			       true, actions)) {
 
-> For this v2 series.
-> 
-> Expecting this to go in through the DaVinci tree!
-> 
-Sekhar, Can you please include these to your DaVinci gpio branch ?
+Any reason why the function args need splitting over two lines?
 
-Regards,
-Santosh
+>  	case INSN_REJECTED:	/* not supported */
+>  		return -EINVAL;
+>  
+
+[...]
+
+> --- a/arch/arm/kernel/probes.c
+> +++ b/arch/arm/kernel/probes.c
+> @@ -193,7 +193,7 @@ void __kprobes probes_emulate_none(probes_opcode_t opcode,
+>   */
+>  static probes_opcode_t __kprobes
+>  prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+> -								bool thumb)
+> +			bool thumb)
+
+Seems like a spurious indentation change.
+
+>  {
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  	if (thumb) {
+> @@ -218,7 +218,7 @@ prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>   */
+>  static void  __kprobes
+>  set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+> -								bool thumb)
+> +			bool thumb)
+
+Another spurious whitespace change.
+
+>  {
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  	if (thumb) {
+> @@ -253,7 +253,7 @@ set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>   * non-zero value, the corresponding nibble in pinsn is validated and modified
+>   * according to the type.
+>   */
+> -static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs)
+> +static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs, bool modify)
+>  {
+>  	probes_opcode_t insn = *pinsn;
+>  	probes_opcode_t mask = 0xf; /* Start at least significant nibble */
+> @@ -317,9 +317,16 @@ static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs)
+>  		/* Replace value of nibble with new register number... */
+>  		insn &= ~mask;
+>  		insn |= new_bits & mask;
+> +		if (modify) {
+> +			/* Replace value of nibble with new register number */
+> +			insn &= ~mask;
+> +			insn |= new_bits & mask;
+> +		}
+
+Huh? As is, the above addition doesn't do anything because insn has
+already been modified. I guess you played with the idea that you needed
+to avoid changing insn (you don't) and then didn't undo the experiment
+quite right. :-)
+
+>  	}
+>  
+> -	*pinsn = insn;
+> +	if (modify)
+> +		*pinsn = insn;
+> +
+>  	return true;
+>  
+>  reject:
+> @@ -380,14 +387,15 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
+>   */
+>  int __kprobes
+>  probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+> -				const union decode_item *table, bool thumb,
+> -				const union decode_item *actions)
+> +		   const union decode_item *table, bool thumb,
+> +		   bool emulate, const union decode_item *actions)
+>  {
+>  	struct decode_header *h = (struct decode_header *)table;
+>  	struct decode_header *next;
+>  	bool matched = false;
+>  
+> -	insn = prepare_emulated_insn(insn, asi, thumb);
+> +	if (emulate)
+> +		insn = prepare_emulated_insn(insn, asi, thumb);
+>  
+>  	for (;; h = next) {
+>  		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
+> @@ -402,7 +410,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>  		if (!matched && (insn & h->mask.bits) != h->value.bits)
+>  			continue;
+>  
+> -		if (!decode_regs(&insn, regs))
+> +		if (!decode_regs(&insn, regs, emulate))
+>  			return INSN_REJECTED;
+>  
+>  		switch (type) {
+> @@ -415,7 +423,8 @@ probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>  
+>  		case DECODE_TYPE_CUSTOM: {
+>  			struct decode_custom *d = (struct decode_custom *)h;
+> -			return actions[d->decoder.bits].decoder(insn, asi, h);
+> +			return actions[d->decoder.bits].decoder(insn,
+> +					asi, h);
+
+No need to split the above line, you haven't changed it and it doesn't
+exceed 80 characters anyway.
+
+[Rest of patch cut]
+
+-- 
+Tixy
