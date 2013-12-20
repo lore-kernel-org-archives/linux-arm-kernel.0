@@ -1,26 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Dec 2013 10:25:18 +0100
-Subject: [PATCH v3 00/10] ARM: sa1100: improve irq handling
-In-Reply-To: <1387081697-21841-1-git-send-email-dbaryshkov@gmail.com>
-References: <1387081697-21841-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CACRpkdZS+sd+2=_SQ3k31qwMdV+_towgBpAGih9uhaXofwhY=g@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Dec 2013 10:33:02 +0100
+Subject: [GIT PULL] clk: ux500 updates for 3.14, take 1
+Message-ID: <CAPDyKFpwUrhtT3840EtVRJVbvzM2zvL54gd+xZ4n95bdy+EWUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 15, 2013 at 5:28 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
+Hi Mike,
 
-> Please review my third attempts on touching the sa1100 irq code. I have split
-> changes to a serie of small, simple and easy to review patches, with each one
-> touching only one aspect of irq handling code for sa1100.
+This is a collection of patches for the ux500 clk driver for 3.14.
 
-I've tested this series on the H3600 and it works flawlessly.
+Actually there is only one minimalistic patch included here, but I
+though it could be a good practice since this is the first pull
+request I send you.
 
-For the series:
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+Kind regards
+Ulf Hansson
 
-I guess you best way forward it to put patches into Russell's
-patch tracker or send him a pull request.
 
-Yours,
-Linus Walleij
+The following changes since commit 1459c837036a44e2dcf14a9452ed330201fb23b5:
+
+  clk: si570: Add a driver for SI570 oscillators (2013-12-14 21:01:35 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ulfh/clk.git clk-next-ux500
+
+for you to fetch changes up to ea8776da4d28dbf2c096076db819dfc7d0a7ad40:
+
+  clk: ux500: Remove extra semicolon (2013-12-19 21:45:51 +0100)
+
+----------------------------------------------------------------
+Sachin Kamat (1):
+      clk: ux500: Remove extra semicolon
+
+ drivers/clk/ux500/clk-prcmu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
