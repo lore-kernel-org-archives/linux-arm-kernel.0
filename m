@@ -1,66 +1,76 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 20 Dec 2013 17:30:23 -0500
-Subject: [PATCH v3 08/23] mm/memblock: Add memblock memory allocation apis
-In-Reply-To: <52ACB608.3050802@ti.com>
-References: <1386625856-12942-1-git-send-email-santosh.shilimkar@ti.com>
- <1386625856-12942-9-git-send-email-santosh.shilimkar@ti.com>
- <20131213213735.GM27070@htj.dyndns.org> <52ABABDA.4020808@ti.com>
- <20131214110844.GB17954@htj.dyndns.org> <52ACB608.3050802@ti.com>
-Message-ID: <52B4C4FF.1020009@ti.com>
+Date: Fri, 20 Dec 2013 17:39:25 -0500
+Subject: [PATCH] mm/ARM: fix ARMs __ffs() to conform to avoid warning
+ with NO_BOOTMEM
+In-Reply-To: <1386981486-3173-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1386981486-3173-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <52B4C71D.9030904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 December 2013 02:48 PM, Santosh Shilimkar wrote:
-> On Saturday 14 December 2013 06:08 AM, Tejun Heo wrote:
->> Hello, Santosh.
->>
->> On Fri, Dec 13, 2013 at 07:52:42PM -0500, Santosh Shilimkar wrote:
->>>>> +static void * __init memblock_virt_alloc_internal(
->>>>> +				phys_addr_t size, phys_addr_t align,
->>>>> +				phys_addr_t min_addr, phys_addr_t max_addr,
->>>>> +				int nid)
->>>>> +{
->>>>> +	phys_addr_t alloc;
->>>>> +	void *ptr;
->>>>> +
->>>>> +	if (nid == MAX_NUMNODES)
->>>>> +		pr_warn("%s: usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE\n",
->>>>> +			__func__);
->>>>
->>>> Why not use WARN_ONCE()?  Also, shouldn't nid be set to NUMA_NO_NODE
->>>> here?
->>>>
->>> You want all the users using MAX_NUMNODES to know about it so that
->>> the wrong usage can be fixed. WARN_ONCE will hide that.
->>
->> Well, it doesn't really help anyone to be printing multiple messages
->> without any info on who was the caller and if this thing is gonna be
->> in mainline triggering of the warning should be rare anyway.  It's
->> more of a tool to gather one-off cases in the wild.  WARN_ONCE()
->> usually is the better choice as otherwise the warnings can swamp the
->> machine and console output in certain cases.
->>
-> Fair enough.
->  
->>>> ...
->>>>> +	if (nid != NUMA_NO_NODE) {
->>>>
->>>> Otherwise, the above test is broken.
->>>>
->>> So the idea was just to warn the users and allow them to fix
->>> the code. Well we are just allowing the existing users of using
->>> either MAX_NUMNODES or NUMA_NO_NODE continue to work. Thats what
->>> we discussed, right ?
->>
->> Huh?  Yeah, sure.  You're testing @nid against MAX_NUMNODES at the
->> beginning of the function.  If it's MAX_NUMNODES, you print a warning
->> but nothing else, so the if() conditional above, which should succeed,
->> would fail.  Am I missing sth here?
->>
-> I get it now. Sorry I missed your point in first part. We will fix this.
-> 
-Posted an incremental fix based on above discussion. You have been
-copied on the patch.
+Russell,
 
-Regards,
-Santosh
+On Friday 13 December 2013 07:38 PM, Santosh Shilimkar wrote:
+> Building ARM with NO_BOOTMEM generates below warning.
+> 
+> mm/nobootmem.c: In function _____free_pages_memory___:
+> mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
+> 
+> 	order = min(MAX_ORDER - 1UL, __ffs(start));
+> 
+> ARM's __ffs() differs from other architectures in that it ends up being
+> an int, whereas almost everyone else is unsigned long.
+> 
+> So fix ARMs __ffs() to conform to other architectures. Suggested by
+> Russell King <linux@arm.linux.org.uk>
+> 
+> Some more details in below thread -
+> 	https://lkml.org/lkml/2013/12/9/807
+> 
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+Is this patch inline with what we discussed off-list ?
+If you ack it, it can go into the Andrews tree to kill that one last
+warning with the memblock series. Thanks
+
+
+>  arch/arm/include/asm/bitops.h |   23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index e691ec9..5f41d81 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -270,10 +270,25 @@ static inline int fls(int x)
+>  	return ret;
+>  }
+>  
+> -#define __fls(x) (fls(x) - 1)
+> -#define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
+> -#define __ffs(x) (ffs(x) - 1)
+> -#define ffz(x) __ffs( ~(x) )
+> +static inline unsigned long __fls(unsigned long x)
+> +{
+> +	return fls(x) - 1;
+> +}
+> +
+> +static inline int ffs(int x)
+> +{
+> +	return fls(x & -x);
+> +}
+> +
+> +static inline unsigned long __ffs(unsigned long x)
+> +{
+> +	return ffs(x) - 1;
+> +}
+> +
+> +static inline unsigned long ffz(unsigned long x)
+> +{
+> +	return __ffs(~x);
+> +}
+>  
+>  #endif
+>  
+> 
