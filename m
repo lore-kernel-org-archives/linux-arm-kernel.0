@@ -1,38 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Dec 2013 21:58:34 +0100
-Subject: [PATCH v3 3/6] pinctrl: Make PINCTRL selectable by
- defconfig/menuconfig
-In-Reply-To: <CACRpkdY-MM7OoMq_L90YRADy=oaDoV1wAOccVz90LqfRfEh=3Q@mail.gmail.com>
-References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
- <20131217001842.GB3840@sonymobile.com>
- <CACRpkdY-MM7OoMq_L90YRADy=oaDoV1wAOccVz90LqfRfEh=3Q@mail.gmail.com>
-Message-ID: <201312202158.34805.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 21 Dec 2013 06:08:51 +0900
+Subject: [PATCH 2/3] ARM: dts: Add the missing "\" key in non-US keyboards
+ for exynos5250-snow
+In-Reply-To: <1387492578-22068-2-git-send-email-dianders@chromium.org>
+References: <1387492578-22068-1-git-send-email-dianders@chromium.org>
+ <1387492578-22068-2-git-send-email-dianders@chromium.org>
+Message-ID: <52B4B1E3.2020108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013, Linus Walleij wrote:
-> On Tue, Dec 17, 2013 at 1:18 AM, Bjorn Andersson
-> <bjorn.andersson@sonymobile.com> wrote:
-> 
-> > No matter how we build the individual pinctrl drivers we will always
-> > need the pinctrl framework in a multi-soc zImage; so I can't see that
-> > we gain anything from being able to compile PINCTRL as a module.
-> 
-> I discussed this matter with Christian on IRC and I believe we could
-> basically do "select PINCTRL" on ARCH_MULTIPLATFORM as the
-> vast majority of multiplatforms appear to be using this anyway, this
-> would make the submenu for pin control pop up in menuconfig
-> for this, and make it possible to move different subdrivers to modules
-> if desired.
-> 
-> MULTIPLATFORM does not seem to be about saving footprint bytes
-> on a very fine-granular level anyway, more about doing the module
-> loading/unloading approach to footprint.
+On 12/20/13 07:36, Doug Anderson wrote:
+> When the exynos5250 device tree was sent upstream the keyboard mapping
+> was missing the 2nd instance of the "\" key.  There are two copies of
+> the "\" because it simply has a different row and column on US and
+> non-US keyboards.
+>
+> For more details, see the previous patch in this series: (mkbp: Fix
+> problems with backslash).
+>
+> Signed-off-by: Doug Anderson<dianders@chromium.org>
+> ---
+>   arch/arm/boot/dts/exynos5250-snow.dts | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index fd711e2..28fe2e2 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -130,6 +130,7 @@
+>   							0x04060024	/* J */
+>   							0x04080027	/* ; */
+>   							0x04090026	/* L */
+> +							0x040a002b	/* \ */
+>   							0x040b001c	/* ENTER */
+>
+>   							0x0501002c	/* Z */
 
-Let's review the list of platforms that don't select PINCTRL. There
-are some platforms that are indeed sensitive about memory footprint,
-and I promised people that converting to multiplatform won't cause
-a significant increase in kernel binary size as long as no other
-platforms are enabled.
+OK, Applied this(2/3) and next one(3/3) into fixes for v3.14.
 
-	Arnd
+If these patches should be sent for 3.13 or before, please let me know.
+
+Thanks and Merry Christmas ;-)
+
+- Kukjin
