@@ -1,57 +1,58 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 20 Dec 2013 11:41:12 -0800
-Subject: [GIT PULL 0/3] Renesas ARM based SoC fixes for v3.13
-In-Reply-To: <cover.1386899269.git.horms+renesas@verge.net.au> (Simon Horman's
- message of "Fri, 13 Dec 2013 11:30:24 +0900")
-References: <cover.1386899269.git.horms+renesas@verge.net.au>
-Message-ID: <87d2krgvjb.fsf@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 20 Dec 2013 19:47:18 +0000
+Subject: [PATCH v4 15/16] ARM: add uprobes support
+In-Reply-To: <CAH+eYFDqVpBzzjxR5tVpPUUKS3XLWiDU1Fe5p0CQTUP4yWUDhg@mail.gmail.com>
+References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
+ <1387166930-13182-16-git-send-email-dave.long@linaro.org>
+ <1387564464.3404.106.camel@linaro1.home>
+ <CAH+eYFDqVpBzzjxR5tVpPUUKS3XLWiDU1Fe5p0CQTUP4yWUDhg@mail.gmail.com>
+Message-ID: <1387568838.3311.5.camel@computer5.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman <horms+renesas@verge.net.au> writes:
+On Fri, 2013-12-20 at 20:00 +0100, Rabin Vincent wrote:
+> 2013/12/20 Jon Medhurst (Tixy) <tixy@linaro.org>
+> > On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
+> > > +static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)
+> > > +{
+> > > +     probes_opcode_t insn = __mem_to_opcode_arm(*pinsn);
+> > > +     probes_opcode_t temp;
+> > > +     probes_opcode_t mask;
+> > > +     int freereg;
+> > > +     u32 free = 0xffff;
+> > > +     u32 regs;
+> > > +
+> > > +     for (regs = oregs; regs; regs >>= 4, insn >>= 4) {
+> > > +             if ((regs & 0xf) == REG_TYPE_NONE)
+> > > +                     continue;
+> > > +
+> > > +             free &= ~(1 << (insn & 0xf));
+> > > +     }
+> > > +
+> > > +     /* No PC, no problem */
+> > > +     if (free & (1 << 15))
+> > > +             return 15;
+> > > +
+> > > +     if (!free)
+> > > +             return -1;
+> > > +
+> > > +     /*
+> > > +      * fls instead of ffs ensures that for "ldrd r0, r1, [pc]" we would
+> > > +      * pick LR instead of R1.
+> >
+> > Do we know why this is desirable, i.e. preferring the higher numbered
+> > registers? If there isn't a preference, then no need for comment really.
+> >
+> > Also, the comment as is is wrong, should be "...pick LR instead of R2"
+> > because R1 wouldn't be chosen as the instruction already uses it.
+> 
+> The second destination register of LDRD (R1 in the example above) is
+> not encoded in the instruction
 
-> Hi Olof, Hi Kevin, Hi Arnd,
->
-> please consider these Renesas ARM based SoC fixes for v3.13.
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.13
->
-> for you to fetch changes up to 23de2278ebc3a2f971ce45ca5e5e35c9d5a74040:
->
->   ARM: shmobile: r8a7790: Fix GPIO resources in DTS (2013-11-28 17:04:39 +0900)
->
-> ----------------------------------------------------------------
-> Renesas ARM based SoC fixes for v3.13
->
-> * r8a7790 (R-Car H1) SoC
->   - Correct GPIO resources in DT.
->
->     This problem has been present since GPIOs were added to the r8a7790 SoC
->     by f98e10c88aa95bf7 ("ARM: shmobile: r8a7790: Add GPIO controller
->     devices to device tree") in v3.12-rc1.
->
-> * irqchip renesas-intc-irqpin
->   - Correct register bitfield shift calculation
->
->     This bug has been present since the renesas-intc-irqpin driver was
->     introduced by 443580486e3b9657 ("irqchip: Renesas INTC External IRQ pin
->     driver") in v3.10-rc1
->
-> * Lager board
->   - Do not build the phy fixup unless CONFIG_PHYLIB is enabled
->
->     This problem was introduced by 48c8b96f21817aad
->
-> ----------------------------------------------------------------
+Ah, that's the fact I'd missed, so the code and comment in this patch is
+correct.
 
-Pulled into fixes.
+Thanks
 
-Thanks,
-
-Kevin
+-- 
+Tixy
