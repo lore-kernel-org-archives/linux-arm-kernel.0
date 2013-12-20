@@ -1,57 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 20 Dec 2013 13:37:36 -0800
-Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
-In-Reply-To: <346894265.CPBN0v9Elj@flatron>
-References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voamU5hc7uC5MTOA7OtYuqpsis7cTX3sx0UrmpdZx7_TpzA@mail.gmail.com>
- <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
- <346894265.CPBN0v9Elj@flatron>
-Message-ID: <CAOesGMi7cGZyHLBMpc7UTBbQkiRBij6rDyuA+E+9tUmsb131zw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Dec 2013 22:41:09 +0100
+Subject: [PATCH 3/3] ARM: sun6i: a31: Add support for the High Speed Timers
+In-Reply-To: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1387575669-21253-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 1:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi,
->
-> On Friday 20 of December 2013 15:56:38 sunil joshi wrote:
->> Hi Abhilash,
->> I saw another patch in chrome tree ..by Andrew Bresticker
->> which may be relevant here ..
->>
->> Just wondering if you missed adding this ? or this is not needed ?
->> You did not face any issue in getting core to suspend ?
->>
->> ------------------------------------------------------------------------------------------
->> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
->> Author: Andrew Bresticker <abrestic@chromium.org>
->> Date:   Mon Jul 15 13:14:36 2013 -0700
->>
->>     arm: exynos: disable all interrupts on Exynos5420 before suspend
->>
->>     Disable all interrupts from the GIC before entering suspend on
->>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
->>     may receive an interrupt after entering WFI but before the PMU has
->>     suspended the system, causing suspend to fail.
->>
->>     BUG=chrome-os-partner:20523
->>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
->>     no longer occasionally fails with the "Failed to suspend the system"
->>     error in exynos_cpu_suspend().
->
-> A question about this for Chromium and LSI guys:
->
-> If you find out that there is already a pending interrupt before you enter
-> the sleep mode, isn't it more reasonable to cancel the process ASAP and
-> handle the event instead of entering the sleep just to leave it?
->
-> I believe this should be both more efficient with respect to power usage
-> and latency, because sleep-wakeup transition takes time and power.
->
-> Do you have any reason to think the opposite?
+The Allwinner A31 has support for four high speed timers. Apart for the
+number of timers (4 vs 2), it's basically the same logic than the high
+speed timers found in the sun5i chips.
 
-If it's expected to be a rare or very rare event, it's not a given
-that the added complexity of dealing with the aborted suspend that
-late is worth it.
+Now that we have a driver to support it, we can enable them in the
+device tree.
 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
--Olof
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 5256ad9..9145c6d 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -312,6 +312,17 @@
+ 			status = "disabled";
+ 		};
+ 
++		hstimer at 01c60000 {
++			compatible = "allwinner,sun7i-a20-hstimer";
++			reg = <0x01c60000 0x1000>;
++			interrupts = <0 51 4>,
++				     <0 52 4>,
++				     <0 53 4>,
++				     <0 54 4>;
++			clocks = <&ahb1_gates 19>;
++			resets = <&ahb1_rst 19>;
++		};
++
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
+-- 
+1.8.4.2
