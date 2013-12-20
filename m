@@ -1,29 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 20 Dec 2013 19:55:09 +0000
-Subject: [Linaro-acpi] [RFC part1 PATCH 1/7] ACPI: Make ACPI core running
- without PCI on ARM64
-In-Reply-To: <20131217112914.GB32118@arm.com>
-References: <1386088611-2801-1-git-send-email-hanjun.guo@linaro.org>
- <201312091735.05014.arnd@arndb.de> <20131209165548.GE19163@arm.com>
- <201312091820.23006.arnd@arndb.de> <20131209180155.GG19163@arm.com>
- <20131216205133.GI5617@xora-haswell.xora.org.uk>
- <20131217112914.GB32118@arm.com>
-Message-ID: <20131220195509.GE31886@sirena.org.uk>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 20 Dec 2013 23:55:30 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gTUFJTlRBSU5FUlM6IHRha2UgbWFpbnRhaW5lcnNoaXAg?=
+ =?UTF-8?B?Zm9yIEVuZXJneSBNaWNybyBlZm0zMiBTb0Nz?=
+In-Reply-To: <1387568343-8754-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1387568343-8754-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1387569330.616105313@f421.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 11:29:14AM +0000, Catalin Marinas wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+...
+> I think this can best go in via armsoc, but needs acks for clk, clocksource,
+> spi and tty/serial.
+...
+>  MAINTAINERS | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 95648eb..28c69a6 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -867,6 +867,21 @@ S:	Maintained
+>  F:	arch/arm/mach-ebsa110/
+>  F:	drivers/net/ethernet/amd/am79c961a.*
+>  
+> +ARM/ENERGY MICRO (SILICON LABS) EFM32 SUPPORT
+> +M:	Uwe Kleine-K?nig <kernel@pengutronix.de>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	arch/arm/boot/dts/efm32*
+> +F:	arch/arm/configs/efm32_defconfig
+> +F:	arch/arm/include/debug/efm32.S
+> +F:	arch/arm/mach-efm32/
+> +F:	drivers/clk/clk-efm32gg.c
+> +F:	drivers/clocksource/time-efm32.c
+> +F:	drivers/spi/spi-efm32.c
+> +F:	drivers/tty/serial/efm32-uart.c
+> +F:	include/dt-bindings/clock/efm32-cmu.h
+> +F:	include/linux/platform_data/efm32-*
 
-> - What if two hw vendors have different descriptors for the same device?
+Maybe "N" keyword with "efm32" is better here?
 
-This one at least is already handled - ACPI ID tables are lists of IDs
-just the same as everything else so we can have as many different
-bindings for the same device as the hardware vendors see fit to bless us
-with.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/33d8ac0c/attachment.sig>
+---
