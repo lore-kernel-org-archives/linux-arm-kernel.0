@@ -1,39 +1,61 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 19 Dec 2013 23:26:58 -0800
-Subject: [PATCH 4/5] ARM: kvm vgic mmio should return data in BE format in BE
- case
+Date: Thu, 19 Dec 2013 23:26:59 -0800
+Subject: [PATCH 5/5] ARM: kvm MMIO support BE host running LE code
 In-Reply-To: <1387524419-4216-1-git-send-email-victor.kamensky@linaro.org>
 References: <1387524419-4216-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1387524419-4216-5-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1387524419-4216-6-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM mmio in BE case assumes that data it recieves is in BE format. Vgic
-operates in LE, so need byteswap data in BE case.
+In case of status register E bit is not set (LE mode) and host runs in
+BE mode we need byteswap data, so read/write is emulated correctly.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 685fc72..7e11458 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -236,12 +236,12 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
- 
- static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
- {
--	return *((u32 *)mmio->data) & mask;
-+	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 0fa90c9..69b7469 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -185,9 +185,16 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+ 		default:
+ 			return be32_to_cpu(data);
+ 		}
++	} else {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return le16_to_cpu(data & 0xffff);
++		default:
++			return le32_to_cpu(data);
++		}
+ 	}
+-
+-	return data;		/* Leave LE untouched */
  }
  
- static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
- {
--	*((u32 *)mmio->data) = value & mask;
-+	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
+ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+@@ -203,9 +210,16 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+ 		default:
+ 			return cpu_to_be32(data);
+ 		}
++	} else {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return cpu_to_le16(data & 0xffff);
++		default:
++			return cpu_to_le32(data);
++		}
+ 	}
+-
+-	return data;		/* Leave LE untouched */
  }
  
- /**
+ #endif /* __ARM_KVM_EMULATE_H__ */
 -- 
 1.8.1.4
