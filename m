@@ -1,10 +1,10 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 20 Dec 2013 11:33:07 +0900
-Subject: [PATCH -next] spi: spi-s3c24xx: remove redundant return value
- check of platform_get_resource()
-In-Reply-To: <CAPgLHd_Dii+mu4GmSUWjxTwy55Xxe6Qoq=TN73jQR1_NQUnAbA@mail.gmail.com>
-References: <CAPgLHd_Dii+mu4GmSUWjxTwy55Xxe6Qoq=TN73jQR1_NQUnAbA@mail.gmail.com>
-Message-ID: <002f01cefd2b$d1512460$73f36d20$%han@samsung.com>
+Date: Fri, 20 Dec 2013 11:36:48 +0900
+Subject: [PATCH -next] spi: nuc900: remove redundant return value check of
+ platform_get_resource()
+In-Reply-To: <CAPgLHd9rWo=vAa5xiPhi_FFheGNMOTEvt_0_AFaxMyYEJ8TBrQ@mail.gmail.com>
+References: <CAPgLHd9rWo=vAa5xiPhi_FFheGNMOTEvt_0_AFaxMyYEJ8TBrQ@mail.gmail.com>
+Message-ID: <003101cefd2c$54f7d700$fee78500$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,5 +24,5 @@ Best regards,
 Jingoo Han
 
 > ---
->  drivers/spi/spi-s3c24xx.c | 7 -------
->  1 file changed, 7 deletions(-)
+>  drivers/spi/spi-nuc900.c | 6 ------
+>  1 file changed, 6 deletions(-)
