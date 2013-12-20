@@ -1,59 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Dec 2013 09:41:12 +0100
-Subject: [GIT PULL] U300 patches for v3.14
-Message-ID: <CACRpkdaU9rjciuJKkFAuQRZ3+8C6kybiUECg-4j4=EtcJUUD8A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Dec 2013 09:43:16 +0100
+Subject: [PATCH V2 0/3] PM: Enable option of re-use runtime PM callbacks
+ at system suspend
+In-Reply-To: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
+References: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFrS6k1Zd5=XQX4ODk2=obo89bk-Z6aJvv+3WsrHw3nGbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On 10 December 2013 14:37, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> To put devices into low power state during system suspend, it is convenient
+> for some runtime PM supported power domains, subsystems and drivers to have
+> the option of re-using and invoking the runtime PM callbacks from their system
+> PM callbacks.
+>
+> The benefit is that we don't need to implement wrapper functions which
+> handles runtime PM resourses, typically called from both runtime PM and system
+> PM callbacks.
+>
+> Some new helper macros for defining the PM callbacks are added.
+>
+> SET_PM_RUNTIME_PM_OPS; to define runtime PM callbacks for CONFIG_PM instead of
+> CONFIG_PM_RUNTIME.
+>
+> SET_LATE_SYSTEM_SLEEP_PM_OPS; to define common late/early system PM callbacks,
+> same approach is applicable to the existing SET_SYSTEM_SLEEP_PM_OPS which
+> defines common suspend/resume system PM callbacks.
+>
+> A minor fix was needed for the platform bus, which runtime PM callbacks are set
+> to the pm_generic_runtime_suspend|resume functions. These were implemented only
+> for CONFIG_PM_RUNTIME and thus the platform bus prevented driver's runtime PM
+> callbacks to be invoked when only CONFIG_PM_SLEEP was used. We move them into
+> CONFIG_PM to resolve the problem.
+>
+> Changes in v2:
+>         Updated commit messages to try to better reflect the changes.
+>         Removed the below patches from this patch set. Let's leave those to be
+>         addressed separately, if needed.
+>         - PM / Sleep: Add pm_generic functions to re-use runtime PM callbacks
+>         - drm/exynos: Convert to suspend_late/resume_early callbacks for fimc
+>
+>
+> Ulf Hansson (3):
+>   PM / Runtime: Add second macro for definition of runtime PM callbacks
+>   PM / Runtime: Implement the pm_generic_runtime functions for
+>     CONFIG_PM
+>   PM / Sleep: Add macro to define common late/early system PM callbacks
+>
+>  drivers/base/power/generic_ops.c |    4 ++--
+>  include/linux/pm.h               |   21 +++++++++++++++++++++
+>  include/linux/pm_runtime.h       |   12 ++++++++----
+>  3 files changed, 31 insertions(+), 6 deletions(-)
+>
+> --
+> 1.7.9.5
+>
 
-here is a set of three U300 patches for the v3.14 series. Nothing major,
-and not motivating to be split up due to the small amount of traffic since
-we moved U300 to multiplatform.
+Hi,
 
-You may want to pull this into a place where Uwe's stuff for timex.h
-removal also ends up so everything is resolved nicely.
+Just wanted to send a kind ping on this patchset.
 
-Please pull it into ARM SoC!
+Would be nice to try to conclude on the way forward after the quite
+long and good discussions we had around this topic.
 
-Yours,
-Linus Walleij
-
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/u300-for-arm-soc-1
-
-for you to fetch changes up to 6a79799d5654bb7800614e8b7a009252be7ff90e:
-
-  ARM: u300: fix timekeeping when periodic mode is used (2013-11-26
-21:00:21 +0100)
-
-----------------------------------------------------------------
-Misc U300 development for the v3.14 series:
-
-- Timekeeping patch from Uwe.
-
-- DT 0x0 cleanup from Lee.
-
-- Return value check from Wei.
-
-----------------------------------------------------------------
-Lee Jones (1):
-      ARM: u300: Remove '0x's from U300 DTS file
-
-Uwe Kleine-K?nig (1):
-      ARM: u300: fix timekeeping when periodic mode is used
-
-Wei Yongjun (1):
-      ARM: u300: fix return value check in __u300_init_boardpower()
-
- arch/arm/boot/dts/ste-u300.dts |  6 +++---
- arch/arm/mach-u300/regulator.c |  4 ++--
- arch/arm/mach-u300/timer.c     | 38 ++++++++++++++++++++++++--------------
- 3 files changed, 29 insertions(+), 19 deletions(-)
+Kind regards
+Uffe
