@@ -1,57 +1,62 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 20 Dec 2013 13:35:34 +0100
-Subject: [GIT PULL v2] Xilinx Zynq clk changes for v3.14
-Message-ID: <52B43996.8000300@monstr.eu>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 20 Dec 2013 13:35:55 +0100
+Subject: [PATCHv7 06/12] ARM: tegra: create a DT header defining SWGROUP ID
+In-Reply-To: <52B1CCF1.2040907@wwwdotorg.org>
+References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
+ <1386835033-4701-7-git-send-email-hdoyu@nvidia.com>
+ <52B1568F.1050305@gmail.com> <52B1CCF1.2040907@wwwdotorg.org>
+Message-ID: <20131220123554.GQ27787@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike
+On Wed, Dec 18, 2013 at 09:27:29AM -0700, Stephen Warren wrote:
+> On 12/18/2013 01:02 AM, Mark Zhang wrote:
+> > On 12/12/2013 03:57 PM, Hiroshi Doyu wrote:
+> >> Create a header file to define the swgroup IDs used by the IOMMU(SMMU)
+> >> binding. "swgroup" is a group of H/W clients which a Tegra SoC
+> >> supports. This unique ID can be used to calculate MC_SMMU_<swgroup
+> >> name>_ASID_0 register offset and MC_<swgroup name>_HOTRESET_*_0
+> >> register bit. This will allow the same header to be used by both
+> >> device tree files, and drivers implementing this binding, which
+> >> guarantees that the two stay in sync. This also makes device trees
+> >> more readable by using names instead of magic numbers. For HOTRESET
+> >> bit shifting we need another conversion table, which will come later.
+> 
+> >> diff --git a/include/dt-bindings/memory/tegra-swgroup.h b/include/dt-bindings/memory/tegra-swgroup.h
+> 
+> >> +#define TEGRA_SWGROUP_MPE	11	/* 0x264 */
+> >> +#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
+> > 
+> > Need to change this to:
+> > 
+> > #define TEGRA_SWGROUP_MSENC	11
+> > 
+> > The reason is that, this makes "TEGRA_SWGROUP_BIT" doesn't work. So if I
+> > write "TEGRA_SWGROUP_CELLS(MSENC)" in dt, that causes a dt compiling error.
+> 
+> I guess it's because TEGRA_SWGROUP_BIT needs to expand its argument
+> twice, which can be done.
+> 
+> That all said, just defining all the names directly to constants is
+> probably the most direct fix.
 
-as we discussed I have rebased this branch on your clk-next branch
-and I have removed one dt patch which will go through arm-soc tree.
+Erm... isn't this simply a typo, where:
 
-Please pull this patch to your tree.
+	#define TEGRA_SWGROUP_MSENC	SWGROUP_MPE
 
-Thanks,
-Michal
+should simply be
 
-The following changes since commit 24c039f6acacd63e739b39a030197d5a2945e0d2:
+	#define TEGRA_SWGROUP_MSENC	TEGRA_SWGROUP_MPE
 
-  clk: ux500: Remove extra semicolon (2013-12-19 17:47:33 -0800)
+?
 
-are available in the git repository at:
+That certainly works for me.
 
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.14-v2
-
-for you to fetch changes up to ba52f8a986089e263ea28e231b6a405769ae1235:
-
-  clk/zynq/clkc: Add 'fclk-enable' feature (2013-12-20 13:23:55 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq clk patches for v3.14
-
-- Add support for fclk-enable feature
-
-----------------------------------------------------------------
-Soren Brinkmann (1):
-      clk/zynq/clkc: Add 'fclk-enable' feature
-
- Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
- drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
- 2 files changed, 19 insertions(+), 3 deletions(-)
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/ee7eb365/attachment.sig>
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/6ffb6516/attachment.sig>
