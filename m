@@ -1,60 +1,141 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 20 Dec 2013 11:09:14 -0800
-Subject: [PATCH 1/7] ARM: msm: trout: fix uninit var warning
+Date: Fri, 20 Dec 2013 11:09:15 -0800
+Subject: [PATCH 2/7] ARM: msm: Add support for APQ8074 Dragonboard
 In-Reply-To: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
 References: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1387566560-23948-2-git-send-email-davidb@codeaurora.org>
+Message-ID: <1387566560-23948-3-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Cartwright <joshc@codeaurora.org>
+From: Rohit Vaswani <rvaswani@codeaurora.org>
 
-Fix the following warning when !CONFIG_MMC:
+This patch adds basic board support for APQ8074 Dragonboard
+which belongs to the Snapdragon 800 family.
+For now, just support a basic machine with device tree.
 
-arch/arm/mach-msm/board-trout.c: In function 'trout_init':
-arch/arm/mach-msm/board-trout.c:67:6: warning: unused variable 'rc' [-Wunused-variable]
-  int rc;
-      ^
-
-Also, while we're here, rework explicit printk(KERN_CRIT..) to use
-pr_crit.
-
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+Acked-by: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/board-trout.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/Makefile                     |  3 ++-
+ arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi            | 33 ++++++++++++++++++++++++++
+ arch/arm/mach-msm/Kconfig                      | 11 ++++++++-
+ arch/arm/mach-msm/board-dt.c                   |  9 +++++++
+ 5 files changed, 60 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
 
-diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-index ccf6621..015d544 100644
---- a/arch/arm/mach-msm/board-trout.c
-+++ b/arch/arm/mach-msm/board-trout.c
-@@ -13,6 +13,7 @@
-  * GNU General Public License for more details.
-  *
-  */
-+#define pr_fmt(fmt) "%s: " fmt, __func__
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d57c1a6..5b37694 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -105,7 +105,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+ 	kirkwood-ts219-6282.dtb
+ dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+ dtb-$(CONFIG_ARCH_MSM) += qcom-msm8660-surf.dtb \
+-	qcom-msm8960-cdp.dtb
++	qcom-msm8960-cdp.dtb \
++	qcom-apq8074-dragonboard.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-370-mirabox.dtb \
+ 	armada-370-netgear-rn102.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+new file mode 100644
+index 0000000..13ac3e2
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+@@ -0,0 +1,6 @@
++#include "qcom-msm8974.dtsi"
++
++/ {
++	model = "Qualcomm APQ8074 Dragonboard";
++	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
++};
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+new file mode 100644
+index 0000000..2ebb4f0
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -0,0 +1,33 @@
++/dts-v1/;
++
++#include "skeleton.dtsi"
++
++/ {
++	model = "Qualcomm MSM8974";
++	compatible = "qcom,msm8974";
++	interrupt-parent = <&intc>;
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at f9000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0xf9000000 0x1000>,
++			      <0xf9002000 0x1000>;
++		};
++
++		timer {
++			compatible = "arm,armv7-timer";
++			interrupts = <1 2 0xf08>,
++				     <1 3 0xf08>,
++				     <1 4 0xf08>,
++				     <1 1 0xf08>;
++			clock-frequency = <19200000>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 2586c28..5e5782d 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -58,9 +58,18 @@ config ARCH_MSM8960
+ 	select GPIO_MSM_V2
+ 	select MSM_SCM if SMP
  
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -68,12 +69,11 @@ static void __init trout_init(void)
++config ARCH_MSM8974
++	bool "MSM8974"
++	select ARM_GIC
++	select CPU_V7
++	select HAVE_ARM_ARCH_TIMER
++	select HAVE_SMP
++	select MSM_SCM if SMP
++	select USE_OF
++
+ config ARCH_MSM_DT
+ 	def_bool y
+-	depends on (ARCH_MSM8X60 || ARCH_MSM8960)
++	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
+ 	select SPARSE_IRQ
+ 	select USE_OF
  
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
+diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+index 16e6183..1f11d93 100644
+--- a/arch/arm/mach-msm/board-dt.c
++++ b/arch/arm/mach-msm/board-dt.c
+@@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
+ 	NULL
+ };
  
--#ifdef CONFIG_MMC
--        rc = trout_init_mmc(system_rev);
--        if (rc)
--                printk(KERN_CRIT "%s: MMC init failure (%d)\n", __func__, rc);
--#endif
--
-+	if (IS_ENABLED(CONFIG_MMC)) {
-+		rc = trout_init_mmc(system_rev);
-+		if (rc)
-+			pr_crit("MMC init failure (%d)\n", rc);
-+	}
- }
- 
- static struct map_desc trout_io_desc[] __initdata = {
++static const char * const apq8074_dt_match[] __initconst = {
++	"qcom,apq8074-dragonboard",
++	NULL
++};
++
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.dt_compat = msm_dt_match,
+ MACHINE_END
++
++DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.dt_compat = apq8074_dt_match,
++MACHINE_END
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
