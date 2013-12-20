@@ -1,9 +1,9 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 20 Dec 2013 10:47:46 +0100
-Subject: [PATCH 8/8] ARM: Convert boot_lock to raw_lock [versatile]
+Date: Fri, 20 Dec 2013 10:47:40 +0100
+Subject: [PATCH 2/8] ARM: Convert boot_lock to raw_lock [msm]
 In-Reply-To: <1387532866-22601-1-git-send-email-bigeasy@linutronix.de>
 References: <1387532866-22601-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1387532866-22601-9-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1387532866-22601-3-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,32 +22,33 @@ try_to_wake_up()
 
 Fix by converting boot_lock to a raw spin lock.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Kevin Hilman <khilman@linaro.org>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: linux-arm-msm at vger.kernel.org
 Cc: Frank Rowand <frank.rowand@sonymobile.com>
 Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
 Link: http://lkml.kernel.org/r/4E77B952.3010606 at am.sony.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- arch/arm/plat-versatile/platsmp.c | 10 +++++-----
+ arch/arm/mach-msm/platsmp.c | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
-index 39895d8..b2e0858 100644
---- a/arch/arm/plat-versatile/platsmp.c
-+++ b/arch/arm/plat-versatile/platsmp.c
-@@ -31,7 +31,7 @@ static void write_pen_release(int val)
- 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
- }
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 3f06edc..fc09a04 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -30,7 +30,7 @@
+ 
+ extern void msm_secondary_startup(void);
  
 -static DEFINE_SPINLOCK(boot_lock);
 +static DEFINE_RAW_SPINLOCK(boot_lock);
  
- void versatile_secondary_init(unsigned int cpu)
+ static inline int get_core_count(void)
  {
-@@ -44,8 +44,8 @@ void versatile_secondary_init(unsigned int cpu)
+@@ -50,8 +50,8 @@ static void msm_secondary_init(unsigned int cpu)
  	/*
  	 * Synchronise with the boot thread.
  	 */
@@ -57,17 +58,17 @@ index 39895d8..b2e0858 100644
 +	raw_spin_unlock(&boot_lock);
  }
  
- int versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
-@@ -56,7 +56,7 @@ int versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * Set synchronisation state between this boot processor
+ static void prepare_cold_cpu(unsigned int cpu)
+@@ -88,7 +88,7 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * set synchronisation state between this boot processor
  	 * and the secondary one
  	 */
 -	spin_lock(&boot_lock);
 +	raw_spin_lock(&boot_lock);
  
  	/*
- 	 * This is really belt and braces; we hold unintended secondary
-@@ -86,7 +86,7 @@ int versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * The secondary processor is waiting to be released from
+@@ -122,7 +122,7 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
  	 * now the secondary core is starting up let it run its
  	 * calibrations, then wait for it to finish
  	 */
