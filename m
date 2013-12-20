@@ -1,79 +1,59 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 19 Dec 2013 19:03:52 -0500
-Subject: [GIT PULL 1/3] ARM: keystone: device tree updates for 3.14
-In-Reply-To: <8761qkjvf5.fsf@linaro.org>
-References: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
- <8761qkjvf5.fsf@linaro.org>
-Message-ID: <52B38968.5070509@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Dec 2013 17:05:33 -0700
+Subject: [PATCH 4/6] ARM: DTS: tegra: add the DFLL IP block to the T114
+ SoC file
+In-Reply-To: <20131219123719.3226.44864.stgit@tamien>
+References: <20131219122857.3226.42830.stgit@tamien>
+ <20131219123719.3226.44864.stgit@tamien>
+Message-ID: <52B389CD.8010004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+On 12/19/2013 05:49 AM, Paul Walmsley wrote:
+> Add basic DT bindings for the DFLL IP block for the NVIDIA Tegra114 SoC.
 
-On Thursday 19 December 2013 06:03 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> Arnd, Olof, Kevin,
->>
->> Please pull below keystone device tree updates for 3.14
->>
->> Regards,
->> Santosh
->>
->> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>
->>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
->>
->> for you to fetch changes up to 732079567da4942b7b4929deff8f236926d0b3eb:
->>
->>   ARM: dts: keystone: Add usb devicetree bindings (2013-12-12 20:29:17 -0500)
->>
->> ----------------------------------------------------------------
->> Keystone DTS updates for 3.14
->>
->> - ddr3 pll clock node typo fixup.
->> - EVM specific clock setting with board k2hk-evm.dts.
->> - GIC node updates for missing virtualisation info.
->> - Adding USB dwc3 and phy nodes.
->>
->> ----------------------------------------------------------------
->> Murali Karicheri (3):
->>       ARM: keystone: dts: add a k2hk-evm specific dts file
->>       ARM: keystone: dts: fix typo in the ddr3 pllclk node name
->>       ARM: keystone: dts: add paclk divider clock node
->>
->> Santosh Shilimkar (2):
->>       ARM: dts: keystone: Add the GICV and GICH address space
->>       ARM: dts: keystone: Add guestos maintenance interrupt
->>
->> WingMan Kwok (2):
->>       ARM: dts: keystone: Add usb phy devicetree bindings
->>       ARM: dts: keystone: Add usb devicetree bindings
-> 
-> I'm not willing to pull these new bindings.
-> 
-> These new bindings don't have an ack from DT maintainers, and from a
-> quick scan of the archives, don't appear to have ever been posted to the
-> DT list.  If they had been posted to the DT list, and hadn't had a
-> response after 2 weeks, it would've been OK for you to queue them up for
-> us, but as it stands they haven't even been posted for the attention of
-> the DT maintainers.  Please remedy that.  Thanks.
-> 
-Not sure if you got confused because of the subject line on couple
-of patches. There are no new dt bindings in $subject pull request.
-Its all just updating the machine dts files for existing bindings.
-And hence explicitly not sent for device tree list.
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
 
-I have some more dt patches which adds new bindings which has been
-getting reviewed with dt folks. And since they are not yet acked,
-i haven't included them in the series.
+> +- clocks : Must contain an array of two-cell arrays, one per clock.
+> +           DFLL source clocks.  At minimum this should include the
+> +           reference clock source and the IP block's main clock
+> +           source.  Also it should contain the DFLL's I2C controller
+> +           clock source.  The format is <&clock-provider-phandle
+> +           clock-id>.
 
-Can you please check one more time and let me know if I am missing
-something ?
+Entries in "clocks" aren't two cells, they're a phandle plus as many
+cells as the node referenced by the phandle specifies.
 
-Regards,
-Santosh
+> +
+> +- clock-names : Must contain an array of strings, one per 'clocks'
+> +                two-cell array.  The position in the array of these
+
+clock-names defines the set of entries in clocks, not the other way around.
+
+> +                strings must correspond to the position in the 'clocks'
+> +                array (see above).  The DFLL driver currently requires
+> +                the "soc", "ref", and "i2c" clock names to be populated.
+
+The standard wording used by all the Tegra clock client bindings is now:
+
+- clocks : Must contain an entry for each entry in clock-names.
+  See clock-bindings.txt for details.
+- clock-names : Must include the following entries:
+  - soc
+  - ref
+  - i2c
+
+For consistency, it'd be nice to adopt the same style here.
+
+> +Optional properties:
+> +
+> +- status : device availability -- managed by the DT integration code, not
+> +           the DFLL driver.  Should be set to "disabled" in the SoC
+> +           DTS file.
+
+That's such a core property that it's not worth documenting in every
+single binding.
+
+> +
+
+Blank line at EOF.
