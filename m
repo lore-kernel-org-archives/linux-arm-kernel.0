@@ -1,33 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 19 Dec 2013 19:21:36 -0500 (EST)
-Subject: [PATCH v2] net: mvmdio: fix interrupt timeout handling
-In-Reply-To: <1387458588-17231-1-git-send-email-leigh@solinno.co.uk>
-References: <52B2D97F.4070200@gmail.com>
- <1387458588-17231-1-git-send-email-leigh@solinno.co.uk>
-Message-ID: <20131219.192136.1089859619183118911.davem@davemloft.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 19 Dec 2013 19:41:57 -0500
+Subject: [GIT PULL 2/3] ARM: keystone: SOC updates for 3.14
+In-Reply-To: <87sitoighp.fsf@linaro.org>
+References: <1387230397-14338-1-git-send-email-santosh.shilimkar@ti.com>
+ <1387230397-14338-2-git-send-email-santosh.shilimkar@ti.com>
+ <87sitoighp.fsf@linaro.org>
+Message-ID: <52B39255.9010307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leigh Brown <leigh@solinno.co.uk>
-Date: Thu, 19 Dec 2013 13:09:48 +0000
+On Thursday 19 December 2013 06:10 PM, Kevin Hilman wrote:
+> Hi Santosh,
+> 
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> 
+>> Arnd, Olof, Kevin,
+>>
+>> Please pull below keystone SOC updates for 3.14
+>>
+>> Regards,
+>> Santosh
+>>
+>> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>>
+>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14/soc
+>>
+>> for you to fetch changes up to 8aad10f656470369b5802da422f68d4d31fcb865:
+>>
+>>   ARM: keystone: defconfig: enable USB support (2013-12-16 16:03:36 -0500)
+>>
+>> ----------------------------------------------------------------
+> 
+> Any (good) reason you're not using signed tags?
+>
+No reason but just forgot to include the tag information in pull request.
+It was already tagged but missed to generate pull-request using tag.
+Just in case you want to pull the tag, below is the info...
 
-> This version corrects the whitespace issue.
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
+ 
+>> Keystone SOC updates for 3.14
+>>
+>> - Allow keystone kernel to be build in BE mode
+>> - Enabling DMA zone support
+>> - Removal of double of_clk_init
+>> - Enabling USB driver support in defconfig
+>>
+>> ----------------------------------------------------------------
 > 
-> orion_mdio_wait_ready uses wait_event_timeout to wait for the
-> SMI interrupt to fire.  wait_event_timeout waits for between
-> "timeout - 1" and "timeout" jiffies.  In this case a 1ms timeout
-> when HZ is 1000 results in a wait of 0 to 1 jiffies, causing
-> premature timeouts.
+> Pulled into next/soc.  
 > 
-> This fix ensures a minimum timeout of 2 jiffies, ensuring
-> wait_event_timeout will always wait at least 1 jiffie.
-> 
-> Issue reported by Nicolas Schichan.
-> 
-> Tested-by: Nicolas Schichan <nschichan@freebox.fr>
-> Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+Thanks and sorry for not including the tag info first place.
 
-Applied, and queued up for -stable.
-
-I wonder how many other wait_event_timeout() users potentially have
-this problem.
+Regards,
+Santosh
