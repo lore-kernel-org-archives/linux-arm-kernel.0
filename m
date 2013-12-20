@@ -1,38 +1,40 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 19 Dec 2013 20:24:26 -0800
-Subject: [PATCH 2/4] misc: xgene: Add base driver for APM X-Gene SoC
- Queue Manager/Traffic Manager
-In-Reply-To: <CAN1v_PuBZHN85xTodfSZ-+H4Wdj0T8kSFUJB56KVj9xFH3--JQ@mail.gmail.com>
-References: <1387507503-7565-1-git-send-email-rapatel@apm.com>
- <1387507503-7565-3-git-send-email-rapatel@apm.com>
- <20131220032133.GB32310@kroah.com>
- <CAN1v_PuBZHN85xTodfSZ-+H4Wdj0T8kSFUJB56KVj9xFH3--JQ@mail.gmail.com>
-Message-ID: <20131220042426.GA21726@kroah.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 20 Dec 2013 10:42:42 +0530
+Subject: [PATCH] cpufreq: imx6q-cpufreq driver is reused on i.MX6 series
+ SoCs
+In-Reply-To: <1387505536-22720-1-git-send-email-shawn.guo@linaro.org>
+References: <1387505536-22720-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAKohponf0n93Vmpqiq6kZ8DKtTRaEQ0k1Jm9nLUTWeB2m21P=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 20 December 2013 07:42, Shawn Guo <shawn.guo@linaro.org> wrote:
+> The imx6q-cpufreq driver nowadays is not only running on imx6q but also
+> other i.MX6 series SoCs like imx6dl and imx6sl.  Update Kconfig prompt
+> and help text to make it clear to users.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index ce52ed9..3ba5dcc 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -79,11 +79,11 @@ config ARM_HIGHBANK_CPUFREQ
+>           If in doubt, say N.
+>
+>  config ARM_IMX6Q_CPUFREQ
+> -       tristate "Freescale i.MX6Q cpufreq support"
+> -       depends on SOC_IMX6Q
+> +       tristate "Freescale i.MX6 cpufreq support"
+> +       depends on ARCH_MXC
+>         depends on REGULATOR_ANATOP
+>         help
+> -         This adds cpufreq driver support for Freescale i.MX6Q SOC.
+> +         This adds cpufreq driver support for Freescale i.MX6 series SoCs.
+>
+>           If in doubt, say N.
 
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
-
-http://daringfireball.net/2007/07/on_top
-
-On Thu, Dec 19, 2013 at 07:41:13PM -0800, Ravi Patel wrote:
-> There is no need to talk to this driver from userspace.
-> It is a device which is used by other IO devices to communicate with each
-> other, including CPU.
-> For example, if CPU (software) wants to send a message to Ethernet HW (i.e.
-> send packet),
-> it used this driver to enqueue a message to Ethernet.
-> In other direction, if Ethernet HW receives a packet, it uses QM/TM device to
-> send message to
-> CPU (software) to process packet.
-
-So it's a "bus" type of thing, right?
-
-My question of "why isn't this reflected in the driver model" still
-stands.
-
-thanks,
-
-greg k-h
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
