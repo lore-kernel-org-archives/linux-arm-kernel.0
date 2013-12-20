@@ -1,134 +1,66 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Fri, 20 Dec 2013 03:00:48 +0000
-Subject: [PATCH V2] ARM: dts: imx6qdl-sabresd: Add power key support
-In-Reply-To: <20131220022821.GJ7172@S2101-09.ap.freescale.net>
-References: <1387487244-2749-1-git-send-email-b20788@freescale.com>
- <20131220022821.GJ7172@S2101-09.ap.freescale.net>
-Message-ID: <276922cfe7a844c3b7f9f7c18bf86f77@BY2PR03MB315.namprd03.prod.outlook.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 19 Dec 2013 22:09:58 -0500
+Subject: [PATCH] ARM: Kirkwood: DT board setup for LaPlug
+In-Reply-To: <20131208005652.GF11251@titan.lakedaemon.net>
+References: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
+ <5288C2B5.7040903@gmail.com>
+ <20131124171319.GK29241@titan.lakedaemon.net>
+ <20131208005652.GF11251@titan.lakedaemon.net>
+Message-ID: <20131220030958.GB2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Dec 07, 2013 at 07:56:52PM -0500, Jason Cooper wrote:
+> On Sun, Nov 24, 2013 at 12:13:19PM -0500, Jason Cooper wrote:
+> > On Sun, Nov 17, 2013 at 02:20:53PM +0100, Sebastian Hesselbarth wrote:
+> > > On 11/16/2013 11:08 PM, Maxime Hadjinlian wrote:
+> > > >This patch adds DT board setup for the LaCie NAS LaPlug.
+> > > 
+> > > [adding MVEBU maintainers, please do that always from now on]
+> > > 
+> > > Maxime,
+> > > 
+> > > first of all, thanks for providing this. Anyway, I do have some
+> > > remarks below.
+> > > 
+> > > >Chipset list:
+> > > >- CPU MARVELL 88FR131 800Mhz
+> > > >- SDRAM memory: 128MB DDR2-800 400Mhz
+> > > >- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
+> > > >- 1 Mini PCI-Express port
+> > > >- 1 NAND 512 MB
+> > > >- 1 push button
+> > > >- 2 LEDs (red and blue)
+> > > >- 4 USB Ports
+> > > >
+> > > >Signed-off-by: Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
+> > > >---
+> > > >  arch/arm/boot/dts/Makefile            |   1 +
+> > > >  arch/arm/boot/dts/kirkwood-nsplug.dts | 178 ++++++++++++++++++++++++++++++++++
+> > > >  2 files changed, 179 insertions(+)
+> > > >  create mode 100644 arch/arm/boot/dts/kirkwood-nsplug.dts
+> > ...
+> > > >+&mdio {
+> > > >+  status = "okay";
+> > > >+
+> > > >+  ethphy0: ethernet-phy at 0 {
+> > > >+    device_type = "ethernet-phy";
+> > > 
+> > > If you know the type of PHY used here, please add
+> > > a compatible like "marvell,88e1318s"
+> > 
+> > Please be aware of the current conversation [1] started by Jason
+> > Gunthorpe regarding the compatible string choice here.  Once that's
+> > resolved, please resend.
+> 
+> Looks like we chose to dodge the issue.  Mind resending with the
+> a comment identifying the phy?
 
+Well, I was going to take this version and fix up the phy node, but
+re-reading the thread I see there were quite a few comments that were
+never addressed.  Please resend a V2 if you'd like to add support for
+this board.
 
-Best Regards.
-Anson huang ???
-?
-Freescale Semiconductor Shanghai
-?????????192?A?2?
-201203
-Tel:021-28937058
+thx,
 
-
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Friday, December 20, 2013 10:28 AM
->To: Huang Yongcai-B20788
->Cc: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
->devicetree at vger.kernel.org
->Subject: Re: [PATCH V2] ARM: dts: imx6qdl-sabresd: Add power key support
->
->On Thu, Dec 19, 2013 at 04:07:24PM -0500, Anson Huang wrote:
->> This patch adds support for imx6qdl-sabresd board's power key, the key
->> is named "SW1" on board, press it can wake up system from suspend.
->>
->> Add a new pinctrl entry for gpio keys and move all gpio keys pin to
->> this entry.
->>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->
->There are a couple of minor things below.  Nothing major, so I just fixed them
->up and applied the patch.
->
->> ---
->>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   26 ++++++++++++++++++++++----
->>  1 file changed, 22 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
->> b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
->> index e75e11b..b545895 100644
->> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
->> @@ -10,6 +10,7 @@
->>   * http://www.gnu.org/copyleft/gpl.html
->>   */
->>
->> +#include <dt-bindings/input/input.h>
->
->Have a blank line here.
->
->>  / {
->>  	memory {
->>  		reg = <0x10000000 0x40000000>;
->> @@ -46,19 +47,28 @@
->>
->>  	gpio-keys {
->>  		compatible = "gpio-keys";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_gpio_keys>;
->> +
->> +		power {
->> +			label = "Power Button";
->> +			gpios = <&gpio3 29 0>;
->> +			gpio-key,wakeup;
->> +			linux,code = <KEY_POWER>;
->> +		};
->>
->>  		volume-up {
->>  			label = "Volume Up";
->>  			gpios = <&gpio1 4 0>;
->>  			gpio-key,wakeup;
->> -			linux,code = <115>; /* KEY_VOLUMEUP */
->> +			linux,code = <KEY_VOLUMEUP>;
->>  		};
->>
->>  		volume-down {
->>  			label = "Volume Down";
->>  			gpios = <&gpio1 5 0>;
->>  			gpio-key,wakeup;
->> -			linux,code = <114>; /* KEY_VOLUMEDOWN */
->> +			linux,code = <KEY_VOLUMEDOWN>;
->>  		};
->>  	};
->>
->> @@ -171,8 +181,6 @@
->>  	hog {
->>  		pinctrl_hog: hoggrp {
->>  			fsl,pins = <
->> -				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
->> -				MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
->>  				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
->>  				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
->>  				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000 @@ -185,6
->+193,16 @@
->>  			>;
->>  		};
->>  	};
->> +
->> +	gpio-keys {
->
->We now use one pinctrl container 'imx6qdl-sabresd' for all pinctrl groups, so
->we can move pinctrl_gpio_keys into above and save this gpio-keys container.
->
-
-Understood, thanks, just put this group in the hog node, no need to add a new gpio-keys.
-[Anson] 
-
-
-
->Shawn
->
->> +		pinctrl_gpio_keys: gpio_keysgrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x80000000
->> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
->> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
->> +			>;
->> +		};
->> +	};
->>  };
->>
->>  &ldb {
->> --
->> 1.7.9.5
->>
->>
+Jason.
