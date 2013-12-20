@@ -1,39 +1,63 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 20 Dec 2013 09:45:18 +0200
-Subject: OMAP display subsystem - does it work?
-In-Reply-To: <20131219165607.GN27438@atomide.com>
-References: <20131218120023.GG4360@n2100.arm.linux.org.uk>
- <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
- <52B282BE.9050705@ti.com> <20131219165607.GN27438@atomide.com>
-Message-ID: <52B3F58E.8060806@ti.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Fri, 20 Dec 2013 07:47:24 +0000
+Subject: [PATCHv6 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <87y53gy07m.fsf@nbsps.com>
+References: <1384220218-12716-1-git-send-email-Li.Xiubo@freescale.com>
+ <1384220218-12716-2-git-send-email-Li.Xiubo@freescale.com>
+ <87y53gy07m.fsf@nbsps.com>
+Message-ID: <ef4b36fcabc7492390834857d5250598@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-12-19 18:56, Tony Lindgren wrote:
-
->>> Russell, maybe all you're missing is just omapfb.vram=0:2M,1:5M or similar
->>> from your kernel cmdline?
->>
->> Nothing like that should be required for normal operation.
+> > +static int fsl_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> > +			  int duty_ns, int period_ns)
+> > +{
+> > +	unsigned long period_cycles, duty_cycles;
+> > +	unsigned long cntin = FTM_CNTIN_VAL;
+> > +	struct fsl_pwm_chip *fpc;
+> > +
+> > +	fpc = to_fsl_chip(chip);
+> > +
+> > +	period_cycles = fsl_rate_to_cycles(fpc, period_ns);
+> > +	if (period_cycles > 0xFFFF) {
+> > +		dev_err(chip->dev, "required PWM period cycles(%lu) overflow "
+> > +				"16-bits counter!\n", period_cycles);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	duty_cycles = fsl_rate_to_cycles(fpc, duty_ns);
+> > +	if (duty_cycles >= 0xFFFF) {
+> > +		dev_err(chip->dev, "required PWM duty cycles(%lu) overflow "
+> > +				"16-bits counter!\n", duty_cycles);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	writel(FTMCnSC_MSB | FTMCnSC_ELSB, fpc->base + FTM_CSC(pwm->hwpwm));
+> > +
+> > +	writel(0xF0, fpc->base + FTM_OUTMASK);
+> > +	writel(0x0F, fpc->base + FTM_OUTINIT);
+> > +	writel(FTM_CNTIN_VAL, fpc->base + FTM_CNTIN);
+> > +
+> > +	writel(period_cycles + cntin - 1, fpc->base + FTM_MOD);
+> > +	writel(duty_cycles + cntin, fpc->base + FTM_CV(pwm->hwpwm));
+> > +
+> > +	return 0;
+> > +}
 > 
-> Hmm maybe these instructions need some updating then:
+> Even though the module can support eight channels, the FTM_MOD is global and
+> is updated in each 'config'.  So, if we have two PWMs, and both call 'config'
+> with different periods, the last one to call will win?  There doesn't seem to
+> be any locking/inspection of 'MOD'.  I think this is global to the FTM, while
+> 'FTM_CV()' is per channel.
 > 
-> http://omappedia.org/wiki/Bootargs_for_enabling_display
+> So we may have 8 PWMs, all with the same period, but with different duty
+> cycles.  Is this correct?  Or are we only supporting one channel per FTM/PWM?
+> 
 
-The page says omapfb.vram "can" be used, and "If the size is not
-specified, frame buffers with default size are created". You only need
-omapfb.vram option if you want to allocate extra memory for the fb.
+Yes, that's right.
 
-The plain 'vram' option has no function anymore, now that we're using
-normal dma alloc. So that part should be updated.
+And in "[PATCHv7 1/4] pwm: Add Freescale FTM PWM driver support" patch, this has
+been fixed.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/19bb3721/attachment.sig>
+Best Regards,
+Xiubo
