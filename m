@@ -1,78 +1,57 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 20 Dec 2013 10:47:45 +0100
-Subject: [PATCH 7/8] ARM: Convert boot_lock to raw_lock [ux500]
-In-Reply-To: <1387532866-22601-1-git-send-email-bigeasy@linutronix.de>
-References: <1387532866-22601-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1387532866-22601-8-git-send-email-bigeasy@linutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 20 Dec 2013 10:46:52 +0100
+Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio A701
+Message-ID: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Rowand <frank.rowand@am.sony.com>
+Recent changes to the pwm-backlight driver have made the power supply
+mandatory. There is code in the regulator core to deal with situations
+where no regulator is specified and provide a dummy, but that works on
+DT-based boards only.
 
-The arm boot_lock is used by the secondary processor startup code.  The locking
-task is the idle thread, which has idle->sched_class == &idle_sched_class.
-idle_sched_class->enqueue_task == NULL, so if the idle task blocks on the
-lock, the attempt to wake it when the lock becomes available will fail:
+The situation can be remedied by adding a dummy regulator during board
+initialization.
 
-try_to_wake_up()
-   ...
-      activate_task()
-         enqueue_task()
-            p->sched_class->enqueue_task(rq, p, flags)
-
-Fix by converting boot_lock to a raw spin lock.
-
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Frank Rowand <frank.rowand@sonymobile.com>
-Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
-Link: http://lkml.kernel.org/r/4E77B952.3010606 at am.sony.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-ux500/platsmp.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-pxa/mioa701.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 1f296e7..eeb5916 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -52,7 +52,7 @@ static void __iomem *scu_base_addr(void)
- 	return NULL;
- }
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index f70583fee59f..29997bde277d 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -38,6 +38,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/reboot.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/max1586.h>
+ #include <linux/slab.h>
+ #include <linux/i2c/pxa-i2c.h>
+@@ -714,6 +715,10 @@ static struct gpio global_gpios[] = {
+ 	{ GPIO56_MT9M111_nOE, GPIOF_OUT_INIT_LOW, "Camera nOE" },
+ };
  
--static DEFINE_SPINLOCK(boot_lock);
-+static DEFINE_RAW_SPINLOCK(boot_lock);
- 
- static void ux500_secondary_init(unsigned int cpu)
++static struct regulator_consumer_supply fixed_5v0_consumers[] = {
++	REGULATOR_SUPPLY("power", "pwm-backlight"),
++};
++
+ static void __init mioa701_machine_init(void)
  {
-@@ -65,8 +65,8 @@ static void ux500_secondary_init(unsigned int cpu)
- 	/*
- 	 * Synchronise with the boot thread.
- 	 */
--	spin_lock(&boot_lock);
--	spin_unlock(&boot_lock);
-+	raw_spin_lock(&boot_lock);
-+	raw_spin_unlock(&boot_lock);
+ 	int rc;
+@@ -753,6 +758,10 @@ static void __init mioa701_machine_init(void)
+ 	pxa_set_i2c_info(&i2c_pdata);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_camera_info(&mioa701_pxacamera_platform_data);
++
++	regulator_register_always_on(0, "fixed-5.0V", fixed_5v0_consumers,
++				     ARRAY_SIZE(fixed_5v0_consumers),
++				     5000000);
  }
  
- static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
-@@ -77,7 +77,7 @@ static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * set synchronisation state between this boot processor
- 	 * and the secondary one
- 	 */
--	spin_lock(&boot_lock);
-+	raw_spin_lock(&boot_lock);
- 
- 	/*
- 	 * The secondary processor is waiting to be released from
-@@ -98,7 +98,7 @@ static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
- 	 */
--	spin_unlock(&boot_lock);
-+	raw_spin_unlock(&boot_lock);
- 
- 	return pen_release != -1 ? -ENOSYS : 0;
- }
+ static void mioa701_machine_exit(void)
 -- 
-1.8.5.1
+1.8.4.2
