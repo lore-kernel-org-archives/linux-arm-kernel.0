@@ -1,55 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 21 Dec 2013 07:53:57 +0900
-Subject: [GIT PULL 4/7] Samsung dev for v3.14
-In-Reply-To: <201312181120.44544.heiko@sntech.de>
-References: <52AE0F62.80409@samsung.com> <201312181120.44544.heiko@sntech.de>
-Message-ID: <52B4CA85.2080106@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Dec 2013 22:55:41 +0000
+Subject: [PATCH] mm/ARM: fix ARMs __ffs() to conform to avoid warning
+ with NO_BOOTMEM
+In-Reply-To: <52B4C71D.9030904@ti.com>
+References: <1386981486-3173-1-git-send-email-santosh.shilimkar@ti.com>
+ <52B4C71D.9030904@ti.com>
+Message-ID: <20131220225541.GN4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/13 19:20, Heiko St?bner wrote:
-> Hi Kukjin,
->
-> Am Sonntag, 15. Dezember 2013, 21:21:54 schrieb Kukjin Kim:
->> The following changes since commit
->> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->>
->>     Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->>
->> are available in the git repository at:
->>
->>     git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> tags/samsung-dev
->>
->> for you to fetch changes up to 70bacadbd07248576290de40cc217c06f0f2d3c3:
->>
->>     ARM: S3C64XX: Select CPU_V6K instead of CPU_V6 (2013-12-16 04:08:51
->> +0900)
->>
->> ----------------------------------------------------------------
->> Samsung updates for v3.14
->> - Skip eint_init() for pinctrl-exynos because of re-executing
->> - Use CPU_V6K for S3C64XX(ARM1176JZF-s) instead of CPU_V6
->>
->> ----------------------------------------------------------------
->> Mateusz Krawczuk (1):
->>         ARM: SAMSUNG: if detected device tree skip irq init for S5P
->>
->> Tomasz Figa (1):
->>         ARM: S3C64XX: Select CPU_V6K instead of CPU_V6
->>
->>    arch/arm/Kconfig                     | 2 +-
->>    arch/arm/plat-samsung/s5p-irq-eint.c | 4 ++++
->>    2 files changed, 5 insertions(+), 1 deletion(-)
->
-> do you also have time for a look at at least the s3c2416/s3c2443 common clock
-> patches for your second round you wrote about yesterday? :-)
->
->
-Hi Heiko,
+On Fri, Dec 20, 2013 at 05:39:25PM -0500, Santosh Shilimkar wrote:
+> Russell,
+> 
+> On Friday 13 December 2013 07:38 PM, Santosh Shilimkar wrote:
+> > Building ARM with NO_BOOTMEM generates below warning.
+> > 
+> > mm/nobootmem.c: In function _____free_pages_memory___:
+> > mm/nobootmem.c:88:11: warning: comparison of distinct pointer types lacks a cast
+> > 
+> > 	order = min(MAX_ORDER - 1UL, __ffs(start));
+> > 
+> > ARM's __ffs() differs from other architectures in that it ends up being
+> > an int, whereas almost everyone else is unsigned long.
+> > 
+> > So fix ARMs __ffs() to conform to other architectures. Suggested by
+> > Russell King <linux@arm.linux.org.uk>
+> > 
+> > Some more details in below thread -
+> > 	https://lkml.org/lkml/2013/12/9/807
+> > 
+> > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> Is this patch inline with what we discussed off-list ?
 
-I couldn't yet but I will do...
+It is.
 
-Thanks for your gentle reminder :-)
+> If you ack it, it can go into the Andrews tree to kill that one last
+> warning with the memblock series. Thanks
 
-- Kukjin
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Please note that I'm rather busy at the moment dealing with a complete
+change in networking here (I've not read much in the way of email over
+the last couple of days).  Also note that my Internet connection is
+highly unstable and experiencing a large amount of packet loss due to
+this wonderful thing called "FTTC"... which when working properly only
+gives me around 5Mbps.
