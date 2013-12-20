@@ -1,38 +1,59 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 20 Dec 2013 13:27:33 -0800
-Subject: [GIT PULL] clk: mvebu: for v3.14
-In-Reply-To: <20131220011521.GA9710@localhost>
-References: <20131201170752.GT2879@titan.lakedaemon.net>
- <20131206162658.GT29282@titan.lakedaemon.net>
- <20131211174935.GX10053@titan.lakedaemon.net>
- <20131220011521.GA9710@localhost>
-Message-ID: <20131220212733.18119.14852@quantum>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 21 Dec 2013 06:34:54 +0900
+Subject: [PATCH] ARM: EXYNOS: Consolidate selection of PM_GENERIC_DOMAINS
+ for Exynos4
+In-Reply-To: <1387574696-26366-1-git-send-email-s.nawrocki@samsung.com>
+References: <1387574696-26366-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <52B4B7FE.8010003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ezequiel Garcia (2013-12-19 17:15:22)
-> On Wed, Dec 11, 2013 at 12:49:35PM -0500, Jason Cooper wrote:
-> > On Fri, Dec 06, 2013 at 11:26:58AM -0500, Jason Cooper wrote:
-> > > On Sun, Dec 01, 2013 at 12:07:52PM -0500, Jason Cooper wrote:
-> > > > Mike,
-> > > > 
-> > > > Here's the first round for v3.14.  These have been in -next for a week
-> > > > now, without problem.
-> > > 
-> > > Ping?  I see you've been pulling stuff into your -next branch.  Did you
-> > > miss this, or did I send it to the wrong list?
-> > 
-> > re-ping?
-> > 
-> 
-> Any news on this? Is there any problem with this driver?
+On 12/21/13 06:24, Sylwester Nawrocki wrote:
+> Instead of repeating "select PM_GENERIC_DOMAINS" for all Exynos4
+> variants add relevant entry in the Kconfig section common to the
+> SoC series.
+>
+> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> ---
+>   arch/arm/mach-exynos/Kconfig |    4 +---
+>   1 files changed, 1 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 1414bc6..35c335d 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -24,6 +24,7 @@ config ARCH_EXYNOS4
+>   	select HAVE_SMP
+>   	select MIGHT_HAVE_CACHE_L2X0
+>   	select PINCTRL
+> +	select PM_GENERIC_DOMAINS if PM
+>   	select S5P_DEV_MFC
+>   	help
+>   	  Samsung EXYNOS4 SoCs based systems
+> @@ -48,7 +49,6 @@ config CPU_EXYNOS4210
+>   	select ARCH_HAS_BANDGAP
+>   	select ARM_CPU_SUSPEND if PM
+>   	select PINCTRL_EXYNOS
+> -	select PM_GENERIC_DOMAINS if PM
+>   	select S5P_PM if PM
+>   	select S5P_SLEEP if PM
+>   	select SAMSUNG_DMADEV
+> @@ -61,7 +61,6 @@ config SOC_EXYNOS4212
+>   	depends on ARCH_EXYNOS4
+>   	select ARCH_HAS_BANDGAP
+>   	select PINCTRL_EXYNOS
+> -	select PM_GENERIC_DOMAINS if PM
+>   	select S5P_PM if PM
+>   	select S5P_SLEEP if PM
+>   	select SAMSUNG_DMADEV
+> @@ -74,7 +73,6 @@ config SOC_EXYNOS4412
+>   	depends on ARCH_EXYNOS4
+>   	select ARCH_HAS_BANDGAP
+>   	select PINCTRL_EXYNOS
+> -	select PM_GENERIC_DOMAINS if PM
+>   	select SAMSUNG_DMADEV
+>   	help
+>   	  Enable EXYNOS4412 SoC support
 
-Taken into clk-next.
-
-Thanks!
-Mike
-
-> -- 
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
+Applied, thanks.
+- Kukjin
