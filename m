@@ -1,67 +1,51 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Fri, 20 Dec 2013 09:03:07 +0800
-Subject: [PATCHv4 4/4] Documentation: Add device tree bindings for Freescale
- SAI.
-In-Reply-To: <1387501387-2151-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1387501387-2151-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1387501387-2151-4-git-send-email-Li.Xiubo@freescale.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 19 Dec 2013 17:59:00 -0800
+Subject: [PATCH Resend 01/10] clk: bcm2835: Remove duplicate inclusion of
+ clk-provider.h
+In-Reply-To: <CAK9yfHwSQd-Gd5dMPYib8FswdutkpaFxfpe2wezGh1Vu7pm7JQ@mail.gmail.com>
+References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHwSQd-Gd5dMPYib8FswdutkpaFxfpe2wezGh1Vu7pm7JQ@mail.gmail.com>
+Message-ID: <20131220015900.18119.89845@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Document for Freescale SAI driver under
-Documentation/devicetree/bindings/sound/.
+Quoting Sachin Kamat (2013-12-05 03:27:15)
+> On 8 October 2013 16:47, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> > clk-provider.h was included twice.
+> >
+> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> > ---
+> > Added all the acquired acks to respective patches.
+> > ---
+> >  drivers/clk/clk-bcm2835.c |    1 -
+> >  1 file changed, 1 deletion(-)
+> >
+> > diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+> > index 5fb4ff5..676077d 100644
+> > --- a/drivers/clk/clk-bcm2835.c
+> > +++ b/drivers/clk/clk-bcm2835.c
+> > @@ -20,7 +20,6 @@
+> >  #include <linux/clk-provider.h>
+> >  #include <linux/clkdev.h>
+> >  #include <linux/clk/bcm2835.h>
+> > -#include <linux/clk-provider.h>
+> >  #include <linux/of.h>
+> >
+> >  static const struct of_device_id clk_match[] __initconst = {
+> > --
+> > 1.7.9.5
+> >
+> 
+> Mike,
+> 
+> Any chance getting this series picked up?
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- .../devicetree/bindings/sound/fsl-sai.txt          | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/fsl-sai.txt
+Thanks for re-ping me on this! Taken into clk-next.
 
-diff --git a/Documentation/devicetree/bindings/sound/fsl-sai.txt b/Documentation/devicetree/bindings/sound/fsl-sai.txt
-new file mode 100644
-index 0000000..ca49ad1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/fsl-sai.txt
-@@ -0,0 +1,40 @@
-+Freescale Synchronous Audio Interface (SAI).
-+
-+The SAI is based on I2S module that used communicating with audio codecs,
-+which provides a synchronous audio interface that supports fullduplex
-+serial interfaces with frame synchronization such as I2S, AC97, TDM, and
-+codec/DSP interfaces.
-+
-+
-+Required properties:
-+- compatible: Compatible list, contains "fsl,vf610-sai".
-+- reg: Offset and length of the register set for the device.
-+- clocks: Must contain an entry for each entry in clock-names.
-+- clock-names : Must include the "sai" entry.
-+- dmas : Generic dma devicetree binding as described in
-+  Documentation/devicetree/bindings/dma/dma.txt.
-+- dma-names : Two dmas have to be defined, "tx" and "rx".
-+- pinctrl-names: Must contain a "default" entry.
-+- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-+  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
-+- big-endian-regs: If this property is absent, the little endian mode will
-+  be in use as default, or the big endian mode will be in use for all the
-+  device registers.
-+- big-endian-data: If this property is absent, the little endian mode will
-+  be in use as default, or the big endian mode will be in use for all the
-+  fifo data.
-+
-+Example:
-+sai2: sai at 40031000 {
-+	      compatible = "fsl,vf610-sai";
-+	      reg = <0x40031000 0x1000>;
-+	      pinctrl-names = "default";
-+	      pinctrl-0 = <&pinctrl_sai2_1>;
-+	      clocks = <&clks VF610_CLK_SAI2>;
-+	      clock-names = "sai";
-+	      dma-names = "tx", "rx";
-+	      dmas = <&edma0 0 VF610_EDMA_MUXID0_SAI2_TX>,
-+		   <&edma0 0 VF610_EDMA_MUXID0_SAI2_RX>;
-+	      big-endian_regs;
-+	      big-endian_data;
-+};
--- 
-1.8.4
+Regards,
+Mike
+
+> 
+> -- 
+> With warm regards,
+> Sachin
