@@ -1,147 +1,112 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Dec 2013 18:34:20 +0200
-Subject: [PATCHv12 01/49] clk: add support for registering clocks from
- description
+Date: Fri, 20 Dec 2013 18:34:22 +0200
+Subject: [PATCHv12 04/49] clk: mux: add support for registering mux clock from
+ descriptor
 In-Reply-To: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
 References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387557274-22583-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1387557274-22583-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Turquette <mturquette@linaro.org>
+New clk_register_desc() call can be used to register this clock type now.
 
-clk_register_desc is the primary interface for populating the clock tree
-with new clock nodes. In time, this will replace the various hardware-specific
-registration functions (e.g. clk_register_gate).
-
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk.c            |   71 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |   22 +++++++++++++
- 2 files changed, 93 insertions(+)
+ drivers/clk/clk-mux.c        |   37 +++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |   20 ++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2cf2ea6..29281f6 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1905,6 +1905,77 @@ fail_out:
- EXPORT_SYMBOL_GPL(clk_register);
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 4f96ff3..2cbed08 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -27,8 +27,12 @@
+  * parent - parent is adjustable through clk_set_parent
+  */
  
- /**
-+ * clk_register_desc - register a new clock from its description
-+ * @dev: device that is registering this clock
-+ * @desc: description of the clock, may be __initdata or otherwise discarded
-+ *
-+ * clk_register_desc is the primary interface for populating the clock tree
-+ * with new clock nodes. In time it will replace the various hardware-specific
-+ * registration functions (e.g. clk_register_gate). clk_register_desc returns a
-+ * pointer to the newly allocated struct clk which is an opaque cookie. Drivers
-+ * must not dereference it except to check with IS_ERR.
-+ */
-+struct clk *clk_register_desc(struct device *dev, struct clk_desc *desc)
++/* resolve struct clk_mux from inner struct clk_hw member */
+ #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+ 
++/* resolve struct clk_mux_desc from inner struct clk_desc member */
++#define to_hw_desc(_desc) container_of(_desc, struct clk_mux_desc, desc)
++
+ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ {
+ 	struct clk_mux *mux = to_clk_mux(hw);
+@@ -177,3 +181,36 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 				      NULL, lock);
+ }
+ EXPORT_SYMBOL_GPL(clk_register_mux);
++
++struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc)
 +{
-+	int ret, i;
-+	struct clk *clk;
++	struct clk_mux *mux;
++	struct clk_mux_desc *hw_desc;
 +
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
++	hw_desc = to_hw_desc(desc);
 +
-+	if (!clk)
++	/* allocate mux clock */
++	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++	if (!mux)
 +		return ERR_PTR(-ENOMEM);
 +
-+	clk->hw = desc->register_func(dev, desc);
-+	clk->hw->clk = clk;
++	/* populate struct clk_mux assignments */
++	mux->reg = hw_desc->reg;
++	mux->table = hw_desc->table;
++	mux->mask = hw_desc->mask;
++	mux->shift = hw_desc->shift;
++	mux->flags = hw_desc->flags;
++	mux->lock = hw_desc->lock;
 +
-+	/* _clk_register */
-+	clk->name = kstrdup(desc->name, GFP_KERNEL);
-+	if (!clk->name) {
-+		ret = -ENOMEM;
-+		goto fail_name;
++	if (!desc->ops) {
++		if (mux->flags & CLK_MUX_READ_ONLY)
++			desc->ops = &clk_mux_ro_ops;
++		else
++			desc->ops = &clk_mux_ops;
 +	}
 +
-+	clk->ops = desc->ops;
-+	clk->flags = desc->flags;
-+	clk->num_parents = desc->num_parents;
++	desc->flags |= CLK_IS_BASIC;
 +
-+	/* allocate local copy in case parent_names is __initdata */
-+	clk->parent_names = kcalloc(clk->num_parents, sizeof(char *),
-+				    GFP_KERNEL);
-+
-+	if (!clk->parent_names) {
-+		ret = -ENOMEM;
-+		goto fail_parent_names;
-+	}
-+
-+	/* copy each string name in case parent_names is __initdata */
-+	for (i = 0; i < clk->num_parents; i++) {
-+		clk->parent_names[i] = kstrdup(desc->parent_names[i],
-+					       GFP_KERNEL);
-+
-+		if (!clk->parent_names[i]) {
-+			ret = -ENOMEM;
-+			goto fail_parent_names_copy;
-+		}
-+	}
-+
-+	ret = __clk_init(dev, clk);
-+
-+	if (!ret)
-+		return clk;
-+
-+fail_parent_names_copy:
-+	while (--i >= 0)
-+		kfree(clk->parent_names[i]);
-+	kfree(clk->parent_names);
-+fail_parent_names:
-+	kfree(clk->name);
-+fail_name:
-+	kfree(clk);
-+	return ERR_PTR(ret);
++	return &mux->hw;
 +}
-+
-+/**
-  * clk_unregister - unregister a currently registered clock
-  * @clk: clock to unregister
-  *
++EXPORT_SYMBOL_GPL(clk_register_mux_desc);
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7e59253..08a0da0 100644
+index bf89ab4..ea5281c 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -161,6 +161,27 @@ struct clk_init_data {
+@@ -391,6 +391,25 @@ struct clk_mux {
+ 	spinlock_t	*lock;
  };
  
- /**
-+ * struct clk_desc - clock init descriptor for providing init time parameters
-+ * for a clock.
-+ * @name: clock name
-+ * @ops: clock ops
-+ * @parent_names: array of string names for all possible parents
-+ * @num_parents: number of possible parents
-+ * @flags: framework-level hints and quirks
-+ * @register_func: function for parsing the clock descriptor and providing
-+ *		   ready-to-register clk_hw
++/**
++ * struct clk_mux_desc - init descriptor for multiplexer clock
++ * @desc:	handle between common and hardware-specific interfaces
++ * @reg:	register controlling multiplexer
++ * @shift:	shift to multiplexer bit field
++ * @width:	width of multiplexer bit field
++ * @flags:	hardware-specific flags
++ * @lock:	register lock
 + */
-+struct clk_desc {
-+	const char		*name;
-+	const struct clk_ops	*ops;
-+	const char		**parent_names;
-+	u8			num_parents;
-+	unsigned long		flags;
-+	struct clk_hw *(*register_func)(struct device *dev,
-+					struct clk_desc *desc);
++struct clk_mux_desc {
++	struct clk_desc	desc;
++	void __iomem	*reg;
++	u32		*table;
++	u32		mask;
++	u8		shift;
++	u8		flags;
++	spinlock_t	*lock;
 +};
 +
-+/**
-  * struct clk_hw - handle for traversing from a struct clk to its corresponding
-  * hardware-specific structure.  struct clk_hw should be declared within struct
-  * clk_foo and then referenced by the struct clk instance that uses struct
-@@ -419,6 +440,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
-  * error code; drivers must test for an error code after calling clk_register.
-  */
- struct clk *clk_register(struct device *dev, struct clk_hw *hw);
-+struct clk *clk_register_desc(struct device *dev, struct clk_desc *desc);
- struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+ #define CLK_MUX_INDEX_BIT		BIT(1)
+ #define CLK_MUX_HIWORD_MASK		BIT(2)
+@@ -399,6 +418,7 @@ struct clk_mux {
+ extern const struct clk_ops clk_mux_ops;
+ extern const struct clk_ops clk_mux_ro_ops;
  
- void clk_unregister(struct clk *clk);
++struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc);
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
 -- 
 1.7.9.5
