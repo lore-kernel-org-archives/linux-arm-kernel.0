@@ -1,38 +1,27 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 20 Dec 2013 16:25:17 +0100
-Subject: [PATCH] ARM: dts: imx6q-sabrelite: PHY reset is active-low
-Message-ID: <1387553117-30936-1-git-send-email-p.zabel@pengutronix.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 20 Dec 2013 16:47:46 +0100
+Subject: [PATCH V2 5/5] i2c: riic: add driver
+In-Reply-To: <2069590.SA4Ef3s3BZ@avalon>
+References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
+ <1407973.m5fTNuo5v5@avalon> <20131219120646.GA2563@katana>
+ <2069590.SA4Ef3s3BZ@avalon>
+Message-ID: <20131220154746.GA9017@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note that the fec driver code currently hard-codes an active-low
-reset, regardless of the flags in the device tree.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> disable interrupts at runtime and use that as a state machine, while I was 
+> wondering whether it wouldn't be simpler to keep all interrupts enabled at all 
+> time and handle the synchronization explicitly.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index f004913..338d558 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -12,6 +12,7 @@
- 
- /dts-v1/;
- #include "imx6q.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Freescale i.MX6 Quad SABRE Lite Board";
-@@ -89,7 +90,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet_1>;
- 	phy-mode = "rgmii";
--	phy-reset-gpios = <&gpio3 23 0>;
-+	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
--- 
-1.8.5.1
+If I do this, I'll get another "spurious" interrupt telling me the transmit
+register is empty again, even after I wrote the last byte. I don't like
+this.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/6415bb9c/attachment.sig>
