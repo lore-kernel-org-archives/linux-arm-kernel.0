@@ -1,53 +1,60 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 20 Dec 2013 16:16:02 +0530
-Subject: [PATCH 01/10] ARM: tegra: Add AS3722 PMIC on Venice2
-In-Reply-To: <20131220102542.GJ27787@ulmo.nvidia.com>
-References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
- <1387469182-14398-2-git-send-email-treding@nvidia.com>
- <52B355EC.9040306@wwwdotorg.org> <52B3E968.8090906@nvidia.com>
- <20131220102542.GJ27787@ulmo.nvidia.com>
-Message-ID: <52B41FEA.7020608@nvidia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 20 Dec 2013 10:53:50 +0000 (UTC)
+Subject: [PATCHv11 01/49] clk: add support for registering clocks from
+ description
+In-Reply-To: <1387452260-23276-2-git-send-email-t-kristo@ti.com>
+References: <1387452260-23276-1-git-send-email-t-kristo@ti.com>
+ <1387452260-23276-2-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1312201046510.20802@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 December 2013 03:55 PM, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Fri, Dec 20, 2013 at 12:23:28PM +0530, Laxman Dewangan wrote:
->> On Friday 20 December 2013 01:54 AM, Stephen Warren wrote:
->>> On 12/19/2013 09:06 AM, Thierry Reding wrote:
->>> (Laxman, as an aside, I'm not sure why you're upstreaming patches that
->>> don't exactly match the existing kernel support for this board...)
->> I did not get this based on what context it is. Can you please elaborate
->> where I am missing the stuff?
->>
->>
->>>> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
->>>> +				sd0 {
->>>> +					regulator-name = "vdd_cpu";
->>>> +					regulator-min-microvolt = <700000>;
->>>> +					regulator-max-microvolt = <1350000>;
->>> Laxman's patch has:
->>>
->>>   					regulator-max-microvolt = <1400000>;
->> We have the Laguna platform on which Android and L4T is running fine. This
->> is based on same PMIC used for Venice2. As we are running the more cpu
->> stress on Laguna, I took this parameter from the Laguna Power tree where it
->> is maximum 1.4V. Chrome have maximum as 1.35mV.
-> Whether this is used on Android, ChromeOS or L4T doesn't matter at all.
-> It specifies hardware constraints and thus must be agnostic of the OS
-> and workload.
->
-> Also this file describes the power tree for Venice2, so using values
-> from Laguna is wrong, no matter how similar they are.
->
+On Thu, 19 Dec 2013, Tero Kristo wrote:
 
-Here, I used term "similar" means the which rail is feeding to Tegra's 
-which vdd?
-So by this, if AMS SD0 is feeding to Tegra vdd-cpu then it should be 
-same for Laguna.
-This is maximum possible for Tegra cpu  from PMIC. Tegra can use desired 
-voltage limited to this max based on their sku for going to maximum 
-frequency.
-If we program less voltage as maximum then Tegra will not go to higher 
-frequency assuming PMIC limitation which is not correct.
+> From: Mike Turquette <mturquetter@linaro.org>
+
+Is this E-mail address correct?  It's one byte off of the Signed-off-by: 
+address.
+
+> clk_register_desc is the primary interface for populating the clock tree
+> with new clock nodes. In time, this will replace the various hardware-specific
+> registration functions (e.g. clk_register_gate).
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+
+...
+
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2cf2ea6..29281f6 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1905,6 +1905,77 @@ fail_out:
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 7e59253..7fddcb3 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -161,6 +161,28 @@ struct clk_init_data {
+>  };
+>  
+>  /**
+> + * struct clk_desc - clock init descriptor for providing init time parameters
+> + * for a clock.
+> + *
+> + * @name: clock name
+
+As mentioned in 
+
+http://patchwork.ozlabs.org/patch/294253/
+
+please remove the blank line between the summary line and the arguments.  
+Documentation/kernel-doc-nano.txt says:
+
+"The @argument descriptions must begin on the very next line following
+this opening short function description line, with no intervening
+empty comment lines."
+
+
+- Paul
