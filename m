@@ -1,54 +1,42 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Fri, 20 Dec 2013 12:40:54 +0200
-Subject: [PATCH RFC v2 REPOST 5/8] ASoC: davinci: HDMI audio build for AM33XX
- and TDA998x
-In-Reply-To: <cover.1387535299.git.jsarha@ti.com>
-References: <cover.1387535299.git.jsarha@ti.com>
-Message-ID: <aa27717c56f024eb2f381fd5ee3fcd0938e7c0bd.1387535303.git.jsarha@ti.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Fri, 20 Dec 2013 10:40:01 -0000
+Subject: [PATCH v7 07/14] usb: phy-mxs: change description of usb device
+ speed
+In-Reply-To: <1387525930-27313-8-git-send-email-peter.chen@freescale.com>
+References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
+ <1387525930-27313-8-git-send-email-peter.chen@freescale.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B74C0@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds configuration option for HDMI audio support for AM33XX based
-boards with NXP TDA998x HDMI transmitter. The audio is connected to
-NXP TDA998x trough McASP running in i2s mode.
+> From: Peter Chen
+> Sent: 20 December 2013 07:52
+> Change "high speed" to "HS"
+> Change "non-high speed" to "FS/LS"
+> 
+> Implementation of notify_suspend and notify_resume will be different
+> according to mxs_phy_data->flags.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 0ef930a..489096f 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -166,8 +166,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+>  static int mxs_phy_on_connect(struct usb_phy *phy,
+>  		enum usb_device_speed speed)
+>  {
+> -	dev_dbg(phy->dev, "%s speed device has connected\n",
+> -		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
+> +	dev_dbg(phy->dev, "%s device has connected\n",
+> +		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
 
-Signed-off-by: Jyri Sarha <jsarha@ti.com>
----
- sound/soc/davinci/Kconfig  |   12 ++++++++++++
- sound/soc/davinci/Makefile |    1 +
- 2 files changed, 13 insertions(+)
+Seems you are making these messages even more cryptic.
+With all the speeds that USB supports remembering what 'full'
+means is hard enough without having a cryptic acronym.
 
-diff --git a/sound/soc/davinci/Kconfig b/sound/soc/davinci/Kconfig
-index a8ec1fc..40dd5d1 100644
---- a/sound/soc/davinci/Kconfig
-+++ b/sound/soc/davinci/Kconfig
-@@ -26,6 +26,18 @@ config SND_AM33XX_SOC_EVM
- 	  AM335X-EVMSK, and BeagelBone with AudioCape boards have this
- 	  setup.
- 
-+config SND_AM335X_SOC_NXPTDA_EVM
-+	tristate "HDMI Audio for the AM33XX chip based boards with TDA998x"
-+	depends on SND_DAVINCI_SOC && SOC_AM33XX
-+	depends on DRM_TILCDC && DRM_I2C_NXP_TDA998X
-+	select SND_SOC_HDMI_CODEC
-+	select SND_DAVINCI_SOC_MCASP
-+	help
-+	  Say Y or M if you want to add support for HDMI SoC audio on
-+	  AM33XX boards with NXP TDA998x HDMI transmitter. For example
-+	  BeagleBoneBack. The audio is connected to NXP TDA998x trough
-+	  McASP running in i2s mode.
-+
- config SND_DAVINCI_SOC_EVM
- 	tristate "SoC Audio support for DaVinci DM6446, DM355 or DM365 EVM"
- 	depends on SND_DAVINCI_SOC
-diff --git a/sound/soc/davinci/Makefile b/sound/soc/davinci/Makefile
-index 744d4d9..7587a70 100644
---- a/sound/soc/davinci/Makefile
-+++ b/sound/soc/davinci/Makefile
-@@ -13,3 +13,4 @@ obj-$(CONFIG_SND_DAVINCI_SOC_VCIF) += snd-soc-davinci-vcif.o
- snd-soc-evm-objs := davinci-evm.o
- 
- obj-$(CONFIG_SND_DAVINCI_SOC_GENERIC_EVM) += snd-soc-evm.o
-+obj-$(CONFIG_SND_AM335X_SOC_NXPTDA_EVM) += snd-soc-evm.o
--- 
-1.7.9.5
+	David
