@@ -1,35 +1,17 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Fri, 20 Dec 2013 12:43:07 +0200
-Subject: [PATCH RFC v2 REPOST 8/8] ARM: OMAP2+: omap2plus_defconfig: Enable
- BeagleBone Black HDMI audio support
-In-Reply-To: <cover.1387535299.git.jsarha@ti.com>
-References: <cover.1387535299.git.jsarha@ti.com>
-Message-ID: <e278754ab32a2fdd25e2a7e90cedbdbcd146c1e4.1387535303.git.jsarha@ti.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 20 Dec 2013 11:45:39 +0100
+Subject: ARM: AT91: remove unused pit irq hander and allow higher clockrates
+ for TCLIB
+Message-ID: <1387536341-7452-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select following:
-CONFIG_SND_DAVINCI_SOC=m
-CONFIG_SND_AM335X_SOC_NXPTDA_EVM=m
+Hi,
 
-Signed-off-by: Jyri Sarha <jsarha@ti.com>
-cc: tony at atomide.com
----
- arch/arm/configs/omap2plus_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+these two patches have been sitting in the -RT tree for quite some time
+now. Many thanks to Sami Pietik?inen who fixed them while they got broken
+somewhere between v3.2 and v3.8. I ported them to v3.13-rc4 and compile
+tested but I have no HW to do more testing.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 52b0d92..c1a9730 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -216,6 +216,8 @@ CONFIG_SND_OMAP_SOC=m
- CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
- CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
- CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
-+CONFIG_SND_DAVINCI_SOC=m
-+CONFIG_SND_AM335X_SOC_NXPTDA_EVM=m
- CONFIG_USB=y
- CONFIG_USB_DEBUG=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
--- 
-1.7.9.5
+
+Sebastian
