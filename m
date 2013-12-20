@@ -1,37 +1,44 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 20 Dec 2013 11:47:10 -0700
-Subject: [PATCH V2 4/7] ARM: dts: imx6qdl: use interrupts-extended for fec
+Date: Fri, 20 Dec 2013 11:47:12 -0700
+Subject: [PATCH V2 6/7] ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC
+ interrupt.
 In-Reply-To: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1387565233-16144-5-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1387565233-16144-7-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to be able to override interrupts in board file to
-workaround a hardware bug for ethernet interrupts
-waking the processor by using interrupts-extended.
-So, use interrupts-extended here as well.
+This works around a hardware bug.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 09c3587..5b6cfeb 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -738,8 +738,9 @@
- 			fec: ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
--				interrupts = <0 118 IRQ_TYPE_LEVEL_HIGH>,
--					     <0 119 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts-extended =
-+					<&intc 0 118 IRQ_TYPE_LEVEL_HIGH>,
-+					<&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks 117>, <&clks 117>, <&clks 190>;
- 				clock-names = "ipg", "ahb", "ptp";
- 				status = "disabled";
+---
+This has not been tested.
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 26fa0e5..088b0d2 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -44,6 +44,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
++	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
++			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 	status = "okay";
+ };
+ 
+@@ -77,7 +79,7 @@
+ 		};
+ 
+ 		pinctrl_enet: enetgrp {
+-			fsl,pins = <MX6QDL_ENET_PINGRP2>;
++			fsl,pins = <MX6QDL_ENET_PINGRP2_GPIO6>;
+ 		};
+ 
+ 		pinctrl_gpmi_nand: gpminandgrp {
 -- 
 1.8.1.2
