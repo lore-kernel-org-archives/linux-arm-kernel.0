@@ -1,93 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 20 Dec 2013 17:28:56 -0500
-Subject: [PATCH] mm/memblock: use WARN_ONCE when MAX_NUMNODES passed as input
- parameter
-Message-ID: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Dec 2013 23:28:26 +0100
+Subject: [GIT PULL] Allwinner DT changes for 3.14
+Message-ID: <20131220222826.GA23980@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Hi Arnd, Kevin, Olof,
 
-Check nid parameter and produce warning if it has deprecated MAX_NUMNODES
-value. Also re-assign NUMA_NO_NODE value to the nid parameter in this case.
+Please pull the following changes for the next merge window.
 
-These will help to identify the wrong API usage (the caller) and make code
-simpler.
+Thanks!
+Maxime
 
-Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-Incremental update on the memblock series as suggested by Tejun in
-below thread:
-	https://lkml.org/lkml/2013/12/14/159
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
- mm/memblock.c |   21 ++++++++-------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 71b11d9..6af873a 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -707,11 +707,9 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
- 	struct memblock_type *rsv = &memblock.reserved;
- 	int mi = *idx & 0xffffffff;
- 	int ri = *idx >> 32;
--	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
- 
--	if (nid == MAX_NUMNODES)
--		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
--			     __func__);
-+	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
-+		nid = NUMA_NO_NODE;
- 
- 	for ( ; mi < mem->cnt; mi++) {
- 		struct memblock_region *m = &mem->regions[mi];
-@@ -719,7 +717,7 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
- 		phys_addr_t m_end = m->base + m->size;
- 
- 		/* only memory regions are associated with nodes, check it */
--		if (check_node && nid != memblock_get_region_node(m))
-+		if (nid != NUMA_NO_NODE && nid != memblock_get_region_node(m))
- 			continue;
- 
- 		/* scan areas before each reservation for intersection */
-@@ -775,11 +773,9 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
- 	struct memblock_type *rsv = &memblock.reserved;
- 	int mi = *idx & 0xffffffff;
- 	int ri = *idx >> 32;
--	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
- 
--	if (nid == MAX_NUMNODES)
--		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
--			     __func__);
-+	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
-+		nid = NUMA_NO_NODE;
- 
- 	if (*idx == (u64)ULLONG_MAX) {
- 		mi = mem->cnt - 1;
-@@ -792,7 +788,7 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
- 		phys_addr_t m_end = m->base + m->size;
- 
- 		/* only memory regions are associated with nodes, check it */
--		if (check_node && nid != memblock_get_region_node(m))
-+		if (nid != NUMA_NO_NODE && nid != memblock_get_region_node(m))
- 			continue;
- 
- 		/* scan areas before each reservation for intersection */
-@@ -980,9 +976,8 @@ static void * __init memblock_virt_alloc_internal(
- 	phys_addr_t alloc;
- 	void *ptr;
- 
--	if (nid == MAX_NUMNODES)
--		pr_warn("%s: usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE\n",
--			__func__);
-+	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
-+		nid = NUMA_NO_NODE;
- 
- 	/*
- 	 * Detect any accidental use of these APIs after slab is ready, as at
+are available in the git repository at:
+
+  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.14
+
+for you to fetch changes up to 81ee429ffdd021626bf191bb8a3ae886dd94adcc:
+
+  ARM: sun6i: dt: Add IP needed to bring up the additional cores (2013-12-16 21:15:12 +0100)
+
+----------------------------------------------------------------
+Allwinner sunXi DT Additions for 3.14
+
+Various DT related patches, but mostly:
+  - Support for the Olimex A13-olinuxino-micro
+  - Added the needed IP in the A31 for the HS timer support and SMP bringup
+  - A10 and A20 RTC
+
+----------------------------------------------------------------
+Carlo Caione (1):
+      ARM: dts: sun4i/sun7i: add RTC node
+
+Emilio L?pez (1):
+      ARM: sunxi: dt: add EMAC aliases
+
+Hans de Goede (1):
+      ARM: dts: sun5i: Add new sun5i-a13-olinuxino-micro board
+
+Maxime Ripard (2):
+      ARM: sun6i: Add the reset controller to the DTSI
+      ARM: sun6i: dt: Add IP needed to bring up the additional cores
+
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                | 10 ++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi               |  4 ++
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 68 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31.dtsi                | 34 +++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi                | 10 ++++
+ 6 files changed, 127 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/c438942a/attachment.sig>
