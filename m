@@ -1,44 +1,17 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Dec 2013 17:45:43 +0000
-Subject: [PATCHv3] arm: Correct virt_addr_valid
-In-Reply-To: <1387416724-17868-1-git-send-email-lauraa@codeaurora.org>
-References: <1387416724-17868-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20131220174543.GJ16829@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 20 Dec 2013 10:56:52 -0700
+Subject: [PATCH 07/10] ARM: tegra: Enable Venice2 keyboard
+In-Reply-To: <1387469182-14398-8-git-send-email-treding@nvidia.com>
+References: <1387469182-14398-1-git-send-email-treding@nvidia.com>
+ <1387469182-14398-8-git-send-email-treding@nvidia.com>
+Message-ID: <52B484E4.8050509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 01:32:04AM +0000, Laura Abbott wrote:
-> The definition of virt_addr_valid is that virt_addr_valid should
-> return true if and only if virt_to_page returns a valid pointer.
-> The current definition of virt_addr_valid only checks against the
-> virtual address range. There's no guarantee that just because a
-> virtual address falls bewteen PAGE_OFFSET and high_memory the
-> associated physical memory has a valid backing struct page. Follow
-> the example of other architectures and convert to pfn_valid to
-> verify that the virtual address is actually valid. The check for
-> an address between PAGE_OFFSET and high_memory is still necessary
-> as vmalloc/highmem addresses are not valid with virt_to_page.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm/include/asm/memory.h |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 9ecccc8..35a8511 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -350,7 +350,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
->  #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
->  
->  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
-> -#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
-> +#define virt_addr_valid(kaddr)	(((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory) \
-> +					&& pfn_valid(__pa(kaddr) >> PAGE_SHIFT) )
+On 12/19/2013 09:06 AM, Thierry Reding wrote:
+> The keyboard on Venice2 is attached to the ChromeOS embedded controller.
+> Add the corresponding device tree nodes and use the MATRIX_KEY define to
+> encode keycodes.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Patches 7/10 and 8/10 do work fine with the current pinmux/regulator
+setup in Tegra's for-3.14/dt, so I have applied those patches.
