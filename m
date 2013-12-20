@@ -1,43 +1,39 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 20 Dec 2013 14:05:42 -0300
-Subject: [PATCH] usb: musb: Remove USB_GADGET driver dependency
-In-Reply-To: <20131220154958.GA5957@saruman.home>
-References: <1387502448-11041-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131220154958.GA5957@saruman.home>
-Message-ID: <20131220170541.GA16652@localhost>
+From: josh@joshtriplett.org (Josh Triplett)
+Date: Fri, 20 Dec 2013 09:13:40 -0800
+Subject: [PATCH 0/4] mtd: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+In-Reply-To: <1387555350-989-1-git-send-email-shijie8@gmail.com>
+References: <1387555350-989-1-git-send-email-shijie8@gmail.com>
+Message-ID: <20131220171340.GB26163@leaf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 09:49:58AM -0600, Felipe Balbi wrote:
-> On Thu, Dec 19, 2013 at 10:20:48PM -0300, Ezequiel Garcia wrote:
-> > This USB controller is dual-role, but can also work in host-only mode.
-> > There's no reason to condition the entire driver to USB_GADGET. Fix this by
-> > removing the dependency.
-> > 
-> > Tested on a Beaglebone black (AM335x) using a regular USB mass storage
-> > device.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  drivers/usb/musb/Kconfig | 1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-> > index 57dfc0c..2119370 100644
-> > --- a/drivers/usb/musb/Kconfig
-> > +++ b/drivers/usb/musb/Kconfig
-> > @@ -6,7 +6,6 @@
-> >  # (M)HDRC = (Multipoint) Highspeed Dual-Role Controller
-> >  config USB_MUSB_HDRC
-> >  	tristate 'Inventra Highspeed Dual Role Controller (TI, ADI, ...)'
-> > -	depends on USB_GADGET
+On Sat, Dec 21, 2013 at 12:02:26AM +0800, Huang Shijie wrote:
+> [1] Why kill them?
+>     As time goes on, the NAND's page size and oob size become larger and larger.
+>     So we have changes these two macros frequently in order to support the new
+>     NAND.
 > 
-> the correct patch would be to turn this into (USB || USB_GADGET) and fix
-> the mode selection just like dwc3 is doing.
+> [2] How does this patch set do?
+>     There are three drivers which uses these two macros, the mxc-nand, denali,
+>     and the cafe-nand.
 > 
+>     This patch will allocate a temporary buffer for the nand_scan_ident, and 
+>     after it have getten the right page size and oob size, it will re-allocate
+>     the buffer again.
+> 
+> [3] I do not have the boards which have the relative NAND controller.
+> 
+>     I hope someone can test this patch set.
+> 
+>     thanks.
+> 
+> 
+> Huang Shijie (4):
+>   mtd: mxc-nand: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+>   mtd: denali: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+>   mtd: nand: kill the the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE for
+>     nand_buffers{}
+>   mtd: nand: remove the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
 
-Ah, I see now. Let me prepare a v2 then.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+For all four patches:
+Reviewed-by: Josh Triplett <josh@joshtriplett.org>
