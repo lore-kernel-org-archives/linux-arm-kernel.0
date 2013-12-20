@@ -1,30 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 20 Dec 2013 16:02:18 +0000
-Subject: [PATCH] arm64: cmpxchg: update macros to prevent warnings
-In-Reply-To: <20131220141000.GA11954@localhost>
-References: <1387543334-14036-1-git-send-email-broonie@kernel.org>
- <20131220141000.GA11954@localhost>
-Message-ID: <20131220160218.GW31886@sirena.org.uk>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 21 Dec 2013 00:02:26 +0800
+Subject: [PATCH 0/4] mtd: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+Message-ID: <1387555350-989-1-git-send-email-shijie8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 02:10:02PM +0000, Catalin Marinas wrote:
+[1] Why kill them?
+    As time goes on, the NAND's page size and oob size become larger and larger.
+    So we have changes these two macros frequently in order to support the new
+    NAND.
 
-> I merged the previous one (should be in -next as of last night), I guess
-> it's the same since the patch doesn't have a version number. But I
+[2] How does this patch set do?
+    There are three drivers which uses these two macros, the mxc-nand, denali,
+    and the cafe-nand.
 
-It's the same patch, I was resending it because it had been a while with
-no response.
+    This patch will allocate a temporary buffer for the nand_scan_ident, and 
+    after it have getten the right page size and oob size, it will re-allocate
+    the buffer again.
 
-> wonder whether uses of cmpxchg without checking the return value are
-> sane.
+[3] I do not have the boards which have the relative NAND controller.
 
-IIRC it was used as part of another macro which did have some reasonable
-uses without checking the return value.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/36a0404d/attachment.sig>
+    I hope someone can test this patch set.
+
+    thanks.
+
+
+Huang Shijie (4):
+  mtd: mxc-nand: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+  mtd: denali: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+  mtd: nand: kill the the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE for
+    nand_buffers{}
+  mtd: nand: remove the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+
+ drivers/mtd/nand/cafe_nand.c | 49 +++++++++++++++++++++++++++++++-----------
+ drivers/mtd/nand/denali.c    | 51 ++++++++++++++++++++++++++------------------
+ drivers/mtd/nand/denali.h    |  4 +---
+ drivers/mtd/nand/mxc_nand.c  | 18 +++++++++++++---
+ drivers/mtd/nand/nand_base.c | 19 +++++++++++++----
+ include/linux/mtd/nand.h     | 20 ++++++-----------
+ 6 files changed, 103 insertions(+), 58 deletions(-)
+
+-- 
+1.8.3.1
