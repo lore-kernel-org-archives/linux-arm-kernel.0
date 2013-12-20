@@ -1,38 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 Dec 2013 16:34:01 +0000
-Subject: [PATCH 2/2] arm64: dts: Reduce size of virtio block device for
- foundation model
-In-Reply-To: <20131220160522.GX31886@sirena.org.uk>
-References: <1387543964-15057-1-git-send-email-broonie@kernel.org>
- <1387543964-15057-2-git-send-email-broonie@kernel.org>
- <20131220142524.GB11954@localhost>
- <20131220160522.GX31886@sirena.org.uk>
-Message-ID: <20131220163401.GK25477@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 20 Dec 2013 08:34:09 -0800
+Subject: arm-soc: Xilinx Zynq dt changes for v3.14
+In-Reply-To: <52B1657B.1030803@monstr.eu> (Michal Simek's message of "Wed, 18
+ Dec 2013 10:06:03 +0100")
+References: <52AAC671.6000207@monstr.eu>
+ <20131213112659.GD4360@n2100.arm.linux.org.uk>
+ <52AB0ABD.1050307@monstr.eu> <20131217202731.GA11452@quad.lixom.net>
+ <52B1657B.1030803@monstr.eu>
+Message-ID: <871u17iiri.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 04:05:22PM +0000, Mark Brown wrote:
-> On Fri, Dec 20, 2013 at 02:25:24PM +0000, Catalin Marinas wrote:
-> > On Fri, Dec 20, 2013 at 12:52:44PM +0000, Mark Brown wrote:
-> > > From: Mark Brown <broonie@linaro.org>
-> 
-> > > Will Deacon observed that kvmtool uses a size of 0x200 for virtio
-> > > block memory region and that the virtio block spec only uses 31 bytes in
-> > > the device specific region at 0x100 so reduce the region to a less
-> > > wasteful 0x200.
-> 
-> > What do we waste by keeping it at 4K? That's ioremap'ed, so we use a
-> > full page anyway.
-> 
-> This was done for consistency with the same change made in RTSM
-> motherboard patch so that we register the same device in the same way.  
-> That change was at Will's request, he did point out that we might use
-> 16K pages in some systems IIRC but personally I'm not sure it makes a
-> huge difference either way - I do think we should keep all registrations
-> of the device consistent though to avoid user confusion about how to use
-> it.
+Michal Simek <monstr@monstr.eu> writes:
 
-OK. Applied.
+> On 12/17/2013 09:27 PM, Olof Johansson wrote:
+>> On Fri, Dec 13, 2013 at 02:25:17PM +0100, Michal Simek wrote:
+>>> Hi Russell,
+>>>
+>>> On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
+>>>> 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
+>>>>    individually.  The whole point of arm at kernel.org is that it reaches
+>>>>    the current arm-soc maintainers, whoever they may be at the time that
+>>>>    you send your email without you needing to know who they are.
+>>>>
+>>>> 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
+>>>>    a pull request message.
+>>>
+>>> Thanks, I will keep this in my mind for future. I am just doing what I have done
+>>> before and this is the first complain I have got.
+>> 
+>> I don't think I've noticed it in the past. :-) Either way, see it as a
+>> friendly pointer from Russell, not a complaint.
+>
+> that's how I take it.
+> The point here is just if I should send pull request again.
 
--- 
-Catalin
+No need to send again.
+
+Kevin
