@@ -1,9 +1,9 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 20 Dec 2013 10:47:43 +0100
-Subject: [PATCH 5/8] ARM: Convert boot_lock to raw_lock [spear]
+Date: Fri, 20 Dec 2013 10:47:44 +0100
+Subject: [PATCH 6/8] ARM: Convert boot_lock to raw_lock [sti]
 In-Reply-To: <1387532866-22601-1-git-send-email-bigeasy@linutronix.de>
 References: <1387532866-22601-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1387532866-22601-6-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1387532866-22601-7-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,32 +22,33 @@ try_to_wake_up()
 
 Fix by converting boot_lock to a raw spin lock.
 
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: spear-devel at list.st.com
+Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Cc: Stuart Menefy <stuart.menefy@st.com>
+Cc: kernel at stlinux.com
 Cc: Frank Rowand <frank.rowand@sonymobile.com>
 Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
 Link: http://lkml.kernel.org/r/4E77B952.3010606 at am.sony.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+[bigeasy: was not part of the original patch, added]
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- arch/arm/mach-spear/platsmp.c | 10 +++++-----
+ arch/arm/mach-sti/platsmp.c | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
-index 5c4a198..33dc270 100644
---- a/arch/arm/mach-spear/platsmp.c
-+++ b/arch/arm/mach-spear/platsmp.c
-@@ -20,7 +20,7 @@
- #include <mach/spear.h>
- #include "generic.h"
+diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
+index dce50d9..c05b764 100644
+--- a/arch/arm/mach-sti/platsmp.c
++++ b/arch/arm/mach-sti/platsmp.c
+@@ -35,7 +35,7 @@ static void write_pen_release(int val)
+ 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+ }
  
 -static DEFINE_SPINLOCK(boot_lock);
 +static DEFINE_RAW_SPINLOCK(boot_lock);
  
- static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
- 
-@@ -36,8 +36,8 @@ static void spear13xx_secondary_init(unsigned int cpu)
+ void sti_secondary_init(unsigned int cpu)
+ {
+@@ -50,8 +50,8 @@ void sti_secondary_init(unsigned int cpu)
  	/*
  	 * Synchronise with the boot thread.
  	 */
@@ -57,8 +58,8 @@ index 5c4a198..33dc270 100644
 +	raw_spin_unlock(&boot_lock);
  }
  
- static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
-@@ -48,7 +48,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ int sti_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -62,7 +62,7 @@ int sti_boot_secondary(unsigned int cpu, struct task_struct *idle)
  	 * set synchronisation state between this boot processor
  	 * and the secondary one
  	 */
@@ -67,7 +68,7 @@ index 5c4a198..33dc270 100644
  
  	/*
  	 * The secondary processor is waiting to be released from
-@@ -75,7 +75,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -93,7 +93,7 @@ int sti_boot_secondary(unsigned int cpu, struct task_struct *idle)
  	 * now the secondary core is starting up let it run its
  	 * calibrations, then wait for it to finish
  	 */
