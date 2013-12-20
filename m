@@ -1,40 +1,53 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 20 Dec 2013 08:34:09 -0800
-Subject: arm-soc: Xilinx Zynq dt changes for v3.14
-In-Reply-To: <52B1657B.1030803@monstr.eu> (Michal Simek's message of "Wed, 18
- Dec 2013 10:06:03 +0100")
-References: <52AAC671.6000207@monstr.eu>
- <20131213112659.GD4360@n2100.arm.linux.org.uk>
- <52AB0ABD.1050307@monstr.eu> <20131217202731.GA11452@quad.lixom.net>
- <52B1657B.1030803@monstr.eu>
-Message-ID: <871u17iiri.fsf@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Dec 2013 18:34:19 +0200
+Subject: [PATCHv12 00/49] ARM: TI SoC clock DT conversion
+Message-ID: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal Simek <monstr@monstr.eu> writes:
+Hi,
 
-> On 12/17/2013 09:27 PM, Olof Johansson wrote:
->> On Fri, Dec 13, 2013 at 02:25:17PM +0100, Michal Simek wrote:
->>> Hi Russell,
->>>
->>> On 12/13/2013 12:26 PM, Russell King - ARM Linux wrote:
->>>> 1. Address it to arm at kernel.org; there's no need to copy arm-soc people
->>>>    individually.  The whole point of arm at kernel.org is that it reaches
->>>>    the current arm-soc maintainers, whoever they may be at the time that
->>>>    you send your email without you needing to know who they are.
->>>>
->>>> 2. Include in the subject line not "arm-soc:" but [GIT PULL] to mark it as
->>>>    a pull request message.
->>>
->>> Thanks, I will keep this in my mind for future. I am just doing what I have done
->>> before and this is the first complain I have got.
->> 
->> I don't think I've noticed it in the past. :-) Either way, see it as a
->> friendly pointer from Russell, not a complaint.
->
-> that's how I take it.
-> The point here is just if I should send pull request again.
+Hopefully final post of this series. At least this is going to be the last
+post this year as I will be going to x-mas vacation and won't be back before
+Jan 2nd. This time I just sent the patches that have changes in them,
+the missing ones are exactly the same as in v11.
 
-No need to send again.
+Changes done:
+ - most of the patches:
+   * Some cosmetic documentation fixes
+ - patch 06:
+   * Changed register pointer types from 'u32 __iomem *' to 'void __iomem *'
+ - patch 07,08,09:
+   * Added check for clk->ll_ops being NULL (happens with statically built
+     clock data), fixes the boot time crash issue noticed by Tony
+ - patch 11:
+   * Moved __clk_of_table extern declaration to clk-provider.h header file...
+     Got flamed about this enough times now. :)
+   * Type for the declaration changed also from array to single entry,
+     and address for this used in code. This prevents compile time error:
+     "array type has incomplete element type". Can't use pointer here either
+     as this messes the address of the table.
+   * ti_clk_retry_init() now has int return type, and checks for kzalloc
+     failure
+ - patch 12, 14, 23:
+   * Added cleanup in case ti_clk_retry_init() fails
+ - patch 17:
+   * Fixed potential memory leak in failed init detected by sparse
+ - patch 18:
+   * Modified commit message to add some details about clockdomains
+ - patch 43:
+   * Changed register pointer types from 'u32 *' to 'void __iomem *'
 
-Kevin
+Testing done:
+- omap3-beagle: boot, suspend/resume (ret), suspend/resume (off)
+- omap4-panda-es: boot, suspend/resume (ret)
+- omap5-uevm: boot
+- am335x-bone: boot
+- dra7-evm: boot
+
+Branches available at https://github.com/t-kristo/linux-pm.git:
+- branch: 3.13-rc4-dt-clks-v12 : contains everything, shall me merged last
+- branch: 3.13-rc4-dt-clks-v12-for-mike : drivers/clk changes
+- branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only (from v11, no changes)
+
+-Tero
