@@ -1,24 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 19 Dec 2013 19:22:17 -0800
-Subject: [PATCH 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <1387507503-7565-1-git-send-email-rapatel@apm.com>
-References: <1387507503-7565-1-git-send-email-rapatel@apm.com>
-Message-ID: <20131220032217.GC32310@kroah.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Dec 2013 11:23:39 +0800
+Subject: [PATCH V2] ARM: dts: imx6qdl-sabresd: Add power key support
+In-Reply-To: <276922cfe7a844c3b7f9f7c18bf86f77@BY2PR03MB315.namprd03.prod.outlook.com>
+References: <1387487244-2749-1-git-send-email-b20788@freescale.com>
+ <20131220022821.GJ7172@S2101-09.ap.freescale.net>
+ <276922cfe7a844c3b7f9f7c18bf86f77@BY2PR03MB315.namprd03.prod.outlook.com>
+Message-ID: <20131220032334.GL7172@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 06:44:59PM -0800, Ravi Patel wrote:
-> This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
->  QMTM is required by APM X-Gene SoC Ethernet, PktDMA and Security Engine
->  subsystems. All subsystems communicate with QMTM using messages which
->  include information about the work to be performed and the location of
->  associated data buffers.
+On Fri, Dec 20, 2013 at 03:00:48AM +0000, Anson.Huang at freescale.com wrote:
+> >+193,16 @@
+> >>  			>;
+> >>  		};
+> >>  	};
+> >> +
+> >> +	gpio-keys {
+> >
+> >We now use one pinctrl container 'imx6qdl-sabresd' for all pinctrl groups, so
+> >we can move pinctrl_gpio_keys into above and save this gpio-keys container.
+> >
+> 
+> Understood, thanks, just put this group in the hog node, no need to add a new gpio-keys.
 
-And finally, where are the drivers that are going to use these apis you
-are creating here?  Where are they going to live, and when are they
-going to be submitted?
+What I meant is something below.
 
-thanks,
+https://git.linaro.org/people/shawn.guo/linux-2.6.git/commitdiff/811c64db0af086314ef4e5e4ae22ed157265f3cb
 
-greg k-h
+Shawn
