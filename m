@@ -1,92 +1,86 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 20 Dec 2013 11:09:19 -0800
-Subject: [PATCH 6/7] ARM: dts: MSM8974: Add MMIO architected timer node
-In-Reply-To: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
-References: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1387566560-23948-7-git-send-email-davidb@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 20 Dec 2013 11:25:40 -0800
+Subject: [GIT PULL v2 00/33] Renesas ARM based SoC updates for v3.14
+In-Reply-To: <cover.1386897180.git.horms+renesas@verge.net.au> (Simon Horman's
+ message of "Fri, 13 Dec 2013 11:29:33 +0900")
+References: <cover.1386897180.git.horms+renesas@verge.net.au>
+Message-ID: <87mwjvgw97.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+Simon Horman <horms+renesas@verge.net.au> writes:
 
-Add the mmio architected timer node.
+> Hi Kevin, Hi Olof, Hi Arnd,
+>
+> please consider these Renesas ARM based SoC updates for v3.14.
+>
+> As discussed elsewhere, this pull-request also includes defconfig changes
+> related to renaming ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY. These are also
+> to avoid build regressions when using defconfigs
+>
+> As this pull request is based on v3.12, which does not include
+> genmai_defconfig, it has not been updated. Rather, I have queued up a patch
+> in my defconfig to switch it to use ARCH_SHMOBILE_LEGACY.  This does
+> involve breaking that defconfig. However as it is new and not in
+> wide-spread use it seems better to live with that temporary breakage than
+> to have soc depend on defconfig (as was the case in the previous version of
+> this pull request).
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 59 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+OK, thanks for the detailed explanation.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index df18637..6ac9496 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -30,6 +30,65 @@
- 			clock-frequency = <19200000>;
- 		};
- 
-+		timer at f9020000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			compatible = "arm,armv7-timer-mem";
-+			reg = <0xf9020000 0x1000>;
-+			clock-frequency = <19200000>;
-+
-+			frame at f9021000 {
-+				frame-number = <0>;
-+				interrupts = <0 8 0x4>,
-+					     <0 7 0x4>;
-+				reg = <0xf9021000 0x1000>,
-+				      <0xf9022000 0x1000>;
-+			};
-+
-+			frame at f9023000 {
-+				frame-number = <1>;
-+				interrupts = <0 9 0x4>;
-+				reg = <0xf9023000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9024000 {
-+				frame-number = <2>;
-+				interrupts = <0 10 0x4>;
-+				reg = <0xf9024000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9025000 {
-+				frame-number = <3>;
-+				interrupts = <0 11 0x4>;
-+				reg = <0xf9025000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9026000 {
-+				frame-number = <4>;
-+				interrupts = <0 12 0x4>;
-+				reg = <0xf9026000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9027000 {
-+				frame-number = <5>;
-+				interrupts = <0 13 0x4>;
-+				reg = <0xf9027000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9028000 {
-+				frame-number = <6>;
-+				interrupts = <0 14 0x4>;
-+				reg = <0xf9028000 0x1000>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		restart at fc4ab000 {
- 			compatible = "qcom,pshold";
- 			reg = <0xfc4ab000 0x4>;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.14
+>
+> for you to fetch changes up to fee05eb3d2ce4813b5e9a70ab888d2bc0047f4e1:
+>
+>   ARM: shmobile: r8a7779: add HSPI clock support for DT (2013-12-10 17:20:15 +0900)
+>
+> ----------------------------------------------------------------
+> Renesas ARM based SoC updates for v3.14
+>
+> * Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+>
+> * r8a7791 SoC (R-Car M2)
+>   - Add thermal platform device
+>   - Add DU and LVDS clocks
+>   - GPIO platform device support
+>   - PFC platform device support
+>   - Select IRQC
+>
+> * r8a7790 SoC (R-Car H2)
+>   - Tidyup clock table order
+>   - Fixup I2C clock source
+>   - Correct EXTAL divider settings
+>   - Add clocks for thermal devices and SSI
+>
+> * r8a7779 SoC (R-Car H1)
+>   - Add I2C clock for DT
+>
+> * r8a7778 SoC (R-Car M1)
+>   - Add HSPI clocks for DT
+>   - Add I2C clock for DT
+>   - Add HPBIFx DMAEngine support
+>
+> * r8a7740 SoC (R-Mobile A1)
+>   - Add FSI clocks for DT
+>
+> * emev2 SoC (Emma Mobile)
+>   - Move to Multi-platform
+>   - Remove legacy board code
+>
+> * r7s72100 SoC (RZ/A1H)
+>   - Select GPIO
+>
+> * r8a73a4 SoC (R-Mobile APE6)
+>   - Don't used named IRC for DMAEngine
+>
+> ----------------------------------------------------------------
+
+Pulled into next/soc.
+
+Kevin
