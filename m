@@ -1,39 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 20 Dec 2013 12:52:43 +0000
-Subject: [PATCH 1/2] arm64: dts: Add a virtio disk to the RTSM motherboard
-Message-ID: <1387543964-15057-1-git-send-email-broonie@kernel.org>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Fri, 20 Dec 2013 18:27:23 +0530
+Subject: [PATCH 0/3] exynos5420: clock file cleanup
+Message-ID: <1387544246-31658-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Hambleton <mahamble@broadcom.com>
+Many changes/fixes have been identified for clock file for exynos5420.
+These include correct parents, bit fields, new clocks etc. Existing
+files needs some correction in terms of names of the clock and
+indentation. These issues are addressed in this patch series. It also
+replaces the usage of enums with macro as clock ids.
 
-Describe the virtio device so we can mount disk images in the simulator.
+This series is based on linux-next, Kukjin's for-next and
+Mike's clk-for-linus-3.13 branches.
 
-[Reduced the size of the region based on feedback from review -- broonie]
+This patch is also dependent on the following two series from
+Tomasz Figa <t.figa@samsung.com>:
+http://www.spinics.net/lists/arm-kernel/msg280223.html
+and
+http://www.spinics.net/lists/arm-kernel/msg291988.html.
 
-Signed-off-by: Mark Hambleton <mahamble@broadcom.com>
-Signed-off-by: Mark Brown <broonie@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Rahul Sharma (3):
+  clk/exynos5420: cleanup clock file
+  ARM: dts: replace clock numbers with macros for exynos5420
+  clk/exynos5420: replace enums with macros as clock ids
 
-diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-index b45e5f39f577..2f2ecd217363 100644
---- a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
-@@ -183,6 +183,12 @@
- 				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
- 				clock-names = "clcdclk", "apb_pclk";
- 			};
-+
-+			virtio_block at 0130000 {
-+				compatible = "virtio,mmio";
-+				reg = <0x130000 0x200>;
-+				interrupts = <42>;
-+			};
- 		};
- 
- 		v2m_fixed_3v3: fixedregulator at 0 {
+ arch/arm/boot/dts/exynos5420.dtsi        |   47 +-
+ drivers/clk/samsung/clk-exynos5420.c     | 1200 ++++++++++++++++++------------
+ include/dt-bindings/clk/exynos5420-clk.h |  236 ++++++
+ 3 files changed, 1004 insertions(+), 479 deletions(-)
+ create mode 100644 include/dt-bindings/clk/exynos5420-clk.h
+
 -- 
-1.8.5.2
+1.7.10.4
