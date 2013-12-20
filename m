@@ -1,29 +1,26 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Dec 2013 17:10:17 -0700
-Subject: [PATCH 5/6] ARM: DTS: tegra: add DFLL integration to the Dalmore
- DTS file
-In-Reply-To: <20131219124929.3226.79335.stgit@tamien>
-References: <20131219122857.3226.42830.stgit@tamien>
- <20131219124929.3226.79335.stgit@tamien>
-Message-ID: <52B38AE9.2030209@wwwdotorg.org>
+Date: Thu, 19 Dec 2013 17:11:00 -0700
+Subject: [PATCH 03/10] ARM: tegra: Add MIPI calibration DT entries for
+ Tegra114
+In-Reply-To: <1387468774-14216-4-git-send-email-treding@nvidia.com>
+References: <1387468774-14216-1-git-send-email-treding@nvidia.com>
+ <1387468774-14216-4-git-send-email-treding@nvidia.com>
+Message-ID: <52B38B14.8080605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2013 05:49 AM, Paul Walmsley wrote:
-> Expose the DFLL device on the NVIDIA Tegra114 Dalmore board, and connect
-> the DFLL (and FCPU cluster) voltage regulator.
+On 12/19/2013 08:59 AM, Thierry Reding wrote:
+> Add a device node for the MIPI calibration block on Tegra114. There is
+> no need to disable it by default because it only enables the clock while
+> performing calibration and therefore shouldn't be consuming any power
+> when unused.
 
-> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
+> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
 
-> +NVIDIA Tegra114 DFLL clocksource data in the board DTS file
-> +
-> +Optional properties:
-> +
-> +- status : device availability -- managed by the DT integration code, not
-> +           the DFLL driver.  Should be set to "okay" if the DFLL is to be
-> +           used on this board type.
+> +	mipi: mipi {
 
-There's certainly no need to document the same DT property twice. The DT
-docs are about documenting the schema. If the DT author decides to split
-the properties between a .dtsi and a .dts file, that's irrelevant to the
-schema.
+That should be:
+
+	mipi: mipi at 700e3000 {
+
+I fixed it up for you.
