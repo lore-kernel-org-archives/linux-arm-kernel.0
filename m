@@ -1,122 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Dec 2013 22:41:07 +0100
-Subject: [PATCH 1/3] reset: Add of_reset_control_get
-In-Reply-To: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 20 Dec 2013 22:53:13 +0100
+Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
+In-Reply-To: <CAOesGMi7cGZyHLBMpc7UTBbQkiRBij6rDyuA+E+9tUmsb131zw@mail.gmail.com>
+References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
+ <346894265.CPBN0v9Elj@flatron>
+ <CAOesGMi7cGZyHLBMpc7UTBbQkiRBij6rDyuA+E+9tUmsb131zw@mail.gmail.com>
+Message-ID: <4034332.29qpdhiElM@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases, you might need to deassert from reset an hardware block that
-doesn't associated to a struct device (CPUs, timers, etc.).
+On Friday 20 of December 2013 13:37:36 Olof Johansson wrote:
+> On Fri, Dec 20, 2013 at 1:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > Hi,
+> >
+> > On Friday 20 of December 2013 15:56:38 sunil joshi wrote:
+> >> Hi Abhilash,
+> >> I saw another patch in chrome tree ..by Andrew Bresticker
+> >> which may be relevant here ..
+> >>
+> >> Just wondering if you missed adding this ? or this is not needed ?
+> >> You did not face any issue in getting core to suspend ?
+> >>
+> >> ------------------------------------------------------------------------------------------
+> >> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
+> >> Author: Andrew Bresticker <abrestic@chromium.org>
+> >> Date:   Mon Jul 15 13:14:36 2013 -0700
+> >>
+> >>     arm: exynos: disable all interrupts on Exynos5420 before suspend
+> >>
+> >>     Disable all interrupts from the GIC before entering suspend on
+> >>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
+> >>     may receive an interrupt after entering WFI but before the PMU has
+> >>     suspended the system, causing suspend to fail.
+> >>
+> >>     BUG=chrome-os-partner:20523
+> >>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
+> >>     no longer occasionally fails with the "Failed to suspend the system"
+> >>     error in exynos_cpu_suspend().
+> >
+> > A question about this for Chromium and LSI guys:
+> >
+> > If you find out that there is already a pending interrupt before you enter
+> > the sleep mode, isn't it more reasonable to cancel the process ASAP and
+> > handle the event instead of entering the sleep just to leave it?
+> >
+> > I believe this should be both more efficient with respect to power usage
+> > and latency, because sleep-wakeup transition takes time and power.
+> >
+> > Do you have any reason to think the opposite?
+> 
+> If it's expected to be a rare or very rare event, it's not a given
+> that the added complexity of dealing with the aborted suspend that
+> late is worth it.
 
-Add a small helper to retrieve the reset controller from the device tree
-without the need to pass a struct device.
+I think that the code to support this is already in place, just printing
+an unfortunate message about "suspend failures". It doesn't add any
+significant complexity too.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/reset/core.c  | 39 ++++++++++++++++++++++++++++++---------
- include/linux/reset.h |  4 ++++
- 2 files changed, 34 insertions(+), 9 deletions(-)
+I'm not sure about the frequency of such events, though, and any real
+effect of this or the other behavior in such case and so there is my
+question about this.
 
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-index d1b6089..4f3dda7 100644
---- a/drivers/reset/core.c
-+++ b/drivers/reset/core.c
-@@ -127,15 +127,16 @@ int reset_control_deassert(struct reset_control *rstc)
- EXPORT_SYMBOL_GPL(reset_control_deassert);
- 
- /**
-- * reset_control_get - Lookup and obtain a reference to a reset controller.
-- * @dev: device to be reset by the controller
-+ * of_reset_control_get - Lookup and obtain a reference to a reset controller.
-+ * @node: device to be reset by the controller
-  * @id: reset line name
-  *
-  * Returns a struct reset_control or IS_ERR() condition containing errno.
-  *
-  * Use of id names is optional.
-  */
--struct reset_control *reset_control_get(struct device *dev, const char *id)
-+struct reset_control *of_reset_control_get(struct device_node *node,
-+					   const char *id)
- {
- 	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
- 	struct reset_controller_dev *r, *rcdev;
-@@ -144,13 +145,10 @@ struct reset_control *reset_control_get(struct device *dev, const char *id)
- 	int rstc_id;
- 	int ret;
- 
--	if (!dev)
--		return ERR_PTR(-EINVAL);
--
- 	if (id)
--		index = of_property_match_string(dev->of_node,
-+		index = of_property_match_string(node,
- 						 "reset-names", id);
--	ret = of_parse_phandle_with_args(dev->of_node, "resets", "#reset-cells",
-+	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
- 					 index, &args);
- 	if (ret)
- 		return ERR_PTR(ret);
-@@ -185,12 +183,35 @@ struct reset_control *reset_control_get(struct device *dev, const char *id)
- 		return ERR_PTR(-ENOMEM);
- 	}
- 
--	rstc->dev = dev;
- 	rstc->rcdev = rcdev;
- 	rstc->id = rstc_id;
- 
- 	return rstc;
- }
-+EXPORT_SYMBOL_GPL(of_reset_control_get);
-+
-+/**
-+ * reset_control_get - Lookup and obtain a reference to a reset controller.
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Returns a struct reset_control or IS_ERR() condition containing errno.
-+ *
-+ * Use of id names is optional.
-+ */
-+struct reset_control *reset_control_get(struct device *dev, const char *id)
-+{
-+	struct reset_control *rstc;
-+
-+	if (!dev)
-+		return ERR_PTR(-EINVAL);
-+
-+	rstc = of_reset_control_get(dev->of_node, id);
-+	if (!IS_ERR(rstc))
-+		rstc->dev = dev;
-+
-+	return rstc;
-+}
- EXPORT_SYMBOL_GPL(reset_control_get);
- 
- /**
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index 6082247..a398025 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -1,6 +1,8 @@
- #ifndef _LINUX_RESET_H_
- #define _LINUX_RESET_H_
- 
-+#include <linux/of.h>
-+
- struct device;
- struct reset_control;
- 
-@@ -8,6 +10,8 @@ int reset_control_reset(struct reset_control *rstc);
- int reset_control_assert(struct reset_control *rstc);
- int reset_control_deassert(struct reset_control *rstc);
- 
-+struct reset_control *of_reset_control_get(struct device_node *node,
-+					   const char *id);
- struct reset_control *reset_control_get(struct device *dev, const char *id);
- void reset_control_put(struct reset_control *rstc);
- struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
--- 
-1.8.4.2
+Best regards,
+Tomasz
