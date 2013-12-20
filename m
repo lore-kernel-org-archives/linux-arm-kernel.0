@@ -1,59 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 20 Dec 2013 12:54:03 -0800
-Subject: [GIT PULL v2] Xilinx Zynq clk changes for v3.14
-In-Reply-To: <52B43996.8000300@monstr.eu>
-References: <52B43996.8000300@monstr.eu>
-Message-ID: <20131220205403.18119.12458@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Dec 2013 21:58:34 +0100
+Subject: [PATCH v3 3/6] pinctrl: Make PINCTRL selectable by
+ defconfig/menuconfig
+In-Reply-To: <CACRpkdY-MM7OoMq_L90YRADy=oaDoV1wAOccVz90LqfRfEh=3Q@mail.gmail.com>
+References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+ <20131217001842.GB3840@sonymobile.com>
+ <CACRpkdY-MM7OoMq_L90YRADy=oaDoV1wAOccVz90LqfRfEh=3Q@mail.gmail.com>
+Message-ID: <201312202158.34805.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michal Simek (2013-12-20 04:35:34)
-> Hi Mike
+On Friday 20 December 2013, Linus Walleij wrote:
+> On Tue, Dec 17, 2013 at 1:18 AM, Bjorn Andersson
+> <bjorn.andersson@sonymobile.com> wrote:
 > 
-> as we discussed I have rebased this branch on your clk-next branch
-> and I have removed one dt patch which will go through arm-soc tree.
+> > No matter how we build the individual pinctrl drivers we will always
+> > need the pinctrl framework in a multi-soc zImage; so I can't see that
+> > we gain anything from being able to compile PINCTRL as a module.
 > 
-> Please pull this patch to your tree.
+> I discussed this matter with Christian on IRC and I believe we could
+> basically do "select PINCTRL" on ARCH_MULTIPLATFORM as the
+> vast majority of multiplatforms appear to be using this anyway, this
+> would make the submenu for pin control pop up in menuconfig
+> for this, and make it possible to move different subdrivers to modules
+> if desired.
+> 
+> MULTIPLATFORM does not seem to be about saving footprint bytes
+> on a very fine-granular level anyway, more about doing the module
+> loading/unloading approach to footprint.
 
-Taken into clk-next.
+Let's review the list of platforms that don't select PINCTRL. There
+are some platforms that are indeed sensitive about memory footprint,
+and I promised people that converting to multiplatform won't cause
+a significant increase in kernel binary size as long as no other
+platforms are enabled.
 
-Thanks!
-Mike
-
-> 
-> Thanks,
-> Michal
-> 
-> The following changes since commit 24c039f6acacd63e739b39a030197d5a2945e0d2:
-> 
->   clk: ux500: Remove extra semicolon (2013-12-19 17:47:33 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.14-v2
-> 
-> for you to fetch changes up to ba52f8a986089e263ea28e231b6a405769ae1235:
-> 
->   clk/zynq/clkc: Add 'fclk-enable' feature (2013-12-20 13:23:55 +0100)
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq clk patches for v3.14
-> 
-> - Add support for fclk-enable feature
-> 
-> ----------------------------------------------------------------
-> Soren Brinkmann (1):
->       clk/zynq/clkc: Add 'fclk-enable' feature
-> 
->  Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
->  drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
->  2 files changed, 19 insertions(+), 3 deletions(-)
-> 
-> -- 
-> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-> w: www.monstr.eu p: +42-0-721842854
-> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-> 
-> 
+	Arnd
