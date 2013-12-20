@@ -1,45 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Dec 2013 22:56:59 +0100
-Subject: [PATCH v4 2/2] ARM: sun4i/sun7i: RTC driver
-In-Reply-To: <CAOQ7t2bo0uDfs+1eUZRVD6agk3BSuUNw=C7OEEzyTEa-QYto2g@mail.gmail.com>
-References: <1384623234-9334-1-git-send-email-carlo.caione@gmail.com>
- <1384623234-9334-2-git-send-email-carlo.caione@gmail.com>
- <CAOQ7t2bo0uDfs+1eUZRVD6agk3BSuUNw=C7OEEzyTEa-QYto2g@mail.gmail.com>
-Message-ID: <20131220215659.GE3144@lukather>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 20 Dec 2013 23:02:23 +0100
+Subject: [PATCH 2/3] ARM: dts: replace clock numbers with macros for
+ exynos5420
+In-Reply-To: <1387544246-31658-3-git-send-email-rahul.sharma@samsung.com>
+References: <1387544246-31658-1-git-send-email-rahul.sharma@samsung.com>
+ <1387544246-31658-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <2478495.7T968MEiJL@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
+Hi Rahul,
 
-On Mon, Dec 09, 2013 at 04:34:37PM +0100, Carlo Caione wrote:
-> On Sat, Nov 16, 2013 at 6:33 PM, Carlo Caione <carlo.caione@gmail.com> wrote:
-> > This patch introduces the driver for the RTC in the Allwinner A10 and
-> > A20 SoCs.
-> >
-> > Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
-> > --
-> > v3->v4:
-> > - several bug fixes
-> > - reworked for cycles
-> > - implemented busy-waiting
-> > - new macro for year offset
-> > - new comments
+On Friday 20 of December 2013 18:27:25 Rahul Sharma wrote:
+> DT nodes contain clock numbers which are referred by drivers
+> to get the clocks. These numbers are replaced by MACROs
+> which are defined in the exynos5420-clk.h header file.
+
+This is a good idea, but we already have such conversion scheduled for
+all the existing clock drivers in an automated way. Andrzej Hajda (on CC)
+has a script that automatically converts DTS files and clock drivers from
+enums to defines.
+
+Also such change needs to be done in a timely manner, due to greatly
+increasing chance of conflicting other patches.
+
+My suggestion is to drop this and patch 3/3 from this series and let us
+handle this using Andrzej's script at appropriate point of time.
+
 > 
-> Ping?
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi |   47 +++++++++++++++++++------------------
+>  1 file changed, 24 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index e552608..db8b2da 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -17,6 +17,7 @@
+>  #include "exynos5420-pinctrl.dtsi"
+>  
+>  #include <dt-bindings/clk/exynos-audss-clk.h>
+> +#include <dt-bindings/clk/exynos5420-clk.h>
 
-I just merged the two patches in the sunxi/drivers-for-3.14 branch.
+By the way, this header is added in patch 3/3, so this patch breaks
+bisectability, which is not acceptable.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131220/36291172/attachment.sig>
+Best regards,
+Tomasz
