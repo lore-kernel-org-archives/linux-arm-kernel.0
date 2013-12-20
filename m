@@ -1,112 +1,88 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Dec 2013 18:34:22 +0200
-Subject: [PATCHv12 04/49] clk: mux: add support for registering mux clock from
- descriptor
+Date: Fri, 20 Dec 2013 18:34:24 +0200
+Subject: [PATCHv12 06/49] clk: add support for low level register ops
 In-Reply-To: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
 References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1387557274-22583-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1387557274-22583-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New clk_register_desc() call can be used to register this clock type now.
+Low level register ops are needed for providing SoC or IP block specific
+access routines to clock registers. Subsequent patches add support for
+the low level ops for the individual clock drivers.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/clk-mux.c        |   37 +++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |   20 ++++++++++++++++++++
- 2 files changed, 57 insertions(+)
+ drivers/clk/clk.c            |   28 ++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |   17 +++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 4f96ff3..2cbed08 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -27,8 +27,12 @@
-  * parent - parent is adjustable through clk_set_parent
-  */
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 29281f6..8bcd1e0 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -34,6 +34,34 @@ static HLIST_HEAD(clk_root_list);
+ static HLIST_HEAD(clk_orphan_list);
+ static LIST_HEAD(clk_notifier_list);
  
-+/* resolve struct clk_mux from inner struct clk_hw member */
- #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
- 
-+/* resolve struct clk_mux_desc from inner struct clk_desc member */
-+#define to_hw_desc(_desc) container_of(_desc, struct clk_mux_desc, desc)
-+
- static u8 clk_mux_get_parent(struct clk_hw *hw)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
-@@ -177,3 +181,36 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- 				      NULL, lock);
- }
- EXPORT_SYMBOL_GPL(clk_register_mux);
-+
-+struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc)
++/**
++ * clk_readl_default - default clock register read support function
++ * @reg: register to read
++ *
++ * Default implementation for reading a clock register.
++ */
++static u32 clk_readl_default(void __iomem *reg)
 +{
-+	struct clk_mux *mux;
-+	struct clk_mux_desc *hw_desc;
-+
-+	hw_desc = to_hw_desc(desc);
-+
-+	/* allocate mux clock */
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		return ERR_PTR(-ENOMEM);
-+
-+	/* populate struct clk_mux assignments */
-+	mux->reg = hw_desc->reg;
-+	mux->table = hw_desc->table;
-+	mux->mask = hw_desc->mask;
-+	mux->shift = hw_desc->shift;
-+	mux->flags = hw_desc->flags;
-+	mux->lock = hw_desc->lock;
-+
-+	if (!desc->ops) {
-+		if (mux->flags & CLK_MUX_READ_ONLY)
-+			desc->ops = &clk_mux_ro_ops;
-+		else
-+			desc->ops = &clk_mux_ops;
-+	}
-+
-+	desc->flags |= CLK_IS_BASIC;
-+
-+	return &mux->hw;
++	return readl(reg);
 +}
-+EXPORT_SYMBOL_GPL(clk_register_mux_desc);
++
++/**
++ * clk_writel_default - default clock register write support function
++ * @val: value to write
++ * @reg: register to write to
++ *
++ * Default implementation for writing a clock register.
++ */
++static void clk_writel_default(u32 val, void __iomem *reg)
++{
++	writel(val, reg);
++}
++
++struct clk_ll_ops clk_ll_ops_default = {
++	.clk_readl = clk_readl_default,
++	.clk_writel = clk_writel_default
++};
++
+ /***           locking             ***/
+ static void clk_prepare_lock(void)
+ {
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index bf89ab4..ea5281c 100644
+index a4f14ae..671dff4 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -391,6 +391,25 @@ struct clk_mux {
- 	spinlock_t	*lock;
+@@ -198,6 +198,23 @@ struct clk_hw {
+ 	const struct clk_init_data *init;
  };
  
 +/**
-+ * struct clk_mux_desc - init descriptor for multiplexer clock
-+ * @desc:	handle between common and hardware-specific interfaces
-+ * @reg:	register controlling multiplexer
-+ * @shift:	shift to multiplexer bit field
-+ * @width:	width of multiplexer bit field
-+ * @flags:	hardware-specific flags
-+ * @lock:	register lock
++ * struct clk_ll_ops - low-level register access ops for a clock
++ * @clk_readl: pointer to register read function
++ * @clk_writel: pointer to register write function
++ *
++ * Low-level register access ops are generally used by the basic clock types
++ * (clk-gate, clk-mux, clk-divider etc.) to provide support for various
++ * low-level hardware interfaces (direct MMIO, regmap etc.), but can also be
++ * used by other hardware-specific clock drivers if needed.
 + */
-+struct clk_mux_desc {
-+	struct clk_desc	desc;
-+	void __iomem	*reg;
-+	u32		*table;
-+	u32		mask;
-+	u8		shift;
-+	u8		flags;
-+	spinlock_t	*lock;
++struct clk_ll_ops {
++	u32	(*clk_readl)(void __iomem *reg);
++	void	(*clk_writel)(u32 val, void __iomem *reg);
 +};
 +
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
- #define CLK_MUX_HIWORD_MASK		BIT(2)
-@@ -399,6 +418,7 @@ struct clk_mux {
- extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
- 
-+struct clk_hw *clk_register_mux_desc(struct device *dev, struct clk_desc *desc);
- struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
++extern struct clk_ll_ops clk_ll_ops_default;
++
+ /*
+  * DOC: Basic clock implementations common to many platforms
+  *
 -- 
 1.7.9.5
