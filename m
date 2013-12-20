@@ -1,60 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Dec 2013 10:37:05 -0800
-Subject: [PATCHv12 00/49] ARM: TI SoC clock DT conversion
-In-Reply-To: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20131220183703.GA26054@atomide.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 20 Dec 2013 11:47:06 -0700
+Subject: [PATCH V2 0/7] Fix imx6 fec interrupts
+Message-ID: <1387565233-16144-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [131220 08:36]:
-> Hi,
-> 
-> Hopefully final post of this series. At least this is going to be the last
-> post this year as I will be going to x-mas vacation and won't be back before
-> Jan 2nd. This time I just sent the patches that have changes in them,
-> the missing ones are exactly the same as in v11.
-> 
-> Changes done:
->  - most of the patches:
->    * Some cosmetic documentation fixes
->  - patch 06:
->    * Changed register pointer types from 'u32 __iomem *' to 'void __iomem *'
->  - patch 07,08,09:
->    * Added check for clk->ll_ops being NULL (happens with statically built
->      clock data), fixes the boot time crash issue noticed by Tony
->  - patch 11:
->    * Moved __clk_of_table extern declaration to clk-provider.h header file...
->      Got flamed about this enough times now. :)
->    * Type for the declaration changed also from array to single entry,
->      and address for this used in code. This prevents compile time error:
->      "array type has incomplete element type". Can't use pointer here either
->      as this messes the address of the table.
->    * ti_clk_retry_init() now has int return type, and checks for kzalloc
->      failure
->  - patch 12, 14, 23:
->    * Added cleanup in case ti_clk_retry_init() fails
->  - patch 17:
->    * Fixed potential memory leak in failed init detected by sparse
->  - patch 18:
->    * Modified commit message to add some details about clockdomains
->  - patch 43:
->    * Changed register pointer types from 'u32 *' to 'void __iomem *'
-> 
-> Testing done:
-> - omap3-beagle: boot, suspend/resume (ret), suspend/resume (off)
-> - omap4-panda-es: boot, suspend/resume (ret)
-> - omap5-uevm: boot
-> - am335x-bone: boot
-> - dra7-evm: boot
-> 
-> Branches available at https://github.com/t-kristo/linux-pm.git:
-> - branch: 3.13-rc4-dt-clks-v12 : contains everything, shall me merged last
-> - branch: 3.13-rc4-dt-clks-v12-for-mike : drivers/clk changes
-> - branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only (from v11, no changes)
+This patch series works around a hardware
+wake up on FEC interrupt bug.
 
-Boots now for me on omap2/3/4, and off-idle works on omap3. So as far as
-I'm concerned, please feel free to add my ack to the new and updated patches
-still missing it:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Version 2 only makes changes to commit
+messages of 1/7, 5/7.
+
+Note: The last 2 patches need testing from
+someone who has the boards.
+
+
+Troy Kisky (7):
+  ARM: dts: imx: pinfunc: add MX6QDL_PAD_GPIO_6__ENET_IRQ
+  ARM: dts: imx6qdl: add pingroups for enet with GPIO6 interrupt
+  ARM: dts: imx6qdl-sabrelite: use MX6QDL_ENET_PINGRP_RGMII_MD
+  ARM: dts: imx6qdl: use interrupts-extended for fec
+  ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC interrupt.
+  ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC interrupt.
+  ARM: dts: imx6q-arm2: use GPIO_6 for FEC interrupt.
+
+ arch/arm/boot/dts/imx6dl-pinfunc.h        |  1 +
+ arch/arm/boot/dts/imx6q-arm2.dts          |  4 +-
+ arch/arm/boot/dts/imx6q-pinfunc.h         |  1 +
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 19 ++------
+ arch/arm/boot/dts/imx6qdl-pingrp.h        | 77 +++++++++++++------------------
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  |  4 +-
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 19 ++------
+ arch/arm/boot/dts/imx6qdl.dtsi            |  5 +-
+ 8 files changed, 52 insertions(+), 78 deletions(-)
+
+-- 
+1.8.1.2
