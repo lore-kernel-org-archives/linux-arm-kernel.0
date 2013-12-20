@@ -1,53 +1,38 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Thu, 19 Dec 2013 20:15:29 -0800
-Subject: [PATCH v3 2/2] cpufreq: imx6q: add of_init_opp_table
-In-Reply-To: <1387512929-7304-1-git-send-email-john.tobias.ph@gmail.com>
-References: <1387512929-7304-1-git-send-email-john.tobias.ph@gmail.com>
-Message-ID: <1387512929-7304-2-git-send-email-john.tobias.ph@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 19 Dec 2013 20:24:26 -0800
+Subject: [PATCH 2/4] misc: xgene: Add base driver for APM X-Gene SoC
+ Queue Manager/Traffic Manager
+In-Reply-To: <CAN1v_PuBZHN85xTodfSZ-+H4Wdj0T8kSFUJB56KVj9xFH3--JQ@mail.gmail.com>
+References: <1387507503-7565-1-git-send-email-rapatel@apm.com>
+ <1387507503-7565-3-git-send-email-rapatel@apm.com>
+ <20131220032133.GB32310@kroah.com>
+ <CAN1v_PuBZHN85xTodfSZ-+H4Wdj0T8kSFUJB56KVj9xFH3--JQ@mail.gmail.com>
+Message-ID: <20131220042426.GA21726@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a routine check to see if the platform supplied the OPP table.
-Incase there's not OPP table exist, it will try to get it.
 
-Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
----
- drivers/cpufreq/imx6q-cpufreq.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 4b3f18e..f261a88 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -187,12 +187,25 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		goto put_node;
- 	}
- 
--	/* We expect an OPP table supplied by platform */
-+	/* We expect an OPP table supplied by platform.
-+	 * Just, incase the platform did not supply the OPP
-+	 * table, it will try to get it.
-+	 */
- 	num = dev_pm_opp_get_opp_count(cpu_dev);
- 	if (num < 0) {
--		ret = num;
--		dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
--		goto put_node;
-+		ret = of_init_opp_table(cpu_dev);
-+		if (ret < 0) {
-+			dev_err(cpu_dev, "failed to init OPP table\n");
-+			ret = -ENODEV;
-+			goto put_node;
-+		}
-+
-+		num = dev_pm_opp_get_opp_count(cpu_dev);
-+		if (num < 0) {
-+			ret = num;
-+			dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
-+			goto put_node;
-+		}
- 	}
- 
- 	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
--- 
-1.8.3.2
+http://daringfireball.net/2007/07/on_top
+
+On Thu, Dec 19, 2013 at 07:41:13PM -0800, Ravi Patel wrote:
+> There is no need to talk to this driver from userspace.
+> It is a device which is used by other IO devices to communicate with each
+> other, including CPU.
+> For example, if CPU (software) wants to send a message to Ethernet HW (i.e.
+> send packet),
+> it used this driver to enqueue a message to Ethernet.
+> In other direction, if Ethernet HW receives a packet, it uses QM/TM device to
+> send message to
+> CPU (software) to process packet.
+
+So it's a "bus" type of thing, right?
+
+My question of "why isn't this reflected in the driver model" still
+stands.
+
+thanks,
+
+greg k-h
