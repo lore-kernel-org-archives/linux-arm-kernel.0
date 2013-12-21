@@ -1,35 +1,68 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 21 Dec 2013 11:11:39 +0400
-Subject: [PATCH 3/6] ARM: dts: imx27-phytec-phycore-som: Add spi-cs-high
- property to PMIC
+Date: Sat, 21 Dec 2013 11:11:40 +0400
+Subject: [PATCH 4/6] ARM: dts: i.MX27: Add missing pullup settings for SDHC
+ pin groups
 In-Reply-To: <1387609902-13361-1-git-send-email-shc_work@mail.ru>
 References: <1387609902-13361-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1387609902-13361-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1387609902-13361-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since SPI core does not use GPIO bindings for CS GPIOs,
-we should add an active high level declaration.
-
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx27-pingrp.h | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index 94ba726..c934999 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -61,8 +61,9 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "fsl,mc13783";
--		spi-max-frequency = <20000000>;
- 		reg = <0>;
-+		spi-cs-high;
-+		spi-max-frequency = <20000000>;
- 		interrupt-parent = <&gpio2>;
- 		interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
- 		fsl,mc13xxx-uses-adc;
+diff --git a/arch/arm/boot/dts/imx27-pingrp.h b/arch/arm/boot/dts/imx27-pingrp.h
+index 61eb710..57ca02f 100644
+--- a/arch/arm/boot/dts/imx27-pingrp.h
++++ b/arch/arm/boot/dts/imx27-pingrp.h
+@@ -101,28 +101,28 @@
+ 	MX27_PAD_PWMO__PWMO 0x0
+ 
+ #define MX27_SDHC1_PINGRP1 \
+-	MX27_PAD_SD1_CLK__SD1_CLK \
+-	MX27_PAD_SD1_CMD__SD1_CMD \
+-	MX27_PAD_SD1_D0__SD1_D0 \
+-	MX27_PAD_SD1_D1__SD1_D1 \
+-	MX27_PAD_SD1_D2__SD1_D2 \
+-	MX27_PAD_SD1_D3__SD1_D3
++	MX27_PAD_SD1_CLK__SD1_CLK 0x0 \
++	MX27_PAD_SD1_CMD__SD1_CMD 0x0 \
++	MX27_PAD_SD1_D0__SD1_D0 0x0 \
++	MX27_PAD_SD1_D1__SD1_D1 0x0 \
++	MX27_PAD_SD1_D2__SD1_D2 0x0 \
++	MX27_PAD_SD1_D3__SD1_D3 0x0
+ 
+ #define MX27_SDHC2_PINGRP1 \
+-	MX27_PAD_SD2_CLK__SD2_CLK \
+-	MX27_PAD_SD2_CMD__SD2_CMD \
+-	MX27_PAD_SD2_D0__SD2_D0 \
+-	MX27_PAD_SD2_D1__SD2_D1 \
+-	MX27_PAD_SD2_D2__SD2_D2 \
+-	MX27_PAD_SD2_D3__SD2_D3
++	MX27_PAD_SD2_CLK__SD2_CLK 0x0 \
++	MX27_PAD_SD2_CMD__SD2_CMD 0x0 \
++	MX27_PAD_SD2_D0__SD2_D0 0x0 \
++	MX27_PAD_SD2_D1__SD2_D1 0x0 \
++	MX27_PAD_SD2_D2__SD2_D2 0x0 \
++	MX27_PAD_SD2_D3__SD2_D3 0x0
+ 
+ #define MX27_SDHC3_PINGRP1 \
+-	MX27_PAD_SD3_CLK__SD3_CLK \
+-	MX27_PAD_SD3_CMD__SD3_CMD \
+-	MX27_PAD_SD3_D0__SD3_D0 \
+-	MX27_PAD_SD3_D1__SD3_D1 \
+-	MX27_PAD_SD3_D2__SD3_D2 \
+-	MX27_PAD_SD3_D3__SD3_D3
++	MX27_PAD_SD3_CLK__SD3_CLK 0x0 \
++	MX27_PAD_SD3_CMD__SD3_CMD 0x0 \
++	MX27_PAD_SD3_D0__SD3_D0 0x0 \
++	MX27_PAD_SD3_D1__SD3_D1 0x0 \
++	MX27_PAD_SD3_D2__SD3_D2 0x0 \
++	MX27_PAD_SD3_D3__SD3_D3 0x0
+ 
+ #define MX27_UART1_PINGRP1 \
+ 	MX27_PAD_UART1_TXD__UART1_TXD 0x0 \
 -- 
 1.8.3.2
