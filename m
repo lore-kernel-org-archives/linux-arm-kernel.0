@@ -1,85 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 21 Dec 2013 19:52:20 +0100
-Subject: [PATCH V2 1/4] Documentation: Add documentation for APM X-Gene
- SoC Queue Manager/Traffic Manager DTS binding
-In-Reply-To: <1387594651-25771-2-git-send-email-rapatel@apm.com>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <1387594651-25771-2-git-send-email-rapatel@apm.com>
-Message-ID: <201312211952.20375.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 21 Dec 2013 14:25:01 -0500
+Subject: [RFC PATCH v5 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131221162645.GE20115@lunn.ch>
+References: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
+ <1387316473-3250-1-git-send-email-andrew@lunn.ch>
+ <1387316473-3250-2-git-send-email-andrew@lunn.ch>
+ <20131220033257.GF2609@titan.lakedaemon.net>
+ <20131221162645.GE20115@lunn.ch>
+Message-ID: <20131221192500.GG2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 December 2013, Ravi Patel wrote:
->  create mode 100644 Documentation/devicetree/bindings/misc/apm-xgene-qmtm.txt
+Andrew,
+
+On Sat, Dec 21, 2013 at 05:26:45PM +0100, Andrew Lunn wrote:
+> > > +Dove cpufreq driver
+> > > +-------------------
+> > > +
+> > > +The Dove cpufreq driver makes use of the pmu node in the device tree.
+> > 
+> > I would prefer to reword this to make it OS-agnostic.  The cpufreq
+> > driver is Linux-specific.
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/apm-xgene-qmtm.txt b/Documentation/devicetree/bindings/misc/apm-xgene-qmtm.txt
-> new file mode 100644
-> index 0000000..c3fcbd2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/apm-xgene-qmtm.txt
-> @@ -0,0 +1,51 @@
-> +* APM X-Gene SoC Queue Manager/Traffic Manager nodes
-> +
-> +QMTM nodes are defined to describe on-chip Queue Managers in APM X-Gene SoC.
-> +APM X-Gene SoC Ethernet, PktDMA (XOR Engine), and Security Engine subsystems
-> +communicate with a central Queue Manager using messages which include
-> +information about the work to be performed and the location of the associated
-> +data buffers. There are multiple instances of QMTM. Each QMTM instance has its
-> +own node. Its corresponding clock nodes are shown below.
-> +
-> +Required properties:
-> +- compatible		: Shall be "apm,xgene-qmtm-lite" for QMLite instance
-> +- reg			: First memory resource shall be the QMTM CSR memory
-> +			  resource.
-> +			  Second memory resource shall be the QMTM IO-Fabric
-> +			  memory resource.
-> +- slave-name		: Shall be "CPU_QMTM3" which is receiver for ingress
-> +			  work messages for the QMTM. Here receiver is CPU.
+> Why is it Linux specific? 
 
-What is that string used for? Who decides what strings are valid in the
-future? Why does the device even need to know the name of the receiver,
-shouldn't that have a separate node?
+I'll admit I may be bike-shedding here, and I'm more seeking
+opinion/clarification than mandating anything.  The above sentence,
+imho, is describing how Linux/FreeBSD uses the node, not describing the
+hardware.
 
-> +- interrupts		: First interrupt resource shall be the QMTM Error
-> +			  interrupt.
-> +			  Remaining interrupt resources shall be the Ingress
-> +			  work message interrupt mapping for receiver,
-> +			  receiving work messages for the QMTM.
-> +- clocks		: Reference to the clock entry.
-> +
-> +Optional properties:
-> +- status		: Shall be "ok" if enabled or "disabled" if disabled.
-> +			  Default is "ok".
-> +
-> +Example:
-> +		qmlclk: qmlclk {
-> +			compatible = "apm,xgene-device-clock";
-> +			#clock-cells = <1>;
-> +			clock-names = "qmlclk";
-> +			status = "ok";
-> +			csr-offset = <0x0>;
-> +			csr-mask = <0x3>;
-> +			enable-offset = <0x8>;
-> +			enable-mask = <0x3>;
-> +		};
+thx,
 
-This looks like an invalid node, which makes a bad example. Why do you 
-have a "clock-names" entry here but no "clocks"?
-
-> +		qmlite: qmtm at 17030000 {
-> +			compatible = "apm,xgene-qmtm-lite";
-> +			reg = <0x0 0x17030000 0x0 0x10000>,
-> +			      <0x0 0x10000000 0x0 0x400000>;
-> +			slave-name = "CPU_QMTM3";
-> +			interrupts = <0x0 0x40 0x4>,
-> +				     <0x0 0x3c 0x4>;
-> +			status = "ok";
-> +			#clock-cells = <1>;
-> +			clocks = <&qmlclk 0>;
-> +		};
-
-#clock-cells is neither a required nor an optional property for
-"apm,xgene-qmtm-lite" according to the documentation above. Please
-make the example match the specification.
-
-	Arnd
+Jason.
