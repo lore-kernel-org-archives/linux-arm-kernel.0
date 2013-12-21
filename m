@@ -1,48 +1,29 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Fri, 20 Dec 2013 18:15:25 -0800
-Subject: [PATCH v3 3/6] pinctrl: Make PINCTRL selectable by
- defconfig/menuconfig
-In-Reply-To: <201312202158.34805.arnd@arndb.de>
-References: <1381174108-25168-1-git-send-email-syin@broadcom.com>
- <20131217001842.GB3840@sonymobile.com>
- <CACRpkdY-MM7OoMq_L90YRADy=oaDoV1wAOccVz90LqfRfEh=3Q@mail.gmail.com>
- <201312202158.34805.arnd@arndb.de>
-Message-ID: <52B4F9BD.1010100@broadcom.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Fri, 20 Dec 2013 23:26:28 -0300
+Subject: [PATCH v2 05/11] clk: sunxi: add PLL5 and PLL6 support
+In-Reply-To: <20131219045905.23538.99955@quantum>
+References: <1387327503-15651-1-git-send-email-emilio@elopez.com.ar>
+ <1387327503-15651-6-git-send-email-emilio@elopez.com.ar>
+ <20131219045905.23538.99955@quantum>
+Message-ID: <52B4FC54.7070909@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-12-20 12:58 PM, Arnd Bergmann wrote:
-> On Friday 20 December 2013, Linus Walleij wrote:
->> On Tue, Dec 17, 2013 at 1:18 AM, Bjorn Andersson
->> <bjorn.andersson@sonymobile.com> wrote:
->>
->>> No matter how we build the individual pinctrl drivers we will always
->>> need the pinctrl framework in a multi-soc zImage; so I can't see that
->>> we gain anything from being able to compile PINCTRL as a module.
->>
->> I discussed this matter with Christian on IRC and I believe we could
->> basically do "select PINCTRL" on ARCH_MULTIPLATFORM as the
->> vast majority of multiplatforms appear to be using this anyway, this
->> would make the submenu for pin control pop up in menuconfig
->> for this, and make it possible to move different subdrivers to modules
->> if desired.
->>
->> MULTIPLATFORM does not seem to be about saving footprint bytes
->> on a very fine-granular level anyway, more about doing the module
->> loading/unloading approach to footprint.
+El 19/12/13 01:59, Mike Turquette escribi?:
+> Quoting Emilio L?pez (2013-12-17 16:44:57)
+>> +
+>> +       /* It's not a good idea to have automatic reparenting changing
+>> +        * our RAM clock! */
+>> +       clkflags = !strcmp("pll5", parent) ? 0 : CLK_SET_RATE_PARENT;
 >
-> Let's review the list of platforms that don't select PINCTRL. There
-> are some platforms that are indeed sensitive about memory footprint,
-> and I promised people that converting to multiplatform won't cause
-> a significant increase in kernel binary size as long as no other
-> platforms are enabled.
->
-> 	Arnd
->
+> Just out of curiosity, did you hit this problem in testing?
 
-Ok, for this driver, I'll just select PINCTRL under the ARCH_BCM_MOBILE. 
-  We can move this to ARCH_MULTIPLATFORM once we're sure this is okay 
-for other platforms.
+Yes, I believe it was the case that, with automatic reparenting 
+implemented, reconfiguring the mmc or similar clock ended up choosing 
+pll5_other as ideal parent, and was trying to tune its frequency.
 
-Regards,
-Sherman
+> Acked-by: Mike Turquette <mturquette@linaro.org>
+
+Thanks!
+
+Emilio
