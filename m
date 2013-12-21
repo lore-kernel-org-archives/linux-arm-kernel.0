@@ -1,81 +1,30 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Sat, 21 Dec 2013 21:38:12 +0100
-Subject: [PATCH 1/2] drm/panel: Add support for Samsung LTN101NT05 panel
-Message-ID: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 21 Dec 2013 13:06:38 -0800
+Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
+ Manager/Traffic Manager
+In-Reply-To: <1387594651-25771-1-git-send-email-rapatel@apm.com>
+References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
+Message-ID: <20131221210638.GA30102@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Samsung LNT101NT05 10.1" WXVGA panel can be supported by the simple panel
-driver.
+On Fri, Dec 20, 2013 at 06:57:27PM -0800, Ravi Patel wrote:
+> This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
+>  QMTM is required by APM X-Gene SoC Ethernet, PktDMA (XOR Engine) and
+>  Security Engine subsystems. All subsystems communicate with QMTM using
+>  messages which include information about the work to be performed and
+>  the location of associated data buffers.  
 
-Cc: linux-fbdev at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: David Airlie <airlied@linux.ie>
-Signed-off-by: Marc Dietrich <marvin24@gmx.de>
----
-This isn't strickly required to get the panel up, but Thierry suggested on IRC to
-include it anyway, in case someone else has some use for it.
+As you failed to respond or even acknowledge any of my review comments
+before, I don't understand what you expect me to do with this patch dump
+again.
 
- .../bindings/panel/samsung,ltn101nt05.txt          |    7 +++++
- drivers/gpu/drm/panel/panel-simple.c               |   27 +++++++++++++++++++-
- 2 files changed, 33 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/panel/samsung,ltn101nt05.txt
+Remember, kernel development is about trust.  You need me to trust that
+you know what you are doing, and will be able to handle feedback and
+respond to issues that come up over time.  Right now that trust is in
+the negative zone, around "general annoyance" levels.  It's up to you to
+change that or not, just like it is up to me to take your code, or not.
 
-diff --git a/Documentation/devicetree/bindings/panel/samsung,ltn101nt05.txt b/Documentation/devicetree/bindings/panel/samsung,ltn101nt05.txt
-new file mode 100644
-index 0000000..ef522c6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/samsung,ltn101nt05.txt
-@@ -0,0 +1,7 @@
-+Samsung Electronics 10.1" WSVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "samsung,ltn101nt05"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 3e611af..7f9ddb5 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -338,6 +338,28 @@ static const struct panel_desc chunghwa_claa101wb01 = {
- 	},
- };
- 
-+static const struct drm_display_mode samsung_ltn101nt05_mode = {
-+	.clock = 54030,
-+	.hdisplay = 1024,
-+	.hsync_start = 1024 + 24,
-+	.hsync_end = 1024 + 24 + 136,
-+	.htotal = 1024 + 24 + 136 + 160,
-+	.vdisplay = 600,
-+	.vsync_start = 600 + 3,
-+	.vsync_end = 600 + 3 + 6,
-+	.vtotal = 600 + 3 + 6 + 61,
-+	.vrefresh = 60,
-+};
-+
-+static const struct panel_desc samsung_ltn101nt05 = {
-+	.modes = &samsung_ltn101nt05_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 1024,
-+		.height = 600,
-+	},
-+};
-+
- static const struct of_device_id platform_of_match[] = {
- 	{
- 		.compatible = "auo,b101aw03",
-@@ -346,6 +368,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "chunghwa,claa101wb01",
- 		.data = &chunghwa_claa101wb01
- 	}, {
-+		.compatible = "samsung,ltn101nt05",
-+		.data = &samsung_ltn101nt05,
-+	}, {
- 		.compatible = "simple-panel",
- 	}, {
- 		/* sentinel */
--- 
-1.7.9.5
+grumble,
+
+greg k-h
