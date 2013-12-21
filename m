@@ -1,17 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Sat, 21 Dec 2013 14:29:59 +0000
-Subject: [PATCH 00/10] ASoC: ARM: ux500: Better prepare for full Device
- Tree
-In-Reply-To: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131221142959.GH30815@sirena.org.uk>
+Date: Sat, 21 Dec 2013 14:49:38 +0000
+Subject: [PATCH v2 1/2] regulator: tps65910: Add backup battery regulator
+In-Reply-To: <1387539808-24910-2-git-send-email-mpa@pengutronix.de>
+References: <1387539808-24910-1-git-send-email-mpa@pengutronix.de>
+ <1387539808-24910-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131221144938.GO30815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 03:54:57PM +0000, Lee Jones wrote:
-> At this moment in time the Ux500 ASoC driver obtains its DMA information
-> via AUXDATA platform data passing. To make the driver more independent
-> we have to start extracting it from the Device Tree. This patch-set goes
-> some way to ensure the ux500 Audio driver is ready for the switch over.
+On Fri, Dec 20, 2013 at 12:43:27PM +0100, Markus Pargmann wrote:
+> tps65910 has a backup battery charger with a configurable voltage. This
+> patch adds a regulator for the backup battery.
 
-This all looks good to me, I guess it's OK if I merge the ARM patch?
+Applied, thanks.
