@@ -1,53 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Dec 2013 22:21:50 -0800
-Subject: [PATCH 2/7] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <201312202134.42027.arnd@arndb.de>
-References: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
- <1387566560-23948-3-git-send-email-davidb@codeaurora.org>
- <201312202134.42027.arnd@arndb.de>
-Message-ID: <20131221062150.GE31766@codeaurora.org>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Sat, 21 Dec 2013 12:36:37 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
+In-Reply-To: <CAOesGMjfcTki4qqD-ZP2zt3ERLRF9DX5_K5rfJXfx1KGa5bG-g@mail.gmail.com>
+References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
+ <2459303.277Jr8aotM@amdc1032>
+ <CAM4voamU5hc7uC5MTOA7OtYuqpsis7cTX3sx0UrmpdZx7_TpzA@mail.gmail.com>
+ <CANruHrS1D8d_y43xa-2OGduTvAGWfdeY1REVzZ6YJHjhzLg+hw@mail.gmail.com>
+ <CAM4voamD4Cj594fbkciNS32U7PSkByxakZmjPnhFo0mpCj8hug@mail.gmail.com>
+ <CAOesGMjfcTki4qqD-ZP2zt3ERLRF9DX5_K5rfJXfx1KGa5bG-g@mail.gmail.com>
+Message-ID: <CAM4voanaq9MPK=icad+5DVSBfT39XdM581txKs_skS7aB-DKBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20, Arnd Bergmann wrote:
-> On Friday 20 December 2013, David Brown wrote:
-> > diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
-> > index 16e6183..1f11d93 100644
-> > --- a/arch/arm/mach-msm/board-dt.c
-> > +++ b/arch/arm/mach-msm/board-dt.c
-> > @@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
-> >         NULL
-> >  };
-> >  
-> > +static const char * const apq8074_dt_match[] __initconst = {
-> > +       "qcom,apq8074-dragonboard",
-> > +       NULL
-> > +};
-> > +
-> >  DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
-> >         .smp = smp_ops(msm_smp_ops),
-> >         .dt_compat = msm_dt_match,
-> >  MACHINE_END
-> > +
-> > +DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
-> > +       .dt_compat = apq8074_dt_match,
-> > +MACHINE_END
-> > -- 
-> 
-> Why can't you reuse the MSM_DT definition and just add the dragonboard
-> to the list of compatible machines? The presence of the smp_ops pointer
-> should not matter if you don't support SMP.
-> 
+Hi Olof,
 
-If the smp_ops are present we'll try to boot the secondary CPUs
-with the Scorpion boot sequence instead of the Krait boot
-sequence. This will quickly hang the system. We can properly
-handle this with my SMP patches[1]. In fact, we can delete this
-entire file if those patches are accepted. Please take a look.
-I'll Cc you on them when I resend.
+On Sat, Dec 21, 2013 at 2:52 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Dec 20, 2013 at 3:38 AM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+>> Hi Sunil,
+>>
+>> On Fri, Dec 20, 2013 at 3:56 PM, sunil joshi <sjoshi.open@gmail.com> wrote:
+>>> Hi Abhilash,
+>>> I saw another patch in chrome tree ..by Andrew Bresticker
+>>> which may be relevant here ..
+>>>
+>>> Just wondering if you missed adding this ? or this is not needed ?
+>>> You did not face any issue in getting core to suspend ?
+>>
+>> This has not been added for Exynos5250 in mainline yet. We did notice
+>> that the system would fail to suspend on the rare occasion (~1% of the
+>> time on exynos5250) when we repeatedly suspended and resumed the
+>> system.
+>>
+>> I have not run s2r stress tests, but have had no issues suspending the
+>> system in my limited testing. We can probably let this be for now as
+>> the system would resume fine even on a failed suspend. I will do some
+>> stress testing and then post if needed.
+>
+> Hold on, you're claiming that this patch you've posted has only seen
+> very limited testing, and that you are aware of failures?
+>
+> Don't merge known-broken code into the mainline kernel.
+I have tested this patch on an 5250-snow and SMDK5420 through 30
+cycles without any failure. Yes, I have seen failures on a 3.4
+chromium kernel on an exynos5250 during stress testing. Mainline
+kernel is significantly different from what we are carrying in 3.4 or
+3.8 chromium and the reason for me not adding the GIC patch was that
+it was a hack in the first place. The basic S2R functionality works
+fine, but if you'd rather have it pass a stress test of say a 1000
+cycles then let me do the same and provide you with the results.
 
-[1] https://lkml.org/lkml/2013/11/1/622
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>
+>
+> -Olof
