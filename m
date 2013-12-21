@@ -1,88 +1,52 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Dec 2013 22:15:49 -0800
-Subject: [PATCH v3 04/12] clk: Add regmap core helpers for
- enable/disable/is_enabled
-In-Reply-To: <20131219045050.23538.94293@quantum>
-References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
- <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
- <20131219045050.23538.94293@quantum>
-Message-ID: <20131221061549.GD31766@codeaurora.org>
+Date: Fri, 20 Dec 2013 22:21:50 -0800
+Subject: [PATCH 2/7] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <201312202134.42027.arnd@arndb.de>
+References: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
+ <1387566560-23948-3-git-send-email-davidb@codeaurora.org>
+ <201312202134.42027.arnd@arndb.de>
+Message-ID: <20131221062150.GE31766@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18, Mike Turquette wrote:
-> Quoting Stephen Boyd (2013-10-16 00:40:06)
-> >  struct clk_hw {
-> >         struct clk *clk;
-> >         const struct clk_init_data *init;
-> >         struct regmap *regmap;
-> > +       unsigned int enable_reg;
-> > +       unsigned int enable_mask;
-> > +       bool enable_is_inverted;
+On 12/20, Arnd Bergmann wrote:
+> On Friday 20 December 2013, David Brown wrote:
+> > diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+> > index 16e6183..1f11d93 100644
+> > --- a/arch/arm/mach-msm/board-dt.c
+> > +++ b/arch/arm/mach-msm/board-dt.c
+> > @@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
+> >         NULL
+> >  };
+> >  
+> > +static const char * const apq8074_dt_match[] __initconst = {
+> > +       "qcom,apq8074-dragonboard",
+> > +       NULL
+> > +};
+> > +
+> >  DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+> >         .smp = smp_ops(msm_smp_ops),
+> >         .dt_compat = msm_dt_match,
+> >  MACHINE_END
+> > +
+> > +DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
+> > +       .dt_compat = apq8074_dt_match,
+> > +MACHINE_END
+> > -- 
 > 
-> Thanks for submitting this patch.
+> Why can't you reuse the MSM_DT definition and just add the dragonboard
+> to the list of compatible machines? The presence of the smp_ops pointer
+> should not matter if you don't support SMP.
 > 
-> Adding all of this stuff to struct clk_hw makes me a sad panda. You are
-> essentially sharing a common set of ops for clocks that use regmap as
-> their io operation back-end, and that is a good thing.
-> 
-> However, why not just do this as drivers/clk/clk-regmap.c, or
-> drivers/clk/clk-gate-regmap.c?
 
-These new members aren't exclusively for use by the regmap code.
-For example, we could extend the gate clock implementation to
-store the enable bit in the 'enable_mask' member. They also
-aren't used exclusively by simple gates. If you look at this
-patch series you'll see that I call the helpers from hardware
-specific ops when I want to do the gate operation in addition to
-something else like polling a status bit.
+If the smp_ops are present we'll try to boot the secondary CPUs
+with the Scorpion boot sequence instead of the Krait boot
+sequence. This will quickly hang the system. We can properly
+handle this with my SMP patches[1]. In fact, we can delete this
+entire file if those patches are accepted. Please take a look.
+I'll Cc you on them when I resend.
 
-What is the concern though? I can only guess that perhaps not
-every clock type will have a bit to toggle and so putting the
-information here would unnecessarily penalize those clocks? How
-many clocks in a particular system don't have an on/off
-capability? On MSM hardware I can only count 5 or so out of 200
-that don't have on/off capabilities so it didn't seem worth the
-effort to have a struct inside a struct inside a struct just to
-save a 100 bytes of data.
-
-If I understand you, I could make clk-regmap.c and struct
-clk_regmap like so:
-
-	struct clk_regmap {
-		struct regmap *regmap;
-		unsigned int enable_reg;
-		unsigned int enable_mask;
-		bool enable_is_inverted;
-		struct clk_hw hw;
-	};
-
-	int clk_is_enabled_regmap(struct clk_hw *hw)
-	{
-		...
-
-That certainly avoids adding members to struct clk_hw, but it
-also means that if we want to use this structure and augment it
-with something like a status bit poll we need to make a third
-structure to wrap the clk_regmap struct. That makes me a sad
-panda.
-
-The reason is because we'll need to add a registration function
-like clk_regmap_register(). I would like to just have an array of
-clk_hw pointers that I iterate through and call clk_register()
-on, without having to think/worry that this clock is a basic
-clock that doesn't use a regmap so I should call clk_register()
-and this other clock is wrapping a clk_regmap struct so I need to
-call clk_regmap_register(). I guess I could have more arrays or
-pair the clk_hw pointers with some registration function pointer,
-but that doesn't make me feel much better.
-
-> Putting the clk_ops callback functions in
-> drivers/clk/clk.c is a little weird and putting those struct members
-> into struct clk_hw is definitely strange.
-
-In the regulator framework we have helpers.c. I could make a
-similar file for these very similar helpers.
+[1] https://lkml.org/lkml/2013/11/1/622
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
