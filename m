@@ -1,155 +1,183 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 21 Dec 2013 10:54:59 +0000
-Subject: [PATCH v2] arm: KVM: Don't return =?UTF-8?Q?PSCI=5FINVAL=20if?=
- =?UTF-8?Q?=20waitqueue=20is=20inactive?=
-In-Reply-To: <1387347994-3415-1-git-send-email-christoffer.dall@linaro.org>
-References: <1387347994-3415-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <e9c62340cfe926824002dcb934d82873@www.loen.fr>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Sat, 21 Dec 2013 11:00:48 +0000
+Subject: [PATCH v5 08/10] KVM: arm-vgic: Support unqueueing of LRs to the
+ dist
+In-Reply-To: <1387258201-8738-9-git-send-email-christoffer.dall@linaro.org>
+References: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
+ <1387258201-8738-9-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <aa91f263653df8268c80a41bb7c7d4a1@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-12-18 06:26, Christoffer Dall wrote:
-> The current KVM implementation of PSCI returns INVALID_PARAMETERS if 
-> the
-> waitqueue for the corresponding CPU is not active.  This does not 
-> seem
-> correct, since KVM should not care what the specific thread is doing,
-> for example, user space may not have called KVM_RUN on this VCPU yet 
-> or
-> the thread may be busy looping to user space because it received a
-> signal; this is really up to the user space implementation.  Instead 
-> we
-> should check specifically that the CPU is marked as being turned off,
-> regardless of the VCPU thread state, and if it is, we shall
-> simply clear the pause flag on the CPU and wake up the thread if it
-> happens to be blocked for us.
+On 2013-12-17 05:29, Christoffer Dall wrote:
+> To properly access the VGIC state from user space it is very 
+> unpractical
+> to have to loop through all the LRs in all register access functions.
+> Instead, support moving all pending state from LRs to the 
+> distributor,
+> but leave active state LRs alone.
 >
-> Further, the implementation seems to be racy when executing multiple
-> VCPU threads.  There really isn't a reasonable user space programming
-> scheme to ensure all secondary CPUs have reached 
-> kvm_vcpu_first_run_init
-> before turning on the boot CPU.
+> Note that to accurately present the active and pending state to VCPUs
+> reading these distributor registers from a live VM, we would have to
+> stop all other VPUs than the calling VCPU and ask each CPU to unqueue
+> their LR state onto the distributor and add fields to track active 
+> state
+> on the distributor side as well.  We don't have any users of such
+> functionality yet and there are other inaccuracies of the GIC 
+> emulation,
+> so don't provide accurate synchronized access to this state just yet.
+> However, when the time comes, having this function should help.
 >
-> Therefore, set the pause flag on the vcpu at VCPU init time (which 
-> can
-> reasonably be expected to be completed for all CPUs by user space 
-> before
-> running any VCPUs) and clear both this flag and the feature (in case 
-> the
-> feature can somehow get set again in the future) and ping the 
-> waitqueue
-> on turning on a VCPU using PSCI.
->
-> Reported-by: Peter Maydell <peter.maydell@linaro.org>
 > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 > ---
-> Changes[v2]:
->  - Use non-atomic version of test_and_clear_bit instead
->  - Check if vcpu is paused and return KVM_PSCI_RET_INVAL if not
->  - Remove unnecessary feature bit clear
+>  virt/kvm/arm/vgic.c | 88
+> ++++++++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 83 insertions(+), 5 deletions(-)
 >
->  arch/arm/kvm/arm.c  | 30 +++++++++++++++++++-----------
->  arch/arm/kvm/psci.c | 11 ++++++-----
->  2 files changed, 25 insertions(+), 16 deletions(-)
+> Changelog[v5]:
+>  - Reworked vgic_unqueue_irqs slightly again to also consider the
+>    ACTIVE+PENDING case.
 >
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 2a700e0..151eb91 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -478,15 +478,6 @@ static int kvm_vcpu_first_run_init(struct
-> kvm_vcpu *vcpu)
->  			return ret;
->  	}
+> Changelog[v4]:
+>  - Reworked vgic_unqueue_irqs to explicitly check for the active bit 
+> and
+>    to not use __test_and_clear_bit.
 >
-> -	/*
-> -	 * Handle the "start in power-off" case by calling into the
-> -	 * PSCI code.
-> -	 */
-> -	if (test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, 
-> vcpu->arch.features)) {
-> -		*vcpu_reg(vcpu, 0) = KVM_PSCI_FN_CPU_OFF;
-> -		kvm_psci_call(vcpu);
-> -	}
-> -
->  	return 0;
+> Changelog[v3]:
+>  - New patch in series
+>
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 88599b5..d08ba28 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -589,6 +589,80 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu 
+> *vcpu,
+>  	return false;
 >  }
 >
-> @@ -700,6 +691,24 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm,
-> struct kvm_irq_level *irq_level,
->  	return -EINVAL;
->  }
->
-> +static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
-> +					 struct kvm_vcpu_init *init)
+> +#define LR_CPUID(lr)	\
+> +	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
+> +#define LR_IRQID(lr)	\
+> +	((lr) & GICH_LR_VIRTUALID)
+> +
+> +static void vgic_retire_lr(int lr_nr, int irq, struct vgic_cpu 
+> *vgic_cpu)
 > +{
-> +	int ret;
-> +
-> +	ret = kvm_vcpu_set_target(vcpu, init);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/*
-> +	 * Handle the "start in power-off" case by marking the VCPU as 
-> paused.
-> +	 */
-> +	if (__test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, 
-> vcpu->arch.features))
-> +		vcpu->arch.pause = true;
-> +
-> +	return 0;
+> +	clear_bit(lr_nr, vgic_cpu->lr_used);
+> +	vgic_cpu->vgic_lr[lr_nr] &= ~GICH_LR_STATE;
+> +	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
 > +}
 > +
->  long kvm_arch_vcpu_ioctl(struct file *filp,
->  			 unsigned int ioctl, unsigned long arg)
->  {
-> @@ -713,8 +722,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  		if (copy_from_user(&init, argp, sizeof(init)))
->  			return -EFAULT;
->
-> -		return kvm_vcpu_set_target(vcpu, &init);
-> -
-> +		return kvm_arch_vcpu_ioctl_vcpu_init(vcpu, &init);
+> +/**
+> + * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
+> + * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
+> + *
+> + * Move any pending IRQs that have already been assigned to LRs back 
+> to the
+> + * emulated distributor state so that the complete emulated state
+> can be read
+> + * from the main emulation structures without investigating the LRs.
+> + *
+> + * Note that IRQs in the active state in the LRs get their pending
+> state moved
+> + * to the distributor but the active state stays in the LRs, because
+> we don't
+> + * track the active state on the distributor side.
+> + */
+> +static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	int i, irq, source_cpu;
+> +	u32 *lr;
+> +
+> +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+> +		lr = &vgic_cpu->vgic_lr[i];
+> +		irq = LR_IRQID(*lr);
+> +		source_cpu = LR_CPUID(*lr);
+> +
+> +		/*
+> +		 * There are three options for the state bits:
+> +		 *
+> +		 * 01: pending
+> +		 * 10: active
+> +		 * 11: pending and active
+> +		 *
+> +		 * If the LR holds only an active interrupt (not pending) then
+> +		 * just leave it alone.
+> +		 */
+> +		if ((*lr & GICH_LR_STATE) == GICH_LR_ACTIVE_BIT)
+> +			continue;
+> +
+> +		/*
+> +		 * Reestablish the pending state on the distributor and the
+> +		 * CPU interface.  It may have already been pending, but that
+> +		 * is fine, then we are only setting a few bits that were
+> +		 * already set.
+> +		 */
+> +		vgic_dist_irq_set(vcpu, irq);
+> +		if (irq < VGIC_NR_SGIS)
+> +			dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
+> +		*lr &= ~GICH_LR_PENDING_BIT;
+> +
+> +		/*
+> +		 * If there's no state left on the LR (it could still be
+> +		 * active), then the LR does not hold any useful info and can
+> +		 * be marked as free for other use.
+> +		 */
+> +		if (!(*lr & GICH_LR_STATE))
+> +			vgic_retire_lr(i, irq, vgic_cpu);
+> +
+> +		/* Finally update the VGIC state. */
+> +		vgic_update_state(vcpu->kvm);
+> +	}
+> +}
+> +
+>  static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+>  				  struct kvm_exit_mmio *mmio,
+>  				  phys_addr_t offset)
+> @@ -848,8 +922,6 @@ static void vgic_update_state(struct kvm *kvm)
 >  	}
->  	case KVM_SET_ONE_REG:
->  	case KVM_GET_ONE_REG: {
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 0881bf1..448f60e 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -54,15 +54,15 @@ static unsigned long kvm_psci_vcpu_on(struct
-> kvm_vcpu *source_vcpu)
+>  }
+>
+> -#define LR_CPUID(lr)	\
+> -	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
+>  #define MK_LR_PEND(src, irq)	\
+>  	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | 
+> (irq))
+>
+> @@ -871,9 +943,7 @@ static void vgic_retire_disabled_irqs(struct
+> kvm_vcpu *vcpu)
+>  		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
+>
+>  		if (!vgic_irq_is_enabled(vcpu, irq)) {
+> -			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
+> -			clear_bit(lr, vgic_cpu->lr_used);
+> -			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
+> +			vgic_retire_lr(lr, irq, vgic_cpu);
+>  			if (vgic_irq_is_active(vcpu, irq))
+>  				vgic_irq_clear_active(vcpu, irq);
+>  		}
+> @@ -1675,6 +1745,14 @@ static int vgic_attr_regs_access(struct
+> kvm_device *dev,
 >  		}
 >  	}
 >
-> -	if (!vcpu)
 > +	/*
-> +	 * Make sure the caller requested a valid CPU and that the CPU is
-> +	 * turned off.
+> +	 * Move all pending IRQs from the LRs on all VCPUs so the pending
+> +	 * state can be properly represented in the register state 
+> accessible
+> +	 * through this API.
 > +	 */
-> +	if (!vcpu || !vcpu->arch.pause)
->  		return KVM_PSCI_RET_INVAL;
->
->  	target_pc = *vcpu_reg(source_vcpu, 2);
->
-> -	wq = kvm_arch_vcpu_wq(vcpu);
-> -	if (!waitqueue_active(wq))
-> -		return KVM_PSCI_RET_INVAL;
-> -
->  	kvm_reset_vcpu(vcpu);
->
->  	/* Gracefully handle Thumb2 entry point */
-> @@ -79,6 +79,7 @@ static unsigned long kvm_psci_vcpu_on(struct
-> kvm_vcpu *source_vcpu)
->  	vcpu->arch.pause = false;
->  	smp_mb();		/* Make sure the above is visible */
->
-> +	wq = kvm_arch_vcpu_wq(vcpu);
->  	wake_up_interruptible(wq);
->
->  	return KVM_PSCI_RET_SUCCESS;
+> +	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm)
+> +		vgic_unqueue_irqs(tmp_vcpu);
+> +
+>  	offset -= r->base;
+>  	r->handle_mmio(vcpu, &mmio, offset);
 
 -- 
-Fast, cheap, reliable. Pick two.
+Who you jivin' with that Cosmik Debris?
