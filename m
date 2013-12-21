@@ -1,161 +1,30 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Sat, 21 Dec 2013 10:34:48 +0100
-Subject: [PATCH v4 2/2] clk: add accuracy support for fixed clock
-In-Reply-To: <1387618488-3075-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387618488-3075-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1387618488-3075-3-git-send-email-b.brezillon@overkiz.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Sat, 21 Dec 2013 15:45:27 +0530
+Subject: [PATCH 1/1] clk: si570: Remove redundant of_match_ptr helper
+Message-ID: <1387620927-3315-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for accuracy retrieval on fixed clocks.
-It also adds a new dt property called 'clock-accuracy' to define the clock
-accuracy.
+'clk_si570_of_match' is always compiled in. Hence the
+helper macro is not needed.
 
-This can be usefull for oscillator (RC, crystal, ...) definitions which are
-always given an accuracy characteristic.
-
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- .../devicetree/bindings/clock/fixed-clock.txt      |    3 ++
- drivers/clk/clk-fixed-rate.c                       |   43 +++++++++++++++++---
- include/linux/clk-provider.h                       |    4 ++
- 3 files changed, 44 insertions(+), 6 deletions(-)
+ drivers/clk/clk-si570.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/fixed-clock.txt b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-index 0b1fe78..48ea0ad 100644
---- a/Documentation/devicetree/bindings/clock/fixed-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-@@ -10,6 +10,8 @@ Required properties:
- - clock-frequency : frequency of clock in Hz. Should be a single cell.
- 
- Optional properties:
-+- clock-accuracy : accuracy of clock in ppb (parts per billion).
-+		   Should be a single cell.
- - gpios : From common gpio binding; gpio connection to clock enable pin.
- - clock-output-names : From common clock binding.
- 
-@@ -18,4 +20,5 @@ Example:
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <1000000000>;
-+		clock-accuracy = <100>;
- 	};
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 1ed591a..0fc56ab 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -34,22 +34,31 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
- 	return to_clk_fixed_rate(hw)->fixed_rate;
- }
- 
-+static unsigned long clk_fixed_rate_recalc_accuracy(struct clk_hw *hw,
-+		unsigned long parent_accuracy)
-+{
-+	return to_clk_fixed_rate(hw)->fixed_accuracy;
-+}
-+
- const struct clk_ops clk_fixed_rate_ops = {
- 	.recalc_rate = clk_fixed_rate_recalc_rate,
-+	.recalc_accuracy = clk_fixed_rate_recalc_accuracy,
- };
- EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
- 
- /**
-- * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * clk_register_fixed_rate_with_accuracy - register fixed-rate clock with the
-+ *					   clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of clock's parent
-  * @flags: framework-specific flags
-  * @fixed_rate: non-adjustable clock rate
-+ * @fixed_accuracy: non-adjustable clock rate
-  */
--struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
--		const char *parent_name, unsigned long flags,
--		unsigned long fixed_rate)
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy)
- {
- 	struct clk_fixed_rate *fixed;
- 	struct clk *clk;
-@@ -70,16 +79,33 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 
- 	/* struct clk_fixed_rate assignments */
- 	fixed->fixed_rate = fixed_rate;
-+	fixed->fixed_accuracy = fixed_accuracy;
- 	fixed->hw.init = &init;
- 
- 	/* register the clock */
- 	clk = clk_register(dev, &fixed->hw);
--
- 	if (IS_ERR(clk))
- 		kfree(fixed);
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(clk_register_fixed_rate_with_accuracy);
-+
-+/**
-+ * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * @dev: device that is registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @fixed_rate: non-adjustable clock rate
-+ */
-+struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate)
-+{
-+	return clk_register_fixed_rate_with_accuracy(dev, name, parent_name,
-+						     flags, fixed_rate, 0);
-+}
- EXPORT_SYMBOL_GPL(clk_register_fixed_rate);
- 
- #ifdef CONFIG_OF
-@@ -91,13 +117,18 @@ void of_fixed_clk_setup(struct device_node *node)
- 	struct clk *clk;
- 	const char *clk_name = node->name;
- 	u32 rate;
-+	u32 accuracy = 0;
- 
- 	if (of_property_read_u32(node, "clock-frequency", &rate))
- 		return;
- 
-+	of_property_read_u32(node, "clock-accuracy", &accuracy);
-+
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
--	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
-+	clk = clk_register_fixed_rate_with_accuracy(NULL, clk_name, NULL,
-+						    CLK_IS_ROOT, rate,
-+						    accuracy);
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- }
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 16d182c..5429f5d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -204,6 +204,7 @@ struct clk_hw {
- struct clk_fixed_rate {
- 	struct		clk_hw hw;
- 	unsigned long	fixed_rate;
-+	unsigned long	fixed_accuracy;
- 	u8		flags;
- };
- 
-@@ -211,6 +212,9 @@ extern const struct clk_ops clk_fixed_rate_ops;
- struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate);
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy);
- 
- void of_fixed_clk_setup(struct device_node *np);
- 
+diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+index 5d0ac9f8e1ee..4bbbe32585ec 100644
+--- a/drivers/clk/clk-si570.c
++++ b/drivers/clk/clk-si570.c
+@@ -517,7 +517,7 @@ MODULE_DEVICE_TABLE(of, clk_si570_of_match);
+ static struct i2c_driver si570_driver = {
+ 	.driver = {
+ 		.name = "si570",
+-		.of_match_table = of_match_ptr(clk_si570_of_match),
++		.of_match_table = clk_si570_of_match,
+ 	},
+ 	.probe		= si570_probe,
+ 	.remove		= si570_remove,
 -- 
 1.7.9.5
