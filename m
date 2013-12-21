@@ -1,44 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 21 Dec 2013 09:42:13 +0100
-Subject: [PATCH 1/3] reset: Add of_reset_control_get
-In-Reply-To: <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
- <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20131221094213.03658852@skate>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Sat, 21 Dec 2013 10:34:46 +0100
+Subject: [PATCH v4 0/2] clk: add clk accuracy support
+Message-ID: <1387618488-3075-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime, Philipp,
+Hello,
 
-On Fri, 20 Dec 2013 22:41:07 +0100, Maxime Ripard wrote:
-> In some cases, you might need to deassert from reset an hardware block that
-> doesn't associated to a struct device (CPUs, timers, etc.).
-> 
-> Add a small helper to retrieve the reset controller from the device tree
-> without the need to pass a struct device.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/reset/core.c  | 39 ++++++++++++++++++++++++++++++---------
->  include/linux/reset.h |  4 ++++
->  2 files changed, 34 insertions(+), 9 deletions(-)
+This patch series adds support for clock accuracy retrieval in the common clk
+framework.
 
-I'd like to add that I have the exact same need as Maxime. Maxime needs
-of_reset_control_get() for timers, and in my case, I need it for CPUs,
-since I associated a reset controller to CPU nodes in my DT.
+Best Regards,
 
-Funnily, even though Maxime and I work like 3 meters away from each
-other, both of us came up independently with almost exactly the same
-implementation to solve the exact same problem, without talking to each
-other about this need. It's only yesterday that we discovered we've had
-to solve the same problem.
+Boris
 
-So, definitely looking forward to seeing the feedback about this.
+Changes since v3:
+ - do not export __clk_get_accuracy symbol
 
-Thanks!
+Changes since v2:
+ - fix __clk_recalc_accuracies function comment
+ - modify __clk_get_accuracy to return the current clock accuracy even when the
+   clock is orphan
+ - only recalculate clock accuracy when reparent succeed
 
-Thomas
+Changes since v1:
+ - remove HAVE_CLK_GET_ACCURACY option and enable clk accuracy support only
+   when using the CCF
+ - export __clk_get_accuracy (might be used by clk-providers)
+ - fix documentation (s/recalc_rate/recalc_accuracy/)
+ - move fixed_accuracy field addition (struct clk_fixed_rate) from the 1st
+   patch to the 2nd patch of this series
+
+Boris BREZILLON (2):
+  clk: add clk accuracy retrieval support
+  clk: add accuracy support for fixed clock
+
+ Documentation/clk.txt                              |    4 +
+ .../devicetree/bindings/clock/fixed-clock.txt      |    3 +
+ drivers/clk/clk-fixed-rate.c                       |   43 +++++++--
+ drivers/clk/clk.c                                  |  102 ++++++++++++++++++--
+ include/linux/clk-private.h                        |    1 +
+ include/linux/clk-provider.h                       |   15 +++
+ include/linux/clk.h                                |   17 ++++
+ 7 files changed, 172 insertions(+), 13 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
