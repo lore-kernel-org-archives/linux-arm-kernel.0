@@ -1,25 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 21 Dec 2013 21:11:40 +0100
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <1387594651-25771-1-git-send-email-rapatel@apm.com>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
-Message-ID: <201312212111.40576.arnd@arndb.de>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Sat, 21 Dec 2013 21:38:13 +0100
+Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
+In-Reply-To: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+Message-ID: <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 December 2013, Ravi Patel wrote:
-> This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
->  QMTM is required by APM X-Gene SoC Ethernet, PktDMA (XOR Engine) and
->  Security Engine subsystems. All subsystems communicate with QMTM using
->  messages which include information about the work to be performed and
->  the location of associated data buffers.  
+Add backlight and panel nodes for the PAZ00 TFT LCD panel.
 
-Please describe here what the purpose of the qmtm is, as this is not
-entirely clear from the code.
+Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+---
+This should enable everything needed. Unfortunately, in my tests it only switches on the
+backlight, but the display controller blocks in some infinit loop, so we get no output
+(and no working system). I post it here in case I missed something obvious...
 
-In particular, please describe how this differs from a dmaengine driver
-and why it is not possible to extend the dma slave API to describe qmtm
-as a dma engine.
 
-	Arnd
+ arch/arm/boot/dts/tegra20-paz00.dts |   46 ++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index c7cd8e6..9a39a80 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -17,6 +17,14 @@
+ 	};
+ 
+ 	host1x at 50000000 {
++		dc at 54200000 {
++			rgb {
++				status = "okay";
++
++				nvidia,panel = <&panel>;
++			};
++		};
++
+ 		hdmi at 54280000 {
+ 			status = "okay";
+ 
+@@ -257,7 +265,11 @@
+ 		status = "okay";
+ 	};
+ 
+-	i2c at 7000c000 {
++	pwm: pwm at 7000a000 {
++		status = "okay";
++	};
++
++	lvds_ddc: i2c at 7000c000 {
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+ 
+@@ -475,6 +487,18 @@
+ 		non-removable;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++
++		enable-gpios = <&gpio TEGRA_GPIO(U, 4) GPIO_ACTIVE_HIGH>;
++		pwms = <&pwm 0 5000000>;
++
++		brightness-levels = <0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255>;
++		default-brightness-level = <10>;
++
++		backlight-boot-off;
++	};
++
+ 	clocks {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -509,6 +533,16 @@
+ 		};
+ 	};
+ 
++	panel: panel {
++		compatible = "samsung,ltn101nt05", "simple-panel";
++
++		ddc-i2c-bus = <&lvds_ddc>;
++		power-supply = <&vdd_pnl_reg>;
++		enable-gpios = <&gpio TEGRA_GPIO(M, 6) GPIO_ACTIVE_HIGH>;
++
++		backlight = <&backlight>;
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -522,6 +556,16 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			regulator-always-on;
+ 		};
++
++		vdd_pnl_reg: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "+3VS,vdd_pnl";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio TEGRA_GPIO(A, 4) GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
+ 	};
+ 
+ 	sound {
+-- 
+1.7.9.5
