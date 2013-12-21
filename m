@@ -1,18 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 21 Dec 2013 13:11:58 -0800
-Subject: [PATCH 3/5] drivers: net: APM X-Gene SoC Ethernet base driver
-In-Reply-To: <1387597376-29303-4-git-send-email-isubramanian@apm.com>
-References: <1387597376-29303-1-git-send-email-isubramanian@apm.com>
- <1387597376-29303-4-git-send-email-isubramanian@apm.com>
-Message-ID: <20131221211158.GB30102@kroah.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 21 Dec 2013 22:54:24 +0100
+Subject: [RFC PATCH v5 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131221192500.GG2609@titan.lakedaemon.net>
+References: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
+ <1387316473-3250-1-git-send-email-andrew@lunn.ch>
+ <1387316473-3250-2-git-send-email-andrew@lunn.ch>
+ <20131220033257.GF2609@titan.lakedaemon.net>
+ <20131221162645.GE20115@lunn.ch>
+ <20131221192500.GG2609@titan.lakedaemon.net>
+Message-ID: <20131221215424.GA31584@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 07:42:54PM -0800, Iyappan Subramanian wrote:
-> Ethernet base device driver for APM X-Gene SoC.
+On Sat, Dec 21, 2013 at 02:25:01PM -0500, Jason Cooper wrote:
+> Andrew,
+> 
+> On Sat, Dec 21, 2013 at 05:26:45PM +0100, Andrew Lunn wrote:
+> > > > +Dove cpufreq driver
+> > > > +-------------------
+> > > > +
+> > > > +The Dove cpufreq driver makes use of the pmu node in the device tree.
+> > > 
+> > > I would prefer to reword this to make it OS-agnostic.  The cpufreq
+> > > driver is Linux-specific.
+> > 
+> > Why is it Linux specific? 
+> 
+> I'll admit I may be bike-shedding here, and I'm more seeking
+> opinion/clarification than mandating anything.  The above sentence,
+> imho, is describing how Linux/FreeBSD uses the node, not describing the
+> hardware.
 
-Why is this a platform driver and not a bus driver for a xgene device?
+How about:
 
-thanks,
+Dove has a PMU, which contains DFS, DVS, RTC, clock gates, and thermal
+management,
 
-greg k-h
+	Andrew
