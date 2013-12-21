@@ -1,48 +1,58 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 21 Dec 2013 11:11:42 +0400
-Subject: [PATCH 6/6] ARM: dts: imx27-phytec-phycore-rdk: Add pinctrl
- definitions for WEIM
-In-Reply-To: <1387609902-13361-1-git-send-email-shc_work@mail.ru>
-References: <1387609902-13361-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1387609902-13361-6-git-send-email-shc_work@mail.ru>
+Date: Sat, 21 Dec 2013 11:11:37 +0400
+Subject: [PATCH 1/6] ARM: dts: imx27-phytec-phycore-som: Add NFC pin group
+Message-ID: <1387609902-13361-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinctrl definitions for WEIM CS4 and GPIO used as
-CAN IRQ line.
+This patch adds pin group fro NAND Flash Controller.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 6 ++++++
+ arch/arm/boot/dts/imx27-pingrp.h                | 9 +++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 1967dad..eaaff00 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -69,6 +69,13 @@
- 				MX27_UART2_RTSCTS_PINGRP1
- 			>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 7087a4f..94ba726 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -201,10 +201,16 @@
+ 		pinctrl_i2c2: i2c2grp {
+ 			fsl,pins = <MX27_I2C2_PINGRP1>;
  		};
 +
-+		pinctrl_weim: weimgrp {
-+			fsl,pins = <
-+				MX27_PAD_CS4_B__CS4_B		0x0 /* CS4 */
-+				MX27_PAD_SD1_D1__GPIO5_19	0x0 /* CAN IRQ */
-+			>;
++		pinctrl_nfc: nfcgrp {
++			fsl,pins = <MX27_NFC_PINGRP1>;
 +		};
  	};
  };
  
-@@ -103,6 +110,9 @@
- };
- 
- &weim {
+ &nfc {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_weim>;
++	pinctrl-0 = <&pinctrl_nfc>;
+ 	nand-bus-width = <8>;
+ 	nand-ecc-mode = "hw";
+ 	nand-on-flash-bbt;
+diff --git a/arch/arm/boot/dts/imx27-pingrp.h b/arch/arm/boot/dts/imx27-pingrp.h
+index edc1e90..61eb710 100644
+--- a/arch/arm/boot/dts/imx27-pingrp.h
++++ b/arch/arm/boot/dts/imx27-pingrp.h
+@@ -85,6 +85,15 @@
+ 	MX27_PAD_I2C2_SDA__I2C2_SDA 0x0 \
+ 	MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
+ 
++#define MX27_NFC_PINGRP1 \
++	MX27_PAD_NFRB__NFRB 0x0 \
++	MX27_PAD_NFCLE__NFCLE 0x0 \
++	MX27_PAD_NFWP_B__NFWP_B 0x0 \
++	MX27_PAD_NFCE_B__NFCE_B 0x0 \
++	MX27_PAD_NFALE__NFALE 0x0 \
++	MX27_PAD_NFRE_B__NFRE_B 0x0 \
++	MX27_PAD_NFWE_B__NFWE_B 0x0
 +
- 	can at d4000000 {
- 		compatible = "nxp,sja1000";
- 		reg = <4 0x00000000 0x00000100>;
+ #define MX27_OWIRE1_PINGRP1 \
+ 	MX27_PAD_RTCK__OWIRE 0x0
+ 
 -- 
 1.8.3.2
