@@ -1,82 +1,146 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Sat, 21 Dec 2013 13:10:35 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Support Suspend-to-RAM on EXYNOS5420
-In-Reply-To: <4034332.29qpdhiElM@flatron>
-References: <1387195271-3613-1-git-send-email-a.kesavan@samsung.com>
- <346894265.CPBN0v9Elj@flatron>
- <CAOesGMi7cGZyHLBMpc7UTBbQkiRBij6rDyuA+E+9tUmsb131zw@mail.gmail.com>
- <4034332.29qpdhiElM@flatron>
-Message-ID: <CAM4voak-9qcL6vOpVvTZ8s-0XkyrU=xq0K4TAttYZtj8akZxBg@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 21 Dec 2013 11:58:23 +0400
+Subject: [PATCH] ARM: i.MX: Remove IMX_HAVE_PLATFORM_IMX_FB symbol
+Message-ID: <1387612703-18512-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Symbol IMX_HAVE_PLATFORM_IMX_FB is selected by boards which
+use it, so there is no way to compile the FB driver only with
+DT configuration. This patch removes this dependency completely.
 
-On Sat, Dec 21, 2013 at 3:23 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Friday 20 of December 2013 13:37:36 Olof Johansson wrote:
->> On Fri, Dec 20, 2013 at 1:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> > Hi,
->> >
->> > On Friday 20 of December 2013 15:56:38 sunil joshi wrote:
->> >> Hi Abhilash,
->> >> I saw another patch in chrome tree ..by Andrew Bresticker
->> >> which may be relevant here ..
->> >>
->> >> Just wondering if you missed adding this ? or this is not needed ?
->> >> You did not face any issue in getting core to suspend ?
->> >>
->> >> ------------------------------------------------------------------------------------------
->> >> commit 95402d816b9f1a05ce633f7ff64b4c939c142482
->> >> Author: Andrew Bresticker <abrestic@chromium.org>
->> >> Date:   Mon Jul 15 13:14:36 2013 -0700
->> >>
->> >>     arm: exynos: disable all interrupts on Exynos5420 before suspend
->> >>
->> >>     Disable all interrupts from the GIC before entering suspend on
->> >>     Exynos5420 as is done on Exynos5250.  If interrupts are enabled, we
->> >>     may receive an interrupt after entering WFI but before the PMU has
->> >>     suspended the system, causing suspend to fail.
->> >>
->> >>     BUG=chrome-os-partner:20523
->> >>     TEST=Run suspend_stress_test on Pit and observe that entering suspend
->> >>     no longer occasionally fails with the "Failed to suspend the system"
->> >>     error in exynos_cpu_suspend().
->> >
->> > A question about this for Chromium and LSI guys:
->> >
->> > If you find out that there is already a pending interrupt before you enter
->> > the sleep mode, isn't it more reasonable to cancel the process ASAP and
->> > handle the event instead of entering the sleep just to leave it?
->> >
->> > I believe this should be both more efficient with respect to power usage
->> > and latency, because sleep-wakeup transition takes time and power.
->> >
->> > Do you have any reason to think the opposite?
->>
->> If it's expected to be a rare or very rare event, it's not a given
->> that the added complexity of dealing with the aborted suspend that
->> late is worth it.
->
-> I think that the code to support this is already in place, just printing
-> an unfortunate message about "suspend failures". It doesn't add any
-> significant complexity too.
->
-> I'm not sure about the frequency of such events, though, and any real
-> effect of this or the other behavior in such case and so there is my
-> question about this.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/Kconfig          | 10 ----------
+ arch/arm/mach-imx/devices/Kconfig  |  3 ---
+ arch/arm/mach-imx/devices/Makefile |  3 +--
+ drivers/video/Kconfig              |  2 +-
+ 4 files changed, 2 insertions(+), 16 deletions(-)
 
-Adding to what Doug already mentioned in the thread, in the cases
-where we saw cpu_do_idle fail we noticed the following:
-1) No wake-up source as having woken up the system (by checking the WAKEUP_STAT)
-2) On checking all the EINT Pend registers the values indicated no
-pending interrupts.
-
-The UM says that the PMU may fail to go to suspend when there are
-pending interrupt events. The patch assumed that we have a non-wakeup
-interrupt pending causing "wfi" to fail, especially as we saw the
-failure more often with no_console_suspend.
->
-> Best regards,
-> Tomasz
-Abhilash
->
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index d511e054..9498878 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -179,7 +179,6 @@ comment "MX21 platforms:"
+ 
+ config MACH_MX21ADS
+ 	bool "MX21ADS platform"
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MXC_MMC
+ 	select IMX_HAVE_PLATFORM_MXC_NAND
+@@ -196,7 +195,6 @@ config MACH_MX25_3DS
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMXDI_RTC
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+@@ -211,7 +209,6 @@ config MACH_EUKREA_CPUIMX25SD
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMXDI_RTC
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MXC_EHCI
+@@ -248,7 +245,6 @@ comment "MX27 platforms:"
+ 
+ config MACH_MX27ADS
+ 	bool "MX27ADS platform"
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MXC_MMC
+@@ -281,7 +277,6 @@ choice
+ 
+ config MACH_PCM970_BASEBOARD
+ 	bool "PHYTEC PCM970 development board"
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_MXC_MMC
+ 	help
+ 	  This adds board specific devices that can be found on Phytec's
+@@ -326,7 +321,6 @@ choice
+ 
+ config MACH_EUKREA_MBIMX27_BASEBOARD
+ 	bool "Eukrea MBIMX27 development board"
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+@@ -343,7 +337,6 @@ config MACH_MX27_3DS
+ 	bool "MX27PDK platform"
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_IMX_SSI
+@@ -389,7 +382,6 @@ config MACH_PCA100
+ 	bool "Phytec phyCARD-s (pca100)"
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+@@ -406,7 +398,6 @@ config MACH_PCA100
+ 
+ config MACH_MXT_TD60
+ 	bool "Maxtrack i-MXT TD60"
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MXC_MMC
+@@ -633,7 +624,6 @@ config MACH_MX35_3DS
+ 	bool "Support MX35PDK platform"
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_IPU_CORE
+diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
+index 68c74fb..99951a6 100644
+--- a/arch/arm/mach-imx/devices/Kconfig
++++ b/arch/arm/mach-imx/devices/Kconfig
+@@ -25,9 +25,6 @@ config IMX_HAVE_PLATFORM_IMX2_WDT
+ config IMX_HAVE_PLATFORM_IMXDI_RTC
+ 	bool
+ 
+-config IMX_HAVE_PLATFORM_IMX_FB
+-	bool
+-
+ config IMX_HAVE_PLATFORM_IMX_I2C
+ 	bool
+ 
+diff --git a/arch/arm/mach-imx/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
+index 67416fb..ba2642d 100644
+--- a/arch/arm/mach-imx/devices/Makefile
++++ b/arch/arm/mach-imx/devices/Makefile
+@@ -9,8 +9,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX27_CODA) += platform-imx27-coda.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
+-obj-y += platform-imx-dma.o
+-obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_FB) += platform-imx-fb.o
++obj-y += platform-imx-dma.o platform-imx-fb.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_KEYPAD) += platform-imx-keypad.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_PATA_IMX) += platform-pata_imx.o
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 4f2e1b3..e7d8d88 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -363,7 +363,7 @@ config FB_SA1100
+ 
+ config FB_IMX
+ 	tristate "Freescale i.MX1/21/25/27 LCD support"
+-	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
++	depends on FB && (SOC_IMX1 || SOC_IMX21 || SOC_IMX25 || SOC_IMX27)
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+-- 
+1.8.3.2
