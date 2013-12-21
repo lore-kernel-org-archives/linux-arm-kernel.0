@@ -1,28 +1,27 @@
 From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Sat, 21 Dec 2013 13:51:45 +0530
-Subject: [PATCH v2 2/2] gpio: davinci: reuse for Keystone SoC
-In-Reply-To: <1387361272-20861-3-git-send-email-grygorii.strashko@ti.com>
+Date: Sat, 21 Dec 2013 13:50:56 +0530
+Subject: [PATCH v2 1/2] gpio: davinci: don't create irq_domain in case of
+ unbanked irqs
+In-Reply-To: <1387361272-20861-2-git-send-email-grygorii.strashko@ti.com>
 References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
- <1387361272-20861-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CA+V-a8vChjoYhtmGVkARxtX=dTrDAsbS5L1o69jN2pSg0v13xg@mail.gmail.com>
+ <1387361272-20861-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <CA+V-a8tBQPAHjHibLa=n1mu31ZJyLU3vGwLutHqe=Fg4eXq6zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Dec 18, 2013 at 3:37 PM, Grygorii Strashko
 <grygorii.strashko@ti.com> wrote:
-> The similar GPIO HW block is used by keystone SoCs as
-> in Davinci SoCs.
-> Hence, reuse Davinci GPIO driver for Keystone taking into
-> account that Keystone contains ARM GIC IRQ controller which
-> is implemented using IRQ Chip.
+> The system may crash if:
+> - there are more then 1 bank
+> - unbanked irqs are enabled
+> - someone will call gpio_to_irq() for GPIO from bank2 or above
 >
-> Documentation:
->         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+> Hence, fix it by not creating irq_domain if unbanked irqs are enabled
+> and correct gpio_to_irq_banked() to handle this properly.
 >
 > Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: Alexandre Courbot <gnurou@gmail.com>
 > Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: devicetree at vger.kernel.org
 >
 > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
