@@ -1,84 +1,157 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 21 Dec 2013 11:15:30 +0000
-Subject: [PATCH v5 00/10] Support VGIC save/restore using device control
- API
-In-Reply-To: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
-References: <1387258201-8738-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <010feb6c1a84a5e63b8643c340eb1cf1@www.loen.fr>
+From: robdclark@gmail.com (Rob Clark)
+Date: Sat, 21 Dec 2013 07:42:17 -0500
+Subject: [PATCH] dma-buf: avoid using IS_ERR_OR_NULL
+In-Reply-To: <1387586630-1954-1-git-send-email-ccross@android.com>
+References: <1387586630-1954-1-git-send-email-ccross@android.com>
+Message-ID: <CAF6AEGuQSWOw6KWVo-uorJ+8M3-kLzYHdOOfdHWUDi=SkzUUVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-12-17 05:29, Christoffer Dall wrote:
-> Implement save/restore of the VGIC state using the newer KVM Device
-> Control API.  This requries some number of changes to existing code 
-> in
-> addition to actually supporting save/restore of the necessary state.
+On Fri, Dec 20, 2013 at 7:43 PM, Colin Cross <ccross@android.com> wrote:
+> dma_buf_map_attachment and dma_buf_vmap can return NULL or
+> ERR_PTR on a error.  This encourages a common buggy pattern in
+> callers:
+>         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+>         if (IS_ERR_OR_NULL(sgt))
+>                 return PTR_ERR(sgt);
 >
-> The first patches (01-03) support creating the VGIC using the Device
-> Control API.  This change is necessary because there are no other
-> suitable KVM APIs that we can leverage to access the VGIC state from
-> user space and the device control API was crafted exactly for this
-> purpose.
+> This causes the caller to return 0 on an error.  IS_ERR_OR_NULL
+> is almost always a sign of poorly-defined error handling.
 >
-> Subsequent patches add the missing infrastructure and user space API
-> pieces necessary to actually save and restore the VGIC state.  The 
-> GIC
-> v2.0 architecture specification already specifies registers that can 
-> be
-> used to save and restore the complete VGIC state for suspend/resume
-> purposes on real hardware, and we can reuse this interface for the
-> VGIC.  The API is therefore based on the memory-mapped register 
-> accesses
-> defined in the specs.  See the individual patches for details.
+> This patch converts dma_buf_map_attachment to always return
+> ERR_PTR, and fixes the callers that incorrectly handled NULL.
+> There are a few more callers that were not checking for NULL
+> at all, which would have dereferenced a NULL pointer later.
+> There are also a few more callers that correctly handled NULL
+> and ERR_PTR differently, I left those alone but they could also
+> be modified to delete the NULL check.
 >
-> The patches are based on kvm-arm-next with the arch timers 
-> save/restore
-> patches applied:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git timer-migrate-v4
+> This patch also converts dma_buf_vmap to always return NULL.
+> All the callers to dma_buf_vmap only check for NULL, and would
+> have dereferenced an ERR_PTR and panic'd if one was ever
+> returned. This is not consistent with the rest of the dma buf
+> APIs, but matches the expectations of all of the callers.
 >
-> This patch series based on the above can be cloned from:
-> git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v5
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+>  drivers/base/dma-buf.c                         | 18 +++++++++++-------
+>  drivers/gpu/drm/drm_prime.c                    |  2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     |  2 +-
+>  drivers/media/v4l2-core/videobuf2-dma-contig.c |  2 +-
+>  4 files changed, 14 insertions(+), 10 deletions(-)
 >
-> User space patches for QEMU have also been posted on the list, but an
-> updated version is underway.  Tested on Versatile Express TC2.
+> diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
+> index 1e16cbd61da2..cfe1d8bc7bb8 100644
+> --- a/drivers/base/dma-buf.c
+> +++ b/drivers/base/dma-buf.c
+> @@ -251,9 +251,8 @@ EXPORT_SYMBOL_GPL(dma_buf_put);
+>   * @dmabuf:    [in]    buffer to attach device to.
+>   * @dev:       [in]    device to be attached.
+>   *
+> - * Returns struct dma_buf_attachment * for this attachment; may return negative
+> - * error codes.
+> - *
+> + * Returns struct dma_buf_attachment * for this attachment; returns ERR_PTR on
+> + * error.
+>   */
+>  struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>                                           struct device *dev)
+> @@ -319,9 +318,8 @@ EXPORT_SYMBOL_GPL(dma_buf_detach);
+>   * @attach:    [in]    attachment whose scatterlist is to be returned
+>   * @direction: [in]    direction of DMA transfer
+>   *
+> - * Returns sg_table containing the scatterlist to be returned; may return NULL
+> - * or ERR_PTR.
+> - *
+> + * Returns sg_table containing the scatterlist to be returned; returns ERR_PTR
+> + * on error.
+>   */
+>  struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+>                                         enum dma_data_direction direction)
+> @@ -334,6 +332,8 @@ struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+>                 return ERR_PTR(-EINVAL);
+>
+>         sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
+> +       if (!sg_table)
+> +               sg_table = ERR_PTR(-ENOMEM);
+>
+>         return sg_table;
+>  }
+> @@ -544,6 +544,8 @@ EXPORT_SYMBOL_GPL(dma_buf_mmap);
+>   * These calls are optional in drivers. The intended use for them
+>   * is for mapping objects linear in kernel space for high use objects.
+>   * Please attempt to use kmap/kunmap before thinking about these interfaces.
+> + *
+> + * Returns NULL on error.
+>   */
+>  void *dma_buf_vmap(struct dma_buf *dmabuf)
+>  {
+> @@ -566,7 +568,9 @@ void *dma_buf_vmap(struct dma_buf *dmabuf)
+>         BUG_ON(dmabuf->vmap_ptr);
+>
+>         ptr = dmabuf->ops->vmap(dmabuf);
+> -       if (IS_ERR_OR_NULL(ptr))
+> +       if (WARN_ON_ONCE(IS_ERR(ptr)))
 
-Hi Christoffer,
+since vmap is optional, the WARN_ON might be a bit strong..  although
+it would be a bit strange for an exporter to supply a vmap fxn which
+always returned NULL, not sure about that.  Just thought I'd mention
+it in case anyone else had an opinion about that.
 
-I believe this is now good to go, assuming the userspace interface is 
-stable.
-If it is, I'll merge the above branch for 3.14.
+But either way:
 
-Thanks,
+Reviewed-by: Rob Clark <robdclark@gmail.com>
 
-         M.
 
-> Changelogs in the individual patches.
+> +               ptr = NULL;
+> +       if (!ptr)
+>                 goto out_unlock;
 >
-> Christoffer Dall (10):
->   ARM: KVM: Allow creating the VGIC after VCPUs
->   KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
->   KVM: arm-vgic: Set base addr through device API
->   irqchip: arm-gic: Define additional MMIO offsets and masks
->   KVM: arm-vgic: Make vgic mmio functions more generic
->   arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
->   KVM: arm-vgic: Add vgic reg access from dev attr
->   KVM: arm-vgic: Support unqueueing of LRs to the dist
->   KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
->   KVM: arm-vgic: Support CPU interface reg access
+>         dmabuf->vmap_ptr = ptr;
+> diff --git a/drivers/gpu/drm/drm_prime.c b/drivers/gpu/drm/drm_prime.c
+> index 56805c39c906..bb516fdd195d 100644
+> --- a/drivers/gpu/drm/drm_prime.c
+> +++ b/drivers/gpu/drm/drm_prime.c
+> @@ -471,7 +471,7 @@ struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
+>         get_dma_buf(dma_buf);
 >
->  Documentation/virtual/kvm/api.txt              |   7 +-
->  Documentation/virtual/kvm/devices/arm-vgic.txt |  73 ++++
->  arch/arm/include/uapi/asm/kvm.h                |   8 +
->  arch/arm/kvm/arm.c                             |  17 +-
->  include/kvm/arm_vgic.h                         |   2 +-
->  include/linux/irqchip/arm-gic.h                |  12 +
->  include/linux/kvm_host.h                       |   1 +
->  include/uapi/linux/kvm.h                       |   1 +
->  virt/kvm/arm/vgic.c                            | 583
-> +++++++++++++++++++++++--
->  virt/kvm/kvm_main.c                            |   5 +
->  10 files changed, 672 insertions(+), 37 deletions(-)
->  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
-
--- 
-Fast, cheap, reliable. Pick two.
+>         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+> -       if (IS_ERR_OR_NULL(sgt)) {
+> +       if (IS_ERR(sgt)) {
+>                 ret = PTR_ERR(sgt);
+>                 goto fail_detach;
+>         }
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> index 59827cc5e770..c786cd4f457b 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+> @@ -224,7 +224,7 @@ struct drm_gem_object *exynos_dmabuf_prime_import(struct drm_device *drm_dev,
+>         get_dma_buf(dma_buf);
+>
+>         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+> -       if (IS_ERR_OR_NULL(sgt)) {
+> +       if (IS_ERR(sgt)) {
+>                 ret = PTR_ERR(sgt);
+>                 goto err_buf_detach;
+>         }
+> diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> index 33d3871d1e13..880be0782dd9 100644
+> --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> @@ -719,7 +719,7 @@ static int vb2_dc_map_dmabuf(void *mem_priv)
+>
+>         /* get the associated scatterlist for this buffer */
+>         sgt = dma_buf_map_attachment(buf->db_attach, buf->dma_dir);
+> -       if (IS_ERR_OR_NULL(sgt)) {
+> +       if (IS_ERR(sgt)) {
+>                 pr_err("Error getting dmabuf scatterlist\n");
+>                 return -EINVAL;
+>         }
+> --
+> 1.8.5.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
