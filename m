@@ -1,79 +1,46 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 22 Dec 2013 02:01:35 +0100
-Subject: [PATCH V2 0/3] PM: Enable option of re-use runtime PM callbacks
- at system suspend
-In-Reply-To: <1605004.ViTQsllvdk@vostro.rjw.lan>
-References: <1386682662-17633-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFrS6k1Zd5=XQX4ODk2=obo89bk-Z6aJvv+3WsrHw3nGbg@mail.gmail.com>
- <1605004.ViTQsllvdk@vostro.rjw.lan>
-Message-ID: <1670603.cXT40Mn7Pp@vostro.rjw.lan>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 21 Dec 2013 23:00:23 -0500
+Subject: [RFC PATCH v5 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131221215424.GA31584@lunn.ch>
+References: <20131204145413.GD29200@e106331-lin.cambridge.arm.com>
+ <1387316473-3250-1-git-send-email-andrew@lunn.ch>
+ <1387316473-3250-2-git-send-email-andrew@lunn.ch>
+ <20131220033257.GF2609@titan.lakedaemon.net>
+ <20131221162645.GE20115@lunn.ch>
+ <20131221192500.GG2609@titan.lakedaemon.net>
+ <20131221215424.GA31584@lunn.ch>
+Message-ID: <20131222040023.GI2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 20, 2013 02:18:22 PM Rafael J. Wysocki wrote:
-> On Friday, December 20, 2013 09:43:16 AM Ulf Hansson wrote:
-> > On 10 December 2013 14:37, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > > To put devices into low power state during system suspend, it is convenient
-> > > for some runtime PM supported power domains, subsystems and drivers to have
-> > > the option of re-using and invoking the runtime PM callbacks from their system
-> > > PM callbacks.
-> > >
-> > > The benefit is that we don't need to implement wrapper functions which
-> > > handles runtime PM resourses, typically called from both runtime PM and system
-> > > PM callbacks.
-> > >
-> > > Some new helper macros for defining the PM callbacks are added.
-> > >
-> > > SET_PM_RUNTIME_PM_OPS; to define runtime PM callbacks for CONFIG_PM instead of
-> > > CONFIG_PM_RUNTIME.
-> > >
-> > > SET_LATE_SYSTEM_SLEEP_PM_OPS; to define common late/early system PM callbacks,
-> > > same approach is applicable to the existing SET_SYSTEM_SLEEP_PM_OPS which
-> > > defines common suspend/resume system PM callbacks.
-> > >
-> > > A minor fix was needed for the platform bus, which runtime PM callbacks are set
-> > > to the pm_generic_runtime_suspend|resume functions. These were implemented only
-> > > for CONFIG_PM_RUNTIME and thus the platform bus prevented driver's runtime PM
-> > > callbacks to be invoked when only CONFIG_PM_SLEEP was used. We move them into
-> > > CONFIG_PM to resolve the problem.
-> > >
-> > > Changes in v2:
-> > >         Updated commit messages to try to better reflect the changes.
-> > >         Removed the below patches from this patch set. Let's leave those to be
-> > >         addressed separately, if needed.
-> > >         - PM / Sleep: Add pm_generic functions to re-use runtime PM callbacks
-> > >         - drm/exynos: Convert to suspend_late/resume_early callbacks for fimc
-> > >
-> > >
-> > > Ulf Hansson (3):
-> > >   PM / Runtime: Add second macro for definition of runtime PM callbacks
-> > >   PM / Runtime: Implement the pm_generic_runtime functions for
-> > >     CONFIG_PM
-> > >   PM / Sleep: Add macro to define common late/early system PM callbacks
-> > >
-> > >  drivers/base/power/generic_ops.c |    4 ++--
-> > >  include/linux/pm.h               |   21 +++++++++++++++++++++
-> > >  include/linux/pm_runtime.h       |   12 ++++++++----
-> > >  3 files changed, 31 insertions(+), 6 deletions(-)
-> > >
-> > > --
-> > > 1.7.9.5
-> > >
+On Sat, Dec 21, 2013 at 10:54:24PM +0100, Andrew Lunn wrote:
+> On Sat, Dec 21, 2013 at 02:25:01PM -0500, Jason Cooper wrote:
+> > Andrew,
 > > 
-> > Hi,
+> > On Sat, Dec 21, 2013 at 05:26:45PM +0100, Andrew Lunn wrote:
+> > > > > +Dove cpufreq driver
+> > > > > +-------------------
+> > > > > +
+> > > > > +The Dove cpufreq driver makes use of the pmu node in the device tree.
+> > > > 
+> > > > I would prefer to reword this to make it OS-agnostic.  The cpufreq
+> > > > driver is Linux-specific.
+> > > 
+> > > Why is it Linux specific? 
 > > 
-> > Just wanted to send a kind ping on this patchset.
-> > 
-> > Would be nice to try to conclude on the way forward after the quite
-> > long and good discussions we had around this topic.
+> > I'll admit I may be bike-shedding here, and I'm more seeking
+> > opinion/clarification than mandating anything.  The above sentence,
+> > imho, is describing how Linux/FreeBSD uses the node, not describing the
+> > hardware.
 > 
-> Sorry, I was traveling last week.  I'm processing my backlog now, hopefully
-> I'll get to your patches shortly.
+> How about:
+> 
+> Dove has a PMU, which contains DFS, DVS, RTC, clock gates, and thermal
+> management,
 
-So I've just queued them up for 3.14.
 
-Thanks!
+Yep, much better.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+thx,
+
+Jason.
