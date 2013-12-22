@@ -1,40 +1,85 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 22 Dec 2013 12:21:49 -0500
-Subject: [PATCH 4/4] Phy: Add DT nodes on kirkwood and Dove for the
- SATA PHY
-In-Reply-To: <1387311713-1926-4-git-send-email-andrew@lunn.ch>
-References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
- <1387311713-1926-4-git-send-email-andrew@lunn.ch>
-Message-ID: <20131222172149.GJ2609@titan.lakedaemon.net>
+Date: Sun, 22 Dec 2013 17:28:07 +0000
+Subject: [PATCH] ARM: kirkwood: 6282: sort DT nodes by address
+In-Reply-To: <cover.1386861599.git.jason@lakedaemon.net>
+References: <cover.1386861599.git.jason@lakedaemon.net>
+Message-ID: <1387733287-29166-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 09:21:52PM +0100, Andrew Lunn wrote:
-> Add nodes for the two SATA PHYs on kirkwood.
-> Add node for the one SATA PHY on Dove.
-> Add pHandles to the PHYs in the sata nodes.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> v1->v2:
-> sata_phy at ... ->sata-phy@
-> value after '@' matching the first address in the reg.
-> 
-> v2->v3:
-> "0" -> "port0", etc.
-> kirkewood -> kirkwood
-> ---
->  arch/arm/boot/dts/dove.dtsi          | 11 +++++++++++
->  arch/arm/boot/dts/kirkwood-6281.dtsi |  2 ++
->  arch/arm/boot/dts/kirkwood-6282.dtsi |  2 ++
->  arch/arm/boot/dts/kirkwood.dtsi      | 18 ++++++++++++++++++
->  4 files changed, 33 insertions(+)
+We recently sorted the nodes in dove, orion5x, kirkwood, and armada
+370/xp.  However, I missed this file.  -6281 is fine.
 
-Applied to mvebu/dt with Kishon's Ack.
-
-Please double check me, I had to shuffle dove.dtsi since I recently
-sorted the nodes under the ocp bus.
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+This is just an fyi, Andrew's patch adding the phy nodes brought this to my
+attention.  I've applied this to mvebu/dt.
 
 thx,
 
 Jason.
+
+ arch/arm/boot/dts/kirkwood-6282.dtsi | 35 +++++++++++++++++------------------
+ 1 file changed, 17 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+index a4fec0432168..2902e0d7971d 100644
+--- a/arch/arm/boot/dts/kirkwood-6282.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+@@ -104,6 +104,12 @@
+ 			};
+ 		};
+ 
++		thermal at 10078 {
++			compatible = "marvell,kirkwood-thermal";
++			reg = <0x10078 0x4>;
++			status = "okay";
++		};
++
+ 		rtc at 10300 {
+ 			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
+ 			reg = <0x10300 0x20>;
+@@ -111,6 +117,17 @@
+ 			clocks = <&gate_clk 7>;
+ 		};
+ 
++		i2c at 11100 {
++			compatible = "marvell,mv64xxx-i2c";
++			reg = <0x11100 0x20>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			interrupts = <32>;
++			clock-frequency = <100000>;
++			clocks = <&gate_clk 7>;
++			status = "disabled";
++		};
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+@@ -135,23 +152,5 @@
+ 			cap-mmc-highspeed;
+ 			status = "disabled";
+ 		};
+-
+-		thermal at 10078 {
+-			compatible = "marvell,kirkwood-thermal";
+-			reg = <0x10078 0x4>;
+-			status = "okay";
+-		};
+-
+-		i2c at 11100 {
+-			compatible = "marvell,mv64xxx-i2c";
+-			reg = <0x11100 0x20>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			interrupts = <32>;
+-			clock-frequency = <100000>;
+-			clocks = <&gate_clk 7>;
+-			status = "disabled";
+-		};
+-
+ 	};
+ };
+-- 
+1.8.5.2
