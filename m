@@ -1,52 +1,51 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Sun, 22 Dec 2013 18:52:35 +0100
-Subject: [PATCHv12 07/49] clk: divider: add support for low level ops
-In-Reply-To: <1387557274-22583-7-git-send-email-t-kristo@ti.com>
-References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
- <1387557274-22583-7-git-send-email-t-kristo@ti.com>
-Message-ID: <20131222175235.GC8064@book.gsilab.sittig.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 22 Dec 2013 18:05:49 +0000
+Subject: [PATCH] iio: at91: document ADC clock properties
+In-Reply-To: <52B316A9.1060407@atmel.com>
+References: <1387296973-7779-1-git-send-email-b.brezillon@overkiz.com>
+ <52B316A9.1060407@atmel.com>
+Message-ID: <52B729FD.7020507@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ dropped devicetree, we're clock specific here ]
-
-On Fri, Dec 20, 2013 at 18:34 +0200, Tero Kristo wrote:
+On 12/19/13 15:54, Nicolas Ferre wrote:
+> On 17/12/2013 17:16, Boris BREZILLON :
+>> Document the clock properties required by the at91 ADC driver.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > 
-> Divider clock can now be registered to use low level register access ops.
-> Preferred initialization method is via clock description.
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Looks fine to me.  I'm just waiting on an ack from a device tree maintainer
+(or the 3 weeks to pass so I can pick it up anyway ;)
+
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  drivers/clk/clk-divider.c    |   22 +++++++++++++++++++---
->  include/linux/clk-provider.h |    4 ++++
->  2 files changed, 23 insertions(+), 3 deletions(-)
+>> ---
+>>  .../devicetree/bindings/arm/atmel-adc.txt          |    5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> index d106146..9a1175b 100644
+>> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> @@ -5,6 +5,9 @@ Required properties:
+>>      <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+>>    - reg: Should contain ADC registers location and length
+>>    - interrupts: Should contain the IRQ line for the ADC
+>> +  - clock-names: tuple listing input clock names.
+>> +	Required elements: "adc_clk", "adc_op_clk".
+>> +  - clocks: phandles to input clocks.
+>>    - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+>>      device
+>>    - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+>> @@ -44,6 +47,8 @@ adc0: adc at fffb0000 {
+>>  	compatible = "atmel,at91sam9260-adc";
+>>  	reg = <0xfffb0000 0x100>;
+>>  	interrupts = <20 4>;
+>> +	clocks = <&adc_clk>, <&adc_op_clk>;
+>> +	clock-names = "adc_clk", "adc_op_clk";
+>>  	atmel,adc-channel-base = <0x30>;
+>>  	atmel,adc-channels-used = <0xff>;
+>>  	atmel,adc-drdy-mask = <0x10000>;
+>>
 > 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 8cfed5c..887e2d8 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -108,7 +108,12 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->  	struct clk_divider *divider = to_clk_divider(hw);
->  	unsigned int div, val;
->  
-> -	val = clk_readl(divider->reg) >> divider->shift;
-> +	if (divider->ll_ops)
-> +		val = divider->ll_ops->clk_readl(divider->reg);
-> +	else
-> +		val = clk_readl(divider->reg);
-
-Should this not better always use an ll_ops structure, which
-either is individual to the clock item, or is "global" for a
-platform, yet can get re-registered at runtime (see the comment
-on 06/49)?  And why are you referencing clk_readl() instead of
-clk_readl_default() which you specifically have introduced in the
-previous patch?  Adding a copy of the routine and using both the
-copy and the original doesn't look right.
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+> 
