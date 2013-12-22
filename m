@@ -1,73 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 22 Dec 2013 09:15:39 -0800
-Subject: [GIT PULL] ARM: Fixes for 3.13-rc
-Message-ID: <20131222171539.GA8271@quad.lixom.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 22 Dec 2013 12:21:49 -0500
+Subject: [PATCH 4/4] Phy: Add DT nodes on kirkwood and Dove for the
+ SATA PHY
+In-Reply-To: <1387311713-1926-4-git-send-email-andrew@lunn.ch>
+References: <1387311713-1926-1-git-send-email-andrew@lunn.ch>
+ <1387311713-1926-4-git-send-email-andrew@lunn.ch>
+Message-ID: <20131222172149.GJ2609@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Dec 17, 2013 at 09:21:52PM +0100, Andrew Lunn wrote:
+> Add nodes for the two SATA PHYs on kirkwood.
+> Add node for the one SATA PHY on Dove.
+> Add pHandles to the PHYs in the sata nodes.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> v1->v2:
+> sata_phy at ... ->sata-phy@
+> value after '@' matching the first address in the reg.
+> 
+> v2->v3:
+> "0" -> "port0", etc.
+> kirkewood -> kirkwood
+> ---
+>  arch/arm/boot/dts/dove.dtsi          | 11 +++++++++++
+>  arch/arm/boot/dts/kirkwood-6281.dtsi |  2 ++
+>  arch/arm/boot/dts/kirkwood-6282.dtsi |  2 ++
+>  arch/arm/boot/dts/kirkwood.dtsi      | 18 ++++++++++++++++++
+>  4 files changed, 33 insertions(+)
 
-arm-soc fixes pull request, Christmas edition 2013. No gl?gg included, sorry!
+Applied to mvebu/dt with Kishon's Ack.
 
-God Jul,
+Please double check me, I had to shuffle dove.dtsi since I recently
+sorted the nodes under the ocp bus.
 
+thx,
 
--Olof
-
-The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
-
-  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 95fcfa70f3bc4b3b82bf582fa5b24a39bdbd23ae:
-
-  Merge tag 'renesas-fixes-for-v3.13' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into fixes (2013-12-20 11:28:30 -0800)
-
-----------------------------------------------------------------
-
-ARM: SoC fixes for 3.13-rc
-
-Much smaller batch of fixes this week.
-
-Biggest one is a revert of an OMAP display change that removed some non-DT
-pinmux code that was still needed for 3.13 to get DSI displays to work.
-
-There's also a fix that resolves some misdescribed GPIO controller
-resources on shmobile. The rest are mostly smaller fixes, a couple of
-MAINTAINERS updates, etc.
-
-----------------------------------------------------------------
-Kevin Hilman (3):
-      Merge tag 'keystone/maintainer-file' of git://git.kernel.org/.../ssantosh/linux-keystone into fixes
-      Merge tag 'omap-for-v3.13/display-fix' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'renesas-fixes-for-v3.13' of git://git.kernel.org/.../horms/renesas into fixes
-
-Laurent Pinchart (1):
-      irqchip: renesas-intc-irqpin: Fix register bitfield shift calculation
-
-Magnus Damm (1):
-      ARM: shmobile: r8a7790: Fix GPIO resources in DTS
-
-Santosh Shilimkar (2):
-      MAINTAINERS: Add keystone git tree information
-      MAINTAINERS: Add keystone clock drivers
-
-Simon Horman (1):
-      ARM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-
-Tomasz Figa (1):
-      ARM: s3c64xx: dt: Fix boot failure due to double clock initialization
-
-Tomi Valkeinen (1):
-      Revert "ARM: OMAP2+: Remove legacy mux code for display.c"
-
- MAINTAINERS                               |  2 ++
- arch/arm/boot/dts/r8a7790.dtsi            | 24 +++++++++----------
- arch/arm/mach-omap2/display.c             | 38 +++++++++++++++++++++++++++++++
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c   | 11 +--------
- arch/arm/mach-shmobile/board-lager.c      |  4 +++-
- drivers/irqchip/irq-renesas-intc-irqpin.c |  8 ++++---
- 6 files changed, 61 insertions(+), 26 deletions(-)
+Jason.
