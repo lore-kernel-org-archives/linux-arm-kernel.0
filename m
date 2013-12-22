@@ -1,180 +1,73 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Sun, 22 Dec 2013 12:12:06 -0200
-Subject: [PATCH] dma-buf: avoid using IS_ERR_OR_NULL
-In-Reply-To: <CAF6AEGuQSWOw6KWVo-uorJ+8M3-kLzYHdOOfdHWUDi=SkzUUVA@mail.gmail.com>
-References: <1387586630-1954-1-git-send-email-ccross@android.com>
- <CAF6AEGuQSWOw6KWVo-uorJ+8M3-kLzYHdOOfdHWUDi=SkzUUVA@mail.gmail.com>
-Message-ID: <20131222121206.624e56fe@samsung.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Sun, 22 Dec 2013 23:25:36 +0800
+Subject: [PATCH v7 0/7] Optimize jump label implementation for ARM64
+Message-ID: <1387725944-810-1-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sat, 21 Dec 2013 07:42:17 -0500
-Rob Clark <robdclark@gmail.com> escreveu:
+This patchset tries to optimize arch specfic jump label implementation
+for ARM64 by dynamic kernel text patching.
 
-> On Fri, Dec 20, 2013 at 7:43 PM, Colin Cross <ccross@android.com> wrote:
-> > dma_buf_map_attachment and dma_buf_vmap can return NULL or
-> > ERR_PTR on a error.  This encourages a common buggy pattern in
-> > callers:
-> >         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
-> >         if (IS_ERR_OR_NULL(sgt))
-> >                 return PTR_ERR(sgt);
-> >
-> > This causes the caller to return 0 on an error.  IS_ERR_OR_NULL
-> > is almost always a sign of poorly-defined error handling.
-> >
-> > This patch converts dma_buf_map_attachment to always return
-> > ERR_PTR, and fixes the callers that incorrectly handled NULL.
-> > There are a few more callers that were not checking for NULL
-> > at all, which would have dereferenced a NULL pointer later.
-> > There are also a few more callers that correctly handled NULL
-> > and ERR_PTR differently, I left those alone but they could also
-> > be modified to delete the NULL check.
-> >
-> > This patch also converts dma_buf_vmap to always return NULL.
-> > All the callers to dma_buf_vmap only check for NULL, and would
-> > have dereferenced an ERR_PTR and panic'd if one was ever
-> > returned. This is not consistent with the rest of the dma buf
-> > APIs, but matches the expectations of all of the callers.
-> >
-> > Signed-off-by: Colin Cross <ccross@android.com>
-> > ---
-> >  drivers/base/dma-buf.c                         | 18 +++++++++++-------
-> >  drivers/gpu/drm/drm_prime.c                    |  2 +-
-> >  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     |  2 +-
-> >  drivers/media/v4l2-core/videobuf2-dma-contig.c |  2 +-
-> >  4 files changed, 14 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
-> > index 1e16cbd61da2..cfe1d8bc7bb8 100644
-> > --- a/drivers/base/dma-buf.c
-> > +++ b/drivers/base/dma-buf.c
-> > @@ -251,9 +251,8 @@ EXPORT_SYMBOL_GPL(dma_buf_put);
-> >   * @dmabuf:    [in]    buffer to attach device to.
-> >   * @dev:       [in]    device to be attached.
-> >   *
-> > - * Returns struct dma_buf_attachment * for this attachment; may return negative
-> > - * error codes.
-> > - *
-> > + * Returns struct dma_buf_attachment * for this attachment; returns ERR_PTR on
-> > + * error.
-> >   */
-> >  struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
-> >                                           struct device *dev)
-> > @@ -319,9 +318,8 @@ EXPORT_SYMBOL_GPL(dma_buf_detach);
-> >   * @attach:    [in]    attachment whose scatterlist is to be returned
-> >   * @direction: [in]    direction of DMA transfer
-> >   *
-> > - * Returns sg_table containing the scatterlist to be returned; may return NULL
-> > - * or ERR_PTR.
-> > - *
-> > + * Returns sg_table containing the scatterlist to be returned; returns ERR_PTR
-> > + * on error.
-> >   */
-> >  struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
-> >                                         enum dma_data_direction direction)
-> > @@ -334,6 +332,8 @@ struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
-> >                 return ERR_PTR(-EINVAL);
-> >
-> >         sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
-> > +       if (!sg_table)
-> > +               sg_table = ERR_PTR(-ENOMEM);
-> >
-> >         return sg_table;
-> >  }
-> > @@ -544,6 +544,8 @@ EXPORT_SYMBOL_GPL(dma_buf_mmap);
-> >   * These calls are optional in drivers. The intended use for them
-> >   * is for mapping objects linear in kernel space for high use objects.
-> >   * Please attempt to use kmap/kunmap before thinking about these interfaces.
-> > + *
-> > + * Returns NULL on error.
-> >   */
-> >  void *dma_buf_vmap(struct dma_buf *dmabuf)
-> >  {
-> > @@ -566,7 +568,9 @@ void *dma_buf_vmap(struct dma_buf *dmabuf)
-> >         BUG_ON(dmabuf->vmap_ptr);
-> >
-> >         ptr = dmabuf->ops->vmap(dmabuf);
-> > -       if (IS_ERR_OR_NULL(ptr))
-> > +       if (WARN_ON_ONCE(IS_ERR(ptr)))
-> 
-> since vmap is optional, the WARN_ON might be a bit strong..  although
-> it would be a bit strange for an exporter to supply a vmap fxn which
-> always returned NULL, not sure about that.  Just thought I'd mention
-> it in case anyone else had an opinion about that.
-> 
-> But either way:
-> 
-> Reviewed-by: Rob Clark <robdclark@gmail.com>
+To enable this feature, your toolchain must support "asm goto" extension
+and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
+"%c", and there's a patch for it now:
+http://gcc.gnu.org/ml/gcc-patches/2013-10/msg01314.html
 
-IMHO, a WARN_ON_ONCE() here (or some other error report printk) seems ok, 
-as, if this function is called, the caller would be expecting it to not
-fail.
+It has been tested on ARM Fast mode and a real hardware platform.
 
-Either way:
+Any comments are welcomed!
 
-Reviewed-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+V6->V7:
+1) Minor format clean up
+2) Remove smp_mb() pair
 
-> 
-> 
-> > +               ptr = NULL;
-> > +       if (!ptr)
-> >                 goto out_unlock;
-> >
-> >         dmabuf->vmap_ptr = ptr;
-> > diff --git a/drivers/gpu/drm/drm_prime.c b/drivers/gpu/drm/drm_prime.c
-> > index 56805c39c906..bb516fdd195d 100644
-> > --- a/drivers/gpu/drm/drm_prime.c
-> > +++ b/drivers/gpu/drm/drm_prime.c
-> > @@ -471,7 +471,7 @@ struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
-> >         get_dma_buf(dma_buf);
-> >
-> >         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
-> > -       if (IS_ERR_OR_NULL(sgt)) {
-> > +       if (IS_ERR(sgt)) {
-> >                 ret = PTR_ERR(sgt);
-> >                 goto fail_detach;
-> >         }
-> > diff --git a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
-> > index 59827cc5e770..c786cd4f457b 100644
-> > --- a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
-> > +++ b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
-> > @@ -224,7 +224,7 @@ struct drm_gem_object *exynos_dmabuf_prime_import(struct drm_device *drm_dev,
-> >         get_dma_buf(dma_buf);
-> >
-> >         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
-> > -       if (IS_ERR_OR_NULL(sgt)) {
-> > +       if (IS_ERR(sgt)) {
-> >                 ret = PTR_ERR(sgt);
-> >                 goto err_buf_detach;
-> >         }
-> > diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> > index 33d3871d1e13..880be0782dd9 100644
-> > --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> > +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> > @@ -719,7 +719,7 @@ static int vb2_dc_map_dmabuf(void *mem_priv)
-> >
-> >         /* get the associated scatterlist for this buffer */
-> >         sgt = dma_buf_map_attachment(buf->db_attach, buf->dma_dir);
-> > -       if (IS_ERR_OR_NULL(sgt)) {
-> > +       if (IS_ERR(sgt)) {
-> >                 pr_err("Error getting dmabuf scatterlist\n");
-> >                 return -EINVAL;
-> >         }
-> > --
-> > 1.8.5.1
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+V5->V6:
+1) optimize stop_machine() related code
+2) simplify aarch64_insn_patch_text_nosync() interface
+3) refine comments
 
+V4->V5:
+1) rework the stop_machine() related code
+2) rework aarch64_insn_gen_nop()
+
+V3->V4:
+1) resolve a race condition in kernel text patching
+2) address other review comments
+
+V2->V3:
+1) fix a bug in comparing signed and unsigned values
+2) detect big endian by checking __AARCH64EB__
+
+V1->V2: address review comments of V1
+1) refine comments
+2) add a new interface to always synchronize with stop_machine()
+   when patching code
+3) handle endian issue when patching code
+
+Jiang Liu (7):
+  arm64: introduce basic aarch64 instruction decoding helpers
+  arm64: introduce interfaces to hotpatch kernel and module code
+  arm64: move encode_insn_immediate() from module.c to insn.c
+  arm64: introduce aarch64_insn_gen_{nop|branch_imm}() helper functions
+  arm64, jump label: detect %c support for ARM64
+  arm64, jump label: optimize jump label implementation
+  jump_label: use defined macros instead of hard-coding for better
+    readability
+
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/include/asm/insn.h       | 108 +++++++++++++
+ arch/arm64/include/asm/jump_label.h |  51 ++++++
+ arch/arm64/kernel/Makefile          |   3 +-
+ arch/arm64/kernel/insn.c            | 304 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/jump_label.c      |  58 +++++++
+ arch/arm64/kernel/module.c          | 157 ++++++-------------
+ include/linux/jump_label.h          |  19 ++-
+ scripts/gcc-goto.sh                 |   2 +-
+ 9 files changed, 584 insertions(+), 119 deletions(-)
+ create mode 100644 arch/arm64/include/asm/insn.h
+ create mode 100644 arch/arm64/include/asm/jump_label.h
+ create mode 100644 arch/arm64/kernel/insn.c
+ create mode 100644 arch/arm64/kernel/jump_label.c
 
 -- 
-
-Cheers,
-Mauro
+1.8.1.2
