@@ -1,57 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 22 Dec 2013 14:15:48 -0800
-Subject: [GIT PULL 6/7] Samsung DT for v3.14
-In-Reply-To: <52AE0F9A.3010407@samsung.com>
-References: <52AE0F9A.3010407@samsung.com>
-Message-ID: <20131222221548.GG13365@quad.lixom.net>
+Date: Sun, 22 Dec 2013 14:22:03 -0800
+Subject: [GIT PULL] at91: dt for 3.14 #2
+In-Reply-To: <1387494198-20329-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1387494198-20329-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20131222222203.GH13365@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 05:22:50AM +0900, Kukjin Kim wrote:
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+On Fri, Dec 20, 2013 at 12:03:18AM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> Some more DT material for 3.14 based on top of what I already sent (in
+> your at91/dt branch). Nothing really surprising...
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit ca594844e4a53f778811c06feef60bdf36bc5fec:
+> 
+>   ARM: at91/at91rm9200ek.dts: rearrange nodes in address ascending order (2013-12-09 15:08:57 +0100)
 > 
 > are available in the git repository at:
 > 
-
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt2
 > 
-> for you to fetch changes up to e0b51c2eae8ebf10d80530b7a306818252206325:
+> for you to fetch changes up to 45e5c2cb6bc1c52c7134f898ea326a422dd75761:
 > 
->   ARM: dts: Update Samsung sysreg binding document (2013-12-16
-> 04:47:38 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung DT updates for v3.14
-> - Add support Octa Cores for exynos5420
->   : populate CPU node entries to 8 Cores
->   : extend mct to support 8 local interrupts
-> - Update dwmmc nodes for exynos5250 and exynos5420
->   : change status property of dwmmc nodes for exynos5250
->   : move dwmmc nodes from exynos5 to exynos5250 because
->     it's different between exynos5250 and exynos5420
->   : rename mmc nodes from dwmmc for exynos5 SoCs
->   : add dwmmc nodes for exynos5420
-> - Add G-Scaler nodes for exynos5420
-> - Add HS-i2c nodes in exynos5420
->   : High Speed I2C 7 channels (4 to 10)
-> - Update sysreg binding and node name in exynos4
-> - Update min voltage on exynos5250-arndale
-> - Move fifo-depth property from boards to exynos5250 SoC
->   : because the fifo-depth property is SoC specific
+>   ARM: at91/dt: add clk properties to sama5d3 TDES device node (2013-12-19 23:00:06 +0100)
 
-Shouldn't some of these patches be fixes instead, i.e. the vdd_arm change for
-Arndale, the sysreg node fix, etc?
-
-I've merged this in, but this I considered not doing it since it also contains
-new platform development. As I mentioned in the pull request for the 'dev'
-branch: We need to see exynos converted to multiplatform before we pick up any
-more non-multiplatform support.
-
-Merged into next/dt.
-
-Regards,
+Pulled into next/dt.
+Thanks!
 
 -Olof
