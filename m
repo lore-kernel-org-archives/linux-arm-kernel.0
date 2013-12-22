@@ -1,72 +1,29 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 22 Dec 2013 12:54:14 -0800
-Subject: [PATCH v2] MAINTAINERS: take maintainership for Energy Micro
- efm32 SoCs
-In-Reply-To: <1387570919-13627-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1387569330.616105313@f421.i.mail.ru>
- <1387570919-13627-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131222205414.22761.9778@quantum>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 22 Dec 2013 14:01:54 -0800
+Subject: [GIT PULL 1/7] Samsung fixes for v3.14
+In-Reply-To: <52AE0F41.7050706@samsung.com>
+References: <52AE0F41.7050706@samsung.com>
+Message-ID: <20131222220154.GA13365@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Uwe Kleine-K?nig (2013-12-20 12:21:59)
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Acked-by: Mark Brown <broonie@linaro.org>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
+On Mon, Dec 16, 2013 at 05:21:21AM +0900, Kukjin Kim wrote:
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 > 
-> On Fri, Dec 20, 2013 at 11:55:30PM +0400, Alexander Shiyan wrote:
-> > [...]
-> > > +F: arch/arm/boot/dts/efm32*
-> > > +F: arch/arm/configs/efm32_defconfig
-> > > +F: arch/arm/include/debug/efm32.S
-> > > +F: arch/arm/mach-efm32/
-> > > +F: drivers/clk/clk-efm32gg.c
-> > > +F: drivers/clocksource/time-efm32.c
-> > > +F: drivers/spi/spi-efm32.c
-> > > +F: drivers/tty/serial/efm32-uart.c
-> > > +F: include/dt-bindings/clock/efm32-cmu.h
-> > > +F: include/linux/platform_data/efm32-*
-> > 
-> > Maybe "N" keyword with "efm32" is better here?
-> ah, didn't know about that. Nice.
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 > 
-> So the changes since v1 are:
->  - use N: efm32
->  - add acks from Greg and Mark
->    I assume it's ok to keep them for v2 assuming they mean them being OK with
->    me maintaining the efm32 stuff and not the way to express that in
->    MAINTAINERS.
+> are available in the git repository at:
+> 
 
-Ack for the clock driver.
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes
+> 
+> for you to fetch changes up to 236940d2c951a84735fdd7b958b5159eaf501784:
+> 
+>   ARM: dts: Update display clock frequency for Origen-4412
+> (2013-12-16 04:41:57 +0900)
 
-Mike
+Pulled into next/fixes-non-critical.
 
-> 
-> Thanks
-> Uwe
-> 
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 95648eb..6ea1fb2 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -867,6 +867,12 @@ S: Maintained
->  F:     arch/arm/mach-ebsa110/
->  F:     drivers/net/ethernet/amd/am79c961a.*
->  
-> +ARM/ENERGY MICRO (SILICON LABS) EFM32 SUPPORT
-> +M:     Uwe Kleine-K?nig <kernel@pengutronix.de>
-> +L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:     Maintained
-> +N:     efm32
-> +
->  ARM/EZX SMARTPHONES (A780, A910, A1200, E680, ROKR E2 and ROKR E6)
->  M:     Daniel Ribeiro <drwyrm@gmail.com>
->  M:     Stefan Schmidt <stefan@openezx.org>
-> -- 
-> 1.8.5.1
-> 
+
+-Olof
