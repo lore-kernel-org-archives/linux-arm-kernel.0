@@ -1,81 +1,73 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 22 Dec 2013 21:22:24 +0530
-Subject: [PATCH v2 1/2] gpio: davinci: don't create irq_domain in case
- of unbanked irqs
-In-Reply-To: <1387361272-20861-2-git-send-email-grygorii.strashko@ti.com>
-References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
- <1387361272-20861-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <52B70AB8.6030503@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 22 Dec 2013 09:15:39 -0800
+Subject: [GIT PULL] ARM: Fixes for 3.13-rc
+Message-ID: <20131222171539.GA8271@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 December 2013 03:37 PM, Grygorii Strashko wrote:
-> The system may crash if:
-> - there are more then 1 bank
+Hi Linus,
 
-s/then/than
+arm-soc fixes pull request, Christmas edition 2013. No gl?gg included, sorry!
 
-> - unbanked irqs are enabled
-> - someone will call gpio_to_irq() for GPIO from bank2 or above
-> 
-> Hence, fix it by not creating irq_domain if unbanked irqs are enabled
-> and correct gpio_to_irq_banked() to handle this properly.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> 
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  drivers/gpio/gpio-davinci.c |   34 +++++++++++++++++++---------------
->  1 file changed, 19 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 5d163c0..1b33806 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -351,7 +351,10 @@ static int gpio_to_irq_banked(struct gpio_chip *chip, unsigned offset)
->  {
->  	struct davinci_gpio_controller *d = chip2controller(chip);
->  
-> -	return irq_create_mapping(d->irq_domain, d->chip.base + offset);
-> +	if (d->irq_domain)
-> +		return irq_create_mapping(d->irq_domain, d->chip.base + offset);
-> +	else
-> +		return -ENXIO;
->  }
->  
->  static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
-> @@ -429,7 +432,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->  	struct davinci_gpio_controller *chips = platform_get_drvdata(pdev);
->  	struct davinci_gpio_platform_data *pdata = dev->platform_data;
->  	struct davinci_gpio_regs __iomem *g;
-> -	struct irq_domain	*irq_domain;
-> +	struct irq_domain	*irq_domain = NULL;
->  
->  	ngpio = pdata->ngpio;
->  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> @@ -453,18 +456,20 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->  	}
->  	clk_prepare_enable(clk);
->  
-> -	irq = irq_alloc_descs(-1, 0, ngpio, 0);
-> -	if (irq < 0) {
-> -		dev_err(dev, "Couldn't allocate IRQ numbers\n");
-> -		return irq;
-> -	}
-> +	if (!pdata->gpio_unbanked) {
-> +		irq = irq_alloc_descs(-1, 0, ngpio, 0);
-> +		if (irq < 0) {
-> +			dev_err(dev, "Couldn't allocate IRQ numbers\n");
-> +			return -ENODEV;
+God Jul,
 
-The code was correct before moving. Any objections to doing
 
-			return irq;
+-Olof
 
-instead?
+The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
 
-Thanks,
-Sekhar
+  Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 95fcfa70f3bc4b3b82bf582fa5b24a39bdbd23ae:
+
+  Merge tag 'renesas-fixes-for-v3.13' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into fixes (2013-12-20 11:28:30 -0800)
+
+----------------------------------------------------------------
+
+ARM: SoC fixes for 3.13-rc
+
+Much smaller batch of fixes this week.
+
+Biggest one is a revert of an OMAP display change that removed some non-DT
+pinmux code that was still needed for 3.13 to get DSI displays to work.
+
+There's also a fix that resolves some misdescribed GPIO controller
+resources on shmobile. The rest are mostly smaller fixes, a couple of
+MAINTAINERS updates, etc.
+
+----------------------------------------------------------------
+Kevin Hilman (3):
+      Merge tag 'keystone/maintainer-file' of git://git.kernel.org/.../ssantosh/linux-keystone into fixes
+      Merge tag 'omap-for-v3.13/display-fix' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'renesas-fixes-for-v3.13' of git://git.kernel.org/.../horms/renesas into fixes
+
+Laurent Pinchart (1):
+      irqchip: renesas-intc-irqpin: Fix register bitfield shift calculation
+
+Magnus Damm (1):
+      ARM: shmobile: r8a7790: Fix GPIO resources in DTS
+
+Santosh Shilimkar (2):
+      MAINTAINERS: Add keystone git tree information
+      MAINTAINERS: Add keystone clock drivers
+
+Simon Horman (1):
+      ARM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
+
+Tomasz Figa (1):
+      ARM: s3c64xx: dt: Fix boot failure due to double clock initialization
+
+Tomi Valkeinen (1):
+      Revert "ARM: OMAP2+: Remove legacy mux code for display.c"
+
+ MAINTAINERS                               |  2 ++
+ arch/arm/boot/dts/r8a7790.dtsi            | 24 +++++++++----------
+ arch/arm/mach-omap2/display.c             | 38 +++++++++++++++++++++++++++++++
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c   | 11 +--------
+ arch/arm/mach-shmobile/board-lager.c      |  4 +++-
+ drivers/irqchip/irq-renesas-intc-irqpin.c |  8 ++++---
+ 6 files changed, 61 insertions(+), 26 deletions(-)
