@@ -1,14 +1,12 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 22 Dec 2013 21:05:11 +0530
+Date: Sun, 22 Dec 2013 21:11:03 +0530
 Subject: [PATCH v2 2/2] gpio: davinci: reuse for Keystone SoC
 In-Reply-To: <1387361272-20861-3-git-send-email-grygorii.strashko@ti.com>
 References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
  <1387361272-20861-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <52B706AF.8040408@ti.com>
+Message-ID: <52B7080F.7000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Rob,
 
 On Wednesday 18 December 2013 03:37 PM, Grygorii Strashko wrote:
 > The similar GPIO HW block is used by keystone SoCs as
@@ -43,8 +41,63 @@ On Wednesday 18 December 2013 03:37 PM, Grygorii Strashko wrote:
 >  Required Properties:
 > -- compatible: should be "ti,dm6441-gpio"
 > +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+>  
+>  - reg: Physical base address of the controller and the size of memory mapped
+>         registers.
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 1b33806..38741cc 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -413,6 +413,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
+>  	.xlate = irq_domain_xlate_onetwocell,
+>  };
+>  
+> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
+> +{
+> +	static struct irq_chip_type gpio_unbanked;
+> +
+> +	gpio_unbanked = *container_of(irq_get_chip(irq),
+> +				      struct irq_chip_type, chip);
+> +
+> +	return &gpio_unbanked.chip;
+> +};
+> +
+> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
+> +{
+> +	static struct irq_chip gpio_unbanked;
+> +
+> +	gpio_unbanked = *irq_get_chip(irq);
+> +	return &gpio_unbanked;
+> +};
+> +
+> +static const struct of_device_id davinci_gpio_ids[];
+> +
+>  /*
+>   * NOTE:  for suspend/resume, probably best to make a platform_device with
+>   * suspend_late/resume_resume calls hooking into results of the set_wake()
+> @@ -433,6 +453,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>  	struct davinci_gpio_platform_data *pdata = dev->platform_data;
+>  	struct davinci_gpio_regs __iomem *g;
+>  	struct irq_domain	*irq_domain = NULL;
+> +	const struct of_device_id *match;
+> +	struct irq_chip *irq_chip;
+> +	struct irq_chip *(*gpio_get_irq_chip)(unsigned int irq);
+> +
+> +	/*
+> +	 * Use davinci_gpio_get_irq_chip by default to handle non DT cases
+> +	 */
+> +	gpio_get_irq_chip = davinci_gpio_get_irq_chip;
+> +	match = of_match_device(of_match_ptr(davinci_gpio_ids),
+> +				dev);
+> +	if (match)
+> +		gpio_get_irq_chip = match->data;
 
-Can I get your ack for this change? Its pretty trivial, but still..
+This produces a sparse warning:
+
+  CHECK   drivers/gpio/gpio-davinci.c
+drivers/gpio/gpio-davinci.c:467:35: warning: incorrect type in assignment (different modifiers)
+drivers/gpio/gpio-davinci.c:467:35:    expected struct irq_chip *( *[assigned] gpio_get_irq_chip )( ... )
+drivers/gpio/gpio-davinci.c:467:35:    got void const *const data
 
 Thanks,
 Sekhar
