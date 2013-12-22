@@ -1,47 +1,75 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Dec 2013 08:03:07 +0100
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <CAPw-ZTnsu_EmOW3aZTVKAVjQsdi8qMy95y2ZcYxzgVrjGkirTA@mail.gmail.com>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <201312212111.40576.arnd@arndb.de>
- <CAPw-ZTnsu_EmOW3aZTVKAVjQsdi8qMy95y2ZcYxzgVrjGkirTA@mail.gmail.com>
-Message-ID: <1441245.xPZLG2iNZ6@wuerfel>
+Date: Sun, 22 Dec 2013 10:34:56 +0100
+Subject: [PATCH 4/5] drivers: net: APM X-Gene SoC Ethernet driver error
+ handling
+In-Reply-To: <1387597376-29303-5-git-send-email-isubramanian@apm.com>
+References: <1387597376-29303-1-git-send-email-isubramanian@apm.com>
+ <1387597376-29303-5-git-send-email-isubramanian@apm.com>
+Message-ID: <201312221034.56313.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 December 2013 17:00:51 Loc Ho wrote:
-> On Sat, Dec 21, 2013 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 21 December 2013, Ravi Patel wrote:
-> >> This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
-> >>  QMTM is required by APM X-Gene SoC Ethernet, PktDMA (XOR Engine) and
-> >>  Security Engine subsystems. All subsystems communicate with QMTM using
-> >>  messages which include information about the work to be performed and
-> >>  the location of associated data buffers.
-> >
-> > Please describe here what the purpose of the qmtm is, as this is not
-> > entirely clear from the code.
-> >
-> > In particular, please describe how this differs from a dmaengine driver
-> > and why it is not possible to extend the dma slave API to describe qmtm
-> > as a dma engine.
-> >
-> [Loc Ho]
-> If the QM driver implements the DMA API, what about the actual DMA
-> engine driver which interfaces with this QM driver. We would have DMA
-> client interfaces with the X-Gene DMA driver (not available yet) via
-> DMA API which in turn interfaces with this QM driver via DMA API.
-> Won't this be kind of awkward? Also, the QM only manage messages (or
-> descriptors) which are 32-bytes or 64-bytes. It doesn't actually do
-> any data transfer of various sizes.
+On Saturday 21 December 2013, Iyappan Subramanian wrote:
 
-Please describe here what the purpose of the qmtm is, as this is not
-entirely clear from the code or from your reply.
+> +#define CFG_RSIF_FPBUFF_TIMEOUT_EN_WR(src) \
+> +	(((u32)(src)<<31) & 0x80000000)
+> +#define RSIF_LCL_RXBUF_FIFO_OVERFL_INTR_RXPRT10_MASK                 0x20000000
+> +#define RSIF_LCL_RXBUF_FIFO_OVERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x20000000)>>29)
+> +#define RSIF_LCL_RXBUF_FIFO_UNDERFL_INTR_RXPRT10_MASK                0x10000000
+> +#define RSIF_LCL_RXBUF_FIFO_UNDERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x10000000)>>28)
+> +#define RSIF_CHKSUM_BUFF_FIFO_OVERFL_INTR_RXPRT10_MASK               0x08000000
+> +#define RSIF_CHKSUM_BUFF_FIFO_OVERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x08000000)>>27)
+> +#define RSIF_CHKSUM_BUFF_FIFO_UNDERFL_INTR_RXPRT10_MASK              0x04000000
+> +#define RSIF_CHKSUM_BUFF_FIFO_UNDERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x04000000)>>26)
+> +#define RSIF_TIMESTAMP_BUFF_FIFO_OVERFL_INTR_RXPRT10_MASK            0x02000000
+> +#define RSIF_TIMESTAMP_BUFF_FIFO_OVERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x02000000)>>25)
+> +#define RSIF_TIMESTAMP_BUFF_FIFO_UNDERFL_INTR_RXPRT10_MASK           0x01000000
+> +#define RSIF_TIMESTAMP_BUFF_FIFO_UNDERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x01000000)>>24)
+> +#define RSIF_ERR_BUFF_FIFO_OVERFL_INTR_RXPRT10_MASK                  0x00800000
+> +#define RSIF_ERR_BUFF_FIFO_OVERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x00800000)>>23)
+> +#define RSIF_ERR_BUFF_FIFO_UNDERFL_INTR_RXPRT10_MASK                 0x00400000
+> +#define RSIF_ERR_BUFF_FIFO_UNDERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x00400000)>>22)
+> +#define RSIF_CLEBUFF_FIFO_OVERFL_INTR_RXPRT10_MASK                   0x00200000
+> +#define RSIF_CLEBUFF_FIFO_OVERFL_INTR_RXPRT10_RD(src) \
+> +	(((src) & 0x00200000)>>21)
 
-Greg was guessing that it's a bus controller, my best guess is a DMA
-engine. If it's something completely different, you have to let
-us know what it is so we can do a proper review rather than guessing.
+I think you can just remove all the above obfuscation, since all you ever
+do is this:
 
-Please provide a link to the data sheet if you are unable to explain.
+> +	rc = xgene_enet_rd(priv, BLOCK_MCX_MAC_CSR, MAC_INT_REG0_ADDR, &data);
+> +	if (data) {
+> +		pr_err("Received MAC Error Interrupt\n");
+> +
+> +		if (ICM_DATA_FIFO_UNDERFL_INTR_PRT10_RD(data)) {
+> +			pr_err("RxPort1 ICM Data fifo underflow intr\n");
+> +			int_mask |= ICM_DATA_FIFO_UNDERFL_INTR_PRT10_MASK;
+> +		}
+> +		if (ICM_DATA_FIFO_OVERFL_INTR_PRT10_RD(data)) {
+> +			pr_err("RxPort1 ICM Data fifo overflow intr\n");
+> +			int_mask |= ICM_DATA_FIFO_OVERFL_INTR_PRT10_MASK;
+> +		}
+> +		if (ICM_CTRL_FIFO_UNDERFL_INTR_PRT10_RD(data)) {
+> +			pr_err("RxPort1 ICM Ctrl fifo underflow intr\n");
+> +			int_mask |= ICM_CTRL_FIFO_UNDERFL_INTR_PRT10_MASK;
+> +		}
+> +		if (ICM_CTRL_FIFO_OVERFL_INTR_PRT10_RD(data)) {
+> +			pr_err("RxPort1 ICM Ctrl fifo overflow intr\n");
+> +			int_mask |= ICM_CTRL_FIFO_OVERFL_INTR_PRT10_MASK;
+> +		}
+> +		if (ECM_DATA_FIFO_UNDERN_INTR_PRT10_RD(data)) {
+> +			pr_err("RxPort1 ECM Data fifo underrun intr\n");
+> +			int_mask |= ECM_DATA_FIFO_UNDERN_INTR_PRT10_MASK;
+> +		}
+
+So there is one string you print per bit. Just use an array of strings
+and for_each_set_bit() loop.
 
 	Arnd
