@@ -1,49 +1,95 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 23 Dec 2013 11:57:12 -0500
-Subject: [PATCH v8 3/9] usb: gadget: s3c-hsotg: enable build for other
- platforms
-In-Reply-To: <1831289.ILfyABDFji@amdc1227>
-References: <1387462990-12039-1-git-send-email-mporter@linaro.org>
- <1387462990-12039-4-git-send-email-mporter@linaro.org>
- <20131223162557.GC28679@saruman.home> <1831289.ILfyABDFji@amdc1227>
-Message-ID: <20131223165712.GB9826@beef>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Dec 2013 10:58:51 -0600
+Subject: [PATCH v7 00/14] Add power management support for mxs phy
+In-Reply-To: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
+References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131223165851.GG28679@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 05:30:41PM +0100, Tomasz Figa wrote:
-> On Monday 23 of December 2013 10:25:57 Felipe Balbi wrote:
-> > On Thu, Dec 19, 2013 at 09:23:04AM -0500, Matt Porter wrote:
-> > > Remove unused Samsung-specific machine include and Kconfig
-> > > dependency on S3C.
-> > > 
-> > > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> > > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> > > ---
-> > >  drivers/usb/gadget/Kconfig     | 7 +++----
-> > >  drivers/usb/gadget/s3c-hsotg.c | 2 --
-> > >  2 files changed, 3 insertions(+), 6 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-> > > index a91e642..181e760 100644
-> > > --- a/drivers/usb/gadget/Kconfig
-> > > +++ b/drivers/usb/gadget/Kconfig
-> > > @@ -294,11 +294,10 @@ config USB_PXA27X
-> > >  	   gadget drivers to also be dynamically linked.
-> > >  
-> > >  config USB_S3C_HSOTG
-> > > -	tristate "S3C HS/OtG USB Device controller"
-> > > -	depends on S3C_DEV_USB_HSOTG
-> > > +	tristate "Designware/S3C HS/OtG USB Device controller"
-> > 
-> > causes build failure in x86. Sorry dropping from my queue.
+Hi,
+
+On Fri, Dec 20, 2013 at 03:51:56PM +0800, Peter Chen wrote:
+> Hi Felipe & Shawn,
 > 
-> Maybe depends on ARM would be a good enough stepping stone?
+> The serial adds power management support for MXS PHY, it includes:
+> 
+> - Add one PHY API .set_wakeup, and related API implementation at mxs phy driver
+> - misc changes and bug fixes for mxs phy to support low power mode and wakeup.
+> 
+> It is based on Greg's usb-next, 3.13-rc1.
 
-Yes, we could then move from readsl/writesl to ioread_read/io_write_rep
-next time around as that fixes the portability issue.
+I can't take all patches through my tree because it lacks acked-by's.
+But I'm afraid there are dependencies with your patches.
 
-Felipe, since depending on ARM is a trivial fix for this, can you take
-an updated version at this point?
+> Peter Chen (14):
+>   usb: doc: phy-mxs: Add more compatible strings
 
--Matt
+ok
+
+>   usb: phy-mxs: Add platform judgement code
+
+ok
+
+>   usb: phy-mxs: Add auto clock and power setting
+
+ok
+
+>   usb: doc: phy-mxs: update binding for adding anatop phandle
+
+ok
+
+>   ARM: dts: imx6: add anatop phandle for usbphy
+
+misses Ack
+
+>   usb: phy-mxs: Add anatop regmap
+
+depends on previous
+
+>   usb: phy-mxs: change description of usb device speed
+
+ok
+
+>   usb: phy-mxs: Enable IC fixes for related SoCs
+
+ok
+
+>   ARM: dts: imx: add mxs phy controller id
+
+misses Ack
+
+>   usb: phy-mxs: add controller id
+
+depends on previous
+
+>   usb: phy: Add set_wakeup API
+
+ok
+
+>   usb: phy-mxs: Add implementation of set_wakeup
+
+ok
+
+>   usb: phy-mxs: Add system suspend/resume API
+
+ok
+
+>   usb: phy-mxs: Add sync time after controller clear phcd
+
+ok
+
+Considering the dependencies, I think it's safer to defer this patchset
+until next merge window.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131223/e0fd752f/attachment.sig>
