@@ -1,34 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 23 Dec 2013 09:21:50 -0800
-Subject: arm-soc during the holidays
-Message-ID: <CAOesGMjJeDLyUvmigVVz4geqZaqEibQr3_x7_VEtVKiP2eH+HQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 23 Dec 2013 18:26:49 +0100
+Subject: [RFC 03/18] GPIO: gpio-generic: Add label to platform data
+In-Reply-To: <1387815830-8794-4-git-send-email-pawel.moll@arm.com>
+References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
+ <1387815830-8794-4-git-send-email-pawel.moll@arm.com>
+Message-ID: <CACRpkdb4w26vuOtR1bAhQ6k=1uQx=np4WwoabvH8pOq8HK54=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the holiday season is upon us and I've gotten a few questions
-already, I wanted to let people know that things will be slower than
-usual for the next few weeks w.r.t. merging. I've got a backlog
-already, and I'll be going through them a few at a time. So just
-because you see me merging a few branches but not yours, don't panic
-thinking I've missed your request.
+On Mon, Dec 23, 2013 at 5:23 PM, Pawel Moll <pawel.moll@arm.com> wrote:
 
-The ones currently in the pipeline to look at are:
+> When registering more than one platform device, it is
+> useful to set the gpio chip label in the platform data.
+>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Anton Vorontsov <anton@enomsg.org>
 
-* Tegra from Stephen
-* Allwinner drivers from Maxime
-* A second set of Samsung branches from Kukjin
-* A set of Renesas branches from Simon
-* Revisiting the hisilicon stuff
+Good point. But what about also adding device tree support for
+naming the chips while you're at it?
 
-If yours are in the above; do not worry I will get to them. If it's
-not, send arm at kernel.org a ping on the pull request.
+I imagine a generic gpiochip property in
+Documentation/devicetree/bindings/gpio/gpio.txt
 
-Linus also mentioned the likelihood of going until -rc8 in his -rc5
-announcement. That does not mean I want you to hold off your pull
-requests until -rc7, please post them. This cycle has been good with
-plenty of early pull requests, keep it up.
-
-
-Happy Holidays,
-
--Olof
+Yours,
+Linus Walleij
