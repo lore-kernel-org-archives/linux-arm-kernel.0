@@ -1,28 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Dec 2013 18:20:20 +0100
-Subject: [PATCH 1/2] clk: versatile: pass a name to ICST clock provider
-In-Reply-To: <CACRpkdYw-cjsJWd85_O=ZFOG1oawZU1cuEzZLyCLj6Z49+2fNw@mail.gmail.com>
-References: <1385326732-16406-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdYw-cjsJWd85_O=ZFOG1oawZU1cuEzZLyCLj6Z49+2fNw@mail.gmail.com>
-Message-ID: <CACRpkdaGLhm+3gNtddiU0TKkCDXEBAhp6SrJAw7571gpcEOnaA@mail.gmail.com>
+Date: Mon, 23 Dec 2013 18:20:55 +0100
+Subject: [PATCH 2/2] clk: versatile: fixup IM-PD1 clock implementation
+In-Reply-To: <CACRpkdZmyh-a_0ANEeO-DnJ=E_vXsiT3YifoV+zFReJmekyt7Q@mail.gmail.com>
+References: <1385326744-16445-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZmyh-a_0ANEeO-DnJ=E_vXsiT3YifoV+zFReJmekyt7Q@mail.gmail.com>
+Message-ID: <CACRpkdZMH7HuX_QdwHFr=moK1yWiE7jva1zBCDq9eK3OK6qPTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 11:14 AM, Linus Walleij
+On Tue, Dec 10, 2013 at 11:15 AM, Linus Walleij
 <linus.walleij@linaro.org> wrote:
-> On Sun, Nov 24, 2013 at 9:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Nov 24, 2013 at 9:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 >
->> When we have more than one of these clocks in a system (such as
->> on the IM-PD1) we need a mechanism to pass a name for the clock.
->> Refactor to add this as an argument.
+>> Register both VCO clocks, give per-logical module unique names
+>> to the clocks so we can have several IM-PD1's connected (in
+>> theory). Implement all the fixed-factor clocks as children of
+>> VCO2.
+>>
+>> Tested by using the UARTs and the PL181 MMC block on the IM-PD1,
+>> works flawlessly.
 >>
 >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >> ---
->> Hi Mike, I'd like an ACK for this if you're OK with it, so I
->> can take it through the ARM SoC tree with the rest of the
->> Integrator patches.
+>> Hi Mike, if you're happy with this, I'd like an ACK to carry it
+>> through the ARM SoC tree.
 >
-> Mike, ping on this. I want to prep a pull request...
+> Mike, ping on this.
 
 Ping on this again.
 
