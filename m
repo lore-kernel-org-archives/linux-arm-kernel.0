@@ -1,80 +1,42 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Mon, 23 Dec 2013 13:36:35 -0500
-Subject: [PATCH v9 6/9] usb: gadget: s3c-hsotg: get phy bus width from phy
- subsystem
+Date: Mon, 23 Dec 2013 13:36:36 -0500
+Subject: [PATCH v9 7/9] phy: add Broadcom Kona USB2 PHY DT binding
 In-Reply-To: <1387823798-10211-1-git-send-email-mporter@linaro.org>
 References: <1387823798-10211-1-git-send-email-mporter@linaro.org>
-Message-ID: <1387823798-10211-7-git-send-email-mporter@linaro.org>
+Message-ID: <1387823798-10211-8-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for querying the phy bus width from the generic phy
-subsystem. Configure UTMI bus width in GUSBCFG based on this value.
+Add a binding that describes the Broadcom Kona USB2 PHY found
+on the BCM281xx family of SoCs.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
 Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
- drivers/usb/gadget/s3c-hsotg.h |  1 +
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/phy/bcm-phy.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/bcm-phy.txt
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 8f9bcdb..93ba8b6 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -146,6 +146,7 @@ struct s3c_hsotg_ep {
-  * @regs: The memory area mapped for accessing registers.
-  * @irq: The IRQ number we are using
-  * @supplies: Definition of USB power supplies
-+ * @phyif: PHY interface width
-  * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
-  * @num_of_eps: Number of available EPs (excluding EP0)
-  * @debug_root: root directrory for debugfs.
-@@ -174,6 +175,7 @@ struct s3c_hsotg {
- 
- 	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
- 
-+	u32			phyif;
- 	unsigned int		dedicated_fifos:1;
- 	unsigned char           num_of_eps;
- 
-@@ -2279,7 +2281,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
- 	 */
- 
- 	/* set the PLL on, remove the HNP/SRP and set the PHY */
--	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
-+	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
- 	       (0x5 << 10), hsotg->regs + GUSBCFG);
- 
- 	s3c_hsotg_init_fifo(hsotg);
-@@ -3638,6 +3640,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
- 		goto err_supplies;
- 	}
- 
-+	/* Set default UTMI width */
-+	hsotg->phyif = GUSBCFG_PHYIf16;
+diff --git a/Documentation/devicetree/bindings/phy/bcm-phy.txt b/Documentation/devicetree/bindings/phy/bcm-phy.txt
+new file mode 100644
+index 0000000..3dc8b3d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/bcm-phy.txt
+@@ -0,0 +1,15 @@
++BROADCOM KONA USB2 PHY
 +
-+	/*
-+	 * If using the generic PHY framework, check if the PHY bus
-+	 * width is 8-bit and set the phyif appropriately.
-+	 */
-+	if (hsotg->phy && (phy_get_bus_width(phy) == 8))
-+		hsotg->phyif = GUSBCFG_PHYIf8;
++Required properties:
++ - compatible: brcm,kona-usb2-phy
++ - reg: offset and length of the PHY registers
++ - #phy-cells: must be 0
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
 +
- 	if (hsotg->phy)
- 		phy_init(hsotg->phy);
- 
-diff --git a/drivers/usb/gadget/s3c-hsotg.h b/drivers/usb/gadget/s3c-hsotg.h
-index d650b12..85f549f 100644
---- a/drivers/usb/gadget/s3c-hsotg.h
-+++ b/drivers/usb/gadget/s3c-hsotg.h
-@@ -55,6 +55,7 @@
- #define GUSBCFG_HNPCap				(1 << 9)
- #define GUSBCFG_SRPCap				(1 << 8)
- #define GUSBCFG_PHYIf16			(1 << 3)
-+#define GUSBCFG_PHYIf8				(0 << 3)
- #define GUSBCFG_TOutCal_MASK			(0x7 << 0)
- #define GUSBCFG_TOutCal_SHIFT			(0)
- #define GUSBCFG_TOutCal_LIMIT			(0x7)
++Example:
++
++	usbphy: usb-phy at 3f130000 {
++		compatible = "brcm,kona-usb2-phy";
++		reg = <0x3f130000 0x28>;
++		#phy-cells = <0>;
++	};
 -- 
 1.8.4
