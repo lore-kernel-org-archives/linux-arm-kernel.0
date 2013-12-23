@@ -1,139 +1,68 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 23 Dec 2013 09:31:39 -0800
-Subject: [RFC 08/18] hwmon: vexpress: Use regmap instead of custom
- interface
-In-Reply-To: <1387815830-8794-9-git-send-email-pawel.moll@arm.com>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-9-git-send-email-pawel.moll@arm.com>
-Message-ID: <20131223173139.GA1678@roeck-us.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Dec 2013 11:34:09 -0600
+Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
+In-Reply-To: <20131221005309.GH26054@atomide.com>
+References: <1384970958-4118-1-git-send-email-balbi@ti.com>
+ <20131219184815.GU27438@atomide.com>
+ <20131219232153.GE707@saruman.home>
+ <20131221005309.GH26054@atomide.com>
+Message-ID: <20131223173409.GA10536@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 04:23:40PM +0000, Pawel Moll wrote:
-> This patch makes the Versatile Express hwmon driver
-> use regmap interface, instead of custom vexpress config
-> one. It will request the regmap resource associated
-> with the device, which makes it pretty much hardware
-> agnostic.
+On Fri, Dec 20, 2013 at 04:53:09PM -0800, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [131219 15:23]:
+> > On Thu, Dec 19, 2013 at 10:48:15AM -0800, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [131120 10:10]:
+> > > > Afte these patches, we're very close to being able
+> > > > to move arch/arm/mach-omap2/irq.c to drivers/irqchip/irq-intc.c
+> > > 
+> > > That would be nice :)
+> > >  
+> > > > All which would be missing is for Tony to drop all OMAP2/3 board
+> > > > files so we remove the few pending bits and pieces left in
+> > > > for legacy boot.
+> > > 
+> > > That may still need to wait a while, but let's see.
+> > >  
+> > > > Note that I have only boot tested these on AM335x Bone Black
+> > > > (with a small fix for fixed regulator which should be in
+> > > > the mailing list already), so I'd need help testing all
+> > > > other impacted platforms, specially when it comes to PM.
+> > > 
+> > > Sorry have not had much of a chance to test these with PM with
+> > > all the fixes needed for omap3 DT mode. Tried testing these
+> > > just now, but I get:
+> > > 
+> > > arch/arm/mach-omap2/board-generic.c:134: error: ?omap_intc_of_init? undeclared here (not in a function)
+> > 
+> > some of your other changes messed it up, I have not references of
+> > omap_intc_of_init() in my branch, because that's one of the things I'm
+> > dropping from DT-based boots.
+> > 
+> > Can you see which patch added a new omap_intc_of_init() call ? Or maybe
+> > tell me which branch I should rebase on top of ?
 > 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> Cc: Jean Delvare <khali@linux-fr.org>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: lm-sensors at lm-sensors.org
-> ---
->  drivers/hwmon/Kconfig    |  3 ++-
->  drivers/hwmon/vexpress.c | 29 +++++++++++------------------
->  2 files changed, 13 insertions(+), 19 deletions(-)
+> OK I tried against v3.13-rc4, it's the 3517 changes that caused
+> it. Looks like that can be just removed, and then there are some
+> trivial n8x0 merge conflicts. And n8x0 boots too.
 > 
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 52d548f..7747a47 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-> @@ -1324,7 +1324,8 @@ config SENSORS_TWL4030_MADC
->  
->  config SENSORS_VEXPRESS
->  	tristate "Versatile Express"
-> -	depends on VEXPRESS_CONFIG
-> +	depends on ARM || ARM64
-> +	depends on REGMAP
->  	help
->  	  This driver provides support for hardware sensors available on
->  	  the ARM Ltd's Versatile Express platform. It can provide wide
-> diff --git a/drivers/hwmon/vexpress.c b/drivers/hwmon/vexpress.c
-> index d867e6b..b58cf1c 100644
-> --- a/drivers/hwmon/vexpress.c
-> +++ b/drivers/hwmon/vexpress.c
-> @@ -22,11 +22,11 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> -#include <linux/vexpress.h>
-> +#include <linux/regmap.h>
->  
->  struct vexpress_hwmon_data {
->  	struct device *hwmon_dev;
-> -	struct vexpress_config_func *func;
-> +	struct regmap *reg;
->  };
->  
->  static ssize_t vexpress_hwmon_name_show(struct device *dev,
-> @@ -56,7 +56,7 @@ static ssize_t vexpress_hwmon_u32_show(struct device *dev,
->  	int err;
->  	u32 value;
->  
-> -	err = vexpress_config_read(data->func, 0, &value);
-> +	err = regmap_read(data->reg, 0, &value);
->  	if (err)
->  		return err;
->  
-> @@ -69,13 +69,13 @@ static ssize_t vexpress_hwmon_u64_show(struct device *dev,
->  {
->  	struct vexpress_hwmon_data *data = dev_get_drvdata(dev);
->  	int err;
-> -	u32 value_hi, value_lo;
-> +	unsigned int value_hi, value_lo;
->  
-> -	err = vexpress_config_read(data->func, 0, &value_lo);
-> +	err = regmap_read(data->reg, 0, &value_lo);
->  	if (err)
->  		return err;
->  
-> -	err = vexpress_config_read(data->func, 1, &value_hi);
-> +	err = regmap_read(data->reg, 1, &value_hi);
->  	if (err)
->  		return err;
->  
-> @@ -175,26 +175,21 @@ static int vexpress_hwmon_probe(struct platform_device *pdev)
->  	if (!match)
->  		return -ENODEV;
->  
-> -	data->func = vexpress_config_func_get_by_dev(&pdev->dev);
-> -	if (!data->func)
-> +	data->reg = dev_get_regmap(&pdev->dev, NULL);
-> +	if (!data->reg)
->  		return -ENODEV;
->  
->  	err = sysfs_create_group(&pdev->dev.kobj, match->data);
->  	if (err)
-> -		goto error;
-> +		return err;
->  
->  	data->hwmon_dev = hwmon_device_register(&pdev->dev);
->  	if (IS_ERR(data->hwmon_dev)) {
-> -		err = PTR_ERR(data->hwmon_dev);
-> -		goto error;
-> +		sysfs_remove_group(&pdev->dev.kobj, match->data);
-> +		return PTR_ERR(data->hwmon_dev);
+> But looks like omap3 off-idle hangs after hitting idle with these,
 
-This change is unrelated and violates coding style. If the goto disturbs you,
-I would suggest to convert the driver to use devm_hwmon_device_register_with_groups() 
-in a separate patch and get rid of the error handling and the entire remove() function.
+could it be we're racing between irq_chip.suspend() and hwmod's
+_disable() calls ?
 
-Thanks,
-Guenter
+> so a bit more work is needed. Maybe also rebase these against
+> omap-for-v3.14/dt too?
 
->  	}
->  
->  	return 0;
-> -
-> -error:
-> -	sysfs_remove_group(&pdev->dev.kobj, match->data);
-> -	vexpress_config_func_put(data->func);
-> -	return err;
->  }
->  
->  static int vexpress_hwmon_remove(struct platform_device *pdev)
-> @@ -207,8 +202,6 @@ static int vexpress_hwmon_remove(struct platform_device *pdev)
->  	match = of_match_device(vexpress_hwmon_of_match, &pdev->dev);
->  	sysfs_remove_group(&pdev->dev.kobj, match->data);
->  
-> -	vexpress_config_func_put(data->func);
-> -
->  	return 0;
->  }
->  
-> -- 
-> 1.8.3.2
-> 
-> 
-> 
+Will do.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131223/39d4027f/attachment.sig>
