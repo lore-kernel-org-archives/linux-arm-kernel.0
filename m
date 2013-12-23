@@ -1,58 +1,78 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 12:46:00 -0800
-Subject: [PATCH v2 4/7] mfd: ssbi: Add regmap read/write helpers
+Date: Mon, 23 Dec 2013 12:45:58 -0800
+Subject: [PATCH v2 2/7] mfd: pm8921: Update for genirq changes
 In-Reply-To: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
 References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387831563-13535-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387831563-13535-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add read and write helper functions that the pm8921-core driver
-can use to read and write ssbi regsiters via a "no-bus" regmap.
+Since this code has been marked broken for some time a few genirq
+tree wide changes weren't made. set_irq_wake() was renamed to
+irq_set_irq_wake() in commit a0cd9ca2b (genirq: Namespace
+cleanup, 2011-02-10) and commit 10a8c383 (irq: introduce entry
+and exit functions for chained handlers) introduced the chained
+irq functions but this driver wasn't updated to use them. Fix
+these problems and remove the BROKEN marking on this driver.
 
-Cc: Mark Brown <broonie@kernel.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mfd/ssbi.c   | 13 +++++++++++++
- include/linux/ssbi.h |  3 +++
- 2 files changed, 16 insertions(+)
+ drivers/mfd/Kconfig       | 1 -
+ drivers/mfd/pm8921-core.c | 7 +++++--
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/ssbi.c b/drivers/mfd/ssbi.c
-index b78942e..c5d270f 100644
---- a/drivers/mfd/ssbi.c
-+++ b/drivers/mfd/ssbi.c
-@@ -269,6 +269,19 @@ int ssbi_write(struct device *dev, u16 addr, const u8 *buf, int len)
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 9ee4ce6..35007ed 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -453,7 +453,6 @@ config MFD_PM8XXX
+ config MFD_PM8921_CORE
+ 	tristate "Qualcomm PM8921 PMIC chip"
+ 	depends on (ARCH_MSM || HEXAGON)
+-	depends on BROKEN
+ 	select MFD_CORE
+ 	select MFD_PM8XXX
+ 	help
+diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
+index 669f8f2..7964932 100644
+--- a/drivers/mfd/pm8921-core.c
++++ b/drivers/mfd/pm8921-core.c
+@@ -15,6 +15,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/irq.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+@@ -174,6 +175,8 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	u8	root;
+ 	int	i, ret, masters = 0;
+ 
++	chained_irq_enter(irq_chip, desc);
++
+ 	ret = pm8xxx_read_root_irq(chip, &root);
+ 	if (ret) {
+ 		pr_err("Can't read root status ret=%d\n", ret);
+@@ -188,7 +191,7 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		if (masters & (1 << i))
+ 			pm8xxx_irq_master_handler(chip, i);
+ 
+-	irq_chip->irq_ack(&desc->irq_data);
++	chained_irq_exit(irq_chip, desc);
  }
- EXPORT_SYMBOL_GPL(ssbi_write);
  
-+int ssbi_reg_read(void *context, unsigned int reg, unsigned int *val)
-+{
-+	*val = 0;
-+	return ssbi_read(context, reg, (u8 *)val, 1);
-+}
-+EXPORT_SYMBOL_GPL(ssbi_reg_read);
-+
-+int ssbi_reg_write(void *context, unsigned int reg, unsigned int val)
-+{
-+	return ssbi_write(context, reg, (u8 *)&val, 1);
-+}
-+EXPORT_SYMBOL_GPL(ssbi_reg_write);
-+
- static int ssbi_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-diff --git a/include/linux/ssbi.h b/include/linux/ssbi.h
-index bcbb642..b862f3d 100644
---- a/include/linux/ssbi.h
-+++ b/include/linux/ssbi.h
-@@ -20,4 +20,7 @@
- int ssbi_write(struct device *dev, u16 addr, const u8 *buf, int len);
- int ssbi_read(struct device *dev, u16 addr, u8 *buf, int len);
+ static void pm8xxx_irq_mask_ack(struct irq_data *d)
+@@ -367,7 +370,7 @@ static struct pm_irq_chip *pm8xxx_irq_init(struct device *dev,
+ 	irq_set_irq_type(devirq, pdata->irq_trigger_flag);
+ 	irq_set_handler_data(devirq, chip);
+ 	irq_set_chained_handler(devirq, pm8xxx_irq_handler);
+-	set_irq_wake(devirq, 1);
++	irq_set_irq_wake(devirq, 1);
  
-+int ssbi_reg_read(void *context, unsigned int reg, unsigned int *val);
-+int ssbi_reg_write(void *context, unsigned int reg, unsigned int val);
-+
- #endif
+ 	return chip;
+ }
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
