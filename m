@@ -1,92 +1,68 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Mon, 23 Dec 2013 15:49:22 -0500
-Subject: [PATCH V4] thermal: imx: add necessary clk operation
-Message-ID: <1387831763-16971-1-git-send-email-b20788@freescale.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Dec 2013 09:52:09 +0100
+Subject: [PATCH 1/3] ARM: mvebu: move ARMADA_XP_MAX_CPUS to armada-370-xp.h
+In-Reply-To: <1387788491-3168-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1387788491-3168-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <52B7F9B9.1020209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thermal sensor needs pll3_usb_otg when measuring temperature,
-otherwise the temperature read will be incorrect, so need to
-enable this clk before sensor working, for alarm function,
-as hardware will take measurement periodically, so we should
-keep this clk always on once alarm function is enabled.
+Hi Thomas,
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- .../devicetree/bindings/thermal/imx-thermal.txt    |    4 ++++
- drivers/thermal/imx_thermal.c                      |   20 ++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+On 23/12/2013 09:48, Thomas Petazzoni wrote:
+> The ARMADA_XP_MAX_CPUS definition was in common.h, which as its name
+> says, is common to all mvebu SoCs. It is more logical to have this XP
+> specific definition in the already existing armada-370-xp.h header
+> file, especially in preparation to the addition of the support for
+> other SOCs in mach-mvebu.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-index 541c25e..1f0f672 100644
---- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
-@@ -8,10 +8,14 @@ Required properties:
-   calibration data, e.g. OCOTP on imx6q.  The details about calibration data
-   can be found in SoC Reference Manual.
- 
-+Optional properties:
-+- clocks : thermal sensor's clock source.
-+
- Example:
- 
- tempmon {
- 	compatible = "fsl,imx6q-tempmon";
- 	fsl,tempmon = <&anatop>;
- 	fsl,tempmon-data = <&ocotp>;
-+	clocks = <&clks 172>;
- };
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index 1d6c801..cbb16f3 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -7,6 +7,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/cpu_cooling.h>
- #include <linux/cpufreq.h>
- #include <linux/delay.h>
-@@ -73,6 +74,7 @@ struct imx_thermal_data {
- 	unsigned long last_temp;
- 	bool irq_enabled;
- 	int irq;
-+	struct clk *thermal_clk;
- };
- 
- static void imx_set_alarm_temp(struct imx_thermal_data *data,
-@@ -457,6 +459,22 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->thermal_clk)) {
-+		dev_warn(&pdev->dev, "failed to get thermal clk!\n");
-+	} else {
-+		/*
-+		 * Thermal sensor needs clk on to get correct value, normally
-+		 * we should enable its clk before taking measurement and disable
-+		 * clk after measurement is done, but if alarm function is enabled,
-+		 * hardware will auto measure the temperature periodically, so we
-+		 * need to keep the clk always on for alarm function.
-+		 */
-+		ret = clk_prepare_enable(data->thermal_clk);
-+		if (ret)
-+			dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-+	}
-+
- 	/* Enable measurements at ~ 10 Hz */
- 	regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
- 	measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
-@@ -478,6 +496,8 @@ static int imx_thermal_remove(struct platform_device *pdev)
- 
- 	/* Disable measurements */
- 	regmap_write(map, TEMPSENSE0 + REG_SET, TEMPSENSE0_POWER_DOWN);
-+	if (!IS_ERR(data->thermal_clk))
-+		clk_disable_unprepare(data->thermal_clk);
- 
- 	thermal_zone_device_unregister(data->tz);
- 	cpufreq_cooling_unregister(data->cdev);
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
+>  arch/arm/mach-mvebu/common.h        | 2 --
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
+> index c612b2c..4ed534d 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.h
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.h
+> @@ -18,6 +18,8 @@
+>  #ifdef CONFIG_SMP
+>  #include <linux/cpumask.h>
+>  
+> +#define ARMADA_XP_MAX_CPUS 4
+> +
+>  void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
+>  void armada_xp_mpic_smp_cpu_init(void);
+>  #endif
+> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+> index e366010..f7ad45e 100644
+> --- a/arch/arm/mach-mvebu/common.h
+> +++ b/arch/arm/mach-mvebu/common.h
+> @@ -15,8 +15,6 @@
+>  #ifndef __ARCH_MVEBU_COMMON_H
+>  #define __ARCH_MVEBU_COMMON_H
+>  
+> -#define ARMADA_XP_MAX_CPUS 4
+> -
+>  #include <linux/reboot.h>
+>  
+>  void mvebu_restart(enum reboot_mode mode, const char *cmd);
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
