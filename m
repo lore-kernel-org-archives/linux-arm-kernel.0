@@ -1,131 +1,370 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 23 Dec 2013 11:38:05 +0100
-Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
-In-Reply-To: <s5hzjnwrbq2.wl%tiwai@suse.de>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
- <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
- <s5hd2kssu4g.wl%tiwai@suse.de> <20131219164824.GA16145@lee--X1>
- <s5hzjnwrbq2.wl%tiwai@suse.de>
-Message-ID: <s5h4n5zette.wl%tiwai@suse.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 23 Dec 2013 19:02:23 +0800
+Subject: [PATCH 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe lock in
+ atomic context
+Message-ID: <1387796544-18209-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Thu, 19 Dec 2013 18:29:09 +0100,
-Takashi Iwai wrote:
-> 
-> At Thu, 19 Dec 2013 16:48:24 +0000,
-> Lee Jones wrote:
-> > 
-> > > > Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
-> > > > rather carelessly converts find_next_bit() to fls() (find last
-> > > > bit set), which are not the same.
-> > > 
-> > > Does it break on the real machines?
-> > 
-> > It does, that's how I found the bug.
-> > 
-> > > fls() behaves differently from find_next_bit(), of course, but in this
-> > > case, it should work same in the end, since there are at most two
-> > > bits.
-> > 
-> > Unfortunately it doesn't work at all. This patch brings audio back to
-> > a working state. It took me the best part of a day to track down the
-> > issue. :(
-> 
-> Hmm, then isn't the original code rather buggy?
-> 
-> Check the values set there by ffs(), fls() and the original
-> find_next_bit(), especially whether find_next_bit() gives a valid
-> value fitting with the mask bits.
+Sometimes we may meet the following lockdep issue.
+The root cause is .set_clock callback is executed with spin_lock_irqsave
+in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
+clk_get_rate which is using a mutex lock.
 
-Meanwhile, it's not good to keep the broken code in the upstream, and
-the bug is obvious.  Below is the fixed patch, applicable with git am
-scissors option.  Lee, let me know if this still doesn't fix.
+The fix avoids access mutex in .set_clock callback by initializing the
+pltfm_host->clock at probe time and use it later instead of calling
+clk_get_rate again in atomic context.
 
+[ INFO: HARDIRQ-safe -> HARDIRQ-unsafe lock order detected ]
+3.13.0-rc1+ #285 Not tainted
+------------------------------------------------------
+kworker/u8:1/29 [HC0[0]:SC0[0]:HE0:SE1] is trying to acquire:
+ (prepare_lock){+.+...}, at: [<80480b08>] clk_prepare_lock+0x44/0xe4
 
-thanks,
+and this task is already holding:
+ (&(&host->lock)->rlock#2){-.-...}, at: [<804611f4>] sdhci_do_set_ios+0x20/0x720
+which would create a new lock dependency:
+ (&(&host->lock)->rlock#2){-.-...} -> (prepare_lock){+.+...}
 
-Takashi
+but this new dependency connects a HARDIRQ-irq-safe lock:
+ (&(&host->lock)->rlock#2){-.-...}
+... which became HARDIRQ-irq-safe at:
+  [<8005f030>] mark_lock+0x140/0x6ac
+  [<80060760>] __lock_acquire+0xb30/0x1cbc
+  [<800620d0>] lock_acquire+0x70/0x84
+  [<8061d2f0>] _raw_spin_lock+0x30/0x40
+  [<80460668>] sdhci_irq+0x24/0xa68
+  [<8006b1d4>] handle_irq_event_percpu+0x54/0x18c
+  [<8006b350>] handle_irq_event+0x44/0x64
+  [<8006e50c>] handle_fasteoi_irq+0xa0/0x170
+  [<8006a8f0>] generic_handle_irq+0x30/0x44
+  [<8000f238>] handle_IRQ+0x54/0xbc
+  [<8000864c>] gic_handle_irq+0x30/0x64
+  [<80013024>] __irq_svc+0x44/0x5c
+  [<80614c58>] printk+0x38/0x40
+  [<804622a8>] sdhci_add_host+0x844/0xbcc
+  [<80464948>] sdhci_esdhc_imx_probe+0x378/0x67c
+  [<8032ee88>] platform_drv_probe+0x20/0x50
+  [<8032d48c>] driver_probe_device+0x118/0x234
+  [<8032d690>] __driver_attach+0x9c/0xa0
+  [<8032b89c>] bus_for_each_dev+0x68/0x9c
+  [<8032cf44>] driver_attach+0x20/0x28
+  [<8032cbc8>] bus_add_driver+0x148/0x1f4
+  [<8032dce0>] driver_register+0x80/0x100
+  [<8032ee54>] __platform_driver_register+0x50/0x64
+  [<8084b094>] sdhci_esdhc_imx_driver_init+0x18/0x20
+  [<80008980>] do_one_initcall+0x108/0x16c
+  [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+  [<80611c50>] kernel_init+0x10/0x120
+  [<8000e9c8>] ret_from_fork+0x14/0x2c
 
--- 8< --
-From: Takashi Iwai <tiwai@suse.de>
-Subject: [PATCH] ASoC: ab8500: Back to first_find_bit() & co
+to a HARDIRQ-irq-unsafe lock:
+ (prepare_lock){+.+...}
+... which became HARDIRQ-irq-unsafe at:
+...  [<8005f030>] mark_lock+0x140/0x6ac
+  [<8005f604>] mark_held_locks+0x68/0x12c
+  [<8005f780>] trace_hardirqs_on_caller+0xb8/0x1d8
+  [<8005f8b4>] trace_hardirqs_on+0x14/0x18
+  [<8061a130>] mutex_trylock+0x180/0x20c
+  [<80480ad8>] clk_prepare_lock+0x14/0xe4
+  [<804816a4>] clk_notifier_register+0x28/0xf0
+  [<80015120>] twd_clk_init+0x50/0x68
+  [<80008980>] do_one_initcall+0x108/0x16c
+  [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+  [<80611c50>] kernel_init+0x10/0x120
+  [<8000e9c8>] ret_from_fork+0x14/0x2c
 
-ffs() and fls() give the off-by-one value in comparison with
-find_*_bit() helpers, and find_first_bit() and find_next_bit() are
-more intuitive in the case of two bits.  So, back to find_*_bit() but
-call them properly without invalid cast.  This fixes the slot
-assignment regression introduced by commit 166a34d27fca.
+other info that might help us debug this:
 
-Signed-off-by: Takashi Iwai <tiwai@suse.de>
+ Possible interrupt unsafe locking scenario:
+
+       CPU0                    CPU1
+       ----                    ----
+  lock(prepare_lock);
+                               local_irq_disable();
+                               lock(&(&host->lock)->rlock#2);
+                               lock(prepare_lock);
+  <Interrupt>
+    lock(&(&host->lock)->rlock#2);
+
+ *** DEADLOCK ***
+
+3 locks held by kworker/u8:1/29:
+ #0:  (kmmcd){.+.+.+}, at: [<8003db18>] process_one_work+0x128/0x468
+ #1:  ((&(&host->detect)->work)){+.+.+.}, at: [<8003db18>] process_one_work+0x128/0x468
+ #2:  (&(&host->lock)->rlock#2){-.-...}, at: [<804611f4>] sdhci_do_set_ios+0x20/0x720
+
+the dependencies between HARDIRQ-irq-safe lock and the holding lock:
+-> (&(&host->lock)->rlock#2){-.-...} ops: 330 {
+   IN-HARDIRQ-W at:
+                    [<8005f030>] mark_lock+0x140/0x6ac
+                    [<80060760>] __lock_acquire+0xb30/0x1cbc
+                    [<800620d0>] lock_acquire+0x70/0x84
+                    [<8061d2f0>] _raw_spin_lock+0x30/0x40
+                    [<80460668>] sdhci_irq+0x24/0xa68
+                    [<8006b1d4>] handle_irq_event_percpu+0x54/0x18c
+                    [<8006b350>] handle_irq_event+0x44/0x64
+                    [<8006e50c>] handle_fasteoi_irq+0xa0/0x170
+                    [<8006a8f0>] generic_handle_irq+0x30/0x44
+                    [<8000f238>] handle_IRQ+0x54/0xbc
+                    [<8000864c>] gic_handle_irq+0x30/0x64
+                    [<80013024>] __irq_svc+0x44/0x5c
+                    [<80614c58>] printk+0x38/0x40
+                    [<804622a8>] sdhci_add_host+0x844/0xbcc
+                    [<80464948>] sdhci_esdhc_imx_probe+0x378/0x67c
+                    [<8032ee88>] platform_drv_probe+0x20/0x50
+                    [<8032d48c>] driver_probe_device+0x118/0x234
+                    [<8032d690>] __driver_attach+0x9c/0xa0
+                    [<8032b89c>] bus_for_each_dev+0x68/0x9c
+                    [<8032cf44>] driver_attach+0x20/0x28
+                    [<8032cbc8>] bus_add_driver+0x148/0x1f4
+                    [<8032dce0>] driver_register+0x80/0x100
+                    [<8032ee54>] __platform_driver_register+0x50/0x64
+                    [<8084b094>] sdhci_esdhc_imx_driver_init+0x18/0x20
+                    [<80008980>] do_one_initcall+0x108/0x16c
+                    [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+                    [<80611c50>] kernel_init+0x10/0x120
+                    [<8000e9c8>] ret_from_fork+0x14/0x2c
+   IN-SOFTIRQ-W at:
+                    [<8005f030>] mark_lock+0x140/0x6ac
+                    [<80060204>] __lock_acquire+0x5d4/0x1cbc
+                    [<800620d0>] lock_acquire+0x70/0x84
+                    [<8061d40c>] _raw_spin_lock_irqsave+0x40/0x54
+                    [<8045e4a4>] sdhci_tasklet_finish+0x1c/0x120
+                    [<8002b538>] tasklet_action+0xa0/0x15c
+                    [<8002b778>] __do_softirq+0x118/0x290
+                    [<8002bcf4>] irq_exit+0xb4/0x10c
+                    [<8000f240>] handle_IRQ+0x5c/0xbc
+                    [<8000864c>] gic_handle_irq+0x30/0x64
+                    [<80013024>] __irq_svc+0x44/0x5c
+                    [<80614c58>] printk+0x38/0x40
+                    [<804622a8>] sdhci_add_host+0x844/0xbcc
+                    [<80464948>] sdhci_esdhc_imx_probe+0x378/0x67c
+                    [<8032ee88>] platform_drv_probe+0x20/0x50
+                    [<8032d48c>] driver_probe_device+0x118/0x234
+                    [<8032d690>] __driver_attach+0x9c/0xa0
+                    [<8032b89c>] bus_for_each_dev+0x68/0x9c
+                    [<8032cf44>] driver_attach+0x20/0x28
+                    [<8032cbc8>] bus_add_driver+0x148/0x1f4
+                    [<8032dce0>] driver_register+0x80/0x100
+                    [<8032ee54>] __platform_driver_register+0x50/0x64
+                    [<8084b094>] sdhci_esdhc_imx_driver_init+0x18/0x20
+                    [<80008980>] do_one_initcall+0x108/0x16c
+                    [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+                    [<80611c50>] kernel_init+0x10/0x120
+                    [<8000e9c8>] ret_from_fork+0x14/0x2c
+   INITIAL USE at:
+                   [<8005f030>] mark_lock+0x140/0x6ac
+                   [<8005ff0c>] __lock_acquire+0x2dc/0x1cbc
+                   [<800620d0>] lock_acquire+0x70/0x84
+                   [<8061d40c>] _raw_spin_lock_irqsave+0x40/0x54
+                   [<804611f4>] sdhci_do_set_ios+0x20/0x720
+                   [<80461924>] sdhci_set_ios+0x30/0x3c
+                   [<8044cea0>] mmc_power_up+0x6c/0xd0
+                   [<8044dac4>] mmc_start_host+0x60/0x70
+                   [<8044eb3c>] mmc_add_host+0x60/0x88
+                   [<8046225c>] sdhci_add_host+0x7f8/0xbcc
+                   [<80464948>] sdhci_esdhc_imx_probe+0x378/0x67c
+                   [<8032ee88>] platform_drv_probe+0x20/0x50
+                   [<8032d48c>] driver_probe_device+0x118/0x234
+                   [<8032d690>] __driver_attach+0x9c/0xa0
+                   [<8032b89c>] bus_for_each_dev+0x68/0x9c
+                   [<8032cf44>] driver_attach+0x20/0x28
+                   [<8032cbc8>] bus_add_driver+0x148/0x1f4
+                   [<8032dce0>] driver_register+0x80/0x100
+                   [<8032ee54>] __platform_driver_register+0x50/0x64
+                   [<8084b094>] sdhci_esdhc_imx_driver_init+0x18/0x20
+                   [<80008980>] do_one_initcall+0x108/0x16c
+                   [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+                   [<80611c50>] kernel_init+0x10/0x120
+                   [<8000e9c8>] ret_from_fork+0x14/0x2c
+ }
+ ... key      at: [<80e040e8>] __key.26952+0x0/0x8
+ ... acquired at:
+   [<8005eb60>] check_usage+0x3d0/0x5c0
+   [<8005edac>] check_irq_usage+0x5c/0xb8
+   [<80060d38>] __lock_acquire+0x1108/0x1cbc
+   [<800620d0>] lock_acquire+0x70/0x84
+   [<8061a210>] mutex_lock_nested+0x54/0x3c0
+   [<80480b08>] clk_prepare_lock+0x44/0xe4
+   [<8048188c>] clk_get_rate+0x14/0x64
+   [<8046374c>] esdhc_pltfm_set_clock+0x20/0x2a4
+   [<8045d70c>] sdhci_set_clock+0x4c/0x498
+   [<80461518>] sdhci_do_set_ios+0x344/0x720
+   [<80461924>] sdhci_set_ios+0x30/0x3c
+   [<8044c390>] __mmc_set_clock+0x44/0x60
+   [<8044cd4c>] mmc_set_clock+0x10/0x14
+   [<8044f8f4>] mmc_init_card+0x1b4/0x1520
+   [<80450f00>] mmc_attach_mmc+0xb4/0x194
+   [<8044da08>] mmc_rescan+0x294/0x2f0
+   [<8003db94>] process_one_work+0x1a4/0x468
+   [<8003e850>] worker_thread+0x118/0x3e0
+   [<80044de0>] kthread+0xd4/0xf0
+   [<8000e9c8>] ret_from_fork+0x14/0x2c
+
+the dependencies between the lock to be acquired and HARDIRQ-irq-unsafe lock:
+-> (prepare_lock){+.+...} ops: 395 {
+   HARDIRQ-ON-W at:
+                    [<8005f030>] mark_lock+0x140/0x6ac
+                    [<8005f604>] mark_held_locks+0x68/0x12c
+                    [<8005f780>] trace_hardirqs_on_caller+0xb8/0x1d8
+                    [<8005f8b4>] trace_hardirqs_on+0x14/0x18
+                    [<8061a130>] mutex_trylock+0x180/0x20c
+                    [<80480ad8>] clk_prepare_lock+0x14/0xe4
+                    [<804816a4>] clk_notifier_register+0x28/0xf0
+                    [<80015120>] twd_clk_init+0x50/0x68
+                    [<80008980>] do_one_initcall+0x108/0x16c
+                    [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+                    [<80611c50>] kernel_init+0x10/0x120
+                    [<8000e9c8>] ret_from_fork+0x14/0x2c
+   SOFTIRQ-ON-W at:
+                    [<8005f030>] mark_lock+0x140/0x6ac
+                    [<8005f604>] mark_held_locks+0x68/0x12c
+                    [<8005f7c8>] trace_hardirqs_on_caller+0x100/0x1d8
+                    [<8005f8b4>] trace_hardirqs_on+0x14/0x18
+                    [<8061a130>] mutex_trylock+0x180/0x20c
+                    [<80480ad8>] clk_prepare_lock+0x14/0xe4
+                    [<804816a4>] clk_notifier_register+0x28/0xf0
+                    [<80015120>] twd_clk_init+0x50/0x68
+                    [<80008980>] do_one_initcall+0x108/0x16c
+                    [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+                    [<80611c50>] kernel_init+0x10/0x120
+                    [<8000e9c8>] ret_from_fork+0x14/0x2c
+   INITIAL USE at:
+                   [<8005f030>] mark_lock+0x140/0x6ac
+                   [<8005ff0c>] __lock_acquire+0x2dc/0x1cbc
+                   [<800620d0>] lock_acquire+0x70/0x84
+                   [<8061a0c8>] mutex_trylock+0x118/0x20c
+                   [<80480ad8>] clk_prepare_lock+0x14/0xe4
+                   [<80482af8>] __clk_init+0x1c/0x45c
+                   [<8048306c>] _clk_register+0xd0/0x170
+                   [<80483148>] clk_register+0x3c/0x7c
+                   [<80483b4c>] clk_register_fixed_rate+0x88/0xd8
+                   [<80483c04>] of_fixed_clk_setup+0x68/0x94
+                   [<8084c6fc>] of_clk_init+0x44/0x68
+                   [<808202b0>] time_init+0x2c/0x38
+                   [<8081ca14>] start_kernel+0x1e4/0x368
+                   [<10008074>] 0x10008074
+ }
+ ... key      at: [<808afebc>] prepare_lock+0x38/0x48
+ ... acquired at:
+   [<8005eb94>] check_usage+0x404/0x5c0
+   [<8005edac>] check_irq_usage+0x5c/0xb8
+   [<80060d38>] __lock_acquire+0x1108/0x1cbc
+   [<800620d0>] lock_acquire+0x70/0x84
+   [<8061a210>] mutex_lock_nested+0x54/0x3c0
+   [<80480b08>] clk_prepare_lock+0x44/0xe4
+   [<8048188c>] clk_get_rate+0x14/0x64
+   [<8046374c>] esdhc_pltfm_set_clock+0x20/0x2a4
+   [<8045d70c>] sdhci_set_clock+0x4c/0x498
+   [<80461518>] sdhci_do_set_ios+0x344/0x720
+   [<80461924>] sdhci_set_ios+0x30/0x3c
+   [<8044c390>] __mmc_set_clock+0x44/0x60
+   [<8044cd4c>] mmc_set_clock+0x10/0x14
+   [<8044f8f4>] mmc_init_card+0x1b4/0x1520
+   [<80450f00>] mmc_attach_mmc+0xb4/0x194
+   [<8044da08>] mmc_rescan+0x294/0x2f0
+   [<8003db94>] process_one_work+0x1a4/0x468
+   [<8003e850>] worker_thread+0x118/0x3e0
+   [<80044de0>] kthread+0xd4/0xf0
+   [<8000e9c8>] ret_from_fork+0x14/0x2c
+
+stack backtrace:
+CPU: 2 PID: 29 Comm: kworker/u8:1 Not tainted 3.13.0-rc1+ #285
+Workqueue: kmmcd mmc_rescan
+Backtrace:
+[<80012160>] (dump_backtrace+0x0/0x10c) from [<80012438>] (show_stack+0x18/0x1c)
+ r6:00000000 r5:00000000 r4:8088ecc8 r3:bfa11200
+[<80012420>] (show_stack+0x0/0x1c) from [<80616b14>] (dump_stack+0x84/0x9c)
+[<80616a90>] (dump_stack+0x0/0x9c) from [<8005ebb4>] (check_usage+0x424/0x5c0)
+ r5:80979940 r4:bfa29b44
+[<8005e790>] (check_usage+0x0/0x5c0) from [<8005edac>] (check_irq_usage+0x5c/0xb8)
+[<8005ed50>] (check_irq_usage+0x0/0xb8) from [<80060d38>] (__lock_acquire+0x1108/0x1cbc)
+ r8:bfa115e8 r7:80df9884 r6:80dafa9c r5:00000003 r4:bfa115d0
+[<8005fc30>] (__lock_acquire+0x0/0x1cbc) from [<800620d0>] (lock_acquire+0x70/0x84)
+[<80062060>] (lock_acquire+0x0/0x84) from [<8061a210>] (mutex_lock_nested+0x54/0x3c0)
+ r7:bfa11200 r6:80dafa9c r5:00000000 r4:80480b08
+[<8061a1bc>] (mutex_lock_nested+0x0/0x3c0) from [<80480b08>] (clk_prepare_lock+0x44/0xe4)
+[<80480ac4>] (clk_prepare_lock+0x0/0xe4) from [<8048188c>] (clk_get_rate+0x14/0x64)
+ r6:03197500 r5:bf0e9aa8 r4:bf827400 r3:808ae128
+[<80481878>] (clk_get_rate+0x0/0x64) from [<8046374c>] (esdhc_pltfm_set_clock+0x20/0x2a4)
+ r5:bf0e9aa8 r4:bf0e9c40
+[<8046372c>] (esdhc_pltfm_set_clock+0x0/0x2a4) from [<8045d70c>] (sdhci_set_clock+0x4c/0x498)
+[<8045d6c0>] (sdhci_set_clock+0x0/0x498) from [<80461518>] (sdhci_do_set_ios+0x344/0x720)
+ r8:0000003b r7:20000113 r6:bf0e9d68 r5:bf0e9aa8 r4:bf0e9c40
+r3:00000000
+[<804611d4>] (sdhci_do_set_ios+0x0/0x720) from [<80461924>] (sdhci_set_ios+0x30/0x3c)
+ r9:00000004 r8:bf131000 r7:bf131048 r6:00000000 r5:bf0e9aa8
+r4:bf0e9800
+[<804618f4>] (sdhci_set_ios+0x0/0x3c) from [<8044c390>] (__mmc_set_clock+0x44/0x60)
+ r5:03197500 r4:bf0e9800
+[<8044c34c>] (__mmc_set_clock+0x0/0x60) from [<8044cd4c>] (mmc_set_clock+0x10/0x14)
+ r5:00000000 r4:bf0e9800
+[<8044cd3c>] (mmc_set_clock+0x0/0x14) from [<8044f8f4>] (mmc_init_card+0x1b4/0x1520)
+[<8044f740>] (mmc_init_card+0x0/0x1520) from [<80450f00>] (mmc_attach_mmc+0xb4/0x194)
+[<80450e4c>] (mmc_attach_mmc+0x0/0x194) from [<8044da08>] (mmc_rescan+0x294/0x2f0)
+ r5:8065f358 r4:bf0e9af8
+[<8044d774>] (mmc_rescan+0x0/0x2f0) from [<8003db94>] (process_one_work+0x1a4/0x468)
+ r8:00000000 r7:bfa29eb0 r6:bf80dc00 r5:bf0e9af8 r4:bf9e3f00
+r3:8044d774
+[<8003d9f0>] (process_one_work+0x0/0x468) from [<8003e850>] (worker_thread+0x118/0x3e0)
+[<8003e738>] (worker_thread+0x0/0x3e0) from [<80044de0>] (kthread+0xd4/0xf0)
+[<80044d0c>] (kthread+0x0/0xf0) from [<8000e9c8>] (ret_from_fork+0x14/0x2c)
+ r7:00000000 r6:00000000 r5:80044d0c r4:bf9e7f00
+
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Fixes: 0ddf03c mmc: esdhc-imx: parse max-frequency from devicetree
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- sound/soc/codecs/ab8500-codec.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   12 +++++-------
+ 1 files changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-index 1ad92cbf0b24..cf53c1e2fabc 100644
---- a/sound/soc/codecs/ab8500-codec.c
-+++ b/sound/soc/codecs/ab8500-codec.c
-@@ -2242,6 +2242,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 2a04847..745ee1e 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -576,19 +576,17 @@ static unsigned int esdhc_pltfm_get_max_clock(struct sdhci_host *host)
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+ 	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
+ 
+-	u32 f_host = clk_get_rate(pltfm_host->clk);
+-
+-	if (boarddata->f_max && (boarddata->f_max < f_host))
++	if (boarddata->f_max && (boarddata->f_max < pltfm_host->clock))
+ 		return boarddata->f_max;
+ 	else
+-		return f_host;
++		return pltfm_host->clock;
+ }
+ 
+ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
  {
- 	struct snd_soc_codec *codec = dai->codec;
- 	unsigned int val, mask, slot, slots_active;
-+	unsigned long tmp;
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
  
- 	mask = BIT(AB8500_DIGIFCONF2_IF0WL0) |
- 		BIT(AB8500_DIGIFCONF2_IF0WL1);
-@@ -2308,21 +2309,22 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
- 	dev_dbg(dai->codec->dev, "%s: Slots, active, TX: %d\n", __func__,
- 		slots_active);
+-	return clk_get_rate(pltfm_host->clk) / 256 / 16;
++	return pltfm_host->clock / 256 / 16;
+ }
  
-+	tmp = tx_mask;
- 	switch (slots_active) {
- 	case 0:
- 		break;
- 	case 1:
--		slot = ffs(tx_mask);
-+		slot = find_first_bit(&tmp, 32);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
- 		break;
- 	case 2:
--		slot = ffs(tx_mask);
-+		slot = find_first_bit(&tmp, 32);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
--		slot = fls(tx_mask);
-+		slot = find_next_bit(&tmp, 32, slot + 1);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
- 		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
- 		break;
-@@ -2349,22 +2351,23 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
- 	dev_dbg(dai->codec->dev, "%s: Slots, active, RX: %d\n", __func__,
- 		slots_active);
+ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
+@@ -596,7 +594,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+-	unsigned int host_clock = clk_get_rate(pltfm_host->clk);
++	unsigned int host_clock = pltfm_host->clock;
+ 	int pre_div = 2;
+ 	int div = 1;
+ 	u32 temp, val;
+@@ -1017,7 +1015,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 	}
  
-+	tmp = rx_mask;
- 	switch (slots_active) {
- 	case 0:
- 		break;
- 	case 1:
--		slot = ffs(rx_mask);
-+		slot = find_first_bit(&tmp, 32);
- 		snd_soc_update_bits(codec, AB8500_ADSLOTSEL(slot),
- 				AB8500_MASK_SLOT(slot),
- 				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
- 		break;
- 	case 2:
--		slot = ffs(rx_mask);
-+		slot = find_first_bit(&tmp, 32);
- 		snd_soc_update_bits(codec,
- 				AB8500_ADSLOTSEL(slot),
- 				AB8500_MASK_SLOT(slot),
- 				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
--		slot = fls(rx_mask);
-+		slot = find_next_bit(&tmp, 32, slot + 1);
- 		snd_soc_update_bits(codec,
- 				AB8500_ADSLOTSEL(slot),
- 				AB8500_MASK_SLOT(slot),
+ 	pltfm_host->clk = imx_data->clk_per;
+-
++	pltfm_host->clock = clk_get_rate(pltfm_host->clk);
+ 	clk_prepare_enable(imx_data->clk_per);
+ 	clk_prepare_enable(imx_data->clk_ipg);
+ 	clk_prepare_enable(imx_data->clk_ahb);
 -- 
-1.8.5.2
+1.7.2.rc3
