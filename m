@@ -1,105 +1,30 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 23 Dec 2013 15:35:56 +0200
-Subject: [PATCH v2 2/2] gpio: davinci: reuse for Keystone SoC
-In-Reply-To: <52B7080F.7000900@ti.com>
-References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
- <1387361272-20861-3-git-send-email-grygorii.strashko@ti.com>
- <52B7080F.7000900@ti.com>
-Message-ID: <52B83C3C.6090906@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Dec 2013 20:47:01 +0800
+Subject: [PATCH 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe lock
+ in atomic context
+In-Reply-To: <1387796544-18209-1-git-send-email-b29396@freescale.com>
+References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
+Message-ID: <20131223124659.GK26070@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2013 05:41 PM, Sekhar Nori wrote:
-> On Wednesday 18 December 2013 03:37 PM, Grygorii Strashko wrote:
->> The similar GPIO HW block is used by keystone SoCs as
->> in Davinci SoCs.
->> Hence, reuse Davinci GPIO driver for Keystone taking into
->> account that Keystone contains ARM GIC IRQ controller which
->> is implemented using IRQ Chip.
->>
->> Documentation:
->> 	http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Alexandre Courbot <gnurou@gmail.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: devicetree at vger.kernel.org
->>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->>   .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
->>   drivers/gpio/gpio-davinci.c                        |   46 ++++++++++++++++----
->>   2 files changed, 40 insertions(+), 10 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> index a2e839d..4ce9862 100644
->> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> @@ -1,7 +1,7 @@
->> -Davinci GPIO controller bindings
->> +Davinci/Keystone GPIO controller bindings
->>
->>   Required Properties:
->> -- compatible: should be "ti,dm6441-gpio"
->> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
->>
->>   - reg: Physical base address of the controller and the size of memory mapped
->>          registers.
->> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
->> index 1b33806..38741cc 100644
->> --- a/drivers/gpio/gpio-davinci.c
->> +++ b/drivers/gpio/gpio-davinci.c
->> @@ -413,6 +413,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
->>   	.xlate = irq_domain_xlate_onetwocell,
->>   };
->>
->> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
->> +{
->> +	static struct irq_chip_type gpio_unbanked;
->> +
->> +	gpio_unbanked = *container_of(irq_get_chip(irq),
->> +				      struct irq_chip_type, chip);
->> +
->> +	return &gpio_unbanked.chip;
->> +};
->> +
->> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
->> +{
->> +	static struct irq_chip gpio_unbanked;
->> +
->> +	gpio_unbanked = *irq_get_chip(irq);
->> +	return &gpio_unbanked;
->> +};
->> +
->> +static const struct of_device_id davinci_gpio_ids[];
->> +
->>   /*
->>    * NOTE:  for suspend/resume, probably best to make a platform_device with
->>    * suspend_late/resume_resume calls hooking into results of the set_wake()
->> @@ -433,6 +453,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->>   	struct davinci_gpio_platform_data *pdata = dev->platform_data;
->>   	struct davinci_gpio_regs __iomem *g;
->>   	struct irq_domain	*irq_domain = NULL;
->> +	const struct of_device_id *match;
->> +	struct irq_chip *irq_chip;
->> +	struct irq_chip *(*gpio_get_irq_chip)(unsigned int irq);
->> +
->> +	/*
->> +	 * Use davinci_gpio_get_irq_chip by default to handle non DT cases
->> +	 */
->> +	gpio_get_irq_chip = davinci_gpio_get_irq_chip;
->> +	match = of_match_device(of_match_ptr(davinci_gpio_ids),
->> +				dev);
->> +	if (match)
->> +		gpio_get_irq_chip = match->data;
->
-> This produces a sparse warning:
->
->    CHECK   drivers/gpio/gpio-davinci.c
-> drivers/gpio/gpio-davinci.c:467:35: warning: incorrect type in assignment (different modifiers)
-> drivers/gpio/gpio-davinci.c:467:35:    expected struct irq_chip *( *[assigned] gpio_get_irq_chip )( ... )
-> drivers/gpio/gpio-davinci.c:467:35:    got void const *const data
->
+On Mon, Dec 23, 2013 at 07:02:23PM +0800, Dong Aisheng wrote:
+> Sometimes we may meet the following lockdep issue.
+> The root cause is .set_clock callback is executed with spin_lock_irqsave
+> in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
+> clk_get_rate which is using a mutex lock.
+> 
+> The fix avoids access mutex in .set_clock callback by initializing the
+> pltfm_host->clock at probe time and use it later instead of calling
+> clk_get_rate again in atomic context.
 
-I'll fix it, thanks.
+While I agree this is the way less intrusive, I'm also wondering why
+sdhci_do_set_ios() needs a spinlock at all, or at least it's
+questionable if the lock should necessarily be held for such a long
+running section.
+
+Nevertheless, as long as we can guarantee that the rate of
+pltfm_host->clk does not change after the driver is probed, I'm fine
+with the patch.
+
+Shawn
