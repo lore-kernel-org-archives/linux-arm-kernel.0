@@ -1,40 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 23 Dec 2013 09:48:08 +0100
-Subject: [PATCH 0/3] ARM: mvebu: minor improvements
-Message-ID: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 23 Dec 2013 09:48:10 +0100
+Subject: [PATCH 2/3] ARM: mvebu: fix register length for Armada XP PMSU
+In-Reply-To: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1387788491-3168-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Gregory, Sebastian, Andrew,
+The per-CPU PMSU registers documented in the datasheet start at
+0x22100 and the last register for CPU3 is at 0x22428. However, the DT
+informations use <0x22100 0x430>, which makes the region end at
+0x22530 and not 0x22430.
 
-Here are three patches making minor improvements to the mvebu code
-base.
+Moreover, looking at the datasheet, we can see that the registers for
+CPU0 start at 0x22100, for CPU1 at 0x22200, for CPU2 at 0x22300 and
+for CPU3 at 0x22400. It seems clear that 0x100 bytes of registers have
+been used per CPU.
 
- * The first one moves an 370/XP specific declaration to
-   armada-370-xp.h, in preparation for the future addition of the
-   support for other SOCs in mach-mvebu/. It should go to mvebu/soc.
+Therefore, this commit reduces the length of the PMSU per-CPU register
+area from the incorrect 0x430 bytes to a more logical 0x400 bytes.
 
- * The second one fixes the length of the registers of the Armada XP
-   PMSU. It should go to mvebu/dt. There is no need to push this as a
-   fix, as it *reduces* the length of the register area, so it is
-   really only a cosmetic improvement.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- * The third one makes a function static. It should to to mvebu/soc.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (3):
-  ARM: mvebu: move ARMADA_XP_MAX_CPUS to armada-370-xp.h
-  ARM: mvebu: fix register length for Armada XP PMSU
-  ARM: mvebu: make armada_370_xp_pmsu_init() static
-
- arch/arm/boot/dts/armada-xp.dtsi    | 2 +-
- arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
- arch/arm/mach-mvebu/common.h        | 3 ---
- arch/arm/mach-mvebu/pmsu.c          | 2 +-
- 4 files changed, 4 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 281c644..aa49f17 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -48,7 +48,7 @@
+ 
+ 			armada-370-xp-pmsu at 22000 {
+ 				compatible = "marvell,armada-370-xp-pmsu";
+-				reg = <0x22100 0x430>, <0x20800 0x20>;
++				reg = <0x22100 0x400>, <0x20800 0x20>;
+ 			};
+ 
+ 			serial at 12200 {
 -- 
 1.8.3.2
