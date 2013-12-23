@@ -1,67 +1,58 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 23 Dec 2013 13:07:35 +0100
-Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl speed
-Message-ID: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 23 Dec 2013 20:19:21 +0800
+Subject: [PATCH] dmaengine: sirf: Add device_slave_caps interface
+Message-ID: <1387801161-3126-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+From: Rongjun Ying <rongjun.ying@csr.com>
 
-From: Lior Amsalem <alior@marvell.com>
+this patch adds device_slave_caps() callback as SiRF SoC sound drivers
+depend on it.
 
-This patch fixes a SATA hotplug issue on the Armada 370 and Armada XP
-SoCs. Without it, if a disk is unplugged from a SATA port, then further
-hotplug notification are now longer received on this port.
-
-This should be applied to every -stable kernel supporting Armada SoCs.
-
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: stable at vger.kernel.org
+Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+Signed-off-by: Barry Song <Barry.Song@csr.com>
 ---
- drivers/ata/sata_mv.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/dma/sirf-dma.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-index 56be318..89ca472 100644
---- a/drivers/ata/sata_mv.c
-+++ b/drivers/ata/sata_mv.c
-@@ -304,6 +304,7 @@ enum {
- 	MV5_LTMODE		= 0x30,
- 	MV5_PHY_CTL		= 0x0C,
- 	SATA_IFCFG		= 0x050,
-+	LP_PHY_CTL		= 0x058,
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 6aec3ad..d4d3a31 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -640,6 +640,25 @@ bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
+ }
+ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
  
- 	MV_M2_PREAMP_MASK	= 0x7e0,
- 
-@@ -1358,6 +1359,7 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
- 
- 	if (ofs != 0xffffffffU) {
- 		void __iomem *addr = mv_ap_base(link->ap) + ofs;
-+		void __iomem *lp_phy_addr = mv_ap_base(link->ap) + LP_PHY_CTL;
- 		if (sc_reg_in == SCR_CONTROL) {
- 			/*
- 			 * Workaround for 88SX60x1 FEr SATA#26:
-@@ -1374,6 +1376,14 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
- 			 */
- 			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
- 				val |= 0xf000;
++#define SIRFSOC_DMA_BUSWIDTHS \
++	(BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED) | \
++	BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
++	BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
++	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
++	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
 +
-+			/*
-+			 * Setting PHY speed according to SControl speed
-+			 */
-+			if ((val & 0xf0) == 0x10)
-+				writelfl(0x7, lp_phy_addr);
-+			else
-+				writelfl(0x227, lp_phy_addr);
- 		}
- 		writelfl(val, addr);
- 		return 0;
++static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
++	struct dma_slave_caps *caps)
++{
++	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	caps->dstn_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	caps->cmd_pause = true;
++	caps->cmd_terminate = true;
++
++	return 0;
++}
++
+ static int sirfsoc_dma_probe(struct platform_device *op)
+ {
+ 	struct device_node *dn = op->dev.of_node;
+@@ -712,6 +731,7 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+ 	dma->device_tx_status = sirfsoc_dma_tx_status;
+ 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
+ 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
++	dma->device_slave_caps = sirfsoc_dma_device_slave_caps;
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
 -- 
-1.8.5.1
+1.7.5.4
