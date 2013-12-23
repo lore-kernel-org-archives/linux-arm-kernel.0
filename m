@@ -1,46 +1,45 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 23 Dec 2013 11:34:55 -0800
-Subject: [PATCH 1/4] clk: sunxi: Allwinner A20 output clock support
-In-Reply-To: <52B86393.8020202@gmail.com>
-References: <1387787827-11341-1-git-send-email-wens@csie.org>
- <1387787827-11341-2-git-send-email-wens@csie.org>
- <52B8613B.9040503@elopez.com.ar> <52B86393.8020202@gmail.com>
-Message-ID: <20131223193455.25490.66859@quantum>
+Date: Mon, 23 Dec 2013 11:37:27 -0800
+Subject: [PATCH v3 00/13] clk: sunxi: add PLL5 and PLL6 support
+In-Reply-To: <52B838FD.4050809@elopez.com.ar>
+References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
+ <20131223054401.22761.10523@quantum> <52B838FD.4050809@elopez.com.ar>
+Message-ID: <20131223193727.25490.76390@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-12-23 08:23:47)
-> Hi again,
+Quoting Emilio L?pez (2013-12-23 05:22:05)
+> Hi Mike,
 > 
-> El 23/12/13 13:13, Emilio L?pez escribi?:
-> > Hi,
-> >
-> > El 23/12/13 05:37, Chen-Yu Tsai escribi?:
-> >> This patch adds support for the external clock outputs on the
-> >> Allwinner A20 SoC. The clock outputs are similar to "module 0"
-> >> type clocks, with different offsets and widths for clock factors.
+> El 23/12/13 02:44, Mike Turquette escribi?:
+> > Quoting Emilio L?pez (2013-12-22 19:32:31)
+> >> Hi everyone,
 > >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> This is v3 of the sunxi clock series. For those seeing this for the
+> >> first time, it adds PLL4, PLL5, PLL6 and mod0 clock support on sun4i, sun5i
+> >> and sun7i. Additionally, mbus is supported on sun5i and sun7i. I would like
+> >> to see this merged for 3.14 as clock users are progressing rapidly and will
+> >> be needing this code, so all feedback is appreciated.
 > >
-> > This patch looks good to me,
+> > For all the clock patches missing my Ack (I think just the first three):
 > >
-> > Acked-by: Emilio L?pez <emilio@elopez.com.ar>
-> >
-> >> ---
-> >>   drivers/clk/sunxi/clk-sunxi.c | 57
-> >> +++++++++++++++++++++++++++++++++++++++++++
-> >>   1 file changed, 57 insertions(+)
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
 > 
-> Please add the new binding to the binding document; I just noticed it 
-> was missing. You can keep the Ack once you do so.
+> Great; if nobody else has any other objection I'd like to get these 
+> merged for 3.14. I assume you'll want a pull request as agreed on 
+> earlier; do you have a branch I can use as a base? These patches depend 
+> on the pull Maxime sent last time and is currently sitting on clk-next.
 
-Feel free to add this to your "[PATCH v3 00/13] clk: sunxi: add PLL5 and
-PLL6 support" pull request.
+I can assure you that 0903ea60, "clk: add accuracy support for fixed
+clock" will not change, so feel free to base on that.
+
+Also feel free to roll in "[PATCH 1/4] clk: sunxi: Allwinner A20 output
+clock support" with your pull request if you like.
 
 Regards,
 Mike
 
 > 
-> Cheers,
+> Cheers!
 > 
 > Emilio
