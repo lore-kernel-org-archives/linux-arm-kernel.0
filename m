@@ -1,36 +1,52 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Dec 2013 15:06:29 +0100
-Subject: [PATCH v2 2/5] binfmt_elf: add ELF_HWCAP2 to compat auxv entries
+Date: Mon, 23 Dec 2013 15:06:31 +0100
+Subject: [PATCH v2 4/5] ARM: introduce HWCAP2 feature bits for ARMv8 Crypto
+ Extensions
 In-Reply-To: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1387807592-26375-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1387807592-26375-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ELF_HWCAP2 to the set of auxv entries that is passed to
-a 32-bit ELF program running in 32-bit compat mode under a
-64-bit kernel.
+This allocates feature bits 0-4 in HWCAP2 for the crypto and CRC
+extensions introduced in ARMv8.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- fs/compat_binfmt_elf.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/include/uapi/asm/hwcap.h | 5 +++++
+ arch/arm/kernel/setup.c           | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/fs/compat_binfmt_elf.c b/fs/compat_binfmt_elf.c
-index a81147e..4d24d17 100644
---- a/fs/compat_binfmt_elf.c
-+++ b/fs/compat_binfmt_elf.c
-@@ -88,6 +88,11 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
- #define	ELF_HWCAP		COMPAT_ELF_HWCAP
- #endif
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 87768b5..20d12f2 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -31,5 +31,10 @@
+ /*
+  * HWCAP2 flags - for elf_hwcap2 (in kernel) and AT_HWCAP2
+  */
++#define HWCAP2_AES	(1 << 0)
++#define HWCAP2_PMULL	(1 << 1)
++#define HWCAP2_SHA1	(1 << 2)
++#define HWCAP2_SHA2	(1 << 3)
++#define HWCAP2_CRC32	(1 << 4)
  
-+#ifdef	COMPAT_ELF_HWCAP2
-+#undef	ELF_HWCAP2
-+#define	ELF_HWCAP2		COMPAT_ELF_HWCAP2
-+#endif
-+
- #ifdef	COMPAT_ARCH_DLINFO
- #undef	ARCH_DLINFO
- #define	ARCH_DLINFO		COMPAT_ARCH_DLINFO
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index ce3049c..ac3a7f2 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -996,6 +996,11 @@ static const char *hwcap_str[] = {
+ };
+ 
+ static const char *hwcap2_str[] = {
++	"aes",
++	"pmull",
++	"sha1",
++	"sha2",
++	"crc32",
+ 	NULL
+ };
+ 
 -- 
 1.8.3.2
