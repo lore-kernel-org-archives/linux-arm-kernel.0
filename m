@@ -1,35 +1,131 @@
-From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
-Date: Mon, 23 Dec 2013 11:36:29 +0100
-Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
- hosts found on Allwinner sunxi SoCs
-In-Reply-To: <52AEF060.6000405@redhat.com>
-References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
- <1743952.noztKtcF2Y@dizzy-6.site> <52AEF060.6000405@redhat.com>
-Message-ID: <2155426.QS1WdjUNS8@dizzy-6.site>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 23 Dec 2013 11:38:05 +0100
+Subject: [PATCH 02/11] ASoC: ab8500: Revert back to find_next_bit()
+In-Reply-To: <s5hzjnwrbq2.wl%tiwai@suse.de>
+References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+ <1387468508-12286-3-git-send-email-lee.jones@linaro.org>
+ <s5hd2kssu4g.wl%tiwai@suse.de> <20131219164824.GA16145@lee--X1>
+ <s5hzjnwrbq2.wl%tiwai@suse.de>
+Message-ID: <s5h4n5zette.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I think that we're miss-communicating a bit here. What I'm trying to say
-> is that trying to extend the dw_mmc driver to support sunxi is a bad
-> idea because the sunxi hardware is quite different. And that the
-> sunxi hardware having autostop allows the existing sunxi-mci driver to
-> be much simpler then the dw-mmc driver.
+At Thu, 19 Dec 2013 18:29:09 +0100,
+Takashi Iwai wrote:
+> 
+> At Thu, 19 Dec 2013 16:48:24 +0000,
+> Lee Jones wrote:
+> > 
+> > > > Commit '166a34d ASoC: ab8500: Fix invalid cast to long pointer'
+> > > > rather carelessly converts find_next_bit() to fls() (find last
+> > > > bit set), which are not the same.
+> > > 
+> > > Does it break on the real machines?
+> > 
+> > It does, that's how I found the bug.
+> > 
+> > > fls() behaves differently from find_next_bit(), of course, but in this
+> > > case, it should work same in the end, since there are at most two
+> > > bits.
+> > 
+> > Unfortunately it doesn't work at all. This patch brings audio back to
+> > a working state. It took me the best part of a day to track down the
+> > issue. :(
+> 
+> Hmm, then isn't the original code rather buggy?
+> 
+> Check the values set there by ffs(), fls() and the original
+> find_next_bit(), especially whether find_next_bit() gives a valid
+> value fitting with the mask bits.
 
-> IOW the much simpler driver already exists and it is the sunxi-mci
-> driver.
-Ah! Ok. Now I get it.
-Well then. I'll try to incorporate all the changes within this endless thread 
-until I can get together a patchset v2 I can hand in.
-Now that the lectures have ended for this semester I won't be too tired for 
-straight thinking on daily basis and will be able to create such a patchset.
-And please excuse my contentless answers onto the last few questions
-but I really wasn't myself - so to say -  at this time (half asleep)
+Meanwhile, it's not good to keep the broken code in the upstream, and
+the bug is obvious.  Below is the fixed patch, applicable with git am
+scissors option.  Lee, let me know if this still doesn't fix.
 
--david
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131223/f5d4c97a/attachment-0001.sig>
+
+thanks,
+
+Takashi
+
+-- 8< --
+From: Takashi Iwai <tiwai@suse.de>
+Subject: [PATCH] ASoC: ab8500: Back to first_find_bit() & co
+
+ffs() and fls() give the off-by-one value in comparison with
+find_*_bit() helpers, and find_first_bit() and find_next_bit() are
+more intuitive in the case of two bits.  So, back to find_*_bit() but
+call them properly without invalid cast.  This fixes the slot
+assignment regression introduced by commit 166a34d27fca.
+
+Signed-off-by: Takashi Iwai <tiwai@suse.de>
+---
+ sound/soc/codecs/ab8500-codec.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index 1ad92cbf0b24..cf53c1e2fabc 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -2242,6 +2242,7 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+ {
+ 	struct snd_soc_codec *codec = dai->codec;
+ 	unsigned int val, mask, slot, slots_active;
++	unsigned long tmp;
+ 
+ 	mask = BIT(AB8500_DIGIFCONF2_IF0WL0) |
+ 		BIT(AB8500_DIGIFCONF2_IF0WL1);
+@@ -2308,21 +2309,22 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+ 	dev_dbg(dai->codec->dev, "%s: Slots, active, TX: %d\n", __func__,
+ 		slots_active);
+ 
++	tmp = tx_mask;
+ 	switch (slots_active) {
+ 	case 0:
+ 		break;
+ 	case 1:
+-		slot = ffs(tx_mask);
++		slot = find_first_bit(&tmp, 32);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
+ 		break;
+ 	case 2:
+-		slot = ffs(tx_mask);
++		slot = find_first_bit(&tmp, 32);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF1, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF3, mask, slot);
+-		slot = fls(tx_mask);
++		slot = find_next_bit(&tmp, 32, slot + 1);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF2, mask, slot);
+ 		snd_soc_update_bits(codec, AB8500_DASLOTCONF4, mask, slot);
+ 		break;
+@@ -2349,22 +2351,23 @@ static int ab8500_codec_set_dai_tdm_slot(struct snd_soc_dai *dai,
+ 	dev_dbg(dai->codec->dev, "%s: Slots, active, RX: %d\n", __func__,
+ 		slots_active);
+ 
++	tmp = rx_mask;
+ 	switch (slots_active) {
+ 	case 0:
+ 		break;
+ 	case 1:
+-		slot = ffs(rx_mask);
++		slot = find_first_bit(&tmp, 32);
+ 		snd_soc_update_bits(codec, AB8500_ADSLOTSEL(slot),
+ 				AB8500_MASK_SLOT(slot),
+ 				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
+ 		break;
+ 	case 2:
+-		slot = ffs(rx_mask);
++		slot = find_first_bit(&tmp, 32);
+ 		snd_soc_update_bits(codec,
+ 				AB8500_ADSLOTSEL(slot),
+ 				AB8500_MASK_SLOT(slot),
+ 				AB8500_ADSLOTSELX_AD_OUT_TO_SLOT(AB8500_AD_OUT3, slot));
+-		slot = fls(rx_mask);
++		slot = find_next_bit(&tmp, 32, slot + 1);
+ 		snd_soc_update_bits(codec,
+ 				AB8500_ADSLOTSEL(slot),
+ 				AB8500_MASK_SLOT(slot),
+-- 
+1.8.5.2
