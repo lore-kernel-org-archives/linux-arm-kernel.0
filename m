@@ -1,53 +1,110 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Mon, 23 Dec 2013 13:12:26 -0600
-Subject: [PATCH 5/7] ARM: dts: Complete data for isp iommu
-In-Reply-To: <1387284818-28739-6-git-send-email-florian.vaussard@epfl.ch>
-References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
- <1387284818-28739-6-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <52B88B1A.40506@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 23 Dec 2013 11:26:04 -0800
+Subject: [PATCH 1/2] clk: versatile: pass a name to ICST clock provider
+In-Reply-To: <1385326732-16406-1-git-send-email-linus.walleij@linaro.org>
+References: <1385326732-16406-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131223192604.25490.59336@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Quoting Linus Walleij (2013-11-24 12:58:52)
+> When we have more than one of these clocks in a system (such as
+> on the IM-PD1) we need a mechanism to pass a name for the clock.
+> Refactor to add this as an argument.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-On 12/17/2013 06:53 AM, Florian Vaussard wrote:
-> Add missing information required to probe the iommu for the camera
-> subsystem.
->
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
 > ---
->   arch/arm/boot/dts/omap3.dtsi | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index daabf99..610d084 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -371,11 +371,13 @@
->   			dma-names = "tx", "rx";
->   		};
->
-> -		mmu_isp: mmu at 480bd400 {
-> +		mmu_isp: mmu_isp at 480bd400 {
-
-Any reason for switching the name to mmu_isp?
-
->   			compatible = "ti,omap3-mmu-isp";
->   			ti,hwmods = "mmu_isp";
->   			reg = <0x480bd400 0x80>;
->   			interrupts = <8>;
-
-As I was testing the series, I found that this interrupt number is 
-wrong. The interrupt number should be 24, you can fix it in this patch.
-I will post couple of patches to correct the interrupt numbers for 
-couple of other occurrences.
-
-regards
-Suman
-
-> +			ti,#tlb-entries = <8>;
-> +			dma-window = <0 0xfffff000>;	/* IOVA start & length */
->   		};
->
->   		wdt2: wdt at 48314000 {
->
+> Hi Mike, I'd like an ACK for this if you're OK with it, so I
+> can take it through the ARM SoC tree with the rest of the
+> Integrator patches.
+> ---
+>  drivers/clk/versatile/clk-icst.c       | 3 ++-
+>  drivers/clk/versatile/clk-icst.h       | 1 +
+>  drivers/clk/versatile/clk-impd1.c      | 4 ++--
+>  drivers/clk/versatile/clk-integrator.c | 2 +-
+>  drivers/clk/versatile/clk-realview.c   | 6 ++++--
+>  5 files changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+> index f5e4c21b301f..8cbfcf88fae3 100644
+> --- a/drivers/clk/versatile/clk-icst.c
+> +++ b/drivers/clk/versatile/clk-icst.c
+> @@ -119,6 +119,7 @@ static const struct clk_ops icst_ops = {
+>  
+>  struct clk *icst_clk_register(struct device *dev,
+>                         const struct clk_icst_desc *desc,
+> +                       const char *name,
+>                         void __iomem *base)
+>  {
+>         struct clk *clk;
+> @@ -130,7 +131,7 @@ struct clk *icst_clk_register(struct device *dev,
+>                 pr_err("could not allocate ICST clock!\n");
+>                 return ERR_PTR(-ENOMEM);
+>         }
+> -       init.name = "icst";
+> +       init.name = name;
+>         init.ops = &icst_ops;
+>         init.flags = CLK_IS_ROOT;
+>         init.parent_names = NULL;
+> diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
+> index dad51b6ffd00..be99dd0da785 100644
+> --- a/drivers/clk/versatile/clk-icst.h
+> +++ b/drivers/clk/versatile/clk-icst.h
+> @@ -15,4 +15,5 @@ struct clk_icst_desc {
+>  
+>  struct clk *icst_clk_register(struct device *dev,
+>                               const struct clk_icst_desc *desc,
+> +                             const char *name,
+>                               void __iomem *base);
+> diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
+> index 369139af2a3b..b693a2bbf25a 100644
+> --- a/drivers/clk/versatile/clk-impd1.c
+> +++ b/drivers/clk/versatile/clk-impd1.c
+> @@ -66,8 +66,8 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
+>         }
+>         imc = &impd1_clks[id];
+>  
+> -       clk = icst_clk_register(NULL, &impd1_icst1_desc, base);
+> -       imc->vcoclk = clk;
+> +       clk = icst_clk_register(NULL, &impd1_icst1_desc, "icst1", base);
+> +       imc->vco1clk = clk;
+>         imc->clks[0] = clkdev_alloc(clk, NULL, "lm%x:01000", id);
+>  
+>         /* UART reference clock */
+> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
+> index 08593b4ee2c9..bda8967e09c2 100644
+> --- a/drivers/clk/versatile/clk-integrator.c
+> +++ b/drivers/clk/versatile/clk-integrator.c
+> @@ -78,7 +78,7 @@ void __init integrator_clk_init(bool is_cp)
+>         clk_register_clkdev(clk, NULL, "sp804");
+>  
+>         /* ICST VCO clock used on the Integrator/CP CLCD */
+> -       clk = icst_clk_register(NULL, &cp_icst_desc,
+> +       clk = icst_clk_register(NULL, &cp_icst_desc, "icst",
+>                                 __io_address(INTEGRATOR_HDR_BASE));
+>         clk_register_clkdev(clk, NULL, "clcd");
+>  }
+> diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
+> index cda07e70a408..747e7b31117c 100644
+> --- a/drivers/clk/versatile/clk-realview.c
+> +++ b/drivers/clk/versatile/clk-realview.c
+> @@ -84,9 +84,11 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
+>  
+>         /* ICST VCO clock */
+>         if (is_pb1176)
+> -               clk = icst_clk_register(NULL, &realview_osc0_desc, sysbase);
+> +               clk = icst_clk_register(NULL, &realview_osc0_desc,
+> +                                       "osc0", sysbase);
+>         else
+> -               clk = icst_clk_register(NULL, &realview_osc4_desc, sysbase);
+> +               clk = icst_clk_register(NULL, &realview_osc4_desc,
+> +                                       "osc4", sysbase);
+>  
+>         clk_register_clkdev(clk, NULL, "dev:clcd");
+>         clk_register_clkdev(clk, NULL, "issp:clcd");
+> -- 
+> 1.8.3.1
+> 
