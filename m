@@ -1,83 +1,50 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 23 Dec 2013 13:36:38 -0500
-Subject: [PATCH v9 9/9] ARM: dts: add usb udc support to bcm281xx
-In-Reply-To: <1387823798-10211-1-git-send-email-mporter@linaro.org>
-References: <1387823798-10211-1-git-send-email-mporter@linaro.org>
-Message-ID: <1387823798-10211-10-git-send-email-mporter@linaro.org>
+From: s-anna@ti.com (Anna, Suman)
+Date: Mon, 23 Dec 2013 12:45:26 -0600
+Subject: [PATCH 2/7] iommu/omap: omap_iommu_attach() should return ENODEV,
+ not NULL
+In-Reply-To: <1387284818-28739-3-git-send-email-florian.vaussard@epfl.ch>
+References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
+ <1387284818-28739-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <52B884C6.7030600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds USB OTG/PHY and clock support to BCM281xx and enables
-UDC support on the bcm11351-brt and bcm28155-ap boards.
+On 12/17/2013 06:53 AM, Florian Vaussard wrote:
+> omap_iommu_attach() returns NULL or ERR_PTR in case of error, but
+> omap_iommu_attach_dev() only checks for IS_ERR. Thus a NULL return value (in
+> case driver_find_device fails) will cause the kernel to panic when
+> omap_iommu_attach_dev() dereferences the pointer.
+>
+> In such case, omap_iommu_attach() should return ENODEV, not NULL.
+>
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 
-Signed-off-by: Matt Porter <mporter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
----
- arch/arm/boot/dts/bcm11351-brt.dts |  6 ++++++
- arch/arm/boot/dts/bcm11351.dtsi    | 18 ++++++++++++++++++
- arch/arm/boot/dts/bcm28155-ap.dts  |  8 ++++++++
- 3 files changed, 32 insertions(+)
+Acked-by: Suman Anna <s-anna@ti.com>
 
-diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-index 23cd16d..396b704 100644
---- a/arch/arm/boot/dts/bcm11351-brt.dts
-+++ b/arch/arm/boot/dts/bcm11351-brt.dts
-@@ -44,5 +44,11 @@
- 		status = "okay";
- 	};
- 
-+	usbotg: usb at 3f120000 {
-+		status = "okay";
-+	};
- 
-+	usbphy: usb-phy at 3f130000 {
-+		status = "okay";
-+	};
- };
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 1246885..0fbb455 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -243,4 +243,22 @@
- 			#clock-cells = <0>;
- 		};
- 	};
-+
-+	usbotg: usb at 3f120000 {
-+		compatible = "snps,dwc2";
-+		reg = <0x3f120000 0x10000>;
-+		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&usb_otg_ahb_clk>;
-+		clock-names = "otg";
-+		phys = <&usbphy>;
-+		phy-names = "usb2-phy";
-+		status = "disabled";
-+	};
-+
-+	usbphy: usb-phy at 3f130000 {
-+		compatible = "brcm,kona-usb2-phy";
-+		reg = <0x3f130000 0x28>;
-+		#phy-cells = <0>;
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 08e47c2..a3bc436 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -43,4 +43,12 @@
- 		cd-gpios = <&gpio 14 0>;
- 		status = "okay";
- 	};
-+
-+	usbotg: usb at 3f120000 {
-+		status = "okay";
-+	};
-+
-+	usbphy: usb-phy at 3f130000 {
-+		status = "okay";
-+	};
- };
--- 
-1.8.4
+> ---
+>   drivers/iommu/omap-iommu.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> index ee83bcc..385bf5e 100644
+> --- a/drivers/iommu/omap-iommu.c
+> +++ b/drivers/iommu/omap-iommu.c
+> @@ -863,7 +863,7 @@ static int device_match_by_alias(struct device *dev, void *data)
+>    **/
+>   static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
+>   {
+> -	int err = -ENOMEM;
+> +	int err = -ENODEV;
+>   	struct device *dev;
+>   	struct omap_iommu *obj;
+>
+> @@ -871,7 +871,7 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
+>   				(void *)name,
+>   				device_match_by_alias);
+>   	if (!dev)
+> -		return NULL;
+> +		return ERR_PTR(err);
+>
+>   	obj = to_iommu(dev);
+>
+>
