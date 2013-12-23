@@ -1,24 +1,87 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Dec 2013 20:23:17 +0800
-Subject: [PATCH 1/1] mmc: sdhci: fix lockdep error on tunning routine
-In-Reply-To: <1387797184-18958-1-git-send-email-b29396@freescale.com>
-References: <1387797184-18958-1-git-send-email-b29396@freescale.com>
-Message-ID: <20131223122315.GJ26070@S2101-09.ap.freescale.net>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 23 Dec 2013 15:35:43 +0200
+Subject: [PATCH v2 1/2] gpio: davinci: don't create irq_domain in case
+ of unbanked irqs
+In-Reply-To: <52B70AB8.6030503@ti.com>
+References: <1387361272-20861-1-git-send-email-grygorii.strashko@ti.com>
+ <1387361272-20861-2-git-send-email-grygorii.strashko@ti.com>
+ <52B70AB8.6030503@ti.com>
+Message-ID: <52B83C2F.7090105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 07:13:04PM +0800, Dong Aisheng wrote:
-> It's strange that this issue did not happen on kernel 3.10.17 with the same
-> code.
+On 12/22/2013 05:52 PM, Sekhar Nori wrote:
+> On Wednesday 18 December 2013 03:37 PM, Grygorii Strashko wrote:
+>> The system may crash if:
+>> - there are more then 1 bank
+>
+> s/then/than
+>
+>> - unbanked irqs are enabled
+>> - someone will call gpio_to_irq() for GPIO from bank2 or above
+>>
+>> Hence, fix it by not creating irq_domain if unbanked irqs are enabled
+>> and correct gpio_to_irq_banked() to handle this properly.
+>>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Alexandre Courbot <gnurou@gmail.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>>   drivers/gpio/gpio-davinci.c |   34 +++++++++++++++++++---------------
+>>   1 file changed, 19 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+>> index 5d163c0..1b33806 100644
+>> --- a/drivers/gpio/gpio-davinci.c
+>> +++ b/drivers/gpio/gpio-davinci.c
+>> @@ -351,7 +351,10 @@ static int gpio_to_irq_banked(struct gpio_chip *chip, unsigned offset)
+>>   {
+>>   	struct davinci_gpio_controller *d = chip2controller(chip);
+>>
+>> -	return irq_create_mapping(d->irq_domain, d->chip.base + offset);
+>> +	if (d->irq_domain)
+>> +		return irq_create_mapping(d->irq_domain, d->chip.base + offset);
+>> +	else
+>> +		return -ENXIO;
+>>   }
+>>
+>>   static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
+>> @@ -429,7 +432,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>>   	struct davinci_gpio_controller *chips = platform_get_drvdata(pdev);
+>>   	struct davinci_gpio_platform_data *pdata = dev->platform_data;
+>>   	struct davinci_gpio_regs __iomem *g;
+>> -	struct irq_domain	*irq_domain;
+>> +	struct irq_domain	*irq_domain = NULL;
+>>
+>>   	ngpio = pdata->ngpio;
+>>   	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> @@ -453,18 +456,20 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>>   	}
+>>   	clk_prepare_enable(clk);
+>>
+>> -	irq = irq_alloc_descs(-1, 0, ngpio, 0);
+>> -	if (irq < 0) {
+>> -		dev_err(dev, "Couldn't allocate IRQ numbers\n");
+>> -		return irq;
+>> -	}
+>> +	if (!pdata->gpio_unbanked) {
+>> +		irq = irq_alloc_descs(-1, 0, ngpio, 0);
+>> +		if (irq < 0) {
+>> +			dev_err(dev, "Couldn't allocate IRQ numbers\n");
+>> +			return -ENODEV;
+>
+> The code was correct before moving. Any objections to doing
+>
+> 			return irq;
+>
+> instead?
 
-Probably just because you did not turn on CONFIG_PROVE_LOCKING on your
-3.10.17 kennel.
+This is mistake. I'll update. Thanks
 
-Shawn
-
-> And looking at the code, before call spin_lock we already disable the mmc
-> controller irq, per on my understanding, the deadlock given by lockdep may not
-> be able to happen(pls fix me if wrong).
-> May the lockdep not track the specific irq disable?
-> Copy lockdep guy to comment.
-> ---
+>
+> Thanks,
+> Sekhar
+>
