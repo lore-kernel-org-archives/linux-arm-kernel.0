@@ -1,265 +1,69 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 10:10:24 +0900
-Subject: [PATCH] clk: emev2: Add support for emev2 SMU clocks with DT
-In-Reply-To: <1387761024-10114-1-git-send-email-horms+renesas@verge.net.au>
-References: <1387761024-10114-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1387761024-10114-2-git-send-email-horms+renesas@verge.net.au>
+From: xuwei5@hisilicon.com (xuwei (O))
+Date: Mon, 23 Dec 2013 01:09:48 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIDEvM10gQVJNOiBoaXNpOiByZW5hbWUgaGkzeHh4IHRv?=
+ =?gb2312?Q?_hisi?=
+In-Reply-To: <87sitnh1bz.fsf@linaro.org>
+References: <1387507978-4485-1-git-send-email-haojian.zhuang@gmail.com>
+ <CAOesGMjaJVWoMWgywkHfeD+0TMw3pze40CAvTcuC7+NavMq22w@mail.gmail.com>
+ <87sitnh1bz.fsf@linaro.org>
+Message-ID: <8B36690B4C1B584EAD95DD4902A4FF37095E90C3@SZXEMA511-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+Hi Olof and Kevin,
 
-Device tree clock binding document for EMMA Mobile EV2 SMU,
-And Common clock framework based implementation of it.
-Following nodes are defined to describe clock tree.
-- renesas,emev2-smu
-- renesas,emev2-smu-clkdiv
-- renesas,emev2-smu-gclk
+Please calm down.
+Both of us have a hard time to enable hi3xxx in kernel v3.14.
+Let me explain it.
 
-These bindings are designed manually based on
- 19UH0037EJ1000_SMU : System Management Unit User's Manual
+We have a new serial of SoCs for server market and they will named with hipxx.
+And hi3xxx SoCs are for the mobile and STB market.
+Now we hope to enable the hipxx SoCs in the kernel.
+To make the "mach" directory simple, we hope hipxx SoCs could share the same directory with hi3xxx.
+But according current situation, maybe we should add a new "mach" for the hipxx firstly.
+Do you think is it OK?
+ 
+And for hi3xxx SoCs, could you please keep it in the next?
 
-So far, reparent is not implemented, and is fixed to index #0.
-Clock tree description is not included, and should be provided
-by device-tree.
+Best Regards,
+Wei Xu
 
-Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
- drivers/clk/shmobile/Makefile                      |   2 +-
- drivers/clk/shmobile/clk-emev2.c                   | 104 +++++++++++++++++++++
- 3 files changed, 203 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/emev2-clock.txt
- create mode 100644 drivers/clk/shmobile/clk-emev2.c
 
-diff --git a/Documentation/devicetree/bindings/clock/emev2-clock.txt b/Documentation/devicetree/bindings/clock/emev2-clock.txt
-new file mode 100644
-index 0000000..60bbb1a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/emev2-clock.txt
-@@ -0,0 +1,98 @@
-+Device tree Clock bindings for Renesas EMMA Mobile EV2
-+
-+This binding uses the common clock binding.
-+
-+* SMU
-+System Management Unit described in user's manual R19UH0037EJ1000_SMU.
-+This is not a clock provider, but clocks under SMU depend on it.
-+
-+Required properties:
-+- compatible: Should be "renesas,emev2-smu"
-+- reg: Address and Size of SMU registers
-+
-+* SMU_CLKDIV
-+Function block with an input mux and a divider, which corresponds to
-+"Serial clock generator" in fig."Clock System Overview" of the manual,
-+and "xxx frequency division setting register" (XXXCLKDIV) registers.
-+This makes internal (neither input nor output) clock that is provided
-+to input of xxxGCLK block.
-+
-+Required properties:
-+- compatible: Should be "renesas,emev2-smu-clkdiv"
-+- reg: Byte offset from SMU base and Bit position in the register
-+- clocks: Parent clocks. Input clocks as described in clock-bindings.txt
-+- #clock-cells: Should be <0>
-+
-+* SMU_GCLK
-+Clock gating node shown as "Clock stop processing block" in the
-+fig."Clock System Overview" of the manual.
-+Registers are "xxx clock gate control register" (XXXGCLKCTRL).
-+
-+Required properties:
-+- compatible: Should be "renesas,emev2-smu-gclk"
-+- reg: Byte offset from SMU base and Bit position in the register
-+- clocks: Input clock as described in clock-bindings.txt
-+- #clock-cells: Should be <0>
-+
-+Example of provider:
-+
-+usia_u0_sclkdiv: usia_u0_sclkdiv {
-+	compatible = "renesas,emev2-smu-clkdiv";
-+	reg = <0x610 0>;
-+	clocks = <&pll3_fo>, <&pll4_fo>, <&pll1_fo>, <&osc1_fo>;
-+	#clock-cells = <0>;
-+};
-+
-+usia_u0_sclk: usia_u0_sclk {
-+	compatible = "renesas,emev2-smu-gclk";
-+	reg = <0x4a0 1>;
-+	clocks = <&usia_u0_sclkdiv>;
-+	#clock-cells = <0>;
-+};
-+
-+Example of consumer:
-+
-+uart at e1020000 {
-+	compatible = "renesas,em-uart";
-+	reg = <0xe1020000 0x38>;
-+	interrupts = <0 8 0>;
-+	clocks = <&usia_u0_sclk>;
-+	clock-names = "sclk";
-+};
-+
-+Example of clock-tree description:
-+
-+ This describes a clock path in the clock tree
-+  c32ki -> pll3_fo -> usia_u0_sclkdiv -> usia_u0_sclk
-+
-+smu at e0110000 {
-+	compatible = "renesas,emev2-smu";
-+	reg = <0xe0110000 0x10000>;
-+	#address-cells = <2>;
-+	#size-cells = <0>;
-+
-+	c32ki: c32ki {
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+		#clock-cells = <0>;
-+	};
-+	pll3_fo: pll3_fo {
-+		compatible = "fixed-factor-clock";
-+		clocks = <&c32ki>;
-+		clock-div = <1>;
-+		clock-mult = <7000>;
-+		#clock-cells = <0>;
-+	};
-+	usia_u0_sclkdiv: usia_u0_sclkdiv {
-+		compatible = "renesas,emev2-smu-clkdiv";
-+		reg = <0x610 0>;
-+		clocks = <&pll3_fo>;
-+		#clock-cells = <0>;
-+	};
-+	usia_u0_sclk: usia_u0_sclk {
-+		compatible = "renesas,emev2-smu-gclk";
-+		reg = <0x4a0 1>;
-+		clocks = <&usia_u0_sclkdiv>;
-+		#clock-cells = <0>;
-+	};
-+};
-diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
-index 706adc6..9ecef14 100644
---- a/drivers/clk/shmobile/Makefile
-+++ b/drivers/clk/shmobile/Makefile
-@@ -1,7 +1,7 @@
-+obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
- obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
- obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
- obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
- obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-mstp.o
--
- # for emply built-in.o
- obj-n	:= dummy
-diff --git a/drivers/clk/shmobile/clk-emev2.c b/drivers/clk/shmobile/clk-emev2.c
-new file mode 100644
-index 0000000..6c7c929
---- /dev/null
-+++ b/drivers/clk/shmobile/clk-emev2.c
-@@ -0,0 +1,104 @@
-+/*
-+ * EMMA Mobile EV2 common clock framework support
-+ *
-+ * Copyright (C) 2013 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
-+ * Copyright (C) 2012 Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+/* EMEV2 SMU registers */
-+#define USIAU0_RSTCTRL 0x094
-+#define USIBU1_RSTCTRL 0x0ac
-+#define USIBU2_RSTCTRL 0x0b0
-+#define USIBU3_RSTCTRL 0x0b4
-+#define STI_RSTCTRL 0x124
-+#define STI_CLKSEL 0x688
-+
-+static DEFINE_SPINLOCK(lock);
-+
-+/* not pretty, but hey */
-+void __iomem *smu_base;
-+
-+static void __init emev2_smu_write(unsigned long value, int offs)
-+{
-+	BUG_ON(!smu_base || (offs >= PAGE_SIZE));
-+	writel_relaxed(value, smu_base + offs);
-+}
-+
-+static const struct of_device_id smu_id[] __initconst = {
-+	{ .compatible = "renesas,emev2-smu", },
-+	{},
-+};
-+
-+static void __init emev2_smu_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, smu_id);
-+	BUG_ON(!np);
-+	smu_base = of_iomap(np, 0);
-+	BUG_ON(!smu_base);
-+	of_node_put(np);
-+
-+	/* setup STI timer to run on 32.768 kHz and deassert reset */
-+	emev2_smu_write(0, STI_CLKSEL);
-+	emev2_smu_write(1, STI_RSTCTRL);
-+
-+	/* deassert reset for UART0->UART3 */
-+	emev2_smu_write(2, USIAU0_RSTCTRL);
-+	emev2_smu_write(2, USIBU1_RSTCTRL);
-+	emev2_smu_write(2, USIBU2_RSTCTRL);
-+	emev2_smu_write(2, USIBU3_RSTCTRL);
-+}
-+
-+static void __init emev2_smu_clkdiv_init(struct device_node *np)
-+{
-+	u32 reg[2];
-+	struct clk *clk;
-+	const char *parent_name = of_clk_get_parent_name(np, 0);
-+	if (WARN_ON(of_property_read_u32_array(np, "reg", reg, 2)))
-+		return;
-+	if (!smu_base)
-+		emev2_smu_init();
-+	clk = clk_register_divider(NULL, np->name, parent_name, 0,
-+				   smu_base + reg[0], reg[1], 8, 0, &lock);
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, np->name, NULL);
-+	pr_debug("## %s %s %p\n", __func__, np->name, clk);
-+}
-+CLK_OF_DECLARE(emev2_smu_clkdiv, "renesas,emev2-smu-clkdiv",
-+		emev2_smu_clkdiv_init);
-+
-+static void __init emev2_smu_gclk_init(struct device_node *np)
-+{
-+	u32 reg[2];
-+	struct clk *clk;
-+	const char *parent_name = of_clk_get_parent_name(np, 0);
-+	if (WARN_ON(of_property_read_u32_array(np, "reg", reg, 2)))
-+		return;
-+	if (!smu_base)
-+		emev2_smu_init();
-+	clk = clk_register_gate(NULL, np->name, parent_name, 0,
-+				smu_base + reg[0], reg[1], 0, &lock);
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, np->name, NULL);
-+	pr_debug("## %s %s %p\n", __func__, np->name, clk);
-+}
-+CLK_OF_DECLARE(emev2_smu_gclk, "renesas,emev2-smu-gclk", emev2_smu_gclk_init);
--- 
-1.8.4
+> -----????-----
+> ???: Kevin Hilman [mailto:khilman at linaro.org]
+> ????: 2013?12?21? 1:36
+> ???: Olof Johansson
+> ??: Haojian Zhuang; xuwei (O); Arnd Bergmann;
+> linux-arm-kernel at lists.infradead.org; Haojian Zhuang
+> ??: Re: [PATCH 1/3] ARM: hisi: rename hi3xxx to hisi
+> 
+> Olof Johansson <olof@lixom.net> writes:
+> 
+> > On Thu, Dec 19, 2013 at 6:52 PM, Haojian Zhuang
+> > <haojian.zhuang@linaro.org> wrote:
+> >> Since some new Hisilicon SoCs are not named as hi3xxx, rename
+> >> mach-hi3xxx to mach-hisi instead. And the pronounciation of "hisi" is
+> >> similar to the chinese pronounciation of Hisilicon. So Hisilicon guys like this
+> name.
+> >>
+> >> ARCH_HI3xxx will be renamed later since other drivers are using it
+> >> and they are still in linux-next git tree. So rename ARCH_HI3xxx later.
+> >>
+> >
+> > Are you kidding me? We JUST merge your platform after a very painful
+> > review with many fumbly cycles, and the very first thing you do is
+> > rename it?
+> >
+> > I even complained about the crazy numbering and naming, and you didn't
+> > fix it while we were in review, and now just days after we merge the
+> > patches this one comes out?
+> >
+> > For now, we'll drop your original branch and fold in these patches
+> > with the original ones. There's no point in checking in a platform
+> > just to rename it, so we'll do the fixups.
+> 
+> Agreed. I've dropped the hi3xxx/soc branch from next/soc and rebuild for-next
+> without it.
+> 
+> Kevin
+> 
