@@ -1,59 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:15 +0900
-Subject: [PATCH 19/26] ARM: shmobile: Add pinctrl_register_mappings() for
- Koelsch
+Date: Mon, 23 Dec 2013 11:07:16 +0900
+Subject: [PATCH 20/26] ARM: shmobile: mackerel: clk_round_rate() can return a
+ zero to indicate an error
 In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
 References: <cover.1387763524.git.horms+renesas@verge.net.au>
-Message-ID: <85ef14da7337ba2c9b9fc489637e3db3b956b5a0.1387763524.git.horms+renesas@verge.net.au>
+Message-ID: <90d423faa0ed53cfda9f12d119f6938dd1ab515d.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Paul Walmsley <pwalmsley@nvidia.com>
 
-Add code to setup the r8a7791 PFC for the Koelsch board.
+Treat both negative and zero return values from clk_round_rate() as
+errors.  This is needed since subsequent patches will convert
+clk_round_rate()'s return value to be an unsigned type, rather than a
+signed type, since some clock sources can generate rates higher than
+(2^31)-1 Hz.
 
-At this point serial consoles are added, and in the near
-future other platform-device-only devices will be added
-here like for instance the r8a7791 DU.
+Eventually, when calling clk_round_rate(), only a return value of zero
+will be considered a error.  All other values will be considered valid
+rates.  The comparison against values less than 0 is kept to preserve
+the correct behavior in the meantime.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-shmobile/board-mackerel.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 412e153..6e12914 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -24,6 +24,7 @@
- #include <linux/input.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
- #include <mach/common.h>
-@@ -78,9 +79,20 @@ static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
- };
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index af06753..d90d2f1 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -548,9 +548,9 @@ static void __init hdmi_init_pm_clock(void)
+ 		 clk_get_rate(&sh7372_pllc2_clk));
  
-+static const struct pinctrl_map koelsch_pinctrl_map[] = {
-+	/* SCIF0 (CN19: DEBUG SERIAL0) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
-+				  "scif0_data_d", "scif0"),
-+	/* SCIF1 (CN20: DEBUG SERIAL1) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7791",
-+				  "scif1_data_d", "scif1"),
-+};
-+
- static void __init koelsch_add_standard_devices(void)
- {
- 	r8a7791_clock_init();
-+	pinctrl_register_mappings(koelsch_pinctrl_map,
-+				  ARRAY_SIZE(koelsch_pinctrl_map));
- 	r8a7791_pinmux_init();
- 	r8a7791_add_standard_devices();
- 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
+ 	rate = clk_round_rate(&sh7372_pllc2_clk, 594000000);
+-	if (rate < 0) {
++	if (rate <= 0) {
+ 		pr_err("Cannot get suitable rate: %ld\n", rate);
+-		ret = rate;
++		ret = -EINVAL;
+ 		goto out;
+ 	}
+ 
 -- 
 1.8.4
