@@ -1,61 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:11 +0900
-Subject: [PATCH 15/26] ARM: shmobile: Use ->init_late() on Koelsch
+Date: Mon, 23 Dec 2013 11:07:15 +0900
+Subject: [PATCH 19/26] ARM: shmobile: Add pinctrl_register_mappings() for
+ Koelsch
 In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
 References: <cover.1387763524.git.horms+renesas@verge.net.au>
-Message-ID: <6dc00ab90fa8bc4fec2f9c206ee679d144bc7eb5.1387763524.git.horms+renesas@verge.net.au>
+Message-ID: <85ef14da7337ba2c9b9fc489637e3db3b956b5a0.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Hook in shmobile_init_late() on Koelsch. This enables some PM
-related things like CPUIdle and Suspend-to-RAM.
+Add code to setup the r8a7791 PFC for the Koelsch board.
 
-With this patch applied it is possible to use Suspend-to-RAM:
-# echo enabled > /sys/class/tty/ttySC6/power/wakeup
-# echo mem > /sys/power/state
-(wake by sending a character on the serial console)
+At this point serial consoles are added, and in the near
+future other platform-device-only devices will be added
+here like for instance the r8a7791 DU.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch-reference.c | 2 ++
- arch/arm/mach-shmobile/board-koelsch.c           | 3 ++-
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-koelsch.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 25b558f..a804a17 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -22,6 +22,7 @@
- #include <linux/clk-provider.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <mach/common.h>
- #include <mach/rcar-gen2.h>
- #include <mach/r8a7791.h>
- #include <asm/mach/arch.h>
-@@ -47,5 +48,6 @@ DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.init_early	= r8a7791_init_early,
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= koelsch_add_standard_devices,
-+	.init_late	= shmobile_init_late,
- 	.dt_compat	= koelsch_boards_compat_dt,
- MACHINE_END
 diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 5b81a34..135929b 100644
+index 412e153..6e12914 100644
 --- a/arch/arm/mach-shmobile/board-koelsch.c
 +++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -92,7 +92,8 @@ static const char * const koelsch_boards_compat_dt[] __initconst = {
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.smp		= smp_ops(r8a7791_smp_ops),
- 	.init_early	= r8a7791_init_early,
--	.init_machine	= koelsch_add_standard_devices,
- 	.init_time	= rcar_gen2_timer_init,
-+	.init_machine	= koelsch_add_standard_devices,
-+	.init_late	= shmobile_init_late,
- 	.dt_compat	= koelsch_boards_compat_dt,
- MACHINE_END
+@@ -24,6 +24,7 @@
+ #include <linux/input.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_device.h>
+ #include <mach/common.h>
+@@ -78,9 +79,20 @@ static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
+ 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+ };
+ 
++static const struct pinctrl_map koelsch_pinctrl_map[] = {
++	/* SCIF0 (CN19: DEBUG SERIAL0) */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
++				  "scif0_data_d", "scif0"),
++	/* SCIF1 (CN20: DEBUG SERIAL1) */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7791",
++				  "scif1_data_d", "scif1"),
++};
++
+ static void __init koelsch_add_standard_devices(void)
+ {
+ 	r8a7791_clock_init();
++	pinctrl_register_mappings(koelsch_pinctrl_map,
++				  ARRAY_SIZE(koelsch_pinctrl_map));
+ 	r8a7791_pinmux_init();
+ 	r8a7791_add_standard_devices();
+ 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
 -- 
 1.8.4
