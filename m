@@ -1,33 +1,51 @@
-From: lho@apm.com (Loc Ho)
-Date: Sun, 22 Dec 2013 21:50:45 -0800
-Subject: [PATCH v6 0/4] ata: Add APM X-Gene SoC SATA host controller
- support
-In-Reply-To: <1386834940-30875-1-git-send-email-lho@apm.com>
-References: <1386834940-30875-1-git-send-email-lho@apm.com>
-Message-ID: <CAPw-ZTn2n-HFa+1nExdEKZ6ETjODFjU4+ts5JxDhnn5dbG3xMw@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 22 Dec 2013 22:40:10 -0800
+Subject: [GIT PULL] Renesas ARM based SoC Clock updates for v3.14
+In-Reply-To: <1387761024-10114-1-git-send-email-horms+renesas@verge.net.au>
+References: <1387761024-10114-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20131223064010.22761.89784@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Quoting Simon Horman (2013-12-22 17:10:23)
+> Hi Mike,
+> 
+> please consider the following
+> Renesas ARM based SoC Clock updates for v3.14.
+> 
+> This pull request is based on your clk-next-shmobile branch.
+> 
+> 
+> The following changes since commit f94859c215b6d977794108a1a9a101239e393c09:
+> 
+>   clk: shmobile: Add MSTP clock support (2013-12-12 19:23:59 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-for-v3.14
+> 
+> for you to fetch changes up to 92ca6a8ce97e07206d474da5477d8da4e41bad6c:
+> 
+>   clk: emev2: Add support for emev2 SMU clocks with DT (2013-12-14 13:17:55 +0900)
 
-Any comment on v6 SATA host controller driver before I post v7 which
-fix the clock DTS entry and etc due to the clock change in v5 of the
-PHY driver?
+Pulled into clk-next.
 
--Loc
+Thanks!
+Mike
 
-On Wed, Dec 11, 2013 at 11:55 PM, Loc Ho <lho@apm.com> wrote:
-> This patch adds support for the APM X-Gene SoC SATA host controller. In
-> order for the host controller to work, the corresponding PHY driver
-> musts also be available.
->
-> v6:
->  * Update binding documentation
->  * Change select PHY_XGENE_SATA to PHY_XGENE
->  * Add ULL to constants
->  * Change indentation and comments
->  * Clean up the probe functions a bit more
->  * Remove xgene_ahci_remove function
->  * Add the flush register to DTS
->  * Remove the interrupt-parent from DTS
->
+> 
+> ----------------------------------------------------------------
+> Renesas ARM based SoC Clock updates for v3.14
+> 
+> Add support for using emev2 SMU clocks with DT
+> 
+> ----------------------------------------------------------------
+> Takashi Yoshii (1):
+>       clk: emev2: Add support for emev2 SMU clocks with DT
+> 
+>  .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
+>  drivers/clk/shmobile/Makefile                      |   2 +-
+>  drivers/clk/shmobile/clk-emev2.c                   | 104 +++++++++++++++++++++
+>  3 files changed, 203 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/emev2-clock.txt
+>  create mode 100644 drivers/clk/shmobile/clk-emev2.c
