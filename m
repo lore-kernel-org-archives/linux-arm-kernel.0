@@ -1,40 +1,37 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Mon, 23 Dec 2013 13:21:06 -0300
-Subject: [PATCH 2/4] ARM: dts: sun7i: external clock outputs
-In-Reply-To: <1387787827-11341-3-git-send-email-wens@csie.org>
+From: elopez93@gmail.com (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Mon, 23 Dec 2013 13:23:47 -0300
+Subject: [PATCH 1/4] clk: sunxi: Allwinner A20 output clock support
+In-Reply-To: <52B8613B.9040503@elopez.com.ar>
 References: <1387787827-11341-1-git-send-email-wens@csie.org>
- <1387787827-11341-3-git-send-email-wens@csie.org>
-Message-ID: <52B862F2.1020406@elopez.com.ar>
+ <1387787827-11341-2-git-send-email-wens@csie.org>
+ <52B8613B.9040503@elopez.com.ar>
+Message-ID: <52B86393.8020202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi again,
 
-El 23/12/13 05:37, Chen-Yu Tsai escribi?:
-> This commit adds the two external clock outputs available on A20 to
-> its device tree. A dummy fixed factor clock is also added to serve as
-> the first input of the clock outputs, which according to AW's A20 user
-> manual, is the 24MHz oscillator divided by 750.
+El 23/12/13 13:13, Emilio L?pez escribi?:
+> Hi,
 >
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-(,,,)
-> +		clk_out_a: clk_out_a at 01c201f0 {
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun7i-a20-out-clk";
-> +			reg = <0x01c201f0 0x4>;
-> +			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
-> +		};
+> El 23/12/13 05:37, Chen-Yu Tsai escribi?:
+>> This patch adds support for the external clock outputs on the
+>> Allwinner A20 SoC. The clock outputs are similar to "module 0"
+>> type clocks, with different offsets and widths for clock factors.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> This patch looks good to me,
+>
+> Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+>
+>> ---
+>>   drivers/clk/sunxi/clk-sunxi.c | 57
+>> +++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 57 insertions(+)
 
-These nodes should, as per Maxime's recommendation, look more like
-
-	clk_out_a: clk at 01c201f0 {
-		#clock-cells = <0>;
-		compatible = "allwinner,sun7i-a20-out-clk";
-		reg = <0x01c201f0 0x4>;
-		clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
-		clk-output-names = "clk_out_a";
-	};
+Please add the new binding to the binding document; I just noticed it 
+was missing. You can keep the Ack once you do so.
 
 Cheers,
 
