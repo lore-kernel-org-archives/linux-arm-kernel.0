@@ -1,57 +1,95 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 23 Dec 2013 21:50:08 +0800
-Subject: [PATCH] mmc: sdhci: use time_after to replace mdelay-loop for timeout
-Message-ID: <1387806608-3467-1-git-send-email-21cnbao@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 23 Dec 2013 13:50:25 +0000
+Subject: [PATCH RFC v3 08/12] arm64: kernel: implement HW breakpoints CPU
+ PM notifier
+In-Reply-To: <20131220172907.GF16829@mudshark.cambridge.arm.com>
+References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1385033059-25896-9-git-send-email-lorenzo.pieralisi@arm.com>
+ <20131220172907.GF16829@mudshark.cambridge.arm.com>
+Message-ID: <20131223135025.GA2967@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Barry.Song@csr.com>
+Hi Will,
 
-1ms busy-loop might be wasted when the condition "if(sdhci_readl(host,
-SDHCI_PRESENT_STATE) & mask)" becomes false just after the if().
-here we use time_after which will have no redundant busy-wait loop.
+thanks for having a look.
 
-Signed-off-by: Barry Song <Barry.Song@csr.com>
-Cc: Bin Shi <Bin.Shi@csr.com>
----
- drivers/mmc/host/sdhci.c |   10 ++++------
- 1 files changed, 4 insertions(+), 6 deletions(-)
+On Fri, Dec 20, 2013 at 05:29:07PM +0000, Will Deacon wrote:
+> Hi Lorenzo,
+> 
+> On Thu, Nov 21, 2013 at 11:24:15AM +0000, Lorenzo Pieralisi wrote:
+> > When a CPU is shutdown either through CPU idle or suspend to RAM, the
+> > content of HW breakpoint registers must be reset or restored to proper
+> > values when CPU resume from low power states. This patch adds debug register
+> > restore operations to the HW breakpoint control function and implements a
+> > CPU PM notifier that allows to restore the content of HW breakpoint registers
+> > to allow proper suspend/resume operations.
+> 
+> This looks mostly fine to me, but I have one questions you might be able to
+> answer...
+> 
+> > @@ -840,18 +847,36 @@ void hw_breakpoint_thread_switch(struct task_struct *next)
+> >  /*
+> >   * CPU initialisation.
+> >   */
+> > -static void reset_ctrl_regs(void *unused)
+> > +static void hw_breakpoint_reset(void *unused)
+> >  {
+> >  	int i;
+> > -
+> > -	for (i = 0; i < core_num_brps; ++i) {
+> > -		write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
+> > -		write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
+> > +	struct perf_event **slots;
+> > +	/*
+> > +	 * When a CPU goes through cold-boot, it does not have any installed
+> > +	 * slot, so it is safe to share the same function for restoring and
+> > +	 * resetting breakpoints; when a CPU is hotplugged in, it goes
+> > +	 * through the slots, which are all empty, hence it just resets control
+> > +	 * and value for debug registers.
+> > +	 * When this function is triggered on warm-boot through a CPU PM
+> > +	 * notifier some slots might be initialized; if so they are
+> > +	 * reprogrammed according to the debug slots content.
+> > +	 */
+> > +	for (slots = this_cpu_ptr(bp_on_reg), i = 0; i < core_num_brps; ++i) {
+> > +		if (slots[i]) {
+> > +			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
+> > +		} else {
+> > +			write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
+> > +			write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
+> > +		}
+> 
+> When this runs on warm-boot and starts restoring debug state, are debug
+> exceptions guaranteed to be masked? I think that the debug restoration
+> should appear atomic to a debugger (i.e. you can't take a debug exception
+> half-way through the restore).
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index aac92bd..52f5289 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1036,9 +1036,6 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
- 
- 	WARN_ON(host->cmd);
- 
--	/* Wait max 10 ms */
--	timeout = 10;
--
- 	mask = SDHCI_CMD_INHIBIT;
- 	if ((cmd->data != NULL) || (cmd->flags & MMC_RSP_BUSY))
- 		mask |= SDHCI_DATA_INHIBIT;
-@@ -1048,8 +1045,11 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
- 	if (host->mrq->data && (cmd == host->mrq->data->stop))
- 		mask &= ~SDHCI_DATA_INHIBIT;
- 
-+	/* Wait max 10 ms */
-+	timeout = jiffies + msecs_to_jiffies(10);
-+
- 	while (sdhci_readl(host, SDHCI_PRESENT_STATE) & mask) {
--		if (timeout == 0) {
-+		if (time_after(jiffies, timeout)) {
- 			pr_err("%s: Controller never released "
- 				"inhibit bit(s).\n", mmc_hostname(host->mmc));
- 			sdhci_dumpregs(host);
-@@ -1057,8 +1057,6 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
- 			tasklet_schedule(&host->finish_tasklet);
- 			return;
- 		}
--		timeout--;
--		mdelay(1);
- 	}
- 
- 	mod_timer(&host->timer, jiffies + 10 * HZ);
--- 
-1.7.5.4
+No, they might not be, good catch and this needs fixing (well, CPU PM notifiers
+and suspend must be run with IRQs disabled, but debug exceptions can be left
+on even though we should define to what extent this can be considered
+reasonable/safe, eg debugging should not fiddle with HW state that we are
+saving, it is a bit of a grey area).
+I think the easiest option is to mask/unmask them in the CPU PM notifier,
+before/after restoring the slots. As we discussed, I am trying to keep debug
+on as deep in the power down sequence as possible, and now I mask debug
+exceptions before saving general purpose registers, and restore the exception
+flags when cpu_suspend returns (which means unfortunately that the sequence
+above might run with debug exceptions unmasked). This means that the debugger
+might see a restore that is not atomic from its perspective, again, good spot,
+I should update the patch or put together a fix for -rc1 if the commit history
+is immutable now, which I think that's the case.
+
+Thank you,
+Lorenzo
+
+> 
+> Providing that's the case:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
