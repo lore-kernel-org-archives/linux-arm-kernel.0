@@ -1,69 +1,47 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Mon, 23 Dec 2013 13:32:04 +0530
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
-Message-ID: <1387785725-24262-4-git-send-email-tinamdar@apm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Dec 2013 16:15:22 +0800
+Subject: [PATCH] ARM: i.MX: Remove IMX_HAVE_PLATFORM_IMX_FB symbol
+In-Reply-To: <1387612703-18512-1-git-send-email-shc_work@mail.ru>
+References: <1387612703-18512-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131223081520.GE26070@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bindings for X-Gene PCIe driver. The driver resides
-under 'drivers/pci/host/pcie-xgene.c' file.
+On Sat, Dec 21, 2013 at 11:58:23AM +0400, Alexander Shiyan wrote:
+<snip>
+> @@ -9,8 +9,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX27_CODA) += platform-imx27-coda.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
+> -obj-y += platform-imx-dma.o
+> -obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_FB) += platform-imx-fb.o
+> +obj-y += platform-imx-dma.o platform-imx-fb.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_KEYPAD) += platform-imx-keypad.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_PATA_IMX) += platform-pata_imx.o
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 4f2e1b3..e7d8d88 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -363,7 +363,7 @@ config FB_SA1100
+>  
+>  config FB_IMX
+>  	tristate "Freescale i.MX1/21/25/27 LCD support"
+> -	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
+> +	depends on FB && (SOC_IMX1 || SOC_IMX21 || SOC_IMX25 || SOC_IMX27)
 
-Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
----
- .../devicetree/bindings/pci/xgene-pcie.txt         |   43 ++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/xgene-pcie.txt
+Denis had a patch below to address the same problem.
 
-diff --git a/Documentation/devicetree/bindings/pci/xgene-pcie.txt b/Documentation/devicetree/bindings/pci/xgene-pcie.txt
-new file mode 100644
-index 0000000..d92da4f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/xgene-pcie.txt
-@@ -0,0 +1,43 @@
-+* AppliedMicro X-Gene PCIe interface
-+
-+Required properties:
-+- status: Either "ok" or "disabled".
-+- device_type: set to "pci"
-+- compatible: should contain "xgene,pcie" to identify the core.
-+- reg: base addresses and lengths of the pcie controller configuration
-+	space register.
-+- #address-cells: set to <3>
-+- #size-cells: set to <2>
-+- ranges: ranges for the PCI memory, I/O regions, config and MSI regions
-+- #interrupt-cells: set to <1>
-+- interrupt-map-mask and interrupt-map: standard PCI properties
-+	to define the mapping of the PCIe interface to interrupt
-+	numbers.
-+- clocks: from common clock binding: handle to pci clock.
-+- clock-names: from common clock binding. Should be "pcieclk".
-+
-+Example:
-+
-+SoC specific DT Entry:
-+	pcie0: pcie at 1f2b0000 {
-+		status = "disabled";
-+		device_type = "pci";
-+		compatible = "xgene,pcie";
-+		#interrupt-cells = <1>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
-+		ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
-+			  0x01000000 0x0 0x80000000 0xe0 0x80000000 0x0 0x00010000 /* io */
-+			  0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
-+			  0x00000000 0x0 0x79000000 0x00 0x79000000 0x0 0x00800000>; /* msi */
-+		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-+		interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
-+		clocks = <&pcie0clk 0>;
-+		clock-names = "pcieclk"
-+	};
-+
-+Board specific DT Entry:
-+	&pcie0 {
-+		status = "ok";
-+	};
--- 
-1.7.9.5
+http://thread.gmane.org/gmane.linux.drivers.devicetree/49472
+
+In this way, we can still have IMX_HAVE_PLATFORM_IMX_FB to control the
+build of platform-imx-fb.o.
+
+Shawn 
+
+>  	select FB_CFB_FILLRECT
+>  	select FB_CFB_COPYAREA
+>  	select FB_CFB_IMAGEBLIT
+> -- 
+> 1.8.3.2
+> 
