@@ -1,43 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 23 Dec 2013 14:36:02 -0600
-Subject: [PATCH v8 9/9] ARM: dts: add usb udc support to bcm281xx
-In-Reply-To: <1387462990-12039-10-git-send-email-mporter@linaro.org>
-References: <1387462990-12039-1-git-send-email-mporter@linaro.org>
- <1387462990-12039-10-git-send-email-mporter@linaro.org>
-Message-ID: <20131223203602.GC15101@saruman.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 Dec 2013 12:45:56 -0800
+Subject: [PATCH v2 0/7] Modernize pm8921 with irqdomains, regmap, DT
+Message-ID: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 09:23:10AM -0500, Matt Porter wrote:
-> Adds USB OTG/PHY and clock support to BCM281xx and enables
-> UDC support on the bcm11351-brt and bcm28155-ap boards.
-> 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+These patches lay the groundwork for converting the pm8921 sub-devices
+to devicetree as well as simplify the API by migrating the core code
+to use the regmap API instead of the custom pm8xxx read/write wrapper.
 
-doesn't apply to my tree:
+Changes since v1:
+ * First 3 cleanup patches dropped because they're applied upstream
+ * New regmap read/write helpers
+ * New patch for DT match table
+ * New binding document
 
-checking file arch/arm/boot/dts/bcm11351-brt.dts
-checking file arch/arm/boot/dts/bcm11351.dtsi
-Hunk #1 FAILED at 243.
-1 out of 1 hunk FAILED
-checking file arch/arm/boot/dts/bcm28155-ap.dts
+Stephen Boyd (7):
+  mfd: Move pm8xxx-irq.c contents into only driver that uses it
+  mfd: pm8921: Update for genirq changes
+  mfd: pm8921: Migrate to irqdomains
+  mfd: ssbi: Add regmap read/write helpers
+  mfd: pm8921: Use ssbi regmap
+  mfd: pm8921: Add DT match table
+  devicetree: bindings: Document PM8921/8058 PMICs
 
-I will skip this patch from my tree, all others are now in my
-testing/next branch after fixing dependency ARM-only for now.
-
-Send me a patch removing ARCH dependency for v3.15, since this driver
-can be used in other arches too.
-
-cheers
+ .../devicetree/bindings/mfd/qcom,pm8xxx.txt        |  63 +++
+ drivers/mfd/Kconfig                                |  12 +-
+ drivers/mfd/pm8921-core.c                          | 424 ++++++++++++++++++---
+ drivers/mfd/pm8xxx-irq.c                           | 371 ------------------
+ drivers/mfd/ssbi.c                                 |  13 +
+ include/linux/mfd/pm8xxx/irq.h                     |  59 ---
+ include/linux/mfd/pm8xxx/pm8921.h                  |  30 --
+ include/linux/ssbi.h                               |   3 +
+ 8 files changed, 449 insertions(+), 526 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+ delete mode 100644 drivers/mfd/pm8xxx-irq.c
+ delete mode 100644 include/linux/mfd/pm8xxx/irq.h
+ delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131223/7f6f323f/attachment-0001.sig>
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
