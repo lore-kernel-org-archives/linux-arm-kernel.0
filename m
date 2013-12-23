@@ -1,51 +1,106 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 22 Dec 2013 22:40:10 -0800
-Subject: [GIT PULL] Renesas ARM based SoC Clock updates for v3.14
-In-Reply-To: <1387761024-10114-1-git-send-email-horms+renesas@verge.net.au>
-References: <1387761024-10114-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20131223064010.22761.89784@quantum>
+Date: Sun, 22 Dec 2013 22:41:03 -0800
+Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+In-Reply-To: <20131202022549.GA12357@verge.net.au>
+References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+ <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
+ <20131009034057.GO15065@verge.net.au>
+ <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
+ <20131009065438.GA7220@verge.net.au>
+ <CANqRtoSGFEjcBPDAtq3YCDbkiFCftyr8b=qniYqyMafng=zurw@mail.gmail.com>
+ <20131009103915.GB17869@verge.net.au> <20131029044239.GC20432@verge.net.au>
+ <20131202022549.GA12357@verge.net.au>
+Message-ID: <20131223064103.22761.77246@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Simon Horman (2013-12-22 17:10:23)
-> Hi Mike,
+Quoting Simon Horman (2013-12-01 18:25:51)
+> On Tue, Oct 29, 2013 at 01:42:41PM +0900, Simon Horman wrote:
+> > On Wed, Oct 09, 2013 at 07:39:18PM +0900, Simon Horman wrote:
+> > > On Wed, Oct 09, 2013 at 04:29:56PM +0900, Magnus Damm wrote:
+> > > > Hi Simon,
+> > > > 
+> > > > On Wed, Oct 9, 2013 at 3:54 PM, Simon Horman <horms@verge.net.au> wrote:
+> > > > > On Wed, Oct 09, 2013 at 01:59:46PM +0900, Magnus Damm wrote:
+> > > > >> Hi Simon,
+> > > > >>
+> > > > >> On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
+> > > > >> > On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
+> > > > >> >> Use common clock framework version of clock
+> > > > >> >>  drivers/clk/shmobile/clk-emev2.c
+> > > > >> >> instead of sh-clkfwk version
+> > > > >> >>  arch/arm/mach-shmobile/clock-emev2.c
+> > > > >> >> when it is configured as a part of multi-platform.
+> > > > >> >>
+> > > > >> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> > > > >> >
+> > > > >> > Thanks.
+> > > > >> >
+> > > > >> > I plan to add this patch to a new topic branch,
+> > > > >> > topic/emev2-common-clock, in the renesas tree and
+> > > > >> > queue it up from there for inclusion in mainline
+> > > > >> > if/when the first patch of this series is accepted
+> > > > >> > by Mike Turquette.
+> > > > >>
+> > > > >> Thanks for picking up patches, Simon.
+> > > > >>
+> > > > >> I think you can simply merge this patch after the following series:
+> > > > >>
+> > > > >> [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
+> > > > >
+> > > > > This is already queued up.
+> > > > 
+> > > > Yes, I know, thanks for that. I tried to explain the dependency in the
+> > > > 00/00 cover letter but I will try to be more clear next time!
+> > > > 
+> > > > >> There are no build time dependencies on patch 1 and 2 so this patch
+> > > > >> can be merged independently. Regarding run-time operation, the
+> > > > >> multiplatform series above makes KZM9D DT reference only build for
+> > > > >> multiplatform, and in such case CCF is required.
+> > > > >>
+> > > > >> So if you want to keep KZM9D DT reference working until Mike Turquette
+> > > > >> accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
+> > > > >> ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
+> > > > >> have been merged.
+> > > > >>
+> > > > >> Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
+> > > > >> Multiplatform update" before the EMEV2 CCF bits, but if so you may as
+> > > > >> well merge this patch as well IMO. This
+> > > > >> multiplatform-update-series-merge-before-CCF plan will result in
+> > > > >> untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
+> > > > >> fine with me.
+> > > > >
+> > > > > I am mainly concerned that the bindings may change before
+> > > > > they are finally merged. And I thought it would be nice to avoid
+> > > > > having to fix up the usage of the bindings if they change.
+> > > > 
+> > > > Sure, but the code in this patch looks like it simply starts DT CCF
+> > > > probing regardless of what the bindings look like. So I don't think
+> > > > you will have to worry about actual bindings detail.
+> > > > 
+> > > > > But I'm happy to just queue-up patches 2 and 3 of this series
+> > > > > now if you prefer.
+> > > > 
+> > > > Well, I meant patch 3 only. Patch 1 and 2 are tied together by dependencies. =)
+> > > 
+> > > Thanks, I understand now.
+> > > 
+> > > I'll queue-up 3/3.
+> > 
+> > Which I did.
+> > 
+> > Then some time passed...
+> > 
+> > Mike has accepted my pull-request for patch 1 of this series
+> > and accordingly I have queued-up this patch for v3.14.
+> > It should appear in the devel branch the next time that I push it.
 > 
-> please consider the following
-> Renesas ARM based SoC Clock updates for v3.14.
+> I was mistaken. It was not queued up  for v3.14.
+> And still has not been queued up.
 > 
-> This pull request is based on your clk-next-shmobile branch.
-> 
-> 
-> The following changes since commit f94859c215b6d977794108a1a9a101239e393c09:
-> 
->   clk: shmobile: Add MSTP clock support (2013-12-12 19:23:59 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-for-v3.14
-> 
-> for you to fetch changes up to 92ca6a8ce97e07206d474da5477d8da4e41bad6c:
-> 
->   clk: emev2: Add support for emev2 SMU clocks with DT (2013-12-14 13:17:55 +0900)
+> I have un-queued this patch accordingly.
 
-Pulled into clk-next.
+I have pulled in the emev2 SMU clock support patch now.
 
-Thanks!
+Regards,
 Mike
-
-> 
-> ----------------------------------------------------------------
-> Renesas ARM based SoC Clock updates for v3.14
-> 
-> Add support for using emev2 SMU clocks with DT
-> 
-> ----------------------------------------------------------------
-> Takashi Yoshii (1):
->       clk: emev2: Add support for emev2 SMU clocks with DT
-> 
->  .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
->  drivers/clk/shmobile/Makefile                      |   2 +-
->  drivers/clk/shmobile/clk-emev2.c                   | 104 +++++++++++++++++++++
->  3 files changed, 203 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/emev2-clock.txt
->  create mode 100644 drivers/clk/shmobile/clk-emev2.c
