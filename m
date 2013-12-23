@@ -1,76 +1,147 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 23 Dec 2013 00:32:44 -0300
-Subject: [PATCH v3 13/13] ARM: sunxi: dt: add nodes for the mbus clock
+Date: Mon, 23 Dec 2013 00:32:41 -0300
+Subject: [PATCH v3 10/13] ARM: sun4i: dt: mod0 clocks
 In-Reply-To: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
 References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1387769564-12894-14-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1387769564-12894-11-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mbus is the memory bus clock, and it is present on both sun5i and sun7i
-machines. Its register layout is compatible with the mod0 one.
+This commit adds all the mod0 clocks present on sun4i to its device tree
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a10s.dtsi | 8 ++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi  | 8 ++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi  | 8 ++++++++
- 3 files changed, 24 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 120 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 120 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 5012c27..50f34fd 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -261,6 +261,14 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
- 			clock-output-names = "ir0";
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index ebacb5d..834b37e 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -184,6 +184,126 @@
+ 				"apb1_uart4", "apb1_uart5", "apb1_uart6",
+ 				"apb1_uart7";
  		};
 +
-+		mbus_clk: clk at 01c2015c {
++		nand_clk: clk at 01c20080 {
 +			#clock-cells = <0>;
 +			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2015c 0x4>;
++			reg = <0x01c20080 0x4>;
 +			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+			clock-output-names = "mbus";
++			clock-output-names = "nand";
 +		};
- 	};
- 
- 	soc at 01c00000 {
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index c46ac65..227be94 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -258,6 +258,14 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
- 			clock-output-names = "ir0";
- 		};
 +
-+		mbus_clk: clk at 01c2015c {
++		ms_clk: clk at 01c20084 {
 +			#clock-cells = <0>;
 +			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2015c 0x4>;
++			reg = <0x01c20084 0x4>;
 +			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+			clock-output-names = "mbus";
++			clock-output-names = "ms";
 +		};
- 	};
- 
- 	soc at 01c00000 {
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 9a2e356..1ba8532 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -294,6 +294,14 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
- 			clock-output-names = "spi3";
- 		};
 +
-+		mbus_clk: clk at 01c2015c {
++		mmc0_clk: clk at 01c20088 {
 +			#clock-cells = <0>;
 +			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2015c 0x4>;
-+			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
-+			clock-output-names = "mbus";
++			reg = <0x01c20088 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc0";
++		};
++
++		mmc1_clk: clk at 01c2008c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2008c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc1";
++		};
++
++		mmc2_clk: clk at 01c20090 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20090 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc2";
++		};
++
++		mmc3_clk: clk at 01c20094 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20094 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc3";
++		};
++
++		ts_clk: clk at 01c20098 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c20098 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ts";
++		};
++
++		ss_clk: clk at 01c2009c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c2009c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ss";
++		};
++
++		spi0_clk: clk at 01c200a0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a0 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi0";
++		};
++
++		spi1_clk: clk at 01c200a4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi1";
++		};
++
++		spi2_clk: clk at 01c200a8 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a8 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi2";
++		};
++
++		pata_clk: clk at 01c200ac {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200ac 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "pata";
++		};
++
++		ir0_clk: clk at 01c200b0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200b0 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ir0";
++		};
++
++		ir1_clk: clk at 01c200b4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200b4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ir1";
++		};
++
++		spi3_clk: clk at 01c200d4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200d4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi3";
 +		};
  	};
  
