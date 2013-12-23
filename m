@@ -1,28 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Dec 2013 11:57:46 +0000
-Subject: [PATCH v4 1/3] regulator: act8865: add PMIC act8865 driver
-In-Reply-To: <1387776328-23079-1-git-send-email-wenyou.yang@atmel.com>
-References: <1387776268-23036-1-git-send-email-wenyou.yang@atmel.com>
- <1387776328-23079-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20131223115746.GR30815@sirena.org.uk>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 23 Dec 2013 13:07:35 +0100
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl speed
+Message-ID: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 01:25:28PM +0800, Wenyou Yang wrote:
+From: Lior Amsalem <alior@marvell.com>
 
-> +static int act8865_set_suspend_voltage(struct regulator_dev *rdev, int uV)
-> +{
-> +	u32	selector;
-> +
-> +	selector = regulator_map_voltage_iterate(rdev, uV, uV);
-> +
-> +	return regulator_set_voltage_sel_regmap(rdev, selector);
-> +}
+From: Lior Amsalem <alior@marvell.com>
 
-This looks wrong - it's going to set the normal voltage register that is
-set for runtime voltage changes.  The suspend operations are only for
-setting separate voltage registers, many PMICs know about system suspend
-and provide separate settings for that.  If this one doesn't then it
-shouldn't implement this operation.
+This patch fixes a SATA hotplug issue on the Armada 370 and Armada XP
+SoCs. Without it, if a disk is unplugged from a SATA port, then further
+hotplug notification are now longer received on this port.
 
-Otherwise this looked good.
+This should be applied to every -stable kernel supporting Armada SoCs.
+
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: stable at vger.kernel.org
+---
+ drivers/ata/sata_mv.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 56be318..89ca472 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -304,6 +304,7 @@ enum {
+ 	MV5_LTMODE		= 0x30,
+ 	MV5_PHY_CTL		= 0x0C,
+ 	SATA_IFCFG		= 0x050,
++	LP_PHY_CTL		= 0x058,
+ 
+ 	MV_M2_PREAMP_MASK	= 0x7e0,
+ 
+@@ -1358,6 +1359,7 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+ 
+ 	if (ofs != 0xffffffffU) {
+ 		void __iomem *addr = mv_ap_base(link->ap) + ofs;
++		void __iomem *lp_phy_addr = mv_ap_base(link->ap) + LP_PHY_CTL;
+ 		if (sc_reg_in == SCR_CONTROL) {
+ 			/*
+ 			 * Workaround for 88SX60x1 FEr SATA#26:
+@@ -1374,6 +1376,14 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+ 			 */
+ 			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
+ 				val |= 0xf000;
++
++			/*
++			 * Setting PHY speed according to SControl speed
++			 */
++			if ((val & 0xf0) == 0x10)
++				writelfl(0x7, lp_phy_addr);
++			else
++				writelfl(0x227, lp_phy_addr);
+ 		}
+ 		writelfl(val, addr);
+ 		return 0;
+-- 
+1.8.5.1
