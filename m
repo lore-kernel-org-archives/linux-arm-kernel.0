@@ -1,61 +1,147 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 23 Dec 2013 11:28:28 -0800
-Subject: [RFC 02/18] power/reset: vexpress: Use sched_clock as the time
- source
-In-Reply-To: <1387815830-8794-3-git-send-email-pawel.moll@arm.com>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-3-git-send-email-pawel.moll@arm.com>
-Message-ID: <CANcMJZALQ0khcqkdQA5Tnr6_9kfWK=UUmrUB4mCv2MEkmLv0sg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 Dec 2013 17:28:56 -0200
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabresd: Add PFUZE100 support
+Message-ID: <1387826937-9734-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 8:23 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> At this stage of system shutdown procedure the jiffies may
-> not be updated anymore, so have to base on raw sched_clock
-> values.
->
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> Cc: Anton Vorontsov <anton@enomsg.org>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> ---
->  drivers/power/reset/vexpress-poweroff.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
-> index 476aa49..d752233 100644
-> --- a/drivers/power/reset/vexpress-poweroff.c
-> +++ b/drivers/power/reset/vexpress-poweroff.c
-> @@ -15,6 +15,7 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> +#include <linux/sched.h>
->  #include <linux/stat.h>
->  #include <linux/vexpress.h>
->
-> @@ -27,12 +28,12 @@ static void vexpress_reset_do(struct device *dev, const char *what)
->                         vexpress_config_func_get_by_dev(dev);
->
->         if (func) {
-> -               unsigned long timeout;
-> +               unsigned long long timeout_ns;
->
->                 err = vexpress_config_write(func, 0, 0);
->
-> -               timeout = jiffies + HZ;
-> -               while (time_before(jiffies, timeout))
-> +               timeout_ns = sched_clock() + 50000000;
-> +               while (!err && time_before64(sched_clock(), timeout_ns))
->                         cpu_relax();
->         }
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-So this may not be a problem in this particular case, but sched_clock
-could be backed by jiffies on some hardware, causing the same problem
-to appear.
+mx6 sabresd boards have Freescale PFUZE100 regulator, so add support for it.
 
-Might udelay/mdelay be a better fit for this sort of case (since
-udelay may be counter backed, but may also be loop backed on hardware
-without continuous counters)?
+Signed-off-by: Robin Gong <b38343@freescale.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 110 +++++++++++++++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
 
-thanks
--john
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 9dea121..ae04ec2 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -165,6 +165,112 @@
+        };
+ };
+ 
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3950000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
+ &i2c3 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -223,6 +329,10 @@
+ 			fsl,pins = <MX6QDL_I2C1_PINGRP2>;
+ 		};
+ 
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <MX6QDL_I2C2_PINGRP2>;
++		};
++
+ 		pinctrl_i2c3: i2c3grp {
+ 			fsl,pins = <MX6QDL_I2C3_PINGRP2>;
+ 		};
+-- 
+1.8.1.2
