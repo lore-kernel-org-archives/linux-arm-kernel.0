@@ -1,59 +1,83 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Mon, 23 Dec 2013 13:44:12 -0300
-Subject: [PATCH 4/4] ARM: dts: sun7i: Add pin muxing options for clock
- outputs
-In-Reply-To: <1387787827-11341-5-git-send-email-wens@csie.org>
-References: <1387787827-11341-1-git-send-email-wens@csie.org>
- <1387787827-11341-5-git-send-email-wens@csie.org>
-Message-ID: <52B8685C.3060001@elopez.com.ar>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 23 Dec 2013 13:48:27 -0300
+Subject: [PATCH 2/2] ARM: Kirkwood: DT board setup for LaPlug
+In-Reply-To: <CAGduivwCtQr-6sY92jEydU6uG1QJOSQcqxAKwcxr4viV38vU-Q@mail.gmail.com>
+References: <1387813346-16741-1-git-send-email-maxime.hadjinlian@gmail.com>
+ <1387813346-16741-2-git-send-email-maxime.hadjinlian@gmail.com>
+ <CAGduivwCtQr-6sY92jEydU6uG1QJOSQcqxAKwcxr4viV38vU-Q@mail.gmail.com>
+Message-ID: <20131223164826.GA6535@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-El 23/12/13 05:37, Chen-Yu Tsai escribi?:
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-
-Other than the lack of a commit description, the patch looks ok to me.
-
->   arch/arm/boot/dts/sun7i-a20.dtsi | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 6ad5507..d6e7251 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -414,6 +414,20 @@
->   				allwinner,drive = <0>;
->   				allwinner,pull = <0>;
->   			};
-> +
-> +			clk_out_a_pins: clk_out_a {
-
-I see the other nodes all start like
-
-	foo_pins_a: foo0 at 0 {
-
-Maybe yours should too? Maxime, thoughts?
-
-> +				allwinner,pins = "PI12";
-> +				allwinner,function = "clk_out_a";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <0>;
-> +			};
-> +
-> +			clk_out_b_pins: clk_out_b {
-> +				allwinner,pins = "PI13";
-> +				allwinner,function = "clk_out_b";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <0>;
-> +			};
->   		};
->
->   		timer at 01c20c00 {
+On Mon, Dec 23, 2013 at 04:47:34PM +0100, Maxime Hadjinlian wrote:
+> I have a slight issue which I could not resolve regarding the Hynix
+> NAND on this platform. Although it worked perfectly well with 3.12,
+> the device is not detected  anymore with the current head of master.
 >
 
-Thanks for working on this!
+If you do a "git log v3.12..v3.13-rc4 -- drivers/mtd/nand/orion_nand.c"
+you'll see that no changes have been made.
 
-Emilio
+So maybe this new dts v2 is the problem. And if you look in detail you'll
+find you've been bitten by the subtleties of the devicetree!
+
+See below...
+
+> > +       mbus {
+> > +               ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>;
+> > +               pcie-controller {
+> > +                       status = "okay";
+> > +                       pcie at 1,0 {
+> > +                               status = "okay";
+> > +                       };
+> > +               };
+> > +       };
+
+^^^^
+Here's the problem: there's two wrong things with the above:
+
+1. You can't do this... a ranges properties doesn't add on the included
+(dtsi) ranges properties. Instead it replaces the included one, so you have
+to write the entries all over again.
+
+Yes, we know: it sucks! And given we know it sucks, there was a nice
+message warning you about this. From the kirkwood.dtsi
+
+	/* If a board file needs to change this ranges it must replace it completely */
+	ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000	/* internal-regs */
+		  MBUS_ID(0x01, 0x2f) 0 0xf4000000 0x10000	/* nand flash */
+		  MBUS_ID(0x03, 0x01) 0 0xf5000000 0x10000	/* crypto sram */
+	  >;
+
+2. Looking in yet more detail, you're re-adding the internal-regs window.
+I guess it's just a typo, no?
+
+Anyway, I *think* that's what prevented you from getting the NAND to
+work. The correct mbus node should be:
+
+	mbus {
+		pcie-controller {
+			status = "okay";
+			pcie at 1,0 {
+				status = "okay";
+			};
+		};
+	};
+
+> > +&nand {
+> > +       /* Total size : 512MB */
+> > +       status = "okay";
+> > +
+
+And here: don't you need to add the pinmuxing? Maybe you don't need it,
+but I guess it's the right thing to do.
+
+I hope this helps!
+
+Merry Christmas...
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
