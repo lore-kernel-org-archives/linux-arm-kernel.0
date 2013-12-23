@@ -1,27 +1,35 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Dec 2013 17:05:08 +0100
-Subject: [PATCH 2/2] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <CAGduivwCtQr-6sY92jEydU6uG1QJOSQcqxAKwcxr4viV38vU-Q@mail.gmail.com>
-References: <1387813346-16741-1-git-send-email-maxime.hadjinlian@gmail.com>
- <1387813346-16741-2-git-send-email-maxime.hadjinlian@gmail.com>
- <CAGduivwCtQr-6sY92jEydU6uG1QJOSQcqxAKwcxr4viV38vU-Q@mail.gmail.com>
-Message-ID: <20131223160508.GC7746@lunn.ch>
+Date: Mon, 23 Dec 2013 17:13:10 +0100
+Subject: [PATCH 0/3] ARM: mvebu: minor improvements
+In-Reply-To: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131223161310.GB8292@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 04:47:34PM +0100, Maxime Hadjinlian wrote:
-> I have a slight issue which I could not resolve regarding the Hynix
-> NAND on this platform. Although it worked perfectly well with 3.12,
-> the device is not detected  anymore with the current head of master.
+On Mon, Dec 23, 2013 at 09:48:08AM +0100, Thomas Petazzoni wrote:
+> Jason, Gregory, Sebastian, Andrew,
 > 
-> There is no warning nor bug that I could find. It just not detected.
-> Since I don't really know how to debug this, maybe doing git bisect ?
-> Some advice would be greatly welcomed !
+> Here are three patches making minor improvements to the mvebu code
+> base.
+> 
+>  * The first one moves an 370/XP specific declaration to
+>    armada-370-xp.h, in preparation for the future addition of the
+>    support for other SOCs in mach-mvebu/. It should go to mvebu/soc.
+> 
+>  * The second one fixes the length of the registers of the Armada XP
+>    PMSU. It should go to mvebu/dt. There is no need to push this as a
+>    fix, as it *reduces* the length of the register area, so it is
+>    really only a cosmetic improvement.
+> 
+>  * The third one makes a function static. It should to to mvebu/soc.
+> 
+> Thanks!
 
-Hi Maxime
+Hi Thomas
 
-git bisect sounds like the right thing to do. Once we know which patch
-introduced the issue it becomes a lot easier to fix.
+All look sensible to me,
 
-	   Thanks
-		Andrew
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
