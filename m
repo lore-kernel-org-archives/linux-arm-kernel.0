@@ -1,29 +1,35 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 23 Dec 2013 15:24:26 +0530
-Subject: [PATCH V7 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree
- boot
-In-Reply-To: <1381937948-27057-1-git-send-email-nm@ti.com>
-References: <1381937948-27057-1-git-send-email-nm@ti.com>
-Message-ID: <CAOh2x==pT=ASrocV=dRKgFECyWbxN3pnzo9a4026szPGLXfbqg@mail.gmail.com>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Mon, 23 Dec 2013 11:36:29 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/5] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <52AEF060.6000405@redhat.com>
+References: <1387058295-20641-1-git-send-email-hdegoede@redhat.com>
+ <1743952.noztKtcF2Y@dizzy-6.site> <52AEF060.6000405@redhat.com>
+Message-ID: <2155426.QS1WdjUNS8@dizzy-6.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 9:09 PM, Nishanth Menon <nm@ti.com> wrote:
-> PandaBoard-ES (OMAP4460): http://pastebin.com/qQCmA2ng
+> I think that we're miss-communicating a bit here. What I'm trying to say
+> is that trying to extend the dw_mmc driver to support sunxi is a bad
+> idea because the sunxi hardware is quite different. And that the
+> sunxi hardware having autostop allows the existing sunxi-mci driver to
+> be much simpler then the dw-mmc driver.
 
-Hi Nishanth,
+> IOW the much simpler driver already exists and it is the sunxi-mci
+> driver.
+Ah! Ok. Now I get it.
+Well then. I'll try to incorporate all the changes within this endless thread 
+until I can get together a patchset v2 I can hand in.
+Now that the lectures have ended for this semester I won't be too tired for 
+straight thinking on daily basis and will be able to create such a patchset.
+And please excuse my contentless answers onto the last few questions
+but I really wasn't myself - so to say -  at this time (half asleep)
 
-A colleague of mine (Sanjay), was trying mainline on panda board. And
-wasn't able to get cpufreq-cpu0 working with it. Even your log also
-reports its broken as it can't get any regulator information..
-
-He is getting this:
-
-cpufreq_cpu0: failed to get cpu0 regulator: -19
-cpufreq_cpu0: failed to get cpu0 clock: -2
-cpufreq-cpu0: probe of cpufreq-cpu0.0 failed with error -2
-
-Can you please help him out?
-
---
-viresh
+-david
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131223/f5d4c97a/attachment-0001.sig>
