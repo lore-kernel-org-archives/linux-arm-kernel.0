@@ -1,49 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Dec 2013 22:06:15 +0800
-Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: fix warning during module
- remove function
-In-Reply-To: <1387796544-18209-2-git-send-email-b29396@freescale.com>
-References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
- <1387796544-18209-2-git-send-email-b29396@freescale.com>
-Message-ID: <20131223140613.GL26070@S2101-09.ap.freescale.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Dec 2013 15:06:27 +0100
+Subject: [PATCH v2 0/5] arm64: advertise availability of CRC and crypto
+ instructions
+Message-ID: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 07:02:24PM +0800, Dong Aisheng wrote:
-> @@ -1160,8 +1160,6 @@ free_sdhci:
->  static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
->  {
->  	struct sdhci_host *host = platform_get_drvdata(pdev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct pltfm_imx_data *imx_data = pltfm_host->priv;
->  	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
->  
->  	sdhci_remove_host(host, dead);
-> @@ -1169,10 +1167,6 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
->  	pm_runtime_dont_use_autosuspend(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> -	clk_disable_unprepare(imx_data->clk_per);
-> -	clk_disable_unprepare(imx_data->clk_ipg);
-> -	clk_disable_unprepare(imx_data->clk_ahb);
+This series is a followup to the patch that was recently merged by Catalin that
+allocates hwcaps bits for CRC and Crypto Extensions instructions so userland can
+discover whether the current CPU has any of those capabilities.
 
-It's obviously a bad change to me.  We should definitely have these
-clk_disable_unprepare() calls in sdhci_esdhc_imx_remove() to match the
-clk_prepare_enable() calls in sdhci_esdhc_imx_probe().  Otherwise, at
-least for !CONFIG_PM_RUNTIME build, it's broken.
+Patch #1 enables ARM support for the ELF_HWCAP2/AT_HWCAP2 ELF auxv entry that
+was recently added to the kernel and glibc (2.18). It extends the feature bit
+space to 64 bits (on 32-bit architectures)
 
-I'm looking at sdhci-pxav3 driver.  Why can it call
-clk_disable_unprepare(pltfm_host->clk) in .remove() with runtime PM
-support in there?  Is there anything about runtime PM not being done
-correctly for our driver?
+Patch #2 adds generic support for ELF_HWCAP2/AT_HWCAP2 to the 32-bit ELF compat
+mode for 64-bit architectures.
 
-Shawn
+Patch #3 adds support for ELF_HWCAP2/AT_HWCAP2 to arm64's 32-bit ELF compat mode
 
-> -
->  	sdhci_pltfm_free(pdev);
->  
->  	return 0;
-> -- 
-> 1.7.2.rc3
-> 
-> 
+Patch #4 allocates the HWCAP2 bits in the arch/arm tree. This is necessary
+because 32-bit ARM binaries can execute both under ARM and under arm64 kernels,
+so there should be agreement about the meaning of feature bits, even if the ARM
+kernel has no support yet for ARMv8 32-bit only hardware (such as ARMv8-R)
+
+Patch #5 advertises the CRC and Crypto Extensions to 32-bit ELF binaries running
+under an arm64 kernel.
+
+v2 changes:
+- omitted 2 arm64 specific patches that have already been merged by Catalin
+- move ARM feature bits to HWCAP2
+
+Ard Biesheuvel (5):
+  ARM: add support for AT_HWCAP2 ELF auxv entry
+  binfmt_elf: add ELF_HWCAP2 to compat auxv entries
+  arm64: add AT_HWCAP2 support for 32-bit compat
+  ARM: introduce HWCAP2 feature bits for ARMv8 Crypto Extensions
+  arm64: advertise ARMv8 extensions to 32-bit compat ELF binaries
+
+ arch/arm/include/asm/hwcap.h      |  3 ++-
+ arch/arm/include/uapi/asm/hwcap.h |  9 +++++++++
+ arch/arm/kernel/setup.c           | 16 ++++++++++++++++
+ arch/arm64/include/asm/hwcap.h    |  9 ++++++++-
+ arch/arm64/kernel/setup.c         | 33 +++++++++++++++++++++++++++++++++
+ fs/compat_binfmt_elf.c            |  5 +++++
+ 6 files changed, 73 insertions(+), 2 deletions(-)
+
+-- 
+1.8.3.2
