@@ -1,20 +1,34 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 23 Dec 2013 10:46:34 -0700
-Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <1387785725-24262-3-git-send-email-tinamdar@apm.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <1387785725-24262-3-git-send-email-tinamdar@apm.com>
-Message-ID: <20131223174634.GD25089@obsidianresearch.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 23 Dec 2013 21:57:54 +0300
+Subject: [PATCH 2/2] ARM: shmobile: Lager: conditionally select
+ CONFIG_MICREL_PHY
+In-Reply-To: <20131223005322.GJ12239@verge.net.au>
+References: <201312200218.08076.sergei.shtylyov@cogentembedded.com>
+ <201312200220.54747.sergei.shtylyov@cogentembedded.com>
+ <20131223005322.GJ12239@verge.net.au>
+Message-ID: <52B887B2.7070507@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 01:32:03PM +0530, Tanmay Inamdar wrote:
-> This patch adds the device tree nodes for APM X-Gene PCIe controller and
-> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts nodes
-> are added.
+Hello.
 
-Can you include an lspci dump for PCI DT bindings please? It is
-impossible to review otherwise..
+On 12/23/2013 03:53 AM, Simon Horman wrote:
 
-Regards,
-Jason
+>> Now that support for KSZ8041RNLI is added to the Micrel PHY driver and we intend
+>> to support PHY IRQs on the Lager board, we have to enable the Micrel driver.
+>> Do this by selecting CONFIG_MICREL_PHY for Lager if CONFIG_SH_ETH is enabled.
+
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> Hi Sergei,
+
+> while I am very happy to see this change unfortunately it no longer
+> applies. Could you please rebase it on top of
+> renesas-devel-v3.13-rc4-20131219?
+
+    Hmm, it *was done* on top of this tag. Perhaps you meant today's 
+renesas-devel-v3.13-rc5-20131223?
+
+> Thanks
+
+WBR, Sergei
