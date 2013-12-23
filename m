@@ -1,63 +1,67 @@
 From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Mon, 23 Dec 2013 10:03:28 +0530
-Subject: [PATCH 2/3] ARM: dts: replace clock numbers with macros for
- exynos5420
-In-Reply-To: <2478495.7T968MEiJL@flatron>
-References: <1387544246-31658-1-git-send-email-rahul.sharma@samsung.com>
- <1387544246-31658-3-git-send-email-rahul.sharma@samsung.com>
- <2478495.7T968MEiJL@flatron>
-Message-ID: <CAPdUM4PMY=43PO75NZS6hjcvLnfjwg4bqnEN3+f+DtstQOQQGg@mail.gmail.com>
+Date: Mon, 23 Dec 2013 10:09:17 +0530
+Subject: [PATCH 1/7] ARM: EXYNOS: initial board support for exynos5260 SoC
+In-Reply-To: <CAK9yfHzX1+Rp3DCZiJSjE7VO6+TaDW7iqUZVpgRNkjVJofWauA@mail.gmail.com>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
+ <CAK9yfHzX1+Rp3DCZiJSjE7VO6+TaDW7iqUZVpgRNkjVJofWauA@mail.gmail.com>
+Message-ID: <CAPdUM4PfrVyz+TpEPt-0xnhrjNwp_qbk_PkBtZGu15pfNSMqkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+Thanks Sachin,
 
-On 21 December 2013 03:32, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On 9 December 2013 11:53, Sachin Kamat <sachin.kamat@linaro.org> wrote:
 > Hi Rahul,
 >
-> On Friday 20 of December 2013 18:27:25 Rahul Sharma wrote:
->> DT nodes contain clock numbers which are referred by drivers
->> to get the clocks. These numbers are replaced by MACROs
->> which are defined in the exynos5420-clk.h header file.
+> On 6 December 2013 21:26, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>
+>> This patch add basic arch side support for exynos5260 SoC.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 >
-> This is a good idea, but we already have such conversion scheduled for
-> all the existing clock drivers in an automated way. Andrzej Hajda (on CC)
-> has a script that automatically converts DTS files and clock drivers from
-> enums to defines.
->
-> Also such change needs to be done in a timely manner, due to greatly
-> increasing chance of conflicting other patches.
->
-> My suggestion is to drop this and patch 3/3 from this series and let us
-> handle this using Andrzej's script at appropriate point of time.
+> Since you are posting the patch, your signed off is also required.
 
-Looks fine to me. I will drop them. But we have a requirement to keep 5420
-up to date in mainline tree. I am hoping you will do it soon for all SoCs. In
-case its delaying too much, I will request you to consider these again :).
+Right. I will add my Sign off.
+
+>
+> [snip]
+>
+>>  void exynos4_restart(enum reboot_mode mode, const char *cmd)
+>>  {
+>>         __raw_writel(0x1, S5P_SWRESET);
+>> @@ -371,7 +387,8 @@ static void __init exynos4_map_io(void)
+>>  static void __init exynos5_map_io(void)
+>>  {
+>>         iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
+>> -
+>> +       if (soc_is_exynos5260())
+>> +               iotable_init(exynos5260_iodesc, ARRAY_SIZE(exynos5260_iodesc));
+>
+> Add this after 5250 to maintain numerical order.
+
+ok.
+>
+>>         if (soc_is_exynos5250())
+>>                 iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
+>>  }
+>
+> [snip]
+>>
+>>  #define S5P_VA_SYSRAM          S3C_ADDR(0x02400000)
+>>  #define S5P_VA_SYSRAM_NS       S3C_ADDR(0x02410000)
+>> +
+> Unnecessary blank line addition.
+
+I will remove this.
 
 Regards,
 Rahul Sharma.
 
 >
->>
->> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5420.dtsi |   47 +++++++++++++++++++------------------
->>  1 file changed, 24 insertions(+), 23 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->> index e552608..db8b2da 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -17,6 +17,7 @@
->>  #include "exynos5420-pinctrl.dtsi"
->>
->>  #include <dt-bindings/clk/exynos-audss-clk.h>
->> +#include <dt-bindings/clk/exynos5420-clk.h>
 >
-> By the way, this header is added in patch 3/3, so this patch breaks
-> bisectability, which is not acceptable.
->
-> Best regards,
-> Tomasz
->
+> --
+> With warm regards,
+> Sachin
