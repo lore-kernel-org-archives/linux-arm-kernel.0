@@ -1,147 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:22 +0900
-Subject: [PATCH 26/26] ARM: shmobile: lager: add gpio/fixed regulator for SDHI
-In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
-References: <cover.1387763524.git.horms+renesas@verge.net.au>
-Message-ID: <be0647d556985ae58a42e7fc3751a293c418c41e.1387763524.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Dec 2013 11:07:51 +0900
+Subject: [PATCH] ARM: shmobile: remove unnecessary platform_device as header
+ cleanup
+In-Reply-To: <cover.1387762178.git.horms+renesas@verge.net.au>
+References: <cover.1387762178.git.horms+renesas@verge.net.au>
+Message-ID: <2eb7a8146f5ab5be7cde42438e32461f313d0d0b.1387762178.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Fixed regulator is used for SDHI0/2 Vcc.
-We should use da9063 driver for Vccq,
-but, it doesn't have regulator support at this point.
-This patch uses gpio-regulator for it as quick-hack.
+8e0e7aaef3c98c52e85f5640b73ffa82058abcfd
+(ARM: shmobile: Drop r8a7779_add_device_to_domain())
+removed last user of struct platform_device on this header.
+It is no longer needed
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 83 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 82 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7779.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 04cb932..267f2b3 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -31,7 +31,9 @@
- #include <linux/platform_data/rcar-du.h>
- #include <linux/platform_device.h>
- #include <linux/phy.h>
-+#include <linux/regulator/driver.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/regulator/gpio-regulator.h>
- #include <linux/regulator/machine.h>
- #include <linux/sh_eth.h>
- #include <mach/common.h>
-@@ -146,6 +148,71 @@ static struct regulator_consumer_supply fixed3v3_power_consumers[] =
- 	REGULATOR_SUPPLY("vmmc", "sh_mmcif.1"),
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index 5014145..b40e136 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -11,8 +11,6 @@ enum {
+ 	HPBDMA_SLAVE_SDHI0_RX,
  };
  
-+/*
-+ * SDHI regulator macro
-+ *
-+ ** FIXME**
-+ * Lager board vqmmc is provided via DA9063 PMIC chip,
-+ * and we should use ${LINK}/drivers/mfd/da9063-* driver for it.
-+ * but, it doesn't have regulator support at this point.
-+ * It uses gpio-regulator for vqmmc as quick-hack.
-+ */
-+#define SDHI_REGULATOR(idx, vdd_pin, vccq_pin)				\
-+static struct regulator_consumer_supply vcc_sdhi##idx##_consumer =	\
-+	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi." #idx);		\
-+									\
-+static struct regulator_init_data vcc_sdhi##idx##_init_data = {		\
-+	.constraints = {						\
-+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,		\
-+	},								\
-+	.consumer_supplies	= &vcc_sdhi##idx##_consumer,		\
-+	.num_consumer_supplies	= 1,					\
-+};									\
-+									\
-+static const struct fixed_voltage_config vcc_sdhi##idx##_info __initconst = {\
-+	.supply_name	= "SDHI" #idx "Vcc",				\
-+	.microvolts	= 3300000,					\
-+	.gpio		= vdd_pin,					\
-+	.enable_high	= 1,						\
-+	.init_data	= &vcc_sdhi##idx##_init_data,			\
-+};									\
-+									\
-+static struct regulator_consumer_supply vccq_sdhi##idx##_consumer =	\
-+	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi." #idx);		\
-+									\
-+static struct regulator_init_data vccq_sdhi##idx##_init_data = {	\
-+	.constraints = {						\
-+		.input_uV	= 3300000,				\
-+		.min_uV		= 1800000,				\
-+		.max_uV		= 3300000,				\
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |		\
-+				  REGULATOR_CHANGE_STATUS,		\
-+	},								\
-+	.consumer_supplies	= &vccq_sdhi##idx##_consumer,		\
-+	.num_consumer_supplies	= 1,					\
-+};									\
-+									\
-+static struct gpio vccq_sdhi##idx##_gpio =				\
-+	{ vccq_pin, GPIOF_OUT_INIT_HIGH, "vccq-sdhi" #idx };		\
-+									\
-+static struct gpio_regulator_state vccq_sdhi##idx##_states[] = {	\
-+	{ .value = 1800000, .gpios = 0 },				\
-+	{ .value = 3300000, .gpios = 1 },				\
-+};									\
-+									\
-+static const struct gpio_regulator_config vccq_sdhi##idx##_info __initconst = {\
-+	.supply_name	= "vqmmc",					\
-+	.gpios		= &vccq_sdhi##idx##_gpio,			\
-+	.nr_gpios	= 1,						\
-+	.states		= vccq_sdhi##idx##_states,			\
-+	.nr_states	= ARRAY_SIZE(vccq_sdhi##idx##_states),		\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.init_data	= &vccq_sdhi##idx##_init_data,			\
-+};
-+
-+SDHI_REGULATOR(0, RCAR_GP_PIN(5, 24), RCAR_GP_PIN(5, 29));
-+SDHI_REGULATOR(2, RCAR_GP_PIN(5, 25), RCAR_GP_PIN(5, 30));
-+
- /* MMCIF */
- static const struct sh_mmcif_plat_data mmcif1_pdata __initconst = {
- 	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
-@@ -256,6 +323,9 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 
- static void __init lager_add_standard_devices(void)
- {
-+	int fixed_regulator_idx = 0;
-+	int gpio_regulator_idx = 0;
-+
- 	r8a7790_clock_init();
- 
- 	pinctrl_register_mappings(lager_pinctrl_map,
-@@ -269,7 +339,8 @@ static void __init lager_add_standard_devices(void)
- 	platform_device_register_data(&platform_bus, "gpio-keys", -1,
- 				      &lager_keys_pdata,
- 				      sizeof(lager_keys_pdata));
--	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
-+	regulator_register_always_on(fixed_regulator_idx++,
-+				     "fixed-3.3V", fixed3v3_power_consumers,
- 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
- 	platform_device_register_resndata(&platform_bus, "sh_mmcif", 1,
- 					  mmcif1_resources, ARRAY_SIZE(mmcif1_resources),
-@@ -287,6 +358,16 @@ static void __init lager_add_standard_devices(void)
- 					  ARRAY_SIZE(qspi_resources),
- 					  &qspi_pdata, sizeof(qspi_pdata));
- 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
-+
-+	platform_device_register_data(&platform_bus, "reg-fixed-voltage", fixed_regulator_idx++,
-+				      &vcc_sdhi0_info, sizeof(struct fixed_voltage_config));
-+	platform_device_register_data(&platform_bus, "reg-fixed-voltage", fixed_regulator_idx++,
-+				      &vcc_sdhi2_info, sizeof(struct fixed_voltage_config));
-+
-+	platform_device_register_data(&platform_bus, "gpio-regulator", gpio_regulator_idx++,
-+				      &vccq_sdhi0_info, sizeof(struct gpio_regulator_config));
-+	platform_device_register_data(&platform_bus, "gpio-regulator", gpio_regulator_idx++,
-+				      &vccq_sdhi2_info, sizeof(struct gpio_regulator_config));
- }
- 
- /*
+-struct platform_device;
+-
+ struct r8a7779_pm_ch {
+ 	unsigned long chan_offs;
+ 	unsigned int chan_bit;
 -- 
 1.8.4
