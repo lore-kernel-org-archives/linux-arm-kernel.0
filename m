@@ -1,87 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:08:25 +0900
-Subject: [PATCH 3/3] ARM: shmobile: koelsch: dts: Add gpio-keys device
-In-Reply-To: <cover.1387764079.git.horms+renesas@verge.net.au>
-References: <cover.1387764079.git.horms+renesas@verge.net.au>
-Message-ID: <bd0609896eabe2e64b75d7955ae5ecec528cf860.1387764079.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Dec 2013 11:08:41 +0900
+Subject: [GIT PULL 0/3] Renesas SH SCI updates for v3.14
+Message-ID: <cover.1387761495.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Kevin, Hi Olof, Hi Arnd,
 
-The board has 7 buttons connected to GPIOs, add a corresponding
-gpio-keys device.
+please consider these Renesas SH SCI updates for v3.14.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 54 +++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+They have been acked by Greg Kroah-Hartman to be taken
+through my tree. The reason for this is that they are dependencies
+for subsequent changes to use the common clock framework.
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-index 1919273..588ca17 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-@@ -31,6 +31,60 @@
- 		#size-cells = <1>;
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		key-a {
-+			gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
-+			linux,code = <30>;
-+			label = "SW30";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+		key-b {
-+			gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
-+			linux,code = <48>;
-+			label = "SW31";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+		key-c {
-+			gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
-+			linux,code = <46>;
-+			label = "SW32";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+		key-d {
-+			gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
-+			linux,code = <32>;
-+			label = "SW33";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+		key-e {
-+			gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
-+			linux,code = <18>;
-+			label = "SW34";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+		key-f {
-+			gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
-+			linux,code = <33>;
-+			label = "SW35";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+		key-g {
-+			gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
-+			linux,code = <34>;
-+			label = "SW36";
-+			gpio-key,wakeup;
-+			debounce-interval = <20>;
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		led6 {
--- 
-1.8.4
+
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh-sci-for-v3.14
+
+for you to fetch changes up to b016b646e8676858f39ea9be760494b04b9ee0af:
+
+  serial: sh-sci: Convert to clk_prepare/unprepare (2013-12-14 09:59:31 +0900)
+
+----------------------------------------------------------------
+Renesas SH SCI updates for v3.14
+
+Updates for the SH SCI serial driver
+
+* Convert to clk_prepare/unprepare
+* Fix warnings due to improper casts and printk formats
+
+----------------------------------------------------------------
+Laurent Pinchart (3):
+      serial: sh-sci: Fix warnings due to improper casts and printk formats
+      serial: sh-sci: Don't enable/disable port from within break timer
+      serial: sh-sci: Convert to clk_prepare/unprepare
+
+ drivers/tty/serial/sh-sci.c | 39 ++++++++++++++++++++++-----------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
