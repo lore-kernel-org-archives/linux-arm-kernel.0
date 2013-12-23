@@ -1,39 +1,123 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:37 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM based SoC cleanups for v3.14
-Message-ID: <cover.1387762178.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Dec 2013 11:07:08 +0900
+Subject: [PATCH 12/26] ARM: shmobile: r7s72100 Genmai DT reference C bits
+In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
+References: <cover.1387763524.git.horms+renesas@verge.net.au>
+Message-ID: <c4e337fc0cd5aebda6849fbbecd6cfd645d1bae6.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-please consider this second round of Renesas ARM based SoC cleanups for v3.14.
+Add C code support for r7s72100 Genmai DT reference.
 
-It is based on the first round of cleanups, tagged as
-renesas-cleanup-for-v3.14, which you have already pulled.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig                  | 11 +++++++
+ arch/arm/mach-shmobile/Makefile                 |  1 +
+ arch/arm/mach-shmobile/Makefile.boot            |  3 +-
+ arch/arm/mach-shmobile/board-genmai-reference.c | 44 +++++++++++++++++++++++++
+ 4 files changed, 58 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-shmobile/board-genmai-reference.c
 
-
-The following changes since commit 8af3f18b7b42e32387b54d2e2f8300589b0198e9:
-
-  ARM: shmobile: sh7372: tidyup clock table order (2013-11-24 15:14:32 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v3.14
-
-for you to fetch changes up to 2eb7a8146f5ab5be7cde42438e32461f313d0d0b:
-
-  ARM: shmobile: remove unnecessary platform_device as header cleanup (2013-12-12 21:52:43 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM based SoC cleanups for v3.14
-
-* r8a7779 SoC (R-Car H1)
-  - Remove unnecessary platform device from header file
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      ARM: shmobile: remove unnecessary platform_device as header cleanup
-
- arch/arm/mach-shmobile/include/mach/r8a7779.h | 2 --
- 1 file changed, 2 deletions(-)
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 17a4f40..8bc7308 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -207,6 +207,17 @@ config MACH_GENMAI
+ 	depends on ARCH_R7S72100
+ 	select USE_OF
+ 
++config MACH_GENMAI_REFERENCE
++	bool "Genmai board - Reference Device Tree Implementation"
++	depends on ARCH_R7S72100
++	select USE_OF
++	---help---
++	   Use reference implementation of Genmai board support
++	   which makes use of device tree at the expense
++	   of not supporting a number of devices.
++
++	   This is intended to aid developers
++
+ config MACH_MARZEN
+ 	bool "MARZEN board"
+ 	depends on ARCH_R8A7779
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 021775d..d2b8342 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -65,6 +65,7 @@ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+ obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
++obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 892d4ab..759e4f8f 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -6,7 +6,8 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+-loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
++loadaddr-$(CONFIG_MACH_GENMAI) += 0x08008000
++loadaddr-$(CONFIG_MACH_GENMAI_REFERENCE) += 0x08008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KOELSCH_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+new file mode 100644
+index 0000000..34c9881
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -0,0 +1,44 @@
++/*
++ * Genmai board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/of_platform.h>
++#include <mach/common.h>
++#include <mach/r7s72100.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++static void __init genmai_add_standard_devices(void)
++{
++	r7s72100_clock_init();
++	r7s72100_add_dt_devices();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char * const genmai_boards_compat_dt[] __initconst = {
++	"renesas,genmai-reference",
++	NULL,
++};
++
++DT_MACHINE_START(GENMAI_DT, "genmai")
++	.init_early	= r7s72100_init_early,
++	.init_machine	= genmai_add_standard_devices,
++	.dt_compat	= genmai_boards_compat_dt,
++MACHINE_END
+-- 
+1.8.4
