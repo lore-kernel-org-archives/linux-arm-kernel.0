@@ -1,83 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:08:24 +0900
-Subject: [PATCH 2/3] ARM: shmobile: kzm9g: add FSI support for DTS
+Date: Mon, 23 Dec 2013 11:08:25 +0900
+Subject: [PATCH 3/3] ARM: shmobile: koelsch: dts: Add gpio-keys device
 In-Reply-To: <cover.1387764079.git.horms+renesas@verge.net.au>
 References: <cover.1387764079.git.horms+renesas@verge.net.au>
-Message-ID: <3c2a87c85391272b098827e432813c9437e93992.1387764079.git.horms+renesas@verge.net.au>
+Message-ID: <bd0609896eabe2e64b75d7955ae5ecec528cf860.1387764079.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This patch support FSI-AK4648 with simple audio card
+The board has 7 buttons connected to GPIOs, add a corresponding
+gpio-keys device.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 33 ++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 54 +++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 5bb593d..eb8886b 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -152,6 +152,20 @@
- 			label = "SW1";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+index 1919273..588ca17 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+@@ -31,6 +31,60 @@
+ 		#size-cells = <1>;
  	};
+ 
++	gpio-keys {
++		compatible = "gpio-keys";
 +
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "left_j";
-+		simple-audio-card,cpu {
-+			sound-dai = <&sh_fsi2 0>;
++		key-a {
++			gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
++			linux,code = <30>;
++			label = "SW30";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
 +		};
-+		simple-audio-card,codec {
-+			sound-dai = <&ak4648>;
-+			bitclock-master;
-+			frame-master;
-+			system-clock-frequency = <11289600>;
++		key-b {
++			gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
++			linux,code = <48>;
++			label = "SW31";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
++		};
++		key-c {
++			gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
++			linux,code = <46>;
++			label = "SW32";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
++		};
++		key-d {
++			gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
++			linux,code = <32>;
++			label = "SW33";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
++		};
++		key-e {
++			gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
++			linux,code = <18>;
++			label = "SW34";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
++		};
++		key-f {
++			gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
++			linux,code = <33>;
++			label = "SW35";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
++		};
++		key-g {
++			gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
++			linux,code = <34>;
++			label = "SW36";
++			gpio-key,wakeup;
++			debounce-interval = <20>;
 +		};
 +	};
- };
- 
- &i2c0 {
-@@ -226,6 +240,12 @@
- 			};
- 		};
- 	};
 +
-+	ak4648: ak4648 at 0x12 {
-+		#sound-dai-cells = <0>;
-+		compatible = "asahi-kasei,ak4648";
-+		reg = <0x12>;
-+	};
- };
- 
- &i2c3 {
-@@ -289,6 +309,12 @@
- 		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
- 		renesas,function = "sdhi2";
- 	};
-+
-+	fsia_pins: sounda {
-+		renesas,groups = "fsia_mclk_in", "fsia_sclk_in",
-+				 "fsia_data_in", "fsia_data_out";
-+		renesas,function = "fsia";
-+	};
- };
- 
- &sdhi0 {
-@@ -309,3 +335,10 @@
- 	broken-cd;
- 	status = "okay";
- };
-+
-+&sh_fsi2 {
-+	pinctrl-0 = <&fsia_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led6 {
 -- 
 1.8.4
