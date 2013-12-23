@@ -1,69 +1,65 @@
-From: xuwei5@hisilicon.com (xuwei (O))
-Date: Mon, 23 Dec 2013 01:09:48 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIDEvM10gQVJNOiBoaXNpOiByZW5hbWUgaGkzeHh4IHRv?=
- =?gb2312?Q?_hisi?=
-In-Reply-To: <87sitnh1bz.fsf@linaro.org>
-References: <1387507978-4485-1-git-send-email-haojian.zhuang@gmail.com>
- <CAOesGMjaJVWoMWgywkHfeD+0TMw3pze40CAvTcuC7+NavMq22w@mail.gmail.com>
- <87sitnh1bz.fsf@linaro.org>
-Message-ID: <8B36690B4C1B584EAD95DD4902A4FF37095E90C3@SZXEMA511-MBS.china.huawei.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 23 Dec 2013 09:05:22 +0800
+Subject: [PATCH v7 07/14] usb: phy-mxs: change description of usb
+ device speed
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B74C0@saturn3.aculab.com>
+References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
+ <1387525930-27313-8-git-send-email-peter.chen@freescale.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B74C0@saturn3.aculab.com>
+Message-ID: <20131223010521.GA28096@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Kevin,
+On Fri, Dec 20, 2013 at 10:40:01AM +0000, David Laight wrote:
+> > From: Peter Chen
+> > Sent: 20 December 2013 07:52
+> > Change "high speed" to "HS"
+> > Change "non-high speed" to "FS/LS"
+> > 
+> > Implementation of notify_suspend and notify_resume will be different
+> > according to mxs_phy_data->flags.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/phy/phy-mxs-usb.c |    8 ++++----
+> >  1 files changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > index 0ef930a..489096f 100644
+> > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > @@ -166,8 +166,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+> >  static int mxs_phy_on_connect(struct usb_phy *phy,
+> >  		enum usb_device_speed speed)
+> >  {
+> > -	dev_dbg(phy->dev, "%s speed device has connected\n",
+> > -		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
+> > +	dev_dbg(phy->dev, "%s device has connected\n",
+> > +		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
+> 
+> Seems you are making these messages even more cryptic.
+> With all the speeds that USB supports remembering what 'full'
+> means is hard enough without having a cryptic acronym.
+> 
 
-Please calm down.
-Both of us have a hard time to enable hi3xxx in kernel v3.14.
-Let me explain it.
+We have "phy->dev" know it is a USB device, grep usb driver,
+there are lots of similar naming:
 
-We have a new serial of SoCs for server market and they will named with hipxx.
-And hi3xxx SoCs are for the mobile and STB market.
-Now we hope to enable the hipxx SoCs in the kernel.
-To make the "mach" directory simple, we hope hipxx SoCs could share the same directory with hi3xxx.
-But according current situation, maybe we should add a new "mach" for the hipxx firstly.
-Do you think is it OK?
- 
-And for hi3xxx SoCs, could you please keep it in the next?
+$: find drivers/usb/ -name *.c | xargs grep -rn "FS/LS"
+
+drivers/usb/host/fotg210-hcd.c:2901:			/* gap is f(FS/LS transfer times) */
+drivers/usb/host/ehci-sched.c:257:	/* FS/LS bus bandwidth */
+drivers/usb/host/xhci.c:2335:	 * this check is only valid for HS/FS/LS devices.
+drivers/usb/host/fusbh200-hcd.c:2849:			/* gap is f(FS/LS transfer times) */
+drivers/usb/host/ehci-q.c:832:			/* gap is f(FS/LS transfer times) */
+drivers/usb/host/ehci-dbg.c:571:	/* Dump all the FS/LS tables */
+drivers/usb/host/ehci-dbg.c:574:				"\nTT %s port %d  FS/LS bandwidth allocation (us per frame)\n",
+drivers/usb/host/ehci-dbg.c:589:				"FS/LS budget (us per microframe)\n");
+drivers/usb/host/oxu210hp-hcd.c:1414:			/* gap is f(FS/LS transfer times) */
+	drivers/usb/gadget/fsl_udc_core.c:2101:				s = "FS/LS Serial"; break;
+drivers/usb/core/hcd-pci.c:132:		dev_dbg(&pdev->dev, "FS/LS companion for %s\n",
+
+-- 
 
 Best Regards,
-Wei Xu
-
-
-> -----????-----
-> ???: Kevin Hilman [mailto:khilman at linaro.org]
-> ????: 2013?12?21? 1:36
-> ???: Olof Johansson
-> ??: Haojian Zhuang; xuwei (O); Arnd Bergmann;
-> linux-arm-kernel at lists.infradead.org; Haojian Zhuang
-> ??: Re: [PATCH 1/3] ARM: hisi: rename hi3xxx to hisi
-> 
-> Olof Johansson <olof@lixom.net> writes:
-> 
-> > On Thu, Dec 19, 2013 at 6:52 PM, Haojian Zhuang
-> > <haojian.zhuang@linaro.org> wrote:
-> >> Since some new Hisilicon SoCs are not named as hi3xxx, rename
-> >> mach-hi3xxx to mach-hisi instead. And the pronounciation of "hisi" is
-> >> similar to the chinese pronounciation of Hisilicon. So Hisilicon guys like this
-> name.
-> >>
-> >> ARCH_HI3xxx will be renamed later since other drivers are using it
-> >> and they are still in linux-next git tree. So rename ARCH_HI3xxx later.
-> >>
-> >
-> > Are you kidding me? We JUST merge your platform after a very painful
-> > review with many fumbly cycles, and the very first thing you do is
-> > rename it?
-> >
-> > I even complained about the crazy numbering and naming, and you didn't
-> > fix it while we were in review, and now just days after we merge the
-> > patches this one comes out?
-> >
-> > For now, we'll drop your original branch and fold in these patches
-> > with the original ones. There's no point in checking in a platform
-> > just to rename it, so we'll do the fixups.
-> 
-> Agreed. I've dropped the hi3xxx/soc branch from next/soc and rebuild for-next
-> without it.
-> 
-> Kevin
-> 
+Peter Chen
