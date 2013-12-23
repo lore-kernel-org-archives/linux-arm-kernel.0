@@ -1,69 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:06 +0900
-Subject: [PATCH 01/26] ARM: shmobile: bockw: use regulator for MMCIF
+Date: Mon, 23 Dec 2013 11:07:11 +0900
+Subject: [PATCH 06/26] ARM: shmobile: bockw: fixup FPGA ioremap area
 In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
 References: <cover.1387763524.git.horms+renesas@verge.net.au>
-Message-ID: <06ac2a61e1559e5986b1e2269d110d51576ab8d4.1387763524.git.horms+renesas@verge.net.au>
+Message-ID: <b6d3eba338b4a24e49947fc45542fca7b76dda9a.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-When regulators are used with MMC devices, sh_mmcif_plat_data::ocr
-is not needed, they can be removed from platform data.
-This patch adds v3.3 regulator settings,
-and moved fixed-dummy regulator registration position
+Don't keep FPGA ioremap area.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/board-bockw-reference.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 3861152..540f0dc 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -116,6 +116,11 @@ static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
- };
+diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
+index 1687df9..c7b217d 100644
+--- a/arch/arm/mach-shmobile/board-bockw-reference.c
++++ b/arch/arm/mach-shmobile/board-bockw-reference.c
+@@ -40,7 +40,7 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
+ #define COMCTLR	0x101c
+ static void __init bockw_init(void)
+ {
+-	static void __iomem *fpga;
++	void __iomem *fpga;
  
-+static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
-+	REGULATOR_SUPPLY("vmmc", "sh_mmcif"),
-+	REGULATOR_SUPPLY("vqmmc", "sh_mmcif"),
-+};
-+
- static struct smsc911x_platform_config smsc911x_data __initdata = {
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
- 	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
-@@ -271,7 +276,6 @@ static struct resource mmc_resources[] __initdata = {
- 
- static struct sh_mmcif_plat_data sh_mmcif_plat __initdata = {
- 	.sup_pclk	= 0,
--	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.caps		= MMC_CAP_4_BIT_DATA |
- 			  MMC_CAP_8_BIT_DATA |
- 			  MMC_CAP_NEEDS_POLL,
-@@ -614,6 +618,10 @@ static void __init bockw_init(void)
- 		&usb_phy_platform_data,
- 		sizeof(struct rcar_phy_platform_data));
- 
-+	regulator_register_fixed(0, dummy_supplies,
-+				 ARRAY_SIZE(dummy_supplies));
-+	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
-+				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
- 
- 	/* for SMSC */
- 	fpga = ioremap_nocache(FPGA, SZ_1M);
-@@ -629,9 +637,6 @@ static void __init bockw_init(void)
+ 	r8a7778_clock_init();
+ 	r8a7778_init_irq_extpin_dt(1);
+@@ -62,6 +62,8 @@ static void __init bockw_init(void)
+ 		u16 val = ioread16(fpga + IRQ0MR);
  		val &= ~(1 << 4); /* enable SMSC911x */
  		iowrite16(val, fpga + IRQ0MR);
++
++		iounmap(fpga);
+ 	}
  
--		regulator_register_fixed(0, dummy_supplies,
--					 ARRAY_SIZE(dummy_supplies));
--
- 		platform_device_register_resndata(
- 			&platform_bus, "smsc911x", -1,
- 			smsc911x_resources, ARRAY_SIZE(smsc911x_resources),
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -- 
 1.8.4
