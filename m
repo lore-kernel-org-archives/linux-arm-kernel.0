@@ -1,33 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Dec 2013 18:20:55 +0100
-Subject: [PATCH 2/2] clk: versatile: fixup IM-PD1 clock implementation
-In-Reply-To: <CACRpkdZmyh-a_0ANEeO-DnJ=E_vXsiT3YifoV+zFReJmekyt7Q@mail.gmail.com>
-References: <1385326744-16445-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZmyh-a_0ANEeO-DnJ=E_vXsiT3YifoV+zFReJmekyt7Q@mail.gmail.com>
-Message-ID: <CACRpkdZMH7HuX_QdwHFr=moK1yWiE7jva1zBCDq9eK3OK6qPTg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 23 Dec 2013 09:21:50 -0800
+Subject: arm-soc during the holidays
+Message-ID: <CAOesGMjJeDLyUvmigVVz4geqZaqEibQr3_x7_VEtVKiP2eH+HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 11:15 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Sun, Nov 24, 2013 at 9:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> Register both VCO clocks, give per-logical module unique names
->> to the clocks so we can have several IM-PD1's connected (in
->> theory). Implement all the fixed-factor clocks as children of
->> VCO2.
->>
->> Tested by using the UARTs and the PL181 MMC block on the IM-PD1,
->> works flawlessly.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Hi Mike, if you're happy with this, I'd like an ACK to carry it
->> through the ARM SoC tree.
->
-> Mike, ping on this.
+Since the holiday season is upon us and I've gotten a few questions
+already, I wanted to let people know that things will be slower than
+usual for the next few weeks w.r.t. merging. I've got a backlog
+already, and I'll be going through them a few at a time. So just
+because you see me merging a few branches but not yours, don't panic
+thinking I've missed your request.
 
-Ping on this again.
+The ones currently in the pipeline to look at are:
 
-Yours,
-Linus Walleij
+* Tegra from Stephen
+* Allwinner drivers from Maxime
+* A second set of Samsung branches from Kukjin
+* A set of Renesas branches from Simon
+* Revisiting the hisilicon stuff
+
+If yours are in the above; do not worry I will get to them. If it's
+not, send arm at kernel.org a ping on the pull request.
+
+Linus also mentioned the likelihood of going until -rc8 in his -rc5
+announcement. That does not mean I want you to hold off your pull
+requests until -rc7, please post them. This cycle has been good with
+plenty of early pull requests, keep it up.
+
+
+Happy Holidays,
+
+-Olof
