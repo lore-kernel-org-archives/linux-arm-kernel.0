@@ -1,89 +1,106 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 23 Dec 2013 13:38:09 -0800
-Subject: [GIT PULL 7/7] Samsung SoC for v3.14
-In-Reply-To: <20131223103618.5815379e@amdc2363>
-References: <52AE0FA5.3090804@samsung.com>
- <20131222221141.GF13365@quad.lixom.net>
- <1566886.jecinlyiQ0@flatron> <20131223103618.5815379e@amdc2363>
-Message-ID: <20131223213809.GA23509@quad.lixom.net>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 23 Dec 2013 23:44:35 +0100
+Subject: possible regression on 3.13 when calling flush_dcache_page
+In-Reply-To: <20131220080851.GC16592@ldesroches-Latitude-E6320>
+References: <20131212143149.GI12099@ldesroches-Latitude-E6320>
+ <20131212143618.GJ12099@ldesroches-Latitude-E6320>
+ <20131213015909.GA8845@lge.com>
+ <20131216144343.GD9627@ldesroches-Latitude-E6320>
+ <20131218072117.GA2383@lge.com>
+ <20131220080851.GC16592@ldesroches-Latitude-E6320>
+Message-ID: <20131223224435.GD16592@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 10:36:18AM +0100, Lukasz Majewski wrote:
-> Hi Tomasz,
+On Fri, Dec 20, 2013 at 09:08:51AM +0100, Ludovic Desroches wrote:
+> Hello,
 > 
-> > Hi Olof,
-> > 
-> > On Sunday 22 of December 2013 14:11:41 Olof Johansson wrote:
-> > > On Mon, Dec 16, 2013 at 05:23:01AM +0900, Kukjin Kim wrote:
-> > > > The following changes since commit
-> > > > 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> On Wed, Dec 18, 2013 at 04:21:17PM +0900, Joonsoo Kim wrote:
+> > On Mon, Dec 16, 2013 at 03:43:43PM +0100, Ludovic Desroches wrote:
+> > > Hello,
+> > > 
+> > > On Fri, Dec 13, 2013 at 10:59:09AM +0900, Joonsoo Kim wrote:
+> > > > On Thu, Dec 12, 2013 at 03:36:19PM +0100, Ludovic Desroches wrote:
+> > > > > fix mmc mailing list address error
+> > > > > 
+> > > > > On Thu, Dec 12, 2013 at 03:31:50PM +0100, Ludovic Desroches wrote:
+> > > > > > Hi,
+> > > > > > 
+> > > > > > With v3.13-rc3 I have an error when the atmel-mci driver calls
+> > > > > > flush_dcache_page (log at the end of the message).
+> > > > > > 
+> > > > > > Since I didn't have it before, I did a git bisect and the commit introducing
+> > > > > > the error is the following one:
+> > > > > > 
+> > > > > > 106a74e slab: replace free and inuse in struct slab with newly introduced active
+> > > > > > 
+> > > > > > I don't know if this commit has introduced a bug or if it has revealed a bug
+> > > > > > in the atmel-mci driver.
 > > > > 
-> > > >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> > > > Hello,
 > > > > 
-> > > > are available in the git repository at:
+> > > > I think that this commit may not introduce a bug. This patch remove one
+> > > > variable on slab management structure and replace variable name. So there
+> > > > is no functional change.
 > > > > 
 > > > 
-> > > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > > > tags/samsung-soc
-> > > > 
-> > > > for you to fetch changes up to
-> > > > 538cfbb4c40ab59688236484138133b8e3e89220:
-> > > > 
-> > > >   ARM: dts: Add initial support for Arndale Octa board (2013-12-16
-> > > > 05:05:43 +0900)
-> > > 
-> > > Hi,
-> > > 
-> > > I'm not going to pull this.
-> > > 
-> > > I've asked you for about 6 months now (ever since Arnd went on
-> > > leave) to please finish his multiplatform work for Exynos. Nothing
-> > > has happened.
-> > > 
-> > > I'm not going to merge any more platform or SoC enablement code
-> > > for Samsung platforms until Exynos has been converted over to
-> > > multiplatform. Sorry.
+> > > If I have reverted this patch and other ones you did on top of it and
+> > > the issue disappear.
 > > 
-> > Well, it's hard to disagree with you on this. Keeping adding new
-> > things constantly definitely does not make us closer to multiplatform
-> > support, as it only increases codebase of code that needs to be
-> > cleaned up and made multiplatform aware.
+> > Hello,
 > > 
-> > However it's not that we're not doing anything towards mutliplatform
-> > support. We're slowly getting there. A bit too slowly, but I'm afraid
-> > this is due to the fact that we have definitely too little manpower
-> > working on mainline support of Samsung SoCs.
+> > Could you give me your '/proc/slabinfo' before/after this commit (106a74e)?
 > > 
-> > As for good news, I already have a series cleaning up PM/sleep support
-> > and making it multiplatform friendly and I'm going to post it
-> > tomorrow. The bad news is that it depends on other series and I'm not
-> > sure if we can get it merged in this release. I'll try to do whatever
-> > possible to merge things as soon as possible, though.
+> > And how about testing with artificially increasing size of struct slab on
+> > top of this commit (106a74e)?
 > > 
-> > From smaller things, we still need to sort out Exynos cpufreq driver
-> > that has dependencies on headers in plat-samsung/ and mach-exynos/.
-> > Unfortunately I don't have so much time to work on all the things at
-> > the same time, so I hope that someone else could pick this task up.
-> > Marek, Lukasz, what do you think?
+> > I really wonder why the problem happens, because this doesn't cause any
+> > functional change as far as I know. Only side-effect from this patch is
+> > decreasing size of struct slab.
 > 
-> Regarding the cpufreq for Exynos, we do need to clean things up.
-> 
-> It shall be possible to reuse generic cpufreq-cpu0.c and
-> arm_big_little.c code instead of several copy pasted
-> exynos[4|5]xxx-cpufreq.c ones.
-> 
-> This change will require some "virtual" clocks implementation for atomic
-> clocks dividers change.
-> 
-> I've already committed myself to fix this code. When all goes smooth, I
-> shall deliver some RFC code after new year.
+> Sorry I am not at the office, I have tried to reproduce it with a
+> different device and a different sdcard but without success. I'll test
+> it on Monday.
 
-Great!
+I am still not at the office but I get the same device and the same
+sdcard and I don't reproduce it. I am not totally in the same
+conditions. It seems there is an extra parameter causing this bug but I
+don't figure out which one at the moment.
 
-Sounds like if you can start with this after new year that 3.15 will be
-a good target for Exynos multiplatform. It's way overdue, and I would
-be very happy to see it completed.
-
-
--Olof
+> 
+> Regards
+> 
+> Ludovic
+> 
+> > 
+> > Thanks.
+> > 
+> > diff --git a/mm/slab.c b/mm/slab.c
+> > index 2ec2336..d2240fd 100644
+> > --- a/mm/slab.c
+> > +++ b/mm/slab.c
+> > @@ -174,6 +174,7 @@ struct slab {
+> >         struct {
+> >                 struct list_head list;
+> >                 void *s_mem;            /* including colour offset */
+> > +               unsigned int x;
+> >                 unsigned int active;    /* num of objs active in slab */
+> >         };
+> >  };
+> > 
+> > > 
+> > > > I doubt that side-effect of this patch reveals a bug in other place.
+> > > > Side-effect is reduced memory usage for slab management structure. It would
+> > > > makes some slabs have more objects with more density since slab management
+> > > > structure is sometimes on the page for objects. So if it diminishes, more
+> > > > objects can be in the page.
+> > > > 
+> > > > Anyway, I will look at it more. If you have any progress, please let me know.
+> > > 
+> > > No progress at the moment.
+> > 
+> > --
+> > To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> > the body to majordomo at kvack.org.  For more info on Linux MM,
+> > see: http://www.linux-mm.org/ .
+> > Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
