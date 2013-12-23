@@ -1,85 +1,111 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Mon, 23 Dec 2013 20:18:44 +0200
-Subject: [PATCH 0/4] ARM: OMAP: raw read and write endian fix
-In-Reply-To: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <CAArO44vC4WKGHSqHX3+Mo5+jcNuyJLkh94+SPd4H+aZYAroYzw@mail.gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 23 Dec 2013 13:36:29 -0500
+Subject: [PATCH v9 0/9] USB Device Controller support for BCM281xx
+Message-ID: <1387823798-10211-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 December 2013 20:10, Taras Kondratiuk <taras.kondratiuk@linaro.org> wrote:
-> This series does trivial replacement of __raw_xxx functions with xxx_relaxed
-> endian-neutral variants in 'mach-omap2' and 'plat-omap' directories.
-> Some code here most probably won't be used in BE mode (like debug-leds for
-> OMAP1 boards), but changes are made anyway to remove __raw_xxx() functions
-> completely and simplify future grep'ing for new __raw_xxx() entries.
->
-> This is a part of RFC series [1].
-> Based on v3.13-rc5.
->
-> [1] http://www.spinics.net/lists/linux-omap/msg99927.html
->
-> Victor Kamensky (4):
->   ARM: OMAP2+: raw read and write endian fix
->   ARM: OMAP: dmtimer: raw read and write endian fix
->   ARM: OMAP: counter-32k: raw read and write endian fix
->   ARM: OMAP: debug-leds: raw read and write endian fix
->
->  arch/arm/mach-omap2/board-flash.c         |    4 +--
->  arch/arm/mach-omap2/clkt2xxx_dpllcore.c   |    2 +-
->  arch/arm/mach-omap2/clkt2xxx_osc.c        |    8 +++---
->  arch/arm/mach-omap2/clkt2xxx_sys.c        |    2 +-
->  arch/arm/mach-omap2/clkt_clksel.c         |   10 +++----
->  arch/arm/mach-omap2/clkt_dpll.c           |    6 ++---
->  arch/arm/mach-omap2/clkt_iclk.c           |    8 +++---
->  arch/arm/mach-omap2/clock.c               |   16 +++++------
->  arch/arm/mach-omap2/clock36xx.c           |    6 ++---
->  arch/arm/mach-omap2/cm2xxx_3xxx.h         |    4 +--
->  arch/arm/mach-omap2/cm33xx.c              |    4 +--
->  arch/arm/mach-omap2/cm3xxx.c              |    8 +++---
->  arch/arm/mach-omap2/cm44xx.c              |    8 +++---
->  arch/arm/mach-omap2/cminst44xx.c          |    4 +--
->  arch/arm/mach-omap2/control.c             |   20 +++++++-------
->  arch/arm/mach-omap2/dma.c                 |    4 +--
->  arch/arm/mach-omap2/dpll3xxx.c            |   32 +++++++++++-----------
->  arch/arm/mach-omap2/dpll44xx.c            |   12 ++++-----
->  arch/arm/mach-omap2/gpmc.c                |    8 +++---
->  arch/arm/mach-omap2/id.c                  |    2 +-
->  arch/arm/mach-omap2/irq.c                 |    4 +--
->  arch/arm/mach-omap2/mux.c                 |    8 +++---
->  arch/arm/mach-omap2/omap-hotplug.c        |    4 +--
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   18 ++++++-------
->  arch/arm/mach-omap2/omap-smp.c            |    4 +--
->  arch/arm/mach-omap2/omap-wakeupgen.c      |   42 ++++++++++++++---------------
->  arch/arm/mach-omap2/omap4-common.c        |   16 +++++------
->  arch/arm/mach-omap2/omap_hwmod.c          |   10 +++----
->  arch/arm/mach-omap2/omap_phy_internal.c   |    6 ++---
->  arch/arm/mach-omap2/prcm_mpu44xx.c        |    4 +--
->  arch/arm/mach-omap2/prm2xxx.h             |    2 +-
->  arch/arm/mach-omap2/prm2xxx_3xxx.h        |    4 +--
->  arch/arm/mach-omap2/prm33xx.c             |    4 +--
->  arch/arm/mach-omap2/prm3xxx.h             |    2 +-
->  arch/arm/mach-omap2/prm44xx.c             |    4 +--
->  arch/arm/mach-omap2/prminst44xx.c         |    4 +--
->  arch/arm/mach-omap2/sdrc.h                |    8 +++---
->  arch/arm/mach-omap2/sdrc2xxx.c            |    4 +--
->  arch/arm/mach-omap2/sr_device.c           |    2 +-
->  arch/arm/mach-omap2/sram.c                |   16 +++++------
->  arch/arm/mach-omap2/timer.c               |    8 +++---
->  arch/arm/mach-omap2/vc.c                  |    4 +--
->  arch/arm/mach-omap2/wd_timer.c            |    8 +++---
->  arch/arm/plat-omap/counter_32k.c          |    6 ++---
->  arch/arm/plat-omap/debug-leds.c           |   14 +++++-----
->  arch/arm/plat-omap/dmtimer.c              |    8 +++---
->  arch/arm/plat-omap/include/plat/dmtimer.h |   16 +++++------
->  47 files changed, 199 insertions(+), 199 deletions(-)
->
-> --
-> 1.7.9.5
->
+Changes since v8:
+	- Fix build issue in s3c-hsotg on !ARM by guarding with a
+	  "depends on ARM". Will fix by replacing use of readsl/writesl
+	  for 3.15 and dropping the Kconfig workaround..
 
-+lists
+Changes since v7:
+	- Register phy provider with generic phy subsystem only after
+	  the generic phy has been allocated and configured.
+
+Changes since v6:
+	- Drop dependency on the Exynos generic phy conversion series
+	- Bring back original patch that converts s3c-hsotg to use the
+	  generic phy layer with a fall back to the old usb style phy
+	  support.
+
+Changes since v5:
+	- tweak s3c-hsotg Kconfig help message to be more generic
+
+Changes since v4:
+	- phy_set/get_bus_width now use an int for bus_width
+
+Changes since v3:
+	- Rebased on 3.13-rc3
+	- Move struct phy bus_width attribute back into struct phy_attrs
+	- Fix build issue on !GENERIC_PHY
+	- Update dwc2 binding to reflect optional phy properties
+	- Rename bcm-kona-phy.txt binding to bcm-phy.txt
+	- Reorder bcm kona phy includes and use bitops
+	- phy-names changed to "usb2-phy" to match updated s3c-hsotg
+	  generic phy-ification series
+
+Changes since v2:
+	- Rebased on 3.13-rc1
+	- Fix braces in phy_get_bus_width()/phy_set_bus_width()
+	- Drop generic phy conversion to use the same support from
+	  the Exynos generic phy conversion series
+	- Modify dts support to match the "device" phy name required
+	  in the v3 Exynos generic phy conversion
+	- Add s3c-hsotg phy_init/phy_exit support
+	- Fix typo on reg property in kona phy binding
+	- Replace phy driver reg struct with offset defines
+	- Move phy soft reset to phy driver init
+	- Fix dts node names to match ePAPR conventions
+
+Changes since v1:
+	- Convert USB phy driver to generic phy subsystem
+	- Add phy bus width apis
+	- Drop dwc2 phy bus width DT property in favor of querying the
+	  phy provider for bus width
+	- Add generic phy/clock properties to dwc2 DT binding
+	- Add generic phy subsystem support to s3c-hsotg with the
+	  existing usb phy and pdata phy methods as a fallback
+	- Split bindings out to separate patches to match the latest
+	  DT binding review guidelines
+
+This series adds USB Device Controller support for the Broadcom
+BCM281xx family of parts. BCM281xx contains a DWC2 OTG block and
+s3c-hsotg is used to support UDC operation.
+
+Part 1 adds phy bus width support to the generic phy subsystem
+
+Parts 2-6 allows s3c-hsotg to build on non-Samsung platforms, supports
+the dwc2 binding, adds generic phy layer support, and supports fetching
+phy bus width using the generic phy layer.
+
+Parts 7-8 add a generic phy binding and driver for the BCM Kona USB PHY.
+
+Part 9 adds the DT nodes to enable UDC support on both BCM281xx boards
+in the kernel.
+
+This series depends on:
+	- "Update Kona drivers to use clocks" v4 series
+	  https://lkml.org/lkml/2013/12/5/508
+	  (relevant portion now queued for 3.14)
+
+Matt Porter (9):
+  phy: add phy_get_bus_width()/phy_set_bus_width() calls
+  staging: dwc2: update DT binding to add generic clock/phy properties
+  usb: gadget: s3c-hsotg: enable build for other platforms
+  usb: gadget: s3c-hsotg: add snps,dwc2 compatible string
+  usb: gadget: s3c-hsotg: enable generic phy support
+  usb: gadget: s3c-hsotg: get phy bus width from phy subsystem
+  phy: add Broadcom Kona USB2 PHY DT binding
+  phy: add Broadcom Kona USB2 PHY driver
+  ARM: dts: add usb udc support to bcm281xx
+
+ Documentation/devicetree/bindings/phy/bcm-phy.txt  |  15 ++
+ Documentation/devicetree/bindings/staging/dwc2.txt |  12 ++
+ arch/arm/boot/dts/bcm11351-brt.dts                 |   6 +
+ arch/arm/boot/dts/bcm11351.dtsi                    |  18 +++
+ arch/arm/boot/dts/bcm28155-ap.dts                  |   8 ++
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-kona-usb2.c                    | 158 +++++++++++++++++++++
+ drivers/usb/gadget/Kconfig                         |   8 +-
+ drivers/usb/gadget/s3c-hsotg.c                     |  72 +++++++---
+ drivers/usb/gadget/s3c-hsotg.h                     |   1 +
+ include/linux/phy/phy.h                            |  28 ++++
+ 12 files changed, 310 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/bcm-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-kona-usb2.c
 
 -- 
-Regards,
-Taras Kondratiuk
+1.8.4
