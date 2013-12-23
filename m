@@ -1,57 +1,41 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 Dec 2013 16:37:04 +0800
-Subject: [PATCH 2/4] ARM: dts: sun7i: external clock outputs
+Date: Mon, 23 Dec 2013 16:37:06 +0800
+Subject: [PATCH 4/4] ARM: dts: sun7i: Add pin muxing options for clock outputs
 In-Reply-To: <1387787827-11341-1-git-send-email-wens@csie.org>
 References: <1387787827-11341-1-git-send-email-wens@csie.org>
-Message-ID: <1387787827-11341-3-git-send-email-wens@csie.org>
+Message-ID: <1387787827-11341-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the two external clock outputs available on A20 to
-its device tree. A dummy fixed factor clock is also added to serve as
-the first input of the clock outputs, which according to AW's A20 user
-manual, is the 24MHz oscillator divided by 750.
-
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4c25f81..6ad5507 100644
+index 6ad5507..d6e7251 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -302,6 +302,31 @@
- 			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
- 			clock-output-names = "mbus";
+@@ -414,6 +414,20 @@
+ 				allwinner,drive = <0>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			clk_out_a_pins: clk_out_a {
++				allwinner,pins = "PI12";
++				allwinner,function = "clk_out_a";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			clk_out_b_pins: clk_out_b {
++				allwinner,pins = "PI13";
++				allwinner,function = "clk_out_b";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
  		};
-+
-+		/*
-+		 * Dummy clock used by output clocks
-+		 */
-+		osc24M_32k: osc24M_32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <750>;
-+			clock-mult = <1>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		clk_out_a: clk_out_a at 01c201f0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun7i-a20-out-clk";
-+			reg = <0x01c201f0 0x4>;
-+			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
-+		};
-+
-+		clk_out_b: clk_out_b at 01c201f4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun7i-a20-out-clk";
-+			reg = <0x01c201f4 0x4>;
-+			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
-+		};
- 	};
  
- 	soc at 01c00000 {
+ 		timer at 01c20c00 {
 -- 
 1.8.5.2
