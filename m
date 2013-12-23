@@ -1,49 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Dec 2013 11:30:51 +0800
-Subject: [PATCH] ARM: dts: imx6q-sabrelite: PHY reset is active-low
-In-Reply-To: <1387553117-30936-1-git-send-email-p.zabel@pengutronix.de>
-References: <1387553117-30936-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20131223033049.GA26070@S2101-09.ap.freescale.net>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Mon, 23 Dec 2013 00:32:31 -0300
+Subject: [PATCH v3 00/13] clk: sunxi: add PLL5 and PLL6 support
+Message-ID: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 04:25:17PM +0100, Philipp Zabel wrote:
-> Note that the fec driver code currently hard-codes an active-low
-> reset, regardless of the flags in the device tree.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Hi everyone,
 
-The patch does not apply to my branch because of the sabrelite patches
-from Troy Kisky recently.  But it's not hard for me to rebase and apply
-it, so done so.
+This is v3 of the sunxi clock series. For those seeing this for the 
+first time, it adds PLL4, PLL5, PLL6 and mod0 clock support on sun4i, sun5i
+and sun7i. Additionally, mbus is supported on sun5i and sun7i. I would like 
+to see this merged for 3.14 as clock users are progressing rapidly and will
+be needing this code, so all feedback is appreciated.
 
-Shawn
+v2 -> v3 changelog:
+* clean magic 5 on parent char arrays
+* drop special consideration for pll5, as the clock protection function
+  should be enough to keep that clock enabled.
+* rework the mod0 and mbus nodes as suggested by Maxime, and add a bit 
+  of code to keep the old nodes working.
+* add Acked-by tags from Mike
 
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index f004913..338d558 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -12,6 +12,7 @@
->  
->  /dts-v1/;
->  #include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	model = "Freescale i.MX6 Quad SABRE Lite Board";
-> @@ -89,7 +90,7 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_enet_1>;
->  	phy-mode = "rgmii";
-> -	phy-reset-gpios = <&gpio3 23 0>;
-> +	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
->  	status = "okay";
->  };
->  
-> -- 
-> 1.8.5.1
-> 
+Cheers,
+
+Emilio
+
+Emilio L?pez (13):
+  clk: sunxi: register factors clocks behind composite
+  clk: sunxi: clean the magic number of mux parents
+  clk: sunxi: add gating support to PLL1
+  ARM: sunxi: add PLL4 support
+  clk: sunxi: make factors_clk_setup return the clock it registers
+  clk: sunxi: add PLL5 and PLL6 support
+  ARM: sunxi: add PLL5 and PLL6 support
+  clk: sunxi: mod0 support
+  clk: sunxi: support better factor DT nodes
+  ARM: sun4i: dt: mod0 clocks
+  ARM: sun5i: dt: mod0 clocks
+  ARM: sun7i: dt: mod0 clocks
+  ARM: sunxi: dt: add nodes for the mbus clock
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |   9 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi                  | 146 ++++++++-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                 | 122 ++++++-
+ arch/arm/boot/dts/sun5i-a13.dtsi                  | 122 ++++++-
+ arch/arm/boot/dts/sun7i-a20.dtsi                  | 161 ++++++++-
+ drivers/clk/sunxi/clk-factors.c                   |  63 +---
+ drivers/clk/sunxi/clk-factors.h                   |  16 +-
+ drivers/clk/sunxi/clk-sunxi.c                     | 378 +++++++++++++++++++++-
+ 8 files changed, 921 insertions(+), 96 deletions(-)
+
+-- 
+1.8.5.2
