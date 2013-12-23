@@ -1,38 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:51 +0900
-Subject: [PATCH] ARM: shmobile: remove unnecessary platform_device as header
- cleanup
-In-Reply-To: <cover.1387762178.git.horms+renesas@verge.net.au>
-References: <cover.1387762178.git.horms+renesas@verge.net.au>
-Message-ID: <2eb7a8146f5ab5be7cde42438e32461f313d0d0b.1387762178.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Dec 2013 11:08:12 +0900
+Subject: [GIT PULL 0/3] Second Round of Renesas ARM Based SoC DT Updates for
+ v3.13
+Message-ID: <cover.1387764079.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Kevin, Hi Olof, Hi Arnd,
 
-8e0e7aaef3c98c52e85f5640b73ffa82058abcfd
-(ARM: shmobile: Drop r8a7779_add_device_to_domain())
-removed last user of struct platform_device on this header.
-It is no longer needed
+Please consider this second round of Renesas ARM Based SoC DT Updates for
+v3.13. It is based on the first round, tagged as renesas-dt-for-v3.14,
+which you have already pulled.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/include/mach/r8a7779.h | 2 --
- 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index 5014145..b40e136 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -11,8 +11,6 @@ enum {
- 	HPBDMA_SLAVE_SDHI0_RX,
- };
- 
--struct platform_device;
--
- struct r8a7779_pm_ch {
- 	unsigned long chan_offs;
- 	unsigned int chan_bit;
--- 
-1.8.4
+The following changes since commit 1fd219561a4afc51b5f257692f3581546434db5b:
+
+  ARM: shmobile: marzen: enable HSPI0 in DTS (2013-12-10 17:27:25 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.14
+
+for you to fetch changes up to bd0609896eabe2e64b75d7955ae5ecec528cf860:
+
+  ARM: shmobile: koelsch: dts: Add gpio-keys device (2013-12-12 22:22:04 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v3.13
+
+* r8a7791 (R-Car M2) based Koelsch board
+- Add GPIO keys
+
+* sh73a0 (SH-Mobile AG5) based kzm9g board
+  - Add FSI support
+
+----------------------------------------------------------------
+Kuninori Morimoto (2):
+      ARM: shmobile: sh73a0: add FSI support via DTSI
+      ARM: shmobile: kzm9g: add FSI support for DTS
+
+Laurent Pinchart (1):
+      ARM: shmobile: koelsch: dts: Add gpio-keys device
+
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 54 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts    | 33 +++++++++++++++
+ arch/arm/boot/dts/sh73a0.dtsi                   |  9 +++++
+ 3 files changed, 96 insertions(+)
