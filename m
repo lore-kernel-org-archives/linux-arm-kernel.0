@@ -1,37 +1,58 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Mon, 23 Dec 2013 18:42:07 +0200
-Subject: [PATCH] ARM: traps: fix opcode endianness when read from user memory
-Message-ID: <1387816927-4313-1-git-send-email-taras.kondratiuk@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Dec 2013 00:43:44 +0800
+Subject: [PATCH 2/4] ARM: dts: sun7i: external clock outputs
+In-Reply-To: <52B862F2.1020406@elopez.com.ar>
+References: <1387787827-11341-1-git-send-email-wens@csie.org>
+ <1387787827-11341-3-git-send-email-wens@csie.org>
+ <52B862F2.1020406@elopez.com.ar>
+Message-ID: <CAGb2v6607N5k+h4ym62ZGvHEhAOPoABog8ep1gwkE++FB5CWDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently code has an inverted logic: opcode from user memory
-is swapped to a proper endianness only in case of read error.
-While normally opcode should be swapped only if it was read
-correctly from user memory.
+Hi,
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
- arch/arm/kernel/traps.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On Tue, Dec 24, 2013 at 12:21 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> Hi,
+>
+> El 23/12/13 05:37, Chen-Yu Tsai escribi?:
+>
+>> This commit adds the two external clock outputs available on A20 to
+>> its device tree. A dummy fixed factor clock is also added to serve as
+>> the first input of the clock outputs, which according to AW's A20 user
+>> manual, is the 24MHz oscillator divided by 750.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>
+> (,,,)
+>
+>> +               clk_out_a: clk_out_a at 01c201f0 {
+>> +                       #clock-cells = <0>;
+>> +                       compatible = "allwinner,sun7i-a20-out-clk";
+>> +                       reg = <0x01c201f0 0x4>;
+>> +                       clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
+>> +               };
+>
+>
+> These nodes should, as per Maxime's recommendation, look more like
+>
+>         clk_out_a: clk at 01c201f0 {
+>                 #clock-cells = <0>;
+>                 compatible = "allwinner,sun7i-a20-out-clk";
+>                 reg = <0x01c201f0 0x4>;
+>
+>                 clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
+>                 clk-output-names = "clk_out_a";
+>         };
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 7940241..36a844e 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -425,9 +425,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 			instr2 = __mem_to_opcode_thumb16(instr2);
- 			instr = __opcode_thumb32_compose(instr, instr2);
- 		}
--	} else if (get_user(instr, (u32 __user *)pc)) {
-+	} else {
-+		if (get_user(instr, (u32 __user *)pc))
-+			goto die_sig;
- 		instr = __mem_to_opcode_arm(instr);
--		goto die_sig;
- 	}
- 
- 	if (call_undef_hook(regs, instr) == 0)
--- 
-1.7.9.5
+I see. I was following the structure for the main clocks,
+such as pll* or axi/ahb/apb, as the output clocks do not
+have a specific device tied to them, and no worries that
+a node name collision might happen. Do you plan to convert
+the other clocks to this scheme as well? Or are they
+considered reserved or special names?
+
+>
+> Cheers,
+>
+> Emilio
