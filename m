@@ -1,53 +1,92 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 12:46:02 -0800
-Subject: [PATCH v2 6/7] mfd: pm8921: Add DT match table
+Date: Mon, 23 Dec 2013 12:46:03 -0800
+Subject: [PATCH v2 7/7] devicetree: bindings: Document PM8921/8058 PMICs
 In-Reply-To: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
 References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387831563-13535-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387831563-13535-8-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow this driver to probe based on devicetree.
+PM8921 and PM8058 are PMICs found paired with MSM8960 and MSM8660
+devices respectively. They contain subdevices such as keypads,
+RTC, regulators, clocks, etc.
 
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mfd/pm8921-core.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/mfd/qcom,pm8xxx.txt        | 63 ++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
 
-diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
-index d13cb6e..290f0da 100644
---- a/drivers/mfd/pm8921-core.c
-+++ b/drivers/mfd/pm8921-core.c
-@@ -420,6 +420,13 @@ static const struct regmap_config ssbi_regmap_config = {
- 	.reg_write = ssbi_reg_write
- };
- 
-+static const struct of_device_id pm8921_id_table[] = {
-+	{ .compatible = "qcom,pm8058", },
-+	{ .compatible = "qcom,pm8921", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pm8921_id_table);
+diff --git a/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+new file mode 100644
+index 0000000..e3fe625
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+@@ -0,0 +1,63 @@
++Qualcomm PM8xxx PMIC multi-function devices
 +
- static int pm8921_probe(struct platform_device *pdev)
- {
- 	struct pm8921 *pmic;
-@@ -429,7 +436,6 @@ static int pm8921_probe(struct platform_device *pdev)
- 	unsigned int irq;
- 	u32 rev;
- 
--
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0)
- 		return irq;
-@@ -494,6 +500,7 @@ static struct platform_driver pm8921_driver = {
- 	.driver		= {
- 		.name	= "pm8921-core",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = pm8921_id_table,
- 	},
- };
- 
++PROPERTIES
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,pm8058"
++		    "qcom,pm8921"
++
++- #address-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 1
++
++- #size-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 0
++
++- interrupts:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: specifies the interrupt that indicates a subdevice
++		    has generated an interrupt (summary interrupt). The
++		    format of the specifier is defined by the binding document
++		    describing the node's interrupt parent.
++
++- #interrupt-cells:
++	Usage: required
++	Value type : <u32>
++	Definition: must be 2. Specifies the number of cells needed to encode
++		    an interrupt source. The 1st cell contains the interrupt
++		    number. The 2nd cell is the trigger type and level flags
++		    encoded as follows:
++
++			1 = low-to-high edge triggered
++			2 = high-to-low edge triggered
++			4 = active high level-sensitive
++			8 = active low level-sensitive
++
++- interrupt-controller:
++	Usage: required
++	Value type: <empty>
++	Definition: identifies this node as an interrupt controller
++
++EXAMPLE
++
++	pmicintc: pmic at 0 {
++		compatible = "qcom,pm8921";
++		interrupts = <104 8>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pwrkey {
++			compatible = "qcom,pm8921-pwrkey";
++			interrupt-parent = <&pmicintc>;
++			interrupts = <50 1>, <51 1>;
++		};
++	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
