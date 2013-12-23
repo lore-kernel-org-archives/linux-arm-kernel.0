@@ -1,48 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:08:12 +0900
-Subject: [GIT PULL 0/3] Second Round of Renesas ARM Based SoC DT Updates for
- v3.13
-Message-ID: <cover.1387764079.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Dec 2013 11:08:23 +0900
+Subject: [PATCH 1/3] ARM: shmobile: sh73a0: add FSI support via DTSI
+In-Reply-To: <cover.1387764079.git.horms+renesas@verge.net.au>
+References: <cover.1387764079.git.horms+renesas@verge.net.au>
+Message-ID: <63b1303d1922f7660bd9e90da56dfbf93134c5aa.1387764079.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Please consider this second round of Renesas ARM Based SoC DT Updates for
-v3.13. It is based on the first round, tagged as renesas-dt-for-v3.14,
-which you have already pulled.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/sh73a0.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-
-The following changes since commit 1fd219561a4afc51b5f257692f3581546434db5b:
-
-  ARM: shmobile: marzen: enable HSPI0 in DTS (2013-12-10 17:27:25 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.14
-
-for you to fetch changes up to bd0609896eabe2e64b75d7955ae5ecec528cf860:
-
-  ARM: shmobile: koelsch: dts: Add gpio-keys device (2013-12-12 22:22:04 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Updates for v3.13
-
-* r8a7791 (R-Car M2) based Koelsch board
-- Add GPIO keys
-
-* sh73a0 (SH-Mobile AG5) based kzm9g board
-  - Add FSI support
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: sh73a0: add FSI support via DTSI
-      ARM: shmobile: kzm9g: add FSI support for DTS
-
-Laurent Pinchart (1):
-      ARM: shmobile: koelsch: dts: Add gpio-keys device
-
- arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 54 +++++++++++++++++++++++++
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts    | 33 +++++++++++++++
- arch/arm/boot/dts/sh73a0.dtsi                   |  9 +++++
- 3 files changed, 96 insertions(+)
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 241c8cd..c460dd2 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -243,4 +243,13 @@
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
+ 	};
++
++	sh_fsi2: sound at ec230000 {
++		#sound-dai-cells = <1>;
++		compatible = "renesas,sh_fsi2";
++		reg = <0xec230000 0x400>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 146 0x4>;
++		status = "disabled";
++	};
+ };
+-- 
+1.8.4
