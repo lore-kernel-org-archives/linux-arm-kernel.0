@@ -1,82 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Dec 2013 15:06:32 +0100
-Subject: [PATCH v2 5/5] arm64: advertise ARMv8 extensions to 32-bit compat ELF
- binaries
-In-Reply-To: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1387807592-26375-6-git-send-email-ard.biesheuvel@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 23 Dec 2013 18:10:09 +0400
+Subject: [PATCH 2/3] ARM: shmobile: kzm9g: add FSI support for DTS
+In-Reply-To: <52B838C1.1080705@cogentembedded.com>
+References: <cover.1387764079.git.horms+renesas@verge.net.au>
+ <3c2a87c85391272b098827e432813c9437e93992.1387764079.git.horms+renesas@verge.net.au>
+ <52B838C1.1080705@cogentembedded.com>
+Message-ID: <52B84441.2020809@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for advertising the presence of ARMv8 Crypto
-Extensions in the Aarch32 execution state to 32-bit ELF binaries
-running in 32-bit compat mode under the arm64 kernel.
+Hello.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/hwcap.h |  6 ++++++
- arch/arm64/kernel/setup.c      | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+On 23-12-2013 17:21, Sergei Shtylyov wrote:
 
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 9a4cbd6..024c461 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -32,6 +32,12 @@
- #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
- #define COMPAT_HWCAP_EVTSTRM	(1 << 21)
- 
-+#define COMPAT_HWCAP2_AES	(1 << 0)
-+#define COMPAT_HWCAP2_PMULL	(1 << 1)
-+#define COMPAT_HWCAP2_SHA1	(1 << 2)
-+#define COMPAT_HWCAP2_SHA2	(1 << 3)
-+#define COMPAT_HWCAP2_CRC32	(1 << 4)
-+
- #ifndef __ASSEMBLY__
- /*
-  * This yields a mask that user programs can use to figure out what
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 15f3bd2..c36cab8 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -174,6 +174,38 @@ static void __init setup_processor(void)
- 	block = (features >> 16) & 0xf;
- 	if (block && !(block & 0x8))
- 		elf_hwcap |= HWCAP_CRC32;
-+
-+#ifdef CONFIG_COMPAT
-+	/*
-+	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
-+	 * the Aarch32 32-bit execution state.
-+	 */
-+	features = read_cpuid(ID_ISAR5_EL1);
-+	block = (features >> 4) & 0xf;
-+	if (!(block & 0x8)) {
-+		switch (block) {
-+		default:
-+		case 2:
-+			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
-+		case 1:
-+			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
-+		case 0:
-+			break;
-+		}
-+	}
-+
-+	block = (features >> 8) & 0xf;
-+	if (block && !(block & 0x8))
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
-+
-+	block = (features >> 12) & 0xf;
-+	if (block && !(block & 0x8))
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
-+
-+	block = (features >> 16) & 0xf;
-+	if (block && !(block & 0x8))
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
-+#endif
- }
- 
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
--- 
-1.8.3.2
+>> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+>> This patch support FSI-AK4648 with simple audio card
+
+>> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>   arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 33
+>> ++++++++++++++++++++++++++++
+>>   1 file changed, 33 insertions(+)
+
+>> diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+>> b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+>> index 5bb593d..eb8886b 100644
+>> --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+>> +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> [...]
+>> @@ -226,6 +240,12 @@
+>>               };
+>>           };
+>>       };
+>> +
+>> +    ak4648: ak4648 at 0x12 {
+
+>     Perhaps "sound-codec" or "audio-codec" would be a better name; hardware
+> specific names are not recommended by ePAPR. And drop "0x" from the address
+> part please.
+
+    Sorry, I didn't notice the patch is posted as a part of pull request; I've 
+probably missed the original posting (though I've already told to Morimoto-san 
+that names like "ak4648" shouldn't be used).
+
+WBR, Sergei
