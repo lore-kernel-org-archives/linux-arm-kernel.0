@@ -1,39 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 Dec 2013 16:37:07 +0800
-Subject: [PATCH 0/4] clk: sunxi: add A20 external output clock support
+Date: Mon, 23 Dec 2013 16:37:05 +0800
+Subject: [PATCH 3/4] pinctrl: sunxi: Add Allwinner A20 clock output pin
+ functions
 In-Reply-To: <1387787827-11341-1-git-send-email-wens@csie.org>
 References: <1387787827-11341-1-git-send-email-wens@csie.org>
-Message-ID: <1387787827-11341-6-git-send-email-wens@csie.org>
+Message-ID: <1387787827-11341-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/pinctrl/pinctrl-sunxi-pins.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-This patch series adds support for the Allwinner A20's 2 external clock
-outputs. The CubieTruck uses one such output to supply a stable 32.768
-KHz low power clock to its AP6210 WiFi module. Support for the module
-is being added to brcmfmac (brcm80211) by Broadcom people.
-
-The patches should be applied after Emilio's sunxi clock series, as it
-reuses the new "module 0" type clock support.
-
-Comments?
-
-
-Cheers,
-ChenYu
-
-
-Chen-Yu Tsai (4):
-  clk: sunxi: Allwinner A20 output clock support
-  ARM: dts: sun7i: external clock outputs
-  pinctrl: sunxi: Add Allwinner A20 clock output pin functions
-  ARM: dts: sun7i: Add pin muxing options for clock outputs
-
- arch/arm/boot/dts/sun7i-a20.dtsi     | 39 ++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c        | 15 ++++++++++++++
- drivers/pinctrl/pinctrl-sunxi-pins.h |  2 ++
- 3 files changed, 56 insertions(+)
-
+diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
+index 2c7446a..567bc44 100644
+--- a/drivers/pinctrl/pinctrl-sunxi-pins.h
++++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
+@@ -3774,12 +3774,14 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
++		  SUNXI_FUNCTION(0x4, "clk_out_a"),
+ 		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI13,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
++		  SUNXI_FUNCTION(0x4, "clk_out_b"),
+ 		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI14,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
 1.8.5.2
