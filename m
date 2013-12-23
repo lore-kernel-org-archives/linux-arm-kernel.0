@@ -1,34 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Dec 2013 17:28:57 -0200
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select CONFIG_REGULATOR_PFUZE100
-In-Reply-To: <1387826937-9734-1-git-send-email-festevam@gmail.com>
-References: <1387826937-9734-1-git-send-email-festevam@gmail.com>
-Message-ID: <1387826937-9734-2-git-send-email-festevam@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 23 Dec 2013 11:34:55 -0800
+Subject: [PATCH 1/4] clk: sunxi: Allwinner A20 output clock support
+In-Reply-To: <52B86393.8020202@gmail.com>
+References: <1387787827-11341-1-git-send-email-wens@csie.org>
+ <1387787827-11341-2-git-send-email-wens@csie.org>
+ <52B8613B.9040503@elopez.com.ar> <52B86393.8020202@gmail.com>
+Message-ID: <20131223193455.25490.66859@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Quoting Emilio L?pez (2013-12-23 08:23:47)
+> Hi again,
+> 
+> El 23/12/13 13:13, Emilio L?pez escribi?:
+> > Hi,
+> >
+> > El 23/12/13 05:37, Chen-Yu Tsai escribi?:
+> >> This patch adds support for the external clock outputs on the
+> >> Allwinner A20 SoC. The clock outputs are similar to "module 0"
+> >> type clocks, with different offsets and widths for clock factors.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > This patch looks good to me,
+> >
+> > Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+> >
+> >> ---
+> >>   drivers/clk/sunxi/clk-sunxi.c | 57
+> >> +++++++++++++++++++++++++++++++++++++++++++
+> >>   1 file changed, 57 insertions(+)
+> 
+> Please add the new binding to the binding document; I just noticed it 
+> was missing. You can keep the Ack once you do so.
 
-PFUZE100 regulator is commonly found on mx6 based designs.
+Feel free to add this to your "[PATCH v3 00/13] clk: sunxi: add PLL5 and
+PLL6 support" pull request.
 
-Add support for it. 
+Regards,
+Mike
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 318c5fb..2c3245e 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -167,6 +167,7 @@ CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
-+CONFIG_REGULATOR_PFUZE100=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_RC_SUPPORT=y
--- 
-1.8.1.2
+> 
+> Cheers,
+> 
+> Emilio
