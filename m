@@ -1,79 +1,95 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 23 Dec 2013 00:32:36 -0300
-Subject: [PATCH v3 05/13] clk: sunxi: make factors_clk_setup return the clock
- it registers
+Date: Mon, 23 Dec 2013 00:32:35 -0300
+Subject: [PATCH v3 04/13] ARM: sunxi: add PLL4 support
 In-Reply-To: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
 References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1387769564-12894-6-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1387769564-12894-5-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will be needing this to register a factor clock as parent with leaf
-divisors on a single call.
+This commit adds the PLL4 definition to the sun4i, sun5i and sun7i
+device trees. PLL4 is compatible with PLL1.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 7 +++++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 7 +++++++
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 7 +++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 7 +++++++
+ 4 files changed, 28 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 42e8690..0f23d16 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -311,8 +311,8 @@ static const struct factors_data sun4i_apb1_data __initconst = {
- 	.getter = sun4i_get_apb1_factors,
- };
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 5b158d2..3833c14 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -70,6 +70,13 @@
+ 			clocks = <&osc24M>;
+ 		};
  
--static void __init sunxi_factors_clk_setup(struct device_node *node,
--					   struct factors_data *data)
-+static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
-+						const struct factors_data *data)
- {
- 	struct clk *clk;
- 	struct clk_factors *factors;
-@@ -334,14 +334,14 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
- 
- 	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
- 	if (!factors)
--		return;
-+		return NULL;
- 
- 	/* Add a gate if this factor clock can be gated */
- 	if (data->enable) {
- 		gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
- 		if (!gate) {
- 			kfree(factors);
--			return;
-+			return NULL;
- 		}
- 
- 		/* set up gate properties */
-@@ -357,7 +357,7 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
- 		if (!mux) {
- 			kfree(factors);
- 			kfree(gate);
--			return;
-+			return NULL;
- 		}
- 
- 		/* set up gate properties */
-@@ -378,13 +378,14 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
- 			parents, i,
- 			mux_hw, &clk_mux_ops,
- 			&factors->hw, &clk_factors_ops,
--			gate_hw, &clk_gate_ops,
--			i ? 0 : CLK_IS_ROOT);
-+			gate_hw, &clk_gate_ops, 0);
- 
- 	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
- 	}
++		pll4: pll4 at 01c20018 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-pll1-clk";
++			reg = <0x01c20018 0x4>;
++			clocks = <&osc24M>;
++		};
 +
-+	return clk;
- }
+ 		/* dummy is 200M */
+ 		cpu: cpu at 01c20054 {
+ 			#clock-cells = <0>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index b4764be..3252aa8 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -67,6 +67,13 @@
+ 			clocks = <&osc24M>;
+ 		};
  
++		pll4: pll4 at 01c20018 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-pll1-clk";
++			reg = <0x01c20018 0x4>;
++			clocks = <&osc24M>;
++		};
++
+ 		/* dummy is 200M */
+ 		cpu: cpu at 01c20054 {
+ 			#clock-cells = <0>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index ce8ef2a..8c4a9c3 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -67,6 +67,13 @@
+ 			clocks = <&osc24M>;
+ 		};
  
++		pll4: pll4 at 01c20018 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-pll1-clk";
++			reg = <0x01c20018 0x4>;
++			clocks = <&osc24M>;
++		};
++
+ 		/* dummy is 200M */
+ 		cpu: cpu at 01c20054 {
+ 			#clock-cells = <0>;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index d62d693..2b2d3847 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -66,6 +66,13 @@
+ 			clocks = <&osc24M>;
+ 		};
+ 
++		pll4: pll4 at 01c20018 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-pll1-clk";
++			reg = <0x01c20018 0x4>;
++			clocks = <&osc24M>;
++		};
++
+ 		/*
+ 		 * This is a dummy clock, to be used as placeholder on
+ 		 * other mux clocks when a specific parent clock is not
 -- 
 1.8.5.2
