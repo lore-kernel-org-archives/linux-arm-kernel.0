@@ -1,50 +1,37 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Mon, 23 Dec 2013 13:33:45 -0300
-Subject: [PATCH 3/4] pinctrl: sunxi: Add Allwinner A20 clock output pin
- functions
-In-Reply-To: <1387787827-11341-4-git-send-email-wens@csie.org>
-References: <1387787827-11341-1-git-send-email-wens@csie.org>
- <1387787827-11341-4-git-send-email-wens@csie.org>
-Message-ID: <52B865E9.4040800@elopez.com.ar>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Mon, 23 Dec 2013 18:42:07 +0200
+Subject: [PATCH] ARM: traps: fix opcode endianness when read from user memory
+Message-ID: <1387816927-4313-1-git-send-email-taras.kondratiuk@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently code has an inverted logic: opcode from user memory
+is swapped to a proper endianness only in case of read error.
+While normally opcode should be swapped only if it was read
+correctly from user memory.
 
-El 23/12/13 05:37, Chen-Yu Tsai escribi?:
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+---
+ arch/arm/kernel/traps.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-A commit description would be nice :) What are these outputs used for?
-
->   drivers/pinctrl/pinctrl-sunxi-pins.h | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
-> index 2c7446a..567bc44 100644
-> --- a/drivers/pinctrl/pinctrl-sunxi-pins.h
-> +++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
-> @@ -3774,12 +3774,14 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->   		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
->   		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
-> +		  SUNXI_FUNCTION(0x4, "clk_out_a"),
-
-I would add a /* comment */ here and below too, to keep in line with the 
-rest of the file, but this is just me nitpicking :)
-
->   		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
->   	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI13,
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->   		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
->   		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
-> +		  SUNXI_FUNCTION(0x4, "clk_out_b"),
->   		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
->   	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI14,
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->
-
-Cheers!
-
-Emilio
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 7940241..36a844e 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -425,9 +425,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 			instr2 = __mem_to_opcode_thumb16(instr2);
+ 			instr = __opcode_thumb32_compose(instr, instr2);
+ 		}
+-	} else if (get_user(instr, (u32 __user *)pc)) {
++	} else {
++		if (get_user(instr, (u32 __user *)pc))
++			goto die_sig;
+ 		instr = __mem_to_opcode_arm(instr);
+-		goto die_sig;
+ 	}
+ 
+ 	if (call_undef_hook(regs, instr) == 0)
+-- 
+1.7.9.5
