@@ -1,59 +1,50 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon, 23 Dec 2013 08:32:28 -0800
-Subject: [PATCH 0/5] drivers: net: Adding support for APM X-Gene SoC
- Ethernet base driver
-In-Reply-To: <201312221035.44961.arnd@arndb.de>
-References: <1387597376-29303-1-git-send-email-isubramanian@apm.com>
- <201312221035.44961.arnd@arndb.de>
-Message-ID: <1dd2a889f23c7003b11044665329f174@mail.gmail.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Mon, 23 Dec 2013 13:33:45 -0300
+Subject: [PATCH 3/4] pinctrl: sunxi: Add Allwinner A20 clock output pin
+ functions
+In-Reply-To: <1387787827-11341-4-git-send-email-wens@csie.org>
+References: <1387787827-11341-1-git-send-email-wens@csie.org>
+ <1387787827-11341-4-git-send-email-wens@csie.org>
+Message-ID: <52B865E9.4040800@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes.  My third patch didn't make it to the linux-arm-kernel mailing list
-due to size.  I am waiting for the moderator's approval to get it posted.
+Hi,
 
-Thanks,
-Iyappan
+El 23/12/13 05:37, Chen-Yu Tsai escribi?:
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 
-Your mail to 'linux-arm-kernel' with the subject
+A commit description would be nice :) What are these outputs used for?
 
-    [PATCH 3/5] drivers: net: APM X-Gene SoC Ethernet base driver
+>   drivers/pinctrl/pinctrl-sunxi-pins.h | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
+> index 2c7446a..567bc44 100644
+> --- a/drivers/pinctrl/pinctrl-sunxi-pins.h
+> +++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
+> @@ -3774,12 +3774,14 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>   		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
+>   		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
+> +		  SUNXI_FUNCTION(0x4, "clk_out_a"),
 
-Is being held until the list moderator can review it for approval.
+I would add a /* comment */ here and below too, to keep in line with the 
+rest of the file, but this is just me nitpicking :)
 
-The reason it is being held:
+>   		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
+>   	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI13,
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>   		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
+>   		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
+> +		  SUNXI_FUNCTION(0x4, "clk_out_b"),
+>   		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
+>   	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI14,
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>
 
-    Message body is too big: 112640 bytes with a limit of 100 KB
+Cheers!
 
-Either the message will get posted to the list, or you will receive
-notification of the moderator's decision.  If you would like to cancel
-this posting, please visit the following URL:
-
-
-http://lists.infradead.org/mailman/confirm/linux-arm-kernel/0aca8492f9ca29
-055149ebf4058771fd701fd928
-
-
------Original Message-----
-From: Arnd Bergmann [mailto:arnd at arndb.de]
-Sent: Sunday, December 22, 2013 1:36 AM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Iyappan Subramanian; davem at davemloft.net; devicetree at vger.kernel.org;
-gregkh at linuxfoundation.org; patches at apm.com; linux-kernel at vger.kernel.org;
-netdev at vger.kernel.org; jcm at redhat.com; Keyur Chudgar; Ravi Patel
-Subject: Re: [PATCH 0/5] drivers: net: Adding support for APM X-Gene SoC
-Ethernet base driver
-
-On Saturday 21 December 2013, Iyappan Subramanian wrote:
-> Iyappan Subramanian (5):
->   Documentation: APM X-Gene SoC Ethernet DTS binding documentation
->   arm64: dts: APM X-Gene SoC Ethernet device tree nodes
->   drivers: net: APM X-Gene SoC Ethernet base driver
->   drivers: net: APM X-Gene SoC Ethernet driver error handling
->   drivers: net: APM X-Gene SoC Ethernet driver ethtool support
-
-The third patch (the actual driver) didn't make it to the ARM mailing
-list.
-Maybe it's too large?
-
-	Arnd
+Emilio
