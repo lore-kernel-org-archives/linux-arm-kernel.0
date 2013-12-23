@@ -1,28 +1,19 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Dec 2013 09:52:52 +0100
-Subject: [PATCH 2/3] ARM: mvebu: fix register length for Armada XP PMSU
-In-Reply-To: <1387788491-3168-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 23 Dec 2013 09:53:35 +0100
+Subject: [PATCH 3/3] ARM: mvebu: make armada_370_xp_pmsu_init() static
+In-Reply-To: <1387788491-3168-4-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1387788491-3168-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <52B7F9E4.10301@free-electrons.com>
+ <1387788491-3168-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <52B7FA0F.7030709@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Jason, Sebastian, Andrew,
+Hi Thomas,
 
 On 23/12/2013 09:48, Thomas Petazzoni wrote:
-> The per-CPU PMSU registers documented in the datasheet start at
-> 0x22100 and the last register for CPU3 is at 0x22428. However, the DT
-> informations use <0x22100 0x430>, which makes the region end at
-> 0x22530 and not 0x22430.
-> 
-> Moreover, looking at the datasheet, we can see that the registers for
-> CPU0 start at 0x22100, for CPU1 at 0x22200, for CPU2 at 0x22300 and
-> for CPU3 at 0x22400. It seems clear that 0x100 bytes of registers have
-> been used per CPU.
-> 
-> Therefore, this commit reduces the length of the PMSU per-CPU register
-> area from the incorrect 0x430 bytes to a more logical 0x400 bytes.
+> The armada_370_xp_pmsu_init() function is called as an
+> early_initcall(). Therefore, there is no need to export this function,
+> and we can make it static.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
@@ -34,22 +25,35 @@ Thanks,
 Gregory
 
 > ---
->  arch/arm/boot/dts/armada-xp.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-mvebu/common.h | 1 -
+>  arch/arm/mach-mvebu/pmsu.c   | 2 +-
+>  2 files changed, 1 insertion(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 281c644..aa49f17 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -48,7 +48,7 @@
+> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+> index f7ad45e..8de509a 100644
+> --- a/arch/arm/mach-mvebu/common.h
+> +++ b/arch/arm/mach-mvebu/common.h
+> @@ -24,7 +24,6 @@ void armada_370_xp_handle_irq(struct pt_regs *regs);
 >  
->  			armada-370-xp-pmsu at 22000 {
->  				compatible = "marvell,armada-370-xp-pmsu";
-> -				reg = <0x22100 0x430>, <0x20800 0x20>;
-> +				reg = <0x22100 0x400>, <0x20800 0x20>;
->  			};
+>  void armada_xp_cpu_die(unsigned int cpu);
+>  int armada_370_xp_coherency_init(void);
+> -int armada_370_xp_pmsu_init(void);
+>  void armada_xp_secondary_startup(void);
+>  extern struct smp_operations armada_xp_smp_ops;
+>  #endif
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 27fc4f0..f614727 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -58,7 +58,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+>  }
+>  #endif
 >  
->  			serial at 12200 {
+> -int __init armada_370_xp_pmsu_init(void)
+> +static int __init armada_370_xp_pmsu_init(void)
+>  {
+>  	struct device_node *np;
+>  
 > 
 
 
