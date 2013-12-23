@@ -1,41 +1,61 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 23 Dec 2013 13:30:26 -0800
-Subject: Tegra baseline test results for v3.13-rc5
-Message-ID: <52B8AB72.1080306@nvidia.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 23 Dec 2013 22:07:04 +0100
+Subject: [PATCH 1/7] iommu/omap: Do bus_set_iommu() only if probe()
+ succeeds
+In-Reply-To: <52B888C2.8040303@ti.com>
+References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
+ <1387284818-28739-2-git-send-email-florian.vaussard@epfl.ch>
+ <52B888C2.8040303@ti.com>
+Message-ID: <52B8A5F8.3000706@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.13-rc5.
-Logs and other details at:
+Hi Suman,
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.13-rc5/20131223131320/
+On 12/23/2013 08:02 PM, Anna, Suman wrote:
+> Hi Florian,
+> 
+> On 12/17/2013 06:53 AM, Florian Vaussard wrote:
+>> Currently, bus_set_iommu() is done in omap_iommu_init(). However,
+>> omap_iommu_probe() can fail in a number of ways, leaving the platform
+>> bus with a dangling reference to a non-initialized iommu. Perform
+>> bus_set_iommu() only if omap_iommu_probe() succeed.
+> 
+> Can you clarify a bit more on what kind of issues you were seeing
+> specifically? In general, there can be multiple instances of the iommu,
+> so setting it in probe may not be fixing whatever issue you were seeing.
+> The current OMAP3 code has only the ISP MMU enabled, but there is also
+> another one for the IVA MMU (currently not configured by default).
+> Moving the bus_set_iommu to probe makes sense if only one iommu is
+> present, so this patch may not be needed at all.
+> 
 
+If omap_iommu_probe() fails, the init will have called bus_set_iommu()
+anyways. Thus, when a driver request the iommu by calling
+iommu_domain_alloc(), it will succeed (but iommu_attach_device() will
+fail if I remember). Leaving a driver with a dangling reference to
+a phantom iommu is not good IMHO. It will lead to strange behaviours
+one day or another.
 
-Test summary
-------------
+As for the multiple iommu case, as I do not think it is currently
+possible, as bus_type (in this case &platform_bus_type) has only
+one struct iommu_ops. bus_set_iommu() will return EBUSY on the
+second call. Am I missing something?
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+> Also, the main change in this patch is moving the bus_set_iommu from
+> omap_iommu_init to omap_iommu_probe, so you should probably leave out
+> moving the function. The omap_iommu_probe function would anyway need
+> conversion to using devm_ functions.
+> 
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+This was my first try also, but as bus_set_iommu() needs omap_iommu_ops
+(itself depending on several functions), its call must come after the
+declaration of omap_iommu_ops. Thus I moved omap_iommu_probe() after
+the declaration of omap_iommu_ops. But I can probably use a forward
+declaration for omap_iommu_ops, this would be better.
 
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+Indeed, we can also convert to devm_.
 
+Regards,
 
-vmlinux object size
-(delta in bytes from test_v3.13-rc4 (319e2e3f63c348a9b66db4667efa73178e18b17d)):
-    text     data      bss    total  kernel
-    +548     +192        0     +740  multi_v7_defconfig
-   +4528        0        0    +4528  tegra_defconfig
-
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.13-rc4 (319e2e3f63c348a9b66db4667efa73178e18b17d))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-       -8k       8k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-       -8k       8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Florian
