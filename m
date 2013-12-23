@@ -1,126 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:10 +0900
-Subject: [PATCH 05/26] ARM: shmobile: r8a7791 Koelsch DT reference C bits
+Date: Mon, 23 Dec 2013 11:07:14 +0900
+Subject: [PATCH 18/26] ARM: shmobile: Use ->init_late() on Lager
 In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
 References: <cover.1387763524.git.horms+renesas@verge.net.au>
-Message-ID: <a2baf1912f399c0fbb9ec8064b88a1809f5a5b0a.1387763524.git.horms+renesas@verge.net.au>
+Message-ID: <3fbbcbdf57a5172318d10d0f16a4e2d2c595fd75.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add DT reference support for the r8a7791 Koelsch board.
+Hook in shmobile_init_late() on Lager V2. This enables some PM
+related things like CPUIdle and Suspend-to-RAM.
 
-This board support file will be used together with common
-clocks and multiplatform in the future.
+With this patch applied it is possible to use Suspend-to-RAM:
+# echo enabled > /sys/class/tty/ttySC6/power/wakeup
+# echo mem > /sys/power/state
+(wake by sending a character on the serial console)
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                   | 11 ++++++
- arch/arm/mach-shmobile/Makefile                  |  1 +
- arch/arm/mach-shmobile/Makefile.boot             |  1 +
- arch/arm/mach-shmobile/board-koelsch-reference.c | 46 ++++++++++++++++++++++++
- 4 files changed, 59 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/board-koelsch-reference.c
+ arch/arm/mach-shmobile/board-lager-reference.c | 2 ++
+ arch/arm/mach-shmobile/board-lager.c           | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index aa9017b..8eac47f 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -240,6 +240,17 @@ config MACH_KOELSCH
- 	depends on ARCH_R8A7791
- 	select USE_OF
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 7df9ea0..51a3bcc 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -20,6 +20,7 @@
  
-+config MACH_KOELSCH_REFERENCE
-+	bool "Koelsch board - Reference Device Tree Implementation"
-+	depends on ARCH_R8A7791
-+	select USE_OF
-+	---help---
-+	   Use reference implementation of Koelsch board support
-+	   which makes use of device tree at the expense
-+	   of not supporting a number of devices.
-+
-+	   This is intended to aid developers
-+
- config MACH_KZM9G
- 	bool "KZM-A9-GT board"
- 	depends on ARCH_SH73A0
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index c7e8774..8bca9b5 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -71,6 +71,7 @@ obj-$(CONFIG_MACH_LAGER_REFERENCE)	+= board-lager-reference.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
- obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
-+obj-$(CONFIG_MACH_KOELSCH_REFERENCE)	+= board-koelsch-reference.o
- obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
- obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
- endif
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 4f30e3d..892d4ab 100644
---- a/arch/arm/mach-shmobile/Makefile.boot
-+++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -8,6 +8,7 @@ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
- loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
- loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
- loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
-+loadaddr-$(CONFIG_MACH_KOELSCH_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
- loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
- loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-new file mode 100644
-index 0000000..beecc8b
---- /dev/null
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -0,0 +1,46 @@
-+/*
-+ * Koelsch board support - Reference DT implementation
-+ *
-+ * Copyright (C) 2013  Renesas Electronics Corporation
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/of_platform.h>
-+#include <mach/rcar-gen2.h>
-+#include <mach/r8a7791.h>
-+#include <asm/mach/arch.h>
-+
-+static void __init koelsch_add_standard_devices(void)
-+{
-+	r8a7791_clock_init();
-+	r8a7791_add_dt_devices();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char * const koelsch_boards_compat_dt[] __initconst = {
-+	"renesas,koelsch-reference",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(KOELSCH_DT, "koelsch")
-+	.smp		= smp_ops(r8a7791_smp_ops),
-+	.init_early	= r8a7791_init_early,
-+	.init_time	= rcar_gen2_timer_init,
-+	.init_machine	= koelsch_add_standard_devices,
-+	.dt_compat	= koelsch_boards_compat_dt,
-+MACHINE_END
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
++#include <mach/common.h>
+ #include <mach/rcar-gen2.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
+@@ -41,5 +42,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index f5dab34..d47052e 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -259,5 +259,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_init,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
 -- 
 1.8.4
