@@ -1,41 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Dec 2013 11:07:13 +0900
-Subject: [PATCH 08/26] ARM: shmobile: lager: set .debounce_interval
+Date: Mon, 23 Dec 2013 11:07:12 +0900
+Subject: [PATCH 07/26] ARM: shmobile: bockw: add pin pull-up setting for SDHI
 In-Reply-To: <cover.1387763524.git.horms+renesas@verge.net.au>
 References: <cover.1387763524.git.horms+renesas@verge.net.au>
-Message-ID: <c9fd77d48a72d4210c992c4ee27ef8217a44da03.1387763524.git.horms+renesas@verge.net.au>
+Message-ID: <79990c164dcc7514398ca824a609c74cb5f563da.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-In R-Car GPIO hardware block, 'chattering removal' feature can be
-enabled on GPIO-n-[3:0] pins, but it's not supported on rest of pins
-GPIO-n-[31:4].
+SDHI CD/WP pin needs pull-up
 
-Set an appropriate debounce interval, instead.  We could confirm that
-spurious/unnecessary GPIO interrupts are prevented by this settings.
-
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-bockw-reference.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 78a31b6..fcf06fd 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -120,7 +120,8 @@ static const struct gpio_led_platform_data lager_leds_pdata __initconst = {
+diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
+index c7b217d..6586f5c 100644
+--- a/arch/arm/mach-shmobile/board-bockw-reference.c
++++ b/arch/arm/mach-shmobile/board-bockw-reference.c
+@@ -38,9 +38,13 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
+ #define FPGA	0x18200000
+ #define IRQ0MR	0x30
+ #define COMCTLR	0x101c
++
++#define PFC	0xfffc0000
++#define PUPR4	0x110
+ static void __init bockw_init(void)
+ {
+ 	void __iomem *fpga;
++	void __iomem *pfc;
  
- /* GPIO KEY */
- #define GPIO_KEY(c, g, d, ...) \
--	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
-+	{ .code = c, .gpio = g, .desc = d, .active_low = 1, \
-+	  .debounce_interval = 20 }
+ 	r8a7778_clock_init();
+ 	r8a7778_init_irq_extpin_dt(1);
+@@ -66,6 +70,17 @@ static void __init bockw_init(void)
+ 		iounmap(fpga);
+ 	}
  
- static struct gpio_keys_button gpio_buttons[] = {
- 	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
++	pfc = ioremap_nocache(PFC, 0x200);
++	if (pfc) {
++		/*
++		 * FIXME
++		 *
++		 * SDHI CD/WP pin needs pull-up
++		 */
++		iowrite32(ioread32(pfc + PUPR4) | (3 << 26), pfc + PUPR4);
++		iounmap(pfc);
++	}
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
 -- 
 1.8.4
