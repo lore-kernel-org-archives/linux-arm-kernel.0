@@ -1,80 +1,34 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 23 Dec 2013 14:11:34 +0100
-Subject: [PATCH v4 0/7] ARM: S3C24XX: Convert s3c2416 and s3c2443 to
- common clock framework
-In-Reply-To: <201312101614.29781.heiko@sntech.de>
-References: <201312101614.29781.heiko@sntech.de>
-Message-ID: <201312231411.35417.heiko@sntech.de>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Mon, 23 Dec 2013 10:22:05 -0300
+Subject: [PATCH v3 00/13] clk: sunxi: add PLL5 and PLL6 support
+In-Reply-To: <20131223054401.22761.10523@quantum>
+References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
+ <20131223054401.22761.10523@quantum>
+Message-ID: <52B838FD.4050809@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi Mike,
 
-it seems you didn't have the time for this series during your 2nd round.
+El 23/12/13 02:44, Mike Turquette escribi?:
+> Quoting Emilio L?pez (2013-12-22 19:32:31)
+>> Hi everyone,
+>>
+>> This is v3 of the sunxi clock series. For those seeing this for the
+>> first time, it adds PLL4, PLL5, PLL6 and mod0 clock support on sun4i, sun5i
+>> and sun7i. Additionally, mbus is supported on sun5i and sun7i. I would like
+>> to see this merged for 3.14 as clock users are progressing rapidly and will
+>> be needing this code, so all feedback is appreciated.
+>
+> For all the clock patches missing my Ack (I think just the first three):
+>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-I'm not sure what your plans/time constraint are, but according to the -rc5 
-release mail from Linus [0], 3.13 will at least reach -rc8 so it seems as if 
-there is still a bit of time to for 3.14 stuff.
+Great; if nobody else has any other objection I'd like to get these 
+merged for 3.14. I assume you'll want a pull request as agreed on 
+earlier; do you have a branch I can use as a base? These patches depend 
+on the pull Maxime sent last time and is currently sitting on clk-next.
 
-This series would really be a nice base for not only the other ccf-conversions 
-(the already submitted s3c2410 and the s3c2412 which I'm currently working on) 
-but also for broadening the dt-support, with the auxdata gone from the dt-
-board file.
+Cheers!
 
-
-Thanks
-Heiko
-
-
-
-[0] https://lkml.org/lkml/2013/12/22/70
-
-Am Dienstag, 10. Dezember 2013, 16:14:29 schrieb Heiko St?bner:
-> Next try, this time with less time between submissions.
-> 
-> Tested on both non-dt and dt s3c2416.
-> 
-> Changes since v3:
-> - address comments from Tomasz Figa (binding documentation, etc)
-> - prevent conflicts with unconverted s3c24xx socs
-> Changes since v2
-> - address comments from Tomasz Figa
-> - use new pll registration mechanism
-> - use fixed-rate clocks for xti etc
-> 
-> Heiko Stuebner (7):
->   clk: samsung: add pll_6552 variant for s3c2416
->   clk: samsung: add plls used by the s3c2443
->   dt-bindings: add binding for clock-controller of s3c2443 and following
->   clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
->   ARM: S3C24XX: prevent conflicts between ccf and non-ccf s3c24xx-socs
->   ARM: dt: add clock data for s3c2416
->   ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
-> 
->  .../bindings/clock/samsung,s3c2443-clock.txt       |   56 ++
->  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   13 +
->  arch/arm/boot/dts/s3c2416.dtsi                     |   42 ++
->  arch/arm/mach-s3c24xx/Kconfig                      |   18 +-
->  arch/arm/mach-s3c24xx/Makefile                     |    5 +-
->  arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
->  arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
->  arch/arm/mach-s3c24xx/common-s3c2443.c             |  675
-> -------------------- arch/arm/mach-s3c24xx/common.c                     | 
->  18 +-
->  arch/arm/mach-s3c24xx/common.h                     |    6 +
->  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
->  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
->  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-pll.c                      |   84 ++-
->  drivers/clk/samsung/clk-pll.h                      |    3 +
->  drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
->  include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
->  18 files changed, 756 insertions(+), 1114 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt delete
-> mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
->  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
->  delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
->  create mode 100644 drivers/clk/samsung/clk-s3c2443.c
->  create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
+Emilio
