@@ -1,99 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 23 Dec 2013 14:04:15 +0000
-Subject: [PATCH RFC v3 04/12] arm64: kernel: cpu_{suspend/resume}
- implementation
-In-Reply-To: <52B42A48.5090202@marvell.com>
-References: <1385033059-25896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1385033059-25896-5-git-send-email-lorenzo.pieralisi@arm.com>
- <52B42A48.5090202@marvell.com>
-Message-ID: <20131223140415.GB2967@e102568-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Dec 2013 22:06:15 +0800
+Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: fix warning during module
+ remove function
+In-Reply-To: <1387796544-18209-2-git-send-email-b29396@freescale.com>
+References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
+ <1387796544-18209-2-git-send-email-b29396@freescale.com>
+Message-ID: <20131223140613.GL26070@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 11:30:16AM +0000, Leo Yan wrote:
-> On 11/21/2013 07:24 PM, Lorenzo Pieralisi wrote:
-> 
-> > +/*
-> > + * x0 must contain the sctlr value retrieved from restored context
-> > + */
-> > +ENTRY(cpu_resume_mmu)
-> > +	ldr	x3, =cpu_resume_after_mmu
-> > +	msr	sctlr_el1, x0		// restore sctlr_el1
-> > +	isb
-> > +	br	x3			// global jump to virtual address
-> > +ENDPROC(cpu_resume_mmu)
-> > +cpu_resume_after_mmu:
-> > +	mov	x0, #0			// return zero on success
-> > +	ldp	x19, x20, [sp, #16]
-> > +	ldp	x21, x22, [sp, #32]
-> > +	ldp	x23, x24, [sp, #48]
-> > +	ldp	x25, x26, [sp, #64]
-> > +	ldp	x27, x28, [sp, #80]
-> > +	ldp	x29, lr, [sp], #96
-> > +	ret
-> > +ENDPROC(cpu_resume_after_mmu)
-> > +
-> > +	.data
-> > +ENTRY(cpu_resume)
-> > +	bl	el2_setup		// if in EL2 drop to EL1 cleanly
-> 
-> Compare to v2's patch set, here remove the calculation fro the offset 
-> b/t PHYS_OFFSET - PAGE_OFFSET; so when i verify the patch set, i saw x28 
-> is zero and finally introduce the EL2's sync exception. Below are pasted 
-> v2's code for reference.
+On Mon, Dec 23, 2013 at 07:02:24PM +0800, Dong Aisheng wrote:
+> @@ -1160,8 +1160,6 @@ free_sdhci:
+>  static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>  {
+>  	struct sdhci_host *host = platform_get_drvdata(pdev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>  	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
+>  
+>  	sdhci_remove_host(host, dead);
+> @@ -1169,10 +1167,6 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>  	pm_runtime_dont_use_autosuspend(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> -	clk_disable_unprepare(imx_data->clk_per);
+> -	clk_disable_unprepare(imx_data->clk_ipg);
+> -	clk_disable_unprepare(imx_data->clk_ahb);
 
-What kernel are you testing against ? The offset is not needed anymore
-in el2_setup, that is why the x28 computation is not there.
+It's obviously a bad change to me.  We should definitely have these
+clk_disable_unprepare() calls in sdhci_esdhc_imx_remove() to match the
+clk_prepare_enable() calls in sdhci_esdhc_imx_probe().  Otherwise, at
+least for !CONFIG_PM_RUNTIME build, it's broken.
 
-> do u want use firmware to set the x28 for the offset value? :-) IMHO, 
-> v2's implementation is more reasonable and it's better keep the code.
+I'm looking at sdhci-pxav3 driver.  Why can it call
+clk_disable_unprepare(pltfm_host->clk) in .remove() with runtime PM
+support in there?  Is there anything about runtime PM not being done
+correctly for our driver?
 
-The point is not whether to set it in firmware or in the kernel, see above.
+Shawn
 
-Lorenzo
-
+> -
+>  	sdhci_pltfm_free(pdev);
+>  
+>  	return 0;
+> -- 
+> 1.7.2.rc3
 > 
-> ENTRY(cpu_resume)
->            adr     x4, sleep_save_sp
->            ldr     x5, =sleep_save_sp
->            sub     x28, x4, x5             // x28 = PHYS_OFFSET - 
-> PAGE_OFFSET
->            /*
->             * make sure el2 is sane, el2_setup expects:
->             * x28 = PHYS_OFFSET - PAGE_OFFSET
->             */
->            bl      el2_setup               // if in EL2 drop to EL1 cleanly
-> 
-> 
-> > +#ifdef CONFIG_SMP
-> > +	mrs	x1, mpidr_el1
-> > +	adr	x4, mpidr_hash_ptr
-> > +	ldr	x5, [x4]
-> > +	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
-> > +        /* retrieve mpidr_hash members to compute the hash */
-> > +	ldr	x2, [x8, #MPIDR_HASH_MASK]
-> > +	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
-> > +	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
-> > +	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
-> > +        /* x7 contains hash index, let's use it to grab context pointer */
-> > +#else
-> > +	mov	x7, xzr
-> > +#endif
-> > +	adr	x0, sleep_save_sp
-> > +	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
-> > +	ldr	x0, [x0, x7, lsl #3]
-> > +	/* load sp from context */
-> > +	ldr	x2, [x0, #CPU_CTX_SP]
-> > +	adr	x1, sleep_idmap_phys
-> > +	/* load physical address of identity map page table in x1 */
-> > +	ldr	x1, [x1]
-> > +	mov	sp, x2
-> > +	/*
-> > +	 * cpu_do_resume expects x0 to contain context physical address
-> > +	 * pointer and x1 to contain physical address of 1:1 page tables
-> > +	 */
-> > +	bl	cpu_do_resume		// PC relative jump, MMU off
-> > +	b	cpu_resume_mmu		// Resume MMU, never returns
-> > +ENDPROC(cpu_resume)
-> > +
 > 
