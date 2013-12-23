@@ -1,68 +1,86 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 12:05:53 -0800
-Subject: [PATCH] regmap: Allow regmap_bulk_write() to work for "no-bus"
- regmaps
-In-Reply-To: <20131218184541.GH31886@sirena.org.uk>
-References: <20131210235000.GK11468@sirena.org.uk>
- <52A7AE1B.3040201@codeaurora.org> <20131211005106.GL11468@sirena.org.uk>
- <52A7C0C3.2070805@codeaurora.org> <20131211132729.GT11468@sirena.org.uk>
- <52AA42FD.4040503@codeaurora.org> <20131213104128.GT11044@sirena.org.uk>
- <20131213213707.GO21983@codeaurora.org> <20131216210153.GA3185@sirena.org.uk>
- <20131217023047.GC31766@codeaurora.org>
- <20131218184541.GH31886@sirena.org.uk>
-Message-ID: <52B897A1.8030205@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 23 Dec 2013 12:07:44 -0800
+Subject: [PATCH v4 1/7] clk: samsung: add pll_6552 variant for s3c2416
+In-Reply-To: <201312101615.10927.heiko@sntech.de>
+References: <201312101614.29781.heiko@sntech.de>
+ <201312101615.10927.heiko@sntech.de>
+Message-ID: <20131223200744.25490.94481@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/13 10:45, Mark Brown wrote:
-> On Mon, Dec 16, 2013 at 06:30:47PM -0800, Stephen Boyd wrote:
->
->> -	/* No formatting is require if val_byte is 1 */
->> -	if (val_bytes == 1) {
->> -		wval = (void *)val;
->> +			ival = *(unsigned int *)(val + (i * val_bytes));
->> +			ret = _regmap_write(map, reg + (i * map->reg_stride),
->> +					ival);
->> +			if (ret != 0)
->> +				goto out;
-> This doesn't quite work - val is an array of objects of the size of the
-> size of a register not of unsigned integers so you're parsing extra data
-> out there.  That possibly wasn't the best choice of API but we have
-> quite a few users now so ick.
+Quoting Heiko St?bner (2013-12-10 07:15:10)
+> According to the manual s3c2416 and s3c2450 use a pll 6552 and 6553
+> and while the pll_6553 matches exactly the one already implemented
+> the pll_6552 differs to the one from the s3c64xx series.
+> 
+> The change is solely in the bit locations of the mdiv and pdiv values.
+> All calculations are the same for both implementatons and even the
+> proposed divider-values for specific frequencies in the manuals are
+> the same.
+> 
+> Therefore implement a variant that simply uses the changed bit
+> locations if necessary.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-Are you concerned that we'll read past the end of the val buffer? Do we
-need to cast the pointer to be the appropriate size according to
-val_bytes? Something like this?
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-                for (i = 0; i < val_count; i++) {
-                        unsigned int ival;
-
-                        switch (val_bytes) {
-                        case 1: 
-                                ival = *(u8 *)(val + (i * val_bytes));
-                                break;
-                        case 2: 
-                                ival = *(u16 *)(val + (i * val_bytes));
-                                break;
-                        case 4: 
-                                ival = *(u32 *)(val + (i * val_bytes));
-                                break;
-#ifdef CONFIG_64BIT
-                        case 8: 
-                                ival = *(u64 *)(val + (i * val_bytes));
-                                break;
-#endif
-                        default:
-                                ret = -EINVAL;
-                                goto out;
-                        }
-
-                        ret = _regmap_write(map, reg + (i * map->reg_stride),
-                                        ival);
-                        if (ret != 0)
-                                goto out;
-                }
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  drivers/clk/samsung/clk-pll.c |   12 ++++++++++--
+>  drivers/clk/samsung/clk-pll.h |    1 +
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 529e11d..c37d033 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -564,7 +564,9 @@ static const struct clk_ops samsung_pll46xx_clk_min_ops = {
+>  #define PLL6552_PDIV_MASK      0x3f
+>  #define PLL6552_SDIV_MASK      0x7
+>  #define PLL6552_MDIV_SHIFT     16
+> +#define PLL6552_MDIV_SHIFT_2416        14
+>  #define PLL6552_PDIV_SHIFT     8
+> +#define PLL6552_PDIV_SHIFT_2416        5
+>  #define PLL6552_SDIV_SHIFT     0
+>  
+>  static unsigned long samsung_pll6552_recalc_rate(struct clk_hw *hw,
+> @@ -575,8 +577,13 @@ static unsigned long samsung_pll6552_recalc_rate(struct clk_hw *hw,
+>         u64 fvco = parent_rate;
+>  
+>         pll_con = __raw_readl(pll->con_reg);
+> -       mdiv = (pll_con >> PLL6552_MDIV_SHIFT) & PLL6552_MDIV_MASK;
+> -       pdiv = (pll_con >> PLL6552_PDIV_SHIFT) & PLL6552_PDIV_MASK;
+> +       if (pll->type == pll_6552_s3c2416) {
+> +               mdiv = (pll_con >> PLL6552_MDIV_SHIFT_2416) & PLL6552_MDIV_MASK;
+> +               pdiv = (pll_con >> PLL6552_PDIV_SHIFT_2416) & PLL6552_PDIV_MASK;
+> +       } else {
+> +               mdiv = (pll_con >> PLL6552_MDIV_SHIFT) & PLL6552_MDIV_MASK;
+> +               pdiv = (pll_con >> PLL6552_PDIV_SHIFT) & PLL6552_PDIV_MASK;
+> +       }
+>         sdiv = (pll_con >> PLL6552_SDIV_SHIFT) & PLL6552_SDIV_MASK;
+>  
+>         fvco *= mdiv;
+> @@ -773,6 +780,7 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+>                         init.ops = &samsung_pll36xx_clk_ops;
+>                 break;
+>         case pll_6552:
+> +       case pll_6552_s3c2416:
+>                 init.ops = &samsung_pll6552_clk_ops;
+>                 break;
+>         case pll_6553:
+> diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+> index 6c39030..ddf9029 100644
+> --- a/drivers/clk/samsung/clk-pll.h
+> +++ b/drivers/clk/samsung/clk-pll.h
+> @@ -24,6 +24,7 @@ enum samsung_pll_type {
+>         pll_4650,
+>         pll_4650c,
+>         pll_6552,
+> +       pll_6552_s3c2416,
+>         pll_6553,
+>  };
+>  
+> -- 
+> 1.7.10.4
+> 
