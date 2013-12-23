@@ -1,24 +1,30 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Dec 2013 09:52:09 +0100
-Subject: [PATCH 1/3] ARM: mvebu: move ARMADA_XP_MAX_CPUS to armada-370-xp.h
-In-Reply-To: <1387788491-3168-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 23 Dec 2013 09:52:52 +0100
+Subject: [PATCH 2/3] ARM: mvebu: fix register length for Armada XP PMSU
+In-Reply-To: <1387788491-3168-3-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1387788491-3168-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <52B7F9B9.1020209@free-electrons.com>
+ <1387788491-3168-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <52B7F9E4.10301@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Thomas, Jason, Sebastian, Andrew,
 
 On 23/12/2013 09:48, Thomas Petazzoni wrote:
-> The ARMADA_XP_MAX_CPUS definition was in common.h, which as its name
-> says, is common to all mvebu SoCs. It is more logical to have this XP
-> specific definition in the already existing armada-370-xp.h header
-> file, especially in preparation to the addition of the support for
-> other SOCs in mach-mvebu.
+> The per-CPU PMSU registers documented in the datasheet start at
+> 0x22100 and the last register for CPU3 is at 0x22428. However, the DT
+> informations use <0x22100 0x430>, which makes the region end at
+> 0x22530 and not 0x22430.
+> 
+> Moreover, looking at the datasheet, we can see that the registers for
+> CPU0 start at 0x22100, for CPU1 at 0x22200, for CPU2 at 0x22300 and
+> for CPU3 at 0x22400. It seems clear that 0x100 bytes of registers have
+> been used per CPU.
+> 
+> Therefore, this commit reduces the length of the PMSU per-CPU register
+> area from the incorrect 0x430 bytes to a more logical 0x400 bytes.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
 
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
@@ -28,36 +34,22 @@ Thanks,
 Gregory
 
 > ---
->  arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
->  arch/arm/mach-mvebu/common.h        | 2 --
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/armada-xp.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-> index c612b2c..4ed534d 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.h
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.h
-> @@ -18,6 +18,8 @@
->  #ifdef CONFIG_SMP
->  #include <linux/cpumask.h>
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 281c644..aa49f17 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -48,7 +48,7 @@
 >  
-> +#define ARMADA_XP_MAX_CPUS 4
-> +
->  void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
->  void armada_xp_mpic_smp_cpu_init(void);
->  #endif
-> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-> index e366010..f7ad45e 100644
-> --- a/arch/arm/mach-mvebu/common.h
-> +++ b/arch/arm/mach-mvebu/common.h
-> @@ -15,8 +15,6 @@
->  #ifndef __ARCH_MVEBU_COMMON_H
->  #define __ARCH_MVEBU_COMMON_H
+>  			armada-370-xp-pmsu at 22000 {
+>  				compatible = "marvell,armada-370-xp-pmsu";
+> -				reg = <0x22100 0x430>, <0x20800 0x20>;
+> +				reg = <0x22100 0x400>, <0x20800 0x20>;
+>  			};
 >  
-> -#define ARMADA_XP_MAX_CPUS 4
-> -
->  #include <linux/reboot.h>
->  
->  void mvebu_restart(enum reboot_mode mode, const char *cmd);
+>  			serial at 12200 {
 > 
 
 
