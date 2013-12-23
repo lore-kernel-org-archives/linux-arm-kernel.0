@@ -1,23 +1,26 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 23 Dec 2013 18:27:05 +0200
-Subject: pull request for some small fixes
-Message-ID: <20131223162705.GE3378@tbergstrom-lnx.Nvidia.com>
+Date: Mon, 23 Dec 2013 16:18:52 +0200
+Subject: [PATCH Resend 2/7] clk: tegra: Staticize
+ tegra_clk_periph_nodiv_ops
+In-Reply-To: <52B3265F.8080901@wwwdotorg.org>
+References: <1387443241-5694-1-git-send-email-sachin.kamat@linaro.org>
+ <1387443241-5694-2-git-send-email-sachin.kamat@linaro.org>
+ <52B3265F.8080901@wwwdotorg.org>
+Message-ID: <20131223141852.GD3378@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 62ce7cd62f534023224912dc9b909963f26a38da:
+On Thu, Dec 19, 2013 at 06:01:19PM +0100, Stephen Warren wrote:
+> On 12/19/2013 01:53 AM, Sachin Kamat wrote:
+> > tegra_clk_periph_nodiv_ops is used only in this file. Make it static.
+> 
+> I believe that Peter De Schrijver is picking up patches for
+> drivers/clk/tegra and sending pull requests to Mike. Hence, I'm CC'ing
+> him in here.
+> 
 
-  clk: tegra: fix __clk_lookup() return value checks (2013-11-28 15:09:22 +0200)
+This seems to be already merged in next-20131223 as 4e100354e5b7c8982d1563dca134d375979a8ead
 
-are available in the git repository at:
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-next-1
+Cheers,
 
-Peter De Schrijver (1):
-      clk: tegra: Add missing Tegra20 fuse clks
-
-Thierry Reding (1):
-      clk: tegra: Correct clock number for UARTE
-
- drivers/clk/tegra/clk-tegra-periph.c |    2 +-
- drivers/clk/tegra/clk-tegra20.c      |    2 ++
- 2 files changed, 3 insertions(+), 1 deletions(-)
+Peter.
