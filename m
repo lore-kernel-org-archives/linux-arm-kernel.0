@@ -1,38 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 23 Dec 2013 22:08:24 +0300
-Subject: [PATCH 2/2] ARM: shmobile: Lager: conditionally select
- CONFIG_MICREL_PHY
-In-Reply-To: <52B887B2.7070507@cogentembedded.com>
-References: <201312200218.08076.sergei.shtylyov@cogentembedded.com>
- <201312200220.54747.sergei.shtylyov@cogentembedded.com>
- <20131223005322.GJ12239@verge.net.au> <52B887B2.7070507@cogentembedded.com>
-Message-ID: <52B88A28.4090708@cogentembedded.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Mon, 23 Dec 2013 20:10:33 +0200
+Subject: [PATCH 3/4] ARM: OMAP: counter-32k: raw read and write endian fix
+In-Reply-To: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <1387822234-11167-4-git-send-email-taras.kondratiuk@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Victor Kamensky <victor.kamensky@linaro.org>
 
-On 12/23/2013 09:57 PM, Sergei Shtylyov wrote:
+All OMAP IP blocks expect LE data, but CPU may operate in BE mode.
+Need to use endian neutral functions to read/write h/w registers.
+I.e instead of __raw_read[lw] and __raw_write[lw] functions code
+need to use read[lw]_relaxed and write[lw]_relaxed functions.
+If the first simply reads/writes register, the second will byteswap
+it if host operates in BE mode.
 
->>> Now that support for KSZ8041RNLI is added to the Micrel PHY driver and we
->>> intend
->>> to support PHY IRQs on the Lager board, we have to enable the Micrel driver.
->>> Do this by selecting CONFIG_MICREL_PHY for Lager if CONFIG_SH_ETH is enabled.
+Changes are trivial sed like replacement of __raw_xxx functions
+with xxx_relaxed variant.
 
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+---
+ arch/arm/plat-omap/counter_32k.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
->> Hi Sergei,
-
->> while I am very happy to see this change unfortunately it no longer
->> applies. Could you please rebase it on top of
->> renesas-devel-v3.13-rc4-20131219?
-
->     Hmm, it *was done* on top of this tag. Perhaps you meant today's
-> renesas-devel-v3.13-rc5-20131223?
-
-    It continues to apply even to that tag seamlessly. Some issue must be on 
-your side...
-
->> Thanks
-
-WBR, Sergei
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index d9bc98e..21ca329 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -40,7 +40,7 @@ static void __iomem *sync32k_cnt_reg;
+ 
+ static u32 notrace omap_32k_read_sched_clock(void)
+ {
+-	return sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
++	return sync32k_cnt_reg ? readl_relaxed(sync32k_cnt_reg) : 0;
+ }
+ 
+ /**
+@@ -64,7 +64,7 @@ static void omap_read_persistent_clock(struct timespec *ts)
+ 	spin_lock_irqsave(&read_persistent_clock_lock, flags);
+ 
+ 	last_cycles = cycles;
+-	cycles = sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
++	cycles = sync32k_cnt_reg ? readl_relaxed(sync32k_cnt_reg) : 0;
+ 
+ 	nsecs = clocksource_cyc2ns(cycles - last_cycles,
+ 					persistent_mult, persistent_shift);
+@@ -95,7 +95,7 @@ int __init omap_init_clocksource_32k(void __iomem *vbase)
+ 	 * The 'SCHEME' bits(30-31) of the revision register is used
+ 	 * to identify the version.
+ 	 */
+-	if (__raw_readl(vbase + OMAP2_32KSYNCNT_REV_OFF) &
++	if (readl_relaxed(vbase + OMAP2_32KSYNCNT_REV_OFF) &
+ 						OMAP2_32KSYNCNT_REV_SCHEME)
+ 		sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF_HIGH;
+ 	else
+-- 
+1.7.9.5
