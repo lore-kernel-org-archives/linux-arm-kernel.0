@@ -1,30 +1,80 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Dec 2013 20:47:01 +0800
-Subject: [PATCH 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe lock
- in atomic context
-In-Reply-To: <1387796544-18209-1-git-send-email-b29396@freescale.com>
-References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
-Message-ID: <20131223124659.GK26070@S2101-09.ap.freescale.net>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 23 Dec 2013 14:11:34 +0100
+Subject: [PATCH v4 0/7] ARM: S3C24XX: Convert s3c2416 and s3c2443 to
+ common clock framework
+In-Reply-To: <201312101614.29781.heiko@sntech.de>
+References: <201312101614.29781.heiko@sntech.de>
+Message-ID: <201312231411.35417.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 07:02:23PM +0800, Dong Aisheng wrote:
-> Sometimes we may meet the following lockdep issue.
-> The root cause is .set_clock callback is executed with spin_lock_irqsave
-> in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
-> clk_get_rate which is using a mutex lock.
+Hi Kukjin,
+
+it seems you didn't have the time for this series during your 2nd round.
+
+I'm not sure what your plans/time constraint are, but according to the -rc5 
+release mail from Linus [0], 3.13 will at least reach -rc8 so it seems as if 
+there is still a bit of time to for 3.14 stuff.
+
+This series would really be a nice base for not only the other ccf-conversions 
+(the already submitted s3c2410 and the s3c2412 which I'm currently working on) 
+but also for broadening the dt-support, with the auxdata gone from the dt-
+board file.
+
+
+Thanks
+Heiko
+
+
+
+[0] https://lkml.org/lkml/2013/12/22/70
+
+Am Dienstag, 10. Dezember 2013, 16:14:29 schrieb Heiko St?bner:
+> Next try, this time with less time between submissions.
 > 
-> The fix avoids access mutex in .set_clock callback by initializing the
-> pltfm_host->clock at probe time and use it later instead of calling
-> clk_get_rate again in atomic context.
-
-While I agree this is the way less intrusive, I'm also wondering why
-sdhci_do_set_ios() needs a spinlock at all, or at least it's
-questionable if the lock should necessarily be held for such a long
-running section.
-
-Nevertheless, as long as we can guarantee that the rate of
-pltfm_host->clk does not change after the driver is probed, I'm fine
-with the patch.
-
-Shawn
+> Tested on both non-dt and dt s3c2416.
+> 
+> Changes since v3:
+> - address comments from Tomasz Figa (binding documentation, etc)
+> - prevent conflicts with unconverted s3c24xx socs
+> Changes since v2
+> - address comments from Tomasz Figa
+> - use new pll registration mechanism
+> - use fixed-rate clocks for xti etc
+> 
+> Heiko Stuebner (7):
+>   clk: samsung: add pll_6552 variant for s3c2416
+>   clk: samsung: add plls used by the s3c2443
+>   dt-bindings: add binding for clock-controller of s3c2443 and following
+>   clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
+>   ARM: S3C24XX: prevent conflicts between ccf and non-ccf s3c24xx-socs
+>   ARM: dt: add clock data for s3c2416
+>   ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
+> 
+>  .../bindings/clock/samsung,s3c2443-clock.txt       |   56 ++
+>  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   13 +
+>  arch/arm/boot/dts/s3c2416.dtsi                     |   42 ++
+>  arch/arm/mach-s3c24xx/Kconfig                      |   18 +-
+>  arch/arm/mach-s3c24xx/Makefile                     |    5 +-
+>  arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
+>  arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
+>  arch/arm/mach-s3c24xx/common-s3c2443.c             |  675
+> -------------------- arch/arm/mach-s3c24xx/common.c                     | 
+>  18 +-
+>  arch/arm/mach-s3c24xx/common.h                     |    6 +
+>  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
+>  drivers/clk/samsung/Makefile                       |    1 +
+>  drivers/clk/samsung/clk-pll.c                      |   84 ++-
+>  drivers/clk/samsung/clk-pll.h                      |    3 +
+>  drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
+>  include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
+>  18 files changed, 756 insertions(+), 1114 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt delete
+> mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
+>  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
+>  delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
+>  create mode 100644 drivers/clk/samsung/clk-s3c2443.c
+>  create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
