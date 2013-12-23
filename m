@@ -1,65 +1,124 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 23 Dec 2013 09:05:22 +0800
-Subject: [PATCH v7 07/14] usb: phy-mxs: change description of usb
- device speed
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B74C0@saturn3.aculab.com>
-References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
- <1387525930-27313-8-git-send-email-peter.chen@freescale.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B74C0@saturn3.aculab.com>
-Message-ID: <20131223010521.GA28096@shlinux1.ap.freescale.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 23 Dec 2013 11:06:53 +0900
+Subject: [GIT PULL 00/26] Renesas ARM based SoC board updates for v3.14
+Message-ID: <cover.1387763524.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 10:40:01AM +0000, David Laight wrote:
-> > From: Peter Chen
-> > Sent: 20 December 2013 07:52
-> > Change "high speed" to "HS"
-> > Change "non-high speed" to "FS/LS"
-> > 
-> > Implementation of notify_suspend and notify_resume will be different
-> > according to mxs_phy_data->flags.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/phy/phy-mxs-usb.c |    8 ++++----
-> >  1 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > index 0ef930a..489096f 100644
-> > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > @@ -166,8 +166,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
-> >  static int mxs_phy_on_connect(struct usb_phy *phy,
-> >  		enum usb_device_speed speed)
-> >  {
-> > -	dev_dbg(phy->dev, "%s speed device has connected\n",
-> > -		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-> > +	dev_dbg(phy->dev, "%s device has connected\n",
-> > +		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
-> 
-> Seems you are making these messages even more cryptic.
-> With all the speeds that USB supports remembering what 'full'
-> means is hard enough without having a cryptic acronym.
-> 
+The following changes since commit ea8d8a911f4850312834a0ff45c3d5ebc31fb1f1:
 
-We have "phy->dev" know it is a USB device, grep usb driver,
-there are lots of similar naming:
+  Merge tag 'renesas-cleanup-for-v3.14' into boards-base (2013-12-10 17:22:55 +0900)
 
-$: find drivers/usb/ -name *.c | xargs grep -rn "FS/LS"
+are available in the git repository at:
 
-drivers/usb/host/fotg210-hcd.c:2901:			/* gap is f(FS/LS transfer times) */
-drivers/usb/host/ehci-sched.c:257:	/* FS/LS bus bandwidth */
-drivers/usb/host/xhci.c:2335:	 * this check is only valid for HS/FS/LS devices.
-drivers/usb/host/fusbh200-hcd.c:2849:			/* gap is f(FS/LS transfer times) */
-drivers/usb/host/ehci-q.c:832:			/* gap is f(FS/LS transfer times) */
-drivers/usb/host/ehci-dbg.c:571:	/* Dump all the FS/LS tables */
-drivers/usb/host/ehci-dbg.c:574:				"\nTT %s port %d  FS/LS bandwidth allocation (us per frame)\n",
-drivers/usb/host/ehci-dbg.c:589:				"FS/LS budget (us per microframe)\n");
-drivers/usb/host/oxu210hp-hcd.c:1414:			/* gap is f(FS/LS transfer times) */
-	drivers/usb/gadget/fsl_udc_core.c:2101:				s = "FS/LS Serial"; break;
-drivers/usb/core/hcd-pci.c:132:		dev_dbg(&pdev->dev, "FS/LS companion for %s\n",
 
--- 
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.14
 
-Best Regards,
-Peter Chen
+for you to fetch changes up to be0647d556985ae58a42e7fc3751a293c418c41e:
+
+  ARM: shmobile: lager: add gpio/fixed regulator for SDHI (2013-12-10 17:24:50 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC board updates for v3.14
+
+* Global
+  - Kconfig: Mention Renesas ARM SoCs instead of SH-Mobile
+
+* r7s72100 SoC (RZ/A1H) based Genmai Board
+  - Add Multiplatform support
+  - Add Reference DT
+
+* r8a7791 (R-Car M2) based Koelsch board
+  - Add pinctrl_register_mappings() for Koelsch
+  - Hook up SW30-SW36 on Koelsch
+  - Mark GPIO keys as wake-up sources
+  - Use ->init_late()
+  - Add Multiplatform support
+  - Set .debounce_interval for GPIO keys
+  - Add SW2 to GPIO keys
+  - Add Led 6, 7 and 8 support
+  - Add reference DT
+  - Enable PFC/GPIO
+
+* r8a7790 (R-Car H2) based Lager board
+  - Add gpio/fixed regulator for SDHI
+  - Add SPI FLASH support on QSPI
+  - Mark GPIO keys as wake-up sources
+  - Use ->init_late()
+  - Set .debounce_interval for GPIO keys
+
+* r8a7778 (R-Car M1) based Bock-W board
+  - bockw: remove unused RSND_SSI_CLK_FROM_ADG
+  - Set .debounce_interval for GPIO keys
+  - Correct FPGA ioremap area
+  - Use regulator for MMCIF
+
+* r8a7740 (R-Mobile A1) based Armadillo board
+  - Correct FSI address size
+
+* sh7374 (SH-Mobile AP4) based Mackerel board
+  - Use pinconf API to configure pin pull-down
+  - clk_round_rate() can return a zero to indicate an error
+
+----------------------------------------------------------------
+Hiep Cao Minh (1):
+      ARM: shmobile: Lager:add SPI FLASH support on QSPI
+
+Kuninori Morimoto (6):
+      ARM: shmobile: bockw: use regulator for MMCIF
+      ARM: shmobile: bockw: fixup FPGA ioremap area
+      ARM: shmobile: bockw: add pin pull-up setting for SDHI
+      ARM: shmobile: armadillo: fixup FSI address size
+      ARM: shmobile: bockw: remove unused RSND_SSI_CLK_FROM_ADG
+      ARM: shmobile: lager: add gpio/fixed regulator for SDHI
+
+Laurent Pinchart (2):
+      ARM: shmobile: mackerel: Use pinconf API to configure pin pull-down
+      ARM: Kconfig: Mention Renesas ARM SoCs instead of SH-Mobile
+
+Magnus Damm (13):
+      ARM: shmobile: Enable PFC/GPIO on the Koelsch board
+      ARM: shmobile: Add Koelsch LED6, LED7 and LED8 support
+      ARM: shmobile: Add Koelsch SW2 support
+      ARM: shmobile: r8a7791 Koelsch DT reference C bits
+      ARM: shmobile: Initial r8a7791 and Koelsch multiplatform support
+      ARM: shmobile: r7s72100 Genmai DT reference DTS bits
+      ARM: shmobile: r7s72100 Genmai DT reference C bits
+      ARM: shmobile: r7s72100 Genmai Multiplatform
+      ARM: shmobile: Use ->init_late() on Koelsch
+      ARM: shmobile: koelsch: mark GPIO keys as wake-up sources
+      ARM: shmobile: Hook up SW30-SW36 on Koelsch
+      ARM: shmobile: Use ->init_late() on Lager
+      ARM: shmobile: Add pinctrl_register_mappings() for Koelsch
+
+Paul Walmsley (1):
+      ARM: shmobile: mackerel: clk_round_rate() can return a zero to indicate an error
+
+Shinya Kuribayashi (2):
+      ARM: shmobile: lager: set .debounce_interval
+      ARM: shmobile: lager: mark GPIO keys as wake-up sources
+
+Simon Horman (1):
+      ARM: shmobile: koelsch: set .debounce_interval
+
+ arch/arm/Kconfig                                 |   7 +-
+ arch/arm/boot/dts/Makefile                       |   5 +-
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts  |  31 +++++
+ arch/arm/mach-shmobile/Kconfig                   |  55 +++++++--
+ arch/arm/mach-shmobile/Makefile                  |   4 +
+ arch/arm/mach-shmobile/Makefile.boot             |   4 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c   |   2 +-
+ arch/arm/mach-shmobile/board-bockw-reference.c   |  19 ++-
+ arch/arm/mach-shmobile/board-bockw.c             |  17 ++-
+ arch/arm/mach-shmobile/board-genmai-reference.c  |  49 ++++++++
+ arch/arm/mach-shmobile/board-koelsch-reference.c |  53 ++++++++
+ arch/arm/mach-shmobile/board-koelsch.c           |  73 ++++++++++-
+ arch/arm/mach-shmobile/board-lager-reference.c   |   2 +
+ arch/arm/mach-shmobile/board-lager.c             | 151 ++++++++++++++++++++++-
+ arch/arm/mach-shmobile/board-mackerel.c          |  21 ++--
+ arch/arm/mach-shmobile/sh-gpio.h                 |  19 ---
+ include/sound/rcar_snd.h                         |   1 -
+ 17 files changed, 458 insertions(+), 55 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-genmai-reference.c
+ create mode 100644 arch/arm/mach-shmobile/board-koelsch-reference.c
