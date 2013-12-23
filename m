@@ -1,36 +1,27 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Mon, 23 Dec 2013 00:26:01 -0800
-Subject: [PATCH v4 5/8] mmc: sdhci-bcm-kona: Add basic use of clocks
-In-Reply-To: <CAEPRUYrPXf7QNzput0bz_UPfytRy1eYgyOJYnH5v2v4DCEKSNA@mail.gmail.com>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-6-git-send-email-tim.kryger@linaro.org>
- <CAEPRUYrPXf7QNzput0bz_UPfytRy1eYgyOJYnH5v2v4DCEKSNA@mail.gmail.com>
-Message-ID: <CAEPRUYphct9jJkB7kT=vqmGKX86AQMaZvhxEqChGzizGCS6d1A@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Dec 2013 16:28:43 +0800
+Subject: [PATCH] video: imxfb: Use regulator API with LCD class for
+ powering
+In-Reply-To: <1387787053.605757144@f413.i.mail.ru>
+References: <1387624080-15312-1-git-send-email-shc_work@mail.ru>
+ <20131223082107.GF26070@S2101-09.ap.freescale.net>
+ <1387787053.605757144@f413.i.mail.ru>
+Message-ID: <20131223082842.GI26070@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 14, 2013 at 12:14 AM, Christian Daudt <bcm@fixthebug.org> wrote:
-> On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
->> Enable the external clock needed by the host controller during the
->> probe and disable it during the remove.
->>
->> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
->> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
->> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->
-> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
->
-> Chris,
->  Are you ok with me pulling this patch along with the rest of the
-> patchset into the bcm tree?
->
->  Thanks,
->    csd
-Hi Chris,
- I'm hoping to get this patchset and "rename ARCH_BCM to
-ARCH_BCM_MOBILE (mmc)" patch into 3.14 still, and these 2 patches are
-waiting for your ack and confirmation that you're ok with me pulling
-them through armsoc. Can you pls review them ?
+On Mon, Dec 23, 2013 at 12:24:13PM +0400, Alexander Shiyan wrote:
+> > On Sat, Dec 21, 2013 at 03:08:00PM +0400, Alexander Shiyan wrote:
+> > > This patch replaces custom lcd_power() callback with
+> > > regulator API over LCD class.
+> > 
+> > FYI.  Denis' effort on this already goes to v13.
+> > 
+> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/285326
+> 
+> Hmm, OK, but having LCD class could resolve our problems with contrast control.
+> https://www.mail-archive.com/devicetree at vger.kernel.org/msg07660.html
 
- Thanks,
-  csd
+I just want to make sure you two are aware of each other's work.
+
+Shawn
