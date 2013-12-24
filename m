@@ -1,160 +1,217 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:14:26 +0900
-Subject: [PATCH 09/11] serial: sh-sci: Remove unused GPIO request code
+Date: Tue, 24 Dec 2013 23:14:24 +0900
+Subject: [PATCH 07/11] serial: sh-sci: Support resources passed through
+ platform resources
 In-Reply-To: <cover.1387887969.git.horms+renesas@verge.net.au>
 References: <cover.1387887969.git.horms+renesas@verge.net.au>
-Message-ID: <520402bbc6fe328ae28e08bfc87a2b1eb7f10b2c.1387887969.git.horms+renesas@verge.net.au>
+Message-ID: <1fcc91a607de0bf72d3a6073dfe459f7e9145ac5.1387887969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The driver requests at initialization time GPIOs passed through platform
-data. No platform makes use of this feature, remove it.
+Memory and IRQ resources are currently passed to the driver through
+platform data. Support passing them through the standard platform
+resources mechanism instead. This deprecates platform data resources.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/tty/serial/sh-sci.c | 67 ---------------------------------------------
- include/linux/serial_sci.h  | 12 --------
- 2 files changed, 79 deletions(-)
+ drivers/tty/serial/sh-sci.c | 65 ++++++++++++++++++++++++++++++++++-----------
+ include/linux/serial_sci.h  |  8 +++---
+ 2 files changed, 53 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 98b8e3c..99a64fd 100644
+index b3d0e00..e9c6e23 100644
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -32,7 +32,6 @@
- #include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/errno.h>
--#include <linux/gpio.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
-@@ -79,7 +78,6 @@ struct sci_port {
+@@ -74,6 +74,7 @@ struct sci_port {
+ 	/* Function clock */
+ 	struct clk		*fclk;
  
- 	int			irqs[SCIx_NR_IRQS];
++	int			irqs[SCIx_NR_IRQS];
  	char			*irqstr[SCIx_NR_IRQS];
--	char			*gpiostr[SCIx_NR_FNS];
+ 	char			*gpiostr[SCIx_NR_FNS];
  
- 	struct dma_chan			*chan_tx;
- 	struct dma_chan			*chan_rx;
-@@ -1153,67 +1151,6 @@ static void sci_free_irq(struct sci_port *port)
+@@ -1079,19 +1080,19 @@ static int sci_request_irq(struct sci_port *port)
+ 
+ 	for (i = j = 0; i < SCIx_NR_IRQS; i++, j++) {
+ 		struct sci_irq_desc *desc;
+-		unsigned int irq;
++		int irq;
+ 
+ 		if (SCIx_IRQ_IS_MUXED(port)) {
+ 			i = SCIx_MUX_IRQ;
+ 			irq = up->irq;
+ 		} else {
+-			irq = port->cfg->irqs[i];
++			irq = port->irqs[i];
+ 
+ 			/*
+ 			 * Certain port types won't support all of the
+ 			 * available interrupt sources.
+ 			 */
+-			if (unlikely(!irq))
++			if (unlikely(irq < 0))
+ 				continue;
+ 		}
+ 
+@@ -1116,7 +1117,7 @@ static int sci_request_irq(struct sci_port *port)
+ 
+ out_noirq:
+ 	while (--i >= 0)
+-		free_irq(port->cfg->irqs[i], port);
++		free_irq(port->irqs[i], port);
+ 
+ out_nomem:
+ 	while (--j >= 0)
+@@ -1134,16 +1135,16 @@ static void sci_free_irq(struct sci_port *port)
+ 	 * IRQ first.
+ 	 */
+ 	for (i = 0; i < SCIx_NR_IRQS; i++) {
+-		unsigned int irq = port->cfg->irqs[i];
++		int irq = port->irqs[i];
+ 
+ 		/*
+ 		 * Certain port types won't support all of the available
+ 		 * interrupt sources.
+ 		 */
+-		if (unlikely(!irq))
++		if (unlikely(irq < 0))
+ 			continue;
+ 
+-		free_irq(port->cfg->irqs[i], port);
++		free_irq(port->irqs[i], port);
+ 		kfree(port->irqstr[i]);
+ 
+ 		if (SCIx_IRQ_IS_MUXED(port)) {
+@@ -1659,7 +1660,7 @@ static void rx_timer_fn(unsigned long arg)
+ 
+ 	if (port->type == PORT_SCIFA || port->type == PORT_SCIFB) {
+ 		scr &= ~0x4000;
+-		enable_irq(s->cfg->irqs[1]);
++		enable_irq(s->irqs[SCIx_RXI_IRQ]);
  	}
- }
- 
--static const char *sci_gpio_names[SCIx_NR_FNS] = {
--	"sck", "rxd", "txd", "cts", "rts",
--};
--
--static const char *sci_gpio_str(unsigned int index)
--{
--	return sci_gpio_names[index];
--}
--
--static void sci_init_gpios(struct sci_port *port)
--{
--	struct uart_port *up = &port->port;
--	int i;
--
--	if (!port->cfg)
--		return;
--
--	for (i = 0; i < SCIx_NR_FNS; i++) {
--		const char *desc;
--		int ret;
--
--		if (!port->cfg->gpios[i])
--			continue;
--
--		desc = sci_gpio_str(i);
--
--		port->gpiostr[i] = kasprintf(GFP_KERNEL, "%s:%s",
--					     dev_name(up->dev), desc);
--
--		/*
--		 * If we've failed the allocation, we can still continue
--		 * on with a NULL string.
--		 */
--		if (!port->gpiostr[i])
--			dev_notice(up->dev, "%s string allocation failure\n",
--				   desc);
--
--		ret = gpio_request(port->cfg->gpios[i], port->gpiostr[i]);
--		if (unlikely(ret != 0)) {
--			dev_notice(up->dev, "failed %s gpio request\n", desc);
--
--			/*
--			 * If we can't get the GPIO for whatever reason,
--			 * no point in keeping the verbose string around.
--			 */
--			kfree(port->gpiostr[i]);
--		}
--	}
--}
--
--static void sci_free_gpios(struct sci_port *port)
--{
--	int i;
--
--	for (i = 0; i < SCIx_NR_FNS; i++)
--		if (port->cfg->gpios[i]) {
--			gpio_free(port->cfg->gpios[i]);
--			kfree(port->gpiostr[i]);
--		}
--}
--
- static unsigned int sci_tx_empty(struct uart_port *port)
- {
- 	unsigned short status = serial_port_in(port, SCxSR);
-@@ -2240,8 +2177,6 @@ static int sci_init_single(struct platform_device *dev,
- 
- 		port->dev = &dev->dev;
- 
--		sci_init_gpios(sci_port);
--
- 		pm_runtime_enable(&dev->dev);
- 	}
- 
-@@ -2298,8 +2233,6 @@ static int sci_init_single(struct platform_device *dev,
- 
- static void sci_cleanup_single(struct sci_port *port)
- {
--	sci_free_gpios(port);
--
- 	clk_put(port->iclk);
- 	clk_put(port->fclk);
- 
-diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index af9834b..e9c3021 100644
---- a/include/linux/serial_sci.h
-+++ b/include/linux/serial_sci.h
-@@ -69,17 +69,6 @@ enum {
- 	SCIx_MUX_IRQ = SCIx_NR_IRQS,	/* special case */
+ 	serial_port_out(port, SCSCR, scr | SCSCR_RIE);
+ 	dev_dbg(port->dev, "DMA Rx timed out\n");
+@@ -2150,11 +2151,12 @@ static struct uart_ops sci_uart_ops = {
  };
  
--/* Offsets into the sci_port->gpios array */
--enum {
--	SCIx_SCK,
--	SCIx_RXD,
--	SCIx_TXD,
--	SCIx_CTS,
--	SCIx_RTS,
--
--	SCIx_NR_FNS,
--};
--
- enum {
- 	SCIx_PROBE_REGTYPE,
+ static int sci_init_single(struct platform_device *dev,
+-				     struct sci_port *sci_port,
+-				     unsigned int index,
+-				     struct plat_sci_port *p)
++			   struct sci_port *sci_port, unsigned int index,
++			   struct plat_sci_port *p, bool early)
+ {
+ 	struct uart_port *port = &sci_port->port;
++	const struct resource *res;
++	unsigned int i;
+ 	int ret;
  
-@@ -141,7 +130,6 @@ struct plat_sci_port_ops {
- struct plat_sci_port {
- 	unsigned long	mapbase;		/* resource base */
- 	unsigned int	irqs[SCIx_NR_IRQS];	/* ERI, RXI, TXI, BRI */
--	unsigned int	gpios[SCIx_NR_FNS];	/* SCK, RXD, TXD, CTS, RTS */
- 	unsigned int	type;			/* SCI / SCIF / IRDA / HSCIF */
- 	upf_t		flags;			/* UPF_* flags */
- 	unsigned long	capabilities;		/* Port features/capabilities */
+ 	sci_port->cfg	= p;
+@@ -2163,6 +2165,38 @@ static int sci_init_single(struct platform_device *dev,
+ 	port->iotype	= UPIO_MEM;
+ 	port->line	= index;
+ 
++	if (dev->num_resources) {
++		/* Device has resources, use them. */
++		res = platform_get_resource(dev, IORESOURCE_MEM, 0);
++		if (res == NULL)
++			return -ENOMEM;
++
++		port->mapbase = res->start;
++
++		for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
++			sci_port->irqs[i] = platform_get_irq(dev, i);
++
++		/* The SCI generates several interrupts. They can be muxed
++		 * together or connected to different interrupt lines. In the
++		 * muxed case only one interrupt resource is specified. In the
++		 * non-muxed case three or four interrupt resources are
++		 * specified, as the BRI interrupt is optional.
++		 */
++		if (sci_port->irqs[0] < 0)
++			return -ENXIO;
++
++		if (sci_port->irqs[1] < 0) {
++			sci_port->irqs[1] = sci_port->irqs[0];
++			sci_port->irqs[2] = sci_port->irqs[0];
++			sci_port->irqs[3] = sci_port->irqs[0];
++		}
++	} else {
++		/* No resources, use old-style platform data. */
++		port->mapbase = p->mapbase;
++		for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
++			sci_port->irqs[i] = p->irqs[i] ? p->irqs[i] : -ENXIO;
++	}
++
+ 	switch (p->type) {
+ 	case PORT_SCIFB:
+ 		port->fifosize = 256;
+@@ -2187,7 +2221,7 @@ static int sci_init_single(struct platform_device *dev,
+ 			return ret;
+ 	}
+ 
+-	if (dev) {
++	if (!early) {
+ 		sci_port->iclk = clk_get(&dev->dev, "sci_ick");
+ 		if (IS_ERR(sci_port->iclk)) {
+ 			sci_port->iclk = clk_get(&dev->dev, "peripheral_clk");
+@@ -2242,7 +2276,6 @@ static int sci_init_single(struct platform_device *dev,
+ 		p->error_mask |= (1 << p->overrun_bit);
+ 	}
+ 
+-	port->mapbase		= p->mapbase;
+ 	port->type		= p->type;
+ 	port->flags		= UPF_FIXED_PORT | p->flags;
+ 	port->regshift		= p->regshift;
+@@ -2254,7 +2287,7 @@ static int sci_init_single(struct platform_device *dev,
+ 	 *
+ 	 * For the muxed case there's nothing more to do.
+ 	 */
+-	port->irq		= p->irqs[SCIx_RXI_IRQ];
++	port->irq		= sci_port->irqs[SCIx_RXI_IRQ];
+ 	port->irqflags		= 0;
+ 
+ 	port->serial_in		= sci_serial_in;
+@@ -2386,7 +2419,7 @@ static int sci_probe_earlyprintk(struct platform_device *pdev)
+ 
+ 	early_serial_console.index = pdev->id;
+ 
+-	sci_init_single(NULL, &sci_ports[pdev->id], pdev->id, cfg);
++	sci_init_single(pdev, &sci_ports[pdev->id], pdev->id, cfg, true);
+ 
+ 	serial_console_setup(&early_serial_console, early_serial_buf);
+ 
+@@ -2453,7 +2486,7 @@ static int sci_probe_single(struct platform_device *dev,
+ 		return -EINVAL;
+ 	}
+ 
+-	ret = sci_init_single(dev, sciport, index, p);
++	ret = sci_init_single(dev, sciport, index, p, false);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
+index 12cf50c..42620f1 100644
+--- a/include/linux/serial_sci.h
++++ b/include/linux/serial_sci.h
+@@ -107,10 +107,10 @@ enum {
+ }
+ 
+ #define SCIx_IRQ_IS_MUXED(port)			\
+-	((port)->cfg->irqs[SCIx_ERI_IRQ] ==	\
+-	 (port)->cfg->irqs[SCIx_RXI_IRQ]) ||	\
+-	((port)->cfg->irqs[SCIx_ERI_IRQ] &&	\
+-	 !(port)->cfg->irqs[SCIx_RXI_IRQ])
++	((port)->irqs[SCIx_ERI_IRQ] ==	\
++	 (port)->irqs[SCIx_RXI_IRQ]) ||	\
++	((port)->irqs[SCIx_ERI_IRQ] &&	\
++	 ((port)->irqs[SCIx_RXI_IRQ] < 0))
+ /*
+  * SCI register subset common for all port types.
+  * Not all registers will exist on all parts.
 -- 
 1.8.4
