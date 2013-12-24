@@ -1,141 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:06:53 +0900
-Subject: [PATCH 01/13] ARM: shmobile: r8a7778: add SSIx DMAEngine support
+Date: Tue, 24 Dec 2013 15:06:58 +0900
+Subject: [PATCH 06/13] ARM: rcar-gen2: Do not setup timer in non-secure mode
 In-Reply-To: <cover.1387857168.git.horms+renesas@verge.net.au>
 References: <cover.1387857168.git.horms+renesas@verge.net.au>
-Message-ID: <a91be22c9222061281a380bd3f38ec9281919a2c.1387857168.git.horms+renesas@verge.net.au>
+Message-ID: <0fe35077a92ce45acfa2b7259bba516757fb0c3f.1387857168.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+If the system has been started in non-secure mode, then the ARM generic
+timer is not configurable during the kernel initialisation. Currently
+the only thing we can check for is if the timer has been correctly
+configured during the boot process.
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7778.h | 18 ++++++++++
- arch/arm/mach-shmobile/setup-r8a7778.c        | 51 +++++++++++++++++++++++++++
- 2 files changed, 69 insertions(+)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index b497f93..a3440e5 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -27,6 +27,24 @@ enum {
- 	HPBDMA_SLAVE_DUMMY,
- 	HPBDMA_SLAVE_SDHI0_TX,
- 	HPBDMA_SLAVE_SDHI0_RX,
-+	HPBDMA_SLAVE_SSI0_TX,
-+	HPBDMA_SLAVE_SSI0_RX,
-+	HPBDMA_SLAVE_SSI1_TX,
-+	HPBDMA_SLAVE_SSI1_RX,
-+	HPBDMA_SLAVE_SSI2_TX,
-+	HPBDMA_SLAVE_SSI2_RX,
-+	HPBDMA_SLAVE_SSI3_TX,
-+	HPBDMA_SLAVE_SSI3_RX,
-+	HPBDMA_SLAVE_SSI4_TX,
-+	HPBDMA_SLAVE_SSI4_RX,
-+	HPBDMA_SLAVE_SSI5_TX,
-+	HPBDMA_SLAVE_SSI5_RX,
-+	HPBDMA_SLAVE_SSI6_TX,
-+	HPBDMA_SLAVE_SSI6_RX,
-+	HPBDMA_SLAVE_SSI7_TX,
-+	HPBDMA_SLAVE_SSI7_RX,
-+	HPBDMA_SLAVE_SSI8_TX,
-+	HPBDMA_SLAVE_SSI8_RX,
- 	HPBDMA_SLAVE_HPBIF0_TX,
- 	HPBDMA_SLAVE_HPBIF0_RX,
- 	HPBDMA_SLAVE_HPBIF1_TX,
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 81701cf..e786338 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -319,6 +319,29 @@ void __init r8a7778_add_dt_devices(void)
- #define HPB_DMAE_ASYNCMDR_ASMD21_SINGLE	BIT(1)	/* SDHI0 */
- #define HPB_DMAE_ASYNCMDR_ASMD21_MULTI	0	/* SDHI0 */
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 5734c24..b6275ab 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -78,12 +78,23 @@ void __init rcar_gen2_timer_init(void)
+ 	/* Remap "armgcnt address map" space */
+ 	base = ioremap(0xe6080000, PAGE_SIZE);
  
-+#define HPBDMA_SSI(_id)				\
-+{						\
-+	.id	= HPBDMA_SLAVE_SSI## _id ##_TX,	\
-+	.addr	= 0xffd91008 + (_id * 0x40),	\
-+	.dcr	= HPB_DMAE_DCR_CT |		\
-+		  HPB_DMAE_DCR_DIP |		\
-+		  HPB_DMAE_DCR_SPDS_32BIT |	\
-+		  HPB_DMAE_DCR_DMDL |		\
-+		  HPB_DMAE_DCR_DPDS_32BIT,	\
-+	.port   = _id + (_id << 8),		\
-+	.dma_ch = (28 + _id),			\
-+}, {						\
-+	.id	= HPBDMA_SLAVE_SSI## _id ##_RX,	\
-+	.addr	= 0xffd9100c + (_id * 0x40),	\
-+	.dcr	= HPB_DMAE_DCR_CT |		\
-+		  HPB_DMAE_DCR_DIP |		\
-+		  HPB_DMAE_DCR_SMDL |		\
-+		  HPB_DMAE_DCR_SPDS_32BIT |	\
-+		  HPB_DMAE_DCR_DPDS_32BIT,	\
-+	.port   = _id + (_id << 8),		\
-+	.dma_ch = (28 + _id),			\
-+}
+-	/* Update registers with correct frequency */
+-	iowrite32(freq, base + CNTFID0);
+-	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
++	/*
++	 * Update the timer if it is either not running, or is not at the
++	 * right frequency. The timer is only configurable in secure mode
++	 * so this avoids an abort if the loader started the timer and
++	 * entered the kernel in non-secure mode.
++	 */
 +
- #define HPBDMA_HPBIF(_id)				\
- {							\
- 	.id	= HPBDMA_SLAVE_HPBIF## _id ##_TX,	\
-@@ -373,6 +396,16 @@ static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
- 		.dma_ch	= 22,
- 	},
++	if ((ioread32(base + CNTCR) & 1) == 0 ||
++	    ioread32(base + CNTFID0) != freq) {
++		/* Update registers with correct frequency */
++		iowrite32(freq, base + CNTFID0);
++		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
++
++		/* make sure arch timer is started by setting bit 0 of CNTCR */
++		iowrite32(1, base + CNTCR);
++	}
  
-+	HPBDMA_SSI(0),
-+	HPBDMA_SSI(1),
-+	HPBDMA_SSI(2),
-+	HPBDMA_SSI(3),
-+	HPBDMA_SSI(4),
-+	HPBDMA_SSI(5),
-+	HPBDMA_SSI(6),
-+	HPBDMA_SSI(7),
-+	HPBDMA_SSI(8),
-+
- 	HPBDMA_HPBIF(0),
- 	HPBDMA_HPBIF(1),
- 	HPBDMA_HPBIF(2),
-@@ -387,22 +420,40 @@ static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
- static const struct hpb_dmae_channel hpb_dmae_channels[] = {
- 	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch. 21 */
- 	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch. 22 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI0_TX),   /* ch. 28 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI0_RX),   /* ch. 28 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF0_TX), /* ch. 28 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF0_RX), /* ch. 28 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI1_TX),   /* ch. 29 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI1_RX),   /* ch. 29 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF1_TX), /* ch. 29 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF1_RX), /* ch. 29 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI2_TX),   /* ch. 30 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI2_RX),   /* ch. 30 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF2_TX), /* ch. 30 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF2_RX), /* ch. 30 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI3_TX),   /* ch. 31 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI3_RX),   /* ch. 31 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF3_TX), /* ch. 31 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF3_RX), /* ch. 31 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI4_TX),   /* ch. 32 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI4_RX),   /* ch. 32 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF4_TX), /* ch. 32 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF4_RX), /* ch. 32 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI5_TX),   /* ch. 33 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI5_RX),   /* ch. 33 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF5_TX), /* ch. 33 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF5_RX), /* ch. 33 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI6_TX),   /* ch. 34 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI6_RX),   /* ch. 34 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF6_TX), /* ch. 34 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF6_RX), /* ch. 34 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI7_TX),   /* ch. 35 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI7_RX),   /* ch. 35 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF7_TX), /* ch. 35 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF7_RX), /* ch. 35 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI8_TX),   /* ch. 36 */
-+	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_SSI8_RX),   /* ch. 36 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF8_TX), /* ch. 36 */
- 	HPB_DMAE_CHANNEL(0x7f, HPBDMA_SLAVE_HPBIF8_RX), /* ch. 36 */
- };
+-	/* make sure arch timer is started by setting bit 0 of CNTCR */
+-	iowrite32(1, base + CNTCR);
+ 	iounmap(base);
+ #endif /* CONFIG_ARM_ARCH_TIMER */
+ 
 -- 
 1.8.4
