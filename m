@@ -1,61 +1,66 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 17:12:33 -0800
-Subject: [PATCH v4 09/15] clk: qcom: Add support for MSM8960's global clock
+Date: Mon, 23 Dec 2013 17:12:37 -0800
+Subject: [PATCH v4 13/15] clk: qcom: Add support for MSM8660's global clock
  controller (GCC)
 In-Reply-To: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
 References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387847559-18330-10-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387847559-18330-14-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a driver for the global clock controller found on MSM8960
+Add a driver for the global clock controller found on MSM8660
 based platforms. This should allow most non-multimedia device
 drivers to probe and control their clocks.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
  drivers/clk/qcom/Kconfig                     |    8 +
- drivers/clk/qcom/Makefile                    |    2 +
- drivers/clk/qcom/gcc-msm8960.c               | 2992 ++++++++++++++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8960.h |  313 +++
- include/dt-bindings/reset/qcom,gcc-msm8960.h |  118 +
- 5 files changed, 3433 insertions(+)
- create mode 100644 drivers/clk/qcom/gcc-msm8960.c
- create mode 100644 include/dt-bindings/clock/qcom,gcc-msm8960.h
- create mode 100644 include/dt-bindings/reset/qcom,gcc-msm8960.h
+ drivers/clk/qcom/Makefile                    |    1 +
+ drivers/clk/qcom/gcc-msm8660.c               | 2818 ++++++++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8660.h |  276 +++
+ include/dt-bindings/reset/qcom,gcc-msm8660.h |  134 ++
+ 5 files changed, 3237 insertions(+)
+ create mode 100644 drivers/clk/qcom/gcc-msm8660.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-msm8660.h
+ create mode 100644 include/dt-bindings/reset/qcom,gcc-msm8660.h
 
 diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index 06ccce6..8b39761 100644
+index 7b582dd..995bcfa 100644
 --- a/drivers/clk/qcom/Kconfig
 +++ b/drivers/clk/qcom/Kconfig
-@@ -3,3 +3,11 @@ config COMMON_CLK_QCOM
- 	depends on OF
+@@ -4,6 +4,14 @@ config COMMON_CLK_QCOM
  	select REGMAP_MMIO
  	select RESET_CONTROLLER
-+
-+config MSM_GCC_8960
-+	tristate "MSM8960 Global Clock Controller"
+ 
++config MSM_GCC_8660
++	tristate "MSM8660 Global Clock Controller"
 +	depends on COMMON_CLK_QCOM
 +	help
-+	  Support for the global clock controller on msm8960 devices.
++	  Support for the global clock controller on msm8660 devices.
 +	  Say Y if you want to use peripheral devices such as UART, SPI,
-+	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
++	  i2c, USB, SD/eMMC, etc.
++
+ config MSM_GCC_8960
+ 	tristate "MSM8960 Global Clock Controller"
+ 	depends on COMMON_CLK_QCOM
 diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index b2568be..b8c816f 100644
+index d9480357..82bc40e 100644
 --- a/drivers/clk/qcom/Makefile
 +++ b/drivers/clk/qcom/Makefile
-@@ -5,3 +5,5 @@ clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg.o
- clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg2.o
+@@ -6,6 +6,7 @@ clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg2.o
  clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-branch.o
  clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += reset.o
-+
-+obj-$(CONFIG_MSM_GCC_8960) += gcc-msm8960.o
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
+ 
++obj-$(CONFIG_MSM_GCC_8660) += gcc-msm8660.o
+ obj-$(CONFIG_MSM_GCC_8960) += gcc-msm8960.o
+ obj-$(CONFIG_MSM_GCC_8974) += gcc-msm8974.o
+ obj-$(CONFIG_MSM_MMCC_8960) += mmcc-msm8960.o
+diff --git a/drivers/clk/qcom/gcc-msm8660.c b/drivers/clk/qcom/gcc-msm8660.c
 new file mode 100644
-index 0000000..c9d6f79
+index 0000000..007d41a
 --- /dev/null
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -0,0 +1,2992 @@
++++ b/drivers/clk/qcom/gcc-msm8660.c
+@@ -0,0 +1,2818 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -80,29 +85,13 @@ index 0000000..c9d6f79
 +#include <linux/regmap.h>
 +#include <linux/reset-controller.h>
 +
-+#include <dt-bindings/clock/qcom,gcc-msm8960.h>
-+#include <dt-bindings/reset/qcom,gcc-msm8960.h>
++#include <dt-bindings/clock/qcom,gcc-msm8660.h>
++#include <dt-bindings/reset/qcom,gcc-msm8660.h>
 +
 +#include "clk-pll.h"
 +#include "clk-rcg.h"
 +#include "clk-branch.h"
 +#include "reset.h"
-+
-+static struct clk_pll pll3 = {
-+	.l_reg = 0x3164,
-+	.m_reg = 0x3168,
-+	.n_reg = 0x316c,
-+	.config_reg = 0x3174,
-+	.mode_reg = 0x3160,
-+	.status_reg = 0x3178,
-+	.status_bit = 16,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pll3",
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_ops,
-+	},
-+};
 +
 +static struct clk_pll pll8 = {
 +	.l_reg = 0x3144,
@@ -126,33 +115,6 @@ index 0000000..c9d6f79
 +	.init = &(struct clk_init_data){
 +		.name = "pll8_vote",
 +		.parent_names = (const char *[]){ "pll8" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_vote_ops,
-+	},
-+};
-+
-+static struct clk_pll pll14 = {
-+	.l_reg = 0x31c4,
-+	.m_reg = 0x31c8,
-+	.n_reg = 0x31cc,
-+	.config_reg = 0x31d4,
-+	.mode_reg = 0x31c0,
-+	.status_reg = 0x31d8,
-+	.status_bit = 16,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pll14",
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_ops,
-+	},
-+};
-+
-+static struct clk_hw pll14_vote = {
-+	.enable_reg = 0x34c0,
-+	.enable_mask = BIT(14),
-+	.init = &(struct clk_init_data){
-+		.name = "pll14_vote",
-+		.parent_names = (const char *[]){ "pll14" },
 +		.num_parents = 1,
 +		.ops = &clk_pll_vote_ops,
 +	},
@@ -1625,9 +1587,6 @@ index 0000000..c9d6f79
 +	{  20210000, P_PLL8,  1, 1,  19 },
 +	{  24000000, P_PLL8,  4, 1,   4 },
 +	{  48000000, P_PLL8,  4, 1,   2 },
-+	{  64000000, P_PLL8,  3, 1,   2 },
-+	{  96000000, P_PLL8,  4, 0,   0 },
-+	{ 192000000, P_PLL8,  2, 0,   0 },
 +	{ }
 +};
 +
@@ -1984,102 +1943,6 @@ index 0000000..c9d6f79
 +	},
 +};
 +
-+static struct clk_rcg usb_hsic_xcvr_fs_src = {
-+	.ns_reg = 0x2928,
-+	.md_reg = 0x2924,
-+	.mn = {
-+		.mnctr_en_bit = 8,
-+		.mnctr_reset_bit = 7,
-+		.mnctr_mode_shift = 5,
-+		.n_val_shift = 16,
-+		.m_val_shift = 16,
-+		.width = 8,
-+	},
-+	.p = {
-+		.pre_div_shift = 3,
-+		.pre_div_width = 2,
-+	},
-+	.s = {
-+		.src_sel_shift = 0,
-+		.parent_map = gcc_pxo_pll8_map,
-+	},
-+	.freq_tbl = clk_tbl_usb,
-+	.hw = {
-+		.enable_reg = 0x2928,
-+		.enable_mask = BIT(11),
-+		.init = &(struct clk_init_data){
-+			.name = "usb_hsic_xcvr_fs_src",
-+			.parent_names = gcc_pxo_pll8,
-+			.num_parents = 2,
-+			.ops = &clk_rcg_ops,
-+			.flags = CLK_SET_RATE_GATE,
-+		},
-+	}
-+};
-+
-+static const char *usb_hsic_xcvr_fs_src_p[] = { "usb_hsic_xcvr_fs_src" };
-+
-+static struct clk_branch usb_hsic_xcvr_fs_clk = {
-+	.halt_reg = 0x2fc8,
-+	.halt_bit = 2,
-+	.hw = {
-+		.enable_reg = 0x2928,
-+		.enable_mask = BIT(9),
-+		.init = &(struct clk_init_data){
-+			.name = "usb_hsic_xcvr_fs_clk",
-+			.parent_names = usb_hsic_xcvr_fs_src_p,
-+			.num_parents = 1,
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_SET_RATE_PARENT,
-+		},
-+	},
-+};
-+
-+static struct clk_branch usb_hsic_system_clk = {
-+	.halt_reg = 0x2fcc,
-+	.halt_bit = 24,
-+	.hw = {
-+		.enable_reg = 0x292c,
-+		.enable_mask = BIT(4),
-+		.init = &(struct clk_init_data){
-+			.parent_names = usb_hsic_xcvr_fs_src_p,
-+			.num_parents = 1,
-+			.name = "usb_hsic_system_clk",
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_SET_RATE_PARENT,
-+		},
-+	},
-+};
-+
-+static struct clk_branch usb_hsic_hsic_clk = {
-+	.halt_reg = 0x2fcc,
-+	.halt_bit = 19,
-+	.hw = {
-+		.enable_reg = 0x2b44,
-+		.enable_mask = BIT(0),
-+		.init = &(struct clk_init_data){
-+			.parent_names = (const char *[]){ "pll14_vote" },
-+			.num_parents = 1,
-+			.name = "usb_hsic_hsic_clk",
-+			.ops = &clk_branch_ops,
-+		},
-+	},
-+};
-+
-+static struct clk_branch usb_hsic_hsio_cal_clk = {
-+	.halt_reg = 0x2fcc,
-+	.halt_bit = 23,
-+	.hw = {
-+		.enable_reg = 0x2b48,
-+		.enable_mask = BIT(0),
-+		.init = &(struct clk_init_data){
-+			.name = "usb_hsic_hsio_cal_clk",
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_IS_ROOT,
-+		},
-+	},
-+};
-+
 +static struct clk_rcg usb_fs1_xcvr_fs_src = {
 +	.ns_reg = 0x2968,
 +	.md_reg = 0x2964,
@@ -2214,55 +2077,7 @@ index 0000000..c9d6f79
 +	},
 +};
 +
-+static struct clk_branch ce1_core_clk = {
-+	.hwcg_reg = 0x2724,
-+	.hwcg_bit = 6,
-+	.halt_reg = 0x2fd4,
-+	.halt_bit = 27,
-+	.hw = {
-+		.enable_reg = 0x2724,
-+		.enable_mask = BIT(4),
-+		.init = &(struct clk_init_data){
-+			.name = "ce1_core_clk",
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_IS_ROOT,
-+		},
-+	},
-+};
-+
-+static struct clk_branch ce1_h_clk = {
-+	.halt_reg = 0x2fd4,
-+	.halt_bit = 1,
-+	.hw = {
-+		.enable_reg = 0x2720,
-+		.enable_mask = BIT(4),
-+		.init = &(struct clk_init_data){
-+			.name = "ce1_h_clk",
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_IS_ROOT,
-+		},
-+	},
-+};
-+
-+static struct clk_branch dma_bam_h_clk = {
-+	.hwcg_reg = 0x25c0,
-+	.hwcg_bit = 6,
-+	.halt_reg = 0x2fc8,
-+	.halt_bit = 12,
-+	.hw = {
-+		.enable_reg = 0x25c0,
-+		.enable_mask = BIT(4),
-+		.init = &(struct clk_init_data){
-+			.name = "dma_bam_h_clk",
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_IS_ROOT,
-+		},
-+	},
-+};
-+
 +static struct clk_branch gsbi1_h_clk = {
-+	.hwcg_reg = 0x29c0,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fcc,
 +	.halt_bit = 11,
 +	.hw = {
@@ -2277,8 +2092,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi2_h_clk = {
-+	.hwcg_reg = 0x29e0,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fcc,
 +	.halt_bit = 7,
 +	.hw = {
@@ -2293,8 +2106,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi3_h_clk = {
-+	.hwcg_reg = 0x2a00,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fcc,
 +	.halt_bit = 3,
 +	.hw = {
@@ -2309,8 +2120,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi4_h_clk = {
-+	.hwcg_reg = 0x2a20,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 27,
 +	.hw = {
@@ -2325,8 +2134,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi5_h_clk = {
-+	.hwcg_reg = 0x2a40,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 23,
 +	.hw = {
@@ -2341,8 +2148,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi6_h_clk = {
-+	.hwcg_reg = 0x2a60,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 19,
 +	.hw = {
@@ -2357,8 +2162,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi7_h_clk = {
-+	.hwcg_reg = 0x2a80,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 15,
 +	.hw = {
@@ -2373,8 +2176,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi8_h_clk = {
-+	.hwcg_reg = 0x2aa0,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 11,
 +	.hw = {
@@ -2389,8 +2190,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi9_h_clk = {
-+	.hwcg_reg = 0x2ac0,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 7,
 +	.hw = {
@@ -2405,8 +2204,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi10_h_clk = {
-+	.hwcg_reg = 0x2ae0,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd0,
 +	.halt_bit = 3,
 +	.hw = {
@@ -2421,8 +2218,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi11_h_clk = {
-+	.hwcg_reg = 0x2b00,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd4,
 +	.halt_bit = 18,
 +	.hw = {
@@ -2437,8 +2232,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch gsbi12_h_clk = {
-+	.hwcg_reg = 0x2b20,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd4,
 +	.halt_bit = 14,
 +	.hw = {
@@ -2453,8 +2246,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch tsif_h_clk = {
-+	.hwcg_reg = 0x2700,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fd4,
 +	.halt_bit = 7,
 +	.hw = {
@@ -2497,8 +2288,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch usb_hs1_h_clk = {
-+	.hwcg_reg = 0x2900,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fc8,
 +	.halt_bit = 1,
 +	.hw = {
@@ -2512,23 +2301,7 @@ index 0000000..c9d6f79
 +	},
 +};
 +
-+static struct clk_branch usb_hsic_h_clk = {
-+	.halt_reg = 0x2fcc,
-+	.halt_bit = 28,
-+	.hw = {
-+		.enable_reg = 0x2920,
-+		.enable_mask = BIT(4),
-+		.init = &(struct clk_init_data){
-+			.name = "usb_hsic_h_clk",
-+			.ops = &clk_branch_ops,
-+			.flags = CLK_IS_ROOT,
-+		},
-+	},
-+};
-+
 +static struct clk_branch sdc1_h_clk = {
-+	.hwcg_reg = 0x2820,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fc8,
 +	.halt_bit = 11,
 +	.hw = {
@@ -2543,8 +2316,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch sdc2_h_clk = {
-+	.hwcg_reg = 0x2840,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fc8,
 +	.halt_bit = 10,
 +	.hw = {
@@ -2559,8 +2330,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch sdc3_h_clk = {
-+	.hwcg_reg = 0x2860,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fc8,
 +	.halt_bit = 9,
 +	.hw = {
@@ -2575,8 +2344,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch sdc4_h_clk = {
-+	.hwcg_reg = 0x2880,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fc8,
 +	.halt_bit = 8,
 +	.hw = {
@@ -2591,8 +2358,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch sdc5_h_clk = {
-+	.hwcg_reg = 0x28a0,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fc8,
 +	.halt_bit = 7,
 +	.hw = {
@@ -2622,8 +2387,6 @@ index 0000000..c9d6f79
 +};
 +
 +static struct clk_branch adm0_pbus_clk = {
-+	.hwcg_reg = 0x2208,
-+	.hwcg_bit = 6,
 +	.halt_reg = 0x2fdc,
 +	.halt_check = BRANCH_HALT_VOTED,
 +	.halt_bit = 13,
@@ -2632,6 +2395,66 @@ index 0000000..c9d6f79
 +		.enable_mask = BIT(3),
 +		.init = &(struct clk_init_data){
 +			.name = "adm0_pbus_clk",
++			.ops = &clk_branch_ops,
++			.flags = CLK_IS_ROOT,
++		},
++	},
++};
++
++static struct clk_branch adm1_clk = {
++	.halt_reg = 0x2fdc,
++	.halt_bit = 12,
++	.halt_check = BRANCH_HALT_VOTED,
++	.hw = {
++		.enable_reg = 0x3080,
++		.enable_mask = BIT(4),
++		.init = &(struct clk_init_data){
++			.name = "adm1_clk",
++			.ops = &clk_branch_ops,
++			.flags = CLK_IS_ROOT,
++		},
++	},
++};
++
++static struct clk_branch adm1_pbus_clk = {
++	.halt_reg = 0x2fdc,
++	.halt_bit = 11,
++	.halt_check = BRANCH_HALT_VOTED,
++	.hw = {
++		.enable_reg = 0x3080,
++		.enable_mask = BIT(5),
++		.init = &(struct clk_init_data){
++			.name = "adm1_pbus_clk",
++			.ops = &clk_branch_ops,
++			.flags = CLK_IS_ROOT,
++		},
++	},
++};
++
++static struct clk_branch modem_ahb1_h_clk = {
++	.halt_reg = 0x2fdc,
++	.halt_bit = 8,
++	.halt_check = BRANCH_HALT_VOTED,
++	.hw = {
++		.enable_reg = 0x3080,
++		.enable_mask = BIT(0),
++		.init = &(struct clk_init_data){
++			.name = "modem_ahb1_h_clk",
++			.ops = &clk_branch_ops,
++			.flags = CLK_IS_ROOT,
++		},
++	},
++};
++
++static struct clk_branch modem_ahb2_h_clk = {
++	.halt_reg = 0x2fdc,
++	.halt_bit = 7,
++	.halt_check = BRANCH_HALT_VOTED,
++	.hw = {
++		.enable_reg = 0x3080,
++		.enable_mask = BIT(1),
++		.init = &(struct clk_init_data){
++			.name = "modem_ahb2_h_clk",
 +			.ops = &clk_branch_ops,
 +			.flags = CLK_IS_ROOT,
 +		},
@@ -2700,12 +2523,9 @@ index 0000000..c9d6f79
 +	},
 +};
 +
-+static struct clk_hw *gcc_msm8960_clks[] = {
-+	[PLL3] = &pll3.hw,
++static struct clk_hw *gcc_msm8660_clks[] = {
 +	[PLL8] = &pll8.hw,
 +	[PLL8_VOTE] = &pll8_vote,
-+	[PLL14] = &pll14.hw,
-+	[PLL14_VOTE] = &pll14_vote,
 +	[GSBI1_UART_SRC] = &gsbi1_uart_src.hw,
 +	[GSBI1_UART_CLK] = &gsbi1_uart_clk.hw,
 +	[GSBI2_UART_SRC] = &gsbi2_uart_src.hw,
@@ -2760,7 +2580,7 @@ index 0000000..c9d6f79
 +	[GP1_CLK] = &gp1_clk.hw,
 +	[GP2_SRC] = &gp2_src.hw,
 +	[GP2_CLK] = &gp2_clk.hw,
-+	[PMEM_A_CLK] = &pmem_clk.hw,
++	[PMEM_CLK] = &pmem_clk.hw,
 +	[PRNG_SRC] = &prng_src.hw,
 +	[PRNG_CLK] = &prng_clk.hw,
 +	[SDC1_SRC] = &sdc1_src.hw,
@@ -2777,20 +2597,12 @@ index 0000000..c9d6f79
 +	[TSIF_REF_CLK] = &tsif_ref_clk.hw,
 +	[USB_HS1_XCVR_SRC] = &usb_hs1_xcvr_src.hw,
 +	[USB_HS1_XCVR_CLK] = &usb_hs1_xcvr_clk.hw,
-+	[USB_HSIC_XCVR_FS_SRC] = &usb_hsic_xcvr_fs_src.hw,
-+	[USB_HSIC_XCVR_FS_CLK] = &usb_hsic_xcvr_fs_clk.hw,
-+	[USB_HSIC_SYSTEM_CLK] = &usb_hsic_system_clk.hw,
-+	[USB_HSIC_HSIC_CLK] = &usb_hsic_hsic_clk.hw,
-+	[USB_HSIC_HSIO_CAL_CLK] = &usb_hsic_hsio_cal_clk.hw,
 +	[USB_FS1_XCVR_FS_SRC] = &usb_fs1_xcvr_fs_src.hw,
 +	[USB_FS1_XCVR_FS_CLK] = &usb_fs1_xcvr_fs_clk.hw,
 +	[USB_FS1_SYSTEM_CLK] = &usb_fs1_system_clk.hw,
 +	[USB_FS2_XCVR_FS_SRC] = &usb_fs2_xcvr_fs_src.hw,
 +	[USB_FS2_XCVR_FS_CLK] = &usb_fs2_xcvr_fs_clk.hw,
 +	[USB_FS2_SYSTEM_CLK] = &usb_fs2_system_clk.hw,
-+	[CE1_CORE_CLK] = &ce1_core_clk.hw,
-+	[CE1_H_CLK] = &ce1_h_clk.hw,
-+	[DMA_BAM_H_CLK] = &dma_bam_h_clk.hw,
 +	[GSBI1_H_CLK] = &gsbi1_h_clk.hw,
 +	[GSBI2_H_CLK] = &gsbi2_h_clk.hw,
 +	[GSBI3_H_CLK] = &gsbi3_h_clk.hw,
@@ -2807,7 +2619,6 @@ index 0000000..c9d6f79
 +	[USB_FS1_H_CLK] = &usb_fs1_h_clk.hw,
 +	[USB_FS2_H_CLK] = &usb_fs2_h_clk.hw,
 +	[USB_HS1_H_CLK] = &usb_hs1_h_clk.hw,
-+	[USB_HSIC_H_CLK] = &usb_hsic_h_clk.hw,
 +	[SDC1_H_CLK] = &sdc1_h_clk.hw,
 +	[SDC2_H_CLK] = &sdc2_h_clk.hw,
 +	[SDC3_H_CLK] = &sdc3_h_clk.hw,
@@ -2815,48 +2626,49 @@ index 0000000..c9d6f79
 +	[SDC5_H_CLK] = &sdc5_h_clk.hw,
 +	[ADM0_CLK] = &adm0_clk.hw,
 +	[ADM0_PBUS_CLK] = &adm0_pbus_clk.hw,
++	[ADM1_CLK] = &adm1_clk.hw,
++	[ADM1_PBUS_CLK] = &adm1_pbus_clk.hw,
++	[MODEM_AHB1_H_CLK] = &modem_ahb1_h_clk.hw,
++	[MODEM_AHB2_H_CLK] = &modem_ahb2_h_clk.hw,
 +	[PMIC_ARB0_H_CLK] = &pmic_arb0_h_clk.hw,
 +	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.hw,
 +	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.hw,
 +	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.hw,
 +};
 +
-+static const struct qcom_reset_map gcc_msm8960_resets[] = {
-+	[SFAB_MSS_Q6_SW_RESET] = { 0x2040, 7 },
-+	[SFAB_MSS_Q6_FW_RESET] = { 0x2044, 7 },
-+	[QDSS_STM_RESET] = { 0x2060, 6 },
++static const struct qcom_reset_map gcc_msm8660_resets[] = {
++	[AFAB_CORE_RESET] = { 0x2080, 7 },
++	[SCSS_SYS_RESET] = { 0x20b4, 1 },
++	[SCSS_SYS_POR_RESET] = { 0x20b4 },
 +	[AFAB_SMPSS_S_RESET] = { 0x20b8, 2 },
 +	[AFAB_SMPSS_M1_RESET] = { 0x20b8, 1 },
 +	[AFAB_SMPSS_M0_RESET] = { 0x20b8 },
-+	[AFAB_EBI1_CH0_RESET] = { 0x20c0, 7 },
-+	[AFAB_EBI1_CH1_RESET] = { 0x20c4, 7},
++	[AFAB_EBI1_S_RESET] = { 0x20c0, 7 },
++	[SFAB_CORE_RESET] = { 0x2120, 7 },
 +	[SFAB_ADM0_M0_RESET] = { 0x21e0, 7 },
 +	[SFAB_ADM0_M1_RESET] = { 0x21e4, 7 },
-+	[SFAB_ADM0_M2_RESET] = { 0x21e8, 7 },
-+	[ADM0_C2_RESET] = { 0x220c, 4},
-+	[ADM0_C1_RESET] = { 0x220c, 3},
-+	[ADM0_C0_RESET] = { 0x220c, 2},
++	[SFAB_ADM0_M2_RESET] = { 0x21e4, 7 },
++	[ADM0_C2_RESET] = { 0x220c, 4 },
++	[ADM0_C1_RESET] = { 0x220c, 3 },
++	[ADM0_C0_RESET] = { 0x220c, 2 },
 +	[ADM0_PBUS_RESET] = { 0x220c, 1 },
 +	[ADM0_RESET] = { 0x220c },
-+	[QDSS_CLKS_SW_RESET] = { 0x2260, 5 },
-+	[QDSS_POR_RESET] = { 0x2260, 4 },
-+	[QDSS_TSCTR_RESET] = { 0x2260, 3 },
-+	[QDSS_HRESET_RESET] = { 0x2260, 2 },
-+	[QDSS_AXI_RESET] = { 0x2260, 1 },
-+	[QDSS_DBG_RESET] = { 0x2260 },
-+	[PCIE_A_RESET] = { 0x22c0, 7 },
-+	[PCIE_AUX_RESET] = { 0x22c8, 7 },
-+	[PCIE_H_RESET] = { 0x22d0, 7 },
-+	[SFAB_PCIE_M_RESET] = { 0x22d4, 1 },
-+	[SFAB_PCIE_S_RESET] = { 0x22d4 },
-+	[SFAB_MSS_M_RESET] = { 0x2340, 7 },
-+	[SFAB_USB3_M_RESET] = { 0x2360, 7 },
-+	[SFAB_RIVA_M_RESET] = { 0x2380, 7 },
-+	[SFAB_LPASS_RESET] = { 0x23a0, 7 },
++	[SFAB_ADM1_M0_RESET] = { 0x2220, 7 },
++	[SFAB_ADM1_M1_RESET] = { 0x2224, 7 },
++	[SFAB_ADM1_M2_RESET] = { 0x2228, 7 },
++	[MMFAB_ADM1_M3_RESET] = { 0x2240, 7 },
++	[ADM1_C3_RESET] = { 0x226c, 5 },
++	[ADM1_C2_RESET] = { 0x226c, 4 },
++	[ADM1_C1_RESET] = { 0x226c, 3 },
++	[ADM1_C0_RESET] = { 0x226c, 2 },
++	[ADM1_PBUS_RESET] = { 0x226c, 1 },
++	[ADM1_RESET] = { 0x226c },
++	[IMEM0_RESET] = { 0x2280, 7 },
++	[SFAB_LPASS_Q6_RESET] = { 0x23a0, 7 },
 +	[SFAB_AFAB_M_RESET] = { 0x23e0, 7 },
 +	[AFAB_SFAB_M0_RESET] = { 0x2420, 7 },
 +	[AFAB_SFAB_M1_RESET] = { 0x2424, 7 },
-+	[SFAB_SATA_S_RESET] = { 0x2480, 7 },
++	[DFAB_CORE_RESET] = { 0x24ac, 7 },
 +	[SFAB_DFAB_M_RESET] = { 0x2500, 7 },
 +	[DFAB_SFAB_M_RESET] = { 0x2520, 7 },
 +	[DFAB_SWAY0_RESET] = { 0x2540, 7 },
@@ -2864,30 +2676,38 @@ index 0000000..c9d6f79
 +	[DFAB_ARB0_RESET] = { 0x2560, 7 },
 +	[DFAB_ARB1_RESET] = { 0x2564, 7 },
 +	[PPSS_PROC_RESET] = { 0x2594, 1 },
-+	[PPSS_RESET] = { 0x2594},
++	[PPSS_RESET] = { 0x2594 },
++	[PMEM_RESET] = { 0x25a0, 7 },
 +	[DMA_BAM_RESET] = { 0x25c0, 7 },
-+	[SIC_TIC_RESET] = { 0x2600, 7 },
-+	[SLIMBUS_H_RESET] = { 0x2620, 7 },
++	[SIC_RESET] = { 0x25e0, 7 },
++	[SPS_TIC_RESET] = { 0x2600, 7 },
++	[CFBP0_RESET] = { 0x2650, 7 },
++	[CFBP1_RESET] = { 0x2654, 7 },
++	[CFBP2_RESET] = { 0x2658, 7 },
++	[EBI2_RESET] = { 0x2664, 7 },
 +	[SFAB_CFPB_M_RESET] = { 0x2680, 7 },
++	[CFPB_MASTER_RESET] = { 0x26a0, 7 },
 +	[SFAB_CFPB_S_RESET] = { 0x26c0, 7 },
-+	[TSIF_H_RESET] = { 0x2700, 7 },
-+	[CE1_H_RESET] = { 0x2720, 7 },
-+	[CE1_CORE_RESET] = { 0x2724, 7 },
-+	[CE1_SLEEP_RESET] = { 0x2728, 7 },
-+	[CE2_H_RESET] = { 0x2740, 7 },
-+	[CE2_CORE_RESET] = { 0x2744, 7 },
++	[CFPB_SPLITTER_RESET] = { 0x26e0, 7 },
++	[TSIF_RESET] = { 0x2700, 7 },
++	[CE1_RESET] = { 0x2720, 7 },
++	[CE2_RESET] = { 0x2740, 7 },
 +	[SFAB_SFPB_M_RESET] = { 0x2780, 7 },
 +	[SFAB_SFPB_S_RESET] = { 0x27a0, 7 },
 +	[RPM_PROC_RESET] = { 0x27c0, 7 },
-+	[PMIC_SSBI2_RESET] = { 0x270c, 12 },
++	[RPM_BUS_RESET] = { 0x27c4, 7 },
++	[RPM_MSG_RAM_RESET] = { 0x27e0, 7 },
++	[PMIC_ARB0_RESET] = { 0x2800, 7 },
++	[PMIC_ARB1_RESET] = { 0x2804, 7 },
++	[PMIC_SSBI2_RESET] = { 0x280c, 12 },
 +	[SDC1_RESET] = { 0x2830 },
 +	[SDC2_RESET] = { 0x2850 },
 +	[SDC3_RESET] = { 0x2870 },
 +	[SDC4_RESET] = { 0x2890 },
 +	[SDC5_RESET] = { 0x28b0 },
-+	[DFAB_A2_RESET] = { 0x28c0, 7 },
 +	[USB_HS1_RESET] = { 0x2910 },
-+	[USB_HSIC_RESET] = { 0x2934 },
++	[USB_HS2_XCVR_RESET] = { 0x2934, 1 },
++	[USB_HS2_RESET] = { 0x2934 },
 +	[USB_FS1_XCVR_RESET] = { 0x2974, 1 },
 +	[USB_FS1_RESET] = { 0x2974 },
 +	[USB_FS2_XCVR_RESET] = { 0x2994, 1 },
@@ -2905,38 +2725,49 @@ index 0000000..c9d6f79
 +	[GSBI11_RESET] = { 0x2b1c },
 +	[GSBI12_RESET] = { 0x2b3c },
 +	[SPDM_RESET] = { 0x2b6c },
++	[SEC_CTRL_RESET] = { 0x2b80, 7 },
 +	[TLMM_H_RESET] = { 0x2ba0, 7 },
++	[TLMM_RESET] = { 0x2ba4, 7 },
++	[MARRM_PWRON_RESET] = { 0x2bd4, 1 },
++	[MARM_RESET] = { 0x2bd4 },
++	[MAHB1_RESET] = { 0x2be4, 7 },
 +	[SFAB_MSS_S_RESET] = { 0x2c00, 7 },
++	[MAHB2_RESET] = { 0x2c20, 7 },
++	[MODEM_SW_AHB_RESET] = { 0x2c48, 1 },
++	[MODEM_RESET] = { 0x2c48 },
++	[SFAB_MSS_MDM1_RESET] = { 0x2c4c, 1 },
++	[SFAB_MSS_MDM0_RESET] = { 0x2c4c },
 +	[MSS_SLP_RESET] = { 0x2c60, 7 },
-+	[MSS_Q6SW_JTAG_RESET] = { 0x2c68, 7 },
-+	[MSS_Q6FW_JTAG_RESET] = { 0x2c6c, 7 },
-+	[MSS_RESET] = { 0x2c64 },
-+	[SATA_H_RESET] = { 0x2c80, 7 },
-+	[SATA_RXOOB_RESE] = { 0x2c8c, 7 },
-+	[SATA_PMALIVE_RESET] = { 0x2c90, 7 },
-+	[SATA_SFAB_M_RESET] = { 0x2c98, 7 },
++	[MSS_MARM_SAW_RESET] = { 0x2c68, 1 },
++	[MSS_WDOG_RESET] = { 0x2c68 },
 +	[TSSC_RESET] = { 0x2ca0, 7 },
 +	[PDM_RESET] = { 0x2cc0, 12 },
-+	[MPM_H_RESET] = { 0x2da0, 7 },
-+	[MPM_RESET] = { 0x2da4 },
++	[SCSS_CORE0_RESET] = { 0x2d60, 1 },
++	[SCSS_CORE0_POR_RESET] = { 0x2d60 },
++	[SCSS_CORE1_RESET] = { 0x2d80, 1 },
++	[SCSS_CORE1_POR_RESET] = { 0x2d80 },
++	[MPM_RESET] = { 0x2da4, 1 },
++	[EBI1_1X_DIV_RESET] = { 0x2dec, 9 },
++	[EBI1_RESET] = { 0x2dec, 7 },
 +	[SFAB_SMPSS_S_RESET] = { 0x2e00, 7 },
++	[USB_PHY0_RESET] = { 0x2e20 },
++	[USB_PHY1_RESET] = { 0x2e40 },
 +	[PRNG_RESET] = { 0x2e80, 12 },
-+	[RIVA_RESET] = { 0x35e0 },
 +};
 +
-+static const struct regmap_config gcc_msm8960_regmap_config = {
++static const struct regmap_config gcc_msm8660_regmap_config = {
 +	.reg_bits	= 32,
 +	.reg_stride	= 4,
 +	.val_bits	= 32,
-+	.max_register	= 0x3660,
++	.max_register	= 0x363c,
 +	.fast_io	= true,
 +};
 +
-+static const struct of_device_id gcc_msm8960_match_table[] = {
-+	{ .compatible = "qcom,gcc-msm8960" },
++static const struct of_device_id gcc_msm8660_match_table[] = {
++	{ .compatible = "qcom,gcc-msm8660" },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, gcc_msm8960_match_table);
++MODULE_DEVICE_TABLE(of, gcc_msm8660_match_table);
 +
 +struct qcom_cc {
 +	struct qcom_reset_controller reset;
@@ -2944,7 +2775,7 @@ index 0000000..c9d6f79
 +	struct clk *clks[];
 +};
 +
-+static int gcc_msm8960_probe(struct platform_device *pdev)
++static int gcc_msm8660_probe(struct platform_device *pdev)
 +{
 +	void __iomem *base;
 +	struct resource *res;
@@ -2963,11 +2794,11 @@ index 0000000..c9d6f79
 +	if (IS_ERR(base))
 +		return PTR_ERR(base);
 +
-+	regmap = devm_regmap_init_mmio(dev, base, &gcc_msm8960_regmap_config);
++	regmap = devm_regmap_init_mmio(dev, base, &gcc_msm8660_regmap_config);
 +	if (IS_ERR(regmap))
 +		return PTR_ERR(regmap);
 +
-+	num_clks = ARRAY_SIZE(gcc_msm8960_clks);
++	num_clks = ARRAY_SIZE(gcc_msm8660_clks);
 +	cc = devm_kzalloc(dev, sizeof(*cc) + sizeof(*clks) * num_clks,
 +			  GFP_KERNEL);
 +	if (!cc)
@@ -2988,9 +2819,9 @@ index 0000000..c9d6f79
 +		return PTR_ERR(clk);
 +
 +	for (i = 0; i < num_clks; i++) {
-+		if (!gcc_msm8960_clks[i])
++		if (!gcc_msm8660_clks[i])
 +			continue;
-+		clk = devm_clk_register(dev, gcc_msm8960_clks[i]);
++		clk = devm_clk_register(dev, gcc_msm8660_clks[i]);
 +		if (IS_ERR(clk))
 +			return PTR_ERR(clk);
 +		clks[i] = clk;
@@ -3004,9 +2835,9 @@ index 0000000..c9d6f79
 +	reset->rcdev.of_node = dev->of_node;
 +	reset->rcdev.ops = &qcom_reset_ops,
 +	reset->rcdev.owner = THIS_MODULE,
-+	reset->rcdev.nr_resets = ARRAY_SIZE(gcc_msm8960_resets),
++	reset->rcdev.nr_resets = ARRAY_SIZE(gcc_msm8660_resets),
 +	reset->regmap = regmap;
-+	reset->reset_map = gcc_msm8960_resets,
++	reset->reset_map = gcc_msm8660_resets,
 +	platform_set_drvdata(pdev, &reset->rcdev);
 +
 +	ret = reset_controller_register(&reset->rcdev);
@@ -3016,44 +2847,44 @@ index 0000000..c9d6f79
 +	return ret;
 +}
 +
-+static int gcc_msm8960_remove(struct platform_device *pdev)
++static int gcc_msm8660_remove(struct platform_device *pdev)
 +{
 +	of_clk_del_provider(pdev->dev.of_node);
 +	reset_controller_unregister(platform_get_drvdata(pdev));
 +	return 0;
 +}
 +
-+static struct platform_driver gcc_msm8960_driver = {
-+	.probe		= gcc_msm8960_probe,
-+	.remove		= gcc_msm8960_remove,
++static struct platform_driver gcc_msm8660_driver = {
++	.probe		= gcc_msm8660_probe,
++	.remove		= gcc_msm8660_remove,
 +	.driver		= {
-+		.name	= "gcc-msm8960",
++		.name	= "gcc-msm8660",
 +		.owner	= THIS_MODULE,
-+		.of_match_table = gcc_msm8960_match_table,
++		.of_match_table = gcc_msm8660_match_table,
 +	},
 +};
 +
-+static int __init gcc_msm8960_init(void)
++static int __init gcc_msm8660_init(void)
 +{
-+	return platform_driver_register(&gcc_msm8960_driver);
++	return platform_driver_register(&gcc_msm8660_driver);
 +}
-+core_initcall(gcc_msm8960_init);
++core_initcall(gcc_msm8660_init);
 +
-+static void __exit gcc_msm8960_exit(void)
++static void __exit gcc_msm8660_exit(void)
 +{
-+	platform_driver_unregister(&gcc_msm8960_driver);
++	platform_driver_unregister(&gcc_msm8660_driver);
 +}
-+module_exit(gcc_msm8960_exit);
++module_exit(gcc_msm8660_exit);
 +
-+MODULE_DESCRIPTION("QCOM GCC MSM8960 Driver");
++MODULE_DESCRIPTION("GCC MSM 8660 Driver");
 +MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:gcc-msm8960");
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8960.h b/include/dt-bindings/clock/qcom,gcc-msm8960.h
++MODULE_ALIAS("platform:gcc-msm8660");
+diff --git a/include/dt-bindings/clock/qcom,gcc-msm8660.h b/include/dt-bindings/clock/qcom,gcc-msm8660.h
 new file mode 100644
-index 0000000..03bbf49
+index 0000000..67665f6
 --- /dev/null
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-@@ -0,0 +1,313 @@
++++ b/include/dt-bindings/clock/qcom,gcc-msm8660.h
+@@ -0,0 +1,276 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -3067,312 +2898,275 @@ index 0000000..03bbf49
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_MSM_GCC_8960_H
-+#define _DT_BINDINGS_CLK_MSM_GCC_8960_H
++#ifndef _DT_BINDINGS_CLK_MSM_GCC_8660_H
++#define _DT_BINDINGS_CLK_MSM_GCC_8660_H
 +
 +#define AFAB_CLK_SRC				0
 +#define AFAB_CORE_CLK				1
-+#define SFAB_MSS_Q6_SW_A_CLK			2
-+#define SFAB_MSS_Q6_FW_A_CLK			3
-+#define QDSS_STM_CLK				4
-+#define SCSS_A_CLK				5
-+#define SCSS_H_CLK				6
-+#define SCSS_XO_SRC_CLK				7
-+#define AFAB_EBI1_CH0_A_CLK			8
-+#define AFAB_EBI1_CH1_A_CLK			9
-+#define AFAB_AXI_S0_FCLK			10
-+#define AFAB_AXI_S1_FCLK			11
-+#define AFAB_AXI_S2_FCLK			12
-+#define AFAB_AXI_S3_FCLK			13
-+#define AFAB_AXI_S4_FCLK			14
-+#define SFAB_CORE_CLK				15
-+#define SFAB_AXI_S0_FCLK			16
-+#define SFAB_AXI_S1_FCLK			17
-+#define SFAB_AXI_S2_FCLK			18
-+#define SFAB_AXI_S3_FCLK			19
-+#define SFAB_AXI_S4_FCLK			20
-+#define SFAB_AHB_S0_FCLK			21
-+#define SFAB_AHB_S1_FCLK			22
-+#define SFAB_AHB_S2_FCLK			23
-+#define SFAB_AHB_S3_FCLK			24
-+#define SFAB_AHB_S4_FCLK			25
-+#define SFAB_AHB_S5_FCLK			26
-+#define SFAB_AHB_S6_FCLK			27
-+#define SFAB_AHB_S7_FCLK			28
-+#define QDSS_AT_CLK_SRC				29
-+#define QDSS_AT_CLK				30
-+#define QDSS_TRACECLKIN_CLK_SRC			31
-+#define QDSS_TRACECLKIN_CLK			32
-+#define QDSS_TSCTR_CLK_SRC			33
-+#define QDSS_TSCTR_CLK				34
-+#define SFAB_ADM0_M0_A_CLK			35
-+#define SFAB_ADM0_M1_A_CLK			36
-+#define SFAB_ADM0_M2_A_CLK			37
-+#define ADM0_CLK				38
-+#define ADM0_PBUS_CLK				39
-+#define MSS_XPU_CLK				40
-+#define IMEM0_A_CLK				41
-+#define QDSS_H_CLK				42
-+#define PCIE_A_CLK				43
-+#define PCIE_AUX_CLK				44
-+#define PCIE_PHY_REF_CLK			45
-+#define PCIE_H_CLK				46
-+#define SFAB_CLK_SRC				47
-+#define MAHB0_CLK				48
-+#define Q6SW_CLK_SRC				49
-+#define Q6SW_CLK				50
-+#define Q6FW_CLK_SRC				51
-+#define Q6FW_CLK				52
-+#define SFAB_MSS_M_A_CLK			53
-+#define SFAB_USB3_M_A_CLK			54
-+#define SFAB_LPASS_Q6_A_CLK			55
-+#define SFAB_AFAB_M_A_CLK			56
-+#define AFAB_SFAB_M0_A_CLK			57
-+#define AFAB_SFAB_M1_A_CLK			58
-+#define SFAB_SATA_S_H_CLK			59
-+#define DFAB_CLK_SRC				60
-+#define DFAB_CLK				61
-+#define SFAB_DFAB_M_A_CLK			62
-+#define DFAB_SFAB_M_A_CLK			63
-+#define DFAB_SWAY0_H_CLK			64
-+#define DFAB_SWAY1_H_CLK			65
-+#define DFAB_ARB0_H_CLK				66
-+#define DFAB_ARB1_H_CLK				67
-+#define PPSS_H_CLK				68
-+#define PPSS_PROC_CLK				69
-+#define PPSS_TIMER0_CLK				70
-+#define PPSS_TIMER1_CLK				71
-+#define PMEM_A_CLK				72
-+#define DMA_BAM_H_CLK				73
-+#define SIC_H_CLK				74
-+#define SPS_TIC_H_CLK				75
-+#define SLIMBUS_H_CLK				76
-+#define SLIMBUS_XO_SRC_CLK			77
-+#define CFPB_2X_CLK_SRC				78
-+#define CFPB_CLK				79
-+#define CFPB0_H_CLK				80
-+#define CFPB1_H_CLK				81
-+#define CFPB2_H_CLK				82
-+#define SFAB_CFPB_M_H_CLK			83
-+#define CFPB_MASTER_H_CLK			84
-+#define SFAB_CFPB_S_HCLK			85
-+#define CFPB_SPLITTER_H_CLK			86
-+#define TSIF_H_CLK				87
-+#define TSIF_INACTIVITY_TIMERS_CLK		88
-+#define TSIF_REF_SRC				89
-+#define TSIF_REF_CLK				90
-+#define CE1_H_CLK				91
-+#define CE1_CORE_CLK				92
-+#define CE1_SLEEP_CLK				93
-+#define CE2_H_CLK				94
-+#define CE2_CORE_CLK				95
-+#define CE2_SLEEP_CLK				96
-+#define SFPB_H_CLK_SRC				97
-+#define SFPB_H_CLK				98
-+#define SFAB_SFPB_M_H_CLK			99
-+#define SFAB_SFPB_S_H_CLK			100
-+#define RPM_PROC_CLK				101
-+#define RPM_BUS_H_CLK				102
-+#define RPM_SLEEP_CLK				103
-+#define RPM_TIMER_CLK				104
-+#define RPM_MSG_RAM_H_CLK			105
-+#define PMIC_ARB0_H_CLK				106
-+#define PMIC_ARB1_H_CLK				107
-+#define PMIC_SSBI2_SRC				108
-+#define PMIC_SSBI2_CLK				109
-+#define SDC1_H_CLK				110
-+#define SDC2_H_CLK				111
-+#define SDC3_H_CLK				112
-+#define SDC4_H_CLK				113
-+#define SDC5_H_CLK				114
-+#define SDC1_SRC				115
-+#define SDC2_SRC				116
-+#define SDC3_SRC				117
-+#define SDC4_SRC				118
-+#define SDC5_SRC				119
-+#define SDC1_CLK				120
-+#define SDC2_CLK				121
-+#define SDC3_CLK				122
-+#define SDC4_CLK				123
-+#define SDC5_CLK				124
-+#define DFAB_A2_H_CLK				125
-+#define USB_HS1_H_CLK				126
-+#define USB_HS1_XCVR_SRC			127
-+#define USB_HS1_XCVR_CLK			128
-+#define USB_HSIC_H_CLK				129
-+#define USB_HSIC_XCVR_FS_SRC			130
-+#define USB_HSIC_XCVR_FS_CLK			131
-+#define USB_HSIC_SYSTEM_CLK_SRC			132
-+#define USB_HSIC_SYSTEM_CLK			133
-+#define CFPB0_C0_H_CLK				134
-+#define CFPB0_C1_H_CLK				135
-+#define CFPB0_D0_H_CLK				136
-+#define CFPB0_D1_H_CLK				137
-+#define USB_FS1_H_CLK				138
-+#define USB_FS1_XCVR_FS_SRC			139
-+#define USB_FS1_XCVR_FS_CLK			140
-+#define USB_FS1_SYSTEM_CLK			141
-+#define USB_FS2_H_CLK				142
-+#define USB_FS2_XCVR_FS_SRC			143
-+#define USB_FS2_XCVR_FS_CLK			144
-+#define USB_FS2_SYSTEM_CLK			145
-+#define GSBI_COMMON_SIM_SRC			146
-+#define GSBI1_H_CLK				147
-+#define GSBI2_H_CLK				148
-+#define GSBI3_H_CLK				149
-+#define GSBI4_H_CLK				150
-+#define GSBI5_H_CLK				151
-+#define GSBI6_H_CLK				152
-+#define GSBI7_H_CLK				153
-+#define GSBI8_H_CLK				154
-+#define GSBI9_H_CLK				155
-+#define GSBI10_H_CLK				156
-+#define GSBI11_H_CLK				157
-+#define GSBI12_H_CLK				158
-+#define GSBI1_UART_SRC				159
-+#define GSBI1_UART_CLK				160
-+#define GSBI2_UART_SRC				161
-+#define GSBI2_UART_CLK				162
-+#define GSBI3_UART_SRC				163
-+#define GSBI3_UART_CLK				164
-+#define GSBI4_UART_SRC				165
-+#define GSBI4_UART_CLK				166
-+#define GSBI5_UART_SRC				167
-+#define GSBI5_UART_CLK				168
-+#define GSBI6_UART_SRC				169
-+#define GSBI6_UART_CLK				170
-+#define GSBI7_UART_SRC				171
-+#define GSBI7_UART_CLK				172
-+#define GSBI8_UART_SRC				173
-+#define GSBI8_UART_CLK				174
-+#define GSBI9_UART_SRC				175
-+#define GSBI9_UART_CLK				176
-+#define GSBI10_UART_SRC				177
-+#define GSBI10_UART_CLK				178
-+#define GSBI11_UART_SRC				179
-+#define GSBI11_UART_CLK				180
-+#define GSBI12_UART_SRC				181
-+#define GSBI12_UART_CLK				182
-+#define GSBI1_QUP_SRC				183
-+#define GSBI1_QUP_CLK				184
-+#define GSBI2_QUP_SRC				185
-+#define GSBI2_QUP_CLK				186
-+#define GSBI3_QUP_SRC				187
-+#define GSBI3_QUP_CLK				188
-+#define GSBI4_QUP_SRC				189
-+#define GSBI4_QUP_CLK				190
-+#define GSBI5_QUP_SRC				191
-+#define GSBI5_QUP_CLK				192
-+#define GSBI6_QUP_SRC				193
-+#define GSBI6_QUP_CLK				194
-+#define GSBI7_QUP_SRC				195
-+#define GSBI7_QUP_CLK				196
-+#define GSBI8_QUP_SRC				197
-+#define GSBI8_QUP_CLK				198
-+#define GSBI9_QUP_SRC				199
-+#define GSBI9_QUP_CLK				200
-+#define GSBI10_QUP_SRC				201
-+#define GSBI10_QUP_CLK				202
-+#define GSBI11_QUP_SRC				203
-+#define GSBI11_QUP_CLK				204
-+#define GSBI12_QUP_SRC				205
-+#define GSBI12_QUP_CLK				206
-+#define GSBI1_SIM_CLK				207
-+#define GSBI2_SIM_CLK				208
-+#define GSBI3_SIM_CLK				209
-+#define GSBI4_SIM_CLK				210
-+#define GSBI5_SIM_CLK				211
-+#define GSBI6_SIM_CLK				212
-+#define GSBI7_SIM_CLK				213
-+#define GSBI8_SIM_CLK				214
-+#define GSBI9_SIM_CLK				215
-+#define GSBI10_SIM_CLK				216
-+#define GSBI11_SIM_CLK				217
-+#define GSBI12_SIM_CLK				218
-+#define USB_HSIC_HSIC_CLK_SRC			219
-+#define USB_HSIC_HSIC_CLK			220
-+#define USB_HSIC_HSIO_CAL_CLK			221
-+#define SPDM_CFG_H_CLK				222
-+#define SPDM_MSTR_H_CLK				223
-+#define SPDM_FF_CLK_SRC				224
-+#define SPDM_FF_CLK				225
-+#define SEC_CTRL_CLK				226
-+#define SEC_CTRL_ACC_CLK_SRC			227
-+#define SEC_CTRL_ACC_CLK			228
-+#define TLMM_H_CLK				229
-+#define TLMM_CLK				230
-+#define SFAB_MSS_S_H_CLK			231
-+#define MSS_SLP_CLK				232
-+#define MSS_Q6SW_JTAG_CLK			233
-+#define MSS_Q6FW_JTAG_CLK			234
-+#define MSS_S_H_CLK				235
-+#define MSS_CXO_SRC_CLK				236
-+#define SATA_H_CLK				237
-+#define SATA_SRC_CLK				238
-+#define SATA_RXOOB_CLK				239
-+#define SATA_PMALIVE_CLK			240
-+#define SATA_PHY_REF_CLK			241
-+#define TSSC_CLK_SRC				242
-+#define TSSC_CLK				243
-+#define PDM_SRC					244
-+#define PDM_CLK					245
-+#define GP0_SRC					246
-+#define GP0_CLK					247
-+#define GP1_SRC					248
-+#define GP1_CLK					249
-+#define GP2_SRC					250
-+#define GP2_CLK					251
-+#define MPM_CLK					252
-+#define EBI1_CLK_SRC				253
-+#define EBI1_CH0_CLK				254
-+#define EBI1_CH1_CLK				255
-+#define EBI1_2X_CLK				256
-+#define EBI1_CH0_DQ_CLK				257
-+#define EBI1_CH1_DQ_CLK				258
-+#define EBI1_CH0_CA_CLK				259
-+#define EBI1_CH1_CA_CLK				260
-+#define EBI1_XO_CLK				261
-+#define SFAB_SMPSS_S_H_CLK			262
-+#define PRNG_SRC				263
-+#define PRNG_CLK				264
-+#define PXO_SRC					265
-+#define LPASS_CXO_CLK				266
-+#define LPASS_PXO_CLK				267
-+#define SPDM_CY_PORT0_CLK			268
-+#define SPDM_CY_PORT1_CLK			269
-+#define SPDM_CY_PORT2_CLK			270
-+#define SPDM_CY_PORT3_CLK			271
-+#define SPDM_CY_PORT4_CLK			272
-+#define SPDM_CY_PORT5_CLK			273
-+#define SPDM_CY_PORT6_CLK			274
-+#define SPDM_CY_PORT7_CLK			275
-+#define PLL0					276
-+#define PLL0_VOTE				277
-+#define PLL3					278
-+#define PLL3_VOTE				279
-+#define PLL4_VOTE				280
-+#define PLL5					281
-+#define PLL5_VOTE				282
-+#define PLL6					283
-+#define PLL6_VOTE				284
-+#define PLL7_VOTE				285
-+#define PLL8					286
-+#define PLL8_VOTE				287
-+#define PLL9					288
-+#define PLL10					289
-+#define PLL11					290
-+#define PLL12					291
-+#define PLL13					292
-+#define PLL14					293
-+#define PLL14_VOTE				294
++#define SCSS_A_CLK				2
++#define SCSS_H_CLK				3
++#define SCSS_XO_SRC_CLK				4
++#define AFAB_EBI1_CH0_A_CLK			5
++#define AFAB_EBI1_CH1_A_CLK			6
++#define AFAB_AXI_S0_FCLK			7
++#define AFAB_AXI_S1_FCLK			8
++#define AFAB_AXI_S2_FCLK			9
++#define AFAB_AXI_S3_FCLK			10
++#define AFAB_AXI_S4_FCLK			11
++#define SFAB_CORE_CLK				12
++#define SFAB_AXI_S0_FCLK			13
++#define SFAB_AXI_S1_FCLK			14
++#define SFAB_AXI_S2_FCLK			15
++#define SFAB_AXI_S3_FCLK			16
++#define SFAB_AXI_S4_FCLK			17
++#define SFAB_AHB_S0_FCLK			18
++#define SFAB_AHB_S1_FCLK			19
++#define SFAB_AHB_S2_FCLK			20
++#define SFAB_AHB_S3_FCLK			21
++#define SFAB_AHB_S4_FCLK			22
++#define SFAB_AHB_S5_FCLK			23
++#define SFAB_AHB_S6_FCLK			24
++#define SFAB_ADM0_M0_A_CLK			25
++#define SFAB_ADM0_M1_A_CLK			26
++#define SFAB_ADM0_M2_A_CLK			27
++#define ADM0_CLK				28
++#define ADM0_PBUS_CLK				29
++#define SFAB_ADM1_M0_A_CLK			30
++#define SFAB_ADM1_M1_A_CLK			31
++#define SFAB_ADM1_M2_A_CLK			32
++#define MMFAB_ADM1_M3_A_CLK			33
++#define ADM1_CLK				34
++#define ADM1_PBUS_CLK				35
++#define IMEM0_A_CLK				36
++#define MAHB0_CLK				37
++#define SFAB_LPASS_Q6_A_CLK			38
++#define SFAB_AFAB_M_A_CLK			39
++#define AFAB_SFAB_M0_A_CLK			40
++#define AFAB_SFAB_M1_A_CLK			41
++#define DFAB_CLK_SRC				42
++#define DFAB_CLK				43
++#define DFAB_CORE_CLK				44
++#define SFAB_DFAB_M_A_CLK			45
++#define DFAB_SFAB_M_A_CLK			46
++#define DFAB_SWAY0_H_CLK			47
++#define DFAB_SWAY1_H_CLK			48
++#define DFAB_ARB0_H_CLK				49
++#define DFAB_ARB1_H_CLK				50
++#define PPSS_H_CLK				51
++#define PPSS_PROC_CLK				52
++#define PPSS_TIMER0_CLK				53
++#define PPSS_TIMER1_CLK				54
++#define PMEM_A_CLK				55
++#define DMA_BAM_H_CLK				56
++#define SIC_H_CLK				57
++#define SPS_TIC_H_CLK				58
++#define SLIMBUS_H_CLK				59
++#define SLIMBUS_XO_SRC_CLK			60
++#define CFPB_2X_CLK_SRC				61
++#define CFPB_CLK				62
++#define CFPB0_H_CLK				63
++#define CFPB1_H_CLK				64
++#define CFPB2_H_CLK				65
++#define EBI2_2X_CLK				66
++#define EBI2_CLK				67
++#define SFAB_CFPB_M_H_CLK			68
++#define CFPB_MASTER_H_CLK			69
++#define SFAB_CFPB_S_HCLK			70
++#define CFPB_SPLITTER_H_CLK			71
++#define TSIF_H_CLK				72
++#define TSIF_INACTIVITY_TIMERS_CLK		73
++#define TSIF_REF_SRC				74
++#define TSIF_REF_CLK				75
++#define CE1_H_CLK				76
++#define CE2_H_CLK				77
++#define SFPB_H_CLK_SRC				78
++#define SFPB_H_CLK				79
++#define SFAB_SFPB_M_H_CLK			80
++#define SFAB_SFPB_S_H_CLK			81
++#define RPM_PROC_CLK				82
++#define RPM_BUS_H_CLK				83
++#define RPM_SLEEP_CLK				84
++#define RPM_TIMER_CLK				85
++#define MODEM_AHB1_H_CLK			86
++#define MODEM_AHB2_H_CLK			87
++#define RPM_MSG_RAM_H_CLK			88
++#define SC_H_CLK				89
++#define SC_A_CLK				90
++#define PMIC_ARB0_H_CLK				91
++#define PMIC_ARB1_H_CLK				92
++#define PMIC_SSBI2_SRC				93
++#define PMIC_SSBI2_CLK				94
++#define SDC1_H_CLK				95
++#define SDC2_H_CLK				96
++#define SDC3_H_CLK				97
++#define SDC4_H_CLK				98
++#define SDC5_H_CLK				99
++#define SDC1_SRC				100
++#define SDC2_SRC				101
++#define SDC3_SRC				102
++#define SDC4_SRC				103
++#define SDC5_SRC				104
++#define SDC1_CLK				105
++#define SDC2_CLK				106
++#define SDC3_CLK				107
++#define SDC4_CLK				108
++#define SDC5_CLK				109
++#define USB_HS1_H_CLK				110
++#define USB_HS1_XCVR_SRC			111
++#define USB_HS1_XCVR_CLK			112
++#define USB_HS2_H_CLK				113
++#define USB_HS2_XCVR_SRC			114
++#define USB_HS2_XCVR_CLK			115
++#define USB_FS1_H_CLK				116
++#define USB_FS1_XCVR_FS_SRC			117
++#define USB_FS1_XCVR_FS_CLK			118
++#define USB_FS1_SYSTEM_CLK			119
++#define USB_FS2_H_CLK				120
++#define USB_FS2_XCVR_FS_SRC			121
++#define USB_FS2_XCVR_FS_CLK			122
++#define USB_FS2_SYSTEM_CLK			123
++#define GSBI_COMMON_SIM_SRC			124
++#define GSBI1_H_CLK				125
++#define GSBI2_H_CLK				126
++#define GSBI3_H_CLK				127
++#define GSBI4_H_CLK				128
++#define GSBI5_H_CLK				129
++#define GSBI6_H_CLK				130
++#define GSBI7_H_CLK				131
++#define GSBI8_H_CLK				132
++#define GSBI9_H_CLK				133
++#define GSBI10_H_CLK				134
++#define GSBI11_H_CLK				135
++#define GSBI12_H_CLK				136
++#define GSBI1_UART_SRC				137
++#define GSBI1_UART_CLK				138
++#define GSBI2_UART_SRC				139
++#define GSBI2_UART_CLK				140
++#define GSBI3_UART_SRC				141
++#define GSBI3_UART_CLK				142
++#define GSBI4_UART_SRC				143
++#define GSBI4_UART_CLK				144
++#define GSBI5_UART_SRC				145
++#define GSBI5_UART_CLK				146
++#define GSBI6_UART_SRC				147
++#define GSBI6_UART_CLK				148
++#define GSBI7_UART_SRC				149
++#define GSBI7_UART_CLK				150
++#define GSBI8_UART_SRC				151
++#define GSBI8_UART_CLK				152
++#define GSBI9_UART_SRC				153
++#define GSBI9_UART_CLK				154
++#define GSBI10_UART_SRC				155
++#define GSBI10_UART_CLK				156
++#define GSBI11_UART_SRC				157
++#define GSBI11_UART_CLK				158
++#define GSBI12_UART_SRC				159
++#define GSBI12_UART_CLK				160
++#define GSBI1_QUP_SRC				161
++#define GSBI1_QUP_CLK				162
++#define GSBI2_QUP_SRC				163
++#define GSBI2_QUP_CLK				164
++#define GSBI3_QUP_SRC				165
++#define GSBI3_QUP_CLK				166
++#define GSBI4_QUP_SRC				167
++#define GSBI4_QUP_CLK				168
++#define GSBI5_QUP_SRC				169
++#define GSBI5_QUP_CLK				170
++#define GSBI6_QUP_SRC				171
++#define GSBI6_QUP_CLK				172
++#define GSBI7_QUP_SRC				173
++#define GSBI7_QUP_CLK				174
++#define GSBI8_QUP_SRC				175
++#define GSBI8_QUP_CLK				176
++#define GSBI9_QUP_SRC				177
++#define GSBI9_QUP_CLK				178
++#define GSBI10_QUP_SRC				179
++#define GSBI10_QUP_CLK				180
++#define GSBI11_QUP_SRC				181
++#define GSBI11_QUP_CLK				182
++#define GSBI12_QUP_SRC				183
++#define GSBI12_QUP_CLK				184
++#define GSBI1_SIM_CLK				185
++#define GSBI2_SIM_CLK				186
++#define GSBI3_SIM_CLK				187
++#define GSBI4_SIM_CLK				188
++#define GSBI5_SIM_CLK				189
++#define GSBI6_SIM_CLK				190
++#define GSBI7_SIM_CLK				191
++#define GSBI8_SIM_CLK				192
++#define GSBI9_SIM_CLK				193
++#define GSBI10_SIM_CLK				194
++#define GSBI11_SIM_CLK				195
++#define GSBI12_SIM_CLK				196
++#define SPDM_CFG_H_CLK				197
++#define SPDM_MSTR_H_CLK				198
++#define SPDM_FF_CLK_SRC				199
++#define SPDM_FF_CLK				200
++#define SEC_CTRL_CLK				201
++#define SEC_CTRL_ACC_CLK_SRC			202
++#define SEC_CTRL_ACC_CLK			203
++#define TLMM_H_CLK				204
++#define TLMM_CLK				205
++#define MARM_CLK_SRC				206
++#define MARM_CLK				207
++#define MAHB1_SRC				208
++#define MAHB1_CLK				209
++#define SFAB_MSS_S_H_CLK			210
++#define MAHB2_SRC				211
++#define MAHB2_CLK				212
++#define MSS_MODEM_CLK_SRC			213
++#define MSS_MODEM_CXO_CLK			214
++#define MSS_SLP_CLK				215
++#define MSS_SYS_REF_CLK				216
++#define TSSC_CLK_SRC				217
++#define TSSC_CLK				218
++#define PDM_SRC					219
++#define PDM_CLK					220
++#define GP0_SRC					221
++#define GP0_CLK					222
++#define GP1_SRC					223
++#define GP1_CLK					224
++#define GP2_SRC					225
++#define GP2_CLK					226
++#define PMEM_CLK				227
++#define MPM_CLK					228
++#define EBI1_ASFAB_SRC				229
++#define EBI1_CLK_SRC				230
++#define EBI1_CH0_CLK				231
++#define EBI1_CH1_CLK				232
++#define SFAB_SMPSS_S_H_CLK			233
++#define PRNG_SRC				234
++#define PRNG_CLK				235
++#define PXO_SRC					236
++#define LPASS_CXO_CLK				237
++#define LPASS_PXO_CLK				238
++#define SPDM_CY_PORT0_CLK			239
++#define SPDM_CY_PORT1_CLK			240
++#define SPDM_CY_PORT2_CLK			241
++#define SPDM_CY_PORT3_CLK			242
++#define SPDM_CY_PORT4_CLK			243
++#define SPDM_CY_PORT5_CLK			244
++#define SPDM_CY_PORT6_CLK			245
++#define SPDM_CY_PORT7_CLK			246
++#define PLL0					247
++#define PLL0_VOTE				248
++#define PLL5					249
++#define PLL6					250
++#define PLL6_VOTE				251
++#define PLL8					252
++#define PLL8_VOTE				253
++#define PLL9					254
++#define PLL10					255
++#define PLL11					256
++#define PLL12					257
 +
 +#endif
-diff --git a/include/dt-bindings/reset/qcom,gcc-msm8960.h b/include/dt-bindings/reset/qcom,gcc-msm8960.h
+diff --git a/include/dt-bindings/reset/qcom,gcc-msm8660.h b/include/dt-bindings/reset/qcom,gcc-msm8660.h
 new file mode 100644
-index 0000000..a840e68
+index 0000000..a83282f
 --- /dev/null
-+++ b/include/dt-bindings/reset/qcom,gcc-msm8960.h
-@@ -0,0 +1,118 @@
++++ b/include/dt-bindings/reset/qcom,gcc-msm8660.h
+@@ -0,0 +1,134 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -3386,17 +3180,17 @@ index 0000000..a840e68
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _DT_BINDINGS_RESET_MSM_GCC_8960_H
-+#define _DT_BINDINGS_RESET_MSM_GCC_8960_H
++#ifndef _DT_BINDINGS_RESET_MSM_GCC_8660_H
++#define _DT_BINDINGS_RESET_MSM_GCC_8660_H
 +
-+#define SFAB_MSS_Q6_SW_RESET				0
-+#define SFAB_MSS_Q6_FW_RESET				1
-+#define QDSS_STM_RESET					2
++#define AFAB_CORE_RESET					0
++#define SCSS_SYS_RESET					1
++#define SCSS_SYS_POR_RESET				2
 +#define AFAB_SMPSS_S_RESET				3
 +#define AFAB_SMPSS_M1_RESET				4
 +#define AFAB_SMPSS_M0_RESET				5
-+#define AFAB_EBI1_CH0_RESET				6
-+#define AFAB_EBI1_CH1_RESET				7
++#define AFAB_EBI1_S_RESET				6
++#define SFAB_CORE_RESET					7
 +#define SFAB_ADM0_M0_RESET				8
 +#define SFAB_ADM0_M1_RESET				9
 +#define SFAB_ADM0_M2_RESET				10
@@ -3405,90 +3199,106 @@ index 0000000..a840e68
 +#define ADM0_C0_RESET					13
 +#define ADM0_PBUS_RESET					14
 +#define ADM0_RESET					15
-+#define QDSS_CLKS_SW_RESET				16
-+#define QDSS_POR_RESET					17
-+#define QDSS_TSCTR_RESET				18
-+#define QDSS_HRESET_RESET				19
-+#define QDSS_AXI_RESET					20
-+#define QDSS_DBG_RESET					21
-+#define PCIE_A_RESET					22
-+#define PCIE_AUX_RESET					23
-+#define PCIE_H_RESET					24
-+#define SFAB_PCIE_M_RESET				25
-+#define SFAB_PCIE_S_RESET				26
-+#define SFAB_MSS_M_RESET				27
-+#define SFAB_USB3_M_RESET				28
-+#define SFAB_RIVA_M_RESET				29
-+#define SFAB_LPASS_RESET				30
-+#define SFAB_AFAB_M_RESET				31
-+#define AFAB_SFAB_M0_RESET				32
-+#define AFAB_SFAB_M1_RESET				33
-+#define SFAB_SATA_S_RESET				34
-+#define SFAB_DFAB_M_RESET				35
-+#define DFAB_SFAB_M_RESET				36
-+#define DFAB_SWAY0_RESET				37
-+#define DFAB_SWAY1_RESET				38
-+#define DFAB_ARB0_RESET					39
-+#define DFAB_ARB1_RESET					40
-+#define PPSS_PROC_RESET					41
-+#define PPSS_RESET					42
-+#define DMA_BAM_RESET					43
-+#define SIC_TIC_RESET					44
-+#define SLIMBUS_H_RESET					45
-+#define SFAB_CFPB_M_RESET				46
-+#define SFAB_CFPB_S_RESET				47
-+#define TSIF_H_RESET					48
-+#define CE1_H_RESET					49
-+#define CE1_CORE_RESET					50
-+#define CE1_SLEEP_RESET					51
-+#define CE2_H_RESET					52
-+#define CE2_CORE_RESET					53
-+#define SFAB_SFPB_M_RESET				54
-+#define SFAB_SFPB_S_RESET				55
-+#define RPM_PROC_RESET					56
-+#define PMIC_SSBI2_RESET				57
-+#define SDC1_RESET					58
-+#define SDC2_RESET					59
-+#define SDC3_RESET					60
-+#define SDC4_RESET					61
-+#define SDC5_RESET					62
-+#define DFAB_A2_RESET					63
-+#define USB_HS1_RESET					64
-+#define USB_HSIC_RESET					65
-+#define USB_FS1_XCVR_RESET				66
-+#define USB_FS1_RESET					67
-+#define USB_FS2_XCVR_RESET				68
-+#define USB_FS2_RESET					69
-+#define GSBI1_RESET					70
-+#define GSBI2_RESET					71
-+#define GSBI3_RESET					72
-+#define GSBI4_RESET					73
-+#define GSBI5_RESET					74
-+#define GSBI6_RESET					75
-+#define GSBI7_RESET					76
-+#define GSBI8_RESET					77
-+#define GSBI9_RESET					78
-+#define GSBI10_RESET					79
-+#define GSBI11_RESET					80
-+#define GSBI12_RESET					81
-+#define SPDM_RESET					82
-+#define TLMM_H_RESET					83
-+#define SFAB_MSS_S_RESET				84
-+#define MSS_SLP_RESET					85
-+#define MSS_Q6SW_JTAG_RESET				86
-+#define MSS_Q6FW_JTAG_RESET				87
-+#define MSS_RESET					88
-+#define SATA_H_RESET					89
-+#define SATA_RXOOB_RESE					90
-+#define SATA_PMALIVE_RESET				91
-+#define SATA_SFAB_M_RESET				92
-+#define TSSC_RESET					93
-+#define PDM_RESET					94
-+#define MPM_H_RESET					95
-+#define MPM_RESET					96
-+#define SFAB_SMPSS_S_RESET				97
-+#define PRNG_RESET					98
-+#define RIVA_RESET					99
++#define SFAB_ADM1_M0_RESET				16
++#define SFAB_ADM1_M1_RESET				17
++#define SFAB_ADM1_M2_RESET				18
++#define MMFAB_ADM1_M3_RESET				19
++#define ADM1_C3_RESET					20
++#define ADM1_C2_RESET					21
++#define ADM1_C1_RESET					22
++#define ADM1_C0_RESET					23
++#define ADM1_PBUS_RESET					24
++#define ADM1_RESET					25
++#define IMEM0_RESET					26
++#define SFAB_LPASS_Q6_RESET				27
++#define SFAB_AFAB_M_RESET				28
++#define AFAB_SFAB_M0_RESET				29
++#define AFAB_SFAB_M1_RESET				30
++#define DFAB_CORE_RESET					31
++#define SFAB_DFAB_M_RESET				32
++#define DFAB_SFAB_M_RESET				33
++#define DFAB_SWAY0_RESET				34
++#define DFAB_SWAY1_RESET				35
++#define DFAB_ARB0_RESET					36
++#define DFAB_ARB1_RESET					37
++#define PPSS_PROC_RESET					38
++#define PPSS_RESET					39
++#define PMEM_RESET					40
++#define DMA_BAM_RESET					41
++#define SIC_RESET					42
++#define SPS_TIC_RESET					43
++#define CFBP0_RESET					44
++#define CFBP1_RESET					45
++#define CFBP2_RESET					46
++#define EBI2_RESET					47
++#define SFAB_CFPB_M_RESET				48
++#define CFPB_MASTER_RESET				49
++#define SFAB_CFPB_S_RESET				50
++#define CFPB_SPLITTER_RESET				51
++#define TSIF_RESET					52
++#define CE1_RESET					53
++#define CE2_RESET					54
++#define SFAB_SFPB_M_RESET				55
++#define SFAB_SFPB_S_RESET				56
++#define RPM_PROC_RESET					57
++#define RPM_BUS_RESET					58
++#define RPM_MSG_RAM_RESET				59
++#define PMIC_ARB0_RESET					60
++#define PMIC_ARB1_RESET					61
++#define PMIC_SSBI2_RESET				62
++#define SDC1_RESET					63
++#define SDC2_RESET					64
++#define SDC3_RESET					65
++#define SDC4_RESET					66
++#define SDC5_RESET					67
++#define USB_HS1_RESET					68
++#define USB_HS2_XCVR_RESET				69
++#define USB_HS2_RESET					70
++#define USB_FS1_XCVR_RESET				71
++#define USB_FS1_RESET					72
++#define USB_FS2_XCVR_RESET				73
++#define USB_FS2_RESET					74
++#define GSBI1_RESET					75
++#define GSBI2_RESET					76
++#define GSBI3_RESET					77
++#define GSBI4_RESET					78
++#define GSBI5_RESET					79
++#define GSBI6_RESET					80
++#define GSBI7_RESET					81
++#define GSBI8_RESET					82
++#define GSBI9_RESET					83
++#define GSBI10_RESET					84
++#define GSBI11_RESET					85
++#define GSBI12_RESET					86
++#define SPDM_RESET					87
++#define SEC_CTRL_RESET					88
++#define TLMM_H_RESET					89
++#define TLMM_RESET					90
++#define MARRM_PWRON_RESET				91
++#define MARM_RESET					92
++#define MAHB1_RESET					93
++#define SFAB_MSS_S_RESET				94
++#define MAHB2_RESET					95
++#define MODEM_SW_AHB_RESET				96
++#define MODEM_RESET					97
++#define SFAB_MSS_MDM1_RESET				98
++#define SFAB_MSS_MDM0_RESET				99
++#define MSS_SLP_RESET					100
++#define MSS_MARM_SAW_RESET				101
++#define MSS_WDOG_RESET					102
++#define TSSC_RESET					103
++#define PDM_RESET					104
++#define SCSS_CORE0_RESET				105
++#define SCSS_CORE0_POR_RESET				106
++#define SCSS_CORE1_RESET				107
++#define SCSS_CORE1_POR_RESET				108
++#define MPM_RESET					109
++#define EBI1_1X_DIV_RESET				110
++#define EBI1_RESET					111
++#define SFAB_SMPSS_S_RESET				112
++#define USB_PHY0_RESET					113
++#define USB_PHY1_RESET					114
++#define PRNG_RESET					115
 +
 +#endif
 -- 
