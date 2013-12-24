@@ -1,30 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 23 Dec 2013 18:59:13 -0800
-Subject: [GIT PULL 2nd 1/5] Samsung non-critical fixes for v3.14
-In-Reply-To: <52B5DC99.6010801@samsung.com>
-References: <52B5DC99.6010801@samsung.com>
-Message-ID: <20131224025913.GA27387@quad.lixom.net>
+From: b38343@freescale.com (Robin Gong)
+Date: Tue, 24 Dec 2013 11:07:04 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabresd: Add PFUZE100 support
+In-Reply-To: <CAOMZO5C-0g+LrwqnmJA_Uwyw43UAZSGnmY7JPcLy3nySTZ+GGw@mail.gmail.com>
+References: <1387826937-9734-1-git-send-email-festevam@gmail.com>
+ <20131224025547.GC27081@Robin-OptiPlex-780>
+ <CAOMZO5C-0g+LrwqnmJA_Uwyw43UAZSGnmY7JPcLy3nySTZ+GGw@mail.gmail.com>
+Message-ID: <20131224030703.GE27081@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 22, 2013 at 03:23:21AM +0900, Kukjin Kim wrote:
-> The following changes since commit 236940d2c951a84735fdd7b958b5159eaf501784:
+sw2_reg: sw2 {
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <3300000>;
+}
+On Tue, Dec 24, 2013 at 12:55:09AM -0200, Fabio Estevam wrote:
+> On Tue, Dec 24, 2013 at 12:55 AM, Robin Gong <b38343@freescale.com> wrote:
 > 
->   ARM: dts: Update display clock frequency for Origen-4412
-> (2013-12-16 04:41:57 +0900)
+> >> +                     sw2_reg: sw2 {
+> >> +                             regulator-min-microvolt = <800000>;
+> >> +                             regulator-max-microvolt = <3950000>;
+> > Should be 3300000, right?
 > 
-> are available in the git repository at:
+> Actually it should be:
 > 
-
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-fixes-2
+>                      sw2_reg: sw2 {
+>                              regulator-min-microvolt = <400000>;
+>                              regulator-max-microvolt = <3300000>;
 > 
-> for you to fetch changes up to ca7c11fc8df0657ddeffc1cd98428abd739e1e10:
+> Do you agree?
 > 
->   ARM: dts: Use MSHC controller for eMMC memory for
-> exynos4412-trats2 (2013-12-21 08:01:31 +0900)
-
-Pulled.
-
-
--Olof
+> Regards,
+> 
+> Fabio Estevam
+> 
+> 
