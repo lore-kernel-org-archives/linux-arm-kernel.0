@@ -1,23 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:47:30 +0900
-Subject: [PATCH 00/10] sh-pfc: Fix GPIO to IRQ mapping
-In-Reply-To: <CACRpkdavs4mrtVO32ONja_g=zmz78+u5i_97Zp0UaoEzSxnaig@mail.gmail.com>
-References: <1386732390-31724-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131212131139.GE30624@verge.net.au>
- <CACRpkdZnqzAWdnmjo6cNakwOZcLjZ2Mt_LtM1Vf-L9=b_0_p4g@mail.gmail.com>
- <20131213001456.GB32101@verge.net.au>
- <20131219064052.GE10230@verge.net.au>
- <CACRpkdavs4mrtVO32ONja_g=zmz78+u5i_97Zp0UaoEzSxnaig@mail.gmail.com>
-Message-ID: <20131224064730.GE27167@verge.net.au>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 24 Dec 2013 14:05:38 -0500
+Subject: [PATCH] ARM: imx: add necessary interface for pfd
+Message-ID: <1387911938-4828-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 06:27:57PM +0100, Linus Walleij wrote:
-> On Thu, Dec 19, 2013 at 7:40 AM, Simon Horman <horms@verge.net.au> wrote:
-> 
-> > just to let you know I am planning to use
-> > 70c8f01a357ac74d ("sh-pfc: Support GPIO to IRQ mapping specified IRQ resources")
-> 
-> OK go ahead and pull that to your tree.
+Common clk framework will disable unused clks in late init only if
+they are enabled by default and no one is using it, so we need to
+add is_enabled callback for clk framework to get clks' status.
 
-Thanks, done.
+PFD clocks are enabled by hardware reset, so we need to add
+interface for common clk framework to disable those unused ones for
+saving power.
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/clk-pfd.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/mach-imx/clk-pfd.c b/arch/arm/mach-imx/clk-pfd.c
+index e2ed416..0b0f6f6 100644
+--- a/arch/arm/mach-imx/clk-pfd.c
++++ b/arch/arm/mach-imx/clk-pfd.c
+@@ -109,12 +109,23 @@ static int clk_pfd_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return 0;
+ }
+ 
++static int clk_pfd_is_enabled(struct clk_hw *hw)
++{
++	struct clk_pfd *pfd = to_clk_pfd(hw);
++
++	if (readl_relaxed(pfd->reg) & (1 << ((pfd->idx + 1) * 8 - 1)))
++		return 0;
++
++	return 1;
++}
++
+ static const struct clk_ops clk_pfd_ops = {
+ 	.enable		= clk_pfd_enable,
+ 	.disable	= clk_pfd_disable,
+ 	.recalc_rate	= clk_pfd_recalc_rate,
+ 	.round_rate	= clk_pfd_round_rate,
+ 	.set_rate	= clk_pfd_set_rate,
++	.is_enabled     = clk_pfd_is_enabled,
+ };
+ 
+ struct clk *imx_clk_pfd(const char *name, const char *parent_name,
+-- 
+1.7.9.5
