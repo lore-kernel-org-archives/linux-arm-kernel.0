@@ -1,53 +1,106 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Mon, 23 Dec 2013 18:10:27 -0600
-Subject: [PATCH 5/7] ARM: dts: Complete data for isp iommu
-In-Reply-To: <52B8AC55.70205@epfl.ch>
-References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
- <1387284818-28739-6-git-send-email-florian.vaussard@epfl.ch>
- <52B88B1A.40506@ti.com> <52B8AC55.70205@epfl.ch>
-Message-ID: <52B8D0F3.5060508@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 24 Dec 2013 08:15:00 +0800
+Subject: [PATCH v7 06/14] usb: phy-mxs: Add anatop regmap
+In-Reply-To: <1387525930-27313-7-git-send-email-peter.chen@freescale.com>
+References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
+ <1387525930-27313-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131224001457.GA1128@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Fri, Dec 20, 2013 at 03:52:02PM +0800, Peter Chen wrote:
+> It is needed by imx6 SoC series, but not for imx23 and imx28.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   23 +++++++++++++++++++++--
+>  1 files changed, 21 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 0c6f3bc..0ef930a 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/of_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+>  
+>  #define DRIVER_NAME "mxs_phy"
+>  
+> @@ -58,6 +60,9 @@
+>   */
+>  #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
+>  
+> +/* The SoCs who have anatop module */
+> +#define MXS_PHY_HAS_ANATOP			BIT(3)
+> +
+>  struct mxs_phy_data {
+>  	unsigned int flags;
+>  };
+> @@ -68,11 +73,13 @@ static const struct mxs_phy_data imx23_phy_data = {
+>  
+>  static const struct mxs_phy_data imx6q_phy_data = {
+>  	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
+> -		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
+> +		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
+> +		MXS_PHY_HAS_ANATOP,
+>  };
+>  
+>  static const struct mxs_phy_data imx6sl_phy_data = {
+> -	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
+> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
+> +		MXS_PHY_HAS_ANATOP,
+>  };
+>  
+>  static const struct of_device_id mxs_phy_dt_ids[] = {
+> @@ -87,6 +94,7 @@ struct mxs_phy {
+>  	struct usb_phy phy;
+>  	struct clk *clk;
+>  	const struct mxs_phy_data *data;
+> +	struct regmap *regmap_anatop;
+>  };
+>  
+>  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> @@ -190,6 +198,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  	int ret;
+>  	const struct of_device_id *of_id =
+>  			of_match_device(mxs_phy_dt_ids, &pdev->dev);
+> +	struct device_node *np = pdev->dev.of_node;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -226,6 +235,16 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, mxs_phy);
+>  
+> +	if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
+> +		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
+> +			(np, "fsl,anatop");
+> +		if (IS_ERR(mxs_phy->regmap_anatop)) {
+> +			dev_dbg(&pdev->dev,
+> +				"failed to find regmap for anatop\n");
+> +			return PTR_ERR(mxs_phy->regmap_anatop);
 
-On 12/23/2013 03:34 PM, Florian Vaussard wrote:
-> Hi Suman,
->
-> On 12/23/2013 08:12 PM, Anna, Suman wrote:
->> Hi Florian,
->>
->> On 12/17/2013 06:53 AM, Florian Vaussard wrote:
->>> Add missing information required to probe the iommu for the camera
->>> subsystem.
->>>
->>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>> ---
->>>    arch/arm/boot/dts/omap3.dtsi | 4 +++-
->>>    1 file changed, 3 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->>> index daabf99..610d084 100644
->>> --- a/arch/arm/boot/dts/omap3.dtsi
->>> +++ b/arch/arm/boot/dts/omap3.dtsi
->>> @@ -371,11 +371,13 @@
->>>                dma-names = "tx", "rx";
->>>            };
->>>
->>> -        mmu_isp: mmu at 480bd400 {
->>> +        mmu_isp: mmu_isp at 480bd400 {
->>
->> Any reason for switching the name to mmu_isp?
->>
->
-> The name of the hwmod is "mmu_isp". This was not working otherwise,
-> but I cannot tell you for sure why without getting back at my office.
+I'm looking at the merge dependency that Felipe mentions, and just think
+of the DTB compatibility thing.  Does the above code mean that USB will
+be broken if someone runs the new kernel with an old DTB on his board?
 
-Ok, did a bit of digging, this is due to the name tie-in for iommu arch 
-data (look at the omap3_camera_init in mach-omap2/devices.c), and the 
-obj->name assignment of of->name. This is another thing that needs to be 
-looked into since it would be preferable to move away from the name 
-based lookup towards using a phandle approach by the iommu consumer drivers.
+We're entering the stage where we need to maintain the DTB compatibility
+in kernel.  That said, if users choose to upgrade their kernel only
+(running with an old DTB), it's okay we do not give them new
+features, but we shouldn't cause any regression/breakage for them.
 
-regards
-Suman
+Shawn
+
+> +		}
+> +	}
+> +
+>  	ret = usb_add_phy_dev(&mxs_phy->phy);
+>  	if (ret)
+>  		return ret;
+> -- 
+> 1.7.8
+> 
+> 
