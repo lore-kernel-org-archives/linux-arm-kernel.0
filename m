@@ -1,101 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Tue, 24 Dec 2013 23:15:51 +0900
-Subject: [PATCH 07/29] ARM: shmobile: r7s72100: Don't define SCIF platform
- data in an array
+Subject: [PATCH 11/29] ARM: shmobile: sh7372: Declare SCIF register base and
+ IRQ as resources
 In-Reply-To: <cover.1387888861.git.horms+renesas@verge.net.au>
 References: <cover.1387888861.git.horms+renesas@verge.net.au>
-Message-ID: <a958a31eb021a2c8ce24c718fcbf00d915f38e78.1387888861.git.horms+renesas@verge.net.au>
+Message-ID: <d39f98b3bb1f56180997442ee59e0d60ef2b71b8.1387888861.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The SCIF driver is transitioning to platform resources. Board code will
-thus need to define an array of resources for each SCIF device. This is
-incompatible with the macro-based SCIF platform data definition as an
-array. Rework the macro to define platform data as individual
-structures.
+Passing the register base address and IRQ through platform data is
+deprecated. Use resources instead.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r7s72100.c | 49 +++++++++++++++------------------
- 1 file changed, 22 insertions(+), 27 deletions(-)
+ arch/arm/mach-shmobile/setup-sh7372.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index 55f0b9c..6ae7e32 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -28,8 +28,8 @@
- #include <mach/r7s72100.h>
- #include <asm/mach/arch.h>
- 
--#define SCIF_DATA(index, baseaddr, irq)					\
--[index] = {								\
-+#define R7S72100_SCIF(index, baseaddr, irq)				\
-+static const struct plat_sci_port scif##index##_platform_data = {	\
- 	.type		= PORT_SCIF,					\
- 	.regtype	= SCIx_SH2_SCIF_FIFODATA_REGTYPE,		\
- 	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
-@@ -40,24 +40,19 @@
- 	.irqs		= { irq + 1, irq + 2, irq + 3, irq },		\
- }
- 
--enum { SCIF0, SCIF1, SCIF2, SCIF3, SCIF4, SCIF5, SCIF6, SCIF7 };
-+R7S72100_SCIF(0, 0xe8007000, gic_iid(221));
-+R7S72100_SCIF(1, 0xe8007800, gic_iid(225));
-+R7S72100_SCIF(2, 0xe8008000, gic_iid(229));
-+R7S72100_SCIF(3, 0xe8008800, gic_iid(233));
-+R7S72100_SCIF(4, 0xe8009000, gic_iid(237));
-+R7S72100_SCIF(5, 0xe8009800, gic_iid(241));
-+R7S72100_SCIF(6, 0xe800a000, gic_iid(245));
-+R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
- 
--static const struct plat_sci_port scif[] __initconst = {
--	SCIF_DATA(SCIF0, 0xe8007000, gic_iid(221)), /* SCIF0 */
--	SCIF_DATA(SCIF1, 0xe8007800, gic_iid(225)), /* SCIF1 */
--	SCIF_DATA(SCIF2, 0xe8008000, gic_iid(229)), /* SCIF2 */
--	SCIF_DATA(SCIF3, 0xe8008800, gic_iid(233)), /* SCIF3 */
--	SCIF_DATA(SCIF4, 0xe8009000, gic_iid(237)), /* SCIF4 */
--	SCIF_DATA(SCIF5, 0xe8009800, gic_iid(241)), /* SCIF5 */
--	SCIF_DATA(SCIF6, 0xe800a000, gic_iid(245)), /* SCIF6 */
--	SCIF_DATA(SCIF7, 0xe800a800, gic_iid(249)), /* SCIF7 */
--};
--
--static inline void r7s72100_register_scif(int idx)
--{
--	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
--				      sizeof(struct plat_sci_port));
--}
-+#define r7s72100_register_scif(index)					       \
-+	platform_device_register_data(&platform_bus, "sh-sci", index,	       \
-+				      &scif##index##_platform_data,	       \
-+				      sizeof(scif##index##_platform_data))
- 
- 
- static struct sh_timer_config mtu2_0_platform_data __initdata = {
-@@ -81,14 +76,14 @@ static struct resource mtu2_0_resources[] __initdata = {
- 
- void __init r7s72100_add_dt_devices(void)
- {
--	r7s72100_register_scif(SCIF0);
--	r7s72100_register_scif(SCIF1);
--	r7s72100_register_scif(SCIF2);
--	r7s72100_register_scif(SCIF3);
--	r7s72100_register_scif(SCIF4);
--	r7s72100_register_scif(SCIF5);
--	r7s72100_register_scif(SCIF6);
--	r7s72100_register_scif(SCIF7);
-+	r7s72100_register_scif(0);
-+	r7s72100_register_scif(1);
-+	r7s72100_register_scif(2);
-+	r7s72100_register_scif(3);
-+	r7s72100_register_scif(4);
-+	r7s72100_register_scif(5);
-+	r7s72100_register_scif(6);
-+	r7s72100_register_scif(7);
- 	r7s72100_register_mtu2(0);
- }
- 
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index 77627dd..798f8ac 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -90,16 +90,21 @@ void __init sh7372_pinmux_init(void)
+ #define SH7372_SCIF(scif_type, index, baseaddr, irq)		\
+ static struct plat_sci_port scif##index##_platform_data = {	\
+ 	.type		= scif_type,				\
+-	.mapbase	= baseaddr,				\
+ 	.flags		= UPF_BOOT_AUTOCONF,			\
+-	.irqs		= SCIx_IRQ_MUXED(irq),			\
+ 	.scbrr_algo_id	= SCBRR_ALGO_4,				\
+ 	.scscr		= SCSCR_RE | SCSCR_TE,			\
+ };								\
+ 								\
++static struct resource scif##index##_resources[] = {		\
++	DEFINE_RES_MEM(baseaddr, 0x100),			\
++	DEFINE_RES_IRQ(irq),					\
++};								\
++								\
+ static struct platform_device scif##index##_device = {		\
+ 	.name		= "sh-sci",				\
+ 	.id		= index,				\
++	.resource	= scif##index##_resources,		\
++	.num_resources	= ARRAY_SIZE(scif##index##_resources),	\
+ 	.dev		= {					\
+ 		.platform_data	= &scif##index##_platform_data,	\
+ 	},							\
 -- 
 1.8.4
