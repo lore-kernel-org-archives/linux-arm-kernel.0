@@ -1,23 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 23 Dec 2013 19:52:05 -0500
-Subject: [PATCH] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <CAGduivxnQEvuT4LBtk+zMHw1XfGc0EmcvAzrRUV-wNtAto0L5g@mail.gmail.com>
-References: <1384639708-6868-1-git-send-email-maxime.hadjinlian@gmail.com>
- <5288C2B5.7040903@gmail.com>
- <20131124171319.GK29241@titan.lakedaemon.net>
- <20131208005652.GF11251@titan.lakedaemon.net>
- <20131220030958.GB2609@titan.lakedaemon.net>
- <CAGduivxnQEvuT4LBtk+zMHw1XfGc0EmcvAzrRUV-wNtAto0L5g@mail.gmail.com>
-Message-ID: <20131224005205.GD19878@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 Dec 2013 16:58:04 -0800
+Subject: [PATCH v2 1/3] clocksource: timer-keystone: introduce
+ clocksource driver for Keystone
+In-Reply-To: <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1387297337-25493-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131224005804.GF31766@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 04:48:34PM +0100, Maxime Hadjinlian wrote:
-> I have resent the patch with an issue regarding the NAND device. Sorry
-> that it took so long...
+On 12/17, Ivan Khoronzhuk wrote:
+> +static void __init keystone_timer_init(struct device_node *np)
+> +{
+> +	struct clock_event_device *event_dev = &timer.event_dev;
+> +	unsigned long rate;
+[...]
+> +
+> +	timer.hz_period = rate / (HZ);
 
-No problem, thanks for submitting the new version.
+Unnecessary parentheses here. Also, do you need to use do_div()
+here? I'm lost how the hz_period is ever greater than 32 bits
+though because HZ is most likely very small and the rate is
+unsigned long.
 
-thx,
-
-Jason.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
