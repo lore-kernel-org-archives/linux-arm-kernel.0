@@ -1,177 +1,219 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 16:39:52 -0800
-Subject: [PATCH v2 8/9] ARM: msm: Add SMP support for KPSSv2
+Date: Mon, 23 Dec 2013 16:39:53 -0800
+Subject: [PATCH v2 9/9] ARM: dts: msm: Add nodes necessary for SMP boot
 In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
 References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387845593-10050-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387845593-10050-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rohit Vaswani <rvaswani@codeaurora.org>
 
-Implement support for the Krait CPU release sequence when the
-CPUs are part of the second version of the Krait processor
-subsystem.
+Add the necessary nodes to support SMP on MSM8660, MSM8960, and
+MSM8974/APQ8074. While we're here also add in the error
+interrupts for the Krait cache error detection.
 
 Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+[sboyd: Split into separate patch, add error interrupts]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/platsmp.c | 123 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 123 insertions(+)
+ arch/arm/boot/dts/qcom-msm8660-surf.dts | 24 ++++++++++++
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts  | 52 +++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi     | 69 +++++++++++++++++++++++++++++++++
+ 3 files changed, 145 insertions(+)
 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 4b13cd8..f07ad9d 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -38,7 +38,15 @@
- #define L2DT_SLP		BIT(3)
- #define CLAMP			BIT(0)
+diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+index 20cb9ad..c72325e 100644
+--- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
++++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+@@ -9,6 +9,30 @@
+ 	compatible = "qcom,msm8660-surf", "qcom,msm8660";
+ 	interrupt-parent = <&intc>;
  
-+#define APC_PWR_GATE_CTL	0x14
-+#define BHS_CNT_SHIFT		24
-+#define LDO_PWR_DWN_SHIFT	16
-+#define LDO_BYP_SHIFT		8
-+#define BHS_SEG_SHIFT		1
-+#define BHS_EN			BIT(0)
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "qcom,scorpion";
++		enable-method = "qcom,gcc-msm8660";
 +
- #define APCS_SAW2_VCTL		0x14
-+#define APCS_SAW2_2_VCTL	0x1c
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++		};
++	};
++
+ 	intc: interrupt-controller at 2080000 {
+ 		compatible = "qcom,msm-8660-qgic";
+ 		interrupt-controller;
+diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+index d5b1318..bb20f94 100644
+--- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
++++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+@@ -9,6 +9,36 @@
+ 	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
+ 	interrupt-parent = <&intc>;
  
- extern void secondary_startup(void);
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <1 14 0x304>;
++		compatible = "qcom,krait";
++		enable-method = "qcom,kpss-acc-v1";
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc0>;
++			qcom,saw = <&saw0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc1>;
++			qcom,saw = <&saw1>;
++		};
++
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++			interrupts = <0 2 0x4>;
++		};
++	};
++
+ 	intc: interrupt-controller at 2000000 {
+ 		compatible = "qcom,msm-qgic2";
+ 		interrupt-controller;
+@@ -53,6 +83,28 @@
+ 		#reset-cells = <1>;
+ 	};
  
-@@ -157,6 +165,106 @@ out_acc:
- 	return ret;
- }
++	acc0: clock-controller at 2088000 {
++		compatible = "qcom,kpss-acc-v1";
++		reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
++	};
++
++	acc1: clock-controller at 2098000 {
++		compatible = "qcom,kpss-acc-v1";
++		reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
++	};
++
++	saw0: regulator at 2089000 {
++		compatible = "qcom,saw2";
++		reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
++		regulator;
++	};
++
++	saw1: regulator at 2099000 {
++		compatible = "qcom,saw2";
++		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
++		regulator;
++	};
++
+ 	serial at 16440000 {
+ 		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 		reg = <0x16440000 0x1000>,
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 9fa57d7..22555f6 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -9,6 +9,49 @@
+ 	compatible = "qcom,msm8974";
+ 	interrupt-parent = <&intc>;
  
-+static int kpssv2_release_secondary(unsigned int cpu)
-+{
-+	void __iomem *reg;
-+	struct device_node *cpu_node, *l2_node, *acc_node, *saw_node;
-+	void __iomem *l2_saw_base;
-+	unsigned reg_val;
-+	int ret;
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <1 9 0xf04>;
++		compatible = "qcom,krait";
++		enable-method = "qcom,kpss-acc-v2";
 +
-+	cpu_node = of_get_cpu_node(cpu, NULL);
-+	if (!cpu_node)
-+		return -ENODEV;
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc0>;
++		};
 +
-+	acc_node = of_parse_phandle(cpu_node, "qcom,acc", 0);
-+	if (!acc_node) {
-+		ret = -ENODEV;
-+		goto out_acc;
-+	}
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc1>;
++		};
 +
-+	l2_node = of_parse_phandle(cpu_node, "next-level-cache", 0);
-+	if (!l2_node) {
-+		ret = -ENODEV;
-+		goto out_l2;
-+	}
++		cpu at 2 {
++			device_type = "cpu";
++			reg = <2>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc2>;
++		};
 +
-+	saw_node = of_parse_phandle(l2_node, "qcom,saw", 0);
-+	if (!saw_node) {
-+		ret = -ENODEV;
-+		goto out_saw;
-+	}
++		cpu at 3 {
++			device_type = "cpu";
++			reg = <3>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc3>;
++		};
 +
-+	reg = of_iomap(acc_node, 0);
-+	if (!reg) {
-+		ret = -ENOMEM;
-+		goto out_map;
-+	}
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++			interrupts = <0 2 0x4>;
++			qcom,saw = <&saw_l2>;
++		};
++	};
 +
-+	l2_saw_base = of_iomap(saw_node, 0);
-+	if (!l2_saw_base) {
-+		ret = -ENOMEM;
-+		goto out_saw_map;
-+	}
-+
-+	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
-+	reg_val = (64 << BHS_CNT_SHIFT) | (0x3f << LDO_PWR_DWN_SHIFT) | BHS_EN;
-+	writel_relaxed(reg_val, reg + APC_PWR_GATE_CTL);
-+	mb();
-+	/* wait for the BHS to settle */
-+	udelay(1);
-+
-+	/* Turn on BHS segments */
-+	reg_val |= 0x3f << BHS_SEG_SHIFT;
-+	writel_relaxed(reg_val, reg + APC_PWR_GATE_CTL);
-+	mb();
-+	 /* wait for the BHS to settle */
-+	udelay(1);
-+
-+	/* Finally turn on the bypass so that BHS supplies power */
-+	reg_val |= 0x3f << LDO_BYP_SHIFT;
-+	writel_relaxed(reg_val, reg + APC_PWR_GATE_CTL);
-+
-+	/* enable max phases */
-+	writel_relaxed(0x10003, l2_saw_base + APCS_SAW2_2_VCTL);
-+	mb();
-+	udelay(50);
-+
-+	reg_val = COREPOR_RST | CLAMP;
-+	writel_relaxed(reg_val, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	reg_val &= ~CLAMP;
-+	writel_relaxed(reg_val, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	reg_val &= ~COREPOR_RST;
-+	writel_relaxed(reg_val, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+
-+	reg_val |= CORE_PWRD_UP;
-+	writel_relaxed(reg_val, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+
-+	ret = 0;
-+
-+	iounmap(l2_saw_base);
-+out_saw_map:
-+	iounmap(reg);
-+out_map:
-+	of_node_put(saw_node);
-+out_saw:
-+	of_node_put(l2_node);
-+out_l2:
-+	of_node_put(acc_node);
-+out_acc:
-+	of_node_put(cpu_node);
-+
-+	return ret;
-+}
-+
- static DEFINE_PER_CPU(int, cold_boot_done);
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <1 2 0xf08>,
+@@ -91,6 +134,32 @@
+ 			};
+ 		};
  
- static int msm_boot_secondary(unsigned int cpu, int (*func)(unsigned int))
-@@ -201,6 +309,11 @@ static int kpssv1_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return msm_boot_secondary(cpu, kpssv1_release_secondary);
- }
- 
-+static int kpssv2_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	return msm_boot_secondary(cpu, kpssv2_release_secondary);
-+}
++		saw_l2: regulator at f9012000 {
++			compatible = "qcom,saw2";
++			reg = <0xf9012000 0x1000>;
++			regulator;
++		};
 +
- static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int cpu, map;
-@@ -250,3 +363,13 @@ static struct smp_operations msm_smp_kpssv1_ops __initdata = {
- #endif
- };
- CPU_METHOD_OF_DECLARE(msm_smp_kpssv1, "qcom,kpss-acc-v1", &msm_smp_kpssv1_ops);
++		acc0: clock-controller at f9088000 {
++			compatible = "qcom,kpss-acc-v2";
++			reg = <0xf9088000 0x1000>, <0xf9008000 0x1000>;
++		};
 +
-+static struct smp_operations msm_smp_kpssv2_ops __initdata = {
-+	.smp_prepare_cpus	= msm_smp_prepare_cpus,
-+	.smp_secondary_init	= msm_secondary_init,
-+	.smp_boot_secondary	= kpssv2_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= msm_cpu_die,
-+#endif
-+};
-+CPU_METHOD_OF_DECLARE(msm_smp_kpssv2, "qcom,kpss-acc-v2", &msm_smp_kpssv2_ops);
++		acc1: clock-controller at f9098000 {
++			compatible = "qcom,kpss-acc-v2";
++			reg = <0xf9098000 0x1000>, <0xf9008000 0x1000>;
++		};
++
++		acc2: clock-controller at f90a8000 {
++			compatible = "qcom,kpss-acc-v2";
++			reg = <0xf90a8000 0x1000>, <0xf9008000 0x1000>;
++		};
++
++		acc3: clock-controller at f90b8000 {
++			compatible = "qcom,kpss-acc-v2";
++			reg = <0xf90b8000 0x1000>, <0xf9008000 0x1000>;
++		};
++
+ 		restart at fc4ab000 {
+ 			compatible = "qcom,pshold";
+ 			reg = <0xfc4ab000 0x4>;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
