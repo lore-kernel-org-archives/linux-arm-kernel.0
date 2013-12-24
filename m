@@ -1,66 +1,101 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:15:45 +0900
-Subject: [PATCH 01/29] ARM: shmobile: r8a7778: add sound SCU clock support
+Date: Tue, 24 Dec 2013 23:15:51 +0900
+Subject: [PATCH 07/29] ARM: shmobile: r7s72100: Don't define SCIF platform
+ data in an array
 In-Reply-To: <cover.1387888861.git.horms+renesas@verge.net.au>
 References: <cover.1387888861.git.horms+renesas@verge.net.au>
-Message-ID: <950c4477f7804174338fb32c8cc6f9d228eef833.1387888861.git.horms+renesas@verge.net.au>
+Message-ID: <a958a31eb021a2c8ce24c718fcbf00d915f38e78.1387888861.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This is needed to use SRC (= Sampling Rate Converter)
+The SCIF driver is transitioning to platform resources. Board code will
+thus need to define an array of resources for each SCIF device. This is
+incompatible with the macro-based SCIF platform data definition as an
+array. Rework the macro to define platform data as individual
+structures.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/mach-shmobile/setup-r7s72100.c | 49 +++++++++++++++------------------
+ 1 file changed, 22 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index 5406434..dfb0fff 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -115,6 +115,8 @@ static struct clk *main_clks[] = {
- };
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index 55f0b9c..6ae7e32 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -28,8 +28,8 @@
+ #include <mach/r7s72100.h>
+ #include <asm/mach/arch.h>
  
- enum {
-+	MSTP531, MSTP530,
-+	MSTP529, MSTP528, MSTP527, MSTP526, MSTP525, MSTP524, MSTP523,
- 	MSTP331,
- 	MSTP323, MSTP322, MSTP321,
- 	MSTP311, MSTP310,
-@@ -129,6 +131,15 @@ enum {
- 	MSTP_NR };
+-#define SCIF_DATA(index, baseaddr, irq)					\
+-[index] = {								\
++#define R7S72100_SCIF(index, baseaddr, irq)				\
++static const struct plat_sci_port scif##index##_platform_data = {	\
+ 	.type		= PORT_SCIF,					\
+ 	.regtype	= SCIx_SH2_SCIF_FIFODATA_REGTYPE,		\
+ 	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
+@@ -40,24 +40,19 @@
+ 	.irqs		= { irq + 1, irq + 2, irq + 3, irq },		\
+ }
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP531] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 31, 0), /* SCU0 */
-+	[MSTP530] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 30, 0), /* SCU1 */
-+	[MSTP529] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 29, 0), /* SCU2 */
-+	[MSTP528] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 28, 0), /* SCU3 */
-+	[MSTP527] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 27, 0), /* SCU4 */
-+	[MSTP526] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 26, 0), /* SCU5 */
-+	[MSTP525] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 25, 0), /* SCU6 */
-+	[MSTP524] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 24, 0), /* SCU7 */
-+	[MSTP523] = SH_CLK_MSTP32(&p_clk, MSTPCR5, 23, 0), /* SCU8 */
- 	[MSTP331] = SH_CLK_MSTP32(&s4_clk, MSTPCR3, 31, 0), /* MMC */
- 	[MSTP323] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 23, 0), /* SDHI0 */
- 	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
-@@ -219,6 +230,15 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("ssi.6", "rcar_sound", &mstp_clks[MSTP309]),
- 	CLKDEV_ICK_ID("ssi.7", "rcar_sound", &mstp_clks[MSTP308]),
- 	CLKDEV_ICK_ID("ssi.8", "rcar_sound", &mstp_clks[MSTP307]),
-+	CLKDEV_ICK_ID("scu.0", "rcar_sound", &mstp_clks[MSTP531]),
-+	CLKDEV_ICK_ID("scu.1", "rcar_sound", &mstp_clks[MSTP530]),
-+	CLKDEV_ICK_ID("scu.2", "rcar_sound", &mstp_clks[MSTP529]),
-+	CLKDEV_ICK_ID("scu.3", "rcar_sound", &mstp_clks[MSTP528]),
-+	CLKDEV_ICK_ID("scu.4", "rcar_sound", &mstp_clks[MSTP527]),
-+	CLKDEV_ICK_ID("scu.5", "rcar_sound", &mstp_clks[MSTP526]),
-+	CLKDEV_ICK_ID("scu.6", "rcar_sound", &mstp_clks[MSTP525]),
-+	CLKDEV_ICK_ID("scu.7", "rcar_sound", &mstp_clks[MSTP524]),
-+	CLKDEV_ICK_ID("scu.8", "rcar_sound", &mstp_clks[MSTP523]),
- };
+-enum { SCIF0, SCIF1, SCIF2, SCIF3, SCIF4, SCIF5, SCIF6, SCIF7 };
++R7S72100_SCIF(0, 0xe8007000, gic_iid(221));
++R7S72100_SCIF(1, 0xe8007800, gic_iid(225));
++R7S72100_SCIF(2, 0xe8008000, gic_iid(229));
++R7S72100_SCIF(3, 0xe8008800, gic_iid(233));
++R7S72100_SCIF(4, 0xe8009000, gic_iid(237));
++R7S72100_SCIF(5, 0xe8009800, gic_iid(241));
++R7S72100_SCIF(6, 0xe800a000, gic_iid(245));
++R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
  
- void __init r8a7778_clock_init(void)
+-static const struct plat_sci_port scif[] __initconst = {
+-	SCIF_DATA(SCIF0, 0xe8007000, gic_iid(221)), /* SCIF0 */
+-	SCIF_DATA(SCIF1, 0xe8007800, gic_iid(225)), /* SCIF1 */
+-	SCIF_DATA(SCIF2, 0xe8008000, gic_iid(229)), /* SCIF2 */
+-	SCIF_DATA(SCIF3, 0xe8008800, gic_iid(233)), /* SCIF3 */
+-	SCIF_DATA(SCIF4, 0xe8009000, gic_iid(237)), /* SCIF4 */
+-	SCIF_DATA(SCIF5, 0xe8009800, gic_iid(241)), /* SCIF5 */
+-	SCIF_DATA(SCIF6, 0xe800a000, gic_iid(245)), /* SCIF6 */
+-	SCIF_DATA(SCIF7, 0xe800a800, gic_iid(249)), /* SCIF7 */
+-};
+-
+-static inline void r7s72100_register_scif(int idx)
+-{
+-	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
+-				      sizeof(struct plat_sci_port));
+-}
++#define r7s72100_register_scif(index)					       \
++	platform_device_register_data(&platform_bus, "sh-sci", index,	       \
++				      &scif##index##_platform_data,	       \
++				      sizeof(scif##index##_platform_data))
+ 
+ 
+ static struct sh_timer_config mtu2_0_platform_data __initdata = {
+@@ -81,14 +76,14 @@ static struct resource mtu2_0_resources[] __initdata = {
+ 
+ void __init r7s72100_add_dt_devices(void)
+ {
+-	r7s72100_register_scif(SCIF0);
+-	r7s72100_register_scif(SCIF1);
+-	r7s72100_register_scif(SCIF2);
+-	r7s72100_register_scif(SCIF3);
+-	r7s72100_register_scif(SCIF4);
+-	r7s72100_register_scif(SCIF5);
+-	r7s72100_register_scif(SCIF6);
+-	r7s72100_register_scif(SCIF7);
++	r7s72100_register_scif(0);
++	r7s72100_register_scif(1);
++	r7s72100_register_scif(2);
++	r7s72100_register_scif(3);
++	r7s72100_register_scif(4);
++	r7s72100_register_scif(5);
++	r7s72100_register_scif(6);
++	r7s72100_register_scif(7);
+ 	r7s72100_register_mtu2(0);
+ }
+ 
 -- 
 1.8.4
