@@ -1,62 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:19:36 +0900
-Subject: [PATCH 06/21] ARM: shmobile: armadillo: dts: Add gpio-keys device
+Date: Tue, 24 Dec 2013 23:19:38 +0900
+Subject: [PATCH 15/21] ARM: shmobile: Remove Koelsch reference DTS
 In-Reply-To: <cover.1387893834.git.horms+renesas@verge.net.au>
 References: <cover.1387893834.git.horms+renesas@verge.net.au>
-Message-ID: <90c2434daa0b8c7ec2b75fcb182436813e9120bd.1387893834.git.horms+renesas@verge.net.au>
+Message-ID: <82f7c2065a363cd3c0c84d3c9b59ee47897c5ebb.1387893834.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The board had 4 buttons connected to GPIOs, add a corresponding
-gpio-keys device.
+Now that the DTS file r8a7790-koelsch.dts can be used with
+board-koelsch.c and board-koelsch-reference.c, proceed with removing
+r8a7790-koelsch-reference.dts.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../boot/dts/r8a7740-armadillo800eva-reference.dts | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index e916aae..95a849b 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -72,6 +72,35 @@
- 		regulator-boot-on;
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power-key {
-+			gpios = <&pfc 99 GPIO_ACTIVE_LOW>;
-+			linux,code = <116>;
-+			label = "SW3";
-+			gpio-key,wakeup;
-+		};
-+
-+		back-key {
-+			gpios = <&pfc 100 GPIO_ACTIVE_LOW>;
-+			linux,code = <158>;
-+			label = "SW4";
-+		};
-+
-+		menu-key {
-+			gpios = <&pfc 97 GPIO_ACTIVE_LOW>;
-+			linux,code = <139>;
-+			label = "SW5";
-+		};
-+
-+		home-key {
-+			gpios = <&pfc 98 GPIO_ACTIVE_LOW>;
-+			linux,code = <102>;
-+			label = "SW6";
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		led1 {
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 909d910..5839077 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -225,7 +225,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7779-marzen-reference.dtb \
+ 	r8a7791-koelsch.dtb \
+-	r8a7791-koelsch-reference.dtb \
+ 	r8a7790-lager.dtb \
+ 	r8a7790-lager-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
 -- 
 1.8.4
