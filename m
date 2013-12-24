@@ -1,91 +1,173 @@
-From: maxime.hadjinlian@gmail.com (Maxime Hadjinlian)
-Date: Tue, 24 Dec 2013 12:17:12 +0100
-Subject: [PATCH 2/2] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <20131223164826.GA6535@localhost>
-References: <1387813346-16741-1-git-send-email-maxime.hadjinlian@gmail.com>
- <1387813346-16741-2-git-send-email-maxime.hadjinlian@gmail.com>
- <CAGduivwCtQr-6sY92jEydU6uG1QJOSQcqxAKwcxr4viV38vU-Q@mail.gmail.com>
- <20131223164826.GA6535@localhost>
-Message-ID: <CAGduivx9tkOrccNhhmCwbFqbF7Yi_EHAFA7ge08_OPzDvChR-Q@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 24 Dec 2013 16:50:38 +0530
+Subject: [PATCH v3 2/2] gpio: davinci: reuse for Keystone SoC
+In-Reply-To: <1387885284-8119-3-git-send-email-grygorii.strashko@ti.com>
+References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+ <1387885284-8119-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <CA+V-a8tJRZ5Esn3F4J6_z7VCmGPpptgxMEyyaANbrytAF3pUMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 5:48 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> Hi Maxime,
-Hi Ezequiel
+Hi Grygorii,
+
+Thanks for the patch.
+
+On Tue, Dec 24, 2013 at 5:11 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> The similar GPIO HW block is used by keystone SoCs as
+> in Davinci SoCs.
+> Hence, reuse Davinci GPIO driver for Keystone taking into
+> account that Keystone contains ARM GIC IRQ controller which
+> is implemented using IRQ Chip.
 >
-> On Mon, Dec 23, 2013 at 04:47:34PM +0100, Maxime Hadjinlian wrote:
->> I have a slight issue which I could not resolve regarding the Hynix
->> NAND on this platform. Although it worked perfectly well with 3.12,
->> the device is not detected  anymore with the current head of master.
->>
+> Documentation:
+>         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
 >
-> If you do a "git log v3.12..v3.13-rc4 -- drivers/mtd/nand/orion_nand.c"
-> you'll see that no changes have been made.
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: devicetree at vger.kernel.org
 >
-> So maybe this new dts v2 is the problem. And if you look in detail you'll
-> find you've been bitten by the subtleties of the devicetree!
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+>  drivers/gpio/gpio-davinci.c                        |   48 ++++++++++++++++----
+>  2 files changed, 42 insertions(+), 10 deletions(-)
 >
-> See below...
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> index a2e839d..4ce9862 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> @@ -1,7 +1,7 @@
+> -Davinci GPIO controller bindings
+> +Davinci/Keystone GPIO controller bindings
 >
->> > +       mbus {
->> > +               ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>;
->> > +               pcie-controller {
->> > +                       status = "okay";
->> > +                       pcie at 1,0 {
->> > +                               status = "okay";
->> > +                       };
->> > +               };
->> > +       };
+>  Required Properties:
+> -- compatible: should be "ti,dm6441-gpio"
+> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+
+Can you make it something like this ? It isn't readable.
+
+- compatible : value should be either one among the following
+    (a)  "ti,dm6441-gpio" for davinci.
+    (b)  "ti,keystone-gpio" for keystone.
+
 >
-> ^^^^
-> Here's the problem: there's two wrong things with the above:
+>  - reg: Physical base address of the controller and the size of memory mapped
+>         registers.
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 7629b4f..d0f135d 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -37,6 +37,8 @@ struct davinci_gpio_regs {
+>         u32     intstat;
+>  };
 >
-> 1. You can't do this... a ranges properties doesn't add on the included
-> (dtsi) ranges properties. Instead it replaces the included one, so you have
-> to write the entries all over again.
+> +typedef struct irq_chip *(*gpio_get_irq_chip_cb_t)(unsigned int irq);
+> +
+>  #define BINTEN 0x8 /* GPIO Interrupt Per-Bank Enable Register */
 >
-> Yes, we know: it sucks! And given we know it sucks, there was a nice
-> message warning you about this. From the kirkwood.dtsi
+>  #define chip2controller(chip)  \
+> @@ -413,6 +415,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
+>         .xlate = irq_domain_xlate_onetwocell,
+>  };
 >
->         /* If a board file needs to change this ranges it must replace it completely */
->         ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000     /* internal-regs */
->                   MBUS_ID(0x01, 0x2f) 0 0xf4000000 0x10000      /* nand flash */
->                   MBUS_ID(0x03, 0x01) 0 0xf5000000 0x10000      /* crypto sram */
->           >;
+> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
+> +{
+> +       static struct irq_chip_type gpio_unbanked;
+> +
+> +       gpio_unbanked = *container_of(irq_get_chip(irq),
+> +                                     struct irq_chip_type, chip);
+> +
+> +       return &gpio_unbanked.chip;
+> +};
+> +
+> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
+> +{
+> +       static struct irq_chip gpio_unbanked;
+> +
+> +       gpio_unbanked = *irq_get_chip(irq);
+> +       return &gpio_unbanked;
+> +};
+> +
+> +static const struct of_device_id davinci_gpio_ids[];
+> +
+>  /*
+>   * NOTE:  for suspend/resume, probably best to make a platform_device with
+>   * suspend_late/resume_resume calls hooking into results of the set_wake()
+> @@ -433,6 +455,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>         struct davinci_gpio_platform_data *pdata = dev->platform_data;
+>         struct davinci_gpio_regs __iomem *g;
+>         struct irq_domain       *irq_domain = NULL;
+> +       const struct of_device_id *match;
+> +       struct irq_chip *irq_chip;
+> +       gpio_get_irq_chip_cb_t gpio_get_irq_chip;
+> +
+> +       /*
+> +        * Use davinci_gpio_get_irq_chip by default to handle non DT cases
+> +        */
+> +       gpio_get_irq_chip = davinci_gpio_get_irq_chip;
+> +       match = of_match_device(of_match_ptr(davinci_gpio_ids),
+> +                               dev);
+
+Sorry didn't notice that earlier the data structure of_match_ptr()
+protects is always compiled in.
+so of_match_ptr() is not needed.
+While you are at it you can also fix it in davinci_gpio_driver
+structure as a sperate
+patch.
+
+Regards,
+--Prabhakar Lad
+
+> +       if (match)
+> +               gpio_get_irq_chip = (gpio_get_irq_chip_cb_t)match->data;
 >
-> 2. Looking in yet more detail, you're re-adding the internal-regs window.
-> I guess it's just a typo, no?
+>         ngpio = pdata->ngpio;
+>         res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> @@ -489,8 +523,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+>          * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
+>          */
+>         if (pdata->gpio_unbanked) {
+> -               static struct irq_chip_type gpio_unbanked;
+> -
+>                 /* pass "bank 0" GPIO IRQs to AINTC */
+>                 chips[0].chip.to_irq = gpio_to_irq_unbanked;
+>                 chips[0].gpio_irq = bank_irq;
+> @@ -499,10 +531,9 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
 >
-> Anyway, I *think* that's what prevented you from getting the NAND to
-> work. The correct mbus node should be:
+>                 /* AINTC handles mask/unmask; GPIO handles triggering */
+>                 irq = bank_irq;
+> -               gpio_unbanked = *container_of(irq_get_chip(irq),
+> -                                             struct irq_chip_type, chip);
+> -               gpio_unbanked.chip.name = "GPIO-AINTC";
+> -               gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
+> +               irq_chip = gpio_get_irq_chip(irq);
+> +               irq_chip->name = "GPIO-AINTC";
+> +               irq_chip->irq_set_type = gpio_irq_type_unbanked;
 >
->         mbus {
->                 pcie-controller {
->                         status = "okay";
->                         pcie at 1,0 {
->                                 status = "okay";
->                         };
->                 };
->         };
+>                 /* default trigger: both edges */
+>                 g = gpio2regs(0);
+> @@ -511,7 +542,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
 >
->> > +&nand {
->> > +       /* Total size : 512MB */
->> > +       status = "okay";
->> > +
+>                 /* set the direct IRQs up to use that irqchip */
+>                 for (gpio = 0; gpio < pdata->gpio_unbanked; gpio++, irq++) {
+> -                       irq_set_chip(irq, &gpio_unbanked.chip);
+> +                       irq_set_chip(irq, irq_chip);
+>                         irq_set_handler_data(irq, &chips[gpio / 32]);
+>                         irq_set_status_flags(irq, IRQ_TYPE_EDGE_BOTH);
+>                 }
+> @@ -554,7 +585,8 @@ done:
 >
-> And here: don't you need to add the pinmuxing? Maybe you don't need it,
-> but I guess it's the right thing to do.
->
-> I hope this helps!
-That was it ! Thank you very much, I will resend a v3. Thank you very much.
-I will be more carefarch/arm/boot/dts/kirkwood-laplug.dtsull about
-this next time.
->
-> Merry Christmas...
-Merry Christmas to you.
+>  #if IS_ENABLED(CONFIG_OF)
+>  static const struct of_device_id davinci_gpio_ids[] = {
+> -       { .compatible = "ti,dm6441-gpio", },
+> +       { .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
+> +       { .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
+>         { /* sentinel */ },
+>  };
+>  MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
 > --
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
+> 1.7.9.5
+>
