@@ -1,37 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:06:01 +0900
-Subject: [PATCH 2/3] irqchip: renesas-irqc: Enable mask on suspend
+Date: Tue, 24 Dec 2013 15:06:02 +0900
+Subject: [PATCH 3/3] irq-renesas-irqc: simplify irq_set_type() method
 In-Reply-To: <cover.1387855444.git.horms+renesas@verge.net.au>
 References: <cover.1387855444.git.horms+renesas@verge.net.au>
-Message-ID: <6a7e3b3007b5396a9e812ca0ceddc7915f8768dd.1387855444.git.horms+renesas@verge.net.au>
+Message-ID: <ce70af18801fd8dac6e9f85308294948916e84d6.1387855444.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Now when lazy interrupt disable has been enabled in the driver
-then extend the code to set IRQCHIP_MASK_ON_SUSPEND which tells
-the core that only IRQs marked as wakeups need to stay enabled
-during Suspend-to-RAM.
+Value 0 of the sense  selection field of CONFIG_n register means "disable event
+detection" and serves in irqc_sense[] for marking the invalid values of the IRQ
+type (by just omitting initializers). There is no need for INTC_IRQ_SENSE_VALID
+and hence INTC_IRQ_SENSE() as all field values matching to the  valid IRQ types
+are non-zero anyway.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/irqchip/irq-renesas-irqc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/irqchip/irq-renesas-irqc.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
-index 8fdd7d6..082d95c 100644
+index 082d95c..8777065 100644
 --- a/drivers/irqchip/irq-renesas-irqc.c
 +++ b/drivers/irqchip/irq-renesas-irqc.c
-@@ -213,7 +213,7 @@ static int irqc_probe(struct platform_device *pdev)
- 	irq_chip->irq_mask = irqc_irq_disable;
- 	irq_chip->irq_unmask = irqc_irq_enable;
- 	irq_chip->irq_set_type = irqc_irq_set_type;
--	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE;
-+	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+@@ -81,15 +81,12 @@ static void irqc_irq_disable(struct irq_data *d)
+ 	iowrite32(BIT(hw_irq), p->cpu_int_base + IRQC_EN_STS);
+ }
  
- 	p->irq_domain = irq_domain_add_simple(pdev->dev.of_node,
- 					      p->number_of_irqs,
+-#define INTC_IRQ_SENSE_VALID 0x10
+-#define INTC_IRQ_SENSE(x) (x + INTC_IRQ_SENSE_VALID)
+-
+ static unsigned char irqc_sense[IRQ_TYPE_SENSE_MASK + 1] = {
+-	[IRQ_TYPE_LEVEL_LOW] = INTC_IRQ_SENSE(0x01),
+-	[IRQ_TYPE_LEVEL_HIGH] = INTC_IRQ_SENSE(0x02),
+-	[IRQ_TYPE_EDGE_FALLING] = INTC_IRQ_SENSE(0x04), /* Synchronous */
+-	[IRQ_TYPE_EDGE_RISING] = INTC_IRQ_SENSE(0x08), /* Synchronous */
+-	[IRQ_TYPE_EDGE_BOTH] = INTC_IRQ_SENSE(0x0c),  /* Synchronous */
++	[IRQ_TYPE_LEVEL_LOW]	= 0x01,
++	[IRQ_TYPE_LEVEL_HIGH]	= 0x02,
++	[IRQ_TYPE_EDGE_FALLING]	= 0x04,	/* Synchronous */
++	[IRQ_TYPE_EDGE_RISING]	= 0x08,	/* Synchronous */
++	[IRQ_TYPE_EDGE_BOTH]	= 0x0c,	/* Synchronous */
+ };
+ 
+ static int irqc_irq_set_type(struct irq_data *d, unsigned int type)
+@@ -101,12 +98,12 @@ static int irqc_irq_set_type(struct irq_data *d, unsigned int type)
+ 
+ 	irqc_dbg(&p->irq[hw_irq], "sense");
+ 
+-	if (!(value & INTC_IRQ_SENSE_VALID))
++	if (!value)
+ 		return -EINVAL;
+ 
+ 	tmp = ioread32(p->iomem + IRQC_CONFIG(hw_irq));
+ 	tmp &= ~0x3f;
+-	tmp |= value ^ INTC_IRQ_SENSE_VALID;
++	tmp |= value;
+ 	iowrite32(tmp, p->iomem + IRQC_CONFIG(hw_irq));
+ 	return 0;
+ }
 -- 
 1.8.4
