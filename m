@@ -1,39 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 Dec 2013 20:46:47 +0100
-Subject: [PATCH 6/6] [RFC] arm: shmobile: genmai reference: Add RSPI nodes
-In-Reply-To: <52B9ABFF.90902@cogentembedded.com>
-References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <1387886210-3634-7-git-send-email-geert+renesas@linux-m68k.org>
- <52B9ABFF.90902@cogentembedded.com>
-Message-ID: <CAMuHMdWMXAnLgkap-sQEr1z0M-nS8spwiBd_X4cGsrJq1UO6rA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 24 Dec 2013 23:24:05 +0100
+Subject: [PATCH 3/5] ARM: dts: sun4i: Add rtp controller node
+In-Reply-To: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
+References: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1387923847-1294-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-On Tue, Dec 24, 2013 at 4:45 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->> +       codec: wm8978 at 0 {
->
->    Do not give chip names to device nodes, please use somewhat generic names
-> instead, like "sound-codec at 0". That's to comply with ePAPR spec.
-
-Oh, so the generic codec alias is not sufficient? Last time you gave this
-comment, the code didn't contain a generic name at all, so I thought
-this would be OK...
-
-Seems like Documentation/devicetree/bindings can use some cleanups,
-as it's full of examples like "codec: wm8510 at 1a"...
-
-Thanks for your comments!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index de1dd73..67ccdec 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -452,6 +452,13 @@
+ 			reg = <0x01c23800 0x10>;
+ 		};
+ 
++		rtp: rtp at 01c25000 {
++			compatible = "allwinner,sun4i-ts";
++			reg = <0x01c25000 0x100>;
++			interrupts = <29>;
++			ts-attached = <0>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+-- 
+1.8.4.2
