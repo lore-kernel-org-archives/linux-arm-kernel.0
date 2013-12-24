@@ -1,89 +1,91 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 24 Dec 2013 13:52:52 +0200
-Subject: [PATCH v2] arm: dts: keystone: add gpio device entry
-In-Reply-To: <1387211981-26045-2-git-send-email-grygorii.strashko@ti.com>
-References: <1387211981-26045-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1387885972-8275-1-git-send-email-grygorii.strashko@ti.com>
+From: maxime.hadjinlian@gmail.com (Maxime Hadjinlian)
+Date: Tue, 24 Dec 2013 12:17:12 +0100
+Subject: [PATCH 2/2] ARM: Kirkwood: DT board setup for LaPlug
+In-Reply-To: <20131223164826.GA6535@localhost>
+References: <1387813346-16741-1-git-send-email-maxime.hadjinlian@gmail.com>
+ <1387813346-16741-2-git-send-email-maxime.hadjinlian@gmail.com>
+ <CAGduivwCtQr-6sY92jEydU6uG1QJOSQcqxAKwcxr4viV38vU-Q@mail.gmail.com>
+ <20131223164826.GA6535@localhost>
+Message-ID: <CAGduivx9tkOrccNhhmCwbFqbF7Yi_EHAFA7ge08_OPzDvChR-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Keystone GPIO IP device definitions in DT which supports
-up to 32 GPIO lines and each GPIO line can be configured as separate
-interrupt source (so called "unbanked" IRQ).
-
-For more information see:
- http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Hi Santosh,
-
-I've changed format of "interrupts" property as discussed.
-
- arch/arm/boot/dts/keystone.dtsi |   45 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index f6d6d9e..53eefe3 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -7,6 +7,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- #include "skeleton.dtsi"
- 
-@@ -181,5 +182,49 @@
- 			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
- 			clocks = <&clkspi>;
- 		};
-+
-+		gpio0: gpio at 260bf00 {
-+			compatible = "ti,keystone-gpio";
-+			reg = <0x0260bf00 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* HW Interrupts mapped to GPIO pins */
-+			interrupts = <GIC_SPI 120 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 121 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 122 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 123 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 124 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 125 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 126 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 127 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 128 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 129 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 130 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 131 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 132 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 133 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 134 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 135 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 136 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 137 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 138 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 139 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 140 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 141 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 142 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 143 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 144 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 145 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 146 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 147 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 148 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 149 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 150 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 151 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&clkgpio>;
-+			clock-names = "gpio";
-+			ti,ngpio = <32>;
-+			ti,davinci-gpio-unbanked = <32>;
-+		};
- 	};
- };
--- 
-1.7.9.5
+On Mon, Dec 23, 2013 at 5:48 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Hi Maxime,
+Hi Ezequiel
+>
+> On Mon, Dec 23, 2013 at 04:47:34PM +0100, Maxime Hadjinlian wrote:
+>> I have a slight issue which I could not resolve regarding the Hynix
+>> NAND on this platform. Although it worked perfectly well with 3.12,
+>> the device is not detected  anymore with the current head of master.
+>>
+>
+> If you do a "git log v3.12..v3.13-rc4 -- drivers/mtd/nand/orion_nand.c"
+> you'll see that no changes have been made.
+>
+> So maybe this new dts v2 is the problem. And if you look in detail you'll
+> find you've been bitten by the subtleties of the devicetree!
+>
+> See below...
+>
+>> > +       mbus {
+>> > +               ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>;
+>> > +               pcie-controller {
+>> > +                       status = "okay";
+>> > +                       pcie at 1,0 {
+>> > +                               status = "okay";
+>> > +                       };
+>> > +               };
+>> > +       };
+>
+> ^^^^
+> Here's the problem: there's two wrong things with the above:
+>
+> 1. You can't do this... a ranges properties doesn't add on the included
+> (dtsi) ranges properties. Instead it replaces the included one, so you have
+> to write the entries all over again.
+>
+> Yes, we know: it sucks! And given we know it sucks, there was a nice
+> message warning you about this. From the kirkwood.dtsi
+>
+>         /* If a board file needs to change this ranges it must replace it completely */
+>         ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000     /* internal-regs */
+>                   MBUS_ID(0x01, 0x2f) 0 0xf4000000 0x10000      /* nand flash */
+>                   MBUS_ID(0x03, 0x01) 0 0xf5000000 0x10000      /* crypto sram */
+>           >;
+>
+> 2. Looking in yet more detail, you're re-adding the internal-regs window.
+> I guess it's just a typo, no?
+>
+> Anyway, I *think* that's what prevented you from getting the NAND to
+> work. The correct mbus node should be:
+>
+>         mbus {
+>                 pcie-controller {
+>                         status = "okay";
+>                         pcie at 1,0 {
+>                                 status = "okay";
+>                         };
+>                 };
+>         };
+>
+>> > +&nand {
+>> > +       /* Total size : 512MB */
+>> > +       status = "okay";
+>> > +
+>
+> And here: don't you need to add the pinmuxing? Maybe you don't need it,
+> but I guess it's the right thing to do.
+>
+> I hope this helps!
+That was it ! Thank you very much, I will resend a v3. Thank you very much.
+I will be more carefarch/arm/boot/dts/kirkwood-laplug.dtsull about
+this next time.
+>
+> Merry Christmas...
+Merry Christmas to you.
+> --
+> Ezequiel Garc?a, Free Electrons
+> Embedded Linux, Kernel and Android Engineering
+> http://free-electrons.com
