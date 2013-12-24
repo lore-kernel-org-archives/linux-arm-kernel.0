@@ -1,34 +1,29 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 24 Dec 2013 23:24:05 +0100
-Subject: [PATCH 3/5] ARM: dts: sun4i: Add rtp controller node
-In-Reply-To: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
-References: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1387923847-1294-4-git-send-email-hdegoede@redhat.com>
+Date: Tue, 24 Dec 2013 23:24:02 +0100
+Subject: [PATCH 0/5] input: Add new sun4i-ts driver for Allwinner sunxi SoC's
+Message-ID: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Hi Dimitri,
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index de1dd73..67ccdec 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -452,6 +452,13 @@
- 			reg = <0x01c23800 0x10>;
- 		};
- 
-+		rtp: rtp at 01c25000 {
-+			compatible = "allwinner,sun4i-ts";
-+			reg = <0x01c25000 0x100>;
-+			interrupts = <29>;
-+			ts-attached = <0>;
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
--- 
-1.8.4.2
+Here is a new driver for the resistive touchscreen controller found in
+Allwinner sunxi SoC's. Please review, and when ready pull this driver into
+your tree for Linus.
+
+This series consist of 5 patches, the 1st patch is the actual new driver,
+the 2nd patch extends it with support for the temperature sensor built into
+the rtp controller. Since this depends on the 1st one I would like to ask
+you to pull it into your tree too. I've written and maintain several hwmon
+drivers, so I'm confident the hwmon bits are solid, I've also CC-ed the
+sensors list so that they can review and if they've any comments I will of
+course fix those and send a new version.
+
+Patch 3-5 are dts patches adding the controller to the dts files describing
+the sunxi SoC variants. These will be merged through Maxime Ripard's tree,
+and are here so that the dts bits can be reviewed at the same time. I'll ask
+Maxime to merge them once you're happy with Patch 1 + 2.
+
+Thanks & Regards,
+
+Hans
