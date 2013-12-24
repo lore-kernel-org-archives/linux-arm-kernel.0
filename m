@@ -1,122 +1,72 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Dec 2013 21:26:17 +0800
-Subject: [PATCH 1/4] clk: sunxi: Allwinner A20 output clock support
-In-Reply-To: <1387891580-30715-1-git-send-email-wens@csie.org>
-References: <1387891580-30715-1-git-send-email-wens@csie.org>
-Message-ID: <1387891580-30715-2-git-send-email-wens@csie.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 24 Dec 2013 15:32:05 +0200
+Subject: [PATCH v2 0/6] efuse driver for Tegra
+Message-ID: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the external clock outputs on the
-Allwinner A20 SoC. The clock outputs are similar to "module 0"
-type clocks, with different offsets and widths for clock factors.
+This driver allows userspace to read the raw efuse data. Its userspace
+interface is modelled after the sunxi_sid driver which provides similar
+functionality for some Allwinner SoCs. It has been tested on
+Tegra20 (ventana), Tegra30 (beaverboard) and Tegra114 (dalmore).
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-sunxi.c                     | 57 +++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
+Changes since v1:
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 46d8433..c2cb762 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -36,6 +36,7 @@ Required properties:
- 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
- 	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
-+	"allwinner,sun7i-a20-out-clk" - for the external output clocks
- 
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 25d99b6..19d9e9e 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -330,6 +330,47 @@ static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
- 
- 
- /**
-+ * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
-+ * CLK_OUT rate is calculated as follows
-+ * rate = (parent_rate >> p) / (m + 1);
-+ */
-+
-+static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
-+				      u8 *n, u8 *k, u8 *m, u8 *p)
-+{
-+	u8 div, calcm, calcp;
-+
-+	/* These clocks can only divide, so we will never be able to achieve
-+	 * frequencies higher than the parent frequency */
-+	if (*freq > parent_rate)
-+		*freq = parent_rate;
-+
-+	div = parent_rate / *freq;
-+
-+	if (div < 32)
-+		calcp = 0;
-+	else if (div / 2 < 32)
-+		calcp = 1;
-+	else if (div / 4 < 32)
-+		calcp = 2;
-+	else
-+		calcp = 3;
-+
-+	calcm = DIV_ROUND_UP(div, 1 << calcp);
-+
-+	*freq = (parent_rate >> calcp) / calcm;
-+
-+	/* we were called to round the frequency, we can now return */
-+	if (n == NULL)
-+		return;
-+
-+	*m = calcm - 1;
-+	*p = calcp;
-+}
-+
-+
-+
-+/**
-  * sunxi_factors_clk_setup() - Setup function for factor clocks
-  */
- 
-@@ -384,6 +425,14 @@ static struct clk_factors_config sun4i_mod0_config = {
- 	.pwidth = 2,
- };
- 
-+/* user manual says "n" but it's really "p" */
-+static struct clk_factors_config sun7i_a20_out_config = {
-+	.mshift = 8,
-+	.mwidth = 5,
-+	.pshift = 20,
-+	.pwidth = 2,
-+};
-+
- static const struct factors_data sun4i_pll1_data __initconst = {
- 	.enable = 31,
- 	.table = &sun4i_pll1_config,
-@@ -414,6 +463,13 @@ static const struct factors_data sun4i_mod0_data __initconst = {
- 	.getter = sun4i_get_mod0_factors,
- };
- 
-+static const struct factors_data sun7i_a20_out_data __initconst = {
-+	.enable = 31,
-+	.mux = 24,
-+	.table = &sun7i_a20_out_config,
-+	.getter = sun7i_a20_get_out_factors,
-+};
-+
- static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
- 						const struct factors_data *data)
- {
-@@ -912,6 +968,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
- 	{.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
- 	{.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
-+	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
- 	{}
- };
- 
+* Add documentation for sysfs interface
+* Cleanup messages
+
+TODO:
+* test on Tegra124 (venice2) 
+
+Peter De Schrijver (6):
+  ARM: tegra: export apb dma readl/writel
+  misc: fuse: Add efuse driver for Tegra
+  ARM: tegra: Add efuse bindings
+  ARM: tegra: rework fuse.c
+  ARM: Tegra: remove speedo files
+  misc: enable fuse drivers
+
+ Documentation/ABI/testing/sysfs-driver-tegra-fuse |    8 +
+ arch/arm/boot/dts/tegra114.dtsi                   |    6 +
+ arch/arm/boot/dts/tegra124.dtsi                   |    6 +
+ arch/arm/boot/dts/tegra20.dtsi                    |    6 +
+ arch/arm/boot/dts/tegra30.dtsi                    |    6 +
+ arch/arm/mach-tegra/Makefile                      |    3 -
+ arch/arm/mach-tegra/apbio.c                       |   51 +++--
+ arch/arm/mach-tegra/fuse.c                        |  147 +----------
+ arch/arm/mach-tegra/tegra114_speedo.c             |  104 --------
+ arch/arm/mach-tegra/tegra20_speedo.c              |  109 --------
+ arch/arm/mach-tegra/tegra30_speedo.c              |  292 --------------------
+ drivers/misc/Kconfig                              |    1 +
+ drivers/misc/Makefile                             |    1 +
+ drivers/misc/fuse/Kconfig                         |   12 +
+ drivers/misc/fuse/Makefile                        |    1 +
+ drivers/misc/fuse/tegra/Makefile                  |    7 +
+ drivers/misc/fuse/tegra/fuse-tegra.c              |   97 +++++++
+ drivers/misc/fuse/tegra/fuse-tegra20.c            |  154 +++++++++++
+ drivers/misc/fuse/tegra/fuse-tegra30.c            |  196 ++++++++++++++
+ drivers/misc/fuse/tegra/fuse.h                    |   87 ++++++
+ drivers/misc/fuse/tegra/tegra114_speedo.c         |  109 ++++++++
+ drivers/misc/fuse/tegra/tegra124_speedo.c         |  164 ++++++++++++
+ drivers/misc/fuse/tegra/tegra20_speedo.c          |  109 ++++++++
+ drivers/misc/fuse/tegra/tegra30_speedo.c          |  293 +++++++++++++++++++++
+ include/linux/tegra-soc.h                         |   17 ++
+ 25 files changed, 1317 insertions(+), 669 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-tegra-fuse
+ delete mode 100644 arch/arm/mach-tegra/tegra114_speedo.c
+ delete mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
+ delete mode 100644 arch/arm/mach-tegra/tegra30_speedo.c
+ create mode 100644 drivers/misc/fuse/Kconfig
+ create mode 100644 drivers/misc/fuse/Makefile
+ create mode 100644 drivers/misc/fuse/tegra/Makefile
+ create mode 100644 drivers/misc/fuse/tegra/fuse-tegra.c
+ create mode 100644 drivers/misc/fuse/tegra/fuse-tegra20.c
+ create mode 100644 drivers/misc/fuse/tegra/fuse-tegra30.c
+ create mode 100644 drivers/misc/fuse/tegra/fuse.h
+ create mode 100644 drivers/misc/fuse/tegra/tegra114_speedo.c
+ create mode 100644 drivers/misc/fuse/tegra/tegra124_speedo.c
+ create mode 100644 drivers/misc/fuse/tegra/tegra20_speedo.c
+ create mode 100644 drivers/misc/fuse/tegra/tegra30_speedo.c
+
 -- 
-1.8.5.2
+1.7.7.rc0.72.g4b5ea.dirty
