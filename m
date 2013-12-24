@@ -1,55 +1,93 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Tue, 24 Dec 2013 16:07:41 +0100
-Subject: [PATCH v4 03/15] clk: Add regmap core helpers for
- enable/disable/is_enabled
-In-Reply-To: <1387847559-18330-4-git-send-email-sboyd@codeaurora.org>
-References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
- <1387847559-18330-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20131224150741.GG8064@book.gsilab.sittig.org>
+From: Ranjani.Vaidyanathan@freescale.com (Ranjani.Vaidyanathan at freescale.com)
+Date: Tue, 24 Dec 2013 15:34:17 +0000
+Subject: [PATCH V1 1/7] ARM: dts: imx: pinfunc: add
+ MX6QDL_PAD_GPIO_6__ENET_IRQ
+In-Reply-To: <20131219050430.GS6691@S2101-09.ap.freescale.net>
+References: <1387406497-26430-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1387406497-26430-2-git-send-email-troy.kisky@boundarydevices.com>
+ <20131219050430.GS6691@S2101-09.ap.freescale.net>
+Message-ID: <6104ba97e62f46a08812ac2ed7fef93c@BY2PR03MB379.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 17:12 -0800, Stephen Boyd wrote:
+Hi Shawn,
+
+Unfortunately the obsrv_mux registers are currently not documented in the RM, it was part of the original MX6Q userguide. We would need to request the doc team to put the info in.
+
+Thanks,
+Ranjani
+
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at linaro.org] 
+Sent: Wednesday, December 18, 2013 11:05 PM
+To: Troy Kisky
+Cc: festevam at gmail.com; eric.nelson at boundarydevices.com; marex at denx.de; linux-arm-kernel at lists.infradead.org; Vaidyanathan Ranjani-RA5478
+Subject: Re: [PATCH V1 1/7] ARM: dts: imx: pinfunc: add MX6QDL_PAD_GPIO_6__ENET_IRQ
+
+On Wed, Dec 18, 2013 at 03:41:31PM -0700, Troy Kisky wrote:
+> Quoting from Ranjani Vaidyanathan
 > 
-> The clock framework already has support for simple gate clocks
-> but if drivers want to use the gate clock functionality they need
-> to wrap the gate clock in another struct and chain the ops by
-> calling the gate ops from their own custom ops. Plus the gate
-> clock implementation only supports MMIO accessors so other bus
-> type clocks don't benefit from the potential code reuse. Add some
-> simple regmap helpers for enable/disable/is_enabled that drivers
-> can use as drop in replacements for their clock ops or as simple
-> functions they call from their own custom ops. This is based on 
-> similar helps in the regulator framework.
+> All of the interrupts from the ENET block are not routed to the GPC 
+> block. Hence ENET interrupts are not able to wake up the SOC when the 
+> system is in WAIT mode. And the ENET interrupt gets serviced only when 
+> another interrupt causes the SOC to exit WAIT mode. This impacts the 
+> ENET performance.
 
-The same comment applies as to the previous version.  Is it
-useful to introduce copies of the gate handling while the
-difference in only in how the hardware registers get accessed?
+We should probably also quote the IMX6Q errata document below.
 
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -177,11 +177,21 @@ struct clk_init_data {
-> [ ... ]
-> @@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
->  long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
->  			      unsigned long *best_parent_rate,
->  			      struct clk **best_parent_p);
-> +int clk_is_enabled_regmap(struct clk_hw *hw);
-> +int clk_enable_regmap(struct clk_hw *hw);
-> +void clk_disable_regmap(struct clk_hw *hw);
+ http://cache.freescale.com/files/32bit/doc/errata/IMX6DQCE.pdf?fpsp=1
 
-Looking at the patch:  Do you expect callers to remember whether
-a clock gate is backed by mmio or by regmap access, to call a
-different set of routines?  Should this not be hidden behind the
-API and be transparent after clock registration?
+ERR006687 ENET: Only the ENET wake-up interrupt request can wake the system from Wait mode.
 
-I'd suggest to fold regmap support into Tero Kristo's ll_ops
-approach, and to discuss this in his v12 thread.
+> 
+> Adding MX6QDL_PAD_GPIO_6__ENET_IRQ is the 1st step to workaround this 
+> problem.
+> 
+> The input reg is set to 0x3c to set IOMUX_OBSRV_MUX1 to ENET_IRQ.
 
+It seems this is an undocumented register?  Is the info available somewhere?
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+> The mux reg value is 0x11, so that the observable mux is routed to 
+> this pin and to the gpio controller(sion bit).
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> CC: ra5478 at freescale.com
+
+When having people in the tag, please put their name in there as well, so Ranjani Vaidyanathan <ra5478@freescale.com> please.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +  
+> arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h 
+> b/arch/arm/boot/dts/imx6dl-pinfunc.h
+> index 7499eee..0ead323 100644
+> --- a/arch/arm/boot/dts/imx6dl-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
+> @@ -755,6 +755,7 @@
+>  #define MX6QDL_PAD_GPIO_5__I2C3_SCL                 0x230 0x600 0x878 0x6 0x2
+>  #define MX6QDL_PAD_GPIO_5__ARM_EVENTI               0x230 0x600 0x000 0x7 0x0
+>  #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x234 0x604 0x840 0x0 0x1
+> +#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x234 0x604 0x03c 0x11 0xff000609
+>  #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x234 0x604 0x87c 0x2 0x2
+>  #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x234 0x604 0x000 0x5 0x0
+>  #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x234 0x604 0x000 0x6 0x0
+> diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h 
+> b/arch/arm/boot/dts/imx6q-pinfunc.h
+> index e5834b2..9fc6120 100644
+> --- a/arch/arm/boot/dts/imx6q-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx6q-pinfunc.h
+> @@ -673,6 +673,7 @@
+>  #define MX6QDL_PAD_GPIO_3__USB_H1_OC                0x22c 0x5fc 0x948 0x6 0x1
+>  #define MX6QDL_PAD_GPIO_3__MLB_CLK                  0x22c 0x5fc 0x900 0x7 0x1
+>  #define MX6QDL_PAD_GPIO_6__ESAI_TX_CLK              0x230 0x600 0x870 0x0 0x1
+> +#define MX6QDL_PAD_GPIO_6__ENET_IRQ		    0x230 0x600 0x03c 0x11 0xff000609
+>  #define MX6QDL_PAD_GPIO_6__I2C3_SDA                 0x230 0x600 0x8ac 0x2 0x1
+>  #define MX6QDL_PAD_GPIO_6__GPIO1_IO06               0x230 0x600 0x000 0x5 0x0
+>  #define MX6QDL_PAD_GPIO_6__SD2_LCTL                 0x230 0x600 0x000 0x6 0x0
+> --
+> 1.8.1.2
+> 
