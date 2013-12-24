@@ -1,71 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 11:48:55 +0900
-Subject: [PATCH V2 2/5] arm: shmobile: r7s72100: add i2c clocks
-In-Reply-To: <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
-References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
- <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <20131224024855.GC22401@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 23 Dec 2013 18:49:14 -0800
+Subject: [GIT PULL 2/7] Samsung cleanup for v3.14
+In-Reply-To: <1af801cf0049$783fe660$68bfb320$@samsung.com>
+References: <52AE0F4E.5070309@samsung.com>
+ <20131222220338.GB13365@quad.lixom.net>
+ <1af801cf0049$783fe660$68bfb320$@samsung.com>
+Message-ID: <CAOesGMii6z29QUE2v13f5moaDTx0V2rmFpOS2FYrini=_DD2Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 18, 2013 at 10:31:58PM +0100, Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Tested with RIIC2 on a genmai board. Others untested but hopefully
-> trivial enough to be added.
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
-> V2: adapt to established sorting
+On Mon, Dec 23, 2013 at 5:42 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Olof Johansson wrote:
+>>
+>> On Mon, Dec 16, 2013 at 05:21:34AM +0900, Kukjin Kim wrote:
+>> > The following changes since commit
+>> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>> >
+>> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>> >
+>> > are available in the git repository at:
+>> >
+>>
+>> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> > tags/samsung-cleanup
+>> >
+>> > for you to fetch changes up to 7c394e7be4d267c02eaaac8fa197a7c1b023c99b:
+>> >
+>> >   ARM: EXYNOS: Constify clksrc immutable register restore tables
+>> > (2013-12-12 07:09:33 +0900)
+>> >
+>> > ----------------------------------------------------------------
+>> > Samsung cleanup for v3.14
+>> > - remove unused SAMSUNG_GPIOLIB_4BIT and IRQF_DISABLED
+>> > - constify immutable PMU data table and PM clksrc register
+>> > - make const struct for sleep_save
+>> >
+>> > ----------------------------------------------------------------
+>> > Daniel Kurtz (3):
+>> >       ARM: EXYNOS: Constify data tables for pmu
+>> >       ARM: SAMSUNG: Let s3c_pm_do_restore_*() take const sleep_save
+>> >       ARM: EXYNOS: Constify clksrc immutable register restore tables
+>> >
+>> > Michael Opdenacker (2):
+>> >       ARM: SAMSUNG: remove unused SAMSUNG_GPIOLIB_4BIT Kconfig parameter
+>> >       ARM: SAMSUNG: remove IRQF_DISABLED
+>>
+> Hi Olof,
+>
+>> Pulled into next/cleanup.
+>
+> Thanks.
+>
+>> Please be consistent in patch subjects like
+>> other platforms, so "ARM: samsung: .." or "ARM: exynos: ...".
+>>
+> Well, 'SAMSUNG' and 'EXYNOS' are proper names and they have a habit of
+> starting with a capital letter or just using capital letters like 'ARM' in
+> the subject. Additionally, we used to use like that.
 
-Thanks. This seems safe enough and I will queue it up.
+Ok, well, what I'm looking for mostly is consistency. So if you prefer
+to capitalize the words then make sure you always do so. :)
 
-> 
->  arch/arm/mach-shmobile/clock-r7s72100.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-> index 7b457ae..9cda215 100644
-> --- a/arch/arm/mach-shmobile/clock-r7s72100.c
-> +++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-> @@ -27,6 +27,7 @@
->  #define FRQCR2		0xfcfe0014
->  #define STBCR3		0xfcfe0420
->  #define STBCR4		0xfcfe0424
-> +#define STBCR9		0xfcfe0438
->  
->  #define PLL_RATE 30
->  
-> @@ -144,10 +145,15 @@ struct clk div4_clks[DIV4_NR] = {
->  					| CLK_ENABLE_ON_INIT),
->  };
->  
-> -enum { MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
-> +enum {	MSTP97, MSTP96, MSTP95, MSTP94,
-> +	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
->  	MSTP33,	MSTP_NR };
->  
->  static struct clk mstp_clks[MSTP_NR] = {
-> +	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
-> +	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
-> +	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
-> +	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
->  	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
->  	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
->  	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
-> @@ -170,6 +176,10 @@ static struct clk_lookup lookups[] = {
->  	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
->  
->  	/* MSTP clocks */
-> +	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
-> +	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
-> +	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
-> +	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
->  	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
->  
->  	/* ICK */
-> -- 
-> 1.8.4.2
-> 
+
+-Olof
