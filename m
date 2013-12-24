@@ -1,74 +1,42 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 24 Dec 2013 10:36:10 +0800
-Subject: [PATCH v5 3/3] ARM: dts: sama5d3xcm: add the regulator device node
-In-Reply-To: <1387852421-18033-1-git-send-email-wenyou.yang@atmel.com>
-References: <1387852421-18033-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1387852570-18159-1-git-send-email-wenyou.yang@atmel.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 24 Dec 2013 10:13:56 +0800
+Subject: [PATCH 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe
+ lock in atomic context
+In-Reply-To: <20131223124659.GK26070@S2101-09.ap.freescale.net>
+References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
+ <20131223124659.GK26070@S2101-09.ap.freescale.net>
+Message-ID: <20131224021355.GB23230@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviwed-by: Mark Brown <broonie@linaro.org>
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/boot/dts/sama5d3xcm.dtsi |   46 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+On Mon, Dec 23, 2013 at 08:47:01PM +0800, Shawn Guo wrote:
+> On Mon, Dec 23, 2013 at 07:02:23PM +0800, Dong Aisheng wrote:
+> > Sometimes we may meet the following lockdep issue.
+> > The root cause is .set_clock callback is executed with spin_lock_irqsave
+> > in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
+> > clk_get_rate which is using a mutex lock.
+> > 
+> > The fix avoids access mutex in .set_clock callback by initializing the
+> > pltfm_host->clock at probe time and use it later instead of calling
+> > clk_get_rate again in atomic context.
+> 
+> While I agree this is the way less intrusive, I'm also wondering why
+> sdhci_do_set_ios() needs a spinlock at all, or at least it's
+> questionable if the lock should necessarily be held for such a long
+> running section.
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index 726a0f3..3d4e5c2 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -38,6 +38,52 @@
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
- 			};
-+
-+			i2c1: i2c at f0018000 {
-+				pmic: act8865 at 5b {
-+					compatible = "active-semi,act8865";
-+					reg = <0x5b>;
-+					status = "disabled";
-+
-+					regulators {
-+						vcc_1v8_reg: DCDC_REG1 {
-+							regulator-name = "VCC_1V8";
-+							regulator-min-microvolt = <1800000>;
-+							regulator-max-microvolt = <1800000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_1v2_reg: DCDC_REG2 {
-+							regulator-name = "VCC_1V2";
-+							regulator-min-microvolt = <1100000>;
-+							regulator-max-microvolt = <1300000>;
-+							regulator-suspend-mem-microvolt = <1150000>;
-+							regulator-suspend-standby-microvolt = <1150000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_3v3_reg: DCDC_REG3 {
-+							regulator-name = "VCC_3V3";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddana_reg: LDO_REG1 {
-+							regulator-name = "VDDANA";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddfuse_reg: LDO_REG2 {
-+							regulator-name = "FUSE_2V5";
-+							regulator-min-microvolt = <2500000>;
-+							regulator-max-microvolt = <2500000>;
-+						};
-+					};
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 60000000 {
--- 
-1.7.9.5
+Per my understanding, it's for protecting the host structure including
+register r/w where can also be accessed from ISR, so we need it.
+
+> 
+> Nevertheless, as long as we can guarantee that the rate of
+> pltfm_host->clk does not change after the driver is probed, I'm fine
+> with the patch.
+> 
+
+We does not change the host parent clock always currently.
+
+Regards
+Dong Aisheng
+> Shawn
+> 
