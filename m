@@ -1,40 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:05:35 +0900
-Subject: [GIT PULL 0/3] Renesas ARM based SoC IRQC Driver Updates for v3.14
-Message-ID: <cover.1387855444.git.horms+renesas@verge.net.au>
+Date: Tue, 24 Dec 2013 15:06:00 +0900
+Subject: [PATCH 1/3] irqchip: renesas-irqc: Use lazy disable
+In-Reply-To: <cover.1387855444.git.horms+renesas@verge.net.au>
+References: <cover.1387855444.git.horms+renesas@verge.net.au>
+Message-ID: <272012d0f748de2e4d2428f5cb7003280032ce08.1387855444.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-please consider these Renesas ARM based SoC IRQC driver updates for v3.14.
+Set the ->irq_enable() and ->irq_disable() methods to NULL
+to enable lazy disable of interrupts. This by itself provides
+some level of optimization, but is mainly enabled as ground
+work for future Suspend-to-RAM wake up support.
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/irqchip/irq-renesas-irqc.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-irqc-for-v3.14
-
-for you to fetch changes up to ce70af18801fd8dac6e9f85308294948916e84d6:
-
-  irq-renesas-irqc: simplify irq_set_type() method (2013-12-23 09:27:17 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC IRQC Driver Updates for v3.14
-
-* Simplify irq_set_type() method
-* Enable mask on suspend
-* Use lazy disable
-
-----------------------------------------------------------------
-Magnus Damm (2):
-      irqchip: renesas-irqc: Use lazy disable
-      irqchip: renesas-irqc: Enable mask on suspend
-
-Sergei Shtylyov (1):
-      irq-renesas-irqc: simplify irq_set_type() method
-
- drivers/irqchip/irq-renesas-irqc.c | 21 ++++++++-------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
+diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
+index 2f404ba..8fdd7d6 100644
+--- a/drivers/irqchip/irq-renesas-irqc.c
++++ b/drivers/irqchip/irq-renesas-irqc.c
+@@ -212,8 +212,6 @@ static int irqc_probe(struct platform_device *pdev)
+ 	irq_chip->name = name;
+ 	irq_chip->irq_mask = irqc_irq_disable;
+ 	irq_chip->irq_unmask = irqc_irq_enable;
+-	irq_chip->irq_enable = irqc_irq_enable;
+-	irq_chip->irq_disable = irqc_irq_disable;
+ 	irq_chip->irq_set_type = irqc_irq_set_type;
+ 	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE;
+ 
+-- 
+1.8.4
