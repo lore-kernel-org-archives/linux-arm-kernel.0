@@ -1,148 +1,94 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 17:12:27 -0800
-Subject: [PATCH v4 03/15] clk: Add regmap core helpers for
- enable/disable/is_enabled
+Date: Mon, 23 Dec 2013 17:12:26 -0800
+Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
 In-Reply-To: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
 References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387847559-18330-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock framework already has support for simple gate clocks
-but if drivers want to use the gate clock functionality they need
-to wrap the gate clock in another struct and chain the ops by
-calling the gate ops from their own custom ops. Plus the gate
-clock implementation only supports MMIO accessors so other bus
-type clocks don't benefit from the potential code reuse. Add some
-simple regmap helpers for enable/disable/is_enabled that drivers
-can use as drop in replacements for their clock ops or as simple
-functions they call from their own custom ops. This is based on 
-similar helps in the regulator framework.
+Add support to the clock core so that drivers can pass in a
+regmap. If no regmap is specified try to query the device that's
+registering the clock for its regmap. This should allow drivers
+to use the core regmap helpers. This is based on a similar design
+in the regulator framework.
 
 Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk.c            | 70 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h | 13 ++++++++
- 2 files changed, 83 insertions(+)
+ drivers/clk/clk.c            | 8 ++++++++
+ include/linux/clk-provider.h | 7 +++++++
+ 2 files changed, 15 insertions(+)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 5e71f5c..8b40170 100644
+index 9ad7b71..5e71f5c 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -742,6 +742,76 @@ out:
- 	return best;
- }
+@@ -20,6 +20,7 @@
+ #include <linux/device.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
++#include <linux/regmap.h>
  
-+/**
-+ * clk_is_enabled_regmap - standard is_enabled() for regmap users
-+ *
-+ * @hw: clk to operate on
-+ *
-+ * Clocks that use regmap for their register I/O can set the
-+ * enable_reg and enable_mask fields in their struct clk_hw and then use
-+ * this as their is_enabled operation, saving some code.
-+ */
-+int clk_is_enabled_regmap(struct clk_hw *hw)
-+{
-+	unsigned int val;
-+	int ret;
-+
-+	ret = regmap_read(hw->regmap, hw->enable_reg, &val);
-+	if (ret != 0)
-+		return ret;
-+
-+	if (hw->enable_is_inverted)
-+		return (val & hw->enable_mask) == 0;
-+	else
-+		return (val & hw->enable_mask) != 0;
-+}
-+EXPORT_SYMBOL_GPL(clk_is_enabled_regmap);
-+
-+/**
-+ * clk_enable_regmap - standard enable() for regmap users
-+ *
-+ * @hw: clk to operate on
-+ *
-+ * Clocks that use regmap for their register I/O can set the
-+ * enable_reg and enable_mask fields in their struct clk_hw and then use
-+ * this as their enable() operation, saving some code.
-+ */
-+int clk_enable_regmap(struct clk_hw *hw)
-+{
-+	unsigned int val;
-+
-+	if (hw->enable_is_inverted)
-+		val = 0;
-+	else
-+		val = hw->enable_mask;
-+
-+	return regmap_update_bits(hw->regmap, hw->enable_reg,
-+				  hw->enable_mask, val);
-+}
-+EXPORT_SYMBOL_GPL(clk_enable_regmap);
-+
-+/**
-+ * clk_disable_regmap - standard disable() for regmap users
-+ *
-+ * @hw: clk to operate on
-+ *
-+ * Clocks that use regmap for their register I/O can set the
-+ * enable_reg and enable_mask fields in their struct clk_hw and then use
-+ * this as their disable() operation, saving some code.
-+ */
-+void clk_disable_regmap(struct clk_hw *hw)
-+{
-+	unsigned int val;
-+
-+	if (hw->enable_is_inverted)
-+		val = hw->enable_mask;
-+	else
-+		val = 0;
-+
-+	regmap_update_bits(hw->regmap, hw->enable_reg, hw->enable_mask, val);
-+}
-+EXPORT_SYMBOL_GPL(clk_disable_regmap);
-+
- /***        clk api        ***/
+ static DEFINE_SPINLOCK(enable_lock);
+ static DEFINE_MUTEX(prepare_lock);
+@@ -1834,6 +1835,13 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+ 	clk->num_parents = hw->init->num_parents;
+ 	hw->clk = clk;
  
- void __clk_unprepare(struct clk *clk)
++	if (hw->init->regmap)
++		hw->regmap = hw->init->regmap;
++	else if (dev && dev_get_regmap(dev, NULL))
++		hw->regmap = dev_get_regmap(dev, NULL);
++	else if (dev && dev->parent)
++		hw->regmap = dev_get_regmap(dev->parent, NULL);
++
+ 	/* allocate local copy in case parent_names is __initdata */
+ 	clk->parent_names = kcalloc(clk->num_parents, sizeof(char *),
+ 					GFP_KERNEL);
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 31f2890..61507fb 100644
+index 7e59253..31f2890 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -177,11 +177,21 @@ struct clk_init_data {
-  * with the common clock framework.
+@@ -142,6 +142,8 @@ struct clk_ops {
+ 	void		(*init)(struct clk_hw *hw);
+ };
+ 
++struct regmap;
++
+ /**
+  * struct clk_init_data - holds init data that's common to all clocks and is
+  * shared between the clock provider and the common clock framework.
+@@ -151,6 +153,7 @@ struct clk_ops {
+  * @parent_names: array of string names for all possible parents
+  * @num_parents: number of possible parents
+  * @flags: framework-level hints and quirks
++ * @regmap: regmap to use for regmap helpers and/or by providers
+  */
+ struct clk_init_data {
+ 	const char		*name;
+@@ -158,6 +161,7 @@ struct clk_init_data {
+ 	const char		**parent_names;
+ 	u8			num_parents;
+ 	unsigned long		flags;
++	struct regmap		*regmap;
+ };
+ 
+ /**
+@@ -171,10 +175,13 @@ struct clk_init_data {
   *
-  * @regmap: regmap to use for regmap helpers and/or by providers
+  * @init: pointer to struct clk_init_data that contains the init data shared
+  * with the common clock framework.
 + *
-+ * @enable_reg: register when using regmap enable/disable ops
-+ *
-+ * @enable_mask: mask when using regmap enable/disable ops
-+ *
-+ * @enable_is_inverted: flag to indicate set enable_mask bits to disable
-+ *                      when using clock_enable_regmap and friends APIs.
++ * @regmap: regmap to use for regmap helpers and/or by providers
   */
  struct clk_hw {
  	struct clk *clk;
  	const struct clk_init_data *init;
- 	struct regmap *regmap;
-+	unsigned int enable_reg;
-+	unsigned int enable_mask;
-+	bool enable_is_inverted;
++	struct regmap *regmap;
  };
  
  /*
-@@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
- long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
- 			      unsigned long *best_parent_rate,
- 			      struct clk **best_parent_p);
-+int clk_is_enabled_regmap(struct clk_hw *hw);
-+int clk_enable_regmap(struct clk_hw *hw);
-+void clk_disable_regmap(struct clk_hw *hw);
- 
- /*
-  * FIXME clock api without lock protection
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
