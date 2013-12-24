@@ -1,106 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 24 Dec 2013 08:15:00 +0800
-Subject: [PATCH v7 06/14] usb: phy-mxs: Add anatop regmap
-In-Reply-To: <1387525930-27313-7-git-send-email-peter.chen@freescale.com>
-References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
- <1387525930-27313-7-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131224001457.GA1128@S2101-09.ap.freescale.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 Dec 2013 16:39:46 -0800
+Subject: [PATCH v2 2/9] devicetree: bindings: Document qcom,kpss-acc
+In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387845593-10050-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 03:52:02PM +0800, Peter Chen wrote:
-> It is needed by imx6 SoC series, but not for imx23 and imx28.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/phy/phy-mxs-usb.c |   23 +++++++++++++++++++++--
->  1 files changed, 21 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 0c6f3bc..0ef930a 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -21,6 +21,8 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/of_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
->  
->  #define DRIVER_NAME "mxs_phy"
->  
-> @@ -58,6 +60,9 @@
->   */
->  #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
->  
-> +/* The SoCs who have anatop module */
-> +#define MXS_PHY_HAS_ANATOP			BIT(3)
-> +
->  struct mxs_phy_data {
->  	unsigned int flags;
->  };
-> @@ -68,11 +73,13 @@ static const struct mxs_phy_data imx23_phy_data = {
->  
->  static const struct mxs_phy_data imx6q_phy_data = {
->  	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
-> -		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-> +		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-> +		MXS_PHY_HAS_ANATOP,
->  };
->  
->  static const struct mxs_phy_data imx6sl_phy_data = {
-> -	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-> +		MXS_PHY_HAS_ANATOP,
->  };
->  
->  static const struct of_device_id mxs_phy_dt_ids[] = {
-> @@ -87,6 +94,7 @@ struct mxs_phy {
->  	struct usb_phy phy;
->  	struct clk *clk;
->  	const struct mxs_phy_data *data;
-> +	struct regmap *regmap_anatop;
->  };
->  
->  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-> @@ -190,6 +198,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  	int ret;
->  	const struct of_device_id *of_id =
->  			of_match_device(mxs_phy_dt_ids, &pdev->dev);
-> +	struct device_node *np = pdev->dev.of_node;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	base = devm_ioremap_resource(&pdev->dev, res);
-> @@ -226,6 +235,16 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, mxs_phy);
->  
-> +	if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
-> +		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
-> +			(np, "fsl,anatop");
-> +		if (IS_ERR(mxs_phy->regmap_anatop)) {
-> +			dev_dbg(&pdev->dev,
-> +				"failed to find regmap for anatop\n");
-> +			return PTR_ERR(mxs_phy->regmap_anatop);
+The kpss acc binding describes the clock, reset, and power domain
+controller for a Krait CPU.
 
-I'm looking at the merge dependency that Felipe mentions, and just think
-of the DTB compatibility thing.  Does the above code mean that USB will
-be broken if someone runs the new kernel with an old DTB on his board?
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
 
-We're entering the stage where we need to maintain the DTB compatibility
-in kernel.  That said, if users choose to upgrade their kernel only
-(running with an old DTB), it's okay we do not give them new
-features, but we shouldn't cause any regression/breakage for them.
-
-Shawn
-
-> +		}
-> +	}
-> +
->  	ret = usb_add_phy_dev(&mxs_phy->phy);
->  	if (ret)
->  		return ret;
-> -- 
-> 1.7.8
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+new file mode 100644
+index 0000000..1333db9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+@@ -0,0 +1,30 @@
++Krait Processor Sub-system (KPSS) Application Clock Controller (ACC)
++
++The KPSS ACC provides clock, power domain, and reset control to a Krait CPU.
++There is one ACC register region per CPU within the KPSS remapped region as
++well as an alias register region that remaps accesses to the ACC associated
++with the CPU accessing the region.
++
++PROPERTIES
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: should be one of:
++			"qcom,kpss-acc-v1"
++			"qcom,kpss-acc-v2"
++
++- reg:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: the first element specifies the base address and size of
++		    the register region. An optional second element specifies
++		    the base address and size of the alias register region.
++
++Example:
++
++	clock-controller at 2088000 {
++		compatible = "qcom,kpss-acc-v2";
++		reg = <0x02088000 0x1000>,
++		      <0x02008000 0x1000>;
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
