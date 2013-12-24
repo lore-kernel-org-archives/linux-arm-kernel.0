@@ -1,64 +1,89 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:16:06 +0900
-Subject: [PATCH 26/29] ARM: shmobile: r8a7790: Don't set plat_sci_port
- scbrr_algo_id field
-In-Reply-To: <cover.1387888861.git.horms+renesas@verge.net.au>
-References: <cover.1387888861.git.horms+renesas@verge.net.au>
-Message-ID: <6319ea5089a267b3a1cbd1d745ecc7cdae9a0a7e.1387888861.git.horms+renesas@verge.net.au>
+Date: Tue, 24 Dec 2013 23:17:58 +0900
+Subject: [GIT PULL 00/12] Second Round of Renesas ARM based SoC Board updates
+ for v3.14
+Message-ID: <cover.1387891831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Kevin, Hi Olof, Hi Arnd,
 
-The field will be removed from the sh-sci driver. Don't set it and let
-the driver handle baud rate calculation internally.
+please consider the this second round of Renesas ARM based SoC board
+updates for v3.14.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7790.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+This pull request is based on a merge of:
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 8bfdc36..66476d2 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -100,11 +100,10 @@ void __init r8a7790_pinmux_init(void)
- 	r8a7790_register_i2c(3);
- }
- 
--#define __R8A7790_SCIF(scif_type, _scscr, algo, index, baseaddr, irq)	\
-+#define __R8A7790_SCIF(scif_type, _scscr, index, baseaddr, irq)		\
- static struct plat_sci_port scif##index##_platform_data = {		\
- 	.type		= scif_type,					\
- 	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
--	.scbrr_algo_id	= algo,						\
- 	.scscr		= _scscr,					\
- };									\
- 									\
-@@ -115,19 +114,19 @@ static struct resource scif##index##_resources[] = {			\
- 
- #define R8A7790_SCIF(index, baseaddr, irq)				\
- 	__R8A7790_SCIF(PORT_SCIF, SCSCR_RE | SCSCR_TE,			\
--		       SCBRR_ALGO_2, index, baseaddr, irq)
-+		       index, baseaddr, irq)
- 
- #define R8A7790_SCIFA(index, baseaddr, irq)				\
- 	__R8A7790_SCIF(PORT_SCIFA, SCSCR_RE | SCSCR_TE | SCSCR_CKE0,	\
--		       SCBRR_ALGO_4, index, baseaddr, irq)
-+		       index, baseaddr, irq)
- 
- #define R8A7790_SCIFB(index, baseaddr, irq)				\
- 	__R8A7790_SCIF(PORT_SCIFB, SCSCR_RE | SCSCR_TE,			\
--		       SCBRR_ALGO_4, index, baseaddr, irq)
-+		       index, baseaddr, irq)
- 
- #define R8A7790_HSCIF(index, baseaddr, irq)				\
- 	__R8A7790_SCIF(PORT_HSCIF, SCSCR_RE | SCSCR_TE,			\
--		       SCBRR_ALGO_6, index, baseaddr, irq)
-+		       index, baseaddr, irq)
- 
- R8A7790_SCIFA(0, 0xe6c40000, gic_spi(144)); /* SCIFA0 */
- R8A7790_SCIFA(1, 0xe6c50000, gic_spi(145)); /* SCIFA1 */
--- 
-1.8.4
+* The first round of Renesas ARM based SoC board
+  updates for v3.14, tagged as renesas-boards-for-v3.14,
+  which you have already pulled.
+
+* The second round of Renesas ARM based SoC
+  updates for v3.14, tagged as renesas-soc-for-v3.14,
+  which I have previously sent a pull-request for.
+
+The reason for this merge is to provide SoC dependencies
+used by the multiplatform and CCF changes in this series.
+
+
+The following changes since commit 70d4f2e5576a16120e6bc85b10011032306c1179:
+
+  Merge branch 'heads/soc2' into boards2-base (2013-12-19 19:08:11 +0900)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.14
+
+for you to fetch changes up to b58c8e7b43ad804ad18b30f882b16da2e3d4ed9d:
+
+  ARM: shmobile: mackerel: Fix USBHS pinconf entry (2013-12-19 19:08:27 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC Board updates for v3.14
+
+* r8a7791 (R-Car M2) based Koelsch board
+  - Let Koelsch multiplatform boot with Koelsch DTB
+  - Remove non-multiplatform DT reference support
+  - Instantiate clkdevs for SCIF and CMT
+  - Remove duplicate CCF initialization
+  - Add Ether and DU support
+
+* r8a7790 (R-Car H2) based Lager board
+  - Let Lager multiplatform boot with Lager DTB
+  - Remove non-multiplatform DT reference support
+  - Instantiate clkdevs for SCIF and CMT
+  - Enable multiplaform kernel support
+
+* r8a7740 (R-Mobile A1) based Armadillo board
+  - Set backlight enable GPIO
+
+* sh7374 (SH-Mobile AP4) based Mackerel board
+  - Correct USBHS pinconf entry
+
+----------------------------------------------------------------
+Laurent Pinchart (11):
+      ARM: shmobile: koelsch: Add DU device
+      ARM: shmobile: armadillo: Set backlight enable GPIO
+      ARM: shmobile: lager-reference: Enable multiplaform kernel support
+      ARM: shmobile: koelsch-reference: Remove duplicate CCF initialization
+      ARM: shmobile: lager-reference: Instantiate clkdevs for SCIF and CMT
+      ARM: shmobile: koelsch-reference: Instantiate clkdevs for SCIF and CMT
+      ARM: shmobile: Remove non-multiplatform Lager reference support
+      ARM: shmobile: Remove non-multiplatform Koelsch reference support
+      ARM: shmobile: Let Lager multiplatform boot with Lager DTB
+      ARM: shmobile: Let Koelsch multiplatform boot with Koelsch DTB
+      ARM: shmobile: mackerel: Fix USBHS pinconf entry
+
+Sergei Shtylyov (1):
+      ARM: shmobile: Koelsch: add Ether support
+
+ arch/arm/boot/dts/Makefile                       |   4 +-
+ arch/arm/mach-shmobile/Kconfig                   |  30 ++----
+ arch/arm/mach-shmobile/Makefile                  |   3 +-
+ arch/arm/mach-shmobile/Makefile.boot             |   2 -
+ arch/arm/mach-shmobile/board-armadillo800eva.c   |   5 +-
+ arch/arm/mach-shmobile/board-koelsch-reference.c |  30 +++++-
+ arch/arm/mach-shmobile/board-koelsch.c           | 119 ++++++++++++++++++++++-
+ arch/arm/mach-shmobile/board-lager-reference.c   |  32 ++++++
+ arch/arm/mach-shmobile/board-mackerel.c          |   2 +-
+ 9 files changed, 191 insertions(+), 36 deletions(-)
