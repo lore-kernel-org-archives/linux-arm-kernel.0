@@ -1,63 +1,75 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 16:39:47 -0800
-Subject: [PATCH v2 3/9] devicetree: bindings: Document qcom,saw2 node
+Date: Mon, 23 Dec 2013 16:39:45 -0800
+Subject: [PATCH v2 1/9] devicetree: bindings: Document Krait/Scorpion cpus and
+ enable-method
 In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
 References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387845593-10050-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387845593-10050-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The saw2 binding describes the SPM/AVS wrapper hardware used to
-control the regulator supplying voltage to the Krait CPUs.
+From: Rohit Vaswani <rvaswani@codeaurora.org>
+
+Scorpion and Krait don't use the spin-table enable-method.
+Instead they rely on mmio register accesses to enable power and
+clocks to bring CPUs out of reset. Document their enable-methods.
 
 Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+[sboyd: Split off into separate patch, renamed methods to
+match compatible nodes]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/arm/msm/qcom,saw2.txt      | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+ Documentation/devicetree/bindings/arm/cpus.txt | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-new file mode 100644
-index 0000000..1505fb8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-@@ -0,0 +1,35 @@
-+SPM AVS Wrapper 2 (SAW2)
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 9130435..333f4ae 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -180,7 +180,11 @@ nodes to be present and contain the properties described below.
+ 			  be one of:
+ 			     "spin-table"
+ 			     "psci"
+-			# On ARM 32-bit systems this property is optional.
++			# On ARM 32-bit systems this property is optional and
++			  can be one of:
++			    "qcom,gcc-msm8660"
++			    "qcom,kpss-acc-v1"
++			    "qcom,kpss-acc-v2"
+ 
+ 	- cpu-release-addr
+ 		Usage: required for systems that have an "enable-method"
+@@ -191,6 +195,21 @@ nodes to be present and contain the properties described below.
+ 			  property identifying a 64-bit zero-initialised
+ 			  memory location.
+ 
++	- qcom,saw
++		Usage: required for systems that have an "enable-method"
++		       property value of "qcom,kpss-acc-v1" or
++		       "qcom,kpss-acc-v2"
++		Value type: <phandle>
++		Definition: Specifies the SAW[1] node associated with this CPU.
 +
-+The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
-+Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
-+micro-controller that transitions a piece of hardware (like a processor or
-+subsystem) into and out of low power modes via a direct connection to
-+the PMIC. It can also be wired up to interact with other processors in the
-+system, notifying them when a low power state is entered or exited.
-+
-+PROPERTIES
-+
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: shall contain "qcom,saw2". A more specific value should be
-+		    one of:
-+			 "qcom,saw2-v1"
-+			 "qcom,saw2-v1.1"
-+			 "qcom,saw2-v2"
-+			 "qcom,saw2-v2.1"
-+
-+- reg:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: the first element specifies the base address and size of
-+		    the register region. An optional second element specifies
-+		    the base address and size of the alias register region.
++	- qcom,acc
++		Usage: required for systems that have an "enable-method"
++		       property value of "qcom,kpss-acc-v1" or
++		       "qcom,kpss-acc-v2"
++		Value type: <phandle>
++		Definition: Specifies the ACC[2] node associated with this CPU.
 +
 +
-+Example:
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
+ 	cpus {
+@@ -382,3 +401,7 @@ cpus {
+ 		cpu-release-addr = <0 0x20000000>;
+ 	};
+ };
 +
-+	regulator at 2099000 {
-+		compatible = "qcom,saw2";
-+		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
-+	};
++--
++[1] arm/msm/qcom,saw2.txt
++[2] arm/msm/qcom,kpss-acc.txt
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
