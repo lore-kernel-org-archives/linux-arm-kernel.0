@@ -1,60 +1,97 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 24 Dec 2013 17:19:21 -0500
-Subject: [PATCH V2] ARM: imx: improve the comment of CCM lpm SW workaround
-Message-ID: <1387923561-8724-1-git-send-email-b20788@freescale.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 24 Dec 2013 13:41:23 +0200
+Subject: [PATCH v3 1/2] gpio: davinci: don't create irq_domain in case of
+ unbanked irqs
+In-Reply-To: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1387885284-8119-2-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve the comment of SW workaround for CCM lpm issue using
-hardware errata description to avoid confusion.
+The system may crash if:
+- there are more than 1 bank
+- unbanked irqs are enabled
+- someone will call gpio_to_irq() for GPIO from bank2 or above
 
-ERR007265:
-CCM: When improper low-power sequence is used, the SoC enters
-     low power mode before the ARM core executes WFI.
+Hence, fix it by not creating irq_domain if unbanked irqs are enabled
+and correct gpio_to_irq_banked() to handle this properly.
 
-Software workaround:
-1) Software should trigger IRQ #32 (IOMUX) to be always pending
-   by setting IOMUX_GPR1_GINT.
-2) Software should then unmask IRQ #32 in GPC before setting CCM
-   Low-Power mode.
-3) Software should mask IRQ #32 right after CCM Low-Power mode is
-   set (set bits 0-1 of CCM_CLPCR).
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/mach-imx/pm-imx6q.c |   13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ drivers/gpio/gpio-davinci.c |   34 +++++++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index aecd9f8..31cb9d6 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -156,10 +156,13 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 5d163c0..7629b4f 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -351,7 +351,10 @@ static int gpio_to_irq_banked(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct davinci_gpio_controller *d = chip2controller(chip);
+ 
+-	return irq_create_mapping(d->irq_domain, d->chip.base + offset);
++	if (d->irq_domain)
++		return irq_create_mapping(d->irq_domain, d->chip.base + offset);
++	else
++		return -ENXIO;
+ }
+ 
+ static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
+@@ -429,7 +432,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 	struct davinci_gpio_controller *chips = platform_get_drvdata(pdev);
+ 	struct davinci_gpio_platform_data *pdata = dev->platform_data;
+ 	struct davinci_gpio_regs __iomem *g;
+-	struct irq_domain	*irq_domain;
++	struct irq_domain	*irq_domain = NULL;
+ 
+ 	ngpio = pdata->ngpio;
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+@@ -453,18 +456,20 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 	}
+ 	clk_prepare_enable(clk);
+ 
+-	irq = irq_alloc_descs(-1, 0, ngpio, 0);
+-	if (irq < 0) {
+-		dev_err(dev, "Couldn't allocate IRQ numbers\n");
+-		return irq;
+-	}
++	if (!pdata->gpio_unbanked) {
++		irq = irq_alloc_descs(-1, 0, ngpio, 0);
++		if (irq < 0) {
++			dev_err(dev, "Couldn't allocate IRQ numbers\n");
++			return irq;
++		}
+ 
+-	irq_domain = irq_domain_add_legacy(NULL, ngpio, irq, 0,
+-						&davinci_gpio_irq_ops,
+-						chips);
+-	if (!irq_domain) {
+-		dev_err(dev, "Couldn't register an IRQ domain\n");
+-		return -ENODEV;
++		irq_domain = irq_domain_add_legacy(NULL, ngpio, irq, 0,
++							&davinci_gpio_irq_ops,
++							chips);
++		if (!irq_domain) {
++			dev_err(dev, "Couldn't register an IRQ domain\n");
++			return -ENODEV;
++		}
  	}
  
  	/*
--	 * Unmask the always pending IOMUXC interrupt #32 as wakeup source to
--	 * deassert dsm_request signal, so that we can ensure dsm_request
--	 * is not asserted when we're going to write CLPCR register to set LPM.
--	 * After setting up LPM bits, we need to mask this wakeup source.
-+	 * ERR007265:
-+	 * CCM: When improper low-power sequence is used, the SoC enters low power mode before the ARM core executes WFI.
-+	 *
-+	 * Software workaround:
-+	 * 1) Software should trigger IRQ #32 (IOMUX) to be always pending by setting IOMUX_GPR1_GINT.
-+	 * 2) Software should then unmask IRQ #32 in GPC before setting CCM Low-Power mode.
-+	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode is set (set bits 0-1 of CCM_CLPCR).
+@@ -475,8 +480,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
  	 */
- 	iomuxc_irq_desc = irq_to_desc(32);
- 	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
-@@ -219,6 +222,8 @@ void __init imx6q_pm_init(void)
- 	WARN_ON(!ccm_base);
+ 	for (gpio = 0, bank = 0; gpio < ngpio; bank++, gpio += 32) {
+ 		chips[bank].chip.to_irq = gpio_to_irq_banked;
+-		if (!pdata->gpio_unbanked)
+-			chips[bank].irq_domain = irq_domain;
++		chips[bank].irq_domain = irq_domain;
+ 	}
  
  	/*
-+	 * This is for SW workaround step #1 of ERR007265, see comments
-+	 * in imx6q_set_lpm for details of this errata.
- 	 * Force IOMUXC irq pending, so that the interrupt to GPC can be
- 	 * used to deassert dsm_request signal when the signal gets
- 	 * asserted unexpectedly.
 -- 
 1.7.9.5
