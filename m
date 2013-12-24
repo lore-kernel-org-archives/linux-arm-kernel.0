@@ -1,96 +1,59 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 24 Dec 2013 10:37:23 +0900
-Subject: [PATCH v4 0/7] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
- clock framework
-In-Reply-To: <201312231411.35417.heiko@sntech.de>
-References: <201312101614.29781.heiko@sntech.de>
- <201312231411.35417.heiko@sntech.de>
-Message-ID: <1af701cf0048$b175b3c0$14611b40$@samsung.com>
+Date: Tue, 24 Dec 2013 10:42:56 +0900
+Subject: [GIT PULL 2/7] Samsung cleanup for v3.14
+In-Reply-To: <20131222220338.GB13365@quad.lixom.net>
+References: <52AE0F4E.5070309@samsung.com>
+ <20131222220338.GB13365@quad.lixom.net>
+Message-ID: <1af801cf0049$783fe660$68bfb320$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+Olof Johansson wrote:
 > 
-> Hi Kukjin,
-> 
-Hi,
-
-> it seems you didn't have the time for this series during your 2nd round.
-> 
-> I'm not sure what your plans/time constraint are, but according to the -
-> rc5
-> release mail from Linus [0], 3.13 will at least reach -rc8 so it seems as
-> if
-> there is still a bit of time to for 3.14 stuff.
-> 
-Good news to us :-)
-
-> This series would really be a nice base for not only the other ccf-
-> conversions
-> (the already submitted s3c2410 and the s3c2412 which I'm currently working
-> on)
-> but also for broadening the dt-support, with the auxdata gone from the dt-
-> board file.
-> 
-I agreed, let me try to send one more pull-request for 3.14 after finishing review of your patches.
-
-Thanks and Merry Christmas,
-Kukjin
-
-> 
-> Thanks
-> Heiko
-> 
-> 
-> 
-> [0] https://lkml.org/lkml/2013/12/22/70
-> 
-> Am Dienstag, 10. Dezember 2013, 16:14:29 schrieb Heiko St?bner:
-> > Next try, this time with less time between submissions.
+> On Mon, Dec 16, 2013 at 05:21:34AM +0900, Kukjin Kim wrote:
+> > The following changes since commit
+> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 > >
-> > Tested on both non-dt and dt s3c2416.
+> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 > >
-> > Changes since v3:
-> > - address comments from Tomasz Figa (binding documentation, etc)
-> > - prevent conflicts with unconverted s3c24xx socs
-> > Changes since v2
-> > - address comments from Tomasz Figa
-> > - use new pll registration mechanism
-> > - use fixed-rate clocks for xti etc
+> > are available in the git repository at:
 > >
-> > Heiko Stuebner (7):
-> >   clk: samsung: add pll_6552 variant for s3c2416
-> >   clk: samsung: add plls used by the s3c2443
-> >   dt-bindings: add binding for clock-controller of s3c2443 and following
-> >   clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
-> >   ARM: S3C24XX: prevent conflicts between ccf and non-ccf s3c24xx-socs
-> >   ARM: dt: add clock data for s3c2416
-> >   ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
+> 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-cleanup
 > >
-> >  .../bindings/clock/samsung,s3c2443-clock.txt       |   56 ++
-> >  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   13 +
-> >  arch/arm/boot/dts/s3c2416.dtsi                     |   42 ++
-> >  arch/arm/mach-s3c24xx/Kconfig                      |   18 +-
-> >  arch/arm/mach-s3c24xx/Makefile                     |    5 +-
-> >  arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
-> >  arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
-> >  arch/arm/mach-s3c24xx/common-s3c2443.c             |  675
-> > -------------------- arch/arm/mach-s3c24xx/common.c                     |
-> >  18 +-
-> >  arch/arm/mach-s3c24xx/common.h                     |    6 +
-> >  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
-> >  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
-> >  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
-> >  drivers/clk/samsung/Makefile                       |    1 +
-> >  drivers/clk/samsung/clk-pll.c                      |   84 ++-
-> >  drivers/clk/samsung/clk-pll.h                      |    3 +
-> >  drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
-> >  include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
-> >  18 files changed, 756 insertions(+), 1114 deletions(-)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt delete
-> > mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
-> >  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
-> >  delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
-> >  create mode 100644 drivers/clk/samsung/clk-s3c2443.c
-> >  create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
+> > for you to fetch changes up to 7c394e7be4d267c02eaaac8fa197a7c1b023c99b:
+> >
+> >   ARM: EXYNOS: Constify clksrc immutable register restore tables
+> > (2013-12-12 07:09:33 +0900)
+> >
+> > ----------------------------------------------------------------
+> > Samsung cleanup for v3.14
+> > - remove unused SAMSUNG_GPIOLIB_4BIT and IRQF_DISABLED
+> > - constify immutable PMU data table and PM clksrc register
+> > - make const struct for sleep_save
+> >
+> > ----------------------------------------------------------------
+> > Daniel Kurtz (3):
+> >       ARM: EXYNOS: Constify data tables for pmu
+> >       ARM: SAMSUNG: Let s3c_pm_do_restore_*() take const sleep_save
+> >       ARM: EXYNOS: Constify clksrc immutable register restore tables
+> >
+> > Michael Opdenacker (2):
+> >       ARM: SAMSUNG: remove unused SAMSUNG_GPIOLIB_4BIT Kconfig parameter
+> >       ARM: SAMSUNG: remove IRQF_DISABLED
+> 
+Hi Olof,
+
+> Pulled into next/cleanup.
+
+Thanks.
+
+> Please be consistent in patch subjects like
+> other platforms, so "ARM: samsung: .." or "ARM: exynos: ...".
+> 
+Well, 'SAMSUNG' and 'EXYNOS' are proper names and they have a habit of
+starting with a capital letter or just using capital letters like 'ARM' in
+the subject. Additionally, we used to use like that.
+
+- Kukjin
