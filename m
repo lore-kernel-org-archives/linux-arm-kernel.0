@@ -1,42 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:03:40 +0900
-Subject: [PATCH 7/7] ARM: shmobile: koelsch: Do not disable
- CONFIG_{INOTIFY_USER, UNIX} in defconfig
-In-Reply-To: <cover.1387854925.git.horms+renesas@verge.net.au>
-References: <cover.1387854925.git.horms+renesas@verge.net.au>
-Message-ID: <559cec66f1a2620bc85bb79191512a569a404cb8.1387854925.git.horms+renesas@verge.net.au>
+Date: Tue, 24 Dec 2013 15:04:43 +0900
+Subject: [GIT PULL 0/3] Second Round of Renesas ARM based SoC Fixes for v3.13
+Message-ID: <cover.1387856124.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_INOTIFY_USER and CONFIG_UNIX are required for udev to function.
-This change brings the koelsch defconfig into line with
-other shmobile defconfigs.
+Hi Kevin, Hi Olof, Hi Arnd,
 
-Signed-off-by: Simon Horman <horms@verge.net.au>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/koelsch_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+please consider this second round of Renesas ARM based SoC fixes for v3.13.
+It is based on the first round of fixes, tagged as renesas-fixes-for-v3.13,
+which you have previously pulled.
 
-diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-index ef79cbf..acec6b8 100644
---- a/arch/arm/configs/koelsch_defconfig
-+++ b/arch/arm/configs/koelsch_defconfig
-@@ -31,6 +31,7 @@ CONFIG_NEON=y
- CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-+CONFIG_UNIX=y
- CONFIG_INET=y
- CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
-@@ -66,7 +67,6 @@ CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- # CONFIG_IOMMU_SUPPORT is not set
- # CONFIG_DNOTIFY is not set
--# CONFIG_INOTIFY_USER is not set
- CONFIG_TMPFS=y
- CONFIG_CONFIGFS_FS=y
- # CONFIG_MISC_FILESYSTEMS is not set
--- 
-1.8.4
+
+The following changes since commit 23de2278ebc3a2f971ce45ca5e5e35c9d5a74040:
+
+  ARM: shmobile: r8a7790: Fix GPIO resources in DTS (2013-11-28 17:04:39 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.13
+
+for you to fetch changes up to d721a15c300c5f638a11573a6dd492158e737d6a:
+
+  ARM: shmobile: r8a7790: fix shdi resource sizes (2013-12-19 18:14:48 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC Fixes for v3.13
+
+* r8a7790 (R-Car H2) based Lager board
+
+  - Correct SHDI resource sizes
+
+    This bug has been present since sdhi resources were added to the r8a7790 by
+    8c9b1aa41853272a ("ARM: shmobile: r8a7790: add MMCIF and SDHI DT
+    templates") in v3.11-rc2.
+
+* r8a7778 (R-Car M1) based Bock-W board
+
+  - Correct DMA mask
+
+    This resolves a regression introduced by 4dcfa60071b3d23f
+    ("ARM: DMA-API: better handing of DMA masks for coherent allocations")
+    in v3.12-rc1.
+
+* r8a7740 (R-Mobile A1) based Armadillo board
+
+  - Add PWM backlight power supply
+
+    This resolves a regression introduced by 22ceeee16eb8f0d0
+    ("pwm-backlight: Add power supply support") in v3.12.
+
+----------------------------------------------------------------
+Ben Dooks (1):
+      ARM: shmobile: r8a7790: fix shdi resource sizes
+
+Kuninori Morimoto (1):
+      ARM: shmobile: bockw: fixup DMA mask
+
+Laurent Pinchart (1):
+      ARM: shmobile: armadillo: Add PWM backlight power supply
+
+ arch/arm/boot/dts/r8a7790.dtsi                 | 4 ++--
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 7 +++++++
+ arch/arm/mach-shmobile/board-bockw.c           | 2 +-
+ 3 files changed, 10 insertions(+), 3 deletions(-)
