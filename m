@@ -1,67 +1,71 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 24 Dec 2013 10:09:17 +0800
-Subject: [PATCH v7 10/14] usb: phy-mxs: add controller id
-In-Reply-To: <20131224022516.GD1128@S2101-09.ap.freescale.net>
-References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
- <1387525930-27313-11-git-send-email-peter.chen@freescale.com>
- <20131224020826.GC1128@S2101-09.ap.freescale.net>
- <20131224013446.GB13518@shlinux1.ap.freescale.net>
- <20131224022516.GD1128@S2101-09.ap.freescale.net>
-Message-ID: <20131224020916.GC13518@shlinux1.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Dec 2013 11:48:55 +0900
+Subject: [PATCH V2 2/5] arm: shmobile: r7s72100: add i2c clocks
+In-Reply-To: <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
+References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
+ <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <20131224024855.GC22401@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 10:25:17AM +0800, Shawn Guo wrote:
-> On Tue, Dec 24, 2013 at 09:34:47AM +0800, Peter Chen wrote:
-> > On Tue, Dec 24, 2013 at 10:08:28AM +0800, Shawn Guo wrote:
-> > > On Fri, Dec 20, 2013 at 03:52:06PM +0800, Peter Chen wrote:
-> > > > It is used to access un-regulator registers according to
-> > > > different controllers.
-> > > > 
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > ---
-> > > >  drivers/usb/phy/phy-mxs-usb.c |    8 ++++++++
-> > > >  1 files changed, 8 insertions(+), 0 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > > > index f28bdd8..09ece2b 100644
-> > > > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > > > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > > > @@ -111,6 +111,7 @@ struct mxs_phy {
-> > > >  	struct clk *clk;
-> > > >  	const struct mxs_phy_data *data;
-> > > >  	struct regmap *regmap_anatop;
-> > > > +	int port_id;
-> > > >  };
-> > > >  
-> > > >  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-> > > > @@ -237,6 +238,13 @@ static int mxs_phy_probe(struct platform_device *pdev)
-> > > >  		return -ENOMEM;
-> > > >  	}
-> > > >  
-> > > > +	ret = of_alias_get_id(np, "usbphy");
-> > > > +	if (ret < 0) {
-> > > > +		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
-> > > > +		return ret;
-> > > > +	}
-> > > 
-> > > It has the same compatibility issue with an old DTB.  In case the alias
-> > > is not found, we should keep driver work in the existing way rather than
-> > > failing out.
-> > > 
-> > 
-> > Thanks, will change.
-> > 
-> > Do the two DTS patches are ok?
+On Wed, Dec 18, 2013 at 10:31:58PM +0100, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
 > 
-> Yes.  And with the DTS change being optional to kernel driver, the DTS
-> and driver changes can be merged independently through two trees.  So
-> I just applied those two DTS patches.
+> Tested with RIIC2 on a genmai board. Others untested but hopefully
+> trivial enough to be added.
 > 
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> Acked-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+> V2: adapt to established sorting
 
-Including doc update or not?
+Thanks. This seems safe enough and I will queue it up.
 
--- 
-
-Best Regards,
-Peter Chen
+> 
+>  arch/arm/mach-shmobile/clock-r7s72100.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
+> index 7b457ae..9cda215 100644
+> --- a/arch/arm/mach-shmobile/clock-r7s72100.c
+> +++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+> @@ -27,6 +27,7 @@
+>  #define FRQCR2		0xfcfe0014
+>  #define STBCR3		0xfcfe0420
+>  #define STBCR4		0xfcfe0424
+> +#define STBCR9		0xfcfe0438
+>  
+>  #define PLL_RATE 30
+>  
+> @@ -144,10 +145,15 @@ struct clk div4_clks[DIV4_NR] = {
+>  					| CLK_ENABLE_ON_INIT),
+>  };
+>  
+> -enum { MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
+> +enum {	MSTP97, MSTP96, MSTP95, MSTP94,
+> +	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
+>  	MSTP33,	MSTP_NR };
+>  
+>  static struct clk mstp_clks[MSTP_NR] = {
+> +	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
+> +	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
+> +	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
+> +	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
+>  	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
+>  	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
+>  	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
+> @@ -170,6 +176,10 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
+>  
+>  	/* MSTP clocks */
+> +	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+> +	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+> +	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
+> +	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+>  	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+>  
+>  	/* ICK */
+> -- 
+> 1.8.4.2
+> 
