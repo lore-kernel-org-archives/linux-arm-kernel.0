@@ -1,25 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 24 Dec 2013 10:54:36 +0800
-Subject: [PATCH v7 10/14] usb: phy-mxs: add controller id
-In-Reply-To: <20131224020916.GC13518@shlinux1.ap.freescale.net>
-References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
- <1387525930-27313-11-git-send-email-peter.chen@freescale.com>
- <20131224020826.GC1128@S2101-09.ap.freescale.net>
- <20131224013446.GB13518@shlinux1.ap.freescale.net>
- <20131224022516.GD1128@S2101-09.ap.freescale.net>
- <20131224020916.GC13518@shlinux1.ap.freescale.net>
-Message-ID: <20131224025433.GE1128@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 24 Dec 2013 00:55:09 -0200
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabresd: Add PFUZE100 support
+In-Reply-To: <20131224025547.GC27081@Robin-OptiPlex-780>
+References: <1387826937-9734-1-git-send-email-festevam@gmail.com>
+ <20131224025547.GC27081@Robin-OptiPlex-780>
+Message-ID: <CAOMZO5C-0g+LrwqnmJA_Uwyw43UAZSGnmY7JPcLy3nySTZ+GGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 10:09:17AM +0800, Peter Chen wrote:
-> > Yes.  And with the DTS change being optional to kernel driver, the DTS
-> > and driver changes can be merged independently through two trees.  So
-> > I just applied those two DTS patches.
-> > 
-> 
-> Including doc update or not?
+On Tue, Dec 24, 2013 at 12:55 AM, Robin Gong <b38343@freescale.com> wrote:
 
-No.  The binding should go with driver changes.
+>> +                     sw2_reg: sw2 {
+>> +                             regulator-min-microvolt = <800000>;
+>> +                             regulator-max-microvolt = <3950000>;
+> Should be 3300000, right?
 
-Shawn
+Actually it should be:
+
+                     sw2_reg: sw2 {
+                             regulator-min-microvolt = <400000>;
+                             regulator-max-microvolt = <3300000>;
+
+Do you agree?
+
+Regards,
+
+Fabio Estevam
