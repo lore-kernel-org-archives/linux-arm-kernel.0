@@ -1,45 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 24 Dec 2013 13:48:10 +0800
-Subject: [PATCH] ARM: dts: imx6qdl: Pass "fsl,imx6q-mmdc" to MMDC1 port
-In-Reply-To: <1387812797-22082-1-git-send-email-festevam@gmail.com>
-References: <1387812797-22082-1-git-send-email-festevam@gmail.com>
-Message-ID: <20131224054809.GE3872@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Dec 2013 14:54:34 +0900
+Subject: [PATCH 2/3] ARM: shmobile: kzm9g: add FSI support for DTS
+In-Reply-To: <52B84441.2020809@cogentembedded.com>
+References: <cover.1387764079.git.horms+renesas@verge.net.au>
+ <3c2a87c85391272b098827e432813c9437e93992.1387764079.git.horms+renesas@verge.net.au>
+ <52B838C1.1080705@cogentembedded.com>
+ <52B84441.2020809@cogentembedded.com>
+Message-ID: <20131224055434.GB27167@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 01:33:17PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, Dec 23, 2013 at 06:10:09PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Currently only MMDC0 port passes the "compatible = "fsl,imx6q-mmdc".
+> On 23-12-2013 17:21, Sergei Shtylyov wrote:
 > 
-> Do the same for MMDC1.
+> >>From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > 
-> Basically all that 'fsl,imx6q-mmdc' does is to clear the PSD bit of MMDCx_MAPSR
-> register, so do the same for MMDC1.
+> >>This patch support FSI-AK4648 with simple audio card
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+> >>Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>---
+> >>  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 33
+> >>++++++++++++++++++++++++++++
+> >>  1 file changed, 33 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 8a7ce97..18f29def 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -833,6 +833,7 @@
->  			};
->  
->  			mmdc1: mmdc at 021b4000 { /* MMDC1 */
-> +				compatible = "fsl,imx6q-mmdc";
+> >>diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> >>b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> >>index 5bb593d..eb8886b 100644
+> >>--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> >>+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> >[...]
+> >>@@ -226,6 +240,12 @@
+> >>              };
+> >>          };
+> >>      };
+> >>+
+> >>+    ak4648: ak4648 at 0x12 {
+> 
+> >    Perhaps "sound-codec" or "audio-codec" would be a better name; hardware
+> >specific names are not recommended by ePAPR. And drop "0x" from the address
+> >part please.
+> 
+>    Sorry, I didn't notice the patch is posted as a part of pull
+> request; I've probably missed the original posting (though I've
+> already told to Morimoto-san that names like "ak4648" shouldn't be
+> used).
 
-Do you have a real usage of this change?  If not, I would defer it to
-the time when we have a real use case.
-
-Shawn
-
->  				reg = <0x021b4000 0x4000>;
->  			};
->  
-> -- 
-> 1.8.1.2
-> 
+Indeed, I think that you have commended on node naming on more
+than one occasion. Feel free to make some cleanup patches if you
+have the inclination.
