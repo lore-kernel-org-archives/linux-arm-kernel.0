@@ -1,84 +1,101 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Dec 2013 15:14:30 +0100
-Subject: [PATCH RFC 07/11] ARM: SAMSUNG: pm: Move s3c_pm_check_* prototypes to
- plat/pm-common.h
-In-Reply-To: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
-References: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1387894474-14428-7-git-send-email-t.figa@samsung.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 24 Dec 2013 23:15:38 +0900
+Subject: [GIT PULL 00/29] Third Round of Renesas ARM Based SoC Updates for
+ v3.14
+Message-ID: <cover.1387888861.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow using Samsung PM memory check helpers on platforms that do not
-use the legacy Samsung PM core, this patch moves prototypes of relevant
-functions to plat/pm-common.h header.
+Hi Kevin, Hi Olof, Hi Arnd,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/plat-samsung/include/plat/pm-common.h | 14 ++++++++++++++
- arch/arm/plat-samsung/include/plat/pm.h        | 14 --------------
- arch/arm/plat-samsung/pm-check.c               |  2 +-
- 3 files changed, 15 insertions(+), 15 deletions(-)
+please consider this third round of Renesas ARM based SoC updates for v3.14.
 
-diff --git a/arch/arm/plat-samsung/include/plat/pm-common.h b/arch/arm/plat-samsung/include/plat/pm-common.h
-index 2268db6..997b10a 100644
---- a/arch/arm/plat-samsung/include/plat/pm-common.h
-+++ b/arch/arm/plat-samsung/include/plat/pm-common.h
-@@ -93,4 +93,18 @@ static inline void s3c_pm_save_uarts(void) { }
- static inline void s3c_pm_restore_uarts(void) { }
- #endif
- 
-+/* suspend memory checking */
-+
-+#ifdef CONFIG_SAMSUNG_PM_CHECK
-+extern void s3c_pm_check_prepare(void);
-+extern void s3c_pm_check_restore(void);
-+extern void s3c_pm_check_cleanup(void);
-+extern void s3c_pm_check_store(void);
-+#else
-+#define s3c_pm_check_prepare() do { } while(0)
-+#define s3c_pm_check_restore() do { } while(0)
-+#define s3c_pm_check_cleanup() do { } while(0)
-+#define s3c_pm_check_store()   do { } while(0)
-+#endif
-+
- #endif
-diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
-index 4099e8d..e17d871 100644
---- a/arch/arm/plat-samsung/include/plat/pm.h
-+++ b/arch/arm/plat-samsung/include/plat/pm.h
-@@ -80,20 +80,6 @@ extern void s3c_pm_debug_smdkled(u32 set, u32 clear);
- static inline void s3c_pm_debug_smdkled(u32 set, u32 clear) { }
- #endif /* CONFIG_S3C_PM_DEBUG_LED_SMDK */
- 
--/* suspend memory checking */
--
--#ifdef CONFIG_SAMSUNG_PM_CHECK
--extern void s3c_pm_check_prepare(void);
--extern void s3c_pm_check_restore(void);
--extern void s3c_pm_check_cleanup(void);
--extern void s3c_pm_check_store(void);
--#else
--#define s3c_pm_check_prepare() do { } while(0)
--#define s3c_pm_check_restore() do { } while(0)
--#define s3c_pm_check_cleanup() do { } while(0)
--#define s3c_pm_check_store()   do { } while(0)
--#endif
--
- /**
-  * s3c_pm_configure_extint() - ensure pins are correctly set for IRQ
-  *
-diff --git a/arch/arm/plat-samsung/pm-check.c b/arch/arm/plat-samsung/pm-check.c
-index 3cbd626..04aff2c 100644
---- a/arch/arm/plat-samsung/pm-check.c
-+++ b/arch/arm/plat-samsung/pm-check.c
-@@ -19,7 +19,7 @@
- #include <linux/ioport.h>
- #include <linux/slab.h>
- 
--#include <plat/pm.h>
-+#include <plat/pm-common.h>
- 
- #if CONFIG_SAMSUNG_PM_CHECK_CHUNKSIZE < 1
- #error CONFIG_SAMSUNG_PM_CHECK_CHUNKSIZE must be a positive non-zero value
--- 
-1.8.4.3
+It is based on a merge of:
+
+* The second round of Renesas ARM based SoC updates for v3.14, tagged as
+  renesas-soc2-for-v3.14, which I have sent a pull-request for.
+
+* The second round of Renesas SH SCI updates for v3.14, tagged as
+  renesas-sh-sci2-for-v3.14, which I have sent a pull-request for.
+
+The reason for the merge is to provide SH SCI driver dependencies
+for the SH SCI SoC changes in this series. That is, all
+the changes by Laurent Pinchart in this series.
+
+
+The following changes since commit e62db3848cd61e85a2b0b7828eb47de3ccda83e2:
+
+  Merge branch 'sh-sci' into soc3-base (2013-12-24 21:08:27 +0900)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.14
+
+for you to fetch changes up to d85bcfa916ffdf078f188aeab60f738b290f4309:
+
+  arm: shmobile: r7s72100: add i2c clocks (2013-12-24 21:09:19 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC Updates for v3.14
+
+* Global
+  - Don't set plat_sci_port scbrr_algo_id field
+  - Declare SCIF register base and IRQ as resources
+  - Don't define SCIF platform data in an array
+  - Use macros to declare SCIF devices
+
+* r7s72100 SoC (RZ/A1H)
+  - Add i2c clocks
+
+* r8a7778 (R-Car M1)
+  - Add sound SCU clock support
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: r8a7778: add sound SCU clock support
+
+Laurent Pinchart (27):
+      ARM: shmobile: sh7372: Use macros to declare SCIF devices
+      ARM: shmobile: sh73a0: Use macros to declare SCIF devices
+      ARM: shmobile: r8a7740: Use macros to declare SCIF devices
+      ARM: shmobile: r8a7779: Use macros to declare SCIF devices
+      ARM: shmobile: r8a73a4: Don't define SCIF platform data in an array
+      ARM: shmobile: r7s72100: Don't define SCIF platform data in an array
+      ARM: shmobile: r8a7778: Don't define SCIF platform data in an array
+      ARM: shmobile: r8a7791: Don't define SCIF platform data in an array
+      ARM: shmobile: r8a7790: Don't define SCIF platform data in an array
+      ARM: shmobile: sh7372: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: sh73a0: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: r7s72100: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: r8a73a4: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: r8a7740: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: r8a7779: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: sh7372: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a7778: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: r8a7791: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: r8a7790: Declare SCIF register base and IRQ as resources
+      ARM: shmobile: sh73a0: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r7s72100: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a7778: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a73a4: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a7740: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a7790: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a7779: Don't set plat_sci_port scbrr_algo_id field
+      ARM: shmobile: r8a7791: Don't set plat_sci_port scbrr_algo_id field
+
+Wolfram Sang (1):
+      arm: shmobile: r7s72100: add i2c clocks
+
+ arch/arm/mach-shmobile/clock-r7s72100.c |   8 +-
+ arch/arm/mach-shmobile/clock-r8a7778.c  |  20 ++++
+ arch/arm/mach-shmobile/setup-r7s72100.c |  64 ++++++-----
+ arch/arm/mach-shmobile/setup-r8a73a4.c  |  66 ++++++-----
+ arch/arm/mach-shmobile/setup-r8a7740.c  | 195 ++++++--------------------------
+ arch/arm/mach-shmobile/setup-r8a7778.c  |  46 ++++----
+ arch/arm/mach-shmobile/setup-r8a7779.c  | 128 +++++----------------
+ arch/arm/mach-shmobile/setup-r8a7790.c  | 116 +++++++++----------
+ arch/arm/mach-shmobile/setup-r8a7791.c  | 129 +++++++++------------
+ arch/arm/mach-shmobile/setup-sh7372.c   | 160 +++++---------------------
+ arch/arm/mach-shmobile/setup-sh73a0.c   | 191 +++++--------------------------
+ 11 files changed, 348 insertions(+), 775 deletions(-)
