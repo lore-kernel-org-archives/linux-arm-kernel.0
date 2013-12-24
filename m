@@ -1,50 +1,47 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 24 Dec 2013 19:45:03 +0400
-Subject: [PATCH 6/6] [RFC] arm: shmobile: genmai reference: Add RSPI nodes
-In-Reply-To: <1387886210-3634-7-git-send-email-geert+renesas@linux-m68k.org>
-References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <1387886210-3634-7-git-send-email-geert+renesas@linux-m68k.org>
-Message-ID: <52B9ABFF.90902@cogentembedded.com>
+Date: Tue, 24 Dec 2013 20:00:43 +0400
+Subject: [PATCH 15/21] ARM: shmobile: Remove Koelsch reference DTS
+In-Reply-To: <82f7c2065a363cd3c0c84d3c9b59ee47897c5ebb.1387893834.git.horms+renesas@verge.net.au>
+References: <cover.1387893834.git.horms+renesas@verge.net.au>
+ <82f7c2065a363cd3c0c84d3c9b59ee47897c5ebb.1387893834.git.horms+renesas@verge.net.au>
+Message-ID: <52B9AFAB.8040704@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 24-12-2013 15:56, Geert Uytterhoeven wrote:
+On 24-12-2013 18:19, Simon Horman wrote:
 
-> Add pinctrl and SPI devices for RSPI on Genmai.
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-> On this board, only rspi4 is in use. It's bus contains a single device
-> (a wm8978 audio codec), for which no bindings are defined yet.
+> Now that the DTS file r8a7790-koelsch.dts can be used with
+> board-koelsch.c and board-koelsch-reference.c, proceed with removing
+> r8a7790-koelsch-reference.dts.
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->   arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 +++++++++++++++++-
->   1 file changed, 17 insertions(+), 1 deletion(-)
+>   arch/arm/boot/dts/Makefile | 1 -
+>   1 file changed, 1 deletion(-)
 
-> diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> index 114510f8bf09..6d99630627e4 100644
-> --- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> +++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-[...]
-> @@ -85,3 +91,13 @@
->   		pagesize = <64>;
->   	};
->   };
-> +
-> +&spi4 {
-> +	status = "okay";
-> +
-> +	codec: wm8978 at 0 {
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 909d910..5839077 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -225,7 +225,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+>   	r8a7779-marzen.dtb \
+>   	r8a7779-marzen-reference.dtb \
+>   	r8a7791-koelsch.dtb \
+> -	r8a7791-koelsch-reference.dtb \
+>   	r8a7790-lager.dtb \
+>   	r8a7790-lager-reference.dtb \
 
-    Do not give chip names to device nodes, please use somewhat generic names 
-instead, like "sound-codec at 0". That's to comply with ePAPR spec.
+    Hm, the previous commit removed that file itself but forgot to remove it 
+from the Makefile.
 
-> +		compatible = "wlf,wm8978";
-> +		reg = <0>;
-> +		spi-max-frequency = <5000000>;
-> +	};
-> +};
+>   	sh73a0-kzm9g.dtb \
+
+    I suspect this patch should have removed the *.dts fiel itself but failed 
+to do so...
 
 WBR, Sergei
