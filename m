@@ -1,71 +1,162 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 16:39:44 -0800
-Subject: [PATCH v2 0/9] CPU enable method based SMP/hotplug + MSM conversion
-Message-ID: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 23 Dec 2013 16:39:48 -0800
+Subject: [PATCH v2 4/9] ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu
+ hotplug/smp
+In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387845593-10050-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a rework of patches sent a months back by Rohit[1].
-The goal of these patches is to add support for SMP and (basic)
-hotplug on MSM based SoCs. To get there, we add support for a
-generic way to hook in SMP/hotplug support code based on DT. To
-show how it's used, we convert the MSM8660 SMP support code over
-to the new method. After that we add support for the rest of the
-upstream MSM SoCs (note these patches are piled high on top of
-Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
-but this should only matter to the MSM maintainers).
+The goal of multi-platform kernels is to remove the need for mach
+directories and machine descriptors. To further that goal,
+introduce CPU_METHOD_OF_DECLARE() to allow cpu hotplug/smp
+support to be separated from the machine descriptors.
+Implementers should specify an enable-method property in their
+cpus node and then implement a matching set of smp_ops in their
+hotplug/smp code, wiring it up with the CPU_METHOD_OF_DECLARE()
+macro. When the kernel is compiled we'll collect all the
+enable-method smp_ops into one section for use at boot.
 
-This is one of the last items of code that still requires us to have
-a mach directory and a machine descriptor. We should be able to move
-the hotplug/smp code out of mach directories if this approach is
-accepted.
+At boot time we'll look for an enable-method in each cpu node and
+try to match that against all known CPU enable methods in the
+kernel. If there are no enable-methods in the cpu nodes we
+fallback to the cpus node and try to use any enable-method found
+there. If that doesn't work we fall back to the old way of using
+the machine descriptor.
 
-Changes since v1:
- * Added pointers from cpu nodes to saw and acc nodes
- * Squashed nr_cpus removal into reorganization patch
- * Reworked bindings/documentation
- * Rebased onto v3.13-rc4
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/include/asm/smp.h        |  9 +++++++++
+ arch/arm/kernel/devtree.c         | 40 +++++++++++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h | 10 ++++++++++
+ 3 files changed, 59 insertions(+)
 
-[1] https://lkml.org/lkml/2013/8/1/770
-[2] https://lkml.org/lkml/2013/10/17/520
-[3] https://lkml.org/lkml/2013/10/18/406
-[4] http://lkml.org/lkml/2013/10/28/501
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 22a3b9b..772435b 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -114,6 +114,15 @@ struct smp_operations {
+ #endif
+ };
  
-
-Rohit Vaswani (6):
-  devicetree: bindings: Document Krait/Scorpion cpus and enable-method
-  ARM: msm: Remove pen_release usage
-  ARM: msm: Re-organize platsmp to make it extensible
-  ARM: msm: Add SMP support for KPSSv1
-  ARM: msm: Add SMP support for KPSSv2
-  ARM: dts: msm: Add nodes necessary for SMP boot
-
-Stephen Boyd (3):
-  devicetree: bindings: Document qcom,kpss-acc
-  devicetree: bindings: Document qcom,saw2 node
-  ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu hotplug/smp
-
- Documentation/devicetree/bindings/arm/cpus.txt     |  25 +-
- .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  30 ++
- .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  35 ++
- arch/arm/boot/dts/qcom-msm8660-surf.dts            |  24 ++
- arch/arm/boot/dts/qcom-msm8960-cdp.dts             |  52 +++
- arch/arm/boot/dts/qcom-msm8974.dtsi                |  69 ++++
- arch/arm/include/asm/smp.h                         |   9 +
- arch/arm/kernel/devtree.c                          |  40 +++
- arch/arm/mach-msm/Makefile                         |   2 +-
- arch/arm/mach-msm/board-dt.c                       |  14 -
- arch/arm/mach-msm/common.h                         |   1 -
- arch/arm/mach-msm/headsmp.S                        |  39 ---
- arch/arm/mach-msm/hotplug.c                        |  31 +-
- arch/arm/mach-msm/platsmp.c                        | 371 ++++++++++++++++-----
- arch/arm/mach-msm/scm-boot.h                       |   8 +-
- include/asm-generic/vmlinux.lds.h                  |  10 +
- 16 files changed, 595 insertions(+), 165 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
- delete mode 100644 arch/arm/mach-msm/headsmp.S
-
++struct of_cpu_method {
++	const char *method;
++	struct smp_operations *ops;
++};
++
++#define CPU_METHOD_OF_DECLARE(name, _method, _ops)			\
++	static const struct of_cpu_method __cpu_method_of_table_##name	\
++		__used __section(__cpu_method_of_table)			\
++		= { .method = _method, .ops = _ops }
+ /*
+  * set platform specific SMP operations
+  */
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 739c3df..91cc3f8 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -18,6 +18,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/smp.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/setup.h>
+@@ -63,6 +64,34 @@ void __init arm_dt_memblock_reserve(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_SMP
++extern struct of_cpu_method __cpu_method_of_table_begin[];
++extern struct of_cpu_method __cpu_method_of_table_end[];
++
++static int __init set_smp_ops_by_method(struct device_node *node)
++{
++	const char *method;
++	struct of_cpu_method *m = __cpu_method_of_table_begin;
++
++	if (of_property_read_string(node, "enable-method", &method))
++		return 0;
++
++	for (; m < __cpu_method_of_table_end; m++)
++		if (!strcmp(m->method, method)) {
++			smp_set_ops(m->ops);
++			return 1;
++		}
++
++	return 0;
++}
++#else
++static inline int set_smp_ops_by_method(struct device_node *node)
++{
++	return 1;
++}
++#endif
++
++
+ /*
+  * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+  * and builds the cpu logical map array containing MPIDR values related to
+@@ -79,6 +108,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 	 * read as 0.
+ 	 */
+ 	struct device_node *cpu, *cpus;
++	int found_method = 0;
+ 	u32 i, j, cpuidx = 1;
+ 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
+ 
+@@ -150,8 +180,18 @@ void __init arm_dt_init_cpu_maps(void)
+ 		}
+ 
+ 		tmp_map[i] = hwid;
++
++		if (!found_method)
++			found_method = set_smp_ops_by_method(cpu);
+ 	}
+ 
++	/*
++	 * Fallback to an enable-method in the cpus node if nothing found in
++	 * a cpu node.
++	 */
++	if (!found_method)
++		set_smp_ops_by_method(cpus);
++
+ 	if (!bootcpu_valid) {
+ 		pr_warn("DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map\n");
+ 		return;
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index bc2121f..bd02ca7 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -167,6 +167,15 @@
+ #define CLK_OF_TABLES()
+ #endif
+ 
++#ifdef CONFIG_SMP
++#define CPU_METHOD_OF_TABLES() . = ALIGN(8);				    \
++			   VMLINUX_SYMBOL(__cpu_method_of_table_begin) = .; \
++			   *(__cpu_method_of_table)			    \
++			   VMLINUX_SYMBOL(__cpu_method_of_table_end) = .;
++#else
++#define CPU_METHOD_OF_TABLES()
++#endif
++
+ #define KERNEL_DTB()							\
+ 	STRUCT_ALIGN();							\
+ 	VMLINUX_SYMBOL(__dtb_start) = .;				\
+@@ -491,6 +500,7 @@
+ 	MEM_DISCARD(init.rodata)					\
+ 	CLK_OF_TABLES()							\
+ 	CLKSRC_OF_TABLES()						\
++	CPU_METHOD_OF_TABLES()						\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
