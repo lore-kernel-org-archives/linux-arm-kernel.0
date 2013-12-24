@@ -1,85 +1,62 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Dec 2013 11:27:45 +0800
-Subject: [linux-sunxi] Re: [PATCH 04/10] net: stmmac: sunxi platfrom
- extensions for GMAC in Allwinner A20 SoC's
-In-Reply-To: <20131213103822.GX3651@lukather>
-References: <1386350983-13281-1-git-send-email-wens@csie.org>
- <1386350983-13281-5-git-send-email-wens@csie.org> <52A5A52C.50605@st.com>
- <CAGb2v67WiCaMpJEzA_X6o7uOu6i3w3FCEz7=N5HY0amQb01SZA@mail.gmail.com>
- <52A72C6D.60100@st.com>
- <CAGb2v64qQvqJSicA6MTAxeh1sGjWY=Pk=vDq=9J3pTQW+wkXrA@mail.gmail.com>
- <52A87A74.8040807@st.com> <20131212090415.GQ3651@lukather>
- <CAGb2v655_83b76PTmgkDmNGCADWwTjTwW13sOgM5HFmCVkeu=w@mail.gmail.com>
- <20131213103822.GX3651@lukather>
-Message-ID: <CAGb2v64Q1PSMw_nULBHMR5eOC44hWBPewchxE_4sO+4XN8_sDA@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 24 Dec 2013 11:29:29 +0800
+Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: fix warning during module
+ remove function
+In-Reply-To: <20131224032925.GA4166@S2101-09.ap.freescale.net>
+References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
+ <1387796544-18209-2-git-send-email-b29396@freescale.com>
+ <20131223140613.GL26070@S2101-09.ap.freescale.net>
+ <20131224023412.GC23230@shlinux2.ap.freescale.net>
+ <20131224031607.GB3872@S2101-09.ap.freescale.net>
+ <20131224032925.GA4166@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=QoVSPW3msrhBUvJVg6JFQqPFn8UuZNLdr7AYg0Akiy+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Dec 13, 2013 at 6:38 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Dec 12, 2013 at 06:31:43PM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Thu, Dec 12, 2013 at 5:04 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
+On Tue, Dec 24, 2013 at 11:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Dec 24, 2013 at 11:16:09AM +0800, Shawn Guo wrote:
+>> On Tue, Dec 24, 2013 at 10:34:13AM +0800, Dong Aisheng wrote:
+>> > > > @@ -1169,10 +1167,6 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>> > > >         pm_runtime_dont_use_autosuspend(&pdev->dev);
+>> > > >         pm_runtime_disable(&pdev->dev);
+>> > > >
+>> > > > -       clk_disable_unprepare(imx_data->clk_per);
+>> > > > -       clk_disable_unprepare(imx_data->clk_ipg);
+>> > > > -       clk_disable_unprepare(imx_data->clk_ahb);
+>> > >
+>> > > It's obviously a bad change to me.  We should definitely have these
+>> > > clk_disable_unprepare() calls in sdhci_esdhc_imx_remove() to match the
+>> > > clk_prepare_enable() calls in sdhci_esdhc_imx_probe().  Otherwise, at
+>> > > least for !CONFIG_PM_RUNTIME build, it's broken.
+>> > >
 >> >
->> > On Wed, Dec 11, 2013 at 02:45:08PM +0000, srinivas kandagatla wrote:
->> >> >>> 1. .tx_coe
->> >> >>>    This is not exported in the DT bindings.
->> >> >>>    Looking at stmmac code, not setting this seems to disable all
->> >> >>>    checksum offloading.
->> >> >>
->> >> >> Why cant this go via DT as well?
->> >> >
->> >> > If you and Giuseppe are OK with this, why not?
->> >> Am Ok with it.
+>> > How about add the !CONFIG_RUMTIME_PM precondition for these code to avoid
+>> > break non runtime pm case?
 >> >
->> > Please note that I'm opposed to this until someone explain why putting
->> > it in the DT is relevant (and not just convenient).
+>> > #ifndef CONFIG_PM_RUNTIME
+>> >     clk_disable_unprepare(imx_data->clk_per);
+>> >     clk_disable_unprepare(imx_data->clk_ipg);
+>> >     clk_disable_unprepare(imx_data->clk_ahb);
+>> > #endif
 >>
->> Checksum offloading is an optional feature[1], implemented starting
->> from version 3.20a. It is not tied to a specific IP version. As such,
->> using a "snps,dwmac-<version>" compatible isn't a good fit here.
+>> It's quite ugly.  But well, if we do not have anything better, we have
+>> to live with it.
 >
-> No, but we're not in such case. Since we have a compatible of our own,
-> we can derive it from that. Putting a property in the DT would only be
-> redundant.
+> To make it look less ugly, we may want to use something like the
+> following.
 >
->> stmmac does auto-detection for optional features on MAC version > 3.50a.
->> This is what Srinivas was referring to.
->>
->> Unfortunately, our MAC is < 3.50a. No auto-detection. We could add a
->> "snps,dwmac-tx-coe" compatible for this, or the seperate DT property.
->>
->> The other way would be to pass the flags in the initial .data with the
->> SoC specific compatible. Other SoCs with the same feature won't be
->> able to reuse the same compatible though.
+>         if (!IS_ENABLED(CONFIG_PM_RUNTIME)
 >
-> Which is already pretty much the case, since we have to deal with
-> Allwinner specific code and features.
+
+I'm ok with it.
+
+Regards
+Dong Aisheng
+
+> Shawn
 >
-> A new compatible is cheap to maintain, a new property is not.
-
-Srinivas,
-
-Let's keep platform data as of_data, so SoC compatibles can pass
-hardware feature flags for cores that don't support auto-detection.
-
-We can adjust the callbacks as you suggested, and I added a .free
-to complement .setup. Driver private data and platform data are
-off limits to the callbacks. My version of the callbacks:
-
-        void (*fix_mac_speed)(void *priv, unsigned int speed);
-        void (*bus_setup)(void __iomem *ioaddr);
-        void *(*setup)(struct platform_device *pdev);
-        void (*free)(struct platform_device *pdev, void *priv);
-        int (*init)(struct platform_device *pdev, void *priv);
-        void (*exit)(struct platform_device *pdev, void *priv);
-
-
-Cheers,
-
-ChenYu
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
