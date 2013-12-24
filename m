@@ -1,58 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:19:41 +0900
-Subject: [PATCH 18/21] ARM: shmobile: r8a7790: Add QSPI module clock in device
- tree
+Date: Tue, 24 Dec 2013 23:19:33 +0900
+Subject: [PATCH 10/21] ARM: shmobile: Sync Lager DTS with Lager reference DTS
 In-Reply-To: <cover.1387893834.git.horms+renesas@verge.net.au>
 References: <cover.1387893834.git.horms+renesas@verge.net.au>
-Message-ID: <91b56ca10a3cf4999bae5f8b8e7e2723bf4b1363.1387893834.git.horms+renesas@verge.net.au>
+Message-ID: <39fa511b8cd96395ee788267a16b8d3b20ac56e2.1387893834.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
+Copy the device nodes from Lager reference into the Lager device tree
+file. This will allow us to use a single DTS file regarless of kernel
+configuration. In case of legacy C board code the device nodes may or
+may not be used, but in the multiplatform case all the DT device nodes
+are used.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi            | 11 +++++++----
- include/dt-bindings/clock/r8a7790-clock.h |  1 +
- 2 files changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 53 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 9c9a992..a179125 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -615,13 +615,16 @@
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
--			clocks = <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>;
-+			clocks = <&p_clk>, <&p_clk>, <&cpg_clocks R8A7790_CLK_QSPI>,
-+				 <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
--				R8A7790_CLK_RCAN1 R8A7790_CLK_RCAN0 R8A7790_CLK_I2C3
--				R8A7790_CLK_I2C2 R8A7790_CLK_I2C1 R8A7790_CLK_I2C0
-+				R8A7790_CLK_RCAN1 R8A7790_CLK_RCAN0 R8A7790_CLK_QSPI_MOD
-+				R8A7790_CLK_I2C3 R8A7790_CLK_I2C2 R8A7790_CLK_I2C1
-+				R8A7790_CLK_I2C0
- 			>;
--			clock-output-names = "rcan1", "rcan0", "i2c3", "i2c2", "i2c1", "i2c0";
-+			clock-output-names =
-+				"rcan1", "rcan0", "qspi_mod", "i2c3", "i2c2", "i2c1", "i2c0";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 10e6a08..67a6939 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7790.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Lager";
+@@ -33,4 +34,56 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
  	};
++
++	leds {
++		compatible = "gpio-leds";
++		led6 {
++			gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
++		};
++		led7 {
++			gpios = <&gpio4 23 GPIO_ACTIVE_HIGH>;
++		};
++		led8 {
++			gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	fixedregulator3v3: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&pfc {
++	pinctrl-0 = <&scif0_pins &scif1_pins>;
++	pinctrl-names = "default";
++
++	scif0_pins: serial0 {
++		renesas,groups = "scif0_data";
++		renesas,function = "scif0";
++	};
++
++	scif1_pins: serial1 {
++		renesas,groups = "scif1_data";
++		renesas,function = "scif1";
++	};
++
++	mmc1_pins: mmc1 {
++		renesas,groups = "mmc1_data8", "mmc1_ctrl";
++		renesas,function = "mmc1";
++	};
++};
++
++&mmcif1 {
++	pinctrl-0 = <&mmc1_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&fixedregulator3v3>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
  };
-diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
-index bbabb8e..859e9be 100644
---- a/include/dt-bindings/clock/r8a7790-clock.h
-+++ b/include/dt-bindings/clock/r8a7790-clock.h
-@@ -97,6 +97,7 @@
- #define R8A7790_CLK_GPIO0		12
- #define R8A7790_CLK_RCAN1		15
- #define R8A7790_CLK_RCAN0		16
-+#define R8A7790_CLK_QSPI_MOD		17
- #define R8A7790_CLK_IICDVFS		26
- #define R8A7790_CLK_I2C3		28
- #define R8A7790_CLK_I2C2		29
 -- 
 1.8.4
