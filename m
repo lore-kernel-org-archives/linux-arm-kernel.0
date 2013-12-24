@@ -1,42 +1,67 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 24 Dec 2013 10:13:56 +0800
-Subject: [PATCH 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe
- lock in atomic context
-In-Reply-To: <20131223124659.GK26070@S2101-09.ap.freescale.net>
-References: <1387796544-18209-1-git-send-email-b29396@freescale.com>
- <20131223124659.GK26070@S2101-09.ap.freescale.net>
-Message-ID: <20131224021355.GB23230@shlinux2.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 24 Dec 2013 10:09:17 +0800
+Subject: [PATCH v7 10/14] usb: phy-mxs: add controller id
+In-Reply-To: <20131224022516.GD1128@S2101-09.ap.freescale.net>
+References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
+ <1387525930-27313-11-git-send-email-peter.chen@freescale.com>
+ <20131224020826.GC1128@S2101-09.ap.freescale.net>
+ <20131224013446.GB13518@shlinux1.ap.freescale.net>
+ <20131224022516.GD1128@S2101-09.ap.freescale.net>
+Message-ID: <20131224020916.GC13518@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 08:47:01PM +0800, Shawn Guo wrote:
-> On Mon, Dec 23, 2013 at 07:02:23PM +0800, Dong Aisheng wrote:
-> > Sometimes we may meet the following lockdep issue.
-> > The root cause is .set_clock callback is executed with spin_lock_irqsave
-> > in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
-> > clk_get_rate which is using a mutex lock.
+On Tue, Dec 24, 2013 at 10:25:17AM +0800, Shawn Guo wrote:
+> On Tue, Dec 24, 2013 at 09:34:47AM +0800, Peter Chen wrote:
+> > On Tue, Dec 24, 2013 at 10:08:28AM +0800, Shawn Guo wrote:
+> > > On Fri, Dec 20, 2013 at 03:52:06PM +0800, Peter Chen wrote:
+> > > > It is used to access un-regulator registers according to
+> > > > different controllers.
+> > > > 
+> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > ---
+> > > >  drivers/usb/phy/phy-mxs-usb.c |    8 ++++++++
+> > > >  1 files changed, 8 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > > > index f28bdd8..09ece2b 100644
+> > > > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > > > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > > > @@ -111,6 +111,7 @@ struct mxs_phy {
+> > > >  	struct clk *clk;
+> > > >  	const struct mxs_phy_data *data;
+> > > >  	struct regmap *regmap_anatop;
+> > > > +	int port_id;
+> > > >  };
+> > > >  
+> > > >  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> > > > @@ -237,6 +238,13 @@ static int mxs_phy_probe(struct platform_device *pdev)
+> > > >  		return -ENOMEM;
+> > > >  	}
+> > > >  
+> > > > +	ret = of_alias_get_id(np, "usbphy");
+> > > > +	if (ret < 0) {
+> > > > +		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
+> > > > +		return ret;
+> > > > +	}
+> > > 
+> > > It has the same compatibility issue with an old DTB.  In case the alias
+> > > is not found, we should keep driver work in the existing way rather than
+> > > failing out.
+> > > 
 > > 
-> > The fix avoids access mutex in .set_clock callback by initializing the
-> > pltfm_host->clock at probe time and use it later instead of calling
-> > clk_get_rate again in atomic context.
+> > Thanks, will change.
+> > 
+> > Do the two DTS patches are ok?
 > 
-> While I agree this is the way less intrusive, I'm also wondering why
-> sdhci_do_set_ios() needs a spinlock at all, or at least it's
-> questionable if the lock should necessarily be held for such a long
-> running section.
-
-Per my understanding, it's for protecting the host structure including
-register r/w where can also be accessed from ISR, so we need it.
-
-> 
-> Nevertheless, as long as we can guarantee that the rate of
-> pltfm_host->clk does not change after the driver is probed, I'm fine
-> with the patch.
+> Yes.  And with the DTS change being optional to kernel driver, the DTS
+> and driver changes can be merged independently through two trees.  So
+> I just applied those two DTS patches.
 > 
 
-We does not change the host parent clock always currently.
+Including doc update or not?
 
-Regards
-Dong Aisheng
-> Shawn
-> 
+-- 
+
+Best Regards,
+Peter Chen
