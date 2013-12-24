@@ -1,92 +1,128 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:18:08 +0900
-Subject: [PATCH 04/12] ARM: shmobile: lager-reference: Enable multiplaform
- kernel support
+Date: Tue, 24 Dec 2013 23:18:06 +0900
+Subject: [PATCH 02/12] ARM: shmobile: Koelsch: add Ether support
 In-Reply-To: <cover.1387891831.git.horms+renesas@verge.net.au>
 References: <cover.1387891831.git.horms+renesas@verge.net.au>
-Message-ID: <0ef3cde4d906041a497bfc585568a45ae84b4a8f.1387891831.git.horms+renesas@verge.net.au>
+Message-ID: <974faba70550409049ee349939f4479ad98908ae.1387891831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Enable multiplaform ARM architecture support for the Lager reference
-board. Common clock framework initialization will be handled by the
-rcar_gen2_init_timer() call, we just need to remove the legacy clock
-code initialization.
+Register Ether platform device and pin data on  the  Koelsch board.
+Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile                     | 1 +
- arch/arm/mach-shmobile/Kconfig                 | 8 ++++++++
- arch/arm/mach-shmobile/Makefile                | 1 +
- arch/arm/mach-shmobile/board-lager-reference.c | 2 ++
- 4 files changed, 12 insertions(+)
+ arch/arm/mach-shmobile/board-koelsch.c | 56 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 55 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5ef42fc..9e22bd4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -235,6 +235,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
- 	sh7372-mackerel.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- 	r7s72100-genmai-reference.dtb \
-+	r8a7790-lager-reference.dtb \
- 	r8a7791-koelsch-reference.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_cyclone5_socdk.dtb \
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index cd89d63..e7033a8 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -28,6 +28,10 @@ config ARCH_EMEV2
- config ARCH_R7S72100
- 	bool "RZ/A1H (R7S72100)"
- 
-+config ARCH_R8A7790
-+	bool "R-Car H2 (R8A77900)"
-+	select RENESAS_IRQC
-+
- config ARCH_R8A7791
- 	bool "R-Car M2 (R8A77910)"
- 	select RENESAS_IRQC
-@@ -47,6 +51,10 @@ config MACH_KZM9D
- 	depends on ARCH_EMEV2
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 
-+config MACH_LAGER
-+	bool "Lager board"
-+	depends on ARCH_R8A7790
-+
- comment "Renesas ARM SoCs System Configuration"
- endif
- 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 1c13104..9daa9c1 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -59,6 +59,7 @@ ifdef CONFIG_ARCH_SHMOBILE_MULTI
- obj-$(CONFIG_MACH_GENMAI)	+= board-genmai-reference.o
- obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch-reference.o
- obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d-reference.o
-+obj-$(CONFIG_MACH_LAGER)	+= board-lager-reference.o
- else
- obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
- obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 51a3bcc..fc43f7c 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -27,7 +27,9 @@
- 
- static void __init lager_add_standard_devices(void)
- {
-+#ifndef CONFIG_COMMON_CLK
- 	r8a7790_clock_init();
-+#endif
- 	r8a7790_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+index 5d84fb6..de7cc64 100644
+--- a/arch/arm/mach-shmobile/board-koelsch.c
++++ b/arch/arm/mach-shmobile/board-koelsch.c
+@@ -25,10 +25,12 @@
+ #include <linux/input.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
++#include <linux/phy.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_data/rcar-du.h>
+ #include <linux/platform_device.h>
++#include <linux/sh_eth.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7791.h>
+@@ -87,6 +89,19 @@ static void __init koelsch_add_du_device(void)
+ 	platform_device_register_full(&info);
  }
+ 
++/* Ether */
++static const struct sh_eth_plat_data ether_pdata __initconst = {
++	.phy			= 0x1,
++	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
++	.phy_interface		= PHY_INTERFACE_MODE_RMII,
++	.ether_link_active_low	= 1,
++};
++
++static const struct resource ether_resources[] __initconst = {
++	DEFINE_RES_MEM(0xee700000, 0x400),
++	DEFINE_RES_IRQ(gic_spi(162)),
++};
++
+ /* LEDS */
+ static struct gpio_led koelsch_leds[] = {
+ 	{
+@@ -141,6 +156,15 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
+ 				  "du_sync", "du"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
+ 				  "du_clk_out_0", "du"),
++	/* Ether */
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
++				  "eth_link", "eth"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
++				  "eth_mdio", "eth"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
++				  "eth_rmii", "eth"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
++				  "intc_irq0", "intc"),
+ 	/* SCIF0 (CN19: DEBUG SERIAL0) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
+ 				  "scif0_data_d", "scif0"),
+@@ -156,6 +180,10 @@ static void __init koelsch_add_standard_devices(void)
+ 				  ARRAY_SIZE(koelsch_pinctrl_map));
+ 	r8a7791_pinmux_init();
+ 	r8a7791_add_standard_devices();
++	platform_device_register_resndata(&platform_bus, "r8a7791-ether", -1,
++					  ether_resources,
++					  ARRAY_SIZE(ether_resources),
++					  &ether_pdata, sizeof(ether_pdata));
+ 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
+ 				      &koelsch_leds_pdata,
+ 				      sizeof(koelsch_leds_pdata));
+@@ -166,6 +194,32 @@ static void __init koelsch_add_standard_devices(void)
+ 	koelsch_add_du_device();
+ }
+ 
++/*
++ * Ether LEDs on the Koelsch board are named LINK and ACTIVE which corresponds
++ * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
++ * 14-15. We have to set them back to 01 from the default 00 value each time
++ * the PHY is reset. It's also important because the PHY's LED0 signal is
++ * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
++ * bounce on and off after each packet, which we apparently want to avoid.
++ */
++static int koelsch_ksz8041_fixup(struct phy_device *phydev)
++{
++	u16 phyctrl1 = phy_read(phydev, 0x1e);
++
++	phyctrl1 &= ~0xc000;
++	phyctrl1 |= 0x4000;
++	return phy_write(phydev, 0x1e, phyctrl1);
++}
++
++static void __init koelsch_init(void)
++{
++	koelsch_add_standard_devices();
++
++	if (IS_ENABLED(CONFIG_PHYLIB))
++		phy_register_fixup_for_id("r8a7791-ether-ff:01",
++					  koelsch_ksz8041_fixup);
++}
++
+ static const char * const koelsch_boards_compat_dt[] __initconst = {
+ 	"renesas,koelsch",
+ 	NULL,
+@@ -175,7 +229,7 @@ DT_MACHINE_START(KOELSCH_DT, "koelsch")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+ 	.init_early	= r8a7791_init_early,
+ 	.init_time	= rcar_gen2_timer_init,
+-	.init_machine	= koelsch_add_standard_devices,
++	.init_machine	= koelsch_init,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= koelsch_boards_compat_dt,
+ MACHINE_END
 -- 
 1.8.4
