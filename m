@@ -1,43 +1,59 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 24 Dec 2013 13:36:26 +0200
-Subject: [PATCH v2 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52B9479B.3040108@ti.com>
-References: <1387297337-25493-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
- <20131224005804.GF31766@codeaurora.org> <52B9479B.3040108@ti.com>
-Message-ID: <52B971BA.7040705@ti.com>
+From: geert+renesas@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 24 Dec 2013 12:56:47 +0100
+Subject: [PATCH 3/6] ARM: shmobile: r7s72100: Add RSPI resources
+In-Reply-To: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
+References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
+Message-ID: <1387886210-3634-4-git-send-email-geert+renesas@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/24/2013 10:36 AM, ivan.khoronzhuk wrote:
-> On 12/24/2013 02:58 AM, Stephen Boyd wrote:
->> On 12/17, Ivan Khoronzhuk wrote:
->>> +static void __init keystone_timer_init(struct device_node *np)
->>> +{
->>> +    struct clock_event_device *event_dev = &timer.event_dev;
->>> +    unsigned long rate;
->> [...]
->>> +
->>> +    timer.hz_period = rate / (HZ);
->>
->> Unnecessary parentheses here. Also, do you need to use do_div()
->> here? I'm lost how the hz_period is ever greater than 32 bits
->> though because HZ is most likely very small and the rate is
->> unsigned long.
->>
-> 
-> You are right.
-> I'll do the following:
-> 
-> timer.hz_period = rate / (HZ)    ---> timer.hz_period = rate / HZ
-> u64 hz_period            ---> unsigned long hz_period
-> 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+ arch/arm/mach-shmobile/setup-r7s72100.c |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-... maybe it be better to use DIV_ROUND_UP to be sure in no less than HZ period:
-
-timer.hz_period = rate / (HZ) --> timer.hz_period = DIV_ROUND_UP(rate, HZ)
-
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index 55f0b9c7c482..fbcb0c798994 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -79,6 +79,26 @@ static struct resource mtu2_0_resources[] __initdata = {
+ 					  &mtu2_##idx##_platform_data,	\
+ 					  sizeof(struct sh_timer_config))
+ 
++/* RSPI */
++#define RSPI_RESOURCE(idx, baseaddr, irq)				\
++static const struct resource rspi##idx##_resources[] __initconst = {	\
++	DEFINE_RES_MEM(baseaddr, 0x24),					\
++	DEFINE_RES_IRQ(irq),		/* SPEI */			\
++	DEFINE_RES_IRQ(irq + 1),	/* SPRI */			\
++	DEFINE_RES_IRQ(irq + 2),	/* SPTI */			\
++}
++
++RSPI_RESOURCE(0, 0xe800c800, gic_iid(270));
++RSPI_RESOURCE(1, 0xe800d000, gic_iid(273));
++RSPI_RESOURCE(2, 0xe800d800, gic_iid(276));
++RSPI_RESOURCE(3, 0xe800e000, gic_iid(279));
++RSPI_RESOURCE(4, 0xe800e800, gic_iid(282));
++
++#define r7s72100_register_rspi(idx)					\
++	platform_device_register_simple("rspi" #idx, idx,		\
++					rspi##idx##_resources,		\
++					ARRAY_SIZE(rspi##idx##_resources))
++
+ void __init r7s72100_add_dt_devices(void)
+ {
+ 	r7s72100_register_scif(SCIF0);
+@@ -90,6 +110,11 @@ void __init r7s72100_add_dt_devices(void)
+ 	r7s72100_register_scif(SCIF6);
+ 	r7s72100_register_scif(SCIF7);
+ 	r7s72100_register_mtu2(0);
++	r7s72100_register_rspi(0);
++	r7s72100_register_rspi(1);
++	r7s72100_register_rspi(2);
++	r7s72100_register_rspi(3);
++	r7s72100_register_rspi(4);
+ }
+ 
+ void __init r7s72100_init_early(void)
 -- 
-Regards,
-Ivan Khoronzhuk
+1.7.9.5
