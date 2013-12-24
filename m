@@ -1,28 +1,40 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 16:58:04 -0800
-Subject: [PATCH v2 1/3] clocksource: timer-keystone: introduce
- clocksource driver for Keystone
-In-Reply-To: <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1387297337-25493-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20131224005804.GF31766@codeaurora.org>
+Date: Mon, 23 Dec 2013 17:12:25 -0800
+Subject: [PATCH v4 01/15] reset: Silence warning in reset-controller.h
+In-Reply-To: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387847559-18330-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17, Ivan Khoronzhuk wrote:
-> +static void __init keystone_timer_init(struct device_node *np)
-> +{
-> +	struct clock_event_device *event_dev = &timer.event_dev;
-> +	unsigned long rate;
-[...]
-> +
-> +	timer.hz_period = rate / (HZ);
+If a user of <linux/reset-controller.h> doesn't include
+<linux/of.h> before including reset-controller.h they'll get a
+warning as follows:
 
-Unnecessary parentheses here. Also, do you need to use do_div()
-here? I'm lost how the hz_period is ever greater than 32 bits
-though because HZ is most likely very small and the rate is
-unsigned long.
+  include/linux/reset-controller.h:44:17:
+  warning: 'struct of_phandle_args' declared inside parameter list
 
+This is because of_phandle_args is not forward declared. Add the
+declaration to silence this warning.
+
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ include/linux/reset-controller.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+index 2f61311..41a4695 100644
+--- a/include/linux/reset-controller.h
++++ b/include/linux/reset-controller.h
+@@ -21,6 +21,7 @@ struct reset_control_ops {
+ 
+ struct module;
+ struct device_node;
++struct of_phandle_args;
+ 
+ /**
+  * struct reset_controller_dev - reset controller entity that might
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
