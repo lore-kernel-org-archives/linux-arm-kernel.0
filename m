@@ -1,392 +1,380 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Dec 2013 15:14:28 +0100
-Subject: [PATCH RFC 05/11] ARM: SAMSUNG: pm: Move Samsung PM debug code into
- separate file
+Date: Tue, 24 Dec 2013 15:14:34 +0100
+Subject: [PATCH RFC 11/11] ARM: EXYNOS: Stop using legacy Samsung PM code
 In-Reply-To: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
 References: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1387894474-14428-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1387894474-14428-11-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all Samsung SoC platforms are going to use the legacy Samsung PM
-code enabled by CONFIG_SAMSUNG_PM_DEBUG. To allow using Samsung PM debug
-helpers on such platforms, related code is moved to separate file and
-a plat/pm-common.h header is added to separate legacy and generic code.
+Since Exynos SoCs does not follow most of the semantics of older SoCs
+when configuring the system to enter sleep, there is no reason to rely
+on the legacy Samsung PM core anymore.
+
+This patch adds local Exynos suspend ops and removes all the code left
+unnecessary. As a side effect, suspend support on Exynos becomes
+multiplatform-friendly.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/plat-samsung/Makefile                 |  1 +
- arch/arm/plat-samsung/include/plat/pm-common.h | 70 ++++++++++++++++++
- arch/arm/plat-samsung/include/plat/pm.h        | 39 +---------
- arch/arm/plat-samsung/pm-debug.c               | 98 ++++++++++++++++++++++++++
- arch/arm/plat-samsung/pm.c                     | 85 ----------------------
- 5 files changed, 170 insertions(+), 123 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/pm-common.h
- create mode 100644 arch/arm/plat-samsung/pm-debug.c
+ arch/arm/mach-exynos/Kconfig                |  8 ---
+ arch/arm/mach-exynos/Makefile               |  2 +-
+ arch/arm/mach-exynos/common.h               |  8 +++
+ arch/arm/mach-exynos/include/mach/pm-core.h | 72 --------------------------
+ arch/arm/mach-exynos/pm.c                   | 79 ++++++++++++++++++++++++++---
+ arch/arm/plat-samsung/s5p-sleep.S           | 43 ----------------
+ 6 files changed, 80 insertions(+), 132 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/pm-core.h
 
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 9267d29..ba30a16 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_SAMSUNG_DMADEV)	+= dma-ops.o
- obj-$(CONFIG_SAMSUNG_PM)	+= pm.o
- obj-$(CONFIG_SAMSUNG_PM_GPIO)	+= pm-gpio.o
- obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
-+obj-$(CONFIG_SAMSUNG_PM_DEBUG)	+= pm-debug.o
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 27ea463..9e06e60 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -49,8 +49,6 @@ config CPU_EXYNOS4210
+ 	select ARM_CPU_SUSPEND if PM_SLEEP
+ 	select PINCTRL_EXYNOS
+ 	select PM_GENERIC_DOMAINS if PM_RUNTIME
+-	select S5P_PM if PM_SLEEP
+-	select S5P_SLEEP if PM_SLEEP
+ 	select SAMSUNG_DMADEV
+ 	help
+ 	  Enable EXYNOS4210 CPU support
+@@ -62,8 +60,6 @@ config SOC_EXYNOS4212
+ 	select ARCH_HAS_BANDGAP
+ 	select PINCTRL_EXYNOS
+ 	select PM_GENERIC_DOMAINS if PM_RUNTIME
+-	select S5P_PM if PM_SLEEP
+-	select S5P_SLEEP if PM_SLEEP
+ 	select SAMSUNG_DMADEV
+ 	help
+ 	  Enable EXYNOS4212 SoC support
+@@ -86,8 +82,6 @@ config SOC_EXYNOS5250
+ 	select ARCH_HAS_BANDGAP
+ 	select PINCTRL_EXYNOS
+ 	select PM_GENERIC_DOMAINS if PM_RUNTIME
+-	select S5P_PM if PM_SLEEP
+-	select S5P_SLEEP if PM_SLEEP
+ 	select S5P_DEV_MFC
+ 	select SAMSUNG_DMADEV
+ 	help
+@@ -98,8 +92,6 @@ config SOC_EXYNOS5420
+ 	default y
+ 	depends on ARCH_EXYNOS5
+ 	select PM_GENERIC_DOMAINS if PM_RUNTIME
+-	select S5P_PM if PM_SLEEP
+-	select S5P_SLEEP if PM_SLEEP
+ 	help
+ 	  Enable EXYNOS5420 SoC support
  
- obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
- obj-$(CONFIG_SAMSUNG_WDT_RESET)	+= watchdog-reset.o
-diff --git a/arch/arm/plat-samsung/include/plat/pm-common.h b/arch/arm/plat-samsung/include/plat/pm-common.h
-new file mode 100644
-index 0000000..79f66ef
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/pm-common.h
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ * 	Tomasz Figa <t.figa@samsung.com>
-+ * Copyright (c) 2004 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Written by Ben Dooks, <ben@simtec.co.uk>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __PLAT_SAMSUNG_PM_COMMON_H
-+#define __PLAT_SAMSUNG_PM_COMMON_H __FILE__
-+
-+/* PM debug functions */
-+
-+/**
-+ * struct pm_uart_save - save block for core UART
-+ * @ulcon: Save value for S3C2410_ULCON
-+ * @ucon: Save value for S3C2410_UCON
-+ * @ufcon: Save value for S3C2410_UFCON
-+ * @umcon: Save value for S3C2410_UMCON
-+ * @ubrdiv: Save value for S3C2410_UBRDIV
-+ *
-+ * Save block for UART registers to be held over sleep and restored if they
-+ * are needed (say by debug).
-+*/
-+struct pm_uart_save {
-+	u32	ulcon;
-+	u32	ucon;
-+	u32	ufcon;
-+	u32	umcon;
-+	u32	ubrdiv;
-+	u32	udivslot;
-+};
-+
-+#ifdef CONFIG_SAMSUNG_PM_DEBUG
-+/**
-+ * s3c_pm_dbg() - low level debug function for use in suspend/resume.
-+ * @msg: The message to print.
-+ *
-+ * This function is used mainly to debug the resume process before the system
-+ * can rely on printk/console output. It uses the low-level debugging output
-+ * routine printascii() to do its work.
-+ */
-+extern void s3c_pm_dbg(const char *msg, ...);
-+
-+/**
-+ * s3c_pm_debug_init() - suspend/resume low level debug initialization.
-+ * @base: Virtual base of UART to use for suspend/resume debugging.
-+ *
-+ * This function needs to be called before S3C_PMDBG() can be used, to set up
-+ * UART port base address and configuration.
-+ */
-+extern void s3c_pm_debug_init(void);
-+
-+#define S3C_PMDBG(fmt...) s3c_pm_dbg(fmt)
-+
-+extern void s3c_pm_save_uarts(void);
-+extern void s3c_pm_restore_uarts(void);
-+#else
-+#define S3C_PMDBG(fmt...) printk(KERN_DEBUG fmt)
-+#define s3c_pm_debug_init() do { } while(0)
-+
-+static inline void s3c_pm_save_uarts(void) { }
-+static inline void s3c_pm_restore_uarts(void) { }
-+#endif
-+
-+#endif
-diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
-index 67defdb..3648e05 100644
---- a/arch/arm/plat-samsung/include/plat/pm.h
-+++ b/arch/arm/plat-samsung/include/plat/pm.h
-@@ -16,6 +16,7 @@
- */
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 8930b66..58fe9e6 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -14,7 +14,7 @@ obj-				:=
  
- #include <linux/irq.h>
-+#include <plat/pm-common.h>
+ obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
  
- struct device;
+-obj-$(CONFIG_S5P_PM)		+= pm.o
++obj-$(CONFIG_PM_SLEEP)		+= pm.o sleep.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
  
-@@ -76,26 +77,6 @@ struct sleep_save {
- #define SAVE_ITEM(x) \
- 	{ .reg = (x) }
- 
--/**
-- * struct pm_uart_save - save block for core UART
-- * @ulcon: Save value for S3C2410_ULCON
-- * @ucon: Save value for S3C2410_UCON
-- * @ufcon: Save value for S3C2410_UFCON
-- * @umcon: Save value for S3C2410_UMCON
-- * @ubrdiv: Save value for S3C2410_UBRDIV
-- *
-- * Save block for UART registers to be held over sleep and restored if they
-- * are needed (say by debug).
--*/
--struct pm_uart_save {
--	u32	ulcon;
--	u32	ucon;
--	u32	ufcon;
--	u32	umcon;
--	u32	ubrdiv;
--	u32	udivslot;
--};
--
- /* helper functions to save/restore lists of registers. */
- 
- extern void s3c_pm_do_save(struct sleep_save *ptr, int count);
-@@ -112,24 +93,6 @@ extern void s3c_cpu_resume(void);
- #define s3c_cpu_resume NULL
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index f2d1892..e8342e5 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -32,12 +32,20 @@ int exynos_pm_late_initcall(void);
+ static inline int exynos_pm_late_initcall(void) { return 0; }
  #endif
  
--/* PM debug functions */
--
--#ifdef CONFIG_SAMSUNG_PM_DEBUG
--/**
-- * s3c_pm_dbg() - low level debug function for use in suspend/resume.
-- * @msg: The message to print.
-- *
-- * This function is used mainly to debug the resume process before the system
-- * can rely on printk/console output. It uses the low-level debugging output
-- * routine printascii() to do its work.
-- */
--extern void s3c_pm_dbg(const char *msg, ...);
--
--#define S3C_PMDBG(fmt...) s3c_pm_dbg(fmt)
--#else
--#define S3C_PMDBG(fmt...) printk(KERN_DEBUG fmt)
--#endif
--
- #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
- /**
-  * s3c_pm_debug_smdkled() - Debug PM suspend/resume via SMDK Board LEDs
-diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
-new file mode 100644
-index 0000000..9f979b2
---- /dev/null
-+++ b/arch/arm/plat-samsung/pm-debug.c
-@@ -0,0 +1,98 @@
-+/*
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ *	Tomasz Figa <t.figa@samsung.com>
-+ * Copyright (C) 2008 Openmoko, Inc.
-+ * Copyright (C) 2004-2008 Simtec Electronics
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *	http://armlinux.simtec.co.uk/
-+ *
-+ * Samsung common power management (suspend to RAM) debug support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/serial_core.h>
-+#include <linux/io.h>
-+
-+#include <asm/mach/map.h>
-+
-+#include <plat/cpu.h>
-+#include <plat/pm-common.h>
-+#include <plat/regs-serial.h>
-+
-+#ifdef CONFIG_SAMSUNG_ATAGS
-+#include <mach/pm-core.h>
++#ifdef CONFIG_PINCTRL_EXYNOS
++extern u32 exynos_get_eint_wake_mask(void);
 +#else
-+static inline void s3c_pm_debug_init_uart(void) {}
-+static inline void s3c_pm_arch_update_uart(void __iomem *regs,
-+					   struct pm_uart_save *save) {}
++static inline u32 exynos_get_eint_wake_mask(void) { return 0xffffffff; }
 +#endif
 +
-+static struct pm_uart_save uart_save;
-+
-+extern void printascii(const char *);
-+
-+void s3c_pm_dbg(const char *fmt, ...)
-+{
-+	va_list va;
-+	char buff[256];
-+
-+	va_start(va, fmt);
-+	vsnprintf(buff, sizeof(buff), fmt, va);
-+	va_end(va);
-+
-+	printascii(buff);
-+}
-+
-+void s3c_pm_debug_init(void)
-+{
-+	/* restart uart clocks so we can use them to output */
-+	s3c_pm_debug_init_uart();
-+}
-+
-+static inline void __iomem *s3c_pm_uart_base(void)
-+{
-+	unsigned long paddr;
-+	unsigned long vaddr;
-+
-+	debug_ll_addr(&paddr, &vaddr);
-+
-+	return (void __iomem *)vaddr;
-+}
-+
-+void s3c_pm_save_uarts(void)
-+{
-+	void __iomem *regs = s3c_pm_uart_base();
-+	struct pm_uart_save *save = &uart_save;
-+
-+	save->ulcon = __raw_readl(regs + S3C2410_ULCON);
-+	save->ucon = __raw_readl(regs + S3C2410_UCON);
-+	save->ufcon = __raw_readl(regs + S3C2410_UFCON);
-+	save->umcon = __raw_readl(regs + S3C2410_UMCON);
-+	save->ubrdiv = __raw_readl(regs + S3C2410_UBRDIV);
-+
-+	if (!soc_is_s3c2410())
-+		save->udivslot = __raw_readl(regs + S3C2443_DIVSLOT);
-+
-+	S3C_PMDBG("UART[%p]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
-+		  regs, save->ulcon, save->ucon, save->ufcon, save->ubrdiv);
-+}
-+
-+void s3c_pm_restore_uarts(void)
-+{
-+	void __iomem *regs = s3c_pm_uart_base();
-+	struct pm_uart_save *save = &uart_save;
-+
-+	s3c_pm_arch_update_uart(regs, save);
-+
-+	__raw_writel(save->ulcon, regs + S3C2410_ULCON);
-+	__raw_writel(save->ucon,  regs + S3C2410_UCON);
-+	__raw_writel(save->ufcon, regs + S3C2410_UFCON);
-+	__raw_writel(save->umcon, regs + S3C2410_UMCON);
-+	__raw_writel(save->ubrdiv, regs + S3C2410_UBRDIV);
-+
-+	if (!soc_is_s3c2410())
-+		__raw_writel(save->udivslot, regs + S3C2443_DIVSLOT);
-+}
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index 6f19a8e..0d19391 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -17,16 +17,11 @@
- #include <linux/errno.h>
- #include <linux/delay.h>
- #include <linux/of.h>
--#include <linux/serial_core.h>
- #include <linux/io.h>
+ #ifdef CONFIG_PM_SLEEP
+ extern void __init exynos_pm_init(void);
+ #else
+ static inline void exynos_pm_init(void) {}
+ #endif
  
- #include <asm/cacheflush.h>
--#include <asm/mach/map.h>
- #include <asm/suspend.h>
++extern void exynos_cpu_resume(void);
++
+ extern struct smp_operations exynos_smp_ops;
  
--#include <plat/cpu.h>
--#include <plat/regs-serial.h>
--
- #ifdef CONFIG_SAMSUNG_ATAGS
- #include <mach/hardware.h>
- #include <mach/map.h>
-@@ -44,86 +39,6 @@
- 
- unsigned long s3c_pm_flags;
- 
--/* Debug code:
+ extern void exynos_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-exynos/include/mach/pm-core.h b/arch/arm/mach-exynos/include/mach/pm-core.h
+deleted file mode 100644
+index 2b00833..0000000
+--- a/arch/arm/mach-exynos/include/mach/pm-core.h
++++ /dev/null
+@@ -1,72 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/pm-core.h
 - *
-- * This code supports debug output to the low level UARTs for use on
-- * resume before the console layer is available.
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * Based on arch/arm/mach-s3c2410/include/mach/pm-core.h,
+- * Copyright 2008 Simtec Electronics
+- *      Ben Dooks <ben@simtec.co.uk>
+- *      http://armlinux.simtec.co.uk/
+- *
+- * EXYNOS4210 - PM core support for arch/arm/plat-s5p/pm.c
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 -*/
 -
--#ifdef CONFIG_SAMSUNG_PM_DEBUG
--extern void printascii(const char *);
+-#ifndef __ASM_ARCH_PM_CORE_H
+-#define __ASM_ARCH_PM_CORE_H __FILE__
 -
--void s3c_pm_dbg(const char *fmt, ...)
--{
--	va_list va;
--	char buff[256];
+-#include <linux/of.h>
+-#include <mach/regs-pmu.h>
 -
--	va_start(va, fmt);
--	vsnprintf(buff, sizeof(buff), fmt, va);
--	va_end(va);
--
--	printascii(buff);
--}
--
--static inline void s3c_pm_debug_init(void)
--{
--	/* restart uart clocks so we can use them to output */
--	s3c_pm_debug_init_uart();
--}
--
--static struct pm_uart_save uart_save;
--
--static inline void __iomem *s3c_pm_uart_base(void)
--{
--	unsigned long paddr;
--	unsigned long vaddr;
--
--	debug_ll_addr(&paddr, &vaddr);
--
--	return (void __iomem *)vaddr;
--}
--
--static void s3c_pm_save_uarts(void)
--{
--	void __iomem *regs = s3c_pm_uart_base();
--	struct pm_uart_save *save = &uart_save;
--
--	save->ulcon = __raw_readl(regs + S3C2410_ULCON);
--	save->ucon = __raw_readl(regs + S3C2410_UCON);
--	save->ufcon = __raw_readl(regs + S3C2410_UFCON);
--	save->umcon = __raw_readl(regs + S3C2410_UMCON);
--	save->ubrdiv = __raw_readl(regs + S3C2410_UBRDIV);
--
--	if (!soc_is_s3c2410())
--		save->udivslot = __raw_readl(regs + S3C2443_DIVSLOT);
--
--	S3C_PMDBG("UART[%p]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
--		  regs, save->ulcon, save->ucon, save->ufcon, save->ubrdiv);
--}
--
--static void s3c_pm_restore_uarts(void)
--{
--	void __iomem *regs = s3c_pm_uart_base();
--	struct pm_uart_save *save = &uart_save;
--
--	s3c_pm_arch_update_uart(regs, save);
--
--	__raw_writel(save->ulcon, regs + S3C2410_ULCON);
--	__raw_writel(save->ucon,  regs + S3C2410_UCON);
--	__raw_writel(save->ufcon, regs + S3C2410_UFCON);
--	__raw_writel(save->umcon, regs + S3C2410_UMCON);
--	__raw_writel(save->ubrdiv, regs + S3C2410_UBRDIV);
--
--	if (!soc_is_s3c2410())
--		__raw_writel(save->udivslot, regs + S3C2443_DIVSLOT);
--}
+-#ifdef CONFIG_PINCTRL_EXYNOS
+-extern u32 exynos_get_eint_wake_mask(void);
 -#else
--#define s3c_pm_debug_init() do { } while(0)
--
--static void s3c_pm_save_uarts(void) { }
--static void s3c_pm_restore_uarts(void) { }
+-static inline u32 exynos_get_eint_wake_mask(void) { return 0xffffffff; }
 -#endif
 -
- /* The IRQ ext-int code goes here, it is too small to currently bother
-  * with its own file. */
+-static inline void s3c_pm_debug_init_uart(void)
+-{
+-	/* nothing here yet */
+-}
+-
+-static inline void s3c_pm_arch_prepare_irqs(void)
+-{
+-	__raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
+-	__raw_writel(s3c_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
+-}
+-
+-static inline void s3c_pm_arch_stop_clocks(void)
+-{
+-	/* nothing here yet */
+-}
+-
+-static inline void s3c_pm_arch_show_resume_irqs(void)
+-{
+-	/* nothing here yet */
+-}
+-
+-static inline void s3c_pm_arch_update_uart(void __iomem *regs,
+-					   struct pm_uart_save *save)
+-{
+-	/* nothing here yet */
+-}
+-
+-static inline void s3c_pm_restored_gpios(void)
+-{
+-	/* nothing here yet */
+-}
+-
+-static inline void samsung_pm_saved_gpios(void)
+-{
+-	/* nothing here yet */
+-}
+-
+-/* Compatibility definitions to make plat-samsung/pm.c compile */
+-#define IRQ_EINT_BIT(x)		1
+-#define s3c_irqwake_intallow	0
+-#define s3c_irqwake_eintallow	0
+-
+-#endif /* __ASM_ARCH_PM_CORE_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 8cdb000..29b6a22 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -23,15 +23,15 @@
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/smp_scu.h>
++#include <asm/suspend.h>
  
+ #include <plat/cpu.h>
+-#include <plat/pm.h>
++#include <plat/pm-common.h>
+ #include <plat/pll.h>
+ #include <plat/regs-srom.h>
+ 
+ #include <mach/regs-irq.h>
+ #include <mach/regs-pmu.h>
+-#include <mach/pm-core.h>
+ 
+ #include "common.h"
+ 
+@@ -48,6 +48,7 @@ static struct sleep_save exynos_core_save[] = {
+ 	SAVE_ITEM(S5P_SROM_BC3),
+ };
+ 
++static u32 exynos_irqwake_intmask = 0xffffffff;
+ 
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+@@ -72,6 +73,10 @@ static void exynos_pm_prepare(void)
+ {
+ 	unsigned int tmp;
+ 
++	/* Set wake-up mask registers */
++	__raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
++	__raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
++
+ 	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+ 
+ 	if (soc_is_exynos5250()) {
+@@ -89,7 +94,7 @@ static void exynos_pm_prepare(void)
+ 
+ 	/* ensure@least INFORM0 has the resume address */
+ 
+-	__raw_writel(virt_to_phys(s3c_cpu_resume), S5P_INFORM0);
++	__raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+ }
+ 
+ static int exynos_pm_suspend(void)
+@@ -187,14 +192,71 @@ static struct syscore_ops exynos_pm_syscore_ops = {
+ 	.resume		= exynos_pm_resume,
+ };
+ 
+-void __init exynos_pm_init(void)
++/*
++ * Suspend Ops
++ */
++
++static int exynos_suspend_enter(suspend_state_t state)
+ {
+-	u32 tmp;
++	int ret;
++
++	s3c_pm_debug_init();
++
++	S3C_PMDBG("%s: suspending the system...\n", __func__);
++
++	S3C_PMDBG("%s: wakeup masks: %08x,%08x\n", __func__,
++			exynos_irqwake_intmask, exynos_get_eint_wake_mask());
+ 
+-	pm_cpu_prep = exynos_pm_prepare;
+-	pm_cpu_sleep = exynos_cpu_suspend;
++	if (exynos_irqwake_intmask == -1U
++	    && exynos_get_eint_wake_mask() == -1U) {
++		printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
++		printk(KERN_ERR "%s: Aborting sleep\n", __func__);
++		return -EINVAL;
++	}
++
++	s3c_pm_save_uarts();
++	exynos_pm_prepare();
++	flush_cache_all();
++	s3c_pm_check_store();
++
++	ret = cpu_suspend(0, exynos_cpu_suspend);
++	if (ret)
++		return ret;
++
++	s3c_pm_restore_uarts();
+ 
+-	s3c_pm_init();
++	S3C_PMDBG("%s: wakeup stat: %08x\n", __func__,
++			__raw_readl(S5P_WAKEUP_STAT));
++
++	s3c_pm_check_restore();
++
++	S3C_PMDBG("%s: resuming the system...\n", __func__);
++
++	return 0;
++}
++
++static int exynos_suspend_prepare(void)
++{
++	s3c_pm_check_prepare();
++
++	return 0;
++}
++
++static void exynos_suspend_finish(void)
++{
++	s3c_pm_check_cleanup();
++}
++
++static const struct platform_suspend_ops exynos_suspend_ops = {
++	.enter		= exynos_suspend_enter,
++	.prepare	= exynos_suspend_prepare,
++	.finish		= exynos_suspend_finish,
++	.valid		= suspend_valid_only_mem,
++};
++
++void __init exynos_pm_init(void)
++{
++	u32 tmp;
+ 
+ 	/* All wakeup disable */
+ 	tmp = __raw_readl(S5P_WAKEUP_MASK);
+@@ -202,4 +264,5 @@ void __init exynos_pm_init(void)
+ 	__raw_writel(tmp, S5P_WAKEUP_MASK);
+ 
+ 	register_syscore_ops(&exynos_pm_syscore_ops);
++	suspend_set_ops(&exynos_suspend_ops);
+ }
+diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-samsung/s5p-sleep.S
+index a030e73..c500165 100644
+--- a/arch/arm/plat-samsung/s5p-sleep.S
++++ b/arch/arm/plat-samsung/s5p-sleep.S
+@@ -23,18 +23,7 @@
+ 
+ #include <linux/linkage.h>
+ #include <asm/asm-offsets.h>
+-#include <asm/hardware/cache-l2x0.h>
+ 
+-#define CPU_MASK	0xff0ffff0
+-#define CPU_CORTEX_A9	0x410fc090
+-
+-/*
+- *	 The following code is located into the .data section. This is to
+- *	 allow l2x0_regs_phys to be accessed with a relative load while we
+- *	 can't rely on any MMU translation. We could have put l2x0_regs_phys
+- *	 in the .text section as well, but some setups might insist on it to
+- *	 be truly read-only. (Reference from: arch/arm/kernel/sleep.S)
+- */
+ 	.data
+ 	.align
+ 
+@@ -53,37 +42,5 @@
+ 	 */
+ 
+ ENTRY(s3c_cpu_resume)
+-#ifdef CONFIG_CACHE_L2X0
+-	mrc	p15, 0, r0, c0, c0, 0
+-	ldr	r1, =CPU_MASK
+-	and	r0, r0, r1
+-	ldr	r1, =CPU_CORTEX_A9
+-	cmp	r0, r1
+-	bne	resume_l2on
+-	adr	r0, l2x0_regs_phys
+-	ldr	r0, [r0]
+-	ldr	r1, [r0, #L2X0_R_PHY_BASE]
+-	ldr	r2, [r1, #L2X0_CTRL]
+-	tst	r2, #0x1
+-	bne	resume_l2on
+-	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
+-	str	r2, [r1, #L2X0_AUX_CTRL]
+-	ldr	r2, [r0, #L2X0_R_TAG_LATENCY]
+-	str	r2, [r1, #L2X0_TAG_LATENCY_CTRL]
+-	ldr	r2, [r0, #L2X0_R_DATA_LATENCY]
+-	str	r2, [r1, #L2X0_DATA_LATENCY_CTRL]
+-	ldr	r2, [r0, #L2X0_R_PREFETCH_CTRL]
+-	str	r2, [r1, #L2X0_PREFETCH_CTRL]
+-	ldr	r2, [r0, #L2X0_R_PWR_CTRL]
+-	str	r2, [r1, #L2X0_POWER_CTRL]
+-	mov	r2, #1
+-	str	r2, [r1, #L2X0_CTRL]
+-resume_l2on:
+-#endif
+ 	b	cpu_resume
+ ENDPROC(s3c_cpu_resume)
+-#ifdef CONFIG_CACHE_L2X0
+-	.globl l2x0_regs_phys
+-l2x0_regs_phys:
+-	.long	0
+-#endif
 -- 
 1.8.4.3
