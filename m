@@ -1,215 +1,251 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 16:39:49 -0800
-Subject: [PATCH v2 5/9] ARM: msm: Remove pen_release usage
+Date: Mon, 23 Dec 2013 16:39:50 -0800
+Subject: [PATCH v2 6/9] ARM: msm: Re-organize platsmp to make it extensible
 In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
 References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387845593-10050-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387845593-10050-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rohit Vaswani <rvaswani@codeaurora.org>
 
-pen_release is no longer required as the synchronization
-is now managed by generic arm code.
-This is done as suggested in https://lkml.org/lkml/2013/6/4/184
+This makes it easy to add SMP support for new devices by keying
+on a device node for the release sequence. We add the
+enable-method property for the cpus property to specify that we
+want to use the gcc-msm8660 release sequence (which is going to
+look for the global clock controller device node to map some
+Scorpion specific power and control registers). We also remove
+the nr_cpus detection code as that is done generically in the DT
+CPU detection code.
 
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+[sboyd: Port to CPU_METHOD_OF_DECLARE]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/Makefile  |  2 +-
- arch/arm/mach-msm/headsmp.S | 39 ---------------------------------------
- arch/arm/mach-msm/hotplug.c | 31 ++++---------------------------
- arch/arm/mach-msm/platsmp.c | 35 +++--------------------------------
- 4 files changed, 8 insertions(+), 99 deletions(-)
- delete mode 100644 arch/arm/mach-msm/headsmp.S
+ arch/arm/mach-msm/board-dt.c |  14 ------
+ arch/arm/mach-msm/common.h   |   1 -
+ arch/arm/mach-msm/platsmp.c  | 117 ++++++++++++++++++++++++-------------------
+ 3 files changed, 65 insertions(+), 67 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 7ed4c1b..15562cf 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -19,7 +19,7 @@ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
- CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+index 1f11d93..1e3af2b 100644
+--- a/arch/arm/mach-msm/board-dt.c
++++ b/arch/arm/mach-msm/board-dt.c
+@@ -11,31 +11,17 @@
+  */
  
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
--obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-+obj-$(CONFIG_SMP) += platsmp.o
+ #include <linux/init.h>
+-#include <linux/of.h>
+-#include <linux/of_platform.h>
  
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
-diff --git a/arch/arm/mach-msm/headsmp.S b/arch/arm/mach-msm/headsmp.S
-deleted file mode 100644
-index 6c62c3f..0000000
---- a/arch/arm/mach-msm/headsmp.S
-+++ /dev/null
-@@ -1,39 +0,0 @@
--/*
-- *  linux/arch/arm/mach-realview/headsmp.S
-- *
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
+ #include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
 -
--/*
-- * MSM specific entry point for secondary CPUs.  This provides
-- * a "holding pen" into which all secondary cores are held until we're
-- * ready for them to initialise.
-- */
--ENTRY(msm_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--ENDPROC(msm_secondary_startup)
--
--	.align
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
-index 326a872..cea80fc 100644
---- a/arch/arm/mach-msm/hotplug.c
-+++ b/arch/arm/mach-msm/hotplug.c
-@@ -24,33 +24,10 @@ static inline void cpu_leave_lowpower(void)
+-#include "common.h"
  
- static inline void platform_do_lowpower(unsigned int cpu)
- {
--	/* Just enter wfi for now. TODO: Properly shut off the cpu. */
--	for (;;) {
--		/*
--		 * here's the WFI
--		 */
--		asm("wfi"
--		    :
--		    :
--		    : "memory", "cc");
+ static const char * const msm_dt_match[] __initconst = {
+ 	"qcom,msm8660-fluid",
+ 	"qcom,msm8660-surf",
+ 	"qcom,msm8960-cdp",
+-	NULL
+-};
 -
--		if (pen_release == cpu_logical_map(cpu)) {
--			/*
--			 * OK, proper wakeup, we're done
--			 */
--			break;
--		}
--
--		/*
--		 * getting here, means that we have come out of WFI without
--		 * having been woken up - this shouldn't happen
--		 *
--		 * The trouble is, letting people know about this is not really
--		 * possible, since we are currently running incoherently, and
--		 * therefore cannot safely call printk() or anything else
--		 */
--		pr_debug("CPU%u: spurious wakeup call\n", cpu);
--	}
-+	asm("wfi"
-+	    :
-+	    :
-+	    : "memory", "cc");
- }
+-static const char * const apq8074_dt_match[] __initconst = {
+ 	"qcom,apq8074-dragonboard",
+ 	NULL
+ };
  
- /*
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+-	.smp = smp_ops(msm_smp_ops),
+ 	.dt_compat = msm_dt_match,
+ MACHINE_END
+-
+-DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
+-	.dt_compat = apq8074_dt_match,
+-MACHINE_END
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index 33c7725..1513f2c 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -23,7 +23,6 @@ extern void msm_map_qsd8x50_io(void);
+ extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 					  unsigned int mtype, void *caller);
+ 
+-extern struct smp_operations msm_smp_ops;
+ extern void msm_cpu_die(unsigned int cpu);
+ 
+ struct msm_mmc_platform_data;
 diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 3f06edc..5b481db 100644
+index 5b481db..11c6239 100644
 --- a/arch/arm/mach-msm/platsmp.c
 +++ b/arch/arm/mach-msm/platsmp.c
-@@ -28,7 +28,7 @@
- #define SCSS_CPU1CORE_RESET 0xD80
- #define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
+@@ -13,6 +13,8 @@
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/jiffies.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
  
--extern void msm_secondary_startup(void);
-+extern void secondary_startup(void);
+@@ -24,20 +26,14 @@
+ #include "scm-boot.h"
+ #include "common.h"
+ 
+-#define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
+-#define SCSS_CPU1CORE_RESET 0xD80
+-#define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
++#define VDD_SC1_ARRAY_CLAMP_GFS_CTL	0x35a0
++#define SCSS_CPU1CORE_RESET		0x2d80
++#define SCSS_DBG_STATUS_CORE_PWRDUP	0x2e64
+ 
+ extern void secondary_startup(void);
  
  static DEFINE_SPINLOCK(boot_lock);
  
-@@ -41,13 +41,6 @@ static inline int get_core_count(void)
+-static inline int get_core_count(void)
+-{
+-	/* 1 + the PART[1:0] field of MIDR */
+-	return ((read_cpuid_id() >> 4) & 3) + 1;
+-}
+-
  static void msm_secondary_init(unsigned int cpu)
  {
  	/*
--	 * let the primary processor know we're out of the
--	 * pen, then head off into the C entry point
--	 */
--	pen_release = -1;
--	smp_wmb();
--
--	/*
- 	 * Synchronise with the boot thread.
- 	 */
- 	spin_lock(&boot_lock);
-@@ -57,7 +50,7 @@ static void msm_secondary_init(unsigned int cpu)
- static void prepare_cold_cpu(unsigned int cpu)
- {
- 	int ret;
--	ret = scm_set_boot_addr(virt_to_phys(msm_secondary_startup),
-+	ret = scm_set_boot_addr(virt_to_phys(secondary_startup),
- 				SCM_FLAG_COLDBOOT_CPU1);
- 	if (ret == 0) {
- 		void __iomem *sc1_base_ptr;
-@@ -75,7 +68,6 @@ static void prepare_cold_cpu(unsigned int cpu)
- 
- static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	unsigned long timeout;
- 	static int cold_boot_done;
- 
- 	/* Only need to bring cpu out of reset this way once */
-@@ -91,40 +83,19 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	spin_lock(&boot_lock);
- 
- 	/*
--	 * The secondary processor is waiting to be released from
--	 * the holding pen - release it, then wait for it to flag
--	 * that it has been released by resetting pen_release.
--	 *
--	 * Note that "pen_release" is the hardware CPU ID, whereas
--	 * "cpu" is Linux's internal ID.
--	 */
--	pen_release = cpu_logical_map(cpu);
--	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
--	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
--
--	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * the boot monitor to read the system wide flags register,
- 	 * and branch to the address found there.
- 	 */
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
--	timeout = jiffies + (1 * HZ);
--	while (time_before(jiffies, timeout)) {
--		smp_rmb();
--		if (pen_release == -1)
--			break;
--
--		udelay(10);
--	}
--
- 	/*
- 	 * now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
- 	 */
+@@ -47,33 +43,41 @@ static void msm_secondary_init(unsigned int cpu)
  	spin_unlock(&boot_lock);
+ }
  
--	return pen_release != -1 ? -ENOSYS : 0;
+-static void prepare_cold_cpu(unsigned int cpu)
++static int scss_release_secondary(unsigned int cpu)
+ {
+-	int ret;
+-	ret = scm_set_boot_addr(virt_to_phys(secondary_startup),
+-				SCM_FLAG_COLDBOOT_CPU1);
+-	if (ret == 0) {
+-		void __iomem *sc1_base_ptr;
+-		sc1_base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
+-		if (sc1_base_ptr) {
+-			writel(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
+-			writel(0, sc1_base_ptr + SCSS_CPU1CORE_RESET);
+-			writel(3, sc1_base_ptr + SCSS_DBG_STATUS_CORE_PWRDUP);
+-			iounmap(sc1_base_ptr);
+-		}
+-	} else
+-		printk(KERN_DEBUG "Failed to set secondary core boot "
+-				  "address\n");
++	struct device_node *node;
++	void __iomem *base;
++
++	node = of_find_compatible_node(NULL, NULL, "qcom,gcc-msm8660");
++	if (!node) {
++		pr_err("%s: can't find node\n", __func__);
++		return -ENXIO;
++	}
++
++	base = of_iomap(node, 0);
++	of_node_put(node);
++	if (!base)
++		return -ENOMEM;
++
++	writel_relaxed(0, base + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
++	writel_relaxed(0, base + SCSS_CPU1CORE_RESET);
++	writel_relaxed(3, base + SCSS_DBG_STATUS_CORE_PWRDUP);
++	mb();
++	iounmap(base);
++
 +	return 0;
  }
  
- /*
+-static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static DEFINE_PER_CPU(int, cold_boot_done);
++
++static int msm_boot_secondary(unsigned int cpu, int (*func)(unsigned int))
+ {
+-	static int cold_boot_done;
++	int ret = 0;
+ 
+-	/* Only need to bring cpu out of reset this way once */
+-	if (cold_boot_done == false) {
+-		prepare_cold_cpu(cpu);
+-		cold_boot_done = true;
++	if (!per_cpu(cold_boot_done, cpu)) {
++		ret = func(cpu);
++		if (!ret)
++			per_cpu(cold_boot_done, cpu) = true;
+ 	}
+ 
+ 	/*
+@@ -95,39 +99,48 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 */
+ 	spin_unlock(&boot_lock);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+-/*
+- * Initialise the CPU possible map early - this describes the CPUs
+- * which may be present or become present in the system. The msm8x60
+- * does not support the ARM SCU, so just set the possible cpu mask to
+- * NR_CPUS.
+- */
+-static void __init msm_smp_init_cpus(void)
++static int msm8660_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	unsigned int i, ncores = get_core_count();
+-
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+-			ncores, nr_cpu_ids);
+-		ncores = nr_cpu_ids;
+-	}
+-
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
++	return msm_boot_secondary(cpu, scss_release_secondary);
+ }
+ 
+ static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	int cpu, map;
++	unsigned int flags = 0;
++	static const int cold_boot_flags[] = {
++		0,
++		SCM_FLAG_COLDBOOT_CPU1,
++	};
++
++	for_each_present_cpu(cpu) {
++		map = cpu_logical_map(cpu);
++		if (WARN_ON(map >= ARRAY_SIZE(cold_boot_flags))) {
++			set_cpu_present(cpu, false);
++			continue;
++		}
++		flags |= cold_boot_flags[map];
++	}
++
++	if (scm_set_boot_addr(virt_to_phys(secondary_startup), flags)) {
++		for_each_present_cpu(cpu) {
++			if (cpu == smp_processor_id())
++				continue;
++			set_cpu_present(cpu, false);
++		}
++		pr_warn("Failed to set CPU boot address, disabling SMP\n");
++	}
+ }
+ 
+-struct smp_operations msm_smp_ops __initdata = {
+-	.smp_init_cpus		= msm_smp_init_cpus,
++static struct smp_operations msm_smp_8660_ops __initdata = {
+ 	.smp_prepare_cpus	= msm_smp_prepare_cpus,
+ 	.smp_secondary_init	= msm_secondary_init,
+-	.smp_boot_secondary	= msm_boot_secondary,
++	.smp_boot_secondary	= msm8660_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= msm_cpu_die,
+ #endif
+ };
++CPU_METHOD_OF_DECLARE(msm_smp, "qcom,gcc-msm8660", &msm_smp_8660_ops);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
