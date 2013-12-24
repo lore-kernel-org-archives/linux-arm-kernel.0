@@ -1,234 +1,46 @@
-From: maxime.hadjinlian@gmail.com (Maxime Hadjinlian)
-Date: Tue, 24 Dec 2013 13:53:19 +0100
-Subject: [PATCH v3 2/2] ARM: Kirkwood: DT board setup for LaPlug
-In-Reply-To: <1387889599-12898-1-git-send-email-maxime.hadjinlian@gmail.com>
-References: <1387889599-12898-1-git-send-email-maxime.hadjinlian@gmail.com>
-Message-ID: <1387889599-12898-2-git-send-email-maxime.hadjinlian@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Dec 2013 12:53:58 +0000
+Subject: [PATCH] regmap: Allow regmap_bulk_write() to work for "no-bus"
+ regmaps
+In-Reply-To: <52B897A1.8030205@codeaurora.org>
+References: <20131211005106.GL11468@sirena.org.uk>
+ <52A7C0C3.2070805@codeaurora.org>
+ <20131211132729.GT11468@sirena.org.uk>
+ <52AA42FD.4040503@codeaurora.org>
+ <20131213104128.GT11044@sirena.org.uk>
+ <20131213213707.GO21983@codeaurora.org>
+ <20131216210153.GA3185@sirena.org.uk>
+ <20131217023047.GC31766@codeaurora.org>
+ <20131218184541.GH31886@sirena.org.uk>
+ <52B897A1.8030205@codeaurora.org>
+Message-ID: <20131224125358.GB30815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT board setup for the LaCie NAS LaPlug.
+On Mon, Dec 23, 2013 at 12:05:53PM -0800, Stephen Boyd wrote:
+> On 12/18/13 10:45, Mark Brown wrote:
 
-Chipset list:
-- CPU MARVELL 88FR131 800Mhz
-- SDRAM memory: 128MB DDR2-800 400Mhz
-- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
-- 1 Mini PCI-Express port
-- 1 NAND 512 MB
-- 1 push button
-- 2 LEDs (red and blue)
-- 4 USB Ports
+> > This doesn't quite work - val is an array of objects of the size of the
+> > size of a register not of unsigned integers so you're parsing extra data
+> > out there.  That possibly wasn't the best choice of API but we have
+> > quite a few users now so ick.
 
-Signed-off-by: Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
----
-Changes v2 -> v3:
-  - Add the pinmuxing for the NAND
-  - Remove the redefinition of the range property for mbus
-Changes v1 -> v2:
-  - Rename the board from ns-plug to laplug, changes everywhere
-    accordingly
-  - Retab the files
-  - Use defines for GPIO active state and key input's name.
-  - Remove #*-cells in gpio-keys as this is not a bus
-  - Use kirkwood-6192.dtsi
----
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/kirkwood-laplug.dts | 175 ++++++++++++++++++++++++++++++++++
- 2 files changed, 176 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-laplug.dts
+> Are you concerned that we'll read past the end of the val buffer? Do we
+> need to cast the pointer to be the appropriate size according to
+> val_bytes? Something like this?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d57c1a6..4c4ff37 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -85,6 +85,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-iomega_ix2_200.dtb \
- 	kirkwood-is2.dtb \
- 	kirkwood-km_kirkwood.dtb \
-+	kirkwood-laplug.dtb \
- 	kirkwood-lschlv2.dtb \
- 	kirkwood-lsxhl.dtb \
- 	kirkwood-mplcec4.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-laplug.dts b/arch/arm/boot/dts/kirkwood-laplug.dts
-new file mode 100644
-index 0000000..c9e82ef
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-laplug.dts
-@@ -0,0 +1,175 @@
-+/*
-+ * Copyright (C) 2013 Maxime Hadjinlian <maxime.hadjinlian@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6192.dtsi"
-+
-+/ {
-+	model = "LaCie LaPlug";
-+	compatible = "lacie,laplug", "marvell,kirkwood-88f6192", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>; /* 128 MB */
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		serial at 12000 {
-+			pinctrl-0 = <&pmx_uart0>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+		};
-+
-+		i2c at 11000 {
-+			pinctrl-0 = <&pmx_twsi0>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+
-+			eeprom at 50 {
-+				compatible = "at,24c04";
-+				pagesize = <16>;
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		pinctrl: pinctrl at 10000 {
-+			pmx_usb_power_enable: pmx-usb-power-enable {
-+				marvell,pins = "mpp14";
-+				marvell,function = "gpio";
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		button at 1{
-+			label = "Power push button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		red-fail {
-+			label = "laplug_v2:red:power";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+		};
-+		blue-power {
-+			label = "laplug_v2:blue:power";
-+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_usb_power_enable>;
-+		pinctrl-names = "default";
-+
-+		usb_power_back1: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power Back 1";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		usb_power_back2: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "USB Power Back 2";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		usb_power_front: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "USB Power Front";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&nand {
-+	/* Total size : 512MB */
-+	status = "okay";
-+	pinctrl-0 = <&pmx_nand>;
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0 0x100000>; /* 1MB */
-+		read-only;
-+	};
-+
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x100000 0x1000000>; /* 16MB */
-+	};
-+
-+	partition at 1100000 {
-+		label = "rootfs";
-+		reg = <0x1100000 0x1EF00000>; /* 495MB */
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 0 {
-+		device_type = "ethernet-phy";
-+		reg = <0>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
--- 
-1.8.5.1
+That's one issue, the other is that if we try to read (say) and 8 bit
+value as an unsigned int we'll not just read the value we're looking
+for.
+
+>                 for (i = 0; i < val_count; i++) {
+>                         unsigned int ival;
+> 
+>                         switch (val_bytes) {
+>                         case 1: 
+>                                 ival = *(u8 *)(val + (i * val_bytes));
+>                                 break;
+
+I think we do sadly.  Or refactor the API to work in unsigned ints
+which would've been more sensible in the first place but that'd make it
+asymmetrical with the read API as it stands...
