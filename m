@@ -1,16 +1,16 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 24 Dec 2013 10:42:56 +0900
-Subject: [GIT PULL 2/7] Samsung cleanup for v3.14
-In-Reply-To: <20131222220338.GB13365@quad.lixom.net>
-References: <52AE0F4E.5070309@samsung.com>
- <20131222220338.GB13365@quad.lixom.net>
-Message-ID: <1af801cf0049$783fe660$68bfb320$@samsung.com>
+Date: Tue, 24 Dec 2013 10:55:31 +0900
+Subject: [GIT PULL 5/7] Samsung irq for v3.14
+In-Reply-To: <20131222220928.GE13365@quad.lixom.net>
+References: <52AE0F8C.3040408@samsung.com>
+ <20131222220928.GE13365@quad.lixom.net>
+Message-ID: <1af901cf004b$39f812e0$ade838a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof Johansson wrote:
 > 
-> On Mon, Dec 16, 2013 at 05:21:34AM +0900, Kukjin Kim wrote:
+> On Mon, Dec 16, 2013 at 05:22:36AM +0900, Kukjin Kim wrote:
 > > The following changes since commit
 > 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 > >
@@ -20,40 +20,19 @@ Olof Johansson wrote:
 > >
 > 
 > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-cleanup
+> > tags/samsung-irq
 > >
-> > for you to fetch changes up to 7c394e7be4d267c02eaaac8fa197a7c1b023c99b:
+> > for you to fetch changes up to 9403ac88220d79f8822e22c875ad1ebd7ffbea6f:
 > >
-> >   ARM: EXYNOS: Constify clksrc immutable register restore tables
-> > (2013-12-12 07:09:33 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Samsung cleanup for v3.14
-> > - remove unused SAMSUNG_GPIOLIB_4BIT and IRQF_DISABLED
-> > - constify immutable PMU data table and PM clksrc register
-> > - make const struct for sleep_save
-> >
-> > ----------------------------------------------------------------
-> > Daniel Kurtz (3):
-> >       ARM: EXYNOS: Constify data tables for pmu
-> >       ARM: SAMSUNG: Let s3c_pm_do_restore_*() take const sleep_save
-> >       ARM: EXYNOS: Constify clksrc immutable register restore tables
-> >
-> > Michael Opdenacker (2):
-> >       ARM: SAMSUNG: remove unused SAMSUNG_GPIOLIB_4BIT Kconfig parameter
-> >       ARM: SAMSUNG: remove IRQF_DISABLED
+> >   irqchip: exynos-combiner: remove hard-coded irq_base value
+> > (2013-12-02 07:15:51 +0900)
 > 
-Hi Olof,
-
-> Pulled into next/cleanup.
+> Pulled into next/drivers. This should probably have gone through the
+> irqchip
+> maintainer though. The patch is small so I took it anyway.
+> 
+Yeah, I know, but irqchip maintainer, Tomas Gleixner is included in CC for
+the patch for a long time. So I think, your pulling is fair enough ;-)
 
 Thanks.
-
-> Please be consistent in patch subjects like
-> other platforms, so "ARM: samsung: .." or "ARM: exynos: ...".
-> 
-Well, 'SAMSUNG' and 'EXYNOS' are proper names and they have a habit of
-starting with a capital letter or just using capital letters like 'ARM' in
-the subject. Additionally, we used to use like that.
-
-- Kukjin
+Kukjin
