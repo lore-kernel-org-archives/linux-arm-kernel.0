@@ -1,43 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:05:00 +0900
-Subject: [PATCH 2/3] ARM: shmobile: bockw: fixup DMA mask
-In-Reply-To: <cover.1387856124.git.horms+renesas@verge.net.au>
-References: <cover.1387856124.git.horms+renesas@verge.net.au>
-Message-ID: <4799e310caf0fb9078389766d0210d1c6133ad51.1387856124.git.horms+renesas@verge.net.au>
+Date: Tue, 24 Dec 2013 15:05:35 +0900
+Subject: [GIT PULL 0/3] Renesas ARM based SoC IRQC Driver Updates for v3.14
+Message-ID: <cover.1387855444.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Kevin, Hi Olof, Hi Arnd,
 
-4dcfa60071b3d23f0181f27d8519f12e37cefbb9
-(ARM: DMA-API: better handing of DMA masks for coherent allocations)
-exchanged DMA mask check method.
-Below warning will appear without this patch
+please consider these Renesas ARM based SoC IRQC driver updates for v3.14.
 
-asoc-simple-card asoc-simple-card.0: \
-  Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
-asoc-simple-card asoc-simple-card.0: \
-  Driver did not use or check the return value from dma_set_coherent_mask()?
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-bockw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 3861152..3c4995a 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -679,7 +679,7 @@ static void __init bockw_init(void)
- 			.id             = i,
- 			.data           = &rsnd_card_info[i],
- 			.size_data      = sizeof(struct asoc_simple_card_info),
--			.dma_mask       = ~0,
-+			.dma_mask	= DMA_BIT_MASK(32),
- 		};
- 
- 		platform_device_register_full(&cardinfo);
--- 
-1.8.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-irqc-for-v3.14
+
+for you to fetch changes up to ce70af18801fd8dac6e9f85308294948916e84d6:
+
+  irq-renesas-irqc: simplify irq_set_type() method (2013-12-23 09:27:17 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC IRQC Driver Updates for v3.14
+
+* Simplify irq_set_type() method
+* Enable mask on suspend
+* Use lazy disable
+
+----------------------------------------------------------------
+Magnus Damm (2):
+      irqchip: renesas-irqc: Use lazy disable
+      irqchip: renesas-irqc: Enable mask on suspend
+
+Sergei Shtylyov (1):
+      irq-renesas-irqc: simplify irq_set_type() method
+
+ drivers/irqchip/irq-renesas-irqc.c | 21 ++++++++-------------
+ 1 file changed, 8 insertions(+), 13 deletions(-)
