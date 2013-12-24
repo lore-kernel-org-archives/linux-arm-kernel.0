@@ -1,61 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:15:53 +0900
-Subject: [PATCH 13/29] ARM: shmobile: r7s72100: Declare SCIF register base and
- IRQ as resources
+Date: Tue, 24 Dec 2013 23:16:05 +0900
+Subject: [PATCH 25/29] ARM: shmobile: r8a7740: Don't set plat_sci_port
+ scbrr_algo_id field
 In-Reply-To: <cover.1387888861.git.horms+renesas@verge.net.au>
 References: <cover.1387888861.git.horms+renesas@verge.net.au>
-Message-ID: <572f218095dcca5b2e02923c68a152f5f506bfd4.1387888861.git.horms+renesas@verge.net.au>
+Message-ID: <52613951a600207df9d75185b677d91bbde44a9e.1387888861.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Passing the register base address and IRQ through platform data is
-deprecated. Use resources instead.
+The field will be removed from the sh-sci driver. Don't set it and let
+the driver handle baud rate calculation internally.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r7s72100.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index 6ae7e32..81b995b 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -36,9 +36,15 @@ static const struct plat_sci_port scif##index##_platform_data = {	\
- 	.scbrr_algo_id	= SCBRR_ALGO_2,					\
- 	.scscr		= SCSCR_RIE | SCSCR_TIE | SCSCR_RE | SCSCR_TE |	\
- 			  SCSCR_REIE,					\
--	.mapbase	= baseaddr,					\
--	.irqs		= { irq + 1, irq + 2, irq + 3, irq },		\
--}
-+};									\
-+									\
-+static struct resource scif##index##_resources[] = {			\
-+	DEFINE_RES_MEM(baseaddr, 0x100),				\
-+	DEFINE_RES_IRQ(irq + 1),					\
-+	DEFINE_RES_IRQ(irq + 2),					\
-+	DEFINE_RES_IRQ(irq + 3),					\
-+	DEFINE_RES_IRQ(irq),						\
-+}									\
- 
- R7S72100_SCIF(0, 0xe8007000, gic_iid(221));
- R7S72100_SCIF(1, 0xe8007800, gic_iid(225));
-@@ -50,9 +56,11 @@ R7S72100_SCIF(6, 0xe800a000, gic_iid(245));
- R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
- 
- #define r7s72100_register_scif(index)					       \
--	platform_device_register_data(&platform_bus, "sh-sci", index,	       \
--				      &scif##index##_platform_data,	       \
--				      sizeof(scif##index##_platform_data))
-+	platform_device_register_resndata(&platform_bus, "sh-sci", index,      \
-+					  scif##index##_resources,	       \
-+					  ARRAY_SIZE(scif##index##_resources), \
-+					  &scif##index##_platform_data,	       \
-+					  sizeof(scif##index##_platform_data))
- 
- 
- static struct sh_timer_config mtu2_0_platform_data __initdata = {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 81a4366..8f3c681 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -208,7 +208,6 @@ static struct platform_device irqpin3_device = {
+ static struct plat_sci_port scif##index##_platform_data = {	\
+ 	.type		= scif_type,				\
+ 	.flags		= UPF_BOOT_AUTOCONF,			\
+-	.scbrr_algo_id	= SCBRR_ALGO_4,				\
+ 	.scscr		= SCSCR_RE | SCSCR_TE,			\
+ };								\
+ 								\
 -- 
 1.8.4
