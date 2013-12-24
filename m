@@ -1,107 +1,96 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 24 Dec 2013 10:35:22 +0900
-Subject: [GIT PULL 7/7] Samsung SoC for v3.14
-In-Reply-To: <20131223213809.GA23509@quad.lixom.net>
-References: <52AE0FA5.3090804@samsung.com>
- <20131222221141.GF13365@quad.lixom.net> <1566886.jecinlyiQ0@flatron>
- <20131223103618.5815379e@amdc2363> <20131223213809.GA23509@quad.lixom.net>
-Message-ID: <1af601cf0048$695ad700$3c108500$@samsung.com>
+Date: Tue, 24 Dec 2013 10:37:23 +0900
+Subject: [PATCH v4 0/7] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
+ clock framework
+In-Reply-To: <201312231411.35417.heiko@sntech.de>
+References: <201312101614.29781.heiko@sntech.de>
+ <201312231411.35417.heiko@sntech.de>
+Message-ID: <1af701cf0048$b175b3c0$14611b40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Heiko St?bner wrote:
 > 
-> On Mon, Dec 23, 2013 at 10:36:18AM +0100, Lukasz Majewski wrote:
-> > Hi Tomasz,
-> >
-> > > Hi Olof,
-> > >
-> > > On Sunday 22 of December 2013 14:11:41 Olof Johansson wrote:
-> > > > On Mon, Dec 16, 2013 at 05:23:01AM +0900, Kukjin Kim wrote:
-> > > > > The following changes since commit
-> > > > > 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> > > > >
-> > > > >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> > > > >
-> > > > > are available in the git repository at:
-> > > > >
-> > > >
-> > > > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-
-> samsung.git
-> > > > > tags/samsung-soc
-> > > > >
-> > > > > for you to fetch changes up to
-> > > > > 538cfbb4c40ab59688236484138133b8e3e89220:
-> > > > >
-> > > > >   ARM: dts: Add initial support for Arndale Octa board (2013-12-16
-> > > > > 05:05:43 +0900)
-> > > >
-> > > > Hi,
-> > > >
-> > > > I'm not going to pull this.
-> > > >
-> > > > I've asked you for about 6 months now (ever since Arnd went on
-> > > > leave) to please finish his multiplatform work for Exynos. Nothing
-> > > > has happened.
-> > > >
-> > > > I'm not going to merge any more platform or SoC enablement code
-> > > > for Samsung platforms until Exynos has been converted over to
-> > > > multiplatform. Sorry.
-> > >
-> > > Well, it's hard to disagree with you on this. Keeping adding new
-> > > things constantly definitely does not make us closer to multiplatform
-> > > support, as it only increases codebase of code that needs to be
-> > > cleaned up and made multiplatform aware.
-> > >
-
-Well, I don't know why this will hurt multiplatform, even you requested that
-long time ago. I thought I could finish that by end of this year but it will
-be done in Jan. Of course, I'm not sure it could be merged in 3.14, because
-it's up to arm-soc tree, it could be sent to before merge window though.
-
-Samsung SoC patches in this pull-request already got review in mailing-list
-and it's ready to merge in the mainline. I think, multiplatform support
-issue should be handled separately, it's up to you and arm-soc maintainers
-though.
-
-> > > However it's not that we're not doing anything towards mutliplatform
-> > > support. We're slowly getting there. A bit too slowly, but I'm afraid
-> > > this is due to the fact that we have definitely too little manpower
-> > > working on mainline support of Samsung SoCs.
-> > >
-> > > As for good news, I already have a series cleaning up PM/sleep support
-> > > and making it multiplatform friendly and I'm going to post it
-> > > tomorrow. The bad news is that it depends on other series and I'm not
-> > > sure if we can get it merged in this release. I'll try to do whatever
-> > > possible to merge things as soon as possible, though.
-> > >
-> > > From smaller things, we still need to sort out Exynos cpufreq driver
-> > > that has dependencies on headers in plat-samsung/ and mach-exynos/.
-> > > Unfortunately I don't have so much time to work on all the things at
-> > > the same time, so I hope that someone else could pick this task up.
-> > > Marek, Lukasz, what do you think?
-> >
-> > Regarding the cpufreq for Exynos, we do need to clean things up.
-> >
-> > It shall be possible to reuse generic cpufreq-cpu0.c and
-> > arm_big_little.c code instead of several copy pasted
-> > exynos[4|5]xxx-cpufreq.c ones.
-> >
-> > This change will require some "virtual" clocks implementation for atomic
-> > clocks dividers change.
-> >
-> > I've already committed myself to fix this code. When all goes smooth, I
-> > shall deliver some RFC code after new year.
+> Hi Kukjin,
 > 
-> Great!
-> 
-> Sounds like if you can start with this after new year that 3.15 will be
-> a good target for Exynos multiplatform. It's way overdue, and I would
-> be very happy to see it completed.
-> 
-And Thomas P Abraham is working on multiplatform for exynos stuff and I
-think he could finish in Jan. So I think Samsung folks need to talk
-internally to avoid duplication efforts, let me talk to Marek in SRPC.
+Hi,
 
-Thanks,
+> it seems you didn't have the time for this series during your 2nd round.
+> 
+> I'm not sure what your plans/time constraint are, but according to the -
+> rc5
+> release mail from Linus [0], 3.13 will at least reach -rc8 so it seems as
+> if
+> there is still a bit of time to for 3.14 stuff.
+> 
+Good news to us :-)
+
+> This series would really be a nice base for not only the other ccf-
+> conversions
+> (the already submitted s3c2410 and the s3c2412 which I'm currently working
+> on)
+> but also for broadening the dt-support, with the auxdata gone from the dt-
+> board file.
+> 
+I agreed, let me try to send one more pull-request for 3.14 after finishing review of your patches.
+
+Thanks and Merry Christmas,
 Kukjin
+
+> 
+> Thanks
+> Heiko
+> 
+> 
+> 
+> [0] https://lkml.org/lkml/2013/12/22/70
+> 
+> Am Dienstag, 10. Dezember 2013, 16:14:29 schrieb Heiko St?bner:
+> > Next try, this time with less time between submissions.
+> >
+> > Tested on both non-dt and dt s3c2416.
+> >
+> > Changes since v3:
+> > - address comments from Tomasz Figa (binding documentation, etc)
+> > - prevent conflicts with unconverted s3c24xx socs
+> > Changes since v2
+> > - address comments from Tomasz Figa
+> > - use new pll registration mechanism
+> > - use fixed-rate clocks for xti etc
+> >
+> > Heiko Stuebner (7):
+> >   clk: samsung: add pll_6552 variant for s3c2416
+> >   clk: samsung: add plls used by the s3c2443
+> >   dt-bindings: add binding for clock-controller of s3c2443 and following
+> >   clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
+> >   ARM: S3C24XX: prevent conflicts between ccf and non-ccf s3c24xx-socs
+> >   ARM: dt: add clock data for s3c2416
+> >   ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
+> >
+> >  .../bindings/clock/samsung,s3c2443-clock.txt       |   56 ++
+> >  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   13 +
+> >  arch/arm/boot/dts/s3c2416.dtsi                     |   42 ++
+> >  arch/arm/mach-s3c24xx/Kconfig                      |   18 +-
+> >  arch/arm/mach-s3c24xx/Makefile                     |    5 +-
+> >  arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
+> >  arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
+> >  arch/arm/mach-s3c24xx/common-s3c2443.c             |  675
+> > -------------------- arch/arm/mach-s3c24xx/common.c                     |
+> >  18 +-
+> >  arch/arm/mach-s3c24xx/common.h                     |    6 +
+> >  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
+> >  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
+> >  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
+> >  drivers/clk/samsung/Makefile                       |    1 +
+> >  drivers/clk/samsung/clk-pll.c                      |   84 ++-
+> >  drivers/clk/samsung/clk-pll.h                      |    3 +
+> >  drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
+> >  include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
+> >  18 files changed, 756 insertions(+), 1114 deletions(-)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt delete
+> > mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
+> >  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
+> >  delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
+> >  create mode 100644 drivers/clk/samsung/clk-s3c2443.c
+> >  create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
