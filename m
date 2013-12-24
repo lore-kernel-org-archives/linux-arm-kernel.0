@@ -1,71 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 24 Dec 2013 21:54:44 +0800
-Subject: [PATCH V2] ARM: imx: improve the comment of CCM lpm SW workaround
-In-Reply-To: <1387923561-8724-1-git-send-email-b20788@freescale.com>
-References: <1387923561-8724-1-git-send-email-b20788@freescale.com>
-Message-ID: <20131224135442.GI3872@S2101-09.ap.freescale.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 24 Dec 2013 23:14:11 +0900
+Subject: [GIT PULL 00/11] Second Round of Renesas SH SCI updates for v3.14
+Message-ID: <cover.1387887969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 05:19:21PM -0500, Anson Huang wrote:
-> Improve the comment of SW workaround for CCM lpm issue using
-> hardware errata description to avoid confusion.
-> 
-> ERR007265:
-> CCM: When improper low-power sequence is used, the SoC enters
->      low power mode before the ARM core executes WFI.
-> 
-> Software workaround:
-> 1) Software should trigger IRQ #32 (IOMUX) to be always pending
->    by setting IOMUX_GPR1_GINT.
-> 2) Software should then unmask IRQ #32 in GPC before setting CCM
->    Low-Power mode.
-> 3) Software should mask IRQ #32 right after CCM Low-Power mode is
->    set (set bits 0-1 of CCM_CLPCR).
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/mach-imx/pm-imx6q.c |   13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-> index aecd9f8..31cb9d6 100644
-> --- a/arch/arm/mach-imx/pm-imx6q.c
-> +++ b/arch/arm/mach-imx/pm-imx6q.c
-> @@ -156,10 +156,13 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  	}
->  
->  	/*
-> -	 * Unmask the always pending IOMUXC interrupt #32 as wakeup source to
-> -	 * deassert dsm_request signal, so that we can ensure dsm_request
-> -	 * is not asserted when we're going to write CLPCR register to set LPM.
-> -	 * After setting up LPM bits, we need to mask this wakeup source.
-> +	 * ERR007265:
-> +	 * CCM: When improper low-power sequence is used, the SoC enters low power mode before the ARM core executes WFI.
-> +	 *
-> +	 * Software workaround:
-> +	 * 1) Software should trigger IRQ #32 (IOMUX) to be always pending by setting IOMUX_GPR1_GINT.
-> +	 * 2) Software should then unmask IRQ #32 in GPC before setting CCM Low-Power mode.
-> +	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode is set (set bits 0-1 of CCM_CLPCR).
+Hi Kevin, Hi Olof, Hi Arnd,
 
-The lines are too long.  I wrapped them a little bit, and applied the
-patch.
+please consider this second round of Renesas SH SCI updates for v3.14.
 
-Shawn
+They have been acked by Greg Kroah-Hartman to be taken
+through my tree. The reason for this is that they are dependencies
+for subsequent changes to use the common clock framework.
 
->  	 */
->  	iomuxc_irq_desc = irq_to_desc(32);
->  	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
-> @@ -219,6 +222,8 @@ void __init imx6q_pm_init(void)
->  	WARN_ON(!ccm_base);
->  
->  	/*
-> +	 * This is for SW workaround step #1 of ERR007265, see comments
-> +	 * in imx6q_set_lpm for details of this errata.
->  	 * Force IOMUXC irq pending, so that the interrupt to GPC can be
->  	 * used to deassert dsm_request signal when the signal gets
->  	 * asserted unexpectedly.
-> -- 
-> 1.7.9.5
-> 
-> 
+This pull-request is based on the first round of such changes,
+tagged as renesas-sh-sci-for-v3.14, which I have previously sent
+a pull-request for.
+
+
+The following changes since commit b016b646e8676858f39ea9be760494b04b9ee0af:
+
+  serial: sh-sci: Convert to clk_prepare/unprepare (2013-12-14 09:59:31 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh-sci2-for-v3.14
+
+for you to fetch changes up to ec09c5eb491834d4011c72538e58d8b7096076bd:
+
+  serial: sh-sci: Rework baud rate calculation (2013-12-24 11:17:53 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas SH SCI updates for v3.14
+
+* Rework baud rate calculation
+* Compute overrun_bit without using baud rate algo
+* Remove unused GPIO request code
+* Move overrun_bit and error_mask fields out of pdata
+* Support resources passed through platform resources
+* Don't check IRQ in verify port operation
+* Set the UPF_FIXED_PORT flag
+* Remove duplicate interrupt check in verify port op
+* Simplify baud rate calculation algorithms
+* Remove baud rate calculation algorithm 5
+* Sort headers alphabetically
+
+----------------------------------------------------------------
+Laurent Pinchart (11):
+      serial: sh-sci: Sort headers alphabetically
+      serial: sh-sci: Remove baud rate calculation algorithm 5
+      serial: sh-sci: Simplify baud rate calculation algorithms
+      serial: sh-sci: Remove duplicate interrupt check in verify port op
+      serial: sh-sci: Set the UPF_FIXED_PORT flag
+      serial: sh-sci: Don't check IRQ in verify port operation
+      serial: sh-sci: Support resources passed through platform resources
+      serial: sh-sci: Move overrun_bit and error_mask fields out of pdata
+      serial: sh-sci: Remove unused GPIO request code
+      serial: sh-sci: Compute overrun_bit without using baud rate algo
+      serial: sh-sci: Rework baud rate calculation
+
+ drivers/tty/serial/sh-sci.c | 281 +++++++++++++++++++++-----------------------
+ drivers/tty/serial/sh-sci.h |   2 +-
+ include/linux/serial_sci.h  |  34 ++----
+ 3 files changed, 142 insertions(+), 175 deletions(-)
