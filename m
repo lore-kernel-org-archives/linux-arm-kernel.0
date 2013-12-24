@@ -1,52 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:16:09 +0900
-Subject: [PATCH 29/29] arm: shmobile: r7s72100: add i2c clocks
+Date: Tue, 24 Dec 2013 23:16:08 +0900
+Subject: [PATCH 28/29] ARM: shmobile: r8a7791: Don't set plat_sci_port
+ scbrr_algo_id field
 In-Reply-To: <cover.1387888861.git.horms+renesas@verge.net.au>
 References: <cover.1387888861.git.horms+renesas@verge.net.au>
-Message-ID: <d85bcfa916ffdf078f188aeab60f738b290f4309.1387888861.git.horms+renesas@verge.net.au>
+Message-ID: <f72ed4beb198eb25c8532e76addc0034ae2aa8c7.1387888861.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa@sang-engineering.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Tested with RIIC2 on a genmai board. Others untested but hopefully
-trivial enough to be added.
+The field will be removed from the sh-sci driver. Don't set it and let
+the driver handle baud rate calculation internally.
 
-Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7791.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 4aba20c..850a8a3 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -27,6 +27,7 @@
- #define FRQCR2		0xfcfe0014
- #define STBCR3		0xfcfe0420
- #define STBCR4		0xfcfe0424
-+#define STBCR9		0xfcfe0438
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index f15b537..e28404e 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -84,11 +84,10 @@ void __init r8a7791_pinmux_init(void)
+ 	r8a7791_register_gpio(7);
+ }
  
- #define PLL_RATE 30
+-#define __R8A7791_SCIF(scif_type, algo, index, baseaddr, irq)		\
++#define __R8A7791_SCIF(scif_type, index, baseaddr, irq)			\
+ static struct plat_sci_port scif##index##_platform_data = {		\
+ 	.type		= scif_type,					\
+ 	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
+-	.scbrr_algo_id	= algo,						\
+ 	.scscr		= SCSCR_RE | SCSCR_TE,				\
+ };									\
+ 									\
+@@ -98,13 +97,13 @@ static struct resource scif##index##_resources[] = {			\
+ }
  
-@@ -144,10 +145,15 @@ struct clk div4_clks[DIV4_NR] = {
- 					| CLK_ENABLE_ON_INIT),
- };
+ #define R8A7791_SCIF(index, baseaddr, irq)				\
+-	__R8A7791_SCIF(PORT_SCIF, SCBRR_ALGO_2, index, baseaddr, irq)
++	__R8A7791_SCIF(PORT_SCIF, index, baseaddr, irq)
  
--enum { MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
-+enum {	MSTP97, MSTP96, MSTP95, MSTP94,
-+	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
- 	MSTP33,	MSTP_NR };
+ #define R8A7791_SCIFA(index, baseaddr, irq)				\
+-	__R8A7791_SCIF(PORT_SCIFA, SCBRR_ALGO_4, index, baseaddr, irq)
++	__R8A7791_SCIF(PORT_SCIFA, index, baseaddr, irq)
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
-+	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
-+	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
-+	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
- 	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
- 	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
- 	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
+ #define R8A7791_SCIFB(index, baseaddr, irq)				\
+-	__R8A7791_SCIF(PORT_SCIFB, SCBRR_ALGO_4, index, baseaddr, irq)
++	__R8A7791_SCIF(PORT_SCIFB, index, baseaddr, irq)
+ 
+ R8A7791_SCIFA(0,  0xe6c40000, gic_spi(144)); /* SCIFA0 */
+ R8A7791_SCIFA(1,  0xe6c50000, gic_spi(145)); /* SCIFA1 */
 -- 
 1.8.4
