@@ -1,37 +1,59 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Tue, 24 Dec 2013 10:36:43 +0200
-Subject: [PATCH v2 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <20131224005804.GF31766@codeaurora.org>
-References: <1387297337-25493-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
- <20131224005804.GF31766@codeaurora.org>
-Message-ID: <52B9479B.3040108@ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 24 Dec 2013 14:27:02 +0530
+Subject: [PATCH 0/4] Add support for clocks in S5M8767
+In-Reply-To: <CAHbNUh2-WTc2myFbzYDmV=aSYUvO03pj3ZwNAen3j_GiGsRJkg@mail.gmail.com>
+References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
+ <18704605.0nz1OWeNy9@flatron>
+ <CAHbNUh2-WTc2myFbzYDmV=aSYUvO03pj3ZwNAen3j_GiGsRJkg@mail.gmail.com>
+Message-ID: <CAHbNUh1HchzsM_4Jq2NkgwyWf9t6sYJNdbKY1quEb75GapHitA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/24/2013 02:58 AM, Stephen Boyd wrote:
-> On 12/17, Ivan Khoronzhuk wrote:
->> +static void __init keystone_timer_init(struct device_node *np)
->> +{
->> +	struct clock_event_device *event_dev = &timer.event_dev;
->> +	unsigned long rate;
-> [...]
->> +
->> +	timer.hz_period = rate / (HZ);
+On 11 November 2013 08:28, Tushar Behera <tushar.behera@linaro.org> wrote:
+> On 10 November 2013 18:04, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> Hi Tushar,
+>>
+>> On Thursday 31 of October 2013 12:18:40 Tushar Behera wrote:
+>>> S5M8767 chip has 3 crystal oscillators which are operated in the same
+>>> as the crystal oscillators in S2MPS11. Extend s2mps11-clk driver to
+>>> support clocks in S5M8767.
+>>>
+>>> The patches are based on next-20131030.
+>>>
+>>> Tushar Behera (4):
+>>>   clk: clk-s2mps11: Refactor for including support for other MFD clocks
+>>>   clk: clk-s2mps11: Add support for clocks in S5M8767 MFD
+>>>   mfd: sec-core: Add cells for S5M8767-clocks
+>>>   ARM: dts: Add S5M8767 clock nodes on Arndale board
+>>>
+>>>  arch/arm/boot/dts/exynos5250-arndale.dts |    7 +++++++
+>>>  drivers/clk/Kconfig                      |    6 ++++--
+>>>  drivers/clk/clk-s2mps11.c                |   25
+>>> +++++++++++++++++++++---- drivers/mfd/sec-core.c                   |
+>>> 4 +++-
+>>>  4 files changed, 35 insertions(+), 7 deletions(-)
+>>
+>> For the whole series:
+>>
+>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>
+>> Best regards,
+>> Tomasz
+>>
 >
-> Unnecessary parentheses here. Also, do you need to use do_div()
-> here? I'm lost how the hz_period is ever greater than 32 bits
-> though because HZ is most likely very small and the rate is
-> unsigned long.
+> Thanks Tomasz.
 >
+> Mike,
+>
+> Would you please pick up patches 1 and 2? Lee would pick up patch 3
+> after these patches are merged.
+>
+> --
+> Tushar Behera
 
-You are right.
-I'll do the following:
+Mike,
 
-timer.hz_period = rate / (HZ)	---> timer.hz_period = rate / HZ
-u64 hz_period			---> unsigned long hz_period
+Would you please take patches 1 and 2 during this merge window?
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Tushar Behera
