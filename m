@@ -1,38 +1,49 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 24 Dec 2013 15:32:11 +0200
-Subject: [PATCH v2 6/6] misc: enable fuse drivers
-In-Reply-To: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1387891931-9854-7-git-send-email-pdeschrijver@nvidia.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 24 Dec 2013 14:45:49 +0100
+Subject: [PATCH v3 04/12] clk: Add regmap core helpers for
+ enable/disable/is_enabled
+In-Reply-To: <20131219202419.GS8064@book.gsilab.sittig.org>
+References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
+ <1381909214-12693-5-git-send-email-sboyd@codeaurora.org>
+ <20131219045050.23538.94293@quantum>
+ <20131219202419.GS8064@book.gsilab.sittig.org>
+Message-ID: <20131224134549.GF8064@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable building the fuse drivers.
+On Thu, Dec 19, 2013 at 21:24 +0100, Gerhard Sittig wrote:
+> 
+> Wasn't the idea to extend the set of register accessor routines
+> in <linux/clk-provider.h> such that memory mapped I/O as well as
+> regmap style becomes possible?  This is what I understood from
+> past iterations of discussing this approach.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/misc/Kconfig  |    1 +
- drivers/misc/Makefile |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+Just FYI and to have the pointer in some archive:  Had a look at
+recent threads because it appears that several pending changes
+have similar needs to adjust the kind of hardware access, while
+sharing common code to handle the actual clock item logic would
+be desirable.
 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 6cb388e..45560dc 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -526,4 +526,5 @@ source "drivers/misc/mei/Kconfig"
- source "drivers/misc/vmw_vmci/Kconfig"
- source "drivers/misc/mic/Kconfig"
- source "drivers/misc/genwqe/Kconfig"
-+source "drivers/misc/fuse/Kconfig"
- endmenu
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 99b9424..e243a8b 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -54,3 +54,4 @@ obj-$(CONFIG_LATTICE_ECP3_CONFIG)	+= lattice-ecp3-config.o
- obj-$(CONFIG_SRAM)		+= sram.o
- obj-y				+= mic/
- obj-$(CONFIG_GENWQE)		+= genwqe/
-+obj-y				+= fuse/
+Please check "[PATCHv12 00/49] ARM: TI SoC clock DT conversion"
+from Tero Kristo as of 2013-12-20, which "in bypassing"
+introduces low level ops for register access (patches 06 and
+following).  I suggested to separate this hardware access aspect
+out of the "TI SoC clock" series (almost missed the fact that it
+changes behaviour in common code), and to add regmap support or
+at least allow to do regmap on top of the ll_ops infrastructure.
+
+With the proposed generic approach all of us should be happy.
+The vast amount of ARM code should not experience any change, the
+queued PowerPC support can keep working, new TI SoC clocks can
+get implemented, Steven you can get regmap access, and more
+platforms may use the common code even if readl()/writel() won't
+fit them.  Let's followup in Tero's v12 feedback thread to make
+that happen.
+
+
+virtually yours
+Gerhard Sittig
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
