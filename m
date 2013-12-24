@@ -1,217 +1,153 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:14:24 +0900
-Subject: [PATCH 07/11] serial: sh-sci: Support resources passed through
- platform resources
+Date: Tue, 24 Dec 2013 23:14:32 +0900
+Subject: [PATCH 11/11] serial: sh-sci: Rework baud rate calculation
 In-Reply-To: <cover.1387887969.git.horms+renesas@verge.net.au>
 References: <cover.1387887969.git.horms+renesas@verge.net.au>
-Message-ID: <1fcc91a607de0bf72d3a6073dfe459f7e9145ac5.1387887969.git.horms+renesas@verge.net.au>
+Message-ID: <ec09c5eb491834d4011c72538e58d8b7096076bd.1387887969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Memory and IRQ resources are currently passed to the driver through
-platform data. Support passing them through the standard platform
-resources mechanism instead. This deprecates platform data resources.
+Computing the baud rate register value requires knowledge of the
+hardware sampling rate. This information is currently encoded in a baud
+rate calculation algorithm ID passed through platform data. However, it
+can be derived from the port type directly in most cases.
+
+Compute the sampling rate internally in the driver if the baud rate
+calculation algorithm ID isn't specified, and allow platforms to
+override the sampling rate through platform data in special cases (this
+is only required for SCIFA ports on sh7723 and sh7724, the reason needs
+to be investigated).
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/tty/serial/sh-sci.c | 65 ++++++++++++++++++++++++++++++++++-----------
- include/linux/serial_sci.h  |  8 +++---
- 2 files changed, 53 insertions(+), 20 deletions(-)
+ drivers/tty/serial/sh-sci.c | 37 ++++++++++++++++++++++++++++++-------
+ include/linux/serial_sci.h  |  2 ++
+ 2 files changed, 32 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index b3d0e00..e9c6e23 100644
+index d5239d5..e4bf0e4 100644
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -74,6 +74,7 @@ struct sci_port {
- 	/* Function clock */
- 	struct clk		*fclk;
+@@ -65,6 +65,7 @@ struct sci_port {
+ 	struct plat_sci_port	*cfg;
+ 	int			overrun_bit;
+ 	unsigned int		error_mask;
++	unsigned int		sampling_rate;
  
-+	int			irqs[SCIx_NR_IRQS];
- 	char			*irqstr[SCIx_NR_IRQS];
- 	char			*gpiostr[SCIx_NR_FNS];
  
-@@ -1079,19 +1080,19 @@ static int sci_request_irq(struct sci_port *port)
- 
- 	for (i = j = 0; i < SCIx_NR_IRQS; i++, j++) {
- 		struct sci_irq_desc *desc;
--		unsigned int irq;
-+		int irq;
- 
- 		if (SCIx_IRQ_IS_MUXED(port)) {
- 			i = SCIx_MUX_IRQ;
- 			irq = up->irq;
- 		} else {
--			irq = port->cfg->irqs[i];
-+			irq = port->irqs[i];
- 
- 			/*
- 			 * Certain port types won't support all of the
- 			 * available interrupt sources.
- 			 */
--			if (unlikely(!irq))
-+			if (unlikely(irq < 0))
- 				continue;
- 		}
- 
-@@ -1116,7 +1117,7 @@ static int sci_request_irq(struct sci_port *port)
- 
- out_noirq:
- 	while (--i >= 0)
--		free_irq(port->cfg->irqs[i], port);
-+		free_irq(port->irqs[i], port);
- 
- out_nomem:
- 	while (--j >= 0)
-@@ -1134,16 +1135,16 @@ static void sci_free_irq(struct sci_port *port)
- 	 * IRQ first.
- 	 */
- 	for (i = 0; i < SCIx_NR_IRQS; i++) {
--		unsigned int irq = port->cfg->irqs[i];
-+		int irq = port->irqs[i];
- 
- 		/*
- 		 * Certain port types won't support all of the available
- 		 * interrupt sources.
- 		 */
--		if (unlikely(!irq))
-+		if (unlikely(irq < 0))
- 			continue;
- 
--		free_irq(port->cfg->irqs[i], port);
-+		free_irq(port->irqs[i], port);
- 		kfree(port->irqstr[i]);
- 
- 		if (SCIx_IRQ_IS_MUXED(port)) {
-@@ -1659,7 +1660,7 @@ static void rx_timer_fn(unsigned long arg)
- 
- 	if (port->type == PORT_SCIFA || port->type == PORT_SCIFB) {
- 		scr &= ~0x4000;
--		enable_irq(s->cfg->irqs[1]);
-+		enable_irq(s->irqs[SCIx_RXI_IRQ]);
- 	}
- 	serial_port_out(port, SCSCR, scr | SCSCR_RIE);
- 	dev_dbg(port->dev, "DMA Rx timed out\n");
-@@ -2150,11 +2151,12 @@ static struct uart_ops sci_uart_ops = {
- };
- 
- static int sci_init_single(struct platform_device *dev,
--				     struct sci_port *sci_port,
--				     unsigned int index,
--				     struct plat_sci_port *p)
-+			   struct sci_port *sci_port, unsigned int index,
-+			   struct plat_sci_port *p, bool early)
- {
- 	struct uart_port *port = &sci_port->port;
-+	const struct resource *res;
-+	unsigned int i;
- 	int ret;
- 
- 	sci_port->cfg	= p;
-@@ -2163,6 +2165,38 @@ static int sci_init_single(struct platform_device *dev,
- 	port->iotype	= UPIO_MEM;
- 	port->line	= index;
- 
-+	if (dev->num_resources) {
-+		/* Device has resources, use them. */
-+		res = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+		if (res == NULL)
-+			return -ENOMEM;
-+
-+		port->mapbase = res->start;
-+
-+		for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
-+			sci_port->irqs[i] = platform_get_irq(dev, i);
-+
-+		/* The SCI generates several interrupts. They can be muxed
-+		 * together or connected to different interrupt lines. In the
-+		 * muxed case only one interrupt resource is specified. In the
-+		 * non-muxed case three or four interrupt resources are
-+		 * specified, as the BRI interrupt is optional.
-+		 */
-+		if (sci_port->irqs[0] < 0)
-+			return -ENXIO;
-+
-+		if (sci_port->irqs[1] < 0) {
-+			sci_port->irqs[1] = sci_port->irqs[0];
-+			sci_port->irqs[2] = sci_port->irqs[0];
-+			sci_port->irqs[3] = sci_port->irqs[0];
-+		}
-+	} else {
-+		/* No resources, use old-style platform data. */
-+		port->mapbase = p->mapbase;
-+		for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
-+			sci_port->irqs[i] = p->irqs[i] ? p->irqs[i] : -ENXIO;
-+	}
-+
- 	switch (p->type) {
- 	case PORT_SCIFB:
- 		port->fifosize = 256;
-@@ -2187,7 +2221,7 @@ static int sci_init_single(struct platform_device *dev,
- 			return ret;
- 	}
- 
--	if (dev) {
-+	if (!early) {
- 		sci_port->iclk = clk_get(&dev->dev, "sci_ick");
- 		if (IS_ERR(sci_port->iclk)) {
- 			sci_port->iclk = clk_get(&dev->dev, "peripheral_clk");
-@@ -2242,7 +2276,6 @@ static int sci_init_single(struct platform_device *dev,
- 		p->error_mask |= (1 << p->overrun_bit);
- 	}
- 
--	port->mapbase		= p->mapbase;
- 	port->type		= p->type;
- 	port->flags		= UPF_FIXED_PORT | p->flags;
- 	port->regshift		= p->regshift;
-@@ -2254,7 +2287,7 @@ static int sci_init_single(struct platform_device *dev,
- 	 *
- 	 * For the muxed case there's nothing more to do.
- 	 */
--	port->irq		= p->irqs[SCIx_RXI_IRQ];
-+	port->irq		= sci_port->irqs[SCIx_RXI_IRQ];
- 	port->irqflags		= 0;
- 
- 	port->serial_in		= sci_serial_in;
-@@ -2386,7 +2419,7 @@ static int sci_probe_earlyprintk(struct platform_device *pdev)
- 
- 	early_serial_console.index = pdev->id;
- 
--	sci_init_single(NULL, &sci_ports[pdev->id], pdev->id, cfg);
-+	sci_init_single(pdev, &sci_ports[pdev->id], pdev->id, cfg, true);
- 
- 	serial_console_setup(&early_serial_console, early_serial_buf);
- 
-@@ -2453,7 +2486,7 @@ static int sci_probe_single(struct platform_device *dev,
- 		return -EINVAL;
- 	}
- 
--	ret = sci_init_single(dev, sciport, index, p);
-+	ret = sci_init_single(dev, sciport, index, p, false);
- 	if (ret)
- 		return ret;
- 
-diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index 12cf50c..42620f1 100644
---- a/include/linux/serial_sci.h
-+++ b/include/linux/serial_sci.h
-@@ -107,10 +107,10 @@ enum {
+ 	/* Break timer */
+@@ -1750,10 +1751,13 @@ static void sci_shutdown(struct uart_port *port)
+ 	sci_free_irq(s);
  }
  
- #define SCIx_IRQ_IS_MUXED(port)			\
--	((port)->cfg->irqs[SCIx_ERI_IRQ] ==	\
--	 (port)->cfg->irqs[SCIx_RXI_IRQ]) ||	\
--	((port)->cfg->irqs[SCIx_ERI_IRQ] &&	\
--	 !(port)->cfg->irqs[SCIx_RXI_IRQ])
-+	((port)->irqs[SCIx_ERI_IRQ] ==	\
-+	 (port)->irqs[SCIx_RXI_IRQ]) ||	\
-+	((port)->irqs[SCIx_ERI_IRQ] &&	\
-+	 ((port)->irqs[SCIx_RXI_IRQ] < 0))
- /*
-  * SCI register subset common for all port types.
-  * Not all registers will exist on all parts.
+-static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
++static unsigned int sci_scbrr_calc(struct sci_port *s, unsigned int bps,
+ 				   unsigned long freq)
+ {
+-	switch (algo_id) {
++	if (s->sampling_rate)
++		return DIV_ROUND_CLOSEST(freq, s->sampling_rate * bps) - 1;
++
++	switch (s->cfg->scbrr_algo_id) {
+ 	case SCBRR_ALGO_1:
+ 		return freq / (16 * bps);
+ 	case SCBRR_ALGO_2:
+@@ -1843,12 +1847,11 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
+ 
+ 	baud = uart_get_baud_rate(port, termios, old, 0, max_baud);
+ 	if (likely(baud && port->uartclk)) {
+-		if (s->cfg->scbrr_algo_id == SCBRR_ALGO_6) {
++		if (s->cfg->type == PORT_HSCIF) {
+ 			sci_baud_calc_hscif(baud, port->uartclk, &t, &srr,
+ 					    &cks);
+ 		} else {
+-			t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud,
+-					   port->uartclk);
++			t = sci_scbrr_calc(s, baud, port->uartclk);
+ 			for (cks = 0; t >= 256 && cks <= 3; cks++)
+ 				t >>= 2;
+ 		}
+@@ -2092,6 +2095,7 @@ static int sci_init_single(struct platform_device *dev,
+ {
+ 	struct uart_port *port = &sci_port->port;
+ 	const struct resource *res;
++	unsigned int sampling_rate;
+ 	unsigned int i;
+ 	int ret;
+ 
+@@ -2143,28 +2147,47 @@ static int sci_init_single(struct platform_device *dev,
+ 	case PORT_SCIFB:
+ 		port->fifosize = 256;
+ 		sci_port->overrun_bit = 9;
++		sampling_rate = 16;
+ 		break;
+ 	case PORT_HSCIF:
+ 		port->fifosize = 128;
++		sampling_rate = 0;
+ 		sci_port->overrun_bit = 0;
+ 		break;
+ 	case PORT_SCIFA:
+ 		port->fifosize = 64;
+ 		sci_port->overrun_bit = 9;
++		sampling_rate = 16;
+ 		break;
+ 	case PORT_SCIF:
+ 		port->fifosize = 16;
+-		if (p->regtype == SCIx_SH7705_SCIF_REGTYPE)
++		if (p->regtype == SCIx_SH7705_SCIF_REGTYPE) {
+ 			sci_port->overrun_bit = 9;
+-		else
++			sampling_rate = 16;
++		} else {
+ 			sci_port->overrun_bit = 0;
++			sampling_rate = 32;
++		}
+ 		break;
+ 	default:
+ 		port->fifosize = 1;
+ 		sci_port->overrun_bit = 5;
++		sampling_rate = 32;
+ 		break;
+ 	}
+ 
++	/* Set the sampling rate if the baud rate calculation algorithm isn't
++	 * specified.
++	 */
++	if (p->scbrr_algo_id == SCBRR_ALGO_NONE) {
++		/* SCIFA on sh7723 and sh7724 need a custom sampling rate that
++		 * doesn't match the SoC datasheet, this should be investigated.
++		 * Let platform data override the sampling rate for now.
++		 */
++		sci_port->sampling_rate = p->sampling_rate ? p->sampling_rate
++					: sampling_rate;
++	}
++
+ 	if (!early) {
+ 		sci_port->iclk = clk_get(&dev->dev, "sci_ick");
+ 		if (IS_ERR(sci_port->iclk)) {
+diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
+index e9c3021..af414e1 100644
+--- a/include/linux/serial_sci.h
++++ b/include/linux/serial_sci.h
+@@ -11,6 +11,7 @@
+ #define SCIx_NOT_SUPPORTED	(-1)
+ 
+ enum {
++	SCBRR_ALGO_NONE,	/* Compute sampling rate in the driver */
+ 	SCBRR_ALGO_1,		/* clk / (16 * bps) */
+ 	SCBRR_ALGO_2,		/* DIV_ROUND_CLOSEST(clk, 32 * bps) - 1 */
+ 	SCBRR_ALGO_3,		/* clk / (8 * bps) */
+@@ -134,6 +135,7 @@ struct plat_sci_port {
+ 	upf_t		flags;			/* UPF_* flags */
+ 	unsigned long	capabilities;		/* Port features/capabilities */
+ 
++	unsigned int	sampling_rate;
+ 	unsigned int	scbrr_algo_id;		/* SCBRR calculation algo */
+ 	unsigned int	scscr;			/* SCSCR initialization */
+ 
 -- 
 1.8.4
