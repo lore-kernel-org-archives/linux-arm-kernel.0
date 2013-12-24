@@ -1,82 +1,107 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Tue, 24 Dec 2013 10:19:09 +0900
-Subject: [PATCH] [RFC] ARM: mm: add configuration for the size of module space
-Message-ID: <000c01cf0046$25eb1db0$71c15910$@lge.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 24 Dec 2013 10:35:22 +0900
+Subject: [GIT PULL 7/7] Samsung SoC for v3.14
+In-Reply-To: <20131223213809.GA23509@quad.lixom.net>
+References: <52AE0FA5.3090804@samsung.com>
+ <20131222221141.GF13365@quad.lixom.net> <1566886.jecinlyiQ0@flatron>
+ <20131223103618.5815379e@amdc2363> <20131223213809.GA23509@quad.lixom.net>
+Message-ID: <1af601cf0048$695ad700$3c108500$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Olof Johansson wrote:
+> 
+> On Mon, Dec 23, 2013 at 10:36:18AM +0100, Lukasz Majewski wrote:
+> > Hi Tomasz,
+> >
+> > > Hi Olof,
+> > >
+> > > On Sunday 22 of December 2013 14:11:41 Olof Johansson wrote:
+> > > > On Mon, Dec 16, 2013 at 05:23:01AM +0900, Kukjin Kim wrote:
+> > > > > The following changes since commit
+> > > > > 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > > > >
+> > > > >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> > > > >
+> > > > > are available in the git repository at:
+> > > > >
+> > > >
+> > > > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-
+> samsung.git
+> > > > > tags/samsung-soc
+> > > > >
+> > > > > for you to fetch changes up to
+> > > > > 538cfbb4c40ab59688236484138133b8e3e89220:
+> > > > >
+> > > > >   ARM: dts: Add initial support for Arndale Octa board (2013-12-16
+> > > > > 05:05:43 +0900)
+> > > >
+> > > > Hi,
+> > > >
+> > > > I'm not going to pull this.
+> > > >
+> > > > I've asked you for about 6 months now (ever since Arnd went on
+> > > > leave) to please finish his multiplatform work for Exynos. Nothing
+> > > > has happened.
+> > > >
+> > > > I'm not going to merge any more platform or SoC enablement code
+> > > > for Samsung platforms until Exynos has been converted over to
+> > > > multiplatform. Sorry.
+> > >
+> > > Well, it's hard to disagree with you on this. Keeping adding new
+> > > things constantly definitely does not make us closer to multiplatform
+> > > support, as it only increases codebase of code that needs to be
+> > > cleaned up and made multiplatform aware.
+> > >
 
-Hi,
+Well, I don't know why this will hurt multiplatform, even you requested that
+long time ago. I thought I could finish that by end of this year but it will
+be done in Jan. Of course, I'm not sure it could be merged in 3.14, because
+it's up to arm-soc tree, it could be sent to before merge window though.
 
-I run out of module space because I have several big driver modules.
-I know I can strip the modules to decrease size but I need debug info now.
+Samsung SoC patches in this pull-request already got review in mailing-list
+and it's ready to merge in the mainline. I think, multiplatform support
+issue should be handled separately, it's up to you and arm-soc maintainers
+though.
 
-The default size of module is 16MB and the size is statically 
-defined in the header file. But a description for the module space 
-size tell that it can be configurable at most 32MB.
+> > > However it's not that we're not doing anything towards mutliplatform
+> > > support. We're slowly getting there. A bit too slowly, but I'm afraid
+> > > this is due to the fact that we have definitely too little manpower
+> > > working on mainline support of Samsung SoCs.
+> > >
+> > > As for good news, I already have a series cleaning up PM/sleep support
+> > > and making it multiplatform friendly and I'm going to post it
+> > > tomorrow. The bad news is that it depends on other series and I'm not
+> > > sure if we can get it merged in this release. I'll try to do whatever
+> > > possible to merge things as soon as possible, though.
+> > >
+> > > From smaller things, we still need to sort out Exynos cpufreq driver
+> > > that has dependencies on headers in plat-samsung/ and mach-exynos/.
+> > > Unfortunately I don't have so much time to work on all the things at
+> > > the same time, so I hope that someone else could pick this task up.
+> > > Marek, Lukasz, what do you think?
+> >
+> > Regarding the cpufreq for Exynos, we do need to clean things up.
+> >
+> > It shall be possible to reuse generic cpufreq-cpu0.c and
+> > arm_big_little.c code instead of several copy pasted
+> > exynos[4|5]xxx-cpufreq.c ones.
+> >
+> > This change will require some "virtual" clocks implementation for atomic
+> > clocks dividers change.
+> >
+> > I've already committed myself to fix this code. When all goes smooth, I
+> > shall deliver some RFC code after new year.
+> 
+> Great!
+> 
+> Sounds like if you can start with this after new year that 3.15 will be
+> a good target for Exynos multiplatform. It's way overdue, and I would
+> be very happy to see it completed.
+> 
+And Thomas P Abraham is working on multiplatform for exynos stuff and I
+think he could finish in Jan. So I think Samsung folks need to talk
+internally to avoid duplication efforts, let me talk to Marek in SRPC.
 
-I have changed the module space size to 18MB and tested my platform.
-It have been looking good.
-
-I am not sure my patch is proper solution.
-Anyway, could I configure the module space size?
-
-
-
-Signed-off-by: Gioh Kim <gioh.kim@lge.com>
----
- arch/arm/Kconfig              |    4 ++++
- arch/arm/include/asm/memory.h |   10 +++++++---
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..cf1fb55 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2257,6 +2257,10 @@ config ARM_CPU_SUSPEND
-
- endmenu
-
-+config MODULES_AREA_SIZE
-+       int
-+       default 0x1000000
-+
- source "net/Kconfig"
-
- source "drivers/Kconfig"
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 6976b03..3396758 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -32,13 +32,17 @@
-
- #ifdef CONFIG_MMU
-
-+#if CONFIG_MODULES_AREA_SIZE > SZ_32M
-+#error Too much space for modules
-+#endif
-+
- /*
-  * PAGE_OFFSET - the virtual address of the start of the kernel image
-  * TASK_SIZE - the maximum size of a user space task.
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
-  */
--#define PAGE_OFFSET            UL(CONFIG_PAGE_OFFSET)
--#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
-+#define PAGE_OFFSET    UL(CONFIG_PAGE_OFFSET)
-+#define TASK_SIZE      (UL(CONFIG_PAGE_OFFSET) -
-UL(CONFIG_MODULES_AREA_SIZE))
- #define TASK_UNMAPPED_BASE     ALIGN(TASK_SIZE / 3, SZ_16M)
-
- /*
-@@ -51,7 +55,7 @@
-  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
-  */
- #ifndef CONFIG_THUMB2_KERNEL
--#define MODULES_VADDR          (PAGE_OFFSET - SZ_16M)
-+#define MODULES_VADDR          (PAGE_OFFSET - CONFIG_MODULES_AREA_SIZE)
- #else
- /* smaller range for Thumb-2 symbols relocation (2^24)*/
- #define MODULES_VADDR          (PAGE_OFFSET - SZ_8M)
---
-1.7.9.5
+Thanks,
+Kukjin
