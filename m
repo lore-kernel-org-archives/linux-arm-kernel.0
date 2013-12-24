@@ -1,41 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Dec 2013 21:26:19 +0800
-Subject: [PATCH 3/4] pinctrl: sunxi: Add Allwinner A20 clock output pin
- functions
+Date: Tue, 24 Dec 2013 21:26:18 +0800
+Subject: [PATCH 2/4] ARM: dts: sun7i: external clock outputs
 In-Reply-To: <1387891580-30715-1-git-send-email-wens@csie.org>
 References: <1387891580-30715-1-git-send-email-wens@csie.org>
-Message-ID: <1387891580-30715-4-git-send-email-wens@csie.org>
+Message-ID: <1387891580-30715-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the clock output pin functions on the A20.
-The 2 pins can output a configurable clock to be used by
-external modules. This is used on the CubieTruck, to supply
-a 32768 Hz low power clock to the onboard Wifi+BT module.
+This commit adds the two external clock outputs available on A20 to
+its device tree. A dummy fixed factor clock is also added to serve as
+the first input of the clock outputs, which according to AW's A20 user
+manual, is the 24MHz oscillator divided by 750.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/pinctrl/pinctrl-sunxi-pins.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
-index 2c7446a..6fd8d4d 100644
---- a/drivers/pinctrl/pinctrl-sunxi-pins.h
-+++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
-@@ -3774,12 +3774,14 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
- 		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
-+		  SUNXI_FUNCTION(0x4, "clk_out_a"),	/* CLK_OUT_A */
- 		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI13,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
- 		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
-+		  SUNXI_FUNCTION(0x4, "clk_out_b"),	/* CLK_OUT_B */
- 		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI14,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 4c25f81..f255a49 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -302,6 +302,33 @@
+ 			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
+ 			clock-output-names = "mbus";
+ 		};
++
++		/*
++		 * Dummy clock used by output clocks
++		 */
++		osc24M_32k: osc24M_32k {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clock-div = <750>;
++			clock-mult = <1>;
++			clocks = <&osc24M>;
++		};
++
++		clk_out_a: clk at 01c201f0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun7i-a20-out-clk";
++			reg = <0x01c201f0 0x4>;
++			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
++			clock-output-names = "clk_out_a";
++		};
++
++		clk_out_b: clk at 01c201f4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun7i-a20-out-clk";
++			reg = <0x01c201f4 0x4>;
++			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
++			clock-output-names = "clk_out_b";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
 -- 
 1.8.5.2
