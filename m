@@ -1,44 +1,56 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 24 Dec 2013 10:05:52 +0800
-Subject: [PATCH v7 06/14] usb: phy-mxs: Add anatop regmap
-In-Reply-To: <20131224012010.GA13518@shlinux1.ap.freescale.net>
+Date: Tue, 24 Dec 2013 10:08:28 +0800
+Subject: [PATCH v7 10/14] usb: phy-mxs: add controller id
+In-Reply-To: <1387525930-27313-11-git-send-email-peter.chen@freescale.com>
 References: <1387525930-27313-1-git-send-email-peter.chen@freescale.com>
- <1387525930-27313-7-git-send-email-peter.chen@freescale.com>
- <20131224001457.GA1128@S2101-09.ap.freescale.net>
- <20131224012010.GA13518@shlinux1.ap.freescale.net>
-Message-ID: <20131224020550.GB1128@S2101-09.ap.freescale.net>
+ <1387525930-27313-11-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131224020826.GC1128@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 09:20:11AM +0800, Peter Chen wrote:
-> > > @@ -226,6 +235,16 @@ static int mxs_phy_probe(struct platform_device *pdev)
-> > >  
-> > >  	platform_set_drvdata(pdev, mxs_phy);
-> > >  
-> > > +	if (mxs_phy->data->flags & MXS_PHY_HAS_ANATOP) {
-> > > +		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
-> > > +			(np, "fsl,anatop");
-> > > +		if (IS_ERR(mxs_phy->regmap_anatop)) {
-> > > +			dev_dbg(&pdev->dev,
-> > > +				"failed to find regmap for anatop\n");
-> > > +			return PTR_ERR(mxs_phy->regmap_anatop);
-> > 
-> > I'm looking at the merge dependency that Felipe mentions, and just think
-> > of the DTB compatibility thing.  Does the above code mean that USB will
-> > be broken if someone runs the new kernel with an old DTB on his board?
-> > 
-> > We're entering the stage where we need to maintain the DTB compatibility
-> > in kernel.  That said, if users choose to upgrade their kernel only
-> > (running with an old DTB), it's okay we do not give them new
-> > features, but we shouldn't cause any regression/breakage for them.
-> > 
+On Fri, Dec 20, 2013 at 03:52:06PM +0800, Peter Chen wrote:
+> It is used to access un-regulator registers according to
+> different controllers.
 > 
-> Then, this patch needs to change for old imx6 DTB. I will use of_find_property 
-> like my previous version patch, do you think so?
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
 > 
-> http://marc.info/?l=linux-usb&m=138361742123380&w=2
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index f28bdd8..09ece2b 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -111,6 +111,7 @@ struct mxs_phy {
+>  	struct clk *clk;
+>  	const struct mxs_phy_data *data;
+>  	struct regmap *regmap_anatop;
+> +	int port_id;
+>  };
+>  
+>  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> @@ -237,6 +238,13 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	ret = of_alias_get_id(np, "usbphy");
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
+> +		return ret;
+> +	}
 
-Yes.  Basically, we need to add the new property as optional one and
-keep the driver work in the existing way if the property is absent.
+It has the same compatibility issue with an old DTB.  In case the alias
+is not found, we should keep driver work in the existing way rather than
+failing out.
 
 Shawn
+
+> +	mxs_phy->port_id = ret;
+> +
+>  	mxs_phy->phy.io_priv		= base;
+>  	mxs_phy->phy.dev		= &pdev->dev;
+>  	mxs_phy->phy.label		= DRIVER_NAME;
+> -- 
+> 1.7.8
+> 
+> 
