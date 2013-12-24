@@ -1,119 +1,69 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:19:37 +0900
-Subject: [PATCH 14/21] ARM: shmobile: Remove Lager reference DTS
-In-Reply-To: <cover.1387893834.git.horms+renesas@verge.net.au>
-References: <cover.1387893834.git.horms+renesas@verge.net.au>
-Message-ID: <2b4baad03854ab23ce9a4c073e3795ac29985132.1387893834.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Dec 2013 23:26:41 +0900
+Subject: [PATCH 03/15] serial: sh-sci: Restrict non-COMPILE_TEST
+ compilation
+In-Reply-To: <3378064.llLXVomVIb@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131128073711.GF24146@verge.net.au> <1644962.Fmr1aLVkXP@avalon>
+ <3378064.llLXVomVIb@avalon>
+Message-ID: <20131224142640.GB16032@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Tue, Dec 24, 2013 at 01:03:10PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Wednesday 11 December 2013 13:44:54 Laurent Pinchart wrote:
+> > Hi Simon,
+> > 
+> > Could you please add this patch to your tree with the "[PATCH 00/47] sh-sci
+> > updates for v3.14" series ?
+> 
+> I've updated all my pending branches to your latest devel tag and this patch 
+> is missing. Could you please pick it up ?
 
-Now that the DTS file r8a7790-lager.dts can be used with board-lager.c
-and board-lager-reference.c, proceed with removing
-r8a7790-lager-reference.dts.
+Sure, will do.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790-lager-reference.dts | 89 ---------------------------
- 1 file changed, 89 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7790-lager-reference.dts
-
-diff --git a/arch/arm/boot/dts/r8a7790-lager-reference.dts b/arch/arm/boot/dts/r8a7790-lager-reference.dts
-deleted file mode 100644
-index dfedc0e..0000000
---- a/arch/arm/boot/dts/r8a7790-lager-reference.dts
-+++ /dev/null
-@@ -1,89 +0,0 @@
--/*
-- * Device Tree Source for the Lager board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--/dts-v1/;
--#include "r8a7790.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--
--/ {
--	model = "Lager";
--	compatible = "renesas,lager-reference", "renesas,r8a7790";
--
--	chosen {
--		bootargs = "console=ttySC6,115200 ignore_loglevel rw";
--	};
--
--	memory at 40000000 {
--		device_type = "memory";
--		reg = <0 0x40000000 0 0x80000000>;
--	};
--
--	memory at 180000000 {
--		device_type = "memory";
--		reg = <1 0x80000000 0 0x80000000>;
--	};
--
--	lbsc {
--		#address-cells = <1>;
--		#size-cells = <1>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		led6 {
--			gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
--		};
--		led7 {
--			gpios = <&gpio4 23 GPIO_ACTIVE_HIGH>;
--		};
--		led8 {
--			gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
--		};
--	};
--
--	fixedregulator3v3: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
--};
--
--&pfc {
--	pinctrl-0 = <&scif0_pins &scif1_pins>;
--	pinctrl-names = "default";
--
--	scif0_pins: serial0 {
--		renesas,groups = "scif0_data";
--		renesas,function = "scif0";
--	};
--
--	scif1_pins: serial1 {
--		renesas,groups = "scif1_data";
--		renesas,function = "scif1";
--	};
--
--	mmc1_pins: mmc1 {
--		renesas,groups = "mmc1_data8", "mmc1_ctrl";
--		renesas,function = "mmc1";
--	};
--};
--
--&mmcif1 {
--	pinctrl-0 = <&mmc1_pins>;
--	pinctrl-names = "default";
--
--	vmmc-supply = <&fixedregulator3v3>;
--	bus-width = <8>;
--	non-removable;
--	status = "okay";
--};
--- 
-1.8.4
+> 
+> > On Thursday 28 November 2013 16:37:11 Simon Horman wrote:
+> > > On Wed, Nov 27, 2013 at 02:18:25AM +0100, Laurent Pinchart wrote:
+> > > > Hardware supported by the driver is only found on SUPERH or
+> > > > ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
+> > > > 
+> > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > > Cc: linux-serial at vger.kernel.org
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> > > 
+> > > > ---
+> > > > 
+> > > >  drivers/tty/serial/Kconfig | 3 ++-
+> > > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> > > > index a3817ab..a640d0b 100644
+> > > > --- a/drivers/tty/serial/Kconfig
+> > > > +++ b/drivers/tty/serial/Kconfig
+> > > > @@ -709,7 +709,8 @@ config SERIAL_IP22_ZILOG_CONSOLE
+> > > > 
+> > > >  config SERIAL_SH_SCI
+> > > >  	tristate "SuperH SCI(F) serial port support"
+> > > > -	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
+> > > > +	depends on HAVE_CLK
+> > > > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> > > >  	select SERIAL_CORE
+> > > >  
+> > > >  config SERIAL_SH_SCI_NR_UARTS
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
