@@ -1,46 +1,67 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 24 Dec 2013 02:14:32 +0000
-Subject: [PATCH v4 1/3] regulator: act8865: add PMIC act8865 driver
-In-Reply-To: <20131223115746.GR30815@sirena.org.uk>
-References: <1387776268-23036-1-git-send-email-wenyou.yang@atmel.com>
- <1387776328-23079-1-git-send-email-wenyou.yang@atmel.com>
- <20131223115746.GR30815@sirena.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A24364172F2EA7F@penmbx01>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 24 Dec 2013 11:14:42 +0900
+Subject: [GIT PULL 6/7] Samsung DT for v3.14
+In-Reply-To: <20131222221548.GG13365@quad.lixom.net>
+References: <52AE0F9A.3010407@samsung.com>
+ <20131222221548.GG13365@quad.lixom.net>
+Message-ID: <1afb01cf004d$e823b610$b86b2230$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Monday, December 23, 2013 7:58 PM
-> To: Yang, Wenyou
-> Cc: lgirdwood at gmail.com; linux-kernel at vger.kernel.org;
-> grant.likely at linaro.org; rob.herring at calxeda.com; linux-
-> doc at vger.kernel.org; vpalatin at chromium.org; Ferre, Nicolas;
-> plagnioj at jcrosoft.com; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH v4 1/3] regulator: act8865: add PMIC act8865 driver
+Olof Johansson wrote:
 > 
-> On Mon, Dec 23, 2013 at 01:25:28PM +0800, Wenyou Yang wrote:
+> On Mon, Dec 16, 2013 at 05:22:50AM +0900, Kukjin Kim wrote:
+> > The following changes since commit
+> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> >
+> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> >
+> > are available in the git repository at:
+> >
 > 
-> > +static int act8865_set_suspend_voltage(struct regulator_dev *rdev,
-> > +int uV) {
-> > +	u32	selector;
-> > +
-> > +	selector = regulator_map_voltage_iterate(rdev, uV, uV);
-> > +
-> > +	return regulator_set_voltage_sel_regmap(rdev, selector); }
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-dt
+> >
+> > for you to fetch changes up to e0b51c2eae8ebf10d80530b7a306818252206325:
+> >
+> >   ARM: dts: Update Samsung sysreg binding document (2013-12-16
+> > 04:47:38 +0900)
+> >
+> > ----------------------------------------------------------------
+> > Samsung DT updates for v3.14
+> > - Add support Octa Cores for exynos5420
+> >   : populate CPU node entries to 8 Cores
+> >   : extend mct to support 8 local interrupts
+> > - Update dwmmc nodes for exynos5250 and exynos5420
+> >   : change status property of dwmmc nodes for exynos5250
+> >   : move dwmmc nodes from exynos5 to exynos5250 because
+> >     it's different between exynos5250 and exynos5420
+> >   : rename mmc nodes from dwmmc for exynos5 SoCs
+> >   : add dwmmc nodes for exynos5420
+> > - Add G-Scaler nodes for exynos5420
+> > - Add HS-i2c nodes in exynos5420
+> >   : High Speed I2C 7 channels (4 to 10)
+> > - Update sysreg binding and node name in exynos4
+> > - Update min voltage on exynos5250-arndale
+> > - Move fifo-depth property from boards to exynos5250 SoC
+> >   : because the fifo-depth property is SoC specific
 > 
-> This looks wrong - it's going to set the normal voltage register that is
-> set for runtime voltage changes.  The suspend operations are only for
-> setting separate voltage registers, many PMICs know about system suspend
-> and provide separate settings for that.  If this one doesn't then it
-> shouldn't implement this operation.
-I re-read the act8865 datasheet, There is NO a separate voltage registers for the suspend operation.
-So I will remove this operation.
+> Shouldn't some of these patches be fixes instead, i.e. the vdd_arm change
+> for
+> Arndale, the sysreg node fix, etc?
+> 
+OK, I see, I will pay more attention, some of them were ambiguous though :-)
 
-Thanks.
+> I've merged this in, but this I considered not doing it since it also
+> contains
+> new platform development. As I mentioned in the pull request for the 'dev'
+> branch: We need to see exynos converted to multiplatform before we pick up
+> any
+> more non-multiplatform support.
+> 
+OK, thanks.
 
-Best Regards,
-Wenyou Yang
+> Merged into next/dt.
+> 
+Thanks,
+Kukjin
