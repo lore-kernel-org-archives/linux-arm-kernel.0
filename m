@@ -1,66 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:04:43 +0900
-Subject: [GIT PULL 0/3] Second Round of Renesas ARM based SoC Fixes for v3.13
-Message-ID: <cover.1387856124.git.horms+renesas@verge.net.au>
+Date: Tue, 24 Dec 2013 15:04:59 +0900
+Subject: [PATCH 1/3] ARM: shmobile: armadillo: Add PWM backlight power supply
+In-Reply-To: <cover.1387856124.git.horms+renesas@verge.net.au>
+References: <cover.1387856124.git.horms+renesas@verge.net.au>
+Message-ID: <9fb444f22f09cfad3798e3610f7dc62f8a385ee8.1387856124.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-please consider this second round of Renesas ARM based SoC fixes for v3.13.
-It is based on the first round of fixes, tagged as renesas-fixes-for-v3.13,
-which you have previously pulled.
+Commit 22ceeee16eb8f0d04de3ef43a5174fb30ec18af9 ("pwm-backlight: Add
+power supply support") added a mandatory power supply for the PWM
+backlight. Add a fixed 5V regulator to board code with a consumer supply
+entry for the backlight device.
 
-
-The following changes since commit 23de2278ebc3a2f971ce45ca5e5e35c9d5a74040:
-
-  ARM: shmobile: r8a7790: Fix GPIO resources in DTS (2013-11-28 17:04:39 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.13
-
-for you to fetch changes up to d721a15c300c5f638a11573a6dd492158e737d6a:
-
-  ARM: shmobile: r8a7790: fix shdi resource sizes (2013-12-19 18:14:48 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM based SoC Fixes for v3.13
-
-* r8a7790 (R-Car H2) based Lager board
-
-  - Correct SHDI resource sizes
-
-    This bug has been present since sdhi resources were added to the r8a7790 by
-    8c9b1aa41853272a ("ARM: shmobile: r8a7790: add MMCIF and SDHI DT
-    templates") in v3.11-rc2.
-
-* r8a7778 (R-Car M1) based Bock-W board
-
-  - Correct DMA mask
-
-    This resolves a regression introduced by 4dcfa60071b3d23f
-    ("ARM: DMA-API: better handing of DMA masks for coherent allocations")
-    in v3.12-rc1.
-
-* r8a7740 (R-Mobile A1) based Armadillo board
-
-  - Add PWM backlight power supply
-
-    This resolves a regression introduced by 22ceeee16eb8f0d0
-    ("pwm-backlight: Add power supply support") in v3.12.
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      ARM: shmobile: r8a7790: fix shdi resource sizes
-
-Kuninori Morimoto (1):
-      ARM: shmobile: bockw: fixup DMA mask
-
-Laurent Pinchart (1):
-      ARM: shmobile: armadillo: Add PWM backlight power supply
-
- arch/arm/boot/dts/r8a7790.dtsi                 | 4 ++--
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+(cherry picked from commit ad11cb9a5cf96346f1240995c672cdbb5501785c)
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/board-armadillo800eva.c | 7 +++++++
- arch/arm/mach-shmobile/board-bockw.c           | 2 +-
- 3 files changed, 10 insertions(+), 3 deletions(-)
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 958e3cb..c186891 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -614,6 +614,11 @@ static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
+ 	REGULATOR_SUPPLY("vqmmc", "sh_mmcif"),
+ };
+ 
++/* Fixed 3.3V regulator used by LCD backlight */
++static struct regulator_consumer_supply fixed5v0_power_consumers[] = {
++	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
++};
++
+ /* Fixed 3.3V regulator to be used by SDHI0 */
+ static struct regulator_consumer_supply vcc_sdhi0_consumers[] = {
+ 	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
+@@ -1196,6 +1201,8 @@ static void __init eva_init(void)
+ 
+ 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
+ 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
++	regulator_register_always_on(3, "fixed-5.0V", fixed5v0_power_consumers,
++				     ARRAY_SIZE(fixed5v0_power_consumers), 5000000);
+ 
+ 	pinctrl_register_mappings(eva_pinctrl_map, ARRAY_SIZE(eva_pinctrl_map));
+ 	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
+-- 
+1.8.4
