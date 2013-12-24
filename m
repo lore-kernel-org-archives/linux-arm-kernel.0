@@ -1,53 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 14:54:34 +0900
-Subject: [PATCH 2/3] ARM: shmobile: kzm9g: add FSI support for DTS
-In-Reply-To: <52B84441.2020809@cogentembedded.com>
-References: <cover.1387764079.git.horms+renesas@verge.net.au>
- <3c2a87c85391272b098827e432813c9437e93992.1387764079.git.horms+renesas@verge.net.au>
- <52B838C1.1080705@cogentembedded.com>
- <52B84441.2020809@cogentembedded.com>
-Message-ID: <20131224055434.GB27167@verge.net.au>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 24 Dec 2013 13:00:47 -0500
+Subject: [PATCH] ARM: imx: improve the comment of CCM lpm SW workaround
+Message-ID: <1387908047-1848-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 06:10:09PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 23-12-2013 17:21, Sergei Shtylyov wrote:
-> 
-> >>From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> 
-> >>This patch support FSI-AK4648 with simple audio card
-> 
-> >>Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>---
-> >>  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 33
-> >>++++++++++++++++++++++++++++
-> >>  1 file changed, 33 insertions(+)
-> 
-> >>diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> >>b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> >>index 5bb593d..eb8886b 100644
-> >>--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> >>+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> >[...]
-> >>@@ -226,6 +240,12 @@
-> >>              };
-> >>          };
-> >>      };
-> >>+
-> >>+    ak4648: ak4648 at 0x12 {
-> 
-> >    Perhaps "sound-codec" or "audio-codec" would be a better name; hardware
-> >specific names are not recommended by ePAPR. And drop "0x" from the address
-> >part please.
-> 
->    Sorry, I didn't notice the patch is posted as a part of pull
-> request; I've probably missed the original posting (though I've
-> already told to Morimoto-san that names like "ak4648" shouldn't be
-> used).
+Improve the comment of SW workaround for CCM lpm issue using
+hardware errata description to avoid confusion.
 
-Indeed, I think that you have commended on node naming on more
-than one occasion. Feel free to make some cleanup patches if you
-have the inclination.
+TKT194736:
+Chip will enter low power mode before ARM A9 CPU executes
+WFI when improper low power sequence is used.
+
+SW workaround:
+1) SW will trigger irq #32(IOMUX) to be always pending manually by setting IOMUX_GPR1_GINT bit,
+2) SW should then Unmask it in GPC before setting CCM LPM
+3) SW should Mask it right after CCM LPM is set (set bit0-1 of CCM_CLPCR)
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/pm-imx6q.c |   13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index aecd9f8..8da4732 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -156,10 +156,13 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 	}
+ 
+ 	/*
+-	 * Unmask the always pending IOMUXC interrupt #32 as wakeup source to
+-	 * deassert dsm_request signal, so that we can ensure dsm_request
+-	 * is not asserted when we're going to write CLPCR register to set LPM.
+-	 * After setting up LPM bits, we need to mask this wakeup source.
++	 * TKT194736:
++	 * Chip will enter low power mode before ARM A9 CPU executes WFI when improper low power sequence is used.
++	 *
++	 * SW workaround:
++	 * 1) SW will trigger irq #32(IOMUXC) to be always pending manually by setting IOMUX_GPR1_GINT bit,
++	 * 2) SW should then Unmask it in GPC before setting CCM LPM
++	 * 3) SW should Mask it right after CCM LPM is set (set bit0-1 of CCM_CLPCR)
+ 	 */
+ 	iomuxc_irq_desc = irq_to_desc(32);
+ 	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
+@@ -219,6 +222,8 @@ void __init imx6q_pm_init(void)
+ 	WARN_ON(!ccm_base);
+ 
+ 	/*
++	 * This is for SW workaround step #1 of TKT194736, see comments
++	 * in imx6q_set_lpm for details of this errata.
+ 	 * Force IOMUXC irq pending, so that the interrupt to GPC can be
+ 	 * used to deassert dsm_request signal when the signal gets
+ 	 * asserted unexpectedly.
+-- 
+1.7.9.5
