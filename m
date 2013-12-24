@@ -1,81 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:06:54 +0900
-Subject: [PATCH 02/13] ARM: shmobile: r8a7790: add I2C support
+Date: Tue, 24 Dec 2013 15:06:57 +0900
+Subject: [PATCH 05/13] ARM: shmobile: r8a7791: add Ether clock
 In-Reply-To: <cover.1387857168.git.horms+renesas@verge.net.au>
 References: <cover.1387857168.git.horms+renesas@verge.net.au>
-Message-ID: <b448c904f5058b6cd35bf1a43ca219dcfeca4da6.1387857168.git.horms+renesas@verge.net.au>
+Message-ID: <893c3f0bc55e749124f14b02eee9510147fefd90.1387857168.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Add support for R8A7791 Ether clock.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
- arch/arm/mach-shmobile/setup-r8a7790.c | 25 +++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7791.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 36c8917..b6ecea3 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -292,9 +292,13 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
- 	CLKDEV_DEV_ID("e6508000.i2c", &mstp_clks[MSTP931]),
-+	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP931]),
- 	CLKDEV_DEV_ID("e6518000.i2c", &mstp_clks[MSTP930]),
-+	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP930]),
- 	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
-+	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP929]),
- 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
-+	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP928]),
- 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index ff2d60d..f546126 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -122,6 +122,7 @@ static struct clk *main_clks[] = {
+ 
+ /* MSTP */
+ enum {
++	MSTP813,
+ 	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
+ 	MSTP719, MSTP718, MSTP715, MSTP714,
+ 	MSTP522,
+@@ -132,6 +133,7 @@ enum {
+ };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+ 	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
+ 	[MSTP724] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 24, 0), /* DU0 */
+ 	[MSTP723] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 23, 0), /* DU1 */
+@@ -192,6 +194,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
  	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
  	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index c47bcebb..1a11e26 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -63,6 +63,27 @@ R8A7790_GPIO(5);
- 		&r8a7790_gpio##idx##_platform_data,			\
- 		sizeof(r8a7790_gpio##idx##_platform_data))
++	CLKDEV_DEV_ID("r8a7791-ether", &mstp_clks[MSTP813]), /* Ether */
+ };
  
-+static struct resource i2c_resources[] __initdata = {
-+	/* I2C0 */
-+	DEFINE_RES_MEM(0xE6508000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(287)),
-+	/* I2C1 */
-+	DEFINE_RES_MEM(0xE6518000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(288)),
-+	/* I2C2 */
-+	DEFINE_RES_MEM(0xE6530000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(286)),
-+	/* I2C3 */
-+	DEFINE_RES_MEM(0xE6540000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(290)),
-+
-+};
-+
-+#define r8a7790_register_i2c(idx)		\
-+	platform_device_register_simple(	\
-+		"i2c-rcar", idx,		\
-+		i2c_resources + (2 * idx), 2);	\
-+
- void __init r8a7790_pinmux_init(void)
- {
- 	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources,
-@@ -73,6 +94,10 @@ void __init r8a7790_pinmux_init(void)
- 	r8a7790_register_gpio(3);
- 	r8a7790_register_gpio(4);
- 	r8a7790_register_gpio(5);
-+	r8a7790_register_i2c(0);
-+	r8a7790_register_i2c(1);
-+	r8a7790_register_i2c(2);
-+	r8a7790_register_i2c(3);
- }
- 
- #define SCIF_COMMON(scif_type, baseaddr, irq)			\
+ #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
 -- 
 1.8.4
