@@ -1,51 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:04:59 +0900
-Subject: [PATCH 1/3] ARM: shmobile: armadillo: Add PWM backlight power supply
+Date: Tue, 24 Dec 2013 15:05:01 +0900
+Subject: [PATCH 3/3] ARM: shmobile: r8a7790: fix shdi resource sizes
 In-Reply-To: <cover.1387856124.git.horms+renesas@verge.net.au>
 References: <cover.1387856124.git.horms+renesas@verge.net.au>
-Message-ID: <9fb444f22f09cfad3798e3610f7dc62f8a385ee8.1387856124.git.horms+renesas@verge.net.au>
+Message-ID: <d721a15c300c5f638a11573a6dd492158e737d6a.1387856124.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Commit 22ceeee16eb8f0d04de3ef43a5174fb30ec18af9 ("pwm-backlight: Add
-power supply support") added a mandatory power supply for the PWM
-backlight. Add a fixed 5V regulator to board code with a consumer supply
-entry for the backlight device.
+The r8a7790.dtsi file has four sdhi nodes which the first two have the wrong
+resource size for their register block. This causes the sh_modbile_sdhi driver
+to fail to communicate with card at-all.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-(cherry picked from commit ad11cb9a5cf96346f1240995c672cdbb5501785c)
+Change sdhi{0,1} node size from 0x100 to 0x200 to correct these nodes
+as per Kuninori Morimoto's response to the original patch where all four
+nodes where changed. sdhi{2,3} are the correct size.
+
+This bug has been present since sdhi resources were added to the r8a7790 by
+8c9b1aa41853272a ("ARM: shmobile: r8a7790: add MMCIF and SDHI DT
+templates") in v3.11-rc2.
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Tested-by: William Towle <william.towle@codethink.co.uk>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 958e3cb..c186891 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -614,6 +614,11 @@ static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
- 	REGULATOR_SUPPLY("vqmmc", "sh_mmcif"),
- };
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 46e1d7e..9987dd0e 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -241,7 +241,7 @@
  
-+/* Fixed 3.3V regulator used by LCD backlight */
-+static struct regulator_consumer_supply fixed5v0_power_consumers[] = {
-+	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
-+};
-+
- /* Fixed 3.3V regulator to be used by SDHI0 */
- static struct regulator_consumer_supply vcc_sdhi0_consumers[] = {
- 	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
-@@ -1196,6 +1201,8 @@ static void __init eva_init(void)
+ 	sdhi0: sdhi at ee100000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee100000 0 0x100>;
++		reg = <0 0xee100000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 4>;
+ 		cap-sd-highspeed;
+@@ -250,7 +250,7 @@
  
- 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
- 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-+	regulator_register_always_on(3, "fixed-5.0V", fixed5v0_power_consumers,
-+				     ARRAY_SIZE(fixed5v0_power_consumers), 5000000);
- 
- 	pinctrl_register_mappings(eva_pinctrl_map, ARRAY_SIZE(eva_pinctrl_map));
- 	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
+ 	sdhi1: sdhi at ee120000 {
+ 		compatible = "renesas,sdhi-r8a7790";
+-		reg = <0 0xee120000 0 0x100>;
++		reg = <0 0xee120000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 4>;
+ 		cap-sd-highspeed;
 -- 
 1.8.4
