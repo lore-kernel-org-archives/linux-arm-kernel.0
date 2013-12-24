@@ -1,145 +1,160 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:14:25 +0900
-Subject: [PATCH 08/11] serial: sh-sci: Move overrun_bit and error_mask fields
- out of pdata
+Date: Tue, 24 Dec 2013 23:14:26 +0900
+Subject: [PATCH 09/11] serial: sh-sci: Remove unused GPIO request code
 In-Reply-To: <cover.1387887969.git.horms+renesas@verge.net.au>
 References: <cover.1387887969.git.horms+renesas@verge.net.au>
-Message-ID: <3ae988d97b160c07463b980ccf26ed9226660fef.1387887969.git.horms+renesas@verge.net.au>
+Message-ID: <520402bbc6fe328ae28e08bfc87a2b1eb7f10b2c.1387887969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-None of the fields is ever set by board code, and both of them are set
-in the driver at probe time. Move them out of struct plat_sci_port to
-struct sci_port.
+The driver requests at initialization time GPIOs passed through platform
+data. No platform makes use of this feature, remove it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/tty/serial/sh-sci.c | 50 +++++++++++++++++++++------------------------
- drivers/tty/serial/sh-sci.h |  2 +-
- include/linux/serial_sci.h  |  3 ---
- 3 files changed, 24 insertions(+), 31 deletions(-)
+ drivers/tty/serial/sh-sci.c | 67 ---------------------------------------------
+ include/linux/serial_sci.h  | 12 --------
+ 2 files changed, 79 deletions(-)
 
 diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index e9c6e23..98b8e3c 100644
+index 98b8e3c..99a64fd 100644
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -64,6 +64,9 @@ struct sci_port {
+@@ -32,7 +32,6 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/errno.h>
+-#include <linux/gpio.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
+@@ -79,7 +78,6 @@ struct sci_port {
  
- 	/* Platform configuration */
- 	struct plat_sci_port	*cfg;
-+	int			overrun_bit;
-+	unsigned int		error_mask;
-+
+ 	int			irqs[SCIx_NR_IRQS];
+ 	char			*irqstr[SCIx_NR_IRQS];
+-	char			*gpiostr[SCIx_NR_FNS];
  
- 	/* Break timer */
- 	struct timer_list	break_timer;
-@@ -760,19 +763,15 @@ static int sci_handle_errors(struct uart_port *port)
- 	struct tty_port *tport = &port->state->port;
- 	struct sci_port *s = to_sci_port(port);
+ 	struct dma_chan			*chan_tx;
+ 	struct dma_chan			*chan_rx;
+@@ -1153,67 +1151,6 @@ static void sci_free_irq(struct sci_port *port)
+ 	}
+ }
  
--	/*
--	 * Handle overruns, if supported.
--	 */
--	if (s->cfg->overrun_bit != SCIx_NOT_SUPPORTED) {
--		if (status & (1 << s->cfg->overrun_bit)) {
--			port->icount.overrun++;
-+	/* Handle overruns */
-+	if (status & (1 << s->overrun_bit)) {
-+		port->icount.overrun++;
- 
--			/* overrun error */
--			if (tty_insert_flip_char(tport, 0, TTY_OVERRUN))
--				copied++;
-+		/* overrun error */
-+		if (tty_insert_flip_char(tport, 0, TTY_OVERRUN))
-+			copied++;
- 
--			dev_notice(port->dev, "overrun error");
+-static const char *sci_gpio_names[SCIx_NR_FNS] = {
+-	"sck", "rxd", "txd", "cts", "rts",
+-};
+-
+-static const char *sci_gpio_str(unsigned int index)
+-{
+-	return sci_gpio_names[index];
+-}
+-
+-static void sci_init_gpios(struct sci_port *port)
+-{
+-	struct uart_port *up = &port->port;
+-	int i;
+-
+-	if (!port->cfg)
+-		return;
+-
+-	for (i = 0; i < SCIx_NR_FNS; i++) {
+-		const char *desc;
+-		int ret;
+-
+-		if (!port->cfg->gpios[i])
+-			continue;
+-
+-		desc = sci_gpio_str(i);
+-
+-		port->gpiostr[i] = kasprintf(GFP_KERNEL, "%s:%s",
+-					     dev_name(up->dev), desc);
+-
+-		/*
+-		 * If we've failed the allocation, we can still continue
+-		 * on with a NULL string.
+-		 */
+-		if (!port->gpiostr[i])
+-			dev_notice(up->dev, "%s string allocation failure\n",
+-				   desc);
+-
+-		ret = gpio_request(port->cfg->gpios[i], port->gpiostr[i]);
+-		if (unlikely(ret != 0)) {
+-			dev_notice(up->dev, "failed %s gpio request\n", desc);
+-
+-			/*
+-			 * If we can't get the GPIO for whatever reason,
+-			 * no point in keeping the verbose string around.
+-			 */
+-			kfree(port->gpiostr[i]);
 -		}
-+		dev_notice(port->dev, "overrun error");
+-	}
+-}
+-
+-static void sci_free_gpios(struct sci_port *port)
+-{
+-	int i;
+-
+-	for (i = 0; i < SCIx_NR_FNS; i++)
+-		if (port->cfg->gpios[i]) {
+-			gpio_free(port->cfg->gpios[i]);
+-			kfree(port->gpiostr[i]);
+-		}
+-}
+-
+ static unsigned int sci_tx_empty(struct uart_port *port)
+ {
+ 	unsigned short status = serial_port_in(port, SCxSR);
+@@ -2240,8 +2177,6 @@ static int sci_init_single(struct platform_device *dev,
+ 
+ 		port->dev = &dev->dev;
+ 
+-		sci_init_gpios(sci_port);
+-
+ 		pm_runtime_enable(&dev->dev);
  	}
  
- 	if (status & SCxSR_FER(port)) {
-@@ -834,7 +833,7 @@ static int sci_handle_fifo_overrun(struct uart_port *port)
- 	if (!reg->size)
- 		return 0;
+@@ -2298,8 +2233,6 @@ static int sci_init_single(struct platform_device *dev,
  
--	if ((serial_port_in(port, SCLSR) & (1 << s->cfg->overrun_bit))) {
-+	if ((serial_port_in(port, SCLSR) & (1 << s->overrun_bit))) {
- 		serial_port_out(port, SCLSR, 0);
+ static void sci_cleanup_single(struct sci_port *port)
+ {
+-	sci_free_gpios(port);
+-
+ 	clk_put(port->iclk);
+ 	clk_put(port->fclk);
  
- 		port->icount.overrun++;
-@@ -2253,28 +2252,25 @@ static int sci_init_single(struct platform_device *dev,
- 	/*
- 	 * Establish some sensible defaults for the error detection.
- 	 */
--	if (!p->error_mask)
--		p->error_mask = (p->type == PORT_SCI) ?
-+	sci_port->error_mask = (p->type == PORT_SCI) ?
- 			SCI_DEFAULT_ERROR_MASK : SCIF_DEFAULT_ERROR_MASK;
- 
- 	/*
- 	 * Establish sensible defaults for the overrun detection, unless
- 	 * the part has explicitly disabled support for it.
- 	 */
--	if (p->overrun_bit != SCIx_NOT_SUPPORTED) {
--		if (p->type == PORT_SCI)
--			p->overrun_bit = 5;
--		else if (p->scbrr_algo_id == SCBRR_ALGO_4)
--			p->overrun_bit = 9;
--		else
--			p->overrun_bit = 0;
-+	if (p->type == PORT_SCI)
-+		sci_port->overrun_bit = 5;
-+	else if (p->scbrr_algo_id == SCBRR_ALGO_4)
-+		sci_port->overrun_bit = 9;
-+	else
-+		sci_port->overrun_bit = 0;
- 
--		/*
--		 * Make the error mask inclusive of overrun detection, if
--		 * supported.
--		 */
--		p->error_mask |= (1 << p->overrun_bit);
--	}
-+	/*
-+	 * Make the error mask inclusive of overrun detection, if
-+	 * supported.
-+	 */
-+	sci_port->error_mask |= 1 << sci_port->overrun_bit;
- 
- 	port->type		= p->type;
- 	port->flags		= UPF_FIXED_PORT | p->flags;
-diff --git a/drivers/tty/serial/sh-sci.h b/drivers/tty/serial/sh-sci.h
-index 5aca736..d5db81a 100644
---- a/drivers/tty/serial/sh-sci.h
-+++ b/drivers/tty/serial/sh-sci.h
-@@ -9,7 +9,7 @@
- #define SCxSR_PER(port)		(((port)->type == PORT_SCI) ? SCI_PER    : SCIF_PER)
- #define SCxSR_BRK(port)		(((port)->type == PORT_SCI) ? 0x00       : SCIF_BRK)
- 
--#define SCxSR_ERRORS(port)	(to_sci_port(port)->cfg->error_mask)
-+#define SCxSR_ERRORS(port)	(to_sci_port(port)->error_mask)
- 
- #if defined(CONFIG_CPU_SUBTYPE_SH7705) || \
-     defined(CONFIG_CPU_SUBTYPE_SH7720) || \
 diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index 42620f1..af9834b 100644
+index af9834b..e9c3021 100644
 --- a/include/linux/serial_sci.h
 +++ b/include/linux/serial_sci.h
-@@ -152,9 +152,6 @@ struct plat_sci_port {
- 	/*
- 	 * Platform overrides if necessary, defaults otherwise.
- 	 */
--	int		overrun_bit;
--	unsigned int	error_mask;
+@@ -69,17 +69,6 @@ enum {
+ 	SCIx_MUX_IRQ = SCIx_NR_IRQS,	/* special case */
+ };
+ 
+-/* Offsets into the sci_port->gpios array */
+-enum {
+-	SCIx_SCK,
+-	SCIx_RXD,
+-	SCIx_TXD,
+-	SCIx_CTS,
+-	SCIx_RTS,
 -
- 	int		port_reg;
- 	unsigned char	regshift;
- 	unsigned char	regtype;
+-	SCIx_NR_FNS,
+-};
+-
+ enum {
+ 	SCIx_PROBE_REGTYPE,
+ 
+@@ -141,7 +130,6 @@ struct plat_sci_port_ops {
+ struct plat_sci_port {
+ 	unsigned long	mapbase;		/* resource base */
+ 	unsigned int	irqs[SCIx_NR_IRQS];	/* ERI, RXI, TXI, BRI */
+-	unsigned int	gpios[SCIx_NR_FNS];	/* SCK, RXD, TXD, CTS, RTS */
+ 	unsigned int	type;			/* SCI / SCIF / IRDA / HSCIF */
+ 	upf_t		flags;			/* UPF_* flags */
+ 	unsigned long	capabilities;		/* Port features/capabilities */
 -- 
 1.8.4
