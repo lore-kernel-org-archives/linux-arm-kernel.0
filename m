@@ -1,55 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:05:01 +0900
-Subject: [PATCH 3/3] ARM: shmobile: r8a7790: fix shdi resource sizes
+Date: Tue, 24 Dec 2013 15:05:00 +0900
+Subject: [PATCH 2/3] ARM: shmobile: bockw: fixup DMA mask
 In-Reply-To: <cover.1387856124.git.horms+renesas@verge.net.au>
 References: <cover.1387856124.git.horms+renesas@verge.net.au>
-Message-ID: <d721a15c300c5f638a11573a6dd492158e737d6a.1387856124.git.horms+renesas@verge.net.au>
+Message-ID: <4799e310caf0fb9078389766d0210d1c6133ad51.1387856124.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The r8a7790.dtsi file has four sdhi nodes which the first two have the wrong
-resource size for their register block. This causes the sh_modbile_sdhi driver
-to fail to communicate with card at-all.
+4dcfa60071b3d23f0181f27d8519f12e37cefbb9
+(ARM: DMA-API: better handing of DMA masks for coherent allocations)
+exchanged DMA mask check method.
+Below warning will appear without this patch
 
-Change sdhi{0,1} node size from 0x100 to 0x200 to correct these nodes
-as per Kuninori Morimoto's response to the original patch where all four
-nodes where changed. sdhi{2,3} are the correct size.
+asoc-simple-card asoc-simple-card.0: \
+  Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
+asoc-simple-card asoc-simple-card.0: \
+  Driver did not use or check the return value from dma_set_coherent_mask()?
 
-This bug has been present since sdhi resources were added to the r8a7790 by
-8c9b1aa41853272a ("ARM: shmobile: r8a7790: add MMCIF and SDHI DT
-templates") in v3.11-rc2.
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Tested-by: William Towle <william.towle@codethink.co.uk>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/board-bockw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 46e1d7e..9987dd0e 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -241,7 +241,7 @@
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 3861152..3c4995a 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -679,7 +679,7 @@ static void __init bockw_init(void)
+ 			.id             = i,
+ 			.data           = &rsnd_card_info[i],
+ 			.size_data      = sizeof(struct asoc_simple_card_info),
+-			.dma_mask       = ~0,
++			.dma_mask	= DMA_BIT_MASK(32),
+ 		};
  
- 	sdhi0: sdhi at ee100000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee100000 0 0x100>;
-+		reg = <0 0xee100000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 4>;
- 		cap-sd-highspeed;
-@@ -250,7 +250,7 @@
- 
- 	sdhi1: sdhi at ee120000 {
- 		compatible = "renesas,sdhi-r8a7790";
--		reg = <0 0xee120000 0 0x100>;
-+		reg = <0 0xee120000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 4>;
- 		cap-sd-highspeed;
+ 		platform_device_register_full(&cardinfo);
 -- 
 1.8.4
