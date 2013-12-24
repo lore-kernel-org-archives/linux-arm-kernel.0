@@ -1,173 +1,43 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 24 Dec 2013 16:50:38 +0530
-Subject: [PATCH v3 2/2] gpio: davinci: reuse for Keystone SoC
-In-Reply-To: <1387885284-8119-3-git-send-email-grygorii.strashko@ti.com>
-References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
- <1387885284-8119-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CA+V-a8tJRZ5Esn3F4J6_z7VCmGPpptgxMEyyaANbrytAF3pUMA@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Tue, 24 Dec 2013 13:36:26 +0200
+Subject: [PATCH v2 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <52B9479B.3040108@ti.com>
+References: <1387297337-25493-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1387297337-25493-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131224005804.GF31766@codeaurora.org> <52B9479B.3040108@ti.com>
+Message-ID: <52B971BA.7040705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+On 12/24/2013 10:36 AM, ivan.khoronzhuk wrote:
+> On 12/24/2013 02:58 AM, Stephen Boyd wrote:
+>> On 12/17, Ivan Khoronzhuk wrote:
+>>> +static void __init keystone_timer_init(struct device_node *np)
+>>> +{
+>>> +    struct clock_event_device *event_dev = &timer.event_dev;
+>>> +    unsigned long rate;
+>> [...]
+>>> +
+>>> +    timer.hz_period = rate / (HZ);
+>>
+>> Unnecessary parentheses here. Also, do you need to use do_div()
+>> here? I'm lost how the hz_period is ever greater than 32 bits
+>> though because HZ is most likely very small and the rate is
+>> unsigned long.
+>>
+> 
+> You are right.
+> I'll do the following:
+> 
+> timer.hz_period = rate / (HZ)    ---> timer.hz_period = rate / HZ
+> u64 hz_period            ---> unsigned long hz_period
+> 
 
-Thanks for the patch.
+... maybe it be better to use DIV_ROUND_UP to be sure in no less than HZ period:
 
-On Tue, Dec 24, 2013 at 5:11 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> The similar GPIO HW block is used by keystone SoCs as
-> in Davinci SoCs.
-> Hence, reuse Davinci GPIO driver for Keystone taking into
-> account that Keystone contains ARM GIC IRQ controller which
-> is implemented using IRQ Chip.
->
-> Documentation:
->         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: devicetree at vger.kernel.org
->
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
->  drivers/gpio/gpio-davinci.c                        |   48 ++++++++++++++++----
->  2 files changed, 42 insertions(+), 10 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> index a2e839d..4ce9862 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> @@ -1,7 +1,7 @@
-> -Davinci GPIO controller bindings
-> +Davinci/Keystone GPIO controller bindings
->
->  Required Properties:
-> -- compatible: should be "ti,dm6441-gpio"
-> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+timer.hz_period = rate / (HZ) --> timer.hz_period = DIV_ROUND_UP(rate, HZ)
 
-Can you make it something like this ? It isn't readable.
-
-- compatible : value should be either one among the following
-    (a)  "ti,dm6441-gpio" for davinci.
-    (b)  "ti,keystone-gpio" for keystone.
-
->
->  - reg: Physical base address of the controller and the size of memory mapped
->         registers.
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 7629b4f..d0f135d 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -37,6 +37,8 @@ struct davinci_gpio_regs {
->         u32     intstat;
->  };
->
-> +typedef struct irq_chip *(*gpio_get_irq_chip_cb_t)(unsigned int irq);
-> +
->  #define BINTEN 0x8 /* GPIO Interrupt Per-Bank Enable Register */
->
->  #define chip2controller(chip)  \
-> @@ -413,6 +415,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
->         .xlate = irq_domain_xlate_onetwocell,
->  };
->
-> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
-> +{
-> +       static struct irq_chip_type gpio_unbanked;
-> +
-> +       gpio_unbanked = *container_of(irq_get_chip(irq),
-> +                                     struct irq_chip_type, chip);
-> +
-> +       return &gpio_unbanked.chip;
-> +};
-> +
-> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
-> +{
-> +       static struct irq_chip gpio_unbanked;
-> +
-> +       gpio_unbanked = *irq_get_chip(irq);
-> +       return &gpio_unbanked;
-> +};
-> +
-> +static const struct of_device_id davinci_gpio_ids[];
-> +
->  /*
->   * NOTE:  for suspend/resume, probably best to make a platform_device with
->   * suspend_late/resume_resume calls hooking into results of the set_wake()
-> @@ -433,6 +455,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->         struct davinci_gpio_platform_data *pdata = dev->platform_data;
->         struct davinci_gpio_regs __iomem *g;
->         struct irq_domain       *irq_domain = NULL;
-> +       const struct of_device_id *match;
-> +       struct irq_chip *irq_chip;
-> +       gpio_get_irq_chip_cb_t gpio_get_irq_chip;
-> +
-> +       /*
-> +        * Use davinci_gpio_get_irq_chip by default to handle non DT cases
-> +        */
-> +       gpio_get_irq_chip = davinci_gpio_get_irq_chip;
-> +       match = of_match_device(of_match_ptr(davinci_gpio_ids),
-> +                               dev);
-
-Sorry didn't notice that earlier the data structure of_match_ptr()
-protects is always compiled in.
-so of_match_ptr() is not needed.
-While you are at it you can also fix it in davinci_gpio_driver
-structure as a sperate
-patch.
-
+-- 
 Regards,
---Prabhakar Lad
-
-> +       if (match)
-> +               gpio_get_irq_chip = (gpio_get_irq_chip_cb_t)match->data;
->
->         ngpio = pdata->ngpio;
->         res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> @@ -489,8 +523,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->          * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
->          */
->         if (pdata->gpio_unbanked) {
-> -               static struct irq_chip_type gpio_unbanked;
-> -
->                 /* pass "bank 0" GPIO IRQs to AINTC */
->                 chips[0].chip.to_irq = gpio_to_irq_unbanked;
->                 chips[0].gpio_irq = bank_irq;
-> @@ -499,10 +531,9 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->
->                 /* AINTC handles mask/unmask; GPIO handles triggering */
->                 irq = bank_irq;
-> -               gpio_unbanked = *container_of(irq_get_chip(irq),
-> -                                             struct irq_chip_type, chip);
-> -               gpio_unbanked.chip.name = "GPIO-AINTC";
-> -               gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
-> +               irq_chip = gpio_get_irq_chip(irq);
-> +               irq_chip->name = "GPIO-AINTC";
-> +               irq_chip->irq_set_type = gpio_irq_type_unbanked;
->
->                 /* default trigger: both edges */
->                 g = gpio2regs(0);
-> @@ -511,7 +542,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->
->                 /* set the direct IRQs up to use that irqchip */
->                 for (gpio = 0; gpio < pdata->gpio_unbanked; gpio++, irq++) {
-> -                       irq_set_chip(irq, &gpio_unbanked.chip);
-> +                       irq_set_chip(irq, irq_chip);
->                         irq_set_handler_data(irq, &chips[gpio / 32]);
->                         irq_set_status_flags(irq, IRQ_TYPE_EDGE_BOTH);
->                 }
-> @@ -554,7 +585,8 @@ done:
->
->  #if IS_ENABLED(CONFIG_OF)
->  static const struct of_device_id davinci_gpio_ids[] = {
-> -       { .compatible = "ti,dm6441-gpio", },
-> +       { .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
-> +       { .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
->         { /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
-> --
-> 1.7.9.5
->
+Ivan Khoronzhuk
