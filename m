@@ -1,78 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:18:11 +0900
-Subject: [PATCH 07/12] ARM: shmobile: koelsch-reference: Instantiate clkdevs
- for SCIF and CMT
+Date: Tue, 24 Dec 2013 23:18:16 +0900
+Subject: [PATCH 10/12] ARM: shmobile: Let Lager multiplatform boot with Lager
+ DTB
 In-Reply-To: <cover.1387891831.git.horms+renesas@verge.net.au>
 References: <cover.1387891831.git.horms+renesas@verge.net.au>
-Message-ID: <f31239ef590186b6895a2f2cf7e0f2709a5c0da0.1387891831.git.horms+renesas@verge.net.au>
+Message-ID: <1fb68146d5fa7656f48bc5caaa74312b7fc7257e.1387891831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Now that the common clock framework is supported, the clock lookup
-entries in clock-r8a7791.c are not registered anymore. Devices must
-instead reference their clocks in the device tree. However, SCIF and CMT
-devices are still instantiated through platform code, and thus need a
-clock lookup entry.
-
-Retrieve the SCIF and CMT clock entries by name and register clkdevs for
-the corresponding devices. This will be removed when the SCIF and CMT
-devices will be instantiated from the device tree.
+Let the multiplatform Lager support boot with the legacy DTS for Lager
+as well as the Lager reference DTS.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch-reference.c | 30 +++++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                     | 2 +-
+ arch/arm/mach-shmobile/board-lager-reference.c | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 4b48e2d..e1c787e 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -19,6 +19,8 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 37aefa2..f28b4ef 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -234,7 +234,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+ 	sh7372-mackerel.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai-reference.dtb \
+-	r8a7790-lager-reference.dtb \
++	r8a7790-lager.dtb \
+ 	r8a7791-koelsch-reference.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 7e3fe37..a6e271d 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -64,6 +64,7 @@ static void __init lager_add_standard_devices(void)
+ }
  
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <mach/common.h>
-@@ -28,7 +30,33 @@
- 
- static void __init koelsch_add_standard_devices(void)
- {
--#ifndef CONFIG_COMMON_CLK
-+#ifdef CONFIG_COMMON_CLK
-+	/*
-+	 * This is a really crude hack to provide clkdev support to the SCIF
-+	 * and CMT devices until they get moved to DT.
-+	 */
-+	static const char * const scif_names[] = {
-+		"scifa0", "scifa1", "scifb0", "scifb1", "scifb2", "scifa2",
-+		"scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scifa3",
-+		"scifa4", "scifa5",
-+	};
-+	struct clk *clk;
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(scif_names); ++i) {
-+		clk = clk_get(NULL, scif_names[i]);
-+		if (clk) {
-+			clk_register_clkdev(clk, NULL, "sh-sci.%u", i);
-+			clk_put(clk);
-+		}
-+	}
-+
-+	clk = clk_get(NULL, "cmt0");
-+	if (clk) {
-+		clk_register_clkdev(clk, NULL, "sh_cmt.0");
-+		clk_put(clk);
-+	}
-+#else
- 	r8a7791_clock_init();
- #endif
- 	r8a7791_add_dt_devices();
+ static const char *lager_boards_compat_dt[] __initdata = {
++	"renesas,lager",
+ 	"renesas,lager-reference",
+ 	NULL,
+ };
 -- 
 1.8.4
