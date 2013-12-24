@@ -1,32 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:07:06 +0900
-Subject: [PATCH 13/13] arm: shmobile: clks: remove duplicated clock from
- r7s72100
+Date: Tue, 24 Dec 2013 15:07:00 +0900
+Subject: [PATCH 08/13] ARM: shmobile: Add select MIGHT_HAVE_PCI for PCI-AHB
+ bridge code
 In-Reply-To: <cover.1387857168.git.horms+renesas@verge.net.au>
 References: <cover.1387857168.git.horms+renesas@verge.net.au>
-Message-ID: <250d829f68ecb5e775a99deb03c56832acec28f4.1387857168.git.horms+renesas@verge.net.au>
+Message-ID: <7e429989b68533ee3896c96264a1cce99b95d218.1387857168.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa@the-dreams.de>
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+The PCI sub-system is not enabled by default on ARM and on certain
+Renesas devices the build does not select it. This means that there
+are configurations that do not allow the AHB-PCI bridge used for the
+USB sub-systems to be built.
+
+For the R8A7790, R8A7791 and EMEV-2 select MIGHT_HAVE_PCI to allow the
+PCI drivers to be built. Also select MIGHT_HAVE_PCI for the multi-config
+where there may be many Reneasas devices selected.
+
+Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-shmobile/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 1c9d261..4aba20c 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -178,7 +178,6 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
--	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
- };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index aa9017b..8a1364e 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -12,6 +12,7 @@ config ARCH_SHMOBILE_MULTI
+ 	select HAVE_SMP
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select MIGHT_HAVE_PCI
+ 	select NO_IOPORT
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -96,6 +97,7 @@ config ARCH_R8A7790
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
++	select MIGHT_HAVE_PCI
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
  
- void __init r7s72100_clock_init(void)
+@@ -104,6 +106,7 @@ config ARCH_R8A7791
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
++	select MIGHT_HAVE_PCI
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
+ 
+@@ -112,6 +115,7 @@ config ARCH_EMEV2
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
++	select MIGHT_HAVE_PCI
+ 	select USE_OF
+ 	select AUTO_ZRELADDR
+ 
 -- 
 1.8.4
