@@ -1,157 +1,55 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:30:23 +0900
-Subject: [PATCH 2/4] serial: sh-sci: Remove platform data mapbase and irqs
- fields
-In-Reply-To: <cover.1387890410.git.horms+renesas@verge.net.au>
-References: <cover.1387890410.git.horms+renesas@verge.net.au>
-Message-ID: <89b5c1ab94a1cea921d8a280de0a483d71af5091.1387890410.git.horms+renesas@verge.net.au>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 24 Dec 2013 16:07:41 +0100
+Subject: [PATCH v4 03/15] clk: Add regmap core helpers for
+ enable/disable/is_enabled
+In-Reply-To: <1387847559-18330-4-git-send-email-sboyd@codeaurora.org>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131224150741.GG8064@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Mon, Dec 23, 2013 at 17:12 -0800, Stephen Boyd wrote:
+> 
+> The clock framework already has support for simple gate clocks
+> but if drivers want to use the gate clock functionality they need
+> to wrap the gate clock in another struct and chain the ops by
+> calling the gate ops from their own custom ops. Plus the gate
+> clock implementation only supports MMIO accessors so other bus
+> type clocks don't benefit from the potential code reuse. Add some
+> simple regmap helpers for enable/disable/is_enabled that drivers
+> can use as drop in replacements for their clock ops or as simple
+> functions they call from their own custom ops. This is based on 
+> similar helps in the regulator framework.
 
-The fields are not used anymore by board files, remove them.
+The same comment applies as to the previous version.  Is it
+useful to introduce copies of the gate handling while the
+difference in only in how the hardware registers get accessed?
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/tty/serial/sh-sci.c | 60 +++++++++++++++++++++++++--------------------
- include/linux/serial_sci.h  | 26 --------------------
- 2 files changed, 34 insertions(+), 52 deletions(-)
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -177,11 +177,21 @@ struct clk_init_data {
+> [ ... ]
+> @@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
+>  long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  			      unsigned long *best_parent_rate,
+>  			      struct clk **best_parent_p);
+> +int clk_is_enabled_regmap(struct clk_hw *hw);
+> +int clk_enable_regmap(struct clk_hw *hw);
+> +void clk_disable_regmap(struct clk_hw *hw);
 
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 96d26d7..c411116 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -58,6 +58,23 @@
- 
- #include "sh-sci.h"
- 
-+/* Offsets into the sci_port->irqs array */
-+enum {
-+	SCIx_ERI_IRQ,
-+	SCIx_RXI_IRQ,
-+	SCIx_TXI_IRQ,
-+	SCIx_BRI_IRQ,
-+	SCIx_NR_IRQS,
-+
-+	SCIx_MUX_IRQ = SCIx_NR_IRQS,	/* special case */
-+};
-+
-+#define SCIx_IRQ_IS_MUXED(port)			\
-+	((port)->irqs[SCIx_ERI_IRQ] ==	\
-+	 (port)->irqs[SCIx_RXI_IRQ]) ||	\
-+	((port)->irqs[SCIx_ERI_IRQ] &&	\
-+	 ((port)->irqs[SCIx_RXI_IRQ] < 0))
-+
- struct sci_port {
- 	struct uart_port	port;
- 
-@@ -2094,36 +2111,27 @@ static int sci_init_single(struct platform_device *dev,
- 	port->iotype	= UPIO_MEM;
- 	port->line	= index;
- 
--	if (dev->num_resources) {
--		/* Device has resources, use them. */
--		res = platform_get_resource(dev, IORESOURCE_MEM, 0);
--		if (res == NULL)
--			return -ENOMEM;
-+	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+	if (res == NULL)
-+		return -ENOMEM;
- 
--		port->mapbase = res->start;
-+	port->mapbase = res->start;
- 
--		for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
--			sci_port->irqs[i] = platform_get_irq(dev, i);
-+	for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
-+		sci_port->irqs[i] = platform_get_irq(dev, i);
- 
--		/* The SCI generates several interrupts. They can be muxed
--		 * together or connected to different interrupt lines. In the
--		 * muxed case only one interrupt resource is specified. In the
--		 * non-muxed case three or four interrupt resources are
--		 * specified, as the BRI interrupt is optional.
--		 */
--		if (sci_port->irqs[0] < 0)
--			return -ENXIO;
-+	/* The SCI generates several interrupts. They can be muxed together or
-+	 * connected to different interrupt lines. In the muxed case only one
-+	 * interrupt resource is specified. In the non-muxed case three or four
-+	 * interrupt resources are specified, as the BRI interrupt is optional.
-+	 */
-+	if (sci_port->irqs[0] < 0)
-+		return -ENXIO;
- 
--		if (sci_port->irqs[1] < 0) {
--			sci_port->irqs[1] = sci_port->irqs[0];
--			sci_port->irqs[2] = sci_port->irqs[0];
--			sci_port->irqs[3] = sci_port->irqs[0];
--		}
--	} else {
--		/* No resources, use old-style platform data. */
--		port->mapbase = p->mapbase;
--		for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i)
--			sci_port->irqs[i] = p->irqs[i] ? p->irqs[i] : -ENXIO;
-+	if (sci_port->irqs[1] < 0) {
-+		sci_port->irqs[1] = sci_port->irqs[0];
-+		sci_port->irqs[2] = sci_port->irqs[0];
-+		sci_port->irqs[3] = sci_port->irqs[0];
- 	}
- 
- 	if (p->regtype == SCIx_PROBE_REGTYPE) {
-diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index fd7f9da..22b3640 100644
---- a/include/linux/serial_sci.h
-+++ b/include/linux/serial_sci.h
-@@ -50,17 +50,6 @@
- /* HSSRR HSCIF */
- #define HSCIF_SRE	0x8000
- 
--/* Offsets into the sci_port->irqs array */
--enum {
--	SCIx_ERI_IRQ,
--	SCIx_RXI_IRQ,
--	SCIx_TXI_IRQ,
--	SCIx_BRI_IRQ,
--	SCIx_NR_IRQS,
--
--	SCIx_MUX_IRQ = SCIx_NR_IRQS,	/* special case */
--};
--
- enum {
- 	SCIx_PROBE_REGTYPE,
- 
-@@ -79,19 +68,6 @@ enum {
- 	SCIx_NR_REGTYPES,
- };
- 
--#define SCIx_IRQ_MUXED(irq)		\
--{					\
--	[SCIx_ERI_IRQ]	= (irq),	\
--	[SCIx_RXI_IRQ]	= (irq),	\
--	[SCIx_TXI_IRQ]	= (irq),	\
--	[SCIx_BRI_IRQ]	= (irq),	\
--}
--
--#define SCIx_IRQ_IS_MUXED(port)			\
--	((port)->irqs[SCIx_ERI_IRQ] ==	\
--	 (port)->irqs[SCIx_RXI_IRQ]) ||	\
--	((port)->irqs[SCIx_ERI_IRQ] &&	\
--	 ((port)->irqs[SCIx_RXI_IRQ] < 0))
- /*
-  * SCI register subset common for all port types.
-  * Not all registers will exist on all parts.
-@@ -120,8 +96,6 @@ struct plat_sci_port_ops {
-  * Platform device specific platform_data struct
-  */
- struct plat_sci_port {
--	unsigned long	mapbase;		/* resource base */
--	unsigned int	irqs[SCIx_NR_IRQS];	/* ERI, RXI, TXI, BRI */
- 	unsigned int	type;			/* SCI / SCIF / IRDA / HSCIF */
- 	upf_t		flags;			/* UPF_* flags */
- 	unsigned long	capabilities;		/* Port features/capabilities */
+Looking at the patch:  Do you expect callers to remember whether
+a clock gate is backed by mmio or by regmap access, to call a
+different set of routines?  Should this not be hidden behind the
+API and be transparent after clock registration?
+
+I'd suggest to fold regmap support into Tero Kristo's ll_ops
+approach, and to discuss this in his v12 thread.
+
+
+virtually yours
+Gerhard Sittig
 -- 
-1.8.4
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
