@@ -1,96 +1,168 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:30:22 +0900
-Subject: [PATCH 1/4] serial: sh-sci: Remove platform data scbrr_algo_id field
+Date: Tue, 24 Dec 2013 23:30:25 +0900
+Subject: [PATCH 4/4] serial: sh-sci: Add OF support
 In-Reply-To: <cover.1387890410.git.horms+renesas@verge.net.au>
 References: <cover.1387890410.git.horms+renesas@verge.net.au>
-Message-ID: <878fbb91399df0d37e0183890b0ad6aeb63590fe.1387890410.git.horms+renesas@verge.net.au>
+Message-ID: <20bdcab8268cb05702e12ae9013be96ecc7ec3a6.1387890410.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Bastian Hecht <hechtb@gmail.com>
 
-The field isn't set by any board, remote it.
+Extend the driver to with support for SCIx device tree bindings. A
+minimal set of features is supported, additional properties can be added
+later should the need to describe more device features arise.
 
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/tty/serial/sh-sci.c | 26 +++++---------------------
- include/linux/serial_sci.h  | 10 ----------
- 2 files changed, 5 insertions(+), 31 deletions(-)
+ drivers/tty/serial/sh-sci.c | 101 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 98 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index e4bf0e4..96d26d7 100644
+index c411116..be33d2b 100644
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -1757,17 +1757,6 @@ static unsigned int sci_scbrr_calc(struct sci_port *s, unsigned int bps,
- 	if (s->sampling_rate)
- 		return DIV_ROUND_CLOSEST(freq, s->sampling_rate * bps) - 1;
+@@ -39,6 +39,7 @@
+ #include <linux/module.h>
+ #include <linux/mm.h>
+ #include <linux/notifier.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/scatterlist.h>
+@@ -2415,6 +2416,83 @@ static int sci_remove(struct platform_device *dev)
+ 	return 0;
+ }
  
--	switch (s->cfg->scbrr_algo_id) {
--	case SCBRR_ALGO_1:
--		return freq / (16 * bps);
--	case SCBRR_ALGO_2:
--		return DIV_ROUND_CLOSEST(freq, 32 * bps) - 1;
--	case SCBRR_ALGO_3:
--		return freq / (8 * bps);
--	case SCBRR_ALGO_4:
--		return DIV_ROUND_CLOSEST(freq, 16 * bps) - 1;
--	}
--
- 	/* Warn, but use a safe default */
- 	WARN_ON(1);
++struct sci_port_info {
++	unsigned int type;
++	unsigned int regtype;
++};
++
++static const struct of_device_id of_sci_match[] = {
++	{
++		.compatible = "renesas,scif",
++		.data = (void *)&(const struct sci_port_info) {
++			.type = PORT_SCIF,
++			.regtype = SCIx_SH4_SCIF_REGTYPE,
++		},
++	}, {
++		.compatible = "renesas,scifa",
++		.data = (void *)&(const struct sci_port_info) {
++			.type = PORT_SCIFA,
++			.regtype = SCIx_SCIFA_REGTYPE,
++		},
++	}, {
++		.compatible = "renesas,scifb",
++		.data = (void *)&(const struct sci_port_info) {
++			.type = PORT_SCIFB,
++			.regtype = SCIx_SCIFB_REGTYPE,
++		},
++	}, {
++		.compatible = "renesas,hscif",
++		.data = (void *)&(const struct sci_port_info) {
++			.type = PORT_HSCIF,
++			.regtype = SCIx_HSCIF_REGTYPE,
++		},
++	}, {
++		/* Terminator */
++	},
++};
++MODULE_DEVICE_TABLE(of, of_sci_match);
++
++static struct plat_sci_port *
++sci_parse_dt(struct platform_device *pdev, unsigned int *dev_id)
++{
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match;
++	const struct sci_port_info *info;
++	struct plat_sci_port *p;
++	int id;
++
++	if (!IS_ENABLED(CONFIG_OF) || !np)
++		return NULL;
++
++	match = of_match_node(of_sci_match, pdev->dev.of_node);
++	if (!match)
++		return NULL;
++
++	info = match->data;
++
++	p = devm_kzalloc(&pdev->dev, sizeof(struct plat_sci_port), GFP_KERNEL);
++	if (!p) {
++		dev_err(&pdev->dev, "failed to allocate DT config data\n");
++		return NULL;
++	}
++
++	/* Get the line number for the aliases node. */
++	id = of_alias_get_id(np, "serial");
++	if (id < 0) {
++		dev_err(&pdev->dev, "failed to get alias id (%d)\n", id);
++		return NULL;
++	}
++
++	*dev_id = id;
++
++	p->flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
++	p->type = info->type;
++	p->regtype = info->regtype;
++	p->scscr = SCSCR_RE | SCSCR_TE;
++
++	return p;
++}
++
+ static int sci_probe_single(struct platform_device *dev,
+ 				      unsigned int index,
+ 				      struct plat_sci_port *p,
+@@ -2447,8 +2525,9 @@ static int sci_probe_single(struct platform_device *dev,
  
-@@ -2176,17 +2165,12 @@ static int sci_init_single(struct platform_device *dev,
- 		break;
- 	}
- 
--	/* Set the sampling rate if the baud rate calculation algorithm isn't
--	 * specified.
-+	/* SCIFA on sh7723 and sh7724 need a custom sampling rate that doesn't
-+	 * match the SoC datasheet, this should be investigated. Let platform
-+	 * data override the sampling rate for now.
- 	 */
--	if (p->scbrr_algo_id == SCBRR_ALGO_NONE) {
--		/* SCIFA on sh7723 and sh7724 need a custom sampling rate that
--		 * doesn't match the SoC datasheet, this should be investigated.
--		 * Let platform data override the sampling rate for now.
--		 */
--		sci_port->sampling_rate = p->sampling_rate ? p->sampling_rate
--					: sampling_rate;
--	}
-+	sci_port->sampling_rate = p->sampling_rate ? p->sampling_rate
-+				: sampling_rate;
- 
- 	if (!early) {
- 		sci_port->iclk = clk_get(&dev->dev, "sci_ick");
-diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index af414e1..fd7f9da 100644
---- a/include/linux/serial_sci.h
-+++ b/include/linux/serial_sci.h
-@@ -10,15 +10,6 @@
- 
- #define SCIx_NOT_SUPPORTED	(-1)
- 
--enum {
--	SCBRR_ALGO_NONE,	/* Compute sampling rate in the driver */
--	SCBRR_ALGO_1,		/* clk / (16 * bps) */
--	SCBRR_ALGO_2,		/* DIV_ROUND_CLOSEST(clk, 32 * bps) - 1 */
--	SCBRR_ALGO_3,		/* clk / (8 * bps) */
--	SCBRR_ALGO_4,		/* DIV_ROUND_CLOSEST(clk, 16 * bps) - 1 */
--	SCBRR_ALGO_6,		/* HSCIF variable sample rate algorithm */
--};
--
- #define SCSCR_TIE	(1 << 7)
- #define SCSCR_RIE	(1 << 6)
- #define SCSCR_TE	(1 << 5)
-@@ -136,7 +127,6 @@ struct plat_sci_port {
- 	unsigned long	capabilities;		/* Port features/capabilities */
- 
- 	unsigned int	sampling_rate;
--	unsigned int	scbrr_algo_id;		/* SCBRR calculation algo */
- 	unsigned int	scscr;			/* SCSCR initialization */
+ static int sci_probe(struct platform_device *dev)
+ {
+-	struct plat_sci_port *p = dev_get_platdata(&dev->dev);
+-	struct sci_port *sp = &sci_ports[dev->id];
++	struct plat_sci_port *p;
++	struct sci_port *sp;
++	unsigned int dev_id;
+ 	int ret;
  
  	/*
+@@ -2459,9 +2538,24 @@ static int sci_probe(struct platform_device *dev)
+ 	if (is_early_platform_device(dev))
+ 		return sci_probe_earlyprintk(dev);
+ 
++	if (dev->dev.of_node) {
++		p = sci_parse_dt(dev, &dev_id);
++		if (p == NULL)
++			return -EINVAL;
++	} else {
++		p = dev->dev.platform_data;
++		if (p == NULL) {
++			dev_err(&dev->dev, "no platform data supplied\n");
++			return -EINVAL;
++		}
++
++		dev_id = dev->id;
++	}
++
++	sp = &sci_ports[dev_id];
+ 	platform_set_drvdata(dev, sp);
+ 
+-	ret = sci_probe_single(dev, dev->id, p, sp);
++	ret = sci_probe_single(dev, dev_id, p, sp);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -2513,6 +2607,7 @@ static struct platform_driver sci_driver = {
+ 		.name	= "sh-sci",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &sci_dev_pm_ops,
++		.of_match_table = of_match_ptr(of_sci_match),
+ 	},
+ };
+ 
 -- 
 1.8.4
