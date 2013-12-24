@@ -1,124 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:18:05 +0900
-Subject: [PATCH 01/12] ARM: shmobile: koelsch: Add DU device
+Date: Tue, 24 Dec 2013 23:18:09 +0900
+Subject: [PATCH 05/12] ARM: shmobile: koelsch-reference: Remove duplicate CCF
+ initialization
 In-Reply-To: <cover.1387891831.git.horms+renesas@verge.net.au>
 References: <cover.1387891831.git.horms+renesas@verge.net.au>
-Message-ID: <784c33a0c9b509f09cb69bc93f3863ed20338462.1387891831.git.horms+renesas@verge.net.au>
+Message-ID: <e006502126a6a1f3afd879afa9101cc3df8b11f9.1387891831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Only the LVDS output is currently supported.
+The common clock framework is initialized in the rcar_gen2_init_timer()
+function, remove the of_clk_init() call.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch.c | 63 ++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 6e12914..5d84fb6 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -19,6 +19,7 @@
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index a804a17..4b48e2d 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -19,7 +19,6 @@
   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   */
  
-+#include <linux/dma-mapping.h>
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-@@ -26,13 +27,66 @@
- #include <linux/leds.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
-+#include <linux/platform_data/rcar-du.h>
- #include <linux/platform_device.h>
+-#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
  #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r8a7791.h>
- #include <mach/rcar-gen2.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+@@ -29,9 +28,7 @@
  
-+/* DU */
-+static struct rcar_du_encoder_data koelsch_du_encoders[] = {
-+	{
-+		.type = RCAR_DU_ENCODER_NONE,
-+		.output = RCAR_DU_OUTPUT_LVDS0,
-+		.connector.lvds.panel = {
-+			.width_mm = 210,
-+			.height_mm = 158,
-+			.mode = {
-+				.clock = 65000,
-+				.hdisplay = 1024,
-+				.hsync_start = 1048,
-+				.hsync_end = 1184,
-+				.htotal = 1344,
-+				.vdisplay = 768,
-+				.vsync_start = 771,
-+				.vsync_end = 777,
-+				.vtotal = 806,
-+				.flags = 0,
-+			},
-+		},
-+	},
-+};
-+
-+static const struct rcar_du_platform_data koelsch_du_pdata __initconst = {
-+	.encoders = koelsch_du_encoders,
-+	.num_encoders = ARRAY_SIZE(koelsch_du_encoders),
-+};
-+
-+static const struct resource du_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xfeb00000, 0x40000),
-+	DEFINE_RES_MEM_NAMED(0xfeb90000, 0x1c, "lvds.0"),
-+	DEFINE_RES_IRQ(gic_spi(256)),
-+	DEFINE_RES_IRQ(gic_spi(268)),
-+};
-+
-+static void __init koelsch_add_du_device(void)
-+{
-+	struct platform_device_info info = {
-+		.name = "rcar-du-r8a7791",
-+		.id = -1,
-+		.res = du_resources,
-+		.num_res = ARRAY_SIZE(du_resources),
-+		.data = &koelsch_du_pdata,
-+		.size_data = sizeof(koelsch_du_pdata),
-+		.dma_mask = DMA_BIT_MASK(32),
-+	};
-+
-+	platform_device_register_full(&info);
-+}
-+
- /* LEDS */
- static struct gpio_led koelsch_leds[] = {
- 	{
-@@ -80,6 +134,13 @@ static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
- };
- 
- static const struct pinctrl_map koelsch_pinctrl_map[] = {
-+	/* DU */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
-+				  "du_rgb666", "du"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
-+				  "du_sync", "du"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
-+				  "du_clk_out_0", "du"),
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
- 				  "scif0_data_d", "scif0"),
-@@ -101,6 +162,8 @@ static void __init koelsch_add_standard_devices(void)
- 	platform_device_register_data(&platform_bus, "gpio-keys", -1,
- 				      &koelsch_keys_pdata,
- 				      sizeof(koelsch_keys_pdata));
-+
-+	koelsch_add_du_device();
- }
- 
- static const char * const koelsch_boards_compat_dt[] __initconst = {
+ static void __init koelsch_add_standard_devices(void)
+ {
+-#ifdef CONFIG_COMMON_CLK
+-	of_clk_init(NULL);
+-#else
++#ifndef CONFIG_COMMON_CLK
+ 	r8a7791_clock_init();
+ #endif
+ 	r8a7791_add_dt_devices();
 -- 
 1.8.4
