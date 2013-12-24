@@ -1,38 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:14:21 +0900
-Subject: [PATCH 04/11] serial: sh-sci: Remove duplicate interrupt check in
- verify port op
+Date: Tue, 24 Dec 2013 23:14:19 +0900
+Subject: [PATCH 02/11] serial: sh-sci: Remove baud rate calculation algorithm 5
 In-Reply-To: <cover.1387887969.git.horms+renesas@verge.net.au>
 References: <cover.1387887969.git.horms+renesas@verge.net.au>
-Message-ID: <b5e17b71c6b2ff284b4018e272e18876ccfa9b2c.1387887969.git.horms+renesas@verge.net.au>
+Message-ID: <6db201da2522d7dd231982ff7b83916cf4db3e41.1387887969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The driver checks if the interrupt number is greater than nr_irqs and
-returns an error in that case. The same check is already performed by
-the caller, remove it.
+The algorithm isn't used, remove it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/tty/serial/sh-sci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/sh-sci.c | 2 --
+ include/linux/serial_sci.h  | 1 -
+ 2 files changed, 3 deletions(-)
 
 diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index f2fad4d..8c17d55 100644
+index e98a217..eb59bb2 100644
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -2120,7 +2120,7 @@ static int sci_verify_port(struct uart_port *port, struct serial_struct *ser)
- {
- 	struct sci_port *s = to_sci_port(port);
+@@ -1825,8 +1825,6 @@ static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
+ 		return (((freq * 2) + 16 * bps) / (16 * bps) - 1);
+ 	case SCBRR_ALGO_4:
+ 		return (((freq * 2) + 16 * bps) / (32 * bps) - 1);
+-	case SCBRR_ALGO_5:
+-		return (((freq * 1000 / 32) / bps) - 1);
+ 	}
  
--	if (ser->irq != s->cfg->irqs[SCIx_TXI_IRQ] || ser->irq > nr_irqs)
-+	if (ser->irq != s->cfg->irqs[SCIx_TXI_IRQ])
- 		return -EINVAL;
- 	if (ser->baud_base < 2400)
- 		/* No paper tape reader for Mitch.. */
+ 	/* Warn, but use a safe default */
+diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
+index 50fe651..babc5fe 100644
+--- a/include/linux/serial_sci.h
++++ b/include/linux/serial_sci.h
+@@ -15,7 +15,6 @@ enum {
+ 	SCBRR_ALGO_2,		/* ((clk + 16 * bps) / (32 * bps) - 1) */
+ 	SCBRR_ALGO_3,		/* (((clk * 2) + 16 * bps) / (16 * bps) - 1) */
+ 	SCBRR_ALGO_4,		/* (((clk * 2) + 16 * bps) / (32 * bps) - 1) */
+-	SCBRR_ALGO_5,		/* (((clk * 1000 / 32) / bps) - 1) */
+ 	SCBRR_ALGO_6,		/* HSCIF variable sample rate algorithm */
+ };
+ 
 -- 
 1.8.4
