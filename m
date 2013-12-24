@@ -1,153 +1,119 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 23:14:32 +0900
-Subject: [PATCH 11/11] serial: sh-sci: Rework baud rate calculation
-In-Reply-To: <cover.1387887969.git.horms+renesas@verge.net.au>
-References: <cover.1387887969.git.horms+renesas@verge.net.au>
-Message-ID: <ec09c5eb491834d4011c72538e58d8b7096076bd.1387887969.git.horms+renesas@verge.net.au>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 24 Dec 2013 15:14:25 +0100
+Subject: [PATCH RFC 02/11] ARM: SAMSUNG: pm: Save UART DIVSLOT register based
+ on SoC type
+In-Reply-To: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
+References: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1387894474-14428-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+The only SoC that does not have DIVSLOT register is S3C2410, so instead
+of exporting a variable for platforms to set if DIVSLOT register should
+be preserved, it's enough to simply check whether we are running on
+a S3C2410 instead.
 
-Computing the baud rate register value requires knowledge of the
-hardware sampling rate. This information is currently encoded in a baud
-rate calculation algorithm ID passed through platform data. However, it
-can be derived from the port type directly in most cases.
-
-Compute the sampling rate internally in the driver if the baud rate
-calculation algorithm ID isn't specified, and allow platforms to
-override the sampling rate through platform data in special cases (this
-is only required for SCIFA ports on sh7723 and sh7724, the reason needs
-to be investigated).
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/tty/serial/sh-sci.c | 37 ++++++++++++++++++++++++++++++-------
- include/linux/serial_sci.h  |  2 ++
- 2 files changed, 32 insertions(+), 7 deletions(-)
+ arch/arm/mach-s3c64xx/pm.c              |  1 -
+ arch/arm/mach-s5p64x0/pm.c              |  1 -
+ arch/arm/plat-samsung/include/plat/pm.h |  2 --
+ arch/arm/plat-samsung/pm.c              | 18 +++++-------------
+ 4 files changed, 5 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index d5239d5..e4bf0e4 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -65,6 +65,7 @@ struct sci_port {
- 	struct plat_sci_port	*cfg;
- 	int			overrun_bit;
- 	unsigned int		error_mask;
-+	unsigned int		sampling_rate;
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 8cdb824..0b48908 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -331,7 +331,6 @@ static __init int s3c64xx_pm_initcall(void)
+ {
+ 	pm_cpu_prep = s3c64xx_pm_prepare;
+ 	pm_cpu_sleep = s3c64xx_cpu_suspend;
+-	pm_uart_udivslot = 1;
  
+ #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
+ 	gpio_request(S3C64XX_GPN(12), "DEBUG_LED0");
+diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
+index 861e15c..ec8229c 100644
+--- a/arch/arm/mach-s5p64x0/pm.c
++++ b/arch/arm/mach-s5p64x0/pm.c
+@@ -161,7 +161,6 @@ static int s5p64x0_pm_add(struct device *dev, struct subsys_interface *sif)
+ {
+ 	pm_cpu_prep = s5p64x0_pm_prepare;
+ 	pm_cpu_sleep = s5p64x0_cpu_suspend;
+-	pm_uart_udivslot = 1;
  
- 	/* Break timer */
-@@ -1750,10 +1751,13 @@ static void sci_shutdown(struct uart_port *port)
- 	sci_free_irq(s);
+ 	return 0;
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index 6bc1a8f..67defdb 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -54,8 +54,6 @@ extern int (*pm_cpu_sleep)(unsigned long);
+ 
+ extern unsigned long s3c_pm_flags;
+ 
+-extern unsigned char pm_uart_udivslot;  /* true to save UART UDIVSLOT */
+-
+ /* from sleep.S */
+ 
+ extern int s3c2410_cpu_suspend(unsigned long);
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index d0c2301..e017b7b 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -23,6 +23,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/suspend.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/regs-serial.h>
+ 
+ #ifdef CONFIG_SAMSUNG_ATAGS
+@@ -69,17 +70,6 @@ static inline void s3c_pm_debug_init(void)
+ 	s3c_pm_debug_init_uart();
  }
  
--static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
-+static unsigned int sci_scbrr_calc(struct sci_port *s, unsigned int bps,
- 				   unsigned long freq)
- {
--	switch (algo_id) {
-+	if (s->sampling_rate)
-+		return DIV_ROUND_CLOSEST(freq, s->sampling_rate * bps) - 1;
+-#else
+-#define s3c_pm_debug_init() do { } while(0)
+-
+-#endif /* CONFIG_SAMSUNG_PM_DEBUG */
+-
+-/* Save the UART configurations if we are configured for debug. */
+-
+-unsigned char pm_uart_udivslot;
+-
+-#ifdef CONFIG_SAMSUNG_PM_DEBUG
+-
+ static struct pm_uart_save uart_save;
+ 
+ static void s3c_pm_save_uart(unsigned int uart, struct pm_uart_save *save)
+@@ -92,7 +82,7 @@ static void s3c_pm_save_uart(unsigned int uart, struct pm_uart_save *save)
+ 	save->umcon = __raw_readl(regs + S3C2410_UMCON);
+ 	save->ubrdiv = __raw_readl(regs + S3C2410_UBRDIV);
+ 
+-	if (pm_uart_udivslot)
++	if (!soc_is_s3c2410())
+ 		save->udivslot = __raw_readl(regs + S3C2443_DIVSLOT);
+ 
+ 	S3C_PMDBG("UART[%d]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
+@@ -116,7 +106,7 @@ static void s3c_pm_restore_uart(unsigned int uart, struct pm_uart_save *save)
+ 	__raw_writel(save->umcon, regs + S3C2410_UMCON);
+ 	__raw_writel(save->ubrdiv, regs + S3C2410_UBRDIV);
+ 
+-	if (pm_uart_udivslot)
++	if (!soc_is_s3c2410())
+ 		__raw_writel(save->udivslot, regs + S3C2443_DIVSLOT);
+ }
+ 
+@@ -125,6 +115,8 @@ static void s3c_pm_restore_uarts(void)
+ 	s3c_pm_restore_uart(CONFIG_DEBUG_S3C_UART, &uart_save);
+ }
+ #else
++#define s3c_pm_debug_init() do { } while(0)
 +
-+	switch (s->cfg->scbrr_algo_id) {
- 	case SCBRR_ALGO_1:
- 		return freq / (16 * bps);
- 	case SCBRR_ALGO_2:
-@@ -1843,12 +1847,11 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	baud = uart_get_baud_rate(port, termios, old, 0, max_baud);
- 	if (likely(baud && port->uartclk)) {
--		if (s->cfg->scbrr_algo_id == SCBRR_ALGO_6) {
-+		if (s->cfg->type == PORT_HSCIF) {
- 			sci_baud_calc_hscif(baud, port->uartclk, &t, &srr,
- 					    &cks);
- 		} else {
--			t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud,
--					   port->uartclk);
-+			t = sci_scbrr_calc(s, baud, port->uartclk);
- 			for (cks = 0; t >= 256 && cks <= 3; cks++)
- 				t >>= 2;
- 		}
-@@ -2092,6 +2095,7 @@ static int sci_init_single(struct platform_device *dev,
- {
- 	struct uart_port *port = &sci_port->port;
- 	const struct resource *res;
-+	unsigned int sampling_rate;
- 	unsigned int i;
- 	int ret;
- 
-@@ -2143,28 +2147,47 @@ static int sci_init_single(struct platform_device *dev,
- 	case PORT_SCIFB:
- 		port->fifosize = 256;
- 		sci_port->overrun_bit = 9;
-+		sampling_rate = 16;
- 		break;
- 	case PORT_HSCIF:
- 		port->fifosize = 128;
-+		sampling_rate = 0;
- 		sci_port->overrun_bit = 0;
- 		break;
- 	case PORT_SCIFA:
- 		port->fifosize = 64;
- 		sci_port->overrun_bit = 9;
-+		sampling_rate = 16;
- 		break;
- 	case PORT_SCIF:
- 		port->fifosize = 16;
--		if (p->regtype == SCIx_SH7705_SCIF_REGTYPE)
-+		if (p->regtype == SCIx_SH7705_SCIF_REGTYPE) {
- 			sci_port->overrun_bit = 9;
--		else
-+			sampling_rate = 16;
-+		} else {
- 			sci_port->overrun_bit = 0;
-+			sampling_rate = 32;
-+		}
- 		break;
- 	default:
- 		port->fifosize = 1;
- 		sci_port->overrun_bit = 5;
-+		sampling_rate = 32;
- 		break;
- 	}
- 
-+	/* Set the sampling rate if the baud rate calculation algorithm isn't
-+	 * specified.
-+	 */
-+	if (p->scbrr_algo_id == SCBRR_ALGO_NONE) {
-+		/* SCIFA on sh7723 and sh7724 need a custom sampling rate that
-+		 * doesn't match the SoC datasheet, this should be investigated.
-+		 * Let platform data override the sampling rate for now.
-+		 */
-+		sci_port->sampling_rate = p->sampling_rate ? p->sampling_rate
-+					: sampling_rate;
-+	}
-+
- 	if (!early) {
- 		sci_port->iclk = clk_get(&dev->dev, "sci_ick");
- 		if (IS_ERR(sci_port->iclk)) {
-diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index e9c3021..af414e1 100644
---- a/include/linux/serial_sci.h
-+++ b/include/linux/serial_sci.h
-@@ -11,6 +11,7 @@
- #define SCIx_NOT_SUPPORTED	(-1)
- 
- enum {
-+	SCBRR_ALGO_NONE,	/* Compute sampling rate in the driver */
- 	SCBRR_ALGO_1,		/* clk / (16 * bps) */
- 	SCBRR_ALGO_2,		/* DIV_ROUND_CLOSEST(clk, 32 * bps) - 1 */
- 	SCBRR_ALGO_3,		/* clk / (8 * bps) */
-@@ -134,6 +135,7 @@ struct plat_sci_port {
- 	upf_t		flags;			/* UPF_* flags */
- 	unsigned long	capabilities;		/* Port features/capabilities */
- 
-+	unsigned int	sampling_rate;
- 	unsigned int	scbrr_algo_id;		/* SCBRR calculation algo */
- 	unsigned int	scscr;			/* SCSCR initialization */
- 
+ static void s3c_pm_save_uarts(void) { }
+ static void s3c_pm_restore_uarts(void) { }
+ #endif
 -- 
-1.8.4
+1.8.4.3
