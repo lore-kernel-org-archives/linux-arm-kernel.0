@@ -1,39 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Dec 2013 15:03:36 +0900
-Subject: [PATCH 3/7] ARM: shmobile: genmai: Rename ARCH_SHMOBILE to
- ARCH_SHMOBILE_LEGACY
+Date: Tue, 24 Dec 2013 15:03:40 +0900
+Subject: [PATCH 7/7] ARM: shmobile: koelsch: Do not disable
+ CONFIG_{INOTIFY_USER, UNIX} in defconfig
 In-Reply-To: <cover.1387854925.git.horms+renesas@verge.net.au>
 References: <cover.1387854925.git.horms+renesas@verge.net.au>
-Message-ID: <7f558a124022630e177f08bbdd0673c3301f7e84.1387854925.git.horms+renesas@verge.net.au>
+Message-ID: <559cec66f1a2620bc85bb79191512a569a404cb8.1387854925.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+CONFIG_INOTIFY_USER and CONFIG_UNIX are required for udev to function.
+This change brings the koelsch defconfig into line with
+other shmobile defconfigs.
 
-The ARCH_SHMOBILE configuration option has been renamed to
-ARCH_SHMOBILE_LEGACY. Update the defconfig accordingly.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-[ horms+renesas at verge.net.au: Removed non-genmai changes which
-  have been squashed into "ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY". ]
+Signed-off-by: Simon Horman <horms@verge.net.au>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/genmai_defconfig | 2 +-
+ arch/arm/configs/koelsch_defconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/genmai_defconfig b/arch/arm/configs/genmai_defconfig
-index 69b1531..aa0b704 100644
---- a/arch/arm/configs/genmai_defconfig
-+++ b/arch/arm/configs/genmai_defconfig
-@@ -12,7 +12,7 @@ CONFIG_SLAB=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_SHMOBILE=y
-+CONFIG_ARCH_SHMOBILE_LEGACY=y
- CONFIG_ARCH_R7S72100=y
- CONFIG_MACH_GENMAI=y
- # CONFIG_SH_TIMER_CMT is not set
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index ef79cbf..acec6b8 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -31,6 +31,7 @@ CONFIG_NEON=y
+ CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
++CONFIG_UNIX=y
+ CONFIG_INET=y
+ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+@@ -66,7 +67,6 @@ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ # CONFIG_DNOTIFY is not set
+-# CONFIG_INOTIFY_USER is not set
+ CONFIG_TMPFS=y
+ CONFIG_CONFIGFS_FS=y
+ # CONFIG_MISC_FILESYSTEMS is not set
 -- 
 1.8.4
