@@ -1,93 +1,124 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Dec 2013 15:14:31 +0100
-Subject: [PATCH RFC 08/11] ARM: EXYNOS: Kconfig: Fix abuse of CONFIG_PM
+Date: Tue, 24 Dec 2013 15:14:32 +0100
+Subject: [PATCH RFC 09/11] ARM: EXYNOS: Remove PM initcalls and useless
+ indirection
 In-Reply-To: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
 References: <1387894474-14428-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1387894474-14428-8-git-send-email-t.figa@samsung.com>
+Message-ID: <1387894474-14428-9-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_PM means that at least one of CONFIG_PM_SLEEP and
-CONFIG_PM_RUNTIME is enabled, while multiple entries in
-mach-exynos/Kconfig abused it to enable sleep- and runtime-specific
-functionality.
+This patch simplifies Exynos PM initialization and makes it
+multiplatform friendly by replacing initcalls used originally to invoke
+all the initialization code with explicit function calls.
 
-This patch fixes this abuse by replacing dependencies on CONFIG_PM with
-appropriate dependencies on either CONFIG_PM_SLEEP or CONFIG_PM_RUNTIME,
-whichever is appropriate.
+In addition, an useless subsys_interface is removed, as all its .add_dev
+callback did was setting two function pointers.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/mach-exynos/common.c |  1 +
+ arch/arm/mach-exynos/common.h |  6 ++++++
+ arch/arm/mach-exynos/pm.c     | 50 +++++++++++--------------------------------
+ 3 files changed, 19 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index f9d67a0..27ea463 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -46,11 +46,11 @@ config CPU_EXYNOS4210
- 	default y
- 	depends on ARCH_EXYNOS4
- 	select ARCH_HAS_BANDGAP
--	select ARM_CPU_SUSPEND if PM
-+	select ARM_CPU_SUSPEND if PM_SLEEP
- 	select PINCTRL_EXYNOS
--	select PM_GENERIC_DOMAINS if PM
--	select S5P_PM if PM
--	select S5P_SLEEP if PM
-+	select PM_GENERIC_DOMAINS if PM_RUNTIME
-+	select S5P_PM if PM_SLEEP
-+	select S5P_SLEEP if PM_SLEEP
- 	select SAMSUNG_DMADEV
- 	help
- 	  Enable EXYNOS4210 CPU support
-@@ -61,9 +61,9 @@ config SOC_EXYNOS4212
- 	depends on ARCH_EXYNOS4
- 	select ARCH_HAS_BANDGAP
- 	select PINCTRL_EXYNOS
--	select PM_GENERIC_DOMAINS if PM
--	select S5P_PM if PM
--	select S5P_SLEEP if PM
-+	select PM_GENERIC_DOMAINS if PM_RUNTIME
-+	select S5P_PM if PM_SLEEP
-+	select S5P_SLEEP if PM_SLEEP
- 	select SAMSUNG_DMADEV
- 	help
- 	  Enable EXYNOS4212 SoC support
-@@ -74,7 +74,7 @@ config SOC_EXYNOS4412
- 	depends on ARCH_EXYNOS4
- 	select ARCH_HAS_BANDGAP
- 	select PINCTRL_EXYNOS
--	select PM_GENERIC_DOMAINS if PM
-+	select PM_GENERIC_DOMAINS if PM_RUNTIME
- 	select SAMSUNG_DMADEV
- 	help
- 	  Enable EXYNOS4412 SoC support
-@@ -85,9 +85,9 @@ config SOC_EXYNOS5250
- 	depends on ARCH_EXYNOS5
- 	select ARCH_HAS_BANDGAP
- 	select PINCTRL_EXYNOS
--	select PM_GENERIC_DOMAINS if PM
--	select S5P_PM if PM
--	select S5P_SLEEP if PM
-+	select PM_GENERIC_DOMAINS if PM_RUNTIME
-+	select S5P_PM if PM_SLEEP
-+	select S5P_SLEEP if PM_SLEEP
- 	select S5P_DEV_MFC
- 	select SAMSUNG_DMADEV
- 	help
-@@ -97,9 +97,9 @@ config SOC_EXYNOS5420
- 	bool "SAMSUNG EXYNOS5420"
- 	default y
- 	depends on ARCH_EXYNOS5
--	select PM_GENERIC_DOMAINS if PM
--	select S5P_PM if PM
--	select S5P_SLEEP if PM
-+	select PM_GENERIC_DOMAINS if PM_RUNTIME
-+	select S5P_PM if PM_SLEEP
-+	select S5P_SLEEP if PM_SLEEP
- 	help
- 	  Enable EXYNOS5420 SoC support
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 61d2906..0e3f371 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -310,6 +310,7 @@ void __init exynos_init_late(void)
+ 		return;
  
+ 	exynos_pm_late_initcall();
++	exynos_pm_init();
+ }
+ 
+ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index ff9b6a9..f2d1892 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -32,6 +32,12 @@ int exynos_pm_late_initcall(void);
+ static inline int exynos_pm_late_initcall(void) { return 0; }
+ #endif
+ 
++#ifdef CONFIG_PM_SLEEP
++extern void __init exynos_pm_init(void);
++#else
++static inline void exynos_pm_init(void) {}
++#endif
++
+ extern struct smp_operations exynos_smp_ops;
+ 
+ extern void exynos_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 78a22bf..8cdb000 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -92,39 +92,6 @@ static void exynos_pm_prepare(void)
+ 	__raw_writel(virt_to_phys(s3c_cpu_resume), S5P_INFORM0);
+ }
+ 
+-static int exynos_pm_add(struct device *dev, struct subsys_interface *sif)
+-{
+-	pm_cpu_prep = exynos_pm_prepare;
+-	pm_cpu_sleep = exynos_cpu_suspend;
+-
+-	return 0;
+-}
+-
+-static struct subsys_interface exynos_pm_interface = {
+-	.name		= "exynos_pm",
+-	.subsys		= &exynos_subsys,
+-	.add_dev	= exynos_pm_add,
+-};
+-
+-static __init int exynos_pm_drvinit(void)
+-{
+-	unsigned int tmp;
+-
+-	if (soc_is_exynos5440())
+-		return 0;
+-
+-	s3c_pm_init();
+-
+-	/* All wakeup disable */
+-
+-	tmp = __raw_readl(S5P_WAKEUP_MASK);
+-	tmp |= ((0xFF << 8) | (0x1F << 1));
+-	__raw_writel(tmp, S5P_WAKEUP_MASK);
+-
+-	return subsys_interface_register(&exynos_pm_interface);
+-}
+-arch_initcall(exynos_pm_drvinit);
+-
+ static int exynos_pm_suspend(void)
+ {
+ 	unsigned long tmp;
+@@ -220,12 +187,19 @@ static struct syscore_ops exynos_pm_syscore_ops = {
+ 	.resume		= exynos_pm_resume,
+ };
+ 
+-static __init int exynos_pm_syscore_init(void)
++void __init exynos_pm_init(void)
+ {
+-	if (soc_is_exynos5440())
+-		return 0;
++	u32 tmp;
++
++	pm_cpu_prep = exynos_pm_prepare;
++	pm_cpu_sleep = exynos_cpu_suspend;
++
++	s3c_pm_init();
++
++	/* All wakeup disable */
++	tmp = __raw_readl(S5P_WAKEUP_MASK);
++	tmp |= ((0xFF << 8) | (0x1F << 1));
++	__raw_writel(tmp, S5P_WAKEUP_MASK);
+ 
+ 	register_syscore_ops(&exynos_pm_syscore_ops);
+-	return 0;
+ }
+-arch_initcall(exynos_pm_syscore_init);
 -- 
 1.8.4.3
