@@ -1,82 +1,731 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Dec 2013 17:12:29 -0800
-Subject: [PATCH v4 05/15] clk: qcom: Add support for phase locked loops (PLLs)
+Date: Mon, 23 Dec 2013 17:12:30 -0800
+Subject: [PATCH v4 06/15] clk: qcom: Add support for root clock generators
+ (RCGs)
 In-Reply-To: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
 References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1387847559-18330-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1387847559-18330-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Qualcomm's PLLs (phase locked loops). This is
-sufficient enough to be able to determine the rate the PLL is
-running at. We can add rate setting support later when it's
-needed.
+Add support for the root clock generators on Qualcomm devices.
+RCGs are highly customizable mux/divider/counter clocks that can
+be used to generate almost any rate desired given some input
+source that is faster than the desired rate.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/Kconfig        |   2 +
- drivers/clk/Makefile       |   1 +
- drivers/clk/qcom/Kconfig   |   5 +
- drivers/clk/qcom/Makefile  |   3 +
- drivers/clk/qcom/clk-pll.c | 222 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/qcom/clk-pll.h |  65 +++++++++++++
- 6 files changed, 298 insertions(+)
- create mode 100644 drivers/clk/qcom/Kconfig
- create mode 100644 drivers/clk/qcom/Makefile
- create mode 100644 drivers/clk/qcom/clk-pll.c
- create mode 100644 drivers/clk/qcom/clk-pll.h
+ drivers/clk/qcom/Makefile   |   2 +
+ drivers/clk/qcom/clk-rcg.c  | 517 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-rcg.h  | 157 ++++++++++++++
+ drivers/clk/qcom/clk-rcg2.c | 291 +++++++++++++++++++++++++
+ 4 files changed, 967 insertions(+)
+ create mode 100644 drivers/clk/qcom/clk-rcg.c
+ create mode 100644 drivers/clk/qcom/clk-rcg.h
+ create mode 100644 drivers/clk/qcom/clk-rcg2.c
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 5c51115..afd2a45 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -107,6 +107,8 @@ config COMMON_CLK_KEYSTONE
-           Supports clock drivers for Keystone based SOCs. These SOCs have local
- 	  a power sleep control module that gate the clock to the IPs and PLLs.
- 
-+source "drivers/clk/qcom/Kconfig"
-+
- endmenu
- 
- source "drivers/clk/mvebu/Kconfig"
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 7a10bc9..088b517 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
- obj-$(CONFIG_COMMON_CLK_VERSATILE) += versatile/
- obj-$(CONFIG_ARCH_SIRF)		+= clk-prima2.o
-+obj-$(CONFIG_COMMON_CLK_QCOM)	+= qcom/
- obj-$(CONFIG_PLAT_ORION)	+= mvebu/
- ifeq ($(CONFIG_COMMON_CLK), y)
- obj-$(CONFIG_ARCH_MMP)		+= mmp/
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-new file mode 100644
-index 0000000..73a8c8f
---- /dev/null
-+++ b/drivers/clk/qcom/Kconfig
-@@ -0,0 +1,5 @@
-+config COMMON_CLK_QCOM
-+	tristate "Support for Qualcomm's clock controllers"
-+	depends on OF
-+	select REGMAP_MMIO
-+
 diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-new file mode 100644
-index 0000000..9849a99
---- /dev/null
+index 9849a99..7ed16d7 100644
+--- a/drivers/clk/qcom/Makefile
 +++ b/drivers/clk/qcom/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_COMMON_CLK_QCOM) += clk-qcom.o
-+
-+clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-pll.o
-diff --git a/drivers/clk/qcom/clk-pll.c b/drivers/clk/qcom/clk-pll.c
+@@ -1,3 +1,5 @@
+ obj-$(CONFIG_COMMON_CLK_QCOM) += clk-qcom.o
+ 
+ clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-pll.o
++clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg.o
++clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg2.o
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
 new file mode 100644
-index 0000000..b0d2a4e
+index 0000000..afc0401
 --- /dev/null
-+++ b/drivers/clk/qcom/clk-pll.c
-@@ -0,0 +1,222 @@
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -0,0 +1,517 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/export.h>
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include <asm/div64.h>
++
++#include "clk-rcg.h"
++
++static u32 ns_to_src(struct src_sel *s, u32 ns)
++{
++	ns >>= s->src_sel_shift;
++	ns &= SRC_SEL_MASK;
++	return ns;
++}
++
++static u32 src_to_ns(struct src_sel *s, u8 src, u32 ns)
++{
++	u32 mask;
++
++	mask = SRC_SEL_MASK;
++	mask <<= s->src_sel_shift;
++	ns &= ~mask;
++
++	ns |= src << s->src_sel_shift;
++	return ns;
++}
++
++static u8 clk_rcg_get_parent(struct clk_hw *hw)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 ns;
++	int i;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns = ns_to_src(&rcg->s, ns);
++	for (i = 0; i < num_parents; i++)
++		if (ns == rcg->s.parent_map[i])
++			return i;
++
++	return -EINVAL;
++}
++
++static int reg_to_bank(struct clk_dyn_rcg *rcg, u32 bank)
++{
++	bank &= BIT(rcg->mux_sel_bit);
++	return !!bank;
++}
++
++static u8 clk_dyn_rcg_get_parent(struct clk_hw *hw)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 ns, ctl;
++	int bank;
++	int i;
++	struct src_sel *s;
++
++	regmap_read(hw->regmap, hw->enable_reg, &ctl);
++	bank = reg_to_bank(rcg, ctl);
++	s = &rcg->s[bank];
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns = ns_to_src(s, ns);
++
++	for (i = 0; i < num_parents; i++)
++		if (ns == s->parent_map[i])
++			return i;
++
++	return -EINVAL;
++}
++
++static int clk_rcg_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	u32 ns;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns = src_to_ns(&rcg->s, rcg->s.parent_map[index], ns);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	return 0;
++}
++
++static u32 md_to_m(struct mn *mn, u32 md)
++{
++	md >>= mn->m_val_shift;
++	md &= BIT(mn->width) - 1;
++	return md;
++}
++
++static u32 ns_to_pre_div(struct pre_div *p, u32 ns)
++{
++	ns >>= p->pre_div_shift;
++	ns &= BIT(p->pre_div_width) - 1;
++	return ns;
++}
++
++static u32 pre_div_to_ns(struct pre_div *p, u8 pre_div, u32 ns)
++{
++	u32 mask;
++
++	mask = BIT(p->pre_div_width) - 1;
++	mask <<= p->pre_div_shift;
++	ns &= ~mask;
++
++	ns |= pre_div << p->pre_div_shift;
++	return ns;
++}
++
++static u32 mn_to_md(struct mn *mn, u32 m, u32 n, u32 md)
++{
++	u32 mask, mask_w;
++
++	mask_w = BIT(mn->width) - 1;
++	mask = (mask_w << mn->m_val_shift) | mask_w;
++	md &= ~mask;
++
++	if (n) {
++		m <<= mn->m_val_shift;
++		md |= m;
++		md |= ~n & mask_w;
++	}
++
++	return md;
++}
++
++static u32 ns_m_to_n(struct mn *mn, u32 ns, u32 m)
++{
++	ns = ~ns >> mn->n_val_shift;
++	ns &= BIT(mn->width) - 1;
++	return ns + m;
++}
++
++static u32 reg_to_mnctr_mode(struct mn *mn, u32 val)
++{
++	val >>= mn->mnctr_mode_shift;
++	val &= MNCTR_MODE_MASK;
++	return val;
++}
++
++static u32 mn_to_ns(struct mn *mn, u32 m, u32 n, u32 ns)
++{
++	u32 mask;
++
++	mask = BIT(mn->width) - 1;
++	mask <<= mn->n_val_shift;
++	ns &= ~mask;
++
++	if (n) {
++		n = n - m;
++		n = ~n;
++		n &= BIT(mn->width) - 1;
++		n <<= mn->n_val_shift;
++		ns |= n;
++	}
++
++	return ns;
++}
++
++static u32 mn_to_reg(struct mn *mn, u32 m, u32 n, u32 val)
++{
++	u32 mask;
++
++	mask = MNCTR_MODE_MASK << mn->mnctr_mode_shift;
++	mask |= BIT(mn->mnctr_en_bit);
++	val &= ~mask;
++
++	if (n) {
++		val |= BIT(mn->mnctr_en_bit);
++		val |= MNCTR_MODE_DUAL << mn->mnctr_mode_shift;
++	}
++
++	return val;
++}
++
++static void configure_bank(struct clk_dyn_rcg *rcg, const struct freq_tbl *f)
++{
++	u32 ns, md, ctl, *regp;
++	int bank, new_bank;
++	struct mn *mn;
++	struct pre_div *p;
++	struct src_sel *s;
++	bool enabled;
++	u32 md_reg;
++	u32 bank_reg;
++	bool banked_mn = !!rcg->mn[1].width;
++	struct clk_hw *hw = &rcg->hw;
++
++	enabled = __clk_is_enabled(rcg->hw.clk);
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	regmap_read(hw->regmap, hw->enable_reg, &ctl);
++
++	if (banked_mn) {
++		regp = &ctl;
++		bank_reg = hw->enable_reg;
++	} else {
++		regp = &ns;
++		bank_reg = rcg->ns_reg;
++	}
++
++	bank = reg_to_bank(rcg, *regp);
++	new_bank = enabled ? !bank : bank;
++
++	if (banked_mn) {
++		mn = &rcg->mn[new_bank];
++		md_reg = rcg->md_reg[new_bank];
++
++		ns |= BIT(mn->mnctr_reset_bit);
++		regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++		regmap_read(hw->regmap, md_reg, &md);
++		md = mn_to_md(mn, f->m, f->n, md);
++		regmap_write(hw->regmap, md_reg, md);
++
++		ns = mn_to_ns(mn, f->m, f->n, ns);
++		regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++		ctl = mn_to_reg(mn, f->m, f->n, ctl);
++		regmap_write(hw->regmap, hw->enable_reg, ctl);
++
++		ns &= ~BIT(mn->mnctr_reset_bit);
++		regmap_write(hw->regmap, rcg->ns_reg, ns);
++	} else {
++		p = &rcg->p[new_bank];
++		ns = pre_div_to_ns(p, f->pre_div - 1, ns);
++	}
++
++	s = &rcg->s[new_bank];
++	ns = src_to_ns(s, s->parent_map[f->src], ns);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	if (enabled) {
++		*regp ^= BIT(rcg->mux_sel_bit);
++		regmap_write(hw->regmap, bank_reg, *regp);
++	}
++}
++
++static int clk_dyn_rcg_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	u32 ns, ctl, md, reg;
++	int bank;
++	struct freq_tbl f = { 0 };
++	bool banked_mn = !!rcg->mn[1].width;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	regmap_read(hw->regmap, hw->enable_reg, &ctl);
++	reg = banked_mn ? ctl : ns;
++
++	bank = reg_to_bank(rcg, reg);
++
++	if (banked_mn) {
++		regmap_read(hw->regmap, rcg->md_reg[bank], &md);
++		f.m = md_to_m(&rcg->mn[bank], md);
++		f.n = ns_m_to_n(&rcg->mn[bank], ns, f.m);
++	} else {
++		f.pre_div = ns_to_pre_div(&rcg->p[bank], ns) + 1;
++	}
++	f.src = index;
++
++	configure_bank(rcg, &f);
++
++	return 0;
++}
++
++/*
++ * Calculate m/n:d rate
++ *
++ *          parent_rate     m
++ *   rate = ----------- x  ---
++ *            pre_div       n
++ */
++static unsigned long
++calc_rate(unsigned long rate, u32 m, u32 n, u32 mode, u32 pre_div)
++{
++	if (pre_div)
++		rate /= pre_div + 1;
++
++	if (mode) {
++		u64 tmp = rate;
++		tmp *= m;
++		do_div(tmp, n);
++		rate = tmp;
++	}
++
++	return rate;
++}
++
++static unsigned long
++clk_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	u32 pre_div, m = 0, n = 0, ns, md, mode = 0;
++	struct mn *mn = &rcg->mn;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	pre_div = ns_to_pre_div(&rcg->p, ns);
++
++	if (rcg->mn.width) {
++		regmap_read(hw->regmap, rcg->md_reg, &md);
++		m = md_to_m(mn, md);
++		n = ns_m_to_n(mn, ns, m);
++		/* MN counter mode is in hw.enable_reg sometimes */
++		if (hw->enable_reg != rcg->ns_reg)
++			regmap_read(hw->regmap, hw->enable_reg, &mode);
++		else
++			mode = ns;
++		mode = reg_to_mnctr_mode(mn, mode);
++	}
++
++	return calc_rate(parent_rate, m, n, mode, pre_div);
++}
++
++static unsigned long
++clk_dyn_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	u32 m, n, pre_div, ns, md, mode, reg;
++	int bank;
++	struct mn *mn;
++	bool banked_mn = !!rcg->mn[1].width;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++
++	if (banked_mn)
++		regmap_read(hw->regmap, hw->enable_reg, &reg);
++	else
++		reg = ns;
++
++	bank = reg_to_bank(rcg, reg);
++
++	if (banked_mn) {
++		mn = &rcg->mn[bank];
++		regmap_read(hw->regmap, rcg->md_reg[bank], &md);
++		m = md_to_m(mn, md);
++		n = ns_m_to_n(mn, ns, m);
++		mode = reg_to_mnctr_mode(mn, reg);
++		return calc_rate(parent_rate, m, n, mode, 0);
++	} else {
++		pre_div = ns_to_pre_div(&rcg->p[bank], ns);
++		return calc_rate(parent_rate, 0, 0, 0, pre_div);
++	}
++}
++
++static const
++struct freq_tbl *find_freq(const struct freq_tbl *f, unsigned long rate)
++{
++	if (!f)
++		return NULL;
++
++	for (; f->freq; f++)
++		if (rate <= f->freq)
++			return f;
++
++	return NULL;
++}
++
++static long _freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	unsigned long clk_flags;
++
++	f = find_freq(f, rate);
++	if (!f)
++		return -EINVAL;
++
++	clk_flags = __clk_get_flags(hw->clk);
++	*p = clk_get_parent_by_index(hw->clk, f->src);
++	if (clk_flags & CLK_SET_RATE_PARENT) {
++		rate = rate * f->pre_div;
++		if (f->n) {
++			u64 tmp = rate;
++			tmp = tmp * f->n;
++			do_div(tmp, f->m);
++			rate = tmp;
++		}
++	} else {
++		rate =  __clk_get_rate(*p);
++	}
++	*p_rate = rate;
++
++	return f->freq;
++}
++
++static long clk_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++}
++
++static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++}
++
++static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	const struct freq_tbl *f;
++	u32 ns, md, ctl;
++	struct mn *mn = &rcg->mn;
++	u32 mask = 0;
++	unsigned int reset_reg;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	if (rcg->mn.reset_in_cc)
++		reset_reg = hw->enable_reg;
++	else
++		reset_reg = rcg->ns_reg;
++
++	if (rcg->mn.width) {
++		mask = BIT(mn->mnctr_reset_bit);
++		regmap_update_bits(hw->regmap, reset_reg, mask, mask);
++
++		regmap_read(hw->regmap, rcg->md_reg, &md);
++		md = mn_to_md(mn, f->m, f->n, md);
++		regmap_write(hw->regmap, rcg->md_reg, md);
++
++		regmap_read(hw->regmap, rcg->ns_reg, &ns);
++		/* MN counter mode is in hw.enable_reg sometimes */
++		if (hw->enable_reg != rcg->ns_reg) {
++			regmap_read(hw->regmap, hw->enable_reg, &ctl);
++			ctl = mn_to_reg(mn, f->m, f->n, ctl);
++			regmap_write(hw->regmap, hw->enable_reg, ctl);
++		} else {
++			ns = mn_to_reg(mn, f->m, f->n, ns);
++		}
++		ns = mn_to_ns(mn, f->m, f->n, ns);
++	} else {
++		regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	}
++
++	ns = pre_div_to_ns(&rcg->p, f->pre_div - 1, ns);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	regmap_update_bits(hw->regmap, reset_reg, mask, 0);
++
++	return 0;
++}
++
++static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	const struct freq_tbl *f;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	configure_bank(rcg, f);
++
++	return 0;
++}
++
++static int clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_dyn_rcg_set_rate(hw, rate);
++}
++
++static int clk_dyn_rcg_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_dyn_rcg_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_rcg_ops = {
++	.enable = clk_enable_regmap,
++	.disable = clk_disable_regmap,
++	.get_parent = clk_rcg_get_parent,
++	.set_parent = clk_rcg_set_parent,
++	.recalc_rate = clk_rcg_recalc_rate,
++	.determine_rate = clk_rcg_determine_rate,
++	.set_rate = clk_rcg_set_rate,
++};
++EXPORT_SYMBOL_GPL(clk_rcg_ops);
++
++const struct clk_ops clk_dyn_rcg_ops = {
++	.enable = clk_enable_regmap,
++	.is_enabled = clk_is_enabled_regmap,
++	.disable = clk_disable_regmap,
++	.get_parent = clk_dyn_rcg_get_parent,
++	.set_parent = clk_dyn_rcg_set_parent,
++	.recalc_rate = clk_dyn_rcg_recalc_rate,
++	.determine_rate = clk_dyn_rcg_determine_rate,
++	.set_rate = clk_dyn_rcg_set_rate,
++	.set_rate_and_parent = clk_dyn_rcg_set_rate_and_parent,
++};
++EXPORT_SYMBOL_GPL(clk_dyn_rcg_ops);
+diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
+new file mode 100644
+index 0000000..3dfc73d
+--- /dev/null
++++ b/drivers/clk/qcom/clk-rcg.h
+@@ -0,0 +1,157 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MSM_CLK_RCG_H__
++#define __MSM_CLK_RCG_H__
++
++#include <linux/clk-provider.h>
++
++struct freq_tbl {
++	unsigned long freq;
++	u8 src;
++	u8 pre_div;
++	u16 m;
++	u16 n;
++};
++
++/**
++ * struct mn - M/N:D counter
++ * @mnctr_en_bit: bit to enable mn counter
++ * @mnctr_reset_bit: bit to assert mn counter reset
++ * @mnctr_mode_shift: lowest bit of mn counter mode field
++ * @n_val_shift: lowest bit of n value field
++ * @m_val_shift: lowest bit of m value field
++ * @width: number of bits in m/n/d values
++ * @reset_in_cc: true if the mnctr_reset_bit is in the CC register
++ */
++struct mn {
++	u8		mnctr_en_bit;
++	u8		mnctr_reset_bit;
++	u8		mnctr_mode_shift;
++#define MNCTR_MODE_DUAL 0x2
++#define MNCTR_MODE_MASK 0x3
++	u8		n_val_shift;
++	u8		m_val_shift;
++	u8		width;
++	bool		reset_in_cc;
++};
++
++/**
++ * struct pre_div - pre-divider
++ * @pre_div_shift: lowest bit of pre divider field
++ * @pre_div_width: number of bits in predivider
++ */
++struct pre_div {
++	u8		pre_div_shift;
++	u8		pre_div_width;
++};
++
++/**
++ * struct src_sel - source selector
++ * @src_sel_shift: lowest bit of source selection field
++ * @parent_map: map from software's parent index to hardware's src_sel field
++ */
++struct src_sel {
++	u8		src_sel_shift;
++#define SRC_SEL_MASK	0x7
++	const u8	*parent_map;
++};
++
++/**
++ * struct clk_rcg - root clock generator
++ *
++ * @ns_reg: NS register
++ * @md_reg: MD register
++ * @mn: mn counter
++ * @p: pre divider
++ * @s: source selector
++ * @freq_tbl: frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ */
++struct clk_rcg {
++	u32		ns_reg;
++	u32		md_reg;
++
++	struct mn	mn;
++	struct pre_div	p;
++	struct src_sel	s;
++
++	const struct freq_tbl	*freq_tbl;
++
++	struct clk_hw	hw;
++};
++
++extern const struct clk_ops clk_rcg_ops;
++
++#define to_clk_rcg(_hw) container_of(_hw, struct clk_rcg, hw)
++
++/**
++ * struct clk_dyn_rcg - root clock generator with glitch free mux
++ *
++ * @mux_sel_bit: bit to switch glitch free mux
++ * @ns_reg: NS register
++ * @md_reg: MD0 and MD1 register
++ * @mn: mn counter (banked)
++ * @s: source selector (banked)
++ * @freq_tbl: frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ */
++struct clk_dyn_rcg {
++	u32	ns_reg;
++	u32	md_reg[2];
++
++	u8	mux_sel_bit;
++
++	struct mn	mn[2];
++	struct pre_div	p[2];
++	struct src_sel	s[2];
++
++	const struct freq_tbl	*freq_tbl;
++
++	struct clk_hw	hw;
++};
++
++extern const struct clk_ops clk_dyn_rcg_ops;
++
++#define to_clk_dyn_rcg(_hw) container_of(_hw, struct clk_dyn_rcg, hw)
++
++/**
++ * struct clk_rcg2 - root clock generator
++ *
++ * @cmd_rcgr: corresponds to *_CMD_RCGR
++ * @mnd_width: number of bits in m/n/d values
++ * @hid_width: number of bits in half integer divider
++ * @parent_map: map from software's parent index to hardware's src_sel field
++ * @freq_tbl: frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ */
++struct clk_rcg2 {
++	u32			cmd_rcgr;
++	u8			mnd_width;
++	u8			hid_width;
++	const u8		*parent_map;
++	const struct freq_tbl	*freq_tbl;
++	struct clk_hw		hw;
++};
++
++#define to_clk_rcg2(_hw) container_of(_hw, struct clk_rcg2, hw)
++
++extern const struct clk_ops clk_rcg2_ops;
++
++#endif
+diff --git a/drivers/clk/qcom/clk-rcg2.c b/drivers/clk/qcom/clk-rcg2.c
+new file mode 100644
+index 0000000..94b8138
+--- /dev/null
++++ b/drivers/clk/qcom/clk-rcg2.c
+@@ -0,0 +1,291 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -94,282 +743,280 @@ index 0000000..b0d2a4e
 +#include <linux/bitops.h>
 +#include <linux/err.h>
 +#include <linux/bug.h>
-+#include <linux/delay.h>
 +#include <linux/export.h>
 +#include <linux/clk-provider.h>
++#include <linux/delay.h>
 +#include <linux/regmap.h>
 +
 +#include <asm/div64.h>
 +
-+#include "clk-pll.h"
++#include "clk-rcg.h"
 +
-+#define PLL_OUTCTRL		BIT(0)
-+#define PLL_BYPASSNL		BIT(1)
-+#define PLL_RESET_N		BIT(2)
-+#define PLL_LOCK_COUNT_SHIFT	8
-+#define PLL_LOCK_COUNT_MASK	0x3f
-+#define PLL_BIAS_COUNT_SHIFT	14
-+#define PLL_BIAS_COUNT_MASK	0x3f
-+#define PLL_VOTE_FSM_ENA	BIT(20)
-+#define PLL_VOTE_FSM_RESET	BIT(21)
++#define CMD_REG			0x0
++#define CMD_UPDATE		BIT(0)
++#define CMD_ROOT_EN		BIT(1)
++#define CMD_DIRTY_CFG		BIT(4)
++#define CMD_DIRTY_N		BIT(5)
++#define CMD_DIRTY_M		BIT(6)
++#define CMD_DIRTY_D		BIT(7)
++#define CMD_ROOT_OFF		BIT(31)
 +
-+static int clk_pll_enable(struct clk_hw *hw)
++#define CFG_REG			0x4
++#define CFG_SRC_DIV_SHIFT	0
++#define CFG_SRC_SEL_SHIFT	8
++#define CFG_SRC_SEL_MASK	(0x7 << CFG_SRC_SEL_SHIFT)
++#define CFG_MODE_SHIFT		12
++#define CFG_MODE_MASK		(0x3 << CFG_MODE_SHIFT)
++#define CFG_MODE_DUAL_EDGE	(0x2 << CFG_MODE_SHIFT)
++
++#define M_REG			0x8
++#define N_REG			0xc
++#define D_REG			0x10
++
++static int clk_rcg2_is_enabled(struct clk_hw *hw)
 +{
-+	struct clk_pll *pll = to_clk_pll(hw);
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	u32 cmd;
 +	int ret;
-+	u32 mask, val;
 +
-+	mask = PLL_OUTCTRL | PLL_RESET_N | PLL_BYPASSNL;
-+	ret = regmap_read(hw->regmap, pll->mode_reg, &val);
++	ret = regmap_read(hw->regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
 +	if (ret)
 +		return ret;
 +
-+	/* Skip if already enabled or in FSM mode */
-+	if ((val & mask) == mask || val & PLL_VOTE_FSM_ENA)
-+		return 0;
-+
-+	/* Disable PLL bypass mode. */
-+	ret = regmap_update_bits(hw->regmap, pll->mode_reg, PLL_BYPASSNL,
-+				 PLL_BYPASSNL);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * H/W requires a 5us delay between disabling the bypass and
-+	 * de-asserting the reset. Delay 10us just to be safe.
-+	 */
-+	udelay(10);
-+
-+	/* De-assert active-low PLL reset. */
-+	ret = regmap_update_bits(hw->regmap, pll->mode_reg, PLL_RESET_N,
-+				 PLL_RESET_N);
-+	if (ret)
-+		return ret;
-+
-+	/* Wait until PLL is locked. */
-+	udelay(50);
-+
-+	/* Enable PLL output. */
-+	ret = regmap_update_bits(hw->regmap, pll->mode_reg, PLL_OUTCTRL,
-+				 PLL_OUTCTRL);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
++	return (cmd & CMD_ROOT_OFF) != 0;
 +}
 +
-+static void clk_pll_disable(struct clk_hw *hw)
++static u8 clk_rcg2_get_parent(struct clk_hw *hw)
 +{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	u32 mask;
-+	u32 val;
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 cfg;
++	int i, ret;
 +
-+	regmap_read(hw->regmap, pll->mode_reg, &val);
-+	/* Skip if in FSM mode */
-+	if (val & PLL_VOTE_FSM_ENA)
-+		return;
-+	mask = PLL_OUTCTRL | PLL_RESET_N | PLL_BYPASSNL;
-+	regmap_update_bits(hw->regmap, pll->mode_reg, mask, 0);
++	ret = regmap_read(hw->regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++	if (ret)
++		return ret;
++
++	cfg &= CFG_SRC_SEL_MASK;
++	cfg >>= CFG_SRC_SEL_SHIFT;
++
++	for (i = 0; i < num_parents; i++)
++		if (cfg == rcg->parent_map[i])
++			return i;
++
++	return -EINVAL;
 +}
 +
-+static unsigned long
-+clk_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++static int update_config(struct clk_rcg2 *rcg)
 +{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	u32 l, m, n;
-+	unsigned long rate;
-+	u64 tmp;
++	int count, ret;
++	u32 cmd;
++	struct clk_hw *hw = &rcg->hw;
++	const char *name = __clk_get_name(hw->clk);
 +
-+	regmap_read(hw->regmap, pll->l_reg, &l);
-+	regmap_read(hw->regmap, pll->m_reg, &m);
-+	regmap_read(hw->regmap, pll->n_reg, &n);
++	ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + CMD_REG,
++				 CMD_UPDATE, CMD_UPDATE);
++	if (ret)
++		return ret;
 +
-+	l &= 0x3ff;
-+	m &= 0x7ffff;
-+	n &= 0x7ffff;
-+
-+	rate = parent_rate * l;
-+	if (n) {
-+		tmp = parent_rate;
-+		tmp *= m;
-+		do_div(tmp, n);
-+		rate += tmp;
-+	}
-+	return rate;
-+}
-+
-+const struct clk_ops clk_pll_ops = {
-+	.enable = clk_pll_enable,
-+	.disable = clk_pll_disable,
-+	.recalc_rate = clk_pll_recalc_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_pll_ops);
-+
-+static int wait_for_pll(struct clk_pll *pll)
-+{
-+	u32 val;
-+	int count;
-+	int ret;
-+	const char *name = __clk_get_name(pll->hw.clk);
-+
-+	/* Wait for pll to enable. */
-+	for (count = 200; count > 0; count--) {
-+		ret = regmap_read(pll->hw.regmap, pll->status_reg, &val);
++	/* Wait for update to take effect */
++	for (count = 500; count > 0; count--) {
++		ret = regmap_read(hw->regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
 +		if (ret)
 +			return ret;
-+		if (val & BIT(pll->status_bit))
++		if (!(cmd & CMD_UPDATE))
 +			return 0;
 +		udelay(1);
 +	}
 +
-+	WARN(1, "%s didn't enable after voting for it!\n", name);
-+	return -ETIMEDOUT;
++	WARN(1, "%s: rcg didn't update its configuration.", name);
++	return 0;
 +}
 +
-+static int clk_pll_vote_enable(struct clk_hw *hw)
++static int clk_rcg2_set_parent(struct clk_hw *hw, u8 index)
 +{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 +	int ret;
-+	struct clk_pll *p = to_clk_pll(__clk_get_hw(__clk_get_parent(hw->clk)));
 +
-+	ret = clk_enable_regmap(hw);
++	ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + CFG_REG,
++				 CFG_SRC_SEL_MASK,
++				 rcg->parent_map[index] << CFG_SRC_SEL_SHIFT);
 +	if (ret)
 +		return ret;
 +
-+	return wait_for_pll(p);
++	return update_config(rcg);
 +}
 +
-+const struct clk_ops clk_pll_vote_ops = {
-+	.enable = clk_pll_vote_enable,
-+	.disable = clk_disable_regmap,
-+};
-+EXPORT_SYMBOL_GPL(clk_pll_vote_ops);
-+
-+static void
-+clk_pll_set_fsm_mode(struct clk_pll *pll, struct regmap *regmap)
-+{
-+	u32 val;
-+	u32 mask;
-+
-+	/* De-assert reset to FSM */
-+	regmap_update_bits(regmap, pll->mode_reg, PLL_VOTE_FSM_RESET, 0);
-+
-+	/* Program bias count and lock count */
-+	val = 1 << PLL_BIAS_COUNT_SHIFT;
-+	mask = PLL_BIAS_COUNT_MASK << PLL_BIAS_COUNT_SHIFT;
-+	mask |= PLL_LOCK_COUNT_MASK << PLL_LOCK_COUNT_SHIFT;
-+	regmap_update_bits(regmap, pll->mode_reg, mask, val);
-+
-+	/* Enable PLL FSM voting */
-+	regmap_update_bits(regmap, pll->mode_reg, PLL_VOTE_FSM_ENA,
-+		PLL_VOTE_FSM_ENA);
-+}
-+
-+static void clk_pll_configure(struct clk_pll *pll, struct regmap *regmap,
-+	const struct pll_config *config)
-+{
-+	u32 val;
-+	u32 mask;
-+
-+	regmap_write(regmap, pll->l_reg, config->l);
-+	regmap_write(regmap, pll->m_reg, config->m);
-+	regmap_write(regmap, pll->n_reg, config->n);
-+
-+	val = config->vco_val;
-+	val |= config->pre_div_val;
-+	val |= config->post_div_val;
-+	val |= config->mn_ena_mask;
-+	val |= config->main_output_mask;
-+	val |= config->aux_output_mask;
-+
-+	mask = config->vco_mask;
-+	mask |= config->pre_div_mask;
-+	mask |= config->post_div_mask;
-+	mask |= config->mn_ena_mask;
-+	mask |= config->main_output_mask;
-+	mask |= config->aux_output_mask;
-+
-+	regmap_update_bits(regmap, pll->config_reg, mask, val);
-+}
-+
-+void clk_pll_configure_sr_hpm_lp(struct clk_pll *pll, struct regmap *regmap,
-+		const struct pll_config *config, bool fsm_mode)
-+{
-+	clk_pll_configure(pll, regmap, config);
-+	if (fsm_mode)
-+		clk_pll_set_fsm_mode(pll, regmap);
-+}
-+EXPORT_SYMBOL_GPL(clk_pll_configure_sr_hpm_lp);
-diff --git a/drivers/clk/qcom/clk-pll.h b/drivers/clk/qcom/clk-pll.h
-new file mode 100644
-index 0000000..86f8e90
---- /dev/null
-+++ b/drivers/clk/qcom/clk-pll.h
-@@ -0,0 +1,65 @@
 +/*
-+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ * Calculate m/n:d rate
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *          parent_rate     m
++ *   rate = ----------- x  ---
++ *            hid_div       n
 + */
++static unsigned long
++calc_rate(unsigned long rate, u32 m, u32 n, u32 mode, u32 hid_div)
++{
++	if (hid_div) {
++		rate *= 2;
++		rate /= hid_div + 1;
++	}
 +
-+#ifndef __MSM_CLK_PLL_H__
-+#define __MSM_CLK_PLL_H__
++	if (mode) {
++		u64 tmp = rate;
++		tmp *= m;
++		do_div(tmp, n);
++		rate = tmp;
++	}
 +
-+#include <linux/clk-provider.h>
++	return rate;
++}
 +
-+/**
-+ * struct clk_pll - phase locked loop (PLL)
-+ * @l_reg: L register
-+ * @m_reg: M register
-+ * @n_reg: N register
-+ * @config_reg: config register
-+ * @mode_reg: mode register
-+ * @status_reg: status register
-+ * @status_bit: ANDed with @status_reg to determine if PLL is enabled
-+ * @hw: handle between common and hardware-specific interfaces
-+ */
-+struct clk_pll {
-+	u32	l_reg;
-+	u32	m_reg;
-+	u32	n_reg;
-+	u32	config_reg;
-+	u32	mode_reg;
-+	u32	status_reg;
-+	u8	status_bit;
++static unsigned long
++clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	u32 cfg, hid_div, m = 0, n = 0, mode = 0, mask;
 +
-+	struct clk_hw	hw;
++	regmap_read(hw->regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++
++	if (rcg->mnd_width) {
++		mask = BIT(rcg->mnd_width) - 1;
++		regmap_read(hw->regmap, rcg->cmd_rcgr + M_REG, &m);
++		m &= mask;
++		regmap_read(hw->regmap, rcg->cmd_rcgr + N_REG, &n);
++		n =  ~n;
++		n &= mask;
++		n += m;
++		mode = cfg & CFG_MODE_MASK;
++		mode >>= CFG_MODE_SHIFT;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	hid_div = cfg >> CFG_SRC_DIV_SHIFT;
++	hid_div &= mask;
++
++	return calc_rate(parent_rate, m, n, mode, hid_div);
++}
++
++static const
++struct freq_tbl *find_freq(const struct freq_tbl *f, unsigned long rate)
++{
++	if (!f)
++		return NULL;
++
++	for (; f->freq; f++)
++		if (rate <= f->freq)
++			return f;
++
++	return NULL;
++}
++
++static long _freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	unsigned long clk_flags;
++
++	f = find_freq(f, rate);
++	if (!f)
++		return -EINVAL;
++
++	clk_flags = __clk_get_flags(hw->clk);
++	*p = clk_get_parent_by_index(hw->clk, f->src);
++	if (clk_flags & CLK_SET_RATE_PARENT) {
++		if (f->pre_div) {
++			rate /= 2;
++			rate *= f->pre_div + 1;
++		}
++
++		if (f->n) {
++			u64 tmp = rate;
++			tmp = tmp * f->n;
++			do_div(tmp, f->m);
++			rate = tmp;
++		}
++	} else {
++		rate =  __clk_get_rate(*p);
++	}
++	*p_rate = rate;
++
++	return f->freq;
++}
++
++static long clk_rcg2_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++}
++
++static int __clk_rcg2_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	const struct freq_tbl *f;
++	u32 cfg, mask;
++	int ret;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	if (rcg->mnd_width && f->n) {
++		mask = BIT(rcg->mnd_width) - 1;
++		ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + M_REG,
++					 mask, f->m);
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + N_REG,
++					 mask, ~(f->n - f->m));
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + D_REG,
++					 mask, ~f->n);
++		if (ret)
++			return ret;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	mask |= CFG_SRC_SEL_MASK | CFG_MODE_MASK;
++	cfg = f->pre_div << CFG_SRC_DIV_SHIFT;
++	cfg |= rcg->parent_map[f->src] << CFG_SRC_SEL_SHIFT;
++	if (rcg->mnd_width && f->n)
++		cfg |= CFG_MODE_DUAL_EDGE;
++	ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + CFG_REG, mask,
++			cfg);
++	if (ret)
++		return ret;
++
++	return update_config(rcg);
++}
++
++static int clk_rcg2_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_rcg2_set_rate(hw, rate);
++}
++
++static int clk_rcg2_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_rcg2_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_rcg2_ops = {
++	.is_enabled = clk_rcg2_is_enabled,
++	.get_parent = clk_rcg2_get_parent,
++	.set_parent = clk_rcg2_set_parent,
++	.recalc_rate = clk_rcg2_recalc_rate,
++	.determine_rate = clk_rcg2_determine_rate,
++	.set_rate = clk_rcg2_set_rate,
++	.set_rate_and_parent = clk_rcg2_set_rate_and_parent,
 +};
-+
-+extern const struct clk_ops clk_pll_ops;
-+extern const struct clk_ops clk_pll_vote_ops;
-+
-+#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
-+
-+struct pll_config {
-+	u16 l;
-+	u32 m;
-+	u32 n;
-+	u32 vco_val;
-+	u32 vco_mask;
-+	u32 pre_div_val;
-+	u32 pre_div_mask;
-+	u32 post_div_val;
-+	u32 post_div_mask;
-+	u32 mn_ena_mask;
-+	u32 main_output_mask;
-+	u32 aux_output_mask;
-+};
-+
-+void clk_pll_configure_sr_hpm_lp(struct clk_pll *pll, struct regmap *regmap,
-+		const struct pll_config *config, bool fsm_mode);
-+
-+#endif
++EXPORT_SYMBOL_GPL(clk_rcg2_ops);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
