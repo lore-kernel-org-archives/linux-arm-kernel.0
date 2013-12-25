@@ -1,27 +1,22 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 25 Dec 2013 12:08:50 +0100
-Subject: Linux ARM hackfest Brno Thursday February 6th
-Message-ID: <52BABCC2.3090402@redhat.com>
+From: zalan.blenessy@gmail.com (Zalan Blenessy)
+Date: Wed, 25 Dec 2013 13:11:05 +0100
+Subject: [PATCH 0/1] ARM: sunxi: select ARM_PSCI
+Message-ID: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hello!
 
-I'm organizing a (small) ARM hackfest in Brno the day before devconf.cz:
-http://devconf.cz/
+This patch enabled ARM_PSCI by default, which is necessary 
+when the CPU (e.g. sun7i) is intialized from u-boot.
 
-The hackfest will be held inside the Red Hat Office in Brno but visitors
-are very much welcome!
+BR, Zalan Blenessy
 
-I'll be focussing on:
-https://fedoraproject.org/wiki/Changes/AllwinnerSunxiSupport
+Zalan Blenessy (1):
+  ARM: sunxi: select ARM_PSCI
 
-But anyone who wants to do any ARM related work is welcome.
+ arch/arm/mach-sunxi/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-If you plan to attend, please drop me a mail so that I can keep track
-of how many people will be there and make sure I reserve a big enough
-conference room.
-
-Regards,
-
-Hans
+-- 
+1.7.10.4
