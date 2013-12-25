@@ -1,30 +1,54 @@
-From: zalan.blenessy@gmail.com (Zalan Blenessy)
-Date: Wed, 25 Dec 2013 13:11:06 +0100
-Subject: [PATCH 1/1] ARM: sunxi: select ARM_PSCI
-In-Reply-To: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
-References: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
-Message-ID: <1387973466-5067-2-git-send-email-zalan.blenessy@gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 25 Dec 2013 14:32:01 +0200
+Subject: [PATCH v3 0/3] Introduce clocksource driver for Keystone platform
+Message-ID: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is necessary for SMP on sun7i.
+Add a broadcast timer64 based clockevent driver for keystone arch.
+This driver uses timer in 64-bit general purpose mode as clock event
+device.
 
-Signed-off-by: Zalan Blenessy <zalan.blenessy@gmail.com>
----
- arch/arm/mach-sunxi/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+Documentation:
+    http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 547004c..09df4b81 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -3,6 +3,7 @@ config ARCH_SUNXI
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_GIC
-+	select ARM_PSCI
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
- 	select COMMON_CLK
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
+
+v2..v3:
+- clocksource: timer-keystone: introduce clocksource driver for
+	changed "u64" type to "unsigned long" for hz_period as more appropriate
+	hz_period rounded up by DIV_ROUND_UP(rate, HZ)
+	corrected comments
+
+v1..v2:
+- clocksource: timer-keystone: introduce clocksource driver for
+	renamed timer on "timer-keystone"
+	in keystone_timer_interrupt() evet pointer is passed via "dev_id"
+	used __relaxed variants of writel/readl and added explicit barriers
+	added "keystone_timer_disable()" for using in keystone_set_mode()
+	keystone_timer_config() is not used for disabling the timer any more
+	in case of an unsupported mode the keystone_timer_config() returns -1.
+	used request_irq() instead of setup_irq()
+	assigned irq for event_device in event_dev->irq
+	calculated timer.hz_period for CLOCK_EVT_MODE_PERIODIC at init
+	deleted spare call of keystone_timer_config() in keystone_timer_init()
+
+Ivan Khoronzhuk (3):
+  clocksource: timer-keystone: introduce clocksource driver for
+    Keystone
+  clocksource: keystone: add bindings for keystone timer
+  arm: dts: keystone: add keystone timer entry
+
+ .../bindings/timer/ti,keystone-timer.txt           |   29 +++
+ arch/arm/boot/dts/keystone-clocks.dtsi             |   10 +
+ arch/arm/boot/dts/keystone.dtsi                    |    7 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/timer-keystone.c               |  233 ++++++++++++++++++++
+ 5 files changed, 280 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/ti,keystone-timer.txt
+ create mode 100644 drivers/clocksource/timer-keystone.c
+
 -- 
-1.7.10.4
+1.7.9.5
