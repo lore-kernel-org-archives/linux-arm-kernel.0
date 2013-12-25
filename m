@@ -1,25 +1,32 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Tue, 24 Dec 2013 16:51:23 -0800 (PST)
-Subject: [PATCH 2/6] ARM: shmobile: r7s72100: Add RSPI clocks
-In-Reply-To: <1387886210-3634-3-git-send-email-geert+renesas@linux-m68k.org>
-References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <1387886210-3634-3-git-send-email-geert+renesas@linux-m68k.org>
-Message-ID: <87ioudhhx9.wl%kuninori.morimoto.gx@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 24 Dec 2013 20:47:15 -0500
+Subject: [PATCH 3/3] ARM: mvebu: make armada_370_xp_pmsu_init() static
+In-Reply-To: <1387788491-3168-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1387788491-3168-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1387788491-3168-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131225014715.GG19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thomas,
 
-Hi Geert
+On Mon, Dec 23, 2013 at 09:48:11AM +0100, Thomas Petazzoni wrote:
+> The armada_370_xp_pmsu_init() function is called as an
+> early_initcall(). Therefore, there is no need to export this function,
+> and we can make it static.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/common.h | 1 -
+>  arch/arm/mach-mvebu/pmsu.c   | 2 +-
+>  2 files changed, 1 insertion(+), 2 deletions(-)
 
->  	/* MSTP clocks */
-> +	CLKDEV_DEV_ID("rspi0", &mstp_clks[MSTP107]),
-> +	CLKDEV_DEV_ID("rspi1", &mstp_clks[MSTP106]),
-> +	CLKDEV_DEV_ID("rspi2", &mstp_clks[MSTP105]),
-> +	CLKDEV_DEV_ID("rspi3", &mstp_clks[MSTP104]),
-> +	CLKDEV_DEV_ID("rspi4", &mstp_clks[MSTP103]),
+Thanks, but this was already cleaned up up by:
 
-I think "rspi.x" is correct name ?
+  b12634e343be ARM: mvebu: fix some sparse warnings
 
-Best regards
----
-Kuninori Morimoto
+in mvebu/soc (it was actually HEAD up until a few moments ago ;-)
+
+Ho, ho, ho,
+
+Jason.
