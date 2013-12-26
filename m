@@ -1,94 +1,150 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 26 Dec 2013 04:04:11 +0000 (UTC)
-Subject: OMAP baseline test results for v3.13-rc5
-Message-ID: <alpine.DEB.2.02.1312260402460.15949@utopia.booyaka.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 26 Dec 2013 09:38:39 +0530
+Subject: [PATCH v3 2/2] gpio: davinci: reuse for Keystone SoC
+In-Reply-To: <52B98BBC.9060909@ti.com>
+References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+ <1387885284-8119-3-git-send-email-grygorii.strashko@ti.com>
+ <CA+V-a8tJRZ5Esn3F4J6_z7VCmGPpptgxMEyyaANbrytAF3pUMA@mail.gmail.com>
+ <52B98BBC.9060909@ti.com>
+Message-ID: <CA+V-a8u+iFRM=FU86GOaAusUAQ-nUifQ1vpPEfChF9zYZW70MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 24, 2013 at 6:57 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> On 12/24/2013 01:20 PM, Prabhakar Lad wrote:
+>>
+>> Hi Grygorii,
+>>
+>> Thanks for the patch.
+>>
+>> On Tue, Dec 24, 2013 at 5:11 PM, Grygorii Strashko
+>> <grygorii.strashko@ti.com> wrote:
+>>>
+>>> The similar GPIO HW block is used by keystone SoCs as
+>>> in Davinci SoCs.
+>>> Hence, reuse Davinci GPIO driver for Keystone taking into
+>>> account that Keystone contains ARM GIC IRQ controller which
+>>> is implemented using IRQ Chip.
+>>>
+>>> Documentation:
+>>>          http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>>
+>>> Cc: Alexandre Courbot <gnurou@gmail.com>
+>>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>> Cc: devicetree at vger.kernel.org
+>>>
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>> ---
+>>>   .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+>>>   drivers/gpio/gpio-davinci.c                        |   48
+>>> ++++++++++++++++----
+>>>   2 files changed, 42 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>> b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>> index a2e839d..4ce9862 100644
+>>> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>> @@ -1,7 +1,7 @@
+>>> -Davinci GPIO controller bindings
+>>> +Davinci/Keystone GPIO controller bindings
+>>>
+>>>   Required Properties:
+>>> -- compatible: should be "ti,dm6441-gpio"
+>>> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+>>
+>>
+>> Can you make it something like this ? It isn't readable.
+>>
+>> - compatible : value should be either one among the following
+>>      (a)  "ti,dm6441-gpio" for davinci.
+>>      (b)  "ti,keystone-gpio" for keystone.
+>>
+>>>
+>>>   - reg: Physical base address of the controller and the size of memory
+>>> mapped
+>>>          registers.
+>>> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+>>> index 7629b4f..d0f135d 100644
+>>> --- a/drivers/gpio/gpio-davinci.c
+>>> +++ b/drivers/gpio/gpio-davinci.c
+>>> @@ -37,6 +37,8 @@ struct davinci_gpio_regs {
+>>>          u32     intstat;
+>>>   };
+>>>
+>>> +typedef struct irq_chip *(*gpio_get_irq_chip_cb_t)(unsigned int irq);
+>>> +
+>>>   #define BINTEN 0x8 /* GPIO Interrupt Per-Bank Enable Register */
+>>>
+>>>   #define chip2controller(chip)  \
+>>> @@ -413,6 +415,26 @@ static const struct irq_domain_ops
+>>> davinci_gpio_irq_ops = {
+>>>          .xlate = irq_domain_xlate_onetwocell,
+>>>   };
+>>>
+>>> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
+>>> +{
+>>> +       static struct irq_chip_type gpio_unbanked;
+>>> +
+>>> +       gpio_unbanked = *container_of(irq_get_chip(irq),
+>>> +                                     struct irq_chip_type, chip);
+>>> +
+>>> +       return &gpio_unbanked.chip;
+>>> +};
+>>> +
+>>> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
+>>> +{
+>>> +       static struct irq_chip gpio_unbanked;
+>>> +
+>>> +       gpio_unbanked = *irq_get_chip(irq);
+>>> +       return &gpio_unbanked;
+>>> +};
+>>> +
+>>> +static const struct of_device_id davinci_gpio_ids[];
+>>> +
+>>>   /*
+>>>    * NOTE:  for suspend/resume, probably best to make a platform_device
+>>> with
+>>>    * suspend_late/resume_resume calls hooking into results of the
+>>> set_wake()
+>>> @@ -433,6 +455,18 @@ static int davinci_gpio_irq_setup(struct
+>>> platform_device *pdev)
+>>>          struct davinci_gpio_platform_data *pdata = dev->platform_data;
+>>>          struct davinci_gpio_regs __iomem *g;
+>>>          struct irq_domain       *irq_domain = NULL;
+>>> +       const struct of_device_id *match;
+>>> +       struct irq_chip *irq_chip;
+>>> +       gpio_get_irq_chip_cb_t gpio_get_irq_chip;
+>>> +
+>>> +       /*
+>>> +        * Use davinci_gpio_get_irq_chip by default to handle non DT
+>>> cases
+>>> +        */
+>>> +       gpio_get_irq_chip = davinci_gpio_get_irq_chip;
+>>> +       match = of_match_device(of_match_ptr(davinci_gpio_ids),
+>>> +                               dev);
+>>
+>>
+>> Sorry didn't notice that earlier the data structure of_match_ptr()
+>> protects is always compiled in.
+>> so of_match_ptr() is not needed.
+>> While you are at it you can also fix it in davinci_gpio_driver
+>> structure as a sperate
+>> patch.
+>>
+>
+> Not sure. davinci_gpio_ids defined as:
+>
+>
+> #if IS_ENABLED(CONFIG_OF)
+> static const struct of_device_id davinci_gpio_ids[] = {
+>
+> And seems, Davinci may still be compiled without OF enabled.
+>
+My Bad, yes its gaurded by CONFIG_OF so my above suggestion doesn't hold good.
 
-Here are some basic OMAP test results for Linux v3.13-rc5.
-Logs and other details at:
-
-    http://www.pwsan.com/omap/testlogs/test_v3.13-rc5/20131223031812/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
-
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 1/ 5): 3530es3beagle
-
-
-vmlinux object size
-(delta in bytes from test_v3.13-rc4 (319e2e3f63c348a9b66db4667efa73178e18b17d)):
-   text     data      bss    total  kernel
-  +7036        0        0    +7036  omap1_defconfig
-  +8060        0        0    +8060  omap1_defconfig_1510innovator_only
-  +7004        0        0    +7004  omap1_defconfig_5912osk_only
-   -664      -24        0     -688  omap2plus_defconfig
-  -1040        0        0    -1040  omap2plus_defconfig_2430sdp_only
-   -664       +8        0     -656  omap2plus_defconfig_cpupm
-   +276       +8        0     +284  omap2plus_defconfig_n800_multi_omap2xxx
-   +340      +40        0     +380  omap2plus_defconfig_n800_only_a
-   -600       +8        0     -592  omap2plus_defconfig_no_pm
-   -728        0        0     -728  omap2plus_defconfig_omap2_4_only
-   -664        0        0     -664  omap2plus_defconfig_omap3_4_only
-   +228        0      -16     +212  rmk_omap3430_ldp_allnoconfig
-  +6304        0        0    +6304  rmk_omap3430_ldp_oldconfig
-   +536        0        0     +536  rmk_omap4430_sdp_allnoconfig
-    -96        0        0      -96  rmk_omap4430_sdp_oldnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.13-rc4 (319e2e3f63c348a9b66db4667efa73178e18b17d))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
-
-
-Ho ho ho
+Thanks,
+--Prabhakar Lad
