@@ -1,42 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 26 Dec 2013 14:01:06 -0600
-Subject: [PATCH V5 2/4] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
-References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
- <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <20131226200106.GA30559@saruman.home>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 Dec 2013 22:20:23 +0100
+Subject: [PATCH V2 2/5] arm: shmobile: r7s72100: add i2c clocks
+In-Reply-To: <20131224024855.GC22401@verge.net.au>
+References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
+ <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
+ <20131224024855.GC22401@verge.net.au>
+Message-ID: <CAMuHMdWPZjeF7+nEjXR3vL4HgSEVEk-uf-qQ68ZnFA=+Y_Q8tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 24, 2013 at 3:48 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Dec 18, 2013 at 10:31:58PM +0100, Wolfram Sang wrote:
+>> From: Wolfram Sang <wsa@sang-engineering.com>
+>>
+>> Tested with RIIC2 on a genmai board. Others untested but hopefully
+>> trivial enough to be added.
+>>
+>> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+>> Acked-by: Magnus Damm <damm@opensource.se>
+>> ---
+>>
+>> V2: adapt to established sorting
+>
+> Thanks. This seems safe enough and I will queue it up.
 
-On Tue, Dec 03, 2013 at 03:57:23PM +0530, Sricharan R wrote:
-> +static const struct of_device_id crossbar_match[] __initconst = {
-> +	{ .compatible = "ti,irq-crossbar" },
-> +	{}
-> +};
-> +
-> +int irqcrossbar_init(void)
-> +{
-> +	struct device_node *np;
-> +	np = of_find_matching_node(NULL, crossbar_match);
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	crossbar_of_init(np);
-> +	return 0;
-> +}
+Note that after dropping these lines:
 
-instead, please use IRQCHIP_DECLARE() then you won't need to expose this
-symbol to be used by arch/arm/ code.
+       CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+       CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+       CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
+       CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131226/fba560a9/attachment.sig>
+i2c stopped working.
+
+Before:
+
+of_irq_parse_one: dev=/i2c at fcfee800/eeprom at 50, index=0
+at24 2-0050: 16384 byte 24c128 EEPROM, writable, 64 bytes/write
+i2c-riic fcfee800.i2c: registered with 400000Hz bus speed
+
+After:
+
+i2c-riic fcfee800.i2c: missing controller clock
+i2c-riic: probe of fcfee800.i2c failed with error -2
+
+Am I missing some other patch?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
