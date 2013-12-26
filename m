@@ -1,132 +1,41 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Fri, 27 Dec 2013 01:28:06 +0900
-Subject: [RFC v2 1/4] power: asv: Add common ASV support for Samsung SoCs
-In-Reply-To: <11098201.47kElN2vGm@flatron>
-References: <1384515691-26299-1-git-send-email-sachin.kamat@linaro.org>
- <4229773.U5JovcREjb@amdc1227>
- <CAKew6eVSOQaHjYj3JRhJKnozY26OkeUGhvC2usadfUqW9hyu2Q@mail.gmail.com>
- <11098201.47kElN2vGm@flatron>
-Message-ID: <CAKew6eUn0PNE0Jig5Nyf0f_deK0OX0q6chOGyRKR2AbsjXYUvw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 26 Dec 2013 17:49:20 +0100
+Subject: [PATCH 2/2] ARM: mvebu: move Armada 370/XP specific definitions
+ to armada-370-xp.h
+In-Reply-To: <20131226161806.GC19323@lunn.ch>
+References: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1388046026-332-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20131226160048.GA19323@lunn.ch> <20131226170454.79529766@skate>
+ <20131226161806.GC19323@lunn.ch>
+Message-ID: <20131226174920.5d404189@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Dear Andrew Lunn,
 
-Sorry for being late.
+On Thu, 26 Dec 2013 17:18:06 +0100, Andrew Lunn wrote:
 
-On Sun, Dec 15, 2013 at 10:51 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Sunday 15 of December 2013 22:30:13 Yadwinder Singh Brar wrote:
-> [snip]
->> >> +
->> >> +     return NULL;
->> >> +}
->> >> +
->> >> +unsigned int asv_get_volt(enum asv_type_id target_type,
->> >> +                                             unsigned int target_freq)
->> >
->> > Do you need this function at all? I believe this is all about populating
->> > device's OPP array with frequencies and voltages according to its ASV
->> > level. Users will be able to query for required voltage using standard OPP
->> > calls then, without a need for ASV specific functions like this one.
->> >
->>
->> Yes, I had put a comment in initial version after commit message :
->> "Hopefully asv_get_volt() can go out in future, once all users start using OPP
->> library." , which seems to be missed in this version.
->> I had kept it for the time being in initial version, to keep it
->> usable(for testing) with
->> existing cpufreq drivers, which need to reworked and may take time.
->
-> Hmm, at the moment none of cpufreq drivers use ASV, so they need to be
-> reworked anyway to use it either by the means of a private get_volt
-> function or OPP framework. I agree that OPP may require more work,
-> though.
->
-> If we decide to keep this function in final version, a comment should be
-> added saying that its usage is deprecated in favor of generic OPP helpers.
->
+> > As it is today, none of the contents of armada-370-xp.h are useful for
+> > Armada 370. However, the "main" file is also named armada-370-xp.c and
+> > handles both SoC, so it made sense to have a file named armada-370-xp.h
+> > as well.
+> 
+> Hi Thomas
+> 
+> So thinking about dove, kirkwood, this new SoC, all living in mvebu,
+> should we have a board-dt.c file which all SoCs share, and then one
+> .c/.h pair of files per SoC? I'm saying this without looking at the
+> actual content, so i've no idea is this is actually possible. I guess
+> we need to do something like this sometime, but does it need to be
+> now?
 
-yes.
+I think it's a bit hard to see now what will be the common parts. I
+personally would worry too much about this though, as code can easily be
+reorganized as needed as we see patterns emerge and gain a better
+understanding of what's common and what's specific.
 
->>
->> [snip]
->> >> +
->> >> +     for (i = 0; i < asv_info->nr_dvfs_level; i++) {
->> >> +             if (dev_pm_opp_add(dev, dvfs_table[i].freq * 1000,
->> >> +                     dvfs_table[i].volt)) {
->> >> +                     dev_warn(dev, "Failed to add OPP %d\n",
->> >> +                              dvfs_table[i].freq);
->> >
->> > Hmm, shouldn't it be considered a failure instead?
->> >
->>
->> hmm, not really always. Theoretically system with some less(failed to add)
->> levels can work. Moreover I had prefered to keep it only warning, just to
->> keep the behaviour of  asv_init_opp_table() similar to that of its
->> counter part of_init_opp_table().
->
-> I'm not quite convinced about it. If dev_pm_opp_add() fails, doesn't it mean
-> that something broke seriously in upper layer and we should propagate the
-> error down? Especially when looking at opp_add(), the only failure
-> conditions I can find are memory allocation errors which mean that the
-> system is unlikely to operate correctly anyway.
->
-
-yes, for the time being i had prefered to keep it similar to
-of_init_opp_table() behaviour wise.
-If required both should be fixed.
-
-
->> [snip]
->> >
->> > Hmm, I don't see a point of these three separate callbacks above.
->> >
->> > In general, I'd suggest a different architecture. I'd see this more as:
->> >
->> > 1) Platform code registers static platform device to instantiate SoC ASV
->> >    driver.
->> > 2) SoC specific ASV driver probes, reads group ID from hardware register,
->> >    calls register_asv_member() with appropriate DVFS table for detected
->> >    group.
->> > 3) Driver using ASV calls asv_init_opp_table() with its struct device and
->> >    ASV member name, which causes the ASV code to fill device's operating
->> >    point using OPP calls.
->> >
->> > Now client driver has all the information it needs and the work of ASV
->> > subsystem is done. The control flow between drivers would be much simpler
->> > and no callbacks would have to be called.
->> >
->>
->> Architecture stated above seems to be a subset(one possible way of use),
->> of the proposed architecture. If someone really have nothing much to do,
->> he can adopt the above stated approach using this framework also,
->> callbacks are not mandatory.
->
-> I believe that kernel design principles are to first start with something
-> simple and then if a real need for an extension shows up then extend
-> existing code base with missing features.
->
-
-Sorry, I can't see it complex as with architecture stated above
-also we have to implement similar structure in drivers as we are already
-doing now individually in each soc driver.
-
->>
->> Since we usually have more things to do other than only reading
->> fused group value and simply parsing a table index, so in drivers we have to
->> implement functions to segregate stuff and different people do it in
->> different way. Its an attempt to provide a way to keep structure(functions)
->> similar for easy understanding and factoring out of common code.
->
-> I fail to see those more things. Could you elaborate a bit about them?
-
-Usually we need to implement functions in drivers clearly demarking following :
-1- Reading chip info (which can be done at probe time only once for all).
-2- Parse/Calculate(modify) ASV group.
-3- Any Group specific one time setting. eg ABB settings.
-4- Parsing and modifying table ( implementing Voltage locking, if
-required based on locking info bits).
-
-
-Best Regards,
-Yadwinder
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
