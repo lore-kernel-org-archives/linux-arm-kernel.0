@@ -1,30 +1,36 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 26 Dec 2013 14:52:10 +0100
-Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
-In-Reply-To: <1519363.agF5fhqzYs@ax5200p>
-References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
- <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
- <1519363.agF5fhqzYs@ax5200p>
-Message-ID: <12640298.egJ6YnqTYx@ax5200p>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 26 Dec 2013 23:04:48 +0900
+Subject: [PATCH RFC v2 0/3] Add ethernet support for r7s72100
+Message-ID: <1388066691-5854-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 December 2013 23:11:58 Marc Dietrich wrote:
-> Sorry, Stephen, I mistyped your email address in the first post.
-> 
-> On Saturday 21 December 2013 21:38:13 Marc Dietrich wrote:
-> > Add backlight and panel nodes for the PAZ00 TFT LCD panel.
-> > 
-> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
-> > ---
-> > This should enable everything needed. Unfortunately, in my tests it only
-> > switches on the backlight, but the display controller blocks in some
-> > infinit loop, so we get no output (and no working system). I post it here
-> > in case I missed something obvious...
+Hi,
 
-Some users reported that it works when using uboot (yeah, shame on me that I 
-still use fastboot on my dev machine), so I did a bit more research. It indeed 
-works when using uboot, even when the display setup is disabled there. So my 
-guess is that maybe some clock isn't setup by fastboot which is done by uboot.
+this is a second pass at adding ethernet support to sh-pfc for
+the r7s72100 SoC.
 
-Marc
+It has been written with reference to the hardware documentation
+but not well tested.
+
+This series is based on a merge of:
+* The topic/r7s72100-v3.13-rc5-20131226 tag in my renesas tree
+* net-next
+  - Head revision: db34de939ae28954
+    ("rose: cleanup checkpatch errors,spaces required")
+
+Changes since v1 are noted in the changelog of each patch.
+
+Simon Horman (3):
+  sh_eth: Add support for r7s72100
+  ARM: shmobile: r7s72100: Add clock for r7s72100-ether
+  ARM: shmobile: genmai: Enable r7s72100-ether
+
+ arch/arm/mach-shmobile/board-genmai.c   |  21 ++++++
+ arch/arm/mach-shmobile/clock-r7s72100.c |   4 ++
+ drivers/net/ethernet/renesas/sh_eth.c   | 119 ++++++++++++++++++++++++++++++--
+ drivers/net/ethernet/renesas/sh_eth.h   |   4 +-
+ 4 files changed, 141 insertions(+), 7 deletions(-)
+
+-- 
+1.8.4
