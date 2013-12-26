@@ -1,34 +1,41 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 26 Dec 2013 15:05:04 +0200
-Subject: [PATCH v2] phy: kconfig: add depends on "USB_PHY" to OMAP_USB2
- and TWL4030_USB
-In-Reply-To: <1386079732-19657-1-git-send-email-kishon@ti.com>
-References: <1386079732-19657-1-git-send-email-kishon@ti.com>
-Message-ID: <20131226130504.GA19462@blackmetal.musicnaut.iki.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 26 Dec 2013 14:34:07 +0100
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <20131226115428.GC5531@kw.sim.vm.gnt>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131224194603.GE19878@titan.lakedaemon.net>
+ <20131225224034.GB5531@kw.sim.vm.gnt>
+ <20131226085355.2fd1969c@skate>
+ <20131226115428.GC5531@kw.sim.vm.gnt>
+Message-ID: <20131226143407.5c187277@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Simon Guinot,
 
-On Tue, Dec 03, 2013 at 07:38:52PM +0530, Kishon Vijay Abraham I wrote:
-> Fixes
-> warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet
-> direct dependencies (USB_SUPPORT)
-> that shows up while disabling USB_SUPPORT from menuconfig.
-[...]
->  config TWL4030_USB
->  	tristate "TWL4030 USB Transceiver Driver"
->  	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
-> +	depends on USB_PHY
->  	select GENERIC_PHY
-> -	select USB_PHY
->  	help
->  	  Enable this to support the USB OTG transceiver on TWL4030
->  	  family chips (including the TWL5030 and TPS659x0 devices).
+On Thu, 26 Dec 2013 12:54:28 +0100, Simon Guinot wrote:
 
-This introduced a minor problem in 3.13-rc5: User is no longer able to
-select TWL4030_USB with menuconfig, since there is no menu entry for
-enabling USB_PHY. The only way to enable TWL4030_USB is to enable some
-other option first that happens to select USB_PHY...
+> > In some sense, we could say that this is not a regression. According to
+> > what you mean, SATA hotplug has *never* been working on Armada 370/XP.
+> > So technically, it could be seen as a new feature for this platform,
+> > and is therefore not a regression (i.e something that used to work, and
+> > that no longer works). There has been no kernel release for which SATA
+> > hotplug was working for Armada 370/XP.
+> 
+> I agree with that. It is not correct to call this issue a regression.
+> But, it would also be nice to have this patch applied in the stable
+> branches 3.10 and onwards. Maybe, I could just add this information
+> while CC'ing Linux stable ?
 
-A.
+Yes. Even though not a regression, I believe it qualifies for -stable,
+at least according to the rules in
+Documentation/stable_kernel_rules.txt.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
