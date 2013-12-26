@@ -1,49 +1,30 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 26 Dec 2013 20:21:06 -0300
-Subject: [PATCH] ARM: configs: Select USB PHY for AM335x SoC
-In-Reply-To: <20131226155555.GA3937@saruman.home>
-References: <1386861269-28949-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131226120833.GA24645@localhost>
- <20131226155555.GA3937@saruman.home>
-Message-ID: <20131226232105.GA2456@localhost>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 26 Dec 2013 15:30:00 -0800
+Subject: [PATCH 1/5] input: Add new sun4i-ts driver for Allwinner sunxi
+ SoC's rtp controller
+In-Reply-To: <52BCAEA2.6040607@redhat.com>
+References: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
+ <1387923847-1294-2-git-send-email-hdegoede@redhat.com>
+ <20131226221558.GA18562@core.coreip.homeip.net>
+ <52BCAEA2.6040607@redhat.com>
+Message-ID: <20131226233000.GE18562@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 26, 2013 at 09:55:55AM -0600, Felipe Balbi wrote:
-> On Thu, Dec 26, 2013 at 09:08:34AM -0300, Ezequiel Garcia wrote:
-> > Felipe,
-> > 
-> > On Thu, Dec 12, 2013 at 12:14:29PM -0300, Ezequiel Garcia wrote:
-> > > Enable this option as it's required to use USB on AM335x SoC.
-> > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  arch/arm/configs/omap2plus_defconfig | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> > > index 12c848e..e427b95 100644
-> > > --- a/arch/arm/configs/omap2plus_defconfig
-> > > +++ b/arch/arm/configs/omap2plus_defconfig
-> > > @@ -223,6 +223,7 @@ CONFIG_USB_TEST=y
-> > >  CONFIG_NOP_USB_XCEIV=y
-> > >  CONFIG_OMAP_USB2=y
-> > >  CONFIG_OMAP_USB3=y
-> > > +CONFIG_AM335X_PHY_USB=y
-> > >  CONFIG_USB_GADGET=y
-> > >  CONFIG_USB_GADGET_DEBUG=y
-> > >  CONFIG_USB_GADGET_DEBUG_FILES=y
-> > > -- 
-> > > 1.8.1.5
-> > > 
-> > 
-> > Maybe you can take this through your tree?
+On Thu, Dec 26, 2013 at 11:33:06PM +0100, Hans de Goede wrote:
+> On 12/26/2013 11:15 PM, Dmitry Torokhov wrote:
+> >
+> >Are we 1000% sure that the device is quiesced here and we will not get a
+> >stray interrupt? Even if we are sure I'd still rather allocate input
+> >device earlier, together with ts structure.
 > 
-> sorry, no. This should go through Tony to avoid conflicting.
-> 
+> I will change things to allocate the input device earlier. What about
+> registering it, when is the best time to do that?
 
-Tony?
+The common pattern for the most input drivers is to register it last,
+but that usually matters when you are not using managed input devices
+since it helps making error unwinding path simpler. I'd still register
+it last just so it looks the same as the rest of the drivers.
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Dmitry
