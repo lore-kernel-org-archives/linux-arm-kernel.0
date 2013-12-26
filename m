@@ -1,31 +1,46 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 26 Dec 2013 14:52:43 +0800
-Subject: [PATCH] regulator: act8865: fix incorrect devm_kzalloc for act8865
-Message-ID: <1388040763-15653-1-git-send-email-wenyou.yang@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 26 Dec 2013 08:53:55 +0100
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <20131225224034.GB5531@kw.sim.vm.gnt>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131224194603.GE19878@titan.lakedaemon.net>
+ <20131225224034.GB5531@kw.sim.vm.gnt>
+Message-ID: <20131226085355.2fd1969c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Which cause to allocate more needless memory.
+Dear Simon Guinot,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- drivers/regulator/act8865-regulator.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+On Wed, 25 Dec 2013 23:40:34 +0100, Simon Guinot wrote:
 
-diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-index f853353..aecf01b 100644
---- a/drivers/regulator/act8865-regulator.c
-+++ b/drivers/regulator/act8865-regulator.c
-@@ -290,9 +290,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 		return -EINVAL;
- 	}
- 
--	act8865 = devm_kzalloc(dev, sizeof(struct act8865) +
--			sizeof(struct regulator_dev *) * ACT8865_REG_NUM,
--			GFP_KERNEL);
-+	act8865 = devm_kzalloc(dev, sizeof(struct act8865), GFP_KERNEL);
- 	if (!act8865)
- 		return -ENOMEM;
- 
+> > > This should be applied to every -stable kernel supporting Armada
+> > > SoCs.
+> > 
+> > Could we get a little more specific here?  Please determine which
+> > commit introduced the regression and note it with 'Fixes:
+> > <commitish> "oneline"'
+> 
+> Well, since the DT support for the sata_mv driver precedes SATA
+> support for Armada SoCs, I'd say that the bug has been introduced by:
+> 
+> a6a6de1a "arm: mvebu: SATA support: SoC-level DT data for Armada
+> 370/XP"
+> 
+> Let me know if you agree with that. I will update the commit message
+> accorgingly.
+
+In some sense, we could say that this is not a regression. According to
+what you mean, SATA hotplug has *never* been working on Armada 370/XP.
+So technically, it could be seen as a new feature for this platform,
+and is therefore not a regression (i.e something that used to work, and
+that no longer works). There has been no kernel release for which SATA
+hotplug was working for Armada 370/XP.
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
