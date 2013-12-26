@@ -1,95 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 16:52:41 +0100
-Subject: Issue with the emulated PCI bridge implementation
-In-Reply-To: <20131226160534.36cc4203@skate>
-References: <20131226160534.36cc4203@skate>
-Message-ID: <20131226165241.2c50b244@skate>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 26 Dec 2013 09:55:55 -0600
+Subject: [PATCH] ARM: configs: Select USB PHY for AM335x SoC
+In-Reply-To: <20131226120833.GA24645@localhost>
+References: <1386861269-28949-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131226120833.GA24645@localhost>
+Message-ID: <20131226155555.GA3937@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+On Thu, Dec 26, 2013 at 09:08:34AM -0300, Ezequiel Garcia wrote:
+> Felipe,
+> 
+> On Thu, Dec 12, 2013 at 12:14:29PM -0300, Ezequiel Garcia wrote:
+> > Enable this option as it's required to use USB on AM335x SoC.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/configs/omap2plus_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> > index 12c848e..e427b95 100644
+> > --- a/arch/arm/configs/omap2plus_defconfig
+> > +++ b/arch/arm/configs/omap2plus_defconfig
+> > @@ -223,6 +223,7 @@ CONFIG_USB_TEST=y
+> >  CONFIG_NOP_USB_XCEIV=y
+> >  CONFIG_OMAP_USB2=y
+> >  CONFIG_OMAP_USB3=y
+> > +CONFIG_AM335X_PHY_USB=y
+> >  CONFIG_USB_GADGET=y
+> >  CONFIG_USB_GADGET_DEBUG=y
+> >  CONFIG_USB_GADGET_DEBUG_FILES=y
+> > -- 
+> > 1.8.1.5
+> > 
+> 
+> Maybe you can take this through your tree?
 
-On Thu, 26 Dec 2013 16:05:34 +0100, Thomas Petazzoni wrote:
-
-> For now, my only idea would be to do the pci_ioremap_io()
-> unconditionally for all PCIe interfaces when the PCIe host controller
-> driver is initialized. We know the maximum size of the I/O region for
-> each PCIe interface, and this size is small (64 KB). We can keep the
-> creation of the corresponding MBus window as something dynamic done by
-> the bridge.
-
-Here is an implementation of this idea, tested to work with an e1000e
-card, with the driver modified to do a few read/write to the I/O
-region. What do you think about it?
-
-Thanks!
-
-Thomas
-
->From c062af329fa07ddc6d0ca305b4c9633f7e1dca00 Mon Sep 17 00:00:00 2001
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Thu, 26 Dec 2013 16:46:24 +0100
-Subject: [PATCH] pci: mvebu: call pci_ioremap_io() at startup instead of
- dynamically
-
-The mvebu PCI host controller driver uses an emulated PCI-to-PCI
-bridge to leverage the core PCI kernel enumeration logic to
-dynamically create and remove the MBus windows needed to access the
-memory and I/O regions of each PCI interface.
-
-In the context of this PCI-to-PCI bridge emulation, the driver
-emulates all reads and writes to the PCI bridge registers. Upon a
-write to the registers conguring the I/O base and limit, the driver
-was creating the MBus window, and calling pci_ioremap_io() to setup
-the mapping.
-
-However, it turns out that accesses to these registers are made in an
-IRQ disabled context, while pci_ioremap_io() is a potentially sleeping
-function. Not only this is wrong, but it is causing so fairly loud
-warnings at boot time when the appropriate kernel hacking options are
-enabled.
-
-This patch solves this by moving the pci_ioremap_io() call at the
-startup of the driver. At this point, we don't know how many PCI
-interfaces will be enabled, so we are simply remapping the entire PCI
-I/O space to virtual addresses. This is reasonable since this I/O
-space is limited to 1 MB in size, and also because the MBus windows
-continue to be created in a dynamic fashion only when devices need
-them.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-mvebu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 2aa7b77c..476dd72 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -330,8 +330,6 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- 	mvebu_mbus_add_window_remap_by_id(port->io_target, port->io_attr,
- 					  port->iowin_base, port->iowin_size,
- 					  iobase);
--
--	pci_ioremap_io(iobase, port->iowin_base);
- }
- 
- static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
-@@ -969,6 +967,10 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	pcie->nports = i;
-+
-+	for (i = 0; i < (IO_SPACE_LIMIT - SZ_64K); i += SZ_64K)
-+		pci_ioremap_io(i, pcie->io.start + i);
-+
- 	mvebu_pcie_msi_enable(pcie);
- 	mvebu_pcie_enable(pcie);
- 
--- 
-1.8.3.2
+sorry, no. This should go through Tony to avoid conflicting.
 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131226/bb1cd146/attachment.sig>
