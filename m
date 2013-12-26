@@ -1,34 +1,58 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Dec 2013 11:41:33 -0800
-Subject: [PATCH v2 4/7] mfd: ssbi: Add regmap read/write helpers
-In-Reply-To: <20131224125443.GC30815@sirena.org.uk>
-References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
- <1387831563-13535-5-git-send-email-sboyd@codeaurora.org>
- <20131224125443.GC30815@sirena.org.uk>
-Message-ID: <20131226194133.GJ31766@codeaurora.org>
+Date: Thu, 26 Dec 2013 11:42:55 -0800
+Subject: [PATCH v3 1/3] clocksource: timer-keystone: introduce
+ clocksource driver for Keystone
+In-Reply-To: <52BC7818.9070409@ti.com>
+References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1387974724-31138-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <20131226182254.GG31766@codeaurora.org> <52BC7818.9070409@ti.com>
+Message-ID: <20131226194255.GK31766@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/24, Mark Brown wrote:
-> On Mon, Dec 23, 2013 at 12:46:00PM -0800, Stephen Boyd wrote:
+On 12/26, ivan.khoronzhuk wrote:
+> On 12/26/2013 08:22 PM, Stephen Boyd wrote:
+> > On 12/25, Ivan Khoronzhuk wrote:
+> >> +
+> >> +	/* enable timer interrupts */
+> >> +	keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
+> >> +
+> >> +	error = request_irq(irq, keystone_timer_interrupt, IRQF_TIMER,
+> >> +			    TIMER_NAME, event_dev);
+> >> +	if (error) {
+> >> +		pr_err("%s: failed to setup irq\n", __func__);
+> >> +		goto err;
+> >> +	}
+> >> +
+> >> +	/* setup clockevent */
+> >> +	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> >> +	event_dev->set_next_event = keystone_set_next_event;
+> >> +	event_dev->set_mode = keystone_set_mode;
+> >> +	event_dev->cpumask = cpu_all_mask;
+> >> +	event_dev->owner = THIS_MODULE;
+> >> +	event_dev->name = TIMER_NAME;
+> >> +	event_dev->irq = irq;
+> >> +
+> >> +	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
+> >> +
+> > 
+> > I hope you don't get an interrupt before you register the
+> > clockevent. You might want to reorder the interrupt request and
+> > the clockevent registration so that it isn't a problem. Other
+> > than that you can have my
+> > 
+> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
 > 
-> > +int ssbi_reg_read(void *context, unsigned int reg, unsigned int *val)
-> > +{
-> > +	*val = 0;
-> > +	return ssbi_read(context, reg, (u8 *)val, 1);
-> > +}
-> > +EXPORT_SYMBOL_GPL(ssbi_reg_read);
-> > +
-> > +int ssbi_reg_write(void *context, unsigned int reg, unsigned int val)
-> > +{
-> > +	return ssbi_write(context, reg, (u8 *)&val, 1);
-> > +}
-> > +EXPORT_SYMBOL_GPL(ssbi_reg_write);
+> Thanks.
 > 
-> Not a big deal but could these just be inlined in the headers?
+> While interrupt enabling the timer is disabled, so it cannot generate interrupt.
+> The timer will be enabled when next event is set by clockevent core.
+> 
 
-Sure, I can do that if I need to resend? The only benefit I see
-is two less symbols exported.
+Ok, I was thinking more like the interrupt is level triggered and
+the bootloader left it triggered. Sounds like that doesn't
+happen.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
