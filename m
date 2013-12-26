@@ -1,131 +1,98 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 26 Dec 2013 09:11:36 +0000
-Subject: [RFC] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <87eh58zh2u.fsf@nbsps.com>
-References: <1385979309-10505-1-git-send-email-Li.Xiubo@freescale.com>
- <87eh58zh2u.fsf@nbsps.com>
-Message-ID: <fd88a38d1bf247149c43d8b418b0553d@BY2PR03MB505.namprd03.prod.outlook.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 26 Dec 2013 15:48:58 +0530
+Subject: [PATCH RESEND 1/4] clk: clk-s2mps11: Refactor for including support
+ for other MFD clocks
+In-Reply-To: <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
+References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
+ <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <1388053141-30085-2-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
+The clocks in S2MPS11 and S5M8767 are managed in the same way, baring
+a difference in the register offset. It would be better to update
+existing S2MPS11 driver to support the clocks in S5M8767, rather than
+creating an almost duplicate driver altogether.
 
-> > +static inline u32 fsl_pwm_readl(struct fsl_pwm_chip *fpc, void __iomem *reg)
-> > +{
-> > +	u32 val;
-> > +
-> > +	val = __raw_readl(reg);
-> > +
-> > +	if (fpc->endianess == FTM_BIG)
-> > +		return be32_to_cpu(val);
-> > +	else
-> > +		return le32_to_cpu(val);
-> > +}
-> > +
-> > +static inline void fsl_pwm_writel(struct fsl_pwm_chip *fpc, u32 val,
-> > +		void __iomem *reg)
-> > +{
-> > +	if (fpc->endianess == FTM_BIG)
-> > +		val = cpu_to_be32(val);
-> > +	else
-> > +		val = cpu_to_le32(val);
-> > +
-> > +	__raw_writel(val, reg);
-> > +}
-> 
-> Remove above and alter as below,
-> 
-> static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> 				enum pwm_polarity polarity)
-> {
-> 	u32 val;
-> 	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-> 
-> 	val = readl(fpc, fpc->base + FTM_POL);
-> 	if (polarity == PWM_POLARITY_INVERSED)
-> -		val |= BIT(pwm->hwpwm);
-> +		val |= BIT(fpc->chn_bit);
-> 	else
-> -		val &= ~BIT(pwm->hwpwm);
-> +		val &= ~BIT(fpc->chn_bit);
-> 	writel(fpc, val, fpc->base + FTM_POL);
-> 
-> 	return 0;
-> }
-> 
-> static int fsl_counter_clock_enable(struct fsl_pwm_chip *fpc)
-> {
-> 	int ret;
-> 	u32 val;
-> 
-> 	if (fpc->counter_clk_enable++)
-> 		return 0;
-> 
-> 	ret = clk_prepare_enable(fpc->counter_clk);
-> 	if (ret) {
-> 		fpc->counter_clk_enable--;
-> 		return ret;
-> 	}
-> 
-> 	val = readl(fpc, fpc->base + FTM_SC);
-> +	val |= val >> 24; /* get value on big-endian. */
-> 	val &= ~((FTM_SC_CLK_MASK << FTM_SC_CLK_SHIFT) |
-> 			(FTM_SC_PS_MASK << FTM_SC_PS_SHIFT));
-> 
-> 	/* select counter clock source */
-> 	switch (fpc->counter_clk_select) {
-> 	case VF610_CLK_FTM0:
-> 		val |= FTM_SC_CLK_SYS;
-> 		break;
-> 	case VF610_CLK_FTM0_FIX_SEL:
-> 		val |= FTM_SC_CLK_FIX;
-> 		break;
-> 	case VF610_CLK_FTM0_EXT_SEL:
-> 		val |= FTM_SC_CLK_EXT;
-> 		break;
-> 	default:
-> 		fpc->counter_clk_enable--;
-> 		return -EINVAL;
-> 	}
-> 
-> 	val |= fpc->clk_ps;
-> +	val |= val << 24; /* modify to high byte for big-endian. */
-> 	writel(fpc, val, fpc->base + FTM_SC);
-> 
-> 	return 0;
-> }
-> 
-> That is instead of modifying the low level accessor, you can alter the
-> driver masks based on the OF selected endian.  Many of the registers are
-> already accessed as run-time fields because each channel is in a
-> different bit position.  There are only two registers with fields that
-> cross a byte boundary; COUNT and MOD.  These two must be swapped.  The
-> others are either a byte or are accessed base on a channel number.
-> 
-> For example in fsl_pwm_set_polarity(), we would read the memory, swap
-> the value, calculate a bit to set, clear or set the bit and then write
-> back the swapped value all on the 'big_endian' condition.  This way, you
-> just read a bit shift which is conditional on the endian at probe time
-> and don't double swap.
-> 
-> In the fsl_counter_clock_enable(), the example is using 'write ignored
-> bits' and duplicating the value in both big/little bytes.  An
-> alternative is to parameterize all the mask/values in 'const struct' and
-> have a different pointer for big/little and store this in-place (or via
-> a pointer) in fsl_pwm_chip.
-> 
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+CC: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/clk-s2mps11.c |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-Yes, this is one optional method.
-
-The PWM is only one feature of the FlexTimer Module, and in the future there
-will implements all of them, and then there will be many other bits that cross
-a byte position. And now the fsl_pwm_readl()/fsl_pwm_writel() are just copied
-from readl()/writel(), and then added the endianess arbitration.
-
-And there are many other IP blocks like FTM need to do same work for LS-1 series
-and Vybird machines. IMO, this is more readable and easier to extern to full
-functions for these device driver code, and also easier to debug.
-
-Thanks,
-Best Regards,
-Xiubo
+diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
+index 00a3abe..43e25bb 100644
+--- a/drivers/clk/clk-s2mps11.c
++++ b/drivers/clk/clk-s2mps11.c
+@@ -48,6 +48,7 @@ struct s2mps11_clk {
+ 	struct clk_lookup *lookup;
+ 	u32 mask;
+ 	bool enabled;
++	unsigned int reg;
+ };
+ 
+ static struct s2mps11_clk *to_s2mps11_clk(struct clk_hw *hw)
+@@ -61,7 +62,7 @@ static int s2mps11_clk_prepare(struct clk_hw *hw)
+ 	int ret;
+ 
+ 	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
+-				S2MPS11_REG_RTC_CTRL,
++				 s2mps11->reg,
+ 				 s2mps11->mask, s2mps11->mask);
+ 	if (!ret)
+ 		s2mps11->enabled = true;
+@@ -74,7 +75,7 @@ static void s2mps11_clk_unprepare(struct clk_hw *hw)
+ 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+ 	int ret;
+ 
+-	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic, S2MPS11_REG_RTC_CTRL,
++	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic, s2mps11->reg,
+ 			   s2mps11->mask, ~s2mps11->mask);
+ 
+ 	if (!ret)
+@@ -155,6 +156,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
+ 	struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+ 	struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
+ 	struct device_node *clk_np = NULL;
++	unsigned int s2mps11_reg;
+ 	int i, ret = 0;
+ 	u32 val;
+ 
+@@ -169,13 +171,23 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clk_np))
+ 		return PTR_ERR(clk_np);
+ 
++	switch(platform_get_device_id(pdev)->driver_data) {
++	case S2MPS11X:
++		s2mps11_reg = S2MPS11_REG_RTC_CTRL;
++		break;
++	default:
++		dev_err(&pdev->dev, "Invalid device type\n");
++		return -EINVAL;
++	};
++
+ 	for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
+ 		s2mps11_clk->iodev = iodev;
+ 		s2mps11_clk->hw.init = &s2mps11_clks_init[i];
+ 		s2mps11_clk->mask = 1 << i;
++		s2mps11_clk->reg = s2mps11_reg;
+ 
+ 		ret = regmap_read(s2mps11_clk->iodev->regmap_pmic,
+-				  S2MPS11_REG_RTC_CTRL, &val);
++				  s2mps11_clk->reg, &val);
+ 		if (ret < 0)
+ 			goto err_reg;
+ 
+@@ -241,7 +253,7 @@ static int s2mps11_clk_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct platform_device_id s2mps11_clk_id[] = {
+-	{ "s2mps11-clk", 0},
++	{ "s2mps11-clk", S2MPS11X},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(platform, s2mps11_clk_id);
+-- 
+1.7.9.5
