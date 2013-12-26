@@ -1,30 +1,56 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 26 Dec 2013 15:48:57 +0530
-Subject: [PATCH RESEND 0/4] Add support for clocks in S5M8767
-In-Reply-To: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
-References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 26 Dec 2013 12:54:28 +0100
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <20131226085355.2fd1969c@skate>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131224194603.GE19878@titan.lakedaemon.net>
+ <20131225224034.GB5531@kw.sim.vm.gnt>
+ <20131226085355.2fd1969c@skate>
+Message-ID: <20131226115428.GC5531@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5M8767 chip has 3 crystal oscillators which are operated in the same
-as the crystal oscillators in S2MPS11. Extend s2mps11-clk driver to
-support clocks in S5M8767.
+On Thu, Dec 26, 2013 at 08:53:55AM +0100, Thomas Petazzoni wrote:
+> Dear Simon Guinot,
+> 
+> On Wed, 25 Dec 2013 23:40:34 +0100, Simon Guinot wrote:
+> 
+> > > > This should be applied to every -stable kernel supporting Armada
+> > > > SoCs.
+> > > 
+> > > Could we get a little more specific here?  Please determine which
+> > > commit introduced the regression and note it with 'Fixes:
+> > > <commitish> "oneline"'
+> > 
+> > Well, since the DT support for the sata_mv driver precedes SATA
+> > support for Armada SoCs, I'd say that the bug has been introduced by:
+> > 
+> > a6a6de1a "arm: mvebu: SATA support: SoC-level DT data for Armada
+> > 370/XP"
+> > 
+> > Let me know if you agree with that. I will update the commit message
+> > accorgingly.
+> 
+> In some sense, we could say that this is not a regression. According to
+> what you mean, SATA hotplug has *never* been working on Armada 370/XP.
+> So technically, it could be seen as a new feature for this platform,
+> and is therefore not a regression (i.e something that used to work, and
+> that no longer works). There has been no kernel release for which SATA
+> hotplug was working for Armada 370/XP.
 
-The earlier set of patches no longer apply cleanly on linux-next, hence
-rebased them on top of next-20131224.
+I agree with that. It is not correct to call this issue a regression.
+But, it would also be nice to have this patch applied in the stable
+branches 3.10 and onwards. Maybe, I could just add this information
+while CC'ing Linux stable ?
 
-Tushar Behera (4):
-  clk: clk-s2mps11: Refactor for including support for other MFD clocks
-  clk: clk-s2mps11: Add support for clocks in S5M8767 MFD
-  mfd: sec-core: Add cells for S5M8767-clocks
-  ARM: dts: Add S5M8767 clock nodes on Arndale board
+Regards,
 
- arch/arm/boot/dts/exynos5250-arndale.dts |    7 +++++++
- drivers/clk/Kconfig                      |    6 ++++--
- drivers/clk/clk-s2mps11.c                |   25 +++++++++++++++++++++----
- drivers/mfd/sec-core.c                   |    4 +++-
- 4 files changed, 35 insertions(+), 7 deletions(-)
-
--- 
-1.7.9.5
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131226/4cdb287c/attachment.sig>
