@@ -1,48 +1,30 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 15:22:28 +0100
-Subject: [PATCH 2/2] ARM: mvebu: move Armada 370/XP specific definitions to
- armada-370-xp.h
-In-Reply-To: <1388067748-18414-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1388067748-18414-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1388067748-18414-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 26 Dec 2013 15:22:26 +0100
+Subject: [PATCH 0/2] ARM: mvebu: minor improvements
+Message-ID: <1388067748-18414-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to the introduction of the support for additional SoC,
-the mvebu/common.h should be clear of Armada 370/XP-specific
-definitions. Therefore, move the Armada 370/XP SMP specific
-definitions to the armada-370-xp.h file.
+Jason, Andrew, Gregory, Sebastian,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
+Here are again the two patches I sent to you this morning, which I'm
+resending because I forgot to Cc LAKML. Hopefully this time I do not
+forget it.
+
+The two patches do some minor cleanups/improvements in the mach-mvebu
+header files.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (2):
+  ARM: mvebu: remove prototypes of non-existing functions from common.h
+  ARM: mvebu: move Armada 370/XP specific definitions to armada-370-xp.h
+
  arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
- arch/arm/mach-mvebu/common.h        | 3 +--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/common.h        | 8 +-------
+ 2 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index c612b2c..775d9c3 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -20,6 +20,8 @@
- 
- void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
- void armada_xp_mpic_smp_cpu_init(void);
-+void armada_xp_secondary_startup(void);
-+extern struct smp_operations armada_xp_smp_ops;
- #endif
- 
- #endif /* __MACH_ARMADA_370_XP_H */
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 4c84689..c23b077 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -22,6 +22,5 @@
- void mvebu_restart(enum reboot_mode mode, const char *cmd);
- 
- void armada_xp_cpu_die(unsigned int cpu);
--void armada_xp_secondary_startup(void);
--extern struct smp_operations armada_xp_smp_ops;
-+
- #endif
 -- 
 1.8.3.2
