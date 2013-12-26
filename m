@@ -1,46 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 08:53:55 +0100
-Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
- speed
-In-Reply-To: <20131225224034.GB5531@kw.sim.vm.gnt>
-References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
- <20131224194603.GE19878@titan.lakedaemon.net>
- <20131225224034.GB5531@kw.sim.vm.gnt>
-Message-ID: <20131226085355.2fd1969c@skate>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 26 Dec 2013 15:23:54 +0800
+Subject: [PATCH V2 2/2] mmc: sdhci-esdhc-imx: fix warning during module remove
+ function
+In-Reply-To: <1388042634-17281-1-git-send-email-b29396@freescale.com>
+References: <1388042634-17281-1-git-send-email-b29396@freescale.com>
+Message-ID: <1388042634-17281-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon Guinot,
+Since the clock is managed by runtime pm currently, we do not need
+disable it again during driver remove function, or it will cause
+clock disable count mismatch issue since the clocks have already been disabled.
 
-On Wed, 25 Dec 2013 23:40:34 +0100, Simon Guinot wrote:
+The issue can be simply reproduced by unbind the devices via sysfs.
+mx6slevk:/sys/bus/platform/drivers/sdhci-esdhc-imx# echo 2194000.usdhc > unbind
+mmc1: card aaaa removed
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 657 at drivers/clk/clk.c:842 __clk_disable+0x68/0x88()
+Modules linked in:
+CPU: 0 PID: 657 Comm: sh Not tainted 3.13.0-rc1+ #285
+Backtrace:
+[<80012160>] (dump_backtrace+0x0/0x10c) from [<80012438>] (show_stack+0x18/0x1c)
+ r6:80481370 r5:00000000 r4:8088ecc8 r3:00000000
+[<80012420>] (show_stack+0x0/0x1c) from [<80616b14>] (dump_stack+0x84/0x9c)
+[<80616a90>] (dump_stack+0x0/0x9c) from [<80027158>] (warn_slowpath_common+0x70/0x94)
+ r5:00000009 r4:00000000
+[<800270e8>] (warn_slowpath_common+0x0/0x94) from [<80027220>] (warn_slowpath_null+0x24/0x2c)
+ r8:bec4ff78 r7:0000000e r6:bf91d800 r5:bf81d080 r4:bf81d080
+[<800271fc>] (warn_slowpath_null+0x0/0x2c) from [<80481370>] (__clk_disable+0x68/0x88)
+[<80481308>] (__clk_disable+0x0/0x88) from [<8048148c>] (clk_disable+0x20/0x2c)
+ r4:200f0113 r3:bf95ec00
+[<8048146c>] (clk_disable+0x0/0x2c) from [<80463bd8>] (sdhci_esdhc_imx_remove+0x64/0xa4)
+ r5:bf81d080 r4:bfabb010
+[<80463b74>] (sdhci_esdhc_imx_remove+0x0/0xa4) from [<8032e82c>] (platform_drv_remove+0x20/0x24)
+ r6:808ae0e0 r5:808ae0e0 r4:bf91d810 r3:80463b74
+[<8032e80c>] (platform_drv_remove+0x0/0x24) from [<8032d010>] (__device_release_driver+0x78/0xd0)
+[<8032cf98>] (__device_release_driver+0x0/0xd0) from [<8032d090>] (device_release_driver+0x28/0x34)
+ r5:bf91d810 r4:bf91d844
+[<8032d068>] (device_release_driver+0x0/0x34) from [<8032c0c8>] (unbind_store+0x80/0xc4)
+ r5:bf91d810 r4:80899ba0
+[<8032c048>] (unbind_store+0x0/0xc4) from [<8032b648>] (drv_attr_store+0x28/0x34)
+ r7:bed73100 r6:0000000e r5:00000000 r4:8032b620
+[<8032b620>] (drv_attr_store+0x0/0x34) from [<80140580>] (sysfs_write_file+0x1b0/0x1e4)
+[<801403d0>] (sysfs_write_file+0x0/0x1e4) from [<800dcda0>] (vfs_write+0xb4/0x190)
+[<800dccec>] (vfs_write+0x0/0x190) from [<800dd3e4>] (SyS_write+0x44/0x80)
+ r9:0000000e r8:00000000 r7:01a00408 r6:bf3b1c00 r5:00000000
+r4:00000000
+[<800dd3a0>] (SyS_write+0x0/0x80) from [<8000e900>] (ret_fast_syscall+0x0/0x48)
+ r9:bec4e000 r8:8000eac4 r7:00000004 r6:76f5fb40 r5:01a00408
+r4:0000000e
+---[ end trace a0897d268e6233b2 ]---
 
-> > > This should be applied to every -stable kernel supporting Armada
-> > > SoCs.
-> > 
-> > Could we get a little more specific here?  Please determine which
-> > commit introduced the regression and note it with 'Fixes:
-> > <commitish> "oneline"'
-> 
-> Well, since the DT support for the sata_mv driver precedes SATA
-> support for Armada SoCs, I'd say that the bug has been introduced by:
-> 
-> a6a6de1a "arm: mvebu: SATA support: SoC-level DT data for Armada
-> 370/XP"
-> 
-> Let me know if you agree with that. I will update the commit message
-> accorgingly.
+If without runtime pm, we just run as before to match the clock enable
+in probe function.
 
-In some sense, we could say that this is not a regression. According to
-what you mean, SATA hotplug has *never* been working on Armada 370/XP.
-So technically, it could be seen as a new feature for this platform,
-and is therefore not a regression (i.e something that used to work, and
-that no longer works). There has been no kernel release for which SATA
-hotplug was working for Armada 370/XP.
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ChangeLog:
+v1->v2: cover the !CONFIG_PM_RUNTIME case as suggested by Shawn
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Best regards,
-
-Thomas
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 745ee1e..452171f 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -1169,9 +1169,11 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+ 	pm_runtime_dont_use_autosuspend(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+-	clk_disable_unprepare(imx_data->clk_per);
+-	clk_disable_unprepare(imx_data->clk_ipg);
+-	clk_disable_unprepare(imx_data->clk_ahb);
++	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
++		clk_disable_unprepare(imx_data->clk_per);
++		clk_disable_unprepare(imx_data->clk_ipg);
++		clk_disable_unprepare(imx_data->clk_ahb);
++	}
+ 
+ 	sdhci_pltfm_free(pdev);
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.2.rc3
