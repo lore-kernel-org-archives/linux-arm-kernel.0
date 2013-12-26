@@ -1,30 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 26 Dec 2013 15:30:00 -0800
-Subject: [PATCH 1/5] input: Add new sun4i-ts driver for Allwinner sunxi
- SoC's rtp controller
-In-Reply-To: <52BCAEA2.6040607@redhat.com>
-References: <1387923847-1294-1-git-send-email-hdegoede@redhat.com>
- <1387923847-1294-2-git-send-email-hdegoede@redhat.com>
- <20131226221558.GA18562@core.coreip.homeip.net>
- <52BCAEA2.6040607@redhat.com>
-Message-ID: <20131226233000.GE18562@core.coreip.homeip.net>
+From: rientjes@google.com (David Rientjes)
+Date: Thu, 26 Dec 2013 15:45:04 -0800 (PST)
+Subject: [PATCH] mm/memblock: use WARN_ONCE when MAX_NUMNODES passed as
+ input parameter
+In-Reply-To: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.02.1312261542260.9342@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 26, 2013 at 11:33:06PM +0100, Hans de Goede wrote:
-> On 12/26/2013 11:15 PM, Dmitry Torokhov wrote:
-> >
-> >Are we 1000% sure that the device is quiesced here and we will not get a
-> >stray interrupt? Even if we are sure I'd still rather allocate input
-> >device earlier, together with ts structure.
-> 
-> I will change things to allocate the input device earlier. What about
-> registering it, when is the best time to do that?
+On Fri, 20 Dec 2013, Santosh Shilimkar wrote:
 
-The common pattern for the most input drivers is to register it last,
-but that usually matters when you are not using managed input devices
-since it helps making error unwinding path simpler. I'd still register
-it last just so it looks the same as the rest of the drivers.
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 71b11d9..6af873a 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -707,11 +707,9 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
+>  	struct memblock_type *rsv = &memblock.reserved;
+>  	int mi = *idx & 0xffffffff;
+>  	int ri = *idx >> 32;
+> -	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
+>  
+> -	if (nid == MAX_NUMNODES)
+> -		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
+> -			     __func__);
+> +	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
+> +		nid = NUMA_NO_NODE;
+>  
+>  	for ( ; mi < mem->cnt; mi++) {
+>  		struct memblock_region *m = &mem->regions[mi];
 
--- 
-Dmitry
+Um, why do this at runtime?  This is only used for 
+for_each_free_mem_range(), which is used rarely in x86 and memblock-only 
+code.  I'm struggling to understand why we can't deterministically fix the 
+callers if this condition is possible.
