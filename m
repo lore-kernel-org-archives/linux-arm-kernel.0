@@ -1,45 +1,45 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 26 Dec 2013 13:20:56 -0500
-Subject: [PATCH v5 0/5] Update Davinci watchdog driver
-In-Reply-To: <20131226181725.GL10136@spo001.leaseweb.com>
-References: <1386185970-14488-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52A5EF6B.6060700@ti.com> <52ACAED4.7000305@ti.com> <52BC6D76.7000400@ti.com>
- <20131226181725.GL10136@spo001.leaseweb.com>
-Message-ID: <52BC7388.3040302@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Dec 2013 10:22:54 -0800
+Subject: [PATCH v3 1/3] clocksource: timer-keystone: introduce
+ clocksource driver for Keystone
+In-Reply-To: <1387974724-31138-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1387974724-31138-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20131226182254.GG31766@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 December 2013 01:17 PM, Wim Van Sebroeck wrote:
-> Hi Santosh,
-> 
->>>> On Wednesday 04 December 2013 02:39 PM, Ivan Khoronzhuk wrote:
->>>>> These patches are intended to update Davinci watchdog to use WDT core
->>>>> and reuse driver for keystone arch, because Keystone uses the similar
->>>>> IP like Davinci.
->>>>>
->>>>
->>>> [..]
->>>>
->>>>> v4..v5:
->>>>> - watchdog: davinci: change driver to use WDT core
->>>>> 	switched off CONFIG_WATCHDOG_NOWAYOUT option
->>>>>
->>>> Can you please apply the series to your watchdog tree ?
->>>> Do let me know if you want us to prepare a git branch
->>>> to pull from.
->>>>
->>> ping..
->>>
->> I haven't heard anything on this yet from you Wim.
->>
->> Guenter,
->> I have seen you actively reviewing the $subject patch series.
->> Will you be able to pick the series up for 3.14 merge window
->> considering almost no response from Wim so far on it ?
-> 
-> I have review the patches and they will go in my tree tomorrow.
+On 12/25, Ivan Khoronzhuk wrote:
+> +
+> +	/* enable timer interrupts */
+> +	keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
+> +
+> +	error = request_irq(irq, keystone_timer_interrupt, IRQF_TIMER,
+> +			    TIMER_NAME, event_dev);
+> +	if (error) {
+> +		pr_err("%s: failed to setup irq\n", __func__);
+> +		goto err;
+> +	}
+> +
+> +	/* setup clockevent */
+> +	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> +	event_dev->set_next_event = keystone_set_next_event;
+> +	event_dev->set_mode = keystone_set_mode;
+> +	event_dev->cpumask = cpu_all_mask;
+> +	event_dev->owner = THIS_MODULE;
+> +	event_dev->name = TIMER_NAME;
+> +	event_dev->irq = irq;
+> +
+> +	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
+> +
 
-Thanks Wim.
+I hope you don't get an interrupt before you register the
+clockevent. You might want to reorder the interrupt request and
+the clockevent registration so that it isn't a problem. Other
+than that you can have my
 
-Regards,
-Santosh
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
