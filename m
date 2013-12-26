@@ -1,41 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 14:34:07 +0100
-Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
- speed
-In-Reply-To: <20131226115428.GC5531@kw.sim.vm.gnt>
-References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
- <20131224194603.GE19878@titan.lakedaemon.net>
- <20131225224034.GB5531@kw.sim.vm.gnt>
- <20131226085355.2fd1969c@skate>
- <20131226115428.GC5531@kw.sim.vm.gnt>
-Message-ID: <20131226143407.5c187277@skate>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 26 Dec 2013 14:52:10 +0100
+Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
+In-Reply-To: <1519363.agF5fhqzYs@ax5200p>
+References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+ <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
+ <1519363.agF5fhqzYs@ax5200p>
+Message-ID: <12640298.egJ6YnqTYx@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon Guinot,
-
-On Thu, 26 Dec 2013 12:54:28 +0100, Simon Guinot wrote:
-
-> > In some sense, we could say that this is not a regression. According to
-> > what you mean, SATA hotplug has *never* been working on Armada 370/XP.
-> > So technically, it could be seen as a new feature for this platform,
-> > and is therefore not a regression (i.e something that used to work, and
-> > that no longer works). There has been no kernel release for which SATA
-> > hotplug was working for Armada 370/XP.
+On Saturday 21 December 2013 23:11:58 Marc Dietrich wrote:
+> Sorry, Stephen, I mistyped your email address in the first post.
 > 
-> I agree with that. It is not correct to call this issue a regression.
-> But, it would also be nice to have this patch applied in the stable
-> branches 3.10 and onwards. Maybe, I could just add this information
-> while CC'ing Linux stable ?
+> On Saturday 21 December 2013 21:38:13 Marc Dietrich wrote:
+> > Add backlight and panel nodes for the PAZ00 TFT LCD panel.
+> > 
+> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> > ---
+> > This should enable everything needed. Unfortunately, in my tests it only
+> > switches on the backlight, but the display controller blocks in some
+> > infinit loop, so we get no output (and no working system). I post it here
+> > in case I missed something obvious...
 
-Yes. Even though not a regression, I believe it qualifies for -stable,
-at least according to the rules in
-Documentation/stable_kernel_rules.txt.
+Some users reported that it works when using uboot (yeah, shame on me that I 
+still use fastboot on my dev machine), so I did a bit more research. It indeed 
+works when using uboot, even when the display setup is disabled there. So my 
+guess is that maybe some clock isn't setup by fastboot which is done by uboot.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Marc
