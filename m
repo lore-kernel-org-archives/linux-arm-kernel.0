@@ -1,44 +1,125 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Dec 2013 22:51:34 +0100
-Subject: [PATCH V2 2/5] arm: shmobile: r7s72100: add i2c clocks
-In-Reply-To: <CAMuHMdXF6WmS_j4pC1U5jL3SK-ck7N=EA+-45duXdRZP1cOJkw@mail.gmail.com>
-References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
- <1387402321-21866-3-git-send-email-wsa@the-dreams.de>
- <20131224024855.GC22401@verge.net.au>
- <CAMuHMdWPZjeF7+nEjXR3vL4HgSEVEk-uf-qQ68ZnFA=+Y_Q8tQ@mail.gmail.com>
- <20131226212539.GA2561@katana>
- <CAMuHMdXF6WmS_j4pC1U5jL3SK-ck7N=EA+-45duXdRZP1cOJkw@mail.gmail.com>
-Message-ID: <CAMuHMdXP4DAF1_DPtNfwCyP8WHFU03=zgM7i8FW9n6tcJpAHHQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Dec 2013 13:52:04 -0800
+Subject: [PATCH v2] regmap: Allow regmap_bulk_write() to work for "no-bus"
+ regmaps
+In-Reply-To: <20131226193416.GI31766@codeaurora.org>
+References: <20131211132729.GT11468@sirena.org.uk>
+ <52AA42FD.4040503@codeaurora.org>
+ <20131213104128.GT11044@sirena.org.uk>
+ <20131213213707.GO21983@codeaurora.org>
+ <20131216210153.GA3185@sirena.org.uk>
+ <20131217023047.GC31766@codeaurora.org>
+ <20131218184541.GH31886@sirena.org.uk>
+ <52B897A1.8030205@codeaurora.org>
+ <20131224125358.GB30815@sirena.org.uk>
+ <20131226193416.GI31766@codeaurora.org>
+Message-ID: <20131226215204.GL31766@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 26, 2013 at 10:34 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->>> Note that after dropping these lines:
->>>
->>>        CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
->>>        CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
->>>        CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
->>>        CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
->>>
->>> i2c stopped working.
->>
->> ??? Why do you want to drop these lines?
->
-> Your v2 dropped them, presumably in response to Sergei's ICKy comments.
-> And that's what Simon committed...
+regmap_bulk_write() should decay to performing individual writes
+if we're using a "no-bus" regmap. Unfortunately, it returns an
+error because there is no map->bus pointer. Fix it.
 
-Upon checking again, your v2 did contain them, but gmail tried to smart
-me out by not showing those few lines.
-So it must have been Simon who dropped them, or lost them during rebase?
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-Gr{oetje,eeting}s,
+This is based on v3.13-rc4
 
-                        Geert
+ drivers/base/regmap/regmap.c | 62 ++++++++++++++++++++++++++------------------
+ 1 file changed, 37 insertions(+), 25 deletions(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index d043d80..13d32fd 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -1514,21 +1514,49 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ {
+ 	int ret = 0, i;
+ 	size_t val_bytes = map->format.val_bytes;
+-	void *wval;
+ 
+-	if (!map->bus)
+-		return -EINVAL;
+-	if (!map->format.parse_inplace)
++	if (map->bus && !map->format.parse_inplace)
+ 		return -EINVAL;
+ 	if (reg % map->reg_stride)
+ 		return -EINVAL;
+ 
+ 	map->lock(map->lock_arg);
++	/*
++	 * Some devices don't support bulk write, for
++	 * them we have a series of single write operations.
++	 */
++	if (!map->bus || map->use_single_rw) {
++		for (i = 0; i < val_count; i++) {
++			unsigned int ival;
++
++			switch (val_bytes) {
++			case 1:
++				ival = *(u8 *)(val + (i * val_bytes));
++				break;
++			case 2:
++				ival = *(u16 *)(val + (i * val_bytes));
++				break;
++			case 4:
++				ival = *(u32 *)(val + (i * val_bytes));
++				break;
++#ifdef CONFIG_64BIT
++			case 8:
++				ival = *(u64 *)(val + (i * val_bytes));
++				break;
++#endif
++			default:
++				ret = -EINVAL;
++				goto out;
++			}
+ 
+-	/* No formatting is require if val_byte is 1 */
+-	if (val_bytes == 1) {
+-		wval = (void *)val;
++			ret = _regmap_write(map, reg + (i * map->reg_stride),
++					ival);
++			if (ret != 0)
++				goto out;
++		}
+ 	} else {
++		void *wval;
++
+ 		wval = kmemdup(val, val_count * val_bytes, GFP_KERNEL);
+ 		if (!wval) {
+ 			ret = -ENOMEM;
+@@ -1537,27 +1565,11 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
+ 		}
+ 		for (i = 0; i < val_count * val_bytes; i += val_bytes)
+ 			map->format.parse_inplace(wval + i);
+-	}
+-	/*
+-	 * Some devices does not support bulk write, for
+-	 * them we have a series of single write operations.
+-	 */
+-	if (map->use_single_rw) {
+-		for (i = 0; i < val_count; i++) {
+-			ret = _regmap_raw_write(map,
+-						reg + (i * map->reg_stride),
+-						val + (i * val_bytes),
+-						val_bytes);
+-			if (ret != 0)
+-				goto out;
+-		}
+-	} else {
++
+ 		ret = _regmap_raw_write(map, reg, wval, val_bytes * val_count);
+-	}
+ 
+-	if (val_bytes != 1)
+ 		kfree(wval);
+-
++	}
+ out:
+ 	map->unlock(map->lock_arg);
+ 	return ret;
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
