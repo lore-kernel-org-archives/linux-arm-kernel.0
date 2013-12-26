@@ -1,66 +1,105 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 15:12:50 +0100
-Subject: [PATCH RFCv1 0/6] ARM: mvebu: coherency support improvements
-Message-ID: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 26 Dec 2013 15:12:52 +0100
+Subject: [PATCH RFCv1 2/6] ARM: mvebu: add a coherency_available() call
+In-Reply-To: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1388067176-18177-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Gregory, Andrew, Sebastian,
+This commit extends the coherency fabric code to provide a
+coherency_available()function that the SoC code can call to be told
+whether coherency support is available or not. On Armada 370/XP,
+coherency support is available as soon as the relevant DT node is
+present. On some upcoming SoCs, the DT node needs to be present *and*
+the system running with CONFIG_SMP enabled.
 
-Here is a set of patches that make some changes to the mach-mvebu
-coherency code, and the way the mvebu-mbus driver determines whether
-hardware I/O coherency is enabled or not.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 30 +++++++++++++++++++++++-------
+ arch/arm/mach-mvebu/coherency.h |  1 +
+ 2 files changed, 24 insertions(+), 7 deletions(-)
 
-These changes are proposed in preparation to the introduction of the
-support for more recent SOCs in mach-mvebu, which have a slightly
-different coherency fabric (hence the need for different compatible
-strings) and different constraints to be able to enable the I/O
-coherency (not only the coherency fabric must be available, but the
-kernel must be running in CONFIG_SMP).
-
-Moreover, the mvebu-mbus driver was directly poking into the DT to
-find whether a coherency fabric node was available or not, to
-determine if I/O coherency is enabled or not. However, with the new
-constraint that CONFIG_SMP must be enabled on some SOCs to get I/O
-coherency, the solution of having mvebu-mbus directly poke into the DT
-is not longer appropriate. This patch set therefore changes the
-mvebu_mbus_dt_init() function call to take an additional boolean
-argument telling whether the system is running in I/O coherent mode or
-not.
-
-I've for now marked those patches as RFC, to indicate that they are
-clearly open for discussion. For example, I'm still wondering if I
-should not introduce separate compatible strings
-marvell,armada-370-coherency-fabric and
-marvell,armada-xp-coherency-fabric for Armada 370 and Armada XP
-respectively instead of using marvell,armada-370-coherency-fabric for
-both. Our experience has shown that we often initially believe that a
-given hardware unit is similar between SOCs, and then later discover
-that there are in fact some slight differences, which should have
-called for different compatible strings from the beginning.
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (6):
-  ARM: mvebu: prepare coherency code to support more SOCs
-  ARM: mvebu: add a coherency_available() call
-  bus: mvebu: pass the coherency availability information at init time
-  ARM: mvebu: use of_find_matching_node_and_match() in coherency.c
-  ARM: mvebu: update Armada 370/XP DT to use new coherency compatible
-    string
-  ARM: mvebu: update coherency fabric DT binding documentation
-
- .../devicetree/bindings/arm/coherency-fabric.txt   | 19 +++--
- arch/arm/boot/dts/armada-370-xp.dtsi               |  2 +-
- arch/arm/mach-kirkwood/board-dt.c                  |  2 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |  2 +-
- arch/arm/mach-mvebu/coherency.c                    | 80 ++++++++++++++++------
- arch/arm/mach-mvebu/coherency.h                    |  1 +
- drivers/bus/mvebu-mbus.c                           | 11 +--
- include/linux/mbus.h                               |  2 +-
- 8 files changed, 79 insertions(+), 40 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index a8209ae..70db4e9 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -38,6 +38,7 @@ static void __iomem *coherency_cpu_base;
+ #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
+ 
+ enum {
++	COHERENCY_FABRIC_TYPE_NONE,
+ 	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
+ };
+ 
+@@ -149,7 +150,7 @@ static void __init armada_370_coherency_init(struct device_node *np)
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+ }
+ 
+-int __init coherency_init(void)
++static int coherency_type(void)
+ {
+ 	struct device_node *np;
+ 
+@@ -160,27 +161,42 @@ int __init coherency_init(void)
+ 		int type;
+ 
+ 		type = (int) match->data;
++
+ 		pr_info("Initializing Coherency fabric\n");
+ 
++		/* Armada 370/XP coherency works in both UP and SMP */
+ 		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+-			armada_370_coherency_init(np);
++			return type;
+ 
+ 		of_node_put(np);
+ 	}
+ 
+-	return 0;
++	return COHERENCY_FABRIC_TYPE_NONE;
+ }
+ 
+-static int __init coherency_late_init(void)
++int coherency_available(void)
+ {
++	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
++}
++
++int __init coherency_init(void)
++{
++	int type = coherency_type();
+ 	struct device_node *np;
+ 
+ 	np = of_find_matching_node(NULL, of_coherency_table);
+-	if (np) {
++
++	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
++		armada_370_coherency_init(np);
++
++	return 0;
++}
++
++static int __init coherency_late_init(void)
++{
++	if (coherency_available())
+ 		bus_register_notifier(&platform_bus_type,
+ 				      &mvebu_hwcc_platform_nb);
+-		of_node_put(np);
+-	}
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index df33ad8..2a05b6e 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -16,5 +16,6 @@
+ 
+ int set_cpu_coherent(int cpu_id, int smp_group_id);
+ int coherency_init(void);
++int coherency_available(void);
+ 
+ #endif	/* __MACH_370_XP_COHERENCY_H */
 -- 
 1.8.3.2
