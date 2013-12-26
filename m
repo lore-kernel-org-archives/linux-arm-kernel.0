@@ -1,35 +1,49 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Fri, 27 Dec 2013 00:18:30 +0100
-Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
-In-Reply-To: <12640298.egJ6YnqTYx@ax5200p>
-References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
- <1519363.agF5fhqzYs@ax5200p> <12640298.egJ6YnqTYx@ax5200p>
-Message-ID: <4478357.8zXrzzag7Z@ax5200p>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 26 Dec 2013 20:21:06 -0300
+Subject: [PATCH] ARM: configs: Select USB PHY for AM335x SoC
+In-Reply-To: <20131226155555.GA3937@saruman.home>
+References: <1386861269-28949-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131226120833.GA24645@localhost>
+ <20131226155555.GA3937@saruman.home>
+Message-ID: <20131226232105.GA2456@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 December 2013 14:52:10 Marc Dietrich wrote:
-> On Saturday 21 December 2013 23:11:58 Marc Dietrich wrote:
-> > Sorry, Stephen, I mistyped your email address in the first post.
+On Thu, Dec 26, 2013 at 09:55:55AM -0600, Felipe Balbi wrote:
+> On Thu, Dec 26, 2013 at 09:08:34AM -0300, Ezequiel Garcia wrote:
+> > Felipe,
 > > 
-> > On Saturday 21 December 2013 21:38:13 Marc Dietrich wrote:
-> > > Add backlight and panel nodes for the PAZ00 TFT LCD panel.
+> > On Thu, Dec 12, 2013 at 12:14:29PM -0300, Ezequiel Garcia wrote:
+> > > Enable this option as it's required to use USB on AM335x SoC.
 > > > 
-> > > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > > > ---
-> > > This should enable everything needed. Unfortunately, in my tests it only
-> > > switches on the backlight, but the display controller blocks in some
-> > > infinit loop, so we get no output (and no working system). I post it
-> > > here
-> > > in case I missed something obvious...
+> > >  arch/arm/configs/omap2plus_defconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> > > index 12c848e..e427b95 100644
+> > > --- a/arch/arm/configs/omap2plus_defconfig
+> > > +++ b/arch/arm/configs/omap2plus_defconfig
+> > > @@ -223,6 +223,7 @@ CONFIG_USB_TEST=y
+> > >  CONFIG_NOP_USB_XCEIV=y
+> > >  CONFIG_OMAP_USB2=y
+> > >  CONFIG_OMAP_USB3=y
+> > > +CONFIG_AM335X_PHY_USB=y
+> > >  CONFIG_USB_GADGET=y
+> > >  CONFIG_USB_GADGET_DEBUG=y
+> > >  CONFIG_USB_GADGET_DEBUG_FILES=y
+> > > -- 
+> > > 1.8.1.5
+> > > 
+> > 
+> > Maybe you can take this through your tree?
 > 
-> Some users reported that it works when using uboot (yeah, shame on me that I
-> still use fastboot on my dev machine), so I did a bit more research. It
-> indeed works when using uboot, even when the display setup is disabled
-> there. So my guess is that maybe some clock isn't setup by fastboot which
-> is done by uboot.
+> sorry, no. This should go through Tony to avoid conflicting.
+> 
 
-ok, to bring this self-conversation to an end, the cpu blocks at a memory 
-barrier right after 
-	value = tegra_dc_readl(rgb->dc, DC_CMD_DISPLAY_COMMAND);
-in tegra_output_rgb_disable (rgb.c).
+Tony?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
