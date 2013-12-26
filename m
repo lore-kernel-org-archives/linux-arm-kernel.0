@@ -1,59 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Dec 2013 11:42:55 -0800
-Subject: [PATCH v3 1/3] clocksource: timer-keystone: introduce
- clocksource driver for Keystone
-In-Reply-To: <52BC7818.9070409@ti.com>
-References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387974724-31138-2-git-send-email-ivan.khoronzhuk@ti.com>
- <20131226182254.GG31766@codeaurora.org> <52BC7818.9070409@ti.com>
-Message-ID: <20131226194255.GK31766@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 26 Dec 2013 14:01:06 -0600
+Subject: [PATCH V5 2/4] DRIVERS: IRQCHIP: CROSSBAR: Add support for
+ Crossbar IP
+In-Reply-To: <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
+References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
+ <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <20131226200106.GA30559@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26, ivan.khoronzhuk wrote:
-> On 12/26/2013 08:22 PM, Stephen Boyd wrote:
-> > On 12/25, Ivan Khoronzhuk wrote:
-> >> +
-> >> +	/* enable timer interrupts */
-> >> +	keystone_timer_writel(INTCTLSTAT_ENINT_MASK, INTCTLSTAT);
-> >> +
-> >> +	error = request_irq(irq, keystone_timer_interrupt, IRQF_TIMER,
-> >> +			    TIMER_NAME, event_dev);
-> >> +	if (error) {
-> >> +		pr_err("%s: failed to setup irq\n", __func__);
-> >> +		goto err;
-> >> +	}
-> >> +
-> >> +	/* setup clockevent */
-> >> +	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> >> +	event_dev->set_next_event = keystone_set_next_event;
-> >> +	event_dev->set_mode = keystone_set_mode;
-> >> +	event_dev->cpumask = cpu_all_mask;
-> >> +	event_dev->owner = THIS_MODULE;
-> >> +	event_dev->name = TIMER_NAME;
-> >> +	event_dev->irq = irq;
-> >> +
-> >> +	clockevents_config_and_register(event_dev, rate, 1, ULONG_MAX);
-> >> +
-> > 
-> > I hope you don't get an interrupt before you register the
-> > clockevent. You might want to reorder the interrupt request and
-> > the clockevent registration so that it isn't a problem. Other
-> > than that you can have my
-> > 
-> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
-> 
-> Thanks.
-> 
-> While interrupt enabling the timer is disabled, so it cannot generate interrupt.
-> The timer will be enabled when next event is set by clockevent core.
-> 
+Hi,
 
-Ok, I was thinking more like the interrupt is level triggered and
-the bootloader left it triggered. Sounds like that doesn't
-happen.
+On Tue, Dec 03, 2013 at 03:57:23PM +0530, Sricharan R wrote:
+> +static const struct of_device_id crossbar_match[] __initconst = {
+> +	{ .compatible = "ti,irq-crossbar" },
+> +	{}
+> +};
+> +
+> +int irqcrossbar_init(void)
+> +{
+> +	struct device_node *np;
+> +	np = of_find_matching_node(NULL, crossbar_match);
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	crossbar_of_init(np);
+> +	return 0;
+> +}
+
+instead, please use IRQCHIP_DECLARE() then you won't need to expose this
+symbol to be used by arch/arm/ code.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131226/fba560a9/attachment.sig>
