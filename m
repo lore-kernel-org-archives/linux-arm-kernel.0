@@ -1,70 +1,31 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 Dec 2013 14:30:19 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
-In-Reply-To: <52B37BAC.4090405@cogentembedded.com>
-References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
- <52B37BAC.4090405@cogentembedded.com>
-Message-ID: <20131226053015.GA9638@verge.net.au>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 26 Dec 2013 14:52:43 +0800
+Subject: [PATCH] regulator: act8865: fix incorrect devm_kzalloc for act8865
+Message-ID: <1388040763-15653-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 02:05:16AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12/16/2013 03:31 AM, Simon Horman wrote:
-> 
-> >The koelsch board uses has an SH ethernet controller which uses a Micrel
-> >phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
-> >Micrel-specific phy driver rather than relying on the generic phy driver.
-> 
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/Kconfig | 3 +++
-> >  1 file changed, 3 insertions(+)
-> 
-> >diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> >index f01e878..670238a 100644
-> >--- a/arch/arm/mach-shmobile/Kconfig
-> >+++ b/arch/arm/mach-shmobile/Kconfig
-> >@@ -41,6 +41,7 @@ config MACH_GENMAI
-> >  config MACH_KOELSCH
-> >  	bool "Koelsch board"
-> >  	depends on ARCH_R8A7791
-> >+	select MICREL_PHY if SH_ETH
-> >
-> >  config MACH_KZM9D
-> >  	bool "KZM9D board"
-> 
->    Simon, did you initially remove that hunk when committing?
+Which cause to allocate more needless memory.
 
-Thanks for noticing.
-
-I will queue up the following:
-
-From: Simon Horman <horms+renesas@verge.net.au>
-
-ARM: shmobile: koelsch: Conditionally select MICREL_PHY for Multiplatform
-
-The koelsch board uses has an SH ethernet controller which uses a Micrel
-phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
-Micrel-specific phy driver rather than relying on the generic phy driver.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- arch/arm/mach-shmobile/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/regulator/act8865-regulator.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index a127252..958ccf3d 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -45,6 +45,7 @@ config MACH_GENMAI
- config MACH_KOELSCH
- 	bool "Koelsch board"
- 	depends on ARCH_R8A7791
-+	select MICREL_PHY if SH_ETH
+diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+index f853353..aecf01b 100644
+--- a/drivers/regulator/act8865-regulator.c
++++ b/drivers/regulator/act8865-regulator.c
+@@ -290,9 +290,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+ 		return -EINVAL;
+ 	}
  
- config MACH_KZM9D
- 	bool "KZM9D board"
+-	act8865 = devm_kzalloc(dev, sizeof(struct act8865) +
+-			sizeof(struct regulator_dev *) * ACT8865_REG_NUM,
+-			GFP_KERNEL);
++	act8865 = devm_kzalloc(dev, sizeof(struct act8865), GFP_KERNEL);
+ 	if (!act8865)
+ 		return -ENOMEM;
+ 
 -- 
-1.8.4
+1.7.9.5
