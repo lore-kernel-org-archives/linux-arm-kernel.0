@@ -1,71 +1,57 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Thu, 26 Dec 2013 08:26:41 -0600
-Subject: [PATCH] clk: support hardware-specific debugfs entries
-Message-ID: <52BC3CA1.7000701@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 26 Dec 2013 15:48:58 +0100
+Subject: [PATCH 15/21] ARM: shmobile: Remove Koelsch reference DTS
+In-Reply-To: <52B9AFAB.8040704@cogentembedded.com>
+References: <cover.1387893834.git.horms+renesas@verge.net.au>
+ <82f7c2065a363cd3c0c84d3c9b59ee47897c5ebb.1387893834.git.horms+renesas@verge.net.au>
+ <52B9AFAB.8040704@cogentembedded.com>
+Message-ID: <11196073.PIXxcg54ZL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new clk_ops->debug_init method to allow a clock hardware
-driver to populate the clock's debugfs directory with entries
-beyond those common for every clock.
+Hi Sergei and Simon,
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- drivers/clk/clk.c            |    4 ++++
- include/linux/clk-provider.h |   10 ++++++++++
- 2 files changed, 14 insertions(+)
+On Tuesday 24 December 2013 20:00:43 Sergei Shtylyov wrote:
+> On 24-12-2013 18:19, Simon Horman wrote:
+> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > Now that the DTS file r8a7790-koelsch.dts can be used with
+> > board-koelsch.c and board-koelsch-reference.c, proceed with removing
+> > r8a7790-koelsch-reference.dts.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> > 
+> >   arch/arm/boot/dts/Makefile | 1 -
+> >   1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 909d910..5839077 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -225,7 +225,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb
+> > \
+> >   	r8a7779-marzen.dtb \
+> >   	r8a7779-marzen-reference.dtb \
+> >   	r8a7791-koelsch.dtb \
+> > -	r8a7791-koelsch-reference.dtb \
+> >   	r8a7790-lager.dtb \
+> >   	r8a7790-lager-reference.dtb \
+> 
+> Hm, the previous commit removed that file itself but forgot to remove it
+> from the Makefile.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2cf2ea6..c82a1bc 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -268,6 +268,10 @@ static int clk_debug_create_one(struct clk *clk,
-struct dentry *pdentry)
- 	if (!d)
- 		goto err_out;
+Indeed, this problem doesn't seem to be present in the patches I've sent. 
+Simon, has something gone wrong during a rebase ?
 
-+	if (clk->ops->debug_init)
-+		if (clk->ops->debug_init(clk->hw, clk->dentry))
-+			goto err_out;
-+
- 	ret = 0;
- 	goto out;
+> >   	sh73a0-kzm9g.dtb \
+> 
+> I suspect this patch should have removed the *.dts fiel itself but failed to
+> do so...
 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7e59253..4812512 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -31,6 +31,7 @@
- #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate
-change */
-
- struct clk_hw;
-+struct dentry;
-
- /**
-  * struct clk_ops -  Callback operations for hardware clocks; these are to
-@@ -108,6 +109,12 @@ struct clk_hw;
-  *		which is likely helpful for most .set_rate implementation.
-  *		Returns 0 on success, -EERROR otherwise.
-  *
-+ * @debug_init:	Set up type-specific debugfs entries for this clock.  This
-+ *		is called once, after the debugfs directory entry for this
-+ *		clock has been created.  The dentry pointer representing that
-+ *		directory is provided as an argument.  Called with
-+ *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
-+ *
-  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-  * implementations to split any work between atomic (enable) and sleepable
-  * (prepare) contexts.  If enabling a clock requires code that might sleep,
-@@ -140,6 +147,9 @@ struct clk_ops {
- 	int		(*set_rate)(struct clk_hw *hw, unsigned long,
- 				    unsigned long);
- 	void		(*init)(struct clk_hw *hw);
-+#ifdef CONFIG_COMMON_CLK_DEBUG
-+	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
-+#endif
- };
-
- /**
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
