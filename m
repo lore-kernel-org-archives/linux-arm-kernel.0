@@ -1,61 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 26 Dec 2013 14:50:59 -0800
-Subject: [GIT PULL] clk: initial support  for Broadcom Kona clocks
-In-Reply-To: <52AF1BA5.6000902@linaro.org>
-References: <52AF1BA5.6000902@linaro.org>
-Message-ID: <20131226225059.28468.61907@quantum>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Fri, 27 Dec 2013 00:18:30 +0100
+Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
+In-Reply-To: <12640298.egJ6YnqTYx@ax5200p>
+References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+ <1519363.agF5fhqzYs@ax5200p> <12640298.egJ6YnqTYx@ax5200p>
+Message-ID: <4478357.8zXrzzag7Z@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2013-12-16 07:26:29)
-> Mike, please pull the following for 3.14.  It adds clock support
-> for Broadcom SoCs having "Kona" clock control units.  Thanks.
+On Thursday 26 December 2013 14:52:10 Marc Dietrich wrote:
+> On Saturday 21 December 2013 23:11:58 Marc Dietrich wrote:
+> > Sorry, Stephen, I mistyped your email address in the first post.
+> > 
+> > On Saturday 21 December 2013 21:38:13 Marc Dietrich wrote:
+> > > Add backlight and panel nodes for the PAZ00 TFT LCD panel.
+> > > 
+> > > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> > > ---
+> > > This should enable everything needed. Unfortunately, in my tests it only
+> > > switches on the backlight, but the display controller blocks in some
+> > > infinit loop, so we get no output (and no working system). I post it
+> > > here
+> > > in case I missed something obvious...
+> 
+> Some users reported that it works when using uboot (yeah, shame on me that I
+> still use fastboot on my dev machine), so I did a bit more research. It
+> indeed works when using uboot, even when the display setup is disabled
+> there. So my guess is that maybe some clock isn't setup by fastboot which
+> is done by uboot.
 
-Pulled into clk-next.
-
-Thanks!
-Mike
-
-> 
->                                         -Alex
-> 
-> The following changes since commit 1459c837036a44e2dcf14a9452ed330201fb23b5:
-> 
->   clk: si570: Add a driver for SI570 oscillators (2013-12-14 21:01:35 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/landing-teams/working/broadcom/kernel.git
-> pull/mturquette-kona-clocks
-> 
-> for you to fetch changes up to 143522e704d105bd2b3cbbca6e8fb2d217866ec0:
-> 
->   clk: bcm281xx: add initial clock framework support (2013-12-16
-> 07:34:52 -0600)
-> 
-> ----------------------------------------------------------------
-> Alex Elder (2):
->       clk: bcm281xx: define kona clock binding
->       clk: bcm281xx: add initial clock framework support
-> 
->  .../devicetree/bindings/clock/bcm-kona-clock.txt   |   93 ++
->  drivers/clk/Kconfig                                |    1 +
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/bcm/Kconfig                            |    8 +
->  drivers/clk/bcm/Makefile                           |    3 +
->  drivers/clk/bcm/clk-bcm281xx.c                     |  416 ++++++++
->  drivers/clk/bcm/clk-kona-setup.c                   |  769 +++++++++++++++
->  drivers/clk/bcm/clk-kona.c                         | 1033
-> ++++++++++++++++++++
->  drivers/clk/bcm/clk-kona.h                         |  414 ++++++++
->  include/dt-bindings/clock/bcm281xx.h               |   65 ++
->  10 files changed, 2803 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->  create mode 100644 drivers/clk/bcm/Kconfig
->  create mode 100644 drivers/clk/bcm/Makefile
->  create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
->  create mode 100644 drivers/clk/bcm/clk-kona-setup.c
->  create mode 100644 drivers/clk/bcm/clk-kona.c
->  create mode 100644 drivers/clk/bcm/clk-kona.h
->  create mode 100644 include/dt-bindings/clock/bcm281xx.h
+ok, to bring this self-conversation to an end, the cpu blocks at a memory 
+barrier right after 
+	value = tegra_dc_readl(rgb->dc, DC_CMD_DISPLAY_COMMAND);
+in tegra_output_rgb_disable (rgb.c).
