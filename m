@@ -1,65 +1,94 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 26 Dec 2013 09:57:21 +0800
-Subject: [PATCH] regulator: act8865: register all regulators regardless of how
- many are used
-Message-ID: <1388023041-25785-1-git-send-email-wenyou.yang@atmel.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Dec 2013 04:04:11 +0000 (UTC)
+Subject: OMAP baseline test results for v3.13-rc5
+Message-ID: <alpine.DEB.2.02.1312260402460.15949@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Mark pointed out, the driver should register all regulators
-regardless of how many are used in the system in order to aid diagnostics.
 
-But in the previous patch, only register the regulators that are used.
+Here are some basic OMAP test results for Linux v3.13-rc5.
+Logs and other details at:
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- drivers/regulator/act8865-regulator.c |   13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+    http://www.pwsan.com/omap/testlogs/test_v3.13-rc5/20131223031812/
 
-diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-index db048f2..f853353 100644
---- a/drivers/regulator/act8865-regulator.c
-+++ b/drivers/regulator/act8865-regulator.c
-@@ -227,8 +227,8 @@ static int act8865_pdata_from_dt(struct device *dev,
- 		return matched;
- 
- 	pdata->regulators = devm_kzalloc(dev,
--				sizeof(struct act8865_regulator_data) * matched,
--				GFP_KERNEL);
-+				sizeof(struct act8865_regulator_data) *
-+				ARRAY_SIZE(act8865_matches), GFP_KERNEL);
- 	if (!pdata->regulators) {
- 		dev_err(dev, "%s: failed to allocate act8865 registor\n",
- 						__func__);
-@@ -238,10 +238,7 @@ static int act8865_pdata_from_dt(struct device *dev,
- 	pdata->num_regulators = matched;
- 	regulator = pdata->regulators;
- 
--	for (i = 0; i < matched; i++) {
--		if (!act8865_matches[i].init_data)
--			continue;
--
-+	for (i = 0; i < ARRAY_SIZE(act8865_matches); i++) {
- 		regulator->id = i;
- 		regulator->name = act8865_matches[i].name;
- 		regulator->platform_data = act8865_matches[i].init_data;
-@@ -310,7 +307,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 	}
- 
- 	/* Finally register devices */
--	for (i = 0; i < pdata->num_regulators; i++) {
-+	for (i = 0; i < ARRAY_SIZE(act8865_matches); i++) {
- 
- 		id = pdata->regulators[i].id;
- 
-@@ -339,7 +336,7 @@ static int act8865_pmic_remove(struct i2c_client *client)
- 	struct act8865 *act8865 = i2c_get_clientdata(client);
- 	int i;
- 
--	for (i = 0; i < ACT8865_REG_NUM; i++)
-+	for (i = 0; i < ARRAY_SIZE(act8865_matches); i++)
- 		regulator_unregister(act8865->rdev[i]);
- 
- 	return 0;
--- 
-1.7.9.5
+
+Test summary
+------------
+
+Build: zImage:
+    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+
+Build: uImage:
+    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+PM: chip off via dynamic idle:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+
+vmlinux object size
+(delta in bytes from test_v3.13-rc4 (319e2e3f63c348a9b66db4667efa73178e18b17d)):
+   text     data      bss    total  kernel
+  +7036        0        0    +7036  omap1_defconfig
+  +8060        0        0    +8060  omap1_defconfig_1510innovator_only
+  +7004        0        0    +7004  omap1_defconfig_5912osk_only
+   -664      -24        0     -688  omap2plus_defconfig
+  -1040        0        0    -1040  omap2plus_defconfig_2430sdp_only
+   -664       +8        0     -656  omap2plus_defconfig_cpupm
+   +276       +8        0     +284  omap2plus_defconfig_n800_multi_omap2xxx
+   +340      +40        0     +380  omap2plus_defconfig_n800_only_a
+   -600       +8        0     -592  omap2plus_defconfig_no_pm
+   -728        0        0     -728  omap2plus_defconfig_omap2_4_only
+   -664        0        0     -664  omap2plus_defconfig_omap3_4_only
+   +228        0      -16     +212  rmk_omap3430_ldp_allnoconfig
+  +6304        0        0    +6304  rmk_omap3430_ldp_oldconfig
+   +536        0        0     +536  rmk_omap4430_sdp_allnoconfig
+    -96        0        0      -96  rmk_omap4430_sdp_oldnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.13-rc4 (319e2e3f63c348a9b66db4667efa73178e18b17d))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
+
+
+Ho ho ho
