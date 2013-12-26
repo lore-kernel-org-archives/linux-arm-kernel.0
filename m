@@ -1,30 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 15:22:26 +0100
-Subject: [PATCH 0/2] ARM: mvebu: minor improvements
-Message-ID: <1388067748-18414-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Thu, 26 Dec 2013 08:26:41 -0600
+Subject: [PATCH] clk: support hardware-specific debugfs entries
+Message-ID: <52BC3CA1.7000701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew, Gregory, Sebastian,
+Add a new clk_ops->debug_init method to allow a clock hardware
+driver to populate the clock's debugfs directory with entries
+beyond those common for every clock.
 
-Here are again the two patches I sent to you this morning, which I'm
-resending because I forgot to Cc LAKML. Hopefully this time I do not
-forget it.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/clk.c            |    4 ++++
+ include/linux/clk-provider.h |   10 ++++++++++
+ 2 files changed, 14 insertions(+)
 
-The two patches do some minor cleanups/improvements in the mach-mvebu
-header files.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2cf2ea6..c82a1bc 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -268,6 +268,10 @@ static int clk_debug_create_one(struct clk *clk,
+struct dentry *pdentry)
+ 	if (!d)
+ 		goto err_out;
 
-Thanks!
++	if (clk->ops->debug_init)
++		if (clk->ops->debug_init(clk->hw, clk->dentry))
++			goto err_out;
++
+ 	ret = 0;
+ 	goto out;
 
-Thomas
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 7e59253..4812512 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -31,6 +31,7 @@
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate
+change */
 
-Thomas Petazzoni (2):
-  ARM: mvebu: remove prototypes of non-existing functions from common.h
-  ARM: mvebu: move Armada 370/XP specific definitions to armada-370-xp.h
+ struct clk_hw;
++struct dentry;
 
- arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
- arch/arm/mach-mvebu/common.h        | 8 +-------
- 2 files changed, 3 insertions(+), 7 deletions(-)
+ /**
+  * struct clk_ops -  Callback operations for hardware clocks; these are to
+@@ -108,6 +109,12 @@ struct clk_hw;
+  *		which is likely helpful for most .set_rate implementation.
+  *		Returns 0 on success, -EERROR otherwise.
+  *
++ * @debug_init:	Set up type-specific debugfs entries for this clock.  This
++ *		is called once, after the debugfs directory entry for this
++ *		clock has been created.  The dentry pointer representing that
++ *		directory is provided as an argument.  Called with
++ *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
++ *
+  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
+  * implementations to split any work between atomic (enable) and sleepable
+  * (prepare) contexts.  If enabling a clock requires code that might sleep,
+@@ -140,6 +147,9 @@ struct clk_ops {
+ 	int		(*set_rate)(struct clk_hw *hw, unsigned long,
+ 				    unsigned long);
+ 	void		(*init)(struct clk_hw *hw);
++#ifdef CONFIG_COMMON_CLK_DEBUG
++	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
++#endif
+ };
 
+ /**
 -- 
-1.8.3.2
+1.7.9.5
