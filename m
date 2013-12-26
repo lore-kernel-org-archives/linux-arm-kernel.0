@@ -1,25 +1,70 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 26 Dec 2013 13:08:47 +0800
-Subject: [PATCH] ARM: Remove duplicate SCHED_HRTICK config option
-In-Reply-To: <20131222195118.GF9144@quad.lixom.net>
-References: <1387205515.6989.1.camel@phoenix>
- <20131222195118.GF9144@quad.lixom.net>
-Message-ID: <CAFRkauA_7Mi0SGYOrdmrAJ29rNNi-EVNyP9_h-HVaEaPMhfReg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 26 Dec 2013 14:30:19 +0900
+Subject: [PATCH] ARM: shmobile: koelsch: Conditionally select MICREL_PHY
+In-Reply-To: <52B37BAC.4090405@cogentembedded.com>
+References: <1387153872-8387-1-git-send-email-horms+renesas@verge.net.au>
+ <52B37BAC.4090405@cogentembedded.com>
+Message-ID: <20131226053015.GA9638@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/23 Olof Johansson <olof@lixom.net>:
-> On Mon, Dec 16, 2013 at 10:51:55PM +0800, Axel Lin wrote:
->> There are two SCHED_HRTICK config entries in Kconfig.
->> This looks like a merge mistake. Fix it.
->>
->> Signed-off-by: Axel Lin <axel.lin@ingics.com>
->
-> Acked-by: Olof Johansson <olof@lixom.net>
->
-> Please send to Russell's patch tracker.
-Already sent to patch tracker.
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7929/1
+On Fri, Dec 20, 2013 at 02:05:16AM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 12/16/2013 03:31 AM, Simon Horman wrote:
+> 
+> >The koelsch board uses has an SH ethernet controller which uses a Micrel
+> >phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
+> >Micrel-specific phy driver rather than relying on the generic phy driver.
+> 
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/Kconfig | 3 +++
+> >  1 file changed, 3 insertions(+)
+> 
+> >diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> >index f01e878..670238a 100644
+> >--- a/arch/arm/mach-shmobile/Kconfig
+> >+++ b/arch/arm/mach-shmobile/Kconfig
+> >@@ -41,6 +41,7 @@ config MACH_GENMAI
+> >  config MACH_KOELSCH
+> >  	bool "Koelsch board"
+> >  	depends on ARCH_R8A7791
+> >+	select MICREL_PHY if SH_ETH
+> >
+> >  config MACH_KZM9D
+> >  	bool "KZM9D board"
+> 
+>    Simon, did you initially remove that hunk when committing?
 
-Thanks,
-Axel
+Thanks for noticing.
+
+I will queue up the following:
+
+From: Simon Horman <horms+renesas@verge.net.au>
+
+ARM: shmobile: koelsch: Conditionally select MICREL_PHY for Multiplatform
+
+The koelsch board uses has an SH ethernet controller which uses a Micrel
+phy. Select MICREL_PHY for koelsch if SH_ETH is enabled to make use of the
+Micrel-specific phy driver rather than relying on the generic phy driver.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index a127252..958ccf3d 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -45,6 +45,7 @@ config MACH_GENMAI
+ config MACH_KOELSCH
+ 	bool "Koelsch board"
+ 	depends on ARCH_R8A7791
++	select MICREL_PHY if SH_ETH
+ 
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+-- 
+1.8.4
