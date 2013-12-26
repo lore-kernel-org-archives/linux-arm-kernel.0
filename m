@@ -1,29 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 09:20:24 +0100
-Subject: [PATCH 0/2] ARM: mvebu: additional cleanups
-Message-ID: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 26 Dec 2013 09:20:25 +0100
+Subject: [PATCH 1/2] ARM: mvebu: remove prototypes of non-existing functions
+ from common.h
+In-Reply-To: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1388046026-332-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Gregory, Andrew, Sebastian,
+The mach-mvebu/common.h file contains prototypes of functions that
+have been removed, so this commit removes the corresponding
+prototypes.
 
-Here are two additional minor cleanups to the mach-mvebu code
-base. They are intended for mvebu/soc. Note that they are based on
-3.13-rc5, so there might be some conflicts while applying them to
-mvebu/soc, but the resolution should be trivial considering how simple
-the patches are.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/common.h | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (2):
-  ARM: mvebu: remove prototypes of non-existing functions from common.h
-  ARM: mvebu: move Armada 370/XP specific definitions to armada-370-xp.h
-
- arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
- arch/arm/mach-mvebu/common.h        | 8 +-------
- 2 files changed, 3 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index e366010..4c84689 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -21,12 +21,7 @@
+ 
+ void mvebu_restart(enum reboot_mode mode, const char *cmd);
+ 
+-void armada_370_xp_init_irq(void);
+-void armada_370_xp_handle_irq(struct pt_regs *regs);
+-
+ void armada_xp_cpu_die(unsigned int cpu);
+-int armada_370_xp_coherency_init(void);
+-int armada_370_xp_pmsu_init(void);
+ void armada_xp_secondary_startup(void);
+ extern struct smp_operations armada_xp_smp_ops;
+ #endif
 -- 
 1.8.3.2
