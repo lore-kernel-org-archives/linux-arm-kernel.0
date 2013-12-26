@@ -1,148 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Dec 2013 15:12:51 +0100
-Subject: [PATCH RFCv1 1/6] ARM: mvebu: prepare coherency code to support more
- SOCs
+Date: Thu, 26 Dec 2013 15:12:55 +0100
+Subject: [PATCH RFCv1 5/6] ARM: mvebu: update Armada 370/XP DT to use new
+ coherency compatible string
 In-Reply-To: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1388067176-18177-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1388067176-18177-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code that handles the coherency fabric of Armada 370 and Armada XP
-in arch/arm/mach-mvebu/coherency.c made the assumption that there was
-only one type of coherency fabric. Unfortunately, it turns out that
-upcoming SoCs have a slightly different coherency unit.
-
-In preparation to the introduction of the coherency support for more
-SoCs, this commit:
-
- * Adds a new "marvell,armada-370-coherency-fabric" compatible string,
-   to indicate the Armada 370/XP variant of the coherency fabric. The
-   existing compatible string "marvel,coherency-fabric" is preserved
-   for compatibility reasons, and has the same behavior as
-   the new "marvell,armada-370-coherency-fabric".
-
- * Introduces a data associated to the compatible string in the
-   compatible string match table, so that the code can differantiate
-   the variant of coherency unit being used.
-
- * Separates the coherency unit initialization code into its own
-   function.
+Update the common Armada 370 and Armada XP Device Tree files to use
+the new compatible string for the coherency fabric.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/arm/coherency-fabric.txt   | 12 ++++-
- arch/arm/mach-mvebu/coherency.c                    | 53 ++++++++++++++++------
- 2 files changed, 49 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-index 17d8cd1..6bd8788 100644
---- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-+++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-@@ -4,7 +4,15 @@ Available on Marvell SOCs: Armada 370 and Armada XP
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 7f10f62..c32f522 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -117,7 +117,7 @@
+ 			};
  
- Required properties:
- 
--- compatible: "marvell,coherency-fabric"
-+- compatible: the possible values are:
-+
-+ * "marvell,coherency-fabric", kept for backward compatibility reasons
-+   only. To be used for the coherency fabric of the Armada 370 and
-+   Armada XP. It is recommended to use
-+   "marvell,armada-370-coherency-fabric" instead.
-+
-+ * "marvell,armada-370-coherency-fabric", for the Armada 370 and
-+   Armada XP coherency fabric.
- 
- - reg: Should contain coherency fabric registers location and
-   length. First pair for the coherency fabric registers, second pair
-@@ -13,7 +21,7 @@ Required properties:
- Example:
- 
- coherency-fabric at d0020200 {
--	compatible = "marvell,coherency-fabric";
-+	compatible = "marvell,armada-370-coherency-fabric";
- 	reg = <0xd0020200 0xb0>,
- 		<0xd0021810 0x1c>;
- 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 58adf2f..a8209ae 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -37,8 +37,20 @@ static void __iomem *coherency_cpu_base;
- 
- #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
- 
-+enum {
-+	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
-+};
-+
-+/*
-+ * The "marvell,coherency-fabric" compatible string is kept for
-+ * backward compatibility reasons, and is equivalent to
-+ * "marvell,armada-370-coherency-fabric".
-+ */
- static struct of_device_id of_coherency_table[] = {
--	{.compatible = "marvell,coherency-fabric"},
-+	{.compatible = "marvell,coherency-fabric",
-+	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
-+	{.compatible = "marvell,armada-370-coherency-fabric",
-+	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
- 	{ /* end of list */ },
- };
- 
-@@ -120,26 +132,39 @@ static struct notifier_block mvebu_hwcc_platform_nb = {
- 	.notifier_call = mvebu_hwcc_platform_notifier,
- };
- 
-+static void __init armada_370_coherency_init(struct device_node *np)
-+{
-+	struct resource res;
-+	of_address_to_resource(np, 0, &res);
-+	coherency_phys_base = res.start;
-+	/*
-+	 * Ensure secondary CPUs will see the updated value,
-+	 * which they read before they join the coherency
-+	 * fabric, and therefore before they are coherent with
-+	 * the boot CPU cache.
-+	 */
-+	sync_cache_w(&coherency_phys_base);
-+	coherency_base = of_iomap(np, 0);
-+	coherency_cpu_base = of_iomap(np, 1);
-+	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+}
-+
- int __init coherency_init(void)
- {
- 	struct device_node *np;
- 
- 	np = of_find_matching_node(NULL, of_coherency_table);
- 	if (np) {
--		struct resource res;
-+		const struct of_device_id *match =
-+			of_match_node(of_coherency_table, np);
-+		int type;
-+
-+		type = (int) match->data;
- 		pr_info("Initializing Coherency fabric\n");
--		of_address_to_resource(np, 0, &res);
--		coherency_phys_base = res.start;
--		/*
--		 * Ensure secondary CPUs will see the updated value,
--		 * which they read before they join the coherency
--		 * fabric, and therefore before they are coherent with
--		 * the boot CPU cache.
--		 */
--		sync_cache_w(&coherency_phys_base);
--		coherency_base = of_iomap(np, 0);
--		coherency_cpu_base = of_iomap(np, 1);
--		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+
-+		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
-+			armada_370_coherency_init(np);
-+
- 		of_node_put(np);
- 	}
+ 			coherency-fabric at 20200 {
+-				compatible = "marvell,coherency-fabric";
++				compatible = "marvell,armada-370-coherency-fabric";
+ 				reg = <0x20200 0xb0>, <0x21010 0x1c>;
+ 			};
  
 -- 
 1.8.3.2
