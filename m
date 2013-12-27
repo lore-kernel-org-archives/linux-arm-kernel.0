@@ -1,85 +1,100 @@
-From: rjying@gmail.com (rjying)
-Date: Fri, 27 Dec 2013 13:40:47 +0800
-Subject: [PATCH v2] extcon: gpio: Add power resume support
-Message-ID: <1388122847-3276-1-git-send-email-rongjun.ying@csr.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 27 Dec 2013 14:13:22 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52BBB1B0.8040907@samsung.com>
+References: <1386987174-1788-3-git-send-email-zhangfei.gao@linaro.org>
+ <1387199536-7053-1-git-send-email-zhangfei.gao@linaro.org>
+ <52BBB1B0.8040907@samsung.com>
+Message-ID: <52BD1A82.7090101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+Dear Jaehoon
 
-When system on the suspend state, Some SoC can't get gpio interrupt.
-After system resume, need send extcon uevent to userspace.
+Thanks for the reviewing.
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
----
- -v2: Add lost_sleep_irq flags.
+On 12/26/2013 12:33 PM, Jaehoon Chung wrote:
 
- drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
- include/linux/extcon/extcon-gpio.h |    1 +
- 2 files changed, 21 insertions(+), 0 deletions(-)
+>> +config MMC_DW_K3
+>> +	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
+>> +	depends on MMC_DW
+>> +	select MMC_DW_PLTFM
+>> +	select MMC_DW_IDMAC
+>
+> Only use the IDMAC?
 
-diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
-index 7e0dff5..fde52c1 100644
---- a/drivers/extcon/extcon-gpio.c
-+++ b/drivers/extcon/extcon-gpio.c
-@@ -40,6 +40,7 @@ struct gpio_extcon_data {
- 	int irq;
- 	struct delayed_work work;
- 	unsigned long debounce_jiffies;
-+	bool lost_sleep_irq;
- };
- 
- static void gpio_extcon_work(struct work_struct *work)
-@@ -103,6 +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
- 	extcon_data->gpio_active_low = pdata->gpio_active_low;
- 	extcon_data->state_on = pdata->state_on;
- 	extcon_data->state_off = pdata->state_off;
-+	extcon_data->lost_sleep_irq = pdata->lost_sleep_irq;
- 	if (pdata->state_on && pdata->state_off)
- 		extcon_data->edev.print_state = extcon_gpio_print_state;
- 	if (pdata->debounce) {
-@@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int gpio_extcon_resume(struct device *dev)
-+{
-+	struct gpio_extcon_data *extcon_data;
-+
-+	extcon_data = dev_get_drvdata(dev);
-+	if (extcon_data->lost_sleep_irq)
-+		queue_delayed_work(system_power_efficient_wq,
-+			&extcon_data->work, extcon_data->debounce_jiffies);
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops gpio_extcon_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
-+};
-+
- static struct platform_driver gpio_extcon_driver = {
- 	.probe		= gpio_extcon_probe,
- 	.remove		= gpio_extcon_remove,
- 	.driver		= {
- 		.name	= "extcon-gpio",
- 		.owner	= THIS_MODULE,
-+		.pm = &gpio_extcon_pm_ops,
- 	},
- };
- 
-diff --git a/include/linux/extcon/extcon-gpio.h b/include/linux/extcon/extcon-gpio.h
-index 4195810..c7f0c3e 100644
---- a/include/linux/extcon/extcon-gpio.h
-+++ b/include/linux/extcon/extcon-gpio.h
-@@ -51,6 +51,7 @@ struct gpio_extcon_platform_data {
- 	/* if NULL, "0" or "1" will be printed */
- 	const char *state_on;
- 	const char *state_off;
-+	bool lost_sleep_irq;
- };
- 
- #endif /* __EXTCON_GPIO_H__ */
--- 
-1.7.5.4
+IDMAC has to be set here since we found the controller have some issue 
+in non-dma mode.
+
+
+>> +static unsigned long k3_dwmmc_caps[4] = {
+>> +	MMC_CAP_4_BIT_DATA | MMC_CAP_SD_HIGHSPEED,
+>> +	MMC_CAP_8_BIT_DATA | MMC_CAP_MMC_HIGHSPEED,
+>> +	0,
+>> +	0,
+>> +};
+>
+> If supports-highspeed is defined at dt-file,
+> then MMC_CAP_SD_HIGHSEEPD and MMC_CAP_MMC_HIGHSPEED should set in dw-mmc.c
+
+Yes, good catch, they can be removed.
+
+>
+>> +
+>> +static const struct dw_mci_drv_data k3_drv_data = {
+>> +	.caps			= k3_dwmmc_caps,
+>> +	.set_ios		= dw_mci_k3_set_ios,
+>> +	.parse_dt		= dw_mci_k3_parse_dt,
+>> +};
+>> +
+>> +static const struct of_device_id dw_mci_k3_match[] = {
+>> +	{ .compatible = "hisilicon,hi4511-dw-mshc", .data = &k3_drv_data, },
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, dw_mci_k3_match);
+>> +
+>> +static int dw_mci_k3_probe(struct platform_device *pdev)
+>> +{
+>> +	const struct dw_mci_drv_data *drv_data;
+>> +	const struct of_device_id *match;
+>> +
+>> +	match = of_match_node(dw_mci_k3_match, pdev->dev.of_node);
+>> +	drv_data = match->data;
+>> +
+>> +	return dw_mci_pltfm_register(pdev, drv_data);
+>> +}
+>> +
+>> +static int dw_mci_k3_suspend(struct device *dev)
+>> +{
+>> +	struct dw_mci *host = dev_get_drvdata(dev);
+>> +	int ret = 0;
+>> +
+>> +	ret = dw_mci_suspend(host);
+>> +	if (!ret)
+>> +		clk_disable_unprepare(host->ciu_clk);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int dw_mci_k3_resume(struct device *dev)
+>> +{
+>> +	struct dw_mci *host = dev_get_drvdata(dev);
+>> +	int ret = 0;
+>> +
+>> +	ret = clk_prepare_enable(host->ciu_clk);
+>> +	if (ret) {
+>> +		dev_err(host->dev, "failed to enable ciu clock\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	return dw_mci_resume(host);
+>> +}
+>
+> Clock control need in suspend/resume? ciu-clk is used into dw-mmc.c.
+
+The ciu-clk is required here not only for power, but also clk prepare 
+have to be triggered in the resume operation as well as init process, 
+otherwise sd register access will fail. Some tuning registers accessing 
+have been abstracted to clock.
+
+Thanks
