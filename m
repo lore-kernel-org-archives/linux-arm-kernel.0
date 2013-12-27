@@ -1,351 +1,108 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Fri, 27 Dec 2013 19:24:09 +0800
-Subject: [PATCH] the eDMA support for the LPUART send driver
-Message-ID: <1388143449-28640-1-git-send-email-yao.yuan@freescale.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 27 Dec 2013 19:19:34 +0530
+Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <52BC6B16.80507@ti.com>
+References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
+ <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com> <52BC6B16.80507@ti.com>
+Message-ID: <52BD856E.7010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add eDMA support for LPUART send function.
+On Thursday 26 December 2013 11:14 PM, Santosh Shilimkar wrote:
+> Sricharan,
+> 
+> On Wednesday 25 December 2013 11:52 PM, Sricharan R wrote:
+>> Hi Thomas,
+>> On Wednesday 18 December 2013 02:49 PM, Sricharan R wrote:
+>>> Hi Thomas,
+>>>
+>>> On Tuesday 03 December 2013 03:57 PM, Sricharan R wrote:
+>>>> Some socs have a large number of interrupts requests to service
+>>>> the needs of its many peripherals and subsystems. All of the interrupt
+>>>> requests lines from the subsystems are not needed at the same
+>>>> time, so they have to be muxed to the controllers appropriately.
+>>>> In such places a interrupt controllers are preceded by an
+>>>> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+>>>> requests to the controller inputs.
+>>>>
+>>>> This series models the peripheral interrupts that can be routed through
+>>>> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+>>>> in a separate linear domain inside the GIC. The registered routable domain's
+>>>> callback are invoked as a part of the GIC's callback, which in turn should
+>>>> allocate a free irq line and configure the IP accordingly. So every peripheral
+>>>> in the dts files mentions the fixed crossbar number as its interrupt. A free
+>>>> gic line for that gets allocated and configured when the peripheral interrupts
+>>>> are mapped.
+>>>>
+>>>> The minimal crossbar driver to track and allocate free GIC lines and configure the
+>>>> crossbar is added here, along with the DT bindings.
+>>>>
+>>>> V5:
+>>>>    Addressed a comment from Mark Rutland <mark.rutland@arm.com>,
+>>>>    updated tags and rebased on 3.13-rc2
+>>>>
+>>>> V4:
+>>>>    Addressed a couple of comments and split the DTS file updates in to
+>>>>    a separate series.
+>>>>
+>>>> V3:
+>>>>    Addressed few more comments from Thomas Gleixner <tglx@linutronix.de>
+>>>>
+>>>>    Rebased patches 3,4,5,7 which updates the DTS file on top of below branch
+>>>> 	   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+>>>> 	   for_3.13/dts
+>>>>
+>>>>    Rebased patches 1,2,6 on top of 3.12 mainline
+>>>>    Updated Commit tags
+>>>>
+>>>> V2:
+>>>>    Addressed Thomas Gleixner <tglx@linutronix.de> comments and
+>>>>    Kumar Gala <galak@codeaurora.org>
+>>>>
+>>>>    Split updating the DRA7.dtsi file for adding the routable-irqs
+>>>>
+>>>> Previous discussions that led to this is at
+>>>> 	https://lkml.org/lkml/2013/9/18/540
+>>>>
+>>>> The V1,V2,V3,V4 post of these patches is at
+>>>>       [V1]  https://lkml.org/lkml/2013/9/30/283
+>>>>       [V2]  http://www.spinics.net/lists/linux-omap/msg99540.html
+>>>>       [V3]  http://www.kernelhub.org/?msg=356470&p=2
+>>>>       [V4]  http://www.spinics.net/lists/linux-doc/msg16726.html
+>>>>
+>>>> Sricharan R (4):
+>>>>   DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+>>>>   DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+>>>>   ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+>>>>   ARM: DRA: Enable Crossbar IP support for DRA7XX
+>>>>
+>>>>  Documentation/devicetree/bindings/arm/gic.txt      |    6 +
+>>>>  .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+>>>>  arch/arm/mach-omap2/Kconfig                        |    1 +
+>>>>  arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
+>>>>  arch/arm/mach-omap2/omap4-common.c                 |    2 +
+>>>>  drivers/irqchip/Kconfig                            |    8 +
+>>>>  drivers/irqchip/Makefile                           |    1 +
+>>>>  drivers/irqchip/irq-crossbar.c                     |  208 ++++++++++++++++++++
+>>>>  drivers/irqchip/irq-gic.c                          |   81 +++++++-
+>>>>  include/linux/irqchip/arm-gic.h                    |    7 +-
+>>>>  include/linux/irqchip/irq-crossbar.h               |   11 ++
+>>>>  11 files changed, 343 insertions(+), 13 deletions(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>>>  create mode 100644 drivers/irqchip/irq-crossbar.c
+>>>>  create mode 100644 include/linux/irqchip/irq-crossbar.h
+>>>>
+>>>
+>>> I have addressed all the comments on this series, can this be merged now ?
+>>>
+>>   Ping..
+>>
+> Thomas has already given his reviewed-by tag so the patches can be
+> taken via arm-soc tree considering OMAP and GIC changes. Can you
+> create a branch with all these patches applied and send it
+> to Tony ?
+> 
+Ok, i will send out a branch for this.
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- arch/arm/boot/dts/vf610.dtsi    |  12 +++
- drivers/tty/serial/fsl_lpuart.c | 187 ++++++++++++++++++++++++++++++++--------
- 2 files changed, 163 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 365e0fa..35d7a79 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -118,6 +118,9 @@
- 				interrupts = <0 61 0x00>;
- 				clocks = <&clks VF610_CLK_UART0>;
- 				clock-names = "ipg";
-+				dma-names = "lpuart-rx","lpuart-tx";
-+				dmas = <&edma0 0 VF610_EDMA_MUXID0_UART0_RX>,
-+				       <&edma0 0 VF610_EDMA_MUXID0_UART0_TX>;
- 				status = "disabled";
- 			};
- 
-@@ -127,6 +130,9 @@
- 				interrupts = <0 62 0x04>;
- 				clocks = <&clks VF610_CLK_UART1>;
- 				clock-names = "ipg";
-+				dma-names = "lpuart-rx","lpuart-tx";
-+				dmas = <&edma0 0 VF610_EDMA_MUXID0_UART1_RX>,
-+				       <&edma0 0 VF610_EDMA_MUXID0_UART1_TX>;
- 				status = "disabled";
- 			};
- 
-@@ -136,6 +142,9 @@
- 				interrupts = <0 63 0x04>;
- 				clocks = <&clks VF610_CLK_UART2>;
- 				clock-names = "ipg";
-+				dma-names = "lpuart-rx","lpuart-tx";
-+				dmas = <&edma0 0 VF610_EDMA_MUXID0_UART2_RX>,
-+				       <&edma0 0 VF610_EDMA_MUXID0_UART2_TX>;
- 				status = "disabled";
- 			};
- 
-@@ -145,6 +154,9 @@
- 				interrupts = <0 64 0x04>;
- 				clocks = <&clks VF610_CLK_UART3>;
- 				clock-names = "ipg";
-+				dma-names = "lpuart-rx","lpuart-tx";
-+				dmas = <&edma0 0 VF610_EDMA_MUXID0_UART3_RX>,
-+				       <&edma0 0 VF610_EDMA_MUXID0_UART3_TX>;
- 				status = "disabled";
- 			};
- 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 8978dc9..8375141 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -13,14 +13,19 @@
- #define SUPPORT_SYSRQ
- #endif
- 
--#include <linux/module.h>
-+#include <linux/clk.h>
-+#include <linux/console.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dmapool.h>
- #include <linux/io.h>
- #include <linux/irq.h>
--#include <linux/clk.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
--#include <linux/console.h>
-+#include <linux/of_dma.h>
- #include <linux/serial_core.h>
-+#include <linux/slab.h>
- #include <linux/tty_flip.h>
- 
- /* All registers are 8-bit width */
-@@ -112,6 +117,9 @@
- #define UARTSFIFO_TXOF		0x02
- #define UARTSFIFO_RXUF		0x01
- 
-+#define DMA_MAXBURST		16
-+#define DMA_MAXBURST_MASK	(DMA_MAXBURST - 1)
-+
- #define DRIVER_NAME	"fsl-lpuart"
- #define DEV_NAME	"ttyLP"
- #define UART_NR		6
-@@ -121,6 +129,13 @@ struct lpuart_port {
- 	struct clk		*clk;
- 	unsigned int		txfifo_size;
- 	unsigned int		rxfifo_size;
-+	struct dma_chan		*tx_dma_lpuart;
-+	struct dma_async_tx_descriptor  *tx_dma_desc;
-+	dma_addr_t		tx_dma_buf_phys;
-+	dma_cookie_t		tx_cookie;
-+	unsigned char		*tx_dma_buf_virt;
-+	unsigned int		tx_bytes;
-+	int			tx_in_progress;
- };
- 
- static struct of_device_id lpuart_dt_ids[] = {
-@@ -131,6 +146,9 @@ static struct of_device_id lpuart_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
- 
-+static int lpuart_dma_tx(struct lpuart_port *sport, unsigned long count);
-+static void lpuart_prepare_tx(struct lpuart_port *sport);
-+
- static void lpuart_stop_tx(struct uart_port *port)
- {
- 	unsigned char temp;
-@@ -152,12 +170,36 @@ static void lpuart_enable_ms(struct uart_port *port)
- {
- }
- 
--static inline void lpuart_transmit_buffer(struct lpuart_port *sport)
-+static void lpuart_dma_tx_complete(void *arg)
-+{
-+	struct lpuart_port *sport = arg;
-+	struct circ_buf *xmit = &sport->port.state->xmit;
-+	unsigned long flags;
-+
-+	async_tx_ack(sport->tx_dma_desc);
-+
-+	spin_lock_irqsave(&sport->port.lock, flags);
-+
-+	xmit->tail = (xmit->tail + sport->tx_bytes) & (UART_XMIT_SIZE - 1);
-+	sport->tx_in_progress = 0;
-+
-+	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-+		uart_write_wakeup(&sport->port);
-+
-+	lpuart_prepare_tx(sport);
-+
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
-+}
-+
-+static void lpuart_pio_tx(struct lpuart_port *sport)
- {
- 	struct circ_buf *xmit = &sport->port.state->xmit;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&sport->port.lock, flags);
- 
- 	while (!uart_circ_empty(xmit) &&
--		(readb(sport->port.membase + UARTTCFIFO) < sport->txfifo_size)) {
-+		readb(sport->port.membase + UARTTCFIFO) < sport->txfifo_size) {
- 		writeb(xmit->buf[xmit->tail], sport->port.membase + UARTDR);
- 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
- 		sport->port.icount.tx++;
-@@ -167,46 +211,69 @@ static inline void lpuart_transmit_buffer(struct lpuart_port *sport)
- 		uart_write_wakeup(&sport->port);
- 
- 	if (uart_circ_empty(xmit))
--		lpuart_stop_tx(&sport->port);
--}
-+		writeb(readb(sport->port.membase + UARTCR5) | UARTCR5_TDMAS,
-+			sport->port.membase + UARTCR5);
- 
--static void lpuart_start_tx(struct uart_port *port)
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
-+}
-+
-+static int lpuart_dma_tx(struct lpuart_port *sport, unsigned long count)
- {
--	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
--	unsigned char temp;
-+	struct circ_buf *xmit = &sport->port.state->xmit;
-+	dma_addr_t tx_phys_addr;
-+
-+	dma_sync_single_for_device(sport->port.dev, sport->tx_dma_buf_phys,
-+				UART_XMIT_SIZE, DMA_TO_DEVICE);
-+	sport->tx_bytes = count & ~(DMA_MAXBURST_MASK);
-+	tx_phys_addr = sport->tx_dma_buf_phys + xmit->tail;
-+	sport->tx_dma_desc = dmaengine_prep_slave_single(sport->tx_dma_lpuart,
-+					tx_phys_addr, sport->tx_bytes,
-+					DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
-+
-+	if (!sport->tx_dma_desc) {
-+		dev_err(sport->port.dev, "Not able to get desc for Tx\n");
-+		return -EIO;
-+	}
- 
--	temp = readb(port->membase + UARTCR2);
--	writeb(temp | UARTCR2_TIE, port->membase + UARTCR2);
-+	sport->tx_dma_desc->callback = lpuart_dma_tx_complete;
-+	sport->tx_dma_desc->callback_param = sport;
-+	sport->tx_in_progress = 1;
-+	sport->tx_cookie = dmaengine_submit(sport->tx_dma_desc);
-+	dma_async_issue_pending(sport->tx_dma_lpuart);
- 
--	if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
--		lpuart_transmit_buffer(sport);
-+	return 0;
- }
- 
--static irqreturn_t lpuart_txint(int irq, void *dev_id)
-+static void lpuart_prepare_tx(struct lpuart_port *sport)
- {
--	struct lpuart_port *sport = dev_id;
- 	struct circ_buf *xmit = &sport->port.state->xmit;
--	unsigned long flags;
-+	unsigned long count =  CIRC_CNT_TO_END(xmit->head,
-+					xmit->tail, UART_XMIT_SIZE);
- 
--	spin_lock_irqsave(&sport->port.lock, flags);
--	if (sport->port.x_char) {
--		writeb(sport->port.x_char, sport->port.membase + UARTDR);
--		goto out;
--	}
--
--	if (uart_circ_empty(xmit) || uart_tx_stopped(&sport->port)) {
--		lpuart_stop_tx(&sport->port);
--		goto out;
--	}
-+	if (!count)
-+		return;
- 
--	lpuart_transmit_buffer(sport);
-+	if (count < DMA_MAXBURST)
-+		writeb(readb(sport->port.membase + UARTCR5) & ~UARTCR5_TDMAS,
-+				sport->port.membase + UARTCR5);
-+	else
-+		lpuart_dma_tx(sport, count);
-+}
-+
-+static void lpuart_start_tx(struct uart_port *port)
-+{
-+	struct lpuart_port *sport = container_of(port,
-+			struct lpuart_port, port);
-+	struct circ_buf *xmit = &sport->port.state->xmit;
-+	unsigned char temp;
- 
--	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
--		uart_write_wakeup(&sport->port);
-+	temp = readb(port->membase + UARTCR2);
-+	writeb(temp | UARTCR2_TIE, port->membase + UARTCR2);
-+	temp = readb(port->membase + UARTCR5);
-+	writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
- 
--out:
--	spin_unlock_irqrestore(&sport->port.lock, flags);
--	return IRQ_HANDLED;
-+	if (!uart_circ_empty(xmit) && !sport->tx_in_progress)
-+		lpuart_prepare_tx(sport);
- }
- 
- static irqreturn_t lpuart_rxint(int irq, void *dev_id)
-@@ -283,8 +346,9 @@ static irqreturn_t lpuart_int(int irq, void *dev_id)
- 		lpuart_rxint(irq, dev_id);
- 
- 	if (sts & UARTSR1_TDRE &&
--		!(readb(sport->port.membase + UARTCR5) & UARTCR5_TDMAS))
--		lpuart_txint(irq, dev_id);
-+		!(readb(sport->port.membase + UARTCR5) & UARTCR5_TDMAS)) {
-+		lpuart_pio_tx(sport);
-+	}
- 
- 	return IRQ_HANDLED;
- }
-@@ -366,13 +430,60 @@ static void lpuart_setup_watermark(struct lpuart_port *sport)
- 	writeb(UARTCFIFO_TXFLUSH | UARTCFIFO_RXFLUSH,
- 			sport->port.membase + UARTCFIFO);
- 
--	writeb(2, sport->port.membase + UARTTWFIFO);
-+	writeb(0, sport->port.membase + UARTTWFIFO);
- 	writeb(1, sport->port.membase + UARTRWFIFO);
- 
- 	/* Restore cr2 */
- 	writeb(cr2_saved, sport->port.membase + UARTCR2);
- }
- 
-+static int fsl_request_dma(struct uart_port *port)
-+{
-+	struct lpuart_port *sport = container_of(port,
-+					struct lpuart_port, port);
-+	struct dma_chan *tx_chan;
-+	struct dma_slave_config dma_tx_sconfig;
-+	dma_addr_t dma_phys;
-+	unsigned char *dma_buf;
-+	int ret;
-+
-+	tx_chan  = dma_request_slave_channel(sport->port.dev, "lpuart-tx");
-+
-+	if (!tx_chan) {
-+		dev_err(sport->port.dev, "Dma TX channel request failed!\n");
-+		return -ENODEV;
-+	}
-+
-+	dma_phys = dma_map_single(sport->port.dev,
-+				sport->port.state->xmit.buf,
-+				UART_XMIT_SIZE, DMA_TO_DEVICE);
-+
-+	if (!dma_phys) {
-+		dev_err(sport->port.dev, "Dma_phys single failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	dma_buf = sport->port.state->xmit.buf;
-+	dma_tx_sconfig.dst_addr = sport->port.mapbase + UARTDR;
-+	dma_tx_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	dma_tx_sconfig.dst_maxburst = DMA_MAXBURST;
-+	dma_tx_sconfig.direction = DMA_MEM_TO_DEV;
-+	ret = dmaengine_slave_config(tx_chan, &dma_tx_sconfig);
-+
-+	if (ret < 0) {
-+		dev_err(sport->port.dev,
-+				"Dma slave config failed, err = %d\n", ret);
-+		return ret;
-+	}
-+
-+	sport->tx_dma_lpuart = tx_chan;
-+	sport->tx_dma_buf_virt = dma_buf;
-+	sport->tx_dma_buf_phys = dma_phys;
-+	sport->tx_in_progress = 0;
-+
-+	return 0;
-+}
-+
- static int lpuart_startup(struct uart_port *port)
- {
- 	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
-@@ -380,6 +491,7 @@ static int lpuart_startup(struct uart_port *port)
- 	unsigned long flags;
- 	unsigned char temp;
- 
-+	fsl_request_dma(port);
- 	ret = devm_request_irq(port->dev, port->irq, lpuart_int, 0,
- 				DRIVER_NAME, sport);
- 	if (ret)
-@@ -393,6 +505,9 @@ static int lpuart_startup(struct uart_port *port)
- 	temp |= (UARTCR2_RIE | UARTCR2_TIE | UARTCR2_RE | UARTCR2_TE);
- 	writeb(temp, sport->port.membase + UARTCR2);
- 
-+	temp = readb(port->membase + UARTCR5);
-+	writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
-+
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 	return 0;
- }
--- 
-1.8.4
+Regards,
+ Sricharan
