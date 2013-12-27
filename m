@@ -1,62 +1,40 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 27 Dec 2013 10:38:34 +0800
-Subject: [PATCH v9 05/12] usb: phy-mxs: Add anatop regmap
+Date: Fri, 27 Dec 2013 10:38:37 +0800
+Subject: [PATCH v9 08/12] usb: phy-mxs: add controller id
 In-Reply-To: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
 References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1388111921-17326-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1388111921-17326-9-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is needed by imx6 SoC series, but not for imx23 and imx28.
+It is used to access un-regulator registers according to
+different controllers.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 0c6f3bc..12671c5 100644
+index bf22970..c5300bc 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -21,6 +21,8 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
- 
- #define DRIVER_NAME "mxs_phy"
- 
-@@ -87,6 +89,7 @@ struct mxs_phy {
- 	struct usb_phy phy;
+@@ -106,6 +106,7 @@ struct mxs_phy {
  	struct clk *clk;
  	const struct mxs_phy_data *data;
-+	struct regmap *regmap_anatop;
+ 	struct regmap *regmap_anatop;
++	int port_id;
  };
  
  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-@@ -190,6 +193,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	int ret;
- 	const struct of_device_id *of_id =
- 			of_match_device(mxs_phy_dt_ids, &pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
-@@ -209,6 +213,17 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+@@ -243,6 +244,11 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 		}
  	}
  
-+	/* Some SoCs don't have anatop registers */
-+	if (of_get_property(np, "fsl,anatop", NULL)) {
-+		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
-+			(np, "fsl,anatop");
-+		if (IS_ERR(mxs_phy->regmap_anatop)) {
-+			dev_dbg(&pdev->dev,
-+				"failed to find regmap for anatop\n");
-+			return PTR_ERR(mxs_phy->regmap_anatop);
-+		}
-+	}
++	ret = of_alias_get_id(np, "usbphy");
++	if (ret < 0)
++		dev_dbg(&pdev->dev, "failed to get alias id, errno %d\n", ret);
++	mxs_phy->port_id = ret;
 +
  	mxs_phy->phy.io_priv		= base;
  	mxs_phy->phy.dev		= &pdev->dev;
