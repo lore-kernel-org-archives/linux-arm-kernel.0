@@ -1,51 +1,65 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 27 Dec 2013 09:48:21 +0800
-Subject: [PATCH v8 11/12] usb: phy-mxs: Add system suspend/resume API
-In-Reply-To: <20131226162520.GC3937@saruman.home>
-References: <1387857536-4996-1-git-send-email-peter.chen@freescale.com>
- <1387857536-4996-12-git-send-email-peter.chen@freescale.com>
- <20131226162520.GC3937@saruman.home>
-Message-ID: <20131227014820.GB6214@shlinux1.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 27 Dec 2013 01:21:36 +0100
+Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
+In-Reply-To: <20131220120408.GA31738@gondor.apana.org.au>
+References: <1386703583-8386-1-git-send-email-marex@denx.de>
+ <20131220120408.GA31738@gondor.apana.org.au>
+Message-ID: <201312270121.36578.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 26, 2013 at 10:25:20AM -0600, Felipe Balbi wrote:
-> Hi,
+On Friday, December 20, 2013 at 01:04:08 PM, Herbert Xu wrote:
+> On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
+> > When finishing the ahash request, the ahash_op_unaligned_done() will
+> > call complete() on the request. Yet, this will not call the correct
+> > complete callback. The correct complete callback was previously stored
+> > in the requests' private data, as seen in ahash_op_unaligned(). This
+> > patch restores the correct complete callback and .data field of the
+> > request before calling complete() on it.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> > Cc: David S. Miller <davem@davemloft.net>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: linux-crypto at vger.kernel.org
+> > ---
+> > 
+> >  crypto/ahash.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/crypto/ahash.c b/crypto/ahash.c
+> > index 793a27f..a92dc38 100644
+> > --- a/crypto/ahash.c
+> > +++ b/crypto/ahash.c
+> > @@ -213,7 +213,10 @@ static void ahash_op_unaligned_done(struct
+> > crypto_async_request *req, int err)
+> > 
+> >  	ahash_op_unaligned_finish(areq, err);
+> > 
+> > -	complete(data, err);
+> > +	areq->base.complete = complete;
+> > +	areq->base.data = data;
+> > +
+> > +	complete(&areq->base, err);
 > 
-> On Tue, Dec 24, 2013 at 11:58:55AM +0800, Peter Chen wrote:
-> > @@ -398,6 +433,29 @@ static int mxs_phy_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > +static int mxs_phy_system_suspend(struct device *dev)
-> > +{
-> > +	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-> > +
-> > +	if (device_may_wakeup(dev))
-> > +		mxs_phy_enable_ldo_in_suspend(mxs_phy, true);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int mxs_phy_system_resume(struct device *dev)
-> > +{
-> > +	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-> > +
-> > +	if (device_may_wakeup(dev))
-> > +		mxs_phy_enable_ldo_in_suspend(mxs_phy, false);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static SIMPLE_DEV_PM_OPS(mxs_phy_pm, mxs_phy_system_suspend,
-> > +		mxs_phy_system_resume);
-> 
-> this will give "Defined but not used" warnings when !PM_SLEEP.
-> 
+> This looks completely bogus.  While restoring areq isn't wrong per
+> se, calling complete with &areq->base makes no sense.  The original
+> completion data is in the variable "data".
 
-Oh, sorry, will change.
+Is there some documentation for this so I can understand why this is wrong, 
+please? I really don't quite get it, sorry. Actually, is there some 
+documentation for writing crypto API drivers at all please ?
 
--- 
+> Which driver relies on this behaviour?
 
-Best Regards,
-Peter Chen
+This one.
+
+> Also, does your subsequent patches rely on this?
+
+Yes
+
+> Cheers,
+
+Best regards,
+Marek Vasut
