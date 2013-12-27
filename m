@@ -1,60 +1,48 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 27 Dec 2013 10:38:32 +0800
-Subject: [PATCH v9 03/12] usb: phy-mxs: Add auto clock and power setting
+Date: Fri, 27 Dec 2013 10:38:35 +0800
+Subject: [PATCH v9 06/12] usb: phy-mxs: change description of usb device speed
 In-Reply-To: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
 References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1388111921-17326-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <1388111921-17326-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The auto setting is used to open related power and clocks
-automatically after receiving wakeup signal.
+Change "high speed" to "HS"
+Change "non-high speed" to "FS/LS"
 
-With this feature, the PHY's clock and power can be recovered
-correctly from low power mode, it is guaranteed by IC logic.
+Implementation of notify_suspend and notify_resume will be different
+according to mxs_phy_data->flags.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   20 +++++++++++++++++---
- 1 files changed, 17 insertions(+), 3 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 6d49040..0c6f3bc 100644
+index 12671c5..c53b327 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -31,6 +31,11 @@
+@@ -161,8 +161,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+ static int mxs_phy_on_connect(struct usb_phy *phy,
+ 		enum usb_device_speed speed)
+ {
+-	dev_dbg(phy->dev, "%s speed device has connected\n",
+-		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++	dev_dbg(phy->dev, "%s device has connected\n",
++		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
  
- #define BM_USBPHY_CTRL_SFTRST			BIT(31)
- #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
-+#define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
-+#define BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE	BIT(25)
-+#define BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD	BIT(20)
-+#define BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE	BIT(19)
-+#define BM_USBPHY_CTRL_ENAUTO_PWRON_PLL		BIT(18)
- #define BM_USBPHY_CTRL_ENUTMILEVEL3		BIT(15)
- #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
- #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
-@@ -96,9 +101,18 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- 	/* Power up the PHY */
- 	writel(0, base + HW_USBPHY_PWD);
+ 	if (speed == USB_SPEED_HIGH)
+ 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+@@ -174,8 +174,8 @@ static int mxs_phy_on_connect(struct usb_phy *phy,
+ static int mxs_phy_on_disconnect(struct usb_phy *phy,
+ 		enum usb_device_speed speed)
+ {
+-	dev_dbg(phy->dev, "%s speed device has disconnected\n",
+-		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++	dev_dbg(phy->dev, "%s device has disconnected\n",
++		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
  
--	/* enable FS/LS device */
--	writel(BM_USBPHY_CTRL_ENUTMILEVEL2 |
--	       BM_USBPHY_CTRL_ENUTMILEVEL3,
-+	/*
-+	 * USB PHY Ctrl Setting
-+	 * - Auto clock/power on
-+	 * - Enable full/low speed support
-+	 */
-+	writel(BM_USBPHY_CTRL_ENAUTOSET_USBCLKS |
-+		BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE |
-+		BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD |
-+		BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE |
-+		BM_USBPHY_CTRL_ENAUTO_PWRON_PLL |
-+		BM_USBPHY_CTRL_ENUTMILEVEL2 |
-+		BM_USBPHY_CTRL_ENUTMILEVEL3,
- 	       base + HW_USBPHY_CTRL_SET);
- 
- 	return 0;
+ 	if (speed == USB_SPEED_HIGH)
+ 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
 -- 
 1.7.8
