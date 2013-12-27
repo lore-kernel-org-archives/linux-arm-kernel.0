@@ -1,131 +1,47 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Dec 2013 12:58:31 -0500
-Subject: [PATCH RFCv1 3/6] bus: mvebu: pass the coherency availability
- information at init time
-In-Reply-To: <1388067146-18111-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 27 Dec 2013 12:59:08 -0500
+Subject: [PATCH RFCv1 5/6] ARM: mvebu: update Armada 370/XP DT to use
+ new coherency compatible string
+In-Reply-To: <1388067146-18111-6-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1388067146-18111-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1388067146-18111-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131227175831.GA19878@titan.lakedaemon.net>
+ <1388067146-18111-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131227175908.GB19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 All,
 
-Including the MLs
+Including the MLs.
 
-On Thu, Dec 26, 2013 at 03:12:23PM +0100, Thomas Petazzoni wrote:
-> Until now, the mvebu-mbus was guessing by itself whether hardware I/O
-> coherency was available or not by poking into the Device Tree to see
-> if the coherency fabric Device Tree node was present or not.
-> 
-> However, on some upcoming SoCs, the presence or absence of the
-> coherency fabric DT node isn't sufficient: in CONFIG_SMP, the
-> coherency can be enabled, but not in !CONFIG_SMP.
-> 
-> In order to clean this up, the mvebu_mbus_dt_init() function is
-> extended to get a boolean argument telling whether coherency is
-> enabled or not. Therefore, the logic to decide whether coherency is
-> available or not now belongs to the core SoC code instead of the
-> mvebu-mbus driver itself, which is much better.
+On Thu, Dec 26, 2013 at 03:12:25PM +0100, Thomas Petazzoni wrote:
+> Update the common Armada 370 and Armada XP Device Tree files to use
+> the new compatible string for the coherency fabric.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/mach-kirkwood/board-dt.c   |  2 +-
->  arch/arm/mach-mvebu/armada-370-xp.c |  2 +-
->  drivers/bus/mvebu-mbus.c            | 11 +++--------
->  include/linux/mbus.h                |  2 +-
->  4 files changed, 6 insertions(+), 11 deletions(-)
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 9caa4fe..ba0f1ca 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -150,7 +150,7 @@ static void __init kirkwood_dt_init(void)
->  	 */
->  	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 7f10f62..c32f522 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -117,7 +117,7 @@
+>  			};
 >  
-> -	BUG_ON(mvebu_mbus_dt_init());
-> +	BUG_ON(mvebu_mbus_dt_init(false));
->  
->  	kirkwood_l2_init();
->  
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index e2acff9..b407525 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -39,7 +39,7 @@ static void __init armada_370_xp_timer_and_clk_init(void)
->  	of_clk_init(NULL);
->  	clocksource_of_init();
->  	coherency_init();
-> -	BUG_ON(mvebu_mbus_dt_init());
-> +	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+>  			coherency-fabric at 20200 {
+> -				compatible = "marvell,coherency-fabric";
+> +				compatible = "marvell,armada-370-coherency-fabric";
 
-coherency_available() is only available when support for armada 370/xp
-is enabled.  Please update the Kconfig to restrict the conditions under
-which this driver can be built.
+Not needed, see my reply to 1/6.
 
 thx,
 
 Jason.
 
->  #ifdef CONFIG_CACHE_L2X0
->  	l2x0_of_init(0, ~0UL);
->  #endif
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index 2394e97..16d11cf 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -700,7 +700,6 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
->  					 phys_addr_t sdramwins_phys_base,
->  					 size_t sdramwins_size)
->  {
-> -	struct device_node *np;
->  	int win;
+>  				reg = <0x20200 0xb0>, <0x21010 0x1c>;
+>  			};
 >  
->  	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
-> @@ -713,12 +712,6 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
->  		return -ENOMEM;
->  	}
->  
-> -	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-> -	if (np) {
-> -		mbus->hw_io_coherency = 1;
-> -		of_node_put(np);
-> -	}
-> -
->  	for (win = 0; win < mbus->soc->num_wins; win++)
->  		mvebu_mbus_disable_window(mbus, win);
->  
-> @@ -888,7 +881,7 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
->  	}
->  }
->  
-> -int __init mvebu_mbus_dt_init(void)
-> +int __init mvebu_mbus_dt_init(bool is_coherent)
->  {
->  	struct resource mbuswins_res, sdramwins_res;
->  	struct device_node *np, *controller;
-> @@ -927,6 +920,8 @@ int __init mvebu_mbus_dt_init(void)
->  		return -EINVAL;
->  	}
->  
-> +	mbus_state.hw_io_coherency = is_coherent;
-> +
->  	/* Get optional pcie-{mem,io}-aperture properties */
->  	mvebu_mbus_get_pcie_resources(np, &mbus_state.pcie_mem_aperture,
->  					  &mbus_state.pcie_io_aperture);
-> diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-> index 345b8c5..550c88f 100644
-> --- a/include/linux/mbus.h
-> +++ b/include/linux/mbus.h
-> @@ -73,6 +73,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
->  int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
->  		    size_t mbus_size, phys_addr_t sdram_phys_base,
->  		    size_t sdram_size);
-> -int mvebu_mbus_dt_init(void);
-> +int mvebu_mbus_dt_init(bool is_coherent);
->  
->  #endif /* __LINUX_MBUS_H */
 > -- 
 > 1.8.3.2
 > 
