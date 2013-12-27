@@ -1,42 +1,73 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Dec 2013 12:06:55 -0500
-Subject: [PATCH 2/2] ARM: mvebu: move Armada 370/XP specific
- definitions to armada-370-xp.h
-In-Reply-To: <20131226174920.5d404189@skate>
-References: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1388046026-332-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131226160048.GA19323@lunn.ch> <20131226170454.79529766@skate>
- <20131226161806.GC19323@lunn.ch> <20131226174920.5d404189@skate>
-Message-ID: <20131227170655.GM19878@titan.lakedaemon.net>
+Date: Fri, 27 Dec 2013 12:32:13 -0500
+Subject: [PATCH RFCv1 0/6] ARM: mvebu: coherency support improvements
+In-Reply-To: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131227173213.GS19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 26, 2013 at 05:49:20PM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Thu, 26 Dec 2013 17:18:06 +0100, Andrew Lunn wrote:
-> 
-> > > As it is today, none of the contents of armada-370-xp.h are useful for
-> > > Armada 370. However, the "main" file is also named armada-370-xp.c and
-> > > handles both SoC, so it made sense to have a file named armada-370-xp.h
-> > > as well.
-> > 
-> > Hi Thomas
-> > 
-> > So thinking about dove, kirkwood, this new SoC, all living in mvebu,
-> > should we have a board-dt.c file which all SoCs share, and then one
-> > .c/.h pair of files per SoC? I'm saying this without looking at the
-> > actual content, so i've no idea is this is actually possible. I guess
-> > we need to do something like this sometime, but does it need to be
-> > now?
-> 
-> I think it's a bit hard to see now what will be the common parts. I
-> personally would worry too much about this though, as code can easily be
-> reorganized as needed as we see patterns emerge and gain a better
-> understanding of what's common and what's specific.
+Thomas,
 
-I agree.  We need to keep an eye on it, but no need to churn.  The
-necessary changes can be made as new code is introduced.
+On Thu, Dec 26, 2013 at 03:12:50PM +0100, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
+> 
+> Here is a set of patches that make some changes to the mach-mvebu
+> coherency code, and the way the mvebu-mbus driver determines whether
+> hardware I/O coherency is enabled or not.
+> 
+> These changes are proposed in preparation to the introduction of the
+> support for more recent SOCs in mach-mvebu, which have a slightly
+> different coherency fabric (hence the need for different compatible
+> strings) and different constraints to be able to enable the I/O
+> coherency (not only the coherency fabric must be available, but the
+> kernel must be running in CONFIG_SMP).
+> 
+> Moreover, the mvebu-mbus driver was directly poking into the DT to
+> find whether a coherency fabric node was available or not, to
+> determine if I/O coherency is enabled or not. However, with the new
+> constraint that CONFIG_SMP must be enabled on some SOCs to get I/O
+> coherency, the solution of having mvebu-mbus directly poke into the DT
+> is not longer appropriate. This patch set therefore changes the
+> mvebu_mbus_dt_init() function call to take an additional boolean
+> argument telling whether the system is running in I/O coherent mode or
+> not.
+> 
+> I've for now marked those patches as RFC, to indicate that they are
+> clearly open for discussion. For example, I'm still wondering if I
+> should not introduce separate compatible strings
+> marvell,armada-370-coherency-fabric and
+> marvell,armada-xp-coherency-fabric for Armada 370 and Armada XP
+> respectively instead of using marvell,armada-370-coherency-fabric for
+> both. Our experience has shown that we often initially believe that a
+> given hardware unit is similar between SOCs, and then later discover
+> that there are in fact some slight differences, which should have
+> called for different compatible strings from the beginning.
+> 
+> Best regards,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (6):
+>   ARM: mvebu: prepare coherency code to support more SOCs
+>   ARM: mvebu: add a coherency_available() call
+>   bus: mvebu: pass the coherency availability information at init time
+>   ARM: mvebu: use of_find_matching_node_and_match() in coherency.c
+>   ARM: mvebu: update Armada 370/XP DT to use new coherency compatible
+>     string
+>   ARM: mvebu: update coherency fabric DT binding documentation
+> 
+>  .../devicetree/bindings/arm/coherency-fabric.txt   | 19 +++--
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |  2 +-
+>  arch/arm/mach-kirkwood/board-dt.c                  |  2 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c                |  2 +-
+>  arch/arm/mach-mvebu/coherency.c                    | 80 ++++++++++++++++------
+>  arch/arm/mach-mvebu/coherency.h                    |  1 +
+>  drivers/bus/mvebu-mbus.c                           | 11 +--
+>  include/linux/mbus.h                               |  2 +-
+>  8 files changed, 79 insertions(+), 40 deletions(-)
+
+How is this different than the RFC v1 I just looked over?
 
 thx,
 
