@@ -1,54 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 27 Dec 2013 20:08:18 +0100
-Subject: [PATCH 6/6] [RFC] arm: shmobile: genmai reference: Add RSPI nodes
-In-Reply-To: <2198668.ESbmzZvna4@avalon>
-References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <1387886210-3634-7-git-send-email-geert+renesas@linux-m68k.org>
- <2198668.ESbmzZvna4@avalon>
-Message-ID: <CAMuHMdVH4PyhxR3JLLPX9a3fKaEgdpQpd2aa4YKL6DUD8+Pw2Q@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 27 Dec 2013 14:26:11 -0500
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.14 (incr. #5)
+Message-ID: <20131227192611.GD19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 5:20 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Tuesday 24 December 2013 12:56:50 Geert Uytterhoeven wrote:
->> Add pinctrl and SPI devices for RSPI on Genmai.
->>
->> On this board, only rspi4 is in use. It's bus contains a single device
->> (a wm8978 audio codec), for which no bindings are defined yet.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
->> Cc: devicetree at vger.kernel.org
->> ---
->>  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 +++++++++++++++++-
->>  1 file changed, 17 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
->> b/arch/arm/boot/dts/r7s72100-genmai-reference.dts index
->> 114510f8bf09..6d99630627e4 100644
->> --- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
->> +++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
->> @@ -43,7 +43,7 @@
->>  };
->>
->>  &pfc {
->> -     pinctrl-0 = <&scif2_pins &ethernet_pins>;
->> +     pinctrl-0 = <&scif2_pins &ethernet_pins &rspi4_pins>;
->
-> You should add pinctrl-0 and pinctrl-names properties to the spi4 node
-> instead. Device nodes should reference their pinctrl configuration directly,
-> scif2 and ethernet are exceptions as DT bindings for those devices are not in
-> mainline yet.
+Guys,
 
-I put it there because the actual driver doesn't use DT yet. Is that OK?
+Another week, another round of changes.  All have been in -next for a
+while, and as with previous requests, this is an incremental pull from
+tags/mvebu-dt-3.14-4 to tags/mvebu-dt-3.14-5 on the mvebu/dt branch.
 
-Gr{oetje,eeting}s,
+Thanks and Merry Christmas!
 
-                        Geert
+Jason.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The following changes since commit a095b1c78a35f05755ca2f0e106d84792974aef5:
+
+  ARM: mvebu: sort DT nodes by address (2013-12-12 15:00:44 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14-5
+
+for you to fetch changes up to 2cc64b5655da65bbb6a760a722b5ab1f53f92cf7:
+
+  ARM: Kirkwood: DT board setup for LaPlug (2013-12-25 02:03:52 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.14 (incremental #5)
+
+ - mvebu
+    - add rtc chip isl12057 node to ReadyNAS boards
+    - fix register length in Armada XP pmsu
+
+ - kirkwood
+    - sort ocp nodes by address in 6282 dtsi file
+    - add 6192 dtsi file
+    - add LaPlug board
+    - add sata phy node
+
+ - dove
+    - add sata phy node
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      Phy: Add DT nodes on kirkwood and Dove for the SATA PHY
+
+Arnaud Ebalard (3):
+      ARM: mvebu: Enable ISL12057 RTC chip in ReadyNAS 102 .dts file
+      ARM: mvebu: Enable ISL12057 RTC chip in ReadyNAS 104 .dts file
+      ARM: mvebu: Enable ISL12057 RTC chip in ReadyNAS 2120 .dts file
+
+Jason Cooper (1):
+      ARM: kirkwood: 6282: sort DT nodes by address
+
+Maxime Hadjinlian (2):
+      ARM: Kirkwood: Add 6192 DTSI file
+      ARM: Kirkwood: DT board setup for LaPlug
+
+Thomas Petazzoni (1):
+      ARM: mvebu: fix register length for Armada XP PMSU
+
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts |   5 +
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts |   5 +
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts |   5 +
+ arch/arm/boot/dts/armada-xp.dtsi               |   2 +-
+ arch/arm/boot/dts/dove.dtsi                    |  11 ++
+ arch/arm/boot/dts/kirkwood-6192.dtsi           | 107 +++++++++++++++
+ arch/arm/boot/dts/kirkwood-6281.dtsi           |   2 +
+ arch/arm/boot/dts/kirkwood-6282.dtsi           |  37 +++---
+ arch/arm/boot/dts/kirkwood-laplug.dts          | 175 +++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                |  18 +++
+ 11 files changed, 349 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-6192.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-laplug.dts
