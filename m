@@ -1,57 +1,73 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Dec 2013 12:55:10 -0500
+Date: Fri, 27 Dec 2013 12:55:33 -0500
 Subject: [PATCH RFCv1 0/6] ARM: mvebu: coherency support improvements
-In-Reply-To: <20131226162931.GD19323@lunn.ch>
-References: <1388067146-18111-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131226160831.GB19323@lunn.ch> <20131226171302.3409b096@skate>
- <20131226162931.GD19323@lunn.ch>
-Message-ID: <20131227175510.GW19878@titan.lakedaemon.net>
+In-Reply-To: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131227175533.GX19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Thomas,
 
-resending to include the MLs
-
-On Thu, Dec 26, 2013 at 05:29:31PM +0100, Andrew Lunn wrote:
-> On Thu, Dec 26, 2013 at 05:13:02PM +0100, Thomas Petazzoni wrote:
-> > Dear Andrew Lunn,
-> > 
-> > On Thu, 26 Dec 2013 17:08:31 +0100, Andrew Lunn wrote:
-> > 
-> > > In the .dtsi file i would suggest multiple compatibilities from the
-> > > most specific to the most general. So listing:
-> > > marvell,armada-370-coherency-fabric,
-> > > marvell,armada-370-xp-coherency-fabric,
-> > > 
-> > > gives you the most forward/backward compatibility, as you discover
-> > > more about the hardware.
-> > 
-> > True, that's another possibility. Though it's unclear if a compatible
-> > string such as "marvell,armada-370-xp-coherency-fabric" makes sense. If
-> > you create such a compatible string, and then later discover than 370
-> > and XP cannot be handled in a same way, then why have a "shared"
-> > compatible string?
+On Thu, Dec 26, 2013 at 03:12:50PM +0100, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
 > 
-> Well presumably, if you need to split it further, it is somehow
-> broken, or at least not optimal. Anybody who cannot update there DT
-> blob keeps with the current somehow broken/non-optimal behavior, but
-> those who can upgrade there DT blob get better behavior.
+> Here is a set of patches that make some changes to the mach-mvebu
+> coherency code, and the way the mvebu-mbus driver determines whether
+> hardware I/O coherency is enabled or not.
 > 
-> More compatible strings helps with backward compatibility for old DT
-> blobs.
+> These changes are proposed in preparation to the introduction of the
+> support for more recent SOCs in mach-mvebu, which have a slightly
+> different coherency fabric (hence the need for different compatible
+> strings) and different constraints to be able to enable the I/O
+> coherency (not only the coherency fabric must be available, but the
+> kernel must be running in CONFIG_SMP).
+> 
+> Moreover, the mvebu-mbus driver was directly poking into the DT to
+> find whether a coherency fabric node was available or not, to
+> determine if I/O coherency is enabled or not. However, with the new
+> constraint that CONFIG_SMP must be enabled on some SOCs to get I/O
+> coherency, the solution of having mvebu-mbus directly poke into the DT
+> is not longer appropriate. This patch set therefore changes the
+> mvebu_mbus_dt_init() function call to take an additional boolean
+> argument telling whether the system is running in I/O coherent mode or
+> not.
+> 
+> I've for now marked those patches as RFC, to indicate that they are
+> clearly open for discussion. For example, I'm still wondering if I
+> should not introduce separate compatible strings
+> marvell,armada-370-coherency-fabric and
+> marvell,armada-xp-coherency-fabric for Armada 370 and Armada XP
+> respectively instead of using marvell,armada-370-coherency-fabric for
+> both. Our experience has shown that we often initially believe that a
+> given hardware unit is similar between SOCs, and then later discover
+> that there are in fact some slight differences, which should have
+> called for different compatible strings from the beginning.
+> 
+> Best regards,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (6):
+>   ARM: mvebu: prepare coherency code to support more SOCs
+>   ARM: mvebu: add a coherency_available() call
+>   bus: mvebu: pass the coherency availability information at init time
+>   ARM: mvebu: use of_find_matching_node_and_match() in coherency.c
+>   ARM: mvebu: update Armada 370/XP DT to use new coherency compatible
+>     string
+>   ARM: mvebu: update coherency fabric DT binding documentation
+> 
+>  .../devicetree/bindings/arm/coherency-fabric.txt   | 19 +++--
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |  2 +-
+>  arch/arm/mach-kirkwood/board-dt.c                  |  2 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c                |  2 +-
+>  arch/arm/mach-mvebu/coherency.c                    | 80 ++++++++++++++++------
+>  arch/arm/mach-mvebu/coherency.h                    |  1 +
+>  drivers/bus/mvebu-mbus.c                           | 11 +--
+>  include/linux/mbus.h                               |  2 +-
+>  8 files changed, 79 insertions(+), 40 deletions(-)
 
-Please, let's not over-think this.  Right now, are there _any_
-capability differences we're aware of between the two?  If not, then we
-should use marvell,armada-370-xp-coherency-fabric.  *after* we discover
-an incompatible difference, then we add
-marvell,armada-370-coherency-fabric.  The driver, if it sees the new
-compatible string, will use the new feature.  If it doesn't, it will
-default to the old behavior as it was under
-marvell,armada-370-xp-coherency-fabric.
-
-Let's not get ahead of ourselves guessing towards the 'perfect' DT
-binding.
+How is this different than the RFC v1 I just looked over?
 
 thx,
 
