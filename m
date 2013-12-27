@@ -1,76 +1,46 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 27 Dec 2013 20:01:53 +0100
-Subject: [PATCH 4/6] [RFC] Documentation: dt: Add Renesas RSPI/QSPI
- bindings
-In-Reply-To: <2590710.91Xybr4TsD@avalon>
+Date: Fri, 27 Dec 2013 20:08:18 +0100
+Subject: [PATCH 6/6] [RFC] arm: shmobile: genmai reference: Add RSPI nodes
+In-Reply-To: <2198668.ESbmzZvna4@avalon>
 References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <1387886210-3634-5-git-send-email-geert+renesas@linux-m68k.org>
- <2590710.91Xybr4TsD@avalon>
-Message-ID: <CAMuHMdXrPamASqFz8eCVxE0WKT=cdkrzxjDDT84m_AHT+1nmEA@mail.gmail.com>
+ <1387886210-3634-7-git-send-email-geert+renesas@linux-m68k.org>
+ <2198668.ESbmzZvna4@avalon>
+Message-ID: <CAMuHMdVH4PyhxR3JLLPX9a3fKaEgdpQpd2aa4YKL6DUD8+Pw2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Fri, Dec 27, 2013 at 5:18 PM, Laurent Pinchart
+On Fri, Dec 27, 2013 at 5:20 PM, Laurent Pinchart
 <laurent.pinchart@ideasonboard.com> wrote:
-> On Tuesday 24 December 2013 12:56:48 Geert Uytterhoeven wrote:
->> +++ b/Documentation/devicetree/bindings/spi/spi-rspi.txt
->> @@ -0,0 +1,27 @@
->> +Device tree configuration for Renesas RSPI/QSPI driver
->> +
->> +Required properties:
->> +- compatible      : "renesas,rspi-<soctype>". "renesas,rspi-rz" as
->> fallback,
->> +                    or
->> +                    "renesas,qspi-<soctype>", "renesas,qspi-rcar" as
->> fallback.
+> On Tuesday 24 December 2013 12:56:50 Geert Uytterhoeven wrote:
+>> Add pinctrl and SPI devices for RSPI on Genmai.
+>>
+>> On this board, only rspi4 is in use. It's bus contains a single device
+>> (a wm8978 audio codec), for which no bindings are defined yet.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>> Cc: devicetree at vger.kernel.org
+>> ---
+>>  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 +++++++++++++++++-
+>>  1 file changed, 17 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+>> b/arch/arm/boot/dts/r7s72100-genmai-reference.dts index
+>> 114510f8bf09..6d99630627e4 100644
+>> --- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+>> +++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+>> @@ -43,7 +43,7 @@
+>>  };
+>>
+>>  &pfc {
+>> -     pinctrl-0 = <&scif2_pins &ethernet_pins>;
+>> +     pinctrl-0 = <&scif2_pins &ethernet_pins &rspi4_pins>;
 >
-> I think you need to be a bit more verbose here and explain when to use rspi
-> and when to use qspi. I'm also wondering where we need the -rz and -rcar
+> You should add pinctrl-0 and pinctrl-names properties to the spi4 node
+> instead. Device nodes should reference their pinctrl configuration directly,
+> scif2 and ethernet are exceptions as DT bindings for those devices are not in
+> mainline yet.
 
-OK.
-
-> suffixes for the generic compatible strings.
-
-The rationale behind this is that RSPI DT would apply to RSPI on RZ/A1H.
-The spi-rspi driver also supports legacy SH7757, which may not move to
-DT anytime soon.
-For symmetry, I did the same thing for QSPI, which applies to QSPI
-on R-Car H2 and M2 (upon second look, it should be "renesas,qspi-rcar-gen2",
-as E1/M1/H1 have HSPI).
-
-Does this makes sense? Or do you still prefer plain "renesas,rspi" and
-"renesas,qspi", and perhaps "renesas,rspi-sh" if we ever get DT there?
-
->> +- reg             : address start and address range size of device
->> +- interrupts      : 3 interrupts for RSPI (SPEI, SPRI, SPTI),
->> +                    1 interrupt for QSPI
->> +- num-cs       : Number of chip selects
->> +- #address-cells  : should be <1>
->> +- #size-cells     : should be <0>
->
-> I would say "must" instead of "should".
-
-OK.
-
->> +Example:
->> +
->> +     spi0: spi at e800c800 {
->> +             compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
->> +             reg = <0xe800c800 0x24>;
->> +             interrupts = <0 238 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 239 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 240 IRQ_TYPE_LEVEL_HIGH>;
->
-> You're missing the interrupt-parent property.
-
-OK.
-
-But we don't need it in the spi node in the actual .dts, as we already have
-"interrupt-parent = <&gic>;" in the enclosing node, right?
-
-Thanks!
+I put it there because the actual driver doesn't use DT yet. Is that OK?
 
 Gr{oetje,eeting}s,
 
