@@ -1,62 +1,62 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 27 Dec 2013 21:16:00 +0100
-Subject: [PATCH v2 6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI bindings
+Date: Fri, 27 Dec 2013 21:15:59 +0100
+Subject: [PATCH v2 5/8] [RFC] ARM: shmobile: genmai: Add preliminary RSPI
+ pinmux setup
 In-Reply-To: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
 References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1388175362-17132-7-git-send-email-geert@linux-m68k.org>
+Message-ID: <1388175362-17132-6-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
+This does not work as there's no pinmux configuration in setup-r7s72100.c
+yet.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Cc: devicetree at vger.kernel.org
 ---
-v2:
-  - Clarify RSPI/QSPI
-  - Add interrupt-parent
-  - s/should/must/ for #address-cells and #size-cells
+New in v2
 
- Documentation/devicetree/bindings/spi/spi-rspi.txt |   31 ++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-rspi.txt
+ arch/arm/mach-shmobile/board-genmai.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rspi.txt b/Documentation/devicetree/bindings/spi/spi-rspi.txt
-new file mode 100644
-index 000000000000..504db8917927
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-rspi.txt
-@@ -0,0 +1,31 @@
-+Device tree configuration for Renesas RSPI/QSPI driver
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+index 7c912d337828..d89d87ac1c6f 100644
+--- a/arch/arm/mach-shmobile/board-genmai.c
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <linux/sh_eth.h>
+ #include <linux/spi/spi.h>
+@@ -51,9 +52,25 @@ static const struct spi_board_info spi_info[] __initconst = {
+ 	},
+ };
+ 
++static const struct pinctrl_map genmai_pinctrl_map[] = {
++	/* RSPI4 */
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi.4", "pfc-r7s72100",
++				  "rspi4_rspck_p4_0", "rspi4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi.4", "pfc-r7s72100",
++				  "rspi4_ssl0_p4_1", "rspi4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi.4", "pfc-r7s72100",
++				  "rspi4_mosi_p4_2", "rspi4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi.4", "pfc-r7s72100",
++				  "rspi4_miso_p4_3", "rspi4"),
++};
 +
-+Required properties:
-+- compatible       : For Renesas Serial Peripheral Interface:
-+                     "renesas,rspi-<soctype>", "renesas,rspi-rz" as fallback.
-+		     For Quad Serial Peripheral Interface:
-+		     "renesas,qspi-<soctype>", "renesas,qspi-rcar" as fallback.
-+- reg              : address start and address range size of device
-+- interrupts       : 3 interrupts for RSPI (SPEI, SPRI, SPTI),
-+		     1 interrupt for QSPI
-+- interrupt-parent : the phandle for the interrupt controller that
-+		     services interrupts for this device.
-+- num-cs	   : Number of chip selects
-+- #address-cells   : must be <1>
-+- #size-cells      : must be <0>
-+
-+Pinctrl properties might be needed, too. See there.
-+
-+Example:
-+
-+	spi0: spi at e800c800 {
-+		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
-+		reg = <0xe800c800 0x24>;
-+		interrupts = <0 238 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 239 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		num-cs = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
+ static void __init genmai_add_standard_devices(void)
+ {
+ 	r7s72100_clock_init();
++	pinctrl_register_mappings(genmai_pinctrl_map,
++				  ARRAY_SIZE(genmai_pinctrl_map));
++	/* FIXME there's no pinmux configuration in setup-r7s72100.c yet */
++	/* r7s72100_pinmux_init(); */
+ 	r7s72100_add_dt_devices();
+ 
+ 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
 -- 
 1.7.9.5
