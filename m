@@ -1,35 +1,37 @@
-From: rientjes@google.com (David Rientjes)
-Date: Thu, 26 Dec 2013 15:45:04 -0800 (PST)
-Subject: [PATCH] mm/memblock: use WARN_ONCE when MAX_NUMNODES passed as
- input parameter
-In-Reply-To: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.02.1312261542260.9342@chino.kir.corp.google.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 26 Dec 2013 16:44:20 -0800
+Subject: [PATCH 0/7] misc Tegra clock fixes
+Message-ID: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Dec 2013, Santosh Shilimkar wrote:
+Fixes for various clock-related issues found during bringup of
+Tegra124-based Venice2 and Norrin boards.
 
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 71b11d9..6af873a 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -707,11 +707,9 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
->  	struct memblock_type *rsv = &memblock.reserved;
->  	int mi = *idx & 0xffffffff;
->  	int ri = *idx >> 32;
-> -	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
->  
-> -	if (nid == MAX_NUMNODES)
-> -		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
-> -			     __func__);
-> +	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
-> +		nid = NUMA_NO_NODE;
->  
->  	for ( ; mi < mem->cnt; mi++) {
->  		struct memblock_region *m = &mem->regions[mi];
+Andrew Bresticker (3):
+  clk: tegra: fix sdmmc clks on Tegra1x4
+  clk: tegra: cclk_lp has a pllx/2 divider
+  clk: tegra: use max divider if divider overflows
 
-Um, why do this at runtime?  This is only used for 
-for_each_free_mem_range(), which is used rarely in x86 and memblock-only 
-code.  I'm struggling to understand why we can't deterministically fix the 
-callers if this condition is possible.
+David Ung (1):
+  clk: tegra: PLLD2 fixes for hdmi
+
+Gabe Black (1):
+  clk: tegra: Fix PLLP rate table
+
+Mark Zhang (1):
+  clk: tegra: fix host1x clock on Tegra124
+
+Rhyland Klein (1):
+  clk: tegra: Fix PLLD mnp table
+
+ drivers/clk/tegra/clk-divider.c          |  2 +-
+ drivers/clk/tegra/clk-id.h               |  4 +++
+ drivers/clk/tegra/clk-tegra-periph.c     |  4 +++
+ drivers/clk/tegra/clk-tegra-super-gen4.c |  2 +-
+ drivers/clk/tegra/clk-tegra114.c         |  8 +++---
+ drivers/clk/tegra/clk-tegra124.c         | 46 +++++++++++++++++++-------------
+ 6 files changed, 41 insertions(+), 25 deletions(-)
+
+-- 
+1.8.5.1
