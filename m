@@ -1,56 +1,33 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 27 Dec 2013 10:38:41 +0800
-Subject: [PATCH v9 12/12] usb: phy-mxs: Add sync time after controller clear
- phcd
-In-Reply-To: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1388111921-17326-13-git-send-email-peter.chen@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 26 Dec 2013 19:53:28 -0800
+Subject: [GIT PULL 10/10] ARM: tegra: defconfig changes
+In-Reply-To: <1387231812-5701-10-git-send-email-swarren@wwwdotorg.org>
+References: <1387231812-5701-1-git-send-email-swarren@wwwdotorg.org>
+ <1387231812-5701-10-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131227035328.GA25848@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After clear portsc.phcd, PHY needs 200us stable time for switch
-32K clock to AHB clock.
+On Mon, Dec 16, 2013 at 03:10:12PM -0700, Stephen Warren wrote:
+> Enable new features required by the Venice2 board.
+> 
+> This branch is based on v3.13-rc1, and shouldn't cause any conflicts.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.14-defconfig
+> 
+> for you to fetch changes up to 0d8c67218cef8af259e4d12221434a1d7b0f3bbc:
+> 
+>   ARM: tegra: tegra_defconfig updates
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+1-10 has been pulled into arm-soc. Thanks!
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 53b8dad..4652fc9 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -151,6 +151,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
- 	return mxs_phy->data == &imx6sl_phy_data;
- }
- 
-+/*
-+ * PHY needs some 32K cycles to switch from 32K clock to
-+ * bus (such as AHB/AXI, etc) clock.
-+ */
-+static void mxs_phy_clock_switch_delay(void)
-+{
-+	usleep_range(300, 400);
-+}
-+
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- {
- 	int ret;
-@@ -260,6 +269,7 @@ static int mxs_phy_init(struct usb_phy *phy)
- {
- 	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
- 
-+	mxs_phy_clock_switch_delay();
- 	clk_prepare_enable(mxs_phy->clk);
- 	return mxs_phy_hw_init(mxs_phy);
- }
-@@ -284,6 +294,7 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- 		       x->io_priv + HW_USBPHY_CTRL_SET);
- 		clk_disable_unprepare(mxs_phy->clk);
- 	} else {
-+		mxs_phy_clock_switch_delay();
- 		clk_prepare_enable(mxs_phy->clk);
- 		writel(BM_USBPHY_CTRL_CLKGATE,
- 		       x->io_priv + HW_USBPHY_CTRL_CLR);
--- 
-1.7.8
+
+-Olof
