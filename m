@@ -1,112 +1,85 @@
-From: markz@nvidia.com (Mark Zhang)
-Date: Fri, 27 Dec 2013 12:58:48 +0800
-Subject: [PATCH] arm: mm: add memory type for inner-writeback
-Message-ID: <1388120328-17148-1-git-send-email-markz@nvidia.com>
+From: rjying@gmail.com (rjying)
+Date: Fri, 27 Dec 2013 13:40:47 +0800
+Subject: [PATCH v2] extcon: gpio: Add power resume support
+Message-ID: <1388122847-3276-1-git-send-email-rongjun.ying@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+From: Rongjun Ying <rongjun.ying@csr.com>
 
-For streaming-style operations (e.g., software rendering of graphics
-surfaces shared with non-coherent DMA devices), the cost of performing
-L2 cache maintenance can exceed the benefit of having the larger cache
-(this is particularly true for OUTER_CACHE configurations like the ARM
-PL2x0).
+When system on the suspend state, Some SoC can't get gpio interrupt.
+After system resume, need send extcon uevent to userspace.
 
-This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
-in the tex remapping tables as an inner-writeback-write-allocate, outer
-non-cacheable memory type, so that this mapping will be available to
-clients which will benefit from the reduced L2 maintenance.
-
-Signed-off-by: Gary King <gking@nvidia.com>
+Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
 ---
- arch/arm/include/asm/pgtable-2level.h | 1 +
- arch/arm/include/asm/pgtable.h        | 3 +++
- arch/arm/mm/proc-macros.S             | 2 +-
- arch/arm/mm/proc-v7-2level.S          | 4 ++--
- arch/arm/mm/proc-xsc3.S               | 2 +-
- arch/arm/mm/proc-xscale.S             | 2 +-
- 6 files changed, 9 insertions(+), 5 deletions(-)
+ -v2: Add lost_sleep_irq flags.
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index dfff709fda3c..528b397b6c91 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -141,6 +141,7 @@
- #define L_PTE_MT_DEV_WC		(_AT(pteval_t, 0x09) << 2)	/* 1001 */
- #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
- #define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
-+#define L_PTE_MT_INNER_WB	(_AT(pteval_t, 0x05) << 2)	/* 0101 (armv6, armv7) */
+ drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
+ include/linux/extcon/extcon-gpio.h |    1 +
+ 2 files changed, 21 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
+index 7e0dff5..fde52c1 100644
+--- a/drivers/extcon/extcon-gpio.c
++++ b/drivers/extcon/extcon-gpio.c
+@@ -40,6 +40,7 @@ struct gpio_extcon_data {
+ 	int irq;
+ 	struct delayed_work work;
+ 	unsigned long debounce_jiffies;
++	bool lost_sleep_irq;
+ };
  
- #ifndef __ASSEMBLY__
+ static void gpio_extcon_work(struct work_struct *work)
+@@ -103,6 +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
+ 	extcon_data->gpio_active_low = pdata->gpio_active_low;
+ 	extcon_data->state_on = pdata->state_on;
+ 	extcon_data->state_off = pdata->state_off;
++	extcon_data->lost_sleep_irq = pdata->lost_sleep_irq;
+ 	if (pdata->state_on && pdata->state_off)
+ 		extcon_data->edev.print_state = extcon_gpio_print_state;
+ 	if (pdata->debounce) {
+@@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 7d59b524f2af..2b0601a9a18e 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -134,6 +134,9 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED | L_PTE_XN)
- #endif
- 
-+#define pgprot_inner_writeback(prot) \
-+	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_INNER_WB)
++#ifdef CONFIG_PM_SLEEP
++static int gpio_extcon_resume(struct device *dev)
++{
++	struct gpio_extcon_data *extcon_data;
 +
- #endif /* __ASSEMBLY__ */
++	extcon_data = dev_get_drvdata(dev);
++	if (extcon_data->lost_sleep_irq)
++		queue_delayed_work(system_power_efficient_wq,
++			&extcon_data->work, extcon_data->debounce_jiffies);
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops gpio_extcon_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
++};
++
+ static struct platform_driver gpio_extcon_driver = {
+ 	.probe		= gpio_extcon_probe,
+ 	.remove		= gpio_extcon_remove,
+ 	.driver		= {
+ 		.name	= "extcon-gpio",
+ 		.owner	= THIS_MODULE,
++		.pm = &gpio_extcon_pm_ops,
+ 	},
+ };
  
- /*
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index e3c48a3fe063..fa829840ee16 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -127,7 +127,7 @@
- 	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
- 	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
- 	.long	PTE_BUFFERABLE					@ L_PTE_MT_DEV_SHARED
--	.long	0x00						@ unused
-+	.long	PTE_EXT_TEX(4) | PTE_BUFFERABLE			@ L_PTE_MT_INNER_WB
- 	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
- 	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
- 	.long	0x00						@ unused
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index bdd3be4be77a..059a9d7242c2 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -144,8 +144,8 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	 *   NS1 = PRRR[19] = 1		- normal shareable property
- 	 *   NOS = PRRR[24+n] = 1	- not outer shareable
- 	 */
--.equ	PRRR,	0xff0a81a8
--.equ	NMRR,	0x40e040e0
-+.equ	PRRR,	0xff0a89a8
-+.equ	NMRR,	0x40e044e0
+diff --git a/include/linux/extcon/extcon-gpio.h b/include/linux/extcon/extcon-gpio.h
+index 4195810..c7f0c3e 100644
+--- a/include/linux/extcon/extcon-gpio.h
++++ b/include/linux/extcon/extcon-gpio.h
+@@ -51,6 +51,7 @@ struct gpio_extcon_platform_data {
+ 	/* if NULL, "0" or "1" will be printed */
+ 	const char *state_on;
+ 	const char *state_off;
++	bool lost_sleep_irq;
+ };
  
- 	/*
- 	 * Macro for setting up the TTBRx and TTBCR registers.
-diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-index dc1645890042..9c374495e778 100644
---- a/arch/arm/mm/proc-xsc3.S
-+++ b/arch/arm/mm/proc-xsc3.S
-@@ -381,7 +381,7 @@ cpu_xsc3_mt_table:
- 	.long	PTE_EXT_TEX(5) | PTE_CACHEABLE			@ L_PTE_MT_WRITETHROUGH
- 	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
- 	.long	PTE_EXT_TEX(1) | PTE_BUFFERABLE			@ L_PTE_MT_DEV_SHARED
--	.long	0x00						@ unused
-+	.long	PTE_EXT_TEX(4) | PTE_BUFFERABLE			@ L_PTE_MT_INNER_WB (not present?)
- 	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
- 	.long	PTE_EXT_TEX(5) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC (not present?)
- 	.long	0x00						@ unused
-diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-index d19b1cfcad91..2ac1b88e02ac 100644
---- a/arch/arm/mm/proc-xscale.S
-+++ b/arch/arm/mm/proc-xscale.S
-@@ -491,7 +491,7 @@ cpu_xscale_mt_table:
- 	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
- 	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
- 	.long	PTE_EXT_TEX(1) | PTE_BUFFERABLE			@ L_PTE_MT_DEV_SHARED
--	.long	0x00						@ unused
-+	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_INNER_WB
- 	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE			@ L_PTE_MT_MINICACHE
- 	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
- 	.long	0x00						@ unused
+ #endif /* __EXTCON_GPIO_H__ */
 -- 
-1.8.1.5
+1.7.5.4
