@@ -1,29 +1,52 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 27 Dec 2013 11:17:59 +0900
-Subject: [PATCH 03/15] serial: sh-sci: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <20131224142640.GB16032@verge.net.au>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131128073711.GF24146@verge.net.au> <1644962.Fmr1aLVkXP@avalon>
- <3378064.llLXVomVIb@avalon> <20131224142640.GB16032@verge.net.au>
-Message-ID: <20131227021759.GE9184@verge.net.au>
+Date: Fri, 27 Dec 2013 11:23:57 +0900
+Subject: [PATCH 15/21] ARM: shmobile: Remove Koelsch reference DTS
+In-Reply-To: <11196073.PIXxcg54ZL@avalon>
+References: <cover.1387893834.git.horms+renesas@verge.net.au>
+ <82f7c2065a363cd3c0c84d3c9b59ee47897c5ebb.1387893834.git.horms+renesas@verge.net.au>
+ <52B9AFAB.8040704@cogentembedded.com> <11196073.PIXxcg54ZL@avalon>
+Message-ID: <20131227022356.GF9184@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 11:26:41PM +0900, Simon Horman wrote:
-> On Tue, Dec 24, 2013 at 01:03:10PM +0100, Laurent Pinchart wrote:
-> > Hi Simon,
-> > 
-> > On Wednesday 11 December 2013 13:44:54 Laurent Pinchart wrote:
-> > > Hi Simon,
-> > > 
-> > > Could you please add this patch to your tree with the "[PATCH 00/47] sh-sci
-> > > updates for v3.14" series ?
-> > 
-> > I've updated all my pending branches to your latest devel tag and this patch 
-> > is missing. Could you please pick it up ?
+On Thu, Dec 26, 2013 at 03:48:58PM +0100, Laurent Pinchart wrote:
+> Hi Sergei and Simon,
 > 
-> Sure, will do.
+> On Tuesday 24 December 2013 20:00:43 Sergei Shtylyov wrote:
+> > On 24-12-2013 18:19, Simon Horman wrote:
+> > > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > Now that the DTS file r8a7790-koelsch.dts can be used with
+> > > board-koelsch.c and board-koelsch-reference.c, proceed with removing
+> > > r8a7790-koelsch-reference.dts.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > > 
+> > >   arch/arm/boot/dts/Makefile | 1 -
+> > >   1 file changed, 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > > index 909d910..5839077 100644
+> > > --- a/arch/arm/boot/dts/Makefile
+> > > +++ b/arch/arm/boot/dts/Makefile
+> > > @@ -225,7 +225,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb
+> > > \
+> > >   	r8a7779-marzen.dtb \
+> > >   	r8a7779-marzen-reference.dtb \
+> > >   	r8a7791-koelsch.dtb \
+> > > -	r8a7791-koelsch-reference.dtb \
+> > >   	r8a7790-lager.dtb \
+> > >   	r8a7790-lager-reference.dtb \
+> > 
+> > Hm, the previous commit removed that file itself but forgot to remove it
+> > from the Makefile.
+> 
+> Indeed, this problem doesn't seem to be present in the patches I've sent. 
+> Simon, has something gone wrong during a rebase ?
 
-I have now done so. But I'm not sure that it will make it into v3.14.
-If not it might be best to send it back to Greg for v3.15. I can handle that.
+Sorry about that.
+
+Could you supply an incremental patch to remove the file itself?
