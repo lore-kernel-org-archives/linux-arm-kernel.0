@@ -1,74 +1,164 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Dec 2013 12:55:33 -0500
-Subject: [PATCH RFCv1 0/6] ARM: mvebu: coherency support improvements
-In-Reply-To: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131227175533.GX19878@titan.lakedaemon.net>
+Date: Fri, 27 Dec 2013 12:57:03 -0500
+Subject: [PATCH RFCv1 1/6] ARM: mvebu: prepare coherency code to
+ support more SOCs
+In-Reply-To: <1388067146-18111-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1388067146-18111-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1388067146-18111-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131227175703.GY19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+All,
 
-On Thu, Dec 26, 2013 at 03:12:50PM +0100, Thomas Petazzoni wrote:
-> Jason, Gregory, Andrew, Sebastian,
-> 
-> Here is a set of patches that make some changes to the mach-mvebu
-> coherency code, and the way the mvebu-mbus driver determines whether
-> hardware I/O coherency is enabled or not.
-> 
-> These changes are proposed in preparation to the introduction of the
-> support for more recent SOCs in mach-mvebu, which have a slightly
-> different coherency fabric (hence the need for different compatible
-> strings) and different constraints to be able to enable the I/O
-> coherency (not only the coherency fabric must be available, but the
-> kernel must be running in CONFIG_SMP).
-> 
-> Moreover, the mvebu-mbus driver was directly poking into the DT to
-> find whether a coherency fabric node was available or not, to
-> determine if I/O coherency is enabled or not. However, with the new
-> constraint that CONFIG_SMP must be enabled on some SOCs to get I/O
-> coherency, the solution of having mvebu-mbus directly poke into the DT
-> is not longer appropriate. This patch set therefore changes the
-> mvebu_mbus_dt_init() function call to take an additional boolean
-> argument telling whether the system is running in I/O coherent mode or
-> not.
-> 
-> I've for now marked those patches as RFC, to indicate that they are
-> clearly open for discussion. For example, I'm still wondering if I
-> should not introduce separate compatible strings
-> marvell,armada-370-coherency-fabric and
-> marvell,armada-xp-coherency-fabric for Armada 370 and Armada XP
-> respectively instead of using marvell,armada-370-coherency-fabric for
-> both. Our experience has shown that we often initially believe that a
-> given hardware unit is similar between SOCs, and then later discover
-> that there are in fact some slight differences, which should have
-> called for different compatible strings from the beginning.
-> 
-> Best regards,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (6):
->   ARM: mvebu: prepare coherency code to support more SOCs
->   ARM: mvebu: add a coherency_available() call
->   bus: mvebu: pass the coherency availability information at init time
->   ARM: mvebu: use of_find_matching_node_and_match() in coherency.c
->   ARM: mvebu: update Armada 370/XP DT to use new coherency compatible
->     string
->   ARM: mvebu: update coherency fabric DT binding documentation
-> 
->  .../devicetree/bindings/arm/coherency-fabric.txt   | 19 +++--
->  arch/arm/boot/dts/armada-370-xp.dtsi               |  2 +-
->  arch/arm/mach-kirkwood/board-dt.c                  |  2 +-
->  arch/arm/mach-mvebu/armada-370-xp.c                |  2 +-
->  arch/arm/mach-mvebu/coherency.c                    | 80 ++++++++++++++++------
->  arch/arm/mach-mvebu/coherency.h                    |  1 +
->  drivers/bus/mvebu-mbus.c                           | 11 +--
->  include/linux/mbus.h                               |  2 +-
->  8 files changed, 79 insertions(+), 40 deletions(-)
+resending to include the MLs.
 
-How is this different than the RFC v1 I just looked over?
+On Thu, Dec 26, 2013 at 03:12:21PM +0100, Thomas Petazzoni wrote:
+> The code that handles the coherency fabric of Armada 370 and Armada XP
+> in arch/arm/mach-mvebu/coherency.c made the assumption that there was
+> only one type of coherency fabric. Unfortunately, it turns out that
+> upcoming SoCs have a slightly different coherency unit.
+> 
+> In preparation to the introduction of the coherency support for more
+> SoCs, this commit:
+> 
+>  * Adds a new "marvell,armada-370-coherency-fabric" compatible string,
+>    to indicate the Armada 370/XP variant of the coherency fabric. The
+>    existing compatible string "marvel,coherency-fabric" is preserved
+>    for compatibility reasons, and has the same behavior as
+>    the new "marvell,armada-370-coherency-fabric".
+> 
+>  * Introduces a data associated to the compatible string in the
+>    compatible string match table, so that the code can differantiate
+>    the variant of coherency unit being used.
+> 
+>  * Separates the coherency unit initialization code into its own
+>    function.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/coherency-fabric.txt   | 12 ++++-
+>  arch/arm/mach-mvebu/coherency.c                    | 53 ++++++++++++++++------
+>  2 files changed, 49 insertions(+), 16 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> index 17d8cd1..6bd8788 100644
+> --- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> +++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> @@ -4,7 +4,15 @@ Available on Marvell SOCs: Armada 370 and Armada XP
+>  
+>  Required properties:
+>  
+> -- compatible: "marvell,coherency-fabric"
+> +- compatible: the possible values are:
+> +
+> + * "marvell,coherency-fabric", kept for backward compatibility reasons
+> +   only. To be used for the coherency fabric of the Armada 370 and
+> +   Armada XP. It is recommended to use
+> +   "marvell,armada-370-coherency-fabric" instead.
+> +
+> + * "marvell,armada-370-coherency-fabric", for the Armada 370 and
+> +   Armada XP coherency fabric.
+
+This is completely unneeded.  Once the new SoC is announced, all you
+should need is marvell,coherency-fabric (for 370/XP) and
+marvell,whizbang-coherency-fabric for the new whizbang SoC.
 
 thx,
 
 Jason.
+
+>  
+>  - reg: Should contain coherency fabric registers location and
+>    length. First pair for the coherency fabric registers, second pair
+> @@ -13,7 +21,7 @@ Required properties:
+>  Example:
+>  
+>  coherency-fabric at d0020200 {
+> -	compatible = "marvell,coherency-fabric";
+> +	compatible = "marvell,armada-370-coherency-fabric";
+>  	reg = <0xd0020200 0xb0>,
+>  		<0xd0021810 0x1c>;
+>  
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index 58adf2f..a8209ae 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -37,8 +37,20 @@ static void __iomem *coherency_cpu_base;
+>  
+>  #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
+>  
+> +enum {
+> +	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
+> +};
+> +
+> +/*
+> + * The "marvell,coherency-fabric" compatible string is kept for
+> + * backward compatibility reasons, and is equivalent to
+> + * "marvell,armada-370-coherency-fabric".
+> + */
+>  static struct of_device_id of_coherency_table[] = {
+> -	{.compatible = "marvell,coherency-fabric"},
+> +	{.compatible = "marvell,coherency-fabric",
+> +	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
+> +	{.compatible = "marvell,armada-370-coherency-fabric",
+> +	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
+>  	{ /* end of list */ },
+>  };
+>  
+> @@ -120,26 +132,39 @@ static struct notifier_block mvebu_hwcc_platform_nb = {
+>  	.notifier_call = mvebu_hwcc_platform_notifier,
+>  };
+>  
+> +static void __init armada_370_coherency_init(struct device_node *np)
+> +{
+> +	struct resource res;
+> +	of_address_to_resource(np, 0, &res);
+> +	coherency_phys_base = res.start;
+> +	/*
+> +	 * Ensure secondary CPUs will see the updated value,
+> +	 * which they read before they join the coherency
+> +	 * fabric, and therefore before they are coherent with
+> +	 * the boot CPU cache.
+> +	 */
+> +	sync_cache_w(&coherency_phys_base);
+> +	coherency_base = of_iomap(np, 0);
+> +	coherency_cpu_base = of_iomap(np, 1);
+> +	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+> +}
+> +
+>  int __init coherency_init(void)
+>  {
+>  	struct device_node *np;
+>  
+>  	np = of_find_matching_node(NULL, of_coherency_table);
+>  	if (np) {
+> -		struct resource res;
+> +		const struct of_device_id *match =
+> +			of_match_node(of_coherency_table, np);
+> +		int type;
+> +
+> +		type = (int) match->data;
+>  		pr_info("Initializing Coherency fabric\n");
+> -		of_address_to_resource(np, 0, &res);
+> -		coherency_phys_base = res.start;
+> -		/*
+> -		 * Ensure secondary CPUs will see the updated value,
+> -		 * which they read before they join the coherency
+> -		 * fabric, and therefore before they are coherent with
+> -		 * the boot CPU cache.
+> -		 */
+> -		sync_cache_w(&coherency_phys_base);
+> -		coherency_base = of_iomap(np, 0);
+> -		coherency_cpu_base = of_iomap(np, 1);
+> -		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+> +
+> +		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+> +			armada_370_coherency_init(np);
+> +
+>  		of_node_put(np);
+>  	}
+>  
+> -- 
+> 1.8.3.2
+> 
