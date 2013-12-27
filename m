@@ -1,68 +1,37 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Dec 2013 19:43:10 -0700
-Subject: [PATCH 2/3] ARM: bcm2835: add USB controller to device tree
-In-Reply-To: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
-References: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1388112192-4762-2-git-send-email-swarren@wwwdotorg.org>
+Date: Thu, 26 Dec 2013 19:43:09 -0700
+Subject: [PATCH 1/3] ARM: bcm2835: Fix grammar in help message
+Message-ID: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM2835 SoC contains a DWC2 USB controller. Add this to the DT.
+From: Stefan Weil <sw@weilnetz.de>
 
-Set up the pin controller to fully enable the USB controller on the
-Raspberry Pi. The GPIO setup works because the default output value for
-GPIO 6 (LAN_RUN/n_reset) just happens to be 1, which enables the
-USB/LAN chip.
+Replace "is use" by "is used" and remove a comma.
 
-Note that you'll need a U-Boot which enables power to the USB controller;
-search for U-Boot patch "ARM: rpi_b: power on SDHCI and USB HW modules".
-
+Signed-off-by: Stefan Weil <sw@weilnetz.de>
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
-I imagine this will go into a dt or boards branch.
+Since I only have 3 patches for bcm2835 this kernel cycle, and they'll
+likely go into different branches, I'm just re-sending them for direct
+application. These patches are already in linux-next, but since there
+are no linux-next being built at the moment, I've reset bcm2835's
+for-next to remove them, so there will be no conflict.
 
- arch/arm/boot/dts/bcm2835-rpi-b.dts |    9 +++++++--
- arch/arm/boot/dts/bcm2835.dtsi      |    6 ++++++
- 2 files changed, 13 insertions(+), 2 deletions(-)
+I imagine this would go into a "soc" branch in arm-soc.
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 6e9deb7..2a3b1c1 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -23,10 +23,15 @@
- 
- &gpio {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&alt0 &alt3>;
-+	pinctrl-0 = <&gpioout &alt0 &alt3>;
-+
-+	gpioout: gpioout {
-+		brcm,pins = <6>;
-+		brcm,function = <1>; /* GPIO out */
-+	};
- 
- 	alt0: alt0 {
--		brcm,pins = <0 1 2 3 4 5 6 7 8 9 10 11 14 15 40 45>;
-+		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 14 15 40 45>;
- 		brcm,function = <4>; /* alt0 */
- 	};
- 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 1e12aef..71a78f7 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -103,6 +103,12 @@
- 			clocks = <&clk_mmc>;
- 			status = "disabled";
- 		};
-+
-+		usb {
-+			compatible = "brcm,bcm2835-usb";
-+			reg = <0x7e980000 0x10000>;
-+			interrupts = <1 9>;
-+		};
- 	};
- 
- 	clocks {
+ arch/arm/mach-bcm2835/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-bcm2835/Kconfig b/arch/arm/mach-bcm2835/Kconfig
+index 560045ca..d1f9612 100644
+--- a/arch/arm/mach-bcm2835/Kconfig
++++ b/arch/arm/mach-bcm2835/Kconfig
+@@ -12,4 +12,4 @@ config ARCH_BCM2835
+ 	select PINCTRL_BCM2835
+ 	help
+ 	  This enables support for the Broadcom BCM2835 SoC. This SoC is
+-	  use in the Raspberry Pi, and Roku 2 devices.
++	  used in the Raspberry Pi and Roku 2 devices.
 -- 
 1.7.10.4
