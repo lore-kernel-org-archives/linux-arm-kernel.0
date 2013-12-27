@@ -1,77 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Dec 2013 10:12:08 -0800
-Subject: [GIT PULL] ARM: OMAP2+: hwmod data: a few more fixes for v3.13-rc
-In-Reply-To: <alpine.DEB.2.02.1312261025340.15949@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1312261025340.15949@utopia.booyaka.com>
-Message-ID: <20131227181208.GB5116@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 27 Dec 2013 13:12:34 -0500
+Subject: [PATCH 0/2] ARM: mvebu: additional cleanups
+In-Reply-To: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1388046026-332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20131227181234.GC19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [131226 02:28]:
-> Hi Tony,
+On Thu, Dec 26, 2013 at 09:20:24AM +0100, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
 > 
-> The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
+> Here are two additional minor cleanups to the mach-mvebu code
+> base. They are intended for mvebu/soc. Note that they are based on
+> 3.13-rc5, so there might be some conflicts while applying them to
+> mvebu/soc, but the resolution should be trivial considering how simple
+> the patches are.
 > 
->   Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
+> Thanks!
 > 
-> are available in the git repository at:
+> Thomas
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13-rc/hwmod-fixes-b
+> Thomas Petazzoni (2):
+>   ARM: mvebu: remove prototypes of non-existing functions from common.h
+>   ARM: mvebu: move Armada 370/XP specific definitions to armada-370-xp.h
 > 
-> for you to fetch changes up to 6d4c88304794442055eaea1c07f3c7b988b8c924:
-> 
->   ARM: OMAP2+: hwmod_data: fix missing OMAP_INTC_START in irq data (2013-12-25 21:41:27 -0700)
-> 
-> ----------------------------------------------------------------
-> A few OMAP hwmod fixes for v3.13-rc.  One patch fixes some IRQ
-> problems with GPMC, RNG, and ISP/IVA MMUs on OMAP2/3.  The other fixes
-> some problems with DEBUG_LL on DRA7xx.
-> 
-> Basic build, boot, and PM test logs are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/hwmod_fixes_b_v3.13-rc/20131226021920/
+>  arch/arm/mach-mvebu/armada-370-xp.h | 2 ++
+>  arch/arm/mach-mvebu/common.h        | 8 +-------
+>  2 files changed, 3 insertions(+), 7 deletions(-)
 
-Thanks pulling into fixes.
+Whole series applied to mvebu/soc
 
-Regards,
+thx,
 
-Tony
- 
-> ----------------------------------------------------------------
-> Rajendra Nayak (1):
->       ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
-> 
-> Suman Anna (1):
->       ARM: OMAP2+: hwmod_data: fix missing OMAP_INTC_START in irq data
-> 
->  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 4 ++--
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 6 +++---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 2 +-
->  3 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> 
-> 
-> vmlinux object size
-> (delta in bytes from test_v3.13-rc3 (374b105797c3d4f29c685f3be535c35f5689b30e)):
->    text     data      bss    total  kernel
->       0        0        0        0  omap1_defconfig
->       0        0        0        0  omap1_defconfig_1510innovator_only
->       0        0        0        0  omap1_defconfig_5912osk_only
->       0        0        0        0  omap2plus_defconfig
->       0        0        0        0  omap2plus_defconfig_2430sdp_only
->       0        0        0        0  omap2plus_defconfig_cpupm
->       0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
->       0        0        0        0  omap2plus_defconfig_n800_only_a
->       0        0        0        0  omap2plus_defconfig_no_pm
->       0        0        0        0  omap2plus_defconfig_omap2_4_only
->       0        0        0        0  omap2plus_defconfig_omap3_4_only
->       0        0        0        0  rmk_omap3430_ldp_allnoconfig
->       0        0        0        0  rmk_omap3430_ldp_oldconfig
->       0        0        0        0  rmk_omap4430_sdp_allnoconfig
->       0        0        0        0  rmk_omap4430_sdp_oldnoconfig
-> 
-> Boot-time memory difference
-> (delta in bytes from test_v3.13-rc3 (374b105797c3d4f29c685f3be535c35f5689b30e))
->   avail  rsrvd   high  freed  board          kconfig
->   (no differences)
-> 
+Jason.
