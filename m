@@ -1,46 +1,66 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 27 Dec 2013 21:15:54 +0100
-Subject: [PATCH v2 0/8] SoC and board integration for RSPI on RZ/A1H
-Message-ID: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
+Date: Fri, 27 Dec 2013 21:16:02 +0100
+Subject: [PATCH v2 8/8] [RFC] ARM: shmobile: genmai reference: Add RSPI nodes
+In-Reply-To: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
+References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1388175362-17132-9-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series integrates Renesas RSPI on the RZ/A1H aka R7S72100 SoC,
-and the Genmai development board.
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-The series is based on renesas-devel-v3.13-rc5-20131226, with Magnus'
-pinctrl, Wolfram's riic, and Simon's sh_eth work applied on top.
+Add pinctrl and SPI devices for RSPI on Genmai.
 
-It was tested on the Genmai development board (genmai-reference), using
-an in-kernel version of Documentation/spi/spidev_test.c, exercising
-loopback mode on rspi1, with the same outcome as the SDK reference code.
+On this board, only rspi4 is in use. Its bus contains a single device
+(a wm8978 audio codec), for which no bindings are defined yet.
 
-Notes:
-  1. The proposed DT bindings also talk about QSPI on the R8A779x, as those
-     SoCs use the same driver.
-  2. As the actual spi-rspi driver doesn't use DT yet, platform devices and
-     spi board info are still used from C to instantiate SPI buses and their
-     children, while pinctrl is performed by DT.
-  3. It will not work with the non-reference version of genmai, due to
-     missing pinmux configuration in setup-r7s72100.c.
-  4. Patches [4/8] and [5/8] are new.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Cc: devicetree at vger.kernel.org
+---
+v2: Use generic "codec" instead of specific "wm8978" node name.
 
-    [1/8] pinctrl: sh-pfc: r7s72100: Add RSPI support
-    [2/8] ARM: shmobile: r7s72100: Add RSPI clocks
-    [3/8] ARM: shmobile: r7s72100: Add RSPI platform devices
-    [4/8] ARM: shmobile: genmai: Add RSPI children (NEW)
-    [5/8] [RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux (NEW)
-    [6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI bindings
-    [7/8] [RFC] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
-    [8/8] [RFC] ARM: shmobile: genmai reference: Add RSPI nodes
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+index 367af5c133e0..c2cc4bd5a470 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+@@ -43,7 +43,7 @@
+ };
+ 
+ &pfc {
+-	pinctrl-0 = <&scif2_pins &ethernet_pins>;
++	pinctrl-0 = <&scif2_pins &ethernet_pins &rspi4_pins>;
+ 	pinctrl-names = "default";
+ 
+ 	scif2_pins: serial2 {
+@@ -73,6 +73,12 @@
+ 				 "ethernet_int_p1_15";
+ 		renesas,function = "ethernet";
+ 	};
++
++	rspi4_pins: spi4 {
++		renesas,groups = "rspi4_rspck_p4_0", "rspi4_ssl0_p4_1",
++				 "rspi4_mosi_p4_2", "rspi4_miso_p4_3";
++		renesas,function = "rspi4";
++	};
+ };
+ 
+ &i2c2 {
+@@ -85,3 +91,13 @@
+ 		pagesize = <64>;
+ 	};
+ };
++
++&spi4 {
++	status = "okay";
++
++	codec: codec at 0 {
++		compatible = "wlf,wm8978";
++		reg = <0>;
++		spi-max-frequency = <5000000>;
++	};
++};
+-- 
+1.7.9.5
