@@ -1,114 +1,44 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 26 Dec 2013 16:44:25 -0800
-Subject: [PATCH 5/7] clk: tegra: fix sdmmc clks on Tegra1x4
+Date: Thu, 26 Dec 2013 16:44:21 -0800
+Subject: [PATCH 1/7] clk: tegra: Fix PLLP rate table
 In-Reply-To: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
 References: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1388105067-24438-6-git-send-email-abrestic@chromium.org>
+Message-ID: <1388105067-24438-2-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdmmc clocks on Tegra114 and Tegra124 are 3-bit wide muxes with
-6 parents.  Add support for tegra_clk_sdmmc*_8 and switch Tegra114
-and Tegra124 to use these clocks instead.
+From: Gabe Black <gabeblack@chromium.org>
 
+This table had settings for 216MHz, but PLLP is (and is supposed to be)
+configured at 408MHz.  If that table is used and PLLP_BASE_OVRRIDE is
+not set, the kernel will panic in clk_pll_recalc_rate().
+
+Signed-off-by: Gabe Black <gabeblack@google.com>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- drivers/clk/tegra/clk-id.h           | 4 ++++
- drivers/clk/tegra/clk-tegra-periph.c | 4 ++++
- drivers/clk/tegra/clk-tegra114.c     | 8 ++++----
- drivers/clk/tegra/clk-tegra124.c     | 8 ++++----
- 4 files changed, 16 insertions(+), 8 deletions(-)
+ drivers/clk/tegra/clk-tegra124.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-id.h b/drivers/clk/tegra/clk-id.h
-index cf0c323..c39613c 100644
---- a/drivers/clk/tegra/clk-id.h
-+++ b/drivers/clk/tegra/clk-id.h
-@@ -180,9 +180,13 @@ enum clk_id {
- 	tegra_clk_sbc6_8,
- 	tegra_clk_sclk,
- 	tegra_clk_sdmmc1,
-+	tegra_clk_sdmmc1_8,
- 	tegra_clk_sdmmc2,
-+	tegra_clk_sdmmc2_8,
- 	tegra_clk_sdmmc3,
-+	tegra_clk_sdmmc3_8,
- 	tegra_clk_sdmmc4,
-+	tegra_clk_sdmmc4_8,
- 	tegra_clk_se,
- 	tegra_clk_soc_therm,
- 	tegra_clk_sor0,
-diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
-index 5c35885..c212473 100644
---- a/drivers/clk/tegra/clk-tegra-periph.c
-+++ b/drivers/clk/tegra/clk-tegra-periph.c
-@@ -465,6 +465,10 @@ static struct tegra_periph_init_data periph_clks[] = {
- 	MUX("adx1", mux_plla_pllc_pllp_clkm, CLK_SOURCE_ADX1, 180, TEGRA_PERIPH_ON_APB, tegra_clk_adx1),
- 	MUX("amx1", mux_plla_pllc_pllp_clkm, CLK_SOURCE_AMX1, 185, TEGRA_PERIPH_ON_APB, tegra_clk_amx1),
- 	MUX("vi_sensor2", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR2, 20, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor2),
-+	MUX8("sdmmc1", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC1, 14, 0, tegra_clk_sdmmc1_8),
-+	MUX8("sdmmc2", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC2, 9, 0, tegra_clk_sdmmc2_8),
-+	MUX8("sdmmc3", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC3, 69, 0, tegra_clk_sdmmc3_8),
-+	MUX8("sdmmc4", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC4, 15, 0, tegra_clk_sdmmc4_8),
- 	MUX8("sbc1", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC1, 41, TEGRA_PERIPH_ON_APB, tegra_clk_sbc1_8),
- 	MUX8("sbc2", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC2, 44, TEGRA_PERIPH_ON_APB, tegra_clk_sbc2_8),
- 	MUX8("sbc3", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SBC3, 46, TEGRA_PERIPH_ON_APB, tegra_clk_sbc3_8),
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index 90d9d25..80431f0 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -682,12 +682,12 @@ static struct tegra_clk tegra114_clks[tegra_clk_max] __initdata = {
- 	[tegra_clk_timer] = { .dt_id = TEGRA114_CLK_TIMER, .present = true },
- 	[tegra_clk_uarta] = { .dt_id = TEGRA114_CLK_UARTA, .present = true },
- 	[tegra_clk_uartd] = { .dt_id = TEGRA114_CLK_UARTD, .present = true },
--	[tegra_clk_sdmmc2] = { .dt_id = TEGRA114_CLK_SDMMC2, .present = true },
-+	[tegra_clk_sdmmc2_8] = { .dt_id = TEGRA114_CLK_SDMMC2, .present = true },
- 	[tegra_clk_i2s1] = { .dt_id = TEGRA114_CLK_I2S1, .present = true },
- 	[tegra_clk_i2c1] = { .dt_id = TEGRA114_CLK_I2C1, .present = true },
- 	[tegra_clk_ndflash] = { .dt_id = TEGRA114_CLK_NDFLASH, .present = true },
--	[tegra_clk_sdmmc1] = { .dt_id = TEGRA114_CLK_SDMMC1, .present = true },
--	[tegra_clk_sdmmc4] = { .dt_id = TEGRA114_CLK_SDMMC4, .present = true },
-+	[tegra_clk_sdmmc1_8] = { .dt_id = TEGRA114_CLK_SDMMC1, .present = true },
-+	[tegra_clk_sdmmc4_8] = { .dt_id = TEGRA114_CLK_SDMMC4, .present = true },
- 	[tegra_clk_pwm] = { .dt_id = TEGRA114_CLK_PWM, .present = true },
- 	[tegra_clk_i2s0] = { .dt_id = TEGRA114_CLK_I2S0, .present = true },
- 	[tegra_clk_i2s2] = { .dt_id = TEGRA114_CLK_I2S2, .present = true },
-@@ -723,7 +723,7 @@ static struct tegra_clk tegra114_clks[tegra_clk_max] __initdata = {
- 	[tegra_clk_bsev] = { .dt_id = TEGRA114_CLK_BSEV, .present = true },
- 	[tegra_clk_i2c3] = { .dt_id = TEGRA114_CLK_I2C3, .present = true },
- 	[tegra_clk_sbc4_8] = { .dt_id = TEGRA114_CLK_SBC4, .present = true },
--	[tegra_clk_sdmmc3] = { .dt_id = TEGRA114_CLK_SDMMC3, .present = true },
-+	[tegra_clk_sdmmc3_8] = { .dt_id = TEGRA114_CLK_SDMMC3, .present = true },
- 	[tegra_clk_owr] = { .dt_id = TEGRA114_CLK_OWR, .present = true },
- 	[tegra_clk_csite] = { .dt_id = TEGRA114_CLK_CSITE, .present = true },
- 	[tegra_clk_la] = { .dt_id = TEGRA114_CLK_LA, .present = true },
 diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 743ccb4..b4cf650 100644
+index aff86b5..28bb238 100644
 --- a/drivers/clk/tegra/clk-tegra124.c
 +++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -761,12 +761,12 @@ static struct tegra_clk tegra124_clks[tegra_clk_max] __initdata = {
- 	[tegra_clk_rtc] = { .dt_id = TEGRA124_CLK_RTC, .present = true },
- 	[tegra_clk_timer] = { .dt_id = TEGRA124_CLK_TIMER, .present = true },
- 	[tegra_clk_uarta] = { .dt_id = TEGRA124_CLK_UARTA, .present = true },
--	[tegra_clk_sdmmc2] = { .dt_id = TEGRA124_CLK_SDMMC2, .present = true },
-+	[tegra_clk_sdmmc2_8] = { .dt_id = TEGRA124_CLK_SDMMC2, .present = true },
- 	[tegra_clk_i2s1] = { .dt_id = TEGRA124_CLK_I2S1, .present = true },
- 	[tegra_clk_i2c1] = { .dt_id = TEGRA124_CLK_I2C1, .present = true },
- 	[tegra_clk_ndflash] = { .dt_id = TEGRA124_CLK_NDFLASH, .present = true },
--	[tegra_clk_sdmmc1] = { .dt_id = TEGRA124_CLK_SDMMC1, .present = true },
--	[tegra_clk_sdmmc4] = { .dt_id = TEGRA124_CLK_SDMMC4, .present = true },
-+	[tegra_clk_sdmmc1_8] = { .dt_id = TEGRA124_CLK_SDMMC1, .present = true },
-+	[tegra_clk_sdmmc4_8] = { .dt_id = TEGRA124_CLK_SDMMC4, .present = true },
- 	[tegra_clk_pwm] = { .dt_id = TEGRA124_CLK_PWM, .present = true },
- 	[tegra_clk_i2s2] = { .dt_id = TEGRA124_CLK_I2S2, .present = true },
- 	[tegra_clk_gr2d] = { .dt_id = TEGRA124_CLK_GR_2D, .present = true },
-@@ -802,7 +802,7 @@ static struct tegra_clk tegra124_clks[tegra_clk_max] __initdata = {
- 	[tegra_clk_uartd] = { .dt_id = TEGRA124_CLK_UARTD, .present = true },
- 	[tegra_clk_i2c3] = { .dt_id = TEGRA124_CLK_I2C3, .present = true },
- 	[tegra_clk_sbc4] = { .dt_id = TEGRA124_CLK_SBC4, .present = true },
--	[tegra_clk_sdmmc3] = { .dt_id = TEGRA124_CLK_SDMMC3, .present = true },
-+	[tegra_clk_sdmmc3_8] = { .dt_id = TEGRA124_CLK_SDMMC3, .present = true },
- 	[tegra_clk_pcie] = { .dt_id = TEGRA124_CLK_PCIE, .present = true },
- 	[tegra_clk_owr] = { .dt_id = TEGRA124_CLK_OWR, .present = true },
- 	[tegra_clk_afi] = { .dt_id = TEGRA124_CLK_AFI, .present = true },
+@@ -516,11 +516,11 @@ static struct div_nmp pllp_nmp = {
+ };
+ 
+ static struct tegra_clk_pll_freq_table pll_p_freq_table[] = {
+-	{12000000, 216000000, 432, 12, 1, 8},
+-	{13000000, 216000000, 432, 13, 1, 8},
+-	{16800000, 216000000, 360, 14, 1, 8},
+-	{19200000, 216000000, 360, 16, 1, 8},
+-	{26000000, 216000000, 432, 26, 1, 8},
++	{12000000, 408000000, 408, 12, 0, 8},
++	{13000000, 408000000, 408, 13, 0, 8},
++	{16800000, 408000000, 340, 14, 0, 8},
++	{19200000, 408000000, 340, 16, 0, 8},
++	{26000000, 408000000, 408, 26, 0, 8},
+ 	{0, 0, 0, 0, 0, 0},
+ };
+ 
 -- 
 1.8.5.1
