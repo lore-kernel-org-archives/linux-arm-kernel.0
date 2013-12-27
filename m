@@ -1,36 +1,51 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 26 Dec 2013 16:44:24 -0800
-Subject: [PATCH 4/7] clk: tegra: fix host1x clock on Tegra124
+Date: Thu, 26 Dec 2013 16:44:22 -0800
+Subject: [PATCH 2/7] clk: tegra: Fix PLLD mnp table
 In-Reply-To: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
 References: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1388105067-24438-5-git-send-email-abrestic@chromium.org>
+Message-ID: <1388105067-24438-3-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Zhang <markz@nvidia.com>
+From: Rhyland Klein <rklein@nvidia.com>
 
-The host1x clock on Tegra124 is a 3-bit wide mux with 6 parents.
-Change thte id to tegra_clk_host1x_8 so that the correct clock gets
-registered.
+PLLD was using the same mnp table as PLLP.  Fix it to use its own
+table which is different from PLLP's.
 
-Signed-off-by: Mark Zhang <markz@nvidia.com>
+Signed-off-by: Rhyland Klein <rklein@nvidia.com>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- drivers/clk/tegra/clk-tegra124.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/tegra/clk-tegra124.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 0fc9126..743ccb4 100644
+index 28bb238..14c3f2f 100644
 --- a/drivers/clk/tegra/clk-tegra124.c
 +++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -775,7 +775,7 @@ static struct tegra_clk tegra124_clks[tegra_clk_max] __initdata = {
- 	[tegra_clk_gr3d] = { .dt_id = TEGRA124_CLK_GR_3D, .present = true },
- 	[tegra_clk_disp2] = { .dt_id = TEGRA124_CLK_DISP2, .present = true },
- 	[tegra_clk_disp1] = { .dt_id = TEGRA124_CLK_DISP1, .present = true },
--	[tegra_clk_host1x] = { .dt_id = TEGRA124_CLK_HOST1X, .present = true },
-+	[tegra_clk_host1x_8] = { .dt_id = TEGRA124_CLK_HOST1X, .present = true },
- 	[tegra_clk_vcp] = { .dt_id = TEGRA124_CLK_VCP, .present = true },
- 	[tegra_clk_i2s0] = { .dt_id = TEGRA124_CLK_I2S0, .present = true },
- 	[tegra_clk_apbdma] = { .dt_id = TEGRA124_CLK_APBDMA, .present = true },
+@@ -570,6 +570,15 @@ static struct tegra_clk_pll_params pll_a_params = {
+ 	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_USE_LOCK,
+ };
+ 
++static struct div_nmp plld_nmp = {
++	.divm_shift = 0,
++	.divm_width = 5,
++	.divn_shift = 8,
++	.divn_width = 11,
++	.divp_shift = 20,
++	.divp_width = 3,
++};
++
+ static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
+ 	{12000000, 216000000, 864, 12, 4, 12},
+ 	{13000000, 216000000, 864, 13, 4, 12},
+@@ -603,7 +612,7 @@ static struct tegra_clk_pll_params pll_d_params = {
+ 	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
+-	.div_nmp = &pllp_nmp,
++	.div_nmp = &plld_nmp,
+ 	.freq_table = pll_d_freq_table,
+ 	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON |
+ 		 TEGRA_PLL_USE_LOCK,
 -- 
 1.8.5.1
