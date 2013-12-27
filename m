@@ -1,25 +1,112 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Fri, 27 Dec 2013 04:58:48 +0000
-Subject: [PATCH v4 1/5] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE to
- enable this ACPI mode
-In-Reply-To: <1387239401-13918-2-git-send-email-al.stone@linaro.org>
-References: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
- <1387239401-13918-2-git-send-email-al.stone@linaro.org>
-Message-ID: <20131227045848.GB21429@srcf.ucam.org>
+From: markz@nvidia.com (Mark Zhang)
+Date: Fri, 27 Dec 2013 12:58:48 +0800
+Subject: [PATCH] arm: mm: add memory type for inner-writeback
+Message-ID: <1388120328-17148-1-git-send-email-markz@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 05:16:37PM -0700, al.stone at linaro.org wrote:
+From: Colin Cross <ccross@android.com>
 
-> +config ACPI_REDUCED_HARDWARE
-> +	bool "Hardware-reduced ACPI support"
-> +	depends on ARM || ARM64
-> +	help
-> +	This config adds support for Hardware-reduced ACPI.
+For streaming-style operations (e.g., software rendering of graphics
+surfaces shared with non-coherent DMA devices), the cost of performing
+L2 cache maintenance can exceed the benefit of having the larger cache
+(this is particularly true for OUTER_CACHE configurations like the ARM
+PL2x0).
 
-Well, that's not really true - most of the hardware-reduced ACPI support 
-seems to be built even if this isn't turned on. Maybe 
-ACPI_REDUCED_HARDWARE_ONLY ?
+This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
+in the tex remapping tables as an inner-writeback-write-allocate, outer
+non-cacheable memory type, so that this mapping will be available to
+clients which will benefit from the reduced L2 maintenance.
 
+Signed-off-by: Gary King <gking@nvidia.com>
+---
+ arch/arm/include/asm/pgtable-2level.h | 1 +
+ arch/arm/include/asm/pgtable.h        | 3 +++
+ arch/arm/mm/proc-macros.S             | 2 +-
+ arch/arm/mm/proc-v7-2level.S          | 4 ++--
+ arch/arm/mm/proc-xsc3.S               | 2 +-
+ arch/arm/mm/proc-xscale.S             | 2 +-
+ 6 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+index dfff709fda3c..528b397b6c91 100644
+--- a/arch/arm/include/asm/pgtable-2level.h
++++ b/arch/arm/include/asm/pgtable-2level.h
+@@ -141,6 +141,7 @@
+ #define L_PTE_MT_DEV_WC		(_AT(pteval_t, 0x09) << 2)	/* 1001 */
+ #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
+ #define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
++#define L_PTE_MT_INNER_WB	(_AT(pteval_t, 0x05) << 2)	/* 0101 (armv6, armv7) */
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7d59b524f2af..2b0601a9a18e 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -134,6 +134,9 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED | L_PTE_XN)
+ #endif
+ 
++#define pgprot_inner_writeback(prot) \
++	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_INNER_WB)
++
+ #endif /* __ASSEMBLY__ */
+ 
+ /*
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index e3c48a3fe063..fa829840ee16 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -127,7 +127,7 @@
+ 	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
+ 	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
+ 	.long	PTE_BUFFERABLE					@ L_PTE_MT_DEV_SHARED
+-	.long	0x00						@ unused
++	.long	PTE_EXT_TEX(4) | PTE_BUFFERABLE			@ L_PTE_MT_INNER_WB
+ 	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
+ 	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
+ 	.long	0x00						@ unused
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index bdd3be4be77a..059a9d7242c2 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -144,8 +144,8 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	 *   NS1 = PRRR[19] = 1		- normal shareable property
+ 	 *   NOS = PRRR[24+n] = 1	- not outer shareable
+ 	 */
+-.equ	PRRR,	0xff0a81a8
+-.equ	NMRR,	0x40e040e0
++.equ	PRRR,	0xff0a89a8
++.equ	NMRR,	0x40e044e0
+ 
+ 	/*
+ 	 * Macro for setting up the TTBRx and TTBCR registers.
+diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+index dc1645890042..9c374495e778 100644
+--- a/arch/arm/mm/proc-xsc3.S
++++ b/arch/arm/mm/proc-xsc3.S
+@@ -381,7 +381,7 @@ cpu_xsc3_mt_table:
+ 	.long	PTE_EXT_TEX(5) | PTE_CACHEABLE			@ L_PTE_MT_WRITETHROUGH
+ 	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
+ 	.long	PTE_EXT_TEX(1) | PTE_BUFFERABLE			@ L_PTE_MT_DEV_SHARED
+-	.long	0x00						@ unused
++	.long	PTE_EXT_TEX(4) | PTE_BUFFERABLE			@ L_PTE_MT_INNER_WB (not present?)
+ 	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
+ 	.long	PTE_EXT_TEX(5) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC (not present?)
+ 	.long	0x00						@ unused
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index d19b1cfcad91..2ac1b88e02ac 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -491,7 +491,7 @@ cpu_xscale_mt_table:
+ 	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
+ 	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
+ 	.long	PTE_EXT_TEX(1) | PTE_BUFFERABLE			@ L_PTE_MT_DEV_SHARED
+-	.long	0x00						@ unused
++	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_INNER_WB
+ 	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE			@ L_PTE_MT_MINICACHE
+ 	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
+ 	.long	0x00						@ unused
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+1.8.1.5
