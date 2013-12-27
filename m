@@ -1,112 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Dec 2013 19:43:11 -0700
-Subject: [PATCH 3/3] ARM: bcm2835: bcm2835_defconfig updates
-In-Reply-To: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
-References: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1388112192-4762-3-git-send-email-swarren@wwwdotorg.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 27 Dec 2013 12:14:08 +0900
+Subject: [PATCH] ARM: shmobile: emev2: Use __initconst for const init
+ definition
+Message-ID: <1388114048-3630-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
-make savedefconfig", and add the following features:
+__initconst must be used instead of __initdata for
+const init definitions.
 
-* Enable the DWC2 USB controller present in the BCM2835 SoC.
-* Enable drivers for various USB-hosted devices, which make the
-  controller useful.
+This problem was introduced by 3d5de27174955702 ("mach-shmobile: Emma
+Mobile EV2 DT support V3") in v3.4-rc7.
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/bcm2835_defconfig |   37 ++++++++++++++++++++++--------------
- 1 file changed, 23 insertions(+), 14 deletions(-)
+ arch/arm/mach-shmobile/setup-emev2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 34e9780..f43392d 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -44,17 +44,26 @@ CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- # CONFIG_SUSPEND is not set
- CONFIG_NET=y
-+CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
- CONFIG_NETWORK_SECMARK=y
--# CONFIG_WIRELESS is not set
-+CONFIG_NETFILTER=y
-+CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
--# CONFIG_INPUT_MOUSEDEV is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_SCSI_CONSTANTS=y
-+CONFIG_SCSI_SCAN_ASYNC=y
-+CONFIG_NETDEVICES=y
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_ZD1211RW=y
-+CONFIG_INPUT_EVDEV=y
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_AMBA_PL011=y
-@@ -71,15 +80,13 @@ CONFIG_FB=y
- CONFIG_FB_SIMPLE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_BCM2835=y
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-@@ -88,6 +95,8 @@ CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
-+CONFIG_STAGING=y
-+CONFIG_USB_DWC2=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
-@@ -109,20 +118,20 @@ CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_BOOT_PRINTK_DELAY=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_DEBUG_INFO=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- CONFIG_UNUSED_SYMBOLS=y
--CONFIG_LOCKUP_DETECTOR=y
--CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_MEMORY_INIT=y
--CONFIG_BOOT_PRINTK_DELAY=y
-+CONFIG_LOCKUP_DETECTOR=y
- CONFIG_SCHED_TRACER=y
- CONFIG_STACK_TRACER=y
- CONFIG_FUNCTION_PROFILER=y
--CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_TEST_KSTRTOX=y
- CONFIG_KGDB=y
- CONFIG_KGDB_KDB=y
--CONFIG_TEST_KSTRTOX=y
- CONFIG_STRICT_DEVMEM=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index c8f2a1a..c71d667 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -58,7 +58,7 @@ static void __init emev2_add_standard_devices_dt(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *emev2_boards_compat_dt[] __initdata = {
++static const char *emev2_boards_compat_dt[] __initconst = {
+ 	"renesas,emev2",
+ 	NULL,
+ };
 -- 
-1.7.10.4
+1.8.4
