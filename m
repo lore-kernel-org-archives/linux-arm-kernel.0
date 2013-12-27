@@ -1,38 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 27 Dec 2013 15:38:10 +0400
-Subject: [PATCH 1/1] ARM: shmobile: Koelsch: pass Ether PHY IRQ
-In-Reply-To: <20131227021227.GC9184@verge.net.au>
-References: <201312200226.38815.sergei.shtylyov@cogentembedded.com>
- <201312200228.00555.sergei.shtylyov@cogentembedded.com>
- <20131227021227.GC9184@verge.net.au>
-Message-ID: <52BD66A2.4050504@cogentembedded.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 27 Dec 2013 12:38:31 +0100
+Subject: [PATCH 0/3] dma: mv_xor: spinlock related improvements
+Message-ID: <1388144314-1581-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Vinod, Dan,
 
-On 27-12-2013 6:12, Simon Horman wrote:
+Here are three patches that make improvements to the spinlock handling
+of the mv_xor driver. The first patch fixes a lock/release of the
+channel spinlock in mv_xor_status(), and the next two patches make
+followup code improvements/refactoring.
 
->> Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
->> trigger type to be low-level as per the Micrel PHY driver's setup.
+Ezequiel, it would be good to have your review on these patches, since
+I know you've spent some time lately doing mv_xor stuff.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Thanks!
 
-> Hi Sergei,
+Thomas
 
-> does this depend on changes that have been queued up in net or net-next
-> since v3.13-rc1?
+Thomas Petazzoni (3):
+  dma: mv_xor: take channel spinlock in mv_xor_status()
+  dma: mv_xor: use __mv_xor_slot_cleanup() in
+    mv_xor_free_chan_resources()
+  dma: mv_xor: rename __mv_xor_slot_cleanup() to mv_xor_slot_cleanup()
 
-    Yes, in net-next.
+ drivers/dma/mv_xor.c | 24 +++++++++++++-----------
+ 1 file changed, 13 insertions(+), 11 deletions(-)
 
-> If so are they present in v3.13-rc5?
-
-    No, they should be available in 3.14-rc1.
-
-> If not please
-> repost when an rc release with the required dependencies is available.
-
-    You mean this patch should inevitably wait for 3.15? I hoped either you or 
-DaveM could still queue this patch for 3.14...
-
-WBR, Sergei
+-- 
+1.8.3.2
