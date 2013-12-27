@@ -1,65 +1,68 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 27 Dec 2013 01:21:36 +0100
-Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
-In-Reply-To: <20131220120408.GA31738@gondor.apana.org.au>
-References: <1386703583-8386-1-git-send-email-marex@denx.de>
- <20131220120408.GA31738@gondor.apana.org.au>
-Message-ID: <201312270121.36578.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Dec 2013 19:43:10 -0700
+Subject: [PATCH 2/3] ARM: bcm2835: add USB controller to device tree
+In-Reply-To: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
+References: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1388112192-4762-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 20, 2013 at 01:04:08 PM, Herbert Xu wrote:
-> On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
-> > When finishing the ahash request, the ahash_op_unaligned_done() will
-> > call complete() on the request. Yet, this will not call the correct
-> > complete callback. The correct complete callback was previously stored
-> > in the requests' private data, as seen in ahash_op_unaligned(). This
-> > patch restores the correct complete callback and .data field of the
-> > request before calling complete() on it.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: linux-crypto at vger.kernel.org
-> > ---
-> > 
-> >  crypto/ahash.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/crypto/ahash.c b/crypto/ahash.c
-> > index 793a27f..a92dc38 100644
-> > --- a/crypto/ahash.c
-> > +++ b/crypto/ahash.c
-> > @@ -213,7 +213,10 @@ static void ahash_op_unaligned_done(struct
-> > crypto_async_request *req, int err)
-> > 
-> >  	ahash_op_unaligned_finish(areq, err);
-> > 
-> > -	complete(data, err);
-> > +	areq->base.complete = complete;
-> > +	areq->base.data = data;
-> > +
-> > +	complete(&areq->base, err);
-> 
-> This looks completely bogus.  While restoring areq isn't wrong per
-> se, calling complete with &areq->base makes no sense.  The original
-> completion data is in the variable "data".
+The BCM2835 SoC contains a DWC2 USB controller. Add this to the DT.
 
-Is there some documentation for this so I can understand why this is wrong, 
-please? I really don't quite get it, sorry. Actually, is there some 
-documentation for writing crypto API drivers at all please ?
+Set up the pin controller to fully enable the USB controller on the
+Raspberry Pi. The GPIO setup works because the default output value for
+GPIO 6 (LAN_RUN/n_reset) just happens to be 1, which enables the
+USB/LAN chip.
 
-> Which driver relies on this behaviour?
+Note that you'll need a U-Boot which enables power to the USB controller;
+search for U-Boot patch "ARM: rpi_b: power on SDHCI and USB HW modules".
 
-This one.
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+I imagine this will go into a dt or boards branch.
 
-> Also, does your subsequent patches rely on this?
+ arch/arm/boot/dts/bcm2835-rpi-b.dts |    9 +++++++--
+ arch/arm/boot/dts/bcm2835.dtsi      |    6 ++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-Yes
-
-> Cheers,
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 6e9deb7..2a3b1c1 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -23,10 +23,15 @@
+ 
+ &gpio {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&alt0 &alt3>;
++	pinctrl-0 = <&gpioout &alt0 &alt3>;
++
++	gpioout: gpioout {
++		brcm,pins = <6>;
++		brcm,function = <1>; /* GPIO out */
++	};
+ 
+ 	alt0: alt0 {
+-		brcm,pins = <0 1 2 3 4 5 6 7 8 9 10 11 14 15 40 45>;
++		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 14 15 40 45>;
+ 		brcm,function = <4>; /* alt0 */
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 1e12aef..71a78f7 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -103,6 +103,12 @@
+ 			clocks = <&clk_mmc>;
+ 			status = "disabled";
+ 		};
++
++		usb {
++			compatible = "brcm,bcm2835-usb";
++			reg = <0x7e980000 0x10000>;
++			interrupts = <1 9>;
++		};
+ 	};
+ 
+ 	clocks {
+-- 
+1.7.10.4
