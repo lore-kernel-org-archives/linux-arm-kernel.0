@@ -1,51 +1,33 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 26 Dec 2013 16:44:22 -0800
-Subject: [PATCH 2/7] clk: tegra: Fix PLLD mnp table
+Date: Thu, 26 Dec 2013 16:44:26 -0800
+Subject: [PATCH 6/7] clk: tegra: cclk_lp has a pllx/2 divider
 In-Reply-To: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
 References: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1388105067-24438-3-git-send-email-abrestic@chromium.org>
+Message-ID: <1388105067-24438-7-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rhyland Klein <rklein@nvidia.com>
+When pll_x is the parent of cclk_lp, PLLX_DIV2_BYPASS_LP determines
+whether cclk_lp output is divided by 2.  Set TEGRA_DIVIDER_2 so that
+the clk_super driver is aware of this.
 
-PLLD was using the same mnp table as PLLP.  Fix it to use its own
-table which is different from PLLP's.
-
-Signed-off-by: Rhyland Klein <rklein@nvidia.com>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- drivers/clk/tegra/clk-tegra124.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/clk/tegra/clk-tegra-super-gen4.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 28bb238..14c3f2f 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -570,6 +570,15 @@ static struct tegra_clk_pll_params pll_a_params = {
- 	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_USE_LOCK,
- };
+diff --git a/drivers/clk/tegra/clk-tegra-super-gen4.c b/drivers/clk/tegra/clk-tegra-super-gen4.c
+index 05dce4a..feb3201 100644
+--- a/drivers/clk/tegra/clk-tegra-super-gen4.c
++++ b/drivers/clk/tegra/clk-tegra-super-gen4.c
+@@ -120,7 +120,7 @@ void __init tegra_super_clk_gen4_init(void __iomem *clk_base,
+ 					ARRAY_SIZE(cclk_lp_parents),
+ 					CLK_SET_RATE_PARENT,
+ 					clk_base + CCLKLP_BURST_POLICY,
+-					0, 4, 8, 9, NULL);
++					TEGRA_DIVIDER_2, 4, 8, 9, NULL);
+ 		*dt_clk = clk;
+ 	}
  
-+static struct div_nmp plld_nmp = {
-+	.divm_shift = 0,
-+	.divm_width = 5,
-+	.divn_shift = 8,
-+	.divn_width = 11,
-+	.divp_shift = 20,
-+	.divp_width = 3,
-+};
-+
- static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
- 	{12000000, 216000000, 864, 12, 4, 12},
- 	{13000000, 216000000, 864, 13, 4, 12},
-@@ -603,7 +612,7 @@ static struct tegra_clk_pll_params pll_d_params = {
- 	.lock_mask = PLL_BASE_LOCK,
- 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
- 	.lock_delay = 1000,
--	.div_nmp = &pllp_nmp,
-+	.div_nmp = &plld_nmp,
- 	.freq_table = pll_d_freq_table,
- 	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON |
- 		 TEGRA_PLL_USE_LOCK,
 -- 
 1.8.5.1
