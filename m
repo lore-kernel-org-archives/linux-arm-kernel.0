@@ -1,47 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 27 Dec 2013 12:38:32 +0100
-Subject: [PATCH 1/3] dma: mv_xor: take channel spinlock in mv_xor_status()
+Date: Fri, 27 Dec 2013 12:38:33 +0100
+Subject: [PATCH 2/3] dma: mv_xor: use __mv_xor_slot_cleanup() in
+ mv_xor_free_chan_resources()
 In-Reply-To: <1388144314-1581-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1388144314-1581-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1388144314-1581-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1388144314-1581-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mv_xor_status() function accesses the mv_xor_chan structure, but
-was not taking the corresponding spinlock. This patch fixes this
-problem.
+The mv_xor_free_chan_resources() was doing:
+
+ 1/ Call mv_xor_slot_cleanup, which take the channel spinlock, does
+    its work, and releases the channel spinlock
+ 2/ Take the channel spinlock
+ 3/ Do its work
+ 4/ Release the channel spinlock
+
+This commit changes the function to use the __mv_xor_slot_cleanup()
+variant of mv_xor_slot_cleanup(), which assumes the caller already
+holds the channel spinlock. The sequence becomes:
+
+ 1/ Take the channel spinlock
+ 2/ Call __mv_xor_slot_cleanup
+ 3/ Do the rest of the work
+ 4/ Release the channel spinlock
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/dma/mv_xor.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 53fb0c8..526ab27 100644
+index 526ab27..3d7d36b 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -701,14 +701,20 @@ static enum dma_status mv_xor_status(struct dma_chan *chan,
- 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
- 	enum dma_status ret;
+@@ -658,9 +658,10 @@ static void mv_xor_free_chan_resources(struct dma_chan *chan)
+ 	struct mv_xor_desc_slot *iter, *_iter;
+ 	int in_use_descs = 0;
  
-+	spin_lock_bh(&mv_chan->lock);
-+
- 	ret = dma_cookie_status(chan, cookie, txstate);
- 	if (ret == DMA_COMPLETE) {
- 		mv_xor_clean_completed_slots(mv_chan);
-+		spin_unlock_bh(&mv_chan->lock);
- 		return ret;
- 	}
 -	mv_xor_slot_cleanup(mv_chan);
-+	__mv_xor_slot_cleanup(mv_chan);
- 
--	return dma_cookie_status(chan, cookie, txstate);
-+	ret = dma_cookie_status(chan, cookie, txstate);
-+	spin_unlock_bh(&mv_chan->lock);
+-
+ 	spin_lock_bh(&mv_chan->lock);
 +
-+	return ret;
- }
- 
- static void mv_dump_xor_regs(struct mv_xor_chan *chan)
++	__mv_xor_slot_cleanup(mv_chan);
++
+ 	list_for_each_entry_safe(iter, _iter, &mv_chan->chain,
+ 					chain_node) {
+ 		in_use_descs++;
 -- 
 1.8.3.2
