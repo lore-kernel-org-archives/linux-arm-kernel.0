@@ -1,74 +1,105 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Dec 2013 12:32:13 -0500
-Subject: [PATCH RFCv1 0/6] ARM: mvebu: coherency support improvements
-In-Reply-To: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1388067176-18177-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131227173213.GS19878@titan.lakedaemon.net>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 27 Dec 2013 18:37:43 +0100
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <20131226180157.GA6919@lunn.ch>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131226180157.GA6919@lunn.ch>
+Message-ID: <20131227173743.GD5531@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Thu, Dec 26, 2013 at 07:01:57PM +0100, Andrew Lunn wrote:
+> On Mon, Dec 23, 2013 at 01:07:35PM +0100, Simon Guinot wrote:
+> > From: Lior Amsalem <alior@marvell.com>
+> > 
+> > From: Lior Amsalem <alior@marvell.com>
+> > 
+> > This patch fixes a SATA hotplug issue on the Armada 370 and Armada XP
+> > SoCs. Without it, if a disk is unplugged from a SATA port, then further
+> > hotplug notification are now longer received on this port.
+> > 
+> > This should be applied to every -stable kernel supporting Armada SoCs.
+> > 
+> > Signed-off-by: Lior Amsalem <alior@marvell.com>
+> > Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > Cc: stable at vger.kernel.org
+> 
+> I tested this on Kirkwood, which does not have any issues to
+> (re)hotplug. Still works O.K. with this patch.
 
-On Thu, Dec 26, 2013 at 03:12:50PM +0100, Thomas Petazzoni wrote:
-> Jason, Gregory, Andrew, Sebastian,
-> 
-> Here is a set of patches that make some changes to the mach-mvebu
-> coherency code, and the way the mvebu-mbus driver determines whether
-> hardware I/O coherency is enabled or not.
-> 
-> These changes are proposed in preparation to the introduction of the
-> support for more recent SOCs in mach-mvebu, which have a slightly
-> different coherency fabric (hence the need for different compatible
-> strings) and different constraints to be able to enable the I/O
-> coherency (not only the coherency fabric must be available, but the
-> kernel must be running in CONFIG_SMP).
-> 
-> Moreover, the mvebu-mbus driver was directly poking into the DT to
-> find whether a coherency fabric node was available or not, to
-> determine if I/O coherency is enabled or not. However, with the new
-> constraint that CONFIG_SMP must be enabled on some SOCs to get I/O
-> coherency, the solution of having mvebu-mbus directly poke into the DT
-> is not longer appropriate. This patch set therefore changes the
-> mvebu_mbus_dt_init() function call to take an additional boolean
-> argument telling whether the system is running in I/O coherent mode or
-> not.
-> 
-> I've for now marked those patches as RFC, to indicate that they are
-> clearly open for discussion. For example, I'm still wondering if I
-> should not introduce separate compatible strings
-> marvell,armada-370-coherency-fabric and
-> marvell,armada-xp-coherency-fabric for Armada 370 and Armada XP
-> respectively instead of using marvell,armada-370-coherency-fabric for
-> both. Our experience has shown that we often initially believe that a
-> given hardware unit is similar between SOCs, and then later discover
-> that there are in fact some slight differences, which should have
-> called for different compatible strings from the beginning.
-> 
-> Best regards,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (6):
->   ARM: mvebu: prepare coherency code to support more SOCs
->   ARM: mvebu: add a coherency_available() call
->   bus: mvebu: pass the coherency availability information at init time
->   ARM: mvebu: use of_find_matching_node_and_match() in coherency.c
->   ARM: mvebu: update Armada 370/XP DT to use new coherency compatible
->     string
->   ARM: mvebu: update coherency fabric DT binding documentation
-> 
->  .../devicetree/bindings/arm/coherency-fabric.txt   | 19 +++--
->  arch/arm/boot/dts/armada-370-xp.dtsi               |  2 +-
->  arch/arm/mach-kirkwood/board-dt.c                  |  2 +-
->  arch/arm/mach-mvebu/armada-370-xp.c                |  2 +-
->  arch/arm/mach-mvebu/coherency.c                    | 80 ++++++++++++++++------
->  arch/arm/mach-mvebu/coherency.h                    |  1 +
->  drivers/bus/mvebu-mbus.c                           | 11 +--
->  include/linux/mbus.h                               |  2 +-
->  8 files changed, 79 insertions(+), 40 deletions(-)
+Hi Andrew,
 
-How is this different than the RFC v1 I just looked over?
+Thanks for the tests.
 
-thx,
+> 
+> My only reservation is that neither the Kirkwood nor Dove datasheet
+> list the LP_PHY_CTL register. Are we now poking something which does
+> not exist on these SoCs? Is that safe?
 
-Jason.
+I will check that.
+
+Simon
+
+> 
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+> 
+>     Andrew
+> 
+> 
+> > ---
+> >  drivers/ata/sata_mv.c | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+> > index 56be318..89ca472 100644
+> > --- a/drivers/ata/sata_mv.c
+> > +++ b/drivers/ata/sata_mv.c
+> > @@ -304,6 +304,7 @@ enum {
+> >  	MV5_LTMODE		= 0x30,
+> >  	MV5_PHY_CTL		= 0x0C,
+> >  	SATA_IFCFG		= 0x050,
+> > +	LP_PHY_CTL		= 0x058,
+> >  
+> >  	MV_M2_PREAMP_MASK	= 0x7e0,
+> >  
+> > @@ -1358,6 +1359,7 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+> >  
+> >  	if (ofs != 0xffffffffU) {
+> >  		void __iomem *addr = mv_ap_base(link->ap) + ofs;
+> > +		void __iomem *lp_phy_addr = mv_ap_base(link->ap) + LP_PHY_CTL;
+> >  		if (sc_reg_in == SCR_CONTROL) {
+> >  			/*
+> >  			 * Workaround for 88SX60x1 FEr SATA#26:
+> > @@ -1374,6 +1376,14 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+> >  			 */
+> >  			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
+> >  				val |= 0xf000;
+> > +
+> > +			/*
+> > +			 * Setting PHY speed according to SControl speed
+> > +			 */
+> > +			if ((val & 0xf0) == 0x10)
+> > +				writelfl(0x7, lp_phy_addr);
+> > +			else
+> > +				writelfl(0x227, lp_phy_addr);
+> >  		}
+> >  		writelfl(val, addr);
+> >  		return 0;
+> > -- 
+> > 1.8.5.1
+> > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131227/3d5ce7c8/attachment.sig>
