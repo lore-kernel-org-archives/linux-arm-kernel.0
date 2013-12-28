@@ -1,107 +1,340 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:32 +0000
-Subject: [PULL 00/15] KVM/{arm,arm64} updates for 3.14
-Message-ID: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
+Date: Sat, 28 Dec 2013 11:15:41 +0000
+Subject: [PATCH 09/15] KVM: arm-vgic: Add vgic reg access from dev attr
+In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
+References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1388229347-24185-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcelo,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Could you please pull the following tag into kvm/next?
+Add infrastructure to handle distributor and cpu interface register
+accesses through the KVM_{GET/SET}_DEVICE_ATTR interface by adding the
+KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_CPU_REGS groups
+and defining the semantics of the attr field to be the MMIO offset as
+specified in the GICv2 specs.
 
-It contains the long overdue GIC+timer save/restore interface for
-KVM/arm, and a couple of other less important changes for KVM/arm64.
+Missing register accesses or other changes in individual register access
+functions to support save/restore of the VGIC state is added in
+subsequent patches.
 
-Thanks,
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  52 ++++++++
+ arch/arm/include/uapi/asm/kvm.h                |   6 +
+ virt/kvm/arm/vgic.c                            | 178 +++++++++++++++++++++++++
+ 3 files changed, 236 insertions(+)
 
-	M.
-
-The following changes since commit 989c6b34f6a9480e397b170cc62237e89bf4fdb9:
-
-  KVM: MMU: handle invalid root_hpa at __direct_map (2013-12-20 19:22:49 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/kvm-arm64/next-3.14-1
-
-for you to fetch changes up to da91747cda0fdbaa05b80becb5cecfac35c8de36:
-
-  Merge branch 'kvm-arm64/for-3.14' into kvm-arm64/next (2013-12-28 10:29:37 +0000)
-
-----------------------------------------------------------------
-
-First drop of 3.14 merge candidates for KVM/{arm,arm64}
-
-- GIC+timer save restore
-- Allow userspace to request a X-Gene vcpu
-- Cleanup SMC handling on arm64
-- Allow configuration of maximum number of vcpus on arm64
-
-----------------------------------------------------------------
-Andre Przywara (1):
-      ARM/KVM: save and restore generic timer registers
-
-Anup Patel (3):
-      arm64: KVM: Add Kconfig option for max VCPUs per-Guest
-      arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
-      arm64: KVM: Force undefined exception for Guest SMC intructions
-
-Christoffer Dall (11):
-      arm/arm64: KVM: arch_timer: Initialize cntvoff at kvm_init
-      ARM: KVM: Allow creating the VGIC after VCPUs
-      KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
-      KVM: arm-vgic: Set base addr through device API
-      irqchip: arm-gic: Define additional MMIO offsets and masks
-      KVM: arm-vgic: Make vgic mmio functions more generic
-      arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
-      KVM: arm-vgic: Add vgic reg access from dev attr
-      KVM: arm-vgic: Support unqueueing of LRs to the dist
-      KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
-      KVM: arm-vgic: Support CPU interface reg access
-
-Marc Zyngier (2):
-      Merge tag 'vgic-migrate-for-marc' of git://git.linaro.org/people/christoffer.dall/linux-kvm-arm into kvm-arm64/next
-      Merge branch 'kvm-arm64/for-3.14' into kvm-arm64/next
-
- Documentation/virtual/kvm/api.txt              |   7 +-
- Documentation/virtual/kvm/devices/arm-vgic.txt |  73 ++++
- arch/arm/include/asm/kvm_host.h                |   3 +
- arch/arm/include/uapi/asm/kvm.h                |  28 ++
- arch/arm/kvm/arm.c                             |  19 +-
- arch/arm/kvm/guest.c                           |  92 +++-
- arch/arm64/include/asm/kvm_host.h              |   7 +-
- arch/arm64/include/uapi/asm/kvm.h              |  21 +-
- arch/arm64/kvm/Kconfig                         |  11 +
- arch/arm64/kvm/guest.c                         |  32 +-
- arch/arm64/kvm/handle_exit.c                   |   3 -
- arch/arm64/kvm/sys_regs_generic_v8.c           |   3 +
- include/kvm/arm_vgic.h                         |   2 +-
- include/linux/irqchip/arm-gic.h                |  12 +
- include/linux/kvm_host.h                       |   1 +
- include/uapi/linux/kvm.h                       |   1 +
- virt/kvm/arm/arch_timer.c                      |  34 ++
- virt/kvm/arm/vgic.c                            | 584 +++++++++++++++++++++++--
- virt/kvm/kvm_main.c                            |   5 +
- 19 files changed, 881 insertions(+), 57 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
-
-Andre Przywara (1):
-  ARM/KVM: save and restore generic timer registers
-
-Anup Patel (3):
-  arm64: KVM: Add Kconfig option for max VCPUs per-Guest
-  arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
-  arm64: KVM: Force undefined exception for Guest SMC intructions
-
-Christoffer Dall (11):
-  arm/arm64: KVM: arch_timer: Initialize cntvoff at kvm_init
-  ARM: KVM: Allow creating the VGIC after VCPUs
-  KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
-  KVM: arm-vgic: Set base addr through device API
-  irqchip: arm-gic: Define additional MMIO offsets and masks
-  KVM: arm-vgic: Make vgic mmio functions more generic
-  arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
-  KVM: arm-vgic: Add vgic reg access from dev attr
-  KVM: arm-vgic: Support unqueueing of LRs to the dist
-  KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
-  KVM: arm-vgic: Support CPU interface reg access
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index c9febb2..7f4e91b 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -19,3 +19,55 @@ Groups:
+     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+       Base address in the guest physical address space of the GIC virtual cpu
+       interface register mappings.
++
++  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
++  Attributes:
++    The attr field of kvm_device_attr encodes two values:
++    bits:     | 63   ....  40 | 39 ..  32  |  31   ....    0 |
++    values:   |    reserved   |   cpu id   |      offset     |
++
++    All distributor regs are (rw, 32-bit)
++
++    The offset is relative to the "Distributor base address" as defined in the
++    GICv2 specs.  Getting or setting such a register has the same effect as
++    reading or writing the register on the actual hardware from the cpu
++    specified with cpu id field.  Note that most distributor fields are not
++    banked, but return the same value regardless of the cpu id used to access
++    the register.
++  Limitations:
++    - Priorities are not implemented, and registers are RAZ/WI
++  Errors:
++    -ENODEV: Getting or setting this register is not yet supported
++    -EBUSY: One or more VCPUs are running
++
++  KVM_DEV_ARM_VGIC_GRP_CPU_REGS
++  Attributes:
++    The attr field of kvm_device_attr encodes two values:
++    bits:     | 63   ....  40 | 39 ..  32  |  31   ....    0 |
++    values:   |    reserved   |   cpu id   |      offset     |
++
++    All CPU interface regs are (rw, 32-bit)
++
++    The offset specifies the offset from the "CPU interface base address" as
++    defined in the GICv2 specs.  Getting or setting such a register has the
++    same effect as reading or writing the register on the actual hardware.
++
++    The Active Priorities Registers APRn are implementation defined, so we set a
++    fixed format for our implementation that fits with the model of a "GICv2
++    implementation without the security extensions" which we present to the
++    guest.  This interface always exposes four register APR[0-3] describing the
++    maximum possible 128 preemption levels.  The semantics of the register
++    indicate if any interrupts in a given preemption level are in the active
++    state by setting the corresponding bit.
++
++    Thus, preemption level X has one or more active interrupts if and only if:
++
++      APRn[X mod 32] == 0b1,  where n = X / 32
++
++    Bits for undefined preemption levels are RAZ/WI.
++
++  Limitations:
++    - Priorities are not implemented, and registers are RAZ/WI
++  Errors:
++    -ENODEV: Getting or setting this register is not yet supported
++    -EBUSY: One or more VCPUs are running
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 76a7427..ef0c878 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -165,6 +165,12 @@ struct kvm_arch_memory_slot {
+ 
+ /* Device Control API: ARM VGIC */
+ #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
++#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
++#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
++#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
++#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
++#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
++#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+ 
+ /* KVM_IRQ_LINE irq field index values */
+ #define KVM_ARM_IRQ_TYPE_SHIFT		24
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index e2596f6..88599b5 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -589,6 +589,20 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+ 	return false;
+ }
+ 
++static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
++				  struct kvm_exit_mmio *mmio,
++				  phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
++				struct kvm_exit_mmio *mmio,
++				phys_addr_t offset)
++{
++	return false;
++}
++
+ /*
+  * I would have liked to use the kvm_bus_io_*() API instead, but it
+  * cannot cope with banked registers (only the VM pointer is passed
+@@ -663,6 +677,16 @@ static const struct mmio_range vgic_dist_ranges[] = {
+ 		.len		= 4,
+ 		.handle_mmio	= handle_mmio_sgi_reg,
+ 	},
++	{
++		.base		= GIC_DIST_SGI_PENDING_CLEAR,
++		.len		= VGIC_NR_SGIS,
++		.handle_mmio	= handle_mmio_sgi_clear,
++	},
++	{
++		.base		= GIC_DIST_SGI_PENDING_SET,
++		.len		= VGIC_NR_SGIS,
++		.handle_mmio	= handle_mmio_sgi_set,
++	},
+ 	{}
+ };
+ 
+@@ -1557,6 +1581,114 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 	return r;
+ }
+ 
++static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
++				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
++{
++	return true;
++}
++
++static const struct mmio_range vgic_cpu_ranges[] = {
++	{
++		.base		= GIC_CPU_CTRL,
++		.len		= 12,
++		.handle_mmio	= handle_cpu_mmio_misc,
++	},
++	{
++		.base		= GIC_CPU_ALIAS_BINPOINT,
++		.len		= 4,
++		.handle_mmio	= handle_cpu_mmio_misc,
++	},
++	{
++		.base		= GIC_CPU_ACTIVEPRIO,
++		.len		= 16,
++		.handle_mmio	= handle_cpu_mmio_misc,
++	},
++	{
++		.base		= GIC_CPU_IDENT,
++		.len		= 4,
++		.handle_mmio	= handle_cpu_mmio_misc,
++	},
++};
++
++static int vgic_attr_regs_access(struct kvm_device *dev,
++				 struct kvm_device_attr *attr,
++				 u32 *reg, bool is_write)
++{
++	const struct mmio_range *r = NULL, *ranges;
++	phys_addr_t offset;
++	int ret, cpuid, c;
++	struct kvm_vcpu *vcpu, *tmp_vcpu;
++	struct vgic_dist *vgic;
++	struct kvm_exit_mmio mmio;
++
++	offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
++	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
++		KVM_DEV_ARM_VGIC_CPUID_SHIFT;
++
++	mutex_lock(&dev->kvm->lock);
++
++	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
++	vgic = &dev->kvm->arch.vgic;
++
++	mmio.len = 4;
++	mmio.is_write = is_write;
++	if (is_write)
++		mmio_data_write(&mmio, ~0, *reg);
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++		mmio.phys_addr = vgic->vgic_dist_base + offset;
++		ranges = vgic_dist_ranges;
++		break;
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
++		mmio.phys_addr = vgic->vgic_cpu_base + offset;
++		ranges = vgic_cpu_ranges;
++		break;
++	default:
++		BUG();
++	}
++	r = find_matching_range(ranges, &mmio, offset);
++
++	if (unlikely(!r || !r->handle_mmio)) {
++		ret = -ENXIO;
++		goto out;
++	}
++
++
++	spin_lock(&vgic->lock);
++
++	/*
++	 * Ensure that no other VCPU is running by checking the vcpu->cpu
++	 * field.  If no other VPCUs are running we can safely access the VGIC
++	 * state, because even if another VPU is run after this point, that
++	 * VCPU will not touch the vgic state, because it will block on
++	 * getting the vgic->lock in kvm_vgic_sync_hwstate().
++	 */
++	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
++		if (unlikely(tmp_vcpu->cpu != -1)) {
++			ret = -EBUSY;
++			goto out_vgic_unlock;
++		}
++	}
++
++	offset -= r->base;
++	r->handle_mmio(vcpu, &mmio, offset);
++
++	if (!is_write)
++		*reg = mmio_data_read(&mmio, ~0);
++
++	ret = 0;
++out_vgic_unlock:
++	spin_unlock(&vgic->lock);
++out:
++	mutex_unlock(&dev->kvm->lock);
++	return ret;
++}
++
+ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ {
+ 	int r;
+@@ -1573,6 +1705,18 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
+ 		return (r == -ENODEV) ? -ENXIO : r;
+ 	}
++
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++		u32 reg;
++
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		return vgic_attr_regs_access(dev, attr, &reg, true);
++	}
++
+ 	}
+ 
+ 	return -ENXIO;
+@@ -1594,14 +1738,42 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 
+ 		if (copy_to_user(uaddr, &addr, sizeof(addr)))
+ 			return -EFAULT;
++		break;
++	}
++
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++		u32 reg = 0;
++
++		r = vgic_attr_regs_access(dev, attr, &reg, false);
++		if (r)
++			return r;
++		r = put_user(reg, uaddr);
++		break;
+ 	}
++
+ 	}
+ 
+ 	return r;
+ }
+ 
++static int vgic_has_attr_regs(const struct mmio_range *ranges,
++			      phys_addr_t offset)
++{
++	struct kvm_exit_mmio dev_attr_mmio;
++
++	dev_attr_mmio.len = 4;
++	if (find_matching_range(ranges, &dev_attr_mmio, offset))
++		return 0;
++	else
++		return -ENXIO;
++}
++
+ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ {
++	phys_addr_t offset;
++
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_ADDR:
+ 		switch (attr->attr) {
+@@ -1610,6 +1782,12 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 			return 0;
+ 		}
+ 		break;
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
++		return vgic_has_attr_regs(vgic_dist_ranges, offset);
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
++		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
++		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
+ 	}
+ 	return -ENXIO;
+ }
+-- 
+1.8.5.1
