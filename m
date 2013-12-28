@@ -1,79 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 28 Dec 2013 21:59:28 +0100
-Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
-In-Reply-To: <20131228170114.GH19878@titan.lakedaemon.net>
-References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
- <20131228170114.GH19878@titan.lakedaemon.net>
-Message-ID: <20131228205928.GB19850@lunn.ch>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Sat, 28 Dec 2013 18:23:18 -0300
+Subject: [GIT PULL] Allwinner sunXi clock changes for 3.14
+Message-ID: <52BF4146.7060403@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 28, 2013 at 12:01:14PM -0500, Jason Cooper wrote:
-> Hi Andrew,
-> 
-> On Sat, Dec 28, 2013 at 05:12:11PM +0100, Andrew Lunn wrote:
-> > The Excito Bubba B3 is a home server, single driver NAS box, Wifi
-> 
-> nit, s/driver/drive/
+Hi Mike,
 
-Upps. Thanks
-> 
-> > + * Note: This requires a new'ish version of u-boot, which disables the
-> > + * L2 cache. If your B3 silently fails to boot, u-boot is probably too
-> > + * old. Either upgrade, or consider the following email:
-> > + *
-> > + * http://lists.debian.org/debian-arm/2012/08/msg00128.html
-> 
-> Nice, thanks for adding this.
+I made this pull with the clk parts of my series, as well as a patch 
+from Chen-Yu Tsai adding support for output clocks on A20. Please pull 
+or let me know if I should fix anything, as it's my first time sending 
+out pull requests.
 
-Yes, i was bashing my head against a brick wall before i went googling
-and found this.
+Cheers,
 
-> > +	ocp at f1000000 {
-> 
-> I plan on going though and sorting the nodes under the ocp bus for all
-> the dts files during the next cycle.  Would you mind sorting these so we
-> have one less to worry about?
+Emilio
 
-Sure. Sort on what? Address, alphabetic on node name?
+----8<----
 
-> > +		i2c at 11000 {
-> > +			status = "okay";
-> > +			/*
-> > +			 * There is something on the bus at address 0x64.
-> > +			 * Not yet identified what it is, maybe the eeprom
-> > +			 * for the Atheros WiFi chip?
-> > +			 */
-> 
-> Not related to accepting this patch, have you found anything in the
-> stock kernel?
+The following changes since commit 0903ea60173fab226a867ceb080b2e0269a6c975:
 
-There is noting in the vendor kernel. I asked Excito about this maybe
-two years ago. The guy who answered said there is no i2c device on the
-base board, but i2c does go to the wifi module, hence the assumption
-given above.
+   clk: add accuracy support for fixed clock (2013-12-22 23:14:28 -0800)
 
-> 
-> > +		};
-> > +
-> > +		serial at 12000 {
-> > +			/* Internal on test pins, 3.3v TTL */
-> 
-> Do you have a pointer to a pin layout?
+are available in the git repository at:
 
-Yes, i can add a URL to an Excito forum page. They are friendly about
-this, document it themselves.
- 
-> > +		programming_led {
-> > +			label = "bubba3:green:programming";
-> > +			gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-> > +			linux,default-trigger = "default-off";
-> 
-> Perhaps we can use 'default-state = "off";' here to avoid the
-> linux-specific property?
+   https://bitbucket.org/emiliolopez/linux.git tags/sunxi-clk-3.14-for-mike
 
-Sure.
+for you to fetch changes up to 6f86341726cbec1921e925fd54a10c5b58e6f9f1:
 
-v2 in the next day or two.
+   clk: sunxi: Allwinner A20 output clock support (2013-12-28 17:14:21 
+-0300)
 
-   Andrew
+----------------------------------------------------------------
+Allwinner sunXi SoCs clock changes
+
+This contains the clk driver parts of the "[PATCH v3 00/13] clk: sunxi:
+add PLL5 and PLL6 support" series. It adds support for PLL4/5/6 and
+mod0 clocks on most sunxi platforms. Additionally, it contains "[PATCH
+1/4] clk: sunxi: Allwinner A20 output clock support" (v2) from Chen-Yu
+Tsai, which adds support for output clocks present on A20.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+       clk: sunxi: Allwinner A20 output clock support
+
+Emilio L?pez (7):
+       clk: sunxi: register factors clocks behind composite
+       clk: sunxi: clean the magic number of mux parents
+       clk: sunxi: add gating support to PLL1
+       clk: sunxi: make factors_clk_setup return the clock it registers
+       clk: sunxi: add PLL5 and PLL6 support
+       clk: sunxi: mod0 support
+       clk: sunxi: support better factor DT nodes
+
+  Documentation/devicetree/bindings/clock/sunxi.txt |  10 +-
+  drivers/clk/sunxi/clk-factors.c                   |  63 +---
+  drivers/clk/sunxi/clk-factors.h                   |  16 +-
+  drivers/clk/sunxi/clk-sunxi.c                     | 435 
++++++++++++++++++++++-
+  4 files changed, 445 insertions(+), 79 deletions(-)
