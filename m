@@ -1,61 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Dec 2013 23:30:53 +0000
-Subject: OMAP display subsystem - does it work?
-In-Reply-To: <20131221005941.GI32243@n2100.arm.linux.org.uk>
-References: <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
- <20131219175644.GE32243@n2100.arm.linux.org.uk>
- <20131219182252.GP27438@atomide.com>
- <20131220112700.GF32243@n2100.arm.linux.org.uk>
- <20131220114837.GH32243@n2100.arm.linux.org.uk> <52B44982.4020501@ti.com>
- <20131220160432.GZ27438@atomide.com> <20131220165456.GD27438@atomide.com>
- <20131221005941.GI32243@n2100.arm.linux.org.uk>
-Message-ID: <20131228233053.GJ32243@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 28 Dec 2013 15:37:13 -0800
+Subject: [GIT PULL 0/3] Second Round of Renesas ARM based SoC Fixes for
+ v3.13
+In-Reply-To: <cover.1387856124.git.horms+renesas@verge.net.au>
+References: <cover.1387856124.git.horms+renesas@verge.net.au>
+Message-ID: <20131228233713.GE22753@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 21, 2013 at 12:59:41AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 20, 2013 at 08:55:03AM -0800, Tony Lindgren wrote:
-> > Yeah this seems to do the trick for me for the built-in DSS on LDP.
-> > 
-> > Tony
-> > 
-> > 8< -----------------------------------
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Fri, 20 Dec 2013 08:53:27 -0800
-> > Subject: [PATCH] ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
-> > 
-> > Looks like the LCD panel on LDP has been broken quite a while, and
-> > recently got fixed. However, there's still an issue where the panel
-> > backlight does not come on if the LCD drivers are built into the
-> > kernel.
-> > 
-> > Fix the issue by registering the DPI LCD panel only after the twl4030
-> > GPIO has probed.
-> > 
-> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > --- a/arch/arm/mach-omap2/board-ldp.c
-> > +++ b/arch/arm/mach-omap2/board-ldp.c
-> > @@ -248,7 +248,7 @@ static int ldp_twl_gpio_setup(struct device *dev, unsigned gpio, unsigned ngpio)
-> >  	/* Backlight enable GPIO */
-> >  	ldp_lcd_pdata.backlight_gpio = gpio + 15;
-> >  
-> > -	return 0;
-> > +	return platform_device_register(&ldp_lcd_device);
-> >  }
-> >  
-> >  static struct twl4030_gpio_platform_data ldp_gpio_data = {
-> > @@ -346,7 +346,6 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
-> >  
-> >  static struct platform_device *ldp_devices[] __initdata = {
-> >  	&ldp_gpio_keys_device,
-> > -	&ldp_lcd_device,
-> >  };
-> >  
-> >  #ifdef CONFIG_OMAP_MUX
+On Tue, Dec 24, 2013 at 03:04:43PM +0900, Simon Horman wrote:
+> Hi Kevin, Hi Olof, Hi Arnd,
 > 
-> I've added it to the test build for tonight (only as an uncommitted
-> modification) so we'll see what happens tomorrow morning.
+> please consider this second round of Renesas ARM based SoC fixes for v3.13.
+> It is based on the first round of fixes, tagged as renesas-fixes-for-v3.13,
+> which you have previously pulled.
+> 
+> 
+> The following changes since commit 23de2278ebc3a2f971ce45ca5e5e35c9d5a74040:
+> 
+>   ARM: shmobile: r8a7790: Fix GPIO resources in DTS (2013-11-28 17:04:39 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.13
+> 
+> for you to fetch changes up to d721a15c300c5f638a11573a6dd492158e737d6a:
+> 
+>   ARM: shmobile: r8a7790: fix shdi resource sizes (2013-12-19 18:14:48 +0900)
 
-BTW, yes, this does result in the display working again on the LDP.
+Pulled, thanks.
+
+
+-Olof
