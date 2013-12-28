@@ -1,58 +1,113 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:38 +0000
-Subject: [PATCH 06/15] irqchip: arm-gic: Define additional MMIO offsets and
- masks
+Date: Sat, 28 Dec 2013 11:15:35 +0000
+Subject: [PATCH 03/15] ARM: KVM: Allow creating the VGIC after VCPUs
 In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
 References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1388229347-24185-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1388229347-24185-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Define CPU interface offsets for the GICC_ABPR, GICC_APR, and GICC_IIDR
-registers.  Define distributor registers for the GICD_SPENDSGIR and the
-GICD_CPENDSGIR.  KVM/ARM needs to know about these definitions to fully
-support save/restore of the VGIC.
+Rework the VGIC initialization slightly to allow initialization of the
+vgic cpu-specific state even if the irqchip (the VGIC) hasn't been
+created by user space yet.  This is safe, because the vgic data
+structures are already allocated when the CPU is allocated if VGIC
+support is compiled into the kernel.  Further, the init process does not
+depend on any other information and the sacrifice is a slight
+performance degradation for creating VMs in the no-VGIC case.
 
-Also define some masks and shifts for the various GICH_VMCR fields.
+The reason is that the new device control API doesn't mandate creating
+the VGIC before creating the VCPU and it is unreasonable to require user
+space to create the VGIC before creating the VCPUs.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
+At the same time move the irqchip_in_kernel check out of
+kvm_vcpu_first_run_init and into the init function to make the per-vcpu
+and global init functions symmetric and add comments on the exported
+functions making it a bit easier to understand the init flow by only
+looking at vgic.c.
+
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/linux/irqchip/arm-gic.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/kvm/arm.c  |  7 ++++---
+ virt/kvm/arm/vgic.c | 22 +++++++++++++++++++---
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index cac496b..0ceb389 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -17,6 +17,9 @@
- #define GIC_CPU_EOI			0x10
- #define GIC_CPU_RUNNINGPRI		0x14
- #define GIC_CPU_HIGHPRI			0x18
-+#define GIC_CPU_ALIAS_BINPOINT		0x1c
-+#define GIC_CPU_ACTIVEPRIO		0xd0
-+#define GIC_CPU_IDENT			0xfc
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 13205bd..c9fe9d7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -464,6 +464,8 @@ static void update_vttbr(struct kvm *kvm)
  
- #define GIC_DIST_CTRL			0x000
- #define GIC_DIST_CTR			0x004
-@@ -56,6 +59,15 @@
- #define GICH_LR_ACTIVE_BIT		(1 << 29)
- #define GICH_LR_EOI			(1 << 19)
- 
-+#define GICH_VMCR_CTRL_SHIFT		0
-+#define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
-+#define GICH_VMCR_PRIMASK_SHIFT		27
-+#define GICH_VMCR_PRIMASK_MASK		(0x1f << GICH_VMCR_PRIMASK_SHIFT)
-+#define GICH_VMCR_BINPOINT_SHIFT	21
-+#define GICH_VMCR_BINPOINT_MASK		(0x7 << GICH_VMCR_BINPOINT_SHIFT)
-+#define GICH_VMCR_ALIAS_BINPOINT_SHIFT	18
-+#define GICH_VMCR_ALIAS_BINPOINT_MASK	(0x7 << GICH_VMCR_ALIAS_BINPOINT_SHIFT)
+ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ {
++	int ret;
 +
- #define GICH_MISR_EOI			(1 << 0)
- #define GICH_MISR_U			(1 << 1)
+ 	if (likely(vcpu->arch.has_run_once))
+ 		return 0;
  
+@@ -473,9 +475,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * Initialize the VGIC before running a vcpu the first time on
+ 	 * this VM.
+ 	 */
+-	if (irqchip_in_kernel(vcpu->kvm) &&
+-	    unlikely(!vgic_initialized(vcpu->kvm))) {
+-		int ret = kvm_vgic_init(vcpu->kvm);
++	if (unlikely(!vgic_initialized(vcpu->kvm))) {
++		ret = kvm_vgic_init(vcpu->kvm);
+ 		if (ret)
+ 			return ret;
+ 	}
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 81e9481..5e9df47 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1243,15 +1243,19 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
++/**
++ * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
++ * @vcpu: pointer to the vcpu struct
++ *
++ * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
++ * this vcpu and enable the VGIC for this VCPU
++ */
+ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int i;
+ 
+-	if (!irqchip_in_kernel(vcpu->kvm))
+-		return 0;
+-
+ 	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
+ 		return -EBUSY;
+ 
+@@ -1383,10 +1387,22 @@ out:
+ 	return ret;
+ }
+ 
++/**
++ * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
++ * @kvm: pointer to the kvm struct
++ *
++ * Map the virtual CPU interface into the VM before running any VCPUs.  We
++ * can't do this at creation time, because user space must first set the
++ * virtual CPU interface address in the guest physical address space.  Also
++ * initialize the ITARGETSRn regs to 0 on the emulated distributor.
++ */
+ int kvm_vgic_init(struct kvm *kvm)
+ {
+ 	int ret = 0, i;
+ 
++	if (!irqchip_in_kernel(kvm))
++		return 0;
++
+ 	mutex_lock(&kvm->lock);
+ 
+ 	if (vgic_initialized(kvm))
 -- 
 1.8.5.1
