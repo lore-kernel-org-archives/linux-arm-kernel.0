@@ -1,104 +1,71 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:46 +0000
-Subject: [PATCH 14/15] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
+Date: Sat, 28 Dec 2013 11:15:45 +0000
+Subject: [PATCH 13/15] arm64: KVM: Add Kconfig option for max VCPUs per-Guest
 In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
 References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1388229347-24185-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1388229347-24185-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anup Patel <anup.patel@linaro.org>
 
-This patch allows us to have X-Gene guest VCPU when using KVM arm64
-on APM X-Gene host.
+Current max VCPUs per-Guest is set to 4 which is preventing
+us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
+X-Gene Storm SOC) with 8 Host CPUs.
 
-We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
-guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
-when running on X-Gene host with Potenza core.
-
-[maz: sanitized the commit log]
+The correct value of max VCPUs per-Guest should be same as
+the max CPUs supported by GICv2 which is 8 but, increasing
+value of max VCPUs per-Guest can make things slower hence
+we add Kconfig option to let KVM users select appropriate
+max VCPUs per-Guest.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/uapi/asm/kvm.h    |  3 ++-
- arch/arm64/kvm/guest.c               | 32 +++++++++++++++++++-------------
- arch/arm64/kvm/sys_regs_generic_v8.c |  3 +++
- 3 files changed, 24 insertions(+), 14 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  7 ++++++-
+ arch/arm64/kvm/Kconfig            | 11 +++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 5031f42..d9f026b 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -55,8 +55,9 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_AEM_V8		0
- #define KVM_ARM_TARGET_FOUNDATION_V8	1
- #define KVM_ARM_TARGET_CORTEX_A57	2
-+#define KVM_ARM_TARGET_XGENE_POTENZA	3
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 5d85a02..0a1d697 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -26,7 +26,12 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
  
--#define KVM_ARM_NUM_TARGETS		3
-+#define KVM_ARM_NUM_TARGETS		4
- 
- /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
- #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 3f0731e..0874557 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -207,20 +207,26 @@ int __attribute_const__ kvm_target_cpu(void)
- 	unsigned long implementor = read_cpuid_implementor();
- 	unsigned long part_number = read_cpuid_part_number();
- 
--	if (implementor != ARM_CPU_IMP_ARM)
--		return -EINVAL;
-+	switch (implementor) {
-+	case ARM_CPU_IMP_ARM:
-+		switch (part_number) {
-+		case ARM_CPU_PART_AEM_V8:
-+			return KVM_ARM_TARGET_AEM_V8;
-+		case ARM_CPU_PART_FOUNDATION:
-+			return KVM_ARM_TARGET_FOUNDATION_V8;
-+		case ARM_CPU_PART_CORTEX_A57:
-+			return KVM_ARM_TARGET_CORTEX_A57;
-+		};
-+		break;
-+	case ARM_CPU_IMP_APM:
-+		switch (part_number) {
-+		case APM_CPU_PART_POTENZA:
-+			return KVM_ARM_TARGET_XGENE_POTENZA;
-+		};
-+		break;
-+	};
- 
--	switch (part_number) {
--	case ARM_CPU_PART_AEM_V8:
--		return KVM_ARM_TARGET_AEM_V8;
--	case ARM_CPU_PART_FOUNDATION:
--		return KVM_ARM_TARGET_FOUNDATION_V8;
--	case ARM_CPU_PART_CORTEX_A57:
--		/* Currently handled by the generic backend */
--		return KVM_ARM_TARGET_CORTEX_A57;
--	default:
--		return -EINVAL;
--	}
-+	return -EINVAL;
- }
- 
- int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 4268ab9..8fe6f76 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
- 					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
-+					  &genericv8_target_table);
+-#define KVM_MAX_VCPUS 4
++#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
++#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
++#else
++#define KVM_MAX_VCPUS 0
++#endif
 +
- 	return 0;
- }
- late_initcall(sys_reg_genericv8_init);
+ #define KVM_USER_MEM_SLOTS 32
+ #define KVM_PRIVATE_MEM_SLOTS 4
+ #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 4480ab3..8ba85e9 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -36,6 +36,17 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
++config KVM_ARM_MAX_VCPUS
++	int "Number maximum supported virtual CPUs per VM"
++	depends on KVM_ARM_HOST
++	default 4
++	help
++	  Static number of max supported virtual CPUs per VM.
++
++	  If you choose a high number, the vcpu structures will be quite
++	  large, so only choose a reasonable number that you expect to
++	  actually use.
++
+ config KVM_ARM_VGIC
+ 	bool
+ 	depends on KVM_ARM_HOST && OF
 -- 
 1.8.5.1
