@@ -1,164 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:44 +0000
-Subject: [PATCH 12/15] KVM: arm-vgic: Support CPU interface reg access
-In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1388229347-24185-13-git-send-email-marc.zyngier@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 28 Dec 2013 12:48:27 +0100
+Subject: [PATCH 6/6] [RFC] arm: shmobile: genmai reference: Add RSPI nodes
+In-Reply-To: <CAMuHMdVH4PyhxR3JLLPX9a3fKaEgdpQpd2aa4YKL6DUD8+Pw2Q@mail.gmail.com>
+References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
+ <2198668.ESbmzZvna4@avalon>
+ <CAMuHMdVH4PyhxR3JLLPX9a3fKaEgdpQpd2aa4YKL6DUD8+Pw2Q@mail.gmail.com>
+Message-ID: <1503028.o7PtQzEmGv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Hi Geert,
 
-Implement support for the CPU interface register access driven by MMIO
-address offsets from the CPU interface base address.  Useful for user
-space to support save/restore of the VGIC state.
+On Friday 27 December 2013 20:08:18 Geert Uytterhoeven wrote:
+> On Fri, Dec 27, 2013 at 5:20 PM, Laurent Pinchart wrote:
+> > On Tuesday 24 December 2013 12:56:50 Geert Uytterhoeven wrote:
+> >> Add pinctrl and SPI devices for RSPI on Genmai.
+> >> 
+> >> On this board, only rspi4 is in use. It's bus contains a single device
+> >> (a wm8978 audio codec), for which no bindings are defined yet.
+> >> 
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> >> Cc: devicetree at vger.kernel.org
+> >> ---
+> >> 
+> >>  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 ++++++++++++++++-
+> >>  1 file changed, 17 insertions(+), 1 deletion(-)
+> >> 
+> >> diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> >> b/arch/arm/boot/dts/r7s72100-genmai-reference.dts index
+> >> 114510f8bf09..6d99630627e4 100644
+> >> --- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> >> +++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+> >> @@ -43,7 +43,7 @@
+> >>  };
+> >>  
+> >>  &pfc {
+> >> -     pinctrl-0 = <&scif2_pins &ethernet_pins>;
+> >> +     pinctrl-0 = <&scif2_pins &ethernet_pins &rspi4_pins>;
+> > 
+> > You should add pinctrl-0 and pinctrl-names properties to the spi4 node
+> > instead. Device nodes should reference their pinctrl configuration
+> > directly, scif2 and ethernet are exceptions as DT bindings for those
+> > devices are not in mainline yet.
+> 
+> I put it there because the actual driver doesn't use DT yet. Is that OK?
 
-This commit adds support only for the same logic as the current VGIC
-support, and no more.  For example, the active priority registers are
-handled as RAZ/WI, just like setting priorities on the emulated
-distributor.
+I had missed that. That's fine, but shouldn't you then delay patch 5/6 until 
+the driver gets DT support ?
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 73 insertions(+), 8 deletions(-)
+You've already sent a DT bindings proposal (thanks for that !), wouldn't it 
+make sense to implement support in the driver before this patch ? We're pretty 
+close to that from what I can see.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index e59aaa4..be456ce 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -71,6 +71,10 @@
- #define VGIC_ADDR_UNDEF		(-1)
- #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
- 
-+#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
-+#define IMPLEMENTER_ARM		0x43b
-+#define GICC_ARCH_VERSION_V2	0x2
-+
- /* Physical address of vgic virtual cpu interface */
- static phys_addr_t vgic_vcpu_base;
- 
-@@ -312,7 +316,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
- 	u32 word_offset = offset & 3;
- 
- 	switch (offset & ~3) {
--	case 0:			/* CTLR */
-+	case 0:			/* GICD_CTLR */
- 		reg = vcpu->kvm->arch.vgic.enabled;
- 		vgic_reg_access(mmio, &reg, word_offset,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
-@@ -323,15 +327,15 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
- 		}
- 		break;
- 
--	case 4:			/* TYPER */
-+	case 4:			/* GICD_TYPER */
- 		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
- 		reg |= (VGIC_NR_IRQS >> 5) - 1;
- 		vgic_reg_access(mmio, &reg, word_offset,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
- 		break;
- 
--	case 8:			/* IIDR */
--		reg = 0x4B00043B;
-+	case 8:			/* GICD_IIDR */
-+		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
- 		vgic_reg_access(mmio, &reg, word_offset,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
- 		break;
-@@ -1716,9 +1720,70 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
- 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
- {
--	return true;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	u32 reg, mask = 0, shift = 0;
-+	bool updated = false;
-+
-+	switch (offset & ~0x3) {
-+	case GIC_CPU_CTRL:
-+		mask = GICH_VMCR_CTRL_MASK;
-+		shift = GICH_VMCR_CTRL_SHIFT;
-+		break;
-+	case GIC_CPU_PRIMASK:
-+		mask = GICH_VMCR_PRIMASK_MASK;
-+		shift = GICH_VMCR_PRIMASK_SHIFT;
-+		break;
-+	case GIC_CPU_BINPOINT:
-+		mask = GICH_VMCR_BINPOINT_MASK;
-+		shift = GICH_VMCR_BINPOINT_SHIFT;
-+		break;
-+	case GIC_CPU_ALIAS_BINPOINT:
-+		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
-+		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+		break;
-+	}
-+
-+	if (!mmio->is_write) {
-+		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
-+		mmio_data_write(mmio, ~0, reg);
-+	} else {
-+		reg = mmio_data_read(mmio, ~0);
-+		reg = (reg << shift) & mask;
-+		if (reg != (vgic_cpu->vgic_vmcr & mask))
-+			updated = true;
-+		vgic_cpu->vgic_vmcr &= ~mask;
-+		vgic_cpu->vgic_vmcr |= reg;
-+	}
-+	return updated;
-+}
-+
-+static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
-+			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+{
-+	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
- }
- 
-+static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
-+				  struct kvm_exit_mmio *mmio,
-+				  phys_addr_t offset)
-+{
-+	u32 reg;
-+
-+	if (mmio->is_write)
-+		return false;
-+
-+	/* GICC_IIDR */
-+	reg = (PRODUCT_ID_KVM << 20) |
-+	      (GICC_ARCH_VERSION_V2 << 16) |
-+	      (IMPLEMENTER_ARM << 0);
-+	mmio_data_write(mmio, ~0, reg);
-+	return false;
-+}
-+
-+/*
-+ * CPU Interface Register accesses - these are not accessed by the VM, but by
-+ * user space for saving and restoring VGIC state.
-+ */
- static const struct mmio_range vgic_cpu_ranges[] = {
- 	{
- 		.base		= GIC_CPU_CTRL,
-@@ -1728,17 +1793,17 @@ static const struct mmio_range vgic_cpu_ranges[] = {
- 	{
- 		.base		= GIC_CPU_ALIAS_BINPOINT,
- 		.len		= 4,
--		.handle_mmio	= handle_cpu_mmio_misc,
-+		.handle_mmio	= handle_mmio_abpr,
- 	},
- 	{
- 		.base		= GIC_CPU_ACTIVEPRIO,
- 		.len		= 16,
--		.handle_mmio	= handle_cpu_mmio_misc,
-+		.handle_mmio	= handle_mmio_raz_wi,
- 	},
- 	{
- 		.base		= GIC_CPU_IDENT,
- 		.len		= 4,
--		.handle_mmio	= handle_cpu_mmio_misc,
-+		.handle_mmio	= handle_cpu_mmio_ident,
- 	},
- };
- 
 -- 
-1.8.5.1
+Regards,
+
+Laurent Pinchart
