@@ -1,71 +1,164 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:45 +0000
-Subject: [PATCH 13/15] arm64: KVM: Add Kconfig option for max VCPUs per-Guest
+Date: Sat, 28 Dec 2013 11:15:44 +0000
+Subject: [PATCH 12/15] KVM: arm-vgic: Support CPU interface reg access
 In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
 References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1388229347-24185-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1388229347-24185-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anup Patel <anup.patel@linaro.org>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Current max VCPUs per-Guest is set to 4 which is preventing
-us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
-X-Gene Storm SOC) with 8 Host CPUs.
+Implement support for the CPU interface register access driven by MMIO
+address offsets from the CPU interface base address.  Useful for user
+space to support save/restore of the VGIC state.
 
-The correct value of max VCPUs per-Guest should be same as
-the max CPUs supported by GICv2 which is 8 but, increasing
-value of max VCPUs per-Guest can make things slower hence
-we add Kconfig option to let KVM users select appropriate
-max VCPUs per-Guest.
+This commit adds support only for the same logic as the current VGIC
+support, and no more.  For example, the active priority registers are
+handled as RAZ/WI, just like setting priorities on the emulated
+distributor.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_host.h |  7 ++++++-
- arch/arm64/kvm/Kconfig            | 11 +++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 73 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 5d85a02..0a1d697 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -26,7 +26,12 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index e59aaa4..be456ce 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -71,6 +71,10 @@
+ #define VGIC_ADDR_UNDEF		(-1)
+ #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
  
--#define KVM_MAX_VCPUS 4
-+#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
-+#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
-+#else
-+#define KVM_MAX_VCPUS 0
-+#endif
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++#define GICC_ARCH_VERSION_V2	0x2
 +
- #define KVM_USER_MEM_SLOTS 32
- #define KVM_PRIVATE_MEM_SLOTS 4
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 4480ab3..8ba85e9 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -36,6 +36,17 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
+ /* Physical address of vgic virtual cpu interface */
+ static phys_addr_t vgic_vcpu_base;
  
-+config KVM_ARM_MAX_VCPUS
-+	int "Number maximum supported virtual CPUs per VM"
-+	depends on KVM_ARM_HOST
-+	default 4
-+	help
-+	  Static number of max supported virtual CPUs per VM.
+@@ -312,7 +316,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 	u32 word_offset = offset & 3;
+ 
+ 	switch (offset & ~3) {
+-	case 0:			/* CTLR */
++	case 0:			/* GICD_CTLR */
+ 		reg = vcpu->kvm->arch.vgic.enabled;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+@@ -323,15 +327,15 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 		}
+ 		break;
+ 
+-	case 4:			/* TYPER */
++	case 4:			/* GICD_TYPER */
+ 		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+ 		reg |= (VGIC_NR_IRQS >> 5) - 1;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+ 
+-	case 8:			/* IIDR */
+-		reg = 0x4B00043B;
++	case 8:			/* GICD_IIDR */
++		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+@@ -1716,9 +1720,70 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
+ 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
+ {
+-	return true;
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	u32 reg, mask = 0, shift = 0;
++	bool updated = false;
 +
-+	  If you choose a high number, the vcpu structures will be quite
-+	  large, so only choose a reasonable number that you expect to
-+	  actually use.
++	switch (offset & ~0x3) {
++	case GIC_CPU_CTRL:
++		mask = GICH_VMCR_CTRL_MASK;
++		shift = GICH_VMCR_CTRL_SHIFT;
++		break;
++	case GIC_CPU_PRIMASK:
++		mask = GICH_VMCR_PRIMASK_MASK;
++		shift = GICH_VMCR_PRIMASK_SHIFT;
++		break;
++	case GIC_CPU_BINPOINT:
++		mask = GICH_VMCR_BINPOINT_MASK;
++		shift = GICH_VMCR_BINPOINT_SHIFT;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
++		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
++		break;
++	}
 +
- config KVM_ARM_VGIC
- 	bool
- 	depends on KVM_ARM_HOST && OF
++	if (!mmio->is_write) {
++		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
++		mmio_data_write(mmio, ~0, reg);
++	} else {
++		reg = mmio_data_read(mmio, ~0);
++		reg = (reg << shift) & mask;
++		if (reg != (vgic_cpu->vgic_vmcr & mask))
++			updated = true;
++		vgic_cpu->vgic_vmcr &= ~mask;
++		vgic_cpu->vgic_vmcr |= reg;
++	}
++	return updated;
++}
++
++static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
++			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
++{
++	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
+ }
+ 
++static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
++				  struct kvm_exit_mmio *mmio,
++				  phys_addr_t offset)
++{
++	u32 reg;
++
++	if (mmio->is_write)
++		return false;
++
++	/* GICC_IIDR */
++	reg = (PRODUCT_ID_KVM << 20) |
++	      (GICC_ARCH_VERSION_V2 << 16) |
++	      (IMPLEMENTER_ARM << 0);
++	mmio_data_write(mmio, ~0, reg);
++	return false;
++}
++
++/*
++ * CPU Interface Register accesses - these are not accessed by the VM, but by
++ * user space for saving and restoring VGIC state.
++ */
+ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_CTRL,
+@@ -1728,17 +1793,17 @@ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_ALIAS_BINPOINT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_abpr,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_ACTIVEPRIO,
+ 		.len		= 16,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_IDENT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_cpu_mmio_ident,
+ 	},
+ };
+ 
 -- 
 1.8.5.1
