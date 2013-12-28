@@ -1,48 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 28 Dec 2013 15:17:35 -0800
-Subject: [GIT PULL 2nd 5/5] Samsung SoC update for v3.14
-In-Reply-To: <52B5DCBD.5020202@samsung.com>
-References: <52B5DCBD.5020202@samsung.com>
-Message-ID: <20131228231735.GC22753@quad.lixom.net>
+Date: Sat, 28 Dec 2013 15:20:14 -0800
+Subject: [GIT PULL][for 3.13] pull request on fix from pxa
+In-Reply-To: <52BA88C8.1020605@gmail.com>
+References: <52BA88C8.1020605@gmail.com>
+Message-ID: <20131228232014.GD22753@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 22, 2013 at 03:23:57AM +0900, Kukjin Kim wrote:
-> The following changes since commit 538cfbb4c40ab59688236484138133b8e3e89220:
+On Wed, Dec 25, 2013 at 03:27:04PM +0800, Haojian Zhuang wrote:
+> Hi all,
 > 
->   ARM: dts: Add initial support for Arndale Octa board (2013-12-16
-> 05:05:43 +0900)
+> Please help to pull the fix.
+> 
+> Regards
+> Haojian
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 > 
 > are available in the git repository at:
 > 
-
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-soc-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+> tags/fix-pxa
 > 
-> for you to fetch changes up to 7a28f198735d040f4d318511827d913d4b53f355:
+> for you to fetch changes up to 17b7de0824891e29bfe6bc981543c6ca5123c519:
 > 
->   ARM: dts: add board dts file for EXYNOS4412 based TINY4412 board
-> (2013-12-19 05:34:26 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung SoC 2nd update for v3.14
-> - add exynos4412-tiny4412 board dt
->   for FriendlyARM's TINY4412 board
+>   ARM: pxa: fix USB gadget driver compilation regression (2013-12-11
+> 17:29:16 +0800)
 > 
 > ----------------------------------------------------------------
-> Alex Ling (1):
->       ARM: dts: add board dts file for EXYNOS4412 based TINY4412 board
-> 
->  arch/arm/boot/dts/Makefile                |  1 +
->  arch/arm/boot/dts/exynos4412-tiny4412.dts | 93
-> +++++++++++++++++++++++++++++++
->  2 files changed, 94 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
+> Linus Walleij (1):
+>       ARM: pxa: fix USB gadget driver compilation regression
 
-Hi,
-
-This is really just a DT patch, and given that I didn't take the base patch it
-makes sense to take this in a DT branch instead. Please resend on top of dt-2.
+Since there was no tag description, I just cherry-picked the patch over
+instead. So the contents is merged now. :) Thanks!
 
 
 -Olof
