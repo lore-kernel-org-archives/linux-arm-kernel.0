@@ -1,40 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 28 Dec 2013 15:20:14 -0800
-Subject: [GIT PULL][for 3.13] pull request on fix from pxa
-In-Reply-To: <52BA88C8.1020605@gmail.com>
-References: <52BA88C8.1020605@gmail.com>
-Message-ID: <20131228232014.GD22753@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Dec 2013 23:30:53 +0000
+Subject: OMAP display subsystem - does it work?
+In-Reply-To: <20131221005941.GI32243@n2100.arm.linux.org.uk>
+References: <52B1A922.6020901@ti.com> <20131218180240.GG27438@atomide.com>
+ <20131219175644.GE32243@n2100.arm.linux.org.uk>
+ <20131219182252.GP27438@atomide.com>
+ <20131220112700.GF32243@n2100.arm.linux.org.uk>
+ <20131220114837.GH32243@n2100.arm.linux.org.uk> <52B44982.4020501@ti.com>
+ <20131220160432.GZ27438@atomide.com> <20131220165456.GD27438@atomide.com>
+ <20131221005941.GI32243@n2100.arm.linux.org.uk>
+Message-ID: <20131228233053.GJ32243@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 25, 2013 at 03:27:04PM +0800, Haojian Zhuang wrote:
-> Hi all,
+On Sat, Dec 21, 2013 at 12:59:41AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 20, 2013 at 08:55:03AM -0800, Tony Lindgren wrote:
+> > Yeah this seems to do the trick for me for the built-in DSS on LDP.
+> > 
+> > Tony
+> > 
+> > 8< -----------------------------------
+> > From: Tony Lindgren <tony@atomide.com>
+> > Date: Fri, 20 Dec 2013 08:53:27 -0800
+> > Subject: [PATCH] ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
+> > 
+> > Looks like the LCD panel on LDP has been broken quite a while, and
+> > recently got fixed. However, there's still an issue where the panel
+> > backlight does not come on if the LCD drivers are built into the
+> > kernel.
+> > 
+> > Fix the issue by registering the DPI LCD panel only after the twl4030
+> > GPIO has probed.
+> > 
+> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > --- a/arch/arm/mach-omap2/board-ldp.c
+> > +++ b/arch/arm/mach-omap2/board-ldp.c
+> > @@ -248,7 +248,7 @@ static int ldp_twl_gpio_setup(struct device *dev, unsigned gpio, unsigned ngpio)
+> >  	/* Backlight enable GPIO */
+> >  	ldp_lcd_pdata.backlight_gpio = gpio + 15;
+> >  
+> > -	return 0;
+> > +	return platform_device_register(&ldp_lcd_device);
+> >  }
+> >  
+> >  static struct twl4030_gpio_platform_data ldp_gpio_data = {
+> > @@ -346,7 +346,6 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
+> >  
+> >  static struct platform_device *ldp_devices[] __initdata = {
+> >  	&ldp_gpio_keys_device,
+> > -	&ldp_lcd_device,
+> >  };
+> >  
+> >  #ifdef CONFIG_OMAP_MUX
 > 
-> Please help to pull the fix.
-> 
-> Regards
-> Haojian
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/fix-pxa
-> 
-> for you to fetch changes up to 17b7de0824891e29bfe6bc981543c6ca5123c519:
-> 
->   ARM: pxa: fix USB gadget driver compilation regression (2013-12-11
-> 17:29:16 +0800)
-> 
-> ----------------------------------------------------------------
-> Linus Walleij (1):
->       ARM: pxa: fix USB gadget driver compilation regression
+> I've added it to the test build for tonight (only as an uncommitted
+> modification) so we'll see what happens tomorrow morning.
 
-Since there was no tag description, I just cherry-picked the patch over
-instead. So the contents is merged now. :) Thanks!
-
-
--Olof
+BTW, yes, this does result in the display working again on the LDP.
