@@ -1,58 +1,61 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 28 Dec 2013 12:48:27 +0100
-Subject: [PATCH 6/6] [RFC] arm: shmobile: genmai reference: Add RSPI nodes
-In-Reply-To: <CAMuHMdVH4PyhxR3JLLPX9a3fKaEgdpQpd2aa4YKL6DUD8+Pw2Q@mail.gmail.com>
-References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <2198668.ESbmzZvna4@avalon>
- <CAMuHMdVH4PyhxR3JLLPX9a3fKaEgdpQpd2aa4YKL6DUD8+Pw2Q@mail.gmail.com>
-Message-ID: <1503028.o7PtQzEmGv@avalon>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Sat, 28 Dec 2013 22:34:52 +0800
+Subject: [PATCH v6 0/3] mmc: dw_mmc: add dw_mmc-k3
+Message-ID: <1388241295-20051-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+v6:
+0002:
+Jaehoon pointed HIGHSPEED cap can be omitted if supports-highspeed is defined.
+Seungwon mentioned clk operation should be called after suspend.
+Remove k3_dwmmc_caps
 
-On Friday 27 December 2013 20:08:18 Geert Uytterhoeven wrote:
-> On Fri, Dec 27, 2013 at 5:20 PM, Laurent Pinchart wrote:
-> > On Tuesday 24 December 2013 12:56:50 Geert Uytterhoeven wrote:
-> >> Add pinctrl and SPI devices for RSPI on Genmai.
-> >> 
-> >> On this board, only rspi4 is in use. It's bus contains a single device
-> >> (a wm8978 audio codec), for which no bindings are defined yet.
-> >> 
-> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> >> Cc: devicetree at vger.kernel.org
-> >> ---
-> >> 
-> >>  arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 ++++++++++++++++-
-> >>  1 file changed, 17 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> >> b/arch/arm/boot/dts/r7s72100-genmai-reference.dts index
-> >> 114510f8bf09..6d99630627e4 100644
-> >> --- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> >> +++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> >> @@ -43,7 +43,7 @@
-> >>  };
-> >>  
-> >>  &pfc {
-> >> -     pinctrl-0 = <&scif2_pins &ethernet_pins>;
-> >> +     pinctrl-0 = <&scif2_pins &ethernet_pins &rspi4_pins>;
-> > 
-> > You should add pinctrl-0 and pinctrl-names properties to the spi4 node
-> > instead. Device nodes should reference their pinctrl configuration
-> > directly, scif2 and ethernet are exceptions as DT bindings for those
-> > devices are not in mainline yet.
-> 
-> I put it there because the actual driver doesn't use DT yet. Is that OK?
+V5:
+0002:
+Follow advice from Arnd, 
+Update dt descirption and use of_property_for_each_u32 to get table number.
 
-I had missed that. That's fine, but shouldn't you then delay patch 5/6 until 
-the driver gets DT support ?
+v4:
+Follow Arnd's suggestion abstracting specific tuning to clock,
+also because new version ip use different method and not use same tuning registers.
 
-You've already sent a DT bindings proposal (thanks for that !), wouldn't it 
-make sense to implement support in the driver before this patch ? We're pretty 
-close to that from what I can see.
+0001 acked by Jaehoon
+
+v3:
+0001: 
+Put set/clear_bit DW_MMC_CARD_PRESENT in dw_mci_get_cd, 
+Since dw_mci_request will check DW_MMC_CARD_PRESENT before sending cmd
+
+0002:
+Follow suggestion from Chris, Kumar and Seungwon
+Sync to latest mmc-next, which is 3.12-rc2
+Remove enum dw_mci_k3_type etc
+
+v2:
+Follow Jaehoon's suggestion
+Use slot-gpio.c handle cd pin
+Move table out to dts
+other suggestion
+
+
+Zhangfei Gao (3):
+  mmc: dw_mmc: use slot-gpio to handle cd pin
+  mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+  clk: hisilicon: add hi3620_mmc_clks
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |   14 ++
+ .../devicetree/bindings/clock/hi3620-clock.txt     |    1 +
+ .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   60 +++++
+ drivers/clk/hisilicon/clk-hi3620.c                 |  262 ++++++++++++++++++++
+ drivers/mmc/host/Kconfig                           |   10 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/dw_mmc-k3.c                       |  126 ++++++++++
+ drivers/mmc/host/dw_mmc.c                          |   48 +++-
+ include/dt-bindings/clock/hi3620-clock.h           |    5 +
+ 9 files changed, 514 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+ create mode 100644 drivers/mmc/host/dw_mmc-k3.c
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
