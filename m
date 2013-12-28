@@ -1,51 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:33 +0000
-Subject: [PATCH 01/15] arm/arm64: KVM: arch_timer: Initialize cntvoff at
- kvm_init
+Date: Sat, 28 Dec 2013 11:15:40 +0000
+Subject: [PATCH 08/15] arm/arm64: kvm: Set vcpu->cpu to -1 on vcpu_put
 In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
 References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1388229347-24185-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1388229347-24185-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Initialize the cntvoff at kvm_init_vm time, not before running the VCPUs
-at the first time because that will overwrite any potentially restored
-values from user space.
+The arch-generic KVM code expects the cpu field of a vcpu to be -1 if
+the vcpu is no longer assigned to a cpu.  This is used for the optimized
+make_all_cpus_request path and will be used by the vgic code to check
+that no vcpus are running.
 
-Cc: Andre Przywara <andre.przywara@linaro.org>
-Acked-by: Marc Zynger <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c  | 2 ++
- virt/kvm/arm/vgic.c | 1 -
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 2a700e0..13205bd 100644
+index f290b22..b92ff6d3 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -137,6 +137,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- 	if (ret)
- 		goto out_free_stage2_pgd;
+@@ -342,6 +342,13 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
  
-+	kvm_timer_init(kvm);
+ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ {
++	/*
++	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
++	 * if the vcpu is no longer assigned to a cpu.  This is used for the
++	 * optimized make_all_cpus_request path.
++	 */
++	vcpu->cpu = -1;
 +
- 	/* Mark the initial VMID generation invalid */
- 	kvm->arch.vmid_gen = 0;
+ 	kvm_arm_set_running_vcpu(NULL);
+ }
  
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 685fc72..81e9481 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1409,7 +1409,6 @@ int kvm_vgic_init(struct kvm *kvm)
- 	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
- 		vgic_set_target_reg(kvm, 0, i);
- 
--	kvm_timer_init(kvm);
- 	kvm->arch.vgic.ready = true;
- out:
- 	mutex_unlock(&kvm->lock);
 -- 
 1.8.5.1
