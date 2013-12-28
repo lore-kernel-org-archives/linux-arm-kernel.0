@@ -1,153 +1,104 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 28 Dec 2013 11:15:42 +0000
-Subject: [PATCH 10/15] KVM: arm-vgic: Support unqueueing of LRs to the dist
+Date: Sat, 28 Dec 2013 11:15:46 +0000
+Subject: [PATCH 14/15] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene host
 In-Reply-To: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
 References: <1388229347-24185-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1388229347-24185-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1388229347-24185-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Anup Patel <anup.patel@linaro.org>
 
-To properly access the VGIC state from user space it is very unpractical
-to have to loop through all the LRs in all register access functions.
-Instead, support moving all pending state from LRs to the distributor,
-but leave active state LRs alone.
+This patch allows us to have X-Gene guest VCPU when using KVM arm64
+on APM X-Gene host.
 
-Note that to accurately present the active and pending state to VCPUs
-reading these distributor registers from a live VM, we would have to
-stop all other VPUs than the calling VCPU and ask each CPU to unqueue
-their LR state onto the distributor and add fields to track active state
-on the distributor side as well.  We don't have any users of such
-functionality yet and there are other inaccuracies of the GIC emulation,
-so don't provide accurate synchronized access to this state just yet.
-However, when the time comes, having this function should help.
+We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+when running on X-Gene host with Potenza core.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+[maz: sanitized the commit log]
+
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 83 insertions(+), 5 deletions(-)
+ arch/arm64/include/uapi/asm/kvm.h    |  3 ++-
+ arch/arm64/kvm/guest.c               | 32 +++++++++++++++++++-------------
+ arch/arm64/kvm/sys_regs_generic_v8.c |  3 +++
+ 3 files changed, 24 insertions(+), 14 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 88599b5..d08ba28 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -589,6 +589,80 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
- 	return false;
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 5031f42..d9f026b 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -55,8 +55,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_AEM_V8		0
+ #define KVM_ARM_TARGET_FOUNDATION_V8	1
+ #define KVM_ARM_TARGET_CORTEX_A57	2
++#define KVM_ARM_TARGET_XGENE_POTENZA	3
+ 
+-#define KVM_ARM_NUM_TARGETS		3
++#define KVM_ARM_NUM_TARGETS		4
+ 
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 3f0731e..0874557 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -207,20 +207,26 @@ int __attribute_const__ kvm_target_cpu(void)
+ 	unsigned long implementor = read_cpuid_implementor();
+ 	unsigned long part_number = read_cpuid_part_number();
+ 
+-	if (implementor != ARM_CPU_IMP_ARM)
+-		return -EINVAL;
++	switch (implementor) {
++	case ARM_CPU_IMP_ARM:
++		switch (part_number) {
++		case ARM_CPU_PART_AEM_V8:
++			return KVM_ARM_TARGET_AEM_V8;
++		case ARM_CPU_PART_FOUNDATION:
++			return KVM_ARM_TARGET_FOUNDATION_V8;
++		case ARM_CPU_PART_CORTEX_A57:
++			return KVM_ARM_TARGET_CORTEX_A57;
++		};
++		break;
++	case ARM_CPU_IMP_APM:
++		switch (part_number) {
++		case APM_CPU_PART_POTENZA:
++			return KVM_ARM_TARGET_XGENE_POTENZA;
++		};
++		break;
++	};
+ 
+-	switch (part_number) {
+-	case ARM_CPU_PART_AEM_V8:
+-		return KVM_ARM_TARGET_AEM_V8;
+-	case ARM_CPU_PART_FOUNDATION:
+-		return KVM_ARM_TARGET_FOUNDATION_V8;
+-	case ARM_CPU_PART_CORTEX_A57:
+-		/* Currently handled by the generic backend */
+-		return KVM_ARM_TARGET_CORTEX_A57;
+-	default:
+-		return -EINVAL;
+-	}
++	return -EINVAL;
  }
  
-+#define LR_CPUID(lr)	\
-+	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
-+#define LR_IRQID(lr)	\
-+	((lr) & GICH_LR_VIRTUALID)
+ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 4268ab9..8fe6f76 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -90,6 +90,9 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
++					  &genericv8_target_table);
 +
-+static void vgic_retire_lr(int lr_nr, int irq, struct vgic_cpu *vgic_cpu)
-+{
-+	clear_bit(lr_nr, vgic_cpu->lr_used);
-+	vgic_cpu->vgic_lr[lr_nr] &= ~GICH_LR_STATE;
-+	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-+}
-+
-+/**
-+ * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
-+ * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
-+ *
-+ * Move any pending IRQs that have already been assigned to LRs back to the
-+ * emulated distributor state so that the complete emulated state can be read
-+ * from the main emulation structures without investigating the LRs.
-+ *
-+ * Note that IRQs in the active state in the LRs get their pending state moved
-+ * to the distributor but the active state stays in the LRs, because we don't
-+ * track the active state on the distributor side.
-+ */
-+static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int vcpu_id = vcpu->vcpu_id;
-+	int i, irq, source_cpu;
-+	u32 *lr;
-+
-+	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+		lr = &vgic_cpu->vgic_lr[i];
-+		irq = LR_IRQID(*lr);
-+		source_cpu = LR_CPUID(*lr);
-+
-+		/*
-+		 * There are three options for the state bits:
-+		 *
-+		 * 01: pending
-+		 * 10: active
-+		 * 11: pending and active
-+		 *
-+		 * If the LR holds only an active interrupt (not pending) then
-+		 * just leave it alone.
-+		 */
-+		if ((*lr & GICH_LR_STATE) == GICH_LR_ACTIVE_BIT)
-+			continue;
-+
-+		/*
-+		 * Reestablish the pending state on the distributor and the
-+		 * CPU interface.  It may have already been pending, but that
-+		 * is fine, then we are only setting a few bits that were
-+		 * already set.
-+		 */
-+		vgic_dist_irq_set(vcpu, irq);
-+		if (irq < VGIC_NR_SGIS)
-+			dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
-+		*lr &= ~GICH_LR_PENDING_BIT;
-+
-+		/*
-+		 * If there's no state left on the LR (it could still be
-+		 * active), then the LR does not hold any useful info and can
-+		 * be marked as free for other use.
-+		 */
-+		if (!(*lr & GICH_LR_STATE))
-+			vgic_retire_lr(i, irq, vgic_cpu);
-+
-+		/* Finally update the VGIC state. */
-+		vgic_update_state(vcpu->kvm);
-+	}
-+}
-+
- static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
- 				  phys_addr_t offset)
-@@ -848,8 +922,6 @@ static void vgic_update_state(struct kvm *kvm)
- 	}
+ 	return 0;
  }
- 
--#define LR_CPUID(lr)	\
--	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
- #define MK_LR_PEND(src, irq)	\
- 	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
- 
-@@ -871,9 +943,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
- 		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
- 
- 		if (!vgic_irq_is_enabled(vcpu, irq)) {
--			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
--			clear_bit(lr, vgic_cpu->lr_used);
--			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
-+			vgic_retire_lr(lr, irq, vgic_cpu);
- 			if (vgic_irq_is_active(vcpu, irq))
- 				vgic_irq_clear_active(vcpu, irq);
- 		}
-@@ -1675,6 +1745,14 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 		}
- 	}
- 
-+	/*
-+	 * Move all pending IRQs from the LRs on all VCPUs so the pending
-+	 * state can be properly represented in the register state accessible
-+	 * through this API.
-+	 */
-+	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm)
-+		vgic_unqueue_irqs(tmp_vcpu);
-+
- 	offset -= r->base;
- 	r->handle_mmio(vcpu, &mmio, offset);
- 
+ late_initcall(sys_reg_genericv8_init);
 -- 
 1.8.5.1
