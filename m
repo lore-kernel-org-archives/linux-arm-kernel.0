@@ -1,61 +1,56 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Sat, 28 Dec 2013 18:23:18 -0300
-Subject: [GIT PULL] Allwinner sunXi clock changes for 3.14
-Message-ID: <52BF4146.7060403@elopez.com.ar>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 28 Dec 2013 16:25:19 -0500
+Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
+In-Reply-To: <20131228205928.GB19850@lunn.ch>
+References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
+ <20131228170114.GH19878@titan.lakedaemon.net>
+ <20131228205928.GB19850@lunn.ch>
+Message-ID: <20131228212519.GI19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Andrew,
 
-I made this pull with the clk parts of my series, as well as a patch 
-from Chen-Yu Tsai adding support for output clocks on A20. Please pull 
-or let me know if I should fix anything, as it's my first time sending 
-out pull requests.
+On Sat, Dec 28, 2013 at 09:59:28PM +0100, Andrew Lunn wrote:
+> On Sat, Dec 28, 2013 at 12:01:14PM -0500, Jason Cooper wrote:
+> > On Sat, Dec 28, 2013 at 05:12:11PM +0100, Andrew Lunn wrote:
+...
+> > > +	ocp at f1000000 {
+> > 
+> > I plan on going though and sorting the nodes under the ocp bus for all
+> > the dts files during the next cycle.  Would you mind sorting these so we
+> > have one less to worry about?
+> 
+> Sure. Sort on what? Address, alphabetic on node name?
 
-Cheers,
+address please.
 
-Emilio
+...
+> > > +		};
+> > > +
+> > > +		serial at 12000 {
+> > > +			/* Internal on test pins, 3.3v TTL */
+> > 
+> > Do you have a pointer to a pin layout?
+> 
+> Yes, i can add a URL to an Excito forum page. They are friendly about
+> this, document it themselves.
 
-----8<----
+ok, considering the transience of web pages, perhaps a little ascii art?
+Not a show stopper, just if you're inclined.
 
-The following changes since commit 0903ea60173fab226a867ceb080b2e0269a6c975:
+> > > +		programming_led {
+> > > +			label = "bubba3:green:programming";
+> > > +			gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
+> > > +			linux,default-trigger = "default-off";
+> > 
+> > Perhaps we can use 'default-state = "off";' here to avoid the
+> > linux-specific property?
+> 
+> Sure.
+> 
+> v2 in the next day or two.
 
-   clk: add accuracy support for fixed clock (2013-12-22 23:14:28 -0800)
+thx,
 
-are available in the git repository at:
-
-   https://bitbucket.org/emiliolopez/linux.git tags/sunxi-clk-3.14-for-mike
-
-for you to fetch changes up to 6f86341726cbec1921e925fd54a10c5b58e6f9f1:
-
-   clk: sunxi: Allwinner A20 output clock support (2013-12-28 17:14:21 
--0300)
-
-----------------------------------------------------------------
-Allwinner sunXi SoCs clock changes
-
-This contains the clk driver parts of the "[PATCH v3 00/13] clk: sunxi:
-add PLL5 and PLL6 support" series. It adds support for PLL4/5/6 and
-mod0 clocks on most sunxi platforms. Additionally, it contains "[PATCH
-1/4] clk: sunxi: Allwinner A20 output clock support" (v2) from Chen-Yu
-Tsai, which adds support for output clocks present on A20.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (1):
-       clk: sunxi: Allwinner A20 output clock support
-
-Emilio L?pez (7):
-       clk: sunxi: register factors clocks behind composite
-       clk: sunxi: clean the magic number of mux parents
-       clk: sunxi: add gating support to PLL1
-       clk: sunxi: make factors_clk_setup return the clock it registers
-       clk: sunxi: add PLL5 and PLL6 support
-       clk: sunxi: mod0 support
-       clk: sunxi: support better factor DT nodes
-
-  Documentation/devicetree/bindings/clock/sunxi.txt |  10 +-
-  drivers/clk/sunxi/clk-factors.c                   |  63 +---
-  drivers/clk/sunxi/clk-factors.h                   |  16 +-
-  drivers/clk/sunxi/clk-sunxi.c                     | 435 
-+++++++++++++++++++++-
-  4 files changed, 445 insertions(+), 79 deletions(-)
+Jason.
