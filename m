@@ -1,52 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 28 Dec 2013 14:09:11 -0800
-Subject: [GIT PULL] few omap regression fixes against v3.13-rc5
-In-Reply-To: <20131228005747.GE5116@atomide.com>
-References: <20131228005747.GE5116@atomide.com>
-Message-ID: <20131228220910.GA9523@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 28 Dec 2013 15:09:16 -0800
+Subject: [PATCH 03/11] ARM: EXYNOS: local regs-pmu.h header file
+In-Reply-To: <116101cefb1e$69ddfe70$3d99fb50$@kernel.org>
+References: <116101cefb1e$69ddfe70$3d99fb50$@kernel.org>
+Message-ID: <CAOesGMjJXodfZUSwHWdYgJsTWL4FANxXnP519B0AUiwpEn4bQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131227 16:57]:
-> The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
-> 
->   Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/intc-ldp-fix
-> 
-> for you to fetch changes up to 82f4fe707836e80b0fcaae9a4a1756e6e89c5e62:
-> 
->   Merge tag 'for-v3.13-rc/hwmod-fixes-b' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into debug-ll-and-ldp-backlight-fix (2013-12-27 09:51:25 -0800)
-> 
-> ----------------------------------------------------------------
-> 
-> Fix a regression for wrong interrupt numbers for some devices after
-> the sparse IRQ conversion, fix DRA7 console output for earlyprintk,
-> and fix the LDP LCD backlight when DSS is built into the kernel and
-> not as a loadable module.  
+Hi,
 
-Added also the mailing lists to Cc.
 
-Regards,
+On Tue, Dec 17, 2013 at 3:52 AM,  <kgene@kernel.org> wrote:
+> From: Kukjin Kim <kgene.kim@samsung.com>
+>
+> This moves regs-pmu.h file into mach-exynos directory.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.c                      |    3 ++-
+>  arch/arm/mach-exynos/cpuidle.c                     |    2 +-
+>  arch/arm/mach-exynos/hotplug.c                     |    2 +-
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
+>  arch/arm/mach-exynos/platsmp.c                     |    2 +-
+>  arch/arm/mach-exynos/pm.c                          |    2 +-
+>  arch/arm/mach-exynos/pm_domains.c                  |    3 ++-
+>  arch/arm/mach-exynos/pmu.c                         |    2 +-
+>  arch/arm/mach-exynos/{include/mach => }/regs-pmu.h |    0
+>  9 files changed, 10 insertions(+), 8 deletions(-)
+>  rename arch/arm/mach-exynos/{include/mach => }/regs-pmu.h (100%)
 
-Tony
- 
-> ----------------------------------------------------------------
-> Rajendra Nayak (1):
->       ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
-> 
-> Suman Anna (1):
->       ARM: OMAP2+: hwmod_data: fix missing OMAP_INTC_START in irq data
-> 
-> Tony Lindgren (2):
->       ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
->       Merge tag 'for-v3.13-rc/hwmod-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into debug-ll-and-ldp-backlight-fix
-> 
->  arch/arm/mach-omap2/board-ldp.c                    | 7 ++++++-
->  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 4 ++--
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 6 +++---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 2 +-
->  4 files changed, 12 insertions(+), 7 deletions(-)
-> 
+This looks OK, but when you committed, you did the move of the include
+file in another commit (e44de221d3ddb99387b04cfd49483bcd05daa6fb).
+That means that between that commit and this patch, there's build
+breakage. Please try to avoid that in the future since if something
+needs to be bisected near here it can cause problems.
+
+
+-Olof
