@@ -1,44 +1,64 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 29 Dec 2013 08:43:40 +0400
-Subject: [PATCH v2 0/3] ARM: clps711x: IRQCHIP driver
-In-Reply-To: <1387454214-1171-1-git-send-email-shc_work@mail.ru>
-References: <1387454214-1171-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20131229084340.10a4abdfc5815a709d7a6cc6@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 29 Dec 2013 07:45:54 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.13-rc
+Message-ID: <20131229154554.GA14633@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Dec 2013 15:56:54 +0400
-Alexander Shiyan <shc_work@mail.ru> wrote:
+Hi Linus,
 
-> This series is devoted to new CLPS711X irqchip driver.
-> The driver designed for booting from ATAGS and devicetree.
-> 
-> Alexander Shiyan (3):
->   ARM: clps711x: Add CLPS711X irqchip driver
->   ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
->     driver
->   ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
-> 
->  .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
->  arch/arm/Kconfig                                   |   2 -
->  arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
->  arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
->  arch/arm/mach-clps711x/board-clep7312.c            |   2 -
->  arch/arm/mach-clps711x/board-edb7211.c             |   2 -
->  arch/arm/mach-clps711x/board-p720t.c               |   2 -
->  arch/arm/mach-clps711x/common.c                    | 201 +----------------
->  arch/arm/mach-clps711x/common.h                    |   5 +-
->  arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
->  drivers/irqchip/Kconfig                            |   8 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-clps711x.c                     | 243 +++++++++++++++++++++
->  13 files changed, 299 insertions(+), 228 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
->  create mode 100644 drivers/irqchip/irq-clps711x.c
-> 
-> -- 
+The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
 
-Ping.
+  Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 9b17c16525552b247cb2d9bb8eeadc87950b36ff:
+
+  Merge tag 'omap-for-v3.13/intc-ldp-fix' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-12-28 15:38:32 -0800)
+
+----------------------------------------------------------------
+
+ARM: SoC fixes for 3.13-rc
+
+Another smallish batch of fixes, it's been quiet due to the holidays. Nothing
+controversial here, a handful of things across the board.
+
+----------------------------------------------------------------
+Ben Dooks (1):
+      ARM: shmobile: r8a7790: fix shdi resource sizes
+
+Kuninori Morimoto (1):
+      ARM: shmobile: bockw: fixup DMA mask
+
+Laurent Pinchart (1):
+      ARM: shmobile: armadillo: Add PWM backlight power supply
+
+Linus Walleij (1):
+      ARM: pxa: fix USB gadget driver compilation regression
+
+Olof Johansson (2):
+      Merge tag 'renesas-fixes2-for-v3.13' of git://git.kernel.org/.../horms/renesas into fixes
+      Merge tag 'omap-for-v3.13/intc-ldp-fix' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+Rajendra Nayak (1):
+      ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
+
+Suman Anna (1):
+      ARM: OMAP2+: hwmod_data: fix missing OMAP_INTC_START in irq data
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
+      Merge tag 'for-v3.13-rc/hwmod-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into debug-ll-and-ldp-backlight-fix
+
+ arch/arm/boot/dts/r8a7790.dtsi                     | 4 ++--
+ arch/arm/mach-omap2/board-ldp.c                    | 7 ++++++-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 4 ++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 6 +++---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 2 +-
+ arch/arm/mach-pxa/include/mach/lubbock.h           | 2 ++
+ arch/arm/mach-shmobile/board-armadillo800eva.c     | 7 +++++++
+ arch/arm/mach-shmobile/board-bockw.c               | 2 +-
+ 8 files changed, 24 insertions(+), 10 deletions(-)
