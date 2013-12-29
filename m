@@ -1,131 +1,64 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 29 Dec 2013 13:30:23 -0800
-Subject: [PATCH 1/4] clk: sunxi: Allwinner A20 output clock support
-In-Reply-To: <1387891580-30715-2-git-send-email-wens@csie.org>
-References: <1387891580-30715-1-git-send-email-wens@csie.org>
- <1387891580-30715-2-git-send-email-wens@csie.org>
-Message-ID: <20131229213023.12054.22673@quantum>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 29 Dec 2013 22:42:02 +0100
+Subject: [PATCH 15/21] ARM: shmobile: Remove Koelsch reference DTS
+In-Reply-To: <20131227022356.GF9184@verge.net.au>
+References: <cover.1387893834.git.horms+renesas@verge.net.au>
+ <11196073.PIXxcg54ZL@avalon> <20131227022356.GF9184@verge.net.au>
+Message-ID: <2111872.r7nHcLFZor@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chen-Yu Tsai (2013-12-24 05:26:17)
-> This patch adds support for the external clock outputs on the
-> Allwinner A20 SoC. The clock outputs are similar to "module 0"
-> type clocks, with different offsets and widths for clock factors.
+Hi Simon,
+
+On Friday 27 December 2013 11:23:57 Simon Horman wrote:
+> On Thu, Dec 26, 2013 at 03:48:58PM +0100, Laurent Pinchart wrote:
+> > On Tuesday 24 December 2013 20:00:43 Sergei Shtylyov wrote:
+> > > On 24-12-2013 18:19, Simon Horman wrote:
+> > > > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > 
+> > > > Now that the DTS file r8a7790-koelsch.dts can be used with
+> > > > board-koelsch.c and board-koelsch-reference.c, proceed with removing
+> > > > r8a7790-koelsch-reference.dts.
+> > > > 
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > ---
+> > > > 
+> > > >   arch/arm/boot/dts/Makefile | 1 -
+> > > >   1 file changed, 1 deletion(-)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > > > index 909d910..5839077 100644
+> > > > --- a/arch/arm/boot/dts/Makefile
+> > > > +++ b/arch/arm/boot/dts/Makefile
+> > > > @@ -225,7 +225,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) +=
+> > > > emev2-kzm9d.dtb
+> > > > \
+> > > > 
+> > > >   	r8a7779-marzen.dtb \
+> > > >   	r8a7779-marzen-reference.dtb \
+> > > >   	r8a7791-koelsch.dtb \
+> > > > 
+> > > > -	r8a7791-koelsch-reference.dtb \
+> > > > 
+> > > >   	r8a7790-lager.dtb \
+> > > >   	r8a7790-lager-reference.dtb \
+> > > 
+> > > Hm, the previous commit removed that file itself but forgot to remove it
+> > > from the Makefile.
+> > 
+> > Indeed, this problem doesn't seem to be present in the patches I've sent.
+> > Simon, has something gone wrong during a rebase ?
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Sorry about that.
+> 
+> Could you supply an incremental patch to remove the file itself?
 
-Looks good to me.
+Sure. I've sent the patch. Could you please also pick "[PATCH v6 15.1/17] ARM: 
+shmobile: Add GPIO keys to Koelsch DTS" from the list ?
 
+-- 
 Regards,
-Mike
 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/clk-sunxi.c                     | 57 +++++++++++++++++++++++
->  2 files changed, 58 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 46d8433..c2cb762 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -36,6 +36,7 @@ Required properties:
->         "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
->         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->         "allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
-> +       "allwinner,sun7i-a20-out-clk" - for the external output clocks
->  
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 25d99b6..19d9e9e 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -330,6 +330,47 @@ static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
->  
->  
->  /**
-> + * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
-> + * CLK_OUT rate is calculated as follows
-> + * rate = (parent_rate >> p) / (m + 1);
-> + */
-> +
-> +static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
-> +                                     u8 *n, u8 *k, u8 *m, u8 *p)
-> +{
-> +       u8 div, calcm, calcp;
-> +
-> +       /* These clocks can only divide, so we will never be able to achieve
-> +        * frequencies higher than the parent frequency */
-> +       if (*freq > parent_rate)
-> +               *freq = parent_rate;
-> +
-> +       div = parent_rate / *freq;
-> +
-> +       if (div < 32)
-> +               calcp = 0;
-> +       else if (div / 2 < 32)
-> +               calcp = 1;
-> +       else if (div / 4 < 32)
-> +               calcp = 2;
-> +       else
-> +               calcp = 3;
-> +
-> +       calcm = DIV_ROUND_UP(div, 1 << calcp);
-> +
-> +       *freq = (parent_rate >> calcp) / calcm;
-> +
-> +       /* we were called to round the frequency, we can now return */
-> +       if (n == NULL)
-> +               return;
-> +
-> +       *m = calcm - 1;
-> +       *p = calcp;
-> +}
-> +
-> +
-> +
-> +/**
->   * sunxi_factors_clk_setup() - Setup function for factor clocks
->   */
->  
-> @@ -384,6 +425,14 @@ static struct clk_factors_config sun4i_mod0_config = {
->         .pwidth = 2,
->  };
->  
-> +/* user manual says "n" but it's really "p" */
-> +static struct clk_factors_config sun7i_a20_out_config = {
-> +       .mshift = 8,
-> +       .mwidth = 5,
-> +       .pshift = 20,
-> +       .pwidth = 2,
-> +};
-> +
->  static const struct factors_data sun4i_pll1_data __initconst = {
->         .enable = 31,
->         .table = &sun4i_pll1_config,
-> @@ -414,6 +463,13 @@ static const struct factors_data sun4i_mod0_data __initconst = {
->         .getter = sun4i_get_mod0_factors,
->  };
->  
-> +static const struct factors_data sun7i_a20_out_data __initconst = {
-> +       .enable = 31,
-> +       .mux = 24,
-> +       .table = &sun7i_a20_out_config,
-> +       .getter = sun7i_a20_get_out_factors,
-> +};
-> +
->  static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
->                                                 const struct factors_data *data)
->  {
-> @@ -912,6 +968,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
->         {.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
->         {.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
->         {.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
-> +       {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
->         {}
->  };
->  
-> -- 
-> 1.8.5.2
-> 
+Laurent Pinchart
