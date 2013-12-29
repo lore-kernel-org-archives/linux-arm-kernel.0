@@ -1,38 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 29 Dec 2013 14:23:39 -0500
-Subject: [PATCH v3 3/3] arm: dts: keystone: add keystone timer entry
-In-Reply-To: <52BF2164.6040501@linaro.org>
-References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387974724-31138-4-git-send-email-ivan.khoronzhuk@ti.com>
- <52BC6F28.1020009@ti.com> <52BF2164.6040501@linaro.org>
-Message-ID: <52C076BB.7080304@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 29 Dec 2013 11:49:10 -0800
+Subject: [PATCH] clk: remove CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <20131219211533.GT8064@book.gsilab.sittig.org>
+References: <1387431800-10092-1-git-send-email-mturquette@linaro.org>
+ <20131219211533.GT8064@book.gsilab.sittig.org>
+Message-ID: <20131229194910.21400.59921@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 December 2013 02:07 PM, Daniel Lezcano wrote:
-> On 12/26/2013 07:02 PM, Santosh Shilimkar wrote:
->> $subject
->> s/arm/ARM,
->>
->> On Wednesday 25 December 2013 07:32 AM, Ivan Khoronzhuk wrote:
->>> Add keystone timer entry to keystone device tree.
->>> This 64-bit timer is used as backup clock event device.
->>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->> No need to repost. I will fix it up while applying based
->> on state of PATCH 1/3 and 2/3.
+Quoting Gerhard Sittig (2013-12-19 13:15:33)
+> On Wed, Dec 18, 2013 at 21:43 -0800, Mike Turquette wrote:
+> > 
+> > Populate ${DEBUGS_MOUNT_POINT}/clk if CONFIG_DEBUG_FS is set. This
+> > eliminates the extra (annoying) step of enabling the config option
+> > manually.
+> > 
+> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
 > 
-> I assume you will take the patchset in your tree.
-> 
-I wasn't planning to take patch 1/3 and 2/3, assuming
-they will go via clocksource tree. Only the dts
-$subject patch is what I was planning to pick it up
-if the 1/3 and 2/3 gets lined up via thomas's tree.
+> Yes, please!  The debugfs information is just too useful to hide
+> behind another option that requires manual enabling. :)
 
-> I am back from vacations, give me a couple of days to review the patchset before applying it please.
-> 
-Take your time. Am not applying them as mentioned above.
+Applied to clk-next.
 
 Regards,
-Santosh
+Mike
+
+> 
+> 
+> virtually yours
+> Gerhard Sittig
+> -- 
+> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+> HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+> Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
