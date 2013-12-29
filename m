@@ -1,43 +1,44 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 29 Dec 2013 13:56:33 -0800
-Subject: [PATCH 0/4] clk: sunxi: add A20 external output clock support
-In-Reply-To: <20131229205927.GM3144@lukather>
-References: <1387787827-11341-1-git-send-email-wens@csie.org>
- <20131229205927.GM3144@lukather>
-Message-ID: <20131229215633.12054.22211@quantum>
+Date: Sun, 29 Dec 2013 14:02:33 -0800
+Subject: [PATCH 0/7] misc Tegra clock fixes
+In-Reply-To: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
+References: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
+Message-ID: <20131229220233.12054.64110@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2013-12-29 12:59:27)
-> Hi Chen-Yu,
-> 
-> On Mon, Dec 23, 2013 at 04:37:02PM +0800, Chen-Yu Tsai wrote:
-> > Hi everyone,
-> > 
-> > This patch series adds support for the Allwinner A20's 2 external clock
-> > outputs. The CubieTruck uses one such output to supply a stable 32.768
-> > KHz low power clock to its AP6210 WiFi module. Support for the module
-> > is being added to brcmfmac (brcm80211) by Broadcom people.
-> > 
-> > The patches should be applied after Emilio's sunxi clock series, as it
-> > uses the new factors clocks setup code.
-> 
-> Overall, it looks nice, but could you resend it as a separate thread,
-> with [PATCHv2] as a prefix (git format-patch's --reroll-count can help
-> you there) and CC'ing Linus Walleij for the pinctrl patch?
+Quoting Andrew Bresticker (2013-12-26 16:44:20)
+> Fixes for various clock-related issues found during bringup of
+> Tegra124-based Venice2 and Norrin boards.
 
-Hi Maxime,
-
-Just FYI I have taken patch #1 of this series via Emilio's pull request.
-
-Regards,
-Mike
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
 > 
-> Thanks!
-> Maxime
+> Andrew Bresticker (3):
+>   clk: tegra: fix sdmmc clks on Tegra1x4
+>   clk: tegra: cclk_lp has a pllx/2 divider
+>   clk: tegra: use max divider if divider overflows
+> 
+> David Ung (1):
+>   clk: tegra: PLLD2 fixes for hdmi
+> 
+> Gabe Black (1):
+>   clk: tegra: Fix PLLP rate table
+> 
+> Mark Zhang (1):
+>   clk: tegra: fix host1x clock on Tegra124
+> 
+> Rhyland Klein (1):
+>   clk: tegra: Fix PLLD mnp table
+> 
+>  drivers/clk/tegra/clk-divider.c          |  2 +-
+>  drivers/clk/tegra/clk-id.h               |  4 +++
+>  drivers/clk/tegra/clk-tegra-periph.c     |  4 +++
+>  drivers/clk/tegra/clk-tegra-super-gen4.c |  2 +-
+>  drivers/clk/tegra/clk-tegra114.c         |  8 +++---
+>  drivers/clk/tegra/clk-tegra124.c         | 46 +++++++++++++++++++-------------
+>  6 files changed, 41 insertions(+), 25 deletions(-)
 > 
 > -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> 1.8.5.1
+> 
