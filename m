@@ -1,35 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 29 Dec 2013 11:49:10 -0800
-Subject: [PATCH] clk: remove CONFIG_COMMON_CLK_DEBUG
-In-Reply-To: <20131219211533.GT8064@book.gsilab.sittig.org>
-References: <1387431800-10092-1-git-send-email-mturquette@linaro.org>
- <20131219211533.GT8064@book.gsilab.sittig.org>
-Message-ID: <20131229194910.21400.59921@quantum>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 29 Dec 2013 21:59:27 +0100
+Subject: [PATCH 0/4] clk: sunxi: add A20 external output clock support
+In-Reply-To: <1387787827-11341-1-git-send-email-wens@csie.org>
+References: <1387787827-11341-1-git-send-email-wens@csie.org>
+Message-ID: <20131229205927.GM3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gerhard Sittig (2013-12-19 13:15:33)
-> On Wed, Dec 18, 2013 at 21:43 -0800, Mike Turquette wrote:
-> > 
-> > Populate ${DEBUGS_MOUNT_POINT}/clk if CONFIG_DEBUG_FS is set. This
-> > eliminates the extra (annoying) step of enabling the config option
-> > manually.
-> > 
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> 
-> Yes, please!  The debugfs information is just too useful to hide
-> behind another option that requires manual enabling. :)
+Hi Chen-Yu,
 
-Applied to clk-next.
-
-Regards,
-Mike
-
+On Mon, Dec 23, 2013 at 04:37:02PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
+> This patch series adds support for the Allwinner A20's 2 external clock
+> outputs. The CubieTruck uses one such output to supply a stable 32.768
+> KHz low power clock to its AP6210 WiFi module. Support for the module
+> is being added to brcmfmac (brcm80211) by Broadcom people.
 > 
-> virtually yours
-> Gerhard Sittig
-> -- 
-> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-> HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-> Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+> The patches should be applied after Emilio's sunxi clock series, as it
+> uses the new factors clocks setup code.
+
+Overall, it looks nice, but could you resend it as a separate thread,
+with [PATCHv2] as a prefix (git format-patch's --reroll-count can help
+you there) and CC'ing Linus Walleij for the pinctrl patch?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131229/0fb064cd/attachment.sig>
