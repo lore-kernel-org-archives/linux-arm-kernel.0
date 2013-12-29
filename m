@@ -1,64 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Dec 2013 07:45:54 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.13-rc
-Message-ID: <20131229154554.GA14633@quad.lixom.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 29 Dec 2013 11:05:29 -0800
+Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
+In-Reply-To: <1386976031-21651-1-git-send-email-dinguyen@altera.com>
+References: <1386976031-21651-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20131229190529.21400.11997@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Quoting dinguyen at altera.com (2013-12-13 15:07:11)
+> Hi Mike,
+> 
+> Please pull in these 3 patches that cleans up the SOCFPGA clock driver.
 
-The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
+Hi Dinh,
 
-  Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
+Patch #2, "clk: socfpga: Look for the GPIO_DB_CLK by its offset" throws
+the following error during compilation:
 
-are available in the git repository at:
+drivers/clk/socfpga/clk.c: In function ?socfpga_clk_recalc_rate?:
+drivers/clk/socfpga/clk.c:238:27: error: invalid operands to binary & (have ?void *? and ?int?)
+   if (socfpgaclk->div_reg & SOCFPGA_GPIO_DB_CLK_OFFSET)
+                           ^
+make[3]: *** [drivers/clk/socfpga/clk.o] Error 1
+make[2]: *** [drivers/clk/socfpga] Error 2
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [drivers/clk] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [drivers] Error 2
+make: *** Waiting for unfinished jobs....
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+Compilation can continue with the following change:
 
-for you to fetch changes up to 9b17c16525552b247cb2d9bb8eeadc87950b36ff:
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 9350071..da6d82c 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -235,7 +235,7 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
+ 		val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
+ 		val &= div_mask(socfpgaclk->width);
+ 		/* Check for GPIO_DB_CLK by its offset */
+-		if (socfpgaclk->div_reg & SOCFPGA_GPIO_DB_CLK_OFFSET)
++		if ((int) socfpgaclk->div_reg & SOCFPGA_GPIO_DB_CLK_OFFSET)
+ 			div = val + 1;
+ 		else
+ 			div = (1 << val);
 
-  Merge tag 'omap-for-v3.13/intc-ldp-fix' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-12-28 15:38:32 -0800)
+I have not applied this change to the patch. Is there anything different
+way of handling this that you would prefer?
 
-----------------------------------------------------------------
+Regards,
+Mike
 
-ARM: SoC fixes for 3.13-rc
-
-Another smallish batch of fixes, it's been quiet due to the holidays. Nothing
-controversial here, a handful of things across the board.
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      ARM: shmobile: r8a7790: fix shdi resource sizes
-
-Kuninori Morimoto (1):
-      ARM: shmobile: bockw: fixup DMA mask
-
-Laurent Pinchart (1):
-      ARM: shmobile: armadillo: Add PWM backlight power supply
-
-Linus Walleij (1):
-      ARM: pxa: fix USB gadget driver compilation regression
-
-Olof Johansson (2):
-      Merge tag 'renesas-fixes2-for-v3.13' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'omap-for-v3.13/intc-ldp-fix' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Rajendra Nayak (1):
-      ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
-
-Suman Anna (1):
-      ARM: OMAP2+: hwmod_data: fix missing OMAP_INTC_START in irq data
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
-      Merge tag 'for-v3.13-rc/hwmod-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into debug-ll-and-ldp-backlight-fix
-
- arch/arm/boot/dts/r8a7790.dtsi                     | 4 ++--
- arch/arm/mach-omap2/board-ldp.c                    | 7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 4 ++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 6 +++---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 2 +-
- arch/arm/mach-pxa/include/mach/lubbock.h           | 2 ++
- arch/arm/mach-shmobile/board-armadillo800eva.c     | 7 +++++++
- arch/arm/mach-shmobile/board-bockw.c               | 2 +-
- 8 files changed, 24 insertions(+), 10 deletions(-)
+> 
+> Thanks,
+> 
+> Dinh
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14
+> 
+> for you to fetch changes up to be4cf9f262a069a91d095b9c17aed44e12699236:
+> 
+>   clk: socfpga: Remove socfpga_init_clocks (2013-12-13 16:54:38 -0600)
+> 
+> ----------------------------------------------------------------
+> SOCFPGA clk cleanups for 3.14
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (3):
+>       clk: socfpga: Map the clk manager base address in the clock driver
+>       clk: socfpga: Look for the GPIO_DB_CLK by its offset
+>       clk: socfpga: Remove socfpga_init_clocks
+> 
+>  arch/arm/mach-socfpga/socfpga.c |    5 -----
+>  drivers/clk/socfpga/clk.c       |   31 +++++++++++++++++--------------
+>  2 files changed, 17 insertions(+), 19 deletions(-)
+> 
