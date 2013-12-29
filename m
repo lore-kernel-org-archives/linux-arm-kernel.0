@@ -1,62 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 29 Dec 2013 20:10:42 +0100
-Subject: [GIT PULL] Allwinner drivers for 3.14
-In-Reply-To: <20131227212403.GC17637@quad.lixom.net>
-References: <20131220221709.GA23196@lukather>
- <20131227212403.GC17637@quad.lixom.net>
-Message-ID: <20131229191042.GK3144@lukather>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 29 Dec 2013 14:23:39 -0500
+Subject: [PATCH v3 3/3] arm: dts: keystone: add keystone timer entry
+In-Reply-To: <52BF2164.6040501@linaro.org>
+References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1387974724-31138-4-git-send-email-ivan.khoronzhuk@ti.com>
+ <52BC6F28.1020009@ti.com> <52BF2164.6040501@linaro.org>
+Message-ID: <52C076BB.7080304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Fri, Dec 27, 2013 at 01:24:03PM -0800, Olof Johansson wrote:
-> [+cc linux-arm-kernel]
+On Saturday 28 December 2013 02:07 PM, Daniel Lezcano wrote:
+> On 12/26/2013 07:02 PM, Santosh Shilimkar wrote:
+>> $subject
+>> s/arm/ARM,
+>>
+>> On Wednesday 25 December 2013 07:32 AM, Ivan Khoronzhuk wrote:
+>>> Add keystone timer entry to keystone device tree.
+>>> This 64-bit timer is used as backup clock event device.
+>>>
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
+>> No need to repost. I will fix it up while applying based
+>> on state of PATCH 1/3 and 2/3.
 > 
-> On Fri, Dec 20, 2013 at 11:17:09PM +0100, Maxime Ripard wrote:
-> > Hi Arnd, Kevin, Olof,
-> > 
-> > Please pull the following patches.
-> > 
-> > Thanks!
-> > Maxime
-> > 
-> > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> > 
-> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/mripard/linux.git tags/sunxi-drivers-for-3.14
-> > 
-> > for you to fetch changes up to 594c6fb92446a07a4d12337adeb3e9fb3ec7e203:
-> > 
-> >   ARM: sun4i/sun7i: RTC driver (2013-12-20 22:55:03 +0100)
+> I assume you will take the patchset in your tree.
 > 
-> Pulled, thanks. The RTC driver could have gone in through the maintainer since
-> there are no external dependencies.
+I wasn't planning to take patch 1/3 and 2/3, assuming
+they will go via clocksource tree. Only the dts
+$subject patch is what I was planning to pick it up
+if the 1/3 and 2/3 gets lined up via thomas's tree.
 
-Yes, but the RTC maintainer actually asked us (Jason Cooper and I, so
-you should see one RTC driver in Marvell's pull request as well :)) to
-merge the patches through our trees, since he doesn't have one, hence
-why I merged it :)
+> I am back from vacations, give me a couple of days to review the patchset before applying it please.
+> 
+Take your time. Am not applying them as mentioned above.
 
-> Also, in the future please cc linux-arm-kernel on your pull requests, we
-> normally don't do them behind the scenes. :)
-
-Ah, right... I somehow forgot to add it to my cc-list...
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131229/1a0f718a/attachment.sig>
+Regards,
+Santosh
