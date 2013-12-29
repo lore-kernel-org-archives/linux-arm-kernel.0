@@ -1,48 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 28 Dec 2013 19:48:26 -0800
-Subject: [GIT PULL 2nd 3/5] Samsung defconfig update for v3.14
-In-Reply-To: <CAOesGMj38JPgFic+ByShH3nHXWe0j=rzcdQzEiTGJ18OKfR6zw@mail.gmail.com>
-References: <52B5DCAB.204@samsung.com> <20131228231531.GB22753@quad.lixom.net>
- <CAOesGMj38JPgFic+ByShH3nHXWe0j=rzcdQzEiTGJ18OKfR6zw@mail.gmail.com>
-Message-ID: <CAOesGMh-ptLF_fvJ2X_7_WZVnB3oUkO2QUPxPENb4e+aDUb6iQ@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 29 Dec 2013 08:43:40 +0400
+Subject: [PATCH v2 0/3] ARM: clps711x: IRQCHIP driver
+In-Reply-To: <1387454214-1171-1-git-send-email-shc_work@mail.ru>
+References: <1387454214-1171-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20131229084340.10a4abdfc5815a709d7a6cc6@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 28, 2013 at 7:44 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sat, Dec 28, 2013 at 3:15 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Sun, Dec 22, 2013 at 03:23:39AM +0900, Kukjin Kim wrote:
->>> The following changes since commit 54b56e62d20ac0de6e8e12b7efdaf3a1b9b6541c:
->>>
->>>   ARM: exynos_defconfig: increase CONFIG_NR_CPUS value to 8
->>> (2013-12-02 07:33:38 +0900)
->>>
->>> are available in the git repository at:
->>>
->>
->>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>> tags/samsung-defconfig-2
->>>
->>> for you to fetch changes up to 7c7be272ae6413d1dd298e68752f5e34bc9b3eba:
->>>
->>>   ARM: exynos_defconfig: Enable S2MPS11 voltage regulator
->>> (2013-12-21 06:27:47 +0900)
->>
->> Pulled into next/boards. Thanks!
->
-> The regulator driver causes build breaks. Really, nobody checks these
-> things before sending patches or merge requests?
->
-> Having exynos_defconfig broken in arm-soc isn't an alternative. So I
-> dropped this branch again. If the regulator driver gets fixed in -rc
-> then we can probably merge it before the merge window, otherwise we'll
-> have to merge the defconfig change after the regulator fix goes in for
-> the 3.14 merge window.
+On Thu, 19 Dec 2013 15:56:54 +0400
+Alexander Shiyan <shc_work@mail.ru> wrote:
 
-Ah, I guess the fix went in after -rc4, which is the latest -rc that
-we have in for-next today. I'll bring for-next forward and merge this
-in.
+> This series is devoted to new CLPS711X irqchip driver.
+> The driver designed for booting from ATAGS and devicetree.
+> 
+> Alexander Shiyan (3):
+>   ARM: clps711x: Add CLPS711X irqchip driver
+>   ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
+>     driver
+>   ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
+> 
+>  .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
+>  arch/arm/Kconfig                                   |   2 -
+>  arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
+>  arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
+>  arch/arm/mach-clps711x/board-clep7312.c            |   2 -
+>  arch/arm/mach-clps711x/board-edb7211.c             |   2 -
+>  arch/arm/mach-clps711x/board-p720t.c               |   2 -
+>  arch/arm/mach-clps711x/common.c                    | 201 +----------------
+>  arch/arm/mach-clps711x/common.h                    |   5 +-
+>  arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
+>  drivers/irqchip/Kconfig                            |   8 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-clps711x.c                     | 243 +++++++++++++++++++++
+>  13 files changed, 299 insertions(+), 228 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+>  create mode 100644 drivers/irqchip/irq-clps711x.c
+> 
+> -- 
 
-Still, it's odd that you were able to test your branch before sending it in.
+Ping.
 
-
--Olof
+-- 
+Alexander Shiyan <shc_work@mail.ru>
