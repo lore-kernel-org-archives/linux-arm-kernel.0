@@ -1,53 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Dec 2013 16:16:26 +0100
-Subject: [PATCH v2 4/4] ARM: dts: sun7i: Add pin muxing options for clock
- outputs
-In-Reply-To: <1388373949-28506-5-git-send-email-wens@csie.org>
+Date: Mon, 30 Dec 2013 16:25:52 +0100
+Subject: [PATCH v2 2/4] ARM: dts: sun7i: external clock outputs
+In-Reply-To: <1388373949-28506-3-git-send-email-wens@csie.org>
 References: <1388373949-28506-1-git-send-email-wens@csie.org>
- <1388373949-28506-5-git-send-email-wens@csie.org>
-Message-ID: <20131230151626.GT3144@lukather>
+ <1388373949-28506-3-git-send-email-wens@csie.org>
+Message-ID: <20131230152552.GU3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi,
 
-On Mon, Dec 30, 2013 at 11:25:49AM +0800, Chen-Yu Tsai wrote:
-> This patch adds the clock output pin options on the A20.
-> The 2 pins can output a configurable clock to be used by
-> external modules. This is used on the CubieTruck, to supply
-> a 32768 Hz low power clock to the onboard Wifi+BT module.
+On Mon, Dec 30, 2013 at 11:25:47AM +0800, Chen-Yu Tsai wrote:
+> This commit adds the two external clock outputs available on A20 to
+> its device tree. A dummy fixed factor clock is also added to serve as
+> the first input of the clock outputs, which according to AW's A20 user
+> manual, is the 24MHz oscillator divided by 750.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index f255a49..7b46ce5 100644
+> index 4c25f81..f255a49 100644
 > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -416,6 +416,20 @@
->  				allwinner,drive = <0>;
->  				allwinner,pull = <0>;
->  			};
+> @@ -302,6 +302,33 @@
+>  			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
+>  			clock-output-names = "mbus";
+>  		};
 > +
-> +			clk_out_a_pins: clk_out_a at 0 {
-> +				allwinner,pins = "PI12";
-> +				allwinner,function = "clk_out_a";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <0>;
-> +			};
-> +
-> +			clk_out_b_pins: clk_out_b at 0 {
-> +				allwinner,pins = "PI13";
-> +				allwinner,function = "clk_out_b";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <0>;
-> +			};
+> +		/*
+> +		 * Dummy clock used by output clocks
+> +		 */
+> +		osc24M_32k: osc24M_32k {
 
-The labels should be clk_out_[ab]_pins_a. That way, if another muxing
-pops up for this clock, we will just need to add the new node, without
-modifying the one you add just there.
+the node name should be clk to reflect the function of the device, and
+not what instance of it it might be.
+
+You should probably use something like clk at 0, to avoid collisions with
+other dummy clocks.
+
+Note that we have pretty much the same problem already for the losc
+and osc24M, it would be great if you could do a patch for these too :)
 
 Thanks!
 Maxime
@@ -62,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/19b5534f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/409a4777/attachment.sig>
