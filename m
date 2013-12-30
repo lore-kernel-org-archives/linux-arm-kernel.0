@@ -1,9 +1,9 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 17:09:21 +0100
-Subject: [PATCH 07/17] ARM: footbridge: Remove deprecated IRQF_DISABLED flag
+Date: Mon, 30 Dec 2013 17:09:24 +0100
+Subject: [PATCH 10/17] ARM: rpc: Remove deprecated IRQF_DISABLED flag
 In-Reply-To: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1388419771-30075-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388419771-30075-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,60 +11,35 @@ This flag is a NOOP and scheduled to be removed
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-footbridge/dc21285-timer.c |    2 +-
- arch/arm/mach-footbridge/dc21285.c       |   10 +++++-----
- arch/arm/mach-footbridge/isa-timer.c     |    2 +-
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-rpc/dma.c  |    4 ++--
+ arch/arm/mach-rpc/time.c |    1 -
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
-index 9ee78f7..892d550 100644
---- a/arch/arm/mach-footbridge/dc21285-timer.c
-+++ b/arch/arm/mach-footbridge/dc21285-timer.c
-@@ -86,7 +86,7 @@ static irqreturn_t timer1_interrupt(int irq, void *dev_id)
- static struct irqaction footbridge_timer_irq = {
- 	.name		= "dc21285_timer1",
- 	.handler	= timer1_interrupt,
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.dev_id		= &ckevt_dc21285,
- };
+diff --git a/arch/arm/mach-rpc/dma.c b/arch/arm/mach-rpc/dma.c
+index 85883b2..80cc2c7 100644
+--- a/arch/arm/mach-rpc/dma.c
++++ b/arch/arm/mach-rpc/dma.c
+@@ -140,8 +140,8 @@ static int iomd_request_dma(unsigned int chan, dma_t *dma)
+ {
+ 	struct iomd_dma *idma = container_of(dma, struct iomd_dma, dma);
  
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index 7c2fdae..96a3d73 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -334,15 +334,15 @@ void __init dc21285_preinit(void)
- 	/*
- 	 * We don't care if these fail.
- 	 */
--	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, 0,
- 			    "PCI system error", &serr_timer);
--	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, 0,
- 			    "PCI parity error", &perr_timer);
--	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, 0,
- 			    "PCI abort", NULL);
--	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, 0,
- 			    "Discard timer", NULL);
--	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, 0,
- 			    "PCI data parity", NULL);
+-	return request_irq(idma->irq, iomd_dma_handle,
+-			   IRQF_DISABLED, idma->dma.device_id, idma);
++	return request_irq(idma->irq, iomd_dma_handle, 0,
++			   idma->dma.device_id, idma);
+ }
  
- 	if (cfn_mode) {
-diff --git a/arch/arm/mach-footbridge/isa-timer.c b/arch/arm/mach-footbridge/isa-timer.c
-index d9301dd..b73f52e 100644
---- a/arch/arm/mach-footbridge/isa-timer.c
-+++ b/arch/arm/mach-footbridge/isa-timer.c
-@@ -27,7 +27,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
- static struct irqaction pit_timer_irq = {
- 	.name		= "pit",
- 	.handler	= pit_timer_interrupt,
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.dev_id		= &i8253_clockevent,
+ static void iomd_free_dma(unsigned int chan, dma_t *dma)
+diff --git a/arch/arm/mach-rpc/time.c b/arch/arm/mach-rpc/time.c
+index 9a6def1..9a51588 100644
+--- a/arch/arm/mach-rpc/time.c
++++ b/arch/arm/mach-rpc/time.c
+@@ -75,7 +75,6 @@ ioc_timer_interrupt(int irq, void *dev_id)
+ 
+ static struct irqaction ioc_timer_irq = {
+ 	.name		= "timer",
+-	.flags		= IRQF_DISABLED,
+ 	.handler	= ioc_timer_interrupt
  };
  
 -- 
