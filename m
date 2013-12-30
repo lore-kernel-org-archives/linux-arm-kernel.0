@@ -1,23 +1,35 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 30 Dec 2013 14:19:15 +0100
-Subject: [GIT PULL] iommu/arm-smmu: updates for 3.14
-In-Reply-To: <20131217180854.GG349@mudshark.cambridge.arm.com>
-References: <20131217180854.GG349@mudshark.cambridge.arm.com>
-Message-ID: <20131230131914.GA2799@8bytes.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 30 Dec 2013 15:19:08 +0200
+Subject: [PATCH 0/2] omapfb: option to use coherent dma mem
+Message-ID: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 06:08:54PM +0000, Will Deacon wrote:
-> Antonios Motakis (1):
->       iommu/arm-smmu: add devices attached to the SMMU to an IOMMU group
-> 
-> Will Deacon (3):
->       iommu/arm-smmu: use VA_BITS to determine arm64 virtual address space
->       iommu: add IOMMU_EXEC flag for safely allowing XN mappings
->       iommu/arm-smmu: add support for IOMMU_EXEC
-> 
->  drivers/iommu/arm-smmu.c | 33 ++++++++++++++++++++++++++-------
->  include/linux/iommu.h    |  7 ++++---
->  2 files changed, 30 insertions(+), 10 deletions(-)
+Hi,
 
-Pulled, thanks Will.
+This is a bit refined version from the patch sent by Ivaylo.
+
+So Ivaylo asked for an exclusive memory area for omapfb, so that the
+allocations would not fail, and Vaibhav asked for reserving the fb at a
+specified physical address, so that the bootloader can pass the fb to the
+kernel. Those are a bit linked issues, and these patches try to accomplish
+both.
+
+This series is somewhat experimental, as I'm not so familiar with the dma api,
+but, well, this seemed to work for the tests I did.
+
+ Tomi
+
+Tomi Valkeinen (2):
+  ARM: omapfb: add coherent dma memory support
+  omapfb: add support to reserve fb at specified phys address
+
+ arch/arm/mach-omap2/common.c             |  1 +
+ arch/arm/mach-omap2/common.h             |  2 +
+ arch/arm/mach-omap2/fb.c                 | 77 +++++++++++++++++++++++++++++++-
+ drivers/video/omap2/omapfb/omapfb-main.c | 36 +++++++++++----
+ drivers/video/omap2/omapfb/omapfb.h      |  1 +
+ 5 files changed, 107 insertions(+), 10 deletions(-)
+
+-- 
+1.8.3.2
