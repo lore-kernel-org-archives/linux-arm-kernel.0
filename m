@@ -1,27 +1,24 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Dec 2013 18:51:06 +0100
-Subject: [PATCH] clk: exynos: File scope reg_save array should depend on
- PM_SLEEP
-In-Reply-To: <20131219075510.18119.67210@quantum>
-References: <1387274199-470-1-git-send-email-k.kozlowski@samsung.com>
- <20131219075510.18119.67210@quantum>
-Message-ID: <24377867.Lxp9m9lerI@amdc1227>
+Date: Mon, 30 Dec 2013 18:51:29 +0100
+Subject: [PATCH Resend 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag
+ to mout_apll
+In-Reply-To: <20131219193708.18119.53403@quantum>
+References: <1387442019-2445-1-git-send-email-sachin.kamat@linaro.org>
+ <20131219193708.18119.53403@quantum>
+Message-ID: <3616477.6ZBKa1KffA@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 of December 2013 23:55:10 Mike Turquette wrote:
-> Quoting Krzysztof Kozlowski (2013-12-17 01:56:39)
-> > Move reg_save[] into CONFIG_PM_SLEEP dependency block as it is used only
-> > by suspend and resume functions.
+On Thursday 19 of December 2013 11:37:08 Mike Turquette wrote:
+> Quoting Sachin Kamat (2013-12-19 00:33:39)
+> > Add CLK_SET_RATE_PARENT flag to mout_apll clock. This will let us set the
+> > clock rate in the cpufreq driver.
 > > 
-> > This fixes the warning on CONFIG_PM_SLEEP=n:
-> > drivers/clk/samsung/clk-exynos-audss.c:29:22: warning: ?reg_save? defined but not used [-Wunused-variable]
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 > 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+> Ack.
 
-Applied onto fixes branch.
+Applied onto next branch.
 
 Best regards,
 Tomasz
