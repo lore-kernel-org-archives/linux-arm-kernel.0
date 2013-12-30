@@ -1,39 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Dec 2013 21:27:41 +0100
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <52C1AB34.3010402@linaro.org>
-References: <1388241295-20051-1-git-send-email-zhangfei.gao@linaro.org>
- <CAMj5Bkif9pQHVdA71QccamVQkfgTheUNzowW6AyTwC3dy5XF+g@mail.gmail.com>
- <52C1AB34.3010402@linaro.org>
-Message-ID: <201312302127.41690.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Dec 2013 13:15:30 -0800
+Subject: [PATCH v2 4/7] ARM: msm: Only build clock.c on proc_comm based
+ platforms
+In-Reply-To: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1388438133-431-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 December 2013, zhangfei wrote:
-> >>>> +static int dw_mci_k3_suspend(struct device *dev)
-> >>>> +{
-> >>>> +    struct dw_mci *host = dev_get_drvdata(dev);
-> >>>> +    int ret = 0;
-> >>>> +
-> >>>> +    ret = dw_mci_suspend(host);
-> >>>
-> >>> You should never initialize local variables when they are set later in the
-> >>> function (the ret = 0 part above). For more complex functions, this prevents
-> >>> gcc from warning you about accidentally uninitialized uses.
-> 
-> I am sorry I may fall into the dead end, but still quite not understand 
-> this rule.
-> I alwayes thought it would be a good habit to init local variables before.
-> Do you mean it should NOT init local variable as much as possible and 
-> only init on demand, like solving the gcc warning.
-> Why not init the them at start in case random value cause unpredicted error?
+The functionality provided by clock.c in mach-msm is only needed
+on proc_comm based platforms. Only build the file if proc_comm is
+enabled. This prevents compile failures for platforms that are
+part of the multi-platform kernel.
 
-The gcc warnings are 100% correct, we can use them as a tool to write better
-code. If you write code that has no warnings with a modern compiler, you will
-never use random values, but if you always initialize the local variables,
-you can end up accidentally using '0' where you shouldn't have.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-See http://rusty.ozlabs.org/?p=232 for an excellent article on the topic
-by former Linaro assignee Rusty Russell.
-
-	Arnd
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 7ed4c1b..6baae6e 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,5 +1,5 @@
+ obj-y += timer.o
+-obj-y += clock.o
++obj-$(CONFIG_MSM_PROC_COMM) += clock.o
+ 
+ obj-$(CONFIG_MSM_VIC) += irq-vic.o
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
