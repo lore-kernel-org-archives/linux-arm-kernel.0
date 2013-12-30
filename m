@@ -1,40 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 12:02:24 +0100
-Subject: [PATCH] ARM/cpuidle: remove __init tag from Calxeda cpuidle probe
- function
-In-Reply-To: <52C15268.4050403@linaro.org>
-References: <52C15268.4050403@linaro.org>
-Message-ID: <1388401344-14110-1-git-send-email-daniel.lezcano@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 30 Dec 2013 14:13:17 +0200
+Subject: [PATCH] mm/memblock: use WARN_ONCE when MAX_NUMNODES passed as
+ input parameter
+In-Reply-To: <alpine.DEB.2.02.1312261542260.9342@chino.kir.corp.google.com>
+References: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1312261542260.9342@chino.kir.corp.google.com>
+Message-ID: <52C1635D.9070703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@linaro.org>
+On 12/27/2013 01:45 AM, David Rientjes wrote:
+> On Fri, 20 Dec 2013, Santosh Shilimkar wrote:
+>
+>> diff --git a/mm/memblock.c b/mm/memblock.c
+>> index 71b11d9..6af873a 100644
+>> --- a/mm/memblock.c
+>> +++ b/mm/memblock.c
+>> @@ -707,11 +707,9 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
+>>   	struct memblock_type *rsv = &memblock.reserved;
+>>   	int mi = *idx & 0xffffffff;
+>>   	int ri = *idx >> 32;
+>> -	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
+>>
+>> -	if (nid == MAX_NUMNODES)
+>> -		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
+>> -			     __func__);
+>> +	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
+>> +		nid = NUMA_NO_NODE;
+>>
+>>   	for ( ; mi < mem->cnt; mi++) {
+>>   		struct memblock_region *m = &mem->regions[mi];
+>
+> Um, why do this at runtime?  This is only used for
+> for_each_free_mem_range(), which is used rarely in x86 and memblock-only
+> code.  I'm struggling to understand why we can't deterministically fix the
+> callers if this condition is possible.
+>
 
-Commit 60a66e370007e8535b7a561353b07b37deaf35ba changed the Calxeda
-cpuidle driver to a platform driver, copying the __init tag from the
-_init() to the newly used _probe() function. However, "probe should
-not be __init." (Rob said ;-)
-Remove the __init tag to fix a section mismatch in the Calxeda
-cpuidle driver.
 
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/cpuidle/cpuidle-calxeda.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Unfortunately, It's not so simple as from first look :(
+We've modified __next_free_mem_range_x() functions which are part of
+Memblock APIs (like memblock_alloc_xxx()) and Nobootmem APIs.
+These APIs are used as directly as indirectly (as part of callbacks from 
+other MM modules like Sparse), as result, it's not trivial to identify 
+all places where MAX_NUMNODES will be used as input parameter.
 
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index 3679563..6e51114 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -65,7 +65,7 @@ static struct cpuidle_driver calxeda_idle_driver = {
- 	.state_count = 2,
- };
- 
--static int __init calxeda_cpuidle_probe(struct platform_device *pdev)
-+static int calxeda_cpuidle_probe(struct platform_device *pdev)
- {
- 	return cpuidle_register(&calxeda_idle_driver, NULL);
- }
--- 
-1.7.9.5
+Same was discussed here in details:
+- [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
+   https://lkml.org/lkml/2013/12/2/1075
+- Re: [PATCH 09/24] mm/memblock: Add memblock memory allocation apis
+   https://lkml.org/lkml/2013/12/2/907
+
+Regards,
+- grygorii
