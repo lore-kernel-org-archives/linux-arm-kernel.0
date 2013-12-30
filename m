@@ -1,48 +1,31 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Dec 2013 16:25:52 +0100
-Subject: [PATCH v2 2/4] ARM: dts: sun7i: external clock outputs
-In-Reply-To: <1388373949-28506-3-git-send-email-wens@csie.org>
-References: <1388373949-28506-1-git-send-email-wens@csie.org>
- <1388373949-28506-3-git-send-email-wens@csie.org>
-Message-ID: <20131230152552.GU3144@lukather>
+Date: Mon, 30 Dec 2013 16:31:54 +0100
+Subject: [PATCH 1/1] ARM: sunxi: select ARM_PSCI
+In-Reply-To: <1387973466-5067-2-git-send-email-zalan.blenessy@gmail.com>
+References: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
+ <1387973466-5067-2-git-send-email-zalan.blenessy@gmail.com>
+Message-ID: <20131230153154.GV3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Zalan,
 
-On Mon, Dec 30, 2013 at 11:25:47AM +0800, Chen-Yu Tsai wrote:
-> This commit adds the two external clock outputs available on A20 to
-> its device tree. A dummy fixed factor clock is also added to serve as
-> the first input of the clock outputs, which according to AW's A20 user
-> manual, is the 24MHz oscillator divided by 750.
+On Wed, Dec 25, 2013 at 01:11:06PM +0100, Zalan Blenessy wrote:
+> This is necessary for SMP on sun7i.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 4c25f81..f255a49 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -302,6 +302,33 @@
->  			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
->  			clock-output-names = "mbus";
->  		};
-> +
-> +		/*
-> +		 * Dummy clock used by output clocks
-> +		 */
-> +		osc24M_32k: osc24M_32k {
+> Signed-off-by: Zalan Blenessy <zalan.blenessy@gmail.com>
 
-the node name should be clk to reflect the function of the device, and
-not what instance of it it might be.
+I'd expect a bit more details here. What you wrote in your cover
+letter would be a good start.
 
-You should probably use something like clk at 0, to avoid collisions with
-other dummy clocks.
+Something like 
+----8<----
+On Allwinner sun7i (A20) SoCs, the SMP operations are implemented in
+u-boot, and exposed to the kernel through PSCI.
 
-Note that we have pretty much the same problem already for the losc
-and osc24M, it would be great if you could do a patch for these too :)
+We thus need to enable PSCI support for Allwinner SoCs so that the
+kernel uses it to bring up the additionnal cores.
+----8<----
 
 Thanks!
 Maxime
@@ -57,4 +40,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/409a4777/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/ce400d0b/attachment.sig>
