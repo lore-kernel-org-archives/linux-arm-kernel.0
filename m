@@ -1,62 +1,120 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Mon, 30 Dec 2013 11:34:44 +0530
-Subject: [PATCH V3 0/2] Exynos5250 SATA Support
-In-Reply-To: <1386669911-17319-1-git-send-email-yuvaraj.cd@samsung.com>
-References: <1386669911-17319-1-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <CAKuRcO+pAfG51tXRA2CuvgDFRa4Pfc2pf-Q4GUs3TN57wE53bQ@mail.gmail.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 30 Dec 2013 11:58:20 +0530
+Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <52BD856E.7010609@ti.com>
+References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
+ <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com> <52BC6B16.80507@ti.com>
+ <52BD856E.7010609@ti.com>
+Message-ID: <52C11284.2030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this series?
+Hi Tony,
 
-On Tue, Dec 10, 2013 at 3:35 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
-> This patch series enable the SATA support on Exynos5250 based boards.
-> It incorporates the generic phy framework to deal with sata phy.
->
-> This patch depends on the below patches
->         [1]. drivers: phy: add generic PHY framework
->                 by Kishon Vijay Abraham I<kishon@ti.com>
->         [2]. ata: ahci_platform: Manage SATA PHY
->                 by Roger Quadros <rogerq@ti.com>
->         [3].ARM: dts: Add pmu sysreg node to exynos5250 and
->                 exynos5420 dtsi files
->                 by Leela Krishna Amudala <l.krishna@samsung.com>
->         [4]. i2c: s3c2410 : Add polling mode support
->                 by Vasanth Ananthan <vasanth.a@samsung.com>
->
-> Changes from V2:
->         1.Removed of_match_table
->         2.Moved to syscon interface for PMU handling.
->
-> Changes from V1:
->         1. Dropped the patch
->         ahci: exynos: add ahci sata support on Exynos platform
->
->         2.Adapt to latest generic PHY framework available in
->         git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
->
->
-> Yuvaraj Kumar C D (2):
->   Phy: Exynos: Add Exynos5250 sata phy driver
->   ARM: dts: Enable ahci sata and sata phy
->
->  .../devicetree/bindings/ata/exynos-sata-phy.txt    |   19 +-
->  .../devicetree/bindings/ata/exynos-sata.txt        |   17 +-
->  .../devicetree/bindings/ata/exynos_sataphy_i2c.txt |   12 ++
->  arch/arm/boot/dts/exynos5250-arndale.dts           |    9 +-
->  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    8 +-
->  arch/arm/boot/dts/exynos5250.dtsi                  |   16 +-
->  drivers/phy/Kconfig                                |   11 +
->  drivers/phy/Makefile                               |    1 +
->  drivers/phy/exynos5250_phy_i2c.c                   |   44 ++++
->  drivers/phy/sata_phy_exynos5250.c                  |  219 ++++++++++++++++++++
->  drivers/phy/sata_phy_exynos5250.h                  |   35 ++++
->  11 files changed, 370 insertions(+), 21 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ata/exynos_sataphy_i2c.txt
->  create mode 100644 drivers/phy/exynos5250_phy_i2c.c
->  create mode 100644 drivers/phy/sata_phy_exynos5250.c
->  create mode 100644 drivers/phy/sata_phy_exynos5250.h
->
-> --
-> 1.7.9.5
->
+On Friday 27 December 2013 07:19 PM, Sricharan R wrote:
+> On Thursday 26 December 2013 11:14 PM, Santosh Shilimkar wrote:
+>> Sricharan,
+>>
+>> On Wednesday 25 December 2013 11:52 PM, Sricharan R wrote:
+>>> Hi Thomas,
+>>> On Wednesday 18 December 2013 02:49 PM, Sricharan R wrote:
+>>>> Hi Thomas,
+>>>>
+>>>> On Tuesday 03 December 2013 03:57 PM, Sricharan R wrote:
+>>>>> Some socs have a large number of interrupts requests to service
+>>>>> the needs of its many peripherals and subsystems. All of the interrupt
+>>>>> requests lines from the subsystems are not needed at the same
+>>>>> time, so they have to be muxed to the controllers appropriately.
+>>>>> In such places a interrupt controllers are preceded by an
+>>>>> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+>>>>> requests to the controller inputs.
+>>>>>
+>>>>> This series models the peripheral interrupts that can be routed through
+>>>>> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+>>>>> in a separate linear domain inside the GIC. The registered routable domain's
+>>>>> callback are invoked as a part of the GIC's callback, which in turn should
+>>>>> allocate a free irq line and configure the IP accordingly. So every peripheral
+>>>>> in the dts files mentions the fixed crossbar number as its interrupt. A free
+>>>>> gic line for that gets allocated and configured when the peripheral interrupts
+>>>>> are mapped.
+>>>>>
+>>>>> The minimal crossbar driver to track and allocate free GIC lines and configure the
+>>>>> crossbar is added here, along with the DT bindings.
+>>>>>
+>>>>> V5:
+>>>>>    Addressed a comment from Mark Rutland <mark.rutland@arm.com>,
+>>>>>    updated tags and rebased on 3.13-rc2
+>>>>>
+>>>>> V4:
+>>>>>    Addressed a couple of comments and split the DTS file updates in to
+>>>>>    a separate series.
+>>>>>
+>>>>> V3:
+>>>>>    Addressed few more comments from Thomas Gleixner <tglx@linutronix.de>
+>>>>>
+>>>>>    Rebased patches 3,4,5,7 which updates the DTS file on top of below branch
+>>>>> 	   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+>>>>> 	   for_3.13/dts
+>>>>>
+>>>>>    Rebased patches 1,2,6 on top of 3.12 mainline
+>>>>>    Updated Commit tags
+>>>>>
+>>>>> V2:
+>>>>>    Addressed Thomas Gleixner <tglx@linutronix.de> comments and
+>>>>>    Kumar Gala <galak@codeaurora.org>
+>>>>>
+>>>>>    Split updating the DRA7.dtsi file for adding the routable-irqs
+>>>>>
+>>>>> Previous discussions that led to this is at
+>>>>> 	https://lkml.org/lkml/2013/9/18/540
+>>>>>
+>>>>> The V1,V2,V3,V4 post of these patches is at
+>>>>>       [V1]  https://lkml.org/lkml/2013/9/30/283
+>>>>>       [V2]  http://www.spinics.net/lists/linux-omap/msg99540.html
+>>>>>       [V3]  http://www.kernelhub.org/?msg=356470&p=2
+>>>>>       [V4]  http://www.spinics.net/lists/linux-doc/msg16726.html
+>>>>>
+>>>>> Sricharan R (4):
+>>>>>   DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+>>>>>   DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+>>>>>   ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+>>>>>   ARM: DRA: Enable Crossbar IP support for DRA7XX
+>>>>>
+>>>>>  Documentation/devicetree/bindings/arm/gic.txt      |    6 +
+>>>>>  .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+>>>>>  arch/arm/mach-omap2/Kconfig                        |    1 +
+>>>>>  arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
+>>>>>  arch/arm/mach-omap2/omap4-common.c                 |    2 +
+>>>>>  drivers/irqchip/Kconfig                            |    8 +
+>>>>>  drivers/irqchip/Makefile                           |    1 +
+>>>>>  drivers/irqchip/irq-crossbar.c                     |  208 ++++++++++++++++++++
+>>>>>  drivers/irqchip/irq-gic.c                          |   81 +++++++-
+>>>>>  include/linux/irqchip/arm-gic.h                    |    7 +-
+>>>>>  include/linux/irqchip/irq-crossbar.h               |   11 ++
+>>>>>  11 files changed, 343 insertions(+), 13 deletions(-)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>>>>  create mode 100644 drivers/irqchip/irq-crossbar.c
+>>>>>  create mode 100644 include/linux/irqchip/irq-crossbar.h
+>>>>>
+>>>>
+>>>> I have addressed all the comments on this series, can this be merged now ?
+>>>>
+>>>   Ping..
+>>>
+>> Thomas has already given his reviewed-by tag so the patches can be
+>> taken via arm-soc tree considering OMAP and GIC changes. Can you
+>> create a branch with all these patches applied and send it
+>> to Tony ?
+>>
+> Ok, i will send out a branch for this.
+> 
+ 
+ I have pushed the below branch
+
+git://github.com/Sricharanti/sricharan.git
+branch: crossbar
+
+This is on top of Tony's linux-omap master branch
+
+Regards,
+ Sricharan
