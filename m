@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Dec 2013 09:58:06 +0900
-Subject: [PATCH 1/3] ARM: shmobile: armadillo: Fix coherent DMA mask
+Date: Mon, 30 Dec 2013 09:58:08 +0900
+Subject: [PATCH 3/3] ARM: shmobile: mackerel: Fix coherent DMA mask
 In-Reply-To: <cover.1388364591.git.horms+renesas@verge.net.au>
 References: <cover.1388364591.git.horms+renesas@verge.net.au>
-Message-ID: <dcd740b645003b866d7eb30d13d34d0729cce9db.1388364591.git.horms+renesas@verge.net.au>
+Message-ID: <b6328a6b7ba57fc84c38248f6f0e387e1170f1a8.1388364591.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,23 +20,23 @@ the problem.
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 4 ++--
+ arch/arm/mach-shmobile/board-mackerel.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index c186891..8ea87bd 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -483,7 +483,7 @@ static struct platform_device lcdc0_device = {
- 	.id		= 0,
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index af06753..e721d2c 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -409,7 +409,7 @@ static struct platform_device lcdc_device = {
+ 	.resource	= lcdc_resources,
  	.dev	= {
- 		.platform_data	= &lcdc0_info,
+ 		.platform_data	= &lcdc_info,
 -		.coherent_dma_mask = ~0,
 +		.coherent_dma_mask = DMA_BIT_MASK(32),
  	},
  };
  
-@@ -580,7 +580,7 @@ static struct platform_device hdmi_lcdc_device = {
+@@ -499,7 +499,7 @@ static struct platform_device hdmi_lcdc_device = {
  	.id		= 1,
  	.dev	= {
  		.platform_data	= &hdmi_lcdc_info,
