@@ -1,86 +1,52 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 11:19:32 +0100
-Subject: [PATCH 13/20] clocksource: armada-370-xp: Enable timer divider only
- when needed
+Date: Mon, 30 Dec 2013 11:19:27 +0100
+Subject: [PATCH 08/20] clocksource: arm_global_timer: Switch to
+ sched_clock_register()
 In-Reply-To: <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
 References: <52C1479E.80808@linaro.org>
  <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1388398779-11222-13-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388398779-11222-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-The current code sets the timer divider bits always. However, when
-the 25 MHz timer is enabled, this is not needed and has no effect.
-As this causes some confusion, rework the code so the divider is
-set only when needed, i.e. when the 25 MHz timer is not in use.
+The 32 bit sched_clock interface now supports 64 bits. Upgrade to
+the 64 bit function to allow us to remove the 32 bit registration
+interface. While we're here increase the number of bits that
+sched_clock can handle to 64 to make full use of the counter.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Stuart Menefy <stuart.menefy@st.com>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by: Stuart Menefy <stuart.menefy@st.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/time-armada-370-xp.c |   18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/clocksource/arm_global_timer.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d8e47e5..0450f6b 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -76,6 +76,7 @@
- static void __iomem *timer_base, *local_base;
- static unsigned int timer_clk;
- static bool timer25Mhz = true;
-+static u32 enable_mask;
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index c639b1a..0fc31d0 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -202,7 +202,7 @@ static struct clocksource gt_clocksource = {
+ };
  
- /*
-  * Number of timer ticks per jiffy.
-@@ -121,8 +122,7 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
- 	/*
- 	 * Enable the timer.
- 	 */
--	local_timer_ctrl_clrset(TIMER0_RELOAD_EN,
--				TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT));
-+	local_timer_ctrl_clrset(TIMER0_RELOAD_EN, enable_mask);
- 	return 0;
+ #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+-static u32 notrace gt_sched_clock_read(void)
++static u64 notrace gt_sched_clock_read(void)
+ {
+ 	return gt_counter_read();
  }
+@@ -217,7 +217,7 @@ static void __init gt_clocksource_init(void)
+ 	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
  
-@@ -141,9 +141,7 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
- 		/*
- 		 * Enable timer.
- 		 */
--		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN |
--					   TIMER0_EN |
--					   TIMER0_DIV(TIMER_DIVIDER_SHIFT));
-+		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
- 	} else {
- 		/*
- 		 * Disable timer.
-@@ -240,10 +238,13 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	WARN_ON(!timer_base);
- 	local_base = of_iomap(np, 1);
- 
--	if (timer25Mhz)
-+	if (timer25Mhz) {
- 		set = TIMER0_25MHZ;		
--	else
-+		enable_mask = TIMER0_EN;
-+	} else {
- 		clr = TIMER0_25MHZ;
-+		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
-+	}
- 	timer_ctrl_clrset(clr, set);
- 	local_timer_ctrl_clrset(clr, set);
- 
-@@ -267,8 +268,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
- 	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
- 
--	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
--			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
-+	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
- 
- 	clocksource_mmio_init(timer_base + TIMER0_VAL_OFF,
- 			      "armada_370_xp_clocksource",
+ #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+-	setup_sched_clock(gt_sched_clock_read, 32, gt_clk_rate);
++	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
+ #endif
+ 	clocksource_register_hz(&gt_clocksource, gt_clk_rate);
+ }
 -- 
 1.7.9.5
