@@ -1,48 +1,86 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 11:19:31 +0100
-Subject: [PATCH 12/20] clocksource: clksrc-of: Warn if no clock sources are
- found
+Date: Mon, 30 Dec 2013 11:19:32 +0100
+Subject: [PATCH 13/20] clocksource: armada-370-xp: Enable timer divider only
+ when needed
 In-Reply-To: <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
 References: <52C1479E.80808@linaro.org>
  <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1388398779-11222-12-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388398779-11222-13-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Many platforms rely on clocksource_of_init() being implicitly
-called for registering clock sources and will get zero warnings
-if no working clock source is available. Let's print a critical
-error message if no clock source is found.
+The current code sets the timer divider bits always. However, when
+the 25 MHz timer is enabled, this is not needed and has no effect.
+As this causes some confusion, rework the code so the divider is
+set only when needed, i.e. when the 25 MHz timer is not in use.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/clksrc-of.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/clocksource/time-armada-370-xp.c |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-index 35639cf4..a30b42c 100644
---- a/drivers/clocksource/clksrc-of.c
-+++ b/drivers/clocksource/clksrc-of.c
-@@ -28,6 +28,7 @@ void __init clocksource_of_init(void)
- 	struct device_node *np;
- 	const struct of_device_id *match;
- 	clocksource_of_init_fn init_func;
-+	unsigned clocksources = 0;
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index d8e47e5..0450f6b 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -76,6 +76,7 @@
+ static void __iomem *timer_base, *local_base;
+ static unsigned int timer_clk;
+ static bool timer25Mhz = true;
++static u32 enable_mask;
  
- 	for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
- 		if (!of_device_is_available(np))
-@@ -36,5 +37,8 @@ void __init clocksource_of_init(void)
- 		init_func = match->data;
- 		init_func(np);
- 		of_node_put(np);
-+		clocksources++;
- 	}
-+	if (!clocksources)
-+		pr_crit("%s: no matching clocksources found\n", __func__);
+ /*
+  * Number of timer ticks per jiffy.
+@@ -121,8 +122,7 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
+ 	/*
+ 	 * Enable the timer.
+ 	 */
+-	local_timer_ctrl_clrset(TIMER0_RELOAD_EN,
+-				TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT));
++	local_timer_ctrl_clrset(TIMER0_RELOAD_EN, enable_mask);
+ 	return 0;
  }
+ 
+@@ -141,9 +141,7 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
+ 		/*
+ 		 * Enable timer.
+ 		 */
+-		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN |
+-					   TIMER0_EN |
+-					   TIMER0_DIV(TIMER_DIVIDER_SHIFT));
++		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+ 	} else {
+ 		/*
+ 		 * Disable timer.
+@@ -240,10 +238,13 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	WARN_ON(!timer_base);
+ 	local_base = of_iomap(np, 1);
+ 
+-	if (timer25Mhz)
++	if (timer25Mhz) {
+ 		set = TIMER0_25MHZ;		
+-	else
++		enable_mask = TIMER0_EN;
++	} else {
+ 		clr = TIMER0_25MHZ;
++		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
++	}
+ 	timer_ctrl_clrset(clr, set);
+ 	local_timer_ctrl_clrset(clr, set);
+ 
+@@ -267,8 +268,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+ 	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+ 
+-	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
+-			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
++	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+ 
+ 	clocksource_mmio_init(timer_base + TIMER0_VAL_OFF,
+ 			      "armada_370_xp_clocksource",
 -- 
 1.7.9.5
