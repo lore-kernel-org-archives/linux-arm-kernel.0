@@ -1,153 +1,44 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 11:44:37 +0100
-Subject: [PATCH] clocksource: cadence_ttc: Fix mutex taken inside interrupt
- context
-In-Reply-To: <52C14E45.5040403@linaro.org>
-References: <52C14E45.5040403@linaro.org>
-Message-ID: <1388400277-13038-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Mon, 30 Dec 2013 12:00:56 +0100
+Subject: [GIT PULL] ARM : cpuidle: 3.13 fix
+Message-ID: <52C15268.4050403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Hi Rafael,
 
-When the kernel is compiled with:
-CONFIG_HIGH_RES_TIMERS=no
-CONFIG_HZ_PERIODIC=yes
-CONFIG_DEBUG_ATOMIC_SLEEP=yes
+this pull request provides a single fix for the calxeda cpuidle driver. 
+It is based on v3.13-rc6.
 
-The following WARN appears:
+* Andre Przywara fixed a compilation warning due to the driver probe 
+function prototype mismatch for the calxeda cpuidle driver
 
-WARNING: CPU: 1 PID: 0 at linux/kernel/mutex.c:856 mutex_trylock+0x70/0x1fc()
-DEBUG_LOCKS_WARN_ON(in_interrupt())
-Modules linked in:
-CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.12.0-xilinx-dirty #93
-[<c0014a78>] (unwind_backtrace+0x0/0x11c) from [<c0011b6c>] (show_stack+0x10/0x14)
-[<c0011b6c>] (show_stack+0x10/0x14) from [<c039120c>] (dump_stack+0x7c/0xc0)
-[<c039120c>] (dump_stack+0x7c/0xc0) from [<c001fda4>] (warn_slowpath_common+0x60/0x84)
-[<c001fda4>] (warn_slowpath_common+0x60/0x84) from [<c001fe48>] (warn_slowpath_fmt+0x2c/0x3c)
-[<c001fe48>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0392658>] (mutex_trylock+0x70/0x1fc)
-[<c0392658>] (mutex_trylock+0x70/0x1fc) from [<c02dfc08>] (clk_prepare_lock+0xc/0xe4)
-[<c02dfc08>] (clk_prepare_lock+0xc/0xe4) from [<c02e099c>] (clk_get_rate+0xc/0x44)
-[<c02e099c>] (clk_get_rate+0xc/0x44) from [<c02d0394>] (ttc_set_mode+0x34/0x78)
-[<c02d0394>] (ttc_set_mode+0x34/0x78) from [<c005f794>] (clockevents_set_mode+0x28/0x5c)
-[<c005f794>] (clockevents_set_mode+0x28/0x5c) from [<c00607fc>] (tick_broadcast_on_off+0x190/0x1c0)
-[<c00607fc>] (tick_broadcast_on_off+0x190/0x1c0) from [<c005f168>] (clockevents_notify+0x58/0x1ac)
-[<c005f168>] (clockevents_notify+0x58/0x1ac) from [<c02b99dc>] (cpuidle_setup_broadcast_timer+0x20/0x24)
-[<c02b99dc>] (cpuidle_setup_broadcast_timer+0x20/0x24) from [<c006cd04>] (generic_smp_call_function_single_interrupt+0)
-[<c006cd04>] (generic_smp_call_function_single_interrupt+0xe0/0x130) from [<c00138c8>] (handle_IPI+0x88/0x118)
-[<c00138c8>] (handle_IPI+0x88/0x118) from [<c0008504>] (gic_handle_irq+0x58/0x60)
-[<c0008504>] (gic_handle_irq+0x58/0x60) from [<c0012644>] (__irq_svc+0x44/0x78)
-Exception stack(0xef099fa0 to 0xef099fe8)
-9fa0: 00000001 ef092100 00000000 ef092100 ef098000 00000015 c0399f2c c0579d74
-9fc0: 0000406a 413fc090 00000000 00000000 00000000 ef099fe8 c00666ec c000f46c
-9fe0: 20000113 ffffffff
-[<c0012644>] (__irq_svc+0x44/0x78) from [<c000f46c>] (arch_cpu_idle+0x34/0x3c)
-[<c000f46c>] (arch_cpu_idle+0x34/0x3c) from [<c0053980>] (cpu_startup_entry+0xa8/0x10c)
-[<c0053980>] (cpu_startup_entry+0xa8/0x10c) from [<000085a4>] (0x85a4)
+Thanks
+   -- Daniel
 
-We are in an interrupt context (IPI) and we are calling clk_get_rate in the
-set_mode function which in turn ends up by getting a mutex... Even if that
-does not hang, it is a potential kernel deadlock.
+The following changes since commit 802eee95bde72fd0cd0f3a5b2098375a487d1eda:
 
-It is not allowed to call clk_get_rate() from interrupt context. To
-avoid such calls the timer input frequency is stored in the driver's
-data struct which makes it accessible to the driver in any context.
+   Linux 3.13-rc6 (2013-12-29 16:01:33 -0800)
 
-[dlezcano] completed the changelog with the WARN trace and added a more
-detailed description. Tested on zync zc702.
+are available in the git repository at:
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Tested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/cadence_ttc_timer.c |   21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+   git://git.linaro.org/people/daniel.lezcano/linux.git cpuidle/3.13-fixes
 
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index b2bb3a4b..a92350b 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -67,11 +67,13 @@
-  * struct ttc_timer - This definition defines local timer structure
-  *
-  * @base_addr:	Base address of timer
-+ * @freq:	Timer input clock frequency
-  * @clk:	Associated clock source
-  * @clk_rate_change_nb	Notifier block for clock rate changes
-  */
- struct ttc_timer {
- 	void __iomem *base_addr;
-+	unsigned long freq;
- 	struct clk *clk;
- 	struct notifier_block clk_rate_change_nb;
- };
-@@ -196,9 +198,8 @@ static void ttc_set_mode(enum clock_event_mode mode,
- 
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		ttc_set_interval(timer,
--				DIV_ROUND_CLOSEST(clk_get_rate(ttce->ttc.clk),
--					PRESCALE * HZ));
-+		ttc_set_interval(timer, DIV_ROUND_CLOSEST(ttce->ttc.freq,
-+						PRESCALE * HZ));
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 	case CLOCK_EVT_MODE_UNUSED:
-@@ -273,6 +274,8 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
- 		return;
- 	}
- 
-+	ttccs->ttc.freq = clk_get_rate(ttccs->ttc.clk);
-+
- 	ttccs->ttc.clk_rate_change_nb.notifier_call =
- 		ttc_rate_change_clocksource_cb;
- 	ttccs->ttc.clk_rate_change_nb.next = NULL;
-@@ -298,16 +301,14 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
- 	__raw_writel(CNT_CNTRL_RESET,
- 		     ttccs->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
- 
--	err = clocksource_register_hz(&ttccs->cs,
--			clk_get_rate(ttccs->ttc.clk) / PRESCALE);
-+	err = clocksource_register_hz(&ttccs->cs, ttccs->ttc.freq / PRESCALE);
- 	if (WARN_ON(err)) {
- 		kfree(ttccs);
- 		return;
- 	}
- 
- 	ttc_sched_clock_val_reg = base + TTC_COUNT_VAL_OFFSET;
--	setup_sched_clock(ttc_sched_clock_read, 16,
--			clk_get_rate(ttccs->ttc.clk) / PRESCALE);
-+	setup_sched_clock(ttc_sched_clock_read, 16, ttccs->ttc.freq / PRESCALE);
- }
- 
- static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
-@@ -334,6 +335,9 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
- 				ndata->new_rate / PRESCALE);
- 		local_irq_restore(flags);
- 
-+		/* update cached frequency */
-+		ttc->freq = ndata->new_rate;
-+
- 		/* fall through */
- 	}
- 	case PRE_RATE_CHANGE:
-@@ -367,6 +371,7 @@ static void __init ttc_setup_clockevent(struct clk *clk,
- 	if (clk_notifier_register(ttcce->ttc.clk,
- 				&ttcce->ttc.clk_rate_change_nb))
- 		pr_warn("Unable to register clock notifier.\n");
-+	ttcce->ttc.freq = clk_get_rate(ttcce->ttc.clk);
- 
- 	ttcce->ttc.base_addr = base;
- 	ttcce->ce.name = "ttc_clockevent";
-@@ -396,7 +401,7 @@ static void __init ttc_setup_clockevent(struct clk *clk,
- 	}
- 
- 	clockevents_config_and_register(&ttcce->ce,
--			clk_get_rate(ttcce->ttc.clk) / PRESCALE, 1, 0xfffe);
-+			ttcce->ttc.freq / PRESCALE, 1, 0xfffe);
- }
- 
- /**
+for you to fetch changes up to 5781532ebecd9e0b7b5fc25d78030bdec635f4ac:
+
+   ARM/cpuidle: remove __init tag from Calxeda cpuidle probe function 
+(2013-12-30 11:55:20 +0100)
+
+----------------------------------------------------------------
+Andre Przywara (1):
+       ARM/cpuidle: remove __init tag from Calxeda cpuidle probe function
+
+  drivers/cpuidle/cpuidle-calxeda.c |    2 +-
+  1 file changed, 1 insertion(+), 1 deletion(-)
+
 -- 
-1.7.9.5
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
