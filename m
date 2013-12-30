@@ -1,9 +1,9 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 17:09:22 +0100
-Subject: [PATCH 08/17] ARM: ks8695: Remove deprecated IRQF_DISABLED flag
+Date: Mon, 30 Dec 2013 17:09:23 +0100
+Subject: [PATCH 09/17] ARM: u300: Remove deprecated IRQF_DISABLED flag
 In-Reply-To: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1388419771-30075-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388419771-30075-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,20 +11,20 @@ This flag is a NOOP and scheduled to be removed
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-ks8695/time.c |    2 +-
+ arch/arm/mach-u300/timer.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
-index 426c976..a197874 100644
---- a/arch/arm/mach-ks8695/time.c
-+++ b/arch/arm/mach-ks8695/time.c
-@@ -122,7 +122,7 @@ static irqreturn_t ks8695_timer_interrupt(int irq, void *dev_id)
+diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
+index 9724e4e..50d73ae 100644
+--- a/arch/arm/mach-u300/timer.c
++++ b/arch/arm/mach-u300/timer.c
+@@ -329,7 +329,7 @@ static irqreturn_t u300_timer_interrupt(int irq, void *dev_id)
  
- static struct irqaction ks8695_timer_irq = {
- 	.name		= "ks8695_tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
-+	.flags		= IRQF_TIMER,
- 	.handler	= ks8695_timer_interrupt,
+ static struct irqaction u300_timer_irq = {
+ 	.name		= "U300 Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= u300_timer_interrupt,
  };
  
 -- 
