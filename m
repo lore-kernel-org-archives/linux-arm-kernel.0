@@ -1,38 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 30 Dec 2013 19:52:40 +0100
-Subject: Can't boot newer kernel on Armada 370 dev board
-In-Reply-To: <20131230183908.GB4172@enneenne.com>
-References: <20131230174738.GA4172@enneenne.com>
- <20131230181205.GA32362@lunn.ch>
- <20131230183908.GB4172@enneenne.com>
-Message-ID: <20131230185240.GA32537@lunn.ch>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 30 Dec 2013 14:20:59 -0500
+Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
+In-Reply-To: <1388386511-32276-1-git-send-email-baozich@gmail.com>
+References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
+Message-ID: <1388431259.2564.15.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 07:39:08PM +0100, Rodolfo Giometti wrote:
-> On Mon, Dec 30, 2013 at 07:12:05PM +0100, Andrew Lunn wrote:
-> >
-> > Hi Redolfo
-> > 
-> > What version of u-boot do you have?
+On Mon, 2013-12-30 at 14:55 +0800, Chen Baozi wrote:
+> xen_remap used to be defined as ioremap_cached on arm64. In commit
+> c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
+> was deleted, while xen_remap stays the same. This would lead to
+> the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
+> on arm64 as ioremap_cache on arm64 to fix it.
 > 
-> U-Boot 2011.12 (Dec 24 2013 - 16:16:38) Marvell version: v2011.12 2013_Q3.0
-> 
-> > There has been a change in u-boot
-> > so that the registers are mapped to a different address. Old u-boot
-> > with new kernel causes instant lockup on boot as soon as it tries to
-> > access the wrong address space.
-> 
-> I see. Where can I get newer u-boot releases in order to avoid this
-> problem? :-)
 
->From Marvell.
+I missed that include of arm header by arm64 when looking for users
+of arm64's ioremap_cached() when working on commit c04e8e2fe. Anyway,
+grepping the kernel tree, I see:
 
-It is also possible to modify the DT to use the old address. I think
-there is a thread somewhere with Thomas Petazzoni telling somebody
-what changes need to be made for Armada XP. 370 should be very
-similar.
+  ioremap_cached()
+    defined by: arm, metag, unicore32
+    used by: arch/arm/include/asm/xen/page.h
+             drivers/mtd/maps/pxa2xx-flash.c
 
-Basically you need to change 0xF1000000 to 0xD0000000.
+  ioremap_cache()
+    defined by: arm64, sh, xtensa, ia64, x86
+    used by: drivers/video/vesafb.c
+             drivers/char/toshiba.c
+             drivers/acpi/apei
+             drivers/lguest/lguest_device.c
+             drivers/sfi/sfi_core.c
+             include/linux/acpi_io.h
 
-	  Andrew
+I think it would be better to just avoid the confusion and the ifdef in
+asm/xen/page.h by globally changing ioremap_cached to ioremap_cache.
+
+--Mark
