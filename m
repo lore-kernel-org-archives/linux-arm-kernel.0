@@ -1,149 +1,40 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 11:14:54 +0100
-Subject: [GIT PULL] clockevents/clocksource : new material for 3.14
-Message-ID: <52C1479E.80808@linaro.org>
+Date: Mon, 30 Dec 2013 11:19:20 +0100
+Subject: [PATCH 01/20] clockevent: sun4i: Fill the irq field in the clockevent
+ structure
+In-Reply-To: <52C1479E.80808@linaro.org>
+References: <52C1479E.80808@linaro.org>
+Message-ID: <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Hi Thomas and Ingo,
+The clock event structure irq field was not filled previously to the
+interrupt we're using.
 
-here is the new material for 3.14. I created a branch for Simon Horman 
-as requested [1] where he can pull from and merged it in the 
-clockevents/3.14 branch.	
+This was resulting in the timer not being used at all when using a
+configuration with SMP enabled on a system with several CPUs, and with
+the cpumask set to the cpu_possible_mask.
 
-  * Axel Lin removed an unused structure defining the ids for the bcm 
-kona driver
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clocksource/sun4i_timer.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-  * Ezequiel Garcia enabled the timer divider only when the 25MHz timer 
-is not used for the armada 370 XP
-
-  * Jingoo Han removed a pointless platform data initialization for the 
-sh_mtu and sh_mtu2
-
-  * Laurent Pinchart added the clk_prepare/clk_unprepare for sh_cmt
-
-  * Linus Walleij added an useful warning in clk_of when no clocks are 
-found while the old behavior was to silently hang at boot time
-
-  * Maxime Ripard added the high speed timer drivers for the Allwinner 
-SoCs (A10, A13, A20). He increased the rating, shared the irq across all 
-available cpus and fixed the clockevent's irq initialization for the sun4i
-
-  * Michael Opdenacker removed the usage of the IRQF_DISABLED for the 
-all the timers driver located in drivers/clocksource
-
-  * Stephen Boyd switched to sched_clock_register for the 
-arm_global_timer, cadence_ttc, sun4i and orion timers
-
-
-Resolved conflicts:
-
-  * (31f8ad387) "sun7i: a20: Add support for the High Speed Timers" and 
-(428abbb8) "Enable the I2C controllers"
-
-  * (67905540) "clocksource: Add Allwinner SoCs HS timers driver" and 
-(b788beda) "Order Kconfig options alphabetically"
-
-Thanks and happy new year !
-
-   -- Daniel
-
-[1] http://www.spinics.net/lists/linux-sh/msg26645.html
-
--------------------------------------------------------------------------
-
-The following changes since commit 0e6601eee039893a3f6420596ae4588d90d13cbe:
-
-   Merge branch 'timers/posix-timers-for-tip-v2' of 
-git://git.kernel.org/pub/scm/linux/kernel/git/frederic/linux-dynticks 
-into timers/core (2013-12-10 12:32:36 +0100)
-
-are available in the git repository at:
-
-
-   git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/3.14
-
-for you to fetch changes up to 98aefbe72ec6015f90fe045ed16c5cf755da283d:
-
-   Merge branch 'clockevents/for-Simon-3.13-rc2' into clockevents/3.14 
-(2013-12-18 15:14:36 +0100)
-
-----------------------------------------------------------------
-
-Axel Lin (1):
-       clocksource: bcm_kona_timer: Remove unused bcm_timer_ids
-
-Daniel Lezcano (1):
-       Merge branch 'clockevents/for-Simon-3.13-rc2' into clockevents/3.14
-
-Ezequiel Garcia (1):
-       clocksource: armada-370-xp: Enable timer divider only when needed
-
-Jingoo Han (2):
-       clocksource: sh_tmu: Remove unnecessary platform_set_drvdata()
-       clocksource: sh_mtu2: Remove unnecessary platform_set_drvdata()
-
-Laurent Pinchart (1):
-       clocksource: sh_cmt: Add clk_prepare/unprepare support
-
-Linus Walleij (1):
-       clocksource: clksrc-of: Warn if no clock sources are found
-
-Maxime Ripard (7):
-       clockevent: sun4i: Fill the irq field in the clockevent structure
-       clocksource: sun4i: Change CPU mask to cpu_possible_mask
-       clocksource: sun4i: Increase a bit the clock event and sources rating
-       clocksource: Add Allwinner SoCs HS timers driver
-       ARM: sun5i: a10s: Add support for the High Speed Timers
-       ARM: sun5i: a13: Add support for the High Speed Timers
-       ARM: sun7i: a20: Add support for the High Speed Timers
-
-Michael Opdenacker (3):
-       clocksource: misc drivers: Remove deprecated IRQF_DISABLED
-       clocksource: tegra: Remove deprecated IRQF_DISABLED
-       clocksource: vt8500: Remove deprecated IRQF_DISABLED
-
-Stephen Boyd (4):
-       clocksource: arm_global_timer: Switch to sched_clock_register()
-       clocksource: cadence_ttc_timer: Switch to sched_clock_register()
-       clocksource: sun4i: Switch to sched_clock_register()
-       clocksource: orion: Switch to sched_clock_register()
-
-  .../bindings/timer/allwinner,sun5i-a13-hstimer.txt |   22 +++
-  arch/arm/boot/dts/sun5i-a10s.dtsi                  |    7 +
-  arch/arm/boot/dts/sun5i-a13.dtsi                   |    7 +
-  arch/arm/boot/dts/sun7i-a20.dtsi                   |   10 +
-  arch/arm/mach-sunxi/Kconfig                        |    1 +
-  drivers/clocksource/Kconfig                        |    4 +
-  drivers/clocksource/Makefile                       |    1 +
-  drivers/clocksource/arm_global_timer.c             |    4 +-
-  drivers/clocksource/bcm_kona_timer.c               |    6 -
-  drivers/clocksource/cadence_ttc_timer.c            |    7 +-
-  drivers/clocksource/clksrc-of.c                    |    4 +
-  drivers/clocksource/cs5535-clockevt.c              |    2 +-
-  drivers/clocksource/dw_apb_timer.c                 |    3 +-
-  drivers/clocksource/nomadik-mtu.c                  |    2 +-
-  drivers/clocksource/samsung_pwm_timer.c            |    2 +-
-  drivers/clocksource/sh_cmt.c                       |   23 ++-
-  drivers/clocksource/sh_mtu2.c                      |    4 +-
-  drivers/clocksource/sh_tmu.c                       |    4 +-
-  drivers/clocksource/sun4i_timer.c                  |   11 +-
-  drivers/clocksource/tegra20_timer.c                |    2 +-
-  drivers/clocksource/time-armada-370-xp.c           |   18 +-
-  drivers/clocksource/time-orion.c                   |    4 +-
-  drivers/clocksource/timer-sun5i.c                  |  192 
-++++++++++++++++++++
-  drivers/clocksource/vt8500_timer.c                 |    2 +-
-  24 files changed, 295 insertions(+), 47 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-  create mode 100644 drivers/clocksource/timer-sun5i.c
-
-
+diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+index 2fb4695..a7f492e 100644
+--- a/drivers/clocksource/sun4i_timer.c
++++ b/drivers/clocksource/sun4i_timer.c
+@@ -188,6 +188,7 @@ static void __init sun4i_timer_init(struct device_node *node)
+ 	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
+ 
+ 	sun4i_clockevent.cpumask = cpumask_of(0);
++	sun4i_clockevent.irq = irq;
+ 
+ 	clockevents_config_and_register(&sun4i_clockevent, rate,
+ 					TIMER_SYNC_TICKS, 0xffffffff);
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
