@@ -1,29 +1,35 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 30 Dec 2013 14:45:23 +0100
-Subject: [PATCHv7 05/12] iommu/core: add ops->{bound,unbind}_driver()
-In-Reply-To: <1386835033-4701-6-git-send-email-hdoyu@nvidia.com>
-References: <1386835033-4701-1-git-send-email-hdoyu@nvidia.com>
- <1386835033-4701-6-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20131230134522.GB2799@8bytes.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 Dec 2013 13:50:58 +0000
+Subject: [PATCH v2 6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI
+ bindings
+In-Reply-To: <CAMuHMdXYH6KmH3ZstAvhqUpqXWEbg6sjdUTDRZUrUthdPg-6aQ@mail.gmail.com>
+References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
+ <1388175362-17132-7-git-send-email-geert@linux-m68k.org>
+ <20131230125845.GX31886@sirena.org.uk>
+ <CAMuHMdXYH6KmH3ZstAvhqUpqXWEbg6sjdUTDRZUrUthdPg-6aQ@mail.gmail.com>
+Message-ID: <20131230135058.GD31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 12, 2013 at 09:57:06AM +0200, Hiroshi Doyu wrote:
-> ops->{bound,unbind}_driver() functions are called at
-> BUS_NOTIFY_{BOUND,UNBIND}_DRIVER respectively.
-> 
-> This is necessary to control the device population order. IOMMU master
-> devices depend on an IOMMU device instanciation. IOMMU master devices
-> can be registered to an IOMMU only after it's successfully
-> populated. This IOMMU registration is done via
-> ops->bound_driver(). Currently this population can be deferred if
-> depending IOMMU device hasn't yet been populated in driver core. This
-> cannot be done via ops->add_device() since after add_device() device's
-> population/instanciation can be still deferred via probe().
+On Mon, Dec 30, 2013 at 02:43:53PM +0100, Geert Uytterhoeven wrote:
+> On Mon, Dec 30, 2013 at 1:58 PM, Mark Brown <broonie@kernel.org> wrote:
+> > On Fri, Dec 27, 2013 at 09:16:00PM +0100, Geert Uytterhoeven wrote:
 
-How about doing dependency checking in the add/remove_device callbacks
-instead? When a device is about to be initialized where the IOMMU is not
-set up yet, just setup the IOMMU first before initializing the device?
+> >> +- num-cs        : Number of chip selects
 
+> > Why is this variable and how does this map onto hardware?
 
-	Joerg
+> It's my understanding that legacy RSPi on SH7757 has 2 chip selects,
+> while other RSPI implementations have 1 chip select.
+
+So this should be documented in the binding document in a way that
+allows someone reading the document and looking at the datasheet to
+figure out how to pick the value (for example, refer to how the chip
+selects are controlled in the hardware).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/c2481155/attachment.sig>
