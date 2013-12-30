@@ -1,51 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 30 Dec 2013 11:32:41 -0800
-Subject: [GIT PULL] clk: keystone: Couple of misc updates for 3.14
-In-Reply-To: <1386692618-28584-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1386692618-28584-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131230193241.12054.82849@quantum>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Dec 2013 12:14:11 -0800
+Subject: [PATCH v4 0/6] Krait L1/L2 EDAC driver
+Message-ID: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Santosh Shilimkar (2013-12-10 08:23:37)
-> Mike,
-> 
-> Please find a below small pull request for couple of keystone clock patches
-> for 3.14. If you prefer to cherry pick and apply instead thats fine as well.
+This patchset adds support for the Krait L1/L2 cache error detection
+hardware. The first patch fixes a generic framework bug. The next
+two patches lay the groundwork for this driver to be added by 
+exporting percpu irq functions as well as adding the Krait l2 indirection
+register code. The next two patches add the driver and the binding and 
+the final patch hooks it all up by adding the device tree node.
 
-Pulled into clk-next.
+I'm not sure which tree this is supposed to go through. Ideally we could
+send the first 3 plus the 5th one through an edac tree. The final dts changes
+could go through arm-soc via davidb's tree and the Documentation patch could
+go through the devicetree tree.
 
-Thanks,
-Mike
+Changes since v3:
+ * Fixed l1_irq handler to properly dereference dev_id
 
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14/keystone-clk
-> 
-> for you to fetch changes up to e0c223ec67a98f70770eec85e625015f5af69f10:
-> 
->   clk: keystone: gate: fix error handling on init (2013-12-10 11:08:20 -0500)
-> 
-> ----------------------------------------------------------------
-> 
-> Grygorii Strashko (1):
->   clk: keystone: gate: fix error handling on init
-> 
-> Murali Karicheri (1):
->   clk: keystone: use clkod register bits for postdiv
-> 
->  .../devicetree/bindings/clock/keystone-pll.txt     |    8 +++----
->  drivers/clk/keystone/gate.c                        |   12 ++++++----
->  drivers/clk/keystone/pll.c                         |   24 ++++++++++++++++----
->  3 files changed, 32 insertions(+), 12 deletions(-)
-> 
-> Regards,
-> Santosh
-> -- 
-> 1.7.9.5
-> 
+Changes since v2:
+ * Picked up acks
+ * s/an/a/ in DT binding
+
+Changes since v1:
+ * Moved binding into cpus node
+ * Picked up acks on first two patches
+ * Commented krait l2 accessor functions
+
+Stephen Boyd (6):
+  edac: Don't try to cancel workqueue when it's never setup
+  genirq: export percpu irq functions for module usage
+  ARM: Add Krait L2 accessor functions
+  devicetree: bindings: Document Krait L1/L2 EDAC
+  edac: Add support for Krait CPU cache error detection
+  ARM: dts: msm: Add Krait CPU/L2 nodes
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  72 +++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi            |  41 +++
+ arch/arm/common/Kconfig                        |   3 +
+ arch/arm/common/Makefile                       |   1 +
+ arch/arm/common/krait-l2-accessors.c           |  58 +++++
+ arch/arm/include/asm/krait-l2-accessors.h      |  20 ++
+ drivers/edac/Kconfig                           |   8 +
+ drivers/edac/Makefile                          |   2 +
+ drivers/edac/edac_device.c                     |   3 +
+ drivers/edac/krait_edac.c                      | 346 +++++++++++++++++++++++++
+ kernel/irq/manage.c                            |   2 +
+ 11 files changed, 556 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+ create mode 100644 drivers/edac/krait_edac.c
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
