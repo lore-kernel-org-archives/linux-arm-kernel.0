@@ -1,52 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Dec 2013 09:57:05 +0900
-Subject: [GIT PULL 0/3] Third Round of Renesas ARM based SoC Fixes for v3.13
-Message-ID: <cover.1388364591.git.horms+renesas@verge.net.au>
+Date: Mon, 30 Dec 2013 09:58:07 +0900
+Subject: [PATCH 2/3] ARM: shmobile: kzm9g: Fix coherent DMA mask
+In-Reply-To: <cover.1388364591.git.horms+renesas@verge.net.au>
+References: <cover.1388364591.git.horms+renesas@verge.net.au>
+Message-ID: <4f387323853c495ac589210832fad4503f75a0e7.1388364591.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Please consider this third round of Renesas ARM based SoC fixes for v3.13.
-Or alternatively, if it is too late in the v3.13 cycle, please consider
-them for v3.14.
+Commit 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 ("ARM: DMA-API: better
+handing of DMA masks for coherent allocations") added an additional
+check to the coherent DMA mask that results in an error when the mask is
+larger than what dma_addr_t can address.
 
-This pull request is based on the second round such fixes,
-tagged as renesas-fixes2-for-v3.13, which you have already pulled.
+Set the LCDC coherent DMA mask to DMA_BIT_MASK(32) instead of ~0 to fix
+the problem.
 
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-kzm9g.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit d721a15c300c5f638a11573a6dd492158e737d6a:
-
-  ARM: shmobile: r8a7790: fix shdi resource sizes (2013-12-19 18:14:48 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes3-for-v3.13
-
-for you to fetch changes up to b6328a6b7ba57fc84c38248f6f0e387e1170f1a8:
-
-  ARM: shmobile: mackerel: Fix coherent DMA mask (2013-12-26 14:21:03 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM based SoC Fixes for v3.13
-
-* sh7372 (SH-Mobile AP4) based Mackerel board
-  r8a773a0 (SH-Mobile AG5) based kzm9g board
-  r8a7740 (R-Mobile A1) based Armadillo board
-
-  - Correct coherent DMA mask
-
-    This resolves regressions introduced by 4dcfa60071b3d23f
-    ("ARM: DMA-API: better handing of DMA masks for coherent allocations")
-    in v3.12-rc1.
-
-----------------------------------------------------------------
-Laurent Pinchart (3):
-      ARM: shmobile: armadillo: Fix coherent DMA mask
-      ARM: shmobile: kzm9g: Fix coherent DMA mask
-      ARM: shmobile: mackerel: Fix coherent DMA mask
-
- arch/arm/mach-shmobile/board-armadillo800eva.c | 4 ++--
- arch/arm/mach-shmobile/board-kzm9g.c           | 2 +-
- arch/arm/mach-shmobile/board-mackerel.c        | 4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index fe689b7..bc40b85 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -334,7 +334,7 @@ static struct platform_device lcdc_device = {
+ 	.resource	= lcdc_resources,
+ 	.dev	= {
+ 		.platform_data	= &lcdc_info,
+-		.coherent_dma_mask = ~0,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 	},
+ };
+ 
+-- 
+1.8.4
