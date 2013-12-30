@@ -1,33 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Dec 2013 16:37:29 +0100
-Subject: [PATCH] ARM: sunxi: Select RESET_CONTROLLER
-Message-ID: <1388417849-7728-1-git-send-email-maxime.ripard@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Dec 2013 17:09:17 +0100
+Subject: [PATCH 03/17] ARM: sa1100: Remove deprecated IRQF_DISABLED flag
+In-Reply-To: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388419771-30075-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code selects ARCH_HAS_RESET_CONTROLLER, that enables the
-RESET_CONTROLLER option by default, but doesn't select it, so a configuration
-might unselect it, leading to compilation error.
+This flag is a NOOP and scheduled to be removed
 
-Explictly select RESET_CONTROLLER so that we can't have this breakage anymore.
-
-Reported-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-sunxi/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-sa1100/time.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 547004c..6278b12 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_SUNXI
- 	select HAVE_SMP
- 	select PINCTRL
- 	select PINCTRL_SUNXI
-+	select RESET_CONTROLLER
- 	select SPARSE_IRQ
- 	select SUN4I_TIMER
- 	select SUN5I_HSTIMER
+diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
+index 6fd4acb..4852c08 100644
+--- a/arch/arm/mach-sa1100/time.c
++++ b/arch/arm/mach-sa1100/time.c
+@@ -112,7 +112,7 @@ static struct clock_event_device ckevt_sa1100_osmr0 = {
+ 
+ static struct irqaction sa1100_timer_irq = {
+ 	.name		= "ost0",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= sa1100_ost0_interrupt,
+ 	.dev_id		= &ckevt_sa1100_osmr0,
+ };
 -- 
-1.8.4.2
+1.7.9.5
