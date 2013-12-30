@@ -1,49 +1,67 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Dec 2013 09:58:08 +0900
-Subject: [PATCH 3/3] ARM: shmobile: mackerel: Fix coherent DMA mask
-In-Reply-To: <cover.1388364591.git.horms+renesas@verge.net.au>
-References: <cover.1388364591.git.horms+renesas@verge.net.au>
-Message-ID: <b6328a6b7ba57fc84c38248f6f0e387e1170f1a8.1388364591.git.horms+renesas@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 30 Dec 2013 10:31:57 +0900
+Subject: [PATCH 23/25] thermal: exynos: fix error return code
+In-Reply-To: <1388357260-4843-24-git-send-email-Julia.Lawall@lip6.fr>
+References: <1388357260-4843-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1388357260-4843-24-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <000001cf04fe$edccf3f0$c966dbd0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Monday, December 30, 2013 7:48 AM, Julia Lawall wrote:
+> 
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> Set the return variable to an error code as done elsewhere in the function.
+> 
+> A simplified version of the semantic match that finds this problem is as
+> follows: (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> (
+> if at p1 (\(ret < 0\|ret != 0\))
+>  { ... return ret; }
+> |
+> ret at p1 = 0
+> )
+> ... when != ret = e1
+>     when != &ret
+> *if(...)
+> {
+>   ... when != ret = e2
+>       when forall
+>  return ret;
+> }
+> 
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Commit 4dcfa60071b3d23f0181f27d8519f12e37cefbb9 ("ARM: DMA-API: better
-handing of DMA masks for coherent allocations") added an additional
-check to the coherent DMA mask that results in an error when the mask is
-larger than what dma_addr_t can address.
+(+cc Amit Daniel Kachhap, Jonghwa Lee)
 
-Set the LCDC coherent DMA mask to DMA_BIT_MASK(32) instead of ~0 to fix
-the problem.
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-mackerel.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Best regards,
+Jingoo Han
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index af06753..e721d2c 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -409,7 +409,7 @@ static struct platform_device lcdc_device = {
- 	.resource	= lcdc_resources,
- 	.dev	= {
- 		.platform_data	= &lcdc_info,
--		.coherent_dma_mask = ~0,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
- 	},
- };
- 
-@@ -499,7 +499,7 @@ static struct platform_device hdmi_lcdc_device = {
- 	.id		= 1,
- 	.dev	= {
- 		.platform_data	= &hdmi_lcdc_info,
--		.coherent_dma_mask = ~0,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
- 	},
- };
- 
--- 
-1.8.4
+> 
+> ---
+> Not tested.
+> 
+>  drivers/thermal/samsung/exynos_tmu.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 32f38b9..0d96a51 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -205,6 +205,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>  skip_calib_data:
+>  	if (pdata->max_trigger_level > MAX_THRESHOLD_LEVS) {
+>  		dev_err(&pdev->dev, "Invalid max trigger level\n");
+> +		ret = -EINVAL;
+>  		goto out;
+>  	}
+> 
+> 
+> --
