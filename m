@@ -1,44 +1,27 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Dec 2013 18:50:04 +0100
-Subject: [PATCH] clk: samsung: exynos4: Correct SRC_MFC register
-In-Reply-To: <20131219042310.23538.98799@quantum>
-References: <1385097668-24620-1-git-send-email-sw0312.kim@samsung.com>
- <4859492.2SOgx7UbdE@amdc1227> <20131219042310.23538.98799@quantum>
-Message-ID: <28945056.75J9o12lTX@amdc1227>
+Date: Mon, 30 Dec 2013 18:51:06 +0100
+Subject: [PATCH] clk: exynos: File scope reg_save array should depend on
+ PM_SLEEP
+In-Reply-To: <20131219075510.18119.67210@quantum>
+References: <1387274199-470-1-git-send-email-k.kozlowski@samsung.com>
+ <20131219075510.18119.67210@quantum>
+Message-ID: <24377867.Lxp9m9lerI@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 of December 2013 20:23:10 Mike Turquette wrote:
-> Quoting Tomasz Figa (2013-12-18 06:54:30)
-> > On Friday 22 of November 2013 14:21:08 Seung-Woo Kim wrote:
-> > > The SRC_MFC register was incorrect. This patch corrects it.
-> > > 
-> > > Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> > > ---
-> > >  drivers/clk/samsung/clk-exynos4.c |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> > > index ad5ff50..1a7c1b9 100644
-> > > --- a/drivers/clk/samsung/clk-exynos4.c
-> > > +++ b/drivers/clk/samsung/clk-exynos4.c
-> > > @@ -39,7 +39,7 @@
-> > >  #define SRC_TOP1             0xc214
-> > >  #define SRC_CAM                      0xc220
-> > >  #define SRC_TV                       0xc224
-> > > -#define SRC_MFC                      0xcc28
-> > > +#define SRC_MFC                      0xc228
-> > >  #define SRC_G3D                      0xc22c
-> > >  #define E4210_SRC_IMAGE              0xc230
-> > >  #define SRC_LCD0             0xc234
-> > > 
+On Wednesday 18 of December 2013 23:55:10 Mike Turquette wrote:
+> Quoting Krzysztof Kozlowski (2013-12-17 01:56:39)
+> > Move reg_save[] into CONFIG_PM_SLEEP dependency block as it is used only
+> > by suspend and resume functions.
 > > 
-> > Applied into samsung-clk fixes branch.
+> > This fixes the warning on CONFIG_PM_SLEEP=n:
+> > drivers/clk/samsung/clk-exynos-audss.c:29:22: warning: ?reg_save? defined but not used [-Wunused-variable]
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > 
-> It's always nice when a fix for the -rc cycle includes a description of
-> the user-visible regression that it fixes.
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-I have updated the description when applying.
+Applied onto fixes branch.
 
 Best regards,
 Tomasz
