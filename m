@@ -1,39 +1,51 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 30 Dec 2013 14:20:59 -0500
-Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
-In-Reply-To: <1388386511-32276-1-git-send-email-baozich@gmail.com>
-References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
-Message-ID: <1388431259.2564.15.camel@deneb.redhat.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 30 Dec 2013 11:32:41 -0800
+Subject: [GIT PULL] clk: keystone: Couple of misc updates for 3.14
+In-Reply-To: <1386692618-28584-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1386692618-28584-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131230193241.12054.82849@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-30 at 14:55 +0800, Chen Baozi wrote:
-> xen_remap used to be defined as ioremap_cached on arm64. In commit
-> c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
-> was deleted, while xen_remap stays the same. This would lead to
-> the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
-> on arm64 as ioremap_cache on arm64 to fix it.
+Quoting Santosh Shilimkar (2013-12-10 08:23:37)
+> Mike,
 > 
+> Please find a below small pull request for couple of keystone clock patches
+> for 3.14. If you prefer to cherry pick and apply instead thats fine as well.
 
-I missed that include of arm header by arm64 when looking for users
-of arm64's ioremap_cached() when working on commit c04e8e2fe. Anyway,
-grepping the kernel tree, I see:
+Pulled into clk-next.
 
-  ioremap_cached()
-    defined by: arm, metag, unicore32
-    used by: arch/arm/include/asm/xen/page.h
-             drivers/mtd/maps/pxa2xx-flash.c
+Thanks,
+Mike
 
-  ioremap_cache()
-    defined by: arm64, sh, xtensa, ia64, x86
-    used by: drivers/video/vesafb.c
-             drivers/char/toshiba.c
-             drivers/acpi/apei
-             drivers/lguest/lguest_device.c
-             drivers/sfi/sfi_core.c
-             include/linux/acpi_io.h
-
-I think it would be better to just avoid the confusion and the ifdef in
-asm/xen/page.h by globally changing ioremap_cached to ioremap_cache.
-
---Mark
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14/keystone-clk
+> 
+> for you to fetch changes up to e0c223ec67a98f70770eec85e625015f5af69f10:
+> 
+>   clk: keystone: gate: fix error handling on init (2013-12-10 11:08:20 -0500)
+> 
+> ----------------------------------------------------------------
+> 
+> Grygorii Strashko (1):
+>   clk: keystone: gate: fix error handling on init
+> 
+> Murali Karicheri (1):
+>   clk: keystone: use clkod register bits for postdiv
+> 
+>  .../devicetree/bindings/clock/keystone-pll.txt     |    8 +++----
+>  drivers/clk/keystone/gate.c                        |   12 ++++++----
+>  drivers/clk/keystone/pll.c                         |   24 ++++++++++++++++----
+>  3 files changed, 32 insertions(+), 12 deletions(-)
+> 
+> Regards,
+> Santosh
+> -- 
+> 1.7.9.5
+> 
