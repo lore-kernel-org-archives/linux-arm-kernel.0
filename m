@@ -1,122 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 30 Dec 2013 11:25:46 +0800
-Subject: [PATCH v2 1/4] clk: sunxi: Allwinner A20 output clock support
-In-Reply-To: <1388373949-28506-1-git-send-email-wens@csie.org>
-References: <1388373949-28506-1-git-send-email-wens@csie.org>
-Message-ID: <1388373949-28506-2-git-send-email-wens@csie.org>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 30 Dec 2013 09:33:50 +0530
+Subject: [PATCH RESEND 1/4] clk: clk-s2mps11: Refactor for including
+ support for other MFD clocks
+In-Reply-To: <20131229221723.12054.40917@quantum>
+References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
+ <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
+ <1388053141-30085-2-git-send-email-tushar.behera@linaro.org>
+ <20131229221723.12054.40917@quantum>
+Message-ID: <CAHbNUh0tJHXv52bA9hBDZMH0Pi+x9uC=LojcvgS=ONnCgEmVTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the external clock outputs on the
-Allwinner A20 SoC. The clock outputs are similar to "module 0"
-type clocks, with different offsets and widths for clock factors.
+On 30 December 2013 03:47, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Tushar Behera (2013-12-26 02:18:58)
+>> The clocks in S2MPS11 and S5M8767 are managed in the same way, baring
+>> a difference in the register offset. It would be better to update
+>> existing S2MPS11 driver to support the clocks in S5M8767, rather than
+>> creating an almost duplicate driver altogether.
+>
+> Can you rebase patches #1 & #2 onto clk-next? They do not apply cleanly
+> as-is.
+>
+> Regards,
+> Mike
+>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-sunxi.c                     | 57 +++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
+Commit 1b1ccee1e821 "mfd: s2mps11: Fix build after regmap field rename
+in sec-core.c" is also touching this file, which is in Mark's tree
+right now. If I rebase
+this patch on top clk-next, I am getting conflicts when I merge that
+with linux-next.
+Let me know how you want to handle this.
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 46d8433..c2cb762 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -36,6 +36,7 @@ Required properties:
- 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
- 	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
-+	"allwinner,sun7i-a20-out-clk" - for the external output clocks
- 
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 25d99b6..19d9e9e 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -330,6 +330,47 @@ static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
- 
- 
- /**
-+ * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
-+ * CLK_OUT rate is calculated as follows
-+ * rate = (parent_rate >> p) / (m + 1);
-+ */
-+
-+static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
-+				      u8 *n, u8 *k, u8 *m, u8 *p)
-+{
-+	u8 div, calcm, calcp;
-+
-+	/* These clocks can only divide, so we will never be able to achieve
-+	 * frequencies higher than the parent frequency */
-+	if (*freq > parent_rate)
-+		*freq = parent_rate;
-+
-+	div = parent_rate / *freq;
-+
-+	if (div < 32)
-+		calcp = 0;
-+	else if (div / 2 < 32)
-+		calcp = 1;
-+	else if (div / 4 < 32)
-+		calcp = 2;
-+	else
-+		calcp = 3;
-+
-+	calcm = DIV_ROUND_UP(div, 1 << calcp);
-+
-+	*freq = (parent_rate >> calcp) / calcm;
-+
-+	/* we were called to round the frequency, we can now return */
-+	if (n == NULL)
-+		return;
-+
-+	*m = calcm - 1;
-+	*p = calcp;
-+}
-+
-+
-+
-+/**
-  * sunxi_factors_clk_setup() - Setup function for factor clocks
-  */
- 
-@@ -384,6 +425,14 @@ static struct clk_factors_config sun4i_mod0_config = {
- 	.pwidth = 2,
- };
- 
-+/* user manual says "n" but it's really "p" */
-+static struct clk_factors_config sun7i_a20_out_config = {
-+	.mshift = 8,
-+	.mwidth = 5,
-+	.pshift = 20,
-+	.pwidth = 2,
-+};
-+
- static const struct factors_data sun4i_pll1_data __initconst = {
- 	.enable = 31,
- 	.table = &sun4i_pll1_config,
-@@ -414,6 +463,13 @@ static const struct factors_data sun4i_mod0_data __initconst = {
- 	.getter = sun4i_get_mod0_factors,
- };
- 
-+static const struct factors_data sun7i_a20_out_data __initconst = {
-+	.enable = 31,
-+	.mux = 24,
-+	.table = &sun7i_a20_out_config,
-+	.getter = sun7i_a20_get_out_factors,
-+};
-+
- static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
- 						const struct factors_data *data)
- {
-@@ -912,6 +968,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
- 	{.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
- 	{.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
-+	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
- 	{}
- };
- 
+I am attaching the rebased patches for your reference.
+If you want, I will send them again through git-send-email.
+
 -- 
-1.8.5.2
+Tushar Behera
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-clk-clk-s2mps11-Refactor-for-including-support-for-o.patch
+Type: text/x-patch
+Size: 2904 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/fbd9b99e/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-clk-clk-s2mps11-Add-support-for-clocks-in-S5M8767-MF.patch
+Type: text/x-patch
+Size: 2224 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/fbd9b99e/attachment-0001.bin>
