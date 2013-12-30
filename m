@@ -1,47 +1,56 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Dec 2013 18:41:11 +0100
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-In-Reply-To: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
-Message-ID: <3255941.gbDAOmmA0C@amdc1227>
+From: giometti@enneenne.com (Rodolfo Giometti)
+Date: Mon, 30 Dec 2013 18:47:39 +0100
+Subject: Can't boot newer kernel on Armada 370 dev board
+Message-ID: <20131230174738.GA4172@enneenne.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 of December 2013 17:07:13 Tomasz Figa wrote:
-> This series intends to improve clock provider impementation of max77686
-> PMIC driver. First two patches are simple fixes of current implementation
-> to allow correct control of provided clocks. Further patches refactor
-> the driver to make the code cleaner and prepare for further patches. Then
-> last two patches add registration of OF clock provider and adjust device
-> tree nodes of boards containing max77686 chip to contain properties
-> required by clock provider.
-> 
-> Tested on Exynos4412-based Trats2 board, with additional patches adding
-> driver being a consumer of one of max77686 clocks.
-> 
-> Changes since v1:
->  - rebased on top of current clk-next (no functional changes)
-> 
-> Tomasz Figa (8):
->   clk: max77686: Correct callback used for checking clock status
->   clk: max77686: Provide .recalc_rate() operation
->   clk: max77686: Refactor successful exit of probe function
->   clk: max77686: Make max77686_clk_register() return struct clk *
->   clk: max77686: Fix clean-up in error and remove paths
->   clk: max77686: Refactor driver data handling
->   clk: max77686: Register OF clock provider
->   ARM: dts: Add clock provider specific properties to max77686 node
-> 
->  .../devicetree/bindings/clock/maxim,max77686.txt   | 38 +++++++++
->  Documentation/devicetree/bindings/mfd/max77686.txt |  3 +
->  arch/arm/boot/dts/cros5250-common.dtsi             |  1 +
->  arch/arm/boot/dts/exynos4412-odroidx.dts           |  1 +
->  arch/arm/boot/dts/exynos4412-trats2.dts            |  1 +
->  drivers/clk/clk-max77686.c                         | 97 +++++++++++++---------
->  6 files changed, 104 insertions(+), 37 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77686.txt
+Hello,
 
-Ping.
+I have an Armada 370 dev board (DB-88F6710-BP) running Marvell kernel
+3.2.
 
-Best regards,
-Tomasz
+Now I'm a bit puzzled because I'd like to use newer kernel (i.e 3.12)
+on my board, so I tried several repositories (vanilla and linux-mvebu)
+with no success! :'(
+
+I read on the net that it should work, but after using the bootz
+command everything hangs:
+
+   Marvell>> tftp $loadaddr zImage-cyone
+   Using egiga0 device
+   TFTP from server 192.168.32.38; our IP address is 192.168.32.25
+   Filename 'zImage-cyone'.
+   Load address: 0x2000000
+   Loading: #################################################################
+            #################################################################
+            #################################################################
+            #################################################################
+            #################################################################
+            #################################################################
+            #################################################################
+            #################################################################
+            ########
+   done
+   Bytes transferred = 2701021 (2936dd hex)
+   Marvell>> bootz $loadaddr
+
+   Starting kernel ...
+
+File zImage-cyone is made with command:
+
+   giometti at hulk:~/Projects/linux-mvebu[mvebu-dt-3.14]$ cat arch/arm/boot/zImage arch/arm/boot/dts/armada-370-db.dtb > /srv/tftp/zImage-cyone
+
+Someone have some advise for me! :)
+
+Thanks in advance,
+
+Rodolfo
+
+-- 
+
+GNU/Linux Solutions                  e-mail: giometti at enneenne.com
+Linux Device Driver                          giometti at linux.it
+Embedded Systems                     phone:  +39 349 2432127
+UNIX programming                     skype:  rodolfo.giometti
+Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
