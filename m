@@ -1,31 +1,23 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 30 Dec 2013 11:12:01 -0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select PCI support
-Message-ID: <1388409121-25133-1-git-send-email-festevam@gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 30 Dec 2013 14:19:15 +0100
+Subject: [GIT PULL] iommu/arm-smmu: updates for 3.14
+In-Reply-To: <20131217180854.GG349@mudshark.cambridge.arm.com>
+References: <20131217180854.GG349@mudshark.cambridge.arm.com>
+Message-ID: <20131230131914.GA2799@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Dec 17, 2013 at 06:08:54PM +0000, Will Deacon wrote:
+> Antonios Motakis (1):
+>       iommu/arm-smmu: add devices attached to the SMMU to an IOMMU group
+> 
+> Will Deacon (3):
+>       iommu/arm-smmu: use VA_BITS to determine arm64 virtual address space
+>       iommu: add IOMMU_EXEC flag for safely allowing XN mappings
+>       iommu/arm-smmu: add support for IOMMU_EXEC
+> 
+>  drivers/iommu/arm-smmu.c | 33 ++++++++++++++++++++++++++-------
+>  include/linux/iommu.h    |  7 ++++---
+>  2 files changed, 30 insertions(+), 10 deletions(-)
 
-Let PCI driver be enabled by default.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 53e82c2..00746d5 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -39,6 +39,8 @@ CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_VF610=y
-+CONFIG_PCI=y
-+CONFIG_PCI_IMX6=y
- CONFIG_SMP=y
- CONFIG_VMSPLIT_2G=y
- CONFIG_PREEMPT_VOLUNTARY=y
--- 
-1.8.1.2
+Pulled, thanks Will.
