@@ -1,55 +1,23 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 30 Dec 2013 14:13:17 +0200
-Subject: [PATCH] mm/memblock: use WARN_ONCE when MAX_NUMNODES passed as
- input parameter
-In-Reply-To: <alpine.DEB.2.02.1312261542260.9342@chino.kir.corp.google.com>
-References: <1387578536-18280-1-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.02.1312261542260.9342@chino.kir.corp.google.com>
-Message-ID: <52C1635D.9070703@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 Dec 2013 12:03:27 +0000
+Subject: [PATCH] regulator: act8865: register all regulators regardless
+ of how many are used
+In-Reply-To: <1388023041-25785-1-git-send-email-wenyou.yang@atmel.com>
+References: <1388023041-25785-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20131230120327.GN31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/27/2013 01:45 AM, David Rientjes wrote:
-> On Fri, 20 Dec 2013, Santosh Shilimkar wrote:
->
->> diff --git a/mm/memblock.c b/mm/memblock.c
->> index 71b11d9..6af873a 100644
->> --- a/mm/memblock.c
->> +++ b/mm/memblock.c
->> @@ -707,11 +707,9 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
->>   	struct memblock_type *rsv = &memblock.reserved;
->>   	int mi = *idx & 0xffffffff;
->>   	int ri = *idx >> 32;
->> -	bool check_node = (nid != NUMA_NO_NODE) && (nid != MAX_NUMNODES);
->>
->> -	if (nid == MAX_NUMNODES)
->> -		pr_warn_once("%s: Usage of MAX_NUMNODES is depricated. Use NUMA_NO_NODE instead\n",
->> -			     __func__);
->> +	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
->> +		nid = NUMA_NO_NODE;
->>
->>   	for ( ; mi < mem->cnt; mi++) {
->>   		struct memblock_region *m = &mem->regions[mi];
->
-> Um, why do this at runtime?  This is only used for
-> for_each_free_mem_range(), which is used rarely in x86 and memblock-only
-> code.  I'm struggling to understand why we can't deterministically fix the
-> callers if this condition is possible.
->
+On Thu, Dec 26, 2013 at 09:57:21AM +0800, Wenyou Yang wrote:
+> As Mark pointed out, the driver should register all regulators
+> regardless of how many are used in the system in order to aid diagnostics.
 
-
-Unfortunately, It's not so simple as from first look :(
-We've modified __next_free_mem_range_x() functions which are part of
-Memblock APIs (like memblock_alloc_xxx()) and Nobootmem APIs.
-These APIs are used as directly as indirectly (as part of callbacks from 
-other MM modules like Sparse), as result, it's not trivial to identify 
-all places where MAX_NUMNODES will be used as input parameter.
-
-Same was discussed here in details:
-- [PATCH v2 08/23] mm/memblock: Add memblock memory allocation apis
-   https://lkml.org/lkml/2013/12/2/1075
-- Re: [PATCH 09/24] mm/memblock: Add memblock memory allocation apis
-   https://lkml.org/lkml/2013/12/2/907
-
-Regards,
-- grygorii
+Thanks for doing this but it doesn't apply against the current code due
+to the fixups from Axel.  Can you please check and resend?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/5f41608a/attachment.sig>
