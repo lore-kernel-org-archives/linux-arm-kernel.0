@@ -1,39 +1,39 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 11:19:38 +0100
-Subject: [PATCH 19/20] clocksource: bcm_kona_timer: Remove unused bcm_timer_ids
+Date: Mon, 30 Dec 2013 11:19:37 +0100
+Subject: [PATCH 18/20] clocksource: vt8500: Remove deprecated IRQF_DISABLED
 In-Reply-To: <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
 References: <52C1479E.80808@linaro.org>
  <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1388398779-11222-19-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388398779-11222-18-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Lin <axel.lin@ingics.com>
+From: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 
-bcm_timer_ids is no longer used after converting to CLOCKSOURCE_OF_DECLARE.
+This patch removes the use of the IRQF_DISABLED flag.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
+It's a NOOP since 2.6.35 and it will be removed one day.
+
+[dlezcano] : slightly changed the changelog
+
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/bcm_kona_timer.c |    6 ------
- 1 file changed, 6 deletions(-)
+ drivers/clocksource/vt8500_timer.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-index 0d7d8c3..5176e76 100644
---- a/drivers/clocksource/bcm_kona_timer.c
-+++ b/drivers/clocksource/bcm_kona_timer.c
-@@ -98,12 +98,6 @@ kona_timer_get_counter(void *timer_base, uint32_t *msw, uint32_t *lsw)
- 	return;
- }
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index ad3c0e8..1098ed3 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -124,7 +124,7 @@ static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
  
--static const struct of_device_id bcm_timer_ids[] __initconst = {
--	{.compatible = "brcm,kona-timer"},
--	{.compatible = "bcm,kona-timer"}, /* deprecated name */
--	{},
--};
--
- static void __init kona_timers_init(struct device_node *node)
- {
- 	u32 freq;
+ static struct irqaction irq = {
+ 	.name    = "vt8500_timer",
+-	.flags   = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags   = IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler = vt8500_timer_interrupt,
+ 	.dev_id  = &clockevent,
+ };
 -- 
 1.7.9.5
