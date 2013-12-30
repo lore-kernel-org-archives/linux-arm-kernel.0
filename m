@@ -1,163 +1,25 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Dec 2013 13:15:33 -0800
-Subject: [PATCH v2 7/7] ARM: msm: Move MSM's DT based hardware to
- multi-platform support
+Date: Mon, 30 Dec 2013 13:17:42 -0800
+Subject: [PATCH v2 0/7] Allow MSM DT platforms to be built multi-platform
 In-Reply-To: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
 References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1388438133-431-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <52C1E2F6.6070600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT based MSM platforms can join the multi-platform builds, so
-introduce a DT based ARCH_MSM option. This option allows DT based
-MSM platforms to be built into the multi-platform kernel. Also
-introduce a hidden ARCH_MSM config that both the DT and non-DT
-platform support code select to avoid churn in places that depend
-on CONFIG_ARCH_MSM.
+On 12/30/13 13:15, Stephen Boyd wrote:
+> These patches allow the DT based MSM platforms to be built as part of the
+> multi-platform kernel. I need acks from Chris Ball on the mmc patch and
+> Rob/Dave on the drm patch. I dropped Arnd's ack on patch 6 because I've
+> rebased that patch on top of the patchset David sent out (which this is in
+> reply to). 
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Forgot to add --in-reply-to. This is on top of these patches:
 
-Arnd acked v1 but this is slightly different due to 8974 coming in.
+Subject: [PATCH 0/7] MSM patches for 3.14
+Date:	Fri, 20 Dec 2013 11:09:13 -0800
+Message-Id: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
 
- arch/arm/Kconfig          |  4 +--
- arch/arm/mach-msm/Kconfig | 80 ++++++++++++++++++++++++-----------------------
- 2 files changed, 43 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..7803a13 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -631,10 +631,10 @@ config ARCH_PXA
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
--config ARCH_MSM
-+config ARCH_MSM_NODT
- 	bool "Qualcomm MSM"
-+	select ARCH_MSM
- 	select ARCH_REQUIRE_GPIOLIB
--	select CLKSRC_OF if OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	help
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index ff69e1c..9625cf3 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -1,12 +1,50 @@
-+config ARCH_MSM
-+	bool
-+
-+config ARCH_MSM_DT
-+	bool "Qualcomm MSM DT Support" if ARCH_MULTI_V7
-+	select ARCH_MSM
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKSRC_OF
-+	select GENERIC_CLOCKEVENTS
-+	help
-+	  Support for Qualcomm's devicetree based MSM systems.
-+
- if ARCH_MSM
- 
--comment "Qualcomm MSM SoC Type"
-+menu "Qualcomm MSM SoC Selection"
- 	depends on ARCH_MSM_DT
- 
-+config ARCH_MSM8X60
-+	bool "Enable support for MSM8X60"
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_SMP
-+	select MSM_SCM if SMP
-+	select MSM_TIMER
-+
-+config ARCH_MSM8960
-+	bool "Enable support for MSM8960"
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_SMP
-+	select MSM_SCM if SMP
-+	select MSM_TIMER
-+
-+config ARCH_MSM8974
-+	bool "Enable support for MSM8974"
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_ARM_ARCH_TIMER
-+	select HAVE_SMP
-+	select MSM_SCM if SMP
-+
-+endmenu
-+
- choice
- 	prompt "Qualcomm MSM SoC Type"
- 	default ARCH_MSM7X00A
--	depends on !ARCH_MSM_DT
-+	depends on ARCH_MSM_NODT
- 
- config ARCH_MSM7X00A
- 	bool "MSM7x00A / MSM7x01A"
-@@ -45,41 +83,6 @@ config ARCH_QSD8X50
- 
- endchoice
- 
--config ARCH_MSM8X60
--	bool "MSM8X60"
--	select ARCH_MSM_DT
--	select ARM_GIC
--	select CPU_V7
--	select GPIO_MSM_V2
--	select HAVE_SMP
--	select MSM_SCM if SMP
--	select MSM_TIMER
--
--config ARCH_MSM8960
--	bool "MSM8960"
--	select ARCH_MSM_DT
--	select ARM_GIC
--	select CPU_V7
--	select HAVE_SMP
--	select GPIO_MSM_V2
--	select MSM_SCM if SMP
--	select MSM_TIMER
--
--config ARCH_MSM8974
--	bool "MSM8974"
--	select ARCH_MSM_DT
--	select ARM_GIC
--	select CPU_V7
--	select HAVE_ARM_ARCH_TIMER
--	select HAVE_SMP
--	select MSM_SCM if SMP
--	select USE_OF
--
--config ARCH_MSM_DT
--	bool
--	select SPARSE_IRQ
--	select USE_OF
--
- config MSM_HAS_DEBUG_UART_HS
- 	bool
- 
-@@ -96,7 +99,7 @@ config  MSM_VIC
- 	bool
- 
- menu "Qualcomm MSM Board Type"
--	depends on !ARCH_MSM_DT
-+	depends on ARCH_MSM_NODT
- 
- config MACH_HALIBUT
- 	depends on ARCH_MSM
-@@ -144,7 +147,6 @@ config MSM_SMD
- 
- config MSM_GPIOMUX
- 	bool
--	depends on !ARCH_MSM_DT
- 	help
- 	  Support for MSM V1 TLMM GPIOMUX architecture.
- 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
