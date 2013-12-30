@@ -1,39 +1,86 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Dec 2013 11:19:37 +0100
-Subject: [PATCH 18/20] clocksource: vt8500: Remove deprecated IRQF_DISABLED
+Date: Mon, 30 Dec 2013 11:19:39 +0100
+Subject: [PATCH 20/20] clocksource: sh_cmt: Add clk_prepare/unprepare support
 In-Reply-To: <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
 References: <52C1479E.80808@linaro.org>
  <1388398779-11222-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1388398779-11222-18-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1388398779-11222-20-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This patch removes the use of the IRQF_DISABLED flag.
+Prepare the clock at probe time, as there is no other appropriate place
+in the driver where we're allowed to sleep.
 
-It's a NOOP since 2.6.35 and it will be removed one day.
-
-[dlezcano] : slightly changed the changelog
-
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/vt8500_timer.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/sh_cmt.c |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index ad3c0e8..1098ed3 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -124,7 +124,7 @@ static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index 0965e98..940341a 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -634,12 +634,18 @@ static int sh_cmt_clock_event_next(unsigned long delta,
  
- static struct irqaction irq = {
- 	.name    = "vt8500_timer",
--	.flags   = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags   = IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler = vt8500_timer_interrupt,
- 	.dev_id  = &clockevent,
- };
+ static void sh_cmt_clock_event_suspend(struct clock_event_device *ced)
+ {
+-	pm_genpd_syscore_poweroff(&ced_to_sh_cmt(ced)->pdev->dev);
++	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
++
++	pm_genpd_syscore_poweroff(&p->pdev->dev);
++	clk_unprepare(p->clk);
+ }
+ 
+ static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
+ {
+-	pm_genpd_syscore_poweron(&ced_to_sh_cmt(ced)->pdev->dev);
++	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
++
++	clk_prepare(p->clk);
++	pm_genpd_syscore_poweron(&p->pdev->dev);
+ }
+ 
+ static void sh_cmt_register_clockevent(struct sh_cmt_priv *p,
+@@ -737,6 +743,10 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err2;
+ 	}
+ 
++	ret = clk_prepare(p->clk);
++	if (ret < 0)
++		goto err3;
++
+ 	if (res2 && (resource_size(res2) == 4)) {
+ 		/* assume both CMSTR and CMCSR to be 32-bit */
+ 		p->read_control = sh_cmt_read32;
+@@ -773,19 +783,21 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 			      cfg->clocksource_rating);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "registration failed\n");
+-		goto err3;
++		goto err4;
+ 	}
+ 	p->cs_enabled = false;
+ 
+ 	ret = setup_irq(irq, &p->irqaction);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+-		goto err3;
++		goto err4;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, p);
+ 
+ 	return 0;
++err4:
++	clk_unprepare(p->clk);
+ err3:
+ 	clk_put(p->clk);
+ err2:
 -- 
 1.7.9.5
