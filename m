@@ -1,249 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 30 Dec 2013 19:17:46 +0100
-Subject: [PATCH v2] ARM: Kirkwood: Add support for Excito Bubba B3
-Message-ID: <1388427467-32488-1-git-send-email-andrew@lunn.ch>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 30 Dec 2013 10:19:48 -0800
+Subject: [PATCH] MAINTAINERS: Update Allwinner sunXi maintainer files
+In-Reply-To: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAPtuhTjSnr0yJXFhZN7UYAXf1RN8c1LaX82XLTDPrD+iSqdb3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Excito Bubba B3 is a home server, single drive NAS box, Wifi
-access point, etc.
+On Mon, Dec 30, 2013 at 7:03 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Add entries for all files having either sunxi or one of the Allwinner flavours
+> in their name.
+>
+> Also elect Emilio Lopez as the maintainer of the clock driver, since he was
+> already acting like it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
-v2:
-s/driver/drive
-Sort ocp DT entries
-Add comment about Serial port RX/TX test points
-Replace linux specific DT led properties with generic equivelent.
----
- arch/arm/boot/dts/Makefile        |    3 +-
- arch/arm/boot/dts/kirkwood-b3.dts |  204 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 206 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-b3.dts
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adcc6067eb13..0447d726a6bc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -71,7 +71,8 @@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
- dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
--dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
-+dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-b3.dtb \
-+	kirkwood-cloudbox.dtb \
- 	kirkwood-db-88f6281.dtb \
- 	kirkwood-db-88f6282.dtb \
- 	kirkwood-dns320.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-new file mode 100644
-index 000000000000..40791053106b
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-b3.dts
-@@ -0,0 +1,204 @@
-+/*
-+ * Device Tree file for Excito Bubba B3
-+ *
-+ * Copyright (C) 2013, Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ *
-+ * Note: This requires a new'ish version of u-boot, which disables the
-+ * L2 cache. If your B3 silently fails to boot, u-boot is probably too
-+ * old. Either upgrade, or consider the following email:
-+ *
-+ * http://lists.debian.org/debian-arm/2012/08/msg00128.html
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	model = "Excito B3";
-+	compatible = "excito,b3", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+	memory { /* 512 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			/* Wifi model has Atheros chipset on pcie port */
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pmx_button_power: pmx-button-power {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_green: pmx-led-green {
-+				marvell,pins = "mpp38";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red: pmx-led-red {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_blue: pmx-led-blue {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+			pmx_beeper: pmx-beeper {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		spi at 10600 {
-+			status = "okay";
-+			pinctrl-0 = <&pmx_spi>;
-+			pinctrl-names = "default";
-+
-+			m25p16 at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "m25p16";
-+				reg = <0>;
-+				spi-max-frequency = <40000000>;
-+				mode = <0>;
-+
-+				partition at 0 {
-+					reg = <0x0 0xc0000>;
-+					label = "u-boot";
-+				};
-+
-+				partition at c0000 {
-+					reg = <0xc0000 0x20000>;
-+					label = "u-boot env";
-+				};
-+
-+				partition at e0000 {
-+					reg = <0xe0000 0x120000>;
-+					label = "data";
-+				};
-+			};
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+			/*
-+			 * There is something on the bus at address 0x64.
-+			 * Not yet identified what it is, maybe the eeprom
-+			 * for the Atheros WiFi chip?
-+			 */
-+		};
-+
-+
-+		serial at 12000 {
-+			/* Internal on test pins, 3.3v TTL
-+		 	 * UART0_RX = Testpoint 65
-+			 * UART0_TX = Testpoint 66
-+			 * See the Excito Wiki for more details.
-+		 	 */
-+			pinctrl-0 = <&pmx_uart0>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+		};
-+
-+		sata at 80000 {
-+			/* One internal, the second as eSATA */
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		/*
-+		 * There is one LED "port" on the front and the colours
-+		 * mix together giving some interesting combinations.
-+		 */
-+		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_green &pmx_led_red
-+			      &pmx_led_blue >;
-+		pinctrl-names = "default";
-+
-+		programming_led {
-+			label = "bubba3:green:programming";
-+			gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		error_led {
-+			label = "bubba3:red:error";
-+			gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		active_led {
-+			label = "bubba3:blue:active";
-+			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <&pmx_button_power>;
-+		pinctrl-names = "default";
-+
-+		power-button {
-+			/* On the back */
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	beeper: beeper {
-+		/* 4KHz Piezoelectric buzzer */
-+		compatible = "gpio-beeper";
-+		pinctrl-0 = <&pmx_beeper>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 8 {
-+		device_type = "ethernet-phy";
-+		reg = <8>;
-+	};
-+
-+	ethphy1: ethernet-phy at 24 {
-+		device_type = "ethernet-phy";
-+		reg = <24>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
-+
-+&eth1 {
-+	status = "okay";
-+	ethernet1-port at 0 {
-+		phy-handle = <&ethphy1>;
-+	};
-+};
-+
--- 
-1.7.10.4
+> ---
+>  MAINTAINERS | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 1344816..dc39230 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -766,7 +766,12 @@ ARM/Allwinner A1X SoC support
+>  M:     Maxime Ripard <maxime.ripard@free-electrons.com>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:     Maintained
+> -F:     arch/arm/mach-sunxi/
+> +N:     sun[x4567]i
+> +
+> +ARM/Allwinner SoC Clock Support
+> +M:     Emilio L?pez <emilio@elopez.com.ar>
+> +S:     Maintained
+> +F:     drivers/clk/sunxi/
+>
+>  ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
+>  M:     Andrew Victor <linux@maxim.org.za>
+> --
+> 1.8.4.2
+>
