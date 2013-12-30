@@ -1,56 +1,38 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Dec 2013 15:32:32 +0100
-Subject: [PATCH 3/3] ARM: dts: Fix MDMA0 clock number
-In-Reply-To: <20131218193203.23538.30551@quantum>
-References: <1386817322-11265-1-git-send-email-a.kesavan@samsung.com>
- <2082327.zpbOvCVe5P@amdc1227> <20131218193203.23538.30551@quantum>
-Message-ID: <19574645.fFapTcOjJm@amdc1227>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Dec 2013 16:03:33 +0100
+Subject: [PATCH] MAINTAINERS: Update Allwinner sunXi maintainer files
+Message-ID: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Add entries for all files having either sunxi or one of the Allwinner flavours
+in their name.
 
-On Wednesday 18 of December 2013 11:32:03 Mike Turquette wrote:
-> Quoting Tomasz Figa (2013-12-18 06:49:10)
-> > Hi Kukjin,
-> > 
-> > On Thursday 12 of December 2013 08:32:02 Abhilash Kesavan wrote:
-> > > Fix wrong clock number in mdma0 node.
-> > > 
-> > > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > > ---
-> > >  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> > > index 9db5047..177becd 100644
-> > > --- a/arch/arm/boot/dts/exynos5250.dtsi
-> > > +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> > > @@ -559,7 +559,7 @@
-> > >                       compatible = "arm,pl330", "arm,primecell";
-> > >                       reg = <0x10800000 0x1000>;
-> > >                       interrupts = <0 33 0>;
-> > > -                     clocks = <&clock 271>;
-> > > +                     clocks = <&clock 346>;
-> > >                       clock-names = "apb_pclk";
-> > >                       #dma-cells = <1>;
-> > >                       #dma-channels = <8>;
-> > > 
-> > 
-> > Can we have your ack for this patch?
-> > 
-> > I'd like to apply the whole series into samsung-clk fixes branch and
-> > send a pull request to Mike to get it and one more fix into his tree.
-> 
-> Do these fixes need to go into the current -rc fixes cycle or can they
-> go for 3.14?
+Also elect Emilio Lopez as the maintainer of the clock driver, since he was
+already acting like it.
 
-I'd say that this should go as an -rc fix, because on some systems on
-which the firmware may leave the mdma0 clock disabled by default,
-trying to initialize MDMA0 by PL330 driver might cause booting failure.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ MAINTAINERS | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Can we get your ack on this, so I could apply this and send you a pull
-request with all fixes?
-
-Best regards,
-Tomasz
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1344816..dc39230 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -766,7 +766,12 @@ ARM/Allwinner A1X SoC support
+ M:	Maxime Ripard <maxime.ripard@free-electrons.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-F:	arch/arm/mach-sunxi/
++N:	sun[x4567]i
++
++ARM/Allwinner SoC Clock Support
++M:	Emilio L?pez <emilio@elopez.com.ar>
++S:	Maintained
++F:	drivers/clk/sunxi/
+ 
+ ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
+ M:	Andrew Victor <linux@maxim.org.za>
+-- 
+1.8.4.2
