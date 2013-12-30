@@ -1,45 +1,238 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Dec 2013 13:15:26 -0800
-Subject: [PATCH v2 0/7] Allow MSM DT platforms to be built multi-platform
-Message-ID: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 30 Dec 2013 13:15:27 -0800
+Subject: [PATCH v2 1/7] usb: phy: msm: Move mach dependent code to platform
+ data
+In-Reply-To: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1388438133-431-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches allow the DT based MSM platforms to be built as part of the
-multi-platform kernel. I need acks from Chris Ball on the mmc patch and
-Rob/Dave on the drm patch. I dropped Arnd's ack on patch 6 because I've
-rebased that patch on top of the patchset David sent out (which this is in
-reply to). The rebase was fairly minor and the new patch for drm/msm is
-trivial. Please consider for v3.14.
+From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-Changes since v1:
- * Rebased onto David's v3.14 patchset
- * Picked up acks
- * New patch for drm/msm driver
+This patch fix compilation error when driver is compiled
+in multi-platform builds.
 
-Ivan T. Ivanov (1):
-  usb: phy: msm: Move mach dependent code to platform data
+drivers/built-in.o: In function `msm_otg_link_clk_reset':
+./drivers/usb/phy/phy-msm-usb.c:314: undefined reference to `clk_reset'
+./drivers/usb/phy/phy-msm-usb.c:318: undefined reference to `clk_reset'
 
-Stephen Boyd (6):
-  mmc: msm_sdcc: Limit driver to platforms that use it
-  tty: serial: Limit msm_serial_hs driver to platforms that use it
-  ARM: msm: Only build clock.c on proc_comm based platforms
-  ARM: msm: Only build timer.c if required
-  drm/msm: Drop unnecessary mach include
-  ARM: msm: Move MSM's DT based hardware to multi-platform support
+Use platform data supplied reset handlers and adjust error
+messages reported when reset sequence fail.
 
- arch/arm/Kconfig                            |  4 +-
- arch/arm/mach-msm/Kconfig                   | 85 ++++++++++++++++-------------
- arch/arm/mach-msm/Makefile                  |  4 +-
- arch/arm/mach-msm/board-msm7x30.c           | 35 ++++++++++++
- arch/arm/mach-msm/board-qsd8x50.c           | 35 ++++++++++++
- drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c |  2 -
- drivers/mmc/host/Kconfig                    |  2 +-
- drivers/tty/serial/Kconfig                  |  2 +-
- drivers/usb/phy/phy-msm-usb.c               | 35 +++++-------
- include/linux/usb/msm_hsusb.h               |  3 +
- 10 files changed, 142 insertions(+), 65 deletions(-)
+This is an intermediate step before adding support for reset
+framework and newer targets.
 
+Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+Acked-by: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/board-msm7x30.c | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/board-qsd8x50.c | 35 +++++++++++++++++++++++++++++++++++
+ drivers/usb/phy/phy-msm-usb.c     | 35 +++++++++++++++--------------------
+ include/linux/usb/msm_hsusb.h     |  3 +++
+ 4 files changed, 88 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index f9af5a4..46de789 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -30,6 +30,7 @@
+ #include <asm/memory.h>
+ #include <asm/setup.h>
+ 
++#include <mach/clk.h>
+ #include <mach/msm_iomap.h>
+ #include <mach/dma.h>
+ 
+@@ -60,10 +61,44 @@ static int hsusb_phy_init_seq[] = {
+ 	-1
+ };
+ 
++static int hsusb_link_clk_reset(struct clk *link_clk, bool assert)
++{
++	int ret;
++
++	if (assert) {
++		ret = clk_reset(link_clk, CLK_RESET_ASSERT);
++		if (ret)
++			pr_err("usb hs_clk assert failed\n");
++	} else {
++		ret = clk_reset(link_clk, CLK_RESET_DEASSERT);
++		if (ret)
++			pr_err("usb hs_clk deassert failed\n");
++	}
++	return ret;
++}
++
++static int hsusb_phy_clk_reset(struct clk *phy_clk)
++{
++	int ret;
++
++	ret = clk_reset(phy_clk, CLK_RESET_ASSERT);
++	if (ret) {
++		pr_err("usb phy clk assert failed\n");
++		return ret;
++	}
++	usleep_range(10000, 12000);
++	ret = clk_reset(phy_clk, CLK_RESET_DEASSERT);
++	if (ret)
++		pr_err("usb phy clk deassert failed\n");
++	return ret;
++}
++
+ static struct msm_otg_platform_data msm_otg_pdata = {
+ 	.phy_init_seq		= hsusb_phy_init_seq,
+ 	.mode                   = USB_PERIPHERAL,
+ 	.otg_control		= OTG_PHY_CONTROL,
++	.link_clk_reset		= hsusb_link_clk_reset,
++	.phy_clk_reset		= hsusb_phy_clk_reset,
+ };
+ 
+ struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 5f933bc..9169ec3 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -31,6 +31,7 @@
+ #include <mach/irqs.h>
+ #include <mach/sirc.h>
+ #include <mach/vreg.h>
++#include <mach/clk.h>
+ #include <linux/platform_data/mmc-msm_sdcc.h>
+ 
+ #include "devices.h"
+@@ -81,10 +82,44 @@ static int hsusb_phy_init_seq[] = {
+ 	-1
+ };
+ 
++static int hsusb_link_clk_reset(struct clk *link_clk, bool assert)
++{
++	int ret;
++
++	if (assert) {
++		ret = clk_reset(link_clk, CLK_RESET_ASSERT);
++		if (ret)
++			pr_err("usb hs_clk assert failed\n");
++	} else {
++		ret = clk_reset(link_clk, CLK_RESET_DEASSERT);
++		if (ret)
++			pr_err("usb hs_clk deassert failed\n");
++	}
++	return ret;
++}
++
++static int hsusb_phy_clk_reset(struct clk *phy_clk)
++{
++	int ret;
++
++	ret = clk_reset(phy_clk, CLK_RESET_ASSERT);
++	if (ret) {
++		pr_err("usb phy clk assert failed\n");
++		return ret;
++	}
++	usleep_range(10000, 12000);
++	ret = clk_reset(phy_clk, CLK_RESET_DEASSERT);
++	if (ret)
++		pr_err("usb phy clk deassert failed\n");
++	return ret;
++}
++
+ static struct msm_otg_platform_data msm_otg_pdata = {
+ 	.phy_init_seq		= hsusb_phy_init_seq,
+ 	.mode                   = USB_PERIPHERAL,
+ 	.otg_control		= OTG_PHY_CONTROL,
++	.link_clk_reset		= hsusb_link_clk_reset,
++	.phy_clk_reset		= hsusb_phy_clk_reset,
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
+diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+index e9d4cd9..9a47d44 100644
+--- a/drivers/usb/phy/phy-msm-usb.c
++++ b/drivers/usb/phy/phy-msm-usb.c
+@@ -40,8 +40,6 @@
+ #include <linux/usb/msm_hsusb_hw.h>
+ #include <linux/regulator/consumer.h>
+ 
+-#include <mach/clk.h>
+-
+ #define MSM_USB_BASE	(motg->regs)
+ #define DRIVER_NAME	"msm_otg"
+ 
+@@ -308,33 +306,30 @@ static void ulpi_init(struct msm_otg *motg)
+ 
+ static int msm_otg_link_clk_reset(struct msm_otg *motg, bool assert)
+ {
+-	int ret;
++	int ret = 0;
++
++	if (!motg->pdata->link_clk_reset)
++		return ret;
++
++	ret = motg->pdata->link_clk_reset(motg->clk, assert);
++	if (ret)
++		dev_err(motg->phy.dev, "usb link clk reset %s failed\n",
++			assert ? "assert" : "deassert");
+ 
+-	if (assert) {
+-		ret = clk_reset(motg->clk, CLK_RESET_ASSERT);
+-		if (ret)
+-			dev_err(motg->phy.dev, "usb hs_clk assert failed\n");
+-	} else {
+-		ret = clk_reset(motg->clk, CLK_RESET_DEASSERT);
+-		if (ret)
+-			dev_err(motg->phy.dev, "usb hs_clk deassert failed\n");
+-	}
+ 	return ret;
+ }
+ 
+ static int msm_otg_phy_clk_reset(struct msm_otg *motg)
+ {
+-	int ret;
++	int ret = 0;
+ 
+-	ret = clk_reset(motg->phy_reset_clk, CLK_RESET_ASSERT);
+-	if (ret) {
+-		dev_err(motg->phy.dev, "usb phy clk assert failed\n");
++	if (!motg->pdata->phy_clk_reset)
+ 		return ret;
+-	}
+-	usleep_range(10000, 12000);
+-	ret = clk_reset(motg->phy_reset_clk, CLK_RESET_DEASSERT);
++
++	ret = motg->pdata->phy_clk_reset(motg->phy_reset_clk);
+ 	if (ret)
+-		dev_err(motg->phy.dev, "usb phy clk deassert failed\n");
++		dev_err(motg->phy.dev, "usb phy clk reset failed\n");
++
+ 	return ret;
+ }
+ 
+diff --git a/include/linux/usb/msm_hsusb.h b/include/linux/usb/msm_hsusb.h
+index 22a396c..3275483 100644
+--- a/include/linux/usb/msm_hsusb.h
++++ b/include/linux/usb/msm_hsusb.h
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/usb/otg.h>
++#include <linux/clk.h>
+ 
+ /**
+  * Supported USB modes
+@@ -135,6 +136,8 @@ struct msm_otg_platform_data {
+ 	enum msm_usb_phy_type phy_type;
+ 	void (*setup_gpio)(enum usb_otg_state state);
+ 	char *pclk_src_name;
++	int (*link_clk_reset)(struct clk *link_clk, bool assert);
++	int (*phy_clk_reset)(struct clk *phy_clk);
+ };
+ 
+ /**
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
