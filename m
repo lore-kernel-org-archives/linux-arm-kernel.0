@@ -1,35 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Dec 2013 13:50:58 +0000
-Subject: [PATCH v2 6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI
- bindings
-In-Reply-To: <CAMuHMdXYH6KmH3ZstAvhqUpqXWEbg6sjdUTDRZUrUthdPg-6aQ@mail.gmail.com>
-References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
- <1388175362-17132-7-git-send-email-geert@linux-m68k.org>
- <20131230125845.GX31886@sirena.org.uk>
- <CAMuHMdXYH6KmH3ZstAvhqUpqXWEbg6sjdUTDRZUrUthdPg-6aQ@mail.gmail.com>
-Message-ID: <20131230135058.GD31886@sirena.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 30 Dec 2013 15:32:32 +0100
+Subject: [PATCH 3/3] ARM: dts: Fix MDMA0 clock number
+In-Reply-To: <20131218193203.23538.30551@quantum>
+References: <1386817322-11265-1-git-send-email-a.kesavan@samsung.com>
+ <2082327.zpbOvCVe5P@amdc1227> <20131218193203.23538.30551@quantum>
+Message-ID: <19574645.fFapTcOjJm@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 02:43:53PM +0100, Geert Uytterhoeven wrote:
-> On Mon, Dec 30, 2013 at 1:58 PM, Mark Brown <broonie@kernel.org> wrote:
-> > On Fri, Dec 27, 2013 at 09:16:00PM +0100, Geert Uytterhoeven wrote:
+Hi Mike,
 
-> >> +- num-cs        : Number of chip selects
+On Wednesday 18 of December 2013 11:32:03 Mike Turquette wrote:
+> Quoting Tomasz Figa (2013-12-18 06:49:10)
+> > Hi Kukjin,
+> > 
+> > On Thursday 12 of December 2013 08:32:02 Abhilash Kesavan wrote:
+> > > Fix wrong clock number in mdma0 node.
+> > > 
+> > > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > > ---
+> > >  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> > > index 9db5047..177becd 100644
+> > > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > > @@ -559,7 +559,7 @@
+> > >                       compatible = "arm,pl330", "arm,primecell";
+> > >                       reg = <0x10800000 0x1000>;
+> > >                       interrupts = <0 33 0>;
+> > > -                     clocks = <&clock 271>;
+> > > +                     clocks = <&clock 346>;
+> > >                       clock-names = "apb_pclk";
+> > >                       #dma-cells = <1>;
+> > >                       #dma-channels = <8>;
+> > > 
+> > 
+> > Can we have your ack for this patch?
+> > 
+> > I'd like to apply the whole series into samsung-clk fixes branch and
+> > send a pull request to Mike to get it and one more fix into his tree.
+> 
+> Do these fixes need to go into the current -rc fixes cycle or can they
+> go for 3.14?
 
-> > Why is this variable and how does this map onto hardware?
+I'd say that this should go as an -rc fix, because on some systems on
+which the firmware may leave the mdma0 clock disabled by default,
+trying to initialize MDMA0 by PL330 driver might cause booting failure.
 
-> It's my understanding that legacy RSPi on SH7757 has 2 chip selects,
-> while other RSPI implementations have 1 chip select.
+Can we get your ack on this, so I could apply this and send you a pull
+request with all fixes?
 
-So this should be documented in the binding document in a way that
-allows someone reading the document and looking at the datasheet to
-figure out how to pick the value (for example, refer to how the chip
-selects are controlled in the hardware).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/c2481155/attachment.sig>
+Best regards,
+Tomasz
