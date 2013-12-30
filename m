@@ -1,71 +1,149 @@
-From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
-Date: Mon, 30 Dec 2013 09:55:50 +0000
-Subject: [PATCH 1/3] dma: mv_xor: take channel spinlock in mv_xor_status()
-In-Reply-To: <1388144314-1581-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1388144314-1581-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1388144314-1581-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1388397319.1871.251.camel@smile>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Dec 2013 11:14:54 +0100
+Subject: [GIT PULL] clockevents/clocksource : new material for 3.14
+Message-ID: <52C1479E.80808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-27 at 12:38 +0100, Thomas Petazzoni wrote:
-> The mv_xor_status() function accesses the mv_xor_chan structure, but
-> was not taking the corresponding spinlock. This patch fixes this
-> problem.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/dma/mv_xor.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-> index 53fb0c8..526ab27 100644
-> --- a/drivers/dma/mv_xor.c
-> +++ b/drivers/dma/mv_xor.c
-> @@ -701,14 +701,20 @@ static enum dma_status mv_xor_status(struct dma_chan *chan,
->  	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
->  	enum dma_status ret;
->  
-> +	spin_lock_bh(&mv_chan->lock);
-> +
 
-I don't think it's a proper place for this spinlock since
-dma_cookie_status is independent to that.
+Hi Thomas and Ingo,
 
->  	ret = dma_cookie_status(chan, cookie, txstate);
->  	if (ret == DMA_COMPLETE) {
+here is the new material for 3.14. I created a branch for Simon Horman 
+as requested [1] where he can pull from and merged it in the 
+clockevents/3.14 branch.	
 
-If you are caring about mv_chan access, better to take it here...
+  * Axel Lin removed an unused structure defining the ids for the bcm 
+kona driver
 
->  		mv_xor_clean_completed_slots(mv_chan);
-> +		spin_unlock_bh(&mv_chan->lock);
->  		return ret;
->  	}
+  * Ezequiel Garcia enabled the timer divider only when the 25MHz timer 
+is not used for the armada 370 XP
 
-...and here.
+  * Jingoo Han removed a pointless platform data initialization for the 
+sh_mtu and sh_mtu2
 
-> -	mv_xor_slot_cleanup(mv_chan);
-> +	__mv_xor_slot_cleanup(mv_chan);
->  
-> -	return dma_cookie_status(chan, cookie, txstate);
-> +	ret = dma_cookie_status(chan, cookie, txstate);
-> +	spin_unlock_bh(&mv_chan->lock);
-> +
-> +	return ret;
->  }
->  
->  static void mv_dump_xor_regs(struct mv_xor_chan *chan)
+  * Laurent Pinchart added the clk_prepare/clk_unprepare for sh_cmt
+
+  * Linus Walleij added an useful warning in clk_of when no clocks are 
+found while the old behavior was to silently hang at boot time
+
+  * Maxime Ripard added the high speed timer drivers for the Allwinner 
+SoCs (A10, A13, A20). He increased the rating, shared the irq across all 
+available cpus and fixed the clockevent's irq initialization for the sun4i
+
+  * Michael Opdenacker removed the usage of the IRQF_DISABLED for the 
+all the timers driver located in drivers/clocksource
+
+  * Stephen Boyd switched to sched_clock_register for the 
+arm_global_timer, cadence_ttc, sun4i and orion timers
+
+
+Resolved conflicts:
+
+  * (31f8ad387) "sun7i: a20: Add support for the High Speed Timers" and 
+(428abbb8) "Enable the I2C controllers"
+
+  * (67905540) "clocksource: Add Allwinner SoCs HS timers driver" and 
+(b788beda) "Order Kconfig options alphabetically"
+
+Thanks and happy new year !
+
+   -- Daniel
+
+[1] http://www.spinics.net/lists/linux-sh/msg26645.html
+
+-------------------------------------------------------------------------
+
+The following changes since commit 0e6601eee039893a3f6420596ae4588d90d13cbe:
+
+   Merge branch 'timers/posix-timers-for-tip-v2' of 
+git://git.kernel.org/pub/scm/linux/kernel/git/frederic/linux-dynticks 
+into timers/core (2013-12-10 12:32:36 +0100)
+
+are available in the git repository at:
+
+
+   git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/3.14
+
+for you to fetch changes up to 98aefbe72ec6015f90fe045ed16c5cf755da283d:
+
+   Merge branch 'clockevents/for-Simon-3.13-rc2' into clockevents/3.14 
+(2013-12-18 15:14:36 +0100)
+
+----------------------------------------------------------------
+
+Axel Lin (1):
+       clocksource: bcm_kona_timer: Remove unused bcm_timer_ids
+
+Daniel Lezcano (1):
+       Merge branch 'clockevents/for-Simon-3.13-rc2' into clockevents/3.14
+
+Ezequiel Garcia (1):
+       clocksource: armada-370-xp: Enable timer divider only when needed
+
+Jingoo Han (2):
+       clocksource: sh_tmu: Remove unnecessary platform_set_drvdata()
+       clocksource: sh_mtu2: Remove unnecessary platform_set_drvdata()
+
+Laurent Pinchart (1):
+       clocksource: sh_cmt: Add clk_prepare/unprepare support
+
+Linus Walleij (1):
+       clocksource: clksrc-of: Warn if no clock sources are found
+
+Maxime Ripard (7):
+       clockevent: sun4i: Fill the irq field in the clockevent structure
+       clocksource: sun4i: Change CPU mask to cpu_possible_mask
+       clocksource: sun4i: Increase a bit the clock event and sources rating
+       clocksource: Add Allwinner SoCs HS timers driver
+       ARM: sun5i: a10s: Add support for the High Speed Timers
+       ARM: sun5i: a13: Add support for the High Speed Timers
+       ARM: sun7i: a20: Add support for the High Speed Timers
+
+Michael Opdenacker (3):
+       clocksource: misc drivers: Remove deprecated IRQF_DISABLED
+       clocksource: tegra: Remove deprecated IRQF_DISABLED
+       clocksource: vt8500: Remove deprecated IRQF_DISABLED
+
+Stephen Boyd (4):
+       clocksource: arm_global_timer: Switch to sched_clock_register()
+       clocksource: cadence_ttc_timer: Switch to sched_clock_register()
+       clocksource: sun4i: Switch to sched_clock_register()
+       clocksource: orion: Switch to sched_clock_register()
+
+  .../bindings/timer/allwinner,sun5i-a13-hstimer.txt |   22 +++
+  arch/arm/boot/dts/sun5i-a10s.dtsi                  |    7 +
+  arch/arm/boot/dts/sun5i-a13.dtsi                   |    7 +
+  arch/arm/boot/dts/sun7i-a20.dtsi                   |   10 +
+  arch/arm/mach-sunxi/Kconfig                        |    1 +
+  drivers/clocksource/Kconfig                        |    4 +
+  drivers/clocksource/Makefile                       |    1 +
+  drivers/clocksource/arm_global_timer.c             |    4 +-
+  drivers/clocksource/bcm_kona_timer.c               |    6 -
+  drivers/clocksource/cadence_ttc_timer.c            |    7 +-
+  drivers/clocksource/clksrc-of.c                    |    4 +
+  drivers/clocksource/cs5535-clockevt.c              |    2 +-
+  drivers/clocksource/dw_apb_timer.c                 |    3 +-
+  drivers/clocksource/nomadik-mtu.c                  |    2 +-
+  drivers/clocksource/samsung_pwm_timer.c            |    2 +-
+  drivers/clocksource/sh_cmt.c                       |   23 ++-
+  drivers/clocksource/sh_mtu2.c                      |    4 +-
+  drivers/clocksource/sh_tmu.c                       |    4 +-
+  drivers/clocksource/sun4i_timer.c                  |   11 +-
+  drivers/clocksource/tegra20_timer.c                |    2 +-
+  drivers/clocksource/time-armada-370-xp.c           |   18 +-
+  drivers/clocksource/time-orion.c                   |    4 +-
+  drivers/clocksource/timer-sun5i.c                  |  192 
+++++++++++++++++++++
+  drivers/clocksource/vt8500_timer.c                 |    2 +-
+  24 files changed, 295 insertions(+), 47 deletions(-)
+  create mode 100644 
+Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+  create mode 100644 drivers/clocksource/timer-sun5i.c
+
 
 -- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
----------------------------------------------------------------------
-Intel Finland Oy
-Registered Address: PL 281, 00181 Helsinki 
-Business Identity Code: 0357606 - 4 
-Domiciled in Helsinki 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
