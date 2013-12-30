@@ -1,24 +1,41 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Dec 2013 13:17:42 -0800
-Subject: [PATCH v2 0/7] Allow MSM DT platforms to be built multi-platform
-In-Reply-To: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 30 Dec 2013 13:20:00 -0800
+Subject: [PATCH v2 6/7] drm/msm: Drop unnecessary mach include
+In-Reply-To: <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
 References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52C1E2F6.6070600@codeaurora.org>
+ <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <52C1E380.4060307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/30/13 13:15, Stephen Boyd wrote:
-> These patches allow the DT based MSM platforms to be built as part of the
-> multi-platform kernel. I need acks from Chris Ball on the mmc patch and
-> Rob/Dave on the drm patch. I dropped Arnd's ack on patch 6 because I've
-> rebased that patch on top of the patchset David sent out (which this is in
-> reply to). 
+> This file doesn't use the clk_reset() API that is exposed in
+> mach-msm's mach/clk.h file. Remove the include so that this
+> driver can be compiled as part of the multi-platform kernel.
+>
+> Cc: Rob Clark <robdclark@gmail.com>
+> Cc: Dave Airlie <airlied@redhat.com>
 
-Forgot to add --in-reply-to. This is on top of these patches:
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Subject: [PATCH 0/7] MSM patches for 3.14
-Date:	Fri, 20 Dec 2013 11:09:13 -0800
-Message-Id: <1387566560-23948-1-git-send-email-davidb@codeaurora.org>
+> ---
+>  drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c | 2 --
+>  1 file changed, 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c b/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
+> index 5e0dcae..3799ccc 100644
+> --- a/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
+> +++ b/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
+> @@ -15,8 +15,6 @@
+>   * this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> -#include <mach/clk.h>
+> -
+>  #include "mdp4_kms.h"
+>  
+>  #include "drm_crtc.h"
+
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
