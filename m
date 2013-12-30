@@ -1,46 +1,37 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 30 Dec 2013 10:19:48 -0800
-Subject: [PATCH] MAINTAINERS: Update Allwinner sunXi maintainer files
-In-Reply-To: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAPtuhTjSnr0yJXFhZN7UYAXf1RN8c1LaX82XLTDPrD+iSqdb3g@mail.gmail.com>
+From: giometti@enneenne.com (Rodolfo Giometti)
+Date: Mon, 30 Dec 2013 19:39:08 +0100
+Subject: Can't boot newer kernel on Armada 370 dev board
+In-Reply-To: <20131230181205.GA32362@lunn.ch>
+References: <20131230174738.GA4172@enneenne.com>
+ <20131230181205.GA32362@lunn.ch>
+Message-ID: <20131230183908.GB4172@enneenne.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 7:03 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Add entries for all files having either sunxi or one of the Allwinner flavours
-> in their name.
+On Mon, Dec 30, 2013 at 07:12:05PM +0100, Andrew Lunn wrote:
 >
-> Also elect Emilio Lopez as the maintainer of the clock driver, since he was
-> already acting like it.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Hi Redolfo
+> 
+> What version of u-boot do you have?
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+U-Boot 2011.12 (Dec 24 2013 - 16:16:38) Marvell version: v2011.12 2013_Q3.0
 
-> ---
->  MAINTAINERS | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 1344816..dc39230 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -766,7 +766,12 @@ ARM/Allwinner A1X SoC support
->  M:     Maxime Ripard <maxime.ripard@free-electrons.com>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:     Maintained
-> -F:     arch/arm/mach-sunxi/
-> +N:     sun[x4567]i
-> +
-> +ARM/Allwinner SoC Clock Support
-> +M:     Emilio L?pez <emilio@elopez.com.ar>
-> +S:     Maintained
-> +F:     drivers/clk/sunxi/
->
->  ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
->  M:     Andrew Victor <linux@maxim.org.za>
-> --
-> 1.8.4.2
->
+> There has been a change in u-boot
+> so that the registers are mapped to a different address. Old u-boot
+> with new kernel causes instant lockup on boot as soon as it tries to
+> access the wrong address space.
+
+I see. Where can I get newer u-boot releases in order to avoid this
+problem? :-)
+
+Thanks in advance,
+
+Rodolfo
+
+-- 
+
+GNU/Linux Solutions                  e-mail: giometti at enneenne.com
+Linux Device Driver                          giometti at linux.it
+Embedded Systems                     phone:  +39 349 2432127
+UNIX programming                     skype:  rodolfo.giometti
+Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
