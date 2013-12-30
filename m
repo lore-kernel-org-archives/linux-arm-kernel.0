@@ -1,32 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Dec 2013 12:58:45 +0000
-Subject: [PATCH v2 6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI
- bindings
-In-Reply-To: <1388175362-17132-7-git-send-email-geert@linux-m68k.org>
-References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
- <1388175362-17132-7-git-send-email-geert@linux-m68k.org>
-Message-ID: <20131230125845.GX31886@sirena.org.uk>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Mon, 30 Dec 2013 18:37:01 +0530
+Subject: [PATCH V4 0/2] Exynos5250 SATA Support
+Message-ID: <1388408823-4963-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 09:16:00PM +0100, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> Cc: devicetree at vger.kernel.org
+This patch series enable the SATA support on Exynos5250 based boards.
+It incorporates the generic phy framework to deal with sata phy.
 
-You've not CCed any maintainers on any of this stuff so I'm assuming you
-don't want any review or the patches applying.  You should in general
-always CC maintainers, things that only go to the list can easily be
-missed.  However I did take a brief look...
+This patch depends on the below patches
+	[1]. drivers: phy: add generic PHY framework
+		by Kishon Vijay Abraham I<kishon@ti.com>
+	[2]. ata: ahci_platform: Manage SATA PHY
+		by Roger Quadros <rogerq@ti.com>
+	[3].ARM: dts: Add pmu sysreg node to exynos5250 and
+		exynos5420 dtsi files
+		by Leela Krishna Amudala <l.krishna@samsung.com>
+	[4]. i2c: s3c2410 : Add polling mode support
+		by Vasanth Ananthan <vasanth.a@samsung.com>
 
-> +- num-cs	   : Number of chip selects
+Changes from V3:
+	1.Moved the devicetree binding documentation
+	from /bindings/ata/ to bindings/phy/ .
+	2.Moved devm_phy_create call before to 
+	the devm_phy_provider_register. 
 
-Why is this variable and how does this map onto hardware?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131230/d23a6495/attachment-0001.sig>
+Changes from V2:
+	1.Removed of_match_table
+	2.Moved to syscon interface for PMU handling.
+
+Changes from V1:
+	1. Dropped the patch 
+	ahci: exynos: add ahci sata support on Exynos platform
+
+	2.Adapt to latest generic PHY framework available in 
+	git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+
+Yuvaraj Kumar C D (2):
+  Phy: Exynos: Add Exynos5250 sata phy driver
+  ARM: dts: Enable ahci sata and sata phy
+
+ .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 --
+ .../devicetree/bindings/ata/exynos-sata.txt        |   25 ++-
+ .../devicetree/bindings/phy/samsung-phy.txt        |   40 ++++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |   11 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    8 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   16 +-
+ drivers/phy/Kconfig                                |   11 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/exynos5250_phy_i2c.c                   |   44 ++++
+ drivers/phy/sata_phy_exynos5250.c                  |  220 ++++++++++++++++++++
+ drivers/phy/sata_phy_exynos5250.h                  |   35 ++++
+ 11 files changed, 392 insertions(+), 33 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+ create mode 100644 drivers/phy/exynos5250_phy_i2c.c
+ create mode 100644 drivers/phy/sata_phy_exynos5250.c
+ create mode 100644 drivers/phy/sata_phy_exynos5250.h
+
+-- 
+1.7.9.5
