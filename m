@@ -1,69 +1,95 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 31 Dec 2013 13:50:34 +0100
-Subject: Openblocks AX3-4 i2c bus lockup
-In-Reply-To: <52C2B889.4030903@free-electrons.com>
-References: <20131221164151.GF20115@lunn.ch>
- <CADx9zJDbzUmgHCRn9K=8m_d_uiSAYoW3y_NVfLFiDq4WzS3C0A@mail.gmail.com>
- <52C2A5C8.7040201@free-electrons.com> <52C2B889.4030903@free-electrons.com>
-Message-ID: <52C2BD9A.9080303@gmail.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 31 Dec 2013 14:02:01 +0100
+Subject: [PATCH v4 03/15] clk: Add regmap core helpers for
+ enable/disable/is_enabled
+In-Reply-To: <20131226193101.GH31766@codeaurora.org>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-4-git-send-email-sboyd@codeaurora.org>
+ <20131224150741.GG8064@book.gsilab.sittig.org>
+ <20131226193101.GH31766@codeaurora.org>
+Message-ID: <20131231130201.GQ8064@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/2013 01:28 PM, Gregory CLEMENT wrote:
->> First I wanted to be sure that there the issue was not introduce by a
->> commit so reverted one by one the commits on the file
->> drivers/i2c/busses/i2c-mv64xxx.c. I tested it on both version of the
->> OpenBlock AX-4 (with CPU A0 and B0). After each commit the kernel
->> continue to work on the B0 version as expected, but it was when I
->> reverted the commit "i2c: mv64xxx: Add I2C Transaction Generator
->> support" that it worked also on the A0 version.
->>
->> Then I had a look on the errata datasheet and I found issues that I
->> missed when I worked on it. This issues were fixed in B0 version.
->>
->> The fix should be pretty simple: disabling the offload_enabled flag when
->> an A0 version of the CPU is used. For this there are 2 solutions:
->> introducing a new compatible string or trying to detect the CPU
->> stepping at runtime. I would prefer the second solution and I am looking
->> for a way to get this information.
->
->
-> We can have this information in the same way that it is currently done
-> by the other mvebu SoC: accessing the PCIE_DEV_REV_OFF register. In
-> arch/arm/plat-orion/pcie.c there were functions named
-> orion_pcie_dev_id() and orion_pcie_dev_id() to retrieve information
-> about the CPU variant and its version.
+On Thu, Dec 26, 2013 at 11:31 -0800, Stephen Boyd wrote:
+> 
+> On 12/24, Gerhard Sittig wrote:
+> > On Mon, Dec 23, 2013 at 17:12 -0800, Stephen Boyd wrote:
+> > > 
+> > > The clock framework already has support for simple gate clocks
+> > > but if drivers want to use the gate clock functionality they need
+> > > to wrap the gate clock in another struct and chain the ops by
+> > > calling the gate ops from their own custom ops. Plus the gate
+> > > clock implementation only supports MMIO accessors so other bus
+> > > type clocks don't benefit from the potential code reuse. Add some
+> > > simple regmap helpers for enable/disable/is_enabled that drivers
+> > > can use as drop in replacements for their clock ops or as simple
+> > > functions they call from their own custom ops. This is based on 
+> > > similar helps in the regulator framework.
+> > 
+> > The same comment applies as to the previous version.  Is it
+> > useful to introduce copies of the gate handling while the
+> > difference in only in how the hardware registers get accessed?
+> > 
+> 
+> I don't plan to use the clk-gate.c implementation because I need
+> more than just a bit toggling clock. We can easily make
+> clk-gate.c use these helpers if you're worried about the very
+> small amount of code duplication between the two. I'd be glad to
+> do that, I just didn't include it here because I don't have a use
+> for it.
 
-Depending on running pcie when calling is tricky, as it can be clock
-gated. Maybe we should have some mach code to get the SoC revision
-early for all SoCs. That should look for a pcie controller node,
-enable the clock, store the revision once, and disable the clock
-again. The callback can then return the stored value.
+OK, then I simply misunderstood.  From past threads I got the
+impression that your clock item was "a gate with regmap instead
+of mmio for hardware access, everything else being the same".
+The concerns were not so much about the size of duplicated code,
+but the "quality step" in starting duplication at all.  But since
+I was wrong, nevermind.
 
-> We could the same in drivers/pci/host/pci-mvebu.c, however it would
-> add a dependency between PCIe and I2C for the mvebu SoCs. I can think
-> of several options:
->
-> 1. Using only a new compatible strings: mv78230-A0-i2c. The benefits
-> of it are that it is very easy to implement and it don't touch anything
-> else than the driver itself. The drawback is that we need to add an
-> new dts file for the A0 variant of the AX3-4.
 
-I know that DT should describe HW, but at this point I tend to not
-fork off another dts. If it is probable, we should probe it. SoC
-revisions are really hard to see even from looking at the pcb, there
-is no way for users to determine the correct dts.
+> > > --- a/include/linux/clk-provider.h
+> > > +++ b/include/linux/clk-provider.h
+> > > @@ -177,11 +177,21 @@ struct clk_init_data {
+> > > [ ... ]
+> > > @@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
+> > >  long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
+> > >  			      unsigned long *best_parent_rate,
+> > >  			      struct clk **best_parent_p);
+> > > +int clk_is_enabled_regmap(struct clk_hw *hw);
+> > > +int clk_enable_regmap(struct clk_hw *hw);
+> > > +void clk_disable_regmap(struct clk_hw *hw);
+> > 
+> > Looking at the patch:  Do you expect callers to remember whether
+> > a clock gate is backed by mmio or by regmap access, to call a
+> > different set of routines? 
+> 
+> There are only regmap functions. I'm not sure where the choice
+> is, but I expect the callers to know what they're doing. If you
+> look at the rest of this series you'll see that I assign these
+> functions directly to the clk_ops, or I call them from the
+> enable/disable functions that need to do some status bit polling
+> after the clock is enabled or disabled.
+> 
+> > Should this not be hidden behind the
+> > API and be transparent after clock registration?
+> 
+> I don't really understand what you mean by hiding it behind the
+> API? What API? If we're talking about clk_register_gate() I think
+> we would need to add a clk_register_regmap_gate() function
+> because the reg argument is an __iomem pointer. It doesn't look
+> like it can be transparent unless that pointer is reused as an
+> offset. I don't attempt to do anything about that here though
+> because I don't use the clk-gate.c code.
 
-> 2. Using the CPU revision information from the pcie driver. The
-> benefits of it are that we don't need modify any device tree and a fix
-> in the kernel will be enough. The drawback is that we introduce a
-> dependency between PCIe and I2C.
->
-> 3. Using the CPU revision information as primary solution and the
-> compatible string as fallback. The benefits of it are there won't be a
-> mandatory dependency between PCI and I2c and the change of the dts
-> won't be mandatory too. The drawback is that we could have a non
-> working kernel if on a Rev A0 CPU, PCIe is not enable _and_
-> mv78230-A0-i2c compatible string is not selected.
->
-> I am open to other ideas as I am not found of none of them.
+See above, it's simple.  I misunderstood, asked (in a previous
+thread), got no response, saw another submission, asked again.
+Now that you told me, it's clear I got something wrong.  Thank
+you for telling me what I missed before.
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
