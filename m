@@ -1,42 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 31 Dec 2013 16:17:43 +0000
-Subject: [GIT PULL 2nd 3/5] Samsung defconfig update for v3.14
-In-Reply-To: <CAOesGMh-ptLF_fvJ2X_7_WZVnB3oUkO2QUPxPENb4e+aDUb6iQ@mail.gmail.com>
-References: <52B5DCAB.204@samsung.com> <20131228231531.GB22753@quad.lixom.net>
- <CAOesGMj38JPgFic+ByShH3nHXWe0j=rzcdQzEiTGJ18OKfR6zw@mail.gmail.com>
- <CAOesGMh-ptLF_fvJ2X_7_WZVnB3oUkO2QUPxPENb4e+aDUb6iQ@mail.gmail.com>
-Message-ID: <20131231161743.GH31886@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 31 Dec 2013 17:20:47 +0100
+Subject: [PATCH v3 0/5] input: Add new sun4i-ts driver for Allwinner sunxi
+Message-ID: <1388506852-3548-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 28, 2013 at 07:48:26PM -0800, Olof Johansson wrote:
-> On Sat, Dec 28, 2013 at 7:44 PM, Olof Johansson <olof@lixom.net> wrote:
+Hi All,
 
-> > The regulator driver causes build breaks. Really, nobody checks these
-> > things before sending patches or merge requests?
+Here is v3 of my sun4i-ts driver for Allwinner sunxi patch-set.
 
-> > Having exynos_defconfig broken in arm-soc isn't an alternative. So I
-> > dropped this branch again. If the regulator driver gets fixed in -rc
-> > then we can probably merge it before the merge window, otherwise we'll
-> > have to merge the defconfig change after the regulator fix goes in for
-> > the 3.14 merge window.
+Changed this version:
+-Addressed review comments from Dimitri
+-Addressed review comments from Guenter
+-Addressed review comments from Maxime
+-Initialize ignore_fifo_data to true, the very first coordinate can be
+ wrong too
 
-> Ah, I guess the fix went in after -rc4, which is the latest -rc that
-> we have in for-next today. I'll bring for-next forward and merge this
-> in.
+Thanks & Regards,
 
-> Still, it's odd that you were able to test your branch before sending it in.
-
-The build breakage was only introduced in -rc4 - a MFD/RTC change went
-in via Andrew's tree so it got no exposure in -next before it showed up
-in Linus' tree which wasn't good.  The fix was in by -rc5, looking at
-the date on the pull request I expect that any testing against -next (as
-opposed to arm-soc) would've been OK and since the branch is based on
--rc1 it'd have tested out by itself as well.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131231/7a685a90/attachment.sig>
+Hans
