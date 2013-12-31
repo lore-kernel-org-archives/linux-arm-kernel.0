@@ -1,17 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Dec 2013 11:23:02 +0000
-Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
- CONFIG_ARM_PATCH_PHYS_VIRT.
-In-Reply-To: <m38uv1uuzr.fsf@t19.piap.pl>
-References: <m38uv1uuzr.fsf@t19.piap.pl>
-Message-ID: <20131231112301.GC16456@n2100.arm.linux.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 31 Dec 2013 07:12:14 -0500
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20131231121214.GB3985@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 31, 2013 at 12:20:56PM +0100, Krzysztof Ha?asa wrote:
-> arch/arm/mm/init.c: In function 'setup_dma_zone':
-> arch/arm/mm/init.c:232:19: error: '__pv_phys_offset' undeclared (first use in this function)
-> 
-> Reverting the following commit fixes it:
+On Mon, Dec 23, 2013 at 01:07:35PM +0100, Simon Guinot wrote:
+> @@ -1358,6 +1359,7 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+>  
+>  	if (ofs != 0xffffffffU) {
+>  		void __iomem *addr = mv_ap_base(link->ap) + ofs;
+> +		void __iomem *lp_phy_addr = mv_ap_base(link->ap) + LP_PHY_CTL;
+>  		if (sc_reg_in == SCR_CONTROL) {
+>  			/*
+>  			 * Workaround for 88SX60x1 FEr SATA#26:
+> @@ -1374,6 +1376,14 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+>  			 */
+>  			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
+>  				val |= 0xf000;
+> +
+> +			/*
+> +			 * Setting PHY speed according to SControl speed
+> +			 */
+> +			if ((val & 0xf0) == 0x10)
+> +				writelfl(0x7, lp_phy_addr);
+> +			else
+> +				writelfl(0x227, lp_phy_addr);
 
-Already fixed long before Christmas.  Please use recent kernels.
+Do we know that this is safe for all sata_mvs?  If other sata_mvs
+haven't had the described issue, maybe this should be applied
+selectively to the said soc?  I'd actually prefer to avoid such
+conditionals but we need to confirm this is okay for other
+implementations.
+
+Thanks.
+
+-- 
+tejun
