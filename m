@@ -1,35 +1,30 @@
-From: jjhiblot@traphandler.com (jjhiblot at traphandler.com)
-Date: Tue, 31 Dec 2013 17:33:44 +0100
-Subject: [PATCH] at91: ohci: fixed broken sanity check
-Message-ID: <1388507624-10636-1-git-send-email-jjhiblot@traphandler.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 31 Dec 2013 17:44:53 +0100
+Subject: [RFC PATCH 3/3] i2c: mv64xxx: Document the newly introduced Armada XP
+ A0 compatible
+In-Reply-To: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1388508293-9141-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: jean-jacques hiblot <jean-jacques.hiblot@jdsu.com>
-
-The test (pdev->resource[1].flags != IORESOURCE_IRQ) is broken because the flags
-value may contain not only the information IORESSOURCE_IRQ but also the IRQ type
-(IORESOURCE_IRQ_HIGHLEVEL for example).
-
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/usb/host/ohci-at91.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 418444e..df9c8a4 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -142,8 +142,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		return -ENODEV;
- 	}
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+index 82e8f6f17179..9410ed72ec45 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+@@ -5,7 +5,7 @@ Required properties :
  
--	if ((pdev->resource[0].flags != IORESOURCE_MEM)
--			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
-+	if (!(pdev->resource[0].flags & IORESOURCE_MEM)
-+			|| !(pdev->resource[1].flags & IORESOURCE_IRQ)) {
- 		pr_debug("hcd probe: invalid resource type\n");
- 		return -ENODEV;
- 	}
+  - reg             : Offset and length of the register set for the device
+  - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
+-                     or "marvell,mv78230-i2c"
++                     or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
+  - interrupts      : The interrupt number
+ 
+ Optional properties :
 -- 
-1.8.4.2
+1.8.1.2
