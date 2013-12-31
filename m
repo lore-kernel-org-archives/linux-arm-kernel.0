@@ -1,80 +1,257 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Dec 2013 12:08:56 +0100
-Subject: Openblocks AX3-4 i2c bus lockup
-In-Reply-To: <CADx9zJDbzUmgHCRn9K=8m_d_uiSAYoW3y_NVfLFiDq4WzS3C0A@mail.gmail.com>
-References: <20131221164151.GF20115@lunn.ch>
- <CADx9zJDbzUmgHCRn9K=8m_d_uiSAYoW3y_NVfLFiDq4WzS3C0A@mail.gmail.com>
-Message-ID: <52C2A5C8.7040201@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 31 Dec 2013 12:10:31 +0100
+Subject: [PATCH v2 2/5] input: sun4i-ts: Add support for temperature sensor
+In-Reply-To: <20131228011007.GA14188@core.coreip.homeip.net>
+References: <1388156399-29677-1-git-send-email-hdegoede@redhat.com>
+ <1388156399-29677-3-git-send-email-hdegoede@redhat.com>
+ <20131228011007.GA14188@core.coreip.homeip.net>
+Message-ID: <52C2A627.4070208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-On 22/12/2013 00:06, Gregory CLEMENT wrote:
-> Hi Andrew,
-> 
-> I am away this weekend (Christmas with the first part of the family).
-> 
-> But I remember having few issue on i2c with the first AX3-4 I received. With the second one (using a B0 steping CPU), I didn't remember having any issues. As I thought the first AX3-4 I
-> received was an early release I didn't paid more attention. The last i2c patches I sent were tested on the AX3-4 CPU rev B.
-> 
-> Could you tell me what kind of command did you do to get your issues ? Then I will try to reproduce it on Monday on both revision
-> 
-> Thanks,
-> 
-> Gregory
+On 12/28/2013 02:10 AM, Dmitry Torokhov wrote:
+> Hi Hans,
+>
+> On Fri, Dec 27, 2013 at 03:59:56PM +0100, Hans de Goede wrote:
+>> +
+>> +	if (!ts->input)
+>> +		goto leave;
+>> +
+>>   	if (reg_val & FIFO_DATA_PENDING) {
+>>   		x = readl(ts->base + TP_DATA);
+>>   		y = readl(ts->base + TP_DATA);
+>> @@ -140,6 +151,7 @@ static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
+>>   		input_sync(ts->input);
+>>   	}
+>>
+>> +leave:
+>
+> Can we please not introduce gotos where they are not needed? If you
+> concerned about extra indent just split touchscreen handling into a
+> separate function and then do
+>
+> 	if (ts->input)
+> 		sun4i_ts_handle_touchscreen_data(...);
+>
 
-
-Sorry to not have answered earlier but when I investigated it I found
-an unexpected issue.
-
-First I wanted to be sure that there the issue was not introduce by a
-commit so reverted one by one the commits on the file
-drivers/i2c/busses/i2c-mv64xxx.c. I tested it on both version of the
-OpenBlock AX-4 (with CPU A0 and B0). After each commit the kernel
-continue to work on the B0 version as expected, but it was when I
-reverted the commit "i2c: mv64xxx: Add I2C Transaction Generator
-support" that it worked also on the A0 version.
-
-Then I had a look on the errata datasheet and I found issues that I
-missed when I worked on it. This issues were fixed in B0 version.
-
-The fix should be pretty simple: disabling the offload_enabled flag when
-an A0 version of the CPU is used. For this there are 2 solutions:
-introducing a new compatible string or trying to detect the CPU
-stepping at runtime. I would prefer the second solution and I am looking
-for a way to get this information.
-
-Thanks,
-
-Gregory
+Fixed.
 
 
-> 
-> Le 21 d?c. 2013 17:43, "Andrew Lunn" <andrew at lunn.ch <mailto:andrew@lunn.ch>> a ?crit :
-> 
->     Hi Nobuhiro
-> 
->     You added I2C into the Openblocks AX3-4 device tree and the subnode
->     for the RTC. Did you have any problems with I2C? I'm having lots of
->     problems with my AX3-4 and i2c. I get i2c errors and the bus being
->     locked and then the whole machine locks solid.
-> 
->     Gregory, did you test your I2C patches for 370/XP on an Openblocks
->     AX3-4?
-> 
->     Thanks
->             Andrew
-> 
->     _______________________________________________
->     linux-arm-kernel mailing list
->     linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org>
->     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
+>>   	writel(reg_val, ts->base + TP_INT_FIFOS);
+>>
+>>   	return IRQ_HANDLED;
+>> @@ -149,9 +161,9 @@ static int sun4i_ts_open(struct input_dev *dev)
+>>   {
+>>   	struct sun4i_ts_data *ts = input_get_drvdata(dev);
+>>
+>> -	/* Flush, set trig level to 1, enable data and up irqs */
+>> -	writel(DATA_IRQ_EN(1) | FIFO_TRIG(1) |FIFO_FLUSH(1) | TP_UP_IRQ_EN(1),
+>> -	       ts->base + TP_INT_FIFOC);
+>> +	/* Flush, set trig level to 1, enable temp, data and up irqs */
+>> +	writel(TEMP_IRQ_EN(1) | DATA_IRQ_EN(1) | FIFO_TRIG(1) | FIFO_FLUSH(1) |
+>> +		TP_UP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>>
+>>   	return 0;
+>>   }
+>> @@ -160,40 +172,76 @@ static void sun4i_ts_close(struct input_dev *dev)
+>>   {
+>>   	struct sun4i_ts_data *ts = input_get_drvdata(dev);
+>>
+>> -	/* Deactivate all IRQs */
+>> -	writel(0, ts->base + TP_INT_FIFOC);
+>> +	/* Deactivate all input IRQs */
+>> +	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>>   	synchronize_irq(ts->irq);
+>
+> Hmm, it would be nice we touchscreen methods only affected touchscreen
+> functionality. Can you read current state and adjust it as needed
+> instead of clobbering it?
+
+I could do a read-modify-write of TP_INT_FIFOC here, but I already
+considered that and I decided not to do it because ...
+
+> Then you could do away with remove() method altogether.
+
+No it will still be needed to clear the TEMP_IRQ_EN bit in
+TP_INT_FIFOC. And it will still need to either explicitly deregister
+the input_dev, or take the input_dev mutex to avoid the modification of
+TP_INT_FIFOC in _remove racing with the read-modify-write in _close.
+
+So I decided to keep this kiss, and simply force _close to run
+before _remove clears the TEMP_IRQ_EN bit by doing an explicit
+unregister before this.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+
+
+>
+>>   }
+>>
+>> +static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+>> +			 char *buf)
+>> +{
+>> +	struct sun4i_ts_data *ts = dev_get_drvdata(dev);
+>> +
+>> +	/* No temp_data until the first irq */
+>> +	if (ts->temp_data == -1)
+>> +		return -EAGAIN;
+>> +
+>> +	return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
+>> +}
+>> +
+>> +static ssize_t show_temp_label(struct device *dev,
+>> +			      struct device_attribute *devattr, char *buf)
+>> +{
+>> +	return sprintf(buf, "SoC temperature\n");
+>> +}
+>> +
+>> +static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
+>> +static DEVICE_ATTR(temp1_label, S_IRUGO, show_temp_label, NULL);
+>> +
+>> +static struct attribute *sun4i_ts_attrs[] = {
+>> +	&dev_attr_temp1_input.attr,
+>> +	&dev_attr_temp1_label.attr,
+>> +	NULL
+>> +};
+>> +ATTRIBUTE_GROUPS(sun4i_ts);
+>> +
+>>   static int sun4i_ts_probe(struct platform_device *pdev)
+>>   {
+>>   	struct sun4i_ts_data *ts;
+>>   	struct device *dev = &pdev->dev;
+>> +	struct device_node *np =dev->of_node;
+>> +	struct device *hwmon;
+>>   	int ret;
+>> +	bool ts_attached;
+>> +
+>> +	ts_attached = of_property_read_bool(np, "ts-attached");
+>>
+>>   	ts = devm_kzalloc(dev, sizeof(struct sun4i_ts_data), GFP_KERNEL);
+>>   	if (!ts)
+>>   		return -ENOMEM;
+>>
+>>   	ts->dev = dev;
+>> -
+>> -	ts->input = devm_input_allocate_device(dev);
+>> -	if (!ts->input)
+>> -		return -ENOMEM;
+>> -
+>> -	ts->input->name = pdev->name;
+>> -	ts->input->phys = "sun4i_ts/input0";
+>> -	ts->input->open = sun4i_ts_open;
+>> -	ts->input->close = sun4i_ts_close;
+>> -	ts->input->id.bustype = BUS_HOST;
+>> -	ts->input->id.vendor = 0x0001;
+>> -	ts->input->id.product = 0x0001;
+>> -	ts->input->id.version = 0x0100;
+>> -	ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
+>> -	set_bit(BTN_TOUCH, ts->input->keybit);
+>> -	input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
+>> -	input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
+>> -	input_set_drvdata(ts->input, ts);
+>> +	ts->temp_data = -1;
+>> +
+>> +	if (ts_attached) {
+>> +		ts->input = devm_input_allocate_device(dev);
+>> +		if (!ts->input)
+>> +			return -ENOMEM;
+>> +
+>> +		ts->input->name = pdev->name;
+>> +		ts->input->phys = "sun4i_ts/input0";
+>> +		ts->input->open = sun4i_ts_open;
+>> +		ts->input->close = sun4i_ts_close;
+>> +		ts->input->id.bustype = BUS_HOST;
+>> +		ts->input->id.vendor = 0x0001;
+>> +		ts->input->id.product = 0x0001;
+>> +		ts->input->id.version = 0x0100;
+>> +		ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
+>> +		set_bit(BTN_TOUCH, ts->input->keybit);
+>> +		input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
+>> +		input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
+>> +		input_set_drvdata(ts->input, ts);
+>> +	}
+>>
+>>   	ts->base = devm_ioremap_resource(dev,
+>>   			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
+>> @@ -232,14 +280,42 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>>   	writel(STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1) | TP_MODE_EN(1),
+>>   	       ts->base + TP_CTRL1);
+>>
+>> -	ret = input_register_device(ts->input);
+>> -	if (ret)
+>> -		return ret;
+>> +	hwmon = devm_hwmon_device_register_with_groups(ts->dev, "sun4i_ts",
+>> +						       ts, sun4i_ts_groups);
+>> +	if (IS_ERR(hwmon)) {
+>> +		return PTR_ERR(hwmon);
+>> +	}
+>> +
+>> +	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>> +
+>> +	if (ts_attached) {
+>> +		ret = input_register_device(ts->input);
+>> +		if (ret) {
+>> +			writel(0, ts->base + TP_INT_FIFOC);
+>> +			synchronize_irq(ts->irq);
+>
+> Given that we now can't avoid freeing irq before freeing ts memory or
+> input device I think you can do away with synchronize_irq() here and
+> elsewhere as freeing irq is guaranteed to wait for current interrupt to
+> complete.
+
+Ah yes, removed all calls to synchronize_irq.
+
+I'll run some tests to ensure I did not accidentally break anything and
+then I'll send a v3.
+
+
+>
+>> +			return ret;
+>> +		}
+>> +	}
+>>
+>>   	platform_set_drvdata(pdev, ts);
+>>   	return 0;
+>>   }
+>>
+>> +static int sun4i_ts_remove(struct platform_device *pdev)
+>> +{
+>> +	struct sun4i_ts_data *ts = platform_get_drvdata(pdev);
+>> +
+>> +	/* Explicit unregister to avoid open/close changing the imask later */
+>> +	if (ts->input)
+>> +		input_unregister_device(ts->input);
+>> +
+>> +	/* Deactivate all IRQs */
+>> +	writel(0, ts->base + TP_INT_FIFOC);
+>> +	synchronize_irq(ts->irq);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>   static const struct of_device_id sun4i_ts_of_match[] = {
+>>   	{ .compatible = "allwinner,sun4i-ts", },
+>>   	{ /* sentinel */ }
+>> @@ -253,6 +329,7 @@ static struct platform_driver sun4i_ts_driver = {
+>>   		.of_match_table = of_match_ptr(sun4i_ts_of_match),
+>>   	},
+>>   	.probe	= sun4i_ts_probe,
+>> +	.remove	= sun4i_ts_remove,
+>>   };
+>>
+>>   module_platform_driver(sun4i_ts_driver);
+>> --
+>> 1.8.4.2
+>>
+>
+> Thanks.
+>
+
+
+Regards,
+
+Hans
