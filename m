@@ -1,83 +1,29 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Tue, 31 Dec 2013 10:03:37 -0800
-Subject: [PATCH v5 0/2] watchdog: bcm281xx: Watchdog Driver
-In-Reply-To: <20131228204039.GA19982@spo001.leaseweb.com>
-References: <1385160964-18578-1-git-send-email-markus.mayer@linaro.org>
- <20131228204039.GA19982@spo001.leaseweb.com>
-Message-ID: <CAPdLdqkNtvPwETc+TK9xRSh-ru6q4VvUk7zfYEbjPb1TOESMaA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Dec 2013 18:14:27 +0000
+Subject: [ARM] Fix kernel compile error: drivers/crypto/ixp4xx_crypto.c.
+In-Reply-To: <20131231134820.GS8064@book.gsilab.sittig.org>
+References: <m3d2kduwd7.fsf@t19.piap.pl>
+ <20131231134820.GS8064@book.gsilab.sittig.org>
+Message-ID: <20131231181427.GE16456@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
+Please get rid of your Mail-Followup-To: header:
 
-Thanks for your comments. I addressed them and will be sending out the
-resulting patches shortly.
+Mail-Followup-To: Krzysztof Ha?asa <khalasa@piap.pl>,                           
+        lkml <linux-kernel@vger.kernel.org>,                                    
+        linux-arm-kernel at lists.infradead.org,                                   
+        Russell King <rmk+kernel@arm.linux.org.uk>,                             
+        Christian Hohnstaedt <chohnstaedt@innominate.com>,                      
+        Herbert Xu <herbert@gondor.apana.org.au>                                
+User-Agent: Mutt/1.5.21 (2010-09-15)                                            
 
-> Questions/remarks I still have:
-> 1) *debugfs is defined in the bcm_kona_wdt struct, but busy_count isn't.
->    Seems odd to me. What's the reason?
+It causes all recipients following the thread to be moved into the To:
+header when someone replies to one of your messages, which is deemed to
+be anti-social.  You can kill this header by adding:
 
-secure_register_read() only took a void __iomem * argument, but I
-changed that to struct bcm_kona_wdt * and offset. With that change,
-busy_count can be part of struct bcm_kona_wdt.
+	set followup_to=no
 
-> 2) I don't like the #ifdef pieces in the probe and remove functions.
->    The preferred method is to not have the #ifdefs there, but to have an
->    init and exit function that is defined in a similar way:
+to your .muttrc file.
 
-I took care of those. However I opted to pass a struct platform_device
-* to the new functions bcm_kona_wdt_debug_init() and
-bcm_kona_wdt_debug_exit(). The reason being that bcm_kona_wdt_remove()
-didn't have a struct bcm_kona_wdt * outside the #ifdef that I was
-about to remove. For consistency, I then used struct platform_device *
-for bcm_kona_wdt_debug_init(), as well.
-
->         #ifdef CONFIG_BCM_KONA_WDT_DEBUG
->         ...
->         static void bcm_kona_wdt_debug_init(struct bcm_kona_wdt *wdt)
->         {
->                 wdt->debugfs = bcm_kona_wdt_debugfs_init(wdt, &bcm_kona_wdt_wdd);
->         }
->         ...
->         #else /* !CONFIG_BCM_KONA_WDT_DEBUG */
->         static void bcm_kona_wdt_debug_init(struct bcm_kona_wdt *wdt) {}
->         ...
->         #endif /* CONFIG_BCM_KONA_WDT_DEBUG */
-
-Now I have a question (or rather a comment) of my own. I noticed that
-you "squashed" my two original patches into a single patch before
-breaking out the debugfs related code. The side-effect of this was
-that two lines of my bcm_defconfig change (CONFIG_WATCHDOG=y and
-CONFIG_BCM_KONA_WDT=y) were included in the patch you took into
-linux-watchdog-next.
-
-If I understand correctly (and this is why I had broken out the
-bcm_defconfig change into a separate patch), a defconfig change would
-normally go through the platform maintainer's tree, in this case
-Christian, whereas the actual driver would go upstream through your
-tree.
-
-I don't think it makes too much of a difference with regards to this
-driver where the defconfig change goes. In fact, taking it all through
-one tree might even be slightly easier and reduce the chance of
-conflicts, but I still think Christian needs to at least be aware of
-this change going through the watchdog tree. He owns bcm_defconfig,
-after all.
-
-A loosely related comment: gitweb for linux-watchdog-next seems to be
-broken: http://www.linux-watchdog.org/cgi-bin/gitweb.cgi?p=linux-watchdog-next.git;a=summary.
-I stumbled upon this yesterday when I was trying to look at the
-current status of this tree.
-
-In case readers of this e-mail are interested in taking a quick peek
-at the parts of the Kona watchdog driver that were already accepted,
-without cloning the entire repo, I created a temporary watchdog mirror
-with the commit in question available for in-browser viewing at
-http://git.linaro.org/people/markus.mayer/watchdog-next-mirror.git/commit/bd90ccd42c5d6317979c62919ba1c79fd34fa785
-
-Regards,
--Markus
-
--- 
-Markus Mayer
-Broadcom Landing Team
+Thanks.
