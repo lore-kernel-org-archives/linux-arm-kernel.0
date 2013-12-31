@@ -1,68 +1,54 @@
 From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 31 Dec 2013 18:48:29 +0100
-Subject: [PATCH 0/6] Device Tree support for the at91sam9261ek
-In-Reply-To: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
-References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <52C3036D.50503@overkiz.com>
+Date: Tue, 31 Dec 2013 18:25:40 +0100
+Subject: [PATCH] at91: ohci: fixed broken sanity check
+In-Reply-To: <1388507624-10636-1-git-send-email-jjhiblot@traphandler.com>
+References: <1388507624-10636-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52C2FE14.1020806@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jean-Jacques
+Hello Jean-Jacques,
 
-On 31/12/2013 17:32, jjhiblot at traphandler.com wrote:
-> From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+On 31/12/2013 17:33, jjhiblot at traphandler.com wrote:
+> From: jean-jacques hiblot <jean-jacques.hiblot@jdsu.com>
 >
-> Hi Nicolas,
->
-> This patch set aims at bringing a basic device tree support for the sam9261.
-> It's mostly based on the sam9263 stuff.
-> The only new thing here is the smc bus driver. It's a very simple bus driver
-> used to configure the EBI from the DT. I haven't documented its DT bindings yet
->
-> supported features:
-> * dbgu
-> * nand
-> * lcd
-> * ethernet
-> * leds
+> The test (pdev->resource[1].flags != IORESOURCE_IRQ) is broken because the flags
+> value may contain not only the information IORESSOURCE_IRQ but also the IRQ type
+> (IORESOURCE_IRQ_HIGHLEVEL for example).
 >
 
-Cool, one step forward to the removal of at91 board files ;).
+This is already fixed: we moved to platform_get_irq and
+platform_get_ressource instead of directly accessing platform
+resource table.
 
-I'll try to review this series before the end of the week.
+See http://lists.openwall.net/linux-kernel/2013/12/08/128.
+
+This solves both the problem you're reporting and another problem when
+resources are in a different order (nothing guarantees the resources
+order when using DT).
 
 Best Regards,
 
 Boris
 
-
-> Jean-Jacques
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>   drivers/usb/host/ohci-at91.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> jean-jacques hiblot (6):
->    Basic Device Tree support for the at91sam9261
->    at91: dt: sam9261: Added support for the lcd display
->    At91: dt: Added smc bus driver
->    at91: dt: sam9261: Pinmux DT entries for the SMC/EBI interface
->    at91: dt: sam9261: Add an entry in the DT for the SMC/EBI bus driver.
->    at91: dt: sam9261: Added DM9000 in the device tree
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 418444e..df9c8a4 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -142,8 +142,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   		return -ENODEV;
+>   	}
 >
-> jean-jacques hiblot (6):
->    Basic Device Tree support for the at91sam9261
->    at91: dt: sam9261: Added support for the lcd display
->    At91: dt: Added smc bus driver
->    at91: dt: sam9261: Pinmux DT entries for the SMC/EBI interface
->    at91: dt: sam9261: Add an entry in the DT for the SMC/EBI bus driver.
->    at91: dt: sam9261: Added DM9000 in the device tree
->
->   arch/arm/boot/dts/at91sam9261.dtsi       | 575 +++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/at91sam9261ek.dts      | 159 +++++++++
->   arch/arm/mach-at91/at91sam9261.c         |  16 +
->   arch/arm/mach-at91/at91sam9261_devices.c |  18 +
->   drivers/bus/Kconfig                      |   9 +
->   drivers/bus/Makefile                     |   1 +
->   drivers/bus/atmel-smc.c                  | 182 ++++++++++
->   7 files changed, 960 insertions(+)
->   create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
->   create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
->   create mode 100644 drivers/bus/atmel-smc.c
+> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+> +	if (!(pdev->resource[0].flags & IORESOURCE_MEM)
+> +			|| !(pdev->resource[1].flags & IORESOURCE_IRQ)) {
+>   		pr_debug("hcd probe: invalid resource type\n");
+>   		return -ENODEV;
+>   	}
 >
