@@ -1,84 +1,135 @@
 From: jjhiblot@traphandler.com (jjhiblot at traphandler.com)
-Date: Tue, 31 Dec 2013 17:32:12 +0100
-Subject: [PATCH 4/6] at91: dt: sam9261: Pinmux DT entries for the SMC/EBI
- interface
+Date: Tue, 31 Dec 2013 17:32:13 +0100
+Subject: [PATCH 5/6] at91: dt: sam9261: Add an entry in the DT for the SMC/EBI
+ bus driver.
 In-Reply-To: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
 References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1388507534-10570-5-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1388507534-10570-6-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: jean-jacques hiblot <jean-jacques.hiblot@jdsu.com>
 
+This patch creates a new entry in the device tree for the 9261 under which
+should be the devices attached to the EBI.
+It also moves the NAND DT entries under this new bus.
+
 Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 ---
- arch/arm/boot/dts/at91sam9261.dtsi | 54 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ arch/arm/boot/dts/at91sam9261.dtsi  | 32 +++++++++++++++++---------
+ arch/arm/boot/dts/at91sam9261ek.dts | 46 ++++++++++++++++++++++++++++---------
+ 2 files changed, 56 insertions(+), 22 deletions(-)
 
 diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index 7ee0fff..925f9ad 100644
+index 925f9ad..acd19b4 100644
 --- a/arch/arm/boot/dts/at91sam9261.dtsi
 +++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -317,6 +317,60 @@
- 							 >;
- 					};
+@@ -525,21 +525,31 @@
+ 			status = "disabled";
+ 		};
+ 
+-		nand0: nand at 40000000 {
+-			compatible = "atmel,at91rm9200-nand";
++		smc: smc at ffffec00 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			reg = <0x40000000 0x10000000>;
+-			atmel,nand-addr-offset = <22>;
+-			atmel,nand-cmd-offset = <21>;
++			compatible = "atmel,at91sam9261-smc";
++			reg = <0xffffec00 0x80>;
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_nand>;
+-
+-			gpios = <&pioC 15 GPIO_ACTIVE_HIGH
+-				&pioC 14 GPIO_ACTIVE_HIGH
+-				0
+-				>;
+ 			status = "disabled";
++			ranges = < >;
++			nand0: nand at 40000000 {
++				compatible = "atmel,at91rm9200-nand";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x40000000 0x10000000>;
++				atmel,nand-addr-offset = <22>;
++				atmel,nand-cmd-offset = <21>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_nand>, <&pinctrl_smc_nandoe>, <&pinctrl_smc_nandwe>;
++				smc,cs = <3>;
++
++				gpios = <&pioC 15 GPIO_ACTIVE_HIGH
++					&pioC 14 GPIO_ACTIVE_HIGH
++					0
++					>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		usb0: ohci at 00500000 {
+diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+index 03c05fc..11cf619 100644
+--- a/arch/arm/boot/dts/at91sam9261ek.dts
++++ b/arch/arm/boot/dts/at91sam9261ek.dts
+@@ -42,17 +42,6 @@
+ 			};
+ 		};
+ 
+-		nand0: nand at 40000000 {
+-			nand-bus-width = <8>;
+-			nand-ecc-mode = "soft";
+-			nand-on-flash-bbt = <1>;
+-			status = "okay";
+-			at91bootstrap at 0 {
+-				label = "at91bootstrap";
+-				reg = <0x0 0x20000>;
+-			};
+-		};
+-
+ 		fb0: fb at 0x00600000 {
+ 			display = <&display0>;
+ 			status = "okay";
+@@ -83,6 +72,41 @@
  				};
-+				smc {
-+					pinctrl_smc_nwait: smc_nwait-0 {
-+						atmel,pins = <AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_a23_a25: smc_a23_a25-0 {
-+						atmel,pins =
-+							<AT91_PIOA 30 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOA 31 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOC 3  AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_d16_d31: smc_d16_d31-0 {
-+						atmel,pins =
-+							<AT91_PIOC 16 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 17 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 18 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 19 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 20 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 21 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 22 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 23 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 24 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 25 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 26 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 27 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 28 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 29 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 30 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOC 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_ncs4: smc_ncs4-0 {
-+						atmel,pins = <AT91_PIOC 4 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_ncs5: smc_ncs5-0 {
-+						atmel,pins = <AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_nandoe: smc_nandoe-0 {
-+						atmel,pins = <AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_ncs6: smc_ncs6-0 {
-+						atmel,pins = <AT91_PIOC 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_nandwe: smc_nandwe-0 {
-+						atmel,pins = <AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_ncs7: smc_ncs7-0 {
-+						atmel,pins = <AT91_PIOC 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_cfce1: smc_cfce1-0 {
-+						atmel,pins = <AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_smc_cfce2: smc_cfce2-0 {
-+						atmel,pins = <AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
+ 			};
+ 		};
++
++		smc: smc at ffffec00 {
++			status = "okay";
++
++			nand0: nand at 40000000 {
++				nand-bus-width = <8>;
++				nand-ecc-mode = "soft";
++				nand-on-flash-bbt = <1>;
++				status = "okay";
++
++				smc,ncs_read_setup = <0>;
++				smc,nrd_setup = <1>;
++				smc,ncs_write_setup = <0>;
++				smc,nwe_setup = <1>;
++				smc,ncs_read_pulse = <3>;
++				smc,nrd_pulse = <3>;
++				smc,ncs_write_pulse = <3>;
++				smc,nwe_pulse = <3>;
++				smc,read_cycle = <5>;
++				smc,write_cycle = <5>;
++				smc,tdf_cycles = <2>;
++				smc,tdf_optimized = <0>;
++				smc,page_size = <0>;
++				smc,byte_access_type = <0>;
++				smc,bus_width = <0>;
++				smc,nwait_mode = <0>;
++				smc,read_mode = <1>;
++				smc,write_mode = <1>;
++
++				at91bootstrap at 0 {
++					label = "at91bootstrap";
++					reg = <0x0 0x20000>;
 +				};
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
++			};
++		};
+ 	};
+ 
+ 	leds {
 -- 
 1.8.4.2
