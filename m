@@ -1,44 +1,51 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 31 Dec 2013 08:46:14 +0530
-Subject: [PATCH 3/3] clk: exynos5250: register APLL rate table
-In-Reply-To: <CAK9yfHwTgKW55-ChHNToLGZZ-frd4OJF5Zi5Djt5NzxhOZvcrg@mail.gmail.com>
-References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
- <1383905648-23733-3-git-send-email-sachin.kamat@linaro.org>
- <1713728.JoffI8rva3@flatron>
- <CAK9yfHwTgKW55-ChHNToLGZZ-frd4OJF5Zi5Djt5NzxhOZvcrg@mail.gmail.com>
-Message-ID: <CAK9yfHxRmiUmWjxZx2Uoy37uuYjw03Z2Y=SxaB17Uc-3j1CH_A@mail.gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 31 Dec 2013 12:43:57 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <201312302127.41690.arnd@arndb.de>
+References: <1388241295-20051-1-git-send-email-zhangfei.gao@linaro.org>
+ <CAMj5Bkif9pQHVdA71QccamVQkfgTheUNzowW6AyTwC3dy5XF+g@mail.gmail.com>
+ <52C1AB34.3010402@linaro.org> <201312302127.41690.arnd@arndb.de>
+Message-ID: <52C24B8D.1030205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2013 09:14, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Hi Tomasz,
+Dear Arnd,
+
+On 12/31/2013 04:27 AM, Arnd Bergmann wrote:
+> On Monday 30 December 2013, zhangfei wrote:
+>>>>>> +static int dw_mci_k3_suspend(struct device *dev)
+>>>>>> +{
+>>>>>> +    struct dw_mci *host = dev_get_drvdata(dev);
+>>>>>> +    int ret = 0;
+>>>>>> +
+>>>>>> +    ret = dw_mci_suspend(host);
+>>>>>
+>>>>> You should never initialize local variables when they are set later in the
+>>>>> function (the ret = 0 part above). For more complex functions, this prevents
+>>>>> gcc from warning you about accidentally uninitialized uses.
+>>
+>> I am sorry I may fall into the dead end, but still quite not understand
+>> this rule.
+>> I alwayes thought it would be a good habit to init local variables before.
+>> Do you mean it should NOT init local variable as much as possible and
+>> only init on demand, like solving the gcc warning.
+>> Why not init the them at start in case random value cause unpredicted error?
 >
-> On 10 November 2013 22:44, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Sachin, Andrew,
->>
->> On Friday 08 of November 2013 15:44:08 Sachin Kamat wrote:
->>> From: Andrew Bresticker <abrestic@chromium.org>
->>>
->>> Register the APLL rate table so that we can set the APLL rate from
->>> the cpufreq driver.
->>>
->>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->>> ---
->>>  drivers/clk/samsung/clk-exynos5250.c |   25 ++++++++++++++++++++++++-
->>>  1 file changed, 24 insertions(+), 1 deletion(-)
->>
->> You know that you still need to fix the cpufreq driver to use these,
->> don't you? Anyway:
->>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> The gcc warnings are 100% correct, we can use them as a tool to write better
+> code. If you write code that has no warnings with a modern compiler, you will
+> never use random values, but if you always initialize the local variables,
+> you can end up accidentally using '0' where you shouldn't have.
 >
-> This one too needs to be applied to your tree.
+> See http://rusty.ozlabs.org/?p=232 for an excellent article on the topic
+> by former Linaro assignee Rusty Russell.
+>
 
-Ping Tomasz.
+Excellent, this is what I am looking for.
+Thanks for the patience.
+I may need some time and gradually change the habit to diminish the hurt 
+memory caused by uninitialized vector.
+Will update and take care latter.
 
+By the way, are you fine with the other comments' explanation.
 
-
--- 
-With warm regards,
-Sachin
+Thanks
