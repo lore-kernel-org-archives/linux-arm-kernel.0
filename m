@@ -1,57 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Dec 2013 21:15:58 -0800
-Subject: [PATCH v2 6/7] drm/msm: Drop unnecessary mach include
-In-Reply-To: <CAF6AEGt7o65zpPPJa1chvYdp+K-dkSH9Buq=rDxyrUyS0zh3eA@mail.gmail.com>
-References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
- <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
- <CAF6AEGtortD9FQP-vDj7apsmdkXcoOiahJf++zPcSh=OYg7WfA@mail.gmail.com>
- <CAF6AEGt7o65zpPPJa1chvYdp+K-dkSH9Buq=rDxyrUyS0zh3eA@mail.gmail.com>
-Message-ID: <20131231051558.GB14405@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Dec 2013 13:24:38 +0800
+Subject: [PATCH V2 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe
+ lock in atomic context
+In-Reply-To: <1388042634-17281-1-git-send-email-b29396@freescale.com>
+References: <1388042634-17281-1-git-send-email-b29396@freescale.com>
+Message-ID: <20131231052436.GA22122@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/30, Rob Clark wrote:
-> On Mon, Dec 30, 2013 at 8:12 PM, Rob Clark <robdclark@gmail.com> wrote:
-> > On Mon, Dec 30, 2013 at 4:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> This file doesn't use the clk_reset() API that is exposed in
-> >> mach-msm's mach/clk.h file. Remove the include so that this
-> >> driver can be compiled as part of the multi-platform kernel.
-> >
-> > Thanks!
-> >
-> > Signed-off-by: Rob Clark <robdclark@gmail.com>
-
-I think you mean Acked-by? Signed-off-by usually means you're
-sending the patch along.
-
+On Thu, Dec 26, 2013 at 03:23:53PM +0800, Dong Aisheng wrote:
+> Sometimes we may meet the following lockdep issue.
+> The root cause is .set_clock callback is executed with spin_lock_irqsave
+> in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
+> clk_get_rate which is using a mutex lock.
 > 
-> oh, fwiw, things are a bit re-arranged on msm-next-staging (to add
-> 8074 and 8060a support).. currently I have:
-> 
-> ------------------
-> #if defined(CONFIG_ARCH_MSM)
-> #  include <mach/clk.h>
-> #elif defined(CONFIG_COMPILE_TEST)
-> /* stubs we need for compile-test: */
-> static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
-> {
->         return NULL;
-> }
-> #endif
-> ------------------
-> 
-> Not really sure what to do about msm_iommu_get_ctx(), or whether I
-> still need that?
-> 
+> The fix avoids access mutex in .set_clock callback by initializing the
+> pltfm_host->clock at probe time and use it later instead of calling
+> clk_get_rate again in atomic context.
 
-I think the drm Kconfig should be selecting the MSM iommu Kconfig
-symbol. At least for now, it's a direct compile time dependency
-of this driver. I still don't see a use of mach/clk.h though, so
-we should be able to drop it completely.
+<snip>
 
-Is your msm-next-staging tree going into v3.14? I don't see
-anything in linux-next so far.
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+For both,
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> Fixes: 0ddf03c mmc: esdhc-imx: parse max-frequency from devicetree
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
