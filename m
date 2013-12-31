@@ -1,30 +1,43 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 31 Dec 2013 10:01:18 -0800
-Subject: [ARM] Fix kernel compile error: drivers/crypto/ixp4xx_crypto.c.
-In-Reply-To: <20131231134820.GS8064@book.gsilab.sittig.org>
-References: <m3d2kduwd7.fsf@t19.piap.pl>
- <20131231134820.GS8064@book.gsilab.sittig.org>
-Message-ID: <52C3066E.1070909@infradead.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 31 Dec 2013 10:02:28 -0800
+Subject: [GIT PULL 2nd 3/5] Samsung defconfig update for v3.14
+In-Reply-To: <20131231161743.GH31886@sirena.org.uk>
+References: <52B5DCAB.204@samsung.com> <20131228231531.GB22753@quad.lixom.net>
+ <CAOesGMj38JPgFic+ByShH3nHXWe0j=rzcdQzEiTGJ18OKfR6zw@mail.gmail.com>
+ <CAOesGMh-ptLF_fvJ2X_7_WZVnB3oUkO2QUPxPENb4e+aDUb6iQ@mail.gmail.com>
+ <20131231161743.GH31886@sirena.org.uk>
+Message-ID: <CAOesGMhEVQi7kw9WW+nV3MB=7rz0TK==wccAKFePrm-Ub=H=Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/13 05:48, Gerhard Sittig wrote:
-> On Tue, Dec 31, 2013 at 11:51 +0100, Krzysztof Ha?asa wrote:
->>
->> drivers/crypto/ixp4xx_crypto.c: In function 'ixp_module_init':
->> drivers/crypto/ixp4xx_crypto.c:1419:2: error: 'dev' undeclared (first use in this function)
->>
->> Now builds. Not tested on real hw.
->>
->> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-> 
-> I understood that a 'Fixes: <hash> <subject>' line is suggested when
-> you can clearly identify what broke what you fix.  Is it 27c1789ca6a6
-> "DMA-API: crypto: remove last references to 'static struct device *dev'"?
-> Then v3.13-rc1 would have been affected.
- 
-is 'Fixes: <whatever>' documented somewhere?
+On Tue, Dec 31, 2013 at 8:17 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Sat, Dec 28, 2013 at 07:48:26PM -0800, Olof Johansson wrote:
+>> On Sat, Dec 28, 2013 at 7:44 PM, Olof Johansson <olof@lixom.net> wrote:
+>
+>> > The regulator driver causes build breaks. Really, nobody checks these
+>> > things before sending patches or merge requests?
+>
+>> > Having exynos_defconfig broken in arm-soc isn't an alternative. So I
+>> > dropped this branch again. If the regulator driver gets fixed in -rc
+>> > then we can probably merge it before the merge window, otherwise we'll
+>> > have to merge the defconfig change after the regulator fix goes in for
+>> > the 3.14 merge window.
+>
+>> Ah, I guess the fix went in after -rc4, which is the latest -rc that
+>> we have in for-next today. I'll bring for-next forward and merge this
+>> in.
+>
+>> Still, it's odd that you were able to test your branch before sending it in.
+>
+> The build breakage was only introduced in -rc4 - a MFD/RTC change went
+> in via Andrew's tree so it got no exposure in -next before it showed up
+> in Linus' tree which wasn't good.  The fix was in by -rc5, looking at
+> the date on the pull request I expect that any testing against -next (as
+> opposed to arm-soc) would've been OK and since the branch is based on
+> -rc1 it'd have tested out by itself as well.
 
-thanks,
--- 
-~Randy
+
+Ah, yeah, that explains it. Thanks for the clarification.
+
+
+-Olof
