@@ -1,32 +1,77 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 31 Dec 2013 11:13:42 -0800
-Subject: [PATCH RESEND 1/4] clk: clk-s2mps11: Refactor for including
- support for other MFD clocks
-In-Reply-To: <20131231160916.GG31886@sirena.org.uk>
-References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
- <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
- <1388053141-30085-2-git-send-email-tushar.behera@linaro.org>
- <20131229221723.12054.40917@quantum>
- <CAHbNUh0tJHXv52bA9hBDZMH0Pi+x9uC=LojcvgS=ONnCgEmVTA@mail.gmail.com>
- <20131231160916.GG31886@sirena.org.uk>
-Message-ID: <20131231191342.12054.42268@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 Dec 2013 20:19:51 +0100
+Subject: [PATCH 6/6] at91: dt: sam9261: Added DM9000 in the device tree
+In-Reply-To: <1388507534-10570-7-git-send-email-jjhiblot@traphandler.com>
+References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
+ <1388507534-10570-7-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <4526077.qASk8HSHKP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mark Brown (2013-12-31 08:09:16)
-> On Mon, Dec 30, 2013 at 09:33:50AM +0530, Tushar Behera wrote:
+On Tuesday 31 December 2013 17:32:14 jjhiblot at traphandler.com wrote:
 > 
-> > Commit 1b1ccee1e821 "mfd: s2mps11: Fix build after regmap field rename
-> > in sec-core.c" is also touching this file, which is in Mark's tree
-> > right now. If I rebase
-> 
-> It's been in Linus' tree for a while now.
+> +                       ethernet at 30000000 {
+> +                               compatible = "davicom,dm9000";
+> +                               reg = <0x30000000 0x2 0x30000004 0x2>;
+> +                               interrupt-parent = <&pioC>;
+> +                               interrupts = <11 IRQ_TYPE_EDGE_BOTH>;
+> +                               local-mac-address = [00 00 de ad be ef];
+> +                               davicom,no-eeprom;
+> +
+> +                               smc,cs = <2>;
+> +                               smc,ncs_read_setup = <0>;
+> +                               smc,nrd_setup = <2>;
+> +                               smc,ncs_write_setup = <0>;
+> +                               smc,nwe_setup = <2>;
+> +                               smc,ncs_read_pulse = <8>;
+> +                               smc,nrd_pulse = <4>;
+> +                               smc,ncs_write_pulse = <8>;
+> +                               smc,nwe_pulse = <4>;
+> +                               smc,read_cycle = <16>;
+> +                               smc,write_cycle = <16>;
+> +                               smc,tdf_cycles = <1>;
+> +                               smc,tdf_optimized = <0>;
+> +                               smc,page_size = <0>;
+> +                               smc,byte_access_type = <1>;
+> +                               smc,bus_width = <1>;
+> +                               smc,nwait_mode = <0>;
+> +                               smc,read_mode = <1>;
+> +                               smc,write_mode = <1>;
+> +                       };
 
-OK, so I merged the two patches into clk-next, then merged clk-next into
-next-20131224 and the merge is super trivial to resolve. So I propose
-that we just let it get resolved in linux-next the usual way.
+I don't like how this forces you to mix the properties
+of the ethernet device with the properties of the smc
+port. I would also like to see the address translation
+reflected in the DT nodes. This should probably just work
+out if you restructure the DT representation, and won't need
+changes in the driver.
 
-Any objections? If not I'll take these two patches into clk-next.
+How about this:
 
-Regards,
-Mike
+	smc: smc at ffffec00 {
+		#address-cells = <2>; /* cs, address */
+		#size-cells = <1>;
+		ranges = <2 0 0x30000000 0x10000000>
+			 <3 0 0x40000000 0x10000000>;
+
+		extbus at 2.0 {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 2 0 0x10000000>;
+			smc,ncs_read_setup = <0>;
+			smc,nrd_setup = <2>;
+			smc,...
+
+			ethernet at 0 {
+				compatible = "davicom,dm9000";
+				reg = <0x0 0x2> <0x4 0x2>;
+			};
+		};
+	};
+
+If each bus interface has a fixed range of registers, you can actually
+collapse the upper two nodes again and just have one device per
+chipselect.
+
+	Arnd
