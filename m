@@ -1,73 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Dec 2013 22:10:09 +0000 (UTC)
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
-References: <20131123004334.GJ10023@atomide.com> <20131123005509.GJ16735@
- n2100.arm.linux.org.uk> <20131123010850.GN10023@atomide.com> <
- 20131123011515.GO10023@atomide.com> <20131123015034.GP10023@atomide.com>
- <20131124212757.7D224C402A3@trevor.secretlab.ca>
- <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1312302209200.8869@utopia.booyaka.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 30 Dec 2013 20:12:33 -0500
+Subject: [PATCH v2 6/7] drm/msm: Drop unnecessary mach include
+In-Reply-To: <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+ <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAF6AEGtortD9FQP-vDj7apsmdkXcoOiahJf++zPcSh=OYg7WfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Rob,
+On Mon, Dec 30, 2013 at 4:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> This file doesn't use the clk_reset() API that is exposed in
+> mach-msm's mach/clk.h file. Remove the include so that this
+> driver can be compiled as part of the multi-platform kernel.
 
-On Tue, 10 Dec 2013, Paul Walmsley wrote:
+Thanks!
 
-> On Sun, 24 Nov 2013, Grant Likely wrote:
-> 
-> > On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
-> > > > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
-> > > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
-> > > > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
-> > > > > > > +		/* See of_device_resource_notify for populating interrupts */
-> > > > > > > +		for (i = 0; i < num_irq; i++, res++) {
-> > > > > > > +			res->flags = IORESOURCE_IRQ;
-> > > > > > > +			res->start = -EPROBE_DEFER;
-> > > > > > > +			res->end = -EPROBE_DEFER;
-> > > > > > 
-> > > > > > NAK.  Definitely a bad idea to start introducing magic values other into
-> > > > > > resources.  Please don't do this.
-> > > > > 
-> > > > > Do you have any better ideas on how to sort out this issue then?
-> > > > 
-> > > > I guess we could allocate all the resources lazily here, I'll take a look
-> > > > at that.
-> > > 
-> > > Here's a version that allocates the resources lazily with the notifier.
-> > > Seems to boot, need to play with it a bit more though to make sure we're
-> > > not overwriting resources for any legacy devices.
-> > 
-> > Blurg. Using a notifier really feels like we don't have a good handle on
-> > a reasonable solution yet. Basically it means we're hooking into the
-> > driver core without /looking/ like we're hooking into the driver core. I
-> > don't think this is any better, but I don't have a better suggestion at
-> > the moment.   :-(
-> 
-> Unfortunately this patch, or something that accomplishes the same results, 
-> is somewhat high-priority for us on OMAP.  OMAP37xx got prematurely 
-> converted to DT booting, and now dynamic power management is broken:
-> 
->     http://marc.info/?l=linux-arm-kernel&m=138658294830408&w=2
-> 
-> Tony writes that this patch is one of the two patches needed to get things 
-> working again:
-> 
->     http://marc.info/?l=linux-arm-kernel&m=138660942506846&w=2
-> 
-> Is it possible to get this patch, or something similar, merged for 
-> v3.13-rc?
-> 
-> Once something like PM is broken, it's pretty easy for other broken 
-> patches to make it into the tree, since it becomes very difficult to test 
-> without turning into a maintainer denial-of-service attack.
-
-Ping.  Could you please provide some guidance here about what you'd need 
-to get this solved for v3.13-rc?
+Signed-off-by: Rob Clark <robdclark@gmail.com>
 
 
-
-- Paul
+> Cc: Rob Clark <robdclark@gmail.com>
+> Cc: Dave Airlie <airlied@redhat.com>
+> ---
+>  drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c | 2 --
+>  1 file changed, 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c b/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
+> index 5e0dcae..3799ccc 100644
+> --- a/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
+> +++ b/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
+> @@ -15,8 +15,6 @@
+>   * this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>
+> -#include <mach/clk.h>
+> -
+>  #include "mdp4_kms.h"
+>
+>  #include "drm_crtc.h"
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+>
