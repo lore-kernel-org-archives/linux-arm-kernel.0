@@ -1,63 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 31 Dec 2013 10:12:50 +0800
-Subject: [PATCH v2 2/4] ARM: dts: sun7i: external clock outputs
-In-Reply-To: <20131230152552.GU3144@lukather>
-References: <1388373949-28506-1-git-send-email-wens@csie.org>
- <1388373949-28506-3-git-send-email-wens@csie.org>
- <20131230152552.GU3144@lukather>
-Message-ID: <CAGb2v64iDxjXX_vzvS9GyiFP64vzxnDJZHQwtFDgtx7hYqkgUg@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 31 Dec 2013 08:24:02 +0530
+Subject: [PATCH Resend 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag
+ to mout_apll
+In-Reply-To: <3616477.6ZBKa1KffA@amdc1227>
+References: <1387442019-2445-1-git-send-email-sachin.kamat@linaro.org>
+ <20131219193708.18119.53403@quantum> <3616477.6ZBKa1KffA@amdc1227>
+Message-ID: <CAK9yfHxu0f-ZSkM76HWYOpRRXvzYR2Gu2zc3-sgzMPp+_1JvWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 30, 2013 at 11:25 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Mon, Dec 30, 2013 at 11:25:47AM +0800, Chen-Yu Tsai wrote:
->> This commit adds the two external clock outputs available on A20 to
->> its device tree. A dummy fixed factor clock is also added to serve as
->> the first input of the clock outputs, which according to AW's A20 user
->> manual, is the 24MHz oscillator divided by 750.
+On 30 December 2013 23:21, Tomasz Figa <t.figa@samsung.com> wrote:
+> On Thursday 19 of December 2013 11:37:08 Mike Turquette wrote:
+>> Quoting Sachin Kamat (2013-12-19 00:33:39)
+>> > Add CLK_SET_RATE_PARENT flag to mout_apll clock. This will let us set the
+>> > clock rate in the cpufreq driver.
+>> >
+>> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
->>  1 file changed, 27 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
->> index 4c25f81..f255a49 100644
->> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->> @@ -302,6 +302,33 @@
->>                       clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
->>                       clock-output-names = "mbus";
->>               };
->> +
->> +             /*
->> +              * Dummy clock used by output clocks
->> +              */
->> +             osc24M_32k: osc24M_32k {
+>> Ack.
 >
-> the node name should be clk to reflect the function of the device, and
-> not what instance of it it might be.
->
-> You should probably use something like clk at 0, to avoid collisions with
-> other dummy clocks.
+> Applied onto next branch.
 
-No problem. I will fix this and the pin mux set names.
+Thanks Tomasz. But did not find this branch in your tree [1].
+Also, please consider adding your tree to linux-next.
 
-> Note that we have pretty much the same problem already for the losc
-> and osc24M, it would be great if you could do a patch for these too :)
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git
 
-I will add a patch before this one, so the numbering won't be confusing,
-i.e. @1 appears before @0.
-
-Mind if I add a patch enabling i2c0 on CubieTruck?
-I noticed it was missing when I helped Carlo with AXP209 stuff.
-
-
-Cheers
-
-ChenYu
+---
+With warm regards,
+Sachin
