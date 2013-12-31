@@ -1,32 +1,59 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 31 Dec 2013 01:27:32 +0000
-Subject: [PATCH] regulator: act8865: register all regulators regardless
- of how many are used
-In-Reply-To: <20131230120327.GN31886@sirena.org.uk>
-References: <1388023041-25785-1-git-send-email-wenyou.yang@atmel.com>
- <20131230120327.GN31886@sirena.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A24364172F308AA@penmbx01>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 31 Dec 2013 09:27:52 +0800
+Subject: [PATCH v2] regulator: act8865: register all regulators regardless of
+ how many are used
+Message-ID: <1388453272-5287-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Monday, December 30, 2013 8:03 PM
-> To: Yang, Wenyou
-> Cc: lgirdwood at gmail.com; plagnioj at jcrosoft.com; Ferre, Nicolas; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] regulator: act8865: register all regulators regardless
-> of how many are used
-> 
-> On Thu, Dec 26, 2013 at 09:57:21AM +0800, Wenyou Yang wrote:
-> > As Mark pointed out, the driver should register all regulators
-> > regardless of how many are used in the system in order to aid diagnostics.
-> 
-> Thanks for doing this but it doesn't apply against the current code due to
-> the fixups from Axel.  Can you please check and resend?
-Thanks, I will send a new version.
+v2 changlog:
+ 1./ Rebased on the latest code of for-next branch.
 
-Happy New Year!
+As Mark pointed out, the driver should register all regulators
+regardless of how many are used in the system in order to aid diagnostics.
 
-Best Regards,
-Wenyou Yang
+But in the previous patch, only register the regulators that are used.
+
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+ drivers/regulator/act8865-regulator.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+index f816ad8..5e3e1d2 100644
+--- a/drivers/regulator/act8865-regulator.c
++++ b/drivers/regulator/act8865-regulator.c
+@@ -225,8 +225,8 @@ static int act8865_pdata_from_dt(struct device *dev,
+ 		return matched;
+ 
+ 	pdata->regulators = devm_kzalloc(dev,
+-				sizeof(struct act8865_regulator_data) * matched,
+-				GFP_KERNEL);
++				sizeof(struct act8865_regulator_data) *
++				ARRAY_SIZE(act8865_matches), GFP_KERNEL);
+ 	if (!pdata->regulators) {
+ 		dev_err(dev, "%s: failed to allocate act8865 registor\n",
+ 						__func__);
+@@ -236,10 +236,7 @@ static int act8865_pdata_from_dt(struct device *dev,
+ 	pdata->num_regulators = matched;
+ 	regulator = pdata->regulators;
+ 
+-	for (i = 0; i < matched; i++) {
+-		if (!act8865_matches[i].init_data)
+-			continue;
+-
++	for (i = 0; i < ARRAY_SIZE(act8865_matches); i++) {
+ 		regulator->id = i;
+ 		regulator->name = act8865_matches[i].name;
+ 		regulator->platform_data = act8865_matches[i].init_data;
+@@ -306,7 +303,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+ 	}
+ 
+ 	/* Finally register devices */
+-	for (i = 0; i < pdata->num_regulators; i++) {
++	for (i = 0; i < ARRAY_SIZE(act8865_matches); i++) {
+ 
+ 		id = pdata->regulators[i].id;
+ 
+-- 
+1.7.9.5
