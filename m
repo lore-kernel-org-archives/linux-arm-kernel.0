@@ -1,46 +1,32 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 31 Dec 2013 22:30:39 +0100
-Subject: [GIT PULL] ARM : cpuidle: 3.13 fix
-In-Reply-To: <52C15268.4050403@linaro.org>
-References: <52C15268.4050403@linaro.org>
-Message-ID: <4735745.5h2OjxOOl8@vostro.rjw.lan>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 31 Dec 2013 22:23:26 +0100
+Subject: [RESEND PATCH v7 1/5] omap3isp: Modify clocks registration to
+ avoid circular references
+In-Reply-To: <20131231193707.12054.68169@quantum>
+References: <1386177127-2894-1-git-send-email-s.nawrocki@samsung.com>
+ <1386177127-2894-2-git-send-email-s.nawrocki@samsung.com>
+ <52AF7B4D.2010305@gmail.com> <20131219080729.18119.42456@quantum>
+ <20131231193707.12054.68169@quantum>
+Message-ID: <52C335CE.8000603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 30, 2013 12:00:56 PM Daniel Lezcano wrote:
-> Hi Rafael,
-> 
-> this pull request provides a single fix for the calxeda cpuidle driver. 
-> It is based on v3.13-rc6.
-> 
-> * Andre Przywara fixed a compilation warning due to the driver probe 
-> function prototype mismatch for the calxeda cpuidle driver
-> 
-> Thanks
->    -- Daniel
-> 
-> The following changes since commit 802eee95bde72fd0cd0f3a5b2098375a487d1eda:
-> 
->    Linux 3.13-rc6 (2013-12-29 16:01:33 -0800)
-> 
-> are available in the git repository at:
-> 
->    git://git.linaro.org/people/daniel.lezcano/linux.git cpuidle/3.13-fixes
-> 
-> for you to fetch changes up to 5781532ebecd9e0b7b5fc25d78030bdec635f4ac:
-> 
->    ARM/cpuidle: remove __init tag from Calxeda cpuidle probe function 
-> (2013-12-30 11:55:20 +0100)
-> 
-> ----------------------------------------------------------------
-> Andre Przywara (1):
->        ARM/cpuidle: remove __init tag from Calxeda cpuidle probe function
-> 
->   drivers/cpuidle/cpuidle-calxeda.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+On 12/31/2013 08:37 PM, Mike Turquette wrote:
+> Quoting Mike Turquette (2013-12-19 00:07:29)
+>> Quoting Sylwester Nawrocki (2013-12-16 14:14:37)
+>>> Hi Mike,
+>>>
+>>> Laurent has already taken this patch into his tree, could you apply
+>>> the remaining ones to your clk tree so this series has enough exposure
+>>> in -next ?
+>>
+>> I've taken this in privately to do a little testing. If all goes well
+>> then I'll push it out to clk-next very soon.
+>
+> This is in clk-next now. Hopefully nothing bad will happen when it hits
+> linux-next ;-)
 
-Pulled and pushed out (into the fixes branch).
+Thanks Mike. Yes, fingers crossed ;)
 
-Thanks and Happy New Year!
-
-Rafael
+Regards,
+Sylwester
