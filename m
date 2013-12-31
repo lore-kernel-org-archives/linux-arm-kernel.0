@@ -1,68 +1,32 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 30 Dec 2013 20:19:11 -0500
-Subject: [PATCH v2 6/7] drm/msm: Drop unnecessary mach include
-In-Reply-To: <CAF6AEGtortD9FQP-vDj7apsmdkXcoOiahJf++zPcSh=OYg7WfA@mail.gmail.com>
-References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
- <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
- <CAF6AEGtortD9FQP-vDj7apsmdkXcoOiahJf++zPcSh=OYg7WfA@mail.gmail.com>
-Message-ID: <CAF6AEGt7o65zpPPJa1chvYdp+K-dkSH9Buq=rDxyrUyS0zh3eA@mail.gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 31 Dec 2013 01:27:32 +0000
+Subject: [PATCH] regulator: act8865: register all regulators regardless
+ of how many are used
+In-Reply-To: <20131230120327.GN31886@sirena.org.uk>
+References: <1388023041-25785-1-git-send-email-wenyou.yang@atmel.com>
+ <20131230120327.GN31886@sirena.org.uk>
+Message-ID: <B256D81BAE5131468A838E5D7A24364172F308AA@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 8:12 PM, Rob Clark <robdclark@gmail.com> wrote:
-> On Mon, Dec 30, 2013 at 4:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> This file doesn't use the clk_reset() API that is exposed in
->> mach-msm's mach/clk.h file. Remove the include so that this
->> driver can be compiled as part of the multi-platform kernel.
->
-> Thanks!
->
-> Signed-off-by: Rob Clark <robdclark@gmail.com>
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: Monday, December 30, 2013 8:03 PM
+> To: Yang, Wenyou
+> Cc: lgirdwood at gmail.com; plagnioj at jcrosoft.com; Ferre, Nicolas; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] regulator: act8865: register all regulators regardless
+> of how many are used
+> 
+> On Thu, Dec 26, 2013 at 09:57:21AM +0800, Wenyou Yang wrote:
+> > As Mark pointed out, the driver should register all regulators
+> > regardless of how many are used in the system in order to aid diagnostics.
+> 
+> Thanks for doing this but it doesn't apply against the current code due to
+> the fixups from Axel.  Can you please check and resend?
+Thanks, I will send a new version.
 
-oh, fwiw, things are a bit re-arranged on msm-next-staging (to add
-8074 and 8060a support).. currently I have:
+Happy New Year!
 
-------------------
-#if defined(CONFIG_ARCH_MSM)
-#  include <mach/clk.h>
-#elif defined(CONFIG_COMPILE_TEST)
-/* stubs we need for compile-test: */
-static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
-{
-        return NULL;
-}
-#endif
-------------------
-
-Not really sure what to do about msm_iommu_get_ctx(), or whether I
-still need that?
-
-BR,
--R
-
-
->
->
->> Cc: Rob Clark <robdclark@gmail.com>
->> Cc: Dave Airlie <airlied@redhat.com>
->> ---
->>  drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c | 2 --
->>  1 file changed, 2 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c b/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
->> index 5e0dcae..3799ccc 100644
->> --- a/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
->> +++ b/drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c
->> @@ -15,8 +15,6 @@
->>   * this program.  If not, see <http://www.gnu.org/licenses/>.
->>   */
->>
->> -#include <mach/clk.h>
->> -
->>  #include "mdp4_kms.h"
->>
->>  #include "drm_crtc.h"
->> --
->> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->> hosted by The Linux Foundation
->>
+Best Regards,
+Wenyou Yang
