@@ -1,41 +1,439 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Dec 2013 17:44:50 +0100
-Subject: [RFC PATCH 0/3] Fix i2c bus hang on A0 version of the Armada XP SoCs
-Message-ID: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 31 Dec 2013 17:44:51 +0100
+Subject: [RFC PATCH 1/3] arm: mvebu: add new dts file for old variant of
+ Openblocks AX3-4
+In-Reply-To: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1388508293-9141-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The first variants of Openblocks AX3-4 used the revision A0 of the
+Armada XP SoCs. These early variants have issues related to the i2c
+controller which prevent to use the offload mechanism and lead to a
+kernel hang during boot.
 
-This series is an RFC to fix the i2c bus hang on A0 version of the
-Armada XP SoCs. It occured on the the eraly release of the OpenBlocks
-AX3-4 bords. Indeed the first variants of Armada XP SoCs (A0 stepping)
-have issues related to the i2c controller which prevent to use the
-offload mechanism and lead to a kernel hang during boot.
+The new dts file uses the compatible string marvell,mv78230-a0-i2c for
+the i2c controller, thanks to this the driver disable the offload
+mechanism and the kernel no more hangs on these boards.
 
-The best solution will be to detect the SoCs version at runtime and
-use it in the driver, but I chosed to submit this version in case CPU
-version detection feature takes more time than expected (and we
-already reached the rc6 kernel).
-
-Thanks,
-
-Gregory
-
-
-Gregory CLEMENT (3):
-  arm: mvebu: add new dts file for old variant of Openblocks AX3-4
-  i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
-  i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
-
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |   2 +-
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
  .../arm/boot/dts/armada-xp-a0-openblocks-ax3-4.dts |  40 +++++
  .../dts/armada-xp-common-openblocks-ax3-4.dtsi     | 177 +++++++++++++++++++++
  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   | 164 +------------------
- drivers/i2c/busses/i2c-mv64xxx.c                   |   8 +
- 5 files changed, 227 insertions(+), 164 deletions(-)
+ 3 files changed, 218 insertions(+), 163 deletions(-)
  create mode 100644 arch/arm/boot/dts/armada-xp-a0-openblocks-ax3-4.dts
  create mode 100644 arch/arm/boot/dts/armada-xp-common-openblocks-ax3-4.dtsi
 
+diff --git a/arch/arm/boot/dts/armada-xp-a0-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-a0-openblocks-ax3-4.dts
+new file mode 100644
+index 000000000000..b3ea65255c19
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-xp-a0-openblocks-ax3-4.dts
+@@ -0,0 +1,40 @@
++/*
++ * Device Tree file for OpenBlocks AX3-4 board with A0 SoC
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "armada-xp-common-openblocks-ax3-4.dtsi"
++
++/ {
++	model = "PlatHome OpenBlocks AX3-4 board (A0 SoC)";
++	compatible = "plathome,openblocks-ax3-4", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0 0x00000000 0 0xC0000000>; /* 3 GB */
++	};
++
++	soc {
++
++		internal-regs {
++			i2c at 11000 {
++				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
++			};
++			i2c at 11100 {
++				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp-common-openblocks-ax3-4.dtsi b/arch/arm/boot/dts/armada-xp-common-openblocks-ax3-4.dtsi
+new file mode 100644
+index 000000000000..0d452b07baf5
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-xp-common-openblocks-ax3-4.dtsi
+@@ -0,0 +1,177 @@
++/*
++ * Device Tree file for OpenBlocks AX3-4 board
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include "armada-xp-mv78260.dtsi"
++
++/ {
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 128 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x8000000>;
++				bank-width = <2>;
++			};
++		};
++
++		pcie-controller {
++			status = "okay";
++			/* Internal mini-PCIe connector */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++		};
++
++		internal-regs {
++			serial at 12000 {
++				clock-frequency = <250000000>;
++				status = "okay";
++			};
++			serial at 12100 {
++				clock-frequency = <250000000>;
++				status = "okay";
++			};
++			pinctrl {
++				led_pins: led-pins-0 {
++					marvell,pins = "mpp49", "mpp51", "mpp53";
++					marvell,function = "gpio";
++				};
++			};
++			leds {
++				compatible = "gpio-leds";
++				pinctrl-names = "default";
++				pinctrl-0 = <&led_pins>;
++
++				red_led {
++					label = "red_led";
++					gpios = <&gpio1 17 1>;
++					default-state = "off";
++				};
++
++				yellow_led {
++					label = "yellow_led";
++					gpios = <&gpio1 19 1>;
++					default-state = "off";
++				};
++
++				green_led {
++					label = "green_led";
++					gpios = <&gpio1 21 1>;
++					default-state = "off";
++					linux,default-trigger = "heartbeat";
++				};
++			};
++
++			gpio_keys {
++				compatible = "gpio-keys";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				button at 1 {
++					label = "Init Button";
++					linux,code = <116>;
++					gpios = <&gpio1 28 0>;
++				};
++			};
++
++			mdio {
++				phy0: ethernet-phy at 0 {
++					reg = <0>;
++				};
++
++				phy1: ethernet-phy at 1 {
++					reg = <1>;
++				};
++
++				phy2: ethernet-phy at 2 {
++					reg = <2>;
++				};
++
++				phy3: ethernet-phy at 3 {
++					reg = <3>;
++				};
++			};
++
++			ethernet at 70000 {
++				status = "okay";
++				phy = <&phy0>;
++				phy-mode = "sgmii";
++			};
++			ethernet at 74000 {
++				status = "okay";
++				phy = <&phy1>;
++				phy-mode = "sgmii";
++			};
++			ethernet at 30000 {
++				status = "okay";
++				phy = <&phy2>;
++				phy-mode = "sgmii";
++			};
++			ethernet at 34000 {
++				status = "okay";
++				phy = <&phy3>;
++				phy-mode = "sgmii";
++			};
++			i2c at 11000 {
++				status = "okay";
++				clock-frequency = <400000>;
++			};
++			i2c at 11100 {
++				status = "okay";
++				clock-frequency = <400000>;
++
++				s35390a: s35390a at 30 {
++					compatible = "s35390a";
++					reg = <0x30>;
++				};
++			};
++			sata at a0000 {
++				nr-ports = <2>;
++				status = "okay";
++			};
++
++			/* Front side USB 0 */
++			usb at 50000 {
++				status = "okay";
++			};
++
++			/* Front side USB 1 */
++			usb at 51000 {
++				status = "okay";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 5695afcc04bf..1983de77c3ff 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -11,7 +11,7 @@
+  */
+ 
+ /dts-v1/;
+-#include "armada-xp-mv78260.dtsi"
++#include "armada-xp-common-openblocks-ax3-4.dtsi"
+ 
+ / {
+ 	model = "PlatHome OpenBlocks AX3-4 board";
+@@ -25,166 +25,4 @@
+ 		device_type = "memory";
+ 		reg = <0 0x00000000 0 0xC0000000>; /* 3 GB */
+ 	};
+-
+-	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+-			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
+-
+-		devbus-bootcs {
+-			status = "okay";
+-
+-			/* Device Bus parameters are required */
+-
+-			/* Read parameters */
+-			devbus,bus-width    = <8>;
+-			devbus,turn-off-ps  = <60000>;
+-			devbus,badr-skew-ps = <0>;
+-			devbus,acc-first-ps = <124000>;
+-			devbus,acc-next-ps  = <248000>;
+-			devbus,rd-setup-ps  = <0>;
+-			devbus,rd-hold-ps   = <0>;
+-
+-			/* Write parameters */
+-			devbus,sync-enable = <0>;
+-			devbus,wr-high-ps  = <60000>;
+-			devbus,wr-low-ps   = <60000>;
+-			devbus,ale-wr-ps   = <60000>;
+-
+-			/* NOR 128 MiB */
+-			nor at 0 {
+-				compatible = "cfi-flash";
+-				reg = <0 0x8000000>;
+-				bank-width = <2>;
+-			};
+-		};
+-
+-		pcie-controller {
+-			status = "okay";
+-			/* Internal mini-PCIe connector */
+-			pcie at 1,0 {
+-				/* Port 0, Lane 0 */
+-				status = "okay";
+-			};
+-		};
+-
+-		internal-regs {
+-			serial at 12000 {
+-				clock-frequency = <250000000>;
+-				status = "okay";
+-			};
+-			serial at 12100 {
+-				clock-frequency = <250000000>;
+-				status = "okay";
+-			};
+-			pinctrl {
+-				led_pins: led-pins-0 {
+-					marvell,pins = "mpp49", "mpp51", "mpp53";
+-					marvell,function = "gpio";
+-				};
+-			};
+-			leds {
+-				compatible = "gpio-leds";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&led_pins>;
+-
+-				red_led {
+-					label = "red_led";
+-					gpios = <&gpio1 17 1>;
+-					default-state = "off";
+-				};
+-
+-				yellow_led {
+-					label = "yellow_led";
+-					gpios = <&gpio1 19 1>;
+-					default-state = "off";
+-				};
+-
+-				green_led {
+-					label = "green_led";
+-					gpios = <&gpio1 21 1>;
+-					default-state = "off";
+-					linux,default-trigger = "heartbeat";
+-				};
+-			};
+-
+-			gpio_keys {
+-				compatible = "gpio-keys";
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				button at 1 {
+-					label = "Init Button";
+-					linux,code = <116>;
+-					gpios = <&gpio1 28 0>;
+-				};
+-			};
+-
+-			mdio {
+-				phy0: ethernet-phy at 0 {
+-					reg = <0>;
+-				};
+-
+-				phy1: ethernet-phy at 1 {
+-					reg = <1>;
+-				};
+-
+-				phy2: ethernet-phy at 2 {
+-					reg = <2>;
+-				};
+-
+-				phy3: ethernet-phy at 3 {
+-					reg = <3>;
+-				};
+-			};
+-
+-			ethernet at 70000 {
+-				status = "okay";
+-				phy = <&phy0>;
+-				phy-mode = "sgmii";
+-			};
+-			ethernet at 74000 {
+-				status = "okay";
+-				phy = <&phy1>;
+-				phy-mode = "sgmii";
+-			};
+-			ethernet at 30000 {
+-				status = "okay";
+-				phy = <&phy2>;
+-				phy-mode = "sgmii";
+-			};
+-			ethernet at 34000 {
+-				status = "okay";
+-				phy = <&phy3>;
+-				phy-mode = "sgmii";
+-			};
+-			i2c at 11000 {
+-				status = "okay";
+-				clock-frequency = <400000>;
+-			};
+-			i2c at 11100 {
+-				status = "okay";
+-				clock-frequency = <400000>;
+-
+-				s35390a: s35390a at 30 {
+-					compatible = "s35390a";
+-					reg = <0x30>;
+-				};
+-			};
+-			sata at a0000 {
+-				nr-ports = <2>;
+-				status = "okay";
+-			};
+-
+-			/* Front side USB 0 */
+-			usb at 50000 {
+-				status = "okay";
+-			};
+-
+-			/* Front side USB 1 */
+-			usb at 51000 {
+-				status = "okay";
+-			};
+-		};
+-	};
+ };
 -- 
 1.8.1.2
