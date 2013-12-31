@@ -1,50 +1,246 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 31 Dec 2013 18:05:15 +0100
-Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
- speed
-In-Reply-To: <20131231121214.GB3985@htj.dyndns.org>
-References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
- <20131231121214.GB3985@htj.dyndns.org>
-Message-ID: <20131231170515.GG32537@lunn.ch>
+From: jjhiblot@traphandler.com (jjhiblot at traphandler.com)
+Date: Tue, 31 Dec 2013 17:32:11 +0100
+Subject: [PATCH 3/6] At91: dt: Added smc bus driver
+In-Reply-To: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
+References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1388507534-10570-4-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 31, 2013 at 07:12:14AM -0500, Tejun Heo wrote:
-> On Mon, Dec 23, 2013 at 01:07:35PM +0100, Simon Guinot wrote:
-> > @@ -1358,6 +1359,7 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
-> >  
-> >  	if (ofs != 0xffffffffU) {
-> >  		void __iomem *addr = mv_ap_base(link->ap) + ofs;
-> > +		void __iomem *lp_phy_addr = mv_ap_base(link->ap) + LP_PHY_CTL;
-> >  		if (sc_reg_in == SCR_CONTROL) {
-> >  			/*
-> >  			 * Workaround for 88SX60x1 FEr SATA#26:
-> > @@ -1374,6 +1376,14 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
-> >  			 */
-> >  			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
-> >  				val |= 0xf000;
-> > +
-> > +			/*
-> > +			 * Setting PHY speed according to SControl speed
-> > +			 */
-> > +			if ((val & 0xf0) == 0x10)
-> > +				writelfl(0x7, lp_phy_addr);
-> > +			else
-> > +				writelfl(0x227, lp_phy_addr);
-> 
-> Do we know that this is safe for all sata_mvs?  If other sata_mvs
-> haven't had the described issue, maybe this should be applied
-> selectively to the said soc?  I'd actually prefer to avoid such
-> conditionals but we need to confirm this is okay for other
-> implementations.
+From: jean-jacques hiblot <jean-jacques.hiblot@jdsu.com>
 
-Hi Tejun
+The EBI/SMC external interface is used to access external peripherals (NAND
+and Ethernet controller in the case of sam9261ek). Different configurations and
+ timings are required for those peripherals. This bus driver can be used to
+setup the bus timings/configuration from the device tree.
 
-I've tested on Kirkwood, and not had problems. But i agree with
-you. We need somebody in Marvell to say this is safe with all sata_mv
-variants.
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ drivers/bus/Kconfig     |   9 +++
+ drivers/bus/Makefile    |   1 +
+ drivers/bus/atmel-smc.c | 182 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 192 insertions(+)
+ create mode 100644 drivers/bus/atmel-smc.c
 
-Lior, can you comment?
-
-Thanks
-	Andrew
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 552373c..8c944db5 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -12,6 +12,15 @@ config IMX_WEIM
+ 	  The WEIM(Wireless External Interface Module) works like a bus.
+ 	  You can attach many different devices on it, such as NOR, onenand.
+ 
++config ATMEL_SMC
++	bool "Atmel SMC/EBI driver"
++	depends on SOC_AT91SAM9 && OF
++	help
++	  Driver for Atmel SMC/EBI controller.
++	  Used to configure the EBI (external bus interface) when the device-
++	  tree is used. This bus supports NANDs, external ethernet controller,
++	  SRAMs, ATA devices.
++
+ config MVEBU_MBUS
+ 	bool
+ 	depends on PLAT_ORION
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 8947bdd..4364003 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -2,6 +2,7 @@
+ # Makefile for the bus drivers.
+ #
+ 
++obj-$(CONFIG_ATMEL_SMC)	+= atmel-smc.o
+ obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+ obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+diff --git a/drivers/bus/atmel-smc.c b/drivers/bus/atmel-smc.c
+new file mode 100644
+index 0000000..06e530d
+--- /dev/null
++++ b/drivers/bus/atmel-smc.c
+@@ -0,0 +1,182 @@
++/*
++ * EBI driver for Atmel SAM9 chips
++ * inspired by the fsl weim bus driver
++ *
++ * Copyright (C) 2013 JJ Hiblot.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/of_device.h>
++#include <mach/at91sam9_smc.h>
++
++struct at91_smc_devtype {
++	unsigned int	cs_count;
++};
++
++static const struct at91_smc_devtype sam9261_smc_devtype = {
++	.cs_count	= 6,
++};
++
++static const struct of_device_id smc_id_table[] = {
++	{ .compatible = "atmel,at91sam9261-smc", .data = &sam9261_smc_devtype},
++	{ }
++};
++MODULE_DEVICE_TABLE(of, smc_id_table);
++
++struct smc_parameters_type {
++	const char *name;
++	u16 reg;
++	u16 width;
++	u16 shift;
++};
++
++#define SETUP	0
++#define PULSE	1
++#define CYCLE	2
++#define MODE	3
++static const struct smc_parameters_type smc_parameters[] = {
++	{"smc,ncs_read_setup",		SETUP, 6, 24},
++	{"smc,nrd_setup",		SETUP, 6, 16},
++	{"smc,ncs_write_setup",		SETUP, 6,  8},
++	{"smc,nwe_setup",		SETUP, 6,  0},
++	{"smc,ncs_read_pulse",		PULSE, 6, 24},
++	{"smc,nrd_pulse",		PULSE, 6, 16},
++	{"smc,ncs_write_pulse",		PULSE, 6,  8},
++	{"smc,nwe_pulse",		PULSE, 6,  0},
++	{"smc,read_cycle",		CYCLE, 9, 16},
++	{"smc,write_cycle",		CYCLE, 9,  0},
++	{"smc,burst_size",		MODE,  2, 28},
++	{"smc,burst_enabled",		MODE,  1, 24},
++	{"smc,tdf_mode",		MODE,  1, 20},
++	{"smc,tdf_cycles",		MODE,  4, 16},
++	{"smc,bus_width",		MODE,  2, 12},
++	{"smc,byte_access_type",	MODE,  1,  8},
++	{"smc,nwait_mode",		MODE,  2,  4},
++	{"smc,write_mode",		MODE,  1,  0},
++	{"smc,read_mode",		MODE,  1,  1},
++	{NULL}
++};
++
++/* Parse and set the timing for this device. */
++static int __init smc_timing_setup(struct device *dev, struct device_node *np,
++		void __iomem *base, const struct at91_smc_devtype *devtype)
++{
++	u32 val;
++	int ret;
++	u32 cs;
++	const struct smc_parameters_type *p = smc_parameters;
++	u32 shadow_smc_regs[5];
++
++	ret = of_property_read_u32(np, "smc,cs" , &cs);
++	if (ret < 0) {
++		dev_err(dev, "missing mandatory property : smc,cs\n");
++		return ret;
++	}
++	if (val >= devtype->cs_count) {
++		dev_err(dev, "invalid value for property smc,cs (=%d)."
++		"Must be in range 0 to %d\n", cs, devtype->cs_count-1);
++		return -EINVAL;
++	}
++
++	/* set the timing for EBI */
++	base += (0x10 * cs);
++	shadow_smc_regs[SETUP] = readl_relaxed(base + AT91_SMC_SETUP);
++	shadow_smc_regs[PULSE] = readl_relaxed(base + AT91_SMC_PULSE);
++	shadow_smc_regs[CYCLE] = readl_relaxed(base + AT91_SMC_CYCLE);
++	shadow_smc_regs[MODE] = readl_relaxed(base + AT91_SMC_MODE);
++
++	while (p->name) {
++		ret = of_property_read_u32(np, p->name , &val);
++		if (ret == -EINVAL) {
++			dev_dbg(dev, "cs %d: property %s not set.\n", cs,
++				p->name);
++			p++;
++			continue;
++		} else if (ret) {
++			dev_err(dev, "cs %d: can't get property %s.\n", cs,
++				p->name);
++			return ret;
++		}
++		if (val >= (1<<p->width)) {
++			dev_err(dev, "cs %d: property %s out of range.\n", cs,
++				p->name);
++			return -ERANGE;
++		}
++		shadow_smc_regs[p->reg] &= ~(((1<<p->width)-1) << p->shift);
++		shadow_smc_regs[p->reg] |= (val << p->shift);
++		p++;
++	}
++	writel_relaxed(shadow_smc_regs[SETUP], base + AT91_SMC_SETUP);
++	writel_relaxed(shadow_smc_regs[PULSE], base + AT91_SMC_PULSE);
++	writel_relaxed(shadow_smc_regs[CYCLE], base + AT91_SMC_CYCLE);
++	writel_relaxed(shadow_smc_regs[MODE], base + AT91_SMC_MODE);
++	return 0;
++}
++
++static int __init smc_parse_dt(struct platform_device *pdev,
++				void __iomem *base)
++{
++	struct device *dev = &pdev->dev;
++	const struct of_device_id *of_id = of_match_device(smc_id_table, dev);
++	const struct at91_smc_devtype *devtype = of_id->data;
++	struct device_node *child;
++	int ret;
++
++	for_each_child_of_node(dev->of_node, child) {
++		if (!child->name)
++			continue;
++
++		ret = smc_timing_setup(dev, child, base, devtype);
++		if (ret) {
++			dev_err(dev, "%s set timing failed.\n",
++				child->full_name);
++			return ret;
++		}
++	}
++
++	ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
++	if (ret)
++		dev_err(dev, "%s fail to create devices.\n",
++			dev->of_node->full_name);
++	return ret;
++}
++
++static int __init smc_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	void __iomem *base;
++	int ret;
++
++	/* get the resource */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_request_and_ioremap(&pdev->dev, res);
++	if (IS_ERR(base)) {
++		dev_err(&pdev->dev, "can't map SMC base address\n");
++		return PTR_ERR(base);
++	}
++
++	/* parse the device node */
++	ret = smc_parse_dt(pdev, base);
++	if (!ret)
++		dev_info(&pdev->dev, "Driver registered.\n");
++
++	return ret;
++}
++
++static struct platform_driver smc_driver = {
++	.driver = {
++		.name		= "atmel-smc",
++		.owner		= THIS_MODULE,
++		.of_match_table	= smc_id_table,
++	},
++};
++module_platform_driver_probe(smc_driver, smc_probe);
++
++MODULE_AUTHOR("JJ Hiblot");
++MODULE_DESCRIPTION("Atmel's SMC/EBI driver");
++MODULE_LICENSE("GPL");
+-- 
+1.8.4.2
