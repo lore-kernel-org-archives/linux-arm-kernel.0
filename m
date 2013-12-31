@@ -1,28 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 31 Dec 2013 16:09:16 +0000
-Subject: [PATCH RESEND 1/4] clk: clk-s2mps11: Refactor for including
- support for other MFD clocks
-In-Reply-To: <CAHbNUh0tJHXv52bA9hBDZMH0Pi+x9uC=LojcvgS=ONnCgEmVTA@mail.gmail.com>
-References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
- <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
- <1388053141-30085-2-git-send-email-tushar.behera@linaro.org>
- <20131229221723.12054.40917@quantum>
- <CAHbNUh0tJHXv52bA9hBDZMH0Pi+x9uC=LojcvgS=ONnCgEmVTA@mail.gmail.com>
-Message-ID: <20131231160916.GG31886@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 31 Dec 2013 17:13:57 +0100
+Subject: Openblocks AX3-4 i2c bus lockup
+In-Reply-To: <52C2D36C.8020905@free-electrons.com>
+References: <20131221164151.GF20115@lunn.ch>
+ <CADx9zJDbzUmgHCRn9K=8m_d_uiSAYoW3y_NVfLFiDq4WzS3C0A@mail.gmail.com>
+ <52C2A5C8.7040201@free-electrons.com>
+ <52C2B889.4030903@free-electrons.com> <52C2BD9A.9080303@gmail.com>
+ <20131231133333.GV19878@titan.lakedaemon.net>
+ <52C2D36C.8020905@free-electrons.com>
+Message-ID: <20131231171357.2b23febf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 09:33:50AM +0530, Tushar Behera wrote:
+Dear Gregory CLEMENT,
 
-> Commit 1b1ccee1e821 "mfd: s2mps11: Fix build after regmap field rename
-> in sec-core.c" is also touching this file, which is in Mark's tree
-> right now. If I rebase
+On Tue, 31 Dec 2013 15:23:40 +0100, Gregory CLEMENT wrote:
 
-It's been in Linus' tree for a while now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131231/154498c4/attachment.sig>
+> My plan is:
+> 
+> First introducing a new compatible string and handle it in the driver.
+> Theses patches will be simple and small enough to be applied on the
+> current rc kernel and the stable kernels. I will also add a new dts
+> file: armada-xp-a0-openblocks-ax3-4.dts (and maybe introduce adding
+> also a armada-xp-common-openblocks-ax3-4.dtsi file). A0 SoCs are no
+> more shipped, that's why I try to provide a solution which uses the B0
+> SoC by default and which makes the A0 the exception.
+
+I personally don't think it's worth spending time on doing a separate
+DT for this, and that we should go directly to the solution that
+runtime detects the SoC revision instead.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
