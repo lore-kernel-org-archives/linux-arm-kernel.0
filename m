@@ -1,51 +1,57 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 31 Dec 2013 12:43:57 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <201312302127.41690.arnd@arndb.de>
-References: <1388241295-20051-1-git-send-email-zhangfei.gao@linaro.org>
- <CAMj5Bkif9pQHVdA71QccamVQkfgTheUNzowW6AyTwC3dy5XF+g@mail.gmail.com>
- <52C1AB34.3010402@linaro.org> <201312302127.41690.arnd@arndb.de>
-Message-ID: <52C24B8D.1030205@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Dec 2013 21:15:58 -0800
+Subject: [PATCH v2 6/7] drm/msm: Drop unnecessary mach include
+In-Reply-To: <CAF6AEGt7o65zpPPJa1chvYdp+K-dkSH9Buq=rDxyrUyS0zh3eA@mail.gmail.com>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+ <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
+ <CAF6AEGtortD9FQP-vDj7apsmdkXcoOiahJf++zPcSh=OYg7WfA@mail.gmail.com>
+ <CAF6AEGt7o65zpPPJa1chvYdp+K-dkSH9Buq=rDxyrUyS0zh3eA@mail.gmail.com>
+Message-ID: <20131231051558.GB14405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
+On 12/30, Rob Clark wrote:
+> On Mon, Dec 30, 2013 at 8:12 PM, Rob Clark <robdclark@gmail.com> wrote:
+> > On Mon, Dec 30, 2013 at 4:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> This file doesn't use the clk_reset() API that is exposed in
+> >> mach-msm's mach/clk.h file. Remove the include so that this
+> >> driver can be compiled as part of the multi-platform kernel.
+> >
+> > Thanks!
+> >
+> > Signed-off-by: Rob Clark <robdclark@gmail.com>
 
-On 12/31/2013 04:27 AM, Arnd Bergmann wrote:
-> On Monday 30 December 2013, zhangfei wrote:
->>>>>> +static int dw_mci_k3_suspend(struct device *dev)
->>>>>> +{
->>>>>> +    struct dw_mci *host = dev_get_drvdata(dev);
->>>>>> +    int ret = 0;
->>>>>> +
->>>>>> +    ret = dw_mci_suspend(host);
->>>>>
->>>>> You should never initialize local variables when they are set later in the
->>>>> function (the ret = 0 part above). For more complex functions, this prevents
->>>>> gcc from warning you about accidentally uninitialized uses.
->>
->> I am sorry I may fall into the dead end, but still quite not understand
->> this rule.
->> I alwayes thought it would be a good habit to init local variables before.
->> Do you mean it should NOT init local variable as much as possible and
->> only init on demand, like solving the gcc warning.
->> Why not init the them at start in case random value cause unpredicted error?
->
-> The gcc warnings are 100% correct, we can use them as a tool to write better
-> code. If you write code that has no warnings with a modern compiler, you will
-> never use random values, but if you always initialize the local variables,
-> you can end up accidentally using '0' where you shouldn't have.
->
-> See http://rusty.ozlabs.org/?p=232 for an excellent article on the topic
-> by former Linaro assignee Rusty Russell.
->
+I think you mean Acked-by? Signed-off-by usually means you're
+sending the patch along.
 
-Excellent, this is what I am looking for.
-Thanks for the patience.
-I may need some time and gradually change the habit to diminish the hurt 
-memory caused by uninitialized vector.
-Will update and take care latter.
+> 
+> oh, fwiw, things are a bit re-arranged on msm-next-staging (to add
+> 8074 and 8060a support).. currently I have:
+> 
+> ------------------
+> #if defined(CONFIG_ARCH_MSM)
+> #  include <mach/clk.h>
+> #elif defined(CONFIG_COMPILE_TEST)
+> /* stubs we need for compile-test: */
+> static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
+> {
+>         return NULL;
+> }
+> #endif
+> ------------------
+> 
+> Not really sure what to do about msm_iommu_get_ctx(), or whether I
+> still need that?
+> 
 
-By the way, are you fine with the other comments' explanation.
+I think the drm Kconfig should be selecting the MSM iommu Kconfig
+symbol. At least for now, it's a direct compile time dependency
+of this driver. I still don't see a use of mach/clk.h though, so
+we should be able to drop it completely.
 
-Thanks
+Is your msm-next-staging tree going into v3.14? I don't see
+anything in linux-next so far.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
