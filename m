@@ -1,39 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+From: andrew@lunn.ch (Andrew Lunn)
 Date: Tue, 31 Dec 2013 17:13:57 +0100
-Subject: Openblocks AX3-4 i2c bus lockup
-In-Reply-To: <52C2D36C.8020905@free-electrons.com>
-References: <20131221164151.GF20115@lunn.ch>
- <CADx9zJDbzUmgHCRn9K=8m_d_uiSAYoW3y_NVfLFiDq4WzS3C0A@mail.gmail.com>
- <52C2A5C8.7040201@free-electrons.com>
- <52C2B889.4030903@free-electrons.com> <52C2BD9A.9080303@gmail.com>
- <20131231133333.GV19878@titan.lakedaemon.net>
- <52C2D36C.8020905@free-electrons.com>
-Message-ID: <20131231171357.2b23febf@skate>
+Subject: Can't boot newer kernel on Armada 370 dev board
+In-Reply-To: <20131231103503.3bba7c08@skate>
+References: <20131230174738.GA4172@enneenne.com>
+ <20131230181205.GA32362@lunn.ch>
+ <20131230183908.GB4172@enneenne.com>
+ <20131230185240.GA32537@lunn.ch> <20131231103503.3bba7c08@skate>
+Message-ID: <20131231161357.GC32537@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Tue, 31 Dec 2013 15:23:40 +0100, Gregory CLEMENT wrote:
-
-> My plan is:
+On Tue, Dec 31, 2013 at 10:35:03AM +0100, Thomas Petazzoni wrote:
+> Andrew, Rodolfo,
 > 
-> First introducing a new compatible string and handle it in the driver.
-> Theses patches will be simple and small enough to be applied on the
-> current rc kernel and the stable kernels. I will also add a new dts
-> file: armada-xp-a0-openblocks-ax3-4.dts (and maybe introduce adding
-> also a armada-xp-common-openblocks-ax3-4.dtsi file). A0 SoCs are no
-> more shipped, that's why I try to provide a solution which uses the B0
-> SoC by default and which makes the A0 the exception.
+> On Mon, 30 Dec 2013 19:52:40 +0100, Andrew Lunn wrote:
+> 
+> > > U-Boot 2011.12 (Dec 24 2013 - 16:16:38) Marvell version: v2011.12 2013_Q3.0
+> > > 
+> > > > There has been a change in u-boot
+> > > > so that the registers are mapped to a different address. Old u-boot
+> > > > with new kernel causes instant lockup on boot as soon as it tries to
+> > > > access the wrong address space.
+> > > 
+> > > I see. Where can I get newer u-boot releases in order to avoid this
+> > > problem? :-)
+> > 
+> > From Marvell.
+> > 
+> > It is also possible to modify the DT to use the old address. I think
+> > there is a thread somewhere with Thomas Petazzoni telling somebody
+> > what changes need to be made for Armada XP. 370 should be very
+> > similar.
+> > 
+> > Basically you need to change 0xF1000000 to 0xD0000000.
+> 
+> No, that's the opposite.
+> 
+> The mainline kernel uses 0xD0000000 for this board, because originally
+> the Marvell Armada 370 DB was shipped with an old U-Boot, which was
+> mapping registers at 0xD0000000.
+> 
+> Apparently, they are now shipping these boards with a more recent
+> version of U-Boot that uses 0xF1000000. Therefore, Rodolfo should
+> change the kernel from 0xD0000000 to 0xF1000000.
 
-I personally don't think it's worth spending time on doing a separate
-DT for this, and that we should go directly to the solution that
-runtime detects the SoC revision instead.
+Ah, O.K. Good to know.
 
-Best regards,
+I think we need to better document this. For example put a comment in
+the top of each .dts file about the issues and which u-boot version is
+known to work, and which version needs an alternative .dts file.
+Maybe also how you can tell from a running system, eg what to look for
+in /proc/iomem.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+   Andrew
