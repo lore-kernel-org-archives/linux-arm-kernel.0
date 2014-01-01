@@ -1,22 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Jan 2014 00:09:19 +0100
-Subject: [PATCH v3 2/5] ARM: dts: sun7i: Change 32768 Hz oscillator node
- name to clk@N style
-In-Reply-To: <1388543450-16741-3-git-send-email-wens@csie.org>
+Date: Thu, 2 Jan 2014 00:10:39 +0100
+Subject: [PATCH v3 3/5] ARM: dts: sun7i: external clock outputs
+In-Reply-To: <1388543450-16741-4-git-send-email-wens@csie.org>
 References: <1388543450-16741-1-git-send-email-wens@csie.org>
- <1388543450-16741-3-git-send-email-wens@csie.org>
-Message-ID: <20140101230919.GF3144@lukather>
+ <1388543450-16741-4-git-send-email-wens@csie.org>
+Message-ID: <20140101231039.GG3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 01, 2014 at 10:30:47AM +0800, Chen-Yu Tsai wrote:
-> Device tree naming conventions state that node names should match
-> the nodes function. Change external low speed oscillator node name
-> to match.
+Hi,
+
+On Wed, Jan 01, 2014 at 10:30:48AM +0800, Chen-Yu Tsai wrote:
+> This commit adds the two external clock outputs available on A20 to
+> its device tree. A dummy fixed factor clock is also added to serve as
+> the first input of the clock outputs, which according to AW's A20 user
+> manual, is the 24MHz oscillator divided by 750.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied, thanks!
+I'm ok with this patch, but I'll let Emilio and Mike give their
+opinion on the driver before merging it.
 
 Maxime
 
@@ -30,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/300002bc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/7db4f8c6/attachment.sig>
