@@ -1,23 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Jan 2014 23:56:43 +0100
-Subject: [PATCH] ARM: sunxi: Select RESET_CONTROLLER
-In-Reply-To: <1388417849-7728-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1388417849-7728-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140101225643.GA3144@lukather>
+Date: Wed, 1 Jan 2014 23:57:59 +0100
+Subject: [PATCH] MAINTAINERS: Update Allwinner sunXi maintainer files
+In-Reply-To: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1388415813-6673-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140101225759.GB3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 04:37:29PM +0100, Maxime Ripard wrote:
-> The current code selects ARCH_HAS_RESET_CONTROLLER, that enables the
-> RESET_CONTROLLER option by default, but doesn't select it, so a configuration
-> might unselect it, leading to compilation error.
+On Mon, Dec 30, 2013 at 04:03:33PM +0100, Maxime Ripard wrote:
+> Add entries for all files having either sunxi or one of the Allwinner flavours
+> in their name.
 > 
-> Explictly select RESET_CONTROLLER so that we can't have this breakage anymore.
+> Also elect Emilio Lopez as the maintainer of the clock driver, since he was
+> already acting like it.
 > 
-> Reported-by: Emilio L?pez <emilio@elopez.com.ar>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  MAINTAINERS | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 1344816..dc39230 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -766,7 +766,12 @@ ARM/Allwinner A1X SoC support
+>  M:	Maxime Ripard <maxime.ripard@free-electrons.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+> -F:	arch/arm/mach-sunxi/
+> +N:	sun[x4567]i
+> +
+> +ARM/Allwinner SoC Clock Support
+> +M:	Emilio L?pez <emilio@elopez.com.ar>
+> +S:	Maintained
+> +F:	drivers/clk/sunxi/
+>  
+>  ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
+>  M:	Andrew Victor <linux@maxim.org.za>
 
-Merged in sunxi/core-for-3.14.
+Applied with Mike's Acked-by in sunxi/core-for-3.14
 
 Maxime
 
@@ -31,4 +52,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/1da3dc11/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/d74f18f8/attachment.sig>
