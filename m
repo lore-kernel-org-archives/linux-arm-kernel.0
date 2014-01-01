@@ -1,37 +1,45 @@
-From: zalan.blenessy@gmail.com (Zalan Blenessy)
-Date: Wed,  1 Jan 2014 18:02:55 +0100
-Subject: [PATCHv2 1/1] ARM: sunxi: select ARM_PSCI
-In-Reply-To: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
-References: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
-Message-ID: <1388595775-20737-1-git-send-email-zalan.blenessy@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 1 Jan 2014 20:28:16 +0100
+Subject: [RFC PATCH 0/3] Fix i2c bus hang on A0 version of the Armada XP
+ SoCs
+In-Reply-To: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140101192816.GP32537@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Allwinner sun7i (A20) SoCs, the SMP operations are implemented in 
-u-boot, and exposed to the kernel through PSCI. 
+On Tue, Dec 31, 2013 at 05:44:50PM +0100, Gregory CLEMENT wrote:
+> Hi,
+> 
+> This series is an RFC to fix the i2c bus hang on A0 version of the
+> Armada XP SoCs. It occured on the the eraly release of the OpenBlocks
+> AX3-4 bords. Indeed the first variants of Armada XP SoCs (A0 stepping)
+> have issues related to the i2c controller which prevent to use the
+> offload mechanism and lead to a kernel hang during boot.
+> 
+> The best solution will be to detect the SoCs version at runtime and
+> use it in the driver, but I chosed to submit this version in case CPU
+> version detection feature takes more time than expected (and we
+> already reached the rc6 kernel).
+> 
+> Thanks,
+> 
+> Gregory
 
-We thus need to enable PSCI support for Allwinner SoCs so that the 
-kernel uses it to bring up the additionnal cores.
+Hi Gregory
 
-Signed-off-by: Signed-off-by: Zalan Blenessy <zalan.blenessy@gmail.com>
----
-Changes[v2]:
- - Improved patch description
+Thanks for these RFC patches. I can confirm they work on my Openblocks
+device with an A0 stepping SoC. I can now access the RTC.
 
- arch/arm/mach-sunxi/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+You missed adding the new DTS file to the Makefile. Depending on how
+the discussion goes about auto detecting stepping or not, i would of
+used different filenames, probably:
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 547004c..09df4b81 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -3,6 +3,7 @@ config ARCH_SUNXI
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_GIC
-+	select ARM_PSCI
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
- 	select COMMON_CLK
--- 
-1.7.10.4
+armada-xp-openblocks-ax3-4.dts
+armada-xp-openblocks-ax3-4-a0.dts
+armada-xp-openblocks-ax3-4-common.dts
+
+Keeps all the files together when listed alphabetically
+
+Thanks
+	Andrew
