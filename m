@@ -1,38 +1,52 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Wed, 1 Jan 2014 13:18:22 +0100
+Date: Wed, 1 Jan 2014 13:37:46 +0100
 Subject: [ARM] Fix kernel compile error: drivers/crypto/ixp4xx_crypto.c.
-In-Reply-To: <20131231181427.GE16456@n2100.arm.linux.org.uk>
+In-Reply-To: <52C3066E.1070909@infradead.org>
 References: <m3d2kduwd7.fsf@t19.piap.pl>
  <20131231134820.GS8064@book.gsilab.sittig.org>
- <20131231181427.GE16456@n2100.arm.linux.org.uk>
-Message-ID: <20140101121822.GA20094@book.gsilab.sittig.org>
+ <52C3066E.1070909@infradead.org>
+Message-ID: <20140101123746.GB20094@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 31, 2013 at 18:14 +0000, Russell King - ARM Linux wrote:
+On Tue, Dec 31, 2013 at 10:01 -0800, Randy Dunlap wrote:
 > 
-> Please get rid of your Mail-Followup-To: header:
-> 
-> Mail-Followup-To: Krzysztof Ha?asa <khalasa@piap.pl>,                           
->         lkml <linux-kernel@vger.kernel.org>,                                    
->         linux-arm-kernel at lists.infradead.org,                                   
->         Russell King <rmk+kernel@arm.linux.org.uk>,                             
->         Christian Hohnstaedt <chohnstaedt@innominate.com>,                      
->         Herbert Xu <herbert@gondor.apana.org.au>                                
-> User-Agent: Mutt/1.5.21 (2010-09-15)                                            
-> 
-> It causes all recipients following the thread to be moved into the To:
-> header when someone replies to one of your messages, which is deemed to
-> be anti-social.  You can kill this header by adding:
-> 
-> 	set followup_to=no
-> 
-> to your .muttrc file.
+> On 12/31/13 05:48, Gerhard Sittig wrote:
+> > On Tue, Dec 31, 2013 at 11:51 +0100, Krzysztof Ha?asa wrote:
+> >>
+> >> drivers/crypto/ixp4xx_crypto.c: In function 'ixp_module_init':
+> >> drivers/crypto/ixp4xx_crypto.c:1419:2: error: 'dev' undeclared (first use in this function)
+> >>
+> >> Now builds. Not tested on real hw.
+> >>
+> >> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+> > 
+> > I understood that a 'Fixes: <hash> <subject>' line is suggested when
+> > you can clearly identify what broke what you fix.  Is it 27c1789ca6a6
+> > "DMA-API: crypto: remove last references to 'static struct device *dev'"?
+> > Then v3.13-rc1 would have been affected.
+>  
+> is 'Fixes: <whatever>' documented somewhere?
 
-Thank you for telling me, I was not aware.  Had no MFT related
-setting in my config, learned from the manual that $followup_to
-defaults to yes, have turned it off now.  Other mutt users may
-want to check as well.  Happy new year! :)
+Last time I checked (few days ago, 'git grep -w Fixes:') it
+wasn't, at least not within the kernel source tree and its
+Documentation hierarchy.  Today's master still does not have it.
+
+But a quick search in recent LAKML messages reveals that it's
+been in use by e.g. Olof Johansson, Jason Cooper, Rusty Russell,
+Dan Carpenter, Russell King, Mark Brown, Stephen Warren, Paul
+Walmsley, and I'm not making this up but am just referring to
+what repeatedly was requested in the past.  The form used there
+was "Fixes: <hash> (<oneline>)" though.  A doc update may be due
+to have a canonical format.
+
+I do see the benefit of this tag, as it does not hide this
+information in the commit message's prose, makes submitters think
+about that property in more explicit ways and makes them provide
+the information such that others need not do the research, and
+greatly helps those involved in tests and release management to
+determine affected versions and required actions that need to be
+taken.  The tag is very useful.
 
 
 virtually yours
