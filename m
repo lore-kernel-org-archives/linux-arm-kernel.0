@@ -1,343 +1,1029 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 01 Jan 2014 14:44:38 +0100
-Subject: [PATCH 2/3] clk: samsung: add clock controller driver for s3c2412
+Date: Wed, 01 Jan 2014 14:45:16 +0100
+Subject: [PATCH 3/3] ARM: S3C24XX: convert s3c2412 to common clock framework
 In-Reply-To: <1418190.fUL06mDNi6@phil>
 References: <1418190.fUL06mDNi6@phil>
-Message-ID: <1576389.iuZAhaSJxQ@phil>
+Message-ID: <9648536.o2JO6rEMfk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver can handle the clock controller in the s3c2412 soc.
-
-The clock structure is built according to the manuals of the included
-SoCs and might include changes in comparison to the previous clock
-structure.
+Convert all machines using these cpus to use the ccf clock driver
+instead of the legacy Samsung clock implementation.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/samsung/Makefile                      |    1 +
- drivers/clk/samsung/clk-s3c2412.c                 |  221 +++++++++++++++++++++
- include/dt-bindings/clock/samsung,s3c2412-clock.h |   73 +++++++
- 3 files changed, 295 insertions(+)
- create mode 100644 drivers/clk/samsung/clk-s3c2412.c
- create mode 100644 include/dt-bindings/clock/samsung,s3c2412-clock.h
+ arch/arm/mach-s3c24xx/Kconfig         |    8 +-
+ arch/arm/mach-s3c24xx/Makefile        |    2 +-
+ arch/arm/mach-s3c24xx/clock-s3c2412.c |  761 ---------------------------------
+ arch/arm/mach-s3c24xx/common.c        |    9 +-
+ arch/arm/mach-s3c24xx/common.h        |    4 +
+ arch/arm/mach-s3c24xx/mach-jive.c     |    9 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c |    9 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c    |    9 +-
+ arch/arm/mach-s3c24xx/s3c2412.c       |   43 --
+ 9 files changed, 40 insertions(+), 814 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2412.c
 
-diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-index 1731900..5248c27 100644
---- a/drivers/clk/samsung/Makefile
-+++ b/drivers/clk/samsung/Makefile
-@@ -11,5 +11,6 @@ obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
- obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
- obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
- obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
-+obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
- obj-$(CONFIG_S3C2443_COMMON_CLK)+= clk-s3c2443.o
- obj-$(CONFIG_ARCH_S3C64XX)	+= clk-s3c64xx.o
-diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
-new file mode 100644
-index 0000000..84dc0d4
---- /dev/null
-+++ b/drivers/clk/samsung/clk-s3c2412.c
-@@ -0,0 +1,221 @@
-+/*
-+ * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Common Clock Framework support for S3C2412 and S3C2413.
-+ */
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 075780e..e19e314 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -51,9 +51,10 @@ config CPU_S3C2410
+ 
+ config CPU_S3C2412
+ 	bool "SAMSUNG S3C2412"
+-	depends on SAMSUNG_CLOCK
++	select COMMON_CLK
+ 	select CPU_ARM926T
+ 	select CPU_LLSERIAL_S3C2440
++	select S3C2412_COMMON_CLK
+ 	select S3C2412_DMA if S3C24XX_DMA
+ 	select S3C2412_PM if PM
+ 	help
+@@ -387,6 +388,11 @@ config S3C2412_PM_SLEEP
+ 
+ if CPU_S3C2412
+ 
++config S3C2412_COMMON_CLK
++	bool
++	help
++	  Build the s3c2412 clock driver based on the common clock framework.
 +
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <dt-bindings/clock/samsung,s3c2412-clock.h>
-+
-+#include "clk.h"
-+#include "clk-pll.h"
-+
-+#define LOCKTIME	0x00
-+#define MPLLCON		0x04
-+#define UPLLCON		0x08
-+#define CLKCON		0x0c
-+#define CLKDIVN		0x14
-+#define CLKSRC		0x1c
-+
-+/* list of PLLs to be registered */
-+enum s3c2412_plls {
-+	mpll, upll,
-+};
-+
-+/*
-+ * list of controller registers to be saved and restored during a
-+ * suspend/resume cycle.
-+ */
-+static unsigned long s3c2412_clk_regs[] __initdata = {
-+	LOCKTIME,
-+	MPLLCON,
-+	UPLLCON,
-+	CLKCON,
-+	CLKDIVN,
-+	CLKSRC,
-+};
-+
-+static struct clk_div_table divxti_d[] = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 4 },
-+	{ .val = 3, .div = 6 },
-+	{ .val = 4, .div = 8 },
-+	{ .val = 5, .div = 10 },
-+	{ .val = 6, .div = 12 },
-+	{ .val = 7, .div = 14 },
-+	{ .div = 0 },
-+};
-+
-+struct samsung_div_clock s3c2412_dividers[] __initdata = {
-+	DIV_T(0, "div_xti", "xti", CLKSRC, 0, 3, divxti_d),
-+	DIV(0, "div_cam", "mux_cam", CLKDIVN, 16, 4),
-+	DIV(0, "div_i2s", "mux_i2s", CLKDIVN, 12, 4),
-+	DIV(0, "div_uart", "mux_uart", CLKDIVN, 8, 4),
-+	DIV(0, "div_usb", "mux_usb", CLKDIVN, 6, 1),
-+	DIV(0, "div_hclk_half", "hclk", CLKDIVN, 5, 1),
-+	DIV(ARMDIV, "armdiv", "msysclk", CLKDIVN, 3, 1),
-+	DIV(PCLK, "pclk", "hclk", CLKDIVN, 2, 1),
-+	DIV(HCLK, "hclk", "armdiv", CLKDIVN, 0, 2),
-+};
-+
-+struct samsung_fixed_factor_clock s3c2412_ffactor[] __initdata = {
-+	FFACTOR(0, "ff_hclk", "hclk", 2, 1, CLK_SET_RATE_PARENT),
-+};
-+
-+/*
-+ * The first two use the OM[4] setting, which is not readable from
-+ * software, so assume it is set to xti.
-+ */
-+PNAME(erefclk_p) = { "xti", "xti", "xti", "ext" };
-+PNAME(urefclk_p) = { "xti", "xti", "xti", "ext" };
-+
-+PNAME(camclk_p) = { "usysclk", "hclk" };
-+PNAME(usbclk_p) = { "usysclk", "hclk" };
-+PNAME(i2sclk_p) = { "erefclk", "mpll" };
-+PNAME(uartclk_p) = { "erefclk", "mpll" };
-+PNAME(usysclk_p) = { "urefclk", "upll" };
-+PNAME(msysclk_p) = { "mdivclk", "mpll" };
-+PNAME(mdivclk_p) = { "xti", "div_xti" };
-+PNAME(armclk_p) = { "armdiv", "hclk" };
-+
-+struct samsung_mux_clock s3c2412_muxes[] __initdata = {
-+	MUX(0, "erefclk", erefclk_p, CLKSRC, 14, 2),
-+	MUX(0, "urefclk", urefclk_p, CLKSRC, 12, 2),
-+	MUX(0, "mux_cam", camclk_p, CLKSRC, 11, 1),
-+	MUX(0, "mux_usb", usbclk_p, CLKSRC, 10, 1),
-+	MUX(0, "mux_i2s", i2sclk_p, CLKSRC, 9, 1),
-+	MUX(0, "mux_uart", uartclk_p, CLKSRC, 8, 1),
-+	MUX(USYSCLK, "usysclk", usysclk_p, CLKSRC, 5, 1),
-+	MUX(MSYSCLK, "msysclk", msysclk_p, CLKSRC, 4, 1),
-+	MUX(MDIVCLK, "mdivclk", mdivclk_p, CLKSRC, 3, 1),
-+	MUX(ARMCLK, "armclk", armclk_p, CLKDIVN, 4, 1),
-+};
-+
-+static struct samsung_pll_clock s3c2412_plls[] __initdata = {
-+	[mpll] = PLL(pll_s3c2440_mpll, MPLL, "mpll", "xti",
-+						LOCKTIME, MPLLCON, NULL),
-+	[upll] = PLL(pll_s3c2410_upll, UPLL, "upll", "urefclk",
-+						LOCKTIME, UPLLCON, NULL),
-+};
-+
-+struct samsung_gate_clock s3c2412_gates[] __initdata = {
-+	GATE(PCLK_WDT, "wdt", "pclk", CLKCON, 28, 0, 0),
-+	GATE(PCLK_SPI, "spi", "pclk", CLKCON, 27, 0, 0),
-+	GATE(PCLK_I2S, "i2s", "pclk", CLKCON, 26, 0, 0),
-+	GATE(PCLK_I2C, "i2c", "pclk", CLKCON, 25, 0, 0),
-+	GATE(PCLK_ADC, "adc", "pclk", CLKCON, 24, 0, 0),
-+	GATE(PCLK_RTC, "rtc", "pclk", CLKCON, 23, 0, 0),
-+	GATE(PCLK_GPIO, "gpio", "pclk", CLKCON, 22, CLK_IGNORE_UNUSED, 0),
-+	GATE(PCLK_UART2, "uart2", "pclk", CLKCON, 21, 0, 0),
-+	GATE(PCLK_UART1, "uart1", "pclk", CLKCON, 20, 0, 0),
-+	GATE(PCLK_UART0, "uart0", "pclk", CLKCON, 19, 0, 0),
-+	GATE(PCLK_SDI, "sdi", "pclk", CLKCON, 18, 0, 0),
-+	GATE(PCLK_PWM, "pwm", "pclk", CLKCON, 17, 0, 0),
-+	GATE(PCLK_USBD, "usb-device", "pclk", CLKCON, 16, 0, 0),
-+	GATE(SCLK_CAM, "sclk_cam", "div_cam", CLKCON, 15, 0, 0),
-+	GATE(SCLK_UART, "sclk_uart", "div_uart", CLKCON, 14, 0, 0),
-+	GATE(SCLK_I2S, "sclk_i2s", "div_i2s", CLKCON, 13, 0, 0),
-+	GATE(SCLK_USBH, "sclk_usbh", "div_usb", CLKCON, 12, 0, 0),
-+	GATE(SCLK_USBD, "sclk_usbd", "div_usb", CLKCON, 11, 0, 0),
-+	GATE(HCLK_HALF, "hclk_half", "div_hclk_half", CLKCON, 10, CLK_IGNORE_UNUSED, 0),
-+	GATE(HCLK_X2, "hclkx2", "ff_hclk", CLKCON, 9, CLK_IGNORE_UNUSED, 0),
-+	GATE(HCLK_SDRAM, "sdram", "hclk", CLKCON, 8, CLK_IGNORE_UNUSED, 0),
-+	GATE(HCLK_USBH, "usb-host", "hclk", CLKCON, 6, 0, 0),
-+	GATE(HCLK_LCD, "lcd", "hclk", CLKCON, 5, 0, 0),
-+	GATE(HCLK_NAND, "nand", "hclk", CLKCON, 4, 0, 0),
-+	GATE(HCLK_DMA3, "dma3", "hclk", CLKCON, 3, CLK_IGNORE_UNUSED, 0),
-+	GATE(HCLK_DMA2, "dma2", "hclk", CLKCON, 2, CLK_IGNORE_UNUSED, 0),
-+	GATE(HCLK_DMA1, "dma1", "hclk", CLKCON, 1, CLK_IGNORE_UNUSED, 0),
-+	GATE(HCLK_DMA0, "dma0", "hclk", CLKCON, 0, CLK_IGNORE_UNUSED, 0),
-+};
-+
-+struct samsung_clock_alias s3c2412_aliases[] __initdata = {
-+	ALIAS(PCLK_UART0, "s3c2412-uart.0", "uart"),
-+	ALIAS(PCLK_UART1, "s3c2412-uart.1", "uart"),
-+	ALIAS(PCLK_UART2, "s3c2412-uart.2", "uart"),
-+	ALIAS(PCLK_UART0, "s3c2412-uart.0", "clk_uart_baud2"),
-+	ALIAS(PCLK_UART1, "s3c2412-uart.1", "clk_uart_baud2"),
-+	ALIAS(PCLK_UART2, "s3c2412-uart.2", "clk_uart_baud2"),
-+	ALIAS(SCLK_UART, NULL, "clk_uart_baud3"),
-+	ALIAS(PCLK_I2C, "s3c2410-i2c.0", "i2c"),
-+	ALIAS(PCLK_ADC, NULL, "adc"),
-+	ALIAS(PCLK_RTC, NULL, "rtc"),
-+	ALIAS(PCLK_PWM, NULL, "timers"),
-+	ALIAS(HCLK_LCD, NULL, "lcd"),
-+	ALIAS(PCLK_USBD, NULL, "usb-device"),
-+	ALIAS(SCLK_USBD, NULL, "usb-bus-gadget"),
-+	ALIAS(HCLK_USBH, NULL, "usb-host"),
-+	ALIAS(SCLK_USBH, NULL, "usb-bus-host"),
-+	ALIAS(ARMCLK, NULL, "armclk"),
-+	ALIAS(HCLK, NULL, "hclk"),
-+	ALIAS(MPLL, NULL, "mpll"),
-+	ALIAS(MSYSCLK, NULL, "fclk"),
-+};
-+
-+/*
-+ * fixed rate clocks generated outside the soc
-+ * Only necessary until the devicetree-move is complete
-+ */
-+struct samsung_fixed_rate_clock s3c2412_common_frate_clks[] __initdata = {
-+	FRATE(XTI, "xti", NULL, CLK_IS_ROOT, 0),
-+	FRATE(0, "ext", NULL, CLK_IS_ROOT, 0),
-+};
-+
-+static void __init s3c2412_common_clk_register_fixed_ext(unsigned long xti_f,
-+							 unsigned long ext_f)
+ config CPU_S3C2412_ONLY
+ 	bool
+ 	depends on !CPU_S3C2410 && !CPU_S3C2416 && !CPU_S3C2440 && \
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index 51d9578..2235d0d 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -21,7 +21,7 @@ obj-$(CONFIG_S3C2410_DMA)	+= dma-s3c2410.o
+ obj-$(CONFIG_S3C2410_PLL)	+= pll-s3c2410.o
+ obj-$(CONFIG_S3C2410_PM)	+= pm-s3c2410.o sleep-s3c2410.o
+ 
+-obj-$(CONFIG_CPU_S3C2412)	+= s3c2412.o clock-s3c2412.o
++obj-$(CONFIG_CPU_S3C2412)	+= s3c2412.o
+ obj-$(CONFIG_S3C2412_DMA)	+= dma-s3c2412.o
+ obj-$(CONFIG_S3C2412_PM)	+= pm-s3c2412.o
+ obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep-s3c2412.o
+diff --git a/arch/arm/mach-s3c24xx/clock-s3c2412.c b/arch/arm/mach-s3c24xx/clock-s3c2412.c
+deleted file mode 100644
+index 11b3b28..0000000
+--- a/arch/arm/mach-s3c24xx/clock-s3c2412.c
++++ /dev/null
+@@ -1,761 +0,0 @@
+-/* linux/arch/arm/mach-s3c2412/clock.c
+- *
+- * Copyright (c) 2006 Simtec Electronics
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * S3C2412,S3C2413 Clock control support
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+-*/
+-
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/list.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/device.h>
+-#include <linux/clk.h>
+-#include <linux/mutex.h>
+-#include <linux/delay.h>
+-#include <linux/serial_core.h>
+-#include <linux/io.h>
+-
+-#include <asm/mach/map.h>
+-
+-#include <mach/hardware.h>
+-
+-#include <plat/regs-serial.h>
+-#include <mach/regs-clock.h>
+-#include <mach/regs-gpio.h>
+-
+-#include <plat/clock.h>
+-#include <plat/cpu.h>
+-
+-/* We currently have to assume that the system is running
+- * from the XTPll input, and that all ***REFCLKs are being
+- * fed from it, as we cannot read the state of OM[4] from
+- * software.
+- *
+- * It would be possible for each board initialisation to
+- * set the correct muxing at initialisation
+-*/
+-
+-static int s3c2412_clkcon_enable(struct clk *clk, int enable)
+-{
+-	unsigned int clocks = clk->ctrlbit;
+-	unsigned long clkcon;
+-
+-	clkcon = __raw_readl(S3C2410_CLKCON);
+-
+-	if (enable)
+-		clkcon |= clocks;
+-	else
+-		clkcon &= ~clocks;
+-
+-	__raw_writel(clkcon, S3C2410_CLKCON);
+-
+-	return 0;
+-}
+-
+-static int s3c2412_upll_enable(struct clk *clk, int enable)
+-{
+-	unsigned long upllcon = __raw_readl(S3C2410_UPLLCON);
+-	unsigned long orig = upllcon;
+-
+-	if (!enable)
+-		upllcon |= S3C2412_PLLCON_OFF;
+-	else
+-		upllcon &= ~S3C2412_PLLCON_OFF;
+-
+-	__raw_writel(upllcon, S3C2410_UPLLCON);
+-
+-	/* allow ~150uS for the PLL to settle and lock */
+-
+-	if (enable && (orig & S3C2412_PLLCON_OFF))
+-		udelay(150);
+-
+-	return 0;
+-}
+-
+-/* clock selections */
+-
+-static struct clk clk_erefclk = {
+-	.name		= "erefclk",
+-};
+-
+-static struct clk clk_urefclk = {
+-	.name		= "urefclk",
+-};
+-
+-static int s3c2412_setparent_usysclk(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-
+-	if (parent == &clk_urefclk)
+-		clksrc &= ~S3C2412_CLKSRC_USYSCLK_UPLL;
+-	else if (parent == &clk_upll)
+-		clksrc |= S3C2412_CLKSRC_USYSCLK_UPLL;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	__raw_writel(clksrc, S3C2412_CLKSRC);
+-	return 0;
+-}
+-
+-static struct clk clk_usysclk = {
+-	.name		= "usysclk",
+-	.parent		= &clk_xtal,
+-	.ops		= &(struct clk_ops) {
+-		.set_parent	= s3c2412_setparent_usysclk,
+-	},
+-};
+-
+-static struct clk clk_mrefclk = {
+-	.name		= "mrefclk",
+-	.parent		= &clk_xtal,
+-};
+-
+-static struct clk clk_mdivclk = {
+-	.name		= "mdivclk",
+-	.parent		= &clk_xtal,
+-};
+-
+-static int s3c2412_setparent_usbsrc(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-
+-	if (parent == &clk_usysclk)
+-		clksrc &= ~S3C2412_CLKSRC_USBCLK_HCLK;
+-	else if (parent == &clk_h)
+-		clksrc |= S3C2412_CLKSRC_USBCLK_HCLK;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	__raw_writel(clksrc, S3C2412_CLKSRC);
+-	return 0;
+-}
+-
+-static unsigned long s3c2412_roundrate_usbsrc(struct clk *clk,
+-					      unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	int div;
+-
+-	if (rate > parent_rate)
+-		return parent_rate;
+-
+-	div = parent_rate / rate;
+-	if (div > 2)
+-		div = 2;
+-
+-	return parent_rate / div;
+-}
+-
+-static unsigned long s3c2412_getrate_usbsrc(struct clk *clk)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long div = __raw_readl(S3C2410_CLKDIVN);
+-
+-	return parent_rate / ((div & S3C2412_CLKDIVN_USB48DIV) ? 2 : 1);
+-}
+-
+-static int s3c2412_setrate_usbsrc(struct clk *clk, unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long clkdivn = __raw_readl(S3C2410_CLKDIVN);
+-
+-	rate = s3c2412_roundrate_usbsrc(clk, rate);
+-
+-	if ((parent_rate / rate) == 2)
+-		clkdivn |= S3C2412_CLKDIVN_USB48DIV;
+-	else
+-		clkdivn &= ~S3C2412_CLKDIVN_USB48DIV;
+-
+-	__raw_writel(clkdivn, S3C2410_CLKDIVN);
+-	return 0;
+-}
+-
+-static struct clk clk_usbsrc = {
+-	.name		= "usbsrc",
+-	.ops		= &(struct clk_ops) {
+-		.get_rate	= s3c2412_getrate_usbsrc,
+-		.set_rate	= s3c2412_setrate_usbsrc,
+-		.round_rate	= s3c2412_roundrate_usbsrc,
+-		.set_parent	= s3c2412_setparent_usbsrc,
+-	},
+-};
+-
+-static int s3c2412_setparent_msysclk(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-
+-	if (parent == &clk_mdivclk)
+-		clksrc &= ~S3C2412_CLKSRC_MSYSCLK_MPLL;
+-	else if (parent == &clk_mpll)
+-		clksrc |= S3C2412_CLKSRC_MSYSCLK_MPLL;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	__raw_writel(clksrc, S3C2412_CLKSRC);
+-	return 0;
+-}
+-
+-static struct clk clk_msysclk = {
+-	.name		= "msysclk",
+-	.ops		= &(struct clk_ops) {
+-		.set_parent	= s3c2412_setparent_msysclk,
+-	},
+-};
+-
+-static int s3c2412_setparent_armclk(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long flags;
+-	unsigned long clkdiv;
+-	unsigned long dvs;
+-
+-	/* Note, we current equate fclk andf msysclk for S3C2412 */
+-
+-	if (parent == &clk_msysclk || parent == &clk_f)
+-		dvs = 0;
+-	else if (parent == &clk_h)
+-		dvs = S3C2412_CLKDIVN_DVSEN;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	/* update this under irq lockdown, clkdivn is not protected
+-	 * by the clock system. */
+-
+-	local_irq_save(flags);
+-
+-	clkdiv  = __raw_readl(S3C2410_CLKDIVN);
+-	clkdiv &= ~S3C2412_CLKDIVN_DVSEN;
+-	clkdiv |= dvs;
+-	__raw_writel(clkdiv, S3C2410_CLKDIVN);
+-
+-	local_irq_restore(flags);
+-
+-	return 0;
+-}
+-
+-static struct clk clk_armclk = {
+-	.name		= "armclk",
+-	.parent		= &clk_msysclk,
+-	.ops		= &(struct clk_ops) {
+-		.set_parent	= s3c2412_setparent_armclk,
+-	},
+-};
+-
+-/* these next clocks have an divider immediately after them,
+- * so we can register them with their divider and leave out the
+- * intermediate clock stage
+-*/
+-static unsigned long s3c2412_roundrate_clksrc(struct clk *clk,
+-					      unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	int div;
+-
+-	if (rate > parent_rate)
+-		return parent_rate;
+-
+-	/* note, we remove the +/- 1 calculations as they cancel out */
+-
+-	div = (rate / parent_rate);
+-
+-	if (div < 1)
+-		div = 1;
+-	else if (div > 16)
+-		div = 16;
+-
+-	return parent_rate / div;
+-}
+-
+-static int s3c2412_setparent_uart(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-
+-	if (parent == &clk_erefclk)
+-		clksrc &= ~S3C2412_CLKSRC_UARTCLK_MPLL;
+-	else if (parent == &clk_mpll)
+-		clksrc |= S3C2412_CLKSRC_UARTCLK_MPLL;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	__raw_writel(clksrc, S3C2412_CLKSRC);
+-	return 0;
+-}
+-
+-static unsigned long s3c2412_getrate_uart(struct clk *clk)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long div = __raw_readl(S3C2410_CLKDIVN);
+-
+-	div &= S3C2412_CLKDIVN_UARTDIV_MASK;
+-	div >>= S3C2412_CLKDIVN_UARTDIV_SHIFT;
+-
+-	return parent_rate / (div + 1);
+-}
+-
+-static int s3c2412_setrate_uart(struct clk *clk, unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long clkdivn = __raw_readl(S3C2410_CLKDIVN);
+-
+-	rate = s3c2412_roundrate_clksrc(clk, rate);
+-
+-	clkdivn &= ~S3C2412_CLKDIVN_UARTDIV_MASK;
+-	clkdivn |= ((parent_rate / rate) - 1) << S3C2412_CLKDIVN_UARTDIV_SHIFT;
+-
+-	__raw_writel(clkdivn, S3C2410_CLKDIVN);
+-	return 0;
+-}
+-
+-static struct clk clk_uart = {
+-	.name		= "uartclk",
+-	.ops		= &(struct clk_ops) {
+-		.get_rate	= s3c2412_getrate_uart,
+-		.set_rate	= s3c2412_setrate_uart,
+-		.set_parent	= s3c2412_setparent_uart,
+-		.round_rate	= s3c2412_roundrate_clksrc,
+-	},
+-};
+-
+-static int s3c2412_setparent_i2s(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-
+-	if (parent == &clk_erefclk)
+-		clksrc &= ~S3C2412_CLKSRC_I2SCLK_MPLL;
+-	else if (parent == &clk_mpll)
+-		clksrc |= S3C2412_CLKSRC_I2SCLK_MPLL;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	__raw_writel(clksrc, S3C2412_CLKSRC);
+-	return 0;
+-}
+-
+-static unsigned long s3c2412_getrate_i2s(struct clk *clk)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long div = __raw_readl(S3C2410_CLKDIVN);
+-
+-	div &= S3C2412_CLKDIVN_I2SDIV_MASK;
+-	div >>= S3C2412_CLKDIVN_I2SDIV_SHIFT;
+-
+-	return parent_rate / (div + 1);
+-}
+-
+-static int s3c2412_setrate_i2s(struct clk *clk, unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long clkdivn = __raw_readl(S3C2410_CLKDIVN);
+-
+-	rate = s3c2412_roundrate_clksrc(clk, rate);
+-
+-	clkdivn &= ~S3C2412_CLKDIVN_I2SDIV_MASK;
+-	clkdivn |= ((parent_rate / rate) - 1) << S3C2412_CLKDIVN_I2SDIV_SHIFT;
+-
+-	__raw_writel(clkdivn, S3C2410_CLKDIVN);
+-	return 0;
+-}
+-
+-static struct clk clk_i2s = {
+-	.name		= "i2sclk",
+-	.ops		= &(struct clk_ops) {
+-		.get_rate	= s3c2412_getrate_i2s,
+-		.set_rate	= s3c2412_setrate_i2s,
+-		.set_parent	= s3c2412_setparent_i2s,
+-		.round_rate	= s3c2412_roundrate_clksrc,
+-	},
+-};
+-
+-static int s3c2412_setparent_cam(struct clk *clk, struct clk *parent)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-
+-	if (parent == &clk_usysclk)
+-		clksrc &= ~S3C2412_CLKSRC_CAMCLK_HCLK;
+-	else if (parent == &clk_h)
+-		clksrc |= S3C2412_CLKSRC_CAMCLK_HCLK;
+-	else
+-		return -EINVAL;
+-
+-	clk->parent = parent;
+-
+-	__raw_writel(clksrc, S3C2412_CLKSRC);
+-	return 0;
+-}
+-static unsigned long s3c2412_getrate_cam(struct clk *clk)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long div = __raw_readl(S3C2410_CLKDIVN);
+-
+-	div &= S3C2412_CLKDIVN_CAMDIV_MASK;
+-	div >>= S3C2412_CLKDIVN_CAMDIV_SHIFT;
+-
+-	return parent_rate / (div + 1);
+-}
+-
+-static int s3c2412_setrate_cam(struct clk *clk, unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long clkdivn = __raw_readl(S3C2410_CLKDIVN);
+-
+-	rate = s3c2412_roundrate_clksrc(clk, rate);
+-
+-	clkdivn &= ~S3C2412_CLKDIVN_CAMDIV_MASK;
+-	clkdivn |= ((parent_rate / rate) - 1) << S3C2412_CLKDIVN_CAMDIV_SHIFT;
+-
+-	__raw_writel(clkdivn, S3C2410_CLKDIVN);
+-	return 0;
+-}
+-
+-static struct clk clk_cam = {
+-	.name		= "camif-upll",	/* same as 2440 name */
+-	.ops		= &(struct clk_ops) {
+-		.get_rate	= s3c2412_getrate_cam,
+-		.set_rate	= s3c2412_setrate_cam,
+-		.set_parent	= s3c2412_setparent_cam,
+-		.round_rate	= s3c2412_roundrate_clksrc,
+-	},
+-};
+-
+-/* standard clock definitions */
+-
+-static struct clk init_clocks_disable[] = {
+-	{
+-		.name		= "nand",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_NAND,
+-	}, {
+-		.name		= "sdi",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_SDI,
+-	}, {
+-		.name		= "adc",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_ADC,
+-	}, {
+-		.name		= "i2c",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_IIC,
+-	}, {
+-		.name		= "iis",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_IIS,
+-	}, {
+-		.name		= "spi",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_SPI,
+-	}
+-};
+-
+-static struct clk init_clocks[] = {
+-	{
+-		.name		= "dma.0",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_DMA0,
+-	}, {
+-		.name		= "dma.1",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_DMA1,
+-	}, {
+-		.name		= "dma.2",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_DMA2,
+-	}, {
+-		.name		= "dma.3",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_DMA3,
+-	}, {
+-		.name		= "lcd",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_LCDC,
+-	}, {
+-		.name		= "gpio",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_GPIO,
+-	}, {
+-		.name		= "usb-host",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_USBH,
+-	}, {
+-		.name		= "usb-device",
+-		.parent		= &clk_h,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_USBD,
+-	}, {
+-		.name		= "timers",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_PWMT,
+-	}, {
+-		.name		= "uart",
+-		.devname	= "s3c2412-uart.0",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_UART0,
+-	}, {
+-		.name		= "uart",
+-		.devname	= "s3c2412-uart.1",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_UART1,
+-	}, {
+-		.name		= "uart",
+-		.devname	= "s3c2412-uart.2",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_UART2,
+-	}, {
+-		.name		= "rtc",
+-		.parent		= &clk_p,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_RTC,
+-	}, {
+-		.name		= "watchdog",
+-		.parent		= &clk_p,
+-		.ctrlbit	= 0,
+-	}, {
+-		.name		= "usb-bus-gadget",
+-		.parent		= &clk_usb_bus,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_USB_DEV48,
+-	}, {
+-		.name		= "usb-bus-host",
+-		.parent		= &clk_usb_bus,
+-		.enable		= s3c2412_clkcon_enable,
+-		.ctrlbit	= S3C2412_CLKCON_USB_HOST48,
+-	}
+-};
+-
+-/* clocks to add where we need to check their parentage */
+-
+-struct clk_init {
+-	struct clk	*clk;
+-	unsigned int	 bit;
+-	struct clk	*src_0;
+-	struct clk	*src_1;
+-};
+-
+-static struct clk_init clks_src[] __initdata = {
+-	{
+-		.clk	= &clk_usysclk,
+-		.bit	= S3C2412_CLKSRC_USBCLK_HCLK,
+-		.src_0	= &clk_urefclk,
+-		.src_1	= &clk_upll,
+-	}, {
+-		.clk	= &clk_i2s,
+-		.bit	= S3C2412_CLKSRC_I2SCLK_MPLL,
+-		.src_0	= &clk_erefclk,
+-		.src_1	= &clk_mpll,
+-	}, {
+-		.clk	= &clk_cam,
+-		.bit	= S3C2412_CLKSRC_CAMCLK_HCLK,
+-		.src_0	= &clk_usysclk,
+-		.src_1	= &clk_h,
+-	}, {
+-		.clk	= &clk_msysclk,
+-		.bit	= S3C2412_CLKSRC_MSYSCLK_MPLL,
+-		.src_0	= &clk_mdivclk,
+-		.src_1	= &clk_mpll,
+-	}, {
+-		.clk	= &clk_uart,
+-		.bit	= S3C2412_CLKSRC_UARTCLK_MPLL,
+-		.src_0	= &clk_erefclk,
+-		.src_1	= &clk_mpll,
+-	}, {
+-		.clk	= &clk_usbsrc,
+-		.bit	= S3C2412_CLKSRC_USBCLK_HCLK,
+-		.src_0	= &clk_usysclk,
+-		.src_1	= &clk_h,
+-	/* here we assume  OM[4] select xtal */
+-	}, {
+-		.clk	= &clk_erefclk,
+-		.bit	= S3C2412_CLKSRC_EREFCLK_EXTCLK,
+-		.src_0	= &clk_xtal,
+-		.src_1	= &clk_ext,
+-	}, {
+-		.clk	= &clk_urefclk,
+-		.bit	= S3C2412_CLKSRC_UREFCLK_EXTCLK,
+-		.src_0	= &clk_xtal,
+-		.src_1	= &clk_ext,
+-	},
+-};
+-
+-/* s3c2412_clk_initparents
+- *
+- * Initialise the parents for the clocks that we get@start-time
+-*/
+-
+-static void __init s3c2412_clk_initparents(void)
+-{
+-	unsigned long clksrc = __raw_readl(S3C2412_CLKSRC);
+-	struct clk_init *cip = clks_src;
+-	struct clk *src;
+-	int ptr;
+-	int ret;
+-
+-	for (ptr = 0; ptr < ARRAY_SIZE(clks_src); ptr++, cip++) {
+-		ret = s3c24xx_register_clock(cip->clk);
+-		if (ret < 0) {
+-			printk(KERN_ERR "Failed to register clock %s (%d)\n",
+-			       cip->clk->name, ret);
+-		}
+-
+-		src = (clksrc & cip->bit) ? cip->src_1 : cip->src_0;
+-
+-		printk(KERN_INFO "%s: parent %s\n", cip->clk->name, src->name);
+-		clk_set_parent(cip->clk, src);
+-	}
+-}
+-
+-/* clocks to add straight away */
+-
+-static struct clk *clks[] __initdata = {
+-	&clk_ext,
+-	&clk_usb_bus,
+-	&clk_mrefclk,
+-	&clk_armclk,
+-};
+-
+-static struct clk_lookup s3c2412_clk_lookup[] = {
+-	CLKDEV_INIT(NULL, "clk_uart_baud1", &s3c24xx_uclk),
+-	CLKDEV_INIT(NULL, "clk_uart_baud2", &clk_p),
+-	CLKDEV_INIT(NULL, "clk_uart_baud3", &clk_usysclk),
+-};
+-
+-int __init s3c2412_baseclk_add(void)
+-{
+-	unsigned long clkcon  = __raw_readl(S3C2410_CLKCON);
+-	unsigned int dvs;
+-	struct clk *clkp;
+-	int ret;
+-	int ptr;
+-
+-	clk_upll.enable = s3c2412_upll_enable;
+-	clk_usb_bus.parent = &clk_usbsrc;
+-	clk_usb_bus.rate = 0x0;
+-
+-	clk_f.parent = &clk_msysclk;
+-
+-	s3c2412_clk_initparents();
+-
+-	for (ptr = 0; ptr < ARRAY_SIZE(clks); ptr++) {
+-		clkp = clks[ptr];
+-
+-		ret = s3c24xx_register_clock(clkp);
+-		if (ret < 0) {
+-			printk(KERN_ERR "Failed to register clock %s (%d)\n",
+-			       clkp->name, ret);
+-		}
+-	}
+-
+-	/* set the dvs state according to what we got at boot time */
+-
+-	dvs = __raw_readl(S3C2410_CLKDIVN) & S3C2412_CLKDIVN_DVSEN;
+-
+-	if (dvs)
+-		clk_armclk.parent = &clk_h;
+-
+-	printk(KERN_INFO "S3C2412: DVS is %s\n", dvs ? "on" : "off");
+-
+-	/* ensure usb bus clock is within correct rate of 48MHz */
+-
+-	if (clk_get_rate(&clk_usb_bus) != (48 * 1000 * 1000)) {
+-		printk(KERN_INFO "Warning: USB bus clock not at 48MHz\n");
+-
+-		/* for the moment, let's use the UPLL, and see if we can
+-		 * get 48MHz */
+-
+-		clk_set_parent(&clk_usysclk, &clk_upll);
+-		clk_set_parent(&clk_usbsrc, &clk_usysclk);
+-		clk_set_rate(&clk_usbsrc, 48*1000*1000);
+-	}
+-
+-	printk("S3C2412: upll %s, %ld.%03ld MHz, usb-bus %ld.%03ld MHz\n",
+-	       (__raw_readl(S3C2410_UPLLCON) & S3C2412_PLLCON_OFF) ? "off":"on",
+-	       print_mhz(clk_get_rate(&clk_upll)),
+-	       print_mhz(clk_get_rate(&clk_usb_bus)));
+-
+-	/* register clocks from clock array */
+-
+-	clkp = init_clocks;
+-	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks); ptr++, clkp++) {
+-		/* ensure that we note the clock state */
+-
+-		clkp->usage = clkcon & clkp->ctrlbit ? 1 : 0;
+-
+-		ret = s3c24xx_register_clock(clkp);
+-		if (ret < 0) {
+-			printk(KERN_ERR "Failed to register clock %s (%d)\n",
+-			       clkp->name, ret);
+-		}
+-	}
+-
+-	/* We must be careful disabling the clocks we are not intending to
+-	 * be using at boot time, as subsystems such as the LCD which do
+-	 * their own DMA requests to the bus can cause the system to lockup
+-	 * if they where in the middle of requesting bus access.
+-	 *
+-	 * Disabling the LCD clock if the LCD is active is very dangerous,
+-	 * and therefore the bootloader should be careful to not enable
+-	 * the LCD clock if it is not needed.
+-	*/
+-
+-	/* install (and disable) the clocks we do not need immediately */
+-
+-	clkp = init_clocks_disable;
+-	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks_disable); ptr++, clkp++) {
+-
+-		ret = s3c24xx_register_clock(clkp);
+-		if (ret < 0) {
+-			printk(KERN_ERR "Failed to register clock %s (%d)\n",
+-			       clkp->name, ret);
+-		}
+-
+-		s3c2412_clkcon_enable(clkp, 0);
+-	}
+-
+-	clkdev_add_table(s3c2412_clk_lookup, ARRAY_SIZE(s3c2412_clk_lookup));
+-	return 0;
+-}
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index 29f5812..a7b1269 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -122,7 +122,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idcode		= 0x32412001,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2412_map_io,
+-		.init_clocks	= s3c2412_init_clocks,
+ 		.init_uarts	= s3c2412_init_uarts,
+ 		.init		= s3c2412_init,
+ 		.name		= name_s3c2412,
+@@ -131,7 +130,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idcode		= 0x32412003,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2412_map_io,
+-		.init_clocks	= s3c2412_init_clocks,
+ 		.init_uarts	= s3c2412_init_uarts,
+ 		.init		= s3c2412_init,
+ 		.name		= name_s3c2412,
+@@ -539,6 +537,13 @@ void __init s3c2410_init_clocks(int xtal)
+ }
+ #endif
+ 
++#ifdef CONFIG_CPU_S3C2412
++void __init s3c2412_init_clocks(int xtal)
 +{
-+	struct samsung_clock_alias xti_alias = ALIAS(XTI, NULL, "xtal");
-+
-+	s3c2412_common_frate_clks[0].fixed_rate = xti_f;
-+	s3c2412_common_frate_clks[1].fixed_rate = ext_f;
-+	samsung_clk_register_fixed_rate(s3c2412_common_frate_clks,
-+				ARRAY_SIZE(s3c2412_common_frate_clks));
-+
-+	samsung_clk_register_alias(&xti_alias, 1);
++	s3c2412_common_clk_init(NULL, xtal, 0, S3C24XX_VA_CLKPWR);
 +}
++#endif
 +
+ #ifdef CONFIG_CPU_S3C2416
+ void __init s3c2416_init_clocks(int xtal)
+ {
+diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
+index 30124d1d..0f548c5 100644
+--- a/arch/arm/mach-s3c24xx/common.h
++++ b/arch/arm/mach-s3c24xx/common.h
+@@ -121,6 +121,10 @@ void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 				    int current_soc,
+ 				    void __iomem *reg_base);
+ #endif
++#ifdef CONFIG_S3C2412_COMMON_CLK
 +void __init s3c2412_common_clk_init(struct device_node *np, unsigned long xti_f,
-+				    unsigned long ext_f, void __iomem *reg_base)
++				    unsigned long ext_f, void __iomem *reg_base);
++#endif
+ #ifdef CONFIG_S3C2443_COMMON_CLK
+ void __init s3c2443_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 				    int current_soc,
+diff --git a/arch/arm/mach-s3c24xx/mach-jive.c b/arch/arm/mach-s3c24xx/mach-jive.c
+index 43c23e2..6c1a34f 100644
+--- a/arch/arm/mach-s3c24xx/mach-jive.c
++++ b/arch/arm/mach-s3c24xx/mach-jive.c
+@@ -506,11 +506,16 @@ static struct syscore_ops jive_pm_syscore_ops = {
+ static void __init jive_map_io(void)
+ {
+ 	s3c24xx_init_io(jive_iodesc, ARRAY_SIZE(jive_iodesc));
+-	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(jive_uartcfgs, ARRAY_SIZE(jive_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+ 
++static void __init jive_init_time(void)
 +{
-+	if (np) {
-+		reg_base = of_iomap(np, 0);
-+		if (!reg_base)
-+			panic("%s: failed to map registers\n", __func__);
-+	}
-+
-+	samsung_clk_init(np, reg_base, NR_CLKS, s3c2412_clk_regs,
-+			 ARRAY_SIZE(s3c2412_clk_regs), NULL, 0);
-+
-+	/* Register external clocks only in non-dt cases */
-+	if (!np)
-+		s3c2412_common_clk_register_fixed_ext(xti_f, ext_f);
-+
-+	/* Register PLLs. */
-+	samsung_clk_register_pll(s3c2412_plls, ARRAY_SIZE(s3c2412_plls),
-+				 reg_base);
-+
-+	/* Register common internal clocks. */
-+	samsung_clk_register_mux(s3c2412_muxes, ARRAY_SIZE(s3c2412_muxes));
-+	samsung_clk_register_div(s3c2412_dividers, ARRAY_SIZE(s3c2412_dividers));
-+	samsung_clk_register_gate(s3c2412_gates, ARRAY_SIZE(s3c2412_gates));
-+	samsung_clk_register_fixed_factor(s3c2412_ffactor,
-+					  ARRAY_SIZE(s3c2412_ffactor));
-+	samsung_clk_register_alias(s3c2412_aliases,
-+				   ARRAY_SIZE(s3c2412_aliases));
++	s3c2412_init_clocks(12000000);
++	samsung_timer_init();
 +}
 +
-+static void __init s3c2412_clk_init(struct device_node *np)
+ static void jive_power_off(void)
+ {
+ 	printk(KERN_INFO "powering system down...\n");
+@@ -664,6 +669,6 @@ MACHINE_START(JIVE, "JIVE")
+ 	.init_irq	= s3c2412_init_irq,
+ 	.map_io		= jive_map_io,
+ 	.init_machine	= jive_machine_init,
+-	.init_time	= samsung_timer_init,
++	.init_time	= jive_init_time,
+ 	.restart	= s3c2412_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-smdk2413.c b/arch/arm/mach-s3c24xx/mach-smdk2413.c
+index c9d31ef..cb1a0c7 100644
+--- a/arch/arm/mach-s3c24xx/mach-smdk2413.c
++++ b/arch/arm/mach-s3c24xx/mach-smdk2413.c
+@@ -105,11 +105,16 @@ static void __init smdk2413_fixup(struct tag *tags, char **cmdline,
+ static void __init smdk2413_map_io(void)
+ {
+ 	s3c24xx_init_io(smdk2413_iodesc, ARRAY_SIZE(smdk2413_iodesc));
+-	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(smdk2413_uartcfgs, ARRAY_SIZE(smdk2413_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+ 
++static void __init smdk2413_init_time(void)
 +{
-+	s3c2412_common_clk_init(np, 0, 0, 0);
++	s3c2412_init_clocks(12000000);
++	samsung_timer_init();
 +}
-+CLK_OF_DECLARE(s3c2412_clk, "samsung,s3c2412-clock", s3c2412_clk_init);
-diff --git a/include/dt-bindings/clock/samsung,s3c2412-clock.h b/include/dt-bindings/clock/samsung,s3c2412-clock.h
-new file mode 100644
-index 0000000..7c2c64e
---- /dev/null
-+++ b/include/dt-bindings/clock/samsung,s3c2412-clock.h
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants clock controllers of Samsung S3C2412.
-+ */
 +
-+#ifndef _DT_BINDINGS_CLOCK_SAMSUNG_S3C2412_CLOCK_H
-+#define _DT_BINDINGS_CLOCK_SAMSUNG_S3C2412_CLOCK_H
+ static void __init smdk2413_machine_init(void)
+ {	/* Turn off suspend on both USB ports, and switch the
+ 	 * selectable USB port to USB device mode. */
+@@ -158,6 +163,6 @@ MACHINE_START(SMDK2413, "SMDK2413")
+ 	.init_irq	= s3c2412_init_irq,
+ 	.map_io		= smdk2413_map_io,
+ 	.init_machine	= smdk2413_machine_init,
+-	.init_time	= samsung_timer_init,
++	.init_time	= smdk2413_init_time,
+ 	.restart	= s3c2412_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-vstms.c b/arch/arm/mach-s3c24xx/mach-vstms.c
+index f7ec9c5..d4ebaf4 100644
+--- a/arch/arm/mach-s3c24xx/mach-vstms.c
++++ b/arch/arm/mach-s3c24xx/mach-vstms.c
+@@ -142,11 +142,16 @@ static void __init vstms_fixup(struct tag *tags, char **cmdline,
+ static void __init vstms_map_io(void)
+ {
+ 	s3c24xx_init_io(vstms_iodesc, ARRAY_SIZE(vstms_iodesc));
+-	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(vstms_uartcfgs, ARRAY_SIZE(vstms_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+ 
++static void __init vstms_init_time(void)
++{
++	s3c2412_init_clocks(12000000);
++	samsung_timer_init();
++}
 +
-+/*
-+ * Let each exported clock get a unique index, which is used on DT-enabled
-+ * platforms to lookup the clock from a clock specifier. These indices are
-+ * therefore considered an ABI and so must not be changed. This implies
-+ * that new clocks should be added either in free spaces between clock groups
-+ * or at the end.
-+ */
-+
-+/* Core clocks. */
-+
-+#define XTI			1
-+#define MPLL			2
-+#define UPLL			3
-+#define MDIVCLK			4
-+#define MSYSCLK			5
-+#define USYSCLK			6
-+#define HCLK			7
-+#define PCLK			8
-+#define ARMDIV			9
-+#define ARMCLK			10
-+
-+
-+/* Special clocks */
-+#define SCLK_CAM		16
-+#define SCLK_UART		17
-+#define SCLK_I2S		18
-+#define SCLK_USBD		19
-+#define SCLK_USBH		20
-+
-+/* pclk-gates */
-+#define PCLK_WDT		32
-+#define PCLK_SPI		33
-+#define PCLK_I2S		34
-+#define PCLK_I2C		35
-+#define PCLK_ADC		36
-+#define PCLK_RTC		37
-+#define PCLK_GPIO		38
-+#define PCLK_UART2		39
-+#define PCLK_UART1		40
-+#define PCLK_UART0		41
-+#define PCLK_SDI		42
-+#define PCLK_PWM		43
-+#define PCLK_USBD		44
-+
-+/* hclk-gates */
-+#define HCLK_HALF		48
-+#define HCLK_X2			49
-+#define HCLK_SDRAM		50
-+#define HCLK_USBH		51
-+#define HCLK_LCD		52
-+#define HCLK_NAND		53
-+#define HCLK_DMA3		54
-+#define HCLK_DMA2		55
-+#define HCLK_DMA1		56
-+#define HCLK_DMA0		57
-+
-+/* Total number of clocks. */
-+#define NR_CLKS			(HCLK_DMA0 + 1)
-+
-+#endif /* _DT_BINDINGS_CLOCK_SAMSUNG_S3C2412_CLOCK_H */
+ static void __init vstms_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -162,6 +167,6 @@ MACHINE_START(VSTMS, "VSTMS")
+ 	.init_irq	= s3c2412_init_irq,
+ 	.init_machine	= vstms_init,
+ 	.map_io		= vstms_map_io,
+-	.init_time	= samsung_timer_init,
++	.init_time	= vstms_init_time,
+ 	.restart	= s3c2412_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/s3c2412.c b/arch/arm/mach-s3c24xx/s3c2412.c
+index 0251650c..99bb867 100644
+--- a/arch/arm/mach-s3c24xx/s3c2412.c
++++ b/arch/arm/mach-s3c24xx/s3c2412.c
+@@ -173,49 +173,6 @@ void __init s3c2412_map_io(void)
+ 
+ void __init_or_cpufreq s3c2412_setup_clocks(void)
+ {
+-	struct clk *xtal_clk;
+-	unsigned long tmp;
+-	unsigned long xtal;
+-	unsigned long fclk;
+-	unsigned long hclk;
+-	unsigned long pclk;
+-
+-	xtal_clk = clk_get(NULL, "xtal");
+-	xtal = clk_get_rate(xtal_clk);
+-	clk_put(xtal_clk);
+-
+-	/* now we've got our machine bits initialised, work out what
+-	 * clocks we've got */
+-
+-	fclk = s3c24xx_get_pll(__raw_readl(S3C2410_MPLLCON), xtal * 2);
+-
+-	clk_mpll.rate = fclk;
+-
+-	tmp = __raw_readl(S3C2410_CLKDIVN);
+-
+-	/* work out clock scalings */
+-
+-	hclk = fclk / ((tmp & S3C2412_CLKDIVN_HDIVN_MASK) + 1);
+-	hclk /= ((tmp & S3C2412_CLKDIVN_ARMDIVN) ? 2 : 1);
+-	pclk = hclk / ((tmp & S3C2412_CLKDIVN_PDIVN) ? 2 : 1);
+-
+-	/* print brieft summary of clocks, etc */
+-
+-	printk("S3C2412: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
+-	       print_mhz(fclk), print_mhz(hclk), print_mhz(pclk));
+-
+-	s3c24xx_setup_clocks(fclk, hclk, pclk);
+-}
+-
+-void __init s3c2412_init_clocks(int xtal)
+-{
+-	/* initialise the clocks here, to allow other things like the
+-	 * console to use them
+-	 */
+-
+-	s3c24xx_register_baseclocks(xtal);
+-	s3c2412_setup_clocks();
+-	s3c2412_baseclk_add();
+ }
+ 
+ /* need to register the subsystem before we actually register the device, and
 -- 
 1.7.10.4
