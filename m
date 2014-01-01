@@ -1,26 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Jan 2014 13:24:43 +0000
-Subject: [PATCH 0/2] spi: clps711x: SPI driver refactor
-In-Reply-To: <1388556488-10887-1-git-send-email-shc_work@mail.ru>
-References: <1388556488-10887-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140101132443.GQ31886@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 01 Jan 2014 14:41:54 +0100
+Subject: [PATCH 0/3] ARM: S3C24XX: convert s3c2412 to common clock framework
+Message-ID: <1418190.fUL06mDNi6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 01, 2014 at 10:08:08AM +0400, Alexander Shiyan wrote:
+This series concludes the move of s3c24xx to the common clock framework
+by converting the only remaining cpu-type s3c2412/s3c2413.
 
-> Since we do not have any platform users of this driver,
-> non-DT support is removed. DT users will be introduced later
-> once DT support for this platform will be completed.
-> "ACK" from arm-soc maintainers will be useful here.
+The plls are the same as on the s3c2440/s3c2442 so no new types need to
+be introduced.
 
-That's not likely to happen given that you didn't CC them, though it
-shouldn't be need anyway - there's no reason for the arm-soc guys to
-have to review driver changes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/2ba37789/attachment.sig>
+As before the conversion is done by a mix of datasheet data and the
+pre-existing clock code and as this time I have no hardware of this type,
+it is compile-tested only. So hopefully somebody with s3c2412 hw
+will be able to test it for real.
+
+The only thing left now is to grab a broom and remove the now unused
+remnants of the legacy clock from s3c24xx.
+
+Heiko Stuebner (3):
+  dt-bindings: add documentation for s3c2412 clock controller
+  clk: samsung: add clock controller driver for s3c2412
+  ARM: S3C24XX: convert s3c2412 to common clock framework
+
+ .../bindings/clock/samsung,s3c2412-clock.txt       |   51 ++
+ arch/arm/mach-s3c24xx/Kconfig                      |    8 +-
+ arch/arm/mach-s3c24xx/Makefile                     |    2 +-
+ arch/arm/mach-s3c24xx/clock-s3c2412.c              |  761 --------------------
+ arch/arm/mach-s3c24xx/common.c                     |    9 +-
+ arch/arm/mach-s3c24xx/common.h                     |    4 +
+ arch/arm/mach-s3c24xx/mach-jive.c                  |    9 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c              |    9 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c                 |    9 +-
+ arch/arm/mach-s3c24xx/s3c2412.c                    |   43 --
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-s3c2412.c                  |  221 ++++++
+ include/dt-bindings/clock/samsung,s3c2412-clock.h  |   73 ++
+ 13 files changed, 386 insertions(+), 814 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2412-clock.txt
+ delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2412.c
+ create mode 100644 drivers/clk/samsung/clk-s3c2412.c
+ create mode 100644 include/dt-bindings/clock/samsung,s3c2412-clock.h
+
+-- 
+1.7.10.4
