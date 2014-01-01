@@ -1,47 +1,43 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  1 Jan 2014 10:10:09 +0400
-Subject: [PATCH 2/2] spi: clps711x: dts: Add bindings documentation for the
- CLPS711X SPI
-Message-ID: <1388556609-11040-1-git-send-email-shc_work@mail.ru>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Wed, 1 Jan 2014 13:18:22 +0100
+Subject: [ARM] Fix kernel compile error: drivers/crypto/ixp4xx_crypto.c.
+In-Reply-To: <20131231181427.GE16456@n2100.arm.linux.org.uk>
+References: <m3d2kduwd7.fsf@t19.piap.pl>
+ <20131231134820.GS8064@book.gsilab.sittig.org>
+ <20131231181427.GE16456@n2100.arm.linux.org.uk>
+Message-ID: <20140101121822.GA20094@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the devicetree documentation for the
-Cirrus Logic CLPS711X SPI.
+On Tue, Dec 31, 2013 at 18:14 +0000, Russell King - ARM Linux wrote:
+> 
+> Please get rid of your Mail-Followup-To: header:
+> 
+> Mail-Followup-To: Krzysztof Ha?asa <khalasa@piap.pl>,                           
+>         lkml <linux-kernel@vger.kernel.org>,                                    
+>         linux-arm-kernel at lists.infradead.org,                                   
+>         Russell King <rmk+kernel@arm.linux.org.uk>,                             
+>         Christian Hohnstaedt <chohnstaedt@innominate.com>,                      
+>         Herbert Xu <herbert@gondor.apana.org.au>                                
+> User-Agent: Mutt/1.5.21 (2010-09-15)                                            
+> 
+> It causes all recipients following the thread to be moved into the To:
+> header when someone replies to one of your messages, which is deemed to
+> be anti-social.  You can kill this header by adding:
+> 
+> 	set followup_to=no
+> 
+> to your .muttrc file.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- .../devicetree/bindings/spi/spi-clps711x.txt       | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-clps711x.txt
+Thank you for telling me, I was not aware.  Had no MFT related
+setting in my config, learned from the manual that $followup_to
+defaults to yes, have turned it off now.  Other mutt users may
+want to check as well.  Happy new year! :)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-clps711x.txt b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
-new file mode 100644
-index 0000000..aa16903
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
-@@ -0,0 +1,22 @@
-+* ARM CLPS711X Serial Peripheral Interface (SPI)
-+
-+Required properties:
-+- compatible: Should be "cirrus,clps711x-spi".
-+- reg: Offset and length of the register set for the device.
-+- interrupts: Should contain SPI interrupt.
-+- clocks: Phandle to SPI clock.
-+- syscon: Phandle to SYSCON node used for SPI control (SYSCON3).
-+- cs-gpios: Specifies the GPIO pins to be used for chipselects.
-+
-+Example:
-+	spi: spi at 80000500 {
-+		compatible = "cirrus,clps711x-spi";
-+		reg = <0x80000500 0x4>;
-+		interrupts = <15>;
-+		clocks = <&clks 10>;
-+		syscon = <&syscon3>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cs-gpios = <&portb 4 GPIO_ACTIVE_LOW>,
-+			   <&portb 5 GPIO_ACTIVE_LOW>;
-+	};
+
+virtually yours
+Gerhard Sittig
 -- 
-1.8.3.2
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
