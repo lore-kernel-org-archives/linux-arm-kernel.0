@@ -1,35 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jan 2014 12:46:25 +0000
-Subject: [ARM] Fix kernel compile error: drivers/crypto/ixp4xx_crypto.c.
-In-Reply-To: <20140101123746.GB20094@book.gsilab.sittig.org>
-References: <m3d2kduwd7.fsf@t19.piap.pl>
- <20131231134820.GS8064@book.gsilab.sittig.org>
- <52C3066E.1070909@infradead.org>
- <20140101123746.GB20094@book.gsilab.sittig.org>
-Message-ID: <20140101124625.GF16456@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Jan 2014 13:23:34 +0000
+Subject: [PATCH 1/2] spi: clps711x: Driver refactor
+In-Reply-To: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
+References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140101132334.GP31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 01, 2014 at 01:37:46PM +0100, Gerhard Sittig wrote:
-> Last time I checked (few days ago, 'git grep -w Fixes:') it
-> wasn't, at least not within the kernel source tree and its
-> Documentation hierarchy.  Today's master still does not have it.
-> 
-> But a quick search in recent LAKML messages reveals that it's
-> been in use by e.g. Olof Johansson, Jason Cooper, Rusty Russell,
-> Dan Carpenter, Russell King, Mark Brown, Stephen Warren, Paul
-> Walmsley, and I'm not making this up but am just referring to
-> what repeatedly was requested in the past.  The form used there
-> was "Fixes: <hash> (<oneline>)" though.  A doc update may be due
-> to have a canonical format.
+On Wed, Jan 01, 2014 at 10:09:28AM +0400, Alexander Shiyan wrote:
+> This is a complex patch for refactoring CLPS711X SPI driver.
+> Major changes:
+> - Eliminate <mach/hardware.h> usage.
+> - Devicetree support.
 
-It was discussed at kernel summit, and I believe the resulting format
-was only published in one of the kernel summit mailing lists.  The
-outcome of it as I understand was that the format is:
+This really needs to be broken up into smaller changes so it can be
+reviewed, your summary would be good as the cover mail for a patch
+series but not for a single commit.  We need one change per commit with
+a clear commit message saying what's going on.
 
-Fixes: <hash> ("<one line summary>")
+There's a large set of changes here with no explanation of most of them
+which means I can't really tell if the changes are doing what they're
+supposed to and at least some of them seem to be doing things beyond
+either description above.  I'd expect at least two changes, one for the
+mach/hardware.h elimination and one for the bindings, but probably each
+of those should be split into several changes.  For example the bindings
+changes might have some patches doing refactorings before adding the
+actual bindings.
 
-Though the addition of the quotes was (iirc) only something added after
-the vocal discussion.  If you mail Linus a patch with a fixes line which
-doesn't match that, Linus will probably fix it up... (Linus has done that
-with one of mine in the past.)
+> -	/* We are expect that SPI-device is not selected */
+> -	gpio_direction_output(hw->chipselect[spi->chip_select],
+> -			      !(spi->mode & SPI_CS_HIGH));
+> +		ret = devm_gpio_request(&spi->master->dev, spi->cs_gpio, NULL);
+> +		if (ret)
+> +			return ret;
+
+For example this is a refectoring to use devm and request the GPIO which
+is good but definitely not something I'd expect to see happening in the
+same commit as anything mentioned in the changelog.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/91591fc5/attachment.sig>
