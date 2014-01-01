@@ -1,171 +1,60 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 30 Jan 2014 12:08:06 +0100
-Subject: [PATCH v3 5/5] ASoC: tda998x: adjust the audio CTS_N pre-divider from
- audio format
-In-Reply-To: <cover.1391274627.git.moinejf@free.fr>
-References: <cover.1391274627.git.moinejf@free.fr>
-Message-ID: <df65a2de7d4afc2471846c02b73e8bbdc4f9a743.1391274628.git.moinejf@free.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  1 Jan 2014 10:30:48 +0800
+Subject: [PATCH v3 3/5] ARM: dts: sun7i: external clock outputs
+In-Reply-To: <1388543450-16741-1-git-send-email-wens@csie.org>
+References: <1388543450-16741-1-git-send-email-wens@csie.org>
+Message-ID: <1388543450-16741-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some boards, with I2S input, the NXP TDA998x HDMI transmitter did
-not play audio streams with a sample width lower than S16_32.
+This commit adds the two external clock outputs available on A20 to
+its device tree. A dummy fixed factor clock is also added to serve as
+the first input of the clock outputs, which according to AW's A20 user
+manual, is the 24MHz oscillator divided by 750.
 
-This patch adjusts the CTS_N predivider according to the used sample
-width.
-
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 25 +++++++++++++++++++++----
- include/drm/i2c/tda998x.h         |  5 ++++-
- sound/soc/codecs/tda998x.c        | 18 ++++++++++++++----
- 3 files changed, 39 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index b833fa5..66013ba 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -22,6 +22,7 @@
- #include <linux/irq.h>
- #include <linux/of_platform.h>
- #include <sound/asoundef.h>
-+#include <sound/pcm_params.h>
- 
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
-@@ -48,6 +49,8 @@ struct tda998x_priv {
- 	volatile int wq_edid_wait;
- 	struct drm_encoder *encoder;
- 
-+	int audio_sample_format;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index c0fb390..e192c99 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -303,6 +303,34 @@
+ 			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
+ 			clock-output-names = "mbus";
+ 		};
 +
- 	u8 *eld;
- };
- 
-@@ -664,7 +667,18 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 		reg_write(priv, REG_MUX_AP, MUX_AP_SELECT_I2S);
- 		clksel_aip = AIP_CLKSEL_AIP_I2S;
- 		clksel_fs = AIP_CLKSEL_FS_ACLK;
--		cts_n = CTS_N_M(3) | CTS_N_K(3);
-+		switch (priv->audio_sample_format) {
-+		case SNDRV_PCM_FORMAT_S16_LE:
-+			cts_n = CTS_N_M(3) | CTS_N_K(1);
-+			break;
-+		case SNDRV_PCM_FORMAT_S24_LE:
-+			cts_n = CTS_N_M(3) | CTS_N_K(2);
-+			break;
-+		default:
-+		case SNDRV_PCM_FORMAT_S32_LE:
-+			cts_n = CTS_N_M(3) | CTS_N_K(3);
-+			break;
-+		}
- 		aclk = 1;				/* clock enable */
- 		break;
- 
-@@ -745,13 +759,14 @@ EXPORT_SYMBOL_GPL(tda998x_audio_get_eld);
- 
- void tda998x_audio_update(struct i2c_client *client,
- 			int format,
--			int port)
-+			int port,
-+			struct snd_pcm_hw_params *params)
- {
- 	struct tda998x_priv *priv = i2c_get_clientdata(client);
- 	struct tda998x_encoder_params *p = &priv->params;
- 
- 	/* if the audio output is active, it may be a second start or a stop */
--	if (format == 0 || priv->audio_active) {
-+	if (format == 0 || !params || priv->audio_active) {
- 		if (format == 0) {
- 			priv->audio_active = 0;
- 			reg_write(priv, REG_ENA_AP, 0);
-@@ -763,11 +778,13 @@ void tda998x_audio_update(struct i2c_client *client,
- 	p->audio_cfg = port;
- 
- 	/* don't restart audio if same input format */
--	if (format == p->audio_format) {
-+	if (format == p->audio_format &&
-+	    params_format(params) == priv->audio_sample_format) {
- 		reg_write(priv, REG_ENA_AP, p->audio_cfg);
- 		return;
- 	}
- 	p->audio_format = format;
-+	priv->audio_sample_format = params_format(params);
- 
- 	tda998x_configure_audio(priv, &priv->encoder->crtc->hwmode, p);
- }
-diff --git a/include/drm/i2c/tda998x.h b/include/drm/i2c/tda998x.h
-index 99387ae..62b838f 100644
---- a/include/drm/i2c/tda998x.h
-+++ b/include/drm/i2c/tda998x.h
-@@ -27,8 +27,11 @@ struct tda998x_encoder_params {
- 	unsigned audio_sample_rate;
- };
- 
-+struct snd_pcm_hw_params;
++		/*
++		 * Dummy clock used by output clocks
++		 */
++		osc24M_32k: clk at 1 {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clock-div = <750>;
++			clock-mult = <1>;
++			clocks = <&osc24M>;
++			clock-output-names = "osc24M_32k";
++		};
 +
- u8 *tda998x_audio_get_eld(struct i2c_client *client);
- void tda998x_audio_update(struct i2c_client *client,
- 			int format,
--			int port);
-+			int port,
-+			struct snd_pcm_hw_params *params);
- #endif
-diff --git a/sound/soc/codecs/tda998x.c b/sound/soc/codecs/tda998x.c
-index 0493163..a1de35d 100644
---- a/sound/soc/codecs/tda998x.c
-+++ b/sound/soc/codecs/tda998x.c
-@@ -47,7 +47,8 @@ static int tda_get_encoder(struct tda_priv *priv)
- 	return 0;
- }
- 
--static int tda_start_stop(struct tda_priv *priv)
-+static int tda_start_stop(struct tda_priv *priv,
-+			struct snd_pcm_hw_params *params)
- {
- 	int port;
- 
-@@ -56,7 +57,7 @@ static int tda_start_stop(struct tda_priv *priv)
- 		port = priv->ports[0];
- 	else
- 		port = priv->ports[1];
--	tda998x_audio_update(priv->i2c_client, priv->dai_id, port);
-+	tda998x_audio_update(priv->i2c_client, priv->dai_id, port, params);
- 	return 0;
- }
- 
-@@ -136,9 +137,17 @@ static int tda_startup(struct snd_pcm_substream *substream,
- 		stream->channels_max = max_channels;
- 		stream->formats = formats;
- 	}
-+	return 0;
-+}
++		clk_out_a: clk at 01c201f0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun7i-a20-out-clk";
++			reg = <0x01c201f0 0x4>;
++			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
++			clock-output-names = "clk_out_a";
++		};
 +
-+static int tda_hw_params(struct snd_pcm_substream *substream,
-+			struct snd_pcm_hw_params *params,
-+			struct snd_soc_dai *dai)
-+{
-+	struct tda_priv *priv = snd_soc_codec_get_drvdata(dai->codec);
++		clk_out_b: clk at 01c201f4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun7i-a20-out-clk";
++			reg = <0x01c201f4 0x4>;
++			clocks = <&osc24M_32k>, <&osc32k>, <&osc24M>;
++			clock-output-names = "clk_out_b";
++		};
+ 	};
  
- 	/* start the TDA998x audio */
--	return tda_start_stop(priv);
-+	return tda_start_stop(priv, params);
- }
- 
- static void tda_shutdown(struct snd_pcm_substream *substream,
-@@ -147,11 +156,12 @@ static void tda_shutdown(struct snd_pcm_substream *substream,
- 	struct tda_priv *priv = snd_soc_codec_get_drvdata(dai->codec);
- 
- 	priv->dai_id = 0;		/* streaming stop */
--	tda_start_stop(priv);
-+	tda_start_stop(priv, NULL);
- }
- 
- static const struct snd_soc_dai_ops tda_ops = {
- 	.startup = tda_startup,
-+	.hw_params = tda_hw_params,
- 	.shutdown = tda_shutdown,
- };
- 
+ 	soc at 01c00000 {
 -- 
-1.9.rc1
+1.8.5.2
