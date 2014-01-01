@@ -1,13 +1,15 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 1 Jan 2014 16:44:36 -0500
+Date: Wed, 1 Jan 2014 16:45:52 -0500
 Subject: [RFC PATCH 3/3] i2c: mv64xxx: Document the newly introduced
  Armada XP A0 compatible
 In-Reply-To: <1388508293-9141-4-git-send-email-gregory.clement@free-electrons.com>
 References: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
  <1388508293-9141-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140101214436.GA19878@titan.lakedaemon.net>
+Message-ID: <20140101214552.GB19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+[+ DT ml, Grant, Rob]
 
 On Tue, Dec 31, 2013 at 05:44:53PM +0100, Gregory CLEMENT wrote:
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
