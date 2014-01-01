@@ -1,32 +1,42 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Wed, 01 Jan 2014 15:40:46 +0100
-Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
- CONFIG_ARM_PATCH_PHYS_VIRT.
-In-Reply-To: <20131231112301.GC16456@n2100.arm.linux.org.uk> (Russell King's
- message of "Tue, 31 Dec 2013 11:23:02 +0000")
-References: <m38uv1uuzr.fsf@t19.piap.pl>
- <20131231112301.GC16456@n2100.arm.linux.org.uk>
-Message-ID: <m3bnzvsr2p.fsf@t19.piap.pl>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Jan 2014 15:07:37 +0000
+Subject: [PATCH 1/2] spi: clps711x: Driver refactor
+In-Reply-To: <1388583851.810843204@f301.i.mail.ru>
+References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
+ <20140101132334.GP31886@sirena.org.uk>
+ <1388583851.810843204@f301.i.mail.ru>
+Message-ID: <20140101150737.GR31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Wed, Jan 01, 2014 at 05:44:11PM +0400, Alexander Shiyan wrote:
 
-> On Tue, Dec 31, 2013 at 12:20:56PM +0100, Krzysztof Ha?asa wrote:
->> arch/arm/mm/init.c: In function 'setup_dma_zone':
->> arch/arm/mm/init.c:232:19: error: '__pv_phys_offset' undeclared (first use in this function)
->> 
->> Reverting the following commit fixes it:
->
-> Already fixed long before Christmas.  Please use recent kernels.
+> I wrote that this is a complex patch. This is not a fix, but new driver,
+> many things are done differently.
+> I do not see a way to separate these changes.
 
-Do you mean something other than Linus's tree? The problem I noted
-is present in his tree as of Dec 30 - on both 3.13-rc6 and (then tip)
-71ce176ee6ed1735b9a1160a5704a915d13849b1.
+I already mentioned one thing that could be done incrementally (the
+conversion to devm), from the glance I took through the code there's
+several other things that jump out and like I said at least splitting
+the hardware.h removal from the device tree changes would be a start. 
 
-Or... do you mean the commit that added this regression?
--- 
-Krzysztof Halasa
+Nothing in what you said the change did nor in the change itself
+suggested that it would be impossible to break things up, I'm not
+convinced that any attempt has been made to split anything out.
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+> As an alternative, I can create patch to remove current driver,
+> then re-adding new one.  Will be more convenient to watch. Is it better? 
+
+No, that's really not good.  It's very rare that we just completely
+rewrite a driver especially not one that's been around for a while -
+there needs to be a really good reason for it.  This is a key part of
+how the development process works, incremental improvements and code
+review.  Doing this both helps improve quality control on changes and
+allows collaboration.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/520fd267/attachment.sig>
