@@ -1,52 +1,42 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  1 Jan 2014 10:30:45 +0800
-Subject: [PATCH v3 0/5] clk: sunxi: add A20 external output clock support
-Message-ID: <1388543450-16741-1-git-send-email-wens@csie.org>
+Date: Wed,  1 Jan 2014 10:30:49 +0800
+Subject: [PATCH v3 4/5] pinctrl: sunxi: Add Allwinner A20 clock output pin
+ functions
+In-Reply-To: <1388543450-16741-1-git-send-email-wens@csie.org>
+References: <1388543450-16741-1-git-send-email-wens@csie.org>
+Message-ID: <1388543450-16741-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This patch adds the clock output pin functions on the A20.
+The 2 pins can output a configurable clock to be used by
+external modules. This is used on the CubieTruck, to supply
+a 32768 Hz low power clock to the onboard Wifi+BT module.
 
-This is v3 of A20 external output clock support patch series,
-addressing issues raised by Maxime.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-sunxi-pins.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The patch series builds upon Emilio's clock series, and adds
-support for external output clocks on the Allwinner A20 SoC.
-The outputs can be used to supply a stable clock to external
-modules, such as WiFi or Bluetooth.
-
-Mike Turquette has already taken patch #1 via Emilio's pull
-request.
-
-Changes since v2:
-
-  - #2, #3: Change dummy clock names to clk at N
-  - #5: Change pin mux labels to clk_out_[ab]_pins_a
-
-Changes since v1:
-
-  - Add clock binding to sunxi clock DT binding documentation
-  - Rename clock nodes to match device tree conventions
-  - Add commit message for pin function/mux commits
-  - Add comments to pin functions
-
-
-Cheers,
-ChenYu
-
-
-Chen-Yu Tsai (5):
-  clk: sunxi: Allwinner A20 output clock support
-  ARM: dts: sun7i: Change 32768 Hz oscillator node name to clk at N style
-  ARM: dts: sun7i: external clock outputs
-  pinctrl: sunxi: Add Allwinner A20 clock output pin functions
-  ARM: dts: sun7i: Add pin muxing options for clock outputs
-
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- arch/arm/boot/dts/sun7i-a20.dtsi                  | 45 +++++++++++++++++-
- drivers/clk/sunxi/clk-sunxi.c                     | 57 +++++++++++++++++++++++
- drivers/pinctrl/pinctrl-sunxi-pins.h              |  2 +
- 4 files changed, 104 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
+index 2c7446a..6fd8d4d 100644
+--- a/drivers/pinctrl/pinctrl-sunxi-pins.h
++++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
+@@ -3774,12 +3774,14 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* TX */
++		  SUNXI_FUNCTION(0x4, "clk_out_a"),	/* CLK_OUT_A */
+ 		  SUNXI_FUNCTION_IRQ(0x5, 24)),		/* EINT24 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI13,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
+ 		  SUNXI_FUNCTION(0x3, "uart6"),		/* RX */
++		  SUNXI_FUNCTION(0x4, "clk_out_b"),	/* CLK_OUT_B */
+ 		  SUNXI_FUNCTION_IRQ(0x5, 25)),		/* EINT25 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PI14,
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
 1.8.5.2
