@@ -1,27 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Jan 2014 23:58:46 +0100
-Subject: [PATCHv2 1/1] ARM: sunxi: select ARM_PSCI
-In-Reply-To: <1388595775-20737-1-git-send-email-zalan.blenessy@gmail.com>
-References: <1387973466-5067-1-git-send-email-zalan.blenessy@gmail.com>
- <1388595775-20737-1-git-send-email-zalan.blenessy@gmail.com>
-Message-ID: <20140101225846.GC3144@lukather>
+Date: Wed, 1 Jan 2014 23:56:43 +0100
+Subject: [PATCH] ARM: sunxi: Select RESET_CONTROLLER
+In-Reply-To: <1388417849-7728-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1388417849-7728-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140101225643.GA3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zalan,
-
-On Wed, Jan 01, 2014 at 06:02:55PM +0100, Zalan Blenessy wrote:
-> On Allwinner sun7i (A20) SoCs, the SMP operations are implemented in 
-> u-boot, and exposed to the kernel through PSCI. 
+On Mon, Dec 30, 2013 at 04:37:29PM +0100, Maxime Ripard wrote:
+> The current code selects ARCH_HAS_RESET_CONTROLLER, that enables the
+> RESET_CONTROLLER option by default, but doesn't select it, so a configuration
+> might unselect it, leading to compilation error.
 > 
-> We thus need to enable PSCI support for Allwinner SoCs so that the 
-> kernel uses it to bring up the additionnal cores.
+> Explictly select RESET_CONTROLLER so that we can't have this breakage anymore.
 > 
-> Signed-off-by: Signed-off-by: Zalan Blenessy <zalan.blenessy@gmail.com>
+> Reported-by: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks!
-
-Applied in sunxi/core-for-3.14.
+Merged in sunxi/core-for-3.14.
 
 Maxime
 
@@ -35,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/addfb7ba/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140101/1da3dc11/attachment.sig>
