@@ -1,16 +1,15 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Jan 2014 17:24:13 +0000
-Subject: [BUG] shmobile build failure
-Message-ID: <20140102172413.GB7383@n2100.arm.linux.org.uk>
+Date: Thu, 2 Jan 2014 17:26:25 +0000
+Subject: [BUG] More select madness - keystone
+Message-ID: <20140102172625.GC7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-allmodconfig and allyesconfig fail with this error:
+warning: (ARCH_KEYSTONE && SPI_DAVINCI) selects TI_EDMA which has unmet direct dependencies (DMADEVICES && (ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE))
 
-arch/arm/mach-shmobile/setup-rcar-gen2.c:21:32: fatal error: linux/clk/shmobile.h: No such file or directory
-
-My guess is that shmobile on its own doesn't build because of this.
-Is there a screwed dependency between arm-soc and the clk git trees?
+This results in the EDMA engine code not being built.  Yet another
+example of why improper use of the "select" statement is bad news
+and leads to broken configurations.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
