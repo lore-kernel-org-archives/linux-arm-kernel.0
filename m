@@ -1,29 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Jan 2014 12:08:40 -0800
-Subject: [PATCH 1/3] ARM: bcm2835: Fix grammar in help message
-In-Reply-To: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
-References: <1388112192-4762-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140102200840.GD19720@quad.lixom.net>
+Date: Thu, 2 Jan 2014 12:11:37 -0800
+Subject: [GIT PULL 1/2] ARM: imx: soc changes for 3.14
+In-Reply-To: <20131231053444.GB22122@S2101-09.ap.freescale.net>
+References: <20131231053444.GB22122@S2101-09.ap.freescale.net>
+Message-ID: <20140102201137.GE19720@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 26, 2013 at 07:43:09PM -0700, Stephen Warren wrote:
-> From: Stefan Weil <sw@weilnetz.de>
+On Tue, Dec 31, 2013 at 01:34:46PM +0800, Shawn Guo wrote:
+> The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
 > 
-> Replace "is use" by "is used" and remove a comma.
+>   Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
 > 
-> Signed-off-by: Stefan Weil <sw@weilnetz.de>
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> Since I only have 3 patches for bcm2835 this kernel cycle, and they'll
-> likely go into different branches, I'm just re-sending them for direct
-> application. These patches are already in linux-next, but since there
-> are no linux-next being built at the moment, I've reset bcm2835's
-> for-next to remove them, so there will be no conflict.
+> are available in the git repository at:
 > 
-> I imagine this would go into a "soc" branch in arm-soc.
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.14
+> 
+> for you to fetch changes up to 48c95841110036a95840c6782f27d841ead9a583:
+> 
+>   ARM: imx: improve the comment of CCM lpm SW workaround (2013-12-31 09:36:48 +0800)
 
-Applied 1-3 (in next/fixes-non-critical, next/dt and next/boards respectively)
+Pulled, thanks.
 
 
 -Olof
