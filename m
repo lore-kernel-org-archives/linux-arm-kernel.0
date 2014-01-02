@@ -1,24 +1,36 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Thu, 02 Jan 2014 10:36:46 +0800
-Subject: [PATCH] thermal: imx_thermal: add module device table
-In-Reply-To: <20131219111035.GJ4360@n2100.arm.linux.org.uk>
-References: <E1Vsg3A-0008Q1-9O@rmk-PC.arm.linux.org.uk>
- <52B1B587.3050106@ti.com> <20131219111035.GJ4360@n2100.arm.linux.org.uk>
-Message-ID: <1388630206.3739.72.camel@rzhang1-mobl4>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 2 Jan 2014 10:41:23 +0800
+Subject: [PATCH v3 3/5] ARM: dts: sun7i: external clock outputs
+In-Reply-To: <20140101231039.GG3144@lukather>
+References: <1388543450-16741-1-git-send-email-wens@csie.org>
+ <1388543450-16741-4-git-send-email-wens@csie.org>
+ <20140101231039.GG3144@lukather>
+Message-ID: <CAGb2v66WrvasyFohuGhYvTPNHwh1VdUejMa8m8QTakg6BPG-uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-19 at 11:10 +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 18, 2013 at 10:47:35AM -0400, Eduardo Valentin wrote:
-> > On 16-12-2013 17:50, Russell King wrote:
-> > > Add the module device table declaration so the module can be loaded
-> > > automatically at boot time.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> 
-applied.
+Hi,
 
-thanks,
-rui
+On Thu, Jan 2, 2014 at 7:10 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Jan 01, 2014 at 10:30:48AM +0800, Chen-Yu Tsai wrote:
+>> This commit adds the two external clock outputs available on A20 to
+>> its device tree. A dummy fixed factor clock is also added to serve as
+>> the first input of the clock outputs, which according to AW's A20 user
+>> manual, is the 24MHz oscillator divided by 750.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> I'm ok with this patch, but I'll let Emilio and Mike give their
+> opinion on the driver before merging it.
+
+The driver has not changed since v1.
+Mike merged it via Emilio's pull request.
+
+Or are you referring to the DT part?
+
+
+Cheers,
+ChenYu
