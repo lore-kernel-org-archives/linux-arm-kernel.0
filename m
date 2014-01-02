@@ -1,26 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 2 Jan 2014 14:37:07 -0500
-Subject: [BUG] More select madness - keystone
-In-Reply-To: <52C5BB4A.6010802@ti.com>
-References: <20140102172625.GC7383@n2100.arm.linux.org.uk>
- <52C5BB4A.6010802@ti.com>
-Message-ID: <52C5BFE3.6050408@ti.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 2 Jan 2014 11:38:56 -0800
+Subject: v3.13-rc6+ regression (ARM board)
+In-Reply-To: <m3ppoatwn1.fsf@t19.piap.pl>
+References: <m3mwjhux0e.fsf@t19.piap.pl> <20131231104511.GA9688@1wt.eu>
+ <m3txdmu2ez.fsf@t19.piap.pl>
+ <20140102101455.GG10158@pengutronix.de>
+ <m3ppoatwn1.fsf@t19.piap.pl>
+Message-ID: <CA+55aFyZ0EXYkHd-BhQo6K++qKJVPdGeDbFTVTs3pAPCHFUpOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 January 2014 02:17 PM, Santosh Shilimkar wrote:
-> On Thursday 02 January 2014 12:26 PM, Russell King - ARM Linux wrote:
->> warning: (ARCH_KEYSTONE && SPI_DAVINCI) selects TI_EDMA which has unmet direct dependencies (DMADEVICES && (ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE))
->>
->> This results in the EDMA engine code not being built.  Yet another
->> example of why improper use of the "select" statement is bad news
->> and leads to broken configurations.
->>
-> Thanks for reporting Russell. Will have a look.
-> 
-Just to be clear for records, the select was introduced before
-KEYSTONE support was enabled. As per git blame, it came via commit
-b5f1433059 {spi: davici - make davinci select edma}.
+On Thu, Jan 2, 2014 at 4:07 AM, Krzysztof Ha?asa <khalasa@piap.pl> wrote:
+>
+> This means these two commits don't like each other:
+>
+>     seqcount: Add lockdep functionality to seqcount/seqlock structures
+>     sched_clock: Use seqcount instead of rolling our own
 
-Regards,
-Santosh
+Does something like this fix it for you?
+
+  --- a/kernel/time/sched_clock.c
+  +++ b/kernel/time/sched_clock.c
+  @@ -36,6 +36,7 @@ core_param(irqtime, irqtime, int, 0400);
+
+   static struct clock_data cd = {
+          .mult   = NSEC_PER_SEC / HZ,
+  +       .seq = SEQCNT_ZERO(cd.seq),
+   };
+
+   static u64 __read_mostly sched_clock_mask;
+
+(The above is not even compile-tested, because x86 doesn't use
+GENERIC_SCHED_CLOCK. So I did the patch blindly, but I think you get
+the idea..)
+
+            Linus
