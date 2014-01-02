@@ -1,57 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Jan 2014 12:12:50 +0100
-Subject: [PATCHv8 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <1388656624-26570-2-git-send-email-Li.Xiubo@freescale.com>
-References: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
- <1388656624-26570-2-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <3716216.GQHQhxMFvx@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jan 2014 11:30:57 +0000
+Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140102113057.GI16456@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 January 2014 17:57:01 Xiubo Li wrote:
-> +static inline u32 ftm_readl(bool big_endian, const void __iomem *addr)
-> +{
-> +       u32 val;
-> +
-> +       val = __raw_readl(addr);
-> +
-> +       if (likely(big_endian))
-> +               val = be32_to_cpu((__force __be32)val);
-> +       else
-> +               val = le32_to_cpu((__force __le32)val);
-> +       rmb();
-> +
-> +       return val;
-> +}
-> +
-> +static inline void ftm_writel(bool big_endian, u32 val, void __iomem *addr)
-> +{
-> +       wmb();
-> +       if (likely(big_endian))
-> +               val = (__force u32)cpu_to_be32(val);
-> +       else
-> +               val = (__force u32)cpu_to_le32(val);
-> +
-> +       __raw_writel(val, addr);
+On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
+> Some SoC have MMIO regions that are shared across orthogonal
+> subsystems. This commit implements a possible solution for the
+> thread-safe access of such regions through a spinlock-protected API.
+> 
+> Concurrent access is protected with a single spinlock for the
+> entire MMIO address space. While this protects shared-registers,
+> it also serializes access to unrelated/unshared registers.
+> 
+> We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> respectively. The rationale for this is that some users may not require
+> register write completion but only thread-safe access to a register.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-These functions definitely need some comments regarding why this is necessary.
-I assume that after 8 rounds of review (that I did not read) this has been
-discussed already, so please explain above the functions why you don't just
-use ioread32be/ioread32 and iowrite32be/iowrite32 here.
+Okay, so this patch has been submitted to the patch system, but it
+contains no other tags other than Ezequiel's sign-off.  Clearly
+other people *have* reviewed it.
 
-Also all callers seem to be of the style
+Can we please have some acks etc for it please?
 
-       val = ftm_readl(fpc->big_endian, fpc->base + FTM_SC);
-
-so I wonder why you don't just pass the fpc pointer to the function
-and make it
-
-static inline void ftm_readl(struct fsl_pwm_chip *fpc, unsigned long reg, u32 val)
-{
-	if (fpc->big_endian)
-		iowrite32be(val, fpc->base + reg);
-	else
-		iowrite32(val, fpc->base + reg);
-}
-
-	Arnd
+--
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
