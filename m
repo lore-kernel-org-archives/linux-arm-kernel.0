@@ -1,16 +1,33 @@
-From: dave@sr71.net (Dave Hansen)
-Date: Thu, 02 Jan 2014 14:13:39 -0800
-Subject: [RFC PATCHv3 06/11] arm: use is_vmalloc_addr
-In-Reply-To: <1388699609-18214-7-git-send-email-lauraa@codeaurora.org>
-References: <1388699609-18214-1-git-send-email-lauraa@codeaurora.org>
- <1388699609-18214-7-git-send-email-lauraa@codeaurora.org>
-Message-ID: <52C5E493.6090007@sr71.net>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 2 Jan 2014 14:15:08 -0800
+Subject: [PATCH] sched_clock: Disable seqlock lockdep usage in sched_clock
+In-Reply-To: <1388699686-4834-1-git-send-email-john.stultz@linaro.org>
+References: <52C5DB5B.9050604@linaro.org>
+ <1388699686-4834-1-git-send-email-john.stultz@linaro.org>
+Message-ID: <CA+55aFxGQkChbFj=GMWAANmbJ512S5KAcFNvKoQJsQCiMfvxqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2014 01:53 PM, Laura Abbott wrote:
-> is_vmalloc_addr already does the range checking against VMALLOC_START and
-> VMALLOC_END. Use it.
+On Thu, Jan 2, 2014 at 1:54 PM, John Stultz <john.stultz@linaro.org> wrote:
+> Unforunately the seqlock lockdep enablmenet can't be used
+> in sched_clock, since the lockdep infrastructure eventually
+> calls into sched_clock, which causes a deadlock.
+>
+> Thus, this patch adds _no_lockdep() seqlock methods for the
+> writer side, and changes all generic sched_clock usage to use
+> the _no_lockdep methods.
 
-FWIW, these first 6 look completely sane and should get merged
-regardless of what gets done with the rest.
+Ugh.
+
+On the x86 vclock_gettime() side, we only do this for the reader. Why
+did you make the generic version do it for the writer too, adding the
+necessity for those new operations? It's only the reader side that
+doesn't want it.
+
+Talking about the new operations, that "*_no_lockdep()" naming annoys
+me. It doesn't match the spinlock naming, which is to just use
+"raw_*()" instead. Wouldn't it be nice to make the naming be
+consistent too? Especially when it's paired with raw_local_irq_save()
+that shares that "raw_" model for non-checking stuff.
+
+             Linus
