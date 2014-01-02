@@ -1,46 +1,27 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 02 Jan 2014 16:20:49 +0100
-Subject: [PATCH V4 1/6] clk: exynos-audss: convert to platform device
-In-Reply-To: <529BBB9E.40300@samsung.com>
-References: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
- <20131127184145.16819.44300@quantum> <529BBB9E.40300@samsung.com>
-Message-ID: <1592382.OOUUI06mrc@amdc1227>
+Date: Thu, 02 Jan 2014 16:22:12 +0100
+Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
+In-Reply-To: <20131231194215.12054.39705@quantum>
+References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+ <20131231194215.12054.39705@quantum>
+Message-ID: <2890647.PEOApIOYyP@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin, Mike,
+On Tuesday 31 of December 2013 11:42:15 Mike Turquette wrote:
+> Quoting Tomasz Figa (2013-12-12 08:07:13)
+> > This series intends to improve clock provider impementation of max77686
+> > PMIC driver. First two patches are simple fixes of current implementation
+> > to allow correct control of provided clocks. Further patches refactor
+> > the driver to make the code cleaner and prepare for further patches. Then
+> > last two patches add registration of OF clock provider and adjust device
+> > tree nodes of boards containing max77686 chip to contain properties
+> > required by clock provider.
+> 
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-On Monday 02 of December 2013 07:43:42 Kukjin Kim wrote:
-> On 11/28/13 03:41, Mike Turquette wrote:
-> > Quoting Padma Venkat (2013-11-25 22:29:44)
-> >> Hi Mike and Kukjin,
-> >>
-> >> On Tue, Oct 8, 2013 at 10:23 PM, Andrew Bresticker
-> >> <abrestic@chromium.org>  wrote:
-> >>> Hi Mike and Kukjin,
-> >>>
-> >>> Any decisions regarding this patchset?  I believe all comments have
-> >>> been addressed.
-> >>>
-> >>> Thanks,
-> >>> Andrew
-> >>
-> >> Any decisions on this patchset. These can be applied directly on
-> >> linux-samsung tree.
-> >
-> > For all of the clk parts:
-> >
-> > Acked-by: Mike Turquette<mturquette@linaro.org>
-> >
-> > I'm happy to take them in as part of a pull request.
-> >
-> OK, Mike, I will take this series into samsung tree and let me send a 
-> pull request for your clk tree to avoid useless merge conflicts.
-
-Hmm, I can't find this series in any tree, so I guess it has been lost
-in action.
-
-Should I take it through samsung-clk tree with your acks?
+Hmm... Shouldn't this series go through the clk tree directly? If not, who
+should be taking it?
 
 Best regards,
 Tomasz
