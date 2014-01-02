@@ -1,41 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Jan 2014 10:38:46 -0800
-Subject: [GIT PULL 00/29] Third Round of Renesas ARM Based SoC Updates
- for v3.14
-In-Reply-To: <cover.1387888861.git.horms+renesas@verge.net.au>
-References: <cover.1387888861.git.horms+renesas@verge.net.au>
-Message-ID: <20140102183846.GC8684@quad.lixom.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 2 Jan 2014 19:41:21 +0100
+Subject: [PATCH 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <20140102182822.GI19878@titan.lakedaemon.net>
+References: <1388678476-12875-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388678476-12875-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140102182822.GI19878@titan.lakedaemon.net>
+Message-ID: <20140102184120.GD3914@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 11:15:38PM +0900, Simon Horman wrote:
-> Hi Kevin, Hi Olof, Hi Arnd,
+On Thu, Jan 02, 2014 at 01:28:22PM -0500, Jason Cooper wrote:
+> Wolfram,
 > 
-> please consider this third round of Renesas ARM based SoC updates for v3.14.
-> 
-> It is based on a merge of:
-> 
-> * The second round of Renesas ARM based SoC updates for v3.14, tagged as
->   renesas-soc2-for-v3.14, which I have sent a pull-request for.
-> 
-> * The second round of Renesas SH SCI updates for v3.14, tagged as
->   renesas-sh-sci2-for-v3.14, which I have sent a pull-request for.
-> 
-> The reason for the merge is to provide SH SCI driver dependencies
-> for the SH SCI SoC changes in this series. That is, all
-> the changes by Laurent Pinchart in this series.
-> 
-> 
-> The following changes since commit e62db3848cd61e85a2b0b7828eb47de3ccda83e2:
-> 
->   Merge branch 'sh-sci' into soc3-base (2013-12-24 21:08:27 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.14
+> On Thu, Jan 02, 2014 at 05:01:16PM +0100, Gregory CLEMENT wrote:
+> > The first variants of Armada XP SoCs (A0 stepping) have issues related
+> > to the i2c controller which prevent to use the offload mechanism and
+> > lead to a kernel hang during boot.
+> > 
+> > The driver now check the revision of the SoC. If the revision is not
+> > more recent than the A0 or if the driver can't get the SoC revision
+> > then it disables the offload mechanism.
+> > 
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  drivers/i2c/busses/i2c-mv64xxx.c | 11 ++++++++++-
+> >  1 file changed, 10 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> > index 8be7e42aa4de..089a3663ad86 100644
+> > --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> > +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> > @@ -24,6 +24,7 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/err.h>
+> >  #include <linux/delay.h>
+> > +#include <linux/mvebu-soc-id.h>
+> >  
+> >  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
+> >  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
+> > @@ -779,8 +780,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> >  	 * Transaction Generator support and the errata fix.
+> >  	 */
+> >  	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
+> > -		drv_data->offload_enabled = true;
+> > +		u32 dev, rev;
+> > +
+> >  		drv_data->errata_delay = true;
+> > +		/*
+> > +		 * Only revison more recent than A0 support offload
+> > +		 * mechanism. In case we can't get the SoC revision
+> > +		 * weplay safe and we don't enable it
+> > +		 */
+> > +		if (!mvebu_get_soc_id(&rev, &dev) && (dev > MV78XX0_A0_REV))
 
-Pulled, thanks.
+Very minor nits:
 
+I'd prefer (mvebu_get_soc_id == 0) here, since !mvebu_get_soc_id can
+easily be read as "if not get soc id" which leads to the assumption the
+function failed. And the parantheses around the second comparison are
+superfluous.
 
--Olof
+> > +			drv_data->offload_enabled = true;
+> 
+> Since this depends on arch-specific code in the previous patch, I'd like
+> to keep the two of them together in a topic branch.  Would you prefer to
+> take both with my Ack, or vice-versa?  I'm fine either way.
+
+I'd think you better take it:
+
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/f901950c/attachment-0001.sig>
