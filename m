@@ -1,17 +1,34 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu,  2 Jan 2014 10:58:23 +0100
-Subject: [PATCH v2 0/4] input: Add new sun4i-lradc-keys driver
-Message-ID: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
+Date: Thu,  2 Jan 2014 10:58:25 +0100
+Subject: [PATCH v2 2/4] ARM: dts: sun4i: Add lradc node
+In-Reply-To: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
+References: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1388656707-16181-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dimitri et al,
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Here is v2 of the sun4i-lradc-keys driver, changes since v1:
-
-- Use include/dt-bindings/input/input.h
-- Rename the keycodes property to linux,chan0-keycodes
-
-Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 502f3e2..88f119a 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -447,6 +447,13 @@
+ 			interrupts = <24>;
+ 		};
+ 
++		lradc: lradc at 01c22800 {
++			compatible = "allwinner,sun4i-lradc-keys";
++			reg = <0x01c22800 0x100>;
++			interrupts = <31>;
++			status = "disabled";
++		};
++
+ 		sid: eeprom at 01c23800 {
+ 			compatible = "allwinner,sun4i-sid";
+ 			reg = <0x01c23800 0x10>;
+-- 
+1.8.4.2
