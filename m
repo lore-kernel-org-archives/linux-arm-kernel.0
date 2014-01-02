@@ -1,57 +1,57 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:28:39 +0000
-Subject: [PATCH RFC 34/46] imx-drm: imx-drm-core: provide common connector
- and encoder cleanup functions
+Date: Thu, 02 Jan 2014 21:26:36 +0000
+Subject: [PATCH RFC 10/46] imx-drm: imx-hdmi: fix PLL lock wait
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1Vypol-0007Fn-IZ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Vypmm-0007EB-Sz@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide two helper functions to assist with cleaning up imx-drm
-connectors and encoders.
+Enabling the debug for PLL lock shows that this times out almost every
+time.  Having such an event at debug level is probably a bug in itself
+because it hides this fact.
+
+Waiting 5ms seems to allow it to lock.  Also, adjust the loop so that
+we check for success before checking whether we've timed out: we don't
+want to wait and then fail without first checking whether we locked.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   13 +++++++++++++
- drivers/staging/imx-drm/imx-drm.h      |    2 ++
- 2 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/staging/imx-drm/imx-hdmi.c |   20 ++++++++++++--------
+ 1 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 1cfb8a18d905..30d516cc76bb 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -363,6 +363,19 @@ static void imx_drm_connector_unregister(
- 	drm_mode_group_reinit(imxdrm->drm);
+diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+index 2022635fffdf..ff00759b4d6f 100644
+--- a/drivers/staging/imx-drm/imx-hdmi.c
++++ b/drivers/staging/imx-drm/imx-hdmi.c
+@@ -1032,16 +1032,20 @@ static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
+ 	imx_hdmi_phy_gen2_pddq(hdmi, 0);
+ 
+ 	/*Wait for PHY PLL lock */
+-	msec = 4;
+-	val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+-	while (!val) {
+-		udelay(1000);
+-		if (msec-- == 0) {
+-			dev_dbg(hdmi->dev, "PHY PLL not locked\n");
++	msec = 5;
++	do {
++		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
++		if (!val)
++			break;
++
++		if (msec == 0) {
++			dev_err(hdmi->dev, "PHY PLL not locked\n");
+ 			return -EINVAL;
+ 		}
+-		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+-	}
++
++		udelay(1000);
++		msec--;
++	} while (1);
+ 
+ 	return 0;
  }
- 
-+void imx_drm_connector_destroy(struct drm_connector *connector)
-+{
-+	drm_sysfs_connector_remove(connector);
-+	drm_connector_cleanup(connector);
-+}
-+EXPORT_SYMBOL_GPL(imx_drm_connector_destroy);
-+
-+void imx_drm_encoder_destroy(struct drm_encoder *encoder)
-+{
-+	drm_encoder_cleanup(encoder);
-+}
-+EXPORT_SYMBOL_GPL(imx_drm_encoder_destroy);
-+
- static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
- 	.fb_create = drm_fb_cma_create,
- };
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index 49d4aaf33f97..d13d518e8eb9 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -69,5 +69,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
- 
- int imx_drm_connector_mode_valid(struct drm_connector *connector,
- 	struct drm_display_mode *mode);
-+void imx_drm_connector_destroy(struct drm_connector *connector);
-+void imx_drm_encoder_destroy(struct drm_encoder *encoder);
- 
- #endif /* _IMX_DRM_H_ */
 -- 
 1.7.4.4
