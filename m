@@ -1,196 +1,90 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Thu, 2 Jan 2014 13:56:51 -0800
-Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <20131223174634.GD25089@obsidianresearch.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <1387785725-24262-3-git-send-email-tinamdar@apm.com>
- <20131223174634.GD25089@obsidianresearch.com>
-Message-ID: <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 2 Jan 2014 16:01:01 -0600
+Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
+In-Reply-To: <20131223173409.GA10536@saruman.home>
+References: <1384970958-4118-1-git-send-email-balbi@ti.com>
+ <20131219184815.GU27438@atomide.com>
+ <20131219232153.GE707@saruman.home>
+ <20131221005309.GH26054@atomide.com>
+ <20131223173409.GA10536@saruman.home>
+Message-ID: <20140102220101.GA8652@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 9:46 AM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Mon, Dec 23, 2013 at 01:32:03PM +0530, Tanmay Inamdar wrote:
->> This patch adds the device tree nodes for APM X-Gene PCIe controller and
->> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts nodes
->> are added.
->
-> Can you include an lspci dump for PCI DT bindings please? It is
-> impossible to review otherwise..
->
+Hi,
 
-On the X-Gene evaluation platform, there is only one PCIe port
-enabled. Here is the 'lspci' dump
+On Mon, Dec 23, 2013 at 11:34:09AM -0600, Felipe Balbi wrote:
+> On Fri, Dec 20, 2013 at 04:53:09PM -0800, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [131219 15:23]:
+> > > On Thu, Dec 19, 2013 at 10:48:15AM -0800, Tony Lindgren wrote:
+> > > > * Felipe Balbi <balbi@ti.com> [131120 10:10]:
+> > > > > Afte these patches, we're very close to being able
+> > > > > to move arch/arm/mach-omap2/irq.c to drivers/irqchip/irq-intc.c
+> > > > 
+> > > > That would be nice :)
 
-# lspci -vvv
-00:00.0 Class 0604: Device 19aa:e008 (rev 04)
-        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
-ParErr+ Stepping- SERR+ FastB2B- DisINTx-
-        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
-<TAbort- <MAbort- >SERR- <PERR- INTx-
-        Latency: 0, Cache Line Size: 64 bytes
-        Region 0: Memory@<ignored> (64-bit, prefetchable)
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-        I/O behind bridge: 0000f000-00000fff
-        Memory behind bridge: 00c00000-00cfffff
-        Prefetchable memory behind bridge: 0000000000000000-0000000000bfffff
-        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort-
-<TAbort- <MAbort- <SERR- <PERR-
-        BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
-                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
-        Capabilities: [40] Express (v2) Root Port (Slot+), MSI 00
-                DevCap: MaxPayload 16384 bytes, PhantFunc 1, Latency
-L0s <1us, L1 unlimited
-                        ExtTag- RBE+ FLReset-
-                DevCtl: Report errors: Correctable- Non-Fatal- Fatal-
-Unsupported-
-                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
-                        MaxPayload 128 bytes, MaxReadReq 512 bytes
-                DevSta: CorrErr+ UncorrErr- FatalErr- UnsuppReq-
-AuxPwr- TransPend+
-                LnkCap: Port #0, Speed 8GT/s, Width x8, ASPM L0s L1,
-Latency L0 unlimited, L1 unlimited
-                        ClockPM- Surprise+ LLActRep+ BwNot+
-                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- Retrain- CommClk-
-                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
-                LnkSta: Speed 8GT/s, Width x8, TrErr- Train- SlotClk+
-DLActive+ BWMgmt- ABWMgmt-
-                SltCap: AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd-
-HotPlug- Surprise-
-                        Slot #1, PowerLimit 10.000W; Interlock- NoCompl-
-                SltCtl: Enable: AttnBtn- PwrFlt- MRL- PresDet-
-CmdCplt- HPIrq- LinkChg-
-                        Control: AttnInd Off, PwrInd Off, Power- Interlock-
-                SltSta: Status: AttnBtn- PowerFlt- MRL- CmdCplt-
-PresDet- Interlock-
-                        Changed: MRL- PresDet- LinkState+
-                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal-
-PMEIntEna- CRSVisible-
-                RootCap: CRSVisible-
-                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
-                DevCap2: Completion Timeout: Not Supported,
-TimeoutDis+, LTR-, OBFF Not Supported ARIFwd-
-                DevCtl2: Completion Timeout: 50us to 50ms,
-TimeoutDis-, LTR-, OBFF Disabled ARIFwd-
-                LnkCtl2: Target Link Speed: 8GT/s, EnterCompliance- SpeedDis-
-                         Transmit Margin: Normal Operating Range,
-EnterModifiedCompliance- ComplianceSOS-
-                         Compliance De-emphasis: -6dB
-                LnkSta2: Current De-emphasis Level: -6dB,
-EqualizationComplete+, EqualizationPhase1+
-                         EqualizationPhase2+, EqualizationPhase3+,
-LinkEqualizationRequest-
-        Capabilities: [80] Power Management version 3
-                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA
-PME(D0-,D1-,D2-,D3hot-,D3cold-)
-                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=0 PME-
-        Capabilities: [100 v1] Advanced Error Reporting
-                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
-UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
-UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt-
-UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
-                CESta:  RxErr+ BadTLP+ BadDLLP+ Rollover- Timeout+ NonFatalErr-
-                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
-                AERCap: First Error Pointer: 00, GenCap+ CGenEn- ChkCap+ ChkEn-
-        Capabilities: [180 v1] #19
-        Capabilities: [150 v1] Vendor Specific Information: ID=0001
-Rev=1 Len=010 <?>
+added a few patches on top of my branch removing all arch/arm/
+dependencies and moving the driver to drivers/irqchip/irq-omap-intc.c
 
-01:00.0 Class 0200: Device 15b3:1003
-        Subsystem: Device 15b3:0049
-        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
-ParErr+ Stepping- SERR+ FastB2B- DisINTx-
-        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
-<TAbort- <MAbort- >SERR- <PERR- INTx-
-        Latency: 0, Cache Line Size: 64 bytes
-        Interrupt: pin A routed to IRQ 226
-        Region 0: Memory at e000c00000 (64-bit, non-prefetchable) [size=1M]
-        Region 2: Memory at e000000000 (64-bit, prefetchable) [size=8M]
-        Expansion ROM@e000800000 [size=1M]
-        Capabilities: [40] Power Management version 3
-                Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA
-PME(D0-,D1-,D2-,D3hot-,D3cold-)
-                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
-        Capabilities: [48] Vital Product Data
-                Product Name: CX312A - ConnectX-3 SFP+
-                Read-only fields:
-                        [PN] Part number: MCX312A-XCBT
-                        [EC] Engineering changes: A5
-                        [SN] Serial number: MT1338X00578
-                        [V0] Vendor specific: PCIe Gen3 x8
-                        [RV] Reserved: checksum good, 0 byte(s) reserved
-                Read/write fields:
-                        [V1] Vendor specific: N/A
-                        [YA] Asset tag: N/A
-                        [RW] Read-write area: 105 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 253 byte(s) free
-                        [RW] Read-write area: 252 byte(s) free
-                End
-        Capabilities: [9c] MSI-X: Enable- Count=128 Masked-
-                Vector table: BAR=0 offset=0007c000
-                PBA: BAR=0 offset=0007d000
-        Capabilities: [60] Express (v2) Endpoint, MSI 00
-                DevCap: MaxPayload 256 bytes, PhantFunc 0, Latency L0s
-<64ns, L1 unlimited
-                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset+
-                DevCtl: Report errors: Correctable- Non-Fatal- Fatal-
-Unsupported-
-                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop- FLReset-
-                        MaxPayload 128 bytes, MaxReadReq 512 bytes
-                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq-
-AuxPwr- TransPend-
-                LnkCap: Port #8, Speed 8GT/s, Width x8, ASPM L0s,
-Latency L0 unlimited, L1 unlimited
-                        ClockPM- Surprise- LLActRep- BwNot-
-                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- Retrain- CommClk-
-                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
-                LnkSta: Speed 8GT/s, Width x8, TrErr- Train- SlotClk+
-DLActive- BWMgmt- ABWMgmt-
-                DevCap2: Completion Timeout: Range ABCD, TimeoutDis+,
-LTR-, OBFF Not Supported
-                DevCtl2: Completion Timeout: 50us to 50ms,
-TimeoutDis-, LTR-, OBFF Disabled
-                LnkCtl2: Target Link Speed: 8GT/s, EnterCompliance- SpeedDis-
-                         Transmit Margin: Normal Operating Range,
-EnterModifiedCompliance- ComplianceSOS-
-                         Compliance De-emphasis: -6dB
-                LnkSta2: Current De-emphasis Level: -6dB,
-EqualizationComplete-, EqualizationPhase1-
-                         EqualizationPhase2-, EqualizationPhase3-,
-LinkEqualizationRequest-
-        Capabilities: [100 v1] Alternative Routing-ID Interpretation (ARI)
-                ARICap: MFVC- ACS-, Next Function: 0
-                ARICtl: MFVC- ACS-, Function Group: 0
-        Capabilities: [148 v1] Device Serial Number f4-52-14-03-00-0b-dc-90
-        Capabilities: [154 v2] Advanced Error Reporting
-                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
-UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
-UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UESvrt: DLP+ SDES- TLP- FCP+ CmpltTO- CmpltAbrt-
-UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
-                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
-                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
-                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
-        Capabilities: [18c v1] #19
-        Kernel driver in use: mlx4_core
+> > > > > Note that I have only boot tested these on AM335x Bone Black
+> > > > > (with a small fix for fixed regulator which should be in
+> > > > > the mailing list already), so I'd need help testing all
+> > > > > other impacted platforms, specially when it comes to PM.
+> > > > 
+> > > > Sorry have not had much of a chance to test these with PM with
+> > > > all the fixes needed for omap3 DT mode. Tried testing these
+> > > > just now, but I get:
+> > > > 
+> > > > arch/arm/mach-omap2/board-generic.c:134: error: ?omap_intc_of_init? undeclared here (not in a function)
+> > > 
+> > > some of your other changes messed it up, I have not references of
+> > > omap_intc_of_init() in my branch, because that's one of the things I'm
+> > > dropping from DT-based boots.
+> > > 
+> > > Can you see which patch added a new omap_intc_of_init() call ? Or maybe
+> > > tell me which branch I should rebase on top of ?
+> > 
+> > OK I tried against v3.13-rc4, it's the 3517 changes that caused
+> > it. Looks like that can be just removed, and then there are some
+> > trivial n8x0 merge conflicts. And n8x0 boots too.
+> > 
+> > But looks like omap3 off-idle hangs after hitting idle with these,
+> 
+> could it be we're racing between irq_chip.suspend() and hwmod's
+> _disable() calls ?
 
+So there are a few possibilities here (and having an OMAP3 platform at
+home would help a lot):
 
-> Regards,
-> Jason
+a. We're either killing INTC inside hwmod before irq_chip suspend is
+	called.
+
+b. We could be calling irq_chip's resume before INTC is enabled again
+
+c. We're loosing interrupts (??)
+
+I might have a really old beagleboard somewhere around, if I do, I'll
+try to to boot it up again and track down this regression. Would be
+great to see these patches reaching mainline.
+
+> > so a bit more work is needed. Maybe also rebase these against
+> > omap-for-v3.14/dt too?
+> 
+> Will do.
+
+Rebased on top of omap-for-v3.14/omap3-board-removal. Patches are on my
+k.org tree:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git wip/omap-fix-intc
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/b38f0700/attachment.sig>
