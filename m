@@ -1,261 +1,105 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 15:09:40 +0000
-Subject: [PATCH RFC 05/26] dmaengine: omap-dma: control start/stop directly
+Date: Thu, 02 Jan 2014 15:09:50 +0000
+Subject: [PATCH RFC 06/26] dmaengine: omap-dma: move reading of dma position
+ to omap-dma.c
 In-Reply-To: <20140102150836.GA3826@n2100.arm.linux.org.uk>
 References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
-Message-ID: <E1Vyju0-0005EE-6a@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VyjuA-0005EI-AA@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Program the non-cyclic mode DMA start/stop directly, rather than via
+Read the current DMA position from the hardware directly rather than via
 arch/arm/plat-omap/dma.c.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/omap-dma.c |  152 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 files changed, 142 insertions(+), 10 deletions(-)
+ drivers/dma/omap-dma.c |   66 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 64 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 602c98aebca8..8e2dd4f658d5 100644
+index 8e2dd4f658d5..7e6cdc39725c 100644
 --- a/drivers/dma/omap-dma.c
 +++ b/drivers/dma/omap-dma.c
-@@ -5,6 +5,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/delay.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
- #include <linux/err.h>
-@@ -60,6 +61,7 @@ struct omap_desc {
- 	uint8_t sync_mode;	/* OMAP_DMA_SYNC_xxx */
- 	uint8_t sync_type;	/* OMAP_DMA_xxx_SYNC* */
- 	uint8_t periph_port;	/* Peripheral port */
-+	uint16_t cicr;		/* CICR value */
- 
- 	unsigned sglen;
- 	struct omap_sg sg[0];
-@@ -95,6 +97,112 @@ static void omap_dma_desc_free(struct virt_dma_desc *vd)
- 	kfree(container_of(vd, struct omap_desc, vd));
+@@ -430,6 +430,68 @@ static size_t omap_dma_desc_size_pos(struct omap_desc *d, dma_addr_t addr)
+ 	return size;
  }
  
-+static void omap_dma_start(struct omap_chan *c, struct omap_desc *d)
++static dma_addr_t omap_dma_get_src_pos(struct omap_chan *c)
 +{
 +	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
-+	uint32_t val;
++	dma_addr_t addr;
 +
 +	if (__dma_omap15xx(od->plat->dma_attr))
-+		c->plat->dma_write(0, CPC, c->dma_ch);
++		addr = c->plat->dma_read(CPC, c->dma_ch);
 +	else
-+		c->plat->dma_write(0, CDAC, c->dma_ch);
++		addr = c->plat->dma_read(CSAC, c->dma_ch);
 +
-+	if (!__dma_omap15xx(od->plat->dma_attr) && c->cyclic) {
-+		val = c->plat->dma_read(CLNK_CTRL, c->dma_ch);
++	if (od->plat->errata & DMA_ERRATA_3_3 && addr == 0)
++		addr = c->plat->dma_read(CSAC, c->dma_ch);
 +
-+		if (dma_omap1())
-+			val &= ~(1 << 14);
++	if (!__dma_omap15xx(od->plat->dma_attr)) {
++		/*
++		 * CDAC == 0 indicates that the DMA transfer on the channel has
++		 * not been started (no data has been transferred so far).
++		 * Return the programmed source start address in this case.
++		 */
++		if (c->plat->dma_read(CDAC, c->dma_ch))
++			addr = c->plat->dma_read(CSAC, c->dma_ch);
++		else
++			addr = c->plat->dma_read(CSSA, c->dma_ch);
++	}
 +
-+		val |= c->dma_ch | 1 << 15;
-+
-+		c->plat->dma_write(val, CLNK_CTRL, c->dma_ch);
-+	} else if (od->plat->errata & DMA_ERRATA_PARALLEL_CHANNELS)
-+		c->plat->dma_write(c->dma_ch, CLNK_CTRL, c->dma_ch);
-+
-+	/* Clear CSR */
 +	if (dma_omap1())
-+		c->plat->dma_read(CSR, c->dma_ch);
-+	else
-+		c->plat->dma_write(~0, CSR, c->dma_ch);
++		addr |= c->plat->dma_read(CSSA, c->dma_ch) & 0xffff0000;
 +
-+	/* Enable interrupts */
-+	c->plat->dma_write(d->cicr, CICR, c->dma_ch);
-+
-+	val = c->plat->dma_read(CCR, c->dma_ch);
-+	if (od->plat->errata & DMA_ERRATA_IFRAME_BUFFERING)
-+		val |= OMAP_DMA_CCR_BUFFERING_DISABLE;
-+	val |= OMAP_DMA_CCR_EN;
-+	mb();
-+	c->plat->dma_write(val, CCR, c->dma_ch);
++	return addr;
 +}
 +
-+static void omap_dma_stop(struct omap_chan *c)
++static dma_addr_t omap_dma_get_dst_pos(struct omap_chan *c)
 +{
 +	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
-+	uint32_t val;
++	dma_addr_t addr;
 +
-+	/* disable irq */
-+	c->plat->dma_write(0, CICR, c->dma_ch);
-+
-+	/* Clear CSR */
-+	if (dma_omap1())
-+		c->plat->dma_read(CSR, c->dma_ch);
++	if (__dma_omap15xx(od->plat->dma_attr))
++		addr = c->plat->dma_read(CPC, c->dma_ch);
 +	else
-+		c->plat->dma_write(~0, CSR, c->dma_ch);
++		addr = c->plat->dma_read(CDAC, c->dma_ch);
 +
-+	val = c->plat->dma_read(CCR, c->dma_ch);
-+	if (od->plat->errata & DMA_ERRATA_i541 &&
-+	    val & OMAP_DMA_CCR_SEL_SRC_DST_SYNC) {
-+		uint32_t sysconfig;
-+		unsigned i;
-+
-+		sysconfig = c->plat->dma_read(OCP_SYSCONFIG, c->dma_ch);
-+		val = sysconfig & ~DMA_SYSCONFIG_MIDLEMODE_MASK;
-+		val |= DMA_SYSCONFIG_MIDLEMODE(DMA_IDLEMODE_NO_IDLE);
-+		c->plat->dma_write(val, OCP_SYSCONFIG, c->dma_ch);
-+
-+		val = c->plat->dma_read(CCR, c->dma_ch);
-+		val &= ~OMAP_DMA_CCR_EN;
-+		c->plat->dma_write(val, CCR, c->dma_ch);
-+
-+		/* Wait for sDMA FIFO to drain */
-+		for (i = 0; ; i++) {
-+			val = c->plat->dma_read(CCR, c->dma_ch);
-+			if (!(val & (OMAP_DMA_CCR_RD_ACTIVE | OMAP_DMA_CCR_WR_ACTIVE)))
-+				break;
-+
-+			if (i > 100)
-+				break;
-+
-+			udelay(5);
-+		}
-+
-+		if (val & (OMAP_DMA_CCR_RD_ACTIVE | OMAP_DMA_CCR_WR_ACTIVE))
-+			dev_err(c->vc.chan.device->dev,
-+				"DMA drain did not complete on lch %d\n",
-+			        c->dma_ch);
-+
-+		c->plat->dma_write(sysconfig, OCP_SYSCONFIG, c->dma_ch);
-+	} else {
-+		val &= ~OMAP_DMA_CCR_EN;
-+		c->plat->dma_write(val, CCR, c->dma_ch);
++	/*
++	 * omap 3.2/3.3 erratum: sometimes 0 is returned if CSAC/CDAC is
++	 * read before the DMA controller finished disabling the channel.
++	 */
++	if (!__dma_omap15xx(od->plat->dma_attr) && addr == 0) {
++		addr = c->plat->dma_read(CDAC, c->dma_ch);
++		/*
++		 * CDAC == 0 indicates that the DMA transfer on the channel has
++		 * not been started (no data has been transferred so far).
++		 * Return the programmed destination start address in this case.
++		 */
++		if (addr == 0)
++			addr = c->plat->dma_read(CDSA, c->dma_ch);
 +	}
 +
-+	mb();
++	if (dma_omap1())
++		addr |= c->plat->dma_read(CDSA, c->dma_ch) & 0xffff0000;
 +
-+	if (!__dma_omap15xx(od->plat->dma_attr) && c->cyclic) {
-+		val = c->plat->dma_read(CLNK_CTRL, c->dma_ch);
-+
-+		if (dma_omap1())
-+			val |= 1 << 14; /* set the STOP_LNK bit */
-+
-+		if (dma_omap2plus())
-+			val &= ~(1 << 15); /* Clear the ENABLE_LNK bit */
-+
-+		c->plat->dma_write(val, CLNK_CTRL, c->dma_ch);
-+	}
++	return addr;
 +}
 +
- static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
- 	unsigned idx)
+ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
+ 	dma_cookie_t cookie, struct dma_tx_state *txstate)
  {
-@@ -113,7 +221,7 @@ static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
- 	c->plat->dma_write(sg->en, CEN, c->dma_ch);
- 	c->plat->dma_write(sg->fn, CFN, c->dma_ch);
+@@ -451,9 +513,9 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
+ 		dma_addr_t pos;
  
--	omap_start_dma(c->dma_ch);
-+	omap_dma_start(c, d);
- }
- 
- static void omap_dma_start_desc(struct omap_chan *c)
-@@ -436,6 +544,12 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
- 	d->sync_mode = OMAP_DMA_SYNC_FRAME;
- 	d->sync_type = sync_type;
- 	d->periph_port = OMAP_DMA_PORT_TIPB;
-+	d->cicr = OMAP_DMA_DROP_IRQ | OMAP_DMA_BLOCK_IRQ;
-+
-+	if (dma_omap1())
-+		d->cicr |= OMAP1_DMA_TOUT_IRQ;
-+	else if (dma_omap2plus())
-+		d->cicr |= OMAP2_DMA_MISALIGNED_ERR_IRQ | OMAP2_DMA_TRANS_ERR_IRQ;
- 
- 	/*
- 	 * Build our scatterlist entries: each contains the address,
-@@ -465,6 +579,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
- 	size_t period_len, enum dma_transfer_direction dir, unsigned long flags,
- 	void *context)
- {
-+	struct omap_dmadev *od = to_omap_dma_dev(chan->device);
- 	struct omap_chan *c = to_omap_dma_chan(chan);
- 	enum dma_slave_buswidth dev_width;
- 	struct omap_desc *d;
-@@ -521,15 +636,25 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
- 	d->sg[0].en = period_len / es_bytes[es];
- 	d->sg[0].fn = buf_len / period_len;
- 	d->sglen = 1;
-+	d->cicr = OMAP_DMA_DROP_IRQ;
-+	if (flags & DMA_PREP_INTERRUPT)
-+		d->cicr |= OMAP_DMA_FRAME_IRQ;
-+
-+	if (dma_omap1())
-+		d->cicr |= OMAP1_DMA_TOUT_IRQ;
-+	else if (dma_omap2plus())
-+		d->cicr |= OMAP2_DMA_MISALIGNED_ERR_IRQ | OMAP2_DMA_TRANS_ERR_IRQ;
- 
- 	if (!c->cyclic) {
- 		c->cyclic = true;
--		omap_dma_link_lch(c->dma_ch, c->dma_ch);
- 
--		if (flags & DMA_PREP_INTERRUPT)
--			omap_enable_dma_irq(c->dma_ch, OMAP_DMA_FRAME_IRQ);
-+		if (__dma_omap15xx(od->plat->dma_attr)) {
-+			uint32_t val;
- 
--		omap_disable_dma_irq(c->dma_ch, OMAP_DMA_BLOCK_IRQ);
-+			val = c->plat->dma_read(CCR, c->dma_ch);
-+			val |= 3 << 8;
-+			c->plat->dma_write(val, CCR, c->dma_ch);
-+		}
- 	}
- 
- 	if (dma_omap2plus()) {
-@@ -570,20 +695,27 @@ static int omap_dma_terminate_all(struct omap_chan *c)
- 
- 	/*
- 	 * Stop DMA activity: we assume the callback will not be called
--	 * after omap_stop_dma() returns (even if it does, it will see
-+	 * after omap_dma_stop() returns (even if it does, it will see
- 	 * c->desc is NULL and exit.)
- 	 */
- 	if (c->desc) {
- 		c->desc = NULL;
- 		/* Avoid stopping the dma twice */
- 		if (!c->paused)
--			omap_stop_dma(c->dma_ch);
-+			omap_dma_stop(c);
- 	}
- 
- 	if (c->cyclic) {
- 		c->cyclic = false;
- 		c->paused = false;
--		omap_dma_unlink_lch(c->dma_ch, c->dma_ch);
-+
-+		if (__dma_omap15xx(od->plat->dma_attr)) {
-+			uint32_t val;
-+
-+			val = c->plat->dma_read(CCR, c->dma_ch);
-+			val &= ~(3 << 8);
-+			c->plat->dma_write(val, CCR, c->dma_ch);
-+		}
- 	}
- 
- 	vchan_get_all_descriptors(&c->vc, &head);
-@@ -600,7 +732,7 @@ static int omap_dma_pause(struct omap_chan *c)
- 		return -EINVAL;
- 
- 	if (!c->paused) {
--		omap_stop_dma(c->dma_ch);
-+		omap_dma_stop(c);
- 		c->paused = true;
- 	}
- 
-@@ -614,7 +746,7 @@ static int omap_dma_resume(struct omap_chan *c)
- 		return -EINVAL;
- 
- 	if (c->paused) {
--		omap_start_dma(c->dma_ch);
-+		omap_dma_start(c, c->desc);
- 		c->paused = false;
- 	}
+ 		if (d->dir == DMA_MEM_TO_DEV)
+-			pos = omap_get_dma_src_pos(c->dma_ch);
++			pos = omap_dma_get_src_pos(c);
+ 		else if (d->dir == DMA_DEV_TO_MEM)
+-			pos = omap_get_dma_dst_pos(c->dma_ch);
++			pos = omap_dma_get_dst_pos(c);
+ 		else
+ 			pos = 0;
  
 -- 
 1.7.4.4
