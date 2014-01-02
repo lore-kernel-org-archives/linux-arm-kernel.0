@@ -1,47 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 02 Jan 2014 19:51:26 +0100
-Subject: [PATCH 01/17] ARM: spear: Remove deprecated IRQF_DISABLED flag
-In-Reply-To: <201401021929.46581.arnd@arndb.de>
-References: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
- <201401021929.46581.arnd@arndb.de>
-Message-ID: <52C5B52E.6080609@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 2 Jan 2014 10:49:39 -0800
+Subject: [GIT PULL 00/21] Third Round of Renesas ARM Based SoC DT Updates
+ for v3.14
+In-Reply-To: <cover.1387893834.git.horms+renesas@verge.net.au>
+References: <cover.1387893834.git.horms+renesas@verge.net.au>
+Message-ID: <20140102184939.GE8684@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2014 07:29 PM, Arnd Bergmann wrote:
-> On Monday 30 December 2013, Daniel Lezcano wrote:
->> This flag is a NOOP and scheduled to be removed
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->
-> Thanks for sending this series. I think the patches are duplicates of stuff that
-> Michael Opdenacker has sent before (actually multiple times). I have no problem
-> applying either version into arm-soc, but I think it would be better to attribute
-> them to Michael, since he came first. Can you two please coordinate and send a
-> single pull request for the arm-soc related patches that haven't made it into
-> linux-next yet?
+On Tue, Dec 24, 2013 at 11:19:23PM +0900, Simon Horman wrote:
+> Hi Kevin, Hi Olof, Hi Arnd,
+> 
+> please consider this third round of Renesas ARM based SoC DT updates for v3.14.
+> 
+> This is based on a merge of:
+> 
+> * The second round of Renesas ARM based SoC DT updates for v3.14,
+>   tagged as renesas-dt2-for-v3.14, which I have previously sent a
+>   pull-request for.
+> 
+> * The second round of Renesas ARM based SoC updates for v3.14,
+>   tagged as renesas-soc2-for-v3.14, which I have previously sent a
+>   pull-request for.
+> 
+> * The clk-next-shmobile branch of Mike Turquette's tree
+> 
+> * The clockevents/for-Simon-3.13-rc2 branch of Daniel Lezcano's tree
+> 
+> * The pinctl/for-next branch of Linus Walleij's tree
+> 
+> * v3.13-rc3
 
-Michael removed the flag for:
+Ah, here's the missing clk branch that caused earlier merges not to build.
 
-pxa (ed7936f913456e4c01aed75deba6cfaf830fa8cf)
-samsung (fa53d5cdbffbce421c3bd2f937b5626fc044fedc)
-avr32 (7155530d9eb692994d208836e4965da06b17c99d)
-ep93xx (3a71ae4796fdaedbdbdab94660b7b7b5bfe61d1d)
-plat-orion (eb4d552b933ac59c0c8e0604ff435c5208a82679)
+Please provide actual URLs for the external branches since we want to
+track them. I can't reverse-engineer them since you use remotes instead
+of the URL when you merged in, unfortunately.
 
-The patchset I sent is on top of arm/for-next and finishes to remove 
-this flag for arch/arm. It should not overlap with what Michael did.
+(No need to redo the pull request, just give me the URLs, please.
 
-I'm ok to attribute the patchset to Michael if that can help to accept 
-this patchset and kill this flag for arch/arm.
+> The reason for these merges is to provide dependencies for
+> the clock updates for the r8a7791 (R-Car M2) based Koelsch and r8a7790
+> (R-Car H2) based Lager boards.
+> 
+> 
+> The following changes since commit b652896b02df3dfde3a68957cce01f2aa4585842:
+> 
+>   ARM: shmobile: r8a7791: Add SSI clocks in device tree (2013-12-24 23:01:13 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.14
 
-Thanks
-   -- Daniel
+Pulled, thanks.
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-Olof
