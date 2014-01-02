@@ -1,44 +1,98 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 02 Jan 2014 22:36:32 +0000
-Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
-In-Reply-To: <20140102194924.GA3321@obsidianresearch.com>
-References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
- <20131228170114.GH19878@titan.lakedaemon.net>
- <20140102194924.GA3321@obsidianresearch.com>
-Message-ID: <1388702192.16958.54.camel@hastur.hellion.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 02 Jan 2014 23:36:33 +0100
+Subject: [PATCH 1/4] input: Add new sun4i-lradc-keys drivers
+In-Reply-To: <20140102202022.GK3144@lukather>
+References: <1388604610-20380-1-git-send-email-hdegoede@redhat.com>
+ <20140101205603.GA1141@core.coreip.homeip.net> <52C5336B.9010903@redhat.com>
+ <1700375.GaI3zFl6RI@phil> <52C56D79.1060506@redhat.com>
+ <20140102202022.GK3144@lukather>
+Message-ID: <52C5E9F1.9010700@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-02 at 12:49 -0700, Jason Gunthorpe wrote:
-> On Sat, Dec 28, 2013 at 12:01:14PM -0500, Jason Cooper wrote:
-> 
-> > > + * Note: This requires a new'ish version of u-boot, which disables the
-> > > + * L2 cache. If your B3 silently fails to boot, u-boot is probably too
-> > > + * old. Either upgrade, or consider the following email:
-> > > + *
-> > > + * http://lists.debian.org/debian-arm/2012/08/msg00128.html
-> > 
-> > Nice, thanks for adding this.
-> 
-> Nifty.. But what is the root cause for the above?
-> 
-> I'm guessing that at some point the the L1 icache has been enabled,
-> the L1 dcache disabled, and the L2 cache enabled?
-> 
-> If the pv_fixup runs with both L1 caches off and an empty L2 then it
-> shouldn't cause a problem.
+Hi,
 
-I'm not 100% sure but I think the issue is that the kernel expects to be
-running with all of the caches off, but u-boot incorrectly left the l2
-on. The L2 is probably not empty (because u-boot was using it).
+On 01/02/2014 09:20 PM, Maxime Ripard wrote:
+> On Thu, Jan 02, 2014 at 02:45:29PM +0100, Hans de Goede wrote:
+>>> Also, instead of inventing yet another vendor-specific property, why not re-use
+>>> a button binding similar to gpio-keys like:
+>>>
+>>>         lradc: lradc at 01c22800 {
+>>>                 compatible = "allwinner,sun4i-lradc-keys";
+>>>                 reg = <0x01c22800 0x100>;
+>>>                 interrupts = <31>;
+>>>                 allwinner,chan0-step = <200>;
+>>>
+>>> 		#address-cells = <1>;
+>>> 		#size-cells = <0>;
+>>>
+>>> 		button at 0 {
+>>> 			reg = <0>; /* your channel index from above */
+>>> 			linux,code = <115>; /* already used as dt-property */
+>>> 		};
+>>>
+>>> 		button at 1 {
+>>> 			reg = <1>;
+>>> 			linux,code = <114>;
+>>> 		};
+>>
+>> Ugh no. Having a vendor specific property which is KISS certainly
+>> beats this, both wrt ease of writing dts files as well as wrt the
+>> dts parsing code in the driver.
+>
+> I'd agree with Heiko here. This is pretty much the same construct
+> that's already in use in other input drivers, like gpio-keys.
 
-There is some code modifications done at startup (relating to setting
-paddr offset?) and since the kernel expects caches to be off it doesn't
-do any cache maintenance. Which means that things don't work as
-expected, because stuff is cached in L2 dcache and therefore not seen in
-the instruction stream (Either icached or uncached).
+In the gpio case there is a 1 on 1 relation between a single hw
+entity (the gpio-pin) and a single keycode. Here there is 1 hw entity
+which maps to an array of key-codes, certainly using an array rather
+then a much more complicated construct is the correct data-structure
+to represent this.
 
-Anyway, regardless of the specifics running with caches on when the
-kernel thinks they are off is going to cause all sorts of oddness...
+>
+> This is also something that can really easily be made generic, since
+> this is something that is rather common.
+>
+> Speaking of which. I believe this should actually come in two
+> different drivers:
+>    - The ADC driver itself, using IIO
+>    - A generic button handler driver on top of IIO.
+ >
+ > The fact that on most board this adc is used for buttons doesn't make
+ > any difference, it's actually a hardware designer choice, we should
+ > support that choice, but we should also be able to use it just as an
+ > ADC.
 
-Ian.
+No, this is not a generic adc, as mentioned in the commit msg, this
+adc is specifically designed to be used this way.
+
+The adc won't start sampling data, and won't generate any interrupts
+until a button is pressed. That is until the input voltage drops below
+2/3 of Vref, this is checked through a built-in analog comparator, which
+hooks into the control logic.
+
+It has button down and button up interrupts, and can detect long
+presses (unused) and generate a second type of down interrupt for those.
+
+This really is an input device, which happens to use an adc.
+
+> Carlo Caione already started to work on an IIO driver for the LRADC:
+> https://github.com/carlocaione/linux/tree/sunxi-lradc
+> maybe you can take over his work.
+
+That won't work because the adc won't sample if the input gets above
+2/3 of Vref. There may be some other mode which does not do that, but
+that is not clearly documented.
+
+Even if an IIO driver turns out to be doable, I strongly believe that
+having a separate input driver for this is best, since this device
+was designed to be used as such. Building input on top of IIO would
+mean polling the adc, while with my driver it actually generates
+button down / up interrupts without any polling being involved.
+
+And no boards I know of are using this as a generic analog input,
+where as many boards are using it as designed.
+
+Regards,
+
+Hans
