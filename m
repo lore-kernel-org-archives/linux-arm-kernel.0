@@ -1,42 +1,91 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 2 Jan 2014 12:49:24 -0700
-Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
-In-Reply-To: <20131228170114.GH19878@titan.lakedaemon.net>
-References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
- <20131228170114.GH19878@titan.lakedaemon.net>
-Message-ID: <20140102194924.GA3321@obsidianresearch.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 2 Jan 2014 20:31:00 +0100
+Subject: [PATCH 6/6] at91: dt: sam9261: Added DM9000 in the device tree
+In-Reply-To: <4526077.qASk8HSHKP@wuerfel>
+References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
+ <1388507534-10570-7-git-send-email-jjhiblot@traphandler.com>
+ <4526077.qASk8HSHKP@wuerfel>
+Message-ID: <CACh+v5PptkrXERAqBUOv-DSaRDQ5NzJAc919Ne3iN9iVszRP+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 28, 2013 at 12:01:14PM -0500, Jason Cooper wrote:
+2013/12/31 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 31 December 2013 17:32:14 jjhiblot at traphandler.com wrote:
+>>
+>> +                       ethernet at 30000000 {
+>> +                               compatible = "davicom,dm9000";
+>> +                               reg = <0x30000000 0x2 0x30000004 0x2>;
+>> +                               interrupt-parent = <&pioC>;
+>> +                               interrupts = <11 IRQ_TYPE_EDGE_BOTH>;
+>> +                               local-mac-address = [00 00 de ad be ef];
+>> +                               davicom,no-eeprom;
+>> +
+>> +                               smc,cs = <2>;
+>> +                               smc,ncs_read_setup = <0>;
+>> +                               smc,nrd_setup = <2>;
+>> +                               smc,ncs_write_setup = <0>;
+>> +                               smc,nwe_setup = <2>;
+>> +                               smc,ncs_read_pulse = <8>;
+>> +                               smc,nrd_pulse = <4>;
+>> +                               smc,ncs_write_pulse = <8>;
+>> +                               smc,nwe_pulse = <4>;
+>> +                               smc,read_cycle = <16>;
+>> +                               smc,write_cycle = <16>;
+>> +                               smc,tdf_cycles = <1>;
+>> +                               smc,tdf_optimized = <0>;
+>> +                               smc,page_size = <0>;
+>> +                               smc,byte_access_type = <1>;
+>> +                               smc,bus_width = <1>;
+>> +                               smc,nwait_mode = <0>;
+>> +                               smc,read_mode = <1>;
+>> +                               smc,write_mode = <1>;
+>> +                       };
+>
+> I don't like how this forces you to mix the properties
+> of the ethernet device with the properties of the smc
+> port. I would also like to see the address translation
+> reflected in the DT nodes. This should probably just work
+> out if you restructure the DT representation, and won't need
+> changes in the driver.
+>
+> How about this:
+>
+>         smc: smc at ffffec00 {
+>                 #address-cells = <2>; /* cs, address */
+>                 #size-cells = <1>;
+>                 ranges = <2 0 0x30000000 0x10000000>
+>                          <3 0 0x40000000 0x10000000>;
+>
+>                 extbus at 2.0 {
+>                         compatible = "simple-bus";
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+>                         ranges = <0 2 0 0x10000000>;
+>                         smc,ncs_read_setup = <0>;
+>                         smc,nrd_setup = <2>;
+>                         smc,...
+>
+>                         ethernet at 0 {
+>                                 compatible = "davicom,dm9000";
+>                                 reg = <0x0 0x2> <0x4 0x2>;
+>                         };
+>                 };
+>         };
+I'm okay with this. I'll do something along those lines in the next
+round of the patch set.
+>
+> If each bus interface has a fixed range of registers, you can actually
+> collapse the upper two nodes again and just have one device per
+> chipselect.
+This is indeed the case, but I'd rather keep the top node to highlight
+the fact that all the devices are physically tied to the same bus.
 
-> > + * Note: This requires a new'ish version of u-boot, which disables the
-> > + * L2 cache. If your B3 silently fails to boot, u-boot is probably too
-> > + * old. Either upgrade, or consider the following email:
-> > + *
-> > + * http://lists.debian.org/debian-arm/2012/08/msg00128.html
-> 
-> Nice, thanks for adding this.
+Jean-Jacques
 
-Nifty.. But what is the root cause for the above?
-
-I'm guessing that at some point the the L1 icache has been enabled,
-the L1 dcache disabled, and the L2 cache enabled?
-
-If the pv_fixup runs with both L1 caches off and an empty L2 then it
-shouldn't cause a problem.
-
-If it runs with the icache on lines will be pulled into the L2 by
-icache fetching and won't be updated by uncached L1 dcache writes.
-
-Is uboot running the kernel with the icache turned on but dcache
-turned off?
-
->From a kernel side, a possible way to address this might be to move
-the pv fixup (__fixup_a_pv_table?) after the mmu and caches are
-switched on.
-
-But really, any memory writes done prior to enabling the dcache would
-risk getting lost...
-
-Jason
+>
+>         Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
