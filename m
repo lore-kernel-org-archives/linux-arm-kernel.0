@@ -1,110 +1,136 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:29:10 +0000
-Subject: [PATCH RFC 40/46] imx-drm: imx-drm-core: move allocation of imxdrm
- device to driver load function
+Date: Thu, 02 Jan 2014 21:29:05 +0000
+Subject: [PATCH RFC 39/46] imx-drm: imx-drm-core: kill off mutex
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1VyppG-0007GB-9Y@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VyppB-0007G7-6I@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is now no longer necessary to keep this structure around; we can
-allocate it upon DRM driver load and destroy it thereafter without
-affecting the other components now.
+This mutex doesn't protect anything anymore; get rid of it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   47 ++++---------------------------
- 1 files changed, 6 insertions(+), 41 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c |   26 +++-----------------------
+ 1 files changed, 3 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 0172739a00fe..8e257c5fb041 100644
+index 10cfea0e948a..0172739a00fe 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -38,7 +38,6 @@ struct imx_drm_crtc;
- 
- struct imx_drm_device {
+@@ -40,14 +40,12 @@ struct imx_drm_device {
  	struct drm_device			*drm;
--	struct device				*dev;
+ 	struct device				*dev;
  	struct imx_drm_crtc			*crtc[MAX_CRTC];
+-	struct mutex				mutex;
  	int					pipes;
  	struct drm_fbdev_cma			*fbhelper;
-@@ -206,13 +205,6 @@ int imx_drm_connector_mode_valid(struct drm_connector *connector,
- }
- EXPORT_SYMBOL(imx_drm_connector_mode_valid);
+ };
  
--static struct imx_drm_device *imx_drm_device;
+ struct imx_drm_crtc {
+ 	struct drm_crtc				*crtc;
+-	struct imx_drm_device			*imxdrm;
+ 	int					pipe;
+ 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
+ 	struct crtc_cookie			cookie;
+@@ -270,8 +268,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 
+ 	drm_mode_config_init(drm);
+ 
+-	mutex_lock(&imxdrm->mutex);
 -
--static struct imx_drm_device *__imx_drm_device(void)
--{
--	return imx_drm_device;
--}
+ 	drm_kms_helper_poll_init(drm);
+ 
+ 	ret = drm_vblank_init(drm, MAX_CRTC);
+@@ -285,12 +281,10 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 	 */
+ 	drm->vblank_disable_allowed = true;
+ 
+-	mutex_unlock(&imxdrm->mutex);
 -
- void imx_drm_connector_destroy(struct drm_connector *connector)
- {
- 	drm_sysfs_connector_remove(connector);
-@@ -236,10 +228,14 @@ static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
-  */
- static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- {
--	struct imx_drm_device *imxdrm = __imx_drm_device();
-+	struct imx_drm_device *imxdrm;
- 	struct drm_connector *connector;
+ 	/* Now try and bind all our sub-components */
+ 	ret = component_bind_all(drm->dev, drm);
+ 	if (ret)
+-		goto err_relock;
++		goto err_vblank;
+ 
+ 	/*
+ 	 * All components are now added, we can publish the connector sysfs
+@@ -330,13 +324,11 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 
+ err_unbind:
+ 	component_unbind_all(drm->dev, drm);
+-err_relock:
+-	mutex_lock(&imxdrm->mutex);
++err_vblank:
+ 	drm_vblank_cleanup(drm);
+ err_kms:
+ 	drm_kms_helper_poll_fini(drm);
+ 	drm_mode_config_cleanup(drm);
+-	mutex_unlock(&imxdrm->mutex);
+ 
+ 	return ret;
+ }
+@@ -356,8 +348,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	struct imx_drm_crtc *imx_drm_crtc;
  	int ret;
  
-+	imxdrm = devm_kzalloc(drm->dev, sizeof(*imxdrm), GFP_KERNEL);
-+	if (!imxdrm)
-+		return -ENOMEM;
-+
- 	imxdrm->drm = drm;
- 
- 	drm->dev_private = imxdrm;
-@@ -602,8 +598,6 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	imx_drm_device->dev = &pdev->dev;
+-	mutex_lock(&imxdrm->mutex);
 -
- 	return component_master_add(&pdev->dev, &imx_drm_ops);
+ 	/*
+ 	 * The vblank arrays are dimensioned by MAX_CRTC - we can't
+ 	 * pass IDs greater than this to those functions.
+@@ -384,7 +374,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	imx_drm_crtc->cookie.id = id;
+ 	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
+ 	imx_drm_crtc->crtc = crtc;
+-	imx_drm_crtc->imxdrm = imxdrm;
+ 
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
+ 
+@@ -400,8 +389,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	drm_crtc_init(drm, crtc,
+ 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
+ 
+-	mutex_unlock(&imxdrm->mutex);
+-
+ 	return 0;
+ 
+ err_register:
+@@ -409,7 +396,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	kfree(imx_drm_crtc);
+ err_alloc:
+ err_busy:
+-	mutex_unlock(&imxdrm->mutex);
+ 	return ret;
  }
+ EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
+@@ -419,16 +405,12 @@ EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
+  */
+ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
+ {
+-	struct imx_drm_device *imxdrm = imx_drm_crtc->imxdrm;
+-
+-	mutex_lock(&imxdrm->mutex);
++	struct imx_drm_device *imxdrm = imx_drm_crtc->crtc->dev->dev_private;
  
-@@ -628,36 +622,7 @@ static struct platform_driver imx_drm_pdrv = {
- 		.of_match_table = imx_drm_dt_ids,
- 	},
- };
--
--static int __init imx_drm_init(void)
--{
--	int ret;
--
--	imx_drm_device = kzalloc(sizeof(*imx_drm_device), GFP_KERNEL);
--	if (!imx_drm_device)
--		return -ENOMEM;
--
--	ret = platform_driver_register(&imx_drm_pdrv);
--	if (ret)
--		goto err_pdrv;
--
--	return 0;
--
--err_pdrv:
--	kfree(imx_drm_device);
--
--	return ret;
--}
--
--static void __exit imx_drm_exit(void)
--{
--	platform_driver_unregister(&imx_drm_pdrv);
--
--	kfree(imx_drm_device);
--}
--
--module_init(imx_drm_init);
--module_exit(imx_drm_exit);
-+module_platform_driver(imx_drm_pdrv);
+ 	drm_crtc_cleanup(imx_drm_crtc->crtc);
  
- MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
- MODULE_DESCRIPTION("i.MX drm driver core");
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
+ 
+-	mutex_unlock(&imxdrm->mutex);
+-
+ 	kfree(imx_drm_crtc);
+ 
+ 	return 0;
+@@ -655,8 +637,6 @@ static int __init imx_drm_init(void)
+ 	if (!imx_drm_device)
+ 		return -ENOMEM;
+ 
+-	mutex_init(&imx_drm_device->mutex);
+-
+ 	ret = platform_driver_register(&imx_drm_pdrv);
+ 	if (ret)
+ 		goto err_pdrv;
 -- 
 1.7.4.4
