@@ -1,136 +1,305 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:29:05 +0000
-Subject: [PATCH RFC 39/46] imx-drm: imx-drm-core: kill off mutex
+Date: Thu, 02 Jan 2014 21:27:07 +0000
+Subject: [PATCH RFC 16/46] imx-drm: imx-hdmi: convert HDMI clock settings to
+ tabular form
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1VyppB-0007G7-6I@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VypnH-0007Ea-Ib@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mutex doesn't protect anything anymore; get rid of it.
+Rather than having large if() and switch() statements, provide a table
+to look up the register settings for various clock rates.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   26 +++-----------------------
- 1 files changed, 3 insertions(+), 23 deletions(-)
+ drivers/staging/imx-drm/imx-hdmi.c |  250 ++++++++++++++----------------------
+ 1 files changed, 95 insertions(+), 155 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 10cfea0e948a..0172739a00fe 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -40,14 +40,12 @@ struct imx_drm_device {
- 	struct drm_device			*drm;
- 	struct device				*dev;
- 	struct imx_drm_crtc			*crtc[MAX_CRTC];
--	struct mutex				mutex;
- 	int					pipes;
- 	struct drm_fbdev_cma			*fbhelper;
- };
- 
- struct imx_drm_crtc {
- 	struct drm_crtc				*crtc;
--	struct imx_drm_device			*imxdrm;
- 	int					pipe;
- 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
- 	struct crtc_cookie			cookie;
-@@ -270,8 +268,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 
- 	drm_mode_config_init(drm);
- 
--	mutex_lock(&imxdrm->mutex);
--
- 	drm_kms_helper_poll_init(drm);
- 
- 	ret = drm_vblank_init(drm, MAX_CRTC);
-@@ -285,12 +281,10 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 	 */
- 	drm->vblank_disable_allowed = true;
- 
--	mutex_unlock(&imxdrm->mutex);
--
- 	/* Now try and bind all our sub-components */
- 	ret = component_bind_all(drm->dev, drm);
- 	if (ret)
--		goto err_relock;
-+		goto err_vblank;
- 
- 	/*
- 	 * All components are now added, we can publish the connector sysfs
-@@ -330,13 +324,11 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 
- err_unbind:
- 	component_unbind_all(drm->dev, drm);
--err_relock:
--	mutex_lock(&imxdrm->mutex);
-+err_vblank:
- 	drm_vblank_cleanup(drm);
- err_kms:
- 	drm_kms_helper_poll_fini(drm);
- 	drm_mode_config_cleanup(drm);
--	mutex_unlock(&imxdrm->mutex);
- 
- 	return ret;
+diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+index ee0fceb7b5b2..5fda630a798d 100644
+--- a/drivers/staging/imx-drm/imx-hdmi.c
++++ b/drivers/staging/imx-drm/imx-hdmi.c
+@@ -810,19 +810,94 @@ static void imx_hdmi_phy_sel_interface_control(struct imx_hdmi *hdmi, u8 enable)
+ 			 HDMI_PHY_CONF0_SELDIPIF_MASK);
  }
-@@ -356,8 +348,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 	struct imx_drm_crtc *imx_drm_crtc;
- 	int ret;
  
--	mutex_lock(&imxdrm->mutex);
--
- 	/*
- 	 * The vblank arrays are dimensioned by MAX_CRTC - we can't
- 	 * pass IDs greater than this to those functions.
-@@ -384,7 +374,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 	imx_drm_crtc->cookie.id = id;
- 	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
- 	imx_drm_crtc->crtc = crtc;
--	imx_drm_crtc->imxdrm = imxdrm;
- 
- 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
- 
-@@ -400,8 +389,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 	drm_crtc_init(drm, crtc,
- 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
- 
--	mutex_unlock(&imxdrm->mutex);
--
- 	return 0;
- 
- err_register:
-@@ -409,7 +396,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 	kfree(imx_drm_crtc);
- err_alloc:
- err_busy:
--	mutex_unlock(&imxdrm->mutex);
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
-@@ -419,16 +405,12 @@ EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
-  */
- int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
++enum {
++	RES_8,
++	RES_10,
++	RES_12,
++	RES_MAX,
++};
++
++struct mpll_config {
++	unsigned long mpixelclock;
++	struct {
++		u16 cpce;
++		u16 gmp;
++	} res[RES_MAX];
++};
++
++static const struct mpll_config mpll_config[] = {
++	{
++		45250000, {
++			{ 0x01e0, 0x0000 },
++			{ 0x21e1, 0x0000 },
++			{ 0x41e2, 0x0000 }
++		},
++	}, {
++		92500000, {
++			{ 0x0140, 0x0005 },
++			{ 0x2141, 0x0005 },
++			{ 0x4142, 0x0005 },
++		},
++	}, {
++		148500000, {
++			{ 0x00a0, 0x000a },
++			{ 0x20a1, 0x000a },
++			{ 0x40a2, 0x000a },
++		},
++	}, {
++		~0UL, {
++			{ 0x00a0, 0x000a },
++			{ 0x2001, 0x000f },
++			{ 0x4002, 0x000f },
++		},
++	}
++};
++
++struct curr_ctrl {
++	unsigned long mpixelclock;
++	u16 curr[RES_MAX];
++};
++
++static const struct curr_ctrl curr_ctrl[] = {
++	/*	pixelclk     bpp8    bpp10   bpp12 */
++	{
++		 54000000, { 0x091c, 0x091c, 0x06dc },
++	}, {
++		 58400000, { 0x091c, 0x06dc, 0x06dc },
++	}, {
++		 72000000, { 0x06dc, 0x06dc, 0x091c },
++	}, {
++		 74250000, { 0x06dc, 0x0b5c, 0x091c },
++	}, {
++		118800000, { 0x091c, 0x091c, 0x06dc },
++	}, {
++		216000000, { 0x06dc, 0x0b5c, 0x091c },
++	}
++};
++
+ static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
+ 			      unsigned char res, int cscon)
  {
--	struct imx_drm_device *imxdrm = imx_drm_crtc->imxdrm;
++	unsigned res_idx, i;
+ 	u8 val, msec;
+ 
+-	/* color resolution 0 is 8 bit colour depth */
+-	if (!res)
+-		res = 8;
 -
--	mutex_lock(&imxdrm->mutex);
-+	struct imx_drm_device *imxdrm = imx_drm_crtc->crtc->dev->dev_private;
+ 	if (prep)
+ 		return -EINVAL;
+-	else if (res != 8 && res != 12)
++
++	switch (res) {
++	case 0:	/* color resolution 0 is 8 bit colour depth */
++	case 8:
++		res_idx = RES_8;
++		break;
++	case 10:
++		res_idx = RES_10;
++		break;
++	case 12:
++		res_idx = RES_12;
++		break;
++	default:
+ 		return -EINVAL;
++	}
  
- 	drm_crtc_cleanup(imx_drm_crtc->crtc);
+ 	/* Enable csc path */
+ 	if (cscon)
+@@ -849,165 +924,30 @@ static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
+ 			HDMI_PHY_I2CM_SLAVE_ADDR);
+ 	hdmi_phy_test_clear(hdmi, 0);
  
- 	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
+-	if (hdmi->hdmi_data.video_mode.mpixelclock <= 45250000) {
+-		switch (res) {
+-		case 8:
+-			/* PLL/MPLL Cfg */
+-			hdmi_phy_i2c_write(hdmi, 0x01e0, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);  /* GMPCTRL */
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x21e1, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x41e2, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);
+-			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 92500000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x0140, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x2141, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x4142, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 148500000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x00a0, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x20a1, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x40a2, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
+-		default:
+-			return -EINVAL;
+-		}
+-	} else {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x00a0, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x2001, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x000f, 0x15);
++	/* PLL/MPLL Cfg - always match on final entry */
++	for (i = 0; i < ARRAY_SIZE(mpll_config) - 1; i++)
++		if (hdmi->hdmi_data.video_mode.mpixelclock <=
++		    mpll_config[i].mpixelclock)
+ 			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x4002, 0x06);
+-			hdmi_phy_i2c_write(hdmi, 0x000f, 0x15);
+-		default:
+-			return -EINVAL;
+-		}
+-	}
  
--	mutex_unlock(&imxdrm->mutex);
--
- 	kfree(imx_drm_crtc);
+-	if (hdmi->hdmi_data.video_mode.mpixelclock <= 54000000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);  /* CURRCTRL */
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 58400000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 72000000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
+-			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 74250000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x0b5c, 0x10);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
+-			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 118800000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 216000000) {
+-		switch (res) {
+-		case 8:
+-			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
+-			break;
+-		case 10:
+-			hdmi_phy_i2c_write(hdmi, 0x0b5c, 0x10);
+-			break;
+-		case 12:
+-			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
++	hdmi_phy_i2c_write(hdmi, mpll_config[i].res[res_idx].cpce, 0x06);
++	hdmi_phy_i2c_write(hdmi, mpll_config[i].res[res_idx].gmp, 0x15);
++
++	for (i = 0; i < ARRAY_SIZE(curr_ctrl); i++)
++		if (hdmi->hdmi_data.video_mode.mpixelclock <=
++		    curr_ctrl[i].mpixelclock)
+ 			break;
+-		default:
+-			return -EINVAL;
+-		}
+-	} else {
++
++	if (i >= ARRAY_SIZE(curr_ctrl)) {
+ 		dev_err(hdmi->dev,
+ 				"Pixel clock %d - unsupported by HDMI\n",
+ 				hdmi->hdmi_data.video_mode.mpixelclock);
+ 		return -EINVAL;
+ 	}
  
- 	return 0;
-@@ -655,8 +637,6 @@ static int __init imx_drm_init(void)
- 	if (!imx_drm_device)
- 		return -ENOMEM;
- 
--	mutex_init(&imx_drm_device->mutex);
--
- 	ret = platform_driver_register(&imx_drm_pdrv);
- 	if (ret)
- 		goto err_pdrv;
++	/* CURRCTRL */
++	hdmi_phy_i2c_write(hdmi, curr_ctrl[i].curr[res_idx], 0x10);
++
+ 	hdmi_phy_i2c_write(hdmi, 0x0000, 0x13);  /* PLLPHBYCTRL */
+ 	hdmi_phy_i2c_write(hdmi, 0x0006, 0x17);
+ 	/* RESISTANCE TERM 133Ohm Cfg */
 -- 
 1.7.4.4
