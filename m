@@ -1,47 +1,43 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 02 Jan 2014 12:03:02 -0800
-Subject: v3.13-rc6+ regression (ARM board)
-In-Reply-To: <CA+55aFyZ0EXYkHd-BhQo6K++qKJVPdGeDbFTVTs3pAPCHFUpOA@mail.gmail.com>
-References: <m3mwjhux0e.fsf@t19.piap.pl>	<20131231104511.GA9688@1wt.eu>	<m3txdmu2ez.fsf@t19.piap.pl>	<20140102101455.GG10158@pengutronix.de>	<m3ppoatwn1.fsf@t19.piap.pl>
- <CA+55aFyZ0EXYkHd-BhQo6K++qKJVPdGeDbFTVTs3pAPCHFUpOA@mail.gmail.com>
-Message-ID: <52C5C5F6.70803@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 2 Jan 2014 12:01:55 -0800
+Subject: [GIT PULL] U300 patches for v3.14
+In-Reply-To: <CACRpkdaU9rjciuJKkFAuQRZ3+8C6kybiUECg-4j4=EtcJUUD8A@mail.gmail.com>
+References: <CACRpkdaU9rjciuJKkFAuQRZ3+8C6kybiUECg-4j4=EtcJUUD8A@mail.gmail.com>
+Message-ID: <20140102200155.GA19720@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2014 11:38 AM, Linus Torvalds wrote:
-> On Thu, Jan 2, 2014 at 4:07 AM, Krzysztof Ha?asa <khalasa@piap.pl> wrote:
->> This means these two commits don't like each other:
->>
->>     seqcount: Add lockdep functionality to seqcount/seqlock structures
->>     sched_clock: Use seqcount instead of rolling our own
-> Does something like this fix it for you?
->
->   --- a/kernel/time/sched_clock.c
->   +++ b/kernel/time/sched_clock.c
->   @@ -36,6 +36,7 @@ core_param(irqtime, irqtime, int, 0400);
->
->    static struct clock_data cd = {
->           .mult   = NSEC_PER_SEC / HZ,
->   +       .seq = SEQCNT_ZERO(cd.seq),
->    };
->
->    static u64 __read_mostly sched_clock_mask;
->
-> (The above is not even compile-tested, because x86 doesn't use
-> GENERIC_SCHED_CLOCK. So I did the patch blindly, but I think you get
-> the idea..)
+On Fri, Dec 20, 2013 at 09:41:12AM +0100, Linus Walleij wrote:
+> Hi ARM SoC folks,
+> 
+> here is a set of three U300 patches for the v3.14 series. Nothing major,
+> and not motivating to be split up due to the small amount of traffic since
+> we moved U300 to multiplatform.
+> 
+> You may want to pull this into a place where Uwe's stuff for timex.h
+> removal also ends up so everything is resolved nicely.
+> 
+> Please pull it into ARM SoC!
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/u300-for-arm-soc-1
+> 
+> for you to fetch changes up to 6a79799d5654bb7800614e8b7a009252be7ff90e:
+> 
+>   ARM: u300: fix timekeeping when periodic mode is used (2013-11-26
+> 21:00:21 +0100)
 
-Sheesh. Just finishing up holiday email backlog and Linus already has a
-fix. :)
+Thanks, pulled.
 
-This looks like it should fix the issue, and does build for me.
 
-Assuming it works for Krzysztof,
-
-Acked-by: John Stultz <john.stultz@linaro.org>
-
-I'll do another grep pass through -rc6 to make sure no other new
-uninitialized seqlock usage was added.
-
-thanks
--john
+-Olof
