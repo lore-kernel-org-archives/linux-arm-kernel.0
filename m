@@ -1,206 +1,54 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:28:29 +0000
-Subject: [PATCH RFC 32/46] imx-drm: use supplied drm_device where possible
+Date: Thu, 02 Jan 2014 21:26:31 +0000
+Subject: [PATCH RFC 09/46] imx-drm: update and fix imx6 DT descriptions for
+ v3 HDMI driver
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1Vypob-0007Ff-Bx@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Vypmh-0007E5-Pi@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The component helper provides us the drm_device which is being
-registered.  Rather than having to reference a global in imx-drm-core,
-use this to get the imxdrm device, and also use it to register the CRTC
-against.
-
-This means we never have CRTCs/encoders/connectors without the drivers
-private data being accessible.
-
-Remove the module owner field as well; this provides no protection
-against the device being unbound.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   34 ++++---------------------------
- drivers/staging/imx-drm/imx-drm.h      |    4 +-
- drivers/staging/imx-drm/ipuv3-crtc.c   |    9 ++++---
- 3 files changed, 12 insertions(+), 35 deletions(-)
+ arch/arm/boot/dts/imx6dl.dtsi  |    3 ++-
+ arch/arm/boot/dts/imx6q.dtsi   |    1 +
+ arch/arm/boot/dts/imx6qdl.dtsi |    1 -
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 08e7837d6134..b11568d6444b 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -52,7 +52,6 @@ struct imx_drm_crtc {
- 	struct imx_drm_device			*imxdrm;
- 	int					pipe;
- 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
--	struct module				*owner;
- 	struct crtc_cookie			cookie;
- 	int					mux_id;
- };
-@@ -74,7 +73,6 @@ static int legacyfb_depth = 16;
- module_param(legacyfb_depth, int, 0444);
- 
- static void imx_drm_device_put(void);
--static struct imx_drm_device *__imx_drm_device(void);
- 
- int imx_drm_crtc_id(struct imx_drm_crtc *crtc)
- {
-@@ -114,7 +112,7 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- 
- struct imx_drm_crtc *imx_drm_find_crtc(struct drm_crtc *crtc)
- {
--	struct imx_drm_device *imxdrm = __imx_drm_device();
-+	struct imx_drm_device *imxdrm = crtc->dev->dev_private;
- 	unsigned i;
- 
- 	for (i = 0; i < MAX_CRTC; i++)
-@@ -241,7 +239,6 @@ static struct drm_device *imx_drm_device_get(void)
- 	struct imx_drm_device *imxdrm = __imx_drm_device();
- 	struct imx_drm_encoder *enc;
- 	struct imx_drm_connector *con;
--	struct imx_drm_crtc *crtc;
- 
- 	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
- 		if (!try_module_get(enc->owner)) {
-@@ -259,19 +256,8 @@ static struct drm_device *imx_drm_device_get(void)
- 		}
- 	}
- 
--	list_for_each_entry(crtc, &imxdrm->crtc_list, list) {
--		if (!try_module_get(crtc->owner)) {
--			dev_err(imxdrm->dev, "could not get module %s\n",
--					module_name(crtc->owner));
--			goto unwind_crtc;
--		}
--	}
--
- 	return imxdrm->drm;
- 
--unwind_crtc:
--	list_for_each_entry_continue_reverse(crtc, &imxdrm->crtc_list, list)
--		module_put(crtc->owner);
- unwind_con:
- 	list_for_each_entry_continue_reverse(con, &imxdrm->connector_list, list)
- 		module_put(con->owner);
-@@ -290,13 +276,9 @@ static void imx_drm_device_put(void)
- 	struct imx_drm_device *imxdrm = __imx_drm_device();
- 	struct imx_drm_encoder *enc;
- 	struct imx_drm_connector *con;
--	struct imx_drm_crtc *crtc;
- 
- 	mutex_lock(&imxdrm->mutex);
- 
--	list_for_each_entry(crtc, &imxdrm->crtc_list, list)
--		module_put(crtc->owner);
--
- 	list_for_each_entry(con, &imxdrm->connector_list, list)
- 		module_put(con->owner);
- 
-@@ -535,12 +517,12 @@ static void imx_drm_update_possible_crtcs(void)
-  * The return value if !NULL is a cookie for the caller to pass to
-  * imx_drm_remove_crtc later.
-  */
--int imx_drm_add_crtc(struct drm_crtc *crtc,
-+int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 		struct imx_drm_crtc **new_crtc,
- 		const struct imx_drm_crtc_helper_funcs *imx_drm_helper_funcs,
--		struct module *owner, void *cookie, int id)
-+		void *cookie, int id)
- {
--	struct imx_drm_device *imxdrm = __imx_drm_device();
-+	struct imx_drm_device *imxdrm = drm->dev_private;
- 	struct imx_drm_crtc *imx_drm_crtc;
- 	int ret;
- 
-@@ -574,8 +556,6 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
- 	imx_drm_crtc->crtc = crtc;
- 	imx_drm_crtc->imxdrm = imxdrm;
- 
--	imx_drm_crtc->owner = owner;
--
- 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
- 
- 	*new_crtc = imx_drm_crtc;
-@@ -587,11 +567,9 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
- 	drm_crtc_helper_add(crtc,
- 			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
- 
--	drm_crtc_init(imxdrm->drm, crtc,
-+	drm_crtc_init(drm, crtc,
- 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
- 
--	drm_mode_group_reinit(imxdrm->drm);
--
- 	imx_drm_update_possible_crtcs();
- 
- 	mutex_unlock(&imxdrm->mutex);
-@@ -621,8 +599,6 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
- 
- 	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
- 
--	drm_mode_group_reinit(imxdrm->drm);
--
- 	mutex_unlock(&imxdrm->mutex);
- 
- 	kfree(imx_drm_crtc);
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index d1fb1146240e..78465239ed4c 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -25,10 +25,10 @@ struct imx_drm_crtc_helper_funcs {
- 	const struct drm_crtc_funcs *crtc_funcs;
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 65e54b4529c5..6dc397022214 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -90,5 +90,6 @@
  };
  
--int imx_drm_add_crtc(struct drm_crtc *crtc,
-+int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 		struct imx_drm_crtc **new_crtc,
- 		const struct imx_drm_crtc_helper_funcs *imx_helper_funcs,
--		struct module *owner, void *cookie, int id);
-+		void *cookie, int id);
- int imx_drm_remove_crtc(struct imx_drm_crtc *);
- int imx_drm_init_drm(struct platform_device *pdev,
- 		int preferred_bpp);
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index eb9653a5a887..ed2423efc1d0 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -335,7 +335,7 @@ static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
- }
+ &hdmi {
++	compatible = "fsl,imx6dl-hdmi";
+ 	crtcs = <&ipu1 0>, <&ipu1 1>;
+-}
++};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d2467f532de6..187fe33ba515 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -161,5 +161,6 @@
+ };
  
- static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
--		struct ipu_client_platformdata *pdata)
-+	struct ipu_client_platformdata *pdata, struct drm_device *drm)
- {
- 	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
- 	int dp = -EINVAL;
-@@ -349,9 +349,9 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
- 		return ret;
- 	}
+ &hdmi {
++	compatible = "fsl,imx6q-hdmi";
+ 	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 400bbc624f25..930ebe0c2937 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1369,7 +1369,6 @@
+ 			};
  
--	ret = imx_drm_add_crtc(&ipu_crtc->base,
-+	ret = imx_drm_add_crtc(drm, &ipu_crtc->base,
- 			&ipu_crtc->imx_crtc,
--			&ipu_crtc_helper_funcs, THIS_MODULE,
-+			&ipu_crtc_helper_funcs,
- 			ipu_crtc->dev->parent->of_node, pdata->di);
- 	if (ret) {
- 		dev_err(ipu_crtc->dev, "adding crtc failed with %d.\n", ret);
-@@ -403,6 +403,7 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
- static int ipu_drm_bind(struct device *dev, struct device *master, void *data)
- {
- 	struct ipu_client_platformdata *pdata = dev->platform_data;
-+	struct drm_device *drm = data;
- 	struct ipu_crtc *ipu_crtc;
- 	int ret;
- 
-@@ -412,7 +413,7 @@ static int ipu_drm_bind(struct device *dev, struct device *master, void *data)
- 
- 	ipu_crtc->dev = dev;
- 
--	ret = ipu_crtc_init(ipu_crtc, pdata);
-+	ret = ipu_crtc_init(ipu_crtc, pdata, drm);
- 	if (ret)
- 		return ret;
- 
+ 			hdmi: hdmi at 0120000 {
+-				compatible = "fsl,imx6q-hdmi";
+ 				reg = <0x00120000 0x9000>;
+ 				interrupts = <0 115 0x04>;
+ 				gpr = <&gpr>;
 -- 
 1.7.4.4
