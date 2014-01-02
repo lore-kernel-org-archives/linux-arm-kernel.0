@@ -1,44 +1,35 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Thu, 2 Jan 2014 17:57:02 +0800
-Subject: [PATCHv8 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
+Date: Thu, 2 Jan 2014 17:57:03 +0800
+Subject: [PATCHv8 3/4] ARM: dts: Enables FTM PWM device for Vybrid VF610 TOWER
+ board.
 In-Reply-To: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1388656624-26570-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1388656624-26570-4-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This adds devicetree node for VF610, and there are 8 channels
-supported.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/vf610.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index d31ce1b..6cce861 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -152,6 +152,19 @@
- 				clock-names = "pit";
- 			};
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index c3a3237..d5c6a39 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -100,6 +100,12 @@
+ 	status = "okay";
+ };
  
-+			pwm0: pwm at 40038000 {
-+				compatible = "fsl,vf610-ftm-pwm";
-+				#pwm-cells = <3>;
-+				reg = <0x40038000 0x1000>;
-+				clock-names = "ftm_sys", "ftm_ext",
-+					      "ftm_fix", "ftm_cnt_clk_en";
-+				clocks = <&clks VF610_CLK_FTM0>,
-+					<&clks VF610_CLK_FTM0_EXT_SEL>,
-+					<&clks VF610_CLK_FTM0_FIX_SEL>,
-+					<&clks VF610_CLK_FTM0_EXT_FIX_EN>;
-+				status = "disabled";
-+			};
++&pwm0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm0_1>;
++	status = "okay";
++};
 +
- 			wdog at 4003e000 {
- 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
- 				reg = <0x4003e000 0x1000>;
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1_1>;
 -- 
 1.8.4
