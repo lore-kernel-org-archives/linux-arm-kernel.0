@@ -1,99 +1,169 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 02 Jan 2014 13:07:30 +0100
-Subject: v3.13-rc6+ regression (ARM board)
-In-Reply-To: <20140102101455.GG10158@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
- =?utf-8?Q?e-K=C3=B6nig=22's?=
- message of "Thu, 2 Jan 2014 11:14:55 +0100")
-References: <m3mwjhux0e.fsf@t19.piap.pl> <20131231104511.GA9688@1wt.eu>
- <m3txdmu2ez.fsf@t19.piap.pl> <20140102101455.GG10158@pengutronix.de>
-Message-ID: <m3ppoatwn1.fsf@t19.piap.pl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 2 Jan 2014 13:32:49 +0100
+Subject: [PATCH v3 11/21] ARM: pxa: support ICP DAS LP-8x4x FPGA irq
+In-Reply-To: <1387309071-22382-12-git-send-email-ynvich@gmail.com>
+References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1387309071-22382-12-git-send-email-ynvich@gmail.com>
+Message-ID: <CACRpkdaY7xpoeeUqBBqUS2swe6Y5gKt67VYNvNRrsbFhyU=ATw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+On Tue, Dec 17, 2013 at 8:37 PM, Sergei Ianovich <ynvich@gmail.com> wrote:
 
->> >> There seems to be a regression in v3.13-rc6+ (up to current tip =
->> >> 71ce176ee6ed1735b9a1160a5704a915d13849b1).
->> >>
->> >> Board is Gateworks Cambria, CPU Intel IXP435 ARM big endian, gcc 4.7.3.
->> >> The board boots correctly and works (shell mostly, and SSHD) for about
->> >> 50 seconds. After 52-54 seconds, it frozes dead without any console
->> >> (UART) output.
+> ICP DAS LP-8x4x contains FPGA chip. The chip functions as a interrupt
+> source providing 16 additional interrupts among other things. The
+> interrupt lines are muxed to a GPIO pin. GPIO pins are in turn muxed
+> to a CPU interrupt line.
+>
+> Until pxa is completely converted to device tree, it is impossible
+> to use IRQCHIP_DECLARE() and the irqdomain needs to added manually.
+>
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Linus Walleij <linus.walleij@linaro.org>
 
-Merging 1ca7d67cf5d5a2aef26a8d9afd789006fa098347 with
-85c3d2dd15be4d577a37ffb8bbbd019fc8e3280a = issue, but
+(...)
+> +++ b/drivers/irqchip/irq-lp8x4x.c
 
-merging 1ca7d67cf5d5a2aef26a8d9afd789006fa098347 with
-85c3d2dd15be4d577a37ffb8bbbd019fc8e3280a~1 = no issue.
+Usually combined GPIO+IRQ controllers are put into drivers/gpio but
+this is a bit special as it seems to handle also non-GPIO-related IRQs
+so let's get some input on this.
 
-This means these two commits don't like each other:
+> +static unsigned char irq_sys_enabled;
+> +static unsigned char irq_high_enabled;
+> +static void *base;
+> +static int irq_base;
+> +static int num_irq = 16;
 
-commit 1ca7d67cf5d5a2aef26a8d9afd789006fa098347
-Author: John Stultz <john.stultz@linaro.org>
-Date:   Mon Oct 7 15:51:59 2013 -0700
+Please use the state container design pattern and get rid of these
+global variables.
 
-    seqcount: Add lockdep functionality to seqcount/seqlock structures
+This documentation patch describes this pattern and has been
+merged for v3.14, so please read this:
+http://marc.info/?l=linux-kernel&m=138615980524966&w=2
 
-    Currently seqlocks and seqcounts don't support lockdep.
+> +static void lp8x4x_mask_irq(struct irq_data *d)
+> +{
+> +       unsigned mask;
+> +       int irq = d->irq - irq_base;
 
-    After running across a seqcount related deadlock in the timekeeping
-    code, I used a less-refined and more focused variant of this patch
-    to narrow down the cause of the issue.
+Don't calculate hardware IRQ numbers from offsets. Use
+irqdomain, which is done for exactly this purpose.
 
-    This is a first-pass attempt to properly enable lockdep functionality
-    on seqlocks and seqcounts.
+> +       if (irq < 8) {
+> +               irq_high_enabled &= ~(1 << irq);
 
-    Since seqcounts are used in the vdso gettimeofday code, I've provided
-    non-lockdep accessors for those needs.
+I usually use the BIT() macro for this, like:
 
-    I've also handled one case where there were nested seqlock writers
-    and there may be more edge cases.
+#include <linux/bitops.h>
 
-    Comments and feedback would be appreciated!
+irq_high_enabled &= ~BIT(irq);
 
-    Signed-off-by: John Stultz <john.stultz@linaro.org>
-    Signed-off-by: Peter Zijlstra <peterz@infradead.org>
-    Cc: Eric Dumazet <eric.dumazet@gmail.com>
-    Cc: Li Zefan <lizefan@huawei.com>
-    Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-    Cc: Steven Rostedt <rostedt@goodmis.org>
-    Cc: "David S. Miller" <davem@davemloft.net>
-    Cc: netdev at vger.kernel.org
-    Link: http://lkml.kernel.org/r/1381186321-4906-3-git-send-email-john.stultz at linaro.org
-    Signed-off-by: Ingo Molnar <mingo@kernel.org>
+> +static struct irq_chip lp8x4x_irq_chip = {
+> +       .name                   = "FPGA",
+> +       .irq_ack                = lp8x4x_mask_irq,
+> +       .irq_mask               = lp8x4x_mask_irq,
+> +       .irq_mask_ack           = lp8x4x_mask_irq,
+> +       .irq_unmask             = lp8x4x_unmask_irq,
+> +};
 
- arch/x86/vdso/vclock_gettime.c |  8 ++++---- (not used on this machine)
- fs/dcache.c                    |  4 ++--
- fs/fs_struct.c                 |  2 +-
- include/linux/init_task.h      |  8 ++++----
- include/linux/lockdep.h        |  8 ++++++--
- include/linux/seqlock.h        | 79 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------
- mm/filemap_xip.c               |  2 +-       (not used on this machine)
- 7 files changed, 90 insertions(+), 21 deletions(-)
+After you have added your state container you will have
+a handle to your struct gpio_chip in the cookie passed to
+as irqdata.
 
-and:
+Then you need to mark the GPIO lines used for IRQs by
+doing something similar to this patch in your startup()
+and shutdown() callbacks:
+http://marc.info/?l=linux-gpio&m=138547223832167&w=2
 
-commit 85c3d2dd15be4d577a37ffb8bbbd019fc8e3280a
-Author: Stephen Boyd <sboyd@codeaurora.org>
-Date:   Thu Jul 18 16:21:15 2013 -0700
+> +static void lp8x4x_irq_handler(unsigned int irq, struct irq_desc *desc)
+> +{> +static void lp8x4x_unmask_irq(struct irq_data *d)
+> +{
+> +       unsigned mask;
+> +       int irq = d->irq - irq_base;
 
-    sched_clock: Use seqcount instead of rolling our own
+Use the irqdomain.
 
-    We're going to increase the cyc value to 64 bits in the near
-    future. Doing that is going to break the custom seqcount
-    implementation in the sched_clock code because 64 bit numbers
-    aren't guaranteed to be atomic. Replace the cyc_copy with a
-    seqcount to avoid this problem.
+> +       int loop, n;
+> +       unsigned long mask;
+> +       struct irq_chip *chip = irq_desc_get_chip(desc);
+> +
+> +       chained_irq_enter(chip, desc);
+> +
+> +       do {
+> +               loop = 0;
+> +               mask = ioread8(base + CLRHILVINT) & 0xff;
+> +               mask |= (ioread8(base + SECOINT) & 0x1f) << 8;
+> +               mask |= (ioread8(base + PRIMINT) & 0xe0) << 8;
 
-    Cc: Russell King <linux@arm.linux.org.uk>
-    Acked-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-    Signed-off-by: John Stultz <john.stultz@linaro.org>
+#define these magic constants so we know what they mean.
+0x1f, 0xe0...
 
- kernel/time/sched_clock.c | 27 ++++++++-------------------
- 1 file changed, 8 insertions(+), 19 deletions(-)
--- 
-Krzysztof Halasa
+> +               mask &= (irq_high_enabled | (irq_sys_enabled << 8));
+> +               for_each_set_bit(n, &mask, BITS_PER_LONG) {
+> +                       loop = 1;
+> +
+> +                       generic_handle_irq(irq_base + n);
+> +               }
+> +       } while (loop);
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+If you're going to do it like this then have "loop" be a bool variable.
+
+However I don't quite like this construction, an eternal for() loop
+with a break; statement works too, but try to just use the mask and
+get rid of the "loop" helper variable.
+
+> +       iowrite8(0, base + EOI);
+
+This looks dangerous, what are you doing here?
+
+> +static int lp8x4x_irq_probe(struct platform_device *pdev)
+> +{
+> +       struct resource *rm, *ri;
+
+Explain these names. Usually we call them "res" or something
+simple like this.
+
+> +       irq_base = irq_alloc_descs(-1, 0, num_irq, 0);
+> +       if (irq_base < 0) {
+> +               dev_err(&pdev->dev, "Failed to allocate IRQ numbers\n");
+> +               return irq_base;
+> +       }
+
+Instead of doing this, create the descriptors by calling
+irq_create_mapping() on all the hardware lines after adding
+the irq domain.
+
+> +       domain = irq_domain_add_legacy(np, num_irq, irq_base, 0,
+> +                                      &lp8x4x_irq_domain_ops, NULL);
+> +       if (!domain) {
+> +               dev_err(&pdev->dev, "Failed to add IRQ domain\n");
+> +               return -ENOMEM;
+> +       }
+
+Why are you using a legacy irqdomain? You're not dependent
+on any specific base so use a linear domain.
+
+> +       iowrite8(0, base + CLRRISEINT);
+> +       iowrite8(0, base + ENRISEINT);
+> +       iowrite8(0, base + CLRFALLINT);
+> +       iowrite8(0, base + ENFALLINT);
+> +       iowrite8(0, base + CLRHILVINT);
+> +       iowrite8(0, base + ENHILVINT);
+> +       iowrite8(0, base + ENSYSINT);
+> +       iowrite8(0, base + SECOINT);
+
+Add a comment explaining what you're doing here.
+
+> +static int __init lp8x4x_irq_init(void)
+> +{
+> +       return platform_driver_register(&lp8x4x_irq_driver);
+> +}
+> +postcore_initcall(lp8x4x_irq_init);
+
+Do you *have* to do it this early? I guess if it's used for
+the UARTs then yes, but make a case for it...
+
+Yours,
+Linus Walleij
