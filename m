@@ -1,38 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 1 Jan 2014 19:25:15 -0500
-Subject: [ARM] Fix kernel compile error: drivers/crypto/ixp4xx_crypto.c.
-In-Reply-To: <20140101124625.GF16456@n2100.arm.linux.org.uk>
-References: <m3d2kduwd7.fsf@t19.piap.pl>
- <20131231134820.GS8064@book.gsilab.sittig.org>
- <52C3066E.1070909@infradead.org>
- <20140101123746.GB20094@book.gsilab.sittig.org>
- <20140101124625.GF16456@n2100.arm.linux.org.uk>
-Message-ID: <20140102002515.GD19878@titan.lakedaemon.net>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Thu, 2 Jan 2014 02:01:52 +0100
+Subject: [PATCH 3/7] iommu/omap: Convert to devicetree
+In-Reply-To: <1764051.JiGg1d3s1L@avalon>
+References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
+ <1387284818-28739-4-git-send-email-florian.vaussard@epfl.ch>
+ <1764051.JiGg1d3s1L@avalon>
+Message-ID: <20140102010150.GA9933@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 01, 2014 at 12:46:25PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 01, 2014 at 01:37:46PM +0100, Gerhard Sittig wrote:
-> > Last time I checked (few days ago, 'git grep -w Fixes:') it
-> > wasn't, at least not within the kernel source tree and its
-> > Documentation hierarchy.  Today's master still does not have it.
-> > 
-> > But a quick search in recent LAKML messages reveals that it's
-> > been in use by e.g. Olof Johansson, Jason Cooper, Rusty Russell,
-> > Dan Carpenter, Russell King, Mark Brown, Stephen Warren, Paul
-> > Walmsley, and I'm not making this up but am just referring to
-> > what repeatedly was requested in the past.  The form used there
-> > was "Fixes: <hash> (<oneline>)" though.  A doc update may be due
-> > to have a canonical format.
+Hi,
+
+On Thu, Jan 02, 2014 at 01:13:42AM +0100, Laurent Pinchart wrote:
+> > +		.of_match_table = omap_iommu_of_match,
 > 
-> It was discussed at kernel summit, and I believe the resulting format
-> was only published in one of the kernel summit mailing lists.  The
-> outcome of it as I understand was that the format is:
-> 
-> Fixes: <hash> ("<one line summary>")
+> If CONFIG_OF isn't defined (pretty unlikely I agree, but a possibility you 
+> seem to be prepared for nonetheless given the above #if), this will fail to 
+> compile.
 
-fwiw, Linus also recommended setting core.abbrev = 12.
+FYI: This is avoided in other drivers by using
+of_match_ptr(omap_iommu_of_match), which is replaced with NULL by
+the preprocessor if CONFIG_OF is not defined.
 
-thx,
-
-Jason.
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/8c9e166f/attachment-0001.sig>
