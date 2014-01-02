@@ -1,31 +1,60 @@
-From: giometti@enneenne.com (Rodolfo Giometti)
-Date: Thu, 2 Jan 2014 14:50:08 +0100
-Subject: NAND support for Armada 370
-In-Reply-To: <20140102144236.270c4a6a@skate>
-References: <20140102124407.GF10251@enneenne.com>
- <20140102144236.270c4a6a@skate>
-Message-ID: <20140102135008.GH10251@enneenne.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 2 Jan 2014 16:32:21 +0200
+Subject: [PATCH 4/6] ARM: tegra: rework fuse.c
+In-Reply-To: <CACRpkdbXc_yH-=WgpQyVwHC_TSPfbfx=tHwziNhmB6t0HuSfRw@mail.gmail.com>
+References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
+ <1387468474-26521-5-git-send-email-pdeschrijver@nvidia.com>
+ <CACRpkdbXc_yH-=WgpQyVwHC_TSPfbfx=tHwziNhmB6t0HuSfRw@mail.gmail.com>
+Message-ID: <20140102143221.GR26588@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 02:42:36PM +0100, Thomas Petazzoni wrote:
-> Dear Rodolfo Giometti,
+On Thu, Jan 02, 2014 at 01:37:43PM +0100, Linus Walleij wrote:
+> On Thu, Dec 19, 2013 at 4:54 PM, Peter De Schrijver
+> <pdeschrijver@nvidia.com> wrote:
 > 
-> The e-mail address you used for Gregory is wrong.
+> > Reduce fuse.c to the minimum functionality required for the early bootstages.
+> > Also export tegra_read_straps() for use by the fuse driver.
+> >
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> 
+> Aha, but why?
+> 
 
-I see... sorry! I did too much cut&paste! :-P
+The efuse driver in patch 2 of this series, adds the randomness, so we don't
+need to add it here then?
 
-> Also, for NAND questions, you should Cc Ezequiel Garcia (I added
-> him), as he is our NAND driver developer.
+> > -static void __init tegra20_fuse_init_randomness(void)
+> > -{
+> > -       u32 randomness[2];
+> > -
+> > -       randomness[0] = tegra_fuse_readl(FUSE_UID_LOW);
+> > -       randomness[1] = tegra_fuse_readl(FUSE_UID_HIGH);
+> > -
+> > -       add_device_randomness(randomness, sizeof(randomness));
+> > -}
+> > -
+> > -/* Applies to Tegra30 or later */
+> > -static void __init tegra30_fuse_init_randomness(void)
+> > -{
+> > -       u32 randomness[7];
+> > -
+> > -       randomness[0] = tegra_fuse_readl(FUSE_VENDOR_CODE);
+> > -       randomness[1] = tegra_fuse_readl(FUSE_FAB_CODE);
+> > -       randomness[2] = tegra_fuse_readl(FUSE_LOT_CODE_0);
+> > -       randomness[3] = tegra_fuse_readl(FUSE_LOT_CODE_1);
+> > -       randomness[4] = tegra_fuse_readl(FUSE_WAFER_ID);
+> > -       randomness[5] = tegra_fuse_readl(FUSE_X_COORDINATE);
+> > -       randomness[6] = tegra_fuse_readl(FUSE_Y_COORDINATE);
+> > -
+> > -       add_device_randomness(randomness, sizeof(randomness));
+> > -}
+> 
+> We still want to get this into the random pool right? Can it not simply
+> be moved to a later initcall then?
 
-Thanks a lot for your help!
+Yes, it's done in the efuse driver now, do you think that's too late?
 
-Rodolfo
+Cheers,
 
--- 
-
-GNU/Linux Solutions                  e-mail: giometti at enneenne.com
-Linux Device Driver                          giometti at linux.it
-Embedded Systems                     phone:  +39 349 2432127
-UNIX programming                     skype:  rodolfo.giometti
-Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
+Peter.
