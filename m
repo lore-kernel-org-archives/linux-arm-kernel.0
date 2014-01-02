@@ -1,42 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Jan 2014 18:25:49 +0000
-Subject: [PATCH 1/2] spi: clps711x: Driver refactor
-In-Reply-To: <201401021846.23488.arnd@arndb.de>
-References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
- <1388583851.810843204@f301.i.mail.ru>
- <20140101150737.GR31886@sirena.org.uk>
- <201401021846.23488.arnd@arndb.de>
-Message-ID: <20140102182549.GF31886@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 2 Jan 2014 13:28:22 -0500
+Subject: [PATCH 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <1388678476-12875-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1388678476-12875-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388678476-12875-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140102182822.GI19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 06:46:23PM +0100, Arnd Bergmann wrote:
+Wolfram,
 
-> I definitely agree with what you say, but please note that Alexander is
-> the only person who ever sends clps711x patches, so there is not much
-> hope of collaboration. I also suspect he's the only one who would
+On Thu, Jan 02, 2014 at 05:01:16PM +0100, Gregory CLEMENT wrote:
+> The first variants of Armada XP SoCs (A0 stepping) have issues related
+> to the i2c controller which prevent to use the offload mechanism and
+> lead to a kernel hang during boot.
+> 
+> The driver now check the revision of the SoC. If the revision is not
+> more recent than the A0 or if the driver can't get the SoC revision
+> then it disables the offload mechanism.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/i2c/busses/i2c-mv64xxx.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index 8be7e42aa4de..089a3663ad86 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  #include <linux/delay.h>
+> +#include <linux/mvebu-soc-id.h>
+>  
+>  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
+>  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
+> @@ -779,8 +780,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  	 * Transaction Generator support and the errata fix.
+>  	 */
+>  	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
+> -		drv_data->offload_enabled = true;
+> +		u32 dev, rev;
+> +
+>  		drv_data->errata_delay = true;
+> +		/*
+> +		 * Only revison more recent than A0 support offload
+> +		 * mechanism. In case we can't get the SoC revision
+> +		 * weplay safe and we don't enable it
+> +		 */
+> +		if (!mvebu_get_soc_id(&rev, &dev) && (dev > MV78XX0_A0_REV))
+> +			drv_data->offload_enabled = true;
 
-There's stuff been going in from the people who do generic cleanups and
-updates.
+Since this depends on arch-specific code in the previous patch, I'd like
+to keep the two of them together in a topic branch.  Would you prefer to
+take both with my Ack, or vice-versa?  I'm fine either way.
 
-> suffer from accidental breakage, especially since the existing driver
-> is not used anywhere upstream (no instance of platform data, and no
-> DT support).
+thx,
 
-Right.  On the other hand I really don't want to get into setting bad
-precedents that people then use when they complain that I actually want
-to review their code, that's just going to be more miserable in the long
-run.
-
-There were also some things in there that I really did want to review
-properly but I wasn't entirely sure what they were actually supposed to
-be doing.  Getting things split up with better changelogs will make that
-review much more tractable, it might even be immediately obvious what is
-going on.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/0da08763/attachment-0001.sig>
+Jason.
