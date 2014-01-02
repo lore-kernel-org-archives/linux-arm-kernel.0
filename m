@@ -1,55 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Jan 2014 16:07:37 +0000
-Subject: [PATCH RFC 20/26] ARM: omap: clean up DMA register accesses
-In-Reply-To: <1388677778.1871.255.camel@smile>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
- <E1VyjwR-0005FH-RH@rmk-PC.arm.linux.org.uk> <1388677778.1871.255.camel@smile>
-Message-ID: <20140102160737.GK32243@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 02 Jan 2014 17:14:41 +0100
+Subject: [GIT PULL] Samsung Clock fixes for v3.13
+Message-ID: <3900474.uee5rn6pUr@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 05:49:38PM +0200, Andy Shevchenko wrote:
-> On Thu, 2014-01-02 at 15:12 +0000, Russell King wrote:
-> > We can do much better with this by using a structure to describe each
-> > register, rather than code.
-> > 
-> 
-> One comment bellow.
-> 
-> 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/mach-omap1/dma.c |  121 +++++++++++++++++++++------------------------
-> >  arch/arm/mach-omap2/dma.c |   99 ++++++++++++++++++-------------------
-> >  include/linux/omap-dma.h  |   13 +++++
-> >  3 files changed, 117 insertions(+), 116 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-> > index 11f0b0ee67a3..de30e28ff487 100644
-> > --- a/arch/arm/mach-omap1/dma.c
-> > +++ b/arch/arm/mach-omap1/dma.c
-> > @@ -32,53 +32,52 @@
-> >  
-> >  #define OMAP1_DMA_BASE			(0xfffed800)
-> >  #define OMAP1_LOGICAL_DMA_CH_COUNT	17
-> > -#define OMAP1_DMA_STRIDE		0x40
-> 
-> Does this belong to patch 19/26 ?
+Hi Mike,
 
-Why?
+Please consider the following Samsung Clock fixes for v3.13.
 
-> >  static void __iomem *dma_base;
-> >  static inline void dma_write(u32 val, int reg, int lch)
-> >  {
-> > -	u8  stride;
-> > -	u32 offset;
-> > +	void __iomem *addr = dma_base;
-> >  
-> > -	stride = (reg >= CPC) ? OMAP1_DMA_STRIDE : 0;
-                                ^^^^^^^^^^^^^^^^
-The code here still uses it prior to this patch.
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/samsung-clk-fixes
+
+for you to fetch changes up to 3fd68c99f3026f4fe3a1b7b6fb75e5638b2032fd:
+
+  clk: exynos: File scope reg_save array should depend on PM_SLEEP (2013-12-30 18:01:09 +0100)
+
+----------------------------------------------------------------
+Samsung Clock fixes for v3.13-rc7
+
+* Several patches fixing up incorrectly defined register addresses and
+  bitfield offsets that could lead to undefined operation when accessing
+  respective registers or bitfields.
+
+ 1) clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
+
+ 2a) clk: samsung: exynos5250: Fix ACP gate register offset
+ 2b) clk: samsung: exynos5250: Add MDMA0 clocks
+ 2c) ARM: dts: exynos5250: Fix MDMA0 clock number
+
+ 3) clk: samsung: exynos4: Correct SRC_MFC register
+
+   All three issues have been present since Exynos5250 and Exynos4 clock
+   drivers were added by commits 6e3ad26816b72 ("clk: exynos5250:
+   register clocks using common clock framework") and e062b571777f5
+   ("clk: exynos4: register clocks using common clock framework")
+   respectively.
+
+* Patch to fix automatic disabling of Exynos5250 sysreg clock that could
+  cause undefined operation of several peripherals, such as USB, I2C,
+  MIPI or display block.
+
+ 4) clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag for the sysreg
+    clock
+
+   Present since Exynos5250 clock drivers was added by commits
+   6e3ad26816b72 ("clk: exynos5250: register clocks using common clock
+   framework").
+
+* Patch fixing compilation warning in clk-exynos-audss driver when
+  CONFIG_PM_SLEEP is disabled.
+
+ 5) clk: exynos: File scope reg_save array should depend on PM_SLEEP
+
+   Present since the driver was added by commit 1241ef94ccc3 ("clk:
+   samsung: register audio subsystem clocks using common clock
+   framework").
+
+----------------------------------------------------------------
+Abhilash Kesavan (4):
+      clk: samsung: exynos5250: Fix ACP gate register offset
+      clk: samsung: exynos5250: Add MDMA0 clocks
+      ARM: dts: exynos5250: Fix MDMA0 clock number
+      clk: samsung: exynos5250: Add CLK_IGNORE_UNUSED flag for the sysreg clock
+
+Andrew Bresticker (1):
+      clk: exynos5250: fix sysmmu_mfc{l,r} gate clocks
+
+Krzysztof Kozlowski (1):
+      clk: exynos: File scope reg_save array should depend on PM_SLEEP
+
+Seung-Woo Kim (1):
+      clk: samsung: exynos4: Correct SRC_MFC register
+
+ .../devicetree/bindings/clock/exynos5250-clock.txt         |  2 ++
+ arch/arm/boot/dts/exynos5250.dtsi                          |  2 +-
+ drivers/clk/samsung/clk-exynos-audss.c                     | 10 +++++-----
+ drivers/clk/samsung/clk-exynos4.c                          |  2 +-
+ drivers/clk/samsung/clk-exynos5250.c                       | 14 +++++++++-----
+ 5 files changed, 18 insertions(+), 12 deletions(-)
