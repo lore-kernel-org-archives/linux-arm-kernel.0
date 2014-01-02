@@ -1,36 +1,29 @@
-From: giometti@enneenne.com (Rodolfo Giometti)
-Date: Thu, 2 Jan 2014 13:44:07 +0100
-Subject: NAND support for Armada 370
-Message-ID: <20140102124407.GF10251@enneenne.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Jan 2014 14:11:54 +0100
+Subject: Back from parental leave
+Message-ID: <201401021411.54356.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gregory,
+Happy New Year everyone!
 
-I'm working on vanilla kernel 3.13-rc6 and an Armada-370 based board
-(compatible with armada-370-db) and I'm trying to get NAND support
-working.
+I'm starting to resume my regular work schedule in Linaro and as the arm-soc
+co-maintainer now, after five months of parental leave and a bit of vacation.
+I have started following the mailing lists and replying to more work email
+a couple of weeks ago, but today is the first day that I'm planning to
+actually spend entirely on getting set up for productive work myself again.
 
-I noticed that on my kernel is missing your patch named "[PATCH v2
-01/27] clk: mvebu: Add Core Divider clock", however after applying it
-I get:
+Many thanks to Kevin, Linus and everyone else who has been stepping in for
+me in the meantime! As Deepak Saxena is now on on leave, I will be taking
+over some of his work until he returns, and I also need to catch up with
+what has been going on. I have added a number of people on Cc that I'd like
+to talk to at some point. I don't yet have any scheduled meetings, so if
+you'd like to catch up, please just find me on IRC at a time that is
+convenient for you, I'd be happy to call you back on the phone or just
+talk on IRC. I should be available most days between 9:00 and 16:00 UTC.
 
-   pxa3xx-nand f10d0000.nand: This platform can't do DMA on this device
-   pxa3xx-nand f10d0000.nand: Wait time out!!!
-   pxa3xx-nand f10d0000.nand: Wait time out!!!
-   pxa3xx-nand f10d0000.nand: Wait time out!!!
-   No NAND device found
+I have not yet looked at the current contents of the arm-soc tree, I
+guess I will have a chat with Olof and Kevin first and then get back
+into merging and testing branches.
 
-Do I still miss something? And what about DMA support?
-
-Thanks in advance,
-
-Rodolfo
-
--- 
-
-GNU/Linux Solutions                  e-mail: giometti at enneenne.com
-Linux Device Driver                          giometti at linux.it
-Embedded Systems                     phone:  +39 349 2432127
-UNIX programming                     skype:  rodolfo.giometti
-Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
+	Arnd
