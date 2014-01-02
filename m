@@ -1,34 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 2 Jan 2014 11:46:38 +0100
-Subject: [PATCH] PCI: mvebu: Remove redundant code
-In-Reply-To: <1388659296-21569-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1388659296-21569-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140102114638.47457689@skate>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Thu, 2 Jan 2014 17:57:00 +0800
+Subject: [PATCHv8 0/4] Add Freescale FTM PWM driver.
+Message-ID: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+This patch series is the Freescale FTM PWM implementation. And there
+are 8 channels most supported by the FTM PWM. This implementation is
+only compatible with device tree definition.
 
-On Thu,  2 Jan 2014 11:41:36 +0100, Gregory CLEMENT wrote:
-> In the commit b42285f66f871a989, Sebastian moved clock enable before
-> register access, but during the merge of the commit
-> 9f352f0e6c0fa2dc608812df "PCI: mvebu: Dynamically detect if the PEX
-> link is up to enable hot plug", the moved part was added back.
-> 
-> This patch fixes this by removing the redundant code.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/pci/host/pci-mvebu.c | 8 --------
->  1 file changed, 8 deletions(-)
+This patch series is based on linux-next and has been tested on Vybrid
+VF610 Tower board using device tree.
 
-This has already been fixed by
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/pci/host/pci-mvebu.c?id=84f47190d6be1cb99cd4a680e1018080d93800a8.
 
-Thanks!
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Changes in v8:
+- Fix some issues pointed by Thierry.
+- Fix the _readl/_writel of sparse check.
+
+- And the ftm_readl()/ftm_writel() are just copied from the
+  readl()/writel(), and then add the big endian check.
+
+
+
+Changes in v7:
+- Add big-endian mode support.
+- Add FTM mutex lock.
+- Add period time check with the current running pwm(s).
+- Recode the counter clock source selecting.
+- Sort some header files alphabetically, etc.
+
+[snip] v1~v6
