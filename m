@@ -1,54 +1,57 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:26:31 +0000
-Subject: [PATCH RFC 09/46] imx-drm: update and fix imx6 DT descriptions for
- v3 HDMI driver
+Date: Thu, 02 Jan 2014 21:28:39 +0000
+Subject: [PATCH RFC 34/46] imx-drm: imx-drm-core: provide common connector
+ and encoder cleanup functions
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1Vypmh-0007E5-Pi@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Vypol-0007Fn-IZ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Provide two helper functions to assist with cleaning up imx-drm
+connectors and encoders.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx6dl.dtsi  |    3 ++-
- arch/arm/boot/dts/imx6q.dtsi   |    1 +
- arch/arm/boot/dts/imx6qdl.dtsi |    1 -
- 3 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c |   13 +++++++++++++
+ drivers/staging/imx-drm/imx-drm.h      |    2 ++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 65e54b4529c5..6dc397022214 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -90,5 +90,6 @@
- };
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 1cfb8a18d905..30d516cc76bb 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -363,6 +363,19 @@ static void imx_drm_connector_unregister(
+ 	drm_mode_group_reinit(imxdrm->drm);
+ }
  
- &hdmi {
-+	compatible = "fsl,imx6dl-hdmi";
- 	crtcs = <&ipu1 0>, <&ipu1 1>;
--}
-+};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index d2467f532de6..187fe33ba515 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -161,5 +161,6 @@
++void imx_drm_connector_destroy(struct drm_connector *connector)
++{
++	drm_sysfs_connector_remove(connector);
++	drm_connector_cleanup(connector);
++}
++EXPORT_SYMBOL_GPL(imx_drm_connector_destroy);
++
++void imx_drm_encoder_destroy(struct drm_encoder *encoder)
++{
++	drm_encoder_cleanup(encoder);
++}
++EXPORT_SYMBOL_GPL(imx_drm_encoder_destroy);
++
+ static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
+ 	.fb_create = drm_fb_cma_create,
  };
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index 49d4aaf33f97..d13d518e8eb9 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -69,5 +69,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
  
- &hdmi {
-+	compatible = "fsl,imx6q-hdmi";
- 	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
- };
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 400bbc624f25..930ebe0c2937 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1369,7 +1369,6 @@
- 			};
+ int imx_drm_connector_mode_valid(struct drm_connector *connector,
+ 	struct drm_display_mode *mode);
++void imx_drm_connector_destroy(struct drm_connector *connector);
++void imx_drm_encoder_destroy(struct drm_encoder *encoder);
  
- 			hdmi: hdmi at 0120000 {
--				compatible = "fsl,imx6q-hdmi";
- 				reg = <0x00120000 0x9000>;
- 				interrupts = <0 115 0x04>;
- 				gpr = <&gpr>;
+ #endif /* _IMX_DRM_H_ */
 -- 
 1.7.4.4
