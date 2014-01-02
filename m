@@ -1,32 +1,62 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Thu, 2 Jan 2014 02:01:52 +0100
-Subject: [PATCH 3/7] iommu/omap: Convert to devicetree
-In-Reply-To: <1764051.JiGg1d3s1L@avalon>
-References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
- <1387284818-28739-4-git-send-email-florian.vaussard@epfl.ch>
- <1764051.JiGg1d3s1L@avalon>
-Message-ID: <20140102010150.GA9933@earth.universe>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Thu, 02 Jan 2014 09:55:30 +0800
+Subject: [PATCH 23/25] thermal: exynos: fix error return code
+In-Reply-To: <1388357260-4843-24-git-send-email-Julia.Lawall@lip6.fr>
+References: <1388357260-4843-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1388357260-4843-24-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1388627730.3739.67.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 02, 2014 at 01:13:42AM +0100, Laurent Pinchart wrote:
-> > +		.of_match_table = omap_iommu_of_match,
+On Sun, 2013-12-29 at 23:47 +0100, Julia Lawall wrote:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-> If CONFIG_OF isn't defined (pretty unlikely I agree, but a possibility you 
-> seem to be prepared for nonetheless given the above #if), this will fail to 
-> compile.
+> Set the return variable to an error code as done elsewhere in the function.
+> 
+> A simplified version of the semantic match that finds this problem is as
+> follows: (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> (
+> if at p1 (\(ret < 0\|ret != 0\))
+>  { ... return ret; }
+> |
+> ret at p1 = 0
+> )
+> ... when != ret = e1
+>     when != &ret
+> *if(...)
+> {
+>   ... when != ret = e2
+>       when forall
+>  return ret;
+> }
+> 
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-FYI: This is avoided in other drivers by using
-of_match_ptr(omap_iommu_of_match), which is replaced with NULL by
-the preprocessor if CONFIG_OF is not defined.
+applied.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/8c9e166f/attachment-0001.sig>
+thanks,
+rui
+> 
+> ---
+> Not tested.
+> 
+>  drivers/thermal/samsung/exynos_tmu.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 32f38b9..0d96a51 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -205,6 +205,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>  skip_calib_data:
+>  	if (pdata->max_trigger_level > MAX_THRESHOLD_LEVS) {
+>  		dev_err(&pdev->dev, "Invalid max trigger level\n");
+> +		ret = -EINVAL;
+>  		goto out;
+>  	}
+>  
+> 
