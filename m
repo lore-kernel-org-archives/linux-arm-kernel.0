@@ -1,50 +1,87 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 02 Jan 2014 11:02:44 +0100
-Subject: v3.13-rc6+ regression (ARM board)
-In-Reply-To: <20131231104511.GA9688@1wt.eu> (Willy Tarreau's message of "Tue,
- 31 Dec 2013 11:45:11 +0100")
-References: <m3mwjhux0e.fsf@t19.piap.pl> <20131231104511.GA9688@1wt.eu>
-Message-ID: <m3txdmu2ez.fsf@t19.piap.pl>
+From: gioh.kim@lge.com (Gioh Kim)
+Date: Thu, 2 Jan 2014 19:04:13 +0900
+Subject: ARM: mm: Could I change module space size or place modules in vmalloc
+ area?
+Message-ID: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> There seems to be a regression in v3.13-rc6+ (up to current tip =
->> 71ce176ee6ed1735b9a1160a5704a915d13849b1).
->>
->> Board is Gateworks Cambria, CPU Intel IXP435 ARM big endian, gcc 4.7.3.
->> The board boots correctly and works (shell mostly, and SSHD) for about
->> 50 seconds. After 52-54 seconds, it frozes dead without any console
->> (UART) output.
->>
->> Bisecting shows 5e30025a319910695f5010dc0fb53a23299da14d as the first
->> bad commit. Interestingly it's a merge:
 
-Reverting 1ca7d67cf5d5a2aef26a8d9afd789006fa098347 on top of current tip
-(9a0bb2966efbf30a71c128c3af63307d8b5f5fc0) fixes my issue.
 
-What now?
+Hi,
 
-1ca7d67cf5d5a2aef26a8d9afd789006fa098347:
-    seqcount: Add lockdep functionality to seqcount/seqlock structures
+I run out of module space because I have several big driver modules.
+I know I can strip the modules to decrease size but I need debug info now.
 
-    Currently seqlocks and seqcounts don't support lockdep.
+The default size of module is 16MB and the size is statically defined in the
+header file. 
+But a description for the module space size tells that it can be
+configurable at most 32MB.
 
-    After running across a seqcount related deadlock in the timekeeping
-    code, I used a less-refined and more focused variant of this patch
-    to narrow down the cause of the issue.
+I have changed the module space size to 18MB and tested my platform.
+It has been looking good.
 
-    This is a first-pass attempt to properly enable lockdep functionality
-    on seqlocks and seqcounts.
+I am not sure my patch is proper solution.
+Anyway, could I configure the module space size?
 
-    Since seqcounts are used in the vdso gettimeofday code, I've provided
-    non-lockdep accessors for those needs.
+Or could I place the modules into vmalloc area?
 
-    I've also handled one case where there were nested seqlock writers
-    and there may be more edge cases.
 
-    Comments and feedback would be appreciated!
--- 
-Krzysztof Halasa
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Signed-off-by: Gioh Kim <gioh.kim@lge.com>
+---
+ arch/arm/Kconfig              |    4 ++++
+ arch/arm/include/asm/memory.h |   10 +++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index c1f1a7e..cf1fb55
+100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2257,6 +2257,10 @@ config ARM_CPU_SUSPEND
+
+ endmenu
+
++config MODULES_AREA_SIZE
++       int
++       default 0x1000000
++
+ source "net/Kconfig"
+
+ source "drivers/Kconfig"
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 6976b03..3396758 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -32,13 +32,17 @@
+
+ #ifdef CONFIG_MMU
+
++#if CONFIG_MODULES_AREA_SIZE > SZ_32M
++#error Too much space for modules
++#endif
++
+ /*
+  * PAGE_OFFSET - the virtual address of the start of the kernel image
+  * TASK_SIZE - the maximum size of a user space task.
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+  */
+-#define PAGE_OFFSET            UL(CONFIG_PAGE_OFFSET)
+-#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
++#define PAGE_OFFSET    UL(CONFIG_PAGE_OFFSET)
++#define TASK_SIZE      (UL(CONFIG_PAGE_OFFSET) -
+UL(CONFIG_MODULES_AREA_SIZE))
+ #define TASK_UNMAPPED_BASE     ALIGN(TASK_SIZE / 3, SZ_16M)
+
+ /*
+@@ -51,7 +55,7 @@
+  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
+  */
+ #ifndef CONFIG_THUMB2_KERNEL
+-#define MODULES_VADDR          (PAGE_OFFSET - SZ_16M)
++#define MODULES_VADDR          (PAGE_OFFSET - CONFIG_MODULES_AREA_SIZE)
+ #else
+ /* smaller range for Thumb-2 symbols relocation (2^24)*/
+ #define MODULES_VADDR          (PAGE_OFFSET - SZ_8M)
+--
+1.7.9.5
