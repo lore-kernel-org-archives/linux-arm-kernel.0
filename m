@@ -1,46 +1,45 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 15:11:11 +0000
-Subject: [PATCH RFC 14/26] dmaengine: omap-dma: move barrier to
- omap_dma_start_desc()
+Date: Thu, 02 Jan 2014 15:11:21 +0000
+Subject: [PATCH RFC 15/26] dmaengine: omap-dma: use cached CCR value when
+ enabling DMA
 In-Reply-To: <20140102150836.GA3826@n2100.arm.linux.org.uk>
 References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
-Message-ID: <E1VyjvT-0005Es-6A@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Vyjvd-0005Ew-9c@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need to issue a barrier for every segment of a DMA transfer;
-doing this just once per descriptor will do.
+We don't need to read-modify-write the CCR register; we already know
+what value it should contain at this point.  Use the cached CCR value
+when setting the enable bit.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/omap-dma.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ drivers/dma/omap-dma.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index bdea85802b5b..e212e0df9b42 100644
+index e212e0df9b42..98e77adeaeb3 100644
 --- a/drivers/dma/omap-dma.c
 +++ b/drivers/dma/omap-dma.c
-@@ -194,7 +194,6 @@ static void omap_dma_start(struct omap_chan *c, struct omap_desc *d)
+@@ -180,7 +180,6 @@ static void omap_dma_clear_csr(struct omap_chan *c)
+ static void omap_dma_start(struct omap_chan *c, struct omap_desc *d)
+ {
+ 	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
+-	uint32_t val;
  
- 	val = c->plat->dma_read(CCR, c->dma_ch);
- 	val |= CCR_ENABLE;
--	mb();
- 	c->plat->dma_write(val, CCR, c->dma_ch);
+ 	if (__dma_omap15xx(od->plat->dma_attr))
+ 		c->plat->dma_write(0, CPC, c->dma_ch);
+@@ -192,9 +191,8 @@ static void omap_dma_start(struct omap_chan *c, struct omap_desc *d)
+ 	/* Enable interrupts */
+ 	c->plat->dma_write(d->cicr, CICR, c->dma_ch);
+ 
+-	val = c->plat->dma_read(CCR, c->dma_ch);
+-	val |= CCR_ENABLE;
+-	c->plat->dma_write(val, CCR, c->dma_ch);
++	/* Enable channel */
++	c->plat->dma_write(d->ccr | CCR_ENABLE, CCR, c->dma_ch);
  }
  
-@@ -301,6 +300,13 @@ static void omap_dma_start_desc(struct omap_chan *c)
- 	c->desc = d = to_omap_dma_desc(&vd->tx);
- 	c->sgidx = 0;
- 
-+	/*
-+	 * This provides the necessary barrier to ensure data held in
-+	 * DMA coherent memory is visible to the DMA engine prior to
-+	 * the transfer starting.
-+	 */
-+	mb();
-+
- 	c->plat->dma_write(d->ccr, CCR, c->dma_ch);
- 	if (dma_omap1())
- 		c->plat->dma_write(d->ccr >> 16, CCR2, c->dma_ch);
+ static void omap_dma_stop(struct omap_chan *c)
 -- 
 1.7.4.4
