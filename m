@@ -1,73 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 02 Jan 2014 16:05:50 +0100
-Subject: [PATCH 01/15] i2c: shmobile/rcar: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <1786644.MDElX0sS53@avalon>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131128073621.GC24146@verge.net.au> <1786644.MDElX0sS53@avalon>
-Message-ID: <1798320.lHX29KN0J4@avalon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jan 2014 15:08:36 +0000
+Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
+Message-ID: <20140102150836.GA3826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+The following patch series moves code to setup the DMA hardware and
+service interrupts from the hardware to the DMA engine driver.  This
+reduces the dependency on the legacy DMA implementation.
 
-On Wednesday 11 December 2013 13:47:34 Laurent Pinchart wrote:
-> Hi Wolfram,
-> 
-> Could you please pick this patch up for v3.14 ?
+This series does not remove the channel allocation/freeing hooks which
+are used to manage the allocation of physical channels - this is the
+next step in the evolution.
 
-Ping ?
+The patches which move the interrupt handling are currently less than
+perfect since they're writing to ENABLE_L0 under a different spinlock,
+and hence RFC only at the moment.
 
-> On Thursday 28 November 2013 16:36:21 Simon Horman wrote:
-> > On Wed, Nov 27, 2013 at 02:18:23AM +0100, Laurent Pinchart wrote:
-> > > Hardware supported by the i2c sh_mobile and rcar drivers is only found
-> > > on SUPERH or ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST
-> > > compilation to them.
-> > > 
-> > > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > > Cc: linux-i2c at vger.kernel.org
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > > ---
-> > > 
-> > >  drivers/i2c/busses/Kconfig | 4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> > > index 3b26129..92bdcf9 100644
-> > > --- a/drivers/i2c/busses/Kconfig
-> > > +++ b/drivers/i2c/busses/Kconfig
-> > > @@ -683,7 +683,7 @@ config I2C_SH7760
-> > > 
-> > >  config I2C_SH_MOBILE
-> > >  
-> > >  	tristate "SuperH Mobile I2C Controller"
-> > > 
-> > > -	depends on SUPERH || ARM || COMPILE_TEST
-> > > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
-> > > 
-> > >  	help
-> > >  	
-> > >  	  If you say yes to this option, support will be included for the
-> > >  	  built-in I2C interface on the Renesas SH-Mobile processor.
-> > > 
-> > > @@ -796,7 +796,7 @@ config I2C_XLR
-> > > 
-> > >  config I2C_RCAR
-> > >  
-> > >  	tristate "Renesas R-Car I2C Controller"
-> > > 
-> > > -	depends on ARM || COMPILE_TEST
-> > > +	depends on ARCH_SHMOBILE || COMPILE_TEST
-> > > 
-> > >  	help
-> > >  	
-> > >  	  If you say yes to this option, support will be included for the
-> > >  	  R-Car I2C controller.
+ arch/arm/mach-omap1/dma.c |  183 +++++--------
+ arch/arm/mach-omap2/dma.c |  183 ++++++--------
+ arch/arm/plat-omap/dma.c  |   17 +-
+ drivers/dma/omap-dma.c    |  653 ++++++++++++++++++++++++++++++++++++++++-----
+ include/linux/omap-dma.h  |   25 ++-
+ 5 files changed, 774 insertions(+), 287 deletions(-)
+
 -- 
-Regards,
-
-Laurent Pinchart
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
