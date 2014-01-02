@@ -1,66 +1,74 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:25:56 +0000
-Subject: [PATCH RFC 02/46] imx-drm: imx-drm-core: avoid going the long route
- round for drm_device
+Date: Thu, 02 Jan 2014 21:26:01 +0000
+Subject: [PATCH RFC 03/46] imx-drm: imx-drm-core: merge
+ imx_drm_crtc_register() into imx_drm_add_crtc()
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1Vypm8-0007Dd-10@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VypmD-0007Dh-4G@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have the drm_device available, so rather than storing it and then
-using the stored version, us the one we already have available to us.
+There's no reason for this to be a separate function; merge the
+two together.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c |   33 ++++++++-----------------------
+ 1 files changed, 9 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 9aa5eaab6539..242e8db218ac 100644
+index 242e8db218ac..05dd24ee80dd 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -88,9 +88,9 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- 
- 	imx_drm_device_put();
- 
--	drm_vblank_cleanup(imxdrm->drm);
--	drm_kms_helper_poll_fini(imxdrm->drm);
--	drm_mode_config_cleanup(imxdrm->drm);
-+	drm_vblank_cleanup(drm);
-+	drm_kms_helper_poll_fini(drm);
-+	drm_mode_config_cleanup(drm);
- 
- 	return 0;
+@@ -370,29 +370,6 @@ static void imx_drm_connector_unregister(
  }
-@@ -424,15 +424,15 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
  
- 	mutex_lock(&imxdrm->mutex);
+ /*
+- * register a crtc to the drm core
+- */
+-static int imx_drm_crtc_register(struct imx_drm_crtc *imx_drm_crtc)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	int ret;
+-
+-	ret = drm_mode_crtc_set_gamma_size(imx_drm_crtc->crtc, 256);
+-	if (ret)
+-		return ret;
+-
+-	drm_crtc_helper_add(imx_drm_crtc->crtc,
+-			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
+-
+-	drm_crtc_init(imxdrm->drm, imx_drm_crtc->crtc,
+-			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
+-
+-	drm_mode_group_reinit(imxdrm->drm);
+-
+-	return 0;
+-}
+-
+-/*
+  * Called by the CRTC driver when all CRTCs are registered. This
+  * puts all the pieces together and initializes the driver.
+  * Once this is called no more CRTCs can be registered since
+@@ -535,10 +512,18 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
  
--	drm_kms_helper_poll_init(imxdrm->drm);
-+	drm_kms_helper_poll_init(drm);
+ 	*new_crtc = imx_drm_crtc;
  
- 	/* setup the grouping for the legacy output */
--	ret = drm_mode_group_init_legacy_group(imxdrm->drm,
--			&imxdrm->drm->primary->mode_group);
-+	ret = drm_mode_group_init_legacy_group(drm,
-+			&drm->primary->mode_group);
+-	ret = imx_drm_crtc_register(imx_drm_crtc);
++	ret = drm_mode_crtc_set_gamma_size(imx_drm_crtc->crtc, 256);
  	if (ret)
- 		goto err_kms;
+ 		goto err_register;
  
--	ret = drm_vblank_init(imxdrm->drm, MAX_CRTC);
-+	ret = drm_vblank_init(drm, MAX_CRTC);
- 	if (ret)
- 		goto err_kms;
++	drm_crtc_helper_add(crtc,
++			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
++
++	drm_crtc_init(imxdrm->drm, crtc,
++			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
++
++	drm_mode_group_reinit(imxdrm->drm);
++
+ 	imx_drm_update_possible_crtcs();
  
-@@ -441,7 +441,7 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 	 * by drm timer once a current process gives up ownership of
- 	 * vblank event.(after drm_vblank_put function is called)
- 	 */
--	imxdrm->drm->vblank_disable_allowed = true;
-+	drm->vblank_disable_allowed = true;
- 
- 	if (!imx_drm_device_get()) {
- 		ret = -EINVAL;
+ 	mutex_unlock(&imxdrm->mutex);
 -- 
 1.7.4.4
