@@ -1,74 +1,114 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:26:01 +0000
-Subject: [PATCH RFC 03/46] imx-drm: imx-drm-core: merge
- imx_drm_crtc_register() into imx_drm_add_crtc()
+Date: Thu, 02 Jan 2014 21:26:06 +0000
+Subject: [PATCH RFC 04/46] imx-drm: ipu-v3: more inteligent DI clock selection
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1VypmD-0007Dh-4G@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VypmI-0007Dl-82@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no reason for this to be a separate function; merge the
-two together.
+The DI clock selection was very rudimentary: it would statically use
+either the IPU internal clock or the DI external clock depending on
+which "encoder" was being used.  In the case of HDMI, it would always
+use the IPU clock.
+
+Moreover, using the IPU clock resulted in fractional divisors, which
+are achieved by skipping clock pulses.  This can result in the HDMI
+PHY PLL being frequency modulated, and the attached device is then
+unable to properly lock on to the TMDS clock.
+
+We need at least 1% accurate and stable clocks for HDMI.
+
+Arrange for the DI clock to be sourced from the IPU internal clock
+if it can satisfy our requirements, otherwise switch to the DI
+external clock and try and set the external clock to our desired
+pixel clock rate.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   33 ++++++++-----------------------
- 1 files changed, 9 insertions(+), 24 deletions(-)
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c |   54 +++++++++++++++++++++++++++++-
+ 1 files changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 242e8db218ac..05dd24ee80dd 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -370,29 +370,6 @@ static void imx_drm_connector_unregister(
- }
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 948a49b289ef..8c7241bb435c 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -544,10 +544,48 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 	if ((sig->v_sync_width == 0) || (sig->h_sync_width == 0))
+ 		return -EINVAL;
  
- /*
-- * register a crtc to the drm core
-- */
--static int imx_drm_crtc_register(struct imx_drm_crtc *imx_drm_crtc)
--{
--	struct imx_drm_device *imxdrm = __imx_drm_device();
--	int ret;
--
--	ret = drm_mode_crtc_set_gamma_size(imx_drm_crtc->crtc, 256);
--	if (ret)
--		return ret;
--
--	drm_crtc_helper_add(imx_drm_crtc->crtc,
--			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
--
--	drm_crtc_init(imxdrm->drm, imx_drm_crtc->crtc,
--			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
--
--	drm_mode_group_reinit(imxdrm->drm);
--
--	return 0;
--}
--
--/*
-  * Called by the CRTC driver when all CRTCs are registered. This
-  * puts all the pieces together and initializes the driver.
-  * Once this is called no more CRTCs can be registered since
-@@ -535,10 +512,18 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
- 
- 	*new_crtc = imx_drm_crtc;
- 
--	ret = imx_drm_crtc_register(imx_drm_crtc);
-+	ret = drm_mode_crtc_set_gamma_size(imx_drm_crtc->crtc, 256);
- 	if (ret)
- 		goto err_register;
- 
-+	drm_crtc_helper_add(crtc,
-+			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
++	dev_dbg(di->ipu->dev, "Clocks: IPU %luHz DI %luHz Needed %luHz\n",
++		clk_get_rate(di->clk_ipu),
++		clk_get_rate(di->clk_di),
++		sig->pixelclock);
 +
-+	drm_crtc_init(imxdrm->drm, crtc,
-+			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
++	/*
++	 * CLKMODE_EXT means we must use the DI clock: this is needed
++	 * for things like LVDS which needs to feed the DI and LDB with
++	 * the same pixel clock.
++	 *
++	 * For other interfaces, we can arbitarily select between the DI
++	 * specific clock and the internal IPU clock.  See DI_GENERAL
++	 * bit 20.  We select the IPU clock if it can give us a clock
++	 * rate within 1% of the requested frequency, otherwise we use
++	 * the DI clock.
++	 */
+ 	if (sig->clkflags & IPU_DI_CLKMODE_EXT)
+ 		parent = di->clk_di;
+-	else
+-		parent = di->clk_ipu;
++	else {
++		unsigned long rate, clkrate;
++		unsigned div, error;
 +
-+	drm_mode_group_reinit(imxdrm->drm);
++		clkrate = clk_get_rate(di->clk_ipu);
++		div = (clkrate + sig->pixelclock / 2) / sig->pixelclock;
++		rate = clkrate / div;
 +
- 	imx_drm_update_possible_crtcs();
++		error = rate / (sig->pixelclock / 1000);
++
++		dev_dbg(di->ipu->dev, "  IPU clock can give %lu with divider %u, error %d.%u%%\n",
++			rate, div, (signed)(error - 1000) / 10, error % 10);
++
++		/* Allow a 1% error */
++		if (error < 1010 && error >= 990) {
++			parent = di->clk_ipu;
++		} else {
++			parent = di->clk_di;
++
++			ret = clk_set_rate(parent, sig->pixelclock);
++			if (ret)
++				dev_err(di->ipu->dev, "Setting of DI clock failed: %d\n", ret);
++		}
++	}
  
- 	mutex_unlock(&imxdrm->mutex);
+ 	ret = clk_set_parent(di->clk_di_pixel, parent);
+ 	if (ret) {
+@@ -557,6 +595,11 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		return ret;
+ 	}
+ 
++	/*
++	 * CLKMODE_SYNC means that we want the DI to be clocked at the
++	 * same rate as the parent clock.  This is needed (eg) for LDB
++	 * which needs to be fed with the same pixel clock.
++	 */
+ 	if (sig->clkflags & IPU_DI_CLKMODE_SYNC)
+ 		round = clk_get_rate(parent);
+ 	else
+@@ -564,6 +607,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 
+ 	ret = clk_set_rate(di->clk_di_pixel, round);
+ 
++	dev_dbg(di->ipu->dev, "Want %luHz IPU %luHz DI %luHz using %s, got %luHz\n",
++		sig->pixelclock,
++		clk_get_rate(di->clk_ipu),
++		clk_get_rate(di->clk_di),
++		parent == di->clk_di ? "DI" : "IPU",
++		clk_get_rate(di->clk_di_pixel));
++
+ 	h_total = sig->width + sig->h_sync_width + sig->h_start_width +
+ 		sig->h_end_width;
+ 	v_total = sig->height + sig->v_sync_width + sig->v_start_width +
 -- 
 1.7.4.4
