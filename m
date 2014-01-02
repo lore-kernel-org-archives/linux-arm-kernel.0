@@ -1,63 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 2 Jan 2014 13:28:22 -0500
-Subject: [PATCH 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <1388678476-12875-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1388678476-12875-1-git-send-email-gregory.clement@free-electrons.com>
- <1388678476-12875-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140102182822.GI19878@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Jan 2014 19:29:46 +0100
+Subject: [PATCH 01/17] ARM: spear: Remove deprecated IRQF_DISABLED flag
+In-Reply-To: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1388419771-30075-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <201401021929.46581.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram,
-
-On Thu, Jan 02, 2014 at 05:01:16PM +0100, Gregory CLEMENT wrote:
-> The first variants of Armada XP SoCs (A0 stepping) have issues related
-> to the i2c controller which prevent to use the offload mechanism and
-> lead to a kernel hang during boot.
+On Monday 30 December 2013, Daniel Lezcano wrote:
+> This flag is a NOOP and scheduled to be removed
 > 
-> The driver now check the revision of the SoC. If the revision is not
-> more recent than the A0 or if the driver can't get the SoC revision
-> then it disables the offload mechanism.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 8be7e42aa4de..089a3663ad86 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -24,6 +24,7 @@
->  #include <linux/clk.h>
->  #include <linux/err.h>
->  #include <linux/delay.h>
-> +#include <linux/mvebu-soc-id.h>
->  
->  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
->  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
-> @@ -779,8 +780,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
->  	 * Transaction Generator support and the errata fix.
->  	 */
->  	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
-> -		drv_data->offload_enabled = true;
-> +		u32 dev, rev;
-> +
->  		drv_data->errata_delay = true;
-> +		/*
-> +		 * Only revison more recent than A0 support offload
-> +		 * mechanism. In case we can't get the SoC revision
-> +		 * weplay safe and we don't enable it
-> +		 */
-> +		if (!mvebu_get_soc_id(&rev, &dev) && (dev > MV78XX0_A0_REV))
-> +			drv_data->offload_enabled = true;
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Since this depends on arch-specific code in the previous patch, I'd like
-to keep the two of them together in a topic branch.  Would you prefer to
-take both with my Ack, or vice-versa?  I'm fine either way.
+Thanks for sending this series. I think the patches are duplicates of stuff that
+Michael Opdenacker has sent before (actually multiple times). I have no problem
+applying either version into arm-soc, but I think it would be better to attribute
+them to Michael, since he came first. Can you two please coordinate and send a
+single pull request for the arm-soc related patches that haven't made it into
+linux-next yet?
 
-thx,
-
-Jason.
+	Arnd
