@@ -1,28 +1,42 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Fri,  3 Jan 2014 01:21:46 +0900
-Subject: [PATCH] ARM: dts: add clock provider for mshc in Exynos4412
-Message-ID: <1388679706-29265-1-git-send-email-tobetter@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 2 Jan 2014 18:03:42 +0100
+Subject: [PATCH 4/6] ARM: tegra: rework fuse.c
+In-Reply-To: <20140102143221.GR26588@tbergstrom-lnx.Nvidia.com>
+References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
+ <1387468474-26521-5-git-send-email-pdeschrijver@nvidia.com>
+ <CACRpkdbXc_yH-=WgpQyVwHC_TSPfbfx=tHwziNhmB6t0HuSfRw@mail.gmail.com>
+ <20140102143221.GR26588@tbergstrom-lnx.Nvidia.com>
+Message-ID: <CACRpkdZzaiU-BAmkBS1usLRVKxVEyiTuciNpKATK7k+zA3YKZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock lookup information for mshc in Exynos4412.
+On Thu, Jan 2, 2014 at 3:32 PM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> On Thu, Jan 02, 2014 at 01:37:43PM +0100, Linus Walleij wrote:
+>> On Thu, Dec 19, 2013 at 4:54 PM, Peter De Schrijver
+>> <pdeschrijver@nvidia.com> wrote:
+>>
+>> > Reduce fuse.c to the minimum functionality required for the early bootstages.
+>> > Also export tegra_read_straps() for use by the fuse driver.
+>> >
+>> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+>>
+>> Aha, but why?
+>>
+>
+> The efuse driver in patch 2 of this series, adds the randomness, so we don't
+> need to add it here then?
 
-Signed-off-by: Dongjin Kim <tobetter@gmail.com>
----
- arch/arm/boot/dts/exynos4412.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Aha I wasn't CC:ed on patch 2 so I didn't see that...
 
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index e743e67..67bef99 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -67,5 +67,7 @@
- 		interrupts = <0 77 0>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&clock 301>, <&clock 149>;
-+		clock-names = "biu", "ciu";
- 	};
- };
--- 
-1.8.1.2
+> Yes, it's done in the efuse driver now, do you think that's too late?
+
+Don't know but I don't think so. The important part is that it's done
+before drivers needing good randomness (as opposed to good
+entropy). The only Tegra driver I'm aware of that needs this is the
+crypto driver (which I patched a bit) and I think that will only come
+into play when you do something like set up a VPN tunnel or
+similar which will be waaaaay later, so no problem AFAICT.
+
+Yours,
+Linus Walleij
