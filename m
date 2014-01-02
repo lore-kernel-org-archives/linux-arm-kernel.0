@@ -1,100 +1,53 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 15:11:41 +0000
-Subject: [PATCH RFC 17/26] dmaengine: omap-dma: cleanup errata 3.3 handling
-In-Reply-To: <20140102150836.GA3826@n2100.arm.linux.org.uk>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
-Message-ID: <E1Vyjvx-0005F4-Gd@rmk-PC.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 2 Jan 2014 10:11:17 -0500
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.14 (incr. #2)
+Message-ID: <20140102151117.GH19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/omap-dma.c |   52 ++++++++++++++++++++++++++---------------------
- 1 files changed, 29 insertions(+), 23 deletions(-)
+Guys,
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index a1aefe9fe3fe..04631e6732c4 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -451,28 +451,39 @@ static size_t omap_dma_desc_size_pos(struct omap_desc *d, dma_addr_t addr)
- 	return size;
- }
- 
-+/*
-+ * OMAP 3.2/3.3 erratum: sometimes 0 is returned if CSAC/CDAC is
-+ * read before the DMA controller finished disabling the channel.
-+ */
-+static uint32_t omap_dma_chan_read_3_3(struct omap_chan *c, unsigned reg)
-+{
-+	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
-+	uint32_t val;
-+
-+	val = omap_dma_chan_read(c, reg);
-+	if (val == 0 && od->plat->errata & DMA_ERRATA_3_3)
-+		val = omap_dma_chan_read(c, reg);
-+
-+	return val;
-+}
-+
- static dma_addr_t omap_dma_get_src_pos(struct omap_chan *c)
- {
- 	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
--	dma_addr_t addr;
-+	dma_addr_t addr, cdac;
- 
--	if (__dma_omap15xx(od->plat->dma_attr))
-+	if (__dma_omap15xx(od->plat->dma_attr)) {
- 		addr = omap_dma_chan_read(c, CPC);
--	else
--		addr = omap_dma_chan_read(c, CSAC);
--
--	if (od->plat->errata & DMA_ERRATA_3_3 && addr == 0)
--		addr = omap_dma_chan_read(c, CSAC);
-+	} else {
-+		addr = omap_dma_chan_read_3_3(c, CSAC);
-+		cdac = omap_dma_chan_read_3_3(c, CDAC);
- 
--	if (!__dma_omap15xx(od->plat->dma_attr)) {
- 		/*
- 		 * CDAC == 0 indicates that the DMA transfer on the channel has
- 		 * not been started (no data has been transferred so far).
- 		 * Return the programmed source start address in this case.
- 		 */
--		if (omap_dma_chan_read(c, CDAC))
--			addr = omap_dma_chan_read(c, CSAC);
--		else
-+		if (cdac == 0)
- 			addr = omap_dma_chan_read(c, CSSA);
- 	}
- 
-@@ -487,21 +498,16 @@ static dma_addr_t omap_dma_get_dst_pos(struct omap_chan *c)
- 	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
- 	dma_addr_t addr;
- 
--	if (__dma_omap15xx(od->plat->dma_attr))
-+	if (__dma_omap15xx(od->plat->dma_attr)) {
- 		addr = omap_dma_chan_read(c, CPC);
--	else
--		addr = omap_dma_chan_read(c, CDAC);
-+	} else {
-+		addr = omap_dma_chan_read_3_3(c, CDAC);
- 
--	/*
--	 * omap 3.2/3.3 erratum: sometimes 0 is returned if CSAC/CDAC is
--	 * read before the DMA controller finished disabling the channel.
--	 */
--	if (!__dma_omap15xx(od->plat->dma_attr) && addr == 0) {
--		addr = omap_dma_chan_read(c, CDAC);
- 		/*
--		 * CDAC == 0 indicates that the DMA transfer on the channel has
--		 * not been started (no data has been transferred so far).
--		 * Return the programmed destination start address in this case.
-+		 * CDAC == 0 indicates that the DMA transfer on the channel
-+		 * has not been started (no data has been transferred so
-+		 * far).  Return the programmed destination start address in
-+		 * this case.
- 		 */
- 		if (addr == 0)
- 			addr = omap_dma_chan_read(c, CDSA);
--- 
-1.7.4.4
+This is a nice set of cleanups which lay the groundwork for adding a new
+SoC to mach-mvebu.  We'd like to get this in for v3.14 if possible.
+It's fairly trivial, mvebu-specific, and Linus did say he was going to
+-rc8 this time around.  These patches have also been in -next a minimum
+of 5 days.  I held them there a little longer knowing it was the
+holidays.
+
+Also, this is an incremental pull, from tags/mvebu-soc-3.14 to
+tags/mvebu-soc-3.14-2 on the mvebu/soc branch.  I believe you put the
+first round of changes in next/cleanup.  It should be fine to do the
+same with these.
+
+thx,
+
+Jason.
+
+
+The following changes since commit b12634e343bea9ce94ed3252fccbac347f8bb37f:
+
+  ARM: mvebu: fix some sparse warnings (2013-11-24 03:27:54 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.14-2
+
+for you to fetch changes up to 11dc35e4a24c7e650c40077b7843dcda1e9775c3:
+
+  ARM: mvebu: move Armada 370/XP specific definitions to armada-370-xp.h (2013-12-27 18:08:19 +0000)
+
+----------------------------------------------------------------
+mvebu SoC changes for v3.14 (incremental #2)
+
+ - mvebu
+    - some Armada cleanup to prep for a new SoC in mach-mvebu/
+
+----------------------------------------------------------------
+Thomas Petazzoni (3):
+      ARM: mvebu: move ARMADA_XP_MAX_CPUS to armada-370-xp.h
+      ARM: mvebu: remove prototypes of non-existing functions from common.h
+      ARM: mvebu: move Armada 370/XP specific definitions to armada-370-xp.h
+
+ arch/arm/mach-mvebu/armada-370-xp.h | 4 ++++
+ arch/arm/mach-mvebu/common.h        | 9 +--------
+ 2 files changed, 5 insertions(+), 8 deletions(-)
