@@ -1,261 +1,199 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu,  2 Jan 2014 11:07:30 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <1388241295-20051-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1388241295-20051-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1388632050-13437-1-git-send-email-zhangfei.gao@linaro.org>
+From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
+Date: Thu, 2 Jan 2014 10:31:38 +0530
+Subject: [PATCH V2] i2c: s3c2410 : Add polling mode support
+In-Reply-To: <CAKuRcOJojN46P2SfGfOQatbFWYuhV9DB6Y7tHNtZXgRzNcB+cA@mail.gmail.com>
+References: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOK3gJiPr3PC2-Vf6w0xeQEuEw6N2c7d0sYZYLuesJC_kQ@mail.gmail.com>
+ <CAKuRcOJojN46P2SfGfOQatbFWYuhV9DB6Y7tHNtZXgRzNcB+cA@mail.gmail.com>
+Message-ID: <CA+NduCA=GJyCKWazOoMj5=CedVHhLjrgQLkVr_A09XUHeA3Hkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dw_mmc-k3.c for k3v2, support sd/emmc
+Ping..
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
----
- .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   60 +++++++++
- drivers/mmc/host/Kconfig                           |   10 ++
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/dw_mmc-k3.c                       |  132 ++++++++++++++++++++
- 4 files changed, 203 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
- create mode 100644 drivers/mmc/host/dw_mmc-k3.c
-
-diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-new file mode 100644
-index 000000000000..d7e2d7f159bb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-@@ -0,0 +1,60 @@
-+* Hisilicon specific extensions to the Synopsys Designware Mobile
-+  Storage Host Controller
-+
-+Read synopsys-dw-mshc.txt for more details
-+
-+The Synopsys designware mobile storage host controller is used to interface
-+a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
-+differences between the core Synopsys dw mshc controller properties described
-+by synopsys-dw-mshc.txt and the properties used by the Hisilicon specific
-+extensions to the Synopsys Designware Mobile Storage Host Controller.
-+
-+Required Properties:
-+
-+* compatible: should be one of the following.
-+  - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extentions.
-+
-+* clock-freq-table: should be the frequency (in Hz) array of the ciu clock
-+	in each	supported mode.
-+	0. CIU clock rate in Hz for DS mode
-+	1. CIU clock rate in Hz for MMC HS mode
-+	2. CIU clock rate in Hz for SD HS mode
-+	3. CIU clock rate in Hz for SDR12 mode
-+	4. CIU clock rate in Hz for SDR25 mode
-+	5. CIU clock rate in Hz for SDR50 mode
-+	6. CIU clock rate in Hz for SDR104 mode
-+	7. CIU clock rate in Hz for DDR50 mode
-+	8. CIU clock rate in Hz for HS200 mode
-+
-+Example:
-+
-+	/* for Hi3620 */
-+
-+	/* SoC portion */
-+	dwmmc_0: dwmmc0 at fcd03000 {
-+		compatible = "hisilicon,hi4511-dw-mshc";
-+		reg = <0xfcd03000 0x1000>;
-+		interrupts = <0 16 4>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&mmc_clock HI3620_SD_CIUCLK>, <&clock HI3620_DDRC_PER_CLK>;
-+		clock-names = "ciu", "biu";
-+		clock-freq-table =
-+		<25000000 0 50000000 25000000 50000000 100000000 0 50000000>;
-+	};
-+
-+	/* Board portion */
-+	dwmmc0 at fcd03000 {
-+		num-slots = <1>;
-+		vmmc-supply = <&ldo12>;
-+		fifo-depth = <0x100>;
-+		supports-highspeed;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			disable-wp;
-+			cd-gpios = <&gpio10 3 0>;
-+		};
-+	};
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 7fc5099e44b2..45aaa2de0f58 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -575,6 +575,16 @@ config MMC_DW_SOCFPGA
- 	  This selects support for Altera SoCFPGA specific extensions to the
- 	  Synopsys DesignWare Memory Card Interface driver.
- 
-+config MMC_DW_K3
-+	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
-+	depends on MMC_DW
-+	select MMC_DW_PLTFM
-+	select MMC_DW_IDMAC
-+	help
-+	  This selects support for Hisilicon K3 SoC specific extensions to the
-+	  Synopsys DesignWare Memory Card Interface driver. Select this option
-+	  for platforms based on Hisilicon K3 SoC's.
-+
- config MMC_DW_PCI
- 	tristate "Synopsys Designware MCI support on PCI bus"
- 	depends on MMC_DW && PCI
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index c41d0c364509..64f5f8d35839 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_MMC_DW)		+= dw_mmc.o
- obj-$(CONFIG_MMC_DW_PLTFM)	+= dw_mmc-pltfm.o
- obj-$(CONFIG_MMC_DW_EXYNOS)	+= dw_mmc-exynos.o
- obj-$(CONFIG_MMC_DW_SOCFPGA)	+= dw_mmc-socfpga.o
-+obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
- obj-$(CONFIG_MMC_DW_PCI)	+= dw_mmc-pci.o
- obj-$(CONFIG_MMC_SH_MMCIF)	+= sh_mmcif.o
- obj-$(CONFIG_MMC_JZ4740)	+= jz4740_mmc.o
-diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
-new file mode 100644
-index 000000000000..68e5e428e8f6
---- /dev/null
-+++ b/drivers/mmc/host/dw_mmc-k3.c
-@@ -0,0 +1,132 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/dw_mmc.h>
-+#include <linux/of_address.h>
-+
-+#include "dw_mmc.h"
-+#include "dw_mmc-pltfm.h"
-+
-+#define MAX_NUMS	10
-+struct dw_mci_k3_priv_data {
-+	u32	clk_table[MAX_NUMS];
-+};
-+
-+static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-+{
-+	struct dw_mci_k3_priv_data *priv = host->priv;
-+	u32 rate = priv->clk_table[ios->timing];
-+	int ret;
-+
-+	if (!rate) {
-+		dev_warn(host->dev,
-+			"no specified rate in timing %u\n", ios->timing);
-+		return;
-+	}
-+
-+	ret = clk_set_rate(host->ciu_clk, rate);
-+	if (ret)
-+		dev_warn(host->dev, "failed to set clock rate %uHz\n", rate);
-+
-+	host->bus_hz = clk_get_rate(host->ciu_clk);
-+}
-+
-+static int dw_mci_k3_parse_dt(struct dw_mci *host)
-+{
-+	struct dw_mci_k3_priv_data *priv;
-+	struct device_node *node = host->dev->of_node;
-+	struct property *prop;
-+	const __be32 *cur;
-+	u32 val, num = 0;
-+
-+	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		dev_err(host->dev, "mem alloc failed for private data\n");
-+		return -ENOMEM;
-+	}
-+	host->priv = priv;
-+
-+	of_property_for_each_u32(node, "clock-freq-table", prop, cur, val) {
-+		if (num >= MAX_NUMS)
-+			break;
-+		priv->clk_table[num++] = val;
-+	}
-+	return 0;
-+}
-+
-+static const struct dw_mci_drv_data k3_drv_data = {
-+	.set_ios		= dw_mci_k3_set_ios,
-+	.parse_dt		= dw_mci_k3_parse_dt,
-+};
-+
-+static const struct of_device_id dw_mci_k3_match[] = {
-+	{ .compatible = "hisilicon,hi4511-dw-mshc", .data = &k3_drv_data, },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, dw_mci_k3_match);
-+
-+static int dw_mci_k3_probe(struct platform_device *pdev)
-+{
-+	const struct dw_mci_drv_data *drv_data;
-+	const struct of_device_id *match;
-+
-+	match = of_match_node(dw_mci_k3_match, pdev->dev.of_node);
-+	drv_data = match->data;
-+
-+	return dw_mci_pltfm_register(pdev, drv_data);
-+}
-+
-+static int dw_mci_k3_suspend(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = dw_mci_suspend(host);
-+	if (!ret)
-+		clk_disable_unprepare(host->ciu_clk);
-+
-+	return ret;
-+}
-+
-+static int dw_mci_k3_resume(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(host->ciu_clk);
-+	if (ret) {
-+		dev_err(host->dev, "failed to enable ciu clock\n");
-+		return ret;
-+	}
-+
-+	return dw_mci_resume(host);
-+}
-+
-+SIMPLE_DEV_PM_OPS(dw_mci_k3_pmops, dw_mci_k3_suspend, dw_mci_k3_resume);
-+
-+static struct platform_driver dw_mci_k3_pltfm_driver = {
-+	.probe		= dw_mci_k3_probe,
-+	.remove		= dw_mci_pltfm_remove,
-+	.driver		= {
-+		.name		= "dwmmc_k3",
-+		.of_match_table	= dw_mci_k3_match,
-+		.pm		= &dw_mci_k3_pmops,
-+	},
-+};
-+
-+module_platform_driver(dw_mci_k3_pltfm_driver);
-+
-+MODULE_DESCRIPTION("K3 Specific DW-MSHC Driver Extension");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:dwmmc-k3");
--- 
-1.7.9.5
+On Fri, Dec 13, 2013 at 2:51 PM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+> Dear Wolfram,
+>  Can you take this into your tree?
+>
+> On Fri, Nov 22, 2013 at 11:32 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+>> Any comments on this patch?
+>>
+>> On Mon, Nov 11, 2013 at 4:50 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>> From: Vasanth Ananthan <vasanthananthan@gmail.com>
+>>>
+>>> This patch adds polling mode support for i2c-s3c2410 driver.The
+>>> SATA PHY controller's CMU and TRSV block's are of I2C register
+>>> map in exynos5250.These blocks can be configured using i2c.
+>>>
+>>> But i2c controller instance on which these block's sits lacks an
+>>> interrupt line.Also the current i2c-s3c2410 driver is only interrupt
+>>> driven, thus a polling mode support is required in the driver for
+>>> supporting this controller. This patch adds this support to the driver.
+>>>
+>>> Changes from V1:
+>>>         1.Changed the is_ack() to have even period b/w polls and
+>>>           used usleep_range() instead of udelay().
+>>>
+>>> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>> ---
+>>>  .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    2 +
+>>>  drivers/i2c/busses/i2c-s3c2410.c                   |   66 +++++++++++++++++---
+>>>  2 files changed, 58 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+>>> index 296eb45..278de8e 100644
+>>> --- a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+>>> @@ -10,6 +10,8 @@ Required properties:
+>>>            inside HDMIPHY block found on several samsung SoCs
+>>>        (d) "samsung, exynos5440-i2c", for s3c2440-like i2c used
+>>>            on EXYNOS5440 which does not need GPIO configuration.
+>>> +      (e) "samsung, exynos5-sata-phy-i2c", for s3c2440-like i2c used as
+>>> +          a host to SATA PHY controller on an internal bus.
+>>>    - reg: physical base address of the controller and length of memory mapped
+>>>      region.
+>>>    - interrupts: interrupt number to the cpu.
+>>> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+>>> index 3747b9b..08ed126 100644
+>>> --- a/drivers/i2c/busses/i2c-s3c2410.c
+>>> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+>>> @@ -85,6 +85,7 @@
+>>>  #define QUIRK_S3C2440          (1 << 0)
+>>>  #define QUIRK_HDMIPHY          (1 << 1)
+>>>  #define QUIRK_NO_GPIO          (1 << 2)
+>>> +#define QUIRK_POLL             (1 << 3)
+>>>
+>>>  /* Max time to wait for bus to become idle after a xfer (in us) */
+>>>  #define S3C2410_IDLE_TIMEOUT   5000
+>>> @@ -141,6 +142,8 @@ static struct platform_device_id s3c24xx_driver_ids[] = {
+>>>  };
+>>>  MODULE_DEVICE_TABLE(platform, s3c24xx_driver_ids);
+>>>
+>>> +static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat);
+>>> +
+>>>  #ifdef CONFIG_OF
+>>>  static const struct of_device_id s3c24xx_i2c_match[] = {
+>>>         { .compatible = "samsung,s3c2410-i2c", .data = (void *)0 },
+>>> @@ -149,6 +152,8 @@ static const struct of_device_id s3c24xx_i2c_match[] = {
+>>>           .data = (void *)(QUIRK_S3C2440 | QUIRK_HDMIPHY | QUIRK_NO_GPIO) },
+>>>         { .compatible = "samsung,exynos5440-i2c",
+>>>           .data = (void *)(QUIRK_S3C2440 | QUIRK_NO_GPIO) },
+>>> +       { .compatible = "samsung,exynos5-sata-phy-i2c",
+>>> +         .data = (void *)(QUIRK_S3C2440 | QUIRK_POLL | QUIRK_NO_GPIO) },
+>>>         {},
+>>>  };
+>>>  MODULE_DEVICE_TABLE(of, s3c24xx_i2c_match);
+>>> @@ -187,7 +192,8 @@ static inline void s3c24xx_i2c_master_complete(struct s3c24xx_i2c *i2c, int ret)
+>>>         if (ret)
+>>>                 i2c->msg_idx = ret;
+>>>
+>>> -       wake_up(&i2c->wait);
+>>> +       if (!(i2c->quirks & QUIRK_POLL))
+>>> +               wake_up(&i2c->wait);
+>>>  }
+>>>
+>>>  static inline void s3c24xx_i2c_disable_ack(struct s3c24xx_i2c *i2c)
+>>> @@ -224,6 +230,22 @@ static inline void s3c24xx_i2c_enable_irq(struct s3c24xx_i2c *i2c)
+>>>         writel(tmp | S3C2410_IICCON_IRQEN, i2c->regs + S3C2410_IICCON);
+>>>  }
+>>>
+>>> +static bool is_ack(struct s3c24xx_i2c *i2c)
+>>> +{
+>>> +       int tries;
+>>> +
+>>> +       for (tries = 50; tries; --tries) {
+>>> +               if (readl(i2c->regs + S3C2410_IICCON)
+>>> +                       & S3C2410_IICCON_IRQPEND) {
+>>> +                       if (!(readl(i2c->regs + S3C2410_IICSTAT)
+>>> +                               & S3C2410_IICSTAT_LASTBIT))
+>>> +                               return true;
+>>> +               }
+>>> +               usleep_range(1000, 2000);
+>>> +       }
+>>> +       dev_err(i2c->dev, "ack was not recieved\n");
+>>> +       return false;
+>>> +}
+>>>
+>>>  /* s3c24xx_i2c_message_start
+>>>   *
+>>> @@ -268,6 +290,16 @@ static void s3c24xx_i2c_message_start(struct s3c24xx_i2c *i2c,
+>>>
+>>>         stat |= S3C2410_IICSTAT_START;
+>>>         writel(stat, i2c->regs + S3C2410_IICSTAT);
+>>> +
+>>> +       if (i2c->quirks & QUIRK_POLL) {
+>>> +               while ((i2c->msg_num != 0) && is_ack(i2c)) {
+>>> +                       i2c_s3c_irq_nextbyte(i2c, stat);
+>>> +                       stat = readl(i2c->regs + S3C2410_IICSTAT);
+>>> +
+>>> +                       if (stat & S3C2410_IICSTAT_ARBITR)
+>>> +                               dev_err(i2c->dev, "deal with arbitration loss\n");
+>>> +               }
+>>> +       }
+>>>  }
+>>>
+>>>  static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+>>> @@ -675,6 +707,15 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+>>>         s3c24xx_i2c_enable_irq(i2c);
+>>>         s3c24xx_i2c_message_start(i2c, msgs);
+>>>
+>>> +       if (i2c->quirks & QUIRK_POLL) {
+>>> +               ret = i2c->msg_idx;
+>>> +
+>>> +               if (ret != num)
+>>> +                       dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
+>>> +
+>>> +               goto out;
+>>> +       }
+>>> +
+>>>         timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+>>>
+>>>         ret = i2c->msg_idx;
+>>> @@ -820,6 +861,9 @@ static int s3c24xx_i2c_clockrate(struct s3c24xx_i2c *i2c, unsigned int *got)
+>>>         if (div1 == 512)
+>>>                 iiccon |= S3C2410_IICCON_TXDIV_512;
+>>>
+>>> +       if (i2c->quirks & QUIRK_POLL)
+>>> +               iiccon |= S3C2410_IICCON_SCALE(2);
+>>> +
+>>>         writel(iiccon, i2c->regs + S3C2410_IICCON);
+>>>
+>>>         if (i2c->quirks & QUIRK_S3C2440) {
+>>> @@ -1117,18 +1161,20 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>>>          * ensure no current IRQs pending
+>>>          */
+>>>
+>>> -       i2c->irq = ret = platform_get_irq(pdev, 0);
+>>> -       if (ret <= 0) {
+>>> -               dev_err(&pdev->dev, "cannot find IRQ\n");
+>>> -               return ret;
+>>> -       }
+>>> +       if (!(i2c->quirks & QUIRK_POLL)) {
+>>> +               i2c->irq = ret = platform_get_irq(pdev, 0);
+>>> +               if (ret <= 0) {
+>>> +                       dev_err(&pdev->dev, "cannot find IRQ\n");
+>>> +                       return ret;
+>>> +               }
+>>>
+>>>         ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
+>>> -                              dev_name(&pdev->dev), i2c);
+>>> +                               dev_name(&pdev->dev), i2c);
+>>>
+>>> -       if (ret != 0) {
+>>> -               dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
+>>> -               return ret;
+>>> +               if (ret != 0) {
+>>> +                       dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
+>>> +                       return ret;
+>>> +               }
+>>>         }
+>>>
+>>>         ret = s3c24xx_i2c_register_cpufreq(i2c);
+>>> --
+>>> 1.7.9.5
+>>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
