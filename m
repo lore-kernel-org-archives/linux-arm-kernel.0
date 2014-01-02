@@ -1,68 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 2 Jan 2014 19:16:46 +0100
-Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
-In-Reply-To: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
-References: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 2 Jan 2014 18:25:49 +0000
+Subject: [PATCH 1/2] spi: clps711x: Driver refactor
+In-Reply-To: <201401021846.23488.arnd@arndb.de>
+References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
+ <1388583851.810843204@f301.i.mail.ru>
+ <20140101150737.GR31886@sirena.org.uk>
+ <201401021846.23488.arnd@arndb.de>
+Message-ID: <20140102182549.GF31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 January 2014 18:17, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> Building a multi-arch kernel results in:
->
-> arch/arm/crypto/built-in.o: In function `aesbs_xts_decrypt':
-> sha1_glue.c:(.text+0x15c8): undefined reference to `bsaes_xts_decrypt'
-> arch/arm/crypto/built-in.o: In function `aesbs_xts_encrypt':
-> sha1_glue.c:(.text+0x1664): undefined reference to `bsaes_xts_encrypt'
-> arch/arm/crypto/built-in.o: In function `aesbs_ctr_encrypt':
-> sha1_glue.c:(.text+0x184c): undefined reference to `bsaes_ctr32_encrypt_blocks'
-> arch/arm/crypto/built-in.o: In function `aesbs_cbc_decrypt':
-> sha1_glue.c:(.text+0x19b4): undefined reference to `bsaes_cbc_encrypt'
->
+On Thu, Jan 02, 2014 at 06:46:23PM +0100, Arnd Bergmann wrote:
 
-Interestingly, when I try to reproduce this, the reference is
-(correctly) reported to reside in aesbs-glue.c and not sha1_glue.c
+> I definitely agree with what you say, but please note that Alexander is
+> the only person who ever sends clps711x patches, so there is not much
+> hope of collaboration. I also suspect he's the only one who would
 
-> This code is already runtime-conditional on NEON being supported, so
-> there's no point compiling it out depending on the minimum build
-> architecture.
->
+There's stuff been going in from the people who do generic cleanups and
+updates.
 
-Agreed. It is a leftover from the way this code was embedded into
-OpenSSL originally.
+> suffer from accidental breakage, especially since the existing driver
+> is not used anywhere upstream (no instance of platform data, and no
+> DT support).
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This is more a request for acks since I'd like to keep it/push it through
-> my tree to reduce the autobuilder failures.
->
->  arch/arm/crypto/bsaes-armv7.pl |    2 +-
+Right.  On the other hand I really don't want to get into setting bad
+precedents that people then use when they complain that I actually want
+to review their code, that's just going to be more miserable in the long
+run.
 
-The .S_shipped file produced by this script should be updated at the same time.
-
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-
-Regards,
-Ard.
-
-
-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/crypto/bsaes-armv7.pl b/arch/arm/crypto/bsaes-armv7.pl
-> index f3d96d932573..be068db960ee 100644
-> --- a/arch/arm/crypto/bsaes-armv7.pl
-> +++ b/arch/arm/crypto/bsaes-armv7.pl
-> @@ -701,7 +701,7 @@ $code.=<<___;
->  # define VFP_ABI_FRAME 0
->  # define BSAES_ASM_EXTENDED_KEY
->  # define XTS_CHAIN_TWEAK
-> -# define __ARM_ARCH__ __LINUX_ARM_ARCH__
-> +# define __ARM_ARCH__  7
->  #endif
->
->  #ifdef __thumb__
-> --
-> 1.7.4.4
->
+There were also some things in there that I really did want to review
+properly but I wasn't entirely sure what they were actually supposed to
+be doing.  Getting things split up with better changelogs will make that
+review much more tractable, it might even be immediately obvious what is
+going on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140102/0da08763/attachment-0001.sig>
