@@ -1,67 +1,44 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Thu, 2 Jan 2014 17:57:04 +0800
-Subject: [PATCHv8 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM.
-In-Reply-To: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1388656624-26570-5-git-send-email-Li.Xiubo@freescale.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 02 Jan 2014 11:52:23 +0100
+Subject: [PATCH] PCI: mvebu: Remove redundant code
+In-Reply-To: <20140102114638.47457689@skate>
+References: <1388659296-21569-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140102114638.47457689@skate>
+Message-ID: <52C544E7.4000501@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the binding documentation for Freescale FlexTimer Module
-(FTM) PWM driver under Documentation/devicetree/bindings/pwm/.
+On 02/01/2014 11:46, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Thu,  2 Jan 2014 11:41:36 +0100, Gregory CLEMENT wrote:
+>> In the commit b42285f66f871a989, Sebastian moved clock enable before
+>> register access, but during the merge of the commit
+>> 9f352f0e6c0fa2dc608812df "PCI: mvebu: Dynamically detect if the PEX
+>> link is up to enable hot plug", the moved part was added back.
+>>
+>> This patch fixes this by removing the redundant code.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/pci/host/pci-mvebu.c | 8 --------
+>>  1 file changed, 8 deletions(-)
+> 
+> This has already been fixed by
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/pci/host/pci-mvebu.c?id=84f47190d6be1cb99cd4a680e1018080d93800a8.
+> 
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Kumar Gala <galak@codeaurora.org>
----
- .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+I didn't find it because I only looked for in my emails and I
+wrongly assumed that the LAKML were in CC.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-new file mode 100644
-index 0000000..6ae6377
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-@@ -0,0 +1,38 @@
-+Freescale FlexTimer Module (FTM) PWM controller
-+
-+Required properties:
-+- compatible: Should be "fsl,vf610-ftm-pwm".
-+- reg: Physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clock-names : Should include the following module clock source entries:
-+    "ftm_sys" (module clock, also can be used as counter clock),
-+    "ftm_ext" (external counter clock),
-+    "ftm_fix" (fixed counter clock),
-+    "ftm_cnt_clk_en" (external and fixed counter clock enable/disable).
-+- clocks : Must contain a clock specifier for each entry in clock-names,
-+  See clock/clock-bindings.txt for details of the property values.
-+- pinctrl-names: Must contain a "default" entry.
-+- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-+  See pinctrl/pinctrl-bindings.txt for details of the property values.
-+- big-endian: If this property is absent, the little endian mode will be in
-+  use as default, or the big endian mode will be in use for all the device
-+  registers.
-+
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+		compatible = "fsl,vf610-ftm-pwm";
-+		reg = <0x40038000 0x1000>;
-+		#pwm-cells = <3>;
-+		clock-names = "ftm_sys", "ftm_ext",
-+				"ftm_fix", "ftm_cnt_clk_en";
-+		clocks = <&clks VF610_CLK_FTM0>,
-+			<&clks VF610_CLK_FTM0_EXT_SEL>,
-+			<&clks VF610_CLK_FTM0_FIX_SEL>,
-+			<&clks VF610_CLK_FTM0_EXT_FIX_EN>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pwm0_1>;
-+		big-endian;
-+};
+> Thanks!
+> 
+> Thomas
+> 
+
+
 -- 
-1.8.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
