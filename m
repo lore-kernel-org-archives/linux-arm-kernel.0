@@ -1,35 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Jan 2014 20:03:24 +0100
-Subject: [PATCH 1/2] spi: clps711x: Driver refactor
-In-Reply-To: <20140102182549.GF31886@sirena.org.uk>
-References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
- <201401021846.23488.arnd@arndb.de> <20140102182549.GF31886@sirena.org.uk>
-Message-ID: <1466537.jU4x6flQ6J@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 2 Jan 2014 11:01:29 -0800
+Subject: [GIT PULL 0/3] Third Round of Renesas ARM based SoC Fixes for
+ v3.13
+In-Reply-To: <cover.1388364591.git.horms+renesas@verge.net.au>
+References: <cover.1388364591.git.horms+renesas@verge.net.au>
+Message-ID: <20140102190129.GH8684@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 January 2014 18:25:49 Mark Brown wrote:
-> On Thu, Jan 02, 2014 at 06:46:23PM +0100, Arnd Bergmann wrote:
+On Mon, Dec 30, 2013 at 09:57:05AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> > I definitely agree with what you say, but please note that Alexander is
-> > the only person who ever sends clps711x patches, so there is not much
-> > hope of collaboration. I also suspect he's the only one who would
+> Please consider this third round of Renesas ARM based SoC fixes for v3.13.
+> Or alternatively, if it is too late in the v3.13 cycle, please consider
+> them for v3.14.
 > 
-> There's stuff been going in from the people who do generic cleanups and
-> updates.
+> This pull request is based on the second round such fixes,
+> tagged as renesas-fixes2-for-v3.13, which you have already pulled.
+> 
+> 
+> The following changes since commit d721a15c300c5f638a11573a6dd492158e737d6a:
+> 
+>   ARM: shmobile: r8a7790: fix shdi resource sizes (2013-12-19 18:14:48 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes3-for-v3.13
 
-Yes, I meant patches for new clps711x functionality. I saw the cleanups
-as well.
+Pulled into fixes for 3.13. Thanks!
 
-> > suffer from accidental breakage, especially since the existing driver
-> > is not used anywhere upstream (no instance of platform data, and no
-> > DT support).
->
-> Right.  On the other hand I really don't want to get into setting bad
-> precedents that people then use when they complain that I actually want
-> to review their code, that's just going to be more miserable in the long
-> run.
 
-Makes sense.
-
-	Arnd
+-Olof
