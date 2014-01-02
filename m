@@ -1,50 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Jan 2014 10:58:15 -0800
-Subject: [GIT PULL 0/4] Third Round of Renesas SH SCI Updates for v3.14
-In-Reply-To: <cover.1387890410.git.horms+renesas@verge.net.au>
-References: <cover.1387890410.git.horms+renesas@verge.net.au>
-Message-ID: <20140102185815.GG8684@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jan 2014 20:03:24 +0100
+Subject: [PATCH 1/2] spi: clps711x: Driver refactor
+In-Reply-To: <20140102182549.GF31886@sirena.org.uk>
+References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
+ <201401021846.23488.arnd@arndb.de> <20140102182549.GF31886@sirena.org.uk>
+Message-ID: <1466537.jU4x6flQ6J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 11:30:07PM +0900, Simon Horman wrote:
-> Hi Kevin, Hi Olof, Hi Arnd,
+On Thursday 02 January 2014 18:25:49 Mark Brown wrote:
+> On Thu, Jan 02, 2014 at 06:46:23PM +0100, Arnd Bergmann wrote:
 > 
-> please consider this third round of Renesas SH SCI updates for v3.14.
+> > I definitely agree with what you say, but please note that Alexander is
+> > the only person who ever sends clps711x patches, so there is not much
+> > hope of collaboration. I also suspect he's the only one who would
 > 
-> This pull request is based on a merge of the following:
-> 
-> * Renesas SH based SoC updates for v3.14,
->   tagged as renesas-sh-soc-for-v3.14, which I will
->   also send a pull-request for today.
-> 
-> * Third Round of Renesas ARM based SoC updates for v3.14,
->   tagged as renesas-soc3-for-v3.14, which I will
->   also send a pull-request for today.
-> 
-> Both of the above branches are based on
-> 
-> * Second Round of Renesas SH SCI Updates for v3.14
->   tagged as renesas-sh-sci2-for-v3.14, which I will
->   also send a pull-request for today.
-> 
-> The reason for this merge is to provide dependencies for the
-> patches in this series. In a nutshell there was a round of
-> driver updates, followed by SoC updates to use the new driver code,
-> followed by more driver updates.
-> 
-> 
-> The following changes since commit 20f4e334272dc191e475039d68a3bf3eb46ec66e:
-> 
->   Merge branch 'sh-soc' into sh-sci2-base (2013-12-24 21:50:13 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh-sci3-for-v3.14
-> 
+> There's stuff been going in from the people who do generic cleanups and
+> updates.
 
-Pulled, thanks.
+Yes, I meant patches for new clps711x functionality. I saw the cleanups
+as well.
 
+> > suffer from accidental breakage, especially since the existing driver
+> > is not used anywhere upstream (no instance of platform data, and no
+> > DT support).
+>
+> Right.  On the other hand I really don't want to get into setting bad
+> precedents that people then use when they complain that I actually want
+> to review their code, that's just going to be more miserable in the long
+> run.
 
--Olof
+Makes sense.
+
+	Arnd
