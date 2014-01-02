@@ -1,44 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 02 Jan 2014 11:52:23 +0100
-Subject: [PATCH] PCI: mvebu: Remove redundant code
-In-Reply-To: <20140102114638.47457689@skate>
-References: <1388659296-21569-1-git-send-email-gregory.clement@free-electrons.com>
- <20140102114638.47457689@skate>
-Message-ID: <52C544E7.4000501@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jan 2014 12:12:50 +0100
+Subject: [PATCHv8 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1388656624-26570-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
+ <1388656624-26570-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <3716216.GQHQhxMFvx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2014 11:46, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Thu,  2 Jan 2014 11:41:36 +0100, Gregory CLEMENT wrote:
->> In the commit b42285f66f871a989, Sebastian moved clock enable before
->> register access, but during the merge of the commit
->> 9f352f0e6c0fa2dc608812df "PCI: mvebu: Dynamically detect if the PEX
->> link is up to enable hot plug", the moved part was added back.
->>
->> This patch fixes this by removing the redundant code.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/pci/host/pci-mvebu.c | 8 --------
->>  1 file changed, 8 deletions(-)
-> 
-> This has already been fixed by
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/pci/host/pci-mvebu.c?id=84f47190d6be1cb99cd4a680e1018080d93800a8.
-> 
+On Thursday 02 January 2014 17:57:01 Xiubo Li wrote:
+> +static inline u32 ftm_readl(bool big_endian, const void __iomem *addr)
+> +{
+> +       u32 val;
+> +
+> +       val = __raw_readl(addr);
+> +
+> +       if (likely(big_endian))
+> +               val = be32_to_cpu((__force __be32)val);
+> +       else
+> +               val = le32_to_cpu((__force __le32)val);
+> +       rmb();
+> +
+> +       return val;
+> +}
+> +
+> +static inline void ftm_writel(bool big_endian, u32 val, void __iomem *addr)
+> +{
+> +       wmb();
+> +       if (likely(big_endian))
+> +               val = (__force u32)cpu_to_be32(val);
+> +       else
+> +               val = (__force u32)cpu_to_le32(val);
+> +
+> +       __raw_writel(val, addr);
 
-I didn't find it because I only looked for in my emails and I
-wrongly assumed that the LAKML were in CC.
+These functions definitely need some comments regarding why this is necessary.
+I assume that after 8 rounds of review (that I did not read) this has been
+discussed already, so please explain above the functions why you don't just
+use ioread32be/ioread32 and iowrite32be/iowrite32 here.
 
-> Thanks!
-> 
-> Thomas
-> 
+Also all callers seem to be of the style
 
+       val = ftm_readl(fpc->big_endian, fpc->base + FTM_SC);
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+so I wonder why you don't just pass the fpc pointer to the function
+and make it
+
+static inline void ftm_readl(struct fsl_pwm_chip *fpc, unsigned long reg, u32 val)
+{
+	if (fpc->big_endian)
+		iowrite32be(val, fpc->base + reg);
+	else
+		iowrite32(val, fpc->base + reg);
+}
+
+	Arnd
