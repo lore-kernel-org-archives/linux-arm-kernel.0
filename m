@@ -1,42 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Jan 2014 18:03:42 +0100
-Subject: [PATCH 4/6] ARM: tegra: rework fuse.c
-In-Reply-To: <20140102143221.GR26588@tbergstrom-lnx.Nvidia.com>
-References: <1387468474-26521-1-git-send-email-pdeschrijver@nvidia.com>
- <1387468474-26521-5-git-send-email-pdeschrijver@nvidia.com>
- <CACRpkdbXc_yH-=WgpQyVwHC_TSPfbfx=tHwziNhmB6t0HuSfRw@mail.gmail.com>
- <20140102143221.GR26588@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CACRpkdZzaiU-BAmkBS1usLRVKxVEyiTuciNpKATK7k+zA3YKZg@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 02 Jan 2014 17:17:56 +0000
+Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
+Message-ID: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 2, 2014 at 3:32 PM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Thu, Jan 02, 2014 at 01:37:43PM +0100, Linus Walleij wrote:
->> On Thu, Dec 19, 2013 at 4:54 PM, Peter De Schrijver
->> <pdeschrijver@nvidia.com> wrote:
->>
->> > Reduce fuse.c to the minimum functionality required for the early bootstages.
->> > Also export tegra_read_straps() for use by the fuse driver.
->> >
->> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
->>
->> Aha, but why?
->>
->
-> The efuse driver in patch 2 of this series, adds the randomness, so we don't
-> need to add it here then?
+Building a multi-arch kernel results in:
 
-Aha I wasn't CC:ed on patch 2 so I didn't see that...
+arch/arm/crypto/built-in.o: In function `aesbs_xts_decrypt':
+sha1_glue.c:(.text+0x15c8): undefined reference to `bsaes_xts_decrypt'
+arch/arm/crypto/built-in.o: In function `aesbs_xts_encrypt':
+sha1_glue.c:(.text+0x1664): undefined reference to `bsaes_xts_encrypt'
+arch/arm/crypto/built-in.o: In function `aesbs_ctr_encrypt':
+sha1_glue.c:(.text+0x184c): undefined reference to `bsaes_ctr32_encrypt_blocks'
+arch/arm/crypto/built-in.o: In function `aesbs_cbc_decrypt':
+sha1_glue.c:(.text+0x19b4): undefined reference to `bsaes_cbc_encrypt'
 
-> Yes, it's done in the efuse driver now, do you think that's too late?
+This code is already runtime-conditional on NEON being supported, so
+there's no point compiling it out depending on the minimum build
+architecture.
 
-Don't know but I don't think so. The important part is that it's done
-before drivers needing good randomness (as opposed to good
-entropy). The only Tegra driver I'm aware of that needs this is the
-crypto driver (which I patched a bit) and I think that will only come
-into play when you do something like set up a VPN tunnel or
-similar which will be waaaaay later, so no problem AFAICT.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+This is more a request for acks since I'd like to keep it/push it through
+my tree to reduce the autobuilder failures.
 
-Yours,
-Linus Walleij
+ arch/arm/crypto/bsaes-armv7.pl |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/crypto/bsaes-armv7.pl b/arch/arm/crypto/bsaes-armv7.pl
+index f3d96d932573..be068db960ee 100644
+--- a/arch/arm/crypto/bsaes-armv7.pl
++++ b/arch/arm/crypto/bsaes-armv7.pl
+@@ -701,7 +701,7 @@ $code.=<<___;
+ # define VFP_ABI_FRAME	0
+ # define BSAES_ASM_EXTENDED_KEY
+ # define XTS_CHAIN_TWEAK
+-# define __ARM_ARCH__ __LINUX_ARM_ARCH__
++# define __ARM_ARCH__	7
+ #endif
+ 
+ #ifdef __thumb__
+-- 
+1.7.4.4
