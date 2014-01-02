@@ -1,36 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 2 Jan 2014 10:41:23 +0800
-Subject: [PATCH v3 3/5] ARM: dts: sun7i: external clock outputs
-In-Reply-To: <20140101231039.GG3144@lukather>
-References: <1388543450-16741-1-git-send-email-wens@csie.org>
- <1388543450-16741-4-git-send-email-wens@csie.org>
- <20140101231039.GG3144@lukather>
-Message-ID: <CAGb2v66WrvasyFohuGhYvTPNHwh1VdUejMa8m8QTakg6BPG-uw@mail.gmail.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Thu, 02 Jan 2014 10:55:46 +0800
+Subject: [PATCH 12/15] thermal: rcar-thermal: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <52A9C1C8.2030907@ti.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <5903007.OehDdPcG2U@avalon> <52A9C1C8.2030907@ti.com>
+Message-ID: <1388631346.3739.74.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2013-12-12 at 10:01 -0400, Eduardo Valentin wrote:
+> On 11-12-2013 08:50, Laurent Pinchart wrote:
+> > Hi Zhang and Eduardo,
+> > 
+> > Could you please pick this patch up for v3.14 ?
+> 
+> Yes Laurent, I can pick it.
+> 
+> > 
+> > On Wednesday 27 November 2013 02:18:34 Laurent Pinchart wrote:
+> >> This helps increasing build testing coverage.
+> >>
+> >> Cc: Zhang Rui <rui.zhang@intel.com>
+> >> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+> >> Cc: linux-pm at vger.kernel.org
+> >> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >> Acked-by: Simon Horman <horms@verge.net.au>
+> 
+> Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
 
-On Thu, Jan 2, 2014 at 7:10 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Wed, Jan 01, 2014 at 10:30:48AM +0800, Chen-Yu Tsai wrote:
->> This commit adds the two external clock outputs available on A20 to
->> its device tree. A dummy fixed factor clock is also added to serve as
->> the first input of the clock outputs, which according to AW's A20 user
->> manual, is the 24MHz oscillator divided by 750.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> I'm ok with this patch, but I'll let Emilio and Mike give their
-> opinion on the driver before merging it.
+applied.
 
-The driver has not changed since v1.
-Mike merged it via Emilio's pull request.
-
-Or are you referring to the DT part?
-
-
-Cheers,
-ChenYu
+thanks,
+rui
+> 
+> >> ---
+> >>  drivers/thermal/Kconfig | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> >> index f35a1f7..661cafc 100644
+> >> --- a/drivers/thermal/Kconfig
+> >> +++ b/drivers/thermal/Kconfig
+> >> @@ -121,7 +121,7 @@ config SPEAR_THERMAL
+> >>
+> >>  config RCAR_THERMAL
+> >>  	tristate "Renesas R-Car thermal driver"
+> >> -	depends on ARCH_SHMOBILE
+> >> +	depends on ARCH_SHMOBILE || COMPILE_TEST
+> >>  	help
+> >>  	  Enable this to plug the R-Car thermal sensor driver into the Linux
+> >>  	  thermal framework.
+> 
+> 
