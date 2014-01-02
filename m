@@ -1,106 +1,196 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu,  2 Jan 2014 13:54:46 -0800
-Subject: [PATCH] sched_clock: Disable seqlock lockdep usage in sched_clock
-In-Reply-To: <52C5DB5B.9050604@linaro.org>
-References: <52C5DB5B.9050604@linaro.org>
-Message-ID: <1388699686-4834-1-git-send-email-john.stultz@linaro.org>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Thu, 2 Jan 2014 13:56:51 -0800
+Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <20131223174634.GD25089@obsidianresearch.com>
+References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
+ <1387785725-24262-3-git-send-email-tinamdar@apm.com>
+ <20131223174634.GD25089@obsidianresearch.com>
+Message-ID: <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unforunately the seqlock lockdep enablmenet can't be used
-in sched_clock, since the lockdep infrastructure eventually
-calls into sched_clock, which causes a deadlock.
+On Mon, Dec 23, 2013 at 9:46 AM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Mon, Dec 23, 2013 at 01:32:03PM +0530, Tanmay Inamdar wrote:
+>> This patch adds the device tree nodes for APM X-Gene PCIe controller and
+>> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts nodes
+>> are added.
+>
+> Can you include an lspci dump for PCI DT bindings please? It is
+> impossible to review otherwise..
+>
 
-Thus, this patch adds _no_lockdep() seqlock methods for the
-writer side, and changes all generic sched_clock usage to use
-the _no_lockdep methods.
+On the X-Gene evaluation platform, there is only one PCIe port
+enabled. Here is the 'lspci' dump
 
-This solves the issue I was able to reproduce, but it would
-be good to get Krzysztof to confirm it solves his problem.
+# lspci -vvv
+00:00.0 Class 0604: Device 19aa:e008 (rev 04)
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
+ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+<TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Region 0: Memory@<ignored> (64-bit, prefetchable)
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 0000f000-00000fff
+        Memory behind bridge: 00c00000-00cfffff
+        Prefetchable memory behind bridge: 0000000000000000-0000000000bfffff
+        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort-
+<TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+        Capabilities: [40] Express (v2) Root Port (Slot+), MSI 00
+                DevCap: MaxPayload 16384 bytes, PhantFunc 1, Latency
+L0s <1us, L1 unlimited
+                        ExtTag- RBE+ FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal-
+Unsupported-
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr+ UncorrErr- FatalErr- UnsuppReq-
+AuxPwr- TransPend+
+                LnkCap: Port #0, Speed 8GT/s, Width x8, ASPM L0s L1,
+Latency L0 unlimited, L1 unlimited
+                        ClockPM- Surprise+ LLActRep+ BwNot+
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- Retrain- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 8GT/s, Width x8, TrErr- Train- SlotClk+
+DLActive+ BWMgmt- ABWMgmt-
+                SltCap: AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd-
+HotPlug- Surprise-
+                        Slot #1, PowerLimit 10.000W; Interlock- NoCompl-
+                SltCtl: Enable: AttnBtn- PwrFlt- MRL- PresDet-
+CmdCplt- HPIrq- LinkChg-
+                        Control: AttnInd Off, PwrInd Off, Power- Interlock-
+                SltSta: Status: AttnBtn- PowerFlt- MRL- CmdCplt-
+PresDet- Interlock-
+                        Changed: MRL- PresDet- LinkState+
+                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal-
+PMEIntEna- CRSVisible-
+                RootCap: CRSVisible-
+                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
+                DevCap2: Completion Timeout: Not Supported,
+TimeoutDis+, LTR-, OBFF Not Supported ARIFwd-
+                DevCtl2: Completion Timeout: 50us to 50ms,
+TimeoutDis-, LTR-, OBFF Disabled ARIFwd-
+                LnkCtl2: Target Link Speed: 8GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range,
+EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB,
+EqualizationComplete+, EqualizationPhase1+
+                         EqualizationPhase2+, EqualizationPhase3+,
+LinkEqualizationRequest-
+        Capabilities: [80] Power Management version 3
+                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA
+PME(D0-,D1-,D2-,D3hot-,D3cold-)
+                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [100 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr+ BadTLP+ BadDLLP+ Rollover- Timeout+ NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap+ CGenEn- ChkCap+ ChkEn-
+        Capabilities: [180 v1] #19
+        Capabilities: [150 v1] Vendor Specific Information: ID=0001
+Rev=1 Len=010 <?>
 
-Cc: Krzysztof Ha?asa <khalasa@piap.pl>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Willy Tarreau <w@1wt.eu>
-Cc: Ingo Molnar <mingo@kernel.org>,
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Reported-by: Krzysztof Ha?asa <khalasa@piap.pl>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
----
- include/linux/seqlock.h   | 19 +++++++++++++++----
- kernel/time/sched_clock.c |  6 +++---
- 2 files changed, 18 insertions(+), 7 deletions(-)
+01:00.0 Class 0200: Device 15b3:1003
+        Subsystem: Device 15b3:0049
+        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
+ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+<TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Interrupt: pin A routed to IRQ 226
+        Region 0: Memory at e000c00000 (64-bit, non-prefetchable) [size=1M]
+        Region 2: Memory at e000000000 (64-bit, prefetchable) [size=8M]
+        Expansion ROM@e000800000 [size=1M]
+        Capabilities: [40] Power Management version 3
+                Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA
+PME(D0-,D1-,D2-,D3hot-,D3cold-)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [48] Vital Product Data
+                Product Name: CX312A - ConnectX-3 SFP+
+                Read-only fields:
+                        [PN] Part number: MCX312A-XCBT
+                        [EC] Engineering changes: A5
+                        [SN] Serial number: MT1338X00578
+                        [V0] Vendor specific: PCIe Gen3 x8
+                        [RV] Reserved: checksum good, 0 byte(s) reserved
+                Read/write fields:
+                        [V1] Vendor specific: N/A
+                        [YA] Asset tag: N/A
+                        [RW] Read-write area: 105 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 253 byte(s) free
+                        [RW] Read-write area: 252 byte(s) free
+                End
+        Capabilities: [9c] MSI-X: Enable- Count=128 Masked-
+                Vector table: BAR=0 offset=0007c000
+                PBA: BAR=0 offset=0007d000
+        Capabilities: [60] Express (v2) Endpoint, MSI 00
+                DevCap: MaxPayload 256 bytes, PhantFunc 0, Latency L0s
+<64ns, L1 unlimited
+                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset+
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal-
+Unsupported-
+                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop- FLReset-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq-
+AuxPwr- TransPend-
+                LnkCap: Port #8, Speed 8GT/s, Width x8, ASPM L0s,
+Latency L0 unlimited, L1 unlimited
+                        ClockPM- Surprise- LLActRep- BwNot-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- Retrain- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 8GT/s, Width x8, TrErr- Train- SlotClk+
+DLActive- BWMgmt- ABWMgmt-
+                DevCap2: Completion Timeout: Range ABCD, TimeoutDis+,
+LTR-, OBFF Not Supported
+                DevCtl2: Completion Timeout: 50us to 50ms,
+TimeoutDis-, LTR-, OBFF Disabled
+                LnkCtl2: Target Link Speed: 8GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range,
+EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB,
+EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-,
+LinkEqualizationRequest-
+        Capabilities: [100 v1] Alternative Routing-ID Interpretation (ARI)
+                ARICap: MFVC- ACS-, Next Function: 0
+                ARICtl: MFVC- ACS-, Function Group: 0
+        Capabilities: [148 v1] Device Serial Number f4-52-14-03-00-0b-dc-90
+        Capabilities: [154 v2] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES- TLP- FCP+ CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
+        Capabilities: [18c v1] #19
+        Kernel driver in use: mlx4_core
 
-diff --git a/include/linux/seqlock.h b/include/linux/seqlock.h
-index cf87a24..7664f68 100644
---- a/include/linux/seqlock.h
-+++ b/include/linux/seqlock.h
-@@ -206,14 +206,26 @@ static inline int read_seqcount_retry(const seqcount_t *s, unsigned start)
- }
- 
- 
-+
-+static inline void write_seqcount_begin_no_lockdep(seqcount_t *s)
-+{
-+	s->sequence++;
-+	smp_wmb();
-+}
-+
-+static inline void write_seqcount_end_no_lockdep(seqcount_t *s)
-+{
-+	smp_wmb();
-+	s->sequence++;
-+}
-+
- /*
-  * Sequence counter only version assumes that callers are using their
-  * own mutexing.
-  */
- static inline void write_seqcount_begin_nested(seqcount_t *s, int subclass)
- {
--	s->sequence++;
--	smp_wmb();
-+	write_seqcount_begin_no_lockdep(s);
- 	seqcount_acquire(&s->dep_map, subclass, 0, _RET_IP_);
- }
- 
-@@ -225,8 +237,7 @@ static inline void write_seqcount_begin(seqcount_t *s)
- static inline void write_seqcount_end(seqcount_t *s)
- {
- 	seqcount_release(&s->dep_map, 1, _RET_IP_);
--	smp_wmb();
--	s->sequence++;
-+	write_seqcount_end_no_lockdep(s);
- }
- 
- /**
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index 68b7993..13561a0 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -74,7 +74,7 @@ unsigned long long notrace sched_clock(void)
- 		return cd.epoch_ns;
- 
- 	do {
--		seq = read_seqcount_begin(&cd.seq);
-+		seq = read_seqcount_begin_no_lockdep(&cd.seq);
- 		epoch_cyc = cd.epoch_cyc;
- 		epoch_ns = cd.epoch_ns;
- 	} while (read_seqcount_retry(&cd.seq, seq));
-@@ -99,10 +99,10 @@ static void notrace update_sched_clock(void)
- 			  cd.mult, cd.shift);
- 
- 	raw_local_irq_save(flags);
--	write_seqcount_begin(&cd.seq);
-+	write_seqcount_begin_no_lockdep(&cd.seq);
- 	cd.epoch_ns = ns;
- 	cd.epoch_cyc = cyc;
--	write_seqcount_end(&cd.seq);
-+	write_seqcount_end_no_lockdep(&cd.seq);
- 	raw_local_irq_restore(flags);
- }
- 
--- 
-1.8.3.2
+
+> Regards,
+> Jason
