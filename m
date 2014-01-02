@@ -1,35 +1,55 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 2 Jan 2014 11:17:57 -0800
-Subject: [PATCH 2/7] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
-In-Reply-To: <20140102184959.GI31886@sirena.org.uk>
-References: <1386718996-3733-1-git-send-email-sboyd@codeaurora.org>
- <1386718996-3733-3-git-send-email-sboyd@codeaurora.org>
- <20131215113337.GB14818@core.coreip.homeip.net>
- <20140102184959.GI31886@sirena.org.uk>
-Message-ID: <20140102191757.GA2025@core.coreip.homeip.net>
+Date: Thu, 2 Jan 2014 12:38:31 -0800
+Subject: [PATCH 1/4] input: Add new sun4i-lradc-keys drivers
+In-Reply-To: <20140102202022.GK3144@lukather>
+References: <1388604610-20380-1-git-send-email-hdegoede@redhat.com>
+ <20140101205603.GA1141@core.coreip.homeip.net>
+ <52C5336B.9010903@redhat.com> <1700375.GaI3zFl6RI@phil>
+ <52C56D79.1060506@redhat.com> <20140102202022.GK3144@lukather>
+Message-ID: <20140102203831.GA3239@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 06:49:59PM +0000, Mark Brown wrote:
-> On Sun, Dec 15, 2013 at 03:33:37AM -0800, Dmitry Torokhov wrote:
-> > On Tue, Dec 10, 2013 at 03:43:11PM -0800, Stephen Boyd wrote:
+On Thu, Jan 02, 2014 at 09:20:22PM +0100, Maxime Ripard wrote:
+> On Thu, Jan 02, 2014 at 02:45:29PM +0100, Hans de Goede wrote:
+> > >Also, instead of inventing yet another vendor-specific property, why not re-use
+> > >a button binding similar to gpio-keys like:
+> > >
+> > >        lradc: lradc at 01c22800 {
+> > >                compatible = "allwinner,sun4i-lradc-keys";
+> > >                reg = <0x01c22800 0x100>;
+> > >                interrupts = <31>;
+> > >                allwinner,chan0-step = <200>;
+> > >
+> > >		#address-cells = <1>;
+> > >		#size-cells = <0>;
+> > >
+> > >		button at 0 {
+> > >			reg = <0>; /* your channel index from above */
+> > >			linux,code = <115>; /* already used as dt-property */
+> > >		};
+> > >
+> > >		button at 1 {
+> > >			reg = <1>;
+> > >			linux,code = <114>;
+> > >		};
+> > 
+> > Ugh no. Having a vendor specific property which is KISS certainly
+> > beats this, both wrt ease of writing dts files as well as wrt the
+> > dts parsing code in the driver.
 > 
-> > > +	regmap = dev_get_regmap(pdev->dev.parent, NULL);
-> > > +	if (!regmap)
-> > > +		return -ENODEV;
+> I'd agree with Heiko here. This is pretty much the same construct
+> that's already in use in other input drivers, like gpio-keys.
 > 
-> > And you are leaking memory here...
-> 
-> He's not, dev_get_regmap() just gets a pointer to an existing regmap -
-> no reference is taken and nothing is allocated.  It's a helper that's
-> mainly there so that generic code can be written without needing the
-> regmap to be passed around.  The caller is responsible for ensuring that
-> it will stick around for as long as it's used (generally by having it
-> lifetime managed with the device).
+> This is also something that can really easily be made generic, since
+> this is something that is rather common.
 
-I was not talking about data returned by dev_get_regmap() but all other
-memory that was allocated before as this was pre devm conversion of the
-driver.
+Except that button definition from gpio-keys does not use 'reg' property
+but rather gpio. I'd rather we did not cram non-applicable attributes
+into that definition just to make it "reusable" like that.
+
+I'd be OK with having similar (but not claiming to be the same) mappings
+though.
 
 Thanks.
 
