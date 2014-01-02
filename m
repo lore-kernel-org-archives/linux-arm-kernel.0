@@ -1,89 +1,98 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:29:20 +0000
-Subject: [PATCH RFC 42/46] imx-drm: imx-drm-core: add core hotplug connector
- support
+Date: Thu, 02 Jan 2014 21:27:22 +0000
+Subject: [PATCH RFC 19/46] imx-drm: imx-hdmi: clean up setting of vp_conf
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1VyppQ-0007GK-Gb@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VypnW-0007Em-T2@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add core imx-drm support for hotplug connector support.  We need to
-setup the poll helper after we've setup the connectors; the helper
-scans the connectors to determine their capabilities.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c |   20 ++++++++++++++++----
- 1 files changed, 16 insertions(+), 4 deletions(-)
+ drivers/staging/imx-drm/imx-hdmi.c |   49 ++++++++++++++++-------------------
+ 1 files changed, 22 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 33c020867ed0..6b86bfeb091f 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -69,6 +69,8 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- {
- 	struct imx_drm_device *imxdrm = drm->dev_private;
+diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+index f8c652e58a6d..075dd1f0c8a7 100644
+--- a/drivers/staging/imx-drm/imx-hdmi.c
++++ b/drivers/staging/imx-drm/imx-hdmi.c
+@@ -559,7 +559,7 @@ static void hdmi_video_packetize(struct imx_hdmi *hdmi)
+ 	unsigned int remap_size = HDMI_VP_REMAP_YCC422_16bit;
+ 	unsigned int output_select = HDMI_VP_CONF_OUTPUT_SELECTOR_PP;
+ 	struct hdmi_data_info *hdmi_data = &hdmi->hdmi_data;
+-	u8 val;
++	u8 val, vp_conf;
  
-+	drm_kms_helper_poll_fini(drm);
-+
- #if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
- 	if (imxdrm->fbhelper)
- 		drm_fbdev_cma_fini(imxdrm->fbhelper);
-@@ -77,7 +79,6 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- 	component_unbind_all(drm->dev, drm);
+ 	if (hdmi_data->enc_out_format == RGB
+ 		|| hdmi_data->enc_out_format == YCBCR444) {
+@@ -603,47 +603,42 @@ static void hdmi_video_packetize(struct imx_hdmi *hdmi)
  
- 	drm_vblank_cleanup(drm);
--	drm_kms_helper_poll_fini(drm);
- 	drm_mode_config_cleanup(drm);
- 
- 	return 0;
-@@ -213,8 +214,19 @@ void imx_drm_encoder_destroy(struct drm_encoder *encoder)
- }
- EXPORT_SYMBOL_GPL(imx_drm_encoder_destroy);
- 
-+static void imx_drm_output_poll_changed(struct drm_device *drm)
-+{
-+	struct imx_drm_device *imxdrm = drm->dev_private;
-+
-+#if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
-+	if (imxdrm->fbhelper)
-+		drm_fbdev_cma_hotplug_event(imxdrm->fbhelper);
-+#endif
-+}
-+
- static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
- 	.fb_create = drm_fb_cma_create,
-+	.output_poll_changed = imx_drm_output_poll_changed,
- };
- 
- /*
-@@ -259,8 +271,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 
- 	drm_mode_config_init(drm);
- 
--	drm_kms_helper_poll_init(drm);
--
- 	ret = drm_vblank_init(drm, MAX_CRTC);
- 	if (ret)
- 		goto err_kms;
-@@ -311,6 +321,9 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 		goto err_unbind;
+ 	/* Data from pixel repeater block */
+ 	if (hdmi_data->pix_repet_factor > 1) {
+-		hdmi_modb(hdmi, HDMI_VP_CONF_PR_EN_ENABLE |
+-				HDMI_VP_CONF_BYPASS_SELECT_PIX_REPEATER,
+-			  HDMI_VP_CONF_PR_EN_MASK |
+-			  HDMI_VP_CONF_BYPASS_SELECT_MASK, HDMI_VP_CONF);
++		vp_conf = HDMI_VP_CONF_PR_EN_ENABLE |
++			  HDMI_VP_CONF_BYPASS_SELECT_PIX_REPEATER;
+ 	} else { /* data from packetizer block */
+-		hdmi_modb(hdmi, HDMI_VP_CONF_PR_EN_DISABLE |
+-				HDMI_VP_CONF_BYPASS_SELECT_VID_PACKETIZER,
+-			  HDMI_VP_CONF_PR_EN_MASK |
+-			  HDMI_VP_CONF_BYPASS_SELECT_MASK, HDMI_VP_CONF);
++		vp_conf = HDMI_VP_CONF_PR_EN_DISABLE |
++			  HDMI_VP_CONF_BYPASS_SELECT_VID_PACKETIZER;
  	}
- #endif
-+
-+	drm_kms_helper_poll_init(drm);
-+
- 	return 0;
  
- err_unbind:
-@@ -318,7 +331,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- err_vblank:
- 	drm_vblank_cleanup(drm);
- err_kms:
--	drm_kms_helper_poll_fini(drm);
- 	drm_mode_config_cleanup(drm);
++	hdmi_modb(hdmi, vp_conf,
++		  HDMI_VP_CONF_PR_EN_MASK |
++		  HDMI_VP_CONF_BYPASS_SELECT_MASK, HDMI_VP_CONF);
++
+ 	hdmi_modb(hdmi, 1 << HDMI_VP_STUFF_IDEFAULT_PHASE_OFFSET,
+ 		  HDMI_VP_STUFF_IDEFAULT_PHASE_MASK, HDMI_VP_STUFF);
  
- 	return ret;
+ 	hdmi_writeb(hdmi, remap_size, HDMI_VP_REMAP);
+ 
+ 	if (output_select == HDMI_VP_CONF_OUTPUT_SELECTOR_PP) {
+-		hdmi_modb(hdmi, HDMI_VP_CONF_BYPASS_EN_DISABLE |
+-				HDMI_VP_CONF_PP_EN_ENABLE |
+-				HDMI_VP_CONF_YCC422_EN_DISABLE,
+-			  HDMI_VP_CONF_BYPASS_EN_MASK |
+-			  HDMI_VP_CONF_PP_EN_ENMASK |
+-			  HDMI_VP_CONF_YCC422_EN_MASK, HDMI_VP_CONF);
++		vp_conf = HDMI_VP_CONF_BYPASS_EN_DISABLE |
++			  HDMI_VP_CONF_PP_EN_ENABLE |
++			  HDMI_VP_CONF_YCC422_EN_DISABLE;
+ 	} else if (output_select == HDMI_VP_CONF_OUTPUT_SELECTOR_YCC422) {
+-		hdmi_modb(hdmi, HDMI_VP_CONF_BYPASS_EN_DISABLE |
+-				HDMI_VP_CONF_PP_EN_DISABLE |
+-				HDMI_VP_CONF_YCC422_EN_ENABLE,
+-			  HDMI_VP_CONF_BYPASS_EN_MASK |
+-			  HDMI_VP_CONF_PP_EN_ENMASK |
+-			  HDMI_VP_CONF_YCC422_EN_MASK, HDMI_VP_CONF);
++		vp_conf = HDMI_VP_CONF_BYPASS_EN_DISABLE |
++			  HDMI_VP_CONF_PP_EN_DISABLE |
++			  HDMI_VP_CONF_YCC422_EN_ENABLE;
+ 	} else if (output_select == HDMI_VP_CONF_OUTPUT_SELECTOR_BYPASS) {
+-		hdmi_modb(hdmi, HDMI_VP_CONF_BYPASS_EN_ENABLE |
+-				HDMI_VP_CONF_PP_EN_DISABLE |
+-				HDMI_VP_CONF_YCC422_EN_DISABLE,
+-			  HDMI_VP_CONF_BYPASS_EN_MASK |
+-			  HDMI_VP_CONF_PP_EN_ENMASK |
+-			  HDMI_VP_CONF_YCC422_EN_MASK, HDMI_VP_CONF);
++		vp_conf = HDMI_VP_CONF_BYPASS_EN_ENABLE |
++			  HDMI_VP_CONF_PP_EN_DISABLE |
++			  HDMI_VP_CONF_YCC422_EN_DISABLE;
+ 	} else {
+ 		return;
+ 	}
+ 
++	hdmi_modb(hdmi, vp_conf,
++		  HDMI_VP_CONF_BYPASS_EN_MASK | HDMI_VP_CONF_PP_EN_ENMASK |
++		  HDMI_VP_CONF_YCC422_EN_MASK, HDMI_VP_CONF);
++
+ 	hdmi_modb(hdmi, HDMI_VP_STUFF_PP_STUFFING_STUFFING_MODE |
+ 			HDMI_VP_STUFF_YCC422_STUFFING_STUFFING_MODE,
+ 		  HDMI_VP_STUFF_PP_STUFFING_MASK |
 -- 
 1.7.4.4
