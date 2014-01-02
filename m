@@ -1,63 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 02 Jan 2014 17:22:04 +0100
-Subject: [RFC PATCH 0/3]  Fix i2c bus hang on A0 version of the Armada
- XP SoCs
-In-Reply-To: <20140101192816.GP32537@lunn.ch>
-References: <1388508293-9141-1-git-send-email-gregory.clement@free-electrons.com>
- <20140101192816.GP32537@lunn.ch>
-Message-ID: <52C5922C.8050007@free-electrons.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 02 Jan 2014 16:23:28 +0000
+Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
+Message-ID: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+warning: (ARCH_MULTIPLATFORM && ARCH_CLPS711X && ARCH_PXA &&
+ SOC_EXYNOS5440 && ARCH_EMEV2) selects AUTO_ZRELADDR which
+ has unmet direct dependencies (!ZBOOT_ROM)
 
-On 01/01/2014 20:28, Andrew Lunn wrote:
-> On Tue, Dec 31, 2013 at 05:44:50PM +0100, Gregory CLEMENT wrote:
->> Hi,
->>
->> This series is an RFC to fix the i2c bus hang on A0 version of the
->> Armada XP SoCs. It occured on the the eraly release of the OpenBlocks
->> AX3-4 bords. Indeed the first variants of Armada XP SoCs (A0 stepping)
->> have issues related to the i2c controller which prevent to use the
->> offload mechanism and lead to a kernel hang during boot.
->>
->> The best solution will be to detect the SoCs version at runtime and
->> use it in the driver, but I chosed to submit this version in case CPU
->> version detection feature takes more time than expected (and we
->> already reached the rc6 kernel).
->>
->> Thanks,
->>
->> Gregory
-> 
-> Hi Gregory
-> 
-> Thanks for these RFC patches. I can confirm they work on my Openblocks
-> device with an A0 stepping SoC. I can now access the RTC.
-> 
-> You missed adding the new DTS file to the Makefile. Depending on how
-> the discussion goes about auto detecting stepping or not, i would of
-> used different filenames, probably:
+This is because it's possible to have ZBOOT_ROM enabled, but at the
+same time have another option enabled which selects AUTO_ZRELADDR
+overriding the !ZBOOT_ROM dependency.  Fix this by reversing the
+dependencies between ZBOOT_ROM and the options which depend on
+!ZBOOT_ROM.
 
-Thanks for your feedback. In case there will be a second version I will
-take them into account. However I hope we won't need it as I sent a
-new series to fix this bug by dynamically getting the SoC revision.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+The autobuilder spotted this on one of its randconfig builds - yet again,
+it's another illustration of the problems that throwing a "select"
+statement at a problem is generally a bad idea.  Let's make a new year's
+resolution that we're going to stop throwing "select" at a problem
+without first thinking about the consequences.
 
-> 
-> armada-xp-openblocks-ax3-4.dts
-> armada-xp-openblocks-ax3-4-a0.dts
-> armada-xp-openblocks-ax3-4-common.dts
+ arch/arm/Kconfig |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-you probably meant armada-xp-openblocks-ax3-4-common.dtsi, but I got the
-point and I agree.
-
-> 
-> Keeps all the files together when listed alphabetically
-> 
-
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7eee953..2ec6bfdf03fd 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1946,6 +1946,7 @@ config ZBOOT_ROM_BSS
+ config ZBOOT_ROM
+ 	bool "Compressed boot loader in ROM/flash"
+ 	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
++	depends on !ARM_APPENDED_DTB && !XIP_KERNEL && !AUTO_ZRELADDR
+ 	help
+ 	  Say Y here if you intend to execute your compressed kernel image
+ 	  (zImage) directly from ROM or flash.  If unsure, say N.
+@@ -1981,7 +1982,7 @@ endchoice
+ 
+ config ARM_APPENDED_DTB
+ 	bool "Use appended device tree blob to zImage (EXPERIMENTAL)"
+-	depends on OF && !ZBOOT_ROM
++	depends on OF
+ 	help
+ 	  With this option, the boot code will look for a device tree binary
+ 	  (DTB) appended to zImage
+@@ -2069,7 +2070,7 @@ endchoice
+ 
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+-	depends on !ZBOOT_ROM && !ARM_LPAE && !ARCH_MULTIPLATFORM
++	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM
+ 	help
+ 	  Execute-In-Place allows the kernel to run from non-volatile storage
+ 	  directly addressable by the CPU, such as NOR flash. This saves RAM
+@@ -2132,7 +2133,6 @@ config CRASH_DUMP
+ 
+ config AUTO_ZRELADDR
+ 	bool "Auto calculation of the decompressed kernel image address"
+-	depends on !ZBOOT_ROM
+ 	help
+ 	  ZRELADDR is the physical address where the decompressed kernel
+ 	  image will be placed. If AUTO_ZRELADDR is selected, the address
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.4.4
