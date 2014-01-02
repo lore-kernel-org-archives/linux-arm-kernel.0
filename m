@@ -1,47 +1,44 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 02 Jan 2014 14:21:41 -0800
-Subject: [PATCH] sched_clock: Disable seqlock lockdep usage in sched_clock
-In-Reply-To: <CA+55aFxGQkChbFj=GMWAANmbJ512S5KAcFNvKoQJsQCiMfvxqA@mail.gmail.com>
-References: <52C5DB5B.9050604@linaro.org>	<1388699686-4834-1-git-send-email-john.stultz@linaro.org>
- <CA+55aFxGQkChbFj=GMWAANmbJ512S5KAcFNvKoQJsQCiMfvxqA@mail.gmail.com>
-Message-ID: <52C5E675.80701@linaro.org>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 02 Jan 2014 22:36:32 +0000
+Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
+In-Reply-To: <20140102194924.GA3321@obsidianresearch.com>
+References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
+ <20131228170114.GH19878@titan.lakedaemon.net>
+ <20140102194924.GA3321@obsidianresearch.com>
+Message-ID: <1388702192.16958.54.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2014 02:15 PM, Linus Torvalds wrote:
-> On Thu, Jan 2, 2014 at 1:54 PM, John Stultz <john.stultz@linaro.org> wrote:
->> Unforunately the seqlock lockdep enablmenet can't be used
->> in sched_clock, since the lockdep infrastructure eventually
->> calls into sched_clock, which causes a deadlock.
->>
->> Thus, this patch adds _no_lockdep() seqlock methods for the
->> writer side, and changes all generic sched_clock usage to use
->> the _no_lockdep methods.
-> Ugh.
->
-> On the x86 vclock_gettime() side, we only do this for the reader. Why
-> did you make the generic version do it for the writer too, adding the
-> necessity for those new operations? It's only the reader side that
-> doesn't want it.
+On Thu, 2014-01-02 at 12:49 -0700, Jason Gunthorpe wrote:
+> On Sat, Dec 28, 2013 at 12:01:14PM -0500, Jason Cooper wrote:
+> 
+> > > + * Note: This requires a new'ish version of u-boot, which disables the
+> > > + * L2 cache. If your B3 silently fails to boot, u-boot is probably too
+> > > + * old. Either upgrade, or consider the following email:
+> > > + *
+> > > + * http://lists.debian.org/debian-arm/2012/08/msg00128.html
+> > 
+> > Nice, thanks for adding this.
+> 
+> Nifty.. But what is the root cause for the above?
+> 
+> I'm guessing that at some point the the L1 icache has been enabled,
+> the L1 dcache disabled, and the L2 cache enabled?
+> 
+> If the pv_fixup runs with both L1 caches off and an empty L2 then it
+> shouldn't cause a problem.
 
-So the problem is that the update side calls the lockdep code which
-calls sched_clock, which then deadlocks because the seqcount is odd
-(held by the updater).
+I'm not 100% sure but I think the issue is that the kernel expects to be
+running with all of the caches off, but u-boot incorrectly left the l2
+on. The L2 is probably not empty (because u-boot was using it).
 
-Thus we have to drop the lockdep usage in the updater as well.
+There is some code modifications done at startup (relating to setting
+paddr offset?) and since the kernel expects caches to be off it doesn't
+do any cache maintenance. Which means that things don't work as
+expected, because stuff is cached in L2 dcache and therefore not seen in
+the instruction stream (Either icached or uncached).
 
-On x86 vclock_gettime, we're in userspace, and that's why we can't call
-the lockdep code. The update for that code however happens in kernel
-space, so it doesn't have the same problem.
+Anyway, regardless of the specifics running with caches on when the
+kernel thinks they are off is going to cause all sorts of oddness...
 
-
-> Talking about the new operations, that "*_no_lockdep()" naming annoys
-> me. It doesn't match the spinlock naming, which is to just use
-> "raw_*()" instead. Wouldn't it be nice to make the naming be
-> consistent too? Especially when it's paired with raw_local_irq_save()
-> that shares that "raw_" model for non-checking stuff.
-
-Sure, I can change the naming. New patch to follow in a bit.
-
-thanks
--john
+Ian.
