@@ -1,45 +1,20 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 17:17:56 +0000
-Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
-Message-ID: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jan 2014 17:21:02 +0000
+Subject: [BUG] cpufreq: bL_switcher can fail to build
+Message-ID: <20140102172102.GA7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building a multi-arch kernel results in:
+The randconfig results from the autobuilder produced this error for
+the big.LITTLE cpufreq code for the omap4430-sdp randconfig build on
+New Years day.
 
-arch/arm/crypto/built-in.o: In function `aesbs_xts_decrypt':
-sha1_glue.c:(.text+0x15c8): undefined reference to `bsaes_xts_decrypt'
-arch/arm/crypto/built-in.o: In function `aesbs_xts_encrypt':
-sha1_glue.c:(.text+0x1664): undefined reference to `bsaes_xts_encrypt'
-arch/arm/crypto/built-in.o: In function `aesbs_ctr_encrypt':
-sha1_glue.c:(.text+0x184c): undefined reference to `bsaes_ctr32_encrypt_blocks'
-arch/arm/crypto/built-in.o: In function `aesbs_cbc_decrypt':
-sha1_glue.c:(.text+0x19b4): undefined reference to `bsaes_cbc_encrypt'
+drivers/built-in.o: In function `bL_cpufreq_set_rate':
+powercap_sys.c:(.text+0x5ed9a0): undefined reference to `bL_switch_request_cb'
 
-This code is already runtime-conditional on NEON being supported, so
-there's no point compiling it out depending on the minimum build
-architecture.
+Maybe CONFIG_ARM_BIG_LITTLE_CPUFREQ needs to depend on CONFIG_BIG_LITTLE ?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This is more a request for acks since I'd like to keep it/push it through
-my tree to reduce the autobuilder failures.
-
- arch/arm/crypto/bsaes-armv7.pl |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/crypto/bsaes-armv7.pl b/arch/arm/crypto/bsaes-armv7.pl
-index f3d96d932573..be068db960ee 100644
---- a/arch/arm/crypto/bsaes-armv7.pl
-+++ b/arch/arm/crypto/bsaes-armv7.pl
-@@ -701,7 +701,7 @@ $code.=<<___;
- # define VFP_ABI_FRAME	0
- # define BSAES_ASM_EXTENDED_KEY
- # define XTS_CHAIN_TWEAK
--# define __ARM_ARCH__ __LINUX_ARM_ARCH__
-+# define __ARM_ARCH__	7
- #endif
- 
- #ifdef __thumb__
 -- 
-1.7.4.4
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
