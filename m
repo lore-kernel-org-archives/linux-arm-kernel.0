@@ -1,73 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Jan 2014 11:14:55 +0100
-Subject: v3.13-rc6+ regression (ARM board)
-In-Reply-To: <m3txdmu2ez.fsf@t19.piap.pl>
-References: <m3mwjhux0e.fsf@t19.piap.pl> <20131231104511.GA9688@1wt.eu>
- <m3txdmu2ez.fsf@t19.piap.pl>
-Message-ID: <20140102101455.GG10158@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  2 Jan 2014 11:41:36 +0100
+Subject: [PATCH] PCI: mvebu: Remove redundant code
+Message-ID: <1388659296-21569-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+In the commit b42285f66f871a989, Sebastian moved clock enable before
+register access, but during the merge of the commit
+9f352f0e6c0fa2dc608812df "PCI: mvebu: Dynamically detect if the PEX
+link is up to enable hot plug", the moved part was added back.
 
-On Thu, Jan 02, 2014 at 11:02:44AM +0100, Krzysztof Ha?asa wrote:
-> >> There seems to be a regression in v3.13-rc6+ (up to current tip =
-> >> 71ce176ee6ed1735b9a1160a5704a915d13849b1).
-> >>
-> >> Board is Gateworks Cambria, CPU Intel IXP435 ARM big endian, gcc 4.7.3.
-> >> The board boots correctly and works (shell mostly, and SSHD) for about
-> >> 50 seconds. After 52-54 seconds, it frozes dead without any console
-> >> (UART) output.
-> >>
-> >> Bisecting shows 5e30025a319910695f5010dc0fb53a23299da14d as the first
-> >> bad commit. Interestingly it's a merge:
-> 
-> Reverting 1ca7d67cf5d5a2aef26a8d9afd789006fa098347 on top of current tip
-> (9a0bb2966efbf30a71c128c3af63307d8b5f5fc0) fixes my issue.
-> 
-> What now?
-> 
-> 1ca7d67cf5d5a2aef26a8d9afd789006fa098347:
->     seqcount: Add lockdep functionality to seqcount/seqlock structures
-> 
->     Currently seqlocks and seqcounts don't support lockdep.
-> 
->     After running across a seqcount related deadlock in the timekeeping
->     code, I used a less-refined and more focused variant of this patch
->     to narrow down the cause of the issue.
-> 
->     This is a first-pass attempt to properly enable lockdep functionality
->     on seqlocks and seqcounts.
-> 
->     Since seqcounts are used in the vdso gettimeofday code, I've provided
->     non-lockdep accessors for those needs.
-> 
->     I've also handled one case where there were nested seqlock writers
->     and there may be more edge cases.
-> 
->     Comments and feedback would be appreciated!
-So it seems to be that 1ca7d67cf5d5a2aef26a8d9afd789006fa098347 doesn't
-like to be combined with some other commit from
-5e30025a319910695f5010dc0fb53a23299da14d^2..5e30025a319910695f5010dc0fb53a23299da14d^.
-What you can do is:
+This patch fixes this by removing the redundant code.
 
-	git bisect start 5e30025a319910695f5010dc0fb53a23299da14d^ b8a216269ec0ce2e961d32e6d640d7010b8a818e
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/pci/host/pci-mvebu.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-The bad commit is the tip of Linus' tree when he created the bad merge
-commit. The good one is the base of the merged tree. To check if a tree
-is good or bad do:
-
-	git merge --no-commit 5e30025a319910695f5010dc0fb53a23299da14d^2
-	test test test
-	git reset --hard
-	git bisect good ... or ... git bisect bad
-
-That should find the commit that makes your board break in combination
-with 1ca7d67cf5d5a2aef26a8d9afd789006fa098347.
-
-Best regards
-Uwe
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 2aa7b77c7c88..0b4b99fa1fb5 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -954,14 +954,6 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 
+ 		mvebu_pcie_set_local_dev_nr(port, 1);
+ 
+-		port->clk = of_clk_get_by_name(child, NULL);
+-		if (IS_ERR(port->clk)) {
+-			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+-			       port->port, port->lane);
+-			iounmap(port->base);
+-			continue;
+-		}
+-
+ 		port->dn = child;
+ 		spin_lock_init(&port->conf_lock);
+ 		mvebu_sw_pci_bridge_init(port);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.1.2
