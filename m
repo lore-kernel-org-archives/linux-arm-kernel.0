@@ -1,38 +1,31 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 2 Jan 2014 09:47:24 -0500
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20140102113057.GI16456@n2100.arm.linux.org.uk>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140102113057.GI16456@n2100.arm.linux.org.uk>
-Message-ID: <20140102144724.GF19878@titan.lakedaemon.net>
+Date: Thu, 2 Jan 2014 09:50:35 -0500
+Subject: [PATCH v2] ARM: Kirkwood: Add support for Excito Bubba B3
+In-Reply-To: <1388427467-32488-1-git-send-email-andrew@lunn.ch>
+References: <1388427467-32488-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140102145035.GG19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 11:30:57AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
-> > Some SoC have MMIO regions that are shared across orthogonal
-> > subsystems. This commit implements a possible solution for the
-> > thread-safe access of such regions through a spinlock-protected API.
-> > 
-> > Concurrent access is protected with a single spinlock for the
-> > entire MMIO address space. While this protects shared-registers,
-> > it also serializes access to unrelated/unshared registers.
-> > 
-> > We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
-> > respectively. The rationale for this is that some users may not require
-> > register write completion but only thread-safe access to a register.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+On Mon, Dec 30, 2013 at 07:17:46PM +0100, Andrew Lunn wrote:
+> The Excito Bubba B3 is a home server, single drive NAS box, Wifi
+> access point, etc.
 > 
-> Okay, so this patch has been submitted to the patch system, but it
-> contains no other tags other than Ezequiel's sign-off.  Clearly
-> other people *have* reviewed it.
-> 
-> Can we please have some acks etc for it please?
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> v2:
+> s/driver/drive
+> Sort ocp DT entries
+> Add comment about Serial port RX/TX test points
+> Replace linux specific DT led properties with generic equivelent.
+> ---
+>  arch/arm/boot/dts/Makefile        |    3 +-
+>  arch/arm/boot/dts/kirkwood-b3.dts |  204 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 206 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-b3.dts
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Applied to mvebu/dt
 
-Happy New Year!
+thx,
 
 Jason.
