@@ -1,261 +1,106 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu,  2 Jan 2014 13:53:27 -0800
-Subject: [RFC PATCHv3 09/11] arm: mm: Track lowmem in vmalloc
-In-Reply-To: <1388699609-18214-1-git-send-email-lauraa@codeaurora.org>
-References: <1388699609-18214-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1388699609-18214-10-git-send-email-lauraa@codeaurora.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu,  2 Jan 2014 13:54:46 -0800
+Subject: [PATCH] sched_clock: Disable seqlock lockdep usage in sched_clock
+In-Reply-To: <52C5DB5B.9050604@linaro.org>
+References: <52C5DB5B.9050604@linaro.org>
+Message-ID: <1388699686-4834-1-git-send-email-john.stultz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than always keeping lowmem and vmalloc separate, we can
-now allow the two to be mixed. This means that all lowmem areas
-need to be explicitly tracked in vmalloc to avoid over allocating.
-Additionally, adjust the vmalloc reserve to account for the fact
-that there may be a hole in the middle consisting of vmalloc.
+Unforunately the seqlock lockdep enablmenet can't be used
+in sched_clock, since the lockdep infrastructure eventually
+calls into sched_clock, which causes a deadlock.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+Thus, this patch adds _no_lockdep() seqlock methods for the
+writer side, and changes all generic sched_clock usage to use
+the _no_lockdep methods.
+
+This solves the issue I was able to reproduce, but it would
+be good to get Krzysztof to confirm it solves his problem.
+
+Cc: Krzysztof Ha?asa <khalasa@piap.pl>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Willy Tarreau <w@1wt.eu>
+Cc: Ingo Molnar <mingo@kernel.org>,
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Reported-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Signed-off-by: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm/Kconfig   |    3 +
- arch/arm/mm/init.c |  104 ++++++++++++++++++++++++++++++++++++----------------
- arch/arm/mm/mm.h   |    1 +
- arch/arm/mm/mmu.c  |   29 ++++++++++++++
- 4 files changed, 105 insertions(+), 32 deletions(-)
+ include/linux/seqlock.h   | 19 +++++++++++++++----
+ kernel/time/sched_clock.c |  6 +++---
+ 2 files changed, 18 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..fc7aef2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -277,6 +277,9 @@ config GENERIC_BUG
- 	def_bool y
- 	depends on BUG
- 
-+config ARCH_TRACKS_VMALLOC
-+	bool
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 1f7b19a..ddfab22 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -574,6 +574,46 @@ static void __init free_highpages(void)
- #endif
+diff --git a/include/linux/seqlock.h b/include/linux/seqlock.h
+index cf87a24..7664f68 100644
+--- a/include/linux/seqlock.h
++++ b/include/linux/seqlock.h
+@@ -206,14 +206,26 @@ static inline int read_seqcount_retry(const seqcount_t *s, unsigned start)
  }
  
-+#define MLK(b, t) b, t, ((t) - (b)) >> 10
-+#define MLM(b, t) b, t, ((t) - (b)) >> 20
-+#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
+ 
 +
-+#ifdef CONFIG_VMALLOC_INTERMIX
-+void print_vmalloc_lowmem_info(void)
++static inline void write_seqcount_begin_no_lockdep(seqcount_t *s)
 +{
-+	int i;
-+	void *va_start, *va_end;
-+
-+	printk(KERN_NOTICE
-+		"	   vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n",
-+		MLM(VMALLOC_START, VMALLOC_END));
-+
-+	for (i = meminfo.nr_banks - 1; i >= 0; i--) {
-+		if (!meminfo.bank[i].highmem) {
-+			va_start = __va(meminfo.bank[i].start);
-+			va_end = __va(meminfo.bank[i].start +
-+						meminfo.bank[i].size);
-+			printk(KERN_NOTICE
-+			 "	    lowmem : 0x%08lx - 0x%08lx   (%4ld MB)\n",
-+			MLM((unsigned long)va_start, (unsigned long)va_end));
-+		}
-+		if (i && ((meminfo.bank[i-1].start + meminfo.bank[i-1].size) !=
-+			   meminfo.bank[i].start)) {
-+			if (meminfo.bank[i-1].start + meminfo.bank[i-1].size
-+				   <= MAX_HOLE_ADDRESS) {
-+				va_start = __va(meminfo.bank[i-1].start
-+						+ meminfo.bank[i-1].size);
-+				va_end = __va(meminfo.bank[i].start);
-+				printk(KERN_NOTICE
-+				"	   vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n",
-+					   MLM((unsigned long)va_start,
-+						   (unsigned long)va_end));
-+			}
-+		}
-+	}
++	s->sequence++;
++	smp_wmb();
 +}
-+#endif
++
++static inline void write_seqcount_end_no_lockdep(seqcount_t *s)
++{
++	smp_wmb();
++	s->sequence++;
++}
 +
  /*
-  * mem_init() marks the free areas in the mem_map and tells us how much
-  * memory is free.  This is done after various parts of the system have
-@@ -602,55 +642,52 @@ void __init mem_init(void)
- 
- 	mem_init_print_info(NULL);
- 
--#define MLK(b, t) b, t, ((t) - (b)) >> 10
--#define MLM(b, t) b, t, ((t) - (b)) >> 20
--#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
--
- 	printk(KERN_NOTICE "Virtual kernel memory layout:\n"
- 			"    vector  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
- #ifdef CONFIG_HAVE_TCM
- 			"    DTCM    : 0x%08lx - 0x%08lx   (%4ld kB)\n"
- 			"    ITCM    : 0x%08lx - 0x%08lx   (%4ld kB)\n"
- #endif
--			"    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
--			"    vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n"
--			"    lowmem  : 0x%08lx - 0x%08lx   (%4ld MB)\n"
--#ifdef CONFIG_HIGHMEM
--			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
--#endif
--#ifdef CONFIG_MODULES
--			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
--#endif
--			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
--			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
--			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n"
--			"       .bss : 0x%p" " - 0x%p" "   (%4d kB)\n",
--
-+			"    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n",
- 			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
- 				(PAGE_SIZE)),
- #ifdef CONFIG_HAVE_TCM
- 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
- 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
- #endif
--			MLK(FIXADDR_START, FIXADDR_TOP),
--			MLM(VMALLOC_START, VMALLOC_END),
--			MLM(PAGE_OFFSET, (unsigned long)high_memory),
-+			MLK(FIXADDR_START, FIXADDR_TOP));
-+#ifdef CONFIG_VMALLOC_INTERMIX
-+	print_vmalloc_lowmem_info();
-+#else
-+	printk(KERN_NOTICE
-+		   "    vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-+		   "    lowmem  : 0x%08lx - 0x%08lx   (%4ld MB)\n",
-+		   MLM(VMALLOC_START, VMALLOC_END),
-+		   MLM(PAGE_OFFSET, (unsigned long)high_memory));
-+#endif
- #ifdef CONFIG_HIGHMEM
--			MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
-+	printk(KERN_NOTICE
-+		   "    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-+#endif
-+#ifdef CONFIG_MODULES
-+		   "    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-+#endif
-+		   "      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
-+		   "      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
-+		   "      .data : 0x%p" " - 0x%p" "   (%4d kB)\n"
-+		   "       .bss : 0x%p" " - 0x%p" "   (%4d kB)\n",
-+#ifdef CONFIG_HIGHMEM
-+		   MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
- 				(PAGE_SIZE)),
- #endif
- #ifdef CONFIG_MODULES
--			MLM(MODULES_VADDR, MODULES_END),
-+		   MLM(MODULES_VADDR, MODULES_END),
- #endif
- 
--			MLK_ROUNDUP(_text, _etext),
--			MLK_ROUNDUP(__init_begin, __init_end),
--			MLK_ROUNDUP(_sdata, _edata),
--			MLK_ROUNDUP(__bss_start, __bss_stop));
--
--#undef MLK
--#undef MLM
--#undef MLK_ROUNDUP
-+		   MLK_ROUNDUP(_text, _etext),
-+		   MLK_ROUNDUP(__init_begin, __init_end),
-+		   MLK_ROUNDUP(_sdata, _edata),
-+		   MLK_ROUNDUP(__bss_start, __bss_stop));
- 
- 	/*
- 	 * Check boundaries twice: Some fundamental inconsistencies can
-@@ -658,7 +695,7 @@ void __init mem_init(void)
- 	 */
- #ifdef CONFIG_MMU
- 	BUILD_BUG_ON(TASK_SIZE				> MODULES_VADDR);
--	BUG_ON(TASK_SIZE 				> MODULES_VADDR);
-+	BUG_ON(TASK_SIZE				> MODULES_VADDR);
- #endif
- 
- #ifdef CONFIG_HIGHMEM
-@@ -677,6 +714,9 @@ void __init mem_init(void)
- 	}
+  * Sequence counter only version assumes that callers are using their
+  * own mutexing.
+  */
+ static inline void write_seqcount_begin_nested(seqcount_t *s, int subclass)
+ {
+-	s->sequence++;
+-	smp_wmb();
++	write_seqcount_begin_no_lockdep(s);
+ 	seqcount_acquire(&s->dep_map, subclass, 0, _RET_IP_);
  }
  
-+#undef MLK
-+#undef MLM
-+#undef MLK_ROUNDUP
- void free_initmem(void)
+@@ -225,8 +237,7 @@ static inline void write_seqcount_begin(seqcount_t *s)
+ static inline void write_seqcount_end(seqcount_t *s)
  {
- #ifdef CONFIG_HAVE_TCM
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index 6f9d28b..ba825b0 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -87,6 +87,7 @@ extern unsigned long arm_dma_pfn_limit;
- #define arm_dma_pfn_limit (~0ul >> PAGE_SHIFT)
- #endif
- 
-+#define MAX_HOLE_ADDRESS    (PHYS_OFFSET + 0x10000000)
- extern phys_addr_t arm_lowmem_limit;
- 
- void __init bootmem_init(void);
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 5450b43..55bd742 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1006,6 +1006,19 @@ void __init sanity_check_meminfo(void)
- 	int i, j, highmem = 0;
- 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
- 
-+#ifdef CONFIG_ARCH_TRACKS_VMALLOC
-+	unsigned long hole_start;
-+	for (i = 0; i < (meminfo.nr_banks - 1); i++) {
-+		hole_start = meminfo.bank[i].start + meminfo.bank[i].size;
-+		if (hole_start != meminfo.bank[i+1].start) {
-+			if (hole_start <= MAX_HOLE_ADDRESS) {
-+				vmalloc_min = (void *) (vmalloc_min +
-+				(meminfo.bank[i+1].start - hole_start));
-+			}
-+		}
-+	}
-+#endif
-+
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
- 		phys_addr_t size_limit;
-@@ -1304,6 +1317,21 @@ static void __init kmap_init(void)
- #endif
+ 	seqcount_release(&s->dep_map, 1, _RET_IP_);
+-	smp_wmb();
+-	s->sequence++;
++	write_seqcount_end_no_lockdep(s);
  }
  
-+static void __init reserve_virtual_lowmem(phys_addr_t start, phys_addr_t end)
-+{
-+#ifdef CONFIG_ARCH_TRACKS_VMALLOC
-+	struct vm_struct *vm;
-+
-+	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
-+	vm->addr = (void *)__phys_to_virt(start);
-+	vm->size = end - start;
-+	vm->flags = VM_LOWMEM;
-+	vm->caller = reserve_virtual_lowmem;
-+	vm_area_add_early(vm);
-+	mark_vmalloc_reserved_area(vm->addr, vm->size);
-+#endif
-+}
-+
- static void __init map_lowmem(void)
- {
- 	struct memblock_region *reg;
-@@ -1325,6 +1353,7 @@ static void __init map_lowmem(void)
- 		map.type = MT_MEMORY;
+ /**
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index 68b7993..13561a0 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -74,7 +74,7 @@ unsigned long long notrace sched_clock(void)
+ 		return cd.epoch_ns;
  
- 		create_mapping(&map);
-+		reserve_virtual_lowmem(start, end);
- 	}
+ 	do {
+-		seq = read_seqcount_begin(&cd.seq);
++		seq = read_seqcount_begin_no_lockdep(&cd.seq);
+ 		epoch_cyc = cd.epoch_cyc;
+ 		epoch_ns = cd.epoch_ns;
+ 	} while (read_seqcount_retry(&cd.seq, seq));
+@@ -99,10 +99,10 @@ static void notrace update_sched_clock(void)
+ 			  cd.mult, cd.shift);
+ 
+ 	raw_local_irq_save(flags);
+-	write_seqcount_begin(&cd.seq);
++	write_seqcount_begin_no_lockdep(&cd.seq);
+ 	cd.epoch_ns = ns;
+ 	cd.epoch_cyc = cyc;
+-	write_seqcount_end(&cd.seq);
++	write_seqcount_end_no_lockdep(&cd.seq);
+ 	raw_local_irq_restore(flags);
  }
  
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
