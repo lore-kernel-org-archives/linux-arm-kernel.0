@@ -1,123 +1,112 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:28:24 +0000
-Subject: [PATCH RFC 31/46] imx-drm: remove imx-fb.c
+Date: Thu, 02 Jan 2014 21:28:34 +0000
+Subject: [PATCH RFC 33/46] imx-drm: imx-drm-core: provide helper function to
+ parse possible crtcs
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1VypoW-0007Fb-8S@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Vypog-0007Fj-FH@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx-fb.c doesn't need to be separate from imx-drm-core.c - all it is
-doing is setting up the minimum and maximum sizes of the scanout
-buffers, and setting up the mode_config function pointers.  Move the
-contents into imx-drm-core.c and kill this file.
+Provide a helper function to parse possible crtcs before the encoder
+is registered.  The crtc mask is derived from the position of the
+CRTCs registered in the drm_device.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/Makefile       |    2 +-
- drivers/staging/imx-drm/imx-drm-core.c |   16 ++++++++++-
- drivers/staging/imx-drm/imx-fb.c       |   47 --------------------------------
- 3 files changed, 16 insertions(+), 49 deletions(-)
- delete mode 100644 drivers/staging/imx-drm/imx-fb.c
+ drivers/staging/imx-drm/imx-drm-core.c |   66 ++++++++++++++++++++++++++++++++
+ drivers/staging/imx-drm/imx-drm.h      |    2 +
+ 2 files changed, 68 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/Makefile b/drivers/staging/imx-drm/Makefile
-index 5239f908ceec..129e3a3f59f1 100644
---- a/drivers/staging/imx-drm/Makefile
-+++ b/drivers/staging/imx-drm/Makefile
-@@ -1,5 +1,5 @@
- 
--imxdrm-objs := imx-drm-core.o imx-fb.o
-+imxdrm-objs := imx-drm-core.o
- 
- obj-$(CONFIG_DRM_IMX) += imxdrm.o
- 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 31bc8d9c49be..08e7837d6134 100644
+index b11568d6444b..1cfb8a18d905 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -381,6 +381,10 @@ static void imx_drm_connector_unregister(
- 	drm_mode_group_reinit(imxdrm->drm);
+@@ -657,6 +657,72 @@ int imx_drm_add_encoder(struct drm_encoder *encoder,
  }
+ EXPORT_SYMBOL_GPL(imx_drm_add_encoder);
  
-+static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
-+	.fb_create = drm_fb_cma_create,
-+};
++/*
++ * Find the DRM CRTC possible mask for the device node cookie/id.
++ *
++ * The encoder possible masks are defined by their position in the
++ * mode_config crtc_list.  This means that CRTCs must not be added
++ * or removed once the DRM device has been fully initialised.
++ */
++static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
++	void *cookie, int id)
++{
++	unsigned i;
 +
- /*
-  * Main DRM initialisation. This binds, initialises and registers
-  * with DRM the subcomponents of the driver.
-@@ -406,8 +410,18 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 	 */
- 	drm->irq_enabled = true;
- 
-+	/*
-+	 * set max width and height as default value(4096x4096).
-+	 * this value would be used to check framebuffer size limitation
-+	 * at drm_mode_addfb().
-+	 */
-+	drm->mode_config.min_width = 64;
-+	drm->mode_config.min_height = 64;
-+	drm->mode_config.max_width = 4096;
-+	drm->mode_config.max_height = 4096;
-+	drm->mode_config.funcs = &imx_drm_mode_config_funcs;
++	for (i = 0; i < MAX_CRTC; i++) {
++		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
++		if (imx_drm_crtc && imx_drm_crtc->cookie.id == id &&
++		    imx_drm_crtc->cookie.cookie == cookie)
++			return drm_helper_crtc_possible_mask(imx_drm_crtc->crtc);
++	}
 +
- 	drm_mode_config_init(drm);
--	imx_drm_mode_config_init(drm);
++	return 0;
++}
++
++int imx_drm_encoder_parse_of(struct drm_device *drm,
++	struct drm_encoder *encoder, struct device_node *np)
++{
++	struct imx_drm_device *imxdrm = drm->dev_private;
++	uint32_t crtc_mask = 0;
++	int i, ret = 0;
++
++	for (i = 0; !ret; i++) {
++		struct of_phandle_args args;
++		uint32_t mask;
++		int id;
++
++		ret = of_parse_phandle_with_args(np, "crtcs", "#crtc-cells", i,
++						 &args);
++		if (ret == -ENOENT)
++			break;
++		if (ret < 0)
++			return ret;
++
++		id = args.args_count > 0 ? args.args[0] : 0;
++		mask = imx_drm_find_crtc_mask(imxdrm, args.np, id);
++		of_node_put(args.np);
++
++		/*
++		 * If we failed to find the CRTC(s) which this encoder is
++		 * supposed to be connected to, it's because the CRTC has
++		 * not been registered yet.  Defer probing, and hope that
++		 * the required CRTC is added later.
++		 */
++		if (mask == 0)
++			return -EPROBE_DEFER;
++
++		crtc_mask |= mask;
++	}
++
++	encoder->possible_crtcs = crtc_mask;
++
++	/* FIXME: this is the mask of outputs which can clone this output. */
++	encoder->possible_clones = ~0;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(imx_drm_encoder_parse_of);
++
+ int imx_drm_encoder_add_possible_crtcs(
+ 		struct imx_drm_encoder *imx_drm_encoder,
+ 		struct device_node *np)
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index 78465239ed4c..49d4aaf33f97 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -64,6 +64,8 @@ struct device_node;
+ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
+ int imx_drm_encoder_add_possible_crtcs(struct imx_drm_encoder *imx_drm_encoder,
+ 		struct device_node *np);
++int imx_drm_encoder_parse_of(struct drm_device *drm,
++	struct drm_encoder *encoder, struct device_node *np);
  
- 	mutex_lock(&imxdrm->mutex);
- 
-diff --git a/drivers/staging/imx-drm/imx-fb.c b/drivers/staging/imx-drm/imx-fb.c
-deleted file mode 100644
-index 03a7b4e14f67..000000000000
---- a/drivers/staging/imx-drm/imx-fb.c
-+++ /dev/null
-@@ -1,47 +0,0 @@
--/*
-- * i.MX drm driver
-- *
-- * Copyright (C) 2012 Sascha Hauer, Pengutronix
-- *
-- * Based on Samsung Exynos code
-- *
-- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--#include <linux/module.h>
--#include <drm/drmP.h>
--#include <drm/drm_crtc.h>
--#include <drm/drm_crtc_helper.h>
--#include <drm/drm_gem_cma_helper.h>
--#include <drm/drm_fb_cma_helper.h>
--
--#include "imx-drm.h"
--
--static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
--	.fb_create = drm_fb_cma_create,
--};
--
--void imx_drm_mode_config_init(struct drm_device *dev)
--{
--	dev->mode_config.min_width = 64;
--	dev->mode_config.min_height = 64;
--
--	/*
--	 * set max width and height as default value(4096x4096).
--	 * this value would be used to check framebuffer size limitation
--	 * at drm_mode_addfb().
--	 */
--	dev->mode_config.max_width = 4096;
--	dev->mode_config.max_height = 4096;
--
--	dev->mode_config.funcs = &imx_drm_mode_config_funcs;
--}
+ int imx_drm_connector_mode_valid(struct drm_connector *connector,
+ 	struct drm_display_mode *mode);
 -- 
 1.7.4.4
