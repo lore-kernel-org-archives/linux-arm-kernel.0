@@ -1,35 +1,29 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 02 Jan 2014 21:45:59 +0400
-Subject: =?UTF-8?B?UmU6IEJhY2sgZnJvbSBwYXJlbnRhbCBsZWF2ZQ==?=
-In-Reply-To: <201401021411.54356.arnd@arndb.de>
-References: <201401021411.54356.arnd@arndb.de>
-Message-ID: <1388684759.458390968@f217.i.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Jan 2014 18:46:23 +0100
+Subject: [PATCH 1/2] spi: clps711x: Driver refactor
+In-Reply-To: <20140101150737.GR31886@sirena.org.uk>
+References: <1388556568-10973-1-git-send-email-shc_work@mail.ru>
+ <1388583851.810843204@f301.i.mail.ru> <20140101150737.GR31886@sirena.org.uk>
+Message-ID: <201401021846.23488.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Happy New Year everyone!
+On Wednesday 01 January 2014, Mark Brown wrote:
+> > As an alternative, I can create patch to remove current driver,
+> > then re-adding new one.  Will be more convenient to watch. Is it better? 
 > 
-> I'm starting to resume my regular work schedule in Linaro and as the arm-soc
-> co-maintainer now, after five months of parental leave and a bit of vacation.
-> I have started following the mailing lists and replying to more work email
-> a couple of weeks ago, but today is the first day that I'm planning to
-> actually spend entirely on getting set up for productive work myself again.
-> 
-> Many thanks to Kevin, Linus and everyone else who has been stepping in for
-> me in the meantime! As Deepak Saxena is now on on leave, I will be taking
-> over some of his work until he returns, and I also need to catch up with
-> what has been going on. I have added a number of people on Cc that I'd like
-> to talk to at some point. I don't yet have any scheduled meetings, so if
-> you'd like to catch up, please just find me on IRC at a time that is
-> convenient for you, I'd be happy to call you back on the phone or just
-> talk on IRC. I should be available most days between 9:00 and 16:00 UTC.
-> 
-> I have not yet looked at the current contents of the arm-soc tree, I
-> guess I will have a chat with Olof and Kevin first and then get back
-> into merging and testing branches.
+> No, that's really not good.  It's very rare that we just completely
+> rewrite a driver especially not one that's been around for a while -
+> there needs to be a really good reason for it.  This is a key part of
+> how the development process works, incremental improvements and code
+> review.  Doing this both helps improve quality control on changes and
+> allows collaboration.
 
-Good. Arnd, if it not so hard, please review my CLPS711X IRQCHIP series again.
-I am suspect I'm make for v2 same bug as before and specify incorrect address
-for arm-soc maintainers... If so, I can resend it.
+I definitely agree with what you say, but please note that Alexander is
+the only person who ever sends clps711x patches, so there is not much
+hope of collaboration. I also suspect he's the only one who would
+suffer from accidental breakage, especially since the existing driver
+is not used anywhere upstream (no instance of platform data, and no
+DT support).
 
----
+	Arnd
