@@ -1,50 +1,515 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Jan 2014 21:26:52 +0000
-Subject: [PATCH RFC 13/46] imx-drm: imx-hdmi: get rid of pointless fb_reg
+Date: Thu, 02 Jan 2014 21:28:54 +0000
+Subject: [PATCH RFC 37/46] imx-drm: imx-drm-core: remove imx_drm_connector
+ and imx_drm_encoder code
 In-Reply-To: <20140102212528.GD7383@n2100.arm.linux.org.uk>
 References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
-Message-ID: <E1Vypn2-0007EO-7g@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Vypp0-0007Fz-Uy@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fb_reg provides no real benefit to the driver: imx_hdmi_fb_registered()
-will never be called multiple times.  Let's get rid of this.
+The core imx_drm_connector and imx_drm_encoder code is no longer
+required - the connectors and encoders are all using the component
+support, so we can remove this.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-hdmi.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c |  370 --------------------------------
+ drivers/staging/imx-drm/imx-drm.h      |   14 --
+ 2 files changed, 0 insertions(+), 384 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index 0cba5d4a9966..267d3c9114c6 100644
---- a/drivers/staging/imx-drm/imx-hdmi.c
-+++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -130,7 +130,6 @@ struct imx_hdmi {
- 	int vic;
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 30d516cc76bb..7872d13689ea 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -40,8 +40,6 @@ struct imx_drm_device {
+ 	struct drm_device			*drm;
+ 	struct device				*dev;
+ 	struct imx_drm_crtc			*crtc[MAX_CRTC];
+-	struct list_head			encoder_list;
+-	struct list_head			connector_list;
+ 	struct mutex				mutex;
+ 	int					pipes;
+ 	struct drm_fbdev_cma			*fbhelper;
+@@ -56,24 +54,9 @@ struct imx_drm_crtc {
+ 	int					mux_id;
+ };
  
- 	u8 edid[HDMI_EDID_LEN];
--	bool fb_reg;
- 	bool cable_plugin;
+-struct imx_drm_encoder {
+-	struct drm_encoder			*encoder;
+-	struct list_head			list;
+-	struct module				*owner;
+-	struct list_head			possible_crtcs;
+-};
+-
+-struct imx_drm_connector {
+-	struct drm_connector			*connector;
+-	struct list_head			list;
+-	struct module				*owner;
+-};
+-
+ static int legacyfb_depth = 16;
+ module_param(legacyfb_depth, int, 0444);
  
- 	bool phy_enabled;
-@@ -1451,9 +1450,6 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
+-static void imx_drm_device_put(void);
+-
+ int imx_drm_crtc_id(struct imx_drm_crtc *crtc)
  {
- 	int ret;
+ 	return crtc->pipe;
+@@ -101,8 +84,6 @@ static int imx_drm_driver_unload(struct drm_device *drm)
  
--	if (hdmi->fb_reg)
--		return 0;
--
- 	ret = clk_prepare_enable(hdmi->iahb_clk);
- 	if (ret)
- 		return ret;
-@@ -1474,8 +1470,6 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
- 	/* Unmute interrupts */
- 	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+ 	component_unbind_all(drm->dev, drm);
  
--	hdmi->fb_reg = true;
+-	imx_drm_device_put();
 -
- 	clk_disable_unprepare(hdmi->iahb_clk);
+ 	drm_vblank_cleanup(drm);
+ 	drm_kms_helper_poll_fini(drm);
+ 	drm_mode_config_cleanup(drm);
+@@ -234,135 +215,6 @@ static struct imx_drm_device *__imx_drm_device(void)
+ 	return imx_drm_device;
+ }
+ 
+-static struct drm_device *imx_drm_device_get(void)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct imx_drm_encoder *enc;
+-	struct imx_drm_connector *con;
+-
+-	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
+-		if (!try_module_get(enc->owner)) {
+-			dev_err(imxdrm->dev, "could not get module %s\n",
+-					module_name(enc->owner));
+-			goto unwind_enc;
+-		}
+-	}
+-
+-	list_for_each_entry(con, &imxdrm->connector_list, list) {
+-		if (!try_module_get(con->owner)) {
+-			dev_err(imxdrm->dev, "could not get module %s\n",
+-					module_name(con->owner));
+-			goto unwind_con;
+-		}
+-	}
+-
+-	return imxdrm->drm;
+-
+-unwind_con:
+-	list_for_each_entry_continue_reverse(con, &imxdrm->connector_list, list)
+-		module_put(con->owner);
+-unwind_enc:
+-	list_for_each_entry_continue_reverse(enc, &imxdrm->encoder_list, list)
+-		module_put(enc->owner);
+-
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	return NULL;
+-
+-}
+-
+-static void imx_drm_device_put(void)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct imx_drm_encoder *enc;
+-	struct imx_drm_connector *con;
+-
+-	mutex_lock(&imxdrm->mutex);
+-
+-	list_for_each_entry(con, &imxdrm->connector_list, list)
+-		module_put(con->owner);
+-
+-	list_for_each_entry(enc, &imxdrm->encoder_list, list)
+-		module_put(enc->owner);
+-
+-	mutex_unlock(&imxdrm->mutex);
+-}
+-
+-static int drm_mode_group_reinit(struct drm_device *dev)
+-{
+-	struct drm_mode_group *group = &dev->primary->mode_group;
+-	uint32_t *id_list = group->id_list;
+-	int ret;
+-
+-	ret = drm_mode_group_init_legacy_group(dev, group);
+-	if (ret < 0)
+-		return ret;
+-
+-	kfree(id_list);
+-	return 0;
+-}
+-
+-/*
+- * register an encoder to the drm core
+- */
+-static int imx_drm_encoder_register(struct imx_drm_encoder *imx_drm_encoder)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-
+-	INIT_LIST_HEAD(&imx_drm_encoder->possible_crtcs);
+-
+-	drm_encoder_init(imxdrm->drm, imx_drm_encoder->encoder,
+-			imx_drm_encoder->encoder->funcs,
+-			imx_drm_encoder->encoder->encoder_type);
+-
+-	drm_mode_group_reinit(imxdrm->drm);
+-
+-	return 0;
+-}
+-
+-/*
+- * unregister an encoder from the drm core
+- */
+-static void imx_drm_encoder_unregister(struct imx_drm_encoder
+-		*imx_drm_encoder)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-
+-	drm_encoder_cleanup(imx_drm_encoder->encoder);
+-
+-	drm_mode_group_reinit(imxdrm->drm);
+-}
+-
+-/*
+- * register a connector to the drm core
+- */
+-static int imx_drm_connector_register(
+-		struct imx_drm_connector *imx_drm_connector)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-
+-	drm_connector_init(imxdrm->drm, imx_drm_connector->connector,
+-			imx_drm_connector->connector->funcs,
+-			imx_drm_connector->connector->connector_type);
+-	drm_mode_group_reinit(imxdrm->drm);
+-
+-	return 0;
+-}
+-
+-/*
+- * unregister a connector from the drm core
+- */
+-static void imx_drm_connector_unregister(
+-		struct imx_drm_connector *imx_drm_connector)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-
+-	drm_sysfs_connector_remove(imx_drm_connector->connector);
+-	drm_connector_cleanup(imx_drm_connector->connector);
+-
+-	drm_mode_group_reinit(imxdrm->drm);
+-}
+-
+ void imx_drm_connector_destroy(struct drm_connector *connector)
+ {
+ 	drm_sysfs_connector_remove(connector);
+@@ -439,11 +291,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 	 */
+ 	drm->vblank_disable_allowed = true;
+ 
+-	if (!imx_drm_device_get()) {
+-		ret = -EINVAL;
+-		goto err_vblank;
+-	}
+-
+ 	mutex_unlock(&imxdrm->mutex);
+ 
+ 	/* Now try and bind all our sub-components */
+@@ -491,7 +338,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 	component_unbind_all(drm->dev, drm);
+ err_relock:
+ 	mutex_lock(&imxdrm->mutex);
+-err_vblank:
+ 	drm_vblank_cleanup(drm);
+ err_kms:
+ 	drm_kms_helper_poll_fini(drm);
+@@ -501,29 +347,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 	return ret;
+ }
+ 
+-static void imx_drm_update_possible_crtcs(void)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct imx_drm_crtc *imx_drm_crtc;
+-	struct imx_drm_encoder *enc;
+-	struct crtc_cookie *cookie;
+-
+-	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
+-		u32 possible_crtcs = 0;
+-
+-		list_for_each_entry(cookie, &enc->possible_crtcs, list) {
+-			list_for_each_entry(imx_drm_crtc, &imxdrm->crtc_list, list) {
+-				if (imx_drm_crtc->cookie.cookie == cookie->cookie &&
+-						imx_drm_crtc->cookie.id == cookie->id) {
+-					possible_crtcs |= 1 << imx_drm_crtc->pipe;
+-				}
+-			}
+-		}
+-		enc->encoder->possible_crtcs = possible_crtcs;
+-		enc->encoder->possible_clones = possible_crtcs;
+-	}
+-}
+-
+ /*
+  * imx_drm_add_crtc - add a new crtc
+  *
+@@ -583,8 +406,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	drm_crtc_init(drm, crtc,
+ 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
+ 
+-	imx_drm_update_possible_crtcs();
+-
+ 	mutex_unlock(&imxdrm->mutex);
  
  	return 0;
+@@ -621,56 +442,6 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
+ EXPORT_SYMBOL_GPL(imx_drm_remove_crtc);
+ 
+ /*
+- * imx_drm_add_encoder - add a new encoder
+- */
+-int imx_drm_add_encoder(struct drm_encoder *encoder,
+-		struct imx_drm_encoder **newenc, struct module *owner)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct imx_drm_encoder *imx_drm_encoder;
+-	int ret;
+-
+-	mutex_lock(&imxdrm->mutex);
+-
+-	if (imxdrm->drm->open_count) {
+-		ret = -EBUSY;
+-		goto err_busy;
+-	}
+-
+-	imx_drm_encoder = kzalloc(sizeof(*imx_drm_encoder), GFP_KERNEL);
+-	if (!imx_drm_encoder) {
+-		ret = -ENOMEM;
+-		goto err_alloc;
+-	}
+-
+-	imx_drm_encoder->encoder = encoder;
+-	imx_drm_encoder->owner = owner;
+-
+-	ret = imx_drm_encoder_register(imx_drm_encoder);
+-	if (ret) {
+-		ret = -ENOMEM;
+-		goto err_register;
+-	}
+-
+-	list_add_tail(&imx_drm_encoder->list, &imxdrm->encoder_list);
+-
+-	*newenc = imx_drm_encoder;
+-
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	return 0;
+-
+-err_register:
+-	kfree(imx_drm_encoder);
+-err_alloc:
+-err_busy:
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	return ret;
+-}
+-EXPORT_SYMBOL_GPL(imx_drm_add_encoder);
+-
+-/*
+  * Find the DRM CRTC possible mask for the device node cookie/id.
+  *
+  * The encoder possible masks are defined by their position in the
+@@ -736,49 +507,6 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_encoder_parse_of);
+ 
+-int imx_drm_encoder_add_possible_crtcs(
+-		struct imx_drm_encoder *imx_drm_encoder,
+-		struct device_node *np)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct of_phandle_args args;
+-	struct crtc_cookie *c;
+-	int ret = 0;
+-	int i;
+-
+-	if (!list_empty(&imx_drm_encoder->possible_crtcs))
+-		return -EBUSY;
+-
+-	for (i = 0; !ret; i++) {
+-		ret = of_parse_phandle_with_args(np, "crtcs",
+-				"#crtc-cells", i, &args);
+-		if (ret < 0)
+-			break;
+-
+-		c = kzalloc(sizeof(*c), GFP_KERNEL);
+-		if (!c) {
+-			of_node_put(args.np);
+-			return -ENOMEM;
+-		}
+-
+-		c->cookie = args.np;
+-		c->id = args.args_count > 0 ? args.args[0] : 0;
+-
+-		of_node_put(args.np);
+-
+-		mutex_lock(&imxdrm->mutex);
+-
+-		list_add_tail(&c->list, &imx_drm_encoder->possible_crtcs);
+-
+-		mutex_unlock(&imxdrm->mutex);
+-	}
+-
+-	imx_drm_update_possible_crtcs();
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(imx_drm_encoder_add_possible_crtcs);
+-
+ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder)
+ {
+ 	struct imx_drm_crtc *imx_crtc = imx_drm_find_crtc(encoder->crtc);
+@@ -787,102 +515,6 @@ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder)
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_encoder_get_mux_id);
+ 
+-/*
+- * imx_drm_remove_encoder - remove an encoder
+- */
+-int imx_drm_remove_encoder(struct imx_drm_encoder *imx_drm_encoder)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct crtc_cookie *c, *tmp;
+-
+-	mutex_lock(&imxdrm->mutex);
+-
+-	imx_drm_encoder_unregister(imx_drm_encoder);
+-
+-	list_del(&imx_drm_encoder->list);
+-
+-	list_for_each_entry_safe(c, tmp, &imx_drm_encoder->possible_crtcs,
+-			list)
+-		kfree(c);
+-
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	kfree(imx_drm_encoder);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(imx_drm_remove_encoder);
+-
+-/*
+- * imx_drm_add_connector - add a connector
+- */
+-int imx_drm_add_connector(struct drm_connector *connector,
+-		struct imx_drm_connector **new_con,
+-		struct module *owner)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct imx_drm_connector *imx_drm_connector;
+-	int ret;
+-
+-	mutex_lock(&imxdrm->mutex);
+-
+-	if (imxdrm->drm->open_count) {
+-		ret = -EBUSY;
+-		goto err_busy;
+-	}
+-
+-	imx_drm_connector = kzalloc(sizeof(*imx_drm_connector), GFP_KERNEL);
+-	if (!imx_drm_connector) {
+-		ret = -ENOMEM;
+-		goto err_alloc;
+-	}
+-
+-	imx_drm_connector->connector = connector;
+-	imx_drm_connector->owner = owner;
+-
+-	ret = imx_drm_connector_register(imx_drm_connector);
+-	if (ret)
+-		goto err_register;
+-
+-	list_add_tail(&imx_drm_connector->list, &imxdrm->connector_list);
+-
+-	*new_con = imx_drm_connector;
+-
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	return 0;
+-
+-err_register:
+-	kfree(imx_drm_connector);
+-err_alloc:
+-err_busy:
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	return ret;
+-}
+-EXPORT_SYMBOL_GPL(imx_drm_add_connector);
+-
+-/*
+- * imx_drm_remove_connector - remove a connector
+- */
+-int imx_drm_remove_connector(struct imx_drm_connector *imx_drm_connector)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-
+-	mutex_lock(&imxdrm->mutex);
+-
+-	imx_drm_connector_unregister(imx_drm_connector);
+-
+-	list_del(&imx_drm_connector->list);
+-
+-	mutex_unlock(&imxdrm->mutex);
+-
+-	kfree(imx_drm_connector);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(imx_drm_remove_connector);
+-
+ static const struct drm_ioctl_desc imx_drm_ioctls[] = {
+ 	/* none so far */
+ };
+@@ -1030,8 +662,6 @@ static int __init imx_drm_init(void)
+ 		return -ENOMEM;
+ 
+ 	mutex_init(&imx_drm_device->mutex);
+-	INIT_LIST_HEAD(&imx_drm_device->connector_list);
+-	INIT_LIST_HEAD(&imx_drm_device->encoder_list);
+ 
+ 	ret = platform_driver_register(&imx_drm_pdrv);
+ 	if (ret)
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index d13d518e8eb9..c5b97e9ce9a0 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -38,18 +38,6 @@ int imx_drm_crtc_vblank_get(struct imx_drm_crtc *imx_drm_crtc);
+ void imx_drm_crtc_vblank_put(struct imx_drm_crtc *imx_drm_crtc);
+ void imx_drm_handle_vblank(struct imx_drm_crtc *imx_drm_crtc);
+ 
+-struct imx_drm_encoder;
+-int imx_drm_add_encoder(struct drm_encoder *encoder,
+-		struct imx_drm_encoder **new_enc,
+-		struct module *owner);
+-int imx_drm_remove_encoder(struct imx_drm_encoder *);
+-
+-struct imx_drm_connector;
+-int imx_drm_add_connector(struct drm_connector *connector,
+-		struct imx_drm_connector **new_con,
+-		struct module *owner);
+-int imx_drm_remove_connector(struct imx_drm_connector *);
+-
+ void imx_drm_mode_config_init(struct drm_device *drm);
+ 
+ struct drm_gem_cma_object *imx_drm_fb_get_obj(struct drm_framebuffer *fb);
+@@ -62,8 +50,6 @@ int imx_drm_panel_format(struct drm_encoder *encoder,
+ struct device_node;
+ 
+ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
+-int imx_drm_encoder_add_possible_crtcs(struct imx_drm_encoder *imx_drm_encoder,
+-		struct device_node *np);
+ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np);
+ 
 -- 
 1.7.4.4
