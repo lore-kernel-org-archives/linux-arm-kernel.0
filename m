@@ -1,62 +1,50 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu,  2 Jan 2014 10:58:27 +0100
-Subject: [PATCH v2 4/4] ARM: dts: sun7i: Add lradc node
-In-Reply-To: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
-References: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1388656707-16181-5-git-send-email-hdegoede@redhat.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Thu, 02 Jan 2014 11:02:44 +0100
+Subject: v3.13-rc6+ regression (ARM board)
+In-Reply-To: <20131231104511.GA9688@1wt.eu> (Willy Tarreau's message of "Tue,
+ 31 Dec 2013 11:45:11 +0100")
+References: <m3mwjhux0e.fsf@t19.piap.pl> <20131231104511.GA9688@1wt.eu>
+Message-ID: <m3txdmu2ez.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 9 +++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                | 7 +++++++
- 2 files changed, 16 insertions(+)
+>> There seems to be a regression in v3.13-rc6+ (up to current tip =
+>> 71ce176ee6ed1735b9a1160a5704a915d13849b1).
+>>
+>> Board is Gateworks Cambria, CPU Intel IXP435 ARM big endian, gcc 4.7.3.
+>> The board boots correctly and works (shell mostly, and SSHD) for about
+>> 50 seconds. After 52-54 seconds, it frozes dead without any console
+>> (UART) output.
+>>
+>> Bisecting shows 5e30025a319910695f5010dc0fb53a23299da14d as the first
+>> bad commit. Interestingly it's a merge:
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 0ee2641..2c9a38f 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -13,6 +13,7 @@
- 
- /dts-v1/;
- /include/ "sun7i-a20.dtsi"
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "Olimex A20-Olinuxino Micro";
-@@ -86,6 +87,14 @@
- 			};
- 		};
- 
-+		lradc: lradc at 01c22800 {
-+			allwinner,chan0-step = <200>;
-+			linux,chan0-keycodes = <KEY_VOLUMEUP KEY_VOLUMEDOWN
-+						KEY_MENU KEY_SEARCH KEY_HOME
-+						KEY_ESC KEY_ENTER>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 68e825a..3484275 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -531,6 +531,13 @@
- 			interrupts = <0 24 1>;
- 		};
- 
-+		lradc: lradc at 01c22800 {
-+			compatible = "allwinner,sun4i-lradc-keys";
-+			reg = <0x01c22800 0x100>;
-+			interrupts = <0 31 4>;
-+			status = "disabled";
-+		};
-+
- 		sid: eeprom at 01c23800 {
- 			compatible = "allwinner,sun7i-a20-sid";
- 			reg = <0x01c23800 0x200>;
+Reverting 1ca7d67cf5d5a2aef26a8d9afd789006fa098347 on top of current tip
+(9a0bb2966efbf30a71c128c3af63307d8b5f5fc0) fixes my issue.
+
+What now?
+
+1ca7d67cf5d5a2aef26a8d9afd789006fa098347:
+    seqcount: Add lockdep functionality to seqcount/seqlock structures
+
+    Currently seqlocks and seqcounts don't support lockdep.
+
+    After running across a seqcount related deadlock in the timekeeping
+    code, I used a less-refined and more focused variant of this patch
+    to narrow down the cause of the issue.
+
+    This is a first-pass attempt to properly enable lockdep functionality
+    on seqlocks and seqcounts.
+
+    Since seqcounts are used in the vdso gettimeofday code, I've provided
+    non-lockdep accessors for those needs.
+
+    I've also handled one case where there were nested seqlock writers
+    and there may be more edge cases.
+
+    Comments and feedback would be appreciated!
 -- 
-1.8.4.2
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
