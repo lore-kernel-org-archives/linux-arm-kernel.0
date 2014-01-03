@@ -1,40 +1,53 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 3 Jan 2014 13:19:06 +0000
-Subject: [Xen-devel] [PATCH] arm64/xen: redefine xen_remap on arm64
-In-Reply-To: <CAOsiSVWe7zRL2qmExHL3D4ayYyHmzHU=PonQ+-Q625Vkji+J4A@mail.gmail.com>
-References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
- <CAOsiSVWe7zRL2qmExHL3D4ayYyHmzHU=PonQ+-Q625Vkji+J4A@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1401031318220.8667@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Jan 2014 14:23:55 +0100
+Subject: ARM: mm: Could I change module space size or place modules in
+ vmalloc area?
+In-Reply-To: <20140103122206.GK7383@n2100.arm.linux.org.uk>
+References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
+ <201401031310.09930.arnd@arndb.de>
+ <20140103122206.GK7383@n2100.arm.linux.org.uk>
+Message-ID: <201401031423.55336.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Dec 2013, Wei Liu wrote:
-> On Mon, Dec 30, 2013 at 6:55 AM, Chen Baozi <baozich@gmail.com> wrote:
-> > xen_remap used to be defined as ioremap_cached on arm64. In commit
-> > c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
-> > was deleted, while xen_remap stays the same. This would lead to
-> > the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
-> > on arm64 as ioremap_cache on arm64 to fix it.
-> >
-> > Signed-off-by: Chen Baozi <baozich@gmail.com>
-> > ---
-> >  arch/arm/include/asm/xen/page.h | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> > index 75579a9..b3368df 100644
-> > --- a/arch/arm/include/asm/xen/page.h
-> > +++ b/arch/arm/include/asm/xen/page.h
-> > @@ -117,6 +117,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> >         return __set_phys_to_machine(pfn, mfn);
-> >  }
-> >
-> > +#ifdef CONFIG_ARM64
-> > +#define xen_remap(cookie, size) ioremap_cache((cookie), (size))
-> > +#else
-> >  #define xen_remap(cookie, size) ioremap_cached((cookie), (size));
+On Friday 03 January 2014, Russell King - ARM Linux wrote:
+> On Fri, Jan 03, 2014 at 01:10:09PM +0100, Arnd Bergmann wrote:
+> > Aside from the good comments that Russell made, I would remark that the
+> > fact that you need multiple megabytes worth of modules indicates that you
+> > are doing something wrong. Can you point to a git tree containing those
+> > modules?
 > 
-> Looks like there's an redundant semicolon in the original implementation.
+> From the comments which have been made, one point that seems to have
+> been identified is that if this module is first stripped and then
+> loaded, it can load, but if it's unstripped, it's too big.  This sounds
+> suboptimal to me - the debug info shouldn't be loaded into the kernel.
 
-Well spotted. We can fix this separately.
-Do you want to send a patch for it?
+Reading the layout_and_allocate() function, that is probably the
+intention already, and if something goes wrong there on ARM, it could be
+fixed up in an arch specific module_frob_arch_sections() function.
+
+> However, I guess there's bad interactions with module signing if you
+> don't do this and the module was signed with the debug info present,
+> so I don't think there's a good solution for this.
+
+My point was another anyway: I can't think of any good reason why
+you would end up with this many modules on any sane system. The only
+cases I've seen so far are
+
+- modules written in C++, with libstdc++ linked into the module
+- a closed-source platform port hidden in a loadable module that
+  contains all the device drivers and subsystems while ignoring the
+  infrastructure we have in the kernel, and the possible legal
+  implications.
+- a bug in the module using large arrays that should just be
+  dynamically allocated.
+- device firmware statically linked into the module rather than
+  loaded using request_firmware.
+
+In each of these cases, the real answer is to fix the code they are
+trying to load to do things in a more common way, especially if the
+intention is to eventually merge the code upstream. It is of course
+possible that they are indeed trying something valid, that's why
+I asked to see the source code.
+
+	Arnd
