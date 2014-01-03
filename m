@@ -1,70 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 3 Jan 2014 18:15:59 +0100
-Subject: [PATCH 1/4] input: Add new sun4i-lradc-keys drivers
-In-Reply-To: <20140102203831.GA3239@core.coreip.homeip.net>
-References: <1388604610-20380-1-git-send-email-hdegoede@redhat.com>
- <20140101205603.GA1141@core.coreip.homeip.net>
- <52C5336B.9010903@redhat.com> <1700375.GaI3zFl6RI@phil>
- <52C56D79.1060506@redhat.com> <20140102202022.GK3144@lukather>
- <20140102203831.GA3239@core.coreip.homeip.net>
-Message-ID: <20140103171559.GM3144@lukather>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 3 Jan 2014 09:23:55 -0800
+Subject: [PATCH v7 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
+ entries
+In-Reply-To: <201401031633.18110.arnd@arndb.de>
+References: <1388708539-333-1-git-send-email-lho@apm.com>
+ <1388708539-333-4-git-send-email-lho@apm.com>
+ <1388708539-333-5-git-send-email-lho@apm.com>
+ <201401031633.18110.arnd@arndb.de>
+Message-ID: <CAPw-ZTnpG_qOWs7tZjDc2z+1nG0h7p6ojfuk5ZOLAYxRrb7N=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 12:38:31PM -0800, Dmitry Torokhov wrote:
-> On Thu, Jan 02, 2014 at 09:20:22PM +0100, Maxime Ripard wrote:
-> > On Thu, Jan 02, 2014 at 02:45:29PM +0100, Hans de Goede wrote:
-> > > >Also, instead of inventing yet another vendor-specific property, why not re-use
-> > > >a button binding similar to gpio-keys like:
-> > > >
-> > > >        lradc: lradc at 01c22800 {
-> > > >                compatible = "allwinner,sun4i-lradc-keys";
-> > > >                reg = <0x01c22800 0x100>;
-> > > >                interrupts = <31>;
-> > > >                allwinner,chan0-step = <200>;
-> > > >
-> > > >		#address-cells = <1>;
-> > > >		#size-cells = <0>;
-> > > >
-> > > >		button at 0 {
-> > > >			reg = <0>; /* your channel index from above */
-> > > >			linux,code = <115>; /* already used as dt-property */
-> > > >		};
-> > > >
-> > > >		button at 1 {
-> > > >			reg = <1>;
-> > > >			linux,code = <114>;
-> > > >		};
-> > > 
-> > > Ugh no. Having a vendor specific property which is KISS certainly
-> > > beats this, both wrt ease of writing dts files as well as wrt the
-> > > dts parsing code in the driver.
-> > 
-> > I'd agree with Heiko here. This is pretty much the same construct
-> > that's already in use in other input drivers, like gpio-keys.
-> > 
-> > This is also something that can really easily be made generic, since
-> > this is something that is rather common.
-> 
-> Except that button definition from gpio-keys does not use 'reg' property
-> but rather gpio. I'd rather we did not cram non-applicable attributes
-> into that definition just to make it "reusable" like that.
-> 
-> I'd be OK with having similar (but not claiming to be the same) mappings
-> though.
+Hi,
 
-Yes, this is what I was meaning. Sorry if it was not clear enough.
+>> +                       sata23clk: sata23clk at 1f22c000 {
+>> +                               compatible = "apm,xgene-device-clock";
+>> +                               #clock-cells = <1>;
+>> +                               clocks = <&socplldiv2 0>;
+>> +                               clock-names = "sata23clk";
+>
+>> +                       };
+>> +
+>> +                       sata45clk: sata45clk at 1f23c000 {
+>> +                               compatible = "apm,xgene-device-clock";
+>> +                               #clock-cells = <1>;
+>> +                               clocks = <&socplldiv2 0>;
+>> +                               clock-names = "sata45clk";
+>
+> Something is wrong here: You have two devices with the same "compatible"
+> string but using different "clock-names" strings. The binding document
+> lists this as an optional property with the description  "shall be
+> the name of the device clock. If missing, use the device name", which
+> doesn't seem to make any sense.
+>
+> Please fix the binding and the existing users of this, and don't introduce
+> any more broken instances. Since each device clock is documented to
+> have only one parent anyway, please just make it an anonymous clock.
 
-Maxime
+Okay I miss understood this... I will need to fix the X-Gene device
+parent clocks as well in an separate patch to the clock driver owner.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/b1b5c3a0/attachment.sig>
+-Loc
