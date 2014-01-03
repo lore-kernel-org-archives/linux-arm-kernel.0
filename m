@@ -1,26 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 3 Jan 2014 12:26:25 +0530
-Subject: [BUG] cpufreq: bL_switcher can fail to build
-In-Reply-To: <20140102172102.GA7383@n2100.arm.linux.org.uk>
-References: <20140102172102.GA7383@n2100.arm.linux.org.uk>
-Message-ID: <CAOh2x=kS+t141WKmr2Unawj1h3Y7MkA8NB6Z+bayqXXsVNk_Rg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 2 Jan 2014 23:45:11 -0800
+Subject: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20140103074511.GA10680@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 2, 2014 at 10:51 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> The randconfig results from the autobuilder produced this error for
-> the big.LITTLE cpufreq code for the omap4430-sdp randconfig build on
-> New Years day.
->
-> drivers/built-in.o: In function `bL_cpufreq_set_rate':
-> powercap_sys.c:(.text+0x5ed9a0): undefined reference to `bL_switch_request_cb'
->
-> Maybe CONFIG_ARM_BIG_LITTLE_CPUFREQ needs to depend on CONFIG_BIG_LITTLE ?
+Hi Xiubo,
 
-Yeah. The time this driver got added we didn't had this CONFIG option.
-But we missed pushing it along with big LITTLE support. I will push
-a patch for this through cpufreq tree.
+On Fri, Jan 03, 2014 at 01:24:21PM +0800, Xiubo Li wrote:
+> +
+> +static inline int fsl_pwm_calculate_default_ps(struct fsl_pwm_chip *fpc,
+> +					       enum fsl_pwm_clk index)
+> +{
 
---
-viresh
+Why do you declare this (and other module-local) function as inline?
+It is usually better let compiler decide if given function should be
+inlined or not.
+
+[...]
+
+> +
+> +static int fsl_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct fsl_pwm_chip *fpc = platform_get_drvdata(pdev);
+> +
+> +	mutex_destroy(&fpc->lock);
+> +
+> +	return pwmchip_remove(&fpc->chip);
+
+fpc->lock will be used while pwmchip_remove() is running so you should
+not be destroying it before calling pwmchip_remove(). It should probbaly
+go into free() method or just drop it altogether.
+
+Thanks.
+
+-- 
+Dmitry
