@@ -1,229 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jan 2014 15:51:42 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140103144712.GA22597@lunn.ch>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
- <20140103144712.GA22597@lunn.ch>
-Message-ID: <52C6CE7E.5010800@free-electrons.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 3 Jan 2014 11:53:37 -0300
+Subject: NAND support for Armada 370
+In-Reply-To: <20140103112926.GP10251@enneenne.com>
+References: <20140102124407.GF10251@enneenne.com>
+ <20140102144236.270c4a6a@skate>
+ <20140103112926.GP10251@enneenne.com>
+Message-ID: <20140103145336.GA9618@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2014 15:47, Andrew Lunn wrote:
-> On Fri, Jan 03, 2014 at 10:59:44AM +0100, Gregory CLEMENT wrote:
->> All the mvebu SoCs have information related to their variant and
->> revision that can be read from the PCI control register.
->>
->> This patch adds support for Armada XP and Armada 370. This reading of
->> the revision and the ID are done before the PCI initialization to
->> avoid any conflicts. Once these data are retrieved, the resources are
->> freed to let the PCI subsystem use it.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/mach-mvebu/Makefile       |   2 +-
->>  arch/arm/mach-mvebu/mvebu-soc-id.c | 111 +++++++++++++++++++++++++++++++++++++
->>  include/linux/mvebu-soc-id.h       |  32 +++++++++++
->>  3 files changed, 144 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
->>  create mode 100644 include/linux/mvebu-soc-id.h
->>
->> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
->> index 2d04f0e21870..878aebe98dcc 100644
->> --- a/arch/arm/mach-mvebu/Makefile
->> +++ b/arch/arm/mach-mvebu/Makefile
->> @@ -3,7 +3,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->>  
->>  AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
->>  
->> -obj-y				 += system-controller.o
->> +obj-y				 += system-controller.o mvebu-soc-id.o
->>  obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
->>  obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
->>  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
->> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
->> new file mode 100644
->> index 000000000000..86c901be284c
->> --- /dev/null
->> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
->> @@ -0,0 +1,111 @@
->> +/*
->> + * Variant and revision information for mvebu SoCs
->> + *
->> + * Copyright (C) 2014 Marvell
->> + *
->> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + *
->> + * All the mvebu SoCs have information related to their variant and
->> + * revision that can be read from the PCI control register. This is
->> + * done before the PCI initialization to avoid any conflict. Once the
->> + * ID and revision are retrieved, the mapping is freed.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/mvebu-soc-id.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +
->> +#define PCIE_DEV_ID_OFF		0x0
->> +#define PCIE_DEV_REV_OFF	0x8
->> +
->> +#define SOC_ID_MASK	    0xFFFF0000
->> +#define SOC_REV_MASK	    0xFF
->> +
->> +static u32 soc_dev_id;
->> +static u32 soc_rev;
->> +static bool is_id_valid;
->> +
->> +static const struct of_device_id mvebu_pcie_of_match_table[] = {
->> +	{ .compatible = "marvell,armada-xp-pcie", },
->> +	{ .compatible = "marvell,armada-370-pcie", },
->> +	{},
->> +};
->> +
->> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
->> +{
->> +	if (is_id_valid) {
->> +		*dev = soc_dev_id;
->> +		*rev = soc_rev;
->> +		return 0;
->> +	} else
->> +		return -1;
->> +}
->> +
->> +EXPORT_SYMBOL(mvebu_get_soc_id);
->> +
->> +static int __init mvebu_soc_id_init(void)
->> +{
->> +	struct device_node *np;
->> +	int ret = 0;
->> +
->> +	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
->> +	if (np) {
->> +		void __iomem *pci_base;
->> +		struct clk *clk;
->> +		/*
->> +		 * ID and revision are available from any port, so we
->> +		 * just pick the first one
->> +		 */
->> +		struct device_node *child = of_get_next_child(np, NULL);
+On Fri, Jan 03, 2014 at 12:29:27PM +0100, Rodolfo Giometti wrote:
+> On Thu, Jan 02, 2014 at 02:42:36PM +0100, Thomas Petazzoni wrote:
+> > 
+> > The 3.13-rc kernels do not have NAND support for Armada 370/XP. The
+> > NAND support will only arrive in 3.14. You can try the linux-next tree,
+> > but I'm not sure it has absolutely all of the patches that are needed
+> > (I see at least one potentially missing).
+> > 
+> > Alternatively, you can use the backport-3.10 branch at
+> > https://github.com/MISL-EBU-System-SW/mainline-public/commits/backport-3.10.
+> > It is based on 3.10, and has a good number of backported patches,
+> > including NAND support.
 > 
-> Hi Gregory
+> I got several patches from here:
 > 
-> I'm away from my hardware at the moment. 
+>    https://github.com/MISL-EBU-System-SW/mainline-public.git
 > 
-> Does this work when all the PCIe ports have status = "disabled";? We
-> have many kirkwood devices in NAS boxes which don't use PCIe, so all
-> the ports are disabled. But they still exist in the SoC, so we can
-> read the IDs from them. I just don't know if of_get_next_child() will
-> only return enabled children?
+> and now I have:
+> 
+>    pxa3xx-nand f10d0000.nand: This platform can't do DMA on this device
+>    NAND device: Manufacturer ID: 0x2c, Chip ID: 0xf1 (Micron MT29F1G08ABADAWP)
+>    NAND device: 128MiB, SLC, page size: 2048, OOB size: 64
 
-There is a function named of_get_next_available_child, so I assumed that
-of_get_next_child() will return all the children. But I can test it to
-be sure of it.
+Great! Your NAND is now detected...
 
+>    pxa3xx-nand f10d0000.nand: ECC strength 4 at page size 2048 is not supported
+>    pxa3xx-nand f10d0000.nand: failed to scan nand at cs 0
 > 
-> Thanks
-> 	Andrew
+> So I suppose I should modify function pxa_ecc_init() in file
+> drivers/mtd/nand/pxa3xx_nand.c in order to support my NAND chip, is
+> that right? Have you any advice for me about it? :)
 > 
->> +
->> +		clk = of_clk_get_by_name(child, NULL);
->> +		if (IS_ERR(clk)) {
->> +			pr_err("%s: cannot get clock\n", __func__);
->> +			ret = -ENOMEM;
->> +			goto clk_err;
->> +		}
->> +
->> +		ret = clk_prepare_enable(clk);
->> +		if (ret) {
->> +			pr_err("%s: cannot enable clock\n", __func__);
->> +			goto clk_err;
->> +		}
->> +
->> +		pci_base = of_iomap(child, 0);
->> +		if (IS_ERR(pci_base)) {
->> +			pr_err("%s: cannot map registers\n",  __func__);
->> +			ret = -ENOMEM;
->> +			goto res_ioremap;
->> +		}
->> +
->> +		/* SoC ID */
->> +		soc_dev_id = __raw_readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
->> +
->> +		/* SoC revision */
->> +		soc_rev = __raw_readl(pci_base + PCIE_DEV_REV_OFF)
->> +			& SOC_REV_MASK;
->> +
->> +		is_id_valid = true;
->> +
->> +		iounmap(pci_base);
->> +
->> +res_ioremap:
->> +		clk_disable_unprepare(clk);
->> +
->> +clk_err:
->> +		of_node_put(child);
->> +		of_node_put(np);
->> +	}
->> +
->> +	return ret;
->> +}
->> +arch_initcall(mvebu_soc_id_init);
->> +
->> diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
->> new file mode 100644
->> index 000000000000..602ce1c50d1d
->> --- /dev/null
->> +++ b/include/linux/mvebu-soc-id.h
->> @@ -0,0 +1,32 @@
->> +/*
->> + * Marvell EBU SoC ID and revision definitions.
->> + *
->> + * Copyright (C) 2014 Marvell Semiconductor
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef __LINUX_MVEBU_SOC_ID_H
->> +#define __LINUX_MVEBU_SOC_ID_H
->> +
->> +/* Armada XP ID */
->> +#define MV78230_DEV_ID	    0x7823
->> +#define MV78260_DEV_ID	    0x7826
->> +#define MV78460_DEV_ID	    0x7846
->> +
->> +/* Armada XP Revision */
->> +#define MV78XX0_A0_REV	    0x1
->> +#define MV78XX0_B0_REV	    0x2
->> +
->> +#ifdef CONFIG_ARCH_MVEBU
->> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
->> +#else
->> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
->> +{
->> +	return -1;
->> +}
->> +#endif
->> +
->> +#endif /* __LINUX_MVEBU_SOC_ID_H */
->> -- 
->> 1.8.1.2
->>
 
+Can you modify the above message so the ECC step size is also printed?
+I'll help you prepare a suitable fix to support your NAND.
 
+Thanks!
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
