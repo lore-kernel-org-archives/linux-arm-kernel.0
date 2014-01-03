@@ -1,30 +1,26 @@
 From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 03 Jan 2014 07:01:46 +0100
-Subject: v3.13-rc6+ regression (ARM board)
-In-Reply-To: <CA+55aFyZ0EXYkHd-BhQo6K++qKJVPdGeDbFTVTs3pAPCHFUpOA@mail.gmail.com>
- (Linus Torvalds's message of "Thu, 2 Jan 2014 11:38:56 -0800")
-References: <m3mwjhux0e.fsf@t19.piap.pl> <20131231104511.GA9688@1wt.eu>
- <m3txdmu2ez.fsf@t19.piap.pl> <20140102101455.GG10158@pengutronix.de>
- <m3ppoatwn1.fsf@t19.piap.pl>
- <CA+55aFyZ0EXYkHd-BhQo6K++qKJVPdGeDbFTVTs3pAPCHFUpOA@mail.gmail.com>
-Message-ID: <m3k3ehtxh1.fsf@t19.piap.pl>
+Date: Fri, 03 Jan 2014 07:05:14 +0100
+Subject: [PATCH 2/2] sched_clock: Disable seqlock lockdep usage in
+ sched_clock
+In-Reply-To: <1388704274-5278-2-git-send-email-john.stultz@linaro.org> (John
+ Stultz's message of "Thu, 2 Jan 2014 15:11:14 -0800")
+References: <52C5E675.80701@linaro.org>
+ <1388704274-5278-1-git-send-email-john.stultz@linaro.org>
+ <1388704274-5278-2-git-send-email-john.stultz@linaro.org>
+Message-ID: <m3fvp5txb9.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Torvalds <torvalds@linux-foundation.org> writes:
+John Stultz <john.stultz@linaro.org> writes:
 
->   --- a/kernel/time/sched_clock.c
->   +++ b/kernel/time/sched_clock.c
->   @@ -36,6 +36,7 @@ core_param(irqtime, irqtime, int, 0400);
+> Unforunately the seqlock lockdep enablmenet can't be used
+> in sched_clock, since the lockdep infrastructure eventually
+> calls into sched_clock, which causes a deadlock.
 >
->    static struct clock_data cd = {
->           .mult   = NSEC_PER_SEC / HZ,
->   +       .seq = SEQCNT_ZERO(cd.seq),
->    };
->
->    static u64 __read_mostly sched_clock_mask;
+> Thus, this patch changes all generic sched_clock usage
+> to use the raw_* methods.
 
-Same here, problem still exists (tested with lockdep).
+These two patches fix the problem. Thanks to all involved.
 -- 
 Krzysztof Halasa
 
