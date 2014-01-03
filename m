@@ -1,87 +1,102 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 3 Jan 2014 09:19:22 +0000
-Subject: [PATCHv8 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <3716216.GQHQhxMFvx@wuerfel>
-References: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
- <1388656624-26570-2-git-send-email-Li.Xiubo@freescale.com>
- <3716216.GQHQhxMFvx@wuerfel>
-Message-ID: <bb5e14370ddb4ce2921140d147244097@BY2PR03MB505.namprd03.prod.outlook.com>
+From: r.sh.open@gmail.com (Rahul Sharma)
+Date: Fri, 3 Jan 2014 14:54:26 +0530
+Subject: [PATCH 1/7] ARM: EXYNOS: initial board support for exynos5260 SoC
+In-Reply-To: <2452273.S9E2sU17uX@amdc1227>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
+ <2452273.S9E2sU17uX@amdc1227>
+Message-ID: <CAPdUM4MHZz4z6D8VtyAAA0T1znQpeTeC-NR1shMBMJwmJ3_fqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Tomasz,
 
+Sorry for responding late.
 
-> Subject: Re: [PATCHv8 1/4] pwm: Add Freescale FTM PWM driver support
-> 
-> On Thursday 02 January 2014 17:57:01 Xiubo Li wrote:
-> > +static inline u32 ftm_readl(bool big_endian, const void __iomem *addr)
-> > +{
-> > +       u32 val;
-> > +
-> > +       val = __raw_readl(addr);
-> > +
-> > +       if (likely(big_endian))
-> > +               val = be32_to_cpu((__force __be32)val);
-> > +       else
-> > +               val = le32_to_cpu((__force __le32)val);
-> > +       rmb();
-> > +
-> > +       return val;
-> > +}
-> > +
-> > +static inline void ftm_writel(bool big_endian, u32 val, void __iomem *addr)
-> > +{
-> > +       wmb();
-> > +       if (likely(big_endian))
-> > +               val = (__force u32)cpu_to_be32(val);
-> > +       else
-> > +               val = (__force u32)cpu_to_le32(val);
-> > +
-> > +       __raw_writel(val, addr);
-> 
-> These functions definitely need some comments regarding why this is necessary.
-> I assume that after 8 rounds of review (that I did not read) this has been
-> discussed already, so please explain above the functions why you don't just
-> use ioread32be/ioread32 and iowrite32be/iowrite32 here.
+On 10 December 2013 21:27, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Pankaj, Rahul, Arun,
+>
+> In addition to issues already pointed by Sachin, please also see my
+> comments inline.
+>
+> On Friday 06 of December 2013 21:26:25 Rahul Sharma wrote:
+>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>
+>> This patch add basic arch side support for exynos5260 SoC.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig                 |    9 +++++++++
+>>  arch/arm/mach-exynos/common.c                |   19 ++++++++++++++++++-
+>>  arch/arm/mach-exynos/cpuidle.c               |    2 +-
+>>  arch/arm/mach-exynos/include/mach/map.h      |    1 +
+>>  arch/arm/mach-exynos/include/mach/regs-pmu.h |    4 ++++
+>>  arch/arm/mach-exynos/mach-exynos5-dt.c       |    1 +
+>>  arch/arm/plat-samsung/include/plat/cpu.h     |    8 ++++++++
+>>  arch/arm/plat-samsung/include/plat/map-s5p.h |    1 +
+>>  8 files changed, 43 insertions(+), 2 deletions(-)
+> [snip]
+>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+>> index ddbfe87..405c11a 100644
+>> --- a/arch/arm/mach-exynos/cpuidle.c
+>> +++ b/arch/arm/mach-exynos/cpuidle.c
+>> @@ -120,7 +120,7 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+>>       cpu_suspend(0, idle_finisher);
+>>
+>>  #ifdef CONFIG_SMP
+>> -     if (!soc_is_exynos5250())
+>> +     if (!soc_is_exynos5250() || soc_is_exynos5260())
+>
+> The added OR condition doesn't affect the if condition in any way, because
+> when running on Exynos5260, soc_is_exynos5250() will return false and make
+> the whole condition evaluate to true.
+>
+> Shouldn't it be
+>
+>         if (!soc_is_exynos5250() && !soc_is_exynos5260())
+>
+> if Exynos5260 doesn't need scu_enable(), or left as is if it needs?
 >
 
-As Thierry has commonts in some days before:
-----
-A few years ago GregKH commented in response to a patch that ioread*()
-weren't supposed to be used for memory-mapped only devices. The original
-purpose apparently was to allow drivers to work with both I/O and
-memory-mapped devices.
-----
-I'm not very sure.
+Actually we don't need to call scu_enable() for 5260. Hence leaving it as it is.
 
-The big-endian supports is added at v7~v8 patch series.
+>>               scu_enable(S5P_VA_SCU);
+>>  #endif
+>>       cpu_pm_exit();
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>> index 7b046b5..bd6fa02 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -29,6 +29,7 @@
+>>  #define EXYNOS4210_PA_SYSRAM_NS              0x0203F000
+>>  #define EXYNOS4x12_PA_SYSRAM_NS              0x0204F000
+>>  #define EXYNOS5250_PA_SYSRAM_NS              0x0204F000
+>> +#define EXYNOS5260_PA_SYSRAM_NS              0x02073000
+>>
+>>  #define EXYNOS_PA_CHIPID             0x10000000
+>>
+>> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> index 2cdb63e..09ae29a 100644
+>> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> @@ -234,6 +234,10 @@
+>>
+>>  #define EXYNOS5_SYS_WDTRESET                                 (1 << 20)
+>>
+>> +#define EXYNOS5260_A7_WDTRST                                 (1 << 24)
+>> +#define EXYNOS5260_A15_WDTRST                                        (1 << 23)
+>> +#define EXYNOS5260_SYS_WDTRESET      (EXYNOS5260_A7_WDTRST || EXYNOS5260_A15_WDTRST)
+>> +
+>
+> Are these definitions needed? I don't see any user in this patch.
+>
 
+Removed these definitions.
 
-> Also all callers seem to be of the style
-> 
->        val = ftm_readl(fpc->big_endian, fpc->base + FTM_SC);
-> 
-> so I wonder why you don't just pass the fpc pointer to the function
-> and make it
-> 
-> static inline void ftm_readl(struct fsl_pwm_chip *fpc, unsigned long reg, u32
-> val)
-> {
-> 	if (fpc->big_endian)
-> 		iowrite32be(val, fpc->base + reg);
-> 	else
-> 		iowrite32(val, fpc->base + reg);
-> }
-> 
+Regards,
+Rahul Sharma.
 
-Yes, it was.
-
-I thought this will make the ftm_readl/ftm_writel look more brief like other drivers.
-
- 
-Thanks very much.
-
---
-Best Regards,
-Xiubo
+> Best regards,
+> Tomasz
+>
