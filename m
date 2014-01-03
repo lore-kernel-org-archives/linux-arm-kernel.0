@@ -1,45 +1,56 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Jan 2014 17:10:12 +0100
-Subject: [PATCH V2] i2c: s3c2410 : Add polling mode support
-In-Reply-To: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
-References: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <20140103161012.GH7132@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jan 2014 16:13:20 +0000
+Subject: [PATCH RFC 21/46] drm: provide a helper for the encoder
+ possible_crtcs mask
+In-Reply-To: <CANq1E4RanNbeeh4YDLJuHMgSPStHaVN7wCD-dU-BT=3ohL7e1Q@mail.gmail.com>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypnh-0007Ev-3v@rmk-PC.arm.linux.org.uk>
+ <CANq1E4RanNbeeh4YDLJuHMgSPStHaVN7wCD-dU-BT=3ohL7e1Q@mail.gmail.com>
+Message-ID: <20140103161320.GR7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 11, 2013 at 04:50:20PM +0530, Yuvaraj Kumar C D wrote:
-> From: Vasanth Ananthan <vasanthananthan@gmail.com>
+On Fri, Jan 03, 2014 at 05:05:46PM +0100, David Herrmann wrote:
+> Hi
 > 
-> This patch adds polling mode support for i2c-s3c2410 driver.The
-> SATA PHY controller's CMU and TRSV block's are of I2C register
-> map in exynos5250.These blocks can be configured using i2c.
+> On Thu, Jan 2, 2014 at 10:27 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > The encoder possible_crtcs mask identifies which CRTCs can be bound to
+> > a particular encoder.  Each bit from bit 0 defines an index in the list
+> > of CRTCs held in the DRM mode_config crtc_list.  Rather than having
+> > drivers trying to track the position of their CRTCs in the list, expose
+> > the code which already exists for calculating the appropriate mask bit
+> > for a CRTC.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  drivers/gpu/drm/drm_crtc_helper.c |   39 ++++++++++++++++++++++++------------
+> >  include/drm/drm_crtc_helper.h     |    1 +
+> >  2 files changed, 27 insertions(+), 13 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/drm_crtc_helper.c b/drivers/gpu/drm/drm_crtc_helper.c
+> > index 01361aba033b..10708c248196 100644
+> > --- a/drivers/gpu/drm/drm_crtc_helper.c
+> > +++ b/drivers/gpu/drm/drm_crtc_helper.c
+> > @@ -325,6 +325,29 @@ void drm_helper_disable_unused_functions(struct drm_device *dev)
+> >  EXPORT_SYMBOL(drm_helper_disable_unused_functions);
+> >
+> >  /**
+> > + * drm_helper_crtc_possible_mask - find the mask of a registered CRTC
+> > + * @crtc: crtc to find mask for
+> > + *
+> > + * Given a registered CRTC, return the mask bit of that CRTC for an
+> > + * encoder's possible_crtcs field.
 > 
-> But i2c controller instance on which these block's sits lacks an
-> interrupt line.Also the current i2c-s3c2410 driver is only interrupt
-> driven, thus a polling mode support is required in the driver for
-> supporting this controller. This patch adds this support to the driver.
-> 
-> Changes from V1:
-> 	1.Changed the is_ack() to have even period b/w polls and
-> 	  used usleep_range() instead of udelay().
+> I think this is a nice cleanup which we could pick up right away. Most
+> drivers can be simplified by using this. Only the name is misleading,
+> imo, I'd use something like drm_helper_crtc_to_mask().
 
-Mileages vary, but I'd like to see revision changes after the "---".
+I'm not so sure - since the only place this mask gets used is with
+the "possible_crtcs" field.  It's got nothing to do with the
+"possible_clones" field as that isn't a mask of CRTCs.
 
->  	ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
-> -			       dev_name(&pdev->dev), i2c);
-> +				dev_name(&pdev->dev), i2c);
-
-Unrelated change.
-
-Rest looks good, so I'll fix up the things for you and apply to
-for-next, thanks!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/ee197629/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
