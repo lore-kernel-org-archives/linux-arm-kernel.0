@@ -1,27 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 14:59:17 +0000
-Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
-In-Reply-To: <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
-References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
- <1388431259.2564.15.camel@deneb.redhat.com>
- <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
- <20140103143104.GN7383@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
-Message-ID: <20140103145917.GP7383@n2100.arm.linux.org.uk>
+Date: Fri, 3 Jan 2014 15:04:01 +0000
+Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
+In-Reply-To: <CAKv+Gu8sWLFnRZtuWOw2n96amAVc604Vk_HWD-9S6q1bZ5grhA@mail.gmail.com>
+References: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
+ <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
+ <CAKv+Gu8sWLFnRZtuWOw2n96amAVc604Vk_HWD-9S6q1bZ5grhA@mail.gmail.com>
+Message-ID: <20140103150401.GQ7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 02:49:54PM +0000, Stefano Stabellini wrote:
-> OK. That would be Rob's patch below.
+On Fri, Jan 03, 2014 at 09:13:46AM +0100, Ard Biesheuvel wrote:
+> I noticed that this patch has turned up in rmk/fixes.
+> 
+> Please be aware that by not updating the .S_shipped file in concert
+> with the .pl file, we have a build time dependency on Perl now,
+> something we tried to avoid when we discussed the original series
+> http://marc.info/?l=linux-arm-kernel&m=138091140313491&w=2
 
-Looks fine to me.
-
-> Are you going to take care of sending it to Linus?
-
-If you want to stick it in the patch system, I'll throw it in my tree.
-I need to push out the next set of fixes soon anyway.
-
-Thanks.
+Added, thanks for reminding me.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
