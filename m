@@ -1,40 +1,45 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 2 Jan 2014 23:45:11 -0800
-Subject: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20140103074511.GA10680@core.coreip.homeip.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  3 Jan 2014 16:01:45 +0800
+Subject: [PATCH 0/6] arm: sunxi: rename DT clock node names to clk@N
+Message-ID: <1388736111-10103-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiubo,
+Hi everyone,
 
-On Fri, Jan 03, 2014 at 01:24:21PM +0800, Xiubo Li wrote:
-> +
-> +static inline int fsl_pwm_calculate_default_ps(struct fsl_pwm_chip *fpc,
-> +					       enum fsl_pwm_clk index)
-> +{
+This patch series renames the clock nodes in sunxi dts to conform
+to device tree naming conventions, i.e. clk at N. Dummy clocks that
+will be renamed/removed later, or clocks sharing registers are not
+renamed.
 
-Why do you declare this (and other module-local) function as inline?
-It is usually better let compiler decide if given function should be
-inlined or not.
+Renamed clock nodes have clock-output-names properties added to
+desginate their names. Support for this is added in the first
+patch.
 
-[...]
+The last patch, which enables i2c controllers on Cubietruck, is
+independent of the others.
 
-> +
-> +static int fsl_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct fsl_pwm_chip *fpc = platform_get_drvdata(pdev);
-> +
-> +	mutex_destroy(&fpc->lock);
-> +
-> +	return pwmchip_remove(&fpc->chip);
 
-fpc->lock will be used while pwmchip_remove() is running so you should
-not be destroying it before calling pwmchip_remove(). It should probbaly
-go into free() method or just drop it altogether.
+Cheers
+ChenYu
 
-Thanks.
+
+Chen-Yu Tsai (6):
+  clk: sunxi: Add clock-output-names dt property support
+  arm: dts: sun4i: rename clock node names to clk at N
+  arm: dts: sun5i: rename clock node names to clk at N
+  arm: dts: sun6i: rename clock node names to clk at N
+  arm: dts: sun7i: rename clock node names to clk at N
+  arm: sun7i: cubietruck: Enable the i2c controllers
+
+ arch/arm/boot/dts/sun4i-a10.dtsi           | 24 ++++++++++++++----------
+ arch/arm/boot/dts/sun5i-a10s.dtsi          | 24 ++++++++++++++----------
+ arch/arm/boot/dts/sun5i-a13.dtsi           | 24 ++++++++++++++----------
+ arch/arm/boot/dts/sun6i-a31.dtsi           | 12 +++++++-----
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 18 ++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi           | 19 +++++++++++--------
+ drivers/clk/sunxi/clk-sunxi.c              | 15 +++++++--------
+ 7 files changed, 85 insertions(+), 51 deletions(-)
 
 -- 
-Dmitry
+1.8.5.2
