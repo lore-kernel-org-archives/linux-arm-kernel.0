@@ -1,45 +1,45 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jan 2014 20:31:57 +0100
-Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <20140103194929.706f93c6@skate>
+Date: Fri, 03 Jan 2014 20:35:27 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <20140103185907.GD12098@obsidianresearch.com>
 References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
- <20140103194929.706f93c6@skate>
-Message-ID: <52C7102D.60401@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <20140103185907.GD12098@obsidianresearch.com>
+Message-ID: <52C710FF.7000901@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2014 19:49, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On 03/01/2014 19:59, Jason Gunthorpe wrote:
+> On Fri, Jan 03, 2014 at 10:59:44AM +0100, Gregory CLEMENT wrote:
 > 
-> On Fri,  3 Jan 2014 10:59:45 +0100, Gregory CLEMENT wrote:
+>> +		/* SoC ID */
+>> +		soc_dev_id = __raw_readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
+>> +
+>> +		/* SoC revision */
+>> +		soc_rev = __raw_readl(pci_base + PCIE_DEV_REV_OFF)
+>> +			& SOC_REV_MASK;
 > 
->> +		/*
->> +		 * Only revison more recent than A0 support offload
-> 
-> revison -> revisions
-> 
-> offload mechanism -> the offload mechanism
-> 
->> +		 * mechanism. In case we can't get the SoC revision
->> +		 * weplay safe and we don't enable it
-> 
-> weplay -> we play
-> 
->> +		 */
->> +		if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
->> +			drv_data->offload_enabled = true;
->>  	}
->>  
->>  out:
-> 
+> Sort of a minor nit, but I'm not actually sure these registers are
+> read-only :( I know the documentation doesn't describe how to change
+> them, but in PCI-E EndPoint mode they are read by the host so the
+> firmware must be able to change them to reflect the firmware running
+> on the endpoint..
 
-These typos will be fixed in the next version.
+According to the datasheet of the Armada XP and the Armada 370 these
+register are read-only. Moreover they are already use as is for the
+kirkwood, orion5x, dove and mv78x00 in the current kernel and for all
+the mvebu Socs in the internal version of Marvell, so even if it was
+possible to change these values I believe that it never happened.
 
-> Thanks!
 > 
-> Thomas
+> Which is to say, I suppose the bootloader could program them to
+> something else if it wanted to.
+> 
+> That said, in practice obviously they will not be changed, but maybe
+> there is another ID register you can read?
+> 
+> Jason
 > 
 
 
