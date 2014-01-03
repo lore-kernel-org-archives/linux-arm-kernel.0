@@ -1,32 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 03 Jan 2014 10:51:04 -0800
-Subject: [PATCH v2 0/7] Allow MSM DT platforms to be built multi-platform
-In-Reply-To: <201401021913.25920.arnd@arndb.de>
-References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
- <201401021913.25920.arnd@arndb.de>
-Message-ID: <52C70698.2030004@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 3 Jan 2014 11:59:07 -0700
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140103185907.GD12098@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/14 10:13, Arnd Bergmann wrote:
-> On Monday 30 December 2013, Stephen Boyd wrote:
->> These patches allow the DT based MSM platforms to be built as part of the
->> multi-platform kernel. I need acks from Chris Ball on the mmc patch and
->> Rob/Dave on the drm patch. I dropped Arnd's ack on patch 6 because I've
->> rebased that patch on top of the patchset David sent out (which this is in
->> reply to). The rebase was fairly minor and the new patch for drm/msm is
->> trivial. Please consider for v3.14.
-> Just for the record, I'm definitely happy with the way this is turning out,
-> don't see my question on the serial driver as a NAK. I assume we will apply
-> the patches for 3.14, but I first want to have a better understanding on
-> where we are with the stuff that is already queued up for 3.14.
->
+On Fri, Jan 03, 2014 at 10:59:44AM +0100, Gregory CLEMENT wrote:
 
-It would be great if we could get these patches in for 3.14. Now that
-Olof has applied the collection of patches that David sent, these
-patches should apply cleanly on top of arm-soc.git qcom/soc. Can you
-apply them directly to the arm-soc tree?
+> +		/* SoC ID */
+> +		soc_dev_id = __raw_readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
+> +
+> +		/* SoC revision */
+> +		soc_rev = __raw_readl(pci_base + PCIE_DEV_REV_OFF)
+> +			& SOC_REV_MASK;
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Sort of a minor nit, but I'm not actually sure these registers are
+read-only :( I know the documentation doesn't describe how to change
+them, but in PCI-E EndPoint mode they are read by the host so the
+firmware must be able to change them to reflect the firmware running
+on the endpoint..
+
+Which is to say, I suppose the bootloader could program them to
+something else if it wanted to.
+
+That said, in practice obviously they will not be changed, but maybe
+there is another ID register you can read?
+
+Jason
