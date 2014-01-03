@@ -1,67 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jan 2014 20:30:10 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140103164108.GA23714@lunn.ch>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
- <20140103144712.GA22597@lunn.ch> <52C6CE7E.5010800@free-electrons.com>
- <52C6D3A8.4010801@free-electrons.com> <20140103164108.GA23714@lunn.ch>
-Message-ID: <52C70FC2.20400@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Jan 2014 11:31:46 -0800
+Subject: [PATCH v2 0/7] Allow MSM DT platforms to be built multi-platform
+In-Reply-To: <52C70698.2030004@codeaurora.org>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+ <201401021913.25920.arnd@arndb.de>
+ <52C70698.2030004@codeaurora.org>
+Message-ID: <CAOesGMiFixweRT1R-y2Cxvx+p6tzf3Qr-TaAwqDBCgB=Ge8FfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2014 17:41, Andrew Lunn wrote:
->>>> Hi Gregory
->>>>
->>>> I'm away from my hardware at the moment. 
->>>>
->>>> Does this work when all the PCIe ports have status = "disabled";? We
->>>> have many kirkwood devices in NAS boxes which don't use PCIe, so all
->>>> the ports are disabled. But they still exist in the SoC, so we can
->>>> read the IDs from them. I just don't know if of_get_next_child() will
->>>> only return enabled children?
->>>
->>> There is a function named of_get_next_available_child, so I assumed that
->>> of_get_next_child() will return all the children. But I can test it to
->>> be sure of it.
->>>
+On Fri, Jan 3, 2014 at 10:51 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/02/14 10:13, Arnd Bergmann wrote:
+>> On Monday 30 December 2013, Stephen Boyd wrote:
+>>> These patches allow the DT based MSM platforms to be built as part of the
+>>> multi-platform kernel. I need acks from Chris Ball on the mmc patch and
+>>> Rob/Dave on the drm patch. I dropped Arnd's ack on patch 6 because I've
+>>> rebased that patch on top of the patchset David sent out (which this is in
+>>> reply to). The rebase was fairly minor and the new patch for drm/msm is
+>>> trivial. Please consider for v3.14.
+>> Just for the record, I'm definitely happy with the way this is turning out,
+>> don't see my question on the serial driver as a NAK. I assume we will apply
+>> the patches for 3.14, but I first want to have a better understanding on
+>> where we are with the stuff that is already queued up for 3.14.
 >>
->> I have just removed all the PCIe part in the
->> armada-xp-openblocks-ax3-4.dts file (PCie is disable by default in the
->> dtsi file) and it worled as expected! :)
-> 
-> Great, thanks for testing.
->  
->> by the way waht do you think of adding this line in at the end of the
->> mvebu_soc_id_init() function:
->>
->> pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
-> 
-> Kirkwood prints actual strings, not numbers. More readable.
+>
+> It would be great if we could get these patches in for 3.14. Now that
+> Olof has applied the collection of patches that David sent, these
+> patches should apply cleanly on top of arm-soc.git qcom/soc. Can you
+> apply them directly to the arm-soc tree?
 
-With this number we are sure to have always an information even if the
-SoC ID or version was unknown by the kernel.
-
->  
->> Also keep in mind that currently you can't use it for kirkwood because
->> the build of the file depend on CONFIG_ARCH_MVEBU. But as kirkwood
->> will soon joined the mach-mvebu directory, it won't be a problem then.
-> 
-> I think it is possible to do ../mach-mvebu/soc_id.o sort of thing in
-> the Makefile. Ugly, but might work until we move.
-
-Yes it is doable, but then we also need to update the mvebu_pcie_of_match_table.
-However I would prefer doing this as a separate patch because this one is
-for fixing a bug. Later we can improve the kernel.
-
-> 
->     Andrew
-> 
+Yeah, we'll get to it in a bit.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Olof
