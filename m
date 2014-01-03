@@ -1,43 +1,43 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 3 Jan 2014 09:23:55 -0800
-Subject: [PATCH v7 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
- entries
-In-Reply-To: <201401031633.18110.arnd@arndb.de>
-References: <1388708539-333-1-git-send-email-lho@apm.com>
- <1388708539-333-4-git-send-email-lho@apm.com>
- <1388708539-333-5-git-send-email-lho@apm.com>
- <201401031633.18110.arnd@arndb.de>
-Message-ID: <CAPw-ZTnpG_qOWs7tZjDc2z+1nG0h7p6ojfuk5ZOLAYxRrb7N=A@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 03 Jan 2014 18:26:44 +0100
+Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
+In-Reply-To: <20140103170724.GT7383@n2100.arm.linux.org.uk>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
+ <1388767737.19394.32.camel@pizza.hi.pengutronix.de>
+ <20140103170724.GT7383@n2100.arm.linux.org.uk>
+Message-ID: <1388770004.19394.42.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Freitag, den 03.01.2014, 17:07 +0000 schrieb Russell King - ARM
+Linux:
+> On Fri, Jan 03, 2014 at 05:48:57PM +0100, Philipp Zabel wrote:
+> > Hi Russell,
+> > 
+> > I've tested this series on a BD-SL (SabreLite) with HDMI. Right now
+> > the HPD signal doesn't seem to work, but after overwriting the
+> > connection check, I got a stable and correct picture on the monitor:
+> 
+> Hmm.  Does this mean you're not getting any IRQs from the HDMI interface
+> when you plug and unplug the monitor?
+> 
+> 147:        281       GIC 147  120000.hdmi
+> 
+> on turning the TV on:
+> 
+> 147:        282       GIC 147  120000.hdmi
+> 
+> on unplugging the HDMI cable:
+> 
+> 147:        283       GIC 147  120000.hdmi
+> 
+> on replugging the HDMI cable:
+> 
+> 147:        284       GIC 147  120000.hdmi
 
->> +                       sata23clk: sata23clk at 1f22c000 {
->> +                               compatible = "apm,xgene-device-clock";
->> +                               #clock-cells = <1>;
->> +                               clocks = <&socplldiv2 0>;
->> +                               clock-names = "sata23clk";
->
->> +                       };
->> +
->> +                       sata45clk: sata45clk at 1f23c000 {
->> +                               compatible = "apm,xgene-device-clock";
->> +                               #clock-cells = <1>;
->> +                               clocks = <&socplldiv2 0>;
->> +                               clock-names = "sata45clk";
->
-> Something is wrong here: You have two devices with the same "compatible"
-> string but using different "clock-names" strings. The binding document
-> lists this as an optional property with the description  "shall be
-> the name of the device clock. If missing, use the device name", which
-> doesn't seem to make any sense.
->
-> Please fix the binding and the existing users of this, and don't introduce
-> any more broken instances. Since each device clock is documented to
-> have only one parent anyway, please just make it an anonymous clock.
+Exactly. And while the RX_SENSE bits of HDMI_IH_PHY_STAT0 change when I
+(un)plug, the HPD bit stays zero. I'll check with other hardware.
 
-Okay I miss understood this... I will need to fix the X-Gene device
-parent clocks as well in an separate patch to the clock driver owner.
-
--Loc
+regards
+Philipp
