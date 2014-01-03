@@ -1,55 +1,60 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 4 Jan 2014 06:33:44 +0800
-Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
-In-Reply-To: <10214668.cztjge9Iie@tlendack-t1>
-References: <1386703583-8386-1-git-send-email-marex@denx.de>
- <201312270121.36578.marex@denx.de>
- <20131230090112.GA8550@gondor.apana.org.au>
- <10214668.cztjge9Iie@tlendack-t1>
-Message-ID: <20140103223344.GA15394@gondor.apana.org.au>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Sat, 4 Jan 2014 06:53:52 +0800
+Subject: [PATCH v2 2/2] ARM: dts: imx: enable dma for spi
+In-Reply-To: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
+References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1388789632-12238-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 09:10:30AM -0600, Tom Lendacky wrote:
-> On Monday, December 30, 2013 05:01:13 PM Herbert Xu wrote:
-> > On Fri, Dec 27, 2013 at 01:21:36AM +0100, Marek Vasut wrote:
-> > >
-> > > > > -	complete(data, err);
-> > > > > +	areq->base.complete = complete;
-> > > > > +	areq->base.data = data;
-> > > > > +
-> > > > > +	complete(&areq->base, err);
-> > > > 
-> > > > This looks completely bogus.  While restoring areq isn't wrong per
-> > > > se, calling complete with &areq->base makes no sense.  The original
-> > > > completion data is in the variable "data".
-> > > 
-> > > Is there some documentation for this so I can understand why this is wrong, 
-> > > please? I really don't quite get it, sorry. Actually, is there some 
-> > > documentation for writing crypto API drivers at all please ?
-> > 
-> > Well it's wrong because the completion function (req->base.complete)
-> > is meant to take data (req->base.data) as its first argument.  So
-> > giving it a pointer to req->base makes no sense.
-> > 
-> 
-> The crypto_completion_t typdef is defined as:
-> 
-> typedef void (*crypto_completion_t)(struct crypto_async_request *req, int err);
-> 
-> so I believe &areq->base is the proper first argument (which is actually just
-> the req parameter on the ahash_op_unaligned_done function).
+Enable dma support for espci controller
 
-You are right.  This unaligned code obviously has never worked.
-I will apply Marek's patch to fix this up.
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-> Additionally, you should probably also fix up ahash_def_finup_done2 and
-> ahash_def_finup_done1.
+No change from v1 
 
-Yep I'll fix them up too.
-
-Thanks!
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 858ecd7..6b29f56 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -184,6 +184,8 @@
+ 					interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 112>, <&clks 112>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -195,6 +197,8 @@
+ 					interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 113>, <&clks 113>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -206,6 +210,8 @@
+ 					interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 114>, <&clks 114>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -217,6 +223,8 @@
+ 					interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 115>, <&clks 115>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.7.8
