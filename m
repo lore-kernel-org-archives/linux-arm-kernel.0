@@ -1,18 +1,16 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  3 Jan 2014 11:10:59 +0100
-Subject: [PATCH v1 14/24] zynq: Add GEM0, GEM1 configs support
+Date: Fri,  3 Jan 2014 11:11:00 +0100
+Subject: [PATCH v1 15/24] zynq-common: Define exact TEXT_BASE
 In-Reply-To: <cover.1388743861.git.michal.simek@xilinx.com>
 References: <cover.1388743861.git.michal.simek@xilinx.com>
-Message-ID: <bd249a57750312673d4046d94a63130617e9bcde.1388743861.git.michal.simek@xilinx.com>
+Message-ID: <da8c55e59e770f17ba23459daa125ac3b9322137.1388743861.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagannadha Sutradharudu Teki <jagannadha.sutradharudu-teki@xilinx.com>
 
-Zynq ethernet controller support two GEM's like
-CONFIG_ZYNQ_GEM0 and CONFIG_ZYNQ_GEM1 enabled
-both so-that the respective board will define
-these macros based on their usage.
+Defined TEXT_BASE for u-boot starts from 0x4000000
+w.r.t zynq memory-map.
 
 Signed-off-by: Jagannadha Sutradharudu Teki <jaganna@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
@@ -20,45 +18,22 @@ Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
 Changes in v1: None
 
- include/configs/zynq.h | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ include/configs/zynq.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/include/configs/zynq.h b/include/configs/zynq.h
-index 6632223..2f8f4ab 100644
+index 2f8f4ab..c90d4fd 100644
 --- a/include/configs/zynq.h
 +++ b/include/configs/zynq.h
-@@ -42,10 +42,16 @@
- #endif
+@@ -113,7 +113,7 @@
+ 					sizeof(CONFIG_SYS_PROMPT) + 16)
 
- /* Ethernet driver */
--#define CONFIG_NET_MULTI
--#define CONFIG_ZYNQ_GEM
- #define CONFIG_ZYNQ_GEM0
- #define CONFIG_ZYNQ_GEM_PHY_ADDR0	7
-+#if defined(CONFIG_ZYNQ_GEM0) || defined(CONFIG_ZYNQ_GEM1)
-+# define CONFIG_NET_MULTI
-+# define CONFIG_ZYNQ_GEM
-+# define CONFIG_MII
-+# define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
-+# define CONFIG_PHYLIB
-+# define CONFIG_PHY_MARVELL
-+#endif
+ /* Physical Memory map */
+-#define CONFIG_SYS_TEXT_BASE		0
++#define CONFIG_SYS_TEXT_BASE		0x4000000
 
- #define CONFIG_ZYNQ_SPI
- /* SPI */
-@@ -89,12 +95,6 @@
- #define CONFIG_BOOTP_HOSTNAME
- #define CONFIG_BOOTP_MAY_FAIL
-
--/* MII and Phylib */
--#define CONFIG_MII
--#define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
--#define CONFIG_PHYLIB
--#define CONFIG_PHY_MARVELL
--
- /* Environment */
- #define CONFIG_ENV_SIZE		0x10000 /* Env. sector size */
- #define CONFIG_ENV_IS_NOWHERE
+ #define CONFIG_NR_DRAM_BANKS		1
+ #define CONFIG_SYS_SDRAM_BASE		0
 --
 1.8.2.3
 
@@ -68,4 +43,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/ef2c80e3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/cd4eda90/attachment.sig>
