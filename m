@@ -1,55 +1,118 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 02 Jan 2014 20:15:56 -0800
-Subject: [PATCH] clk: clk-divider: fix divisor > 255 bug
-In-Reply-To: <1387190498-15392-1-git-send-email-james.hogan@imgtec.com>
-References: <1387190498-15392-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <20140103041556.12054.53966@quantum>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 3 Jan 2014 13:10:05 +0800
+Subject: [RESEND] Question: Whether a bank must be fully contained by a
+ section?
+Message-ID: <20140103051005.GB81380@kernel-host>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Hogan (2013-12-16 02:41:38)
-> Commit 6d9252bd9a4bb (clk: Add support for power of two type dividers)
-> merged in v3.6 added the _get_val function to convert a divisor value to
-> a register field value depending on the flags. However it used the type
-> u8 for the div field, causing divisors larger than 255 to be masked
-> and the resultant clock rate to be too high.
-> 
-> E.g. in my case an 11bit divider was supposed to divide 24.576 MHz down
-> to 32.768KHz. The divisor was correctly calculated as 750 (0x2ee). This
-> was masked to 238 (0xee) resulting in a frequency of 103.26KHz.
-> 
-> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+I have sent this question to linux-kernel at vger.kernel.org, but receive
+no answer. I think these should be a better place to discuss this
+question. Apologies if you got multiple copies of this email.
 
-Taken into clk-next. Thanks for the fix!
 
-Regards,
-Mike
+=========
 
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: stable at vger.kernel.org
-> ---
-> Since this bug was introduced in 3.6, it probably should by applied to
-> stable 3.10 and 3.12.
-> ---
->  drivers/clk/clk-divider.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 8d3009e44fba..5543b7df8e16 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -87,7 +87,7 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
->         return 0;
->  }
->  
-> -static unsigned int _get_val(struct clk_divider *divider, u8 div)
-> +static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
->  {
->         if (divider->flags & CLK_DIVIDER_ONE_BASED)
->                 return div;
-> -- 
-> 1.8.1.2
-> 
-> 
+
+By reading the code of show_mem(), I found that there is an assumption
+that the page structs must be continuous for each bank:
+
+	for_each_bank (i, mi) {
+		...
+		page = pfn_to_page(pfn1);
+		end  = pfn_to_page(pfn2 - 1) + 1;
+	
+		do {
+			...
+			page++;  <-- pageframe must be continuous
+			...
+		} while (page < end);
+		...
+	}
+
+Therefore, a bank must be fully contained in a section in sparse memory
+mode, because page frames are allocated section by section (in
+sparse_init()).
+
+However, I didn't find other code which enforces this assumption.
+Instead, in arm_memory_present (arch/arm/mm/init.c), it seems that a
+bank may contain more than one section:
+
+arm_memory_present:
+	...
+	for_each_memblock(memory, reg)
+		memory_present(0, memblock_region_memory_base_pfn(reg),
+			       memblock_region_memory_end_pfn(reg));
+	...
+
+memory_present:
+	...
+	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
+		...
+	}
+	...
+
+
+Therefore, would you please consider the following patch, which removes
+the assumption that a bank must be fully contained in one section?
+
+
+===========================
+
+
+>From b2c4bb5807c755d92274e11bb00cc548fea62242 Mon Sep 17 00:00:00 2001
+From: Wang Nan <wangnan0@huawei.com>
+Date: Thu, 2 Jan 2014 13:20:02 +0800
+Subject: [PATCH] use pfn_to_page in show_mem 
+
+If a bank spans into different sections, the page structures of the bank
+may not continous.
+
+This patch uses pfn_to_page to recompute the address of struct page in show_mem
+from pfn, makes it to collect correct information even if a bank spans into
+different sections.
+
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ arch/arm/mm/init.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 1f7b19a..3078e5a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -97,16 +97,14 @@ void show_mem(unsigned int filter)
+ 
+ 	for_each_bank (i, mi) {
+ 		struct membank *bank = &mi->bank[i];
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
++		unsigned int pfn, pfn_end;
++		struct page *page;
+ 
+-		pfn1 = bank_pfn_start(bank);
+-		pfn2 = bank_pfn_end(bank);
+-
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
++		pfn = bank_pfn_start(bank);
++		pfn_end = bank_pfn_end(bank);
+ 
+ 		do {
++			page = pfn_to_page(pfn);
+ 			total++;
+ 			if (PageReserved(page))
+ 				reserved++;
+@@ -118,8 +116,8 @@ void show_mem(unsigned int filter)
+ 				free++;
+ 			else
+ 				shared += page_count(page) - 1;
+-			page++;
+-		} while (page < end);
++			pfn++;
++		} while (pfn < pfn_end);
+ 	}
+ 
+ 	printk("%d pages of RAM\n", total);
+-- 
+1.8.4
