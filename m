@@ -1,39 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jan 2014 15:49:02 +0100
-Subject: [BUG] shmobile build failure
-In-Reply-To: <20140102232325.GF7383@n2100.arm.linux.org.uk>
-References: <20140102172413.GB7383@n2100.arm.linux.org.uk>
- <CAOesGMh=uWi1gmb_1qhuF42d7Rt85RstvDmPVY2F3_YfkX9xTw@mail.gmail.com>
- <20140102232325.GF7383@n2100.arm.linux.org.uk>
-Message-ID: <201401031549.02866.arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 3 Jan 2014 14:49:54 +0000
+Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
+In-Reply-To: <20140103143104.GN7383@n2100.arm.linux.org.uk>
+References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
+ <1388431259.2564.15.camel@deneb.redhat.com>
+ <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
+ <20140103143104.GN7383@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 January 2014, Russell King - ARM Linux wrote:
-> On Thu, Jan 02, 2014 at 03:20:36PM -0800, Olof Johansson wrote:
-> > On Thu, Jan 2, 2014 at 1:47 PM, Russell King - ARM Linux
-> > > Have you run any allmod or allyesconfig builds recently?  The logs from
-> > > those builds are excessively big and unreadable due to this:
-> > >
-> > > warning: __mcount_loc already exists: object-file.o
-> > >
-> > > being spat out for every object file being built, and I can't figure out
-> > > what's causing that.
+On Fri, 3 Jan 2014, Russell King - ARM Linux wrote:
+> On Fri, Jan 03, 2014 at 01:13:57PM +0000, Stefano Stabellini wrote:
+> > On Mon, 30 Dec 2013, Mark Salter wrote:
+> > > On Mon, 2013-12-30 at 14:55 +0800, Chen Baozi wrote:
+> > > > xen_remap used to be defined as ioremap_cached on arm64. In commit
+> > > > c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
+> > > > was deleted, while xen_remap stays the same. This would lead to
+> > > > the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
+> > > > on arm64 as ioremap_cache on arm64 to fix it.
+> > > > 
+> > > 
+> > > I missed that include of arm header by arm64 when looking for users
+> > > of arm64's ioremap_cached() when working on commit c04e8e2fe. Anyway,
+> > > grepping the kernel tree, I see:
+> > > 
+> > >   ioremap_cached()
+> > >     defined by: arm, metag, unicore32
+> > >     used by: arch/arm/include/asm/xen/page.h
+> > >              drivers/mtd/maps/pxa2xx-flash.c
+> > > 
+> > >   ioremap_cache()
+> > >     defined by: arm64, sh, xtensa, ia64, x86
+> > >     used by: drivers/video/vesafb.c
+> > >              drivers/char/toshiba.c
+> > >              drivers/acpi/apei
+> > >              drivers/lguest/lguest_device.c
+> > >              drivers/sfi/sfi_core.c
+> > >              include/linux/acpi_io.h
+> > > 
+> > > I think it would be better to just avoid the confusion and the ifdef in
+> > > asm/xen/page.h by globally changing ioremap_cached to ioremap_cache.
 > > 
-> > 
-> > Hm, no I have not. Do you have a feel for when it began? I can do a bisect.
+> > While I welcome the suggestion, this is a critical fix for a regression
+> > that I think should go in as soon as possible, maybe 3.13-rc7, while I
+> > don't think that a global s/ioremap_cached/ioremap_cache would be
+> > acceptable at this stage.
 > 
-> I don't know - I've only recently re-enabled those builds.  There's
-> suggestions from other architectures that it may be toolchain related -
-> some people have blamed binutils for it, but I'm running binutils 2.22.
+> Since it's just one driver, just make the change for ARM (provided the
+> grep is accurate.)  pxa2xx-flash is only used on ARM and not the other
+> two listed there, so looks like metag and unicore just decided to copy
+> ARM.
 > 
-> Hence why I'm interested if others see this too.
+> My grep concurs with yours.
 > 
+> So... just change ioremap_cached -> ioremap_cache in
+> arch/arm/include/asm/io.h
+> arch/arm/include/asm/xen/page.h
+> drivers/mtd/maps/pxa2xx-flash.c
+> 
+> to fix the problem.
 
-I just tried building allmodconfig using linux-next-20131224 and
-arm-linux-gnueabihf-gcc-4.8.1-7ubuntu1. I had to disable a bunch of
-drivers to get it to build, but didn't see the __mcount_loc problem.
+OK. That would be Rob's patch below.
+Are you going to take care of sending it to Linus?
 
-What kernel tree and compiler are you using?
-
-	Arnd
+Thanks for the quick reply.
