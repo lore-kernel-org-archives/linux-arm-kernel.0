@@ -1,34 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Jan 2014 01:44:10 +0100
-Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
-In-Reply-To: <20140102230832.GB9339@obsidianresearch.com>
-References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
- <20131228170114.GH19878@titan.lakedaemon.net>
- <20140102194924.GA3321@obsidianresearch.com>
- <1388702192.16958.54.camel@hastur.hellion.org.uk>
- <20140102230832.GB9339@obsidianresearch.com>
-Message-ID: <20140103004410.GA16928@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 02 Jan 2014 16:46:20 -0800
+Subject: [PATCH 2/2] sched_clock: Disable seqlock lockdep usage in
+ sched_clock
+In-Reply-To: <1388704274-5278-2-git-send-email-john.stultz@linaro.org>
+References: <52C5E675.80701@linaro.org>
+ <1388704274-5278-1-git-send-email-john.stultz@linaro.org>
+ <1388704274-5278-2-git-send-email-john.stultz@linaro.org>
+Message-ID: <52C6085C.3070206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> .. and since the problem only shows obviously with multiplatform
-> kernels that have been relocated it could be a broader, subtler issue
-> than just your one board ...
+On 01/02/14 15:11, John Stultz wrote:
+> Unforunately the seqlock lockdep enablmenet can't be used
 
-It is not just this board. It is any board using an old mainline
-u-boot. Any such system will not boot with a kernel after 3.1. It was
-at that point that the issue was found and fixed in u-boot. My Bubba3
-has a u-boot before that point...
+s/Unforunately/Unfortunately/
+s/enablmenet/enablement/
 
-> Jason C: What do you think about applying this [untested]?
+> in sched_clock, since the lockdep infrastructure eventually
+> calls into sched_clock, which causes a deadlock.
+>
+> Thus, this patch changes all generic sched_clock usage
+> to use the raw_* methods.
+>
+> Cc: Krzysztof Ha?asa <khalasa@piap.pl>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Willy Tarreau <w@1wt.eu>
+> Cc: Ingo Molnar <mingo@kernel.org>,
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Reported-by: Krzysztof Ha?asa <khalasa@piap.pl>
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
 
-I'm away for the weekend, so cannot test it.
- 
-> Or do you think the kernel should support booting with L2 on (this is
-> just two instructions, but they need to be conditional on the CPU type
-> :( :( )?
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-It would be good to at least put the fix into the impedance matcher,
-so there is no need to mess with the kernel.
-
-   Andrew
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
