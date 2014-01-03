@@ -1,54 +1,54 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 3 Jan 2014 09:16:06 +0000
-Subject: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20140103074511.GA10680@core.coreip.homeip.net>
-References: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
- <20140103074511.GA10680@core.coreip.homeip.net>
-Message-ID: <f9527d65aa234f40af2830d9fb139bbb@BY2PR03MB505.namprd03.prod.outlook.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 3 Jan 2014 11:17:03 +0200
+Subject: [PATCHv12 07/49] clk: divider: add support for low level ops
+In-Reply-To: <20131222175235.GC8064@book.gsilab.sittig.org>
+References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
+ <1387557274-22583-7-git-send-email-t-kristo@ti.com>
+ <20131222175235.GC8064@book.gsilab.sittig.org>
+Message-ID: <52C6800F.3090303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On 12/22/2013 07:52 PM, Gerhard Sittig wrote:
+> [ dropped devicetree, we're clock specific here ]
+>
+> On Fri, Dec 20, 2013 at 18:34 +0200, Tero Kristo wrote:
+>>
+>> Divider clock can now be registered to use low level register access ops.
+>> Preferred initialization method is via clock description.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   drivers/clk/clk-divider.c    |   22 +++++++++++++++++++---
+>>   include/linux/clk-provider.h |    4 ++++
+>>   2 files changed, 23 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+>> index 8cfed5c..887e2d8 100644
+>> --- a/drivers/clk/clk-divider.c
+>> +++ b/drivers/clk/clk-divider.c
+>> @@ -108,7 +108,12 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+>>   	struct clk_divider *divider = to_clk_divider(hw);
+>>   	unsigned int div, val;
+>>
+>> -	val = clk_readl(divider->reg) >> divider->shift;
+>> +	if (divider->ll_ops)
+>> +		val = divider->ll_ops->clk_readl(divider->reg);
+>> +	else
+>> +		val = clk_readl(divider->reg);
+>
+> Should this not better always use an ll_ops structure, which
+> either is individual to the clock item, or is "global" for a
+> platform, yet can get re-registered at runtime (see the comment
+> on 06/49)?  And why are you referencing clk_readl() instead of
+> clk_readl_default() which you specifically have introduced in the
+> previous patch?  Adding a copy of the routine and using both the
+> copy and the original doesn't look right.
 
-> Subject: Re: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
-> 
-> Hi Xiubo,
-> 
-> On Fri, Jan 03, 2014 at 01:24:21PM +0800, Xiubo Li wrote:
-> > +
-> > +static inline int fsl_pwm_calculate_default_ps(struct fsl_pwm_chip *fpc,
-> > +					       enum fsl_pwm_clk index)
-> > +{
-> 
-> Why do you declare this (and other module-local) function as inline?
-> It is usually better let compiler decide if given function should be
-> inlined or not.
-> 
+In some cases, the clock data is defined statically during compile time 
+and here, ll_ops can be (and for OMAP cases at least is) NULL. I had 
+kind of a global ll_ops definition in some of the earlier versions of 
+this series, but it was frowned upon by some of the maintainers thus I 
+dropped it.
 
-Could the compiler know when the given function should be inlined by not declare it?
-And when will be inlined ?
-
-> [...]
-> 
-> > +
-> > +static int fsl_pwm_remove(struct platform_device *pdev)
-> > +{
-> > +	struct fsl_pwm_chip *fpc = platform_get_drvdata(pdev);
-> > +
-> > +	mutex_destroy(&fpc->lock);
-> > +
-> > +	return pwmchip_remove(&fpc->chip);
-> 
-> fpc->lock will be used while pwmchip_remove() is running so you should
-> not be destroying it before calling pwmchip_remove(). It should probbaly
-> go into free() method or just drop it altogether.
-> 
-
-Yes, I think I should drop it here as Thierry has already pointed out.
-
-
-Thanks very much.
-
---
-Best Regards,
-Xiubo
+-Tero
