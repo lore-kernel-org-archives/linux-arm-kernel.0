@@ -1,215 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Jan 2014 15:47:12 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140103144712.GA22597@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Jan 2014 15:49:02 +0100
+Subject: [BUG] shmobile build failure
+In-Reply-To: <20140102232325.GF7383@n2100.arm.linux.org.uk>
+References: <20140102172413.GB7383@n2100.arm.linux.org.uk>
+ <CAOesGMh=uWi1gmb_1qhuF42d7Rt85RstvDmPVY2F3_YfkX9xTw@mail.gmail.com>
+ <20140102232325.GF7383@n2100.arm.linux.org.uk>
+Message-ID: <201401031549.02866.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 10:59:44AM +0100, Gregory CLEMENT wrote:
-> All the mvebu SoCs have information related to their variant and
-> revision that can be read from the PCI control register.
+On Friday 03 January 2014, Russell King - ARM Linux wrote:
+> On Thu, Jan 02, 2014 at 03:20:36PM -0800, Olof Johansson wrote:
+> > On Thu, Jan 2, 2014 at 1:47 PM, Russell King - ARM Linux
+> > > Have you run any allmod or allyesconfig builds recently?  The logs from
+> > > those builds are excessively big and unreadable due to this:
+> > >
+> > > warning: __mcount_loc already exists: object-file.o
+> > >
+> > > being spat out for every object file being built, and I can't figure out
+> > > what's causing that.
+> > 
+> > 
+> > Hm, no I have not. Do you have a feel for when it began? I can do a bisect.
 > 
-> This patch adds support for Armada XP and Armada 370. This reading of
-> the revision and the ID are done before the PCI initialization to
-> avoid any conflicts. Once these data are retrieved, the resources are
-> freed to let the PCI subsystem use it.
+> I don't know - I've only recently re-enabled those builds.  There's
+> suggestions from other architectures that it may be toolchain related -
+> some people have blamed binutils for it, but I'm running binutils 2.22.
 > 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/Makefile       |   2 +-
->  arch/arm/mach-mvebu/mvebu-soc-id.c | 111 +++++++++++++++++++++++++++++++++++++
->  include/linux/mvebu-soc-id.h       |  32 +++++++++++
->  3 files changed, 144 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
->  create mode 100644 include/linux/mvebu-soc-id.h
+> Hence why I'm interested if others see this too.
 > 
-> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-> index 2d04f0e21870..878aebe98dcc 100644
-> --- a/arch/arm/mach-mvebu/Makefile
-> +++ b/arch/arm/mach-mvebu/Makefile
-> @@ -3,7 +3,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->  
->  AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
->  
-> -obj-y				 += system-controller.o
-> +obj-y				 += system-controller.o mvebu-soc-id.o
->  obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
->  obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
->  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
-> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-> new file mode 100644
-> index 000000000000..86c901be284c
-> --- /dev/null
-> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-> @@ -0,0 +1,111 @@
-> +/*
-> + * Variant and revision information for mvebu SoCs
-> + *
-> + * Copyright (C) 2014 Marvell
-> + *
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * All the mvebu SoCs have information related to their variant and
-> + * revision that can be read from the PCI control register. This is
-> + * done before the PCI initialization to avoid any conflict. Once the
-> + * ID and revision are retrieved, the mapping is freed.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mvebu-soc-id.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +
-> +#define PCIE_DEV_ID_OFF		0x0
-> +#define PCIE_DEV_REV_OFF	0x8
-> +
-> +#define SOC_ID_MASK	    0xFFFF0000
-> +#define SOC_REV_MASK	    0xFF
-> +
-> +static u32 soc_dev_id;
-> +static u32 soc_rev;
-> +static bool is_id_valid;
-> +
-> +static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> +	{ .compatible = "marvell,armada-xp-pcie", },
-> +	{ .compatible = "marvell,armada-370-pcie", },
-> +	{},
-> +};
-> +
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
-> +{
-> +	if (is_id_valid) {
-> +		*dev = soc_dev_id;
-> +		*rev = soc_rev;
-> +		return 0;
-> +	} else
-> +		return -1;
-> +}
-> +
-> +EXPORT_SYMBOL(mvebu_get_soc_id);
-> +
-> +static int __init mvebu_soc_id_init(void)
-> +{
-> +	struct device_node *np;
-> +	int ret = 0;
-> +
-> +	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
-> +	if (np) {
-> +		void __iomem *pci_base;
-> +		struct clk *clk;
-> +		/*
-> +		 * ID and revision are available from any port, so we
-> +		 * just pick the first one
-> +		 */
-> +		struct device_node *child = of_get_next_child(np, NULL);
 
-Hi Gregory
+I just tried building allmodconfig using linux-next-20131224 and
+arm-linux-gnueabihf-gcc-4.8.1-7ubuntu1. I had to disable a bunch of
+drivers to get it to build, but didn't see the __mcount_loc problem.
 
-I'm away from my hardware at the moment. 
+What kernel tree and compiler are you using?
 
-Does this work when all the PCIe ports have status = "disabled";? We
-have many kirkwood devices in NAS boxes which don't use PCIe, so all
-the ports are disabled. But they still exist in the SoC, so we can
-read the IDs from them. I just don't know if of_get_next_child() will
-only return enabled children?
-
-Thanks
-	Andrew
-
-> +
-> +		clk = of_clk_get_by_name(child, NULL);
-> +		if (IS_ERR(clk)) {
-> +			pr_err("%s: cannot get clock\n", __func__);
-> +			ret = -ENOMEM;
-> +			goto clk_err;
-> +		}
-> +
-> +		ret = clk_prepare_enable(clk);
-> +		if (ret) {
-> +			pr_err("%s: cannot enable clock\n", __func__);
-> +			goto clk_err;
-> +		}
-> +
-> +		pci_base = of_iomap(child, 0);
-> +		if (IS_ERR(pci_base)) {
-> +			pr_err("%s: cannot map registers\n",  __func__);
-> +			ret = -ENOMEM;
-> +			goto res_ioremap;
-> +		}
-> +
-> +		/* SoC ID */
-> +		soc_dev_id = __raw_readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
-> +
-> +		/* SoC revision */
-> +		soc_rev = __raw_readl(pci_base + PCIE_DEV_REV_OFF)
-> +			& SOC_REV_MASK;
-> +
-> +		is_id_valid = true;
-> +
-> +		iounmap(pci_base);
-> +
-> +res_ioremap:
-> +		clk_disable_unprepare(clk);
-> +
-> +clk_err:
-> +		of_node_put(child);
-> +		of_node_put(np);
-> +	}
-> +
-> +	return ret;
-> +}
-> +arch_initcall(mvebu_soc_id_init);
-> +
-> diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
-> new file mode 100644
-> index 000000000000..602ce1c50d1d
-> --- /dev/null
-> +++ b/include/linux/mvebu-soc-id.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Marvell EBU SoC ID and revision definitions.
-> + *
-> + * Copyright (C) 2014 Marvell Semiconductor
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __LINUX_MVEBU_SOC_ID_H
-> +#define __LINUX_MVEBU_SOC_ID_H
-> +
-> +/* Armada XP ID */
-> +#define MV78230_DEV_ID	    0x7823
-> +#define MV78260_DEV_ID	    0x7826
-> +#define MV78460_DEV_ID	    0x7846
-> +
-> +/* Armada XP Revision */
-> +#define MV78XX0_A0_REV	    0x1
-> +#define MV78XX0_B0_REV	    0x2
-> +
-> +#ifdef CONFIG_ARCH_MVEBU
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
-> +#else
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
-> +{
-> +	return -1;
-> +}
-> +#endif
-> +
-> +#endif /* __LINUX_MVEBU_SOC_ID_H */
-> -- 
-> 1.8.1.2
-> 
+	Arnd
