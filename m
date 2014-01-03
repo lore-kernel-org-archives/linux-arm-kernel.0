@@ -1,56 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 3 Jan 2014 09:13:46 +0100
-Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
-In-Reply-To: <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
-References: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
- <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8sWLFnRZtuWOw2n96amAVc604Vk_HWD-9S6q1bZ5grhA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 03 Jan 2014 09:48:19 +0100
+Subject: [PATCH 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the Armada
+ XP SoCs
+In-Reply-To: <20140102184120.GD3914@katana>
+References: <1388678476-12875-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388678476-12875-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140102182822.GI19878@titan.lakedaemon.net> <20140102184120.GD3914@katana>
+Message-ID: <52C67953.1050503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 January 2014 19:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 2 January 2014 18:17, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
->> Building a multi-arch kernel results in:
+On 02/01/2014 19:41, Wolfram Sang wrote:
+> On Thu, Jan 02, 2014 at 01:28:22PM -0500, Jason Cooper wrote:
+>> Wolfram,
 >>
->> arch/arm/crypto/built-in.o: In function `aesbs_xts_decrypt':
->> sha1_glue.c:(.text+0x15c8): undefined reference to `bsaes_xts_decrypt'
->> arch/arm/crypto/built-in.o: In function `aesbs_xts_encrypt':
->> sha1_glue.c:(.text+0x1664): undefined reference to `bsaes_xts_encrypt'
->> arch/arm/crypto/built-in.o: In function `aesbs_ctr_encrypt':
->> sha1_glue.c:(.text+0x184c): undefined reference to `bsaes_ctr32_encrypt_blocks'
->> arch/arm/crypto/built-in.o: In function `aesbs_cbc_decrypt':
->> sha1_glue.c:(.text+0x19b4): undefined reference to `bsaes_cbc_encrypt'
+>> On Thu, Jan 02, 2014 at 05:01:16PM +0100, Gregory CLEMENT wrote:
+>>> The first variants of Armada XP SoCs (A0 stepping) have issues related
+>>> to the i2c controller which prevent to use the offload mechanism and
+>>> lead to a kernel hang during boot.
+>>>
+>>> The driver now check the revision of the SoC. If the revision is not
+>>> more recent than the A0 or if the driver can't get the SoC revision
+>>> then it disables the offload mechanism.
+>>>
+>>> Cc: stable at vger.kernel.org
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>  drivers/i2c/busses/i2c-mv64xxx.c | 11 ++++++++++-
+>>>  1 file changed, 10 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+>>> index 8be7e42aa4de..089a3663ad86 100644
+>>> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+>>> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+>>> @@ -24,6 +24,7 @@
+>>>  #include <linux/clk.h>
+>>>  #include <linux/err.h>
+>>>  #include <linux/delay.h>
+>>> +#include <linux/mvebu-soc-id.h>
+>>>  
+>>>  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
+>>>  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
+>>> @@ -779,8 +780,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>>>  	 * Transaction Generator support and the errata fix.
+>>>  	 */
+>>>  	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
+>>> -		drv_data->offload_enabled = true;
+>>> +		u32 dev, rev;
+>>> +
+>>>  		drv_data->errata_delay = true;
+>>> +		/*
+>>> +		 * Only revison more recent than A0 support offload
+>>> +		 * mechanism. In case we can't get the SoC revision
+>>> +		 * weplay safe and we don't enable it
+>>> +		 */
+>>> +		if (!mvebu_get_soc_id(&rev, &dev) && (dev > MV78XX0_A0_REV))
+> 
+> Very minor nits:
+> 
+> I'd prefer (mvebu_get_soc_id == 0) here, since !mvebu_get_soc_id can
+> easily be read as "if not get soc id" which leads to the assumption the
+> function failed. 
+
+yes fair enough
+
+>And the parantheses around the second comparison are
+> superfluous.
+> 
+
+I know but I found it clearer with parenthesis but I can remove them.
+
+>>> +			drv_data->offload_enabled = true;
 >>
->
-> Interestingly, when I try to reproduce this, the reference is
-> (correctly) reported to reside in aesbs-glue.c and not sha1_glue.c
->
->> This code is already runtime-conditional on NEON being supported, so
->> there's no point compiling it out depending on the minimum build
->> architecture.
->>
->
-> Agreed. It is a leftover from the way this code was embedded into
-> OpenSSL originally.
->
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> ---
->> This is more a request for acks since I'd like to keep it/push it through
->> my tree to reduce the autobuilder failures.
->>
->>  arch/arm/crypto/bsaes-armv7.pl |    2 +-
->
-> The .S_shipped file produced by this script should be updated at the same time.
->
+>> Since this depends on arch-specific code in the previous patch, I'd like
+>> to keep the two of them together in a topic branch.  Would you prefer to
+>> take both with my Ack, or vice-versa?  I'm fine either way.
+> 
+> I'd think you better take it:
+> 
+> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> 
 
-Hello Russell,
+I am going to resubmit a series with the change you asked and your acked-by
 
-I noticed that this patch has turned up in rmk/fixes.
-
-Please be aware that by not updating the .S_shipped file in concert
-with the .pl file, we have a build time dependency on Perl now,
-something we tried to avoid when we discussed the original series
-http://marc.info/?l=linux-arm-kernel&m=138091140313491&w=2
-
-Regards,
-Ard.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
