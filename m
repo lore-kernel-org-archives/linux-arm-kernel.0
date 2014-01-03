@@ -1,78 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 3 Jan 2014 19:48:00 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 3 Jan 2014 19:49:29 +0100
+Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
 References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140103194800.2d3ca026@skate>
+ <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140103194929.706f93c6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Gregory CLEMENT,
 
-On Fri,  3 Jan 2014 10:59:44 +0100, Gregory CLEMENT wrote:
-> +static int __init mvebu_soc_id_init(void)
-> +{
-> +	struct device_node *np;
-> +	int ret = 0;
-> +
-> +	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
-> +	if (np) {
+On Fri,  3 Jan 2014 10:59:45 +0100, Gregory CLEMENT wrote:
 
-Change this to:
-
-	if (!np)
-		return 0;
-
-so that you avoid indenting the entire function code inside the if
-{ ... } block.
-
-> +		void __iomem *pci_base;
-> +		struct clk *clk;
 > +		/*
-> +		 * ID and revision are available from any port, so we
-> +		 * just pick the first one
+> +		 * Only revison more recent than A0 support offload
+
+revison -> revisions
+
+offload mechanism -> the offload mechanism
+
+> +		 * mechanism. In case we can't get the SoC revision
+> +		 * weplay safe and we don't enable it
+
+weplay -> we play
+
 > +		 */
-> +		struct device_node *child = of_get_next_child(np, NULL);
+> +		if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
+> +			drv_data->offload_enabled = true;
+>  	}
+>  
+>  out:
 
-Maybe check that child is not NULL here?
-
-> +
-> +		clk = of_clk_get_by_name(child, NULL);
-> +		if (IS_ERR(clk)) {
-> +			pr_err("%s: cannot get clock\n", __func__);
-
-I think you should rather do:
-
-#define pr_fmt(fmt) "mvebu-soc-id: " fmt
-
-at the beginning of your C file and get rid of the "%s" for the
-__func__.
-
-> +		/* SoC ID */
-> +		soc_dev_id = __raw_readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
-> +
-> +		/* SoC revision */
-> +		soc_rev = __raw_readl(pci_base + PCIE_DEV_REV_OFF)
-> +			& SOC_REV_MASK;
-
-Use readl() for both of these reads. __raw_readl() will not work
-properly when the system is booted big-endian.
-
-> +	return ret;
-> +}
-> +arch_initcall(mvebu_soc_id_init);
-
-> +#ifdef CONFIG_ARCH_MVEBU
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
-> +#else
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
-
-Missing "static inline". Without these, if this header file is included
-more than once, you will have two times the same symbol defined.
-
-Best regards,
+Thanks!
 
 Thomas
 -- 
