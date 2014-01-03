@@ -1,46 +1,34 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Fri, 3 Jan 2014 09:39:31 +0900
-Subject: ARM: mm: Could I change module space size or place modules in
- vmalloc area?
-In-Reply-To: <20140102101359.GU6589@tarshish>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <20140102101359.GU6589@tarshish>
-Message-ID: <002e01cf081c$44a11e70$cde35b50$@lge.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Jan 2014 01:44:10 +0100
+Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
+In-Reply-To: <20140102230832.GB9339@obsidianresearch.com>
+References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
+ <20131228170114.GH19878@titan.lakedaemon.net>
+ <20140102194924.GA3321@obsidianresearch.com>
+ <1388702192.16958.54.camel@hastur.hellion.org.uk>
+ <20140102230832.GB9339@obsidianresearch.com>
+Message-ID: <20140103004410.GA16928@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for reply.
+> .. and since the problem only shows obviously with multiplatform
+> kernels that have been relocated it could be a broader, subtler issue
+> than just your one board ...
 
-> -----Original Message-----
-> From: Baruch Siach [mailto:baruch at tkos.co.il]
-> Sent: Thursday, January 02, 2014 7:14 PM
-> To: Gioh Kim
-> Cc: Russell King; linux-mm at kvack.org; linux-arm-kernel; HyoJun Im
-> Subject: Re: ARM: mm: Could I change module space size or place modules in
-> vmalloc area?
-> 
-> Hi Gioh,
-> 
-> On Thu, Jan 02, 2014 at 07:04:13PM +0900, Gioh Kim wrote:
-> > I run out of module space because I have several big driver modules.
-> > I know I can strip the modules to decrease size but I need debug info
-> now.
-> 
-> Are you sure you need the debug info in kernel memory? I don't think the
-> kernel is actually able to parse DWARF. You can load stripped binaries
-> into the kernel, and still use the debug info with whatever tool you have.
+It is not just this board. It is any board using an old mainline
+u-boot. Any such system will not boot with a kernel after 3.1. It was
+at that point that the issue was found and fixed in u-boot. My Bubba3
+has a u-boot before that point...
 
-I agree you but driver developers of another team don't agree.
-I don't know why but they say they will strip drivers later :-(
-So I need to increase modules space size.
+> Jason C: What do you think about applying this [untested]?
 
+I'm away for the weekend, so cannot test it.
+ 
+> Or do you think the kernel should support booting with L2 on (this is
+> just two instructions, but they need to be conditional on the CPU type
+> :( :( )?
 
-> 
-> baruch
-> 
-> --
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open
-Systems
-> =}------------------------------------------------ooO--U--Ooo------------
-> {=
->    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+It would be good to at least put the fix into the impedance matcher,
+so there is no need to mess with the kernel.
+
+   Andrew
