@@ -1,16 +1,15 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  3 Jan 2014 11:11:04 +0100
-Subject: [PATCH v1 19/24] zynq-common: Define flash env. partition
+Date: Fri,  3 Jan 2014 11:11:03 +0100
+Subject: [PATCH v1 18/24] zynq-common: Change Env. Sector size to 128Kb
 In-Reply-To: <cover.1388743861.git.michal.simek@xilinx.com>
 References: <cover.1388743861.git.michal.simek@xilinx.com>
-Message-ID: <9c00c6840757ad351a96ecb1c1b1bb0132c2160b.1388743861.git.michal.simek@xilinx.com>
+Message-ID: <9b18279d14485ff418e22b758c76695cccdfe242.1388743861.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagannadha Sutradharudu Teki <jagannadha.sutradharudu-teki@xilinx.com>
 
-Last 128Kb sector of 1Mb flash is defined as u-boot
-environment partition.
+Changed Env. Sector size from 0x10000 to 128Kb
 
 Signed-off-by: Jagannadha Sutradharudu Teki <jaganna@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
@@ -18,32 +17,25 @@ Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
 Changes in v1: None
 
- include/configs/zynq.h | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ include/configs/zynq.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/include/configs/zynq.h b/include/configs/zynq.h
-index a6caf0c..2e82073 100644
+index 5a33e15..a6caf0c 100644
 --- a/include/configs/zynq.h
 +++ b/include/configs/zynq.h
-@@ -110,7 +110,17 @@
- #define CONFIG_ENV_SIZE			(128 << 10)
+@@ -106,8 +106,10 @@
+ #define CONFIG_BOOTP_HOSTNAME
+ #define CONFIG_BOOTP_MAY_FAIL
 
- /* Environment */
--#define CONFIG_ENV_IS_NOWHERE
-+#ifndef CONFIG_ENV_IS_NOWHERE
-+# ifndef CONFIG_SYS_NO_FLASH
-+#  define CONFIG_ENV_IS_IN_FLASH
-+# elif defined(CONFIG_SYS_NO_FLASH)
-+#  define CONFIG_ENV_IS_NOWHERE
-+# endif
++/* Total Size of Environment Sector */
++#define CONFIG_ENV_SIZE			(128 << 10)
 +
-+# define CONFIG_ENV_SECT_SIZE		CONFIG_ENV_SIZE
-+# define CONFIG_ENV_OFFSET		0xE0000
-+# define CONFIG_CMD_SAVEENV
-+#endif
+ /* Environment */
+-#define CONFIG_ENV_SIZE		0x10000 /* Env. sector size */
+ #define CONFIG_ENV_IS_NOWHERE
 
  /* Default environment */
- #define CONFIG_EXTRA_ENV_SETTINGS	\
 --
 1.8.2.3
 
@@ -53,4 +45,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/11ffe7ad/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/3005efb5/attachment.sig>
