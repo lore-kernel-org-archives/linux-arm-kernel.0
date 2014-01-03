@@ -1,102 +1,96 @@
 From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Fri, 3 Jan 2014 14:54:26 +0530
-Subject: [PATCH 1/7] ARM: EXYNOS: initial board support for exynos5260 SoC
-In-Reply-To: <2452273.S9E2sU17uX@amdc1227>
+Date: Fri, 3 Jan 2014 14:56:18 +0530
+Subject: [PATCH 2/7] pinctrl: exynos: add exynos5260 SoC specific data
+In-Reply-To: <1548210.PeZ57k2d5L@amdc1227>
 References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-2-git-send-email-rahul.sharma@samsung.com>
- <2452273.S9E2sU17uX@amdc1227>
-Message-ID: <CAPdUM4MHZz4z6D8VtyAAA0T1znQpeTeC-NR1shMBMJwmJ3_fqQ@mail.gmail.com>
+ <1386345391-23482-3-git-send-email-rahul.sharma@samsung.com>
+ <1548210.PeZ57k2d5L@amdc1227>
+Message-ID: <CAPdUM4Pjx3eHoMQJ=vfaxNy9sPTiQzeemPDAJuHkXTYEqU4T+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Tomasz,
 
-Sorry for responding late.
-
-On 10 December 2013 21:27, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Pankaj, Rahul, Arun,
+On 10 December 2013 21:34, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Young-Gun, Pankaj, Rahul, Arun,
 >
-> In addition to issues already pointed by Sachin, please also see my
-> comments inline.
+> Please see my comments inline.
 >
-> On Friday 06 of December 2013 21:26:25 Rahul Sharma wrote:
->> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+> On Friday 06 of December 2013 21:26:26 Rahul Sharma wrote:
+>> From: Young-Gun Jang <yg1004.jang@samsung.com>
 >>
->> This patch add basic arch side support for exynos5260 SoC.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
->> ---
->>  arch/arm/mach-exynos/Kconfig                 |    9 +++++++++
->>  arch/arm/mach-exynos/common.c                |   19 ++++++++++++++++++-
->>  arch/arm/mach-exynos/cpuidle.c               |    2 +-
->>  arch/arm/mach-exynos/include/mach/map.h      |    1 +
->>  arch/arm/mach-exynos/include/mach/regs-pmu.h |    4 ++++
->>  arch/arm/mach-exynos/mach-exynos5-dt.c       |    1 +
->>  arch/arm/plat-samsung/include/plat/cpu.h     |    8 ++++++++
->>  arch/arm/plat-samsung/include/plat/map-s5p.h |    1 +
->>  8 files changed, 43 insertions(+), 2 deletions(-)
+>> Add Samsung Exynos5260 SoC specific data to enable pinctrl
+>> support for all platforms based on EXYNOS5260.
 > [snip]
->> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
->> index ddbfe87..405c11a 100644
->> --- a/arch/arm/mach-exynos/cpuidle.c
->> +++ b/arch/arm/mach-exynos/cpuidle.c
->> @@ -120,7 +120,7 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
->>       cpu_suspend(0, idle_finisher);
+>> diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+>> index 155b1b3..9a93df6 100644
+>> --- a/drivers/pinctrl/pinctrl-exynos.c
+>> +++ b/drivers/pinctrl/pinctrl-exynos.c
+>> @@ -1042,6 +1042,88 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+>>       },
+>>  };
 >>
->>  #ifdef CONFIG_SMP
->> -     if (!soc_is_exynos5250())
->> +     if (!soc_is_exynos5250() || soc_is_exynos5260())
+>> +/* pin banks of exynos5260 pin-controller 0 */
+>> +static struct samsung_pin_bank exynos5260_pin_banks0[] = {
+>> +     EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpa0", 0x00),
+>> +     EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpa1", 0x04),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
+>> +     EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpb0", 0x0c),
+>> +     EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpb1", 0x10),
+>> +     EXYNOS_PIN_BANK_EINTG(5, 0x0A0, "gpb2", 0x14),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x0C0, "gpb3", 0x18),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x0E0, "gpb4", 0x1c),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpb5", 0x20),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd0", 0x24),
+>> +     EXYNOS_PIN_BANK_EINTG(7, 0x140, "gpd1", 0x28),
+>> +     EXYNOS_PIN_BANK_EINTG(5, 0x160, "gpd2", 0x2c),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpe0", 0x30),
+>> +     EXYNOS_PIN_BANK_EINTG(5, 0x1A0, "gpe1", 0x34),
+>> +     EXYNOS_PIN_BANK_EINTG(4, 0x1C0, "gpf0", 0x38),
+>> +     EXYNOS_PIN_BANK_EINTG(8, 0x1E0, "gpf1", 0x3c),
+>> +     EXYNOS_PIN_BANK_EINTG(2, 0x200, "gpk0", 0x40),
+>> +     EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gpx0", 0x00),
+>> +     EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gpx1", 0x04),
+>> +     EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gpx2", 0x08),
+>> +     EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gpx3", 0x0c),
 >
-> The added OR condition doesn't affect the if condition in any way, because
-> when running on Exynos5260, soc_is_exynos5250() will return false and make
-> the whole condition evaluate to true.
->
-> Shouldn't it be
->
->         if (!soc_is_exynos5250() && !soc_is_exynos5260())
->
-> if Exynos5260 doesn't need scu_enable(), or left as is if it needs?
+> nit: Please use lowercase hexadecimal characters. Despite of already
+> existing code, lowercase is the preferred way.
 >
 
-Actually we don't need to call scu_enable() for 5260. Hence leaving it as it is.
+Changed.
 
->>               scu_enable(S5P_VA_SCU);
->>  #endif
->>       cpu_pm_exit();
->> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
->> index 7b046b5..bd6fa02 100644
->> --- a/arch/arm/mach-exynos/include/mach/map.h
->> +++ b/arch/arm/mach-exynos/include/mach/map.h
->> @@ -29,6 +29,7 @@
->>  #define EXYNOS4210_PA_SYSRAM_NS              0x0203F000
->>  #define EXYNOS4x12_PA_SYSRAM_NS              0x0204F000
->>  #define EXYNOS5250_PA_SYSRAM_NS              0x0204F000
->> +#define EXYNOS5260_PA_SYSRAM_NS              0x02073000
->>
->>  #define EXYNOS_PA_CHIPID             0x10000000
->>
->> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
->> index 2cdb63e..09ae29a 100644
->> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
->> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
->> @@ -234,6 +234,10 @@
->>
->>  #define EXYNOS5_SYS_WDTRESET                                 (1 << 20)
->>
->> +#define EXYNOS5260_A7_WDTRST                                 (1 << 24)
->> +#define EXYNOS5260_A15_WDTRST                                        (1 << 23)
->> +#define EXYNOS5260_SYS_WDTRESET      (EXYNOS5260_A7_WDTRST || EXYNOS5260_A15_WDTRST)
+>> +};
 >> +
+>> +/* pin banks of exynos5260 pin-controller 1 */
+>> +static struct samsung_pin_bank exynos5260_pin_banks1[] = {
+>> +     EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpc0", 0x00),
+>> +     EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpc1", 0x04),
+>> +     EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpc2", 0x08),
+>> +     EXYNOS_PIN_BANK_EINTG(4, 0x060, "gpc3", 0x0c),
+>> +     EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpc4", 0x10),
+>> +};
+>> +
+>> +/* pin banks of exynos5260 pin-controller 2 */
+>> +static struct samsung_pin_bank exynos5260_pin_banks2[] = {
+>> +     EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
+>> +     EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
+>> +};
+>> +
+>> +/*
+>> + * Samsung pinctrl driver data for Exynos5260 SoC. Exynos5420 SoC includes
+>> + * four gpio/pin-mux/pinconfig controllers.
 >
-> Are these definitions needed? I don't see any user in this patch.
+> Hmm, I can see only three of them below. Is there one left undefined?
+
+There are only three. I updated the comment.
+
+regards,
+Rahul Sharma
+
 >
-
-Removed these definitions.
-
-Regards,
-Rahul Sharma.
-
+> Otherwise, the patch looks fine.
+>
 > Best regards,
 > Tomasz
 >
