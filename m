@@ -1,65 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 11:00:30 +0000
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140103031055.GB28751@kroah.com>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
-Message-ID: <20140103110030.GH7383@n2100.arm.linux.org.uk>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 3 Jan 2014 20:19:12 +0900
+Subject: [PATCH v2 4/6] ARM: tegra: rework fuse.c
+In-Reply-To: <1387891931-9854-5-git-send-email-pdeschrijver@nvidia.com>
+References: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
+ <1387891931-9854-5-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAAVeFuJ2i6N-=bGqjTZNmgD3iT-7vSxaWze+QFLbf4jjhU7dNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 07:10:55PM -0800, Greg Kroah-Hartman wrote:
-> On Thu, Jan 02, 2014 at 09:27:58PM +0000, Russell King wrote:
-> > Subsystems such as ALSA, DRM and others require a single card-level
-> > device structure to represent a subsystem.  However, firmware tends to
-> > describe the individual devices and the connections between them.
-> > 
-> > Therefore, we need a way to gather up the individual component devices
-> > together, and indicate when we have all the component devices.
-> > 
-> > We do this in DT by providing a "superdevice" node which specifies
-> > the components, eg:
-> > 
-> > 	imx-drm {
-> > 		compatible = "fsl,drm";
-> > 		crtcs = <&ipu1>;
-> > 		connectors = <&hdmi>;
-> > 	};
-> > 
-> > The superdevice is declared into the component support, along with the
-> > subcomponents.  The superdevice receives callbacks to locate the
-> > subcomponents, and identify when all components are present.  At this
-> > point, we bind the superdevice, which causes the appropriate subsystem
-> > to be initialised in the conventional way.
-> > 
-> > When any of the components or superdevice are removed from the system,
-> > we unbind the superdevice, thereby taking the subsystem down.
-> 
-> This sounds a lot like the "containers" code that Rafael just submitted
-> and I acked for 3.14.  Look at the lkml post:
-> 	Subject: [PATCH 2/2] ACPI / hotplug / driver core: Handle containers in a special way
-> 	Message-ID: <1991202.gilW172FBV@vostro.rjw.lan>
-> 
-> And see if that could possibly be used instead?
+On Tue, Dec 24, 2013 at 10:32 PM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> Reduce fuse.c to the minimum functionality required for the early bootstages.
+> Also export tegra_read_straps() for use by the fuse driver.
+>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-That's really disappointing bcause I've put a hell of a lot of work into
-this over the last few months, and if that's true it's all just been a
-total waste of my time.  Okay, lesson learned - don't spend any time
-trying to fix other people's problems after discussing them at
-kernel-summit.
+Fine with this since the fuse clock is still explicitly enabled during init.
 
-In any case, the above message ID doesn't give me access to this containers
-code to look at to even evaluate whether it can be used for this - it just
-gives two patches for ACPI specific patches but not the core stuff.
-
-http://www.spinics.net/lists/linux-acpi/msg48101.html
-http://www.spinics.net/lists/linux-acpi/msg48102.html
-
-Please provide a better reference to the code you're referring to.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
