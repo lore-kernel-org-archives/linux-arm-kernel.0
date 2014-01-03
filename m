@@ -1,47 +1,43 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 2 Jan 2014 19:10:55 -0800
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140103031055.GB28751@kroah.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 Jan 2014 11:22:31 +0800
+Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
+ reset
+In-Reply-To: <1388715253-17206-1-git-send-email-festevam@gmail.com>
+References: <1388715253-17206-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140103032230.GC25079@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 09:27:58PM +0000, Russell King wrote:
-> Subsystems such as ALSA, DRM and others require a single card-level
-> device structure to represent a subsystem.  However, firmware tends to
-> describe the individual devices and the connections between them.
+On Fri, Jan 03, 2014 at 12:14:13AM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Therefore, we need a way to gather up the individual component devices
-> together, and indicate when we have all the component devices.
+> Since commit 7a399e3a2e (fec: Do not assume that PHY reset is active low), we no
+> longer assume that the PHY reset is active low.
 > 
-> We do this in DT by providing a "superdevice" node which specifies
-> the components, eg:
+> Now we need to retrieve this information from the device tree instead.
 > 
-> 	imx-drm {
-> 		compatible = "fsl,drm";
-> 		crtcs = <&ipu1>;
-> 		connectors = <&hdmi>;
-> 	};
+> Passing '0' as the phy-reset-gpios means 'active high' according to the 
+> definition from include/dt-bindings/gpio/gpio.h:
 > 
-> The superdevice is declared into the component support, along with the
-> subcomponents.  The superdevice receives callbacks to locate the
-> subcomponents, and identify when all components are present.  At this
-> point, we bind the superdevice, which causes the appropriate subsystem
-> to be initialised in the conventional way.
+> #define GPIO_ACTIVE_HIGH 0
+> #define GPIO_ACTIVE_LOW 1
 > 
-> When any of the components or superdevice are removed from the system,
-> we unbind the superdevice, thereby taking the subsystem down.
+> , so in order to keep things working as before we need to explicitly pass
+> GPIO_ACTIVE_LOW as the flag.
 
-This sounds a lot like the "containers" code that Rafael just submitted
-and I acked for 3.14.  Look at the lkml post:
-	Subject: [PATCH 2/2] ACPI / hotplug / driver core: Handle containers in a special way
-	Message-ID: <1991202.gilW172FBV@vostro.rjw.lan>
+So it sounds like we have a git bisect issue here.
 
-And see if that could possibly be used instead?
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Shawn,
+> 
+> This is needed for 3.13 as 7a399e3a2e (fec: Do not assume that PHY reset is 
+> active low) already reached mainline.
 
-thanks,
+If this is needed for 3.13, you should generate the patch against the
+mainline where the fec change is in place rather than my for-next
+branch.  And for those dts files that can only be patched against my
+for-next branch, we need another patch.
 
-greg k-h
+Shawn
