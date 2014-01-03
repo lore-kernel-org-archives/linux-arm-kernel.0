@@ -1,18 +1,23 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  3 Jan 2014 11:11:01 +0100
-Subject: [PATCH v1 16/24] zynq: Add Catalyst 24WC08 EEPROM config support
+Date: Fri,  3 Jan 2014 11:11:02 +0100
+Subject: [PATCH v1 17/24] zynq-common: Define default environment
 In-Reply-To: <cover.1388743861.git.michal.simek@xilinx.com>
 References: <cover.1388743861.git.michal.simek@xilinx.com>
-Message-ID: <eb4b1bd909db10078eb6e80d72ab4c757c878df0.1388743861.git.michal.simek@xilinx.com>
+Message-ID: <7c5314edd479185e912dacf89ce9540c425b42d0.1388743861.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagannadha Sutradharudu Teki <jagannadha.sutradharudu-teki@xilinx.com>
 
-Adds configurations for Catalyst 24WC08 EEPROM, which
-is present on the zynq boards.
+Defined default env. for autoboot FIT image from
+respective boot devices.
 
-Enable EEPROM support for zynq boards.
+Default settings:
+fit_image=fit.itb
+load_addr=0x2000000
+fit_size=0x800000
+flash_off=0x100000
+nor_flash_off=0xE2100000
 
 Signed-off-by: Jagannadha Sutradharudu Teki <jaganna@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
@@ -20,31 +25,43 @@ Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
 Changes in v1: None
 
- include/configs/zynq.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ include/configs/zynq.h | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/include/configs/zynq.h b/include/configs/zynq.h
-index c90d4fd..2ea5d3f 100644
+index 2ea5d3f..5a33e15 100644
 --- a/include/configs/zynq.h
 +++ b/include/configs/zynq.h
-@@ -89,6 +89,17 @@
- # define CONFIG_SYS_I2C_ZYNQ_SLAVE		1
- #endif
-
-+#define CONFIG_ZYNQ_EEPROM
-+/* EEPROM */
-+#ifdef CONFIG_ZYNQ_EEPROM
-+# define CONFIG_CMD_EEPROM
-+# define CONFIG_SYS_I2C_EEPROM_ADDR_LEN		1
-+# define CONFIG_SYS_I2C_EEPROM_ADDR		0x54
-+# define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	4
-+# define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS	5
-+# define CONFIG_SYS_EEPROM_SIZE			1024 /* Bytes */
-+#endif
+@@ -109,7 +109,28 @@
+ /* Environment */
+ #define CONFIG_ENV_SIZE		0x10000 /* Env. sector size */
+ #define CONFIG_ENV_IS_NOWHERE
+-#define CONFIG_SYS_LOAD_ADDR	0
 +
- #define CONFIG_BOOTP_SERVERIP
- #define CONFIG_BOOTP_BOOTPATH
- #define CONFIG_BOOTP_GATEWAY
++/* Default environment */
++#define CONFIG_EXTRA_ENV_SETTINGS	\
++	"fit_image=fit.itb\0"		\
++	"load_addr=0x2000000\0"		\
++	"fit_size=0x800000\0"		\
++	"flash_off=0x100000\0"		\
++	"nor_flash_off=0xE2100000\0"	\
++	"fdt_high=0x20000000\0"		\
++	"initrd_high=0x20000000\0"	\
++	"norboot=echo Copying FIT from NOR flash to RAM... && " \
++		"cp.b ${nor_flash_off} ${load_addr} ${fit_size} && " \
++		"bootm ${load_addr}\0" \
++	"sdboot=echo Copying FIT from SD to RAM... && " \
++		"fatload mmc 0 ${load_addr} ${fit_image} && " \
++		"bootm ${load_addr}\0" \
++	"jtagboot=echo TFTPing FIT to RAM... && " \
++		"tftp ${load_addr} ${fit_image} && " \
++		"bootm ${load_addr}\0"
++#define CONFIG_BOOTCOMMAND		"run $modeboot"
++#define CONFIG_BOOTDELAY		3 /* -1 to Disable autoboot */
++#define CONFIG_SYS_LOAD_ADDR		0 /* default? */
+
+ /* Miscellaneous configurable options */
+ #define CONFIG_SYS_PROMPT		"zynq-uboot> "
 --
 1.8.2.3
 
@@ -54,4 +71,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/be75112e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/89206355/attachment-0001.sig>
