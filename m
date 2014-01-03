@@ -1,54 +1,87 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 3 Jan 2014 11:17:03 +0200
-Subject: [PATCHv12 07/49] clk: divider: add support for low level ops
-In-Reply-To: <20131222175235.GC8064@book.gsilab.sittig.org>
-References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
- <1387557274-22583-7-git-send-email-t-kristo@ti.com>
- <20131222175235.GC8064@book.gsilab.sittig.org>
-Message-ID: <52C6800F.3090303@ti.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Fri, 3 Jan 2014 09:19:22 +0000
+Subject: [PATCHv8 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <3716216.GQHQhxMFvx@wuerfel>
+References: <1388656624-26570-1-git-send-email-Li.Xiubo@freescale.com>
+ <1388656624-26570-2-git-send-email-Li.Xiubo@freescale.com>
+ <3716216.GQHQhxMFvx@wuerfel>
+Message-ID: <bb5e14370ddb4ce2921140d147244097@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2013 07:52 PM, Gerhard Sittig wrote:
-> [ dropped devicetree, we're clock specific here ]
->
-> On Fri, Dec 20, 2013 at 18:34 +0200, Tero Kristo wrote:
->>
->> Divider clock can now be registered to use low level register access ops.
->> Preferred initialization method is via clock description.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   drivers/clk/clk-divider.c    |   22 +++++++++++++++++++---
->>   include/linux/clk-provider.h |    4 ++++
->>   2 files changed, 23 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
->> index 8cfed5c..887e2d8 100644
->> --- a/drivers/clk/clk-divider.c
->> +++ b/drivers/clk/clk-divider.c
->> @@ -108,7 +108,12 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->>   	struct clk_divider *divider = to_clk_divider(hw);
->>   	unsigned int div, val;
->>
->> -	val = clk_readl(divider->reg) >> divider->shift;
->> +	if (divider->ll_ops)
->> +		val = divider->ll_ops->clk_readl(divider->reg);
->> +	else
->> +		val = clk_readl(divider->reg);
->
-> Should this not better always use an ll_ops structure, which
-> either is individual to the clock item, or is "global" for a
-> platform, yet can get re-registered at runtime (see the comment
-> on 06/49)?  And why are you referencing clk_readl() instead of
-> clk_readl_default() which you specifically have introduced in the
-> previous patch?  Adding a copy of the routine and using both the
-> copy and the original doesn't look right.
+Hi Arnd,
 
-In some cases, the clock data is defined statically during compile time 
-and here, ll_ops can be (and for OMAP cases at least is) NULL. I had 
-kind of a global ll_ops definition in some of the earlier versions of 
-this series, but it was frowned upon by some of the maintainers thus I 
-dropped it.
 
--Tero
+> Subject: Re: [PATCHv8 1/4] pwm: Add Freescale FTM PWM driver support
+> 
+> On Thursday 02 January 2014 17:57:01 Xiubo Li wrote:
+> > +static inline u32 ftm_readl(bool big_endian, const void __iomem *addr)
+> > +{
+> > +       u32 val;
+> > +
+> > +       val = __raw_readl(addr);
+> > +
+> > +       if (likely(big_endian))
+> > +               val = be32_to_cpu((__force __be32)val);
+> > +       else
+> > +               val = le32_to_cpu((__force __le32)val);
+> > +       rmb();
+> > +
+> > +       return val;
+> > +}
+> > +
+> > +static inline void ftm_writel(bool big_endian, u32 val, void __iomem *addr)
+> > +{
+> > +       wmb();
+> > +       if (likely(big_endian))
+> > +               val = (__force u32)cpu_to_be32(val);
+> > +       else
+> > +               val = (__force u32)cpu_to_le32(val);
+> > +
+> > +       __raw_writel(val, addr);
+> 
+> These functions definitely need some comments regarding why this is necessary.
+> I assume that after 8 rounds of review (that I did not read) this has been
+> discussed already, so please explain above the functions why you don't just
+> use ioread32be/ioread32 and iowrite32be/iowrite32 here.
+>
+
+As Thierry has commonts in some days before:
+----
+A few years ago GregKH commented in response to a patch that ioread*()
+weren't supposed to be used for memory-mapped only devices. The original
+purpose apparently was to allow drivers to work with both I/O and
+memory-mapped devices.
+----
+I'm not very sure.
+
+The big-endian supports is added at v7~v8 patch series.
+
+
+> Also all callers seem to be of the style
+> 
+>        val = ftm_readl(fpc->big_endian, fpc->base + FTM_SC);
+> 
+> so I wonder why you don't just pass the fpc pointer to the function
+> and make it
+> 
+> static inline void ftm_readl(struct fsl_pwm_chip *fpc, unsigned long reg, u32
+> val)
+> {
+> 	if (fpc->big_endian)
+> 		iowrite32be(val, fpc->base + reg);
+> 	else
+> 		iowrite32(val, fpc->base + reg);
+> }
+> 
+
+Yes, it was.
+
+I thought this will make the ftm_readl/ftm_writel look more brief like other drivers.
+
+ 
+Thanks very much.
+
+--
+Best Regards,
+Xiubo
