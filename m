@@ -1,28 +1,81 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 3 Jan 2014 11:44:24 -0700
-Subject: Issue with the emulated PCI bridge implementation
-In-Reply-To: <201401031322.31433.arnd@arndb.de>
-References: <20131226160534.36cc4203@skate> <20131226165241.2c50b244@skate>
- <20140103002656.GA12098@obsidianresearch.com>
- <201401031322.31433.arnd@arndb.de>
-Message-ID: <20140103184424.GC12098@obsidianresearch.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 3 Jan 2014 19:48:00 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140103194800.2d3ca026@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 01:22:31PM +0100, Arnd Bergmann wrote:
+Dear Gregory CLEMENT,
 
-> However the part that made me wonder is that an e1000e with a PCI bridge
-> actually /should/not/ need to allocate an I/O space window with a precious
-> mbus resource, since AFAIK this adapter does not have an I/O space BARs.
+On Fri,  3 Jan 2014 10:59:44 +0100, Gregory CLEMENT wrote:
+> +static int __init mvebu_soc_id_init(void)
+> +{
+> +	struct device_node *np;
+> +	int ret = 0;
+> +
+> +	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
+> +	if (np) {
 
-IIRC the e1000 still has a legacy IO port BAR.. (guessing it is used
-for PXE boot on x86?)
+Change this to:
 
-My patch set to allow the DT to turn off IO port allocation is already
-in mainline - drop the IO ranges from the DT and no IO resources are
-consumed at all.
+	if (!np)
+		return 0;
 
-Though, that is an interesting point, a small refinement would be to
-not allocate the pci io map if IO is turned off as well..
+so that you avoid indenting the entire function code inside the if
+{ ... } block.
 
-Jason
+> +		void __iomem *pci_base;
+> +		struct clk *clk;
+> +		/*
+> +		 * ID and revision are available from any port, so we
+> +		 * just pick the first one
+> +		 */
+> +		struct device_node *child = of_get_next_child(np, NULL);
+
+Maybe check that child is not NULL here?
+
+> +
+> +		clk = of_clk_get_by_name(child, NULL);
+> +		if (IS_ERR(clk)) {
+> +			pr_err("%s: cannot get clock\n", __func__);
+
+I think you should rather do:
+
+#define pr_fmt(fmt) "mvebu-soc-id: " fmt
+
+at the beginning of your C file and get rid of the "%s" for the
+__func__.
+
+> +		/* SoC ID */
+> +		soc_dev_id = __raw_readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
+> +
+> +		/* SoC revision */
+> +		soc_rev = __raw_readl(pci_base + PCIE_DEV_REV_OFF)
+> +			& SOC_REV_MASK;
+
+Use readl() for both of these reads. __raw_readl() will not work
+properly when the system is booted big-endian.
+
+> +	return ret;
+> +}
+> +arch_initcall(mvebu_soc_id_init);
+
+> +#ifdef CONFIG_ARCH_MVEBU
+> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
+> +#else
+> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
+
+Missing "static inline". Without these, if this header file is included
+more than once, you will have two times the same symbol defined.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
