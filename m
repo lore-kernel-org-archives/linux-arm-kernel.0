@@ -1,22 +1,105 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 2 Jan 2014 16:50:50 -0800
-Subject: [PATCH 1/2] seqlock: Use raw_ prefix instead of _no_lockdep
-In-Reply-To: <1388704274-5278-1-git-send-email-john.stultz@linaro.org>
-References: <52C5E675.80701@linaro.org>
- <1388704274-5278-1-git-send-email-john.stultz@linaro.org>
-Message-ID: <CA+55aFxv8wTRifZ9iHn-tCfUqwpJZmLiF7QU=Pc6dVa8QnTyCQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 2 Jan 2014 17:52:53 -0700
+Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
+References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
+ <1387785725-24262-3-git-send-email-tinamdar@apm.com>
+ <20131223174634.GD25089@obsidianresearch.com>
+ <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
+Message-ID: <20140103005253.GB12098@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 2, 2014 at 3:11 PM, John Stultz <john.stultz@linaro.org> wrote:
-> Linus disliked the _no_lockdep() naming, so instead
-> use the more-consistent raw_* prefix to the non-lockdep
-> enabled seqcount methods.
->
-> This also adds raw_ methods for the write operations
-> as well, which will be utilized in a following patch.
+On Thu, Jan 02, 2014 at 01:56:51PM -0800, Tanmay Inamdar wrote:
+> On Mon, Dec 23, 2013 at 9:46 AM, Jason Gunthorpe
+> <jgunthorpe@obsidianresearch.com> wrote:
+> > On Mon, Dec 23, 2013 at 01:32:03PM +0530, Tanmay Inamdar wrote:
+> >> This patch adds the device tree nodes for APM X-Gene PCIe controller and
+> >> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts nodes
+> >> are added.
+> >
+> > Can you include an lspci dump for PCI DT bindings please? It is
+> > impossible to review otherwise..
+> >
+> 
+> On the X-Gene evaluation platform, there is only one PCIe port
+> enabled. Here is the 'lspci' dump
 
-Ack on this and on 2/2. I'm assuming I'll get them through the -tip
-tree, which is where the problem came from. No?
+This is a bit hard to read withouth more context, but:
 
-               Linus
+> # lspci -vvv
+> 00:00.0 Class 0604: Device 19aa:e008 (rev 04)
+>         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
+
+This is an on-chip device? (19aa does not seem to be a VID I can find)
+
+Ideally this is the on-chip PCI-PCI bridge which represents the port.
+
+The problem I see is that your DT binding has a top level stanza per
+port.
+
+We *really* prefer to see a single stanza for all ports - but this
+requires the HW to be able to fit into the Linux resource assignment
+model - a single resource pool for all ports and standard PCI-PCI
+bridge config access to assign the resource to a port.
+
+If your HW can't do this (eg because the port aperture 0xe000000000 is
+hard wired) then the fall back is to place every port in a distinct
+domain, with a distinct DT node and have overlapping bus numbers
+and fixed windows. I don't see PCI domain support in your driver..
+
+There is some kind of an addressing problem because you've done this:
+
++static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
++{
++	int i;
++
++	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
++		dev->resource[i].start = dev->resource[i].end = 0;
++		dev->resource[i].flags = 0;
++	}
++}
++DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_BRIDGE_DEVICEID,
++			 xgene_pcie_fixup_bridge);
+
+Which is usually a sign that something is wonky with how the HW is
+being fit into the PCI core.
+
+> ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+> <TAbort- <MAbort- >SERR- <PERR- INTx-
+>         Latency: 0, Cache Line Size: 64 bytes
+>         Region 0: Memory at <ignored> (64-bit, prefetchable)
+>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>         I/O behind bridge: 0000f000-00000fff
+>         Memory behind bridge: 00c00000-00cfffff
+
+[..]
+ 
+> 01:00.0 Class 0200: Device 15b3:1003
+>         Region 0: Memory at e000c00000 (64-bit, non-prefetchable) [size=1M]
+>         Region 2: Memory at e000000000 (64-bit, prefetchable)
+>         [size=8M]
+
+Something funky is going on here too, the 64 bit address e000000000
+should be reflected in the 'memory behind bridge' above, not
+truncated.
+
+ranges = <0x02000000 0x0 0x00000000 0x90 0x00000000 0x0 0x10000000 /* mem*/
++				  0x01000000 0x0 0x80000000 0x90 0x80000000 0x0 0x00010000 /* io */
++				  0x00000000 0x0 0xd0000000 0x90 0xd0000000 0x0 0x00200000 /* cfg */
++				  0x00000000 0x0 0x79000000 0x00 0x79000000 0x0 0x00800000>; /* msi */
+
+Ranges has a defined meaning, MSI shouldn't be in ranges, and 'cfg' is
+only OK if the address encoding exactly matches the funky PCI-E extended
+configuration address format. You can move these to regs or other
+properties
+
+(MSI is tricky, I'm not aware of DT binding work for MSI :()
+
+Also, unrelated, can you please double check that your HW cannot
+generate 8 and 16 bit configuration write TLPs natively? The
+xgene_pcie_cfg_out8/16 hack is not desirable if it can be avoided.
+
+Regards,
+Jason
