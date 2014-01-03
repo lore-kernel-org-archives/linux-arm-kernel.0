@@ -1,63 +1,58 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  3 Jan 2014 11:10:49 +0100
-Subject: [PATCH v1 04/24] zynq: Add OF ram initialization support
+Date: Fri,  3 Jan 2014 11:10:50 +0100
+Subject: [PATCH v1 05/24] gpio: zynq: Add dummy gpio routines
 In-Reply-To: <cover.1388743861.git.michal.simek@xilinx.com>
 References: <cover.1388743861.git.michal.simek@xilinx.com>
-Message-ID: <f928d7027756f3d5bc5d1a1f277dce3b2dadb864.1388743861.git.michal.simek@xilinx.com>
+Message-ID: <72795c2d0788847db1b062f8d2c1f6958773e81c.1388743861.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read ram size directly from DTB.
+From: Jagannadha Sutradharudu Teki <jagannadha.sutradharudu-teki@xilinx.com>
 
+GPIO dummy routines are required for fdt build, may be removed
+these dependencies once the u-boot fdt is fully optimized.
+
+Signed-off-by: Jagannadha Sutradharudu Teki <jaganna@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v1: None
 
- board/xilinx/zynq/board.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/arch-zynq/gpio.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 arch/arm/include/asm/arch-zynq/gpio.h
 
-diff --git a/board/xilinx/zynq/board.c b/board/xilinx/zynq/board.c
-index 5119c09..6b691f3 100644
---- a/board/xilinx/zynq/board.c
-+++ b/board/xilinx/zynq/board.c
-@@ -5,6 +5,7 @@
-  */
-
- #include <common.h>
-+#include <fdtdec.h>
- #include <netdev.h>
- #include <zynqpl.h>
- #include <asm/arch/hardware.h>
-@@ -115,8 +116,27 @@ int board_mmc_init(bd_t *bd)
-
- int dram_init(void)
- {
-+#ifdef CONFIG_OF_CONTROL
-+	int node;
-+	fdt_addr_t addr;
-+	fdt_size_t size;
-+	const void *blob = gd->fdt_blob;
+diff --git a/arch/arm/include/asm/arch-zynq/gpio.h b/arch/arm/include/asm/arch-zynq/gpio.h
+new file mode 100644
+index 0000000..2dbba75
+--- /dev/null
++++ b/arch/arm/include/asm/arch-zynq/gpio.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (c) 2013 Xilinx, Inc.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
 +
-+	node = fdt_node_offset_by_prop_value(blob, -1, "device_type",
-+					     "memory", 7);
-+	if (node == -FDT_ERR_NOTFOUND) {
-+		debug("ZYNQ DRAM: Can't get memory node\n");
-+		return -1;
-+	}
-+	addr = fdtdec_get_addr_size(blob, node, "reg", &size);
-+	if (addr == FDT_ADDR_T_NONE || size == 0) {
-+		debug("ZYNQ DRAM: Can't get base address or size\n");
-+		return -1;
-+	}
-+	gd->ram_size = size;
-+#else
- 	gd->ram_size = CONFIG_SYS_SDRAM_SIZE;
--
-+#endif
- 	zynq_ddrc_init();
-
- 	return 0;
++#ifndef _ZYNQ_GPIO_H
++#define _ZYNQ_GPIO_H
++
++inline int gpio_get_value(unsigned gpio)
++{
++	return 0;
++}
++
++inline int gpio_set_value(unsigned gpio, int val)
++{
++	return 0;
++}
++
++inline int gpio_request(unsigned gpio, const char *label)
++{
++	return 0;
++}
++
++#endif /* _ZYNQ_GPIO_H */
 --
 1.8.2.3
 
@@ -67,4 +62,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/455dd9e4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/24e55534/attachment.sig>
