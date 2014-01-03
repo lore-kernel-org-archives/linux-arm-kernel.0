@@ -1,121 +1,82 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri,  3 Jan 2014 16:34:16 +0100
-Subject: [PATCH 3/3] ARM: shmobile: Koelsch: Add QSPI support
+Date: Fri,  3 Jan 2014 16:34:15 +0100
+Subject: [PATCH 2/3] ARM: shmobile: r8a7791: add QSPI clock
 In-Reply-To: <1388763256-25851-1-git-send-email-geert@linux-m68k.org>
 References: <1388763256-25851-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1388763256-25851-4-git-send-email-geert@linux-m68k.org>
+Message-ID: <1388763256-25851-3-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Enable support for the Spansion s25fl512s SPI FLASH on the Koelsch board:
-  - Add QSPI platform device, resources, platform data, and pinmux,
-  - Add FLASH data and MTD partitions.
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 ---
- arch/arm/mach-shmobile/board-koelsch.c |   61 ++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7791.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index de7cc64b1f37..723ed54b38be 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -25,12 +25,17 @@
- #include <linux/input.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/partitions.h>
- #include <linux/phy.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_data/rcar-du.h>
- #include <linux/platform_device.h>
- #include <linux/sh_eth.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/rspi.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7791.h>
-@@ -148,6 +153,55 @@ static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index f5461262ee25..740c06968994 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -93,6 +93,7 @@ static struct clk main_clk = {
+  */
+ SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
+ SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
++SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
+ 
+ /* fixed ratio clock */
+ SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
+@@ -114,6 +115,7 @@ static struct clk *main_clks[] = {
+ 	&pll3_clk,
+ 	&hp_clk,
+ 	&p_clk,
++	&qspi_clk,
+ 	&rclk_clk,
+ 	&mp_clk,
+ 	&cp_clk,
+@@ -122,6 +124,7 @@ static struct clk *main_clks[] = {
+ 
+ /* MSTP */
+ enum {
++	MSTP917,
+ 	MSTP813,
+ 	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
+ 	MSTP719, MSTP718, MSTP715, MSTP714,
+@@ -133,6 +136,7 @@ enum {
  };
  
-+/* QSPI */
-+static const struct resource qspi_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xe6b10000, 0x1000),
-+	DEFINE_RES_IRQ(gic_spi(184)),
-+};
-+
-+static const struct rspi_plat_data qspi_pdata __initconst = {
-+	.num_chipselect = 1,
-+};
-+
-+/* SPI Flash memory (Spansion S25FL512SAGMFIG11 64 MiB) */
-+static struct mtd_partition spi_flash_part[] = {
-+	{
-+		.name		= "loader",
-+		.offset		= 0x00000000,
-+		.size		= 512 * 1024,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "bootenv",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= 512 * 1024,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "data",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static const struct flash_platform_data spi_flash_data = {
-+	.name		= "m25p80",
-+	.parts		= spi_flash_part,
-+	.nr_parts	= ARRAY_SIZE(spi_flash_part),
-+	.type		= "s25fl512s",
-+};
-+
-+static const struct spi_board_info spi_info[] __initconst = {
-+	{
-+		.modalias	= "m25p80",
-+		.platform_data	= &spi_flash_data,
-+		.mode		= SPI_MODE_0,
-+		.max_speed_hz	= 30000000,
-+		.bus_num	= 0,
-+		.chip_select	= 0,
-+	},
-+};
-+
- static const struct pinctrl_map koelsch_pinctrl_map[] = {
- 	/* DU */
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
-@@ -165,6 +219,8 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
- 				  "eth_rmii", "eth"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
- 				  "intc_irq0", "intc"),
-+	/* QSPI */
-+	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791", "qspi", "qspi"),
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
- 				  "scif0_data_d", "scif0"),
-@@ -190,6 +246,11 @@ static void __init koelsch_add_standard_devices(void)
- 	platform_device_register_data(&platform_bus, "gpio-keys", -1,
- 				      &koelsch_keys_pdata,
- 				      sizeof(koelsch_keys_pdata));
-+	platform_device_register_resndata(&platform_bus, "qspi", 0,
-+					  qspi_resources,
-+					  ARRAY_SIZE(qspi_resources),
-+					  &qspi_pdata, sizeof(qspi_pdata));
-+	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP917] = SH_CLK_MSTP32(&qspi_clk, SMSTPCR9, 17, 0), /* QSPI */
+ 	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+ 	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
+ 	[MSTP724] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 24, 0), /* DU0 */
+@@ -167,6 +171,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("pll3",		&pll3_clk),
+ 	CLKDEV_CON_ID("hp",		&hp_clk),
+ 	CLKDEV_CON_ID("p",		&p_clk),
++	CLKDEV_CON_ID("qspi",		&qspi_clk),
+ 	CLKDEV_CON_ID("rclk",		&rclk_clk),
+ 	CLKDEV_CON_ID("mp",		&mp_clk),
+ 	CLKDEV_CON_ID("cp",		&cp_clk),
+@@ -192,6 +197,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
+ 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
+ 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
++	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+ 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("r8a7791-ether", &mstp_clks[MSTP813]), /* Ether */
+@@ -232,6 +238,11 @@ void __init r8a7791_clock_init(void)
+ 		break;
+ 	}
  
- 	koelsch_add_du_device();
- }
++	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
++		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
++	else
++		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
++
+ 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+ 		ret = clk_register(main_clks[k]);
+ 
 -- 
 1.7.9.5
