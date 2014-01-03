@@ -1,42 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jan 2014 11:29:35 -0800
-Subject: DT include files (was: [GIT PULL 2/2] ARM: imx: device tree
- changes for 3.14)
-In-Reply-To: <20140103030455.GB25079@S2101-09.ap.freescale.net>
-References: <20131231054427.GA22383@S2101-09.ap.freescale.net>
- <20140102202108.GF19720@quad.lixom.net>
- <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
- <20140103030455.GB25079@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 03 Jan 2014 20:30:10 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <20140103164108.GA23714@lunn.ch>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <20140103144712.GA22597@lunn.ch> <52C6CE7E.5010800@free-electrons.com>
+ <52C6D3A8.4010801@free-electrons.com> <20140103164108.GA23714@lunn.ch>
+Message-ID: <52C70FC2.20400@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 2, 2014 at 7:04 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, Jan 02, 2014 at 06:41:30PM -0800, Olof Johansson wrote:
->> Ok, then it's probably just the location of the header files that
->> should be adjusted. Other subsystems have placed them under
->> include/dt-bindings/<subsystem>, so that's likely a better place for
->> these as well, don't you think?
->
-> I had a little discussion with DT people when the headers were firstly
-> created.  These pinctrl headers are a little different from the headers
-> in include/dt-bindings/<subsystem>.  The latter are used by both kernel
-> and device tree sources, while the pinctrl headers are used by device
-> tree sources only, so I chose to put them just in the same folder as
-> dts files.  And DT people are fine with my take.
+On 03/01/2014 17:41, Andrew Lunn wrote:
+>>>> Hi Gregory
+>>>>
+>>>> I'm away from my hardware at the moment. 
+>>>>
+>>>> Does this work when all the PCIe ports have status = "disabled";? We
+>>>> have many kirkwood devices in NAS boxes which don't use PCIe, so all
+>>>> the ports are disabled. But they still exist in the SoC, so we can
+>>>> read the IDs from them. I just don't know if of_get_next_child() will
+>>>> only return enabled children?
+>>>
+>>> There is a function named of_get_next_available_child, so I assumed that
+>>> of_get_next_child() will return all the children. But I can test it to
+>>> be sure of it.
+>>>
+>>
+>> I have just removed all the PCIe part in the
+>> armada-xp-openblocks-ax3-4.dts file (PCie is disable by default in the
+>> dtsi file) and it worled as expected! :)
+> 
+> Great, thanks for testing.
+>  
+>> by the way waht do you think of adding this line in at the end of the
+>> mvebu_soc_id_init() function:
+>>
+>> pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
+> 
+> Kirkwood prints actual strings, not numbers. More readable.
 
-Since you don't provide references to this I had to go searching for
-it. All I find is some discussion from 8 months ago, and quite a bit
-of that seems to have been about changing bindings, and some about the
-preprocessor behavior. Also, the patches seem to have been too big to
-make it out on the lists.
+With this number we are sure to have always an information even if the
+SoC ID or version was unknown by the kernel.
 
-I'd like a fresh look from DT people on this just to make sure no
-opinions have changed -- lots of things have changed in the last 8
-months w.r.t. DT.
+>  
+>> Also keep in mind that currently you can't use it for kirkwood because
+>> the build of the file depend on CONFIG_ARCH_MVEBU. But as kirkwood
+>> will soon joined the mach-mvebu directory, it won't be a problem then.
+> 
+> I think it is possible to do ../mach-mvebu/soc_id.o sort of thing in
+> the Makefile. Ugly, but might work until we move.
 
-I've pinged them on IRC, let's see if they wake up. Adding explicit cc too.
+Yes it is doable, but then we also need to update the mvebu_pcie_of_match_table.
+However I would prefer doing this as a separate patch because this one is
+for fixing a bug. Later we can improve the kernel.
+
+> 
+>     Andrew
+> 
 
 
--Olof
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
