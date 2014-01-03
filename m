@@ -1,159 +1,169 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  2 Jan 2014 16:37:31 -0800
-Subject: [PATCH v2 01/10] Input: pmic8xxx-pwrkey - switch to using managed
+Date: Thu,  2 Jan 2014 16:37:33 -0800
+Subject: [PATCH v2 03/10] Input: pmic8xxx-keypad - Switch to using managed
  resources
 In-Reply-To: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
 References: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1388709460-19222-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1388709460-19222-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Simplify the error paths and reduce the lines of code in this
+driver by using the devm_* APIs.
 
-This simplifies error handling and device removal paths.
-
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/input/misc/pmic8xxx-pwrkey.c | 74 ++++++++++++------------------------
- 1 file changed, 25 insertions(+), 49 deletions(-)
+ drivers/input/keyboard/pmic8xxx-keypad.c | 62 +++++++++-----------------------
+ 1 file changed, 17 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-index ef938405a9c6..aaf332510623 100644
---- a/drivers/input/misc/pmic8xxx-pwrkey.c
-+++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-@@ -32,7 +32,6 @@
-  * @key_press_irq: key press irq number
-  */
- struct pmic8xxx_pwrkey {
--	struct input_dev *pwr;
- 	int key_press_irq;
- };
- 
-@@ -110,22 +109,22 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 		return -ENODEV;
+diff --git a/drivers/input/keyboard/pmic8xxx-keypad.c b/drivers/input/keyboard/pmic8xxx-keypad.c
+index 2c9f19ac35ea..4e6bfbf94ae4 100644
+--- a/drivers/input/keyboard/pmic8xxx-keypad.c
++++ b/drivers/input/keyboard/pmic8xxx-keypad.c
+@@ -586,7 +586,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
  
--	pwrkey = kzalloc(sizeof(*pwrkey), GFP_KERNEL);
-+	pwrkey = devm_kzalloc(&pdev->dev, sizeof(*pwrkey), GFP_KERNEL);
- 	if (!pwrkey)
+-	kp = kzalloc(sizeof(*kp), GFP_KERNEL);
++	kp = devm_kzalloc(&pdev->dev, sizeof(*kp), GFP_KERNEL);
+ 	if (!kp)
  		return -ENOMEM;
  
--	pwr = input_allocate_device();
-+	pwrkey->key_press_irq = key_press_irq;
-+
-+	pwr = devm_input_allocate_device(&pdev->dev);
- 	if (!pwr) {
- 		dev_dbg(&pdev->dev, "Can't allocate power button\n");
--		err = -ENOMEM;
--		goto free_pwrkey;
+@@ -595,32 +595,27 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 	kp->pdata	= pdata;
+ 	kp->dev		= &pdev->dev;
+ 
+-	kp->input = input_allocate_device();
++	kp->input = devm_input_allocate_device(&pdev->dev);
+ 	if (!kp->input) {
+ 		dev_err(&pdev->dev, "unable to allocate input device\n");
+-		rc = -ENOMEM;
+-		goto err_alloc_device;
 +		return -ENOMEM;
  	}
  
- 	input_set_capability(pwr, EV_KEY, KEY_POWER);
- 
- 	pwr->name = "pmic8xxx_pwrkey";
- 	pwr->phys = "pmic8xxx_pwrkey/input0";
--	pwr->dev.parent = &pdev->dev;
- 
- 	delay = (pdata->kpd_trigger_delay_us << 10) / USEC_PER_SEC;
- 	delay = 1 + ilog2(delay);
-@@ -133,7 +132,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	err = regmap_read(regmap, PON_CNTL_1, &pon_cntl);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed reading PON_CNTL_1 err=%d\n", err);
--		goto free_input_dev;
-+		return err;
+ 	kp->key_sense_irq = platform_get_irq(pdev, 0);
+ 	if (kp->key_sense_irq < 0) {
+ 		dev_err(&pdev->dev, "unable to get keypad sense irq\n");
+-		rc = -ENXIO;
+-		goto err_get_irq;
++		return kp->key_sense_irq;
  	}
  
- 	pon_cntl &= ~PON_CNTL_TRIG_DELAY_MASK;
-@@ -146,66 +145,43 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	err = regmap_write(regmap, PON_CNTL_1, pon_cntl);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed writing PON_CNTL_1 err=%d\n", err);
--		goto free_input_dev;
-+		return err;
+ 	kp->key_stuck_irq = platform_get_irq(pdev, 1);
+ 	if (kp->key_stuck_irq < 0) {
+ 		dev_err(&pdev->dev, "unable to get keypad stuck irq\n");
+-		rc = -ENXIO;
+-		goto err_get_irq;
++		return kp->key_stuck_irq;
  	}
  
--	err = input_register_device(pwr);
-+	err = devm_request_irq(&pdev->dev, key_press_irq, pwrkey_press_irq,
-+			       IRQF_TRIGGER_RISING,
-+			       "pmic8xxx_pwrkey_press", pwr);
- 	if (err) {
--		dev_dbg(&pdev->dev, "Can't register power key: %d\n", err);
--		goto free_input_dev;
-+		dev_err(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
-+			key_press_irq, err);
-+		return err;
- 	}
+ 	kp->input->name = pdata->input_name ? : "PMIC8XXX keypad";
+ 	kp->input->phys = pdata->input_phys_device ? : "pmic8xxx_keypad/input0";
  
--	pwrkey->key_press_irq = key_press_irq;
--	pwrkey->pwr = pwr;
+-	kp->input->dev.parent	= &pdev->dev;
 -
--	platform_set_drvdata(pdev, pwrkey);
--
--	err = request_irq(key_press_irq, pwrkey_press_irq,
--		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwr);
--	if (err < 0) {
--		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
--				 key_press_irq, err);
--		goto unreg_input_dev;
-+	err = devm_request_irq(&pdev->dev, key_release_irq, pwrkey_release_irq,
-+			       IRQF_TRIGGER_RISING,
-+			       "pmic8xxx_pwrkey_release", pwr);
-+	if (err) {
-+		dev_err(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
-+			key_release_irq, err);
-+		return err;
+ 	kp->input->id.bustype	= BUS_I2C;
+ 	kp->input->id.version	= 0x0001;
+ 	kp->input->id.product	= 0x0001;
+@@ -634,7 +629,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 					kp->keycodes, kp->input);
+ 	if (rc) {
+ 		dev_err(&pdev->dev, "failed to build keymap\n");
+-		goto err_get_irq;
++		return rc;
  	}
  
--	err = request_irq(key_release_irq, pwrkey_release_irq,
--		 IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_release", pwr);
--	if (err < 0) {
--		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
--				 key_release_irq, err);
--
--		goto free_press_irq;
-+	err = input_register_device(pwr);
-+	if (err) {
-+		dev_err(&pdev->dev, "Can't register power key: %d\n", err);
-+		return err;
+ 	if (pdata->rep)
+@@ -650,7 +645,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 	rc = pmic8xxx_kpd_init(kp);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "unable to initialize keypad controller\n");
+-		goto err_get_irq;
++		return rc;
  	}
  
-+	platform_set_drvdata(pdev, pwrkey);
+ 	rc = pmic8xxx_kp_config_gpio(pdata->cols_gpio_start,
+@@ -667,24 +662,26 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 		goto err_gpio_config;
+ 	}
+ 
+-	rc = request_any_context_irq(kp->key_sense_irq, pmic8xxx_kp_irq,
+-				 IRQF_TRIGGER_RISING, "pmic-keypad", kp);
++	rc = devm_request_any_context_irq(&pdev->dev, kp->key_sense_irq,
++			pmic8xxx_kp_irq, IRQF_TRIGGER_RISING, "pmic-keypad",
++			kp);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "failed to request keypad sense irq\n");
+-		goto err_get_irq;
++		return rc;
+ 	}
+ 
+-	rc = request_any_context_irq(kp->key_stuck_irq, pmic8xxx_kp_stuck_irq,
+-				 IRQF_TRIGGER_RISING, "pmic-keypad-stuck", kp);
++	rc = devm_request_any_context_irq(&pdev->dev, kp->key_stuck_irq,
++			pmic8xxx_kp_stuck_irq, IRQF_TRIGGER_RISING,
++			"pmic-keypad-stuck", kp);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "failed to request keypad stuck irq\n");
+-		goto err_req_stuck_irq;
++		return rc;
+ 	}
+ 
+ 	rc = pmic8xxx_kp_read_u8(kp, &ctrl_val, KEYP_CTRL);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "failed to read KEYP_CTRL register\n");
+-		goto err_pmic_reg_read;
++		return rc;
+ 	}
+ 
+ 	kp->ctrl_reg = ctrl_val;
+@@ -692,36 +689,12 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 	rc = input_register_device(kp->input);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "unable to register keypad input device\n");
+-		goto err_pmic_reg_read;
++		return rc;
+ 	}
+ 
  	device_init_wakeup(&pdev->dev, pdata->wakeup);
  
  	return 0;
 -
--free_press_irq:
--	free_irq(key_press_irq, pwrkey);
--unreg_input_dev:
--	input_unregister_device(pwr);
--	pwr = NULL;
--free_input_dev:
--	input_free_device(pwr);
--free_pwrkey:
--	kfree(pwrkey);
--	return err;
+-err_pmic_reg_read:
+-	free_irq(kp->key_stuck_irq, kp);
+-err_req_stuck_irq:
+-	free_irq(kp->key_sense_irq, kp);
+-err_gpio_config:
+-err_get_irq:
+-	input_free_device(kp->input);
+-err_alloc_device:
+-	kfree(kp);
+-	return rc;
+-}
+-
+-static int pmic8xxx_kp_remove(struct platform_device *pdev)
+-{
+-	struct pmic8xxx_kp *kp = platform_get_drvdata(pdev);
+-
+-	device_init_wakeup(&pdev->dev, 0);
+-	free_irq(kp->key_stuck_irq, kp);
+-	free_irq(kp->key_sense_irq, kp);
+-	input_unregister_device(kp->input);
+-	kfree(kp);
+-
+-	return 0;
  }
  
- static int pmic8xxx_pwrkey_remove(struct platform_device *pdev)
- {
--	struct pmic8xxx_pwrkey *pwrkey = platform_get_drvdata(pdev);
--	int key_release_irq = platform_get_irq(pdev, 0);
--	int key_press_irq = platform_get_irq(pdev, 1);
--
- 	device_init_wakeup(&pdev->dev, 0);
+ #ifdef CONFIG_PM_SLEEP
+@@ -771,7 +744,6 @@ static SIMPLE_DEV_PM_OPS(pm8xxx_kp_pm_ops,
  
--	free_irq(key_press_irq, pwrkey->pwr);
--	free_irq(key_release_irq, pwrkey->pwr);
--	input_unregister_device(pwrkey->pwr);
--	kfree(pwrkey);
--
- 	return 0;
- }
- 
+ static struct platform_driver pmic8xxx_kp_driver = {
+ 	.probe		= pmic8xxx_kp_probe,
+-	.remove		= pmic8xxx_kp_remove,
+ 	.driver		= {
+ 		.name = PM8XXX_KEYPAD_DEV_NAME,
+ 		.owner = THIS_MODULE,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
