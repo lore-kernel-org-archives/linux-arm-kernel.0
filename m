@@ -1,78 +1,119 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 03 Jan 2014 15:53:06 +0000
-Subject: [PATCH 2/5] ARM: kprobes-test: use <asm/opcodes.h> for
- instruction accesses
-In-Reply-To: <1387815579-15677-3-git-send-email-taras.kondratiuk@linaro.org>
-References: <1387815579-15677-1-git-send-email-taras.kondratiuk@linaro.org>
- <1387815579-15677-3-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <1388764386.3430.10.camel@linaro1.home>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Fri, 3 Jan 2014 17:05:46 +0100
+Subject: [PATCH RFC 21/46] drm: provide a helper for the encoder
+ possible_crtcs mask
+In-Reply-To: <E1Vypnh-0007Ev-3v@rmk-PC.arm.linux.org.uk>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypnh-0007Ev-3v@rmk-PC.arm.linux.org.uk>
+Message-ID: <CANq1E4RanNbeeh4YDLJuHMgSPStHaVN7wCD-dU-BT=3ohL7e1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-23 at 18:19 +0200, Taras Kondratiuk wrote:
-> From: Ben Dooks <ben.dooks@codethink.co.uk>
-> 
-> Ensure we read instructions in the correct endian-ness by using
-> the <asm/opcodes.h> helper to transform them as necessary.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> [taras.kondratiuk at linaro.org: fix next_instruction() function]
-> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+Hi
+
+On Thu, Jan 2, 2014 at 10:27 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> The encoder possible_crtcs mask identifies which CRTCs can be bound to
+> a particular encoder.  Each bit from bit 0 defines an index in the list
+> of CRTCs held in the DRM mode_config crtc_list.  Rather than having
+> drivers trying to track the position of their CRTCs in the list, expose
+> the code which already exists for calculating the appropriate mask bit
+> for a CRTC.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
+>  drivers/gpu/drm/drm_crtc_helper.c |   39 ++++++++++++++++++++++++------------
+>  include/drm/drm_crtc_helper.h     |    1 +
+>  2 files changed, 27 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/drm_crtc_helper.c b/drivers/gpu/drm/drm_crtc_helper.c
+> index 01361aba033b..10708c248196 100644
+> --- a/drivers/gpu/drm/drm_crtc_helper.c
+> +++ b/drivers/gpu/drm/drm_crtc_helper.c
+> @@ -325,6 +325,29 @@ void drm_helper_disable_unused_functions(struct drm_device *dev)
+>  EXPORT_SYMBOL(drm_helper_disable_unused_functions);
+>
+>  /**
+> + * drm_helper_crtc_possible_mask - find the mask of a registered CRTC
+> + * @crtc: crtc to find mask for
+> + *
+> + * Given a registered CRTC, return the mask bit of that CRTC for an
+> + * encoder's possible_crtcs field.
 
-Apart from the spurious line removal (see below) then:
+I think this is a nice cleanup which we could pick up right away. Most
+drivers can be simplified by using this. Only the name is misleading,
+imo, I'd use something like drm_helper_crtc_to_mask(). Anyhow, not my
+call so:
 
-Acked-by: Jon Medhurst <tixy@linaro.org>
+Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
 
-and you can include an ACK for the other patches in this series too.
+Thanks
+David
 
-Thanks.
-
-
->  arch/arm/kernel/kprobes-test.c |   12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-> index 0cd63d0..96e3dbc 100644
-> --- a/arch/arm/kernel/kprobes-test.c
-> +++ b/arch/arm/kernel/kprobes-test.c
-> @@ -1329,7 +1329,8 @@ static void test_case_failed(const char *message)
->  static unsigned long next_instruction(unsigned long pc)
+> + */
+> +uint32_t drm_helper_crtc_possible_mask(struct drm_crtc *crtc)
+> +{
+> +       struct drm_device *dev = crtc->dev;
+> +       struct drm_crtc *tmp;
+> +       uint32_t crtc_mask = 1;
+> +
+> +       list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
+> +               if (tmp == crtc)
+> +                       return crtc_mask;
+> +               crtc_mask <<= 1;
+> +       }
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL(drm_helper_crtc_possible_mask);
+> +
+> +/**
+>   * drm_encoder_crtc_ok - can a given crtc drive a given encoder?
+>   * @encoder: encoder to test
+>   * @crtc: crtc to test
+> @@ -334,23 +357,13 @@ EXPORT_SYMBOL(drm_helper_disable_unused_functions);
+>  static bool drm_encoder_crtc_ok(struct drm_encoder *encoder,
+>                                 struct drm_crtc *crtc)
 >  {
->  #ifdef CONFIG_THUMB2_KERNEL
-> -	if ((pc & 1) && !is_wide_instruction(*(u16 *)(pc - 1)))
-> +	if ((pc & 1) &&
-> +	    !is_wide_instruction(__mem_to_opcode_thumb16(*(u16 *)(pc - 1))))
->  		return pc + 2;
->  	else
->  #endif
-> @@ -1374,13 +1375,13 @@ static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
->  
->  	if (test_case_is_thumb) {
->  		u16 *p = (u16 *)(test_code & ~1);
-> -		current_instruction = p[0];
-> +		current_instruction = __mem_to_opcode_thumb16(p[0]);
->  		if (is_wide_instruction(current_instruction)) {
-> -			current_instruction <<= 16;
-> -			current_instruction |= p[1];
-> +			u16 instr2 = __mem_to_opcode_thumb16(p[1]);
-> +			current_instruction = __opcode_thumb32_compose(current_instruction, instr2);
->  		}
->  	} else {
-> -		current_instruction = *(u32 *)test_code;
-> +		current_instruction = __mem_to_opcode_arm(*(u32 *)test_code);
->  	}
->  
->  	if (current_title[0] == '.')
-> @@ -1593,7 +1594,6 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
->  	return 0;
->  }
->  
+> -       struct drm_device *dev;
+> -       struct drm_crtc *tmp;
+> -       int crtc_mask = 1;
+> +       uint32_t crtc_mask;
+>
+>         WARN(!crtc, "checking null crtc?\n");
+>
+> -       dev = crtc->dev;
 > -
-
-I know the above blank line isn't needed but I believe the convention is
-to avoid doing unrelated white-space clean-ups in patches.
-
->  static int __init run_all_tests(void)
->  {
->  	int ret = 0;
+> -       list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
+> -               if (tmp == crtc)
+> -                       break;
+> -               crtc_mask <<= 1;
+> -       }
+> +       crtc_mask = drm_helper_crtc_possible_mask(crtc);
+>
+> -       if (encoder->possible_crtcs & crtc_mask)
+> -               return true;
+> -       return false;
+> +       return !!(encoder->possible_crtcs & crtc_mask);
+>  }
+>
+>  /*
+> diff --git a/include/drm/drm_crtc_helper.h b/include/drm/drm_crtc_helper.h
+> index ef6ad3a8e58e..21b9f47dd88c 100644
+> --- a/include/drm/drm_crtc_helper.h
+> +++ b/include/drm/drm_crtc_helper.h
+> @@ -127,6 +127,7 @@ struct drm_connector_helper_funcs {
+>
+>  extern int drm_helper_probe_single_connector_modes(struct drm_connector *connector, uint32_t maxX, uint32_t maxY);
+>  extern void drm_helper_disable_unused_functions(struct drm_device *dev);
+> +extern uint32_t drm_helper_crtc_possible_mask(struct drm_crtc *crtc);
+>  extern int drm_crtc_helper_set_config(struct drm_mode_set *set);
+>  extern bool drm_crtc_helper_set_mode(struct drm_crtc *crtc,
+>                                      struct drm_display_mode *mode,
+> --
+> 1.7.4.4
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
