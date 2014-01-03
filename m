@@ -1,100 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  3 Jan 2014 16:01:50 +0800
-Subject: [PATCH 5/6] arm: dts: sun7i: rename clock node names to clk@N
-In-Reply-To: <1388736111-10103-1-git-send-email-wens@csie.org>
-References: <1388736111-10103-1-git-send-email-wens@csie.org>
-Message-ID: <1388736111-10103-6-git-send-email-wens@csie.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 3 Jan 2014 09:13:46 +0100
+Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
+In-Reply-To: <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
+References: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
+ <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8sWLFnRZtuWOw2n96amAVc604Vk_HWD-9S6q1bZ5grhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree naming conventions state that node names should match
-node function. Change fully functioning clock nodes to match.
+On 2 January 2014 19:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 2 January 2014 18:17, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+>> Building a multi-arch kernel results in:
+>>
+>> arch/arm/crypto/built-in.o: In function `aesbs_xts_decrypt':
+>> sha1_glue.c:(.text+0x15c8): undefined reference to `bsaes_xts_decrypt'
+>> arch/arm/crypto/built-in.o: In function `aesbs_xts_encrypt':
+>> sha1_glue.c:(.text+0x1664): undefined reference to `bsaes_xts_encrypt'
+>> arch/arm/crypto/built-in.o: In function `aesbs_ctr_encrypt':
+>> sha1_glue.c:(.text+0x184c): undefined reference to `bsaes_ctr32_encrypt_blocks'
+>> arch/arm/crypto/built-in.o: In function `aesbs_cbc_decrypt':
+>> sha1_glue.c:(.text+0x19b4): undefined reference to `bsaes_cbc_encrypt'
+>>
+>
+> Interestingly, when I try to reproduce this, the reference is
+> (correctly) reported to reside in aesbs-glue.c and not sha1_glue.c
+>
+>> This code is already runtime-conditional on NEON being supported, so
+>> there's no point compiling it out depending on the minimum build
+>> architecture.
+>>
+>
+> Agreed. It is a leftover from the way this code was embedded into
+> OpenSSL originally.
+>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+>> This is more a request for acks since I'd like to keep it/push it through
+>> my tree to reduce the autobuilder failures.
+>>
+>>  arch/arm/crypto/bsaes-armv7.pl |    2 +-
+>
+> The .S_shipped file produced by this script should be updated at the same time.
+>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+Hello Russell,
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0062811..2a78de4 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -46,11 +46,12 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		osc24M: osc24M at 01c20050 {
-+		osc24M: clk at 01c20050 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-osc-clk";
- 			reg = <0x01c20050 0x4>;
- 			clock-frequency = <24000000>;
-+			clock-output-names = "osc24M";
- 		};
- 
- 		osc32k: clk at 0 {
-@@ -60,21 +61,23 @@
- 			clock-output-names = "osc32k";
- 		};
- 
--		pll1: pll1 at 01c20000 {
-+		pll1: clk at 01c20000 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-pll1-clk";
- 			reg = <0x01c20000 0x4>;
- 			clocks = <&osc24M>;
-+			clock-output-names = "pll1";
- 		};
- 
--		pll4: pll4 at 01c20018 {
-+		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-pll1-clk";
- 			reg = <0x01c20018 0x4>;
- 			clocks = <&osc24M>;
-+			clock-output-names = "pll4";
- 		};
- 
--		pll5: pll5 at 01c20020 {
-+		pll5: clk at 01c20020 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-pll5-clk";
- 			reg = <0x01c20020 0x4>;
-@@ -82,7 +85,7 @@
- 			clock-output-names = "pll5_ddr", "pll5_other";
- 		};
- 
--		pll6: pll6 at 01c20028 {
-+		pll6: clk at 01c20028 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-pll6-clk";
- 			reg = <0x01c20028 0x4>;
-@@ -111,7 +114,7 @@
- 			clocks = <&axi>;
- 		};
- 
--		ahb_gates: ahb_gates at 01c20060 {
-+		ahb_gates: clk at 01c20060 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun7i-a20-ahb-gates-clk";
- 			reg = <0x01c20060 0x8>;
-@@ -138,7 +141,7 @@
- 			clocks = <&ahb>;
- 		};
- 
--		apb0_gates: apb0_gates at 01c20068 {
-+		apb0_gates: clk at 01c20068 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun7i-a20-apb0-gates-clk";
- 			reg = <0x01c20068 0x4>;
-@@ -163,7 +166,7 @@
- 			clocks = <&apb1_mux>;
- 		};
- 
--		apb1_gates: apb1_gates at 01c2006c {
-+		apb1_gates: clk at 01c2006c {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun7i-a20-apb1-gates-clk";
- 			reg = <0x01c2006c 0x4>;
--- 
-1.8.5.2
+I noticed that this patch has turned up in rmk/fixes.
+
+Please be aware that by not updating the .S_shipped file in concert
+with the .pl file, we have a build time dependency on Perl now,
+something we tried to avoid when we discussed the original series
+http://marc.info/?l=linux-arm-kernel&m=138091140313491&w=2
+
+Regards,
+Ard.
