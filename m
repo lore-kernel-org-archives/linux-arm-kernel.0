@@ -1,32 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 14:58:05 +0000
-Subject: Question about =?iso-8859-1?Q?debuggin?=
- =?iso-8859-1?Q?g_Bad_mode_in_=E2?= handler detected
-In-Reply-To: <1388760385.31617.2.camel@phoenix>
-References: <1388760385.31617.2.camel@phoenix>
-Message-ID: <20140103145805.GO7383@n2100.arm.linux.org.uk>
+Date: Fri, 3 Jan 2014 14:59:17 +0000
+Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
+In-Reply-To: <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
+References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
+ <1388431259.2564.15.camel@deneb.redhat.com>
+ <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
+ <20140103143104.GN7383@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
+Message-ID: <20140103145917.GP7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 10:46:25PM +0800, Axel Lin wrote:
-> I hit a "Bad mode in ? handler detected" oops.
-> The first line of the message looks un-readable, so I print the reason
-> index as well.  The reason index is "4", so it does not exist in the
-> handler array.
-> static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
-> I'd appreciate if someone can give me advices and comments to debug this.
+On Fri, Jan 03, 2014 at 02:49:54PM +0000, Stefano Stabellini wrote:
+> OK. That would be Rob's patch below.
 
-Hmm, the 4th entry should be "undefined instruction".
+Looks fine to me.
 
-You basically hit an undefined instruction while trying to enter interrupt
-servicing very early on.
+> Are you going to take care of sending it to Linus?
 
-My guess is that you have some kind of vectored interrupt controller which
-took told the CPU to jump to 0xa00.  It looks to me as if that's part of
-the vectors page, and there's no code there.
+If you want to stick it in the patch system, I'll throw it in my tree.
+I need to push out the next set of fixes soon anyway.
 
-(The unused portions of the vectors page are now filled with that
-undefined instruction.)
+Thanks.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
