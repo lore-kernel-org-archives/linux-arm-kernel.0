@@ -1,36 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jan 2014 14:10:27 +0100
-Subject: [PATCH v2 1/3] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
-References: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201401031410.27374.arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 3 Jan 2014 13:13:57 +0000
+Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
+In-Reply-To: <1388431259.2564.15.camel@deneb.redhat.com>
+References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
+ <1388431259.2564.15.camel@deneb.redhat.com>
+Message-ID: <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 December 2013, Alexander Shiyan wrote:
-> This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
+On Mon, 30 Dec 2013, Mark Salter wrote:
+> On Mon, 2013-12-30 at 14:55 +0800, Chen Baozi wrote:
+> > xen_remap used to be defined as ioremap_cached on arm64. In commit
+> > c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
+> > was deleted, while xen_remap stays the same. This would lead to
+> > the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
+> > on arm64 as ioremap_cache on arm64 to fix it.
+> > 
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> I missed that include of arm header by arm64 when looking for users
+> of arm64's ioremap_cached() when working on commit c04e8e2fe. Anyway,
+> grepping the kernel tree, I see:
+> 
+>   ioremap_cached()
+>     defined by: arm, metag, unicore32
+>     used by: arch/arm/include/asm/xen/page.h
+>              drivers/mtd/maps/pxa2xx-flash.c
+> 
+>   ioremap_cache()
+>     defined by: arm64, sh, xtensa, ia64, x86
+>     used by: drivers/video/vesafb.c
+>              drivers/char/toshiba.c
+>              drivers/acpi/apei
+>              drivers/lguest/lguest_device.c
+>              drivers/sfi/sfi_core.c
+>              include/linux/acpi_io.h
+> 
+> I think it would be better to just avoid the confusion and the ifdef in
+> asm/xen/page.h by globally changing ioremap_cached to ioremap_cache.
 
-Just one more question from my side, otherwise
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-> +	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_node_id());
-> +	if (IS_ERR_VALUE(err))
-> +		goto out_iounmap;
-> +
-> +	clps711x_intc->ops.map = clps711x_intc_irq_map;
-> +	clps711x_intc->ops.xlate = irq_domain_xlate_onecell;
-> +	clps711x_intc->domain =
-> +		irq_domain_add_legacy(np, ARRAY_SIZE(clps711x_irqs),
-> +				      0, 0, &clps711x_intc->ops, NULL);
-
-Can't you use irq_domain_add_simple() here? When you are booting with DT
-and SPARSE_IRQ, you should not need to allocate the descriptors at boot time,
-but only as needed.
-
-You will have to pass '0' as the first_irq argument for the DT case then,
-and '1' for the non-DT case to actually allocate virqs starting at number 1.
-
-	Arnd
+While I welcome the suggestion, this is a critical fix for a regression
+that I think should go in as soon as possible, maybe 3.13-rc7, while I
+don't think that a global s/ioremap_cached/ioremap_cache would be
+acceptable at this stage.
