@@ -1,22 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jan 2014 13:52:51 +0100
-Subject: [PATCH 1/2] zynq: Do not explicitely enable icache
-In-Reply-To: <521bc636ed31ff2958f8c95417b09036a523782c.1388742126.git.michal.simek@xilinx.com>
-References: <521bc636ed31ff2958f8c95417b09036a523782c.1388742126.git.michal.simek@xilinx.com>
-Message-ID: <201401031352.51392.arnd@arndb.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 03 Jan 2014 14:24:26 +0100
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <20140103121812.GJ7383@n2100.arm.linux.org.uk>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <3242371.eHgoTRi3y3@vostro.rjw.lan>
+ <20140103121812.GJ7383@n2100.arm.linux.org.uk>
+Message-ID: <2450832.kBuTIAzyCY@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 January 2014, Michal Simek wrote:
-> icache is already enabled by default.
+On Friday, January 03, 2014 12:18:13 PM Russell King - ARM Linux wrote:
+> On Fri, Jan 03, 2014 at 12:58:16PM +0100, Rafael J. Wysocki wrote:
+> > On Friday, January 03, 2014 11:00:30 AM Russell King - ARM Linux wrote:
+> > > On Thu, Jan 02, 2014 at 07:10:55PM -0800, Greg Kroah-Hartman wrote:
+> > > > On Thu, Jan 02, 2014 at 09:27:58PM +0000, Russell King wrote:
+> > > > > Subsystems such as ALSA, DRM and others require a single card-level
+> > > > > device structure to represent a subsystem.  However, firmware tends to
+> > > > > describe the individual devices and the connections between them.
+> > > > > 
+> > > > > Therefore, we need a way to gather up the individual component devices
+> > > > > together, and indicate when we have all the component devices.
+> > > > > 
+> > > > > We do this in DT by providing a "superdevice" node which specifies
+> > > > > the components, eg:
+> > > > > 
+> > > > > 	imx-drm {
+> > > > > 		compatible = "fsl,drm";
+> > > > > 		crtcs = <&ipu1>;
+> > > > > 		connectors = <&hdmi>;
+> > > > > 	};
+> > > > > 
+> > > > > The superdevice is declared into the component support, along with the
+> > > > > subcomponents.  The superdevice receives callbacks to locate the
+> > > > > subcomponents, and identify when all components are present.  At this
+> > > > > point, we bind the superdevice, which causes the appropriate subsystem
+> > > > > to be initialised in the conventional way.
+> > > > > 
+> > > > > When any of the components or superdevice are removed from the system,
+> > > > > we unbind the superdevice, thereby taking the subsystem down.
+> > > > 
+> > > > This sounds a lot like the "containers" code that Rafael just submitted
+> > > > and I acked for 3.14.  Look at the lkml post:
+> > > > 	Subject: [PATCH 2/2] ACPI / hotplug / driver core: Handle containers in a special way
+> > > > 	Message-ID: <1991202.gilW172FBV@vostro.rjw.lan>
+> > > > 
+> > > > And see if that could possibly be used instead?
+> > > 
+> > > That's really disappointing bcause I've put a hell of a lot of work into
+> > > this over the last few months, and if that's true it's all just been a
+> > > total waste of my time.  Okay, lesson learned - don't spend any time
+> > > trying to fix other people's problems after discussing them at
+> > > kernel-summit.
+> > 
+> > Well, I didn't know that you were doing this work and my patch is to address
+> > a specific problem that people are seeing in testing.  Also, the generic
+> > containers part in it is very simple and it might be possible to integrate it
+> > with your code, this way or another.  In fact, the only only thing I need from
+> > containers at the moment is the online/offline functionality.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
+> We had a session at kernel summit chaired by David Airlie to discuss
+> various issues associated with DRM which included the problems of
+> componentised devices registering into card-based subsystems.  There
+> were quite a number of attendees to that session.
+
+Yeah, I was there too.
+
+> It is in that session that I said I would work on this, specifically
+> with the aim of getting imx-drm out of drivers/staging.
+
+OK, but that's not directly related to what I did with containers.
+
+> > > In any case, the above message ID doesn't give me access to this containers
+> > > code to look at to even evaluate whether it can be used for this - it just
+> > > gives two patches for ACPI specific patches but not the core stuff.
+> > > 
+> > > http://www.spinics.net/lists/linux-acpi/msg48101.html
+> > > http://www.spinics.net/lists/linux-acpi/msg48102.html
+> > > 
+> > > Please provide a better reference to the code you're referring to.
+> > 
+> > You can use the linux-next branch of the linux-pm.git tree at the moment or I
+> > can set up a separate branch for that if that helps.  The two patches above
+> > depend on some earlier material I've gueued up for 3.14, but it's mostly
+> > ACPI hotplug code.
 > 
->  board/xilinx/zynq/board.c | 2 --
->  1 file changed, 2 deletions(-)
+> I'm not sure what I'm looking for.  I've tried looking at the results of
+> searching your linux-next branch for "container" but I don't see
+> anything implementing similar functionality to the patch I've sent.
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/log/?h=linux-next&qt=grep&q=container
 
-You had me confused for a bit. Please mark u-boot patches as such
-when you send them to the kernel mailing list, and vice-versa.
+I've just set up the acpi-hotplug branch in linux-pm.git (because I often
+rebase the linux-next one).
 
-	Arnd
+The only commit in that branch you need to look at is this one:
+
+http://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=acpi-hotplug&id=caa73ea158de9419f08e456f2716c71d1f06012a
+
+but quite frankly I'm not sure how it is related to your work. :-)
+
+Thanks,
+Rafael
