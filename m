@@ -1,120 +1,314 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu,  2 Jan 2014 17:22:19 -0700
-Subject: [PATCH v7 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
- entries
-In-Reply-To: <1388708539-333-4-git-send-email-lho@apm.com>
-References: <1388708539-333-1-git-send-email-lho@apm.com>
- <1388708539-333-2-git-send-email-lho@apm.com>
- <1388708539-333-3-git-send-email-lho@apm.com>
- <1388708539-333-4-git-send-email-lho@apm.com>
-Message-ID: <1388708539-333-5-git-send-email-lho@apm.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 03 Jan 2014 01:24:50 +0100
+Subject: [PATCH 3/6] At91: dt: Added smc bus driver
+In-Reply-To: <1388507534-10570-4-git-send-email-jjhiblot@traphandler.com>
+References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
+ <1388507534-10570-4-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52C60352.7060006@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   81 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 81 insertions(+), 0 deletions(-)
+On 31/12/2013 17:32, jjhiblot at traphandler.com wrote:
+> From: jean-jacques hiblot <jean-jacques.hiblot@jdsu.com>
+>
+> The EBI/SMC external interface is used to access external peripherals (NAND
+> and Ethernet controller in the case of sam9261ek). Different configurations and
+>   timings are required for those peripherals. This bus driver can be used to
+> setup the bus timings/configuration from the device tree.
+>
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>   drivers/bus/Kconfig     |   9 +++
+>   drivers/bus/Makefile    |   1 +
+>   drivers/bus/atmel-smc.c | 182 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 192 insertions(+)
+>   create mode 100644 drivers/bus/atmel-smc.c
+>
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 552373c..8c944db5 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -12,6 +12,15 @@ config IMX_WEIM
+>   	  The WEIM(Wireless External Interface Module) works like a bus.
+>   	  You can attach many different devices on it, such as NOR, onenand.
+>
+> +config ATMEL_SMC
+> +	bool "Atmel SMC/EBI driver"
+> +	depends on SOC_AT91SAM9 && OF
+> +	help
+> +	  Driver for Atmel SMC/EBI controller.
+> +	  Used to configure the EBI (external bus interface) when the device-
+> +	  tree is used. This bus supports NANDs, external ethernet controller,
+> +	  SRAMs, ATA devices.
+> +
+>   config MVEBU_MBUS
+>   	bool
+>   	depends on PLAT_ORION
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> index 8947bdd..4364003 100644
+> --- a/drivers/bus/Makefile
+> +++ b/drivers/bus/Makefile
+> @@ -2,6 +2,7 @@
+>   # Makefile for the bus drivers.
+>   #
+>
+> +obj-$(CONFIG_ATMEL_SMC)	+= atmel-smc.o
+>   obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+>   obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+>   obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+> diff --git a/drivers/bus/atmel-smc.c b/drivers/bus/atmel-smc.c
+> new file mode 100644
+> index 0000000..06e530d
+> --- /dev/null
+> +++ b/drivers/bus/atmel-smc.c
+> @@ -0,0 +1,182 @@
+> +/*
+> + * EBI driver for Atmel SAM9 chips
+> + * inspired by the fsl weim bus driver
+> + *
+> + * Copyright (C) 2013 JJ Hiblot.
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/of_device.h>
+> +#include <mach/at91sam9_smc.h>
+> +
+> +struct at91_smc_devtype {
+> +	unsigned int	cs_count;
+> +};
+> +
+> +static const struct at91_smc_devtype sam9261_smc_devtype = {
+> +	.cs_count	= 6,
+> +};
+> +
+> +static const struct of_device_id smc_id_table[] = {
+> +	{ .compatible = "atmel,at91sam9261-smc", .data = &sam9261_smc_devtype},
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, smc_id_table);
+> +
+> +struct smc_parameters_type {
+> +	const char *name;
+> +	u16 reg;
+> +	u16 width;
+> +	u16 shift;
+> +};
+> +
+> +#define SETUP	0
+> +#define PULSE	1
+> +#define CYCLE	2
+> +#define MODE	3
+> +static const struct smc_parameters_type smc_parameters[] = {
+> +	{"smc,ncs_read_setup",		SETUP, 6, 24},
+> +	{"smc,nrd_setup",		SETUP, 6, 16},
+> +	{"smc,ncs_write_setup",		SETUP, 6,  8},
+> +	{"smc,nwe_setup",		SETUP, 6,  0},
+> +	{"smc,ncs_read_pulse",		PULSE, 6, 24},
+> +	{"smc,nrd_pulse",		PULSE, 6, 16},
+> +	{"smc,ncs_write_pulse",		PULSE, 6,  8},
+> +	{"smc,nwe_pulse",		PULSE, 6,  0},
+> +	{"smc,read_cycle",		CYCLE, 9, 16},
+> +	{"smc,write_cycle",		CYCLE, 9,  0},
+> +	{"smc,burst_size",		MODE,  2, 28},
+> +	{"smc,burst_enabled",		MODE,  1, 24},
+> +	{"smc,tdf_mode",		MODE,  1, 20},
+> +	{"smc,tdf_cycles",		MODE,  4, 16},
+> +	{"smc,bus_width",		MODE,  2, 12},
+> +	{"smc,byte_access_type",	MODE,  1,  8},
+> +	{"smc,nwait_mode",		MODE,  2,  4},
+> +	{"smc,write_mode",		MODE,  1,  0},
+> +	{"smc,read_mode",		MODE,  1,  1},
+> +	{NULL}
+> +};
+> +
+> +/* Parse and set the timing for this device. */
+> +static int __init smc_timing_setup(struct device *dev, struct device_node *np,
+> +		void __iomem *base, const struct at91_smc_devtype *devtype)
+> +{
+> +	u32 val;
+> +	int ret;
+> +	u32 cs;
+> +	const struct smc_parameters_type *p = smc_parameters;
+> +	u32 shadow_smc_regs[5];
+> +
+> +	ret = of_property_read_u32(np, "smc,cs" , &cs);
+> +	if (ret < 0) {
+> +		dev_err(dev, "missing mandatory property : smc,cs\n");
+> +		return ret;
+> +	}
+> +	if (val >= devtype->cs_count) {
+> +		dev_err(dev, "invalid value for property smc,cs (=%d)."
+> +		"Must be in range 0 to %d\n", cs, devtype->cs_count-1);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* set the timing for EBI */
+> +	base += (0x10 * cs);
+> +	shadow_smc_regs[SETUP] = readl_relaxed(base + AT91_SMC_SETUP);
+> +	shadow_smc_regs[PULSE] = readl_relaxed(base + AT91_SMC_PULSE);
+> +	shadow_smc_regs[CYCLE] = readl_relaxed(base + AT91_SMC_CYCLE);
+> +	shadow_smc_regs[MODE] = readl_relaxed(base + AT91_SMC_MODE);
+> +
+> +	while (p->name) {
+> +		ret = of_property_read_u32(np, p->name , &val);
+> +		if (ret == -EINVAL) {
+> +			dev_dbg(dev, "cs %d: property %s not set.\n", cs,
+> +				p->name);
+> +			p++;
+> +			continue;
+> +		} else if (ret) {
+> +			dev_err(dev, "cs %d: can't get property %s.\n", cs,
+> +				p->name);
+> +			return ret;
+> +		}
+> +		if (val >= (1<<p->width)) {
+> +			dev_err(dev, "cs %d: property %s out of range.\n", cs,
+> +				p->name);
+> +			return -ERANGE;
+> +		}
+> +		shadow_smc_regs[p->reg] &= ~(((1<<p->width)-1) << p->shift);
+> +		shadow_smc_regs[p->reg] |= (val << p->shift);
+> +		p++;
+> +	}
+> +	writel_relaxed(shadow_smc_regs[SETUP], base + AT91_SMC_SETUP);
+> +	writel_relaxed(shadow_smc_regs[PULSE], base + AT91_SMC_PULSE);
+> +	writel_relaxed(shadow_smc_regs[CYCLE], base + AT91_SMC_CYCLE);
+> +	writel_relaxed(shadow_smc_regs[MODE], base + AT91_SMC_MODE);
+> +	return 0;
+> +}
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index fd2b662..5b09797 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -218,6 +218,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "sata01clk";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "sata23clk";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "sata45clk";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -266,5 +308,44 @@
- 			apm,tx-boost-gain = <2 3 3 2 3 3>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 12>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>,
-+			      <0x0 0x1f2a0000 0x0 0x10000>,
-+			      <0x0 0x1c000200 0x0 0x100>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>,
-+			      <0x0 0x1f2a0000 0x0 0x10000>,
-+			      <0x0 0x1c000200 0x0 0x100>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>,
-+			      <0x0 0x1f2a0000 0x0 0x10000>,
-+			      <0x0 0x1c000200 0x0 0x100>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
- 	};
- };
--- 
-1.5.5
+I think we should consider defining timings in nanoseconds instead of
+clk (actually master clk) cycles, because if we ever support master clk
+rate change (I hope so :)), then we won't be able to recalculate the
+appropriate timings (in cycles).
+Moreover this ease dt writer's work.
+
+tcycle calulation :
+   mck_rate = clk_get_rate(mck);
+   tcycle = (tns * 10^9) / mck_rate;
+
+dt binding:
+
+smc at xxx {
+	clocks = <&mck>;
+	dev at zz {
+		smc,ncs_read_setup = <y>; /* in nsecs */
+		...
+	};
+}
+
+
+And what about defining a mechanism capable of handling several
+converter types (not just the generic one you described with the
+ncs, nrd, ... timings) ?
+For example NAND chip vendors use a common timing naming convention 
+(tCLS, tCS, ...), and this is sometime annoying (and error-prone) to
+convert these timings into the SMC model.
+
+It would be great if we could define specific converters for these
+standardized protocols (NAND, NOR, ???).
+
+dt binding example:
+
+smc at xxx {
+	clocks = <&mck>;
+	...
+	dev at cs,offset {
+		compatible = "atmel,at91-smc-generic-converter";
+		smc,ncs_read_setup = <y>; /* in nsecs */
+		...
+	};
+
+	nand at cs,offset {
+		compatible = "atmel,at91-smc-nand-converter";
+		nand-chip {
+			/* see atmel-nand dt binding */
+			timings {
+				tCLS = <..>;
+				...
+			};
+			/*
+			 * these timings are contained by the nand-chip
+			 * node because they describe the NAND timings
+			 * (as defined in many nand datasheets).
+			 */
+		};
+	};
+}
+
+
+These are just some thoughts, feel free to argue ;).
+
+Best Regards,
+
+Boris
+
+> +
+> +static int __init smc_parse_dt(struct platform_device *pdev,
+> +				void __iomem *base)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	const struct of_device_id *of_id = of_match_device(smc_id_table, dev);
+> +	const struct at91_smc_devtype *devtype = of_id->data;
+> +	struct device_node *child;
+> +	int ret;
+> +
+> +	for_each_child_of_node(dev->of_node, child) {
+> +		if (!child->name)
+> +			continue;
+> +
+> +		ret = smc_timing_setup(dev, child, base, devtype);
+> +		if (ret) {
+> +			dev_err(dev, "%s set timing failed.\n",
+> +				child->full_name);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
+> +	if (ret)
+> +		dev_err(dev, "%s fail to create devices.\n",
+> +			dev->of_node->full_name);
+> +	return ret;
+> +}
+> +
+> +static int __init smc_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	/* get the resource */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (IS_ERR(base)) {
+> +		dev_err(&pdev->dev, "can't map SMC base address\n");
+> +		return PTR_ERR(base);
+> +	}
+> +
+> +	/* parse the device node */
+> +	ret = smc_parse_dt(pdev, base);
+> +	if (!ret)
+> +		dev_info(&pdev->dev, "Driver registered.\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static struct platform_driver smc_driver = {
+> +	.driver = {
+> +		.name		= "atmel-smc",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= smc_id_table,
+> +	},
+> +};
+> +module_platform_driver_probe(smc_driver, smc_probe);
+> +
+> +MODULE_AUTHOR("JJ Hiblot");
+> +MODULE_DESCRIPTION("Atmel's SMC/EBI driver");
+> +MODULE_LICENSE("GPL");
+>
