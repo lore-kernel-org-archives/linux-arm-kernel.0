@@ -1,48 +1,52 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri,  3 Jan 2014 11:24:13 +0800
-Subject: [PATCH v2] MAINTAINERS: ARM: SiRF: use regex patterns to involve all
- SiRF drivers
-Message-ID: <1388719453-12447-1-git-send-email-21cnbao@gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 3 Jan 2014 08:55:28 +0530
+Subject: [PATCH Resend 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag
+ to mout_apll
+In-Reply-To: <3836526.9kWglB5ajS@amdc1227>
+References: <1387442019-2445-1-git-send-email-sachin.kamat@linaro.org>
+ <3616477.6ZBKa1KffA@amdc1227>
+ <CAK9yfHxu0f-ZSkM76HWYOpRRXvzYR2Gu2zc3-sgzMPp+_1JvWQ@mail.gmail.com>
+ <3836526.9kWglB5ajS@amdc1227>
+Message-ID: <CAK9yfHzaMyrvvhxfV9KH-gEdcaQNAHPJ3KnUx9wcUi5BqUYpAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Hi Tomasz,
 
-instead of listing drivers one by one, use regex patterns to involve all
-SiRF drivers directly.
-this also adds sirf UART and watchdog drivers automatically from:
-drivers/tty/serial/sirfsoc_uart.*
-drivers/watchdog/sirfsoc_wdt.c
+On 2 January 2014 20:54, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Sachin,
+>
+> On Tuesday 31 of December 2013 08:24:02 Sachin Kamat wrote:
+>> On 30 December 2013 23:21, Tomasz Figa <t.figa@samsung.com> wrote:
+>> > On Thursday 19 of December 2013 11:37:08 Mike Turquette wrote:
+>> >> Quoting Sachin Kamat (2013-12-19 00:33:39)
+>> >> > Add CLK_SET_RATE_PARENT flag to mout_apll clock. This will let us set the
+>> >> > clock rate in the cpufreq driver.
+>> >> >
+>> >> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> >>
+>> >> Ack.
+>> >
+>> > Applied onto next branch.
+>>
+>> Thanks Tomasz. But did not find this branch in your tree [1].
+>
+> I haven't pushed the branches yet, as I'm yet to collect some patches
+> and acks
+>
+>> Also, please consider adding your tree to linux-next.
+>
+> Hmm, I would consider this tree only as a staging to send pull requests
+> for Mike, so patches should be hitting clk-next tree quickly after getting
+> there. I don't think this makes a need to add this tree to linux-next.
 
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v2: use regex patterns according to Uwe's feedback
+Yes, if the window period between the patches landing into your tree
+and Mike's tree
+is relatively small, then there is no need. Else it would be good to
+avoid merge conflicts
+and ease further development and testing.
 
- MAINTAINERS |    9 +--------
- 1 files changed, 1 insertions(+), 8 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 21c038f..1b9e6a3 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -850,14 +850,7 @@ F:	arch/arm/mach-prima2/
- F:	drivers/clk/clk-prima2.c
- F:	drivers/clocksource/timer-prima2.c
- F:	drivers/clocksource/timer-marco.c
--F:	drivers/dma/sirf-dma.c
--F:	drivers/i2c/busses/i2c-sirf.c
--F:	drivers/input/misc/sirfsoc-onkey.c
--F:	drivers/irqchip/irq-sirfsoc.c
--F:	drivers/mmc/host/sdhci-sirf.c
--F:	drivers/pinctrl/sirf/
--F:	drivers/rtc/rtc-sirfsoc.c
--F:	drivers/spi/spi-sirf.c
-+N:	[^a-z]sirf
- 
- ARM/EBSA110 MACHINE SUPPORT
- M:	Russell King <linux@arm.linux.org.uk>
 -- 
-1.7.5.4
+With warm regards,
+Sachin
