@@ -1,29 +1,31 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Jan 2014 16:47:58 +0100
-Subject: [PATCH 01/15] i2c: shmobile/rcar: Restrict non-COMPILE_TEST
- compilation
-In-Reply-To: <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140103154758.GF7132@katana>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri,  3 Jan 2014 16:48:48 +0100
+Subject: [PATCH 4/4] ARM: shmobile: lager: Make spi_flash_data const
+In-Reply-To: <1388764128-27686-1-git-send-email-geert@linux-m68k.org>
+References: <1388764128-27686-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1388764128-27686-4-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 27, 2013 at 02:18:23AM +0100, Laurent Pinchart wrote:
-> Hardware supported by the i2c sh_mobile and rcar drivers is only found
-> on SUPERH or ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST
-> compilation to them.
-> 
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: linux-i2c at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Applied to for-next, thanks!
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+ arch/arm/mach-shmobile/board-lager.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/7f3e244d/attachment.sig>
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index f20c10a18543..40ace7195f84 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -263,7 +263,7 @@ static struct mtd_partition spi_flash_part[] = {
+ 	},
+ };
+ 
+-static struct flash_platform_data spi_flash_data = {
++static const struct flash_platform_data spi_flash_data = {
+ 	.name           = "m25p80",
+ 	.parts          = spi_flash_part,
+ 	.nr_parts       = ARRAY_SIZE(spi_flash_part),
+-- 
+1.7.9.5
