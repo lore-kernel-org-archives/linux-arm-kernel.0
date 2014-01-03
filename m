@@ -1,49 +1,54 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Fri, 3 Jan 2014 09:52:22 +0000
-Subject: [PATCH V3 2/2] cpufreq: imx6q: correct VDDSOC/PU voltage
- scaling when cpufreq is changed
-In-Reply-To: <20131218142536.GM6691@S2101-09.ap.freescale.net>
-References: <1387402010-31749-1-git-send-email-b20788@freescale.com>
- <1387402010-31749-2-git-send-email-b20788@freescale.com>
- <20131218142536.GM6691@S2101-09.ap.freescale.net>
-Message-ID: <67c8e04574694cf59625e95fa1a65332@BY2PR03MB315.namprd03.prod.outlook.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  3 Jan 2014 10:59:43 +0100
+Subject: [PATCH v2 0/2] Fix i2c bus hang on A0 version of the Armada XP SoCs
+Message-ID: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping...
+Hi,
 
-Best Regards.
-Anson huang ???
-?
-Freescale Semiconductor Shanghai
-?????????192?A?2?
-201203
-Tel:021-28937058
+This the 2nd version of the series fixing the i2c bus hang on A0
+version of the Armada XP SoCs. It occurred on the early release of the
+OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
+(A0 stepping) have issues related to the i2c controller which prevent
+to use the offload mechanism and lead to a kernel hang during boot.
 
+The first patch add a mean to detect the SoCs version at run-time and
+the second one use this feature in the driver.
 
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Wednesday, December 18, 2013 10:26 PM
->To: Huang Yongcai-B20788
->Cc: rjw at rjwysocki.net; viresh.kumar at linaro.org; cpufreq at vger.kernel.org;
->linux-pm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->devicetree at vger.kernel.org
->Subject: Re: [PATCH V3 2/2] cpufreq: imx6q: correct VDDSOC/PU voltage scaling
->when cpufreq is changed
->
->On Wed, Dec 18, 2013 at 04:26:50PM -0500, Anson Huang wrote:
->> on i.MX6Q, cpu freq change need to follow below flows:
->>
->> 1. each setpoint has different VDDARM, VDDSOC/PU voltage, get the setpoint
->>    table from dts;
->> 2. when cpu freq is scaling up, need to increase VDDSOC/PU voltage before
->>    VDDARM, if VDDPU is off, no need to change it; 3. when cpu freq is
->> scaling down, need to decrease VDDARM voltage before
->>    VDDSOC/PU, if VDDPU is off, no need to change it;
->>
->> normally dts will pass vddsoc/pu freq/volt info to kernel, if not,
->> will use fixed value for vddsoc/pu voltage setting.
->>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->
->Acked-by: Shawn Guo <shawn.guo@linaro.org>
+These 2 patches should be applied on 3.13-rc and on stable kernel 3.12
+as it fixes a regression introduce by the commit 930ab3d403ae "i2c:
+mv64xxx: Add I2C Transaction Generator support".
+
+The first patch could be latter be extend to also be used with dove,
+kirkwood, orion5x and mv78x00 when there will be merged in mvebu.
+
+Thanks,
+
+Gregory
+
+Changelog:
+
+v1 -> v2:
+
+- Changed the way to test the return of the function mvebu_get_soc_id
+  in order to make it clearer.
+
+- Removed the superfluous parentheses
+
+- Added Wolfram's acked-by on the 2nd patch
+
+Gregory CLEMENT (2):
+  ARM: mvebu: Add support to get the ID and the revision of a SoC
+  i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
+
+ arch/arm/mach-mvebu/Makefile       |   2 +-
+ arch/arm/mach-mvebu/mvebu-soc-id.c | 111 +++++++++++++++++++++++++++++++++++++
+ drivers/i2c/busses/i2c-mv64xxx.c   |  11 +++-
+ include/linux/mvebu-soc-id.h       |  32 +++++++++++
+ 4 files changed, 154 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
+ create mode 100644 include/linux/mvebu-soc-id.h
+
+-- 
+1.8.1.2
