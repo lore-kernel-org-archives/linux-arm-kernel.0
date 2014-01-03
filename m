@@ -1,48 +1,43 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 03 Jan 2014 14:34:18 +0100
-Subject: [PATCH 1/2] zynq: Do not explicitely enable icache
-In-Reply-To: <201401031352.51392.arnd@arndb.de>
-References: <521bc636ed31ff2958f8c95417b09036a523782c.1388742126.git.michal.simek@xilinx.com>
- <201401031352.51392.arnd@arndb.de>
-Message-ID: <52C6BC5A.9060203@monstr.eu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 Jan 2014 14:58:53 +0100
+Subject: [PATCH v2 1/3] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <1388755605.639174335@f136.i.mail.ru>
+References: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
+ <201401031410.27374.arnd@arndb.de> <1388755605.639174335@f136.i.mail.ru>
+Message-ID: <3585542.v49U0LMMmk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2014 01:52 PM, Arnd Bergmann wrote:
-> On Friday 03 January 2014, Michal Simek wrote:
->> icache is already enabled by default.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  board/xilinx/zynq/board.c | 2 --
->>  1 file changed, 2 deletions(-)
+On Friday 03 January 2014 17:26:45 Alexander Shiyan wrote:
+> > > +   err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_node_id());
+> > > +   if (IS_ERR_VALUE(err))
+> > > +           goto out_iounmap;
+> > > +
+> > > +   clps711x_intc->ops.map = clps711x_intc_irq_map;
+> > > +   clps711x_intc->ops.xlate = irq_domain_xlate_onecell;
+> > > +   clps711x_intc->domain =
+> > > +           irq_domain_add_legacy(np, ARRAY_SIZE(clps711x_irqs),
+> > > +                                 0, 0, &clps711x_intc->ops, NULL);
+> > 
+> > Can't you use irq_domain_add_simple() here? When you are booting with DT
+> > and SPARSE_IRQ, you should not need to allocate the descriptors at boot time,
+> > but only as needed.
+> > 
+> > You will have to pass '0' as the first_irq argument for the DT case then,
+> > and '1' for the non-DT case to actually allocate virqs starting at number 1.
 > 
-> You had me confused for a bit. Please mark u-boot patches as such
-> when you send them to the kernel mailing list, and vice-versa.
+> Using irq_domain_add_simple() cause double usage of irq_alloc_descs(),
+> so we cannot do it. At least now.
 
-oou. Patman (tools I use for sending patches to mailing list)
-took arm prefix because of my bad setting.
+Well, the idea would be to remove the irq_alloc_descs() from your code,
+and have irq_domain_add_simple() call it for the ATAGS case but not
+at all for the DT case. That is exactly the purpose of '_simple', i.e.
+to let the irq_alloc_descs() part be handled automatically if needed.
+ 
+> PS: Arnd, can you merge this series for 3.14-rc within arm-soc?
 
-Sorry for that.
+I'd feel more comfortable if Thomas could have a look first and either
+merge it himself or provide an Ack. I'm not much of an irqchip expert
+and I don't want to step on his toes there.
 
-Thanks,
-Michal
-
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/62504f87/attachment.sig>
+	Arnd
