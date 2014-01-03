@@ -1,22 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 Jan 2014 19:41:42 +0100
-Subject: [PATCH] arm/smp: Make boot_secondary() static
-In-Reply-To: <CAMuHMdXoZJEgMXH0K1d5kDs+XSM_KMkigUq+mKYVQezdxZ929g@mail.gmail.com>
-References: <1388763959-27491-1-git-send-email-geert@linux-m68k.org>
- <201401031804.34124.arnd@arndb.de>
- <CAMuHMdXoZJEgMXH0K1d5kDs+XSM_KMkigUq+mKYVQezdxZ929g@mail.gmail.com>
-Message-ID: <4243977.Rh2PlZQ4Sh@wuerfel>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 3 Jan 2014 11:44:24 -0700
+Subject: Issue with the emulated PCI bridge implementation
+In-Reply-To: <201401031322.31433.arnd@arndb.de>
+References: <20131226160534.36cc4203@skate> <20131226165241.2c50b244@skate>
+ <20140103002656.GA12098@obsidianresearch.com>
+ <201401031322.31433.arnd@arndb.de>
+Message-ID: <20140103184424.GC12098@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 January 2014 19:24:19 Geert Uytterhoeven wrote:
-> Fine for me.
-> 
-> Do you want me to fold this into my patch, or will you apply this on top?
-> 
-> 
+On Fri, Jan 03, 2014 at 01:22:31PM +0100, Arnd Bergmann wrote:
 
-The patch is for Russell anyway, so please fold my change into your
-patch, unless he prefers your previous version of course.
+> However the part that made me wonder is that an e1000e with a PCI bridge
+> actually /should/not/ need to allocate an I/O space window with a precious
+> mbus resource, since AFAIK this adapter does not have an I/O space BARs.
 
-	Arnd
+IIRC the e1000 still has a legacy IO port BAR.. (guessing it is used
+for PXE boot on x86?)
+
+My patch set to allow the DT to turn off IO port allocation is already
+in mainline - drop the IO ranges from the DT and no IO resources are
+consumed at all.
+
+Though, that is an interesting point, a small refinement would be to
+not allocate the pci io map if IO is turned off as well..
+
+Jason
