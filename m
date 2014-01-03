@@ -1,37 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jan 2014 13:22:31 +0100
-Subject: Issue with the emulated PCI bridge implementation
-In-Reply-To: <20140103002656.GA12098@obsidianresearch.com>
-References: <20131226160534.36cc4203@skate> <20131226165241.2c50b244@skate>
- <20140103002656.GA12098@obsidianresearch.com>
-Message-ID: <201401031322.31433.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jan 2014 12:18:13 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <3242371.eHgoTRi3y3@vostro.rjw.lan>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <20140103031055.GB28751@kroah.com>
+ <20140103110030.GH7383@n2100.arm.linux.org.uk>
+ <3242371.eHgoTRi3y3@vostro.rjw.lan>
+Message-ID: <20140103121812.GJ7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 January 2014, Jason Gunthorpe wrote:
-> On Thu, Dec 26, 2013 at 04:52:41PM +0100, Thomas Petazzoni wrote:
+On Fri, Jan 03, 2014 at 12:58:16PM +0100, Rafael J. Wysocki wrote:
+> On Friday, January 03, 2014 11:00:30 AM Russell King - ARM Linux wrote:
+> > On Thu, Jan 02, 2014 at 07:10:55PM -0800, Greg Kroah-Hartman wrote:
+> > > On Thu, Jan 02, 2014 at 09:27:58PM +0000, Russell King wrote:
+> > > > Subsystems such as ALSA, DRM and others require a single card-level
+> > > > device structure to represent a subsystem.  However, firmware tends to
+> > > > describe the individual devices and the connections between them.
+> > > > 
+> > > > Therefore, we need a way to gather up the individual component devices
+> > > > together, and indicate when we have all the component devices.
+> > > > 
+> > > > We do this in DT by providing a "superdevice" node which specifies
+> > > > the components, eg:
+> > > > 
+> > > > 	imx-drm {
+> > > > 		compatible = "fsl,drm";
+> > > > 		crtcs = <&ipu1>;
+> > > > 		connectors = <&hdmi>;
+> > > > 	};
+> > > > 
+> > > > The superdevice is declared into the component support, along with the
+> > > > subcomponents.  The superdevice receives callbacks to locate the
+> > > > subcomponents, and identify when all components are present.  At this
+> > > > point, we bind the superdevice, which causes the appropriate subsystem
+> > > > to be initialised in the conventional way.
+> > > > 
+> > > > When any of the components or superdevice are removed from the system,
+> > > > we unbind the superdevice, thereby taking the subsystem down.
+> > > 
+> > > This sounds a lot like the "containers" code that Rafael just submitted
+> > > and I acked for 3.14.  Look at the lkml post:
+> > > 	Subject: [PATCH 2/2] ACPI / hotplug / driver core: Handle containers in a special way
+> > > 	Message-ID: <1991202.gilW172FBV@vostro.rjw.lan>
+> > > 
+> > > And see if that could possibly be used instead?
+> > 
+> > That's really disappointing bcause I've put a hell of a lot of work into
+> > this over the last few months, and if that's true it's all just been a
+> > total waste of my time.  Okay, lesson learned - don't spend any time
+> > trying to fix other people's problems after discussing them at
+> > kernel-summit.
 > 
-> > Here is an implementation of this idea, tested to work with an e1000e
-> > card, with the driver modified to do a few read/write to the I/O
-> > region. What do you think about it?
+> Well, I didn't know that you were doing this work and my patch is to address
+> a specific problem that people are seeing in testing.  Also, the generic
+> containers part in it is very simple and it might be possible to integrate it
+> with your code, this way or another.  In fact, the only only thing I need from
+> containers at the moment is the online/offline functionality.
+
+We had a session at kernel summit chaired by David Airlie to discuss
+various issues associated with DRM which included the problems of
+componentised devices registering into card-based subsystems.  There
+were quite a number of attendees to that session.
+
+It is in that session that I said I would work on this, specifically
+with the aim of getting imx-drm out of drivers/staging.
+
+> > In any case, the above message ID doesn't give me access to this containers
+> > code to look at to even evaluate whether it can be used for this - it just
+> > gives two patches for ACPI specific patches but not the core stuff.
+> > 
+> > http://www.spinics.net/lists/linux-acpi/msg48101.html
+> > http://www.spinics.net/lists/linux-acpi/msg48102.html
+> > 
+> > Please provide a better reference to the code you're referring to.
 > 
-> This seems reasonable, the only down side is that a stray read to an
-> unused portion of the Linux IO mapping will lock the machine instead
-> of getting a page fault - however I don't see that as a blocker.
-> 
+> You can use the linux-next branch of the linux-pm.git tree at the moment or I
+> can set up a separate branch for that if that helps.  The two patches above
+> depend on some earlier material I've gueued up for 3.14, but it's mostly
+> ACPI hotplug code.
 
-I've scratched my head a bit over this patch, and I couldn't find anything
-wrong with it in the end, as long as we don't have any other device
-in the system that also wants its share of the I/O space (e.g. a
-PCMCIA port on the SRAM interface), but then we'd probably need other
-changes as well.
+I'm not sure what I'm looking for.  I've tried looking at the results of
+searching your linux-next branch for "container" but I don't see
+anything implementing similar functionality to the patch I've sent.
 
-However the part that made me wonder is that an e1000e with a PCI bridge
-actually /should/not/ need to allocate an I/O space window with a precious
-mbus resource, since AFAIK this adapter does not have an I/O space BARs.
+https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/log/?h=linux-next&qt=grep&q=container
 
-Thomas, can you send the 'lspci -v' output of the system with this card
-to confirm that the I/O space is actually needed? If not, we should probably
-review the core PCI code to see why the bridge code tries to add this window.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
