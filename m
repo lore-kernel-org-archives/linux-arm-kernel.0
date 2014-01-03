@@ -1,99 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jan 2014 10:49:20 +0100
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <1387785725-24262-4-git-send-email-tinamdar@apm.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <1387785725-24262-4-git-send-email-tinamdar@apm.com>
-Message-ID: <201401031049.20932.arnd@arndb.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 3 Jan 2014 17:51:36 +0800
+Subject: [PATCH 0/6] arm: sunxi: rename DT clock node names to clk@N
+In-Reply-To: <1388736111-10103-1-git-send-email-wens@csie.org>
+References: <1388736111-10103-1-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v64uYUkf8n3NRzSW9t4do5i3mUDUAaLW35RMm9_1hmjn5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 December 2013, Tanmay Inamdar wrote:
-> This patch adds the bindings for X-Gene PCIe driver. The driver resides
-> under 'drivers/pci/host/pcie-xgene.c' file.
-> 
-> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  .../devicetree/bindings/pci/xgene-pcie.txt         |   43 ++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/xgene-pcie.txt b/Documentation/devicetree/bindings/pci/xgene-pcie.txt
-> new file mode 100644
-> index 0000000..d92da4f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/xgene-pcie.txt
-> @@ -0,0 +1,43 @@
-> +* AppliedMicro X-Gene PCIe interface
-> +
-> +Required properties:
-> +- status: Either "ok" or "disabled".
-> +- device_type: set to "pci"
-> +- compatible: should contain "xgene,pcie" to identify the core.
-> +- reg: base addresses and lengths of the pcie controller configuration
-> +	space register.
-> +- #address-cells: set to <3>
-> +- #size-cells: set to <2>
-> +- ranges: ranges for the PCI memory, I/O regions, config and MSI regions
-> +- #interrupt-cells: set to <1>
-> +- interrupt-map-mask and interrupt-map: standard PCI properties
-> +	to define the mapping of the PCIe interface to interrupt
-> +	numbers.
-> +- clocks: from common clock binding: handle to pci clock.
-> +- clock-names: from common clock binding. Should be "pcieclk".
-> +
+Hi,
 
-Better use an anonymous clock?
+On Fri, Jan 3, 2014 at 4:01 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi everyone,
+>
+> This patch series renames the clock nodes in sunxi dts to conform
+> to device tree naming conventions, i.e. clk at N. Dummy clocks that
+> will be renamed/removed later, or clocks sharing registers are not
+> renamed.
 
-The driver also seems to use a phy that is not defined here.
+This patch series breaks pll5 and pll6.
+Please do not apply. I will put out a v2 later.
 
-> +Example:
-> +
-> +SoC specific DT Entry:
-> +	pcie0: pcie at 1f2b0000 {
-> +		status = "disabled";
-> +		device_type = "pci";
-> +		compatible = "xgene,pcie";
-> +		#interrupt-cells = <1>;
-> +		#size-cells = <2>;
-> +		#address-cells = <3>;
-> +		reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
-> +		ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
 
-This is an awfully small memory space for a 64 bit machine. Is that a hardware bug you
-are working around? If not, please make it as large as you can to allow for arbitrary
-extension cards with large BARs,@least 4GB.
-
-Also, do you support no prefetchable memory?
-
-> +			  0x01000000 0x0 0x80000000 0xe0 0x80000000 0x0 0x00010000 /* io */
-
-I/O space at 0x80000000? That won't work with a lot of devices. Can you make it start
-at bus address 0?
-
-> +			  0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
-
-config space is not normally in the ranges property, and I think you will need
-it in the pcie node itself as a 'reg' property so the code can access it.
-
-> +			  0x00000000 0x0 0x79000000 0x00 0x79000000 0x0 0x00800000>; /* msi */
-
-Same here. Also I suspect this is a separate irqchip that isn't actually part
-of the PCIe host. If they are separate devices, I'd strongly recommend modeling
-them as separate device-nodes in DT to make reuse easier.
-
-> +		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-> +		interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
-
-Only one IRQ for all devices?
-
-> +		clocks = <&pcie0clk 0>;
-> +		clock-names = "pcieclk"
-> +	};
-> +
-> +Board specific DT Entry:
-> +	&pcie0 {
-> +		status = "ok";
-> +	};
-
-	Arnd
+ChenYu
