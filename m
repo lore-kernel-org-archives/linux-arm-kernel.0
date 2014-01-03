@@ -1,59 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jan 2014 16:42:23 +0100
-Subject: [PATCH] ARCH: mvebu: Makefile clean-up
-In-Reply-To: <1388763487-28436-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1388763487-28436-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <52C6DA5F.6080702@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri,  3 Jan 2014 16:45:59 +0100
+Subject: [PATCH] arm/smp: Make boot_secondary() static
+Message-ID: <1388763959-27491-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I sent it too fast, there was a typo in the title:
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-s/ARCH/ARM/
+After becoming a mandatory function, boot_secondary() is no longer used
+outside arch/arm/kernel/smp.c. Hence make it static.
+The code is reshuffled a bit to avoid a forward declaration.
 
-Sorry :(
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+ arch/arm/include/asm/smp.h |    6 ------
+ arch/arm/kernel/smp.c      |   18 +++++++++++-------
+ 2 files changed, 11 insertions(+), 13 deletions(-)
 
-On 03/01/2014 16:38, Gregory CLEMENT wrote:
-> Some objects depend on CONFIG_ARCH_MVEBU whereas this whole Makefile
-> depends on the same symbol. Moreover CONFIG_ARCH_MVEBU can't be
-> selected as a module. So we can simplify this Makefile by moving all
-> the object from obj-$(CONFIG_ARCH_MVEBU) to obj-y.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> Jason,
-> 
-> This patch is just a cosmetic one and it will conflict with the patch
-> fix I have just sent, but the conflict is trivial and I can resubmit
-> it as soon as the fix will be part of the 3.13-rc. If it is too late
-> for 3.14, just postpone it for 3.15.
-> 
-> Thanks,
-> 
-> Gregory
-> 
->  arch/arm/mach-mvebu/Makefile | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-> index 2d04f0e21870..74ca9ae8ab9b 100644
-> --- a/arch/arm/mach-mvebu/Makefile
-> +++ b/arch/arm/mach-mvebu/Makefile
-> @@ -3,8 +3,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->  
->  AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
->  
-> -obj-y				 += system-controller.o
-> +obj-y				 += coherency.o coherency_ll.o pmsu.o system-controller.o
->  obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
-> -obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
->  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
-> 
-
-
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 22a3b9b5d4a1..0d2c8c6f8d1d 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -49,12 +49,6 @@ extern void smp_init_cpus(void);
+ extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
+ 
+ /*
+- * Boot a secondary CPU, and assign it the specified idle task.
+- * This also gives us the initial stack to use for this CPU.
+- */
+-extern int boot_secondary(unsigned int cpu, struct task_struct *);
+-
+-/*
+  * Called from platform specific assembly code, this is the
+  * secondary CPU entry point.
+  */
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index dc894ab3622b..d05259a33d93 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -88,6 +88,17 @@ static unsigned long get_arch_pgd(pgd_t *pgd)
+ 	return pgdir >> ARCH_PGD_SHIFT;
+ }
+ 
++/*
++ * Boot a secondary CPU, and assign it the specified idle task.
++ * This also gives us the initial stack to use for this CPU.
++ */
++static int boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	if (smp_ops.smp_boot_secondary)
++		return smp_ops.smp_boot_secondary(cpu, idle);
++	return -ENOSYS;
++}
++
+ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ {
+ 	int ret;
+@@ -140,13 +151,6 @@ void __init smp_init_cpus(void)
+ 		smp_ops.smp_init_cpus();
+ }
+ 
+-int boot_secondary(unsigned int cpu, struct task_struct *idle)
+-{
+-	if (smp_ops.smp_boot_secondary)
+-		return smp_ops.smp_boot_secondary(cpu, idle);
+-	return -ENOSYS;
+-}
+-
+ int platform_can_cpu_hotplug(void)
+ {
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
