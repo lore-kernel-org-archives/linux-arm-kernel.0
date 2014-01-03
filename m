@@ -1,85 +1,31 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Fri, 3 Jan 2014 11:52:54 +0900
-Subject: ARM: mm: Could I change module space size or place modules
- in	vmalloc area?
-In-Reply-To: <20140103004716.GG7383@n2100.arm.linux.org.uk>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <20140102101359.GU6589@tarshish> <002e01cf081c$44a11e70$cde35b50$@lge.com>
- <20140103004716.GG7383@n2100.arm.linux.org.uk>
-Message-ID: <005801cf082e$e688da40$b39a8ec0$@lge.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri,  3 Jan 2014 10:59:21 +0800
+Subject: [PATCH 0/5] *** pinctrl: sirf: a bundle of fixes for pin groups ***
+Message-ID: <1388717966-11703-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Barry Song <Barry.Song@csr.com>
 
+hi Linus,
+here it is a bundle of fixes for CSR SiRFprimaII and SiRFatlasVI including:
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, January 03, 2014 9:47 AM
-> To: Gioh Kim
-> Cc: 'Baruch Siach'; linux-mm at kvack.org; 'linux-arm-kernel'; 'HyoJun Im'
-> Subject: Re: ARM: mm: Could I change module space size or place modules in
-> vmalloc area?
-> 
-> On Fri, Jan 03, 2014 at 09:39:31AM +0900, Gioh Kim wrote:
-> > Thank you for reply.
-> >
-> > > -----Original Message-----
-> > > From: Baruch Siach [mailto:baruch at tkos.co.il]
-> > > Sent: Thursday, January 02, 2014 7:14 PM
-> > > To: Gioh Kim
-> > > Cc: Russell King; linux-mm at kvack.org; linux-arm-kernel; HyoJun Im
-> > > Subject: Re: ARM: mm: Could I change module space size or place
-> > > modules in vmalloc area?
-> > >
-> > > Hi Gioh,
-> > >
-> > > On Thu, Jan 02, 2014 at 07:04:13PM +0900, Gioh Kim wrote:
-> > > > I run out of module space because I have several big driver modules.
-> > > > I know I can strip the modules to decrease size but I need debug
-> > > > info
-> > > now.
-> > >
-> > > Are you sure you need the debug info in kernel memory? I don't think
-> > > the kernel is actually able to parse DWARF. You can load stripped
-> > > binaries into the kernel, and still use the debug info with whatever
-> tool you have.
-> >
-> > I agree you but driver developers of another team don't agree.
-> > I don't know why but they say they will strip drivers later :-( So I
-> > need to increase modules space size.
-> 
-> ARM can only branch relatively within +/- 32MB.  Hence, with a module
-> space of 16MB, modules can reach up to a maximum 16MB into the direct-
-> mapped kernel image.  As module space increases in size, so that figure
-> decreases.  So, if module space were to be 40MB, the maximum size of the
-> kernel binary would be 8MB.
-> 
-> You want to look at a line similar to this:
-> 
->       .text : 0xc0008000 - 0xc031eda0   (3164 kB)
-> 
-> Also, note this:
-> 
->     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-> 
-> If the difference between the lowest module address (0xbf000000) and the
-> highest of .text is greater than 32MB, it's impossible to load modules -
-> they will fail to link.
-> 
-> What is the size of your kernel text? (show us the line(s) like the
-above.)
+Bin Shi (1):
+  pinctrl: sirf: fix the pins of sdmmc5 connected with TriG
 
-My kernel size is about 8MB as below.
-[    0.000000]     modules : 0x7f000000 - 0x80000000   (  16 MB)
-[    0.000000]       .text : 0x80008000 - 0x8085d2b0   (8533 kB)
+Qipan Li (2):
+  pinctrl: sirf: add lost usp1_uart_nostreamctrl group for atlas6
+  ARM: dts: SiRF: add lost usp1_uart_nostreamctrl pin group for atlas6
 
-I think I can increase the modules space size into 20MB.
-Thanks for your reply.
+Rongjun Ying (2):
+  pinctrl: sirf: add pin group for USP0 with only RX or TX frame sync
+  ARM: dts: SiRF: add pin group for USP0 with only RX or TX frame sync
 
-> 
-> Thanks.
-> 
-> --
-> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation in
-> database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-> Estimate before purchase was "up to 13.2Mbit".
+ arch/arm/boot/dts/atlas6.dtsi         |    6 ++++
+ arch/arm/boot/dts/prima2.dtsi         |   12 ++++++++
+ drivers/pinctrl/sirf/pinctrl-atlas6.c |   24 ++++++++++++++++
+ drivers/pinctrl/sirf/pinctrl-prima2.c |   48 ++++++++++++++++++++++++++++-----
+ 4 files changed, 83 insertions(+), 7 deletions(-)
+
+-- 
+1.7.5.4
