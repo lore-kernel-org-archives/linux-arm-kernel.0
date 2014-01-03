@@ -1,55 +1,48 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 3 Jan 2014 13:32:09 +0000
-Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
-In-Reply-To: <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
-References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
- <1388431259.2564.15.camel@deneb.redhat.com>
- <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1401031329160.8667@kaball.uk.xensource.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 03 Jan 2014 14:34:18 +0100
+Subject: [PATCH 1/2] zynq: Do not explicitely enable icache
+In-Reply-To: <201401031352.51392.arnd@arndb.de>
+References: <521bc636ed31ff2958f8c95417b09036a523782c.1388742126.git.michal.simek@xilinx.com>
+ <201401031352.51392.arnd@arndb.de>
+Message-ID: <52C6BC5A.9060203@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jan 2014, Stefano Stabellini wrote:
-> On Mon, 30 Dec 2013, Mark Salter wrote:
-> > On Mon, 2013-12-30 at 14:55 +0800, Chen Baozi wrote:
-> > > xen_remap used to be defined as ioremap_cached on arm64. In commit
-> > > c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
-> > > was deleted, while xen_remap stays the same. This would lead to
-> > > the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
-> > > on arm64 as ioremap_cache on arm64 to fix it.
-> > > 
-> > 
-> > I missed that include of arm header by arm64 when looking for users
-> > of arm64's ioremap_cached() when working on commit c04e8e2fe. Anyway,
-> > grepping the kernel tree, I see:
-> > 
-> >   ioremap_cached()
-> >     defined by: arm, metag, unicore32
-> >     used by: arch/arm/include/asm/xen/page.h
-> >              drivers/mtd/maps/pxa2xx-flash.c
-> > 
-> >   ioremap_cache()
-> >     defined by: arm64, sh, xtensa, ia64, x86
-> >     used by: drivers/video/vesafb.c
-> >              drivers/char/toshiba.c
-> >              drivers/acpi/apei
-> >              drivers/lguest/lguest_device.c
-> >              drivers/sfi/sfi_core.c
-> >              include/linux/acpi_io.h
-> > 
-> > I think it would be better to just avoid the confusion and the ifdef in
-> > asm/xen/page.h by globally changing ioremap_cached to ioremap_cache.
+On 01/03/2014 01:52 PM, Arnd Bergmann wrote:
+> On Friday 03 January 2014, Michal Simek wrote:
+>> icache is already enabled by default.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>>  board/xilinx/zynq/board.c | 2 --
+>>  1 file changed, 2 deletions(-)
 > 
-> While I welcome the suggestion, this is a critical fix for a regression
-> that I think should go in as soon as possible, maybe 3.13-rc7, while I
-> don't think that a global s/ioremap_cached/ioremap_cache would be
-> acceptable at this stage.
+> You had me confused for a bit. Please mark u-boot patches as such
+> when you send them to the kernel mailing list, and vice-versa.
 
-BTW Rob Herring sent a patch in November to solve the problem by
-renaming ioremap_cached to ioremap_cache under arch/arm:
+oou. Patman (tools I use for sending patches to mailing list)
+took arm prefix because of my bad setting.
 
-http://marc.info/?l=linux-arm-kernel&m=138394601804783
+Sorry for that.
 
-I wrongly assumed that was going to go in.
-I think it is too late for that now. We'll have to go this this patch
-for 3.13.
+Thanks,
+Michal
+
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/62504f87/attachment.sig>
