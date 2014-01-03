@@ -1,95 +1,159 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  2 Jan 2014 16:37:32 -0800
-Subject: [PATCH v2 02/10] genirq: Add devm_request_any_context_irq()
+Date: Thu,  2 Jan 2014 16:37:31 -0800
+Subject: [PATCH v2 01/10] Input: pmic8xxx-pwrkey - switch to using managed
+ resources
 In-Reply-To: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
 References: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1388709460-19222-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers use request_any_context_irq() but there isn't a
-devm_* function for it. Add one so that these drivers don't need
-to explicitly free the irq on driver detach.
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
+This simplifies error handling and device removal paths.
+
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- include/linux/interrupt.h |  5 +++++
- kernel/irq/devres.c       | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ drivers/input/misc/pmic8xxx-pwrkey.c | 74 ++++++++++++------------------------
+ 1 file changed, 25 insertions(+), 49 deletions(-)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 0053adde0ed9..a2678d35b5a2 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -158,6 +158,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
- 					 devname, dev_id);
+diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+index ef938405a9c6..aaf332510623 100644
+--- a/drivers/input/misc/pmic8xxx-pwrkey.c
++++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+@@ -32,7 +32,6 @@
+  * @key_press_irq: key press irq number
+  */
+ struct pmic8xxx_pwrkey {
+-	struct input_dev *pwr;
+ 	int key_press_irq;
+ };
+ 
+@@ -110,22 +109,22 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	pwrkey = kzalloc(sizeof(*pwrkey), GFP_KERNEL);
++	pwrkey = devm_kzalloc(&pdev->dev, sizeof(*pwrkey), GFP_KERNEL);
+ 	if (!pwrkey)
+ 		return -ENOMEM;
+ 
+-	pwr = input_allocate_device();
++	pwrkey->key_press_irq = key_press_irq;
++
++	pwr = devm_input_allocate_device(&pdev->dev);
+ 	if (!pwr) {
+ 		dev_dbg(&pdev->dev, "Can't allocate power button\n");
+-		err = -ENOMEM;
+-		goto free_pwrkey;
++		return -ENOMEM;
+ 	}
+ 
+ 	input_set_capability(pwr, EV_KEY, KEY_POWER);
+ 
+ 	pwr->name = "pmic8xxx_pwrkey";
+ 	pwr->phys = "pmic8xxx_pwrkey/input0";
+-	pwr->dev.parent = &pdev->dev;
+ 
+ 	delay = (pdata->kpd_trigger_delay_us << 10) / USEC_PER_SEC;
+ 	delay = 1 + ilog2(delay);
+@@ -133,7 +132,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+ 	err = regmap_read(regmap, PON_CNTL_1, &pon_cntl);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "failed reading PON_CNTL_1 err=%d\n", err);
+-		goto free_input_dev;
++		return err;
+ 	}
+ 
+ 	pon_cntl &= ~PON_CNTL_TRIG_DELAY_MASK;
+@@ -146,66 +145,43 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+ 	err = regmap_write(regmap, PON_CNTL_1, pon_cntl);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "failed writing PON_CNTL_1 err=%d\n", err);
+-		goto free_input_dev;
++		return err;
+ 	}
+ 
+-	err = input_register_device(pwr);
++	err = devm_request_irq(&pdev->dev, key_press_irq, pwrkey_press_irq,
++			       IRQF_TRIGGER_RISING,
++			       "pmic8xxx_pwrkey_press", pwr);
+ 	if (err) {
+-		dev_dbg(&pdev->dev, "Can't register power key: %d\n", err);
+-		goto free_input_dev;
++		dev_err(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
++			key_press_irq, err);
++		return err;
+ 	}
+ 
+-	pwrkey->key_press_irq = key_press_irq;
+-	pwrkey->pwr = pwr;
+-
+-	platform_set_drvdata(pdev, pwrkey);
+-
+-	err = request_irq(key_press_irq, pwrkey_press_irq,
+-		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwr);
+-	if (err < 0) {
+-		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
+-				 key_press_irq, err);
+-		goto unreg_input_dev;
++	err = devm_request_irq(&pdev->dev, key_release_irq, pwrkey_release_irq,
++			       IRQF_TRIGGER_RISING,
++			       "pmic8xxx_pwrkey_release", pwr);
++	if (err) {
++		dev_err(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
++			key_release_irq, err);
++		return err;
+ 	}
+ 
+-	err = request_irq(key_release_irq, pwrkey_release_irq,
+-		 IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_release", pwr);
+-	if (err < 0) {
+-		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
+-				 key_release_irq, err);
+-
+-		goto free_press_irq;
++	err = input_register_device(pwr);
++	if (err) {
++		dev_err(&pdev->dev, "Can't register power key: %d\n", err);
++		return err;
+ 	}
+ 
++	platform_set_drvdata(pdev, pwrkey);
+ 	device_init_wakeup(&pdev->dev, pdata->wakeup);
+ 
+ 	return 0;
+-
+-free_press_irq:
+-	free_irq(key_press_irq, pwrkey);
+-unreg_input_dev:
+-	input_unregister_device(pwr);
+-	pwr = NULL;
+-free_input_dev:
+-	input_free_device(pwr);
+-free_pwrkey:
+-	kfree(pwrkey);
+-	return err;
  }
  
-+extern int __must_check
-+devm_request_any_context_irq(struct device *dev, unsigned int irq,
-+		 irq_handler_t handler, unsigned long irqflags,
-+		 const char *devname, void *dev_id);
-+
- extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+ static int pmic8xxx_pwrkey_remove(struct platform_device *pdev)
+ {
+-	struct pmic8xxx_pwrkey *pwrkey = platform_get_drvdata(pdev);
+-	int key_release_irq = platform_get_irq(pdev, 0);
+-	int key_press_irq = platform_get_irq(pdev, 1);
+-
+ 	device_init_wakeup(&pdev->dev, 0);
  
- /*
-diff --git a/kernel/irq/devres.c b/kernel/irq/devres.c
-index bd8e788d71e0..1ef0606797c9 100644
---- a/kernel/irq/devres.c
-+++ b/kernel/irq/devres.c
-@@ -73,6 +73,51 @@ int devm_request_threaded_irq(struct device *dev, unsigned int irq,
- EXPORT_SYMBOL(devm_request_threaded_irq);
+-	free_irq(key_press_irq, pwrkey->pwr);
+-	free_irq(key_release_irq, pwrkey->pwr);
+-	input_unregister_device(pwrkey->pwr);
+-	kfree(pwrkey);
+-
+ 	return 0;
+ }
  
- /**
-+ *	devm_request_any_context_irq - allocate an interrupt line for a managed device
-+ *	@dev: device to request interrupt for
-+ *	@irq: Interrupt line to allocate
-+ *	@handler: Function to be called when the IRQ occurs
-+ *	@thread_fn: function to be called in a threaded interrupt context. NULL
-+ *		    for devices which handle everything in @handler
-+ *	@irqflags: Interrupt type flags
-+ *	@devname: An ascii name for the claiming device
-+ *	@dev_id: A cookie passed back to the handler function
-+ *
-+ *	Except for the extra @dev argument, this function takes the
-+ *	same arguments and performs the same function as
-+ *	request_any_context_irq().  IRQs requested with this function will be
-+ *	automatically freed on driver detach.
-+ *
-+ *	If an IRQ allocated with this function needs to be freed
-+ *	separately, devm_free_irq() must be used.
-+ */
-+int devm_request_any_context_irq(struct device *dev, unsigned int irq,
-+			      irq_handler_t handler, unsigned long irqflags,
-+			      const char *devname, void *dev_id)
-+{
-+	struct irq_devres *dr;
-+	int rc;
-+
-+	dr = devres_alloc(devm_irq_release, sizeof(struct irq_devres),
-+			  GFP_KERNEL);
-+	if (!dr)
-+		return -ENOMEM;
-+
-+	rc = request_any_context_irq(irq, handler, irqflags, devname, dev_id);
-+	if (rc) {
-+		devres_free(dr);
-+		return rc;
-+	}
-+
-+	dr->irq = irq;
-+	dr->dev_id = dev_id;
-+	devres_add(dev, dr);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(devm_request_any_context_irq);
-+
-+/**
-  *	devm_free_irq - free an interrupt
-  *	@dev: device to free interrupt for
-  *	@irq: Interrupt line to free
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
