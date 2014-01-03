@@ -1,30 +1,28 @@
-From: baozich@gmail.com (Chen Baozi)
-Date: Fri,  3 Jan 2014 23:10:18 +0800
-Subject: [PATCH V2] arm/xen: remove redundant semicolon in definition of
- ioremap_cache
-Message-ID: <1388761818-4646-1-git-send-email-baozich@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 3 Jan 2014 15:17:55 +0000
+Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
+In-Reply-To: <20140103145917.GP7383@n2100.arm.linux.org.uk>
+References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
+ <1388431259.2564.15.camel@deneb.redhat.com>
+ <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
+ <20140103143104.GN7383@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
+ <20140103145917.GP7383@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1401031517070.8667@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 <- v1: Edit based on Rob's patch
+On Fri, 3 Jan 2014, Russell King - ARM Linux wrote:
+> On Fri, Jan 03, 2014 at 02:49:54PM +0000, Stefano Stabellini wrote:
+> > OK. That would be Rob's patch below.
+> 
+> Looks fine to me.
+> 
+> > Are you going to take care of sending it to Linus?
+> 
+> If you want to stick it in the patch system, I'll throw it in my tree.
+> I need to push out the next set of fixes soon anyway.
+> 
+> Thanks.
 
-Reported-by: Wei Liu <liuw@liuw.name>
-Signed-off-by: Chen Baozi <baozich@gmail.com>
----
- arch/arm/include/asm/xen/page.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 3759cac..fba7995 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -117,6 +117,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
- 	return __set_phys_to_machine(pfn, mfn);
- }
- 
--#define xen_remap(cookie, size) ioremap_cache((cookie), (size));
-+#define xen_remap(cookie, size) ioremap_cache((cookie), (size))
- 
- #endif /* _ASM_ARM_XEN_PAGE_H */
--- 
-1.8.4.3
+Done. My first time with the patch system, please be lenient :-)
