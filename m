@@ -1,28 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 3 Jan 2014 15:17:55 +0000
-Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
-In-Reply-To: <20140103145917.GP7383@n2100.arm.linux.org.uk>
-References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
- <1388431259.2564.15.camel@deneb.redhat.com>
- <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
- <20140103143104.GN7383@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1401031444550.8667@kaball.uk.xensource.com>
- <20140103145917.GP7383@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1401031517070.8667@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Jan 2014 16:33:17 +0100
+Subject: [PATCH v7 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
+ entries
+In-Reply-To: <1388708539-333-5-git-send-email-lho@apm.com>
+References: <1388708539-333-1-git-send-email-lho@apm.com>
+ <1388708539-333-4-git-send-email-lho@apm.com>
+ <1388708539-333-5-git-send-email-lho@apm.com>
+Message-ID: <201401031633.18110.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jan 2014, Russell King - ARM Linux wrote:
-> On Fri, Jan 03, 2014 at 02:49:54PM +0000, Stefano Stabellini wrote:
-> > OK. That would be Rob's patch below.
-> 
-> Looks fine to me.
-> 
-> > Are you going to take care of sending it to Linus?
-> 
-> If you want to stick it in the patch system, I'll throw it in my tree.
-> I need to push out the next set of fixes soon anyway.
-> 
-> Thanks.
+On Friday 03 January 2014, Loc Ho wrote:
+> +                       sata23clk: sata23clk at 1f22c000 {
+> +                               compatible = "apm,xgene-device-clock";
+> +                               #clock-cells = <1>;
+> +                               clocks = <&socplldiv2 0>;
+> +                               clock-names = "sata23clk";
 
-Done. My first time with the patch system, please be lenient :-)
+> +                       };
+> +
+> +                       sata45clk: sata45clk at 1f23c000 {
+> +                               compatible = "apm,xgene-device-clock";
+> +                               #clock-cells = <1>;
+> +                               clocks = <&socplldiv2 0>;
+> +                               clock-names = "sata45clk";
+
+Something is wrong here: You have two devices with the same "compatible"
+string but using different "clock-names" strings. The binding document
+lists this as an optional property with the description  "shall be
+the name of the device clock. If missing, use the device name", which
+doesn't seem to make any sense.
+
+Please fix the binding and the existing users of this, and don't introduce
+any more broken instances. Since each device clock is documented to
+have only one parent anyway, please just make it an anonymous clock.
+
+	Arnd
