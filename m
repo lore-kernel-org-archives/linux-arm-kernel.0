@@ -1,57 +1,88 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 2 Jan 2014 12:38:31 -0800
-Subject: [PATCH 1/4] input: Add new sun4i-lradc-keys drivers
-In-Reply-To: <20140102202022.GK3144@lukather>
-References: <1388604610-20380-1-git-send-email-hdegoede@redhat.com>
- <20140101205603.GA1141@core.coreip.homeip.net>
- <52C5336B.9010903@redhat.com> <1700375.GaI3zFl6RI@phil>
- <52C56D79.1060506@redhat.com> <20140102202022.GK3144@lukather>
-Message-ID: <20140102203831.GA3239@core.coreip.homeip.net>
+From: lho@apm.com (Loc Ho)
+Date: Thu,  2 Jan 2014 17:22:15 -0700
+Subject: [PATCH v7 0/4] ata: Add APM X-Gene SoC SATA host controller support
+Message-ID: <1388708539-333-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 09:20:22PM +0100, Maxime Ripard wrote:
-> On Thu, Jan 02, 2014 at 02:45:29PM +0100, Hans de Goede wrote:
-> > >Also, instead of inventing yet another vendor-specific property, why not re-use
-> > >a button binding similar to gpio-keys like:
-> > >
-> > >        lradc: lradc at 01c22800 {
-> > >                compatible = "allwinner,sun4i-lradc-keys";
-> > >                reg = <0x01c22800 0x100>;
-> > >                interrupts = <31>;
-> > >                allwinner,chan0-step = <200>;
-> > >
-> > >		#address-cells = <1>;
-> > >		#size-cells = <0>;
-> > >
-> > >		button at 0 {
-> > >			reg = <0>; /* your channel index from above */
-> > >			linux,code = <115>; /* already used as dt-property */
-> > >		};
-> > >
-> > >		button at 1 {
-> > >			reg = <1>;
-> > >			linux,code = <114>;
-> > >		};
-> > 
-> > Ugh no. Having a vendor specific property which is KISS certainly
-> > beats this, both wrt ease of writing dts files as well as wrt the
-> > dts parsing code in the driver.
-> 
-> I'd agree with Heiko here. This is pretty much the same construct
-> that's already in use in other input drivers, like gpio-keys.
-> 
-> This is also something that can really easily be made generic, since
-> this is something that is rather common.
+This patch adds support for the APM X-Gene SoC SATA host controller. In
+order for the host controller to work, the corresponding PHY driver
+musts also be available.
 
-Except that button definition from gpio-keys does not use 'reg' property
-but rather gpio. I'd rather we did not cram non-applicable attributes
-into that definition just to make it "reusable" like that.
+v7:
+ * Update the clock code by toggle the clock
+ * Update the DTS clock mask values due to the clock spilt between host and 
+   v5 of the PHY drivers
 
-I'd be OK with having similar (but not claiming to be the same) mappings
-though.
+v6:
+ * Update binding documentation
+ * Change select PHY_XGENE_SATA to PHY_XGENE
+ * Add ULL to constants
+ * Change indentation and comments
+ * Clean up the probe functions a bit more
+ * Remove xgene_ahci_remove function
+ * Add the flush register to DTS
+ * Remove the interrupt-parent from DTS
 
-Thanks.
+v5:
+ * Sync up to v3 of the PHY driver
+ * Remove MSLIM wrapper functions
+ * Change the memory shutdown loop to use usleep_range
+ * Use devm_ioremap_resource instead devm_ioremap
+ * Remove suspend/resume functions as not needed
 
--- 
-Dmitry
+v4:
+ * Remove the ID property in DT
+ * Remove the temporary PHY direct function call and use PHY function
+ * Change printk to pr_debug
+ * Move the IOB flush addresses into the DT
+ * Remove the parameters retrieval function as no longer needed
+ * Remove the header file as no longer needed
+ * Require v2 patch of the SATA PHY driver. Require slightly modification
+   in the Kconfig as it is moved to folder driver/phy and use Kconfig
+   PHY_XGENE_SATA instead SATA_XGENE_PHY.
+
+v3:
+ * Move out the SATA PHY to another driver
+ * Remove the clock-cells entry from DTS
+ * Remove debug wrapper
+ * Remove delay functions wrapper
+ * Clean up resource and IRQ query
+ * Remove query clock name
+ * Switch to use dma_set_mask/dma_coherent_mask
+ * Remove un-necessary devm_kfree
+ * Update GPL license header to v2
+ * Spilt up function xgene_ahci_hardreset
+ * Spilt up function xgene_ahci_probe
+ * Remove all reference of CONFIG_ARCH_MSLIM
+ * Clean up chip revision code
+
+v2:
+ * Clean up file sata_xgene.c with Lindent and etc
+ * Clean up file sata_xgene_serdes.c with Lindent and etc
+ * Add description to each patch
+
+v1:
+ * inital version
+
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+Loc Ho (4):
+  ata: Export required functions by APM X-Gene SATA driver
+  Documentation: Add documentation for APM X-Gene SoC SATA host
+    controller DTS binding
+  ata: Add APM X-Gene SoC SATA host controller driver
+  arm64: Add APM X-Gene SoC SATA host controller DTS entries
+
+ .../devicetree/bindings/ata/apm-xgene.txt          |   68 ++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   81 ++
+ drivers/ata/Kconfig                                |    8 +
+ drivers/ata/Makefile                               |    1 +
+ drivers/ata/ahci.h                                 |    9 +
+ drivers/ata/libahci.c                              |   16 +-
+ drivers/ata/sata_xgene.c                           | 1071 ++++++++++++++++++++
+ 7 files changed, 1248 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+ create mode 100644 drivers/ata/sata_xgene.c
