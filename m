@@ -1,30 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 12:22:06 +0000
-Subject: ARM: mm: Could I change module space size or place modules in
- vmalloc area?
-In-Reply-To: <201401031310.09930.arnd@arndb.de>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <201401031310.09930.arnd@arndb.de>
-Message-ID: <20140103122206.GK7383@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Jan 2014 13:22:31 +0100
+Subject: Issue with the emulated PCI bridge implementation
+In-Reply-To: <20140103002656.GA12098@obsidianresearch.com>
+References: <20131226160534.36cc4203@skate> <20131226165241.2c50b244@skate>
+ <20140103002656.GA12098@obsidianresearch.com>
+Message-ID: <201401031322.31433.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 01:10:09PM +0100, Arnd Bergmann wrote:
-> Aside from the good comments that Russell made, I would remark that the
-> fact that you need multiple megabytes worth of modules indicates that you
-> are doing something wrong. Can you point to a git tree containing those
-> modules?
+On Friday 03 January 2014, Jason Gunthorpe wrote:
+> On Thu, Dec 26, 2013 at 04:52:41PM +0100, Thomas Petazzoni wrote:
+> 
+> > Here is an implementation of this idea, tested to work with an e1000e
+> > card, with the driver modified to do a few read/write to the I/O
+> > region. What do you think about it?
+> 
+> This seems reasonable, the only down side is that a stray read to an
+> unused portion of the Linux IO mapping will lock the machine instead
+> of getting a page fault - however I don't see that as a blocker.
+> 
 
->From the comments which have been made, one point that seems to have
-been identified is that if this module is first stripped and then
-loaded, it can load, but if it's unstripped, it's too big.  This sounds
-suboptimal to me - the debug info shouldn't be loaded into the kernel.
+I've scratched my head a bit over this patch, and I couldn't find anything
+wrong with it in the end, as long as we don't have any other device
+in the system that also wants its share of the I/O space (e.g. a
+PCMCIA port on the SRAM interface), but then we'd probably need other
+changes as well.
 
-However, I guess there's bad interactions with module signing if you
-don't do this and the module was signed with the debug info present,
-so I don't think there's a good solution for this.
+However the part that made me wonder is that an e1000e with a PCI bridge
+actually /should/not/ need to allocate an I/O space window with a precious
+mbus resource, since AFAIK this adapter does not have an I/O space BARs.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Thomas, can you send the 'lspci -v' output of the system with this card
+to confirm that the I/O space is actually needed? If not, we should probably
+review the core PCI code to see why the bridge code tries to add this window.
+
+	Arnd
