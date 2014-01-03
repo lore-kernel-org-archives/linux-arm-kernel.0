@@ -1,85 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jan 2014 09:00:32 -0800
-Subject: [GIT PULL] Allwinner core changes for 3.14
-In-Reply-To: <20140103162620.GL3144@lukather>
-References: <20131220221850.GA23269@lukather>
- <20140102200438.GB19720@quad.lixom.net>
- <20140103162620.GL3144@lukather>
-Message-ID: <CAOesGMhyL_qyX2ZmyCFf729UMgRE5UNnKBdo2u6cghcgE+2dgQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jan 2014 17:07:24 +0000
+Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
+In-Reply-To: <1388767737.19394.32.camel@pizza.hi.pengutronix.de>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
+ <1388767737.19394.32.camel@pizza.hi.pengutronix.de>
+Message-ID: <20140103170724.GT7383@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 3, 2014 at 8:26 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Olof,
->
-> On Thu, Jan 02, 2014 at 12:04:38PM -0800, Olof Johansson wrote:
->> Hi Maxime,
->>
->> On Fri, Dec 20, 2013 at 11:18:50PM +0100, Maxime Ripard wrote:
->> > Hi Arnd, Kevin, Olof,
->> >
->> > Please pull the following changes for the next merge window.
->> >
->> > Thanks!
->> > Maxime
->> >
->> > The following changes since commit 8f1ae77f466660b6da2455cccecc07ae631fa66d:
->> >
->> >   reset: Add Allwinner SoCs Reset Controller Driver (2013-11-22 21:20:36 +0100)
->> >
->> > are available in the git repository at:
->> >
->> >   https://github.com/mripard/linux.git tags/sunxi-core-for-3.14
->> >
->> > for you to fetch changes up to 73346794b48237b7b4c2a5c02b12e3c4f1da7551:
->> >
->> >   ARM: sun6i: Add SMP support for the Allwinner A31 (2013-12-16 21:33:41 +0100)
->> >
->> > ----------------------------------------------------------------
->> > Allwinner core changes for 3.14
->> >
->> > This mostly adds the reset controller initialisation for the A31 and the SMP
->> > operations for this SoC.
->> >
->> > ----------------------------------------------------------------
->> > Baruch Siach (1):
->> >       dt-bindings: fix example of allwinner interrupt controller
->> >
->> > Maxime Ripard (4):
->> >       Merge branch 'sunxi/drivers-for-3.14' into sunxi/core-for-3.14
->> >       ARM: sunxi: Select ARCH_HAS_RESET_CONTROLLER
->> >       ARM: sunxi: Register the A31 reset IP in init_time
->> >       ARM: sun6i: Add SMP support for the Allwinner A31
->>
->> This branch contains the driver changes for 3.14 too. Is that really necessary?
->> That's just an independent RTC driver.
->>
->> I would prefer if the SoC support code was kept either separate from drivers
->> (we can handle trivial merge conflicts), or that the SoC code was applied
->> before drivers, since we normally use that merge order
->> (fixes->cleanups->soc->dt->drivers->boards).
->>
->> So, care to respin for us? Thanks!
->
-> Actually, it's not about the RTC part, but the reset one.
->
-> The A31 has some timers set in reset, so, in order to use those
-> timers, we have to init the reset controller driver before calling
-> clocksource_of_init.
->
-> The reset framework related patch (8f1ae77f) in drivers-for-3.14
-> introduces a function that is called in init_time, in a patch in
-> core-for-3.14 (751b2ac4).
->
-> So I just merged the driver branch to avoid a compilation breakage. If
-> you prefer to do it another way, I'm ok with it too :)
+On Fri, Jan 03, 2014 at 05:48:57PM +0100, Philipp Zabel wrote:
+> Hi Russell,
+> 
+> I've tested this series on a BD-SL (SabreLite) with HDMI. Right now
+> the HPD signal doesn't seem to work, but after overwriting the
+> connection check, I got a stable and correct picture on the monitor:
+
+Hmm.  Does this mean you're not getting any IRQs from the HDMI interface
+when you plug and unplug the monitor?
+
+147:        281       GIC 147  120000.hdmi
+
+on turning the TV on:
+
+147:        282       GIC 147  120000.hdmi
+
+on unplugging the HDMI cable:
+
+147:        283       GIC 147  120000.hdmi
+
+on replugging the HDMI cable:
+
+147:        284       GIC 147  120000.hdmi
 
 
-Ah, right, I should have looked closer at the code not just the list
-of patches. :)
-
-I'll pull this in later today.
-
-
--Olof
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
