@@ -1,104 +1,36 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 03 Jan 2014 14:24:26 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140103121812.GJ7383@n2100.arm.linux.org.uk>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <3242371.eHgoTRi3y3@vostro.rjw.lan>
- <20140103121812.GJ7383@n2100.arm.linux.org.uk>
-Message-ID: <2450832.kBuTIAzyCY@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Jan 2014 14:10:27 +0100
+Subject: [PATCH v2 1/3] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
+References: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
+Message-ID: <201401031410.27374.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 03, 2014 12:18:13 PM Russell King - ARM Linux wrote:
-> On Fri, Jan 03, 2014 at 12:58:16PM +0100, Rafael J. Wysocki wrote:
-> > On Friday, January 03, 2014 11:00:30 AM Russell King - ARM Linux wrote:
-> > > On Thu, Jan 02, 2014 at 07:10:55PM -0800, Greg Kroah-Hartman wrote:
-> > > > On Thu, Jan 02, 2014 at 09:27:58PM +0000, Russell King wrote:
-> > > > > Subsystems such as ALSA, DRM and others require a single card-level
-> > > > > device structure to represent a subsystem.  However, firmware tends to
-> > > > > describe the individual devices and the connections between them.
-> > > > > 
-> > > > > Therefore, we need a way to gather up the individual component devices
-> > > > > together, and indicate when we have all the component devices.
-> > > > > 
-> > > > > We do this in DT by providing a "superdevice" node which specifies
-> > > > > the components, eg:
-> > > > > 
-> > > > > 	imx-drm {
-> > > > > 		compatible = "fsl,drm";
-> > > > > 		crtcs = <&ipu1>;
-> > > > > 		connectors = <&hdmi>;
-> > > > > 	};
-> > > > > 
-> > > > > The superdevice is declared into the component support, along with the
-> > > > > subcomponents.  The superdevice receives callbacks to locate the
-> > > > > subcomponents, and identify when all components are present.  At this
-> > > > > point, we bind the superdevice, which causes the appropriate subsystem
-> > > > > to be initialised in the conventional way.
-> > > > > 
-> > > > > When any of the components or superdevice are removed from the system,
-> > > > > we unbind the superdevice, thereby taking the subsystem down.
-> > > > 
-> > > > This sounds a lot like the "containers" code that Rafael just submitted
-> > > > and I acked for 3.14.  Look at the lkml post:
-> > > > 	Subject: [PATCH 2/2] ACPI / hotplug / driver core: Handle containers in a special way
-> > > > 	Message-ID: <1991202.gilW172FBV@vostro.rjw.lan>
-> > > > 
-> > > > And see if that could possibly be used instead?
-> > > 
-> > > That's really disappointing bcause I've put a hell of a lot of work into
-> > > this over the last few months, and if that's true it's all just been a
-> > > total waste of my time.  Okay, lesson learned - don't spend any time
-> > > trying to fix other people's problems after discussing them at
-> > > kernel-summit.
-> > 
-> > Well, I didn't know that you were doing this work and my patch is to address
-> > a specific problem that people are seeing in testing.  Also, the generic
-> > containers part in it is very simple and it might be possible to integrate it
-> > with your code, this way or another.  In fact, the only only thing I need from
-> > containers at the moment is the online/offline functionality.
+On Thursday 19 December 2013, Alexander Shiyan wrote:
+> This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
 > 
-> We had a session at kernel summit chaired by David Airlie to discuss
-> various issues associated with DRM which included the problems of
-> componentised devices registering into card-based subsystems.  There
-> were quite a number of attendees to that session.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Yeah, I was there too.
+Just one more question from my side, otherwise
 
-> It is in that session that I said I would work on this, specifically
-> with the aim of getting imx-drm out of drivers/staging.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-OK, but that's not directly related to what I did with containers.
+> +	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_node_id());
+> +	if (IS_ERR_VALUE(err))
+> +		goto out_iounmap;
+> +
+> +	clps711x_intc->ops.map = clps711x_intc_irq_map;
+> +	clps711x_intc->ops.xlate = irq_domain_xlate_onecell;
+> +	clps711x_intc->domain =
+> +		irq_domain_add_legacy(np, ARRAY_SIZE(clps711x_irqs),
+> +				      0, 0, &clps711x_intc->ops, NULL);
 
-> > > In any case, the above message ID doesn't give me access to this containers
-> > > code to look at to even evaluate whether it can be used for this - it just
-> > > gives two patches for ACPI specific patches but not the core stuff.
-> > > 
-> > > http://www.spinics.net/lists/linux-acpi/msg48101.html
-> > > http://www.spinics.net/lists/linux-acpi/msg48102.html
-> > > 
-> > > Please provide a better reference to the code you're referring to.
-> > 
-> > You can use the linux-next branch of the linux-pm.git tree at the moment or I
-> > can set up a separate branch for that if that helps.  The two patches above
-> > depend on some earlier material I've gueued up for 3.14, but it's mostly
-> > ACPI hotplug code.
-> 
-> I'm not sure what I'm looking for.  I've tried looking at the results of
-> searching your linux-next branch for "container" but I don't see
-> anything implementing similar functionality to the patch I've sent.
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/log/?h=linux-next&qt=grep&q=container
+Can't you use irq_domain_add_simple() here? When you are booting with DT
+and SPARSE_IRQ, you should not need to allocate the descriptors at boot time,
+but only as needed.
 
-I've just set up the acpi-hotplug branch in linux-pm.git (because I often
-rebase the linux-next one).
+You will have to pass '0' as the first_irq argument for the DT case then,
+and '1' for the non-DT case to actually allocate virqs starting at number 1.
 
-The only commit in that branch you need to look at is this one:
-
-http://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=acpi-hotplug&id=caa73ea158de9419f08e456f2716c71d1f06012a
-
-but quite frankly I'm not sure how it is related to your work. :-)
-
-Thanks,
-Rafael
+	Arnd
