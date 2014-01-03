@@ -1,54 +1,101 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 3 Jan 2014 11:01:41 +0800
-Subject: [PATCH 2/3] mtd: gpmi: do not use the mtd->writesize
+Date: Fri, 3 Jan 2014 11:01:39 +0800
+Subject: [PATCH 0/3] mtd: gpmi: add subpage read support
 In-Reply-To: <a>
 References: <a>
-Message-ID: <1388718102-26097-3-git-send-email-b32955@freescale.com>
+Message-ID: <1388718102-26097-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nfc_geo->payload_size is equal to the mtd->writesize now,
-use the nfc_geo->payload_size to replace the mtd->writesize.
+1) Why add the subpage read support?
+  The page size of the nand chip becomes larger and larger, the imx6 has to
+  supports the 16K page or even bigger page. But sometimes, the upper layer only
+  needs a small part of the page, such as 512 bytes or less.
 
-This patch makes preparation for the gpmi's subpage read support.
-In the subpage support, the nfc_geo->payload_size maybe smaller then
-the mtd->writesize.
+  For example, ubiattach may only read 64 bytes per page.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+2) We only enable the subpage read support when it meets the conditions:
+   <1> the chip is imx6 (or later chips) which can supports large nand page.
+   <2> the size of ECC parity is byte aligned.
+       If the size of ECC parity is not byte aligned, the calling of NAND_CMD_RNDOUT
+       will fail.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 1908709..c92df74 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1010,7 +1010,7 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	int           ret;
- 
- 	dev_dbg(this->dev, "page number is : %d\n", page);
--	ret = read_page_prepare(this, buf, mtd->writesize,
-+	ret = read_page_prepare(this, buf, nfc_geo->payload_size,
- 					this->payload_virt, this->payload_phys,
- 					nfc_geo->payload_size,
- 					&payload_virt, &payload_phys);
-@@ -1024,7 +1024,7 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 
- 	/* go! */
- 	ret = gpmi_read_page(this, payload_phys, auxiliary_phys);
--	read_page_end(this, buf, mtd->writesize,
-+	read_page_end(this, buf, nfc_geo->payload_size,
- 			this->payload_virt, this->payload_phys,
- 			nfc_geo->payload_size,
- 			payload_virt, payload_phys);
-@@ -1079,7 +1079,7 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 		chip->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
- 	}
- 
--	read_page_swap_end(this, buf, mtd->writesize,
-+	read_page_swap_end(this, buf, nfc_geo->payload_size,
- 			this->payload_virt, this->payload_phys,
- 			nfc_geo->payload_size,
- 			payload_virt, payload_phys);
+3) What does this patch set do?
+   patch 1: add a new argument for read_subpage hook
+   patch 2: do not use the mtd->writesize. 
+   patch 3: This patch will fake a virtual small page for the subpage read,
+            and call the gpmi_ecc_read_page() to do the real work.
+            In order to fake a virtual small page, the patch changes
+	    the BCH registers and the bch_geometry{}. After the subpage read
+	    finished, we will restore them back.
+
+4) Performace:
+    4.1) Tested with Toshiba TC58NVG2S0F(4096 + 224) with the following command:
+         #ubiattach /dev/ubi_ctrl -m 4
+
+       The detail information of /dev/mtd4 shows below:
+       --------------------------------------------------------------
+       #mtdinfo /dev/mtd4
+        mtd4
+        Name:                           test
+        Type:                           nand
+        Eraseblock size:                262144 bytes, 256.0 KiB
+        Amount of eraseblocks:          1856 (486539264 bytes, 464.0 MiB)
+        Minimum input/output unit size: 4096 bytes
+        Sub-page size:                  4096 bytes
+        OOB size:                       224 bytes
+        Character device major/minor:   90:8
+        Bad blocks are allowed:         true
+        Device is writable:             true
+       --------------------------------------------------------------
+
+    4.2) Before this patch:
+       --------------------------------------------------------------
+       [   94.530495] UBI: attaching mtd4 to ubi0
+       [   98.928850] UBI: scanning is finished
+       [   98.953594] UBI: attached mtd4 (name "test", size 464 MiB) to ubi0
+       [   98.958562] UBI: PEB size: 262144 bytes (256 KiB), LEB size: 253952 bytes
+       [   98.964076] UBI: min./max. I/O unit sizes: 4096/4096, sub-page size 4096
+       [   98.969518] UBI: VID header offset: 4096 (aligned 4096), data offset: 8192
+       [   98.975128] UBI: good PEBs: 1856, bad PEBs: 0, corrupted PEBs: 0
+       [   98.979843] UBI: user volume: 1, internal volumes: 1, max. volumes count: 128
+       [   98.985878] UBI: max/mean erase counter: 2/1, WL threshold: 4096, image sequence number: 2024916145
+       [   98.993635] UBI: available PEBs: 0, total reserved PEBs: 1856, PEBs reserved for bad PEB handling: 40
+       [   99.001807] UBI: background thread "ubi_bgt0d" started, PID 831
+       --------------------------------------------------------------
+       The attach time is about 98.9 - 94.5 = 4.4s
+
+    4.3) After this patch:
+       --------------------------------------------------------------
+       [  286.464906] UBI: attaching mtd4 to ubi0
+       [  289.186129] UBI: scanning is finished
+       [  289.211416] UBI: attached mtd4 (name "test", size 464 MiB) to ubi0
+       [  289.216360] UBI: PEB size: 262144 bytes (256 KiB), LEB size: 253952 bytes
+       [  289.221858] UBI: min./max. I/O unit sizes: 4096/4096, sub-page size 4096
+       [  289.227293] UBI: VID header offset: 4096 (aligned 4096), data offset: 8192
+       [  289.232878] UBI: good PEBs: 1856, bad PEBs: 0, corrupted PEBs: 0
+       [  289.237628] UBI: user volume: 0, internal volumes: 1, max. volumes count: 128
+       [  289.243553] UBI: max/mean erase counter: 1/1, WL threshold: 4096, image sequence number: 2024916145
+       [  289.251348] UBI: available PEBs: 1812, total reserved PEBs: 44, PEBs reserved for bad PEB handling: 40
+       [  289.259417] UBI: background thread "ubi_bgt0d" started, PID 847
+       --------------------------------------------------------------
+       The attach time is about 289.18 - 286.46 = 2.7s
+
+     4.4) The conclusion:
+       We achieve (4.4 - 2.7) / 4.4 = 38.6% faster in the ubiattach.
+
+ 5) This patch depends on the following patch:
+    http://lists.infradead.org/pipermail/linux-mtd/2013-December/051091.html
+
+Huang Shijie (3):
+  mtd: nand: add "page" argument for read_subpage hook
+  mtd: gpmi: do not use the mtd->writesize
+  mtd: gpmi: add subpage read support
+
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  102 +++++++++++++++++++++++++++++++-
+ drivers/mtd/nand/nand_base.c           |    7 ++-
+ include/linux/mtd/nand.h               |    2 +-
+ 3 files changed, 105 insertions(+), 6 deletions(-)
+
 -- 
 1.7.2.rc3
