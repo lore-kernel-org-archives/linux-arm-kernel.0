@@ -1,46 +1,27 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri,  3 Jan 2014 10:59:26 +0800
-Subject: [PATCH 5/5] ARM: dts: SiRF: add pin group for USP0 with only RX or TX
- frame sync
-In-Reply-To: <1388717966-11703-1-git-send-email-21cnbao@gmail.com>
-References: <1388717966-11703-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1388717966-11703-6-git-send-email-21cnbao@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 Jan 2014 11:04:57 +0800
+Subject: DT include files (was: [GIT PULL 2/2] ARM: imx: device tree
+ changes for 3.14)
+In-Reply-To: <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
+References: <20131231054427.GA22383@S2101-09.ap.freescale.net>
+ <20140102202108.GF19720@quad.lixom.net>
+ <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
+Message-ID: <20140103030455.GB25079@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <Rongjun.Ying@csr.com>
+On Thu, Jan 02, 2014 at 06:41:30PM -0800, Olof Johansson wrote:
+> Ok, then it's probably just the location of the header files that
+> should be adjusted. Other subsystems have placed them under
+> include/dt-bindings/<subsystem>, so that's likely a better place for
+> these as well, don't you think?
 
-add pin groups for USP0 only holding one of TX and RX frame sync. this
-patch matches with the change in drivers/pinctrl/sirf.
+I had a little discussion with DT people when the headers were firstly
+created.  These pinctrl headers are a little different from the headers
+in include/dt-bindings/<subsystem>.  The latter are used by both kernel
+and device tree sources, while the pinctrl headers are used by device
+tree sources only, so I chose to put them just in the same folder as
+dts files.  And DT people are fine with my take.
 
-Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-Signed-off-by: Barry Song <Barry.Song@csr.com>
----
- arch/arm/boot/dts/prima2.dtsi |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index daee5894..e0b8cd6 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -540,6 +540,18 @@
- 							"usp0_uart_nostreamctrl";
-                                         };
-                                 };
-+                                usp0_only_utfs_pins_a: usp0 at 2 {
-+                                        usp0 {
-+                                                sirf,pins = "usp0_only_utfs_grp";
-+                                                sirf,function = "usp0_only_utfs";
-+                                        };
-+                                };
-+                                usp0_only_urfs_pins_a: usp0 at 3 {
-+                                        usp0 {
-+                                                sirf,pins = "usp0_only_urfs_grp";
-+                                                sirf,function = "usp0_only_urfs";
-+                                        };
-+                                };
-                                 usp1_pins_a: usp1 at 0 {
-                                         usp1 {
-                                                 sirf,pins = "usp1grp";
--- 
-1.7.5.4
+Shawn
