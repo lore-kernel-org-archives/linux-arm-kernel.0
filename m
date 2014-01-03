@@ -1,52 +1,30 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 3 Jan 2014 08:55:28 +0530
-Subject: [PATCH Resend 1/1] clk: exynos5250: Add CLK_SET_RATE_PARENT flag
- to mout_apll
-In-Reply-To: <3836526.9kWglB5ajS@amdc1227>
-References: <1387442019-2445-1-git-send-email-sachin.kamat@linaro.org>
- <3616477.6ZBKa1KffA@amdc1227>
- <CAK9yfHxu0f-ZSkM76HWYOpRRXvzYR2Gu2zc3-sgzMPp+_1JvWQ@mail.gmail.com>
- <3836526.9kWglB5ajS@amdc1227>
-Message-ID: <CAK9yfHzaMyrvvhxfV9KH-gEdcaQNAHPJ3KnUx9wcUi5BqUYpAw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 3 Jan 2014 01:28:05 -0200
+Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
+ reset
+In-Reply-To: <20140103032230.GC25079@S2101-09.ap.freescale.net>
+References: <1388715253-17206-1-git-send-email-festevam@gmail.com>
+ <20140103032230.GC25079@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5CZnx9Pi79eufO5uCM7uyvKR6r0VULE9dpwfZBAPpdj7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Shawn,
 
-On 2 January 2014 20:54, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Sachin,
->
-> On Tuesday 31 of December 2013 08:24:02 Sachin Kamat wrote:
->> On 30 December 2013 23:21, Tomasz Figa <t.figa@samsung.com> wrote:
->> > On Thursday 19 of December 2013 11:37:08 Mike Turquette wrote:
->> >> Quoting Sachin Kamat (2013-12-19 00:33:39)
->> >> > Add CLK_SET_RATE_PARENT flag to mout_apll clock. This will let us set the
->> >> > clock rate in the cpufreq driver.
->> >> >
->> >> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> >>
->> >> Ack.
->> >
->> > Applied onto next branch.
->>
->> Thanks Tomasz. But did not find this branch in your tree [1].
->
-> I haven't pushed the branches yet, as I'm yet to collect some patches
-> and acks
->
->> Also, please consider adding your tree to linux-next.
->
-> Hmm, I would consider this tree only as a staging to send pull requests
-> for Mike, so patches should be hitting clk-next tree quickly after getting
-> there. I don't think this makes a need to add this tree to linux-next.
+On Fri, Jan 3, 2014 at 1:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Yes, if the window period between the patches landing into your tree
-and Mike's tree
-is relatively small, then there is no need. Else it would be good to
-avoid merge conflicts
-and ease further development and testing.
+> If this is needed for 3.13, you should generate the patch against the
+> mainline where the fec change is in place rather than my for-next
+> branch.  And for those dts files that can only be patched against my
+> for-next branch, we need another patch.
 
+If this patch goes via your for-next there will be no harm to your
+tree, since the fec driver will just ignore the gpio flag and the
+behaviour will be the same as before.
 
--- 
-With warm regards,
-Sachin
+If you are not happy with it, then I will have to generate the patch
+against mainline and ask davem to apply it.
+
+Regards,
+
+Fabio Estevam
