@@ -1,52 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 3 Jan 2014 10:40:55 -0600
-Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
-In-Reply-To: <52C6A939.70708@ti.com>
-References: <1384970958-4118-1-git-send-email-balbi@ti.com>
- <20131219184815.GU27438@atomide.com>
- <20131219232153.GE707@saruman.home>
- <20131221005309.GH26054@atomide.com>
- <20131223173409.GA10536@saruman.home>
- <20140102220101.GA8652@saruman.home> <52C6A939.70708@ti.com>
-Message-ID: <20140103164055.GA18722@saruman.home>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Jan 2014 17:41:08 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <52C6D3A8.4010801@free-electrons.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <20140103144712.GA22597@lunn.ch>
+ <52C6CE7E.5010800@free-electrons.com>
+ <52C6D3A8.4010801@free-electrons.com>
+Message-ID: <20140103164108.GA23714@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 05:42:41PM +0530, Rajendra Nayak wrote:
-> []..
-> 
-> >>> so a bit more work is needed. Maybe also rebase these against
-> >>> omap-for-v3.14/dt too?
+> >> Hi Gregory
 > >>
-> >> Will do.
+> >> I'm away from my hardware at the moment. 
+> >>
+> >> Does this work when all the PCIe ports have status = "disabled";? We
+> >> have many kirkwood devices in NAS boxes which don't use PCIe, so all
+> >> the ports are disabled. But they still exist in the SoC, so we can
+> >> read the IDs from them. I just don't know if of_get_next_child() will
+> >> only return enabled children?
 > > 
-> > Rebased on top of omap-for-v3.14/omap3-board-removal. Patches are on my
-> > k.org tree:
+> > There is a function named of_get_next_available_child, so I assumed that
+> > of_get_next_child() will return all the children. But I can test it to
+> > be sure of it.
 > > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git wip/omap-fix-intc
 > 
-> It needs a minor build fix though..
+> I have just removed all the PCIe part in the
+> armada-xp-openblocks-ax3-4.dts file (PCie is disable by default in the
+> dtsi file) and it worled as expected! :)
+
+Great, thanks for testing.
+ 
+> by the way waht do you think of adding this line in at the end of the
+> mvebu_soc_id_init() function:
 > 
-> diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-> index b58c5d5..d03b5a3 100644
-> --- a/drivers/irqchip/irq-omap-intc.c
-> +++ b/drivers/irqchip/irq-omap-intc.c
-> @@ -151,7 +151,7 @@ static void omap_mask_ack_irq(struct irq_data *d)
->  static void omap_suspend_irq(struct irq_data *d)
->  {
->         omap_intc_save_context();
-> -       omap3_intc_prepare_idle();
-> +       omap_intc_prepare_idle();
+> pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
 
-fixed now, thanks. Wonder how come I didn't see that, I was building
-every commit with omap2plus_defconfig :-( Oh well...
+Kirkwood prints actual strings, not numbers. More readable.
+ 
+> Also keep in mind that currently you can't use it for kirkwood because
+> the build of the file depend on CONFIG_ARCH_MVEBU. But as kirkwood
+> will soon joined the mach-mvebu directory, it won't be a problem then.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/2dd4ab0f/attachment.sig>
+I think it is possible to do ../mach-mvebu/soc_id.o sort of thing in
+the Makefile. Ugly, but might work until we move.
+
+    Andrew
