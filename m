@@ -1,65 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 14:31:04 +0000
-Subject: [PATCH] arm64/xen: redefine xen_remap on arm64
-In-Reply-To: <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
-References: <1388386511-32276-1-git-send-email-baozich@gmail.com>
- <1388431259.2564.15.camel@deneb.redhat.com>
- <alpine.DEB.2.02.1401031310100.8667@kaball.uk.xensource.com>
-Message-ID: <20140103143104.GN7383@n2100.arm.linux.org.uk>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Fri, 03 Jan 2014 22:46:25 +0800
+Subject: Question about debugging Bad mode in =?ISO-8859-1?Q?=E2?= handler
+ detected
+Message-ID: <1388760385.31617.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 01:13:57PM +0000, Stefano Stabellini wrote:
-> On Mon, 30 Dec 2013, Mark Salter wrote:
-> > On Mon, 2013-12-30 at 14:55 +0800, Chen Baozi wrote:
-> > > xen_remap used to be defined as ioremap_cached on arm64. In commit
-> > > c04e8e2fe, a new ioremap_cache was implemented, and ioremap_cached
-> > > was deleted, while xen_remap stays the same. This would lead to
-> > > the failure when building with CONFIG_HVC_XEN. Redefined xen_remap
-> > > on arm64 as ioremap_cache on arm64 to fix it.
-> > > 
-> > 
-> > I missed that include of arm header by arm64 when looking for users
-> > of arm64's ioremap_cached() when working on commit c04e8e2fe. Anyway,
-> > grepping the kernel tree, I see:
-> > 
-> >   ioremap_cached()
-> >     defined by: arm, metag, unicore32
-> >     used by: arch/arm/include/asm/xen/page.h
-> >              drivers/mtd/maps/pxa2xx-flash.c
-> > 
-> >   ioremap_cache()
-> >     defined by: arm64, sh, xtensa, ia64, x86
-> >     used by: drivers/video/vesafb.c
-> >              drivers/char/toshiba.c
-> >              drivers/acpi/apei
-> >              drivers/lguest/lguest_device.c
-> >              drivers/sfi/sfi_core.c
-> >              include/linux/acpi_io.h
-> > 
-> > I think it would be better to just avoid the confusion and the ifdef in
-> > asm/xen/page.h by globally changing ioremap_cached to ioremap_cache.
-> 
-> While I welcome the suggestion, this is a critical fix for a regression
-> that I think should go in as soon as possible, maybe 3.13-rc7, while I
-> don't think that a global s/ioremap_cached/ioremap_cache would be
-> acceptable at this stage.
+Hi list,
 
-Since it's just one driver, just make the change for ARM (provided the
-grep is accurate.)  pxa2xx-flash is only used on ARM and not the other
-two listed there, so looks like metag and unicore just decided to copy
-ARM.
+I hit a "Bad mode in ? handler detected" oops.
+The first line of the message looks un-readable, so I print the reason index as well.
+The reason index is "4", so it does not exist in the handler array.
+static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+I'd appreciate if someone can give me advices and comments to debug this.
 
-My grep concurs with yours.
+I'm testing on Linus' tree + out-of-tree patches for this ARM7TDMI SoC.
 
-So... just change ioremap_cached -> ioremap_cache in
-arch/arm/include/asm/io.h
-arch/arm/include/asm/xen/page.h
-drivers/mtd/maps/pxa2xx-flash.c
+BTW,
+It seems I can hit his oops only when CONFIG_DEBUG_MUTEXES is not set.
+If I set CONFIG_DEBUG_MUTEXES, the system can boot to busybox.
 
-to fix the problem.
+Below is the oops message:
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Bad mode in ? handler detected reason=4
+Internal error: Oops - bad mode: 0 [#1] PREEMPT ARM
+Modules linked in:
+CPU: 0 PID: 19 Comm: spi0 Not tainted 3.13.0-rc6-00247-g228432c-dirty #2347
+task: 01e4efc0 ti: 01eec000 task.ti: 01eec000
+PC is at 0xa04
+LR is at gpl327xx_spi_transfer_one+0xb0/0x238
+pc : [<00000a04>]    lr : [<00127f94>]    psr: 200000d2
+sp : 01eedea8  ip : 0000131f  fp : 001cf02c
+r10: 01eec000  r9 : 00000000  r8 : 0000105e
+r7 : 00000000  r6 : 000000f1  r5 : 01e7b570  r4 : 00000004
+r3 : fffff104  r2 : c0080000  r1 : 00008000  r0 : 01e7b570
+Flags: nzCv  IRQs off  FIQs off  Mode IRQ_32  ISA ARM  Segment kernel
+Process spi0 (pid: 19, stack limit = 0x01eec1c0)
+Stack: (0x01eedea8 to 0x01eee000)
+dea0:                   01e7b570 00008000 c0080000 fffff104 00000004 01e7b570
+dec0: 000000f1 00000000 0000105e 00000000 01eec000 001cf02c 0000131f 01eedea8
+dee0: 00127f94 00000a04 200000d2 ffffffff 01e35db8 00000000 01e7b400 01e35d90
+df00: 00000001 00126cf0 00000000 01e7b540 0018de00 01e7b514 01e7b400 60000053
+df20: 00000001 00000001 00000000 00000000 00000000 00126b28 01e4efc0 01e7b500
+df40: 01e7b514 01eec000 00000000 00028f6c 00000000 01eeb0c0 00000000 01e7b500
+df60: 00028eac 00000000 00000000 00029184 00000000 00000000 00000000 01e7b500
+df80: 00000000 01eedf84 01eedf84 00000000 01eedf90 01eedf90 01eedfac 01eeb0c0
+dfa0: 000290d4 00000000 00000000 000091f0 00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
+[<00127f94>] (gpl327xx_spi_transfer_one+0xb0/0x238) from [<01e7b570>] (0x1e7b570)
+Code: e7fddef1 e7fddef1 e7fddef1 e7fdf1f1 (e7fddef1)
+---[ end trace 546fedf9b22de3f0 ]---
+
+$ echo "Code: e7fddef1 e7fddef1 e7fddef1 e7fdf1f1 (e7fddef1)" |scripts/decodecode 
+Code: e7fddef1 e7fddef1 e7fddef1 e7fdf1f1 (e7fddef1)
+All code
+========
+   0:	e7fddef1 			; <UNDEFINED> instruction: 0xe7fddef1
+   4:	e7fddef1 			; <UNDEFINED> instruction: 0xe7fddef1
+   8:	e7fddef1 			; <UNDEFINED> instruction: 0xe7fddef1
+   c:	e7fdf1f1 			; <UNDEFINED> instruction: 0xe7fdf1f1
+  10:	e7fddef1 			; <UNDEFINED> instruction:* 0xe7fddef1		<-- trapping instruction
+
+Code starting with the faulting instruction
+===========================================
+   0:	e7fddef1 			; <UNDEFINED> instruction: 0xe7fddef1
