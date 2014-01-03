@@ -1,25 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 15:04:01 +0000
-Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
-In-Reply-To: <CAKv+Gu8sWLFnRZtuWOw2n96amAVc604Vk_HWD-9S6q1bZ5grhA@mail.gmail.com>
-References: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
- <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
- <CAKv+Gu8sWLFnRZtuWOw2n96amAVc604Vk_HWD-9S6q1bZ5grhA@mail.gmail.com>
-Message-ID: <20140103150401.GQ7383@n2100.arm.linux.org.uk>
+From: thomas.lendacky@amd.com (Tom Lendacky)
+Date: Fri, 3 Jan 2014 09:10:30 -0600
+Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
+In-Reply-To: <20131230090112.GA8550@gondor.apana.org.au>
+References: <1386703583-8386-1-git-send-email-marex@denx.de>
+ <201312270121.36578.marex@denx.de>
+ <20131230090112.GA8550@gondor.apana.org.au>
+Message-ID: <10214668.cztjge9Iie@tlendack-t1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 09:13:46AM +0100, Ard Biesheuvel wrote:
-> I noticed that this patch has turned up in rmk/fixes.
+On Monday, December 30, 2013 05:01:13 PM Herbert Xu wrote:
+> On Fri, Dec 27, 2013 at 01:21:36AM +0100, Marek Vasut wrote:
+> >
+> > > > -	complete(data, err);
+> > > > +	areq->base.complete = complete;
+> > > > +	areq->base.data = data;
+> > > > +
+> > > > +	complete(&areq->base, err);
+> > > 
+> > > This looks completely bogus.  While restoring areq isn't wrong per
+> > > se, calling complete with &areq->base makes no sense.  The original
+> > > completion data is in the variable "data".
+> > 
+> > Is there some documentation for this so I can understand why this is wrong, 
+> > please? I really don't quite get it, sorry. Actually, is there some 
+> > documentation for writing crypto API drivers at all please ?
 > 
-> Please be aware that by not updating the .S_shipped file in concert
-> with the .pl file, we have a build time dependency on Perl now,
-> something we tried to avoid when we discussed the original series
-> http://marc.info/?l=linux-arm-kernel&m=138091140313491&w=2
+> Well it's wrong because the completion function (req->base.complete)
+> is meant to take data (req->base.data) as its first argument.  So
+> giving it a pointer to req->base makes no sense.
+> 
 
-Added, thanks for reminding me.
+The crypto_completion_t typdef is defined as:
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+typedef void (*crypto_completion_t)(struct crypto_async_request *req, int err);
+
+so I believe &areq->base is the proper first argument (which is actually just
+the req parameter on the ahash_op_unaligned_done function).
+
+If you are going to restore areq, you really should restore all fields that
+were changed - result, base.complete, base.data - and set priv to NULL.
+
+Since the ahash_request_priv structure is freed in ahash_op_unaligned_finish
+you'll need to save the value of priv->result in order to restore areq->result
+(u8 *result = priv->result; or similar).
+
+Additionally, you should probably also fix up ahash_def_finup_done2 and
+ahash_def_finup_done1.
+
+Thanks,
+Tom
+
+> Cheers,
+> 
