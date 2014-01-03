@@ -1,9 +1,9 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 3 Jan 2014 11:01:39 +0800
-Subject: [PATCH 0/3] mtd: gpmi: add subpage read support
+Date: Fri, 3 Jan 2014 11:01:42 +0800
+Subject: [PATCH 3/3] mtd: gpmi: add subpage read support
 In-Reply-To: <a>
 References: <a>
-Message-ID: <1388718102-26097-1-git-send-email-b32955@freescale.com>
+Message-ID: <1388718102-26097-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,14 +20,12 @@ List-Id: linux-arm-kernel.lists.infradead.org
        If the size of ECC parity is not byte aligned, the calling of NAND_CMD_RNDOUT
        will fail.
 
-3) What does this patch set do?
-   patch 1: add a new argument for read_subpage hook
-   patch 2: do not use the mtd->writesize. 
-   patch 3: This patch will fake a virtual small page for the subpage read,
-            and call the gpmi_ecc_read_page() to do the real work.
-            In order to fake a virtual small page, the patch changes
-	    the BCH registers and the bch_geometry{}. After the subpage read
-	    finished, we will restore them back.
+3) What does this patch do?
+   This patch will fake a virtual small page for the subpage read, and call the
+   gpmi_ecc_read_page() to do the real work.
+
+   In order to fake a virtual small page, the patch changes the BCH registers and
+   the bch_geometry{}. After the subpage read finished, we will restore them back.
 
 4) Performace:
     4.1) Tested with Toshiba TC58NVG2S0F(4096 + 224) with the following command:
@@ -84,18 +82,131 @@ List-Id: linux-arm-kernel.lists.infradead.org
      4.4) The conclusion:
        We achieve (4.4 - 2.7) / 4.4 = 38.6% faster in the ubiattach.
 
- 5) This patch depends on the following patch:
-    http://lists.infradead.org/pipermail/linux-mtd/2013-December/051091.html
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   96 ++++++++++++++++++++++++++++++++
+ 1 files changed, 96 insertions(+), 0 deletions(-)
 
-Huang Shijie (3):
-  mtd: nand: add "page" argument for read_subpage hook
-  mtd: gpmi: do not use the mtd->writesize
-  mtd: gpmi: add subpage read support
-
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  102 +++++++++++++++++++++++++++++++-
- drivers/mtd/nand/nand_base.c           |    7 ++-
- include/linux/mtd/nand.h               |    2 +-
- 3 files changed, 105 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index c92df74..2ab7a9f 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -27,6 +27,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of_mtd.h>
+ #include "gpmi-nand.h"
++#include "bch-regs.h"
+ 
+ /* Resource names for the GPMI NAND driver. */
+ #define GPMI_NAND_GPMI_REGS_ADDR_RES_NAME  "gpmi-nand"
+@@ -1087,6 +1088,90 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 	return max_bitflips;
+ }
+ 
++/* Fake a virtual small page for the subpage read */
++static int gpmi_ecc_read_subpage(struct mtd_info *mtd, struct nand_chip *chip,
++			uint32_t offs, uint32_t len, uint8_t *buf, int page)
++{
++	struct gpmi_nand_data *this = chip->priv;
++	void __iomem *bch_regs = this->resources.bch_regs;
++	struct bch_geometry old_geo = this->bch_geometry;
++	struct bch_geometry *geo = &this->bch_geometry;
++	int size = chip->ecc.size; /* ECC chunk size */
++	int meta, n, page_size;
++	u32 r1_old, r2_old, r1_new, r2_new;
++	unsigned int max_bitflips;
++	int first, last, marker_pos;
++	int ecc_parity_size;
++	int col = 0;
++
++	/* The size of ECC parity */
++	ecc_parity_size = geo->gf_len * geo->ecc_strength / 8;
++
++	/* Align it with the chunk size */
++	first = offs / size;
++	last = (offs + len - 1) / size;
++
++	/*
++	 * Find the chunk which contains the Block Marker. If this chunk is
++	 * in the range of [first, last], we have to read out the whole page.
++	 * Why? since we had swapped the data at the position of Block Marker
++	 * to the metadata which is bound with the chunk 0.
++	 */
++	marker_pos = geo->block_mark_byte_offset / size;
++	if (last >= marker_pos && first <= marker_pos) {
++		dev_dbg(this->dev, "page:%d, first:%d, last:%d, marker at:%d\n",
++				page, first, last, marker_pos);
++		return gpmi_ecc_read_page(mtd, chip, buf, 0, page);
++	}
++
++	meta = geo->metadata_size;
++	if (first) {
++		col = meta + (size + ecc_parity_size) * first;
++		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, col, -1);
++
++		meta = 0;
++		buf = buf + first * size;
++	}
++
++	/* Save the old environment */
++	r1_old = r1_new = readl(bch_regs + HW_BCH_FLASH0LAYOUT0);
++	r2_old = r2_new = readl(bch_regs + HW_BCH_FLASH0LAYOUT1);
++
++	/* change the BCH registers and bch_geometry{} */
++	n = last - first + 1;
++	page_size = meta + (size + ecc_parity_size) * n;
++
++	r1_new &= ~(BM_BCH_FLASH0LAYOUT0_NBLOCKS |
++			BM_BCH_FLASH0LAYOUT0_META_SIZE);
++	r1_new |= BF_BCH_FLASH0LAYOUT0_NBLOCKS(n - 1)
++			| BF_BCH_FLASH0LAYOUT0_META_SIZE(meta);
++	writel(r1_new, bch_regs + HW_BCH_FLASH0LAYOUT0);
++
++	r2_new &= ~BM_BCH_FLASH0LAYOUT1_PAGE_SIZE;
++	r2_new |= BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size);
++	writel(r2_new, bch_regs + HW_BCH_FLASH0LAYOUT1);
++
++	geo->ecc_chunk_count = n;
++	geo->payload_size = n * size;
++	geo->page_size = page_size;
++	geo->auxiliary_status_offset = ALIGN(meta, 4);
++
++	dev_dbg(this->dev, "page:%d(%d:%d)%d, chunk:(%d:%d), BCH PG size:%d\n",
++		page, offs, len, col, first, n, page_size);
++
++	/* Read the subpage now */
++	this->swap_block_mark = false;
++	max_bitflips = gpmi_ecc_read_page(mtd, chip, buf, 0, page);
++
++	/* Restore */
++	writel(r1_old, bch_regs + HW_BCH_FLASH0LAYOUT0);
++	writel(r2_old, bch_regs + HW_BCH_FLASH0LAYOUT1);
++	this->bch_geometry = old_geo;
++	this->swap_block_mark = true;
++
++	return max_bitflips;
++}
++
+ static int gpmi_ecc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 				const uint8_t *buf, int oob_required)
+ {
+@@ -1604,6 +1689,17 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	ecc->layout	= &gpmi_hw_ecclayout;
+ 
+ 	/*
++	 * We only enable the subpage read when:
++	 *  (1) the chip is imx6, and
++	 *  (2) the size of the ECC parity is byte aligned.
++	 */
++	if (GPMI_IS_MX6Q(this) &&
++		((bch_geo->gf_len * bch_geo->ecc_strength) % 8) == 0) {
++		ecc->read_subpage = gpmi_ecc_read_subpage;
++		chip->options |= NAND_SUBPAGE_READ;
++	}
++
++	/*
+ 	 * Can we enable the extra features? such as EDO or Sync mode.
+ 	 *
+ 	 * We do not check the return value now. That's means if we fail in
 -- 
 1.7.2.rc3
