@@ -1,53 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jan 2014 14:23:55 +0100
-Subject: ARM: mm: Could I change module space size or place modules in
- vmalloc area?
-In-Reply-To: <20140103122206.GK7383@n2100.arm.linux.org.uk>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <201401031310.09930.arnd@arndb.de>
- <20140103122206.GK7383@n2100.arm.linux.org.uk>
-Message-ID: <201401031423.55336.arnd@arndb.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 03 Jan 2014 17:26:45 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAxLzNdIEFSTTogY2xwczcxMXg6IEFkZCBDTFBTNzEx?=
+ =?UTF-8?B?WCBpcnFjaGlwIGRyaXZlcg==?=
+In-Reply-To: <201401031410.27374.arnd@arndb.de>
+References: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
+ <201401031410.27374.arnd@arndb.de>
+Message-ID: <1388755605.639174335@f136.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 January 2014, Russell King - ARM Linux wrote:
-> On Fri, Jan 03, 2014 at 01:10:09PM +0100, Arnd Bergmann wrote:
-> > Aside from the good comments that Russell made, I would remark that the
-> > fact that you need multiple megabytes worth of modules indicates that you
-> > are doing something wrong. Can you point to a git tree containing those
-> > modules?
+Hello.
+
+> On Thursday 19 December 2013, Alexander Shiyan wrote:
+> > This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > 
-> From the comments which have been made, one point that seems to have
-> been identified is that if this module is first stripped and then
-> loaded, it can load, but if it's unstripped, it's too big.  This sounds
-> suboptimal to me - the debug info shouldn't be loaded into the kernel.
+> Just one more question from my side, otherwise
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> > +	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_node_id());
+> > +	if (IS_ERR_VALUE(err))
+> > +		goto out_iounmap;
+> > +
+> > +	clps711x_intc->ops.map = clps711x_intc_irq_map;
+> > +	clps711x_intc->ops.xlate = irq_domain_xlate_onecell;
+> > +	clps711x_intc->domain =
+> > +		irq_domain_add_legacy(np, ARRAY_SIZE(clps711x_irqs),
+> > +				      0, 0, &clps711x_intc->ops, NULL);
+> 
+> Can't you use irq_domain_add_simple() here? When you are booting with DT
+> and SPARSE_IRQ, you should not need to allocate the descriptors at boot time,
+> but only as needed.
+> 
+> You will have to pass '0' as the first_irq argument for the DT case then,
+> and '1' for the non-DT case to actually allocate virqs starting at number 1.
 
-Reading the layout_and_allocate() function, that is probably the
-intention already, and if something goes wrong there on ARM, it could be
-fixed up in an arch specific module_frob_arch_sections() function.
+Using irq_domain_add_simple() cause double usage of irq_alloc_descs(),
+so we cannot do it. At least now.
+Thanks.
 
-> However, I guess there's bad interactions with module signing if you
-> don't do this and the module was signed with the debug info present,
-> so I don't think there's a good solution for this.
+PS: Arnd, can you merge this series for 3.14-rc within arm-soc?
 
-My point was another anyway: I can't think of any good reason why
-you would end up with this many modules on any sane system. The only
-cases I've seen so far are
-
-- modules written in C++, with libstdc++ linked into the module
-- a closed-source platform port hidden in a loadable module that
-  contains all the device drivers and subsystems while ignoring the
-  infrastructure we have in the kernel, and the possible legal
-  implications.
-- a bug in the module using large arrays that should just be
-  dynamically allocated.
-- device firmware statically linked into the module rather than
-  loaded using request_firmware.
-
-In each of these cases, the real answer is to fix the code they are
-trying to load to do things in a more common way, especially if the
-intention is to eventually merge the code upstream. It is of course
-possible that they are indeed trying something valid, that's why
-I asked to see the source code.
-
-	Arnd
+---
