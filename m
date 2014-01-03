@@ -1,78 +1,63 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  3 Jan 2014 11:10:48 +0100
-Subject: [PATCH v1 03/24] mmc: zynq: Add OF initialization support
+Date: Fri,  3 Jan 2014 11:10:49 +0100
+Subject: [PATCH v1 04/24] zynq: Add OF ram initialization support
 In-Reply-To: <cover.1388743861.git.michal.simek@xilinx.com>
 References: <cover.1388743861.git.michal.simek@xilinx.com>
-Message-ID: <fffd8c3dc4caa1eee612c04f888f4af6fc5a75cf.1388743861.git.michal.simek@xilinx.com>
+Message-ID: <f928d7027756f3d5bc5d1a1f277dce3b2dadb864.1388743861.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable initialize sdhci from DTB.
+Read ram size directly from DTB.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v1: None
 
- arch/arm/include/asm/arch-zynq/sys_proto.h |  1 +
- drivers/mmc/zynq_sdhci.c                   | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ board/xilinx/zynq/board.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/arch-zynq/sys_proto.h b/arch/arm/include/asm/arch-zynq/sys_proto.h
-index 110de90..bb089b6 100644
---- a/arch/arm/include/asm/arch-zynq/sys_proto.h
-+++ b/arch/arm/include/asm/arch-zynq/sys_proto.h
-@@ -18,5 +18,6 @@ extern void zynq_ddrc_init(void);
-
- /* Driver extern functions */
- extern int zynq_sdhci_init(u32 regbase);
-+extern int zynq_sdhci_of_init(const void *blob);
-
- #endif /* _SYS_PROTO_H_ */
-diff --git a/drivers/mmc/zynq_sdhci.c b/drivers/mmc/zynq_sdhci.c
-index 610bef5..d39cbf0 100644
---- a/drivers/mmc/zynq_sdhci.c
-+++ b/drivers/mmc/zynq_sdhci.c
-@@ -7,6 +7,8 @@
+diff --git a/board/xilinx/zynq/board.c b/board/xilinx/zynq/board.c
+index 5119c09..6b691f3 100644
+--- a/board/xilinx/zynq/board.c
++++ b/board/xilinx/zynq/board.c
+@@ -5,6 +5,7 @@
   */
 
  #include <common.h>
 +#include <fdtdec.h>
-+#include <libfdt.h>
- #include <malloc.h>
- #include <sdhci.h>
- #include <asm/arch/sys_proto.h>
-@@ -31,3 +33,30 @@ int zynq_sdhci_init(u32 regbase)
- 	add_sdhci(host, 52000000, 52000000 >> 9);
- 	return 0;
- }
-+
+ #include <netdev.h>
+ #include <zynqpl.h>
+ #include <asm/arch/hardware.h>
+@@ -115,8 +116,27 @@ int board_mmc_init(bd_t *bd)
+
+ int dram_init(void)
+ {
 +#ifdef CONFIG_OF_CONTROL
-+int zynq_sdhci_of_init(const void *blob)
-+{
-+	int offset = 0;
-+	u32 ret = 0;
-+	u32 reg;
++	int node;
++	fdt_addr_t addr;
++	fdt_size_t size;
++	const void *blob = gd->fdt_blob;
 +
-+	debug("ZYNQ SDHCI: Initialization\n");
-+
-+	do {
-+		offset = fdt_node_offset_by_compatible(blob, offset,
-+					"arasan,sdhci-8.9a");
-+		if (offset != -1) {
-+			reg = fdtdec_get_addr(blob, offset, "reg");
-+			if (reg != FDT_ADDR_T_NONE) {
-+				ret |= zynq_sdhci_init(reg);
-+			} else {
-+				debug("ZYNQ SDHCI: Can't get base address\n");
-+				return -1;
-+			}
-+		}
-+	} while (offset != -1);
-+
-+	return ret;
-+}
++	node = fdt_node_offset_by_prop_value(blob, -1, "device_type",
++					     "memory", 7);
++	if (node == -FDT_ERR_NOTFOUND) {
++		debug("ZYNQ DRAM: Can't get memory node\n");
++		return -1;
++	}
++	addr = fdtdec_get_addr_size(blob, node, "reg", &size);
++	if (addr == FDT_ADDR_T_NONE || size == 0) {
++		debug("ZYNQ DRAM: Can't get base address or size\n");
++		return -1;
++	}
++	gd->ram_size = size;
++#else
+ 	gd->ram_size = CONFIG_SYS_SDRAM_SIZE;
+-
 +#endif
+ 	zynq_ddrc_init();
+
+ 	return 0;
 --
 1.8.2.3
 
@@ -82,4 +67,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/c40a8863/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/455dd9e4/attachment.sig>
