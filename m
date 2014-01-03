@@ -1,74 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri,  3 Jan 2014 16:45:59 +0100
-Subject: [PATCH] arm/smp: Make boot_secondary() static
-Message-ID: <1388763959-27491-1-git-send-email-geert@linux-m68k.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Jan 2014 16:47:58 +0100
+Subject: [PATCH 01/15] i2c: shmobile/rcar: Restrict non-COMPILE_TEST
+ compilation
+In-Reply-To: <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140103154758.GF7132@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Wed, Nov 27, 2013 at 02:18:23AM +0100, Laurent Pinchart wrote:
+> Hardware supported by the i2c sh_mobile and rcar drivers is only found
+> on SUPERH or ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST
+> compilation to them.
+> 
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-After becoming a mandatory function, boot_secondary() is no longer used
-outside arch/arm/kernel/smp.c. Hence make it static.
-The code is reshuffled a bit to avoid a forward declaration.
+Applied to for-next, thanks!
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
- arch/arm/include/asm/smp.h |    6 ------
- arch/arm/kernel/smp.c      |   18 +++++++++++-------
- 2 files changed, 11 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 22a3b9b5d4a1..0d2c8c6f8d1d 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -49,12 +49,6 @@ extern void smp_init_cpus(void);
- extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
- 
- /*
-- * Boot a secondary CPU, and assign it the specified idle task.
-- * This also gives us the initial stack to use for this CPU.
-- */
--extern int boot_secondary(unsigned int cpu, struct task_struct *);
--
--/*
-  * Called from platform specific assembly code, this is the
-  * secondary CPU entry point.
-  */
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index dc894ab3622b..d05259a33d93 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -88,6 +88,17 @@ static unsigned long get_arch_pgd(pgd_t *pgd)
- 	return pgdir >> ARCH_PGD_SHIFT;
- }
- 
-+/*
-+ * Boot a secondary CPU, and assign it the specified idle task.
-+ * This also gives us the initial stack to use for this CPU.
-+ */
-+static int boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (smp_ops.smp_boot_secondary)
-+		return smp_ops.smp_boot_secondary(cpu, idle);
-+	return -ENOSYS;
-+}
-+
- int __cpu_up(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret;
-@@ -140,13 +151,6 @@ void __init smp_init_cpus(void)
- 		smp_ops.smp_init_cpus();
- }
- 
--int boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	if (smp_ops.smp_boot_secondary)
--		return smp_ops.smp_boot_secondary(cpu, idle);
--	return -ENOSYS;
--}
--
- int platform_can_cpu_hotplug(void)
- {
- #ifdef CONFIG_HOTPLUG_CPU
--- 
-1.7.9.5
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140103/7f3e244d/attachment.sig>
