@@ -1,51 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jan 2014 17:38:34 +0000
-Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
-In-Reply-To: <1388770004.19394.42.camel@pizza.hi.pengutronix.de>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
- <1388767737.19394.32.camel@pizza.hi.pengutronix.de>
- <20140103170724.GT7383@n2100.arm.linux.org.uk>
- <1388770004.19394.42.camel@pizza.hi.pengutronix.de>
-Message-ID: <20140103173834.GU7383@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Jan 2014 19:24:19 +0100
+Subject: [PATCH] arm/smp: Make boot_secondary() static
+In-Reply-To: <201401031804.34124.arnd@arndb.de>
+References: <1388763959-27491-1-git-send-email-geert@linux-m68k.org>
+ <201401031804.34124.arnd@arndb.de>
+Message-ID: <CAMuHMdXoZJEgMXH0K1d5kDs+XSM_KMkigUq+mKYVQezdxZ929g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 06:26:44PM +0100, Philipp Zabel wrote:
-> Am Freitag, den 03.01.2014, 17:07 +0000 schrieb Russell King - ARM
-> Linux:
-> > On Fri, Jan 03, 2014 at 05:48:57PM +0100, Philipp Zabel wrote:
-> > > Hi Russell,
-> > > 
-> > > I've tested this series on a BD-SL (SabreLite) with HDMI. Right now
-> > > the HPD signal doesn't seem to work, but after overwriting the
-> > > connection check, I got a stable and correct picture on the monitor:
-> > 
-> > Hmm.  Does this mean you're not getting any IRQs from the HDMI interface
-> > when you plug and unplug the monitor?
-> > 
-> > 147:        281       GIC 147  120000.hdmi
-> > 
-> > on turning the TV on:
-> > 
-> > 147:        282       GIC 147  120000.hdmi
-> > 
-> > on unplugging the HDMI cable:
-> > 
-> > 147:        283       GIC 147  120000.hdmi
-> > 
-> > on replugging the HDMI cable:
-> > 
-> > 147:        284       GIC 147  120000.hdmi
-> 
-> Exactly. And while the RX_SENSE bits of HDMI_IH_PHY_STAT0 change when I
-> (un)plug, the HPD bit stays zero. I'll check with other hardware.
+On Fri, Jan 3, 2014 at 6:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 03 January 2014, Geert Uytterhoeven wrote:
+>> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>>
+>> After becoming a mandatory function, boot_secondary() is no longer used
+>> outside arch/arm/kernel/smp.c. Hence make it static.
+>> The code is reshuffled a bit to avoid a forward declaration.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>
+> How about taking it one step further by removing the function entirely?
+> Like this:
+>
+> @@ -92,6 +92,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>  {
+>         int ret;
+>
+> +       if (!smp_ops.smp_boot_secondary)
+> +               return -ENOSYS;
+> +
+>         /*
+>          * We need to tell the secondary core where to find
+>          * its stack and the page tables.
+> @@ -111,7 +114,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>         /*
+>          * Now bring the CPU into our world.
+>          */
+> -       ret = boot_secondary(cpu, idle);
+> +       ret = smp_ops.smp_boot_secondary(cpu, idle);
+>         if (ret == 0) {
+>                 /*
+>                  * CPU was successfully started, wait for it
 
-My guess would be that someone forgot to wire up the HPD line
-correctly.  As ever, the documentation doesn't describe how this
-stuff works...
+Fine for me.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Do you want me to fold this into my patch, or will you apply this on top?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
