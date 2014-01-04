@@ -1,46 +1,49 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 04 Jan 2014 11:20:05 +0900
-Subject: [PATCH 03/11] ARM: EXYNOS: local regs-pmu.h header file
-In-Reply-To: <CAOesGMjJXodfZUSwHWdYgJsTWL4FANxXnP519B0AUiwpEn4bQQ@mail.gmail.com>
-References: <116101cefb1e$69ddfe70$3d99fb50$@kernel.org>
- <CAOesGMjJXodfZUSwHWdYgJsTWL4FANxXnP519B0AUiwpEn4bQQ@mail.gmail.com>
-Message-ID: <22f801cf08f3$7b259750$7170c5f0$@samsung.com>
+Date: Sat, 04 Jan 2014 11:20:58 +0900
+Subject: [GIT PULL 2nd 2/5] Samsung cleanup for v3.14
+In-Reply-To: <20131228231354.GA22753@quad.lixom.net>
+References: <52B5DCA2.6080107@samsung.com>
+ <20131228231354.GA22753@quad.lixom.net>
+Message-ID: <22f901cf08f3$9b049e40$d10ddac0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof Johansson wrote:
 > 
-> Hi,
-> 
-Hi,
-
-> 
-> On Tue, Dec 17, 2013 at 3:52 AM,  <kgene@kernel.org> wrote:
-> > From: Kukjin Kim <kgene.kim@samsung.com>
+> On Sun, Dec 22, 2013 at 03:23:30AM +0900, Kukjin Kim wrote:
+> > The following changes since commit
+> 7c394e7be4d267c02eaaac8fa197a7c1b023c99b:
 > >
-> > This moves regs-pmu.h file into mach-exynos directory.
+> >   ARM: EXYNOS: Constify clksrc immutable register restore tables
+> > (2013-12-12 07:09:33 +0900)
 > >
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/common.c                      |    3 ++-
-> >  arch/arm/mach-exynos/cpuidle.c                     |    2 +-
-> >  arch/arm/mach-exynos/hotplug.c                     |    2 +-
-> >  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
-> >  arch/arm/mach-exynos/platsmp.c                     |    2 +-
-> >  arch/arm/mach-exynos/pm.c                          |    2 +-
-> >  arch/arm/mach-exynos/pm_domains.c                  |    3 ++-
-> >  arch/arm/mach-exynos/pmu.c                         |    2 +-
-> >  arch/arm/mach-exynos/{include/mach => }/regs-pmu.h |    0
-> >  9 files changed, 10 insertions(+), 8 deletions(-)
-> >  rename arch/arm/mach-exynos/{include/mach => }/regs-pmu.h (100%)
+> > are available in the git repository at:
+> >
 > 
-> This looks OK, but when you committed, you did the move of the include
-> file in another commit (e44de221d3ddb99387b04cfd49483bcd05daa6fb).
-> That means that between that commit and this patch, there's build
-> breakage. Please try to avoid that in the future since if something
-> needs to be bisected near here it can cause problems.
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-cleanup-2
+> >
+> > for you to fetch changes up to 1fd3cbccaf47aefbe3bfb026d310cd2f5d0685c6:
+> >
+> >   ARM: EXYNOS: Kill exynos_pm_late_initcall() (2013-12-21 06:40:44
++0900)
+> >
+> > ----------------------------------------------------------------
+> > Samsung cleanup 2nd for v3.14
+> > - remove <mach/regs-clock.h> for exynos
+> > - remove <mach/regs-irq.h> for exynos
+> > - local <mach/regs-pmu.h> into mach-exynos
+> > - select PM_GENERIC_DOMAINS for ARCH_EXYNOS4
+> >   instead of each SOC_EXYNOS4XXX in Kconfig
+> > - call pm_genpd_poweroff_unused() instead of via
+> >   exynos_pm_late_initcall() because no need to
+> >   handle whether CONFIG_PM_GENERIC_DOMAINS is enalbed
 > 
-Yeah, you're right. Sorry and I'll try to avoid that per your suggestion.
+> Great! Merged into next/cleanup. See a separate comment on one of the
+> patches
+> when they were posted regarding bisectability though.
+> 
+Sure, thanks.
 
-Thanks,
-Kukjin
+Happy new year ;-)
+- Kukjin
