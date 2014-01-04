@@ -1,35 +1,62 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sat, 4 Jan 2014 22:43:46 +1100
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-In-Reply-To: <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
-References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
- <52AECF56.8020508@atmel.com>
- <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
-Message-ID: <20140104224346.c0f1689a8c7c62d4ee22aa3b@canb.auug.org.au>
+From: florian.meier@koalo.de (Florian Meier)
+Date: Sat, 4 Jan 2014 16:27:57 +0100
+Subject: [PATCHv9] dmaengine: Add support for BCM2835
+In-Reply-To: <1964639.FVztRK0HBK@wuerfel>
+References: <52C5A6A3.8000405@koalo.de>
+	<1964639.FVztRK0HBK@wuerfel>
+Message-ID: <CABDT8WzhpH2yX=HD9wsx+bN17Qp0hLX45-VMF0a3RAiwWx7F4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Fri, 3 Jan 2014 21:11:29 -0800 Olof Johansson <olof@lixom.net> wrote:
+On 02.01.2014 19:03, Arnd Bergmann wrote:
+> On Thursday 02 January 2014 18:49:23 Florian Meier wrote:
+>> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
+>> Currently it only supports cyclic DMA.
 >
-> Now I can't resolve it properly and move the entries when I do the
-> same merge (and get the same conflict), because that will cause a
-> third conflict for Stephen, and he's about to return from vacation and
-> is going to cuss at us if we cause too many new conflicts in one day.
-> :)
+> Looks very nice. Just a few details I noticed:
+>
+>> +#if defined(CONFIG_OF)
+>> +static const struct of_device_id bcm2835_dma_of_match[] = {
+>> + { .compatible = "brcm,bcm2835-dma", },
+>> + {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, bcm2835_dma_of_match);
+>> +#endif
+>
+> I doubt we are going to see non-DT versions of this driver, so the #ifdef
+> can just get removed here.
 
-Since I have now been made aware of the issue, you might as well just
-sort it in the merge.  And I have never been known to "cuss", though
-ranting is a possibility :-)
+As already explained in previous versions of this patch thread, there is
+a non-DT version in a downstream kernel and the more I make this patch
+incompatible with non-DT, the harder it gets to upstream the remaining
+stuff. I hope this is not something that blocks this driver from getting
+accepted.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140104/44c18c35/attachment.sig>
+> [...]
+> This can now be simplified using the dma_get_any_slave_channel() interface
+> taht Stephen Warren introduced.
+> [...]
+> dma_set_mask_and_coherent()
+
+Sigh, the API is developing faster than I can keep track with updating
+this patch. I hope some day I will be faster....
+When Russell told me about the second one before, it hoped that I can
+avoid merging different trees on my own, but it seems that you want me
+to do that ;-)
+
+>> + if (pdev->dev.of_node) {
+>> + /* Device-tree DMA controller registration */
+>> + rc = of_dma_controller_register(pdev->dev.of_node,
+>> + bcm2835_dma_xlate, od);
+>> + if (rc) {
+>> + dev_err(&pdev->dev, "Failed to register DMA controller\n");
+>> + goto err_no_dma;
+>> + }
+>> + }
+>
+> If pdev->dev.of_node isn't set, you didn't get here, so the if() can be removed.
+
+Why not? (In the case of non-DT initialization)
+
+Greetings,
+Florian
