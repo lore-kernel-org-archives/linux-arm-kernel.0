@@ -1,54 +1,73 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 04 Jan 2014 11:04:24 +0900
-Subject: [GIT PULL 2nd 3/5] Samsung defconfig update for v3.14
-In-Reply-To: <CAOesGMhEVQi7kw9WW+nV3MB=7rz0TK==wccAKFePrm-Ub=H=Bw@mail.gmail.com>
-References: <52B5DCAB.204@samsung.com> <20131228231531.GB22753@quad.lixom.net>
- <CAOesGMj38JPgFic+ByShH3nHXWe0j=rzcdQzEiTGJ18OKfR6zw@mail.gmail.com>
- <CAOesGMh-ptLF_fvJ2X_7_WZVnB3oUkO2QUPxPENb4e+aDUb6iQ@mail.gmail.com>
- <20131231161743.GH31886@sirena.org.uk>
- <CAOesGMhEVQi7kw9WW+nV3MB=7rz0TK==wccAKFePrm-Ub=H=Bw@mail.gmail.com>
-Message-ID: <22f401cf08f1$4a6ece30$df4c6a90$@samsung.com>
+Date: Sat, 04 Jan 2014 11:12:16 +0900
+Subject: [GIT PULL 2nd 5/5] Samsung SoC update for v3.14
+In-Reply-To: <CAK9yfHx=tVFN3zR9LGf44tV1A8vb52XhTu02895sZNLgWMJS3g@mail.gmail.com>
+References: <52B5DCBD.5020202@samsung.com>
+ <20131228231735.GC22753@quad.lixom.net>
+ <CAK9yfHx=tVFN3zR9LGf44tV1A8vb52XhTu02895sZNLgWMJS3g@mail.gmail.com>
+Message-ID: <22f501cf08f2$63fbade0$2bf309a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Sachin Kamat wrote:
 > 
-> On Tue, Dec 31, 2013 at 8:17 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Sat, Dec 28, 2013 at 07:48:26PM -0800, Olof Johansson wrote:
-> >> On Sat, Dec 28, 2013 at 7:44 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi Olof,
+> 
+> On 29 December 2013 04:47, Olof Johansson <olof@lixom.net> wrote:
+> > On Sun, Dec 22, 2013 at 03:23:57AM +0900, Kukjin Kim wrote:
+> >> The following changes since commit
+> 538cfbb4c40ab59688236484138133b8e3e89220:
+> >>
+> >>   ARM: dts: Add initial support for Arndale Octa board (2013-12-16
+> >> 05:05:43 +0900)
+> >>
+> >> are available in the git repository at:
+> >>
 > >
-> >> > The regulator driver causes build breaks. Really, nobody checks these
-> >> > things before sending patches or merge requests?
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> >> tags/samsung-soc-2
+> >>
+> >> for you to fetch changes up to
+7a28f198735d040f4d318511827d913d4b53f355:
+> >>
+> >>   ARM: dts: add board dts file for EXYNOS4412 based TINY4412 board
+> >> (2013-12-19 05:34:26 +0900)
+> >>
+> >> ----------------------------------------------------------------
+> >> Samsung SoC 2nd update for v3.14
+> >> - add exynos4412-tiny4412 board dt
+> >>   for FriendlyARM's TINY4412 board
+> >>
+> >> ----------------------------------------------------------------
+> >> Alex Ling (1):
+> >>       ARM: dts: add board dts file for EXYNOS4412 based TINY4412 board
+> >>
+> >>  arch/arm/boot/dts/Makefile                |  1 +
+> >>  arch/arm/boot/dts/exynos4412-tiny4412.dts | 93
+> >> +++++++++++++++++++++++++++++++
+> >>  2 files changed, 94 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
 > >
-> >> > Having exynos_defconfig broken in arm-soc isn't an alternative. So I
-> >> > dropped this branch again. If the regulator driver gets fixed in -rc
-> >> > then we can probably merge it before the merge window, otherwise
-> we'll
-> >> > have to merge the defconfig change after the regulator fix goes in
-> for
-> >> > the 3.14 merge window.
+> > Hi,
 > >
-> >> Ah, I guess the fix went in after -rc4, which is the latest -rc that
-> >> we have in for-next today. I'll bring for-next forward and merge this
-> >> in.
-> >
-> >> Still, it's odd that you were able to test your branch before sending
-> it in.
-> >
-> > The build breakage was only introduced in -rc4 - a MFD/RTC change went
-> > in via Andrew's tree so it got no exposure in -next before it showed up
-> > in Linus' tree which wasn't good.  The fix was in by -rc5, looking at
-> > the date on the pull request I expect that any testing against -next (as
-> > opposed to arm-soc) would've been OK and since the branch is based on
-> > -rc1 it'd have tested out by itself as well.
+> > This is really just a DT patch, and given that I didn't take the base
+> patch it
+> > makes sense to take this in a DT branch instead. Please resend on top of
+> dt-2.
 > 
 > 
-> Ah, yeah, that explains it. Thanks for the clarification.
+> The Arndale octa support patch ("ARM: dts: Add initial support for
+> Arndale Octa board") is also
+> just a DT patch and does not add any new platform support. It is based
+> on the existing 5420
+> SoC platform. Please consider pulling in that too.
 > 
-Sorry for late response and Mark, thanks for your response ;-)
+Sachin, in my understanding, adding 'Arndale Octa DT' is a support for new
+hardware platform, so I've applied it into -soc branch. The -soc branch is
+for new platform support including new SoC, new hardware, so if arm-soc
+maintainers don't want to pull 'new platform' before supporting
+multiplatform for exynos, we need to hold on at this moment. But I think, we
+could support multiplatform for exynos soon ;-)
 
-Olof, I have not seen regarding problem in my tree before my pull-request so
-I didn't know but I will look at -next and arm-soc more closely.
-
-Thanks.
+Thanks,
 Kukjin
