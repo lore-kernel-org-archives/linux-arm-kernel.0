@@ -1,60 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 04 Jan 2014 16:32:01 +0900
-Subject: [GIT PULL] Samsung 3rd DT updates for v3.14
-Message-ID: <52C7B8F1.6040703@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat,  4 Jan 2014 10:14:35 +0100
+Subject: [PATCH v2 1/4] libahci: Add a pre ahci_start_engine hook
+In-Reply-To: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
+References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1388826878-5602-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof and Kevin,
+From: Oliver Schinagl <oliver@schinagl.nl>
 
-Here is 3rd Exynos DT updates for v3.14, actually it's including new dt 
-files for exynos4412-tiny4412 and exynos5420-arndale-octa boards. They 
-have been included in previous pull-request but it has not been pulled 
-because of multiplatform. However Olof agreed just adding DT like this 
-is OK so I'm re-sending this pull-request after re-sort them out.
+Allwinner A10 and A20 ARM SoCs have an AHCI sata controller which need a
+special register to be poked before starting the DMA engine.
 
-Just note this branch is based on tags/samsung-dt-2 already pulled into 
-arm-soc per Olof's suggestion.
+This register gets reset on an ahci_stop_engine call, so there is no other
+place then ahci_start_engine where this poking can be done.
 
-If any problems, please kindly let me know.
+This commit adds a pre ahci_start_engine hook for use by the Allwinner AHCI
+driver (and potentially other drivers in the future).
 
-Thanks,
-Kukjin
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/ata/ahci.h    | 2 ++
+ drivers/ata/libahci.c | 4 ++++
+ 2 files changed, 6 insertions(+)
 
--------------------------------
-
-The following changes since commit a22d060e3299ce672258d00070fa0ed398c035c5:
-
-   ARM: dts: Rename Exynos5250 ChromeOS common file to have exynos 
-prefix (2013-12-21 10:09:25 +0900)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-dt-3
-
-for you to fetch changes up to b67a55125f1413902f7db6d167a8d9e4154386bf:
-
-   ARM: dts: add support for EXYNOS4412 based TINY4412 board (2014-01-04 
-16:12:04 +0900)
-
-----------------------------------------------------------------
-Samsung DT 3rd updates for v3.14
-- add exynos4412-tiny4412 board dt for FriendlyARM's TINY4412
-   board including initial support UART, SD card and LEDs
-- add exynos5420-arndale-octa board dt for Arndale Octa board
-
-----------------------------------------------------------------
-Alex Ling (1):
-       ARM: dts: add support for EXYNOS4412 based TINY4412 board
-
-Sachin Kamat (1):
-       ARM: dts: Add initial support for Arndale Octa board
-
-  arch/arm/boot/dts/Makefile                    |  2 +
-  arch/arm/boot/dts/exynos4412-tiny4412.dts     | 93 
-+++++++++++++++++++++++++++
-  arch/arm/boot/dts/exynos5420-arndale-octa.dts | 66 +++++++++++++++++++
-  3 files changed, 161 insertions(+)
-  create mode 100644 arch/arm/boot/dts/exynos4412-tiny4412.dts
-  create mode 100644 arch/arm/boot/dts/exynos5420-arndale-octa.dts
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 2289efd..1bba479 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -323,6 +323,8 @@ struct ahci_host_priv {
+ 	u32			em_msg_type;	/* EM message type */
+ 	struct clk		*clk;		/* Only for platforms supporting clk */
+ 	void			*plat_data;	/* Other platform data */
++	/* Optional pre ahci_start_engine hook */
++	void			(*pre_start_engine)(struct ata_port *ap);
+ };
+ 
+ extern int ahci_ignore_sss;
+diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+index c482f8c..780e9df 100644
+--- a/drivers/ata/libahci.c
++++ b/drivers/ata/libahci.c
+@@ -568,8 +568,12 @@ static int ahci_scr_write(struct ata_link *link, unsigned int sc_reg, u32 val)
+ void ahci_start_engine(struct ata_port *ap)
+ {
+ 	void __iomem *port_mmio = ahci_port_base(ap);
++	struct ahci_host_priv *hpriv = ap->host->private_data;
+ 	u32 tmp;
+ 
++	if (hpriv->pre_start_engine)
++		hpriv->pre_start_engine(ap);
++
+ 	/* start DMA */
+ 	tmp = readl(port_mmio + PORT_CMD);
+ 	tmp |= PORT_CMD_START;
+-- 
+1.8.4.2
