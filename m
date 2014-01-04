@@ -1,47 +1,94 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 4 Jan 2014 11:47:01 -0800
-Subject: [GIT PULL] Samsung 3rd DT updates for v3.14
-In-Reply-To: <52C7B8F1.6040703@samsung.com>
-References: <52C7B8F1.6040703@samsung.com>
-Message-ID: <CAOesGMgKbVejY3sFnXaJkmE5T72AhcRPKuUgEVC0HyzPiTXbeg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 04 Jan 2014 22:39:50 +0100
+Subject: [PATCH v2 2/4] ARM: sunxi: Add ahci-sunxi driver for the
+ Allwinner SUNXi SoCs sata
+In-Reply-To: <1388826878-5602-3-git-send-email-hdegoede@redhat.com>
+References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
+ <1388826878-5602-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <4502242.kKUgLAVDcb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 3, 2014 at 11:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof and Kevin,
->
-> Here is 3rd Exynos DT updates for v3.14, actually it's including new dt
-> files for exynos4412-tiny4412 and exynos5420-arndale-octa boards. They have
-> been included in previous pull-request but it has not been pulled because of
-> multiplatform. However Olof agreed just adding DT like this is OK so I'm
-> re-sending this pull-request after re-sort them out.
->
-> Just note this branch is based on tags/samsung-dt-2 already pulled into
-> arm-soc per Olof's suggestion.
->
-> If any problems, please kindly let me know.
->
-> Thanks,
-> Kukjin
->
-> -------------------------------
->
-> The following changes since commit a22d060e3299ce672258d00070fa0ed398c035c5:
->
->   ARM: dts: Rename Exynos5250 ChromeOS common file to have exynos prefix
-> (2013-12-21 10:09:25 +0900)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt-3
->
-> for you to fetch changes up to b67a55125f1413902f7db6d167a8d9e4154386bf:
->
->   ARM: dts: add support for EXYNOS4412 based TINY4412 board (2014-01-04
-> 16:12:04 +0900)
+On Saturday 04 January 2014 10:14:36 Hans de Goede wrote:
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-sunxi.txt b/Documentation/devicetree/bindings/ata/ahci-sunxi.txt
+> new file mode 100644
+> index 0000000..0792fa5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/ahci-sunxi.txt
+> @@ -0,0 +1,24 @@
+> +Allwinner SUNXI AHCI SATA Controller
+> +
+> +SATA nodes are defined to describe on-chip Serial ATA controllers.
+> +Each SATA controller should have its own node.
+> +
+> +Required properties:
+> +- compatible	: compatible list, contains "allwinner,sun4i-a10-ahci"
+> +- reg		: <registers mapping>
+> +- interrupts	: <interrupt mapping for AHCI IRQ>
+> +- clocks	: clocks for ACHI
+> +- clock-names	: clock names for AHCI
 
-Merged, thanks!
+The binding needs to specify the required names for the clocks.
 
+> +Optional properties:
+> +- pwr-supply	: regulator to control the power supply GPIO
+> +
+> +Example:
+> +	ahci at 01c18000 {
+> +		compatible = "allwinner,sun4i-a10-ahci";
+> +		reg = <0x01c18000 0x1000>;
+> +		interrupts = <0 56 1>;
+> +		clocks = <&ahb_gates 25>, <&pll6 0>;
+> +		clock-names = "ahb_sata", "pll6_sata";
 
--Olof
+"pll6_sata" doesn't sound particularly generic. The name should
+reflect what the clock is used for, not what drives it.
+
+Also, please send the binding as a separate patch with Cc to
+the devicetree-discuss mailing list.
+
+> +
+> +static int sunxi_ahci_phy_init(struct device *dev, void __iomem *reg_base)
+> +{
+> +	u32 reg_val;
+> +	int timeout;
+> +
+> +	/* This magic is from the original code */
+> +	writel(0, reg_base + AHCI_RWCR);
+> +	mdelay(5);
+
+This function should probably be in a separate phy driver. I would
+very much hope that we can minimize the required code in an AHCI
+driver and move code from this new file into the ahci-platform
+driver. The clock, regulator and phy setup can all be optional
+properties of the generic driver, and then there shouldn't
+be much left that is sunxi specific.
+
+> +static int sunxi_ahci_susp(struct device *dev)
+> +{
+> +	struct ata_host *host = dev_get_drvdata(dev);
+> +	struct ahci_host_priv *hpriv = host->private_data;
+> +	struct sunxi_ahci *ahci = hpriv->plat_data;
+> +	int ret;
+> +
+> +	/*
+> +	 * AHCI spec rev1.1 section 8.3.3:
+> +	 * Software must disable interrupts prior to requesting a
+> +	 * transition of the HBA to D3 state.
+> +	 */
+> +	sunxi_clrbits(hpriv->mmio + HOST_CTL, HOST_IRQ_EN);
+> +
+> +	ret = ata_host_suspend(host, PMSG_SUSPEND);
+> +	if (ret)
+> +		return ret;
+> +
+> +	sunxi_ahci_disable_clks(ahci);
+> +
+> +	return 0;
+> +}
+
+The only thing in here that seems sunxi-specific is the irq disabling
+part. Can't you do this instead by calling disable_irq() and make
+the function completely generic?
+
+	Arnd
