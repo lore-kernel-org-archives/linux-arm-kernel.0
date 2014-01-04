@@ -1,181 +1,55 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  4 Jan 2014 10:14:38 +0100
-Subject: [PATCH v2 4/4] ARM: sun7i: dts: Add ahci / sata support
-In-Reply-To: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
-References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1388826878-5602-5-git-send-email-hdegoede@redhat.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 4 Jan 2014 08:20:09 +0100
+Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
+In-Reply-To: <20140103223344.GA15394@gondor.apana.org.au>
+References: <1386703583-8386-1-git-send-email-marex@denx.de>
+ <10214668.cztjge9Iie@tlendack-t1>
+ <20140103223344.GA15394@gondor.apana.org.au>
+Message-ID: <201401040820.09129.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds sunxi sata support to A20 boards that have such a connector.
-Some boards also feature a regulator via a GPIO and support for this is also
-added.
+On Friday, January 03, 2014 at 11:33:44 PM, Herbert Xu wrote:
+> On Fri, Jan 03, 2014 at 09:10:30AM -0600, Tom Lendacky wrote:
+> > On Monday, December 30, 2013 05:01:13 PM Herbert Xu wrote:
+> > > On Fri, Dec 27, 2013 at 01:21:36AM +0100, Marek Vasut wrote:
+> > > > > > -	complete(data, err);
+> > > > > > +	areq->base.complete = complete;
+> > > > > > +	areq->base.data = data;
+> > > > > > +
+> > > > > > +	complete(&areq->base, err);
+> > > > > 
+> > > > > This looks completely bogus.  While restoring areq isn't wrong per
+> > > > > se, calling complete with &areq->base makes no sense.  The original
+> > > > > completion data is in the variable "data".
+> > > > 
+> > > > Is there some documentation for this so I can understand why this is
+> > > > wrong, please? I really don't quite get it, sorry. Actually, is
+> > > > there some documentation for writing crypto API drivers at all
+> > > > please ?
+> > > 
+> > > Well it's wrong because the completion function (req->base.complete)
+> > > is meant to take data (req->base.data) as its first argument.  So
+> > > giving it a pointer to req->base makes no sense.
+> > 
+> > The crypto_completion_t typdef is defined as:
+> > 
+> > typedef void (*crypto_completion_t)(struct crypto_async_request *req, int
+> > err);
+> > 
+> > so I believe &areq->base is the proper first argument (which is actually
+> > just the req parameter on the ahash_op_unaligned_done function).
+> 
+> You are right.  This unaligned code obviously has never worked.
+> I will apply Marek's patch to fix this up.
+> 
+> > Additionally, you should probably also fix up ahash_def_finup_done2 and
+> > ahash_def_finup_done1.
+> 
+> Yep I'll fix them up too.
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 27 +++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 27 +++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 26 ++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                |  9 +++++++++
- 4 files changed, 89 insertions(+)
+I'll try to cook some patches shortly, I will probably also cook some 
+documentation for writing drivers using the crypto API, what do you say ?
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 48777cd..a26711c 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -28,7 +28,19 @@
- 			status = "okay";
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			pwr-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			ahci_pwr_pin_cubieboard2: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PB8";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			mmc0_cd_pin_cubieboard2: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
- 				allwinner,function = "gpio_in";
-@@ -86,4 +98,19 @@
- 			gpios = <&pio 7 20 0>;
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		pinctrl-names = "default";
-+
-+		reg_ahci_5v: ahci-5v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "ahci-5v";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			pinctrl-0 = <&ahci_pwr_pin_cubieboard2>;
-+			gpio = <&pio 1 8 0>;
-+			enable-active-high;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 2684f27..a5f3418 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -28,6 +28,11 @@
- 			status = "okay";
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			pwr-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
- 			mmc0_cd_pin_cubietruck: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
-@@ -36,6 +41,13 @@
- 				allwinner,pull = <0>;
- 			};
- 
-+			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PH12";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			led_pins_cubietruck: led_pins at 0 {
- 				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
- 				allwinner,function = "gpio_out";
-@@ -84,4 +96,19 @@
- 			gpios = <&pio 7 7 0>;
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		pinctrl-names = "default";
-+
-+		reg_ahci_5v: ahci-5v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "ahci-5v";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			pinctrl-0 = <&ahci_pwr_pin_cubietruck>;
-+			gpio = <&pio 7 12 0>;
-+			enable-active-high;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index bf6f6c8..20b1000 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -37,7 +37,19 @@
- 			status = "okay";
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			pwr-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			ahci_pwr_pin_olinuxinom: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PB8";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
- 				allwinner,function = "gpio_in";
-@@ -116,4 +128,18 @@
- 			default-state = "on";
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_ahci_5v: ahci-5v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "ahci-5v";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			pinctrl-0 = <&ahci_pwr_pin_olinuxinom>;
-+			gpio = <&pio 1 8 0>;
-+			enable-active-high;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index c9c123a..3242a29 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -448,6 +448,15 @@
- 			};
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			compatible = "allwinner,sun4i-a10-ahci";
-+			reg = <0x01c18000 0x1000>;
-+			interrupts = <0 56 1>;
-+			clocks = <&ahb_gates 25>, <&pll6 0>;
-+			clock-names = "ahb_sata", "pll6_sata";
-+			status = "disabled";
-+		};
-+
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-timer";
- 			reg = <0x01c20c00 0x90>;
--- 
-1.8.4.2
+Best regards,
+Marek Vasut
