@@ -1,104 +1,50 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  4 Jan 2014 10:14:37 +0100
-Subject: [PATCH v2 3/4] ARM: sun4i: dts: Add ahci / sata support
-In-Reply-To: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
-References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1388826878-5602-4-git-send-email-hdegoede@redhat.com>
+Date: Sat,  4 Jan 2014 10:14:34 +0100
+Subject: [PATCH v2 0/4] ARM: sunxi: Add ahci-sunxi driver for Allwinner SoCs
+ sata
+Message-ID: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oliver Schinagl <oliver@schinagl.nl>
+Hi Tejun et al,
 
-This patch adds sunxi sata support to A10 boards that have such a connector.
-Some boards also feature a regulator via a GPIO and support for this is also
-added.
+Here is the second version of the ahci-sunxi driver. Since Oliver is a bit low
+on time atm, I've taken over the efforts to upstream this for now.
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10.dtsi           |  9 +++++++++
- 3 files changed, 40 insertions(+)
+v1 was using the approach of having a platform device which probe method
+creates a new child platform device which gets driven by ahci_platform.c,
+as done by ahci_imx.c . This was rightfully frowned upon, so we've gone
+looking for a better / cleaner solution.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index aef8207..fd6d512 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -48,6 +48,10 @@
- 			status = "okay";
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
- 			mmc0_cd_pin_a1000: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index f50fb2b..53ac453 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -51,7 +51,19 @@
- 			status = "okay";
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			pwr-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			ahci_pwr_pin_cubieboard: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PB8";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			mmc0_cd_pin_cubieboard: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
- 				allwinner,function = "gpio_in";
-@@ -102,4 +114,19 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		pinctrl-names = "default";
-+
-+		reg_ahci_5v: ahci-5v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "ahci-5v";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			pinctrl-0 = <&ahci_pwr_pin_cubieboard>;
-+			gpio = <&pio 1 8 0>;
-+			enable-active-high;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 4736dd2..731b491 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -331,6 +331,15 @@
- 			status = "disabled";
- 		};
- 
-+		sata: ahci at 01c18000 {
-+			compatible = "allwinner,sun4i-a10-ahci";
-+			reg = <0x01c18000 0x1000>;
-+			interrupts = <56>;
-+			clocks = <&ahb_gates 25>, <&pll6 0>;
-+			clock-names = "ahb_sata", "pll6_sata";
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
--- 
-1.8.4.2
+The option of turning ahci_platform.c into a generic re-usable library to be
+shared between different ahci platform drivers was considered and rejected.
+
+Almost all functionality is already shared through libahci / ata-core,
+ahci_platform.c really is just a few lines of glue-code generalized to be
+shared for the simply ahci platform device case.
+
+Modifying ahci_platform.c to be generic enough to cleanly handle more
+complex platform ahci devices, results in much more complex code, which likely
+will still need to be modified each time a new exotic platform device shows
+up. There simply is not enough common code to share there, and making it
+generic enough would grow the code to be larger then simply having stand-alone
+platform drivers using libahci directly.
+
+IOW I believe that the "last mile" of glue code  simply cannot be efficiently
+generalized.
+
+So I've decided avoiding the ahci_imx.c ugliness is best done by refactoring
+ahci_sunxi.c into a stand-alone platform driver, like ie sata_highbank.c.
+
+To put this in numbers, ahci_platform.c is 353 lines, ahci_sunxi.c using
+the ahci_imx.c approach (which was using ahci_platform.c as a lib) was 305
+lines + 12 new lines in ahci_platform.c. ahci_sunxi.c as a standalone driver
+is 351 lines. And the old ahci_sunxi.c was missing proper suspend / resume
+support.
+
+Please review and if there are no remark add patch 1 + 2 to your tree for
+Linus. The dts bits will be merged through Maxime Ripard's tree.
+
+Thanks & Regards,
+
+Hans
