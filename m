@@ -1,55 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 4 Jan 2014 08:20:09 +0100
-Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
-In-Reply-To: <20140103223344.GA15394@gondor.apana.org.au>
-References: <1386703583-8386-1-git-send-email-marex@denx.de>
- <10214668.cztjge9Iie@tlendack-t1>
- <20140103223344.GA15394@gondor.apana.org.au>
-Message-ID: <201401040820.09129.marex@denx.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Sat, 4 Jan 2014 22:43:46 +1100
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+In-Reply-To: <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
+References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
+ <52AECF56.8020508@atmel.com>
+ <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
+Message-ID: <20140104224346.c0f1689a8c7c62d4ee22aa3b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 03, 2014 at 11:33:44 PM, Herbert Xu wrote:
-> On Fri, Jan 03, 2014 at 09:10:30AM -0600, Tom Lendacky wrote:
-> > On Monday, December 30, 2013 05:01:13 PM Herbert Xu wrote:
-> > > On Fri, Dec 27, 2013 at 01:21:36AM +0100, Marek Vasut wrote:
-> > > > > > -	complete(data, err);
-> > > > > > +	areq->base.complete = complete;
-> > > > > > +	areq->base.data = data;
-> > > > > > +
-> > > > > > +	complete(&areq->base, err);
-> > > > > 
-> > > > > This looks completely bogus.  While restoring areq isn't wrong per
-> > > > > se, calling complete with &areq->base makes no sense.  The original
-> > > > > completion data is in the variable "data".
-> > > > 
-> > > > Is there some documentation for this so I can understand why this is
-> > > > wrong, please? I really don't quite get it, sorry. Actually, is
-> > > > there some documentation for writing crypto API drivers at all
-> > > > please ?
-> > > 
-> > > Well it's wrong because the completion function (req->base.complete)
-> > > is meant to take data (req->base.data) as its first argument.  So
-> > > giving it a pointer to req->base makes no sense.
-> > 
-> > The crypto_completion_t typdef is defined as:
-> > 
-> > typedef void (*crypto_completion_t)(struct crypto_async_request *req, int
-> > err);
-> > 
-> > so I believe &areq->base is the proper first argument (which is actually
-> > just the req parameter on the ahash_op_unaligned_done function).
-> 
-> You are right.  This unaligned code obviously has never worked.
-> I will apply Marek's patch to fix this up.
-> 
-> > Additionally, you should probably also fix up ahash_def_finup_done2 and
-> > ahash_def_finup_done1.
-> 
-> Yep I'll fix them up too.
+Hi Olof,
 
-I'll try to cook some patches shortly, I will probably also cook some 
-documentation for writing drivers using the crypto API, what do you say ?
+On Fri, 3 Jan 2014 21:11:29 -0800 Olof Johansson <olof@lixom.net> wrote:
+>
+> Now I can't resolve it properly and move the entries when I do the
+> same merge (and get the same conflict), because that will cause a
+> third conflict for Stephen, and he's about to return from vacation and
+> is going to cuss at us if we cause too many new conflicts in one day.
+> :)
 
-Best regards,
-Marek Vasut
+Since I have now been made aware of the issue, you might as well just
+sort it in the merge.  And I have never been known to "cuss", though
+ranting is a possibility :-)
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140104/44c18c35/attachment.sig>
