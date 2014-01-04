@@ -1,27 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 04 Jan 2014 22:47:08 +0100
-Subject: [PATCH v2 2/4] ARM: sunxi: Add ahci-sunxi driver for the
- Allwinner SUNXi SoCs sata
-In-Reply-To: <4502242.kKUgLAVDcb@wuerfel>
-References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
- <1388826878-5602-3-git-send-email-hdegoede@redhat.com>
- <4502242.kKUgLAVDcb@wuerfel>
-Message-ID: <3250214.yUrU0CPosZ@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 4 Jan 2014 23:11:16 +0100
+Subject: [PATCH] i2c: at91: document clock properties
+In-Reply-To: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387295644-7382-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20140104221116.GE3150@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 04 January 2014 22:39:50 Arnd Bergmann wrote:
-> > +Required properties:
-> > +- compatible : compatible list, contains "allwinner,sun4i-a10-ahci"
-> > +- reg                : <registers mapping>
-> > +- interrupts : <interrupt mapping for AHCI IRQ>
-> > +- clocks     : clocks for ACHI
-> > +- clock-names        : clock names for AHCI
+On Tue, Dec 17, 2013 at 04:54:04PM +0100, Boris BREZILLON wrote:
+> Document the clock properties required by the at91 i2c bus driver.
 > 
-> The binding needs to specify the required names for the clocks.
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-fwiw, the imx driver uses "ahb" and "sata_ref" as the clock names.
-I would strongly suggest using the same names here, and documenting
-them in the ahci binding as optional.
+Applied to for-next, thanks!
 
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140104/9511fe2d/attachment-0001.sig>
