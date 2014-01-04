@@ -1,38 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jan 2014 21:47:02 -0800
-Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
- reset
-In-Reply-To: <20140103120712.GE25079@S2101-09.ap.freescale.net>
-References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
- <20140103120712.GE25079@S2101-09.ap.freescale.net>
-Message-ID: <20140104054702.GA6243@quad.lixom.net>
+Date: Fri, 3 Jan 2014 21:45:46 -0800
+Subject: [GIT PULL] Allwinner core changes for 3.14
+In-Reply-To: <20131220221850.GA23269@lukather>
+References: <20131220221850.GA23269@lukather>
+Message-ID: <20140104054546.GA6152@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 08:07:14PM +0800, Shawn Guo wrote:
-> On Fri, Jan 03, 2014 at 09:55:56AM -0200, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Since commit 7a399e3a2e (fec: Do not assume that PHY reset is active low), we no
-> > longer assume that the PHY reset is active low.
-> > 
-> > Now we need to retrieve this information from the device tree instead.
-> > 
-> > Passing '0' as the phy-reset-gpios means 'active high' according to the 
-> > definition from include/dt-bindings/gpio/gpio.h:
-> > 
-> > #define GPIO_ACTIVE_HIGH 0
-> > #define GPIO_ACTIVE_LOW 1
-> > 
-> > , so in order to keep things working as before we need to explicitly pass
-> > GPIO_ACTIVE_LOW as the flag.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Dec 20, 2013 at 11:18:50PM +0100, Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Please pull the following changes for the next merge window.
+> 
+> Thanks!
+> Maxime
+> 
+> The following changes since commit 8f1ae77f466660b6da2455cccecc07ae631fa66d:
+> 
+>   reset: Add Allwinner SoCs Reset Controller Driver (2013-11-22 21:20:36 +0100)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mripard/linux.git tags/sunxi-core-for-3.14
+> 
+> for you to fetch changes up to 73346794b48237b7b4c2a5c02b12e3c4f1da7551:
+> 
+>   ARM: sun6i: Add SMP support for the Allwinner A31 (2013-12-16 21:33:41 +0100)
 > 
 
-Applied to fixes. Thanks.
+Pulled. As mentioned in the other reply, I've merged this on top of
+next/drivers to avoid the circular dependencies.
 
 
 -Olof
