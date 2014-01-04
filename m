@@ -1,52 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jan 2014 21:11:29 -0800
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-In-Reply-To: <52AECF56.8020508@atmel.com>
-References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
- <52AECF56.8020508@atmel.com>
-Message-ID: <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
+Date: Fri, 3 Jan 2014 21:47:02 -0800
+Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
+ reset
+In-Reply-To: <20140103120712.GE25079@S2101-09.ap.freescale.net>
+References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
+ <20140103120712.GE25079@S2101-09.ap.freescale.net>
+Message-ID: <20140104054702.GA6243@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 2:00 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> On 16/12/2013 00:47, Stephen Rothwell :
->> Hi Simon,
->>
->> Today's linux-next merge of the renesas tree got a conflict in
->> drivers/clk/Makefile between commit 0ad6125b1579 ("clk: at91: add PMC
->> base support") from the arm-soc tree and commit 10cdfe9f327a ("clk:
->> shmobile: Add R-Car Gen2 clocks support") from the renesas tree.
->>
->> I fixed it up (see below) and can carry the fix as necessary (no action
->> is required).
->
-> Fine for me.
+On Fri, Jan 03, 2014 at 08:07:14PM +0800, Shawn Guo wrote:
+> On Fri, Jan 03, 2014 at 09:55:56AM -0200, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Since commit 7a399e3a2e (fec: Do not assume that PHY reset is active low), we no
+> > longer assume that the PHY reset is active low.
+> > 
+> > Now we need to retrieve this information from the device tree instead.
+> > 
+> > Passing '0' as the phy-reset-gpios means 'active high' according to the 
+> > definition from include/dt-bindings/gpio/gpio.h:
+> > 
+> > #define GPIO_ACTIVE_HIGH 0
+> > #define GPIO_ACTIVE_LOW 1
+> > 
+> > , so in order to keep things working as before we need to explicitly pass
+> > GPIO_ACTIVE_LOW as the flag.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
 
-Simon, Nicolas,
-
-<mini-rant>
-
-While a very minor issue, this should have been altogether avoided
-with a little more attention when applying patches. The Makefile is
-sorted, and you've appended new lines to the end instead of in the
-place they're supposed to go. Sure, others have done the same mistake
-in a few places but that doesn't mean we shouldn't try to keep it
-sorted.
-
-The very reason _to_ sort a Makefile is to avoid these needless
-add-add conflicts when two people append to the same unsorted list.
-
-Now I can't resolve it properly and move the entries when I do the
-same merge (and get the same conflict), because that will cause a
-third conflict for Stephen, and he's about to return from vacation and
-is going to cuss at us if we cause too many new conflicts in one day.
-:)
-
-</mini-rant>
-
-So, best choice is to keep the unsortedness now, and have Mike resort
-his Makefile for us at the end of the merge window. And keep a little
-closer eye on Makefile and Kconfig additions in the future. :)
+Applied to fixes. Thanks.
 
 
 -Olof
