@@ -1,75 +1,52 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jan 2014 20:59:18 -0800
-Subject: [GIT PULL 00/21] Third Round of Renesas ARM Based SoC DT Updates
- for v3.14
-In-Reply-To: <20140103234238.GA5150@verge.net.au>
-References: <cover.1387893834.git.horms+renesas@verge.net.au>
- <20140102184939.GE8684@quad.lixom.net>
- <20140103234238.GA5150@verge.net.au>
-Message-ID: <20140104045918.GA3643@quad.lixom.net>
+Date: Fri, 3 Jan 2014 21:11:29 -0800
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+In-Reply-To: <52AECF56.8020508@atmel.com>
+References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
+ <52AECF56.8020508@atmel.com>
+Message-ID: <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 04, 2014 at 08:42:38AM +0900, Simon Horman wrote:
-> On Thu, Jan 02, 2014 at 10:49:39AM -0800, Olof Johansson wrote:
-> > On Tue, Dec 24, 2013 at 11:19:23PM +0900, Simon Horman wrote:
-> > > Hi Kevin, Hi Olof, Hi Arnd,
-> > > 
-> > > please consider this third round of Renesas ARM based SoC DT updates for v3.14.
-> > > 
-> > > This is based on a merge of:
-> > > 
-> > > * The second round of Renesas ARM based SoC DT updates for v3.14,
-> > >   tagged as renesas-dt2-for-v3.14, which I have previously sent a
-> > >   pull-request for.
-> > > 
-> > > * The second round of Renesas ARM based SoC updates for v3.14,
-> > >   tagged as renesas-soc2-for-v3.14, which I have previously sent a
-> > >   pull-request for.
-> > > 
-> > > * The clk-next-shmobile branch of Mike Turquette's tree
-> 
-> git://git.linaro.org/people/mike.turquette/linux.git clk-next-shmobile
-> 
-> > > 
-> > > * The clockevents/for-Simon-3.13-rc2 branch of Daniel Lezcano's tree
-> 
-> git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/for-Simon-3.13-rc2
-> 
-> > > * The pinctl/for-next branch of Linus Walleij's tree
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git pinctl/for-next
-> 
-> > > 
-> > > * v3.13-rc3
-> > 
-> > Ah, here's the missing clk branch that caused earlier merges not to build.
-> 
-> Yes, sorry about that.
-> 
-> > Please provide actual URLs for the external branches since we want to
-> > track them. I can't reverse-engineer them since you use remotes instead
-> > of the URL when you merged in, unfortunately.
-> > 
-> > (No need to redo the pull request, just give me the URLs, please.
-> 
-> Sorry about that. Is the information I have added above sufficient?
+On Mon, Dec 16, 2013 at 2:00 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 16/12/2013 00:47, Stephen Rothwell :
+>> Hi Simon,
+>>
+>> Today's linux-next merge of the renesas tree got a conflict in
+>> drivers/clk/Makefile between commit 0ad6125b1579 ("clk: at91: add PMC
+>> base support") from the arm-soc tree and commit 10cdfe9f327a ("clk:
+>> shmobile: Add R-Car Gen2 clocks support") from the renesas tree.
+>>
+>> I fixed it up (see below) and can carry the fix as necessary (no action
+>> is required).
+>
+> Fine for me.
 
-Yep, thanks! Since the branches both come from parties that we normally
-share branches with. I've cc:d them on this reply as well.
+Simon, Nicolas,
 
-The only branch that isn't optimal is that it pulls in all of for-next from the
-pinctrl tree, but it's OK for that tree in general. Having a dedicated topic
-branch makes it a little harder to forget and accidentally rebase.
+<mini-rant>
 
-Note that it's pretty much ideal for us to be cc:d into the three-way handshake
-that the remote branch will be guaranteed to be stable. The last thing we want
-is that some of these people didn't quite understand what we need w.r.t.
-stability (that has happened in the past). Especially if they feed their
-branches up to another maintainer above them.
+While a very minor issue, this should have been altogether avoided
+with a little more attention when applying patches. The Makefile is
+sorted, and you've appended new lines to the end instead of in the
+place they're supposed to go. Sure, others have done the same mistake
+in a few places but that doesn't mean we shouldn't try to keep it
+sorted.
 
-I'll merge in the dt3 branch with the above three as external dependency
-branches.
+The very reason _to_ sort a Makefile is to avoid these needless
+add-add conflicts when two people append to the same unsorted list.
+
+Now I can't resolve it properly and move the entries when I do the
+same merge (and get the same conflict), because that will cause a
+third conflict for Stephen, and he's about to return from vacation and
+is going to cuss at us if we cause too many new conflicts in one day.
+:)
+
+</mini-rant>
+
+So, best choice is to keep the unsortedness now, and have Mike resort
+his Makefile for us at the end of the merge window. And keep a little
+closer eye on Makefile and Kconfig additions in the future. :)
 
 
 -Olof
