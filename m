@@ -1,136 +1,131 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat,  4 Jan 2014 08:27:23 -0800
-Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
-In-Reply-To: <1388816085-21417-1-git-send-email-christoffer.dall@linaro.org>
-References: <1388816085-21417-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1388852843-30986-1-git-send-email-christoffer.dall@linaro.org>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sat, 4 Jan 2014 17:48:05 +0100
+Subject: [PATCHv12 07/49] clk: divider: add support for low level ops
+In-Reply-To: <52C6800F.3090303@ti.com>
+References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
+ <1387557274-22583-7-git-send-email-t-kristo@ti.com>
+ <20131222175235.GC8064@book.gsilab.sittig.org>
+ <52C6800F.3090303@ti.com>
+Message-ID: <20140104164805.GG20094@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stage-2 memory attributes are distinct from the Hyp memory
-attributes and the Stage-1 memory attributes.  We were using the stage-1
-memory attributes for stage-2 mappings causing device mappings to be
-mapped as normal memory.  Add the S2 equivalent defines for memory
-attributes and fix the comments explaining the defines while at it.
+On Fri, Jan 03, 2014 at 11:17 +0200, Tero Kristo wrote:
+> 
+> On 12/22/2013 07:52 PM, Gerhard Sittig wrote:
+> >[ dropped devicetree, we're clock specific here ]
+> >
+> >On Fri, Dec 20, 2013 at 18:34 +0200, Tero Kristo wrote:
+> >>
+> >>Divider clock can now be registered to use low level register access ops.
+> >>Preferred initialization method is via clock description.
+> >>
+> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >>---
+> >>  drivers/clk/clk-divider.c    |   22 +++++++++++++++++++---
+> >>  include/linux/clk-provider.h |    4 ++++
+> >>  2 files changed, 23 insertions(+), 3 deletions(-)
+> >>
+> >>diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> >>index 8cfed5c..887e2d8 100644
+> >>--- a/drivers/clk/clk-divider.c
+> >>+++ b/drivers/clk/clk-divider.c
+> >>@@ -108,7 +108,12 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+> >>  	struct clk_divider *divider = to_clk_divider(hw);
+> >>  	unsigned int div, val;
+> >>
+> >>-	val = clk_readl(divider->reg) >> divider->shift;
+> >>+	if (divider->ll_ops)
+> >>+		val = divider->ll_ops->clk_readl(divider->reg);
+> >>+	else
+> >>+		val = clk_readl(divider->reg);
+> >
+> >Should this not better always use an ll_ops structure, which
+> >either is individual to the clock item, or is "global" for a
+> >platform, yet can get re-registered at runtime (see the comment
+> >on 06/49)?  And why are you referencing clk_readl() instead of
+> >clk_readl_default() which you specifically have introduced in the
+> >previous patch?  Adding a copy of the routine and using both the
+> >copy and the original doesn't look right.
+> 
+> In some cases, the clock data is defined statically during compile
+> time and here, ll_ops can be (and for OMAP cases at least is) NULL.
+> I had kind of a global ll_ops definition in some of the earlier
+> versions of this series, but it was frowned upon by some of the
+> maintainers thus I dropped it.
 
-Add a prot_pte_s2 field to the mem_type struct and fill out the field
-for device mappings accordingly.
+Well, admittedly v11 was the first version that I have
+seen/noticed.  But the static declaration you talk about and the
+ll_ops potentially being NULL was discussed there.  My response
+was about replacing the above clk_readl() call with some ll_ops
+dereference while the ll_ops to use gets determined before, as
+'divider' need not have one.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changelog[v2]:
- - Guard the use of L_PTE_S2 defines with s2_policy to allow non-LPAE compiles.
+Consider something like this
+- have default routines which do readl() and writel(), and have a
+  default ll_ops struct which references the default routines
+- have a default ll_ops struct _pointer_ that by default
+  references the default readl/writel struct, yet can get changed
+  to something else for a whole platform or architecture
+- never use routines directly upon hardware access, but instead
+  always dereference an ll_ops struct that gets determined so:
+  - start with the clock item's ll_ops reference
+  - use the global ll_ops pointer if the above is NULL
+  - use the pointer to the default ll_ops struct if still NULL
+    (this protects against NULL platform specs, which should not
+    happen yet are possible, and the test is cheap)
 
- arch/arm/include/asm/pgtable-3level.h | 20 +++++++++++++-------
- arch/arm/mm/mm.h                      |  1 +
- arch/arm/mm/mmu.c                     | 15 ++++++++++++++-
- 3 files changed, 28 insertions(+), 8 deletions(-)
+In pseudo code, this would then be
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 4f95039..d5e04d6 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -120,13 +120,19 @@
- /*
-  * 2nd stage PTE definitions for LPAE.
-  */
--#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
--#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
--#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
--#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
--#define L_PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
--
--#define L_PMD_S2_RDWR		 (_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
-+#define L_PTE_S2_MT_UNCACHED		(_AT(pteval_t, 0x0) << 2) /* strongly ordered */
-+#define L_PTE_S2_MT_WRITETHROUGH	(_AT(pteval_t, 0xa) << 2) /* normal inner write-through */
-+#define L_PTE_S2_MT_WRITEBACK		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
-+#define L_PTE_S2_MT_DEV_SHARED		(_AT(pteval_t, 0x1) << 2) /* device */
-+#define L_PTE_S2_MT_DEV_NONSHARED	(_AT(pteval_t, 0x1) << 2) /* device */
-+#define L_PTE_S2_MT_DEV_WC		(_AT(pteval_t, 0x5) << 2) /* normal non-cacheable */
-+#define L_PTE_S2_MT_DEV_CACHED		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
-+#define L_PTE_S2_MT_MASK		(_AT(pteval_t, 0xf) << 2)
-+
-+#define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
-+#define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
-+
-+#define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
- 
- /*
-  * Hyp-mode PL2 PTE definitions for LPAE.
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index d5a982d..7ea641b 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -38,6 +38,7 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
- 
- struct mem_type {
- 	pteval_t prot_pte;
-+	pteval_t prot_pte_s2;
- 	pmdval_t prot_l1;
- 	pmdval_t prot_sect;
- 	unsigned int domain;
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 580ef2d..44d571f 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -231,36 +231,48 @@ __setup("noalign", noalign_setup);
- #endif /* ifdef CONFIG_CPU_CP15 / else */
- 
- #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
-+#define PROT_PTE_S2_DEVICE	PROT_PTE_DEVICE
- #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
- 
- static struct mem_type mem_types[] = {
- 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
- 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
- 				  L_PTE_SHARED,
-+		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
-+				  s2_policy(L_PTE_S2_MT_DEV_SHARED) |
-+				  L_PTE_SHARED,
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
- 		.domain		= DOMAIN_IO,
- 	},
- 	[MT_DEVICE_NONSHARED] = { /* ARMv6 non-shared device */
- 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_NONSHARED,
-+		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
-+				  s2_policy(L_PTE_S2_MT_DEV_NONSHARED),
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PROT_SECT_DEVICE,
- 		.domain		= DOMAIN_IO,
- 	},
- 	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
- 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
-+		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
-+				  s2_policy(L_PTE_S2_MT_DEV_CACHED),
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
- 		.domain		= DOMAIN_IO,
- 	},
- 	[MT_DEVICE_WC] = {	/* ioremap_wc */
- 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
-+		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
-+				  s2_policy(L_PTE_S2_MT_DEV_WC),
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PROT_SECT_DEVICE,
- 		.domain		= DOMAIN_IO,
- 	},
- 	[MT_UNCACHED] = {
- 		.prot_pte	= PROT_PTE_DEVICE,
-+		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
-+				  s2_policy(L_PTE_S2_MT_UNCACHED),
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PMD_TYPE_SECT | PMD_SECT_XN,
- 		.domain		= DOMAIN_IO,
-@@ -458,7 +470,8 @@ static void __init build_mem_type_table(void)
- 	cp = &cache_policies[cachepolicy];
- 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
- 	s2_pgprot = cp->pte_s2;
--	hyp_device_pgprot = s2_device_pgprot = mem_types[MT_DEVICE].prot_pte;
-+	hyp_device_pgprot = mem_types[MT_DEVICE].prot_pte;
-+	s2_device_pgprot = mem_types[MT_DEVICE].prot_pte_s2;
- 
- 	/*
- 	 * ARMv6 and above have extended page tables.
+  init:
+    default_struct = { default_read, default_write, NULL, };
+    default_ops = &default_struct;
+
+  setup:
+    /* allow platforms to optionally change default_ops */
+    /* allow clk items to have individual clk->ll_ops */
+
+  use:
+    ops = divider->ll_ops;
+    if (!ops)
+      ops = default_ops;
+    if (!ops)
+      ops = &default_struct;
+    val = ops->clk_readl(ops, ...);
+
+This way
+- you always end up with an ll_ops reference which leads to
+  routines (and potential additional data that can be specific to
+  a clock item, like regmap data), for both "dynamically"
+  registered clock items as well as "static" declarations
+- one initialization step can apply different accessors for a
+  whole platform, while the default behaviour equals the current
+  implementation
+- individual clock items can specify their accessor routine and
+  data, or may go with the builtin or the preset defaults
+
+The biggest change in cost here is the indirect routine call in
+contrast to the static inline of the current implementation,
+while this additional cost of calling a real wrapper routine
+can't get avoided in the first place.  Comparing pointers and
+falling back in the absence of individual overrides should not
+outweight the above additional cost of calling the routine.  The
+always identical logic to determine which routine to call can get
+implemented in a static inline and then won't clutter the actual
+clock handling logic.
+
+If regmap access is rather popular a method, and requires only
+little additional information, it might receive more explicit
+support such that users need not hand-roll the same logic over
+and over again, yet not too much waste occurs to non-regmap
+items.  But available information suggests that currently there
+is only one user for regmap style access to clock related
+hardware (Steven's).  This could change in the future.
+
+
+virtually yours
+Gerhard Sittig
 -- 
-1.8.5
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
