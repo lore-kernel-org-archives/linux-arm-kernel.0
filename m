@@ -1,131 +1,280 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Sat, 4 Jan 2014 17:48:05 +0100
-Subject: [PATCHv12 07/49] clk: divider: add support for low level ops
-In-Reply-To: <52C6800F.3090303@ti.com>
-References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
- <1387557274-22583-7-git-send-email-t-kristo@ti.com>
- <20131222175235.GC8064@book.gsilab.sittig.org>
- <52C6800F.3090303@ti.com>
-Message-ID: <20140104164805.GG20094@book.gsilab.sittig.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 04 Jan 2014 09:35:33 -0800
+Subject: [lm-sensors] [PATCH v3 2/5] input: sun4i-ts: Add support for
+ temperature sensor
+In-Reply-To: <1388506852-3548-3-git-send-email-hdegoede@redhat.com>
+References: <1388506852-3548-1-git-send-email-hdegoede@redhat.com>
+ <1388506852-3548-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <52C84665.5070203@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 11:17 +0200, Tero Kristo wrote:
-> 
-> On 12/22/2013 07:52 PM, Gerhard Sittig wrote:
-> >[ dropped devicetree, we're clock specific here ]
-> >
-> >On Fri, Dec 20, 2013 at 18:34 +0200, Tero Kristo wrote:
-> >>
-> >>Divider clock can now be registered to use low level register access ops.
-> >>Preferred initialization method is via clock description.
-> >>
-> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>---
-> >>  drivers/clk/clk-divider.c    |   22 +++++++++++++++++++---
-> >>  include/linux/clk-provider.h |    4 ++++
-> >>  2 files changed, 23 insertions(+), 3 deletions(-)
-> >>
-> >>diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> >>index 8cfed5c..887e2d8 100644
-> >>--- a/drivers/clk/clk-divider.c
-> >>+++ b/drivers/clk/clk-divider.c
-> >>@@ -108,7 +108,12 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-> >>  	struct clk_divider *divider = to_clk_divider(hw);
-> >>  	unsigned int div, val;
-> >>
-> >>-	val = clk_readl(divider->reg) >> divider->shift;
-> >>+	if (divider->ll_ops)
-> >>+		val = divider->ll_ops->clk_readl(divider->reg);
-> >>+	else
-> >>+		val = clk_readl(divider->reg);
-> >
-> >Should this not better always use an ll_ops structure, which
-> >either is individual to the clock item, or is "global" for a
-> >platform, yet can get re-registered at runtime (see the comment
-> >on 06/49)?  And why are you referencing clk_readl() instead of
-> >clk_readl_default() which you specifically have introduced in the
-> >previous patch?  Adding a copy of the routine and using both the
-> >copy and the original doesn't look right.
-> 
-> In some cases, the clock data is defined statically during compile
-> time and here, ll_ops can be (and for OMAP cases at least is) NULL.
-> I had kind of a global ll_ops definition in some of the earlier
-> versions of this series, but it was frowned upon by some of the
-> maintainers thus I dropped it.
+On 12/31/2013 08:20 AM, Hans de Goede wrote:
+> The sun4i resisitive touchscreen controller also comes with a built-in
+> temperature sensor. This commit adds support for it.
+>
+> This commit also introduces a new "ts-attached" device-tree property,
+> when this is not set, the input part of the driver won't register. This way
+> the internal temperature sensor can be used to measure the SoC temperature
+> independent of there actually being a touchscreen attached to the controller.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Well, admittedly v11 was the first version that I have
-seen/noticed.  But the static declaration you talk about and the
-ll_ops potentially being NULL was discussed there.  My response
-was about replacing the above clk_readl() call with some ll_ops
-dereference while the ll_ops to use gets determined before, as
-'divider' need not have one.
+Couple of minor comments below, though no need to resubmit unless someone else has comments.
 
-Consider something like this
-- have default routines which do readl() and writel(), and have a
-  default ll_ops struct which references the default routines
-- have a default ll_ops struct _pointer_ that by default
-  references the default readl/writel struct, yet can get changed
-  to something else for a whole platform or architecture
-- never use routines directly upon hardware access, but instead
-  always dereference an ll_ops struct that gets determined so:
-  - start with the clock item's ll_ops reference
-  - use the global ll_ops pointer if the above is NULL
-  - use the pointer to the default ll_ops struct if still NULL
-    (this protects against NULL platform specs, which should not
-    happen yet are possible, and the test is cheap)
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-In pseudo code, this would then be
+> ---
+>   .../bindings/input/touchscreen/sun4i.txt           |   5 +
+>   drivers/input/touchscreen/sun4i-ts.c               | 140 ++++++++++++++++-----
+>   2 files changed, 114 insertions(+), 31 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> index e45927e..6bac67b 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> @@ -6,10 +6,15 @@ Required properties:
+>    - reg: mmio address range of the chip
+>    - interrupts: interrupt to which the chip is connected
+>
+> +Optional properties:
+> + - allwinner,ts-attached: boolean indicating that an actual touchscreen is
+> +			  attached to the controller
+> +
+Brr. While I understand that you were asked to do this, I don't really see the benefit
+of another "allwinner" here. As if this wasn't implied by the "compatible" property.
 
-  init:
-    default_struct = { default_read, default_write, NULL, };
-    default_ops = &default_struct;
+>   Example:
+>
+>   	rtp: rtp at 01c25000 {
+>   		compatible = "allwinner,sun4i-ts";
+>   		reg = <0x01c25000 0x100>;
+>   		interrupts = <29>;
+> +		allwinner,ts-attached;
+>   	};
+> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> index 5945219..16cbb01 100644
+> --- a/drivers/input/touchscreen/sun4i-ts.c
+> +++ b/drivers/input/touchscreen/sun4i-ts.c
+> @@ -3,6 +3,9 @@
+>    *
+>    * Copyright (C) 2013 - 2014 Hans de Goede <hdegoede@redhat.com>
+>    *
+> + * The hwmon parts are based on work by Corentin LABBE which is:
+> + * Copyright (C) 2013 Corentin LABBE <clabbe.montjoie@gmail.com>
+> + *
+>    * This program is free software; you can redistribute it and/or modify
+>    * it under the terms of the GNU General Public License as published by
+>    * the Free Software Foundation; either version 2 of the License, or
+> @@ -30,6 +33,7 @@
+>    */
+>
+>   #include <linux/err.h>
+> +#include <linux/hwmon.h>
+>   #include <linux/init.h>
+>   #include <linux/input.h>
+>   #include <linux/interrupt.h>
+> @@ -106,14 +110,12 @@ struct sun4i_ts_data {
+>   	void __iomem *base;
+>   	unsigned int irq;
+>   	bool ignore_fifo_data;
+> +	int temp_data;
+>   };
+>
+> -static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
+> +static void sun4i_ts_irq_handle_input(struct sun4i_ts_data *ts, u32 reg_val)
+>   {
+> -	struct sun4i_ts_data *ts = dev_id;
+> -	u32 reg_val, x, y;
+> -
+> -	reg_val  = readl(ts->base + TP_INT_FIFOS);
+> +	u32 x, y;
+>
+>   	if (reg_val & FIFO_DATA_PENDING) {
+>   		x = readl(ts->base + TP_DATA);
+> @@ -139,6 +141,20 @@ static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
+>   		input_report_key(ts->input, BTN_TOUCH, 0);
+>   		input_sync(ts->input);
+>   	}
+> +}
+> +
+> +static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
+> +{
+> +	struct sun4i_ts_data *ts = dev_id;
+> +	u32 reg_val;
+> +
+> +	reg_val  = readl(ts->base + TP_INT_FIFOS);
+> +
+> +	if (reg_val & TEMP_DATA_PENDING)
+> +		ts->temp_data = readl(ts->base + TEMP_DATA);
+> +
+> +	if (ts->input)
+> +		sun4i_ts_irq_handle_input(ts, reg_val);
+>
+>   	writel(reg_val, ts->base + TP_INT_FIFOS);
+>
+> @@ -149,9 +165,9 @@ static int sun4i_ts_open(struct input_dev *dev)
+>   {
+>   	struct sun4i_ts_data *ts = input_get_drvdata(dev);
+>
+> -	/* Flush, set trig level to 1, enable data and up irqs */
+> -	writel(DATA_IRQ_EN(1) | FIFO_TRIG(1) | FIFO_FLUSH(1) | TP_UP_IRQ_EN(1),
+> -	       ts->base + TP_INT_FIFOC);
+> +	/* Flush, set trig level to 1, enable temp, data and up irqs */
+> +	writel(TEMP_IRQ_EN(1) | DATA_IRQ_EN(1) | FIFO_TRIG(1) | FIFO_FLUSH(1) |
+> +		TP_UP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>
+>   	return 0;
+>   }
+> @@ -160,15 +176,48 @@ static void sun4i_ts_close(struct input_dev *dev)
+>   {
+>   	struct sun4i_ts_data *ts = input_get_drvdata(dev);
+>
+> -	/* Deactivate all IRQs */
+> -	writel(0, ts->base + TP_INT_FIFOC);
+> +	/* Deactivate all input IRQs */
+> +	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+> +}
+> +
+> +static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+> +			 char *buf)
+> +{
+> +	struct sun4i_ts_data *ts = dev_get_drvdata(dev);
+> +
+> +	/* No temp_data until the first irq */
+> +	if (ts->temp_data == -1)
+> +		return -EAGAIN;
+> +
+> +	return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
+> +}
+> +
+> +static ssize_t show_temp_label(struct device *dev,
+> +			      struct device_attribute *devattr, char *buf)
+> +{
+> +	return sprintf(buf, "SoC temperature\n");
+>   }
+>
+> +static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
+> +static DEVICE_ATTR(temp1_label, S_IRUGO, show_temp_label, NULL);
+> +
 
-  setup:
-    /* allow platforms to optionally change default_ops */
-    /* allow clk items to have individual clk->ll_ops */
+Just remembered ... there is now also a DEVICE_ATTR_RO() macro.
 
-  use:
-    ops = divider->ll_ops;
-    if (!ops)
-      ops = default_ops;
-    if (!ops)
-      ops = &default_struct;
-    val = ops->clk_readl(ops, ...);
-
-This way
-- you always end up with an ll_ops reference which leads to
-  routines (and potential additional data that can be specific to
-  a clock item, like regmap data), for both "dynamically"
-  registered clock items as well as "static" declarations
-- one initialization step can apply different accessors for a
-  whole platform, while the default behaviour equals the current
-  implementation
-- individual clock items can specify their accessor routine and
-  data, or may go with the builtin or the preset defaults
-
-The biggest change in cost here is the indirect routine call in
-contrast to the static inline of the current implementation,
-while this additional cost of calling a real wrapper routine
-can't get avoided in the first place.  Comparing pointers and
-falling back in the absence of individual overrides should not
-outweight the above additional cost of calling the routine.  The
-always identical logic to determine which routine to call can get
-implemented in a static inline and then won't clutter the actual
-clock handling logic.
-
-If regmap access is rather popular a method, and requires only
-little additional information, it might receive more explicit
-support such that users need not hand-roll the same logic over
-and over again, yet not too much waste occurs to non-regmap
-items.  But available information suggests that currently there
-is only one user for regmap style access to clock related
-hardware (Steven's).  This could change in the future.
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+> +static struct attribute *sun4i_ts_attrs[] = {
+> +	&dev_attr_temp1_input.attr,
+> +	&dev_attr_temp1_label.attr,
+> +	NULL
+> +};
+> +ATTRIBUTE_GROUPS(sun4i_ts);
+> +
+>   static int sun4i_ts_probe(struct platform_device *pdev)
+>   {
+>   	struct sun4i_ts_data *ts;
+>   	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct device *hwmon;
+>   	int ret;
+> +	bool ts_attached;
+> +
+> +	ts_attached = of_property_read_bool(np, "allwinner,ts-attached");
+>
+>   	ts = devm_kzalloc(dev, sizeof(struct sun4i_ts_data), GFP_KERNEL);
+>   	if (!ts)
+> @@ -176,24 +225,27 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>
+>   	ts->dev = dev;
+>   	ts->ignore_fifo_data = true;
+> -
+> -	ts->input = devm_input_allocate_device(dev);
+> -	if (!ts->input)
+> -		return -ENOMEM;
+> -
+> -	ts->input->name = pdev->name;
+> -	ts->input->phys = "sun4i_ts/input0";
+> -	ts->input->open = sun4i_ts_open;
+> -	ts->input->close = sun4i_ts_close;
+> -	ts->input->id.bustype = BUS_HOST;
+> -	ts->input->id.vendor = 0x0001;
+> -	ts->input->id.product = 0x0001;
+> -	ts->input->id.version = 0x0100;
+> -	ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
+> -	set_bit(BTN_TOUCH, ts->input->keybit);
+> -	input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
+> -	input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
+> -	input_set_drvdata(ts->input, ts);
+> +	ts->temp_data = -1;
+> +
+> +	if (ts_attached) {
+> +		ts->input = devm_input_allocate_device(dev);
+> +		if (!ts->input)
+> +			return -ENOMEM;
+> +
+> +		ts->input->name = pdev->name;
+> +		ts->input->phys = "sun4i_ts/input0";
+> +		ts->input->open = sun4i_ts_open;
+> +		ts->input->close = sun4i_ts_close;
+> +		ts->input->id.bustype = BUS_HOST;
+> +		ts->input->id.vendor = 0x0001;
+> +		ts->input->id.product = 0x0001;
+> +		ts->input->id.version = 0x0100;
+> +		ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
+> +		set_bit(BTN_TOUCH, ts->input->keybit);
+> +		input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
+> +		input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
+> +		input_set_drvdata(ts->input, ts);
+> +	}
+>
+>   	ts->base = devm_ioremap_resource(dev,
+>   			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
+> @@ -232,14 +284,39 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>   	writel(STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1) | TP_MODE_EN(1),
+>   	       ts->base + TP_CTRL1);
+>
+> -	ret = input_register_device(ts->input);
+> -	if (ret)
+> -		return ret;
+> +	hwmon = devm_hwmon_device_register_with_groups(ts->dev, "sun4i_ts",
+> +						       ts, sun4i_ts_groups);
+> +	if (IS_ERR(hwmon))
+> +		return PTR_ERR(hwmon);
+> +
+> +	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+> +
+> +	if (ts_attached) {
+> +		ret = input_register_device(ts->input);
+> +		if (ret) {
+> +			writel(0, ts->base + TP_INT_FIFOC);
+> +			return ret;
+> +		}
+> +	}
+>
+>   	platform_set_drvdata(pdev, ts);
+>   	return 0;
+>   }
+>
+> +static int sun4i_ts_remove(struct platform_device *pdev)
+> +{
+> +	struct sun4i_ts_data *ts = platform_get_drvdata(pdev);
+> +
+> +	/* Explicit unregister to avoid open/close changing the imask later */
+> +	if (ts->input)
+> +		input_unregister_device(ts->input);
+> +
+> +	/* Deactivate all IRQs */
+> +	writel(0, ts->base + TP_INT_FIFOC);
+> +
+> +	return 0;
+> +}
+> +
+>   static const struct of_device_id sun4i_ts_of_match[] = {
+>   	{ .compatible = "allwinner,sun4i-ts", },
+>   	{ /* sentinel */ }
+> @@ -253,6 +330,7 @@ static struct platform_driver sun4i_ts_driver = {
+>   		.of_match_table = of_match_ptr(sun4i_ts_of_match),
+>   	},
+>   	.probe	= sun4i_ts_probe,
+> +	.remove	= sun4i_ts_remove,
+>   };
+>
+>   module_platform_driver(sun4i_ts_driver);
+>
