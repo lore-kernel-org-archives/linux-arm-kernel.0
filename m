@@ -1,38 +1,23 @@
 From: carlo.caione@gmail.com (Carlo Caione)
-Date: Sun,  5 Jan 2014 16:39:05 +0100
-Subject: [PATCH 2/2] ARM: sun7i: dts: Add NMI irqchip support
-In-Reply-To: <1388936345-5009-1-git-send-email-carlo.caione@gmail.com>
-References: <1388936345-5009-1-git-send-email-carlo.caione@gmail.com>
-Message-ID: <1388936345-5009-3-git-send-email-carlo.caione@gmail.com>
+Date: Sun,  5 Jan 2014 16:39:03 +0100
+Subject: [PATCH 0/2] ARM: sun7i: irqchip driver for NMI 
+Message-ID: <1388936345-5009-1-git-send-email-carlo.caione@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DTS entry for NMI controller as child of GIC.
+Allwinner A20 SoCs have a special interrupt controller for managing NMI.
+Three register are present to (un)mask, control and acknowledge NMI.
+These two patches add a new irqchip driver in cascade with GIC.
 
-Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Carlo Caione (2):
+  ARM: sun7i: Add irqchip driver for NMI controller
+  ARM: sun7i: dts: Add NMI irqchip support
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4c25f81..89e93da 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -310,6 +310,15 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		nmi_intc: sc-nmi-intc at 01c00030 {
-+			compatible = "allwinner,sun7i-sc-nmi";
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x01c00030 0x0c>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0 0 1>;
-+		};
-+
- 		emac: ethernet at 01c0b000 {
- 			compatible = "allwinner,sun4i-emac";
- 			reg = <0x01c0b000 0x1000>;
+ arch/arm/boot/dts/sun7i-a20.dtsi |   9 ++
+ drivers/irqchip/Makefile         |   1 +
+ drivers/irqchip/irq-sun7i-nmi.c  | 192 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 202 insertions(+)
+ create mode 100644 drivers/irqchip/irq-sun7i-nmi.c
+
 -- 
 1.8.5.2
