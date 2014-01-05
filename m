@@ -1,50 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 5 Jan 2014 19:11:12 +0100
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <CAN1v_PtFz42crHW5=cUgw-fAnPn3rQht=o0t3nmjJRamYSLDMg@mail.gmail.com>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <1441245.xPZLG2iNZ6@wuerfel>
- <CAN1v_PtFz42crHW5=cUgw-fAnPn3rQht=o0t3nmjJRamYSLDMg@mail.gmail.com>
-Message-ID: <201401051911.12349.arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun,  5 Jan 2014 19:13:44 +0100
+Subject: [PATCH 2/5] ARM: sun5i: a10s: Add missing serial aliases
+In-Reply-To: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1388945627-3432-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 05 January 2014, Ravi Patel wrote:
-> On Sat, Dec 21, 2013 at 11:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 21 December 2013 17:00:51 Loc Ho wrote:
-> >> On Sat, Dec 21, 2013 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > Please describe here what the purpose of the qmtm is, as this is not
-> > entirely clear from the code or from your reply.
-> >
-> > Greg was guessing that it's a bus controller, my best guess is a DMA
-> > engine. If it's something completely different, you have to let
-> > us know what it is so we can do a proper review rather than guessing.
-> >
-> > Please provide a link to the data sheet if you are unable to explain.
-> 
-> Here is URL to a text document explaining role of QMTM device with CPU, Ethernet
-> subsystem.
-> 
-> https://drive.google.com/file/d/0B28TgQZ3JLoRRGNnbjJoUGNHWW8/edit?usp=sharing
-> 
-> For simplicity, I have shown only Ethernet.
-> PktDMA and Security subsystem interfaces with QMTM in the same way as Ethernet.
-> 
+Some UART aliases have been defined, but not all of them. Add the remaining
+ones to be consistent and to ease the parsing of the DT by the bootloaders.
 
-Thanks, that helps a lot. Please add this file to an appropriate place
-in the Documentation directory in the next version of your patches.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-There is still one central aspect that remains unclear to me, which is
-what the QMTM is actually good for, as opposed to how it gets used from
-the OS. In the text description, it sounds like the ethernet is the DMA
-master and performs DMA all by itself but from that it's not clear why
-a message to and from the QMTM is needed. From your drawing on the other
-hand, it seems like the QMTM is really the DMA master and performs the
-DMA on behalf of the ethernet device, which isn't connected to the
-coherent interface itself. If this is correct, it seems that QMTM is more
-like a DMA engine after all that should use the existing slave API to
-provide services to slave drivers.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index ea16054..2318082 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -18,6 +18,10 @@
+ 
+ 	aliases {
+ 		ethernet0 = &emac;
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
+ 	};
+ 
+ 	cpus {
+-- 
+1.8.4.2
