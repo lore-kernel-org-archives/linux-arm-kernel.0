@@ -1,48 +1,77 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 05 Jan 2014 18:37:21 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140105172756.GA11280@obsidianresearch.com>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
- <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
- <20140105172756.GA11280@obsidianresearch.com>
-Message-ID: <52C99851.70806@gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sun,  5 Jan 2014 18:58:13 +0100
+Subject: [PATCH v4 0/4] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+Message-ID: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2014 06:27 PM, Jason Gunthorpe wrote:
-> On Sun, Jan 05, 2014 at 04:40:23PM +0100, Andrew Lunn wrote:
->>>> +static int __init mvebu_soc_id_init(void)
->>>> +{
->>>> +	struct device_node *np;
->>>> +	int ret = 0;
->>>> +
->>>> +	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
->>>> +	if (np) {
->>>> +		void __iomem *pci_base;
->>>> +		struct clk *clk;
->>>> +		/*
->>>> +		 * ID and revision are available from any port, so we
->>>> +		 * just pick the first one
->>>> +		 */
->>>> +		struct device_node *child = of_get_next_child(np, NULL);
->>>
->>> I guess all this will fail if for some reason the PCIe node is not
->>> present on machines that don't use PCIe.
->>
->> That would be rather odd. These nodes are in the top level SoC dtsi
->> file. When they are not used, they have status = "disabled" and are in
->> the dtb blob with this state.
->
-> Hang on, you can't safely read from a disabled PCI node, it could have been
-> powered down by the bootloader..
+I am working on mainlining this SoC again which I started in Summer 
+2013.
 
-If you mean clock-gated with "powered down", the code is safe. It
-enables the clock gate prior reading from the controller. Or is there
-another way to power down the controller, so you cannot read from the
-controller registers?
+This adds initial support for Broadcom network SoC from the BCM5301X 
+and BCM470X line.
 
-Sebastian
+The vendor BSP also uses BCM5301X for this SoC, so I just toke that.
 
-Sebastian
+I haven't found a better solution than the abort handler for the memory fault.
+
+I do not have any documentation, only the vendor source code published 
+by Asus and Netgear to conform with the GPL, it would be nice to get 
+some documentation for this Soc like this
+https://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
+for the Broadcom BCM440X Ethernet controller.
+
+With some additional patches I got Ethernet working with ~250 MBit/s.
+
+A bootlog can be found here:
+http://hauke-m.de/files/openwrt/devices/R6250/openwrt-boot-2014-01-05.txt
+
+Changes since v3:
+ * rebase on Linus 3.13-rc7
+ * split the workaround into an own patch
+ * add L2 cache controller to Device tree
+ * rename config option
+ * add local-timer and SCU entry to device tree
+
+Changes since v2:
+ * use vendor prefix brcm
+ * move code to arch/arm/mach-bcm/
+ * cleanup arch/arm/mach-bcm/bcm5301x.c
+ * rename to bcm5301x
+ * split into more patches
+
+Changes since v1:
+ * add file Documentation/devicetree/bindings/arm/bcm4708.txt
+ * rename bcm5301x to bcm4708 in dts files
+ * use preprocessor includes in dts file
+ * add CONFIG_ARCH_BCM53XX to multi_v7_defconfig
+ * remove init_machine callback
+ * rename vendor prefix from brcm to bcm
+ * split into two patches 
+
+Hauke Mehrtens (4):
+  ARM: BCM5301X: initial support for the BCM5301X/BCM470X SoCs with ARM
+    CPU
+  ARM: BCM5301X: add early debugging support
+  ARM: BCM5301X: add dts files for BCM4708 SoC
+  ARM: BCM5301X: workaround suppress fault
+
+ Documentation/devicetree/bindings/arm/bcm4708.txt |    8 ++
+ MAINTAINERS                                       |    7 ++
+ arch/arm/Kconfig.debug                            |    7 ++
+ arch/arm/boot/dts/Makefile                        |    1 +
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts       |   20 ++++
+ arch/arm/boot/dts/bcm4708.dtsi                    |  102 +++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig               |    1 +
+ arch/arm/mach-bcm/Kconfig                         |   27 ++++++
+ arch/arm/mach-bcm/Makefile                        |    1 +
+ arch/arm/mach-bcm/bcm_5301x.c                     |   60 ++++++++++++
+ 10 files changed, 234 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm4708.txt
+ create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+ create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
+ create mode 100644 arch/arm/mach-bcm/bcm_5301x.c
+
+-- 
+1.7.10.4
