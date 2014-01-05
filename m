@@ -1,50 +1,27 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  6 Jan 2014 00:06:28 +0100
-Subject: [PATCH 1/2] phy-core: Don't print an error on probe deferral or nodata
-Message-ID: <1388963189-13556-1-git-send-email-hdegoede@redhat.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sun, 5 Jan 2014 16:07:46 -0700
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <52C99851.70806@gmail.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
+ <20140105172756.GA11280@obsidianresearch.com>
+ <52C99851.70806@gmail.com>
+Message-ID: <20140105230746.GB11280@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Printing an error on probe-deferral clearly is not the right thing to do.
-While at it I've also silenced the error in case of -ENODATA, so that
-devm_phy_get can be used to get an optional phy without causing errors to
-be printed. Alternatively a new devm_phy_get_optional method could be
-added for this.
+On Sun, Jan 05, 2014 at 06:37:21PM +0100, Sebastian Hesselbarth wrote:
 
-While at it also factor the error handling out of the if ... else ..., as it
-is identical in both branches.
+> If you mean clock-gated with "powered down", the code is safe. It
+> enables the clock gate prior reading from the controller. Or is there
+> another way to power down the controller, so you cannot read from the
+> controller registers?
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/phy/phy-core.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+There is a clock gate and a power down on kirkwood at least, Linux has
+no code for controlling the powerdown
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index 58e0e97..d7b992e 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -371,16 +371,14 @@ struct phy *phy_get(struct device *dev, const char *string)
- 		index = of_property_match_string(dev->of_node, "phy-names",
- 			string);
- 		phy = of_phy_get(dev, index);
--		if (IS_ERR(phy)) {
--			dev_err(dev, "unable to find phy\n");
--			return phy;
--		}
- 	} else {
- 		phy = phy_lookup(dev, string);
--		if (IS_ERR(phy)) {
--			dev_err(dev, "unable to find phy\n");
--			return phy;
--		}
-+	}
-+	if (IS_ERR(phy)) {
-+		int err = PTR_ERR(phy);
-+		if (err != -EPROBE_DEFER && err != -ENODATA)
-+			dev_err(dev, "unable to get phy\n");
-+		return phy;
- 	}
- 
- 	if (!try_module_get(phy->ops->owner))
--- 
-1.8.4.2
+In any event, I think processing a disabled DT node is not great..
+
+Jason
