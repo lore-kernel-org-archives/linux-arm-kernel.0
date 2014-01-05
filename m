@@ -1,5 +1,5 @@
-From: rapatel@apm.com (Ravi Patel)
-Date: Sat, 4 Jan 2014 21:27:30 -0800
+From: lho@apm.com (Loc Ho)
+Date: Sat, 4 Jan 2014 21:39:08 -0800
 Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
  Manager/Traffic Manager
 In-Reply-To: <20140105033848.GA22595@kroah.com>
@@ -9,16 +9,12 @@ References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
  <1441245.xPZLG2iNZ6@wuerfel>
  <CAN1v_PtFz42crHW5=cUgw-fAnPn3rQht=o0t3nmjJRamYSLDMg@mail.gmail.com>
  <20140105033848.GA22595@kroah.com>
-Message-ID: <CAN1v_Pv7GoXqceu_vDpK-Rk3FzJKFjY=77JCw1fOOUOcuUHAjA@mail.gmail.com>
+Message-ID: <CAPw-ZT=noCwc+3o_762ewTcn2J3SjZ5u11V=Aa8RrZZf4DT5Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 4, 2014 at 7:38 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Sat, Jan 04, 2014 at 03:59:46PM -0800, Ravi Patel wrote:
->> On Sat, Dec 21, 2013 at 11:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Saturday 21 December 2013 17:00:51 Loc Ho wrote:
->> >> On Sat, Dec 21, 2013 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> > On Saturday 21 December 2013, Ravi Patel wrote:
+Hi,
+
 >> >> >> This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
 >> >> >>  QMTM is required by APM X-Gene SoC Ethernet, PktDMA (XOR Engine) and
 >> >> >>  Security Engine subsystems. All subsystems communicate with QMTM using
@@ -57,24 +53,8 @@ On Sat, Jan 4, 2014 at 7:38 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
 >
 > There is nothing at this link :(
 
-The URL is pointing to text document.
-I created another URL to the same document in pdf format.
-https://docs.google.com/file/d/0B28TgQZ3JLoRbXJiUXJjSUNxeDA/edit?usp=sharing&pli=1
+I tried click on the txt file link from web site
+http://www.spinics.net/lists/netdev/msg264628.html and don't see any
+problem with accessing the txt file.
 
-
->> PktDMA and Security subsystem interfaces with QMTM in the same way as Ethernet.
->
-> How does a "security" subsystem have anything to do with ethernet?
->
-> confused,
-
-PktDMA and Security are completely independent of Ethernet.
-Security Subsystem (SEC) is a CPU offload packet processing engine for security
- applications.
-PktDMA subsystem is a general purpose data transfer engine which moves data
- from one location in memory to another.
-PktDMA can perform certain data manipulation functions like XOR as
-data is passing
- through the engine.
-Both PktDMA and Security engine has their own QMTM work message format which
- will be prepared by their driver
+-Loc
