@@ -1,70 +1,51 @@
-From: rapatel@apm.com (Ravi Patel)
-Date: Sun, 5 Jan 2014 12:52:05 -0800
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <20140105180122.GB980@kroah.com>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <201312212111.40576.arnd@arndb.de>
- <CAPw-ZTnsu_EmOW3aZTVKAVjQsdi8qMy95y2ZcYxzgVrjGkirTA@mail.gmail.com>
- <1441245.xPZLG2iNZ6@wuerfel>
- <CAN1v_PtFz42crHW5=cUgw-fAnPn3rQht=o0t3nmjJRamYSLDMg@mail.gmail.com>
- <20140105033848.GA22595@kroah.com>
- <CAPw-ZT=noCwc+3o_762ewTcn2J3SjZ5u11V=Aa8RrZZf4DT5Yw@mail.gmail.com>
- <20140105180122.GB980@kroah.com>
-Message-ID: <CAN1v_PsE2mevK4-2D3MTevtwQF4XkaMzVGHpDZUoqR+a6uMUyg@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sun, 05 Jan 2014 23:29:32 +0100
+Subject: [PATCH v4 4/4] ARM: BCM5301X: workaround suppress fault
+In-Reply-To: <201401052125.40130.arnd@arndb.de>
+References: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
+ <1388944697-19927-5-git-send-email-hauke@hauke-m.de>
+ <201401052125.40130.arnd@arndb.de>
+Message-ID: <52C9DCCC.9030801@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 5, 2014 at 10:01 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Sat, Jan 04, 2014 at 09:39:08PM -0800, Loc Ho wrote:
->> Hi,
+On 01/05/2014 09:25 PM, Arnd Bergmann wrote:
+> On Sunday 05 January 2014, Hauke Mehrtens wrote:
+>> Without this patch I am getting a unhandled fault exception like this
+>> one after "Freeing unused kernel memory":
 >>
->> >> >> >> This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
->> >> >> >>  QMTM is required by APM X-Gene SoC Ethernet, PktDMA (XOR Engine) and
->> >> >> >>  Security Engine subsystems. All subsystems communicate with QMTM using
->> >> >> >>  messages which include information about the work to be performed and
->> >> >> >>  the location of associated data buffers.
->> >> >> >
->> >> >> > Please describe here what the purpose of the qmtm is, as this is not
->> >> >> > entirely clear from the code.
->> >> >> >
->> >> >> > In particular, please describe how this differs from a dmaengine driver
->> >> >> > and why it is not possible to extend the dma slave API to describe qmtm
->> >> >> > as a dma engine.
->> >> >> >
->> >> >> [Loc Ho]
->> >> >> If the QM driver implements the DMA API, what about the actual DMA
->> >> >> engine driver which interfaces with this QM driver. We would have DMA
->> >> >> client interfaces with the X-Gene DMA driver (not available yet) via
->> >> >> DMA API which in turn interfaces with this QM driver via DMA API.
->> >> >> Won't this be kind of awkward? Also, the QM only manage messages (or
->> >> >> descriptors) which are 32-bytes or 64-bytes. It doesn't actually do
->> >> >> any data transfer of various sizes.
->> >> >
->> >> > Please describe here what the purpose of the qmtm is, as this is not
->> >> > entirely clear from the code or from your reply.
->> >> >
->> >> > Greg was guessing that it's a bus controller, my best guess is a DMA
->> >> > engine. If it's something completely different, you have to let
->> >> > us know what it is so we can do a proper review rather than guessing.
->> >> >
->> >> > Please provide a link to the data sheet if you are unable to explain.
->> >>
->> >> Here is URL to a text document explaining role of QMTM device with CPU, Ethernet
->> >> subsystem.
->> >>
->> >> https://drive.google.com/file/d/0B28TgQZ3JLoRRGNnbjJoUGNHWW8/edit?usp=sharing
->> >
->> > There is nothing at this link :(
+>> Freeing unused kernel memory: 1260K (c02c1000 - c03fc000)
+>> Unhandled fault: imprecise external abort (0x1c06) at 0xb6f89005
+>> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
 >>
->> I tried click on the txt file link from web site
->> http://www.spinics.net/lists/netdev/msg264628.html and don't see any
->> problem with accessing the txt file.
->
-> Now it's working :)
->
-> Anyway, as this is a .txt file, why wasn't it just sent in email, and
-> added to the patch series as a documentation file?
+>> The address which is here 0xb6f89005 changes from boot to boot, with a
+>> new build the changes are bigger. With kernel 3.10 I have also seen
+>> this fault at different places in the boot process, but starting with
+>> 3.11 they are always occurring after the "Freeing unused kernel memory"
+>> message. I never was able to completely boot to userspace without this
+>> handler. The abort code is constant 0x1c06. This fault just happens
+>> once in the boot process I have never seen it happing twice or more.
+> 
+> How about narrowing down the abort handler to only ignore a single
+> fault after boot, and only with the abort code 0x1c06? That way you
+> don't risk silent data corruption in case something else goes wrong
+> after booting.
 
-Sure I will include the text documentation to an appropriate place in the
-Documentation directory in my next version of QMTM patch.
+Ok I extended the bcm5301x_abort_handler() to only ignore the fault when
+the code is 0x1c06 and it is the first fault.
+
+>> This workaround was copied from the vendor code including most of the
+>> comments. It says it they think this is caused by the CFE boot loader
+>> used on this device. I do not have any access to any datasheet or
+>> errata document to check this.
+> 
+> Does the SoC by chance have a PCI host controller? The only other
+> platforms with this kind of handler have it to catch things going wrong
+> with PCI. Maybe another thing to try is to turn off the PCI core
+> at early boot.
+
+Yes it has two PCIe host controller. I haven't tried to initialized the
+PCIe core. It could be that the boot loader did something with the PCIe
+controller, but I do not think so.
+
+Hauke
