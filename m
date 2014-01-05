@@ -1,40 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 6 Jan 2014 07:29:27 +0800
-Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
-In-Reply-To: <201401051633.21894.marex@denx.de>
-References: <1386703583-8386-1-git-send-email-marex@denx.de>
- <20140105130529.GA26358@gondor.apana.org.au>
- <201401051633.21894.marex@denx.de>
-Message-ID: <20140105232926.GA29518@gondor.apana.org.au>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Mon, 06 Jan 2014 00:30:37 +0100
+Subject: [PATCH v4 1/4] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+In-Reply-To: <201401052030.07765.arnd@arndb.de>
+References: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
+ <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
+ <201401052030.07765.arnd@arndb.de>
+Message-ID: <52C9EB1D.802@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 05, 2014 at 04:33:21PM +0100, Marek Vasut wrote:
-> On Sunday, January 05, 2014 at 02:05:29 PM, Herbert Xu wrote:
-> > On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
-> > > When finishing the ahash request, the ahash_op_unaligned_done() will
-> > > call complete() on the request. Yet, this will not call the correct
-> > > complete callback. The correct complete callback was previously stored
-> > > in the requests' private data, as seen in ahash_op_unaligned(). This
-> > > patch restores the correct complete callback and .data field of the
-> > > request before calling complete() on it.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > > Cc: David S. Miller <davem@davemloft.net>
-> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: linux-crypto at vger.kernel.org
-> > 
-> > All patches applied.  Thanks!
+On 01/05/2014 08:30 PM, Arnd Bergmann wrote:
+> On Sunday 05 January 2014, Hauke Mehrtens wrote:
+>> +static void __init bcm5301x_timer_init(void)
+>> +{
+>> +       of_clk_init(NULL);
+>> +       clocksource_of_init();
+>> +}
+>> +
+>> +static void __init bcm5301x_dt_init(void)
+>> +{
+>> +       l2x0_of_init(0, ~0UL);
+>> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
 > 
-> Uh, I think this was not intended to happen! We still discuss this patch will 
-> need rework, do we not?
+> I'm pretty sure the first of these two functions is no longer needed,
+> and there were at least plans to make the second one optional as well.
+> 
+> Can you remove bcm5301x_timer_init() now?
 
-Please send your new fixes as incremental patches on top of this.
+Yes I will remove bcm5301x_timer_init(), but calling l2x0_of_init() is
+still needed with kernel 3.13-rc7.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Hauke
