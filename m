@@ -1,41 +1,81 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 06 Jan 2014 00:37:50 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NCAxLzRdIEFSTTogQkNNNTMwMVg6IGluaXRpYWwgc3Vw?=
- =?UTF-8?B?cG9ydCBmb3IgdGhlIEJDTTUzMDFYL0JDTTQ3MFggU29DcyB3aXRoIEFSTSBD?=
- =?UTF-8?B?UFU=?=
-In-Reply-To: <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
-References: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
- <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
-Message-ID: <1388954270.224601777@f339.i.mail.ru>
+From: rapatel@apm.com (Ravi Patel)
+Date: Sun, 5 Jan 2014 12:48:36 -0800
+Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
+ Manager/Traffic Manager
+In-Reply-To: <201401051911.12349.arnd@arndb.de>
+References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
+ <1441245.xPZLG2iNZ6@wuerfel>
+ <CAN1v_PtFz42crHW5=cUgw-fAnPn3rQht=o0t3nmjJRamYSLDMg@mail.gmail.com>
+ <201401051911.12349.arnd@arndb.de>
+Message-ID: <CAN1v_PsaAeDiLaiP7FfTHFbNRG=UHuom6-2L6NMwzyOOyB+5cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch adds support for the BCM5301X/BCM470X SoCs with an ARM CPUs.
-> Currently just booting to a shell is working and nothing else, no
-> Ethernet, wifi, flash, ...
-> I have some pending patches to make Ethernet work for this device.
-> Mostly device tree support for bcma is missing.
-...
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 9fe6d88..e47f9de 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -31,6 +31,33 @@ config ARCH_BCM_MOBILE
->  	  BCM11130, BCM11140, BCM11351, BCM28145 and
->  	  BCM28155 variants.
->  
-> +config ARCH_BCM_5301X
-> +	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
-> +	depends on MMU
-> +	select ARM_GIC
-> +	select CACHE_L2X0
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if SMP
-> +	select HAVE_SMP
-> +	select COMMON_CLK
-> +	select GENERIC_CLOCKEVENTS
-> +	select GENERIC_TIME
+On Sun, Jan 5, 2014 at 10:11 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 05 January 2014, Ravi Patel wrote:
+>> On Sat, Dec 21, 2013 at 11:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Saturday 21 December 2013 17:00:51 Loc Ho wrote:
+>> >> On Sat, Dec 21, 2013 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > Please describe here what the purpose of the qmtm is, as this is not
+>> > entirely clear from the code or from your reply.
+>> >
+>> > Greg was guessing that it's a bus controller, my best guess is a DMA
+>> > engine. If it's something completely different, you have to let
+>> > us know what it is so we can do a proper review rather than guessing.
+>> >
+>> > Please provide a link to the data sheet if you are unable to explain.
+>>
+>> Here is URL to a text document explaining role of QMTM device with CPU, Ethernet
+>> subsystem.
+>>
+>> https://drive.google.com/file/d/0B28TgQZ3JLoRRGNnbjJoUGNHWW8/edit?usp=sharing
+>>
+>> For simplicity, I have shown only Ethernet.
+>> PktDMA and Security subsystem interfaces with QMTM in the same way as Ethernet.
+>
+> Thanks, that helps a lot. Please add this file to an appropriate place
+> in the Documentation directory in the next version of your patches.
+>
+> There is still one central aspect that remains unclear to me, which is
+> what the QMTM is actually good for, as opposed to how it gets used from
+> the OS.
 
-GENERIC_TIME is a dead symbol.
+The document shows the run-time flow of messages between CPU, QMTM and Ethernet.
+QMTM is a centralized resource manager/driver which exports APIs to
+1. Initialize & allocate queue & pbn to the Ethernet, PktDMA and
+Security subsystem.
+2. Read queue state so that subsystems driver knows how much more work
+it can offload
+    to its subsystem.
+3. Apply QoS for subsystems on their queues.
 
----
+> In the text description, it sounds like the ethernet is the DMA
+> master and performs DMA all by itself but from that it's not clear why
+> a message to and from the QMTM is needed. From your drawing on the other
+> hand, it seems like the QMTM is really the DMA master and performs the
+> DMA on behalf of the ethernet device, which isn't connected to the
+> coherent interface itself. If this is correct, it seems that QMTM is more
+> like a DMA engine after all that should use the existing slave API to
+> provide services to slave drivers.
+
+Each subsystem defines their own format of work message.
+A message (or queue descriptor) has attribute fields (QMTM specific)
+which is common
+ for all subsystem work messages.
+The remaining fields of a message are specific to subsystem.
+QMTM device doesn't have any knowledge of these subsystem specific
+fields and the data
+operation which subsystem is going to perform using these fields.
+e.g.
+1. Ethernet work message includes data address & length which is used
+by Ethernet
+DMA engine for copying the data to/from its internal FIFO
+2. PktDMA work message includes multiple data addresses & lengths for
+doing scatter/gather,
+XOR operations and result data address/es to give back result to the
+CPU (driver)
+3. Security work message includes data address & length for doing
+encryption or decryption,
+the type of encryption or decryption and result data address to give
+back result to the CPU (driver)
