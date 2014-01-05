@@ -1,33 +1,51 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Sun, 05 Jan 2014 13:42:54 +0100
-Subject: [PATCH v2 2/4] ARM: sunxi: Add ahci-sunxi driver for the Allwinner
- SUNXi SoCs sata
-In-Reply-To: <3250214.yUrU0CPosZ@wuerfel>
-References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
- <1388826878-5602-3-git-send-email-hdegoede@redhat.com>
- <4502242.kKUgLAVDcb@wuerfel> <3250214.yUrU0CPosZ@wuerfel>
-Message-ID: <52C9534E.4000701@schinagl.nl>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 5 Jan 2014 20:51:05 +0800
+Subject: [PATCH RFC] CRYPTO: Fix more AES build errors:
+In-Reply-To: <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
+References: <E1Vylu8-0005Q9-MO@rmk-PC.arm.linux.org.uk>
+ <CAKv+Gu9SrF_jkNc1ie+AX07YVGUdAYMGoKnJopFyirwh=acDVQ@mail.gmail.com>
+Message-ID: <20140105125105.GA26174@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/14 22:47, Arnd Bergmann wrote:
-> On Saturday 04 January 2014 22:39:50 Arnd Bergmann wrote:
->>> +Required properties:
->>> +- compatible : compatible list, contains "allwinner,sun4i-a10-ahci"
->>> +- reg                : <registers mapping>
->>> +- interrupts : <interrupt mapping for AHCI IRQ>
->>> +- clocks     : clocks for ACHI
->>> +- clock-names        : clock names for AHCI
->> The binding needs to specify the required names for the clocks.
-> fwiw, the imx driver uses "ahb" and "sata_ref" as the clock names.
-> I would strongly suggest using the same names here, and documenting
-> them in the ahci binding as optional.
-This is my fault, and you just reminded me I should have fixed that from 
-the previous comments. It just slipped my mind and I'm sorry for that!
+On Thu, Jan 02, 2014 at 07:16:46PM +0100, Ard Biesheuvel wrote:
+> On 2 January 2014 18:17, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> > Building a multi-arch kernel results in:
+> >
+> > arch/arm/crypto/built-in.o: In function `aesbs_xts_decrypt':
+> > sha1_glue.c:(.text+0x15c8): undefined reference to `bsaes_xts_decrypt'
+> > arch/arm/crypto/built-in.o: In function `aesbs_xts_encrypt':
+> > sha1_glue.c:(.text+0x1664): undefined reference to `bsaes_xts_encrypt'
+> > arch/arm/crypto/built-in.o: In function `aesbs_ctr_encrypt':
+> > sha1_glue.c:(.text+0x184c): undefined reference to `bsaes_ctr32_encrypt_blocks'
+> > arch/arm/crypto/built-in.o: In function `aesbs_cbc_decrypt':
+> > sha1_glue.c:(.text+0x19b4): undefined reference to `bsaes_cbc_encrypt'
+> >
+> 
+> Interestingly, when I try to reproduce this, the reference is
+> (correctly) reported to reside in aesbs-glue.c and not sha1_glue.c
+> 
+> > This code is already runtime-conditional on NEON being supported, so
+> > there's no point compiling it out depending on the minimum build
+> > architecture.
+> >
+> 
+> Agreed. It is a leftover from the way this code was embedded into
+> OpenSSL originally.
+> 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> > This is more a request for acks since I'd like to keep it/push it through
+> > my tree to reduce the autobuilder failures.
+> >
+> >  arch/arm/crypto/bsaes-armv7.pl |    2 +-
+> 
+> The .S_shipped file produced by this script should be updated at the same time.
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Hans, I'll go over the original commit thread and pick up all changes 
-and send them as a patch to you Monday.
-
-Oliver
->
-> 	Arnd
+Patch applied to the crypto tree.  Thanks a lot!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
