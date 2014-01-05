@@ -1,44 +1,48 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 6 Jan 2014 10:38:50 +1100
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-Message-ID: <20140106103850.3c60fa973ae9355c0a3c2449@canb.auug.org.au>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sun, 5 Jan 2014 16:40:09 -0700
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <52C9E6D0.3000406@gmail.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
+ <20140105172756.GA11280@obsidianresearch.com>
+ <52C99851.70806@gmail.com>
+ <20140105230746.GB11280@obsidianresearch.com>
+ <52C9E6D0.3000406@gmail.com>
+Message-ID: <20140105234009.GC11280@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Jan 06, 2014 at 12:12:16AM +0100, Sebastian Hesselbarth wrote:
+> On 01/06/2014 12:07 AM, Jason Gunthorpe wrote:
+> >On Sun, Jan 05, 2014 at 06:37:21PM +0100, Sebastian Hesselbarth wrote:
+> >
+> >>If you mean clock-gated with "powered down", the code is safe. It
+> >>enables the clock gate prior reading from the controller. Or is there
+> >>another way to power down the controller, so you cannot read from the
+> >>controller registers?
+> >
+> >There is a clock gate and a power down on kirkwood at least, Linux has
+> >no code for controlling the powerdown
+> 
+> Does that power down really disable reading from PCIe controller
+> registers or is it just PHY power down?
 
-Today's linux-next merge of the imx-mxs tree got a conflict in
-arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi between commit
-8f568b496dd9 ("ARM: imx: Explicitly pass the active level of the PHY
-reset") from the arm-soc tree and commit 208d5b9c2c71 ("ARM: dts: i.MX27
-boards: Switch to use standard GPIO and IRQ flags definitions") from the
-imx-mxs tree.
+I haven't experimented with it, but every block that has a clock gate
+has a power down, so I doubt it is just a phy power down.
 
-I fixed it up (I randomly chose to go with the latter - please get
-together and decide which is right) and can carry the fix as necessary
-(no action is required).
+> >In any event, I think processing a disabled DT node is not great..
+> 
+> Yeah, but you see another way to get the PCIe controller registers
+> instead? Or any other common id register to read? IMHO PCIe ids are
+> the best we can find here and Gregory found the first IP that really
+> depends on the SoC revision..
 
-At the time of those commits, the file was called
-arch/arm/boot/dts/imx27-phytec-phycore-som.dts (it is renamed by commit
-c7914d9b5565 ("ARM: dts: imx27-phytec-phycore-som: Rename file to .dtsi"
-from the imx-mxs tree) and we we ended up with (cut and paste damaged):
+I don't know of another option off hand, unless something is encoded
+in the CPU ID register set.
 
-&fec {
-	phy-mode = "mii";
-	phy-reset-gpios = <&gpio3 30 GPIO_ACTIVE_HIGH>;
-	phy-supply = <&reg_3v3>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_fec1>;
-	status = "okay";
-};
+Encoding the IP block version in the I2C DT compatible string is the
+next best choice, but it obviously isn't automatic..
 
--- 
-Cheers,
-Stephen Rothwell <sfr@canb.auug.org.au>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/39e455ff/attachment.sig>
+Jason
