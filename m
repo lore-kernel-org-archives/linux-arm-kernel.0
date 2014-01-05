@@ -1,40 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 5 Jan 2014 15:33:58 +0100
-Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201401051533.58931.arnd@arndb.de>
+Date: Sun, 5 Jan 2014 15:44:49 +0100
+Subject: [PATCH] the eDMA support for the LPUART send driver
+In-Reply-To: <1388143449-28640-1-git-send-email-yao.yuan@freescale.com>
+References: <1388143449-28640-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <201401051544.50036.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 January 2014, Gregory CLEMENT wrote:
-> The first variants of Armada XP SoCs (A0 stepping) have issues related
-> to the i2c controller which prevent to use the offload mechanism and
-> lead to a kernel hang during boot.
+On Friday 27 December 2013, Yuan Yao wrote:
+> This patch add eDMA support for LPUART send function.
 > 
-> The driver now check the revision of the SoC. If the revision is not
-> more recent than the A0 or if the driver can't get the SoC revision
-> then it disables the offload mechanism.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610.dtsi    |  12 +++
+>  drivers/tty/serial/fsl_lpuart.c | 187 ++++++++++++++++++++++++++++++++--------
+>  2 files changed, 163 insertions(+), 36 deletions(-)
 
-Relying on the soc id patch for a "stable" bug fix seems a little
-far-reaching to me. I would be happier to first try to do a local
-detection based on the i2c bus device node itself. Do you know how
-common the A0 revision is? You mention "early release of the
-OpenBlocks AX3-4 boards". Any others that you suspect? If not,
-how about adding either a boolean property in the node or a
-new "compatible" value to distinguish the working version from
-the broken one?
+Not sure if this got applied already, but you are missing the respective
+change to Documentation/devicetree/bindings/serial/fsl-lpuart.txt.
 
-If A0 is very common, you might do the same thing in the opposite
-way and default to "broken" unless it is explicitly known to be
-the good version. In general, I'm much in favor of keeping "quirks"
-local to device drivers if possible and not rely on global system
-state.
+Please document the dma-names you use here. While you are at it, please
+also add the "ipg" clock-name.
+
+	Arnd
+
+> +static int fsl_request_dma(struct uart_port *port)
+> +{
+> +	struct lpuart_port *sport = container_of(port,
+> +					struct lpuart_port, port);
+> +	struct dma_chan *tx_chan;
+> +	struct dma_slave_config dma_tx_sconfig;
+> +	dma_addr_t dma_phys;
+> +	unsigned char *dma_buf;
+> +	int ret;
+> +
+> +	tx_chan  = dma_request_slave_channel(sport->port.dev, "lpuart-tx");
+> +
+> +	if (!tx_chan) {
+> +		dev_err(sport->port.dev, "Dma TX channel request failed!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	dma_phys = dma_map_single(sport->port.dev,
+> +				sport->port.state->xmit.buf,
+> +				UART_XMIT_SIZE, DMA_TO_DEVICE);
+
+This is wrong: Since the dma is performed by the dma engine rather
+than the uart, the first argument here needs to be the dma device
+pointer. In fact, dma_map_single is normally supposed to fail on
+the uart device as the dma_mask value should be zero. Not sure
+why this worked.
+
+> +	if (!dma_phys) {
+> +		dev_err(sport->port.dev, "Dma_phys single failed\n");
+> +		return -ENOMEM;
+> +	}
+
+Please also change all references to "phys" -- it's not a phys
+address but a bus address. These are often the same, but that's
+not for the driver to know.
 
 	Arnd
