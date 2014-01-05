@@ -1,58 +1,40 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 6 Jan 2014 10:20:31 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20140106102031.8ecedbad59dddbc8aa0946ce@canb.auug.org.au>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 6 Jan 2014 07:29:27 +0800
+Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
+In-Reply-To: <201401051633.21894.marex@denx.de>
+References: <1386703583-8386-1-git-send-email-marex@denx.de>
+ <20140105130529.GA26358@gondor.apana.org.au>
+ <201401051633.21894.marex@denx.de>
+Message-ID: <20140105232926.GA29518@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Sun, Jan 05, 2014 at 04:33:21PM +0100, Marek Vasut wrote:
+> On Sunday, January 05, 2014 at 02:05:29 PM, Herbert Xu wrote:
+> > On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
+> > > When finishing the ahash request, the ahash_op_unaligned_done() will
+> > > call complete() on the request. Yet, this will not call the correct
+> > > complete callback. The correct complete callback was previously stored
+> > > in the requests' private data, as seen in ahash_op_unaligned(). This
+> > > patch restores the correct complete callback and .data field of the
+> > > request before calling complete() on it.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> > > Cc: David S. Miller <davem@davemloft.net>
+> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: linux-crypto at vger.kernel.org
+> > 
+> > All patches applied.  Thanks!
+> 
+> Uh, I think this was not intended to happen! We still discuss this patch will 
+> need rework, do we not?
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/Kconfig.debug between commit 753d12434da3 ("ARM: 7932/1: bcm:
-Add DEBUG_LL console support") from the arm tree and commit caad0b41de69
-("ARM: add Marvell Berlin UART0 lowlevel debug") from the arm-soc tree.
+Please send your new fixes as incremental patches on top of this.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
+Thanks,
 -- 
-Cheers,
-Stephen Rothwell <sfr@canb.auug.org.au>
-
-diff --cc arch/arm/Kconfig.debug
-index 9afabbb5e798,bda94e46e8d6..000000000000
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@@ -106,17 -94,14 +106,25 @@@ choic
-  		depends on ARCH_BCM2835
-  		select DEBUG_UART_PL01X
-  
- +	config DEBUG_BCM_KONA_UART
- +		bool "Kernel low-level debugging messages via BCM KONA UART"
- +		depends on ARCH_BCM
- +		select DEBUG_UART_8250
- +		help
- +		  Say Y here if you want kernel low-level debugging support
- +		  on Broadcom SoC platforms.
- +		  This low level debug works for Broadcom
- +		  mobile SoCs in the Kona family of chips (e.g. bcm28155,
- +		  bcm11351, etc...)
- +
-+ 	config DEBUG_BERLIN_UART
-+ 		bool "Marvell Berlin SoC Debug UART"
-+ 		depends on ARCH_BERLIN
-+ 		select DEBUG_UART_8250
-+ 		help
-+ 		  Say Y here if you want kernel low-level debugging support
-+ 		  on Marvell Berlin SoC based platforms.
-+ 
-  	config DEBUG_CLPS711X_UART1
-  		bool "Kernel low-level debugging messages via UART1"
-  		depends on ARCH_CLPS711X
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/f5ad351e/attachment.sig>
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
