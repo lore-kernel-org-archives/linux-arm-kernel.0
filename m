@@ -1,34 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  5 Jan 2014 19:13:43 +0100
-Subject: [PATCH 1/5] ARM: sun4i: a10: Add missing serial aliases
-Message-ID: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 5 Jan 2014 19:52:07 +0100
+Subject: [PATCHv9] dmaengine: Add support for BCM2835
+In-Reply-To: <CABDT8WyUVbPu60qwMbAxKS=2m2akskybZQS3-+rehuUD+3oBXQ@mail.gmail.com>
+References: <52C5A6A3.8000405@koalo.de> <201401051506.03481.arnd@arndb.de>
+ <CABDT8WyUVbPu60qwMbAxKS=2m2akskybZQS3-+rehuUD+3oBXQ@mail.gmail.com>
+Message-ID: <201401051952.07355.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some UART aliases have been defined, but not all of them. Add the remaining
-ones to be consistent and to ease the parsing of the DT by the bootloaders.
+On Sunday 05 January 2014, Florian Meier wrote:
+> On 05.01.2014 15:06, Arnd Bergmann wrote:
+> >>
+> >> Sigh, the API is developing faster than I can keep track with updating
+> >> this patch. I hope some day I will be faster....
+> >> When Russell told me about the second one before, it hoped that I can
+> >> avoid merging different trees on my own, but it seems that you want me
+> >> to do that ;-)
+> >
+> > The dma_get_any_slave_channel() change is probably my fault. I suggested
+> > both the initial dma_get_slave_channel() API and this one because the
+> > original approach turned out too complicated. If dma_set_mask_and_coherent().
+> >
+> > I don't think you have to merge other trees, to get both APIs, they should
+> > already be part of the dma-slave tree that your patch would get merged
+> > into. If not, we can probably come up with a different solution. The
+> > dma_set_mask_and_coherent() suggestion is not as important as the
+> > dma_get_any_slave_channel() one, if you have to choose between them.
+> 
+> Both changes are in the slave-dma tree, but I need patches from the
+> bcm2835 tree and the asoc tree, too. Although, it shouldn't be too
+> complicated to merge them, I hope.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Why do you need the bcm2835 and asoc changes? The addition of the
+dmaengine driver should be self-contained as far as I can tell,
+except that the audio driver won't work unless both are merged.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 040bb0e..28273f9 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -19,6 +19,12 @@
- 		ethernet0 = &emac;
- 		serial0 = &uart0;
- 		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+		serial4 = &uart4;
-+		serial5 = &uart5;
-+		serial6 = &uart6;
-+		serial7 = &uart7;
- 	};
- 
- 	cpus {
--- 
-1.8.4.2
+This wouldn't be considered a strict dependency since you are not
+breaking anything that used to work prior to the patches, and you
+don't create a kernel version that doesn't build. Note that this
+would be different if you had a dependency on a platform_data
+definition.
+
+	Arnd
