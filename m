@@ -1,9 +1,7 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  5 Jan 2014 19:13:47 +0100
-Subject: [PATCH 5/5] ARM: sun7i: Add missing serial aliases
-In-Reply-To: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1388945627-3432-5-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  5 Jan 2014 19:13:43 +0100
+Subject: [PATCH 1/5] ARM: sun4i: a10: Add missing serial aliases
+Message-ID: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,19 +10,17 @@ ones to be consistent and to ease the parsing of the DT by the bootloaders.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 119f066..b476855 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -18,6 +18,14 @@
- 
- 	aliases {
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 040bb0e..28273f9 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -19,6 +19,12 @@
  		ethernet0 = &emac;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
 +		serial2 = &uart2;
 +		serial3 = &uart3;
 +		serial4 = &uart4;
