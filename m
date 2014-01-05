@@ -1,77 +1,174 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun,  5 Jan 2014 18:58:13 +0100
-Subject: [PATCH v4 0/4] ARM: BCM5301X: initial support for the
+Date: Sun,  5 Jan 2014 18:58:14 +0100
+Subject: [PATCH v4 1/4] ARM: BCM5301X: initial support for the
  BCM5301X/BCM470X SoCs with ARM CPU
-Message-ID: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
+In-Reply-To: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
+References: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am working on mainlining this SoC again which I started in Summer 
-2013.
+This patch adds support for the BCM5301X/BCM470X SoCs with an ARM CPUs.
+Currently just booting to a shell is working and nothing else, no
+Ethernet, wifi, flash, ...
+I have some pending patches to make Ethernet work for this device.
+Mostly device tree support for bcma is missing.
 
-This adds initial support for Broadcom network SoC from the BCM5301X 
-and BCM470X line.
+This SoC is used in small office and home router with Broadcom SoCs.
+This code should support the BCM4707, BCM4708, BCM4709, BCM53010,
+BCM53011 and BCM53012 SoC. It uses one or two ARM Cortex A9
+Cores, some highlights are 2 PCIe 2.0 controllers, 4 Gigabit Ethernet
+MACs and a USB 3.0 host controller.
 
-The vendor BSP also uses BCM5301X for this SoC, so I just toke that.
+This SoC uses a dual core CPU, but this is currently not implemented.
+More information about this SoC can be found here:
+http://www.anandtech.com/show/5925/broadcom-announces-bcm4708x-and-bcm5301x-socs-for-80211ac-routers
 
-I haven't found a better solution than the abort handler for the memory fault.
-
-I do not have any documentation, only the vendor source code published 
-by Asus and Netgear to conform with the GPL, it would be nice to get 
-some documentation for this Soc like this
-https://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
-for the Broadcom BCM440X Ethernet controller.
-
-With some additional patches I got Ethernet working with ~250 MBit/s.
-
-A bootlog can be found here:
-http://hauke-m.de/files/openwrt/devices/R6250/openwrt-boot-2014-01-05.txt
-
-Changes since v3:
- * rebase on Linus 3.13-rc7
- * split the workaround into an own patch
- * add L2 cache controller to Device tree
- * rename config option
- * add local-timer and SCU entry to device tree
-
-Changes since v2:
- * use vendor prefix brcm
- * move code to arch/arm/mach-bcm/
- * cleanup arch/arm/mach-bcm/bcm5301x.c
- * rename to bcm5301x
- * split into more patches
-
-Changes since v1:
- * add file Documentation/devicetree/bindings/arm/bcm4708.txt
- * rename bcm5301x to bcm4708 in dts files
- * use preprocessor includes in dts file
- * add CONFIG_ARCH_BCM53XX to multi_v7_defconfig
- * remove init_machine callback
- * rename vendor prefix from brcm to bcm
- * split into two patches 
-
-Hauke Mehrtens (4):
-  ARM: BCM5301X: initial support for the BCM5301X/BCM470X SoCs with ARM
-    CPU
-  ARM: BCM5301X: add early debugging support
-  ARM: BCM5301X: add dts files for BCM4708 SoC
-  ARM: BCM5301X: workaround suppress fault
-
- Documentation/devicetree/bindings/arm/bcm4708.txt |    8 ++
- MAINTAINERS                                       |    7 ++
- arch/arm/Kconfig.debug                            |    7 ++
- arch/arm/boot/dts/Makefile                        |    1 +
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts       |   20 ++++
- arch/arm/boot/dts/bcm4708.dtsi                    |  102 +++++++++++++++++++++
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ Documentation/devicetree/bindings/arm/bcm4708.txt |    8 +++++
+ MAINTAINERS                                       |    7 ++++
  arch/arm/configs/multi_v7_defconfig               |    1 +
- arch/arm/mach-bcm/Kconfig                         |   27 ++++++
+ arch/arm/mach-bcm/Kconfig                         |   27 +++++++++++++++
  arch/arm/mach-bcm/Makefile                        |    1 +
- arch/arm/mach-bcm/bcm_5301x.c                     |   60 ++++++++++++
- 10 files changed, 234 insertions(+)
+ arch/arm/mach-bcm/bcm_5301x.c                     |   37 +++++++++++++++++++++
+ 6 files changed, 81 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/bcm4708.txt
- create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
- create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
  create mode 100644 arch/arm/mach-bcm/bcm_5301x.c
 
+diff --git a/Documentation/devicetree/bindings/arm/bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm4708.txt
+new file mode 100644
+index 0000000..6527fad
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm4708.txt
+@@ -0,0 +1,8 @@
++Broadcom BCM4708 device tree bindings
++-------------------------------------------
++
++Boards with the BCM4708 SoC shall have the following properties:
++
++Required root node property:
++
++compatible = "broadcom,bcm4708";
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6c20792..2d98736 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1862,6 +1862,13 @@ F:	arch/arm/boot/dts/bcm2835*
+ F:	arch/arm/configs/bcm2835_defconfig
+ F:	drivers/*/*bcm2835*
+ 
++BROADCOM BCM5301X ARM ARCHICTURE
++M:	Hauke Mehrtens <hauke@hauke-m.de>
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	arch/arm/mach-bcm/bcm_5301x.c
++F:	arch/arm/boot/dts/bcm470*
++
+ BROADCOM TG3 GIGABIT ETHERNET DRIVER
+ M:	Nithin Nayak Sujir <nsujir@broadcom.com>
+ M:	Michael Chan <mchan@broadcom.com>
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index c1df4e9..e7909ce 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -6,6 +6,7 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_BCM=y
++CONFIG_ARCH_BCM_5301X=y
+ CONFIG_ARCH_BCM_MOBILE=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_ARCH_HIGHBANK=y
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 9fe6d88..e47f9de 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -31,6 +31,33 @@ config ARCH_BCM_MOBILE
+ 	  BCM11130, BCM11140, BCM11351, BCM28145 and
+ 	  BCM28155 variants.
+ 
++config ARCH_BCM_5301X
++	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
++	depends on MMU
++	select ARM_GIC
++	select CACHE_L2X0
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	select HAVE_SMP
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select GENERIC_TIME
++	select ARM_GLOBAL_TIMER
++	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
++	select MIGHT_HAVE_PCI
++	help
++	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
++
++	  This is a network SoC line mostly used in home routers and
++	  wifi access points.
++	  This inclused the following SoC: BCM53010, BCM53011, BCM53012,
++	  BCM53014, BCM53015, BCM53016, BCM53017, BCM53018, BCM4707,
++	  BCM4708 and BCM4709.
++
++	  Do not confuse this with the BCM4760 which is a totally
++	  different SoC or with the older BCM47XX and BCM53XX based
++	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
++
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index c2ccd5a..0164913 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -13,3 +13,4 @@
+ obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
++obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
+new file mode 100644
+index 0000000..4b83b52
+--- /dev/null
++++ b/arch/arm/mach-bcm/bcm_5301x.c
+@@ -0,0 +1,37 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ *
++ * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/clocksource.h>
++#include <linux/clk-provider.h>
++#include <asm/hardware/cache-l2x0.h>
++
++#include <asm/mach/arch.h>
++
++static void __init bcm5301x_timer_init(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++}
++
++static void __init bcm5301x_dt_init(void)
++{
++	l2x0_of_init(0, ~0UL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char __initconst *bcm5301x_dt_compat[] = {
++	"brcm,bcm4708",
++	NULL,
++};
++
++DT_MACHINE_START(BCM5301X, "BCM5301X")
++	.init_time	= bcm5301x_timer_init,
++	.init_machine	= bcm5301x_dt_init,
++	.dt_compat	= bcm5301x_dt_compat,
++MACHINE_END
 -- 
 1.7.10.4
