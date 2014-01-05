@@ -1,26 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 5 Jan 2014 20:17:10 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140105154023.GA2048@lunn.ch>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
-Message-ID: <201401052017.10982.arnd@arndb.de>
+Date: Sun, 5 Jan 2014 20:30:07 +0100
+Subject: [PATCH v4 1/4] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+In-Reply-To: <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
+References: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
+ <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
+Message-ID: <201401052030.07765.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 05 January 2014, Andrew Lunn wrote:
-> That would be rather odd. These nodes are in the top level SoC dtsi
-> file. When they are not used, they have status = "disabled" and are in
-> the dtb blob with this state.
-> 
-> The only reason i can think of them not being present at all is if
-> somebody adds an optimizer to dtc which removed disabled nodes. What
-> does the device tree spec say about that? Are we relying on undefined
-> dtc behavior?
+On Sunday 05 January 2014, Hauke Mehrtens wrote:
+> +static void __init bcm5301x_timer_init(void)
+> +{
+> +       of_clk_init(NULL);
+> +       clocksource_of_init();
+> +}
+> +
+> +static void __init bcm5301x_dt_init(void)
+> +{
+> +       l2x0_of_init(0, ~0UL);
+> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
 
-There is no requirement to use the include files. If someone decides
-to ship a default dtb file in their boot loader, it wouldn't be
-a bug to leave the nodes out entirely.
+I'm pretty sure the first of these two functions is no longer needed,
+and there were at least plans to make the second one optional as well.
 
-	Arn
+Can you remove bcm5301x_timer_init() now?
+
+	Arnd
