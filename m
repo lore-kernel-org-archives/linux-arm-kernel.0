@@ -1,36 +1,58 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 06 Jan 2014 00:12:16 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140105230746.GB11280@obsidianresearch.com>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
- <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
- <20140105172756.GA11280@obsidianresearch.com> <52C99851.70806@gmail.com>
- <20140105230746.GB11280@obsidianresearch.com>
-Message-ID: <52C9E6D0.3000406@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 6 Jan 2014 10:20:31 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20140106102031.8ecedbad59dddbc8aa0946ce@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2014 12:07 AM, Jason Gunthorpe wrote:
-> On Sun, Jan 05, 2014 at 06:37:21PM +0100, Sebastian Hesselbarth wrote:
->
->> If you mean clock-gated with "powered down", the code is safe. It
->> enables the clock gate prior reading from the controller. Or is there
->> another way to power down the controller, so you cannot read from the
->> controller registers?
->
-> There is a clock gate and a power down on kirkwood at least, Linux has
-> no code for controlling the powerdown
+Hi all,
 
-Does that power down really disable reading from PCIe controller
-registers or is it just PHY power down?
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/Kconfig.debug between commit 753d12434da3 ("ARM: 7932/1: bcm:
+Add DEBUG_LL console support") from the arm tree and commit caad0b41de69
+("ARM: add Marvell Berlin UART0 lowlevel debug") from the arm-soc tree.
 
-> In any event, I think processing a disabled DT node is not great..
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Yeah, but you see another way to get the PCIe controller registers
-instead? Or any other common id register to read? IMHO PCIe ids are
-the best we can find here and Gregory found the first IP that really
-depends on the SoC revision..
+-- 
+Cheers,
+Stephen Rothwell <sfr@canb.auug.org.au>
 
-Sebastian
+diff --cc arch/arm/Kconfig.debug
+index 9afabbb5e798,bda94e46e8d6..000000000000
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@@ -106,17 -94,14 +106,25 @@@ choic
+  		depends on ARCH_BCM2835
+  		select DEBUG_UART_PL01X
+  
+ +	config DEBUG_BCM_KONA_UART
+ +		bool "Kernel low-level debugging messages via BCM KONA UART"
+ +		depends on ARCH_BCM
+ +		select DEBUG_UART_8250
+ +		help
+ +		  Say Y here if you want kernel low-level debugging support
+ +		  on Broadcom SoC platforms.
+ +		  This low level debug works for Broadcom
+ +		  mobile SoCs in the Kona family of chips (e.g. bcm28155,
+ +		  bcm11351, etc...)
+ +
++ 	config DEBUG_BERLIN_UART
++ 		bool "Marvell Berlin SoC Debug UART"
++ 		depends on ARCH_BERLIN
++ 		select DEBUG_UART_8250
++ 		help
++ 		  Say Y here if you want kernel low-level debugging support
++ 		  on Marvell Berlin SoC based platforms.
++ 
+  	config DEBUG_CLPS711X_UART1
+  		bool "Kernel low-level debugging messages via UART1"
+  		depends on ARCH_CLPS711X
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/f5ad351e/attachment.sig>
