@@ -1,50 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 5 Jan 2014 09:29:37 -0800
-Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
- reset
-In-Reply-To: <20140104054702.GA6243@quad.lixom.net>
-References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
- <20140103120712.GE25079@S2101-09.ap.freescale.net>
- <20140104054702.GA6243@quad.lixom.net>
-Message-ID: <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 05 Jan 2014 18:37:21 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <20140105172756.GA11280@obsidianresearch.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
+ <20140105172756.GA11280@obsidianresearch.com>
+Message-ID: <52C99851.70806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 3, 2014 at 9:47 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Jan 03, 2014 at 08:07:14PM +0800, Shawn Guo wrote:
->> On Fri, Jan 03, 2014 at 09:55:56AM -0200, Fabio Estevam wrote:
->> > From: Fabio Estevam <fabio.estevam@freescale.com>
->> >
->> > Since commit 7a399e3a2e (fec: Do not assume that PHY reset is active low), we no
->> > longer assume that the PHY reset is active low.
->> >
->> > Now we need to retrieve this information from the device tree instead.
->> >
->> > Passing '0' as the phy-reset-gpios means 'active high' according to the
->> > definition from include/dt-bindings/gpio/gpio.h:
->> >
->> > #define GPIO_ACTIVE_HIGH 0
->> > #define GPIO_ACTIVE_LOW 1
->> >
->> > , so in order to keep things working as before we need to explicitly pass
->> > GPIO_ACTIVE_LOW as the flag.
->> >
->> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 01/05/2014 06:27 PM, Jason Gunthorpe wrote:
+> On Sun, Jan 05, 2014 at 04:40:23PM +0100, Andrew Lunn wrote:
+>>>> +static int __init mvebu_soc_id_init(void)
+>>>> +{
+>>>> +	struct device_node *np;
+>>>> +	int ret = 0;
+>>>> +
+>>>> +	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
+>>>> +	if (np) {
+>>>> +		void __iomem *pci_base;
+>>>> +		struct clk *clk;
+>>>> +		/*
+>>>> +		 * ID and revision are available from any port, so we
+>>>> +		 * just pick the first one
+>>>> +		 */
+>>>> +		struct device_node *child = of_get_next_child(np, NULL);
+>>>
+>>> I guess all this will fail if for some reason the PCIe node is not
+>>> present on machines that don't use PCIe.
 >>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->>
+>> That would be rather odd. These nodes are in the top level SoC dtsi
+>> file. When they are not used, they have status = "disabled" and are in
+>> the dtb blob with this state.
 >
-> Applied to fixes. Thanks.
+> Hang on, you can't safely read from a disabled PCI node, it could have been
+> powered down by the bootloader..
 
-Actually, Russell brought this to my attention (I should have looked
-closer earlier). You guys have made an incompatible binding change
-here. In -rc6? That's not cool, we're not doing those any more.
+If you mean clock-gated with "powered down", the code is safe. It
+enables the clock gate prior reading from the controller. Or is there
+another way to power down the controller, so you cannot read from the
+controller registers?
 
-What should happen is that the driver change should be reverted
-instead. You can't rely on every device tree out there changing to
-accommodate these kind of things any more.
+Sebastian
 
-I'll drop the fix from the DT side.
-
-
--Olof
+Sebastian
