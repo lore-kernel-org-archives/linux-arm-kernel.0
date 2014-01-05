@@ -1,29 +1,37 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 5 Jan 2014 21:05:29 +0800
-Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
-In-Reply-To: <1386703583-8386-1-git-send-email-marex@denx.de>
-References: <1386703583-8386-1-git-send-email-marex@denx.de>
-Message-ID: <20140105130529.GA26358@gondor.apana.org.au>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 05 Jan 2014 14:06:04 +0100
+Subject: [PATCH v2 2/4] ARM: sunxi: Add ahci-sunxi driver for the Allwinner
+ SUNXi SoCs sata
+In-Reply-To: <52C9534E.4000701@schinagl.nl>
+References: <1388826878-5602-1-git-send-email-hdegoede@redhat.com>
+ <1388826878-5602-3-git-send-email-hdegoede@redhat.com>
+ <4502242.kKUgLAVDcb@wuerfel> <3250214.yUrU0CPosZ@wuerfel>
+ <52C9534E.4000701@schinagl.nl>
+Message-ID: <52C958BC.3050100@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
-> When finishing the ahash request, the ahash_op_unaligned_done() will
-> call complete() on the request. Yet, this will not call the correct
-> complete callback. The correct complete callback was previously stored
-> in the requests' private data, as seen in ahash_op_unaligned(). This
-> patch restores the correct complete callback and .data field of the
-> request before calling complete() on it.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: linux-crypto at vger.kernel.org
+Hi,
 
-All patches applied.  Thanks!
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On 01/05/2014 01:42 PM, Olliver Schinagl wrote:
+> On 01/04/14 22:47, Arnd Bergmann wrote:
+>> On Saturday 04 January 2014 22:39:50 Arnd Bergmann wrote:
+>>>> +Required properties:
+>>>> +- compatible : compatible list, contains "allwinner,sun4i-a10-ahci"
+>>>> +- reg                : <registers mapping>
+>>>> +- interrupts : <interrupt mapping for AHCI IRQ>
+>>>> +- clocks     : clocks for ACHI
+>>>> +- clock-names        : clock names for AHCI
+>>> The binding needs to specify the required names for the clocks.
+>> fwiw, the imx driver uses "ahb" and "sata_ref" as the clock names.
+>> I would strongly suggest using the same names here, and documenting
+>> them in the ahci binding as optional.
+> This is my fault, and you just reminded me I should have fixed that from the previous comments. It just slipped my mind and I'm sorry for that!
+>
+> Hans, I'll go over the original commit thread and pick up all changes and send them as a patch to you Monday.
+
+Thanks, sounds good. Then I won't touch the code till I get your patch (way too busy with usb now anyways).
+
+Regards,
+
+Hans
