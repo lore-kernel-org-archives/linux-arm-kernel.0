@@ -1,42 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 5 Jan 2014 21:25:39 +0100
-Subject: [PATCH v4 4/4] ARM: BCM5301X: workaround suppress fault
-In-Reply-To: <1388944697-19927-5-git-send-email-hauke@hauke-m.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 06 Jan 2014 00:37:50 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NCAxLzRdIEFSTTogQkNNNTMwMVg6IGluaXRpYWwgc3Vw?=
+ =?UTF-8?B?cG9ydCBmb3IgdGhlIEJDTTUzMDFYL0JDTTQ3MFggU29DcyB3aXRoIEFSTSBD?=
+ =?UTF-8?B?UFU=?=
+In-Reply-To: <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
 References: <1388944697-19927-1-git-send-email-hauke@hauke-m.de>
- <1388944697-19927-5-git-send-email-hauke@hauke-m.de>
-Message-ID: <201401052125.40130.arnd@arndb.de>
+ <1388944697-19927-2-git-send-email-hauke@hauke-m.de>
+Message-ID: <1388954270.224601777@f339.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 05 January 2014, Hauke Mehrtens wrote:
-> Without this patch I am getting a unhandled fault exception like this
-> one after "Freeing unused kernel memory":
-> 
-> Freeing unused kernel memory: 1260K (c02c1000 - c03fc000)
-> Unhandled fault: imprecise external abort (0x1c06) at 0xb6f89005
-> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
-> 
-> The address which is here 0xb6f89005 changes from boot to boot, with a
-> new build the changes are bigger. With kernel 3.10 I have also seen
-> this fault at different places in the boot process, but starting with
-> 3.11 they are always occurring after the "Freeing unused kernel memory"
-> message. I never was able to completely boot to userspace without this
-> handler. The abort code is constant 0x1c06. This fault just happens
-> once in the boot process I have never seen it happing twice or more.
+> This patch adds support for the BCM5301X/BCM470X SoCs with an ARM CPUs.
+> Currently just booting to a shell is working and nothing else, no
+> Ethernet, wifi, flash, ...
+> I have some pending patches to make Ethernet work for this device.
+> Mostly device tree support for bcma is missing.
+...
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 9fe6d88..e47f9de 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -31,6 +31,33 @@ config ARCH_BCM_MOBILE
+>  	  BCM11130, BCM11140, BCM11351, BCM28145 and
+>  	  BCM28155 variants.
+>  
+> +config ARCH_BCM_5301X
+> +	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+> +	depends on MMU
+> +	select ARM_GIC
+> +	select CACHE_L2X0
+> +	select HAVE_ARM_SCU if SMP
+> +	select HAVE_ARM_TWD if SMP
+> +	select HAVE_SMP
+> +	select COMMON_CLK
+> +	select GENERIC_CLOCKEVENTS
+> +	select GENERIC_TIME
 
-How about narrowing down the abort handler to only ignore a single
-fault after boot, and only with the abort code 0x1c06? That way you
-don't risk silent data corruption in case something else goes wrong
-after booting.
+GENERIC_TIME is a dead symbol.
 
-> This workaround was copied from the vendor code including most of the
-> comments. It says it they think this is caused by the CFE boot loader
-> used on this device. I do not have any access to any datasheet or
-> errata document to check this.
-
-Does the SoC by chance have a PCI host controller? The only other
-platforms with this kind of handler have it to catch things going wrong
-with PCI. Maybe another thing to try is to turn off the PCI core
-at early boot.
-
-	Arnd
+---
