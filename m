@@ -1,28 +1,83 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 6 Jan 2014 10:42:27 +1100
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-Message-ID: <20140106104227.6cbe4b16e2fe4120a7e1c51a@canb.auug.org.au>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Mon,  6 Jan 2014 00:46:37 +0100
+Subject: [PATCH v5 0/4] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+Message-ID: <1388965601-18329-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+I am working on mainlining this SoC again which I started in Summer 
+2013.
 
-Today's linux-next merge of the imx-mxs tree got a conflict in
-arch/arm/boot/dts/imx51-apf51.dts between commit 8f568b496dd9 ("ARM: imx:
-Explicitly pass the active level of the PHY reset") from the arm-soc tree
-and commit 756c8d5762c2 ("ARM: dts: i.MX51 boards: Switch to use standard
-GPIO flags definitions") from the imx-mxs tree.
+This adds initial support for Broadcom network SoC from the BCM5301X 
+and BCM470X line.
 
-I fixed it up (again, I arbitrarily chose to go with the latter) and can
-carry the fix as necessary (no action is required).
+The vendor BSP also uses BCM5301X for this SoC, so I just toke that.
+
+I haven't found a better solution than the abort handler for the memory fault.
+
+I do not have any documentation, only the vendor source code published 
+by Asus and Netgear to conform with the GPL, it would be nice to get 
+some documentation for this Soc like this
+https://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
+for the Broadcom BCM440X Ethernet controller.
+
+With some additional patches I got Ethernet working with ~250 MBit/s.
+
+A bootlog can be found here:
+http://hauke-m.de/files/openwrt/devices/R6250/openwrt-boot-2014-01-05.txt
+
+
+Changes since v4:
+ * removed bcm5301x_timer_init(), this function is not needed
+ * removed GENERIC_TIME this is dead
+ * made fault handler check for code and just catch the first fault.
+
+Changes since v3:
+ * rebase on Linus 3.13-rc7
+ * split the workaround into an own patch
+ * add L2 cache controller to Device tree
+ * rename config option
+ * add local-timer and SCU entry to device tree
+
+Changes since v2:
+ * use vendor prefix brcm
+ * move code to arch/arm/mach-bcm/
+ * cleanup arch/arm/mach-bcm/bcm5301x.c
+ * rename to bcm5301x
+ * split into more patches
+
+Changes since v1:
+ * add file Documentation/devicetree/bindings/arm/bcm4708.txt
+ * rename bcm5301x to bcm4708 in dts files
+ * use preprocessor includes in dts file
+ * add CONFIG_ARCH_BCM53XX to multi_v7_defconfig
+ * remove init_machine callback
+ * rename vendor prefix from brcm to bcm
+ * split into two patches 
+
+Hauke Mehrtens (4):
+  ARM: BCM5301X: initial support for the BCM5301X/BCM470X SoCs with ARM
+    CPU
+  ARM: BCM5301X: add early debugging support
+  ARM: BCM5301X: add dts files for BCM4708 SoC
+  ARM: BCM5301X: workaround suppress fault
+
+ Documentation/devicetree/bindings/arm/bcm4708.txt |    8 ++
+ MAINTAINERS                                       |    7 ++
+ arch/arm/Kconfig.debug                            |    7 ++
+ arch/arm/boot/dts/Makefile                        |    1 +
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts       |   20 ++++
+ arch/arm/boot/dts/bcm4708.dtsi                    |  102 +++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig               |    1 +
+ arch/arm/mach-bcm/Kconfig                         |   26 ++++++
+ arch/arm/mach-bcm/Makefile                        |    1 +
+ arch/arm/mach-bcm/bcm_5301x.c                     |   61 ++++++++++++
+ 10 files changed, 234 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm4708.txt
+ create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+ create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
+ create mode 100644 arch/arm/mach-bcm/bcm_5301x.c
 
 -- 
-Cheers,
-Stephen Rothwell <sfr@canb.auug.org.au>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/5c865575/attachment-0001.sig>
+1.7.10.4
