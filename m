@@ -1,114 +1,33 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Sun, 5 Jan 2014 16:06:39 +0100
-Subject: [PATCHv9] dmaengine: Add support for BCM2835
-In-Reply-To: <201401051506.03481.arnd@arndb.de>
-References: <52C5A6A3.8000405@koalo.de> <1964639.FVztRK0HBK@wuerfel>
- <CABDT8WzhpH2yX=HD9wsx+bN17Qp0hLX45-VMF0a3RAiwWx7F4Q@mail.gmail.com>
- <201401051506.03481.arnd@arndb.de>
-Message-ID: <CABDT8WyUVbPu60qwMbAxKS=2m2akskybZQS3-+rehuUD+3oBXQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 5 Jan 2014 16:33:21 +0100
+Subject: [PATCH 1/5] crypto: Fully restore ahash request before completing
+In-Reply-To: <20140105130529.GA26358@gondor.apana.org.au>
+References: <1386703583-8386-1-git-send-email-marex@denx.de>
+ <20140105130529.GA26358@gondor.apana.org.au>
+Message-ID: <201401051633.21894.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.01.2014 15:06, Arnd Bergmann wrote:
-> On Saturday 04 January 2014, Florian Meier wrote:
->> On 02.01.2014 19:03, Arnd Bergmann wrote:
->>> On Thursday 02 January 2014 18:49:23 Florian Meier wrote:
->>>> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
->>>> Currently it only supports cyclic DMA.
->>>
->>> Looks very nice. Just a few details I noticed:
->>>
->>>> +#if defined(CONFIG_OF)
->>>> +static const struct of_device_id bcm2835_dma_of_match[] = {
->>>> + { .compatible = "brcm,bcm2835-dma", },
->>>> + {},
->>>> +};
->>>> +MODULE_DEVICE_TABLE(of, bcm2835_dma_of_match);
->>>> +#endif
->>>
->>> I doubt we are going to see non-DT versions of this driver, so the #ifdef
->>> can just get removed here.
->>
->> As already explained in previous versions of this patch thread, there is
->> a non-DT version in a downstream kernel and the more I make this patch
->> incompatible with non-DT, the harder it gets to upstream the remaining
->> stuff. I hope this is not something that blocks this driver from getting
->> accepted.
->
-> In this case, that's certainly not an excuse unless you are worried about
-> 400 bytes of .rodata in one driver and there are no side-effects of having
-> the device ID listed when it's not used.
+On Sunday, January 05, 2014 at 02:05:29 PM, Herbert Xu wrote:
+> On Tue, Dec 10, 2013 at 08:26:19PM +0100, Marek Vasut wrote:
+> > When finishing the ahash request, the ahash_op_unaligned_done() will
+> > call complete() on the request. Yet, this will not call the correct
+> > complete callback. The correct complete callback was previously stored
+> > in the requests' private data, as seen in ahash_op_unaligned(). This
+> > patch restores the correct complete callback and .data field of the
+> > request before calling complete() on it.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> > Cc: David S. Miller <davem@davemloft.net>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: linux-crypto at vger.kernel.org
+> 
+> All patches applied.  Thanks!
 
-You are right! I forgot that having these lines doesn't prevent non-DT
-initialization. I will change that.
+Uh, I think this was not intended to happen! We still discuss this patch will 
+need rework, do we not?
 
-> Even if it made a real difference
-> to another project, you'd need a much better excuse -- if you are worried
-> about compatibility between mainline and some downstream kernel, how about
-> changing that downstream kernel to use DT?
-
-That is the future plan. Although, the current state is that there is
-a downstream kernel with lots of devicetree incompatible drivers and
-an upstream kernel with some missing important drivers. Therefore,
-since I want my drivers being tested by the community, they have to be
-non-DT compatible (or at least it should be easy to bring changes from
-the non-DT version to the DT version and vice versa).
-Anyway, in this case this introduces no problem as you have mentioned before.
-
->>> [...]
->>> This can now be simplified using the dma_get_any_slave_channel() interface
->>> taht Stephen Warren introduced.
->>> [...]
->>> dma_set_mask_and_coherent()
->>
->> Sigh, the API is developing faster than I can keep track with updating
->> this patch. I hope some day I will be faster....
->> When Russell told me about the second one before, it hoped that I can
->> avoid merging different trees on my own, but it seems that you want me
->> to do that ;-)
->
-> The dma_get_any_slave_channel() change is probably my fault. I suggested
-> both the initial dma_get_slave_channel() API and this one because the
-> original approach turned out too complicated. If dma_set_mask_and_coherent().
->
-> I don't think you have to merge other trees, to get both APIs, they should
-> already be part of the dma-slave tree that your patch would get merged
-> into. If not, we can probably come up with a different solution. The
-> dma_set_mask_and_coherent() suggestion is not as important as the
-> dma_get_any_slave_channel() one, if you have to choose between them.
-
-Both changes are in the slave-dma tree, but I need patches from the
-bcm2835 tree and the asoc tree, too. Although, it shouldn't be too
-complicated to merge them, I hope.
-
->>>> + if (pdev->dev.of_node) {
->>>> + /* Device-tree DMA controller registration */
->>>> + rc = of_dma_controller_register(pdev->dev.of_node,
->>>> + bcm2835_dma_xlate, od);
->>>> + if (rc) {
->>>> + dev_err(&pdev->dev, "Failed to register DMA controller\n");
->>>> + goto err_no_dma;
->>>> + }
->>>> + }
->>>
->>> If pdev->dev.of_node isn't set, you didn't get here, so the if() can be removed.
->>
->> Why not? (In the case of non-DT initialization)
->
-> The code I quoted is right after these lines:
->
-> +       /* Request DMA channel mask from device tree */
-> +       if (of_property_read_u32(pdev->dev.of_node,
-> +                       "brcm,dma-channel-mask",
-> +                       &chans_available)) {
-> +               dev_err(&pdev->dev, "Failed to get channel mask\n");
-> +               rc = -EINVAL;
-> +               goto err_no_dma;
-> +       }
->
-> If DT is disabled or not used, you return -EINVAL here.
-
-Stupid me, thank you!
-
-Greetings,
-Florian
+Best regards,
+Marek Vasut
