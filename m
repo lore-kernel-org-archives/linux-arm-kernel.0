@@ -1,140 +1,104 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon,  6 Jan 2014 15:12:51 +0800
-Subject: [PATCH v2] dmaengine: sirf: enable generic dt binding for dma channels
-Message-ID: <1388992371-7908-1-git-send-email-21cnbao@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Jan 2014 08:16:02 +0100
+Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
+References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <201401060816.02998.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Monday 06 January 2014, Hans de Goede wrote:
+> +Required properties:
+> + - compatible: Should be "platform-ohci"
+> + - reg: Address range of the ohci registers.
+> + - interrupts: Should contain the ohci interrupt.
+> +
+> +Optional properties:
+> + - clocks: array of clocks
+> + - clock-names: clock names "ahb" and/or "ohci"
+> + - phys: phy
+> + - phy-names: "usb_phy"
 
-move to support of_dma_request_slave_channel() and dma_request_slave_channel.
-we add a xlate() to let dma clients be able to find right dma_chan by generic
-"dmas" properties in dts.
+Maybe just "usb"? It obviously is a phy, so that part of the name
+is a bit redundant. Actually, the "usb" part of the name also seems
+redundant. Is it possible to make it an anonymous phy reference
+without a phy-names property as we often do for clocks?
 
-Cc: Lars-Peter Clausen <lars@metafoo.de>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v2:
- use dma_get_slave_channel() function which makes it a bit
- cleaner according to Lars-Peter's feedback
+> +static int ohci_platform_power_on(struct platform_device *dev)
+> +{
+> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
+> +	struct ohci_platform_priv *priv =
+> +		(struct ohci_platform_priv *)hcd_to_ohci(hcd)->priv;
+> +	int ret;
+> +
+> +	if (!IS_ERR(priv->ohci_clk)) {
+> +		ret = clk_prepare_enable(priv->ohci_clk);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	if (!IS_ERR(priv->ahb_clk)) {
+> +		ret = clk_prepare_enable(priv->ahb_clk);
+> +		if (ret)
+> +			goto err_disable_ohci_clk;
+> +	}
+> +
+> +	if (!IS_ERR(priv->phy)) {
+> +		ret = phy_init(priv->phy);
+> +		if (ret)
+> +			goto err_disable_ahb_clk;
+> +
+> +		ret = phy_power_on(priv->phy);
+> +		if (ret)
+> +			goto err_exit_phy;
+> +	}
 
- arch/arm/boot/dts/atlas6.dtsi |    4 ++++
- arch/arm/boot/dts/prima2.dtsi |    4 ++++
- drivers/dma/sirf-dma.c        |   25 +++++++++++++++++++++++++
- 3 files changed, 33 insertions(+), 0 deletions(-)
+Style-wise, I think I'd prefer not storing error values in the
+ohci_platform_priv struct, but rather using NULL pointers for
+when the clocks or phy references are unused.
 
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index 978bab4..afe0d76 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -259,6 +259,8 @@
- 				reg = <0xb00b0000 0x10000>;
- 				interrupts = <12>;
- 				clocks = <&clks 24>;
-+				#dma-cells = <1>;
-+				#dma-channels = <16>;
- 			};
- 
- 			dmac1: dma-controller at b0160000 {
-@@ -267,6 +269,8 @@
- 				reg = <0xb0160000 0x10000>;
- 				interrupts = <13>;
- 				clocks = <&clks 25>;
-+				#dma-cells = <1>;
-+				#dma-channels = <16>;
- 			};
- 
- 			vip at b00C0000 {
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index daee5894..38782e5 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -276,6 +276,8 @@
- 				reg = <0xb00b0000 0x10000>;
- 				interrupts = <12>;
- 				clocks = <&clks 24>;
-+				#dma-cells = <1>;
-+				#dma-channels = <16>;
- 			};
- 
- 			dmac1: dma-controller at b0160000 {
-@@ -284,6 +286,8 @@
- 				reg = <0xb0160000 0x10000>;
- 				interrupts = <13>;
- 				clocks = <&clks 25>;
-+				#dma-cells = <1>;
-+				#dma-channels = <16>;
- 			};
- 
- 			vip at b00C0000 {
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 6aec3ad..546bf3b 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -18,6 +18,7 @@
- #include <linux/of_device.h>
- #include <linux/of_platform.h>
- #include <linux/clk.h>
-+#include <linux/of_dma.h>
- #include <linux/sirfsoc_dma.h>
- 
- #include "dmaengine.h"
-@@ -81,6 +82,7 @@ struct sirfsoc_dma_regs {
- 
- struct sirfsoc_dma {
- 	struct dma_device		dma;
-+	dma_cap_mask_t			cap;
- 	struct tasklet_struct		tasklet;
- 	struct sirfsoc_dma_chan		channels[SIRFSOC_DMA_CHANNELS];
- 	void __iomem			*base;
-@@ -640,6 +642,18 @@ bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
- }
- EXPORT_SYMBOL(sirfsoc_dma_filter_id);
- 
-+static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
-+	struct of_dma *ofdma)
-+{
-+	struct sirfsoc_dma *sdma = ofdma->of_dma_data;
-+	unsigned int request = dma_spec->args[0];
-+
-+	if (request > SIRFSOC_DMA_CHANNELS)
-+		return NULL;
-+
-+	return dma_get_slave_channel(&(sdma->channels[request].chan));
-+}
-+
- static int sirfsoc_dma_probe(struct platform_device *op)
- {
- 	struct device_node *dn = op->dev.of_node;
-@@ -744,11 +758,21 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	if (ret)
- 		goto free_irq;
- 
-+	/* Device-tree DMA controller registration */
-+	ret = of_dma_controller_register(dn, of_dma_sirfsoc_xlate, sdma);
-+	if (ret) {
-+		sdma->cap = dma->cap_mask;
-+		dev_err(dev, "failed to register DMA controller\n");
-+		goto unreg_dma_dev;
-+	}
-+
- 	pm_runtime_enable(&op->dev);
- 	dev_info(dev, "initialized SIRFSOC DMAC driver\n");
- 
- 	return 0;
- 
-+unreg_dma_dev:
-+	dma_async_device_unregister(dma);
- free_irq:
- 	free_irq(sdma->irq, sdma);
- irq_dispose:
-@@ -761,6 +785,7 @@ static int sirfsoc_dma_remove(struct platform_device *op)
- 	struct device *dev = &op->dev;
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
- 
-+	of_dma_controller_free(op->dev.of_node);
- 	dma_async_device_unregister(&sdma->dma);
- 	free_irq(sdma->irq, sdma);
- 	irq_dispose_mapping(sdma->irq);
--- 
-1.7.5.4
+> @@ -83,17 +171,30 @@ static int ohci_platform_probe(struct platform_device *dev)
+>  		return -ENXIO;
+>  	}
+>  
+> +	hcd = usb_create_hcd(&ohci_platform_hc_driver, &dev->dev,
+> +			dev_name(&dev->dev));
+> +	if (!hcd)
+> +		return -ENOMEM;
+> +
+> +	if (pdata == &ohci_platform_defaults) {
+> +		struct ohci_platform_priv *priv = (struct ohci_platform_priv *)
+> +						  hcd_to_ohci(hcd)->priv;
+> +
+> +		priv->phy = devm_phy_get(&dev->dev, "usb_phy");
+> +		if (IS_ERR(priv->phy) && PTR_ERR(priv->phy) == -EPROBE_DEFER) {
+> +			err = -EPROBE_DEFER;
+> +			goto err_put_hcd;
+> +		}
+> +
+> +		priv->ohci_clk = devm_clk_get(&dev->dev, "ohci");
+> +		priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
+> +	}
+
+I think you have to check the clocks for -EPROBE_DEFER as well here, not
+just the PHY. Otherwise you don't know the difference between "no clock
+provided", "error getting the clock reference" and "clock controller not
+initialized yet, try again".
+
+> @@ -178,6 +277,12 @@ static int ohci_platform_resume(struct device *dev)
+>  #define ohci_platform_resume	NULL
+>  #endif /* CONFIG_PM */
+>  
+> +static const struct of_device_id ohci_platform_ids[] = {
+> +	{ .compatible = "platform-ohci", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ohci_platform_ids);
+
+I never liked the "platform-*" naming for compatible properties, the
+name of the driver is just based on a linux implementation detail
+(the platform bus), which could change. How about just calling the
+generic one "ohci" or "usb-ohci"?
+
+	Arnd
