@@ -1,14 +1,14 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Jan 2014 15:45:55 +0000
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 6 Jan 2014 10:49:06 -0500 (EST)
 Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
  instantiation
 In-Reply-To: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
-References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140106154555.GC24664@e106331-lin.cambridge.arm.com>
+Message-ID: <Pine.LNX.4.44L0.1401061043240.1282-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 05, 2014 at 11:04:39PM +0000, Hans de Goede wrote:
+On Mon, 6 Jan 2014, Hans de Goede wrote:
+
 > Add support for ohci-platform instantiation from devicetree, including
 > optionally getting clks and a phy from devicetree, and enabling / disabling
 > those on power_on / off.
@@ -34,16 +34,6 @@ On Sun, Jan 05, 2014 at 11:04:39PM +0000, Hans de Goede wrote:
 > +
 > +Required properties:
 > + - compatible: Should be "platform-ohci"
-
-To me, "platform-ohci" seems rather Linux-specific. Platform devices are
-a Linux abstraction that don't correspond to any particular bus type in
-reality.
-
-We have some "*-generic" bindings. A name of that form might be more
-appropriate. Or we could choose an arbitrary OHCI implementation's
-vendor,ochi string and everything else can declare compatibility with
-that.
-
 > + - reg: Address range of the ohci registers.
 > + - interrupts: Should contain the ohci interrupt.
 > +
@@ -51,16 +41,9 @@ that.
 > + - clocks: array of clocks
 > + - clock-names: clock names "ahb" and/or "ohci"
 
-A description of what the clocks are might be helpful.
+Where does "ahb" come from, what does it mean, and how is it relevant 
+to generic platforms?
 
-How about something like:
+What about platforms that use 3 clocks?
 
-- clocks: a list of phandle + clock specifier pairs, one for each entry
-  in clock-names.
-
-- clock-names: Should contain:
-   * "ahb" - some description here.
-   * "ohci" - some description here.
-
-Thanks,
-Mark.
+Alan Stern
