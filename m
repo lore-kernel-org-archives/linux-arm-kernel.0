@@ -1,121 +1,77 @@
 From: lho@apm.com (Loc Ho)
-Date: Mon,  6 Jan 2014 11:11:00 -0700
-Subject: [PATCH v6 2/4] Documentation: Add APM X-Gene SoC 15Gbps Multi-purpose
- PHY driver binding documentation
-In-Reply-To: <1389031862-4285-2-git-send-email-lho@apm.com>
-References: <1389031862-4285-1-git-send-email-lho@apm.com>
- <1389031862-4285-2-git-send-email-lho@apm.com>
-Message-ID: <1389031862-4285-3-git-send-email-lho@apm.com>
+Date: Mon,  6 Jan 2014 11:10:58 -0700
+Subject: [PATCH v6 0/4] PHY: Add APM X-Gene SoC 15Gbps Multi-purpose PHY
+ support
+Message-ID: <1389031862-4285-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch adds support for APM X-Gene SoC 15Gbps Multi-purpose PHY. This
+is the physical layer interface for the corresponding host controller. This
+driver uses the new PHY generic framework posted by Kishon Vijay Abrahm.
+In addition, the new PHY generic framework is patched to provide an
+function to set the speed of the PHY.
+
+v6
+* Move PHY document to Documentation/devicetree/binding/phy
+* Remove _ADDR from all register defines
+* Update clock-names property for sataphy1clk, sataphy2clk, and sataphy3clk
+
+v5
+* Update DTS binding documentation
+* Remove direct clock access and use clock interface instead
+* Change override parameters to decimal instead hex values
+* Change apm,tx-amplitude, apm,tx-pre-cursor1, apm,tx-pre-cursor2,
+  apm,tx-post-cursor to be unit of uV
+
+v4
+* Update documentation with 'apm,' instead 'apm-'
+* Change DTS override parameter to have 'apm,'
+* Add select GENERIC_PHY to Kconfig PHY_XGENE
+* Make override parameters to be pair of three values instead one
+* Some minor comment and indentation changes
+* Remove error register addition offset
+* Add ULL to constants
+* Use module_init instead subsys_initcall
+* Make DTS node based on first register address
+* Update override setting values
+
+v3
+* Major re-write of the code based on various review comments
+* Support external clock only at the moment
+* Support SATA mode only at the moment
+* No UEFI support at the moment
+
+v2
+* Remove port knowledge from functions
+* Make all functions static
+* Remove ID completely
+* Make resource requirement based on compatible type
+* Rename override PHY parameters with more descriptive name
+* Add override PHY parameter for per controller, per port, and per speed
+* Patch the generic PHY frame to expose set_speed operation
+
+v1
+* Initial version
 
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Tuan Phan <tphan@apm.com>
 Signed-off-by: Suman Tripathi <stripathi@apm.com>
 ---
- .../devicetree/bindings/phy/apm-xgene-phy.txt      |   94 ++++++++++++++++++++
- 1 files changed, 94 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+Loc Ho (4):
+  PHY: Add function set_speed to generic PHY framework
+  Documentation: Add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+    binding documentation
+  PHY: add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+  arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY DTS entries
 
-diff --git a/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-new file mode 100644
-index 0000000..4ffbae0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-@@ -0,0 +1,94 @@
-+* APM X-Gene 15Gbps Multi-purpose PHY nodes
-+
-+PHY nodes are defined to describe on-chip 15Gbps Multi-purpose PHY. Each
-+PHY (pair of lanes) has its own node.
-+
-+Required properties:
-+- compatible		: Shall be "apm,xgene-phy" or
-+			  "apm,xgene-phy-ext". The "apm,xgene-phy" describes
-+			  an PHY with internal reference PLL located within
-+			  the IP. The "apm,xgene-phy-ext" describes an PHY
-+			  where the internal reference PLL located outside of
-+			  the IP.
-+- reg			: First PHY memory resource is the SDS PHY access
-+			  resource.
-+			  Second PHY memory resource is the SDS PHY access
-+			  resource outside of the IP if it is type
-+			  "apm,xgene-phy-ext".
-+- #phy-cells		: Shall be 1 as it expects one argument for setting
-+			  the mode of the PHY. Possible values are 0 (SATA),
-+			  1 (SGMII), 2 (PCIe), 3 (USB), and 4 (XFI).
-+
-+Optional properties:
-+- status		: Shall be "ok" if enabled or "disabled" if disabled.
-+			  Default is "ok".
-+- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
-+			  bit lines from the automatic calibrated position.
-+			  Two set of 3-tuple setting for each (up to 3)
-+			  supported link speed on the host. Range from 0 to
-+			  127 in unit of one bit period. Default is 10.
-+- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
-+			  data earlier than the nominal sampling point. 1 means
-+			  sample data later than the nominal sampling point.
-+			  Two set of 3-tuple setting for each (up to 3)
-+			  supported link speed on the host. Default is 0.
-+- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
-+			  gain control. Two set of 3-tuple setting for each
-+			  (up to 3) supported link speed on the host. Range is
-+			  between 0 to 31 in unit of dB. Default is 3.
-+- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
-+			  each (up to 3) supported link speed on the host.
-+			  Range is between 0 to 199500 in unit of uV.
-+			  Default is 199500 uV.
-+- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
-+			  3-tuple setting for each (up to 3) supported link
-+			  speed on the host. Range is 0 to 273000 in unit of
-+			  uV. Default is 0.
-+- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
-+			  3-tuple setting for each (up to 3) supported link
-+			  speed on the host. Range is 0 to 127400 in unit uV.
-+			  Default is 0x0.
-+- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
-+			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-+			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
-+- apm,tx-speed		: Tx operating speed. One set of 3-tuple for each
-+			  supported link speed on the host.
-+			   0 = 1-2Gbps
-+			   1 = 2-4Gbps (1st tuple default)
-+			   2 = 4-8Gbps
-+			   3 = 8-15Gbps (2nd tuple default)
-+			   4 = 2.5-4Gbps
-+			   5 = 4-5Gbps
-+			   6 = 5-6Gbps
-+			   7 = 6-16Gbps (3rd tuple default)
-+
-+NOTE: PHY override parameters are board specific setting.
-+
-+Example:
-+		phy1: phy at 1f21a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f21a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+			apm,tx-boost-gain = <2 2 2 2 2 2>;
-+			apm,tx-eye-tuning = <10 10 10 10 10 10>;
-+		};
-+
-+		phy2: phy at 1f22a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f22a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			status = "ok";
-+			apm,tx-boost-gain = <2 2 2 2 2 2>;
-+			apm,tx-eye-tuning = <10 10 10 5 5 5>;
-+		};
-+
-+		phy3: phy at 1f23a000 {
-+			compatible = "apm,xgene-phy-ext";
-+			reg = <0x0 0x1f23a000 0x0 0x100>,
-+			      <0x0 0x1f2d0000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			status = "ok";
-+			apm,tx-boost-gain = <3 3 3 3 3 3>;
-+			apm,tx-eye-tuning = <10 10 10 12 12 12>;
-+		};
--- 
-1.5.5
+ .../devicetree/bindings/phy/apm-xgene-phy.txt      |   94 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   76 +
+ drivers/phy/Kconfig                                |    7 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-core.c                             |   21 +
+ drivers/phy/phy-xgene.c                            | 1811 ++++++++++++++++++++
+ include/linux/phy/phy.h                            |    8 +
+ 7 files changed, 2019 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+ create mode 100644 drivers/phy/phy-xgene.c
