@@ -1,40 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Jan 2014 10:24:23 +0800
-Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
- reset
-In-Reply-To: <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
-References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
- <20140103120712.GE25079@S2101-09.ap.freescale.net>
- <20140104054702.GA6243@quad.lixom.net>
- <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
-Message-ID: <20140106022419.GA26128@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 6 Jan 2014 11:24:30 +0900
+Subject: [PATCH 3/3] ARM: shmobile: Koelsch: Add QSPI support
+In-Reply-To: <871u0mkkpg.wl%kuninori.morimoto.gx@gmail.com>
+References: <1388763256-25851-1-git-send-email-geert@linux-m68k.org>
+ <1388763256-25851-4-git-send-email-geert@linux-m68k.org>
+ <52C6EAA7.7050200@cogentembedded.com>
+ <CAMuHMdVzawC2ccXCwyLSe7u0Uaa0qpLwaO+3dqQiSrmOcGdTCA@mail.gmail.com>
+ <871u0mkkpg.wl%kuninori.morimoto.gx@gmail.com>
+Message-ID: <20140106022426.GD11231@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 05, 2014 at 09:29:37AM -0800, Olof Johansson wrote:
-> Actually, Russell brought this to my attention (I should have looked
-> closer earlier). You guys have made an incompatible binding change
-> here. In -rc6? That's not cool, we're not doing those any more.
-
-Yes, the driver change hit mainline too quickly.
-
+On Sun, Jan 05, 2014 at 04:39:14PM -0800, Kuninori Morimoto wrote:
+> Hi
 > 
-> What should happen is that the driver change should be reverted
-> instead. You can't rely on every device tree out there changing to
-> accommodate these kind of things any more.
+> > <sergei.shtylyov@cogentembedded.com> wrote:
+> > >> +       platform_device_register_resndata(&platform_bus, "qspi", 0,
+> > >
+> > >    As I understood, there's single QSPI controller, so why you pass 0, and
+> > > not -1 here?
+> > 
+> > Indeed, there's only a single QSPI instance.
+> > However, I choose to use "0" for consistency with Lager.
+> > Mach-shmobile seems to use a mix of 0 and -1.
+> > 
+> > If the maintainer prefers -1, I can change that.
+> 
+> In SPI driver case, spi master will use dynamic 
+> bus_num value if ID was -1 (in spi_register_master()).
+> Then, slave device can't be detected.
+> So, ID = 0 is reasonable even though single QSPI.
 
-Fabio just sent a revert patch for it, and David has queued it.
-
-This is a typical example that we did not implement device tree
-bindings perfectly right in the first place, and we have to live with it
-forever.  If someday there is board design using an active high PHY
-reset, we basically have to introduce another property for it.  But
-it does no harm to correct the level type of the existing property in
-device tree sources anyway.  So I will still queue Fabio's dts patch [1]
-for 3.14 - a different one from what you're dropping here.  The
-patch [1] is against my for-next branch while the dropped one is
-against mainline.
-
-Shawn
-
-[1] http://www.spinics.net/lists/arm-kernel/msg297829.html
+When it makes sense I prefer -1, however, in this case it
+seems that 0 is a better choice.
