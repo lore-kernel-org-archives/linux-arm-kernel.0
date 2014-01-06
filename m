@@ -1,146 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Jan 2014 17:03:53 +0100
-Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
- instantiation
-In-Reply-To: <52CA603B.3070203@redhat.com>
-References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
- <201401060816.02998.arnd@arndb.de> <52CA603B.3070203@redhat.com>
-Message-ID: <201401061703.53844.arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jan 2014 16:08:59 +0000
+Subject: [PATCH 1/2] ARM: sun7i: Add irqchip driver for NMI controller
+In-Reply-To: <1388936345-5009-2-git-send-email-carlo.caione@gmail.com>
+References: <1388936345-5009-1-git-send-email-carlo.caione@gmail.com>
+ <1388936345-5009-2-git-send-email-carlo.caione@gmail.com>
+Message-ID: <20140106160858.GE24664@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 January 2014, Hans de Goede wrote:
-> On 01/06/2014 08:16 AM, Arnd Bergmann wrote:
-> > On Monday 06 January 2014, Hans de Goede wrote:
-> >> +Required properties:
-> >> + - compatible: Should be "platform-ohci"
-> >> + - reg: Address range of the ohci registers.
-> >> + - interrupts: Should contain the ohci interrupt.
-> >> +
-> >> +Optional properties:
-> >> + - clocks: array of clocks
-> >> + - clock-names: clock names "ahb" and/or "ohci"
-> >> + - phys: phy
-> >> + - phy-names: "usb_phy"
-> >
-> > Maybe just "usb"? It obviously is a phy, so that part of the name
-> > is a bit redundant. Actually, the "usb" part of the name also seems
-> > redundant. Is it possible to make it an anonymous phy reference
-> > without a phy-names property as we often do for clocks?
+On Sun, Jan 05, 2014 at 03:39:04PM +0000, Carlo Caione wrote:
+> Allwinner A20 SoCs have special registers to control / (un)mask /
+> acknowledge NMI. This NMI controller is separated and independent from GIC.
+> This patch adds a new irqchip to manage NMI.
 > 
-> I'm not a big fan of anonymous references, IE currently the ahci-platform
-> driver is using an anonymous clk reference, but for sunxi (and ie imx too)
-> it needs to be extended to 2 clks, which means using names, while
-> keeping compatibility with the older anonymous using dts (and board)
-> files.
-> 
-> So I can agree to dropping the _phy, but I would like to keep the "usb"
-> name I realize the chances are slim of ever needing 2 phys but never
-> say never ...
+> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
+> ---
+>  drivers/irqchip/Makefile        |   1 +
+>  drivers/irqchip/irq-sun7i-nmi.c | 191 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 192 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-sun7i-nmi.c
 
-Ok, fair enough.
+[...]
 
-> > Style-wise, I think I'd prefer not storing error values in the
-> > ohci_platform_priv struct, but rather using NULL pointers for
-> > when the clocks or phy references are unused.
-> 
-> This is a style I picked up from the mmc code, ie do a grep for
-> !IS_ERR in drivers/mmc/host/*.c, but I agree it is not the prettiest,
-> and on looking in other subsystems it is not common, so I'll convert
-> this to storing NULL on error to get the phy or clk.
+> +IRQCHIP_DECLARE(sun7i_sc_nmi, "allwinner,sun7i-sc-nmi", sun7i_sc_nmi_irq_init);
 
-Ok, thanks.
+Binding document please.
 
-> >> @@ -83,17 +171,30 @@ static int ohci_platform_probe(struct platform_device *dev)
-> >>   		return -ENXIO;
-> >>   	}
-> >>
-> >> +	hcd = usb_create_hcd(&ohci_platform_hc_driver, &dev->dev,
-> >> +			dev_name(&dev->dev));
-> >> +	if (!hcd)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	if (pdata == &ohci_platform_defaults) {
-> >> +		struct ohci_platform_priv *priv = (struct ohci_platform_priv *)
-> >> +						  hcd_to_ohci(hcd)->priv;
-> >> +
-> >> +		priv->phy = devm_phy_get(&dev->dev, "usb_phy");
-> >> +		if (IS_ERR(priv->phy) && PTR_ERR(priv->phy) == -EPROBE_DEFER) {
-> >> +			err = -EPROBE_DEFER;
-> >> +			goto err_put_hcd;
-> >> +		}
-> >> +
-> >> +		priv->ohci_clk = devm_clk_get(&dev->dev, "ohci");
-> >> +		priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
-> >> +	}
-> >
-> > I think you have to check the clocks for -EPROBE_DEFER as well here, not
-> > just the PHY.
-> 
-> So far I've never seen clk_get return -EPROBE_DEFER, but I guess on some
-> platforms it can.
-
-Right. Most clock controllers tend to be initialized at early boot
-time, but some of them are on external PMICs that are only probed after
-i2c or some other subsystem is up.
-
-> > Otherwise you don't know the difference between "no clock
-> > provided", "error getting the clock reference" and "clock controller not
-> > initialized yet, try again".
-> 
-> I guess of these 3 we really only want to continue on "no clock provided",
-> so I think something like this (for both clks and the phy) would be best:
-> 
-> 		priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
-> 		if (IS_ERR(priv->ahb_clk)) {
-> 			err = PTR_ERR(priv->ahb_clk);
-> 			if (err != -EINVAL && err != -ENODATA)
-> 				goto err_put_hcd;
-> 			priv->ahb_clk = NULL; /* No clock provided */
-> 		}
-> 
-> To clarify -EINVAL will be returned when there is no clock-names, and
-> -ENODATA when the specified name is not found in clock-names.
-
-Ok, looks good.
-
-> >> @@ -178,6 +277,12 @@ static int ohci_platform_resume(struct device *dev)
-> >>   #define ohci_platform_resume	NULL
-> >>   #endif /* CONFIG_PM */
-> >>
-> >> +static const struct of_device_id ohci_platform_ids[] = {
-> >> +	{ .compatible = "platform-ohci", },
-> >> +	{ }
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, ohci_platform_ids);
-> >
-> > I never liked the "platform-*" naming for compatible properties, the
-> > name of the driver is just based on a linux implementation detail
-> > (the platform bus), which could change. How about just calling the
-> > generic one "ohci" or "usb-ohci"?
-> 
-> usb-ohci seems free but usb-ehci are already taken by
-> drivers/usb/host/ehci-ppc-of.c which is as the name implies pretty ppc
-> specific. And since ehci-platform.c can be build on ppc too, we could
-> end up with 2 drivers claiming the same compatibility string on ppc.
-> 
-> Also uhci-platform.c is already using platform-uhci, so using
-> ohci-platform and ehci-platform seems consistent and avoids the
-> conflict with drivers/usb/host/ehci-ppc-of.c
-
-Hmm, that file seems to do two things that ehci-platform doesn't:
-It handles big-endian controllers and it has special initialization
-for compatible="ibm,usb-ehci-440epx". It also uses a different way
-to get to the resources because the driver dates back to before the
-unification of platform_bus and of_platform_bus, but that can be
-trivially changed.
-
-I would hope that we can eventually merge the two drivers, and I'm
-guessing that we will sooner or later need the big-endian support on
-non-ppc machines anyway. The question is what to do about the 440epx
-hack. It may be small enough that we can just leave it as a quirk
-inside #ifdef CONFIG_PPC in the unified driver, or it may end up
-being shared with arm64 X-Gene, which seems to share a common
-ancestry with some of the ppc4xx socs.
-
-	Arnd
+Thanks,
+Mark.
