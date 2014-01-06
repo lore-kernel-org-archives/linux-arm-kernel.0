@@ -1,36 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 6 Jan 2014 11:31:51 +0900
-Subject: [PATCH 4/4] ARM: shmobile: lager: Make spi_flash_data const
-In-Reply-To: <1388764128-27686-4-git-send-email-geert@linux-m68k.org>
-References: <1388764128-27686-1-git-send-email-geert@linux-m68k.org>
- <1388764128-27686-4-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140106023151.GF11231@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 5 Jan 2014 18:43:33 -0800
+Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
+ reset
+In-Reply-To: <20140106022419.GA26128@S2101-09.ap.freescale.net>
+References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
+ <20140103120712.GE25079@S2101-09.ap.freescale.net>
+ <20140104054702.GA6243@quad.lixom.net>
+ <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
+ <20140106022419.GA26128@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMg3U1oGMy8N3ay=9-GL0A4eZqViubKqtisH5dg78dqhDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 04:48:48PM +0100, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> ---
->  arch/arm/mach-shmobile/board-lager.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> index f20c10a18543..40ace7195f84 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -263,7 +263,7 @@ static struct mtd_partition spi_flash_part[] = {
->  	},
->  };
->  
-> -static struct flash_platform_data spi_flash_data = {
-> +static const struct flash_platform_data spi_flash_data = {
->  	.name           = "m25p80",
->  	.parts          = spi_flash_part,
->  	.nr_parts       = ARRAY_SIZE(spi_flash_part),
+On Sun, Jan 5, 2014 at 6:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Sun, Jan 05, 2014 at 09:29:37AM -0800, Olof Johansson wrote:
+>> Actually, Russell brought this to my attention (I should have looked
+>> closer earlier). You guys have made an incompatible binding change
+>> here. In -rc6? That's not cool, we're not doing those any more.
+>
+> Yes, the driver change hit mainline too quickly.
+>
+>>
+>> What should happen is that the driver change should be reverted
+>> instead. You can't rely on every device tree out there changing to
+>> accommodate these kind of things any more.
+>
+> Fabio just sent a revert patch for it, and David has queued it.
+>
+> This is a typical example that we did not implement device tree
+> bindings perfectly right in the first place, and we have to live with it
+> forever.  If someday there is board design using an active high PHY
+> reset, we basically have to introduce another property for it.
 
-Should spi_flash_part also be const?
+Yes, or another, more precise, binding name.
+> But
+> it does no harm to correct the level type of the existing property in
+> device tree sources anyway.  So I will still queue Fabio's dts patch [1]
+> for 3.14 - a different one from what you're dropping here.  The
+> patch [1] is against my for-next branch while the dropped one is
+> against mainline.
 
-And should flash_platform_data and spi_flash_part be annotated
-as __initconst?
+Sounds good. Thanks!
+
+
+-Olof
