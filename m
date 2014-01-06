@@ -1,77 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 6 Jan 2014 12:00:25 +0100
-Subject: [lm-sensors] [PATCH v3 2/5] input: sun4i-ts: Add support for
- temperature sensor
-In-Reply-To: <52C84665.5070203@roeck-us.net>
-References: <1388506852-3548-1-git-send-email-hdegoede@redhat.com>
- <1388506852-3548-3-git-send-email-hdegoede@redhat.com>
- <52C84665.5070203@roeck-us.net>
-Message-ID: <20140106110025.GQ3144@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 6 Jan 2014 11:06:04 +0000
+Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
+In-Reply-To: <2890647.PEOApIOYyP@amdc1227>
+References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+ <20131231194215.12054.39705@quantum> <2890647.PEOApIOYyP@amdc1227>
+Message-ID: <20140106110604.GN23772@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-On Sat, Jan 04, 2014 at 09:35:33AM -0800, Guenter Roeck wrote:
-> On 12/31/2013 08:20 AM, Hans de Goede wrote:
-> >The sun4i resisitive touchscreen controller also comes with a built-in
-> >temperature sensor. This commit adds support for it.
-> >
-> >This commit also introduces a new "ts-attached" device-tree property,
-> >when this is not set, the input part of the driver won't register. This way
-> >the internal temperature sensor can be used to measure the SoC temperature
-> >independent of there actually being a touchscreen attached to the controller.
-> >
-> >Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > > This series intends to improve clock provider impementation of max77686
+> > > PMIC driver. First two patches are simple fixes of current implementation
+> > > to allow correct control of provided clocks. Further patches refactor
+> > > the driver to make the code cleaner and prepare for further patches. Then
+> > > last two patches add registration of OF clock provider and adjust device
+> > > tree nodes of boards containing max77686 chip to contain properties
+> > > required by clock provider.
+> > 
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
 > 
-> Couple of minor comments below, though no need to resubmit unless someone else has comments.
-> 
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> 
-> >---
-> >  .../bindings/input/touchscreen/sun4i.txt           |   5 +
-> >  drivers/input/touchscreen/sun4i-ts.c               | 140 ++++++++++++++++-----
-> >  2 files changed, 114 insertions(+), 31 deletions(-)
-> >
-> >diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> >index e45927e..6bac67b 100644
-> >--- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> >+++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> >@@ -6,10 +6,15 @@ Required properties:
-> >   - reg: mmio address range of the chip
-> >   - interrupts: interrupt to which the chip is connected
-> >
-> >+Optional properties:
-> >+ - allwinner,ts-attached: boolean indicating that an actual touchscreen is
-> >+			  attached to the controller
-> >+
-> Brr. While I understand that you were asked to do this, I don't
-> really see the benefit of another "allwinner" here. As if this
-> wasn't implied by the "compatible" property.
+> Hmm... Shouldn't this series go through the clk tree directly? If not, who
+> should be taking it?
 
-It's actually the ePAPR that recommends this.
+I'm not quite sure why this patch-set was sent to me in the first
+place, but I guess that's by the by.
 
-Section 6.1.1, General Principles
-
-"
-Some recommended practices includes:
-[..]
-  5. If new properties are needed by the binding, the recommended
-     format for property names is: ?<company>,<property-name>?, where
-     <company> is an OUI or short unique string like a stock ticker
-     that identifies the creator of the binding.
-"
-
-Maxime
+Mike is probably waiting for the ARM and DT patches to be Acked,
+applied.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/24b37344/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
