@@ -1,95 +1,46 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon,  6 Jan 2014 11:12:00 -0700
-Subject: [PATCH v8 2/4] Documentation: Add documentation for APM X-Gene SoC
- SATA host controller DTS binding
-In-Reply-To: <1389031922-4309-2-git-send-email-lho@apm.com>
-References: <1389031922-4309-1-git-send-email-lho@apm.com>
- <1389031922-4309-2-git-send-email-lho@apm.com>
-Message-ID: <1389031922-4309-3-git-send-email-lho@apm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 06 Jan 2014 11:12:15 -0700
+Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
+In-Reply-To: <20131220142530.GK3709@lee--X1>
+References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+ <20131211092435.GC16780@lee--X1> <52B32C05.5010204@wwwdotorg.org>
+ <20131220142530.GK3709@lee--X1>
+Message-ID: <52CAF1FF.9090709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- .../devicetree/bindings/ata/apm-xgene.txt          |   68 ++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+On 12/20/2013 07:25 AM, Lee Jones wrote:
+> Hi Stephen,
+> 
+> Please let me know if this is suitable and I can keep your Ack.
 
-diff --git a/Documentation/devicetree/bindings/ata/apm-xgene.txt b/Documentation/devicetree/bindings/ata/apm-xgene.txt
-new file mode 100644
-index 0000000..3d1421a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/apm-xgene.txt
-@@ -0,0 +1,68 @@
-+* APM X-Gene 6.0 Gb/s SATA host controller nodes
-+
-+SATA host controller nodes are defined to describe on-chip Serial ATA
-+controllers. Each SATA controller (pair of ports) have its own node.
-+
-+Required properties:
-+- compatible		: Shall be "apm,xgene-ahci-sgmii" if mux'ed with SGMII
-+			  or "apm,xgene-ahci-pcie" if mux'ed with PCIe.
-+- reg			: First memory resource shall be the AHCI memory
-+			  resource.
-+			  Second memory resource shall be the host controller
-+			  memory resource.
-+- interrupts		: Interrupt mapping for SATA host controller IRQ.
-+- clocks		: Reference to the clock entry.
-+- phys			: PHY reference with parameter 0.
-+- phy-names		: Name of the PHY. Shall be "sata-6g".
-+
-+Optional properties:
-+- status		: Shall be "ok" if enabled or "disabled" if disabled.
-+			  Default is "ok".
-+- interrupt-parent	: Interrupt controller.
-+
-+Example:
-+		sataclk: sataclk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <1>;
-+			clock-frequency = <100000000>;
-+			clock-output-names = "sataclk";
-+		};
-+
-+		phy2: phy at 1f22a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f22a000 0x0 0x100>,
-+			      <0x0 0x1f22c000 0x0 0x100>;
-+			#phy-cells = <1>;
-+		};
-+
-+		phy3: phy at 1f23a000 {
-+			compatible = "apm,xgene-phy-ext";
-+			reg = <0x0 0x1f23a000 0x0 0x100>,
-+			      <0x0 0x1f23c000 0x0 0x100>,
-+			      <0x0 0x1f2d0000 0x0 0x100>;
-+			#phy-cells = <1>;
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sataclk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sataclk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
--- 
-1.5.5
+This patch doesn't seem to have made it into next-20140106. I assume
+that's just because of the holidays, not because it was forgotten?
+
+> ----
+> 
+> mfd: Revert "mfd: Always assign of_node in mfd_add_device()"
+> 
+> This reverts commit 68044bee13770918e0b28dd44aa98c889ec7558f.
+> 
+> We've had confirmed reports of this patch causing unforeseen issues
+> with existing MFD users. It has been agreed by the original author
+> and myself that reversion is the best solution.
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+> index 32e8d47..2676492 100644
+> --- a/drivers/mfd/mfd-core.c
+> +++ b/drivers/mfd/mfd-core.c
+> @@ -117,8 +117,6 @@ static int mfd_add_device(struct device *parent, int id,
+>  			}
+>  		}
+>  	}
+> -	if (!pdev->dev.of_node)
+> -		pdev->dev.of_node = parent->of_node;
+>  
+>  	if (cell->pdata_size) {
+>  		ret = platform_device_add_data(pdev,
+> 
