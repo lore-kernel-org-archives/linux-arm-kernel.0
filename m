@@ -1,77 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Jan 2014 15:52:04 +0000
-Subject: [PATCH 2/2] ehci-platform: Add support for clks and phy passed
- through devicetree
-In-Reply-To: <1388963080-12544-2-git-send-email-hdegoede@redhat.com>
-References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
- <1388963080-12544-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140106155204.GD24664@e106331-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 6 Jan 2014 15:53:50 +0000
+Subject: [PATCH v2 3/7] mfd: pm8921: Migrate to irqdomains
+In-Reply-To: <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140106155350.GI30156@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 05, 2014 at 11:04:40PM +0000, Hans de Goede wrote:
-> Currently ehci-platform is only used in combination with devicetree when used
-> with some via socs. By extending it to (optionally) get clks and a phy from
-> devicetree, and enabling / disabling those on power_on / off, it can be used
-> more generically. Specifically after this commit it can be used for the
-> ehci controller on Allwinner sunxi SoCs.
+> Convert this driver to use irqdomains so that the PMIC's child
+> devices can be converted to devicetree.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  .../devicetree/bindings/usb/platform-ehci.txt      |  25 +++++
->  .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
->  drivers/usb/host/ehci-platform.c                   | 125 +++++++++++++++++----
->  3 files changed, 131 insertions(+), 31 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/platform-ehci.txt
->  delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>  drivers/mfd/pm8921-core.c         | 184 ++++++++++++++------------------------
+>  include/linux/mfd/pm8xxx/irq.h    |  36 --------
+>  include/linux/mfd/pm8xxx/pm8921.h |  30 -------
+>  3 files changed, 65 insertions(+), 185 deletions(-)
+>  delete mode 100644 include/linux/mfd/pm8xxx/irq.h
+>  delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/platform-ehci.txt b/Documentation/devicetree/bindings/usb/platform-ehci.txt
-> new file mode 100644
-> index 0000000..aba6da1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/platform-ehci.txt
-> @@ -0,0 +1,25 @@
-> +Generic Platform EHCI controller
-> +
-> +Required properties:
-> + - compatible: Should be "platform-ehci"
-> +   (legacy: via,vt8500-ehci" or "wm,prizm-ehci")
 
-Is there any reason for these to be considered legacy? New devices could
-just declare their compatibility with one of the existing
-implementations, e.g:
+<snip>
 
-ehci {
-	compatible  = "some-vendor,ehci", "via,vt8500-ehci";
-	...
-}
+> @@ -56,8 +56,7 @@
+>  struct pm_irq_chip {
+>  	struct device		*dev;
+>  	spinlock_t		pm_irq_lock;
+> -	unsigned int		devirq;
+> -	unsigned int		irq_base;
+> +	struct irq_domain	*domain;
 
-No new compatible string needed in the driver, and we can easily add
-quirks support later.
+It's probably best to explicitly specify 'irqdomain' here in order to
+eliminate any possibility of ambiguity.
 
-I'm also not a fan of "platform-*" naming, it's leaking a Linux-internal
-implementation detail.
+>  	unsigned int		num_irqs;
+>  	unsigned int		num_blocks;
+>  	unsigned int		num_masters;
+> @@ -138,7 +137,7 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
+>  	for (i = 0; i < 8; i++) {
+>  		if (bits & (1 << i)) {
+>  			pmirq = block * 8 + i;
+> -			irq = pmirq + chip->irq_base;
+> +			irq = irq_find_mapping(chip->domain, pmirq);
 
-> + - reg: Address range of the ehci registers.
-> + - interrupts: Should contain the ehci interrupt.
-> +
-> +Optional properties:
-> + - clocks: array of clocks
-> + - clock-names: clock names "ahb" and/or "ehci"
+Going by this patch only, it appears you're calling irq_find_mapping()
+before you've called irq_create_mapping(). This won't work, so unless
+you've called the latter in a previous patch, you should ensure that
+you do so.
 
-It would be nice to define clocks in terms of clock-names, as with my
-OCHI comments.
+>  			generic_handle_irq(irq);
+>  		}
+>  	}
+> @@ -197,12 +196,11 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  static void pm8xxx_irq_mask_ack(struct irq_data *d)
+>  {
+>  	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> -	unsigned int pmirq = d->irq - chip->irq_base;
+> -	int	master, irq_bit;
+> +	unsigned int pmirq = irqd_to_hwirq(d);
 
-[...]
+Why don't you call it hwirq instead of pmirq?
 
-> @@ -85,7 +159,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+> +	int	irq_bit;
+>  	u8	block, config;
 >  
->  	/*
->  	 * use reasonable defaults so platforms don't have to provide these.
-> -	 * with DT probing on ARM, none of these are set.
-> +	 * with DT probing on ARM.
+>  	block = pmirq / 8;
 
-Did you mean to also get rid of the full-stop on the line before?
+Ah, I guess you're keeping the original naming convention.
 
-Thanks,
-Mark.
+> -	master = block / 8;
+
+What was the point in this anyway? Was it completely superfluous?
+
+<snip>
+
+> +static int pm8xxx_irq_init(struct platform_device *pdev, unsigned int irq)
+> +{
+> +	struct pm_irq_chip  *chip;
+> +	unsigned int nirqs = 256;
+
+No magic numbers please.
+
+> +	chip = devm_kzalloc(&pdev->dev, sizeof(*chip) + sizeof(u8) * nirqs,
+> +			    GFP_KERNEL);
+
+What does the sizeof(u8) add here?
+
+<snip>
+
+> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> +}
+
+Can't you use the MFD core instead?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
