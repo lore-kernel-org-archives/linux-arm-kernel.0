@@ -1,63 +1,86 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 06 Jan 2014 16:14:26 -0700
-Subject: [PATCH v4 3/5] ACPI: HW reduced mode does not allow use of the
- FADT sci_interrupt field
-In-Reply-To: <20131227045630.GA21429@srcf.ucam.org>
-References: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
- <1387239401-13918-4-git-send-email-al.stone@linaro.org>
- <20131227045630.GA21429@srcf.ucam.org>
-Message-ID: <52CB38D2.30307@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 6 Jan 2014 23:41:40 +0000 (UTC)
+Subject: [PATCH] of/platform: Fix no irq domain found errors when
+ populating interrupts
+In-Reply-To: <CAL_Jsq+X5G94DUn-zFKQkhEy91cdjCyeciny+kDjr=V6EiBHfQ@mail.gmail.com>
+References: <20131123004334.GJ10023@atomide.com>
+ <20131123010850.GN10023@atomide.com> <20131123015034.GP10023@atomide.com>
+ <20131124212757.7D224C402A3@trevor.secretlab.ca>
+ <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
+ <alpine.DEB.2.02.1312302209200.8869@utopia.booyaka.com>
+ <CAL_Jsq+X5G94DUn-zFKQkhEy91cdjCyeciny+kDjr=V6EiBHfQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1401062340240.31394@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26/2013 09:56 PM, Matthew Garrett wrote:
-> On Mon, Dec 16, 2013 at 05:16:39PM -0700, al.stone at linaro.org wrote:
->
->> +	if (!acpi_gbl_reduced_hardware) {
->
-> I don't really understand this. You've explained that runtime hardware
-> reduced mode switching isn't expected to work, but you're making this
-> conditional on a runtime flag?
->
+Hi Tony, Rob,
 
-Correct.  My apologies if I've made this unclear.
+On Tue, 31 Dec 2013, Rob Herring wrote:
 
-Suppose I build a kernel with full ACPI support.  The kernel would
-then include legacy and hardware-reduced support.  If I pass that
-kernel ACPI tables specifying legacy mode, things work fine.  If I
-pass that same kernel ACPI tables with the hardware-reduced flag
-set in the FADT, that should also work -- iff the ACPI driver checks
-the acpi_gbl_reduced_hardware flag at run-time.  This patch is adding
-some of those checks that were missing so that at least the files in
-drivers/acpi/*.[ch] are correct; I contend that there are still places
-in the drivers/acpi/acpica/*.[ch] files where a Linux driver can call
-code it should not be allowed to when in hardware-reduced (e.g., when
-using the ACPI global lock [0]).  Patching the ACPICA code I'm viewing
-as a separate issue yet to be done.
+> On Mon, Dec 30, 2013 at 4:10 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > Hi Grant, Rob,
+> >
+> > On Tue, 10 Dec 2013, Paul Walmsley wrote:
+> >
+> >> On Sun, 24 Nov 2013, Grant Likely wrote:
+> >>
+> >> > On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> >> > > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
+> >> > > > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
+> >> > > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
+> >> > > > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
+> >> > > > > > > +         /* See of_device_resource_notify for populating interrupts */
+> >> > > > > > > +         for (i = 0; i < num_irq; i++, res++) {
+> >> > > > > > > +                 res->flags = IORESOURCE_IRQ;
+> >> > > > > > > +                 res->start = -EPROBE_DEFER;
+> >> > > > > > > +                 res->end = -EPROBE_DEFER;
+> >> > > > > >
+> >> > > > > > NAK.  Definitely a bad idea to start introducing magic values other into
+> >> > > > > > resources.  Please don't do this.
+> >> > > > >
+> >> > > > > Do you have any better ideas on how to sort out this issue then?
+> >> > > >
+> >> > > > I guess we could allocate all the resources lazily here, I'll take a look
+> >> > > > at that.
+> >> > >
+> >> > > Here's a version that allocates the resources lazily with the notifier.
+> >> > > Seems to boot, need to play with it a bit more though to make sure we're
+> >> > > not overwriting resources for any legacy devices.
+> >> >
+> >> > Blurg. Using a notifier really feels like we don't have a good handle on
+> >> > a reasonable solution yet. Basically it means we're hooking into the
+> >> > driver core without /looking/ like we're hooking into the driver core. I
+> >> > don't think this is any better, but I don't have a better suggestion at
+> >> > the moment.   :-(
+> >>
+> >> Unfortunately this patch, or something that accomplishes the same results,
+> >> is somewhat high-priority for us on OMAP.  OMAP37xx got prematurely
+> >> converted to DT booting, and now dynamic power management is broken:
+> >>
+> >>     http://marc.info/?l=linux-arm-kernel&m=138658294830408&w=2
+> >>
+> >> Tony writes that this patch is one of the two patches needed to get things
+> >> working again:
+> >>
+> >>     http://marc.info/?l=linux-arm-kernel&m=138660942506846&w=2
+> >>
+> >> Is it possible to get this patch, or something similar, merged for
+> >> v3.13-rc?
+> >>
+> >> Once something like PM is broken, it's pretty easy for other broken
+> >> patches to make it into the tree, since it becomes very difficult to test
+> >> without turning into a maintainer denial-of-service attack.
+> >
+> > Ping.  Could you please provide some guidance here about what you'd need
+> > to get this solved for v3.13-rc?
+> 
+> I agree with doing the platform_get_irq modification and feel free to
+> add my ack. I'm going to be offline for the next week.
 
-If I build a kernel with only hardware-reduced ACPI support, using
-ACPI tables without the hardware-reduced flag set in the FADT will
-clearly not work -- nor do I expect it to in this case since most of
-the legacy code gets removed at compile time.  If the ACPI tables do
-have hardware-reduced mode set in the FADT, I expect the kernel to
-behave correctly.  It may turn out to be exactly the same patch for
-ACPICA as mentioned above, but I contend that ACPICA does not
-completely handle this case properly at runtime, either.
+Thanks Rob!
 
-Does that make sense?
+Tony, would you consider sending this patch upstream for v3.13-rc along 
+with your 37xxevm fix patches?
 
 
-
-[0] No driver should be doing this but it cannot currently be precluded
-     by the kernel.  You can call me paranoid but I think if it can be
-     abused by a driver, it will be.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+- Paul
