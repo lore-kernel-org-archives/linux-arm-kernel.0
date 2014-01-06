@@ -1,34 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Jan 2014 11:06:04 +0000
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-In-Reply-To: <2890647.PEOApIOYyP@amdc1227>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
- <20131231194215.12054.39705@quantum> <2890647.PEOApIOYyP@amdc1227>
-Message-ID: <20140106110604.GN23772@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Jan 2014 11:14:28 +0000
+Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
+ reset
+In-Reply-To: <20140106022419.GA26128@S2101-09.ap.freescale.net>
+References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
+ <20140103120712.GE25079@S2101-09.ap.freescale.net>
+ <20140104054702.GA6243@quad.lixom.net>
+ <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
+ <20140106022419.GA26128@S2101-09.ap.freescale.net>
+Message-ID: <20140106111428.GF27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > This series intends to improve clock provider impementation of max77686
-> > > PMIC driver. First two patches are simple fixes of current implementation
-> > > to allow correct control of provided clocks. Further patches refactor
-> > > the driver to make the code cleaner and prepare for further patches. Then
-> > > last two patches add registration of OF clock provider and adjust device
-> > > tree nodes of boards containing max77686 chip to contain properties
-> > > required by clock provider.
-> > 
-> > Acked-by: Mike Turquette <mturquette@linaro.org>
-> 
-> Hmm... Shouldn't this series go through the clk tree directly? If not, who
-> should be taking it?
+On Mon, Jan 06, 2014 at 10:24:23AM +0800, Shawn Guo wrote:
+> This is a typical example that we did not implement device tree
+> bindings perfectly right in the first place, and we have to live with it
+> forever.  If someday there is board design using an active high PHY
+> reset, we basically have to introduce another property for it.
 
-I'm not quite sure why this patch-set was sent to me in the first
-place, but I guess that's by the by.
+Yes and no.  That third number in the property is always zero at present,
+right?  If so, just define zero to mean "the default level of reset"
+which would be the -rc6 behaviour.
 
-Mike is probably waiting for the ARM and DT patches to be Acked,
-applied.
+Then you can define non-zero values to mean "explicitly state the level".
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
