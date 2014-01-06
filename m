@@ -1,32 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 6 Jan 2014 12:43:37 +0000
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <87ha9yqgpb.fsf@iki.fi>
-References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
- <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
- <20120514155859.GA13860@n2100.arm.linux.org.uk>
- <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <87ha9yqgpb.fsf@iki.fi>
-Message-ID: <20140106124337.GB9863@e102568-lin.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 06 Jan 2014 16:47:58 +0400
+Subject: [PATCH 1/1] ARM: shmobile: Koelsch: pass Ether PHY IRQ
+In-Reply-To: <20140106053915.GF24653@verge.net.au>
+References: <201312200226.38815.sergei.shtylyov@cogentembedded.com>
+ <201312200228.00555.sergei.shtylyov@cogentembedded.com>
+ <20131227021227.GC9184@verge.net.au> <52BD66A2.4050504@cogentembedded.com>
+ <20140106053915.GF24653@verge.net.au>
+Message-ID: <52CAA5FE.7020204@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 05:52:48PM +0000, Antti Miettinen wrote:
-> Sorry to still bring up an old thread, but this still bothers me..
-> 
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> > [..] dirty cache lines can be migrated across
-> > processors caches. [..]
-> 
-> What are the conditions under which this can happen? Which CPUs in
-> reality migrate dirty lines between caches? And C==0 does prevent
-> migrations as well as local allocations?
+Hello.
 
-It happens if a cache miss is for a cache line that is dirty on another CPU
-that is part of the coherency domain, the line is just moved from one L1
-to the local L1.
+On 06-01-2014 9:39, Simon Horman wrote:
 
-Yes, C bit cleared prevents allocations so it prevents migrations too.
+>>>> Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
+>>>> trigger type to be low-level as per the Micrel PHY driver's setup.
 
-Lorenzo
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>> Hi Sergei,
+
+>>> does this depend on changes that have been queued up in net or net-next
+>>> since v3.13-rc1?
+
+>>     Yes, in net-next.
+
+>>> If so are they present in v3.13-rc5?
+
+>>     No, they should be available in 3.14-rc1.
+
+>>> If not please
+>>> repost when an rc release with the required dependencies is available.
+
+>>     You mean this patch should inevitably wait for 3.15? I hoped
+>> either you or DaveM could still queue this patch for 3.14...
+
+> Sorry, it was too late for v3.14 and I would prefer if you didn't route
+> this via Dave's tree.
+
+    I somehow thought you were asking about the Lager patch. No, I wasn't 
+going to route the Koelsch patch via Dave, only Lager. Dave doesn't seem eager 
+to do it anyway.
+
+WBR, Sergei
