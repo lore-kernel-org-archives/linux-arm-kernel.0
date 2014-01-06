@@ -1,74 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Jan 2014 13:58:07 +0800
-Subject: [PATCH v2 2/2] ARM: dts: imx: enable dma for spi
-In-Reply-To: <1388789632-12238-2-git-send-email-Frank.Li@freescale.com>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
- <1388789632-12238-2-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20140106055802.GB27227@S2101-09.ap.freescale.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  6 Jan 2014 13:58:04 +0800
+Subject: [PATCH v2 0/8] arm: sunxi: rename DT clock node names to clk@N
+Message-ID: <1388987892-23733-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 04, 2014 at 06:53:52AM +0800, Frank Li wrote:
-> Enable dma support for espci controller
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+This is v2 of the clock node renaming patch series, which renames
+the clock nodes in sunxi dts to conform to device tree naming
+conventions, i.e. clk at N. Dummy clocks that will be renamed/removed
+later, or clocks sharing registers are not renamed.
 
-In patch subject, s/imx/imx6qdl, and applied the patch.
+Renamed clock nodes have clock-output-names properties added to
+desginate their names. Support for this is added in the first
+patch.
 
-Shawn
+The last patch, which enables i2c controllers on Cubietruck, is
+not related to the clocks. Just submitting them together.
 
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> No change from v1 
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 858ecd7..6b29f56 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -184,6 +184,8 @@
->  					interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 112>, <&clks 112>;
->  					clock-names = "ipg", "per";
-> +					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
-> +					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> @@ -195,6 +197,8 @@
->  					interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 113>, <&clks 113>;
->  					clock-names = "ipg", "per";
-> +					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
-> +					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> @@ -206,6 +210,8 @@
->  					interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 114>, <&clks 114>;
->  					clock-names = "ipg", "per";
-> +					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
-> +					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> @@ -217,6 +223,8 @@
->  					interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 115>, <&clks 115>;
->  					clock-names = "ipg", "per";
-> +					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
-> +					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> -- 
-> 1.7.8
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Changes since v1:
+
+  * Fixed pll5, pll6 divs clock name handling 
+
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (8):
+  clk: sunxi: add clock-output-names dt property support
+  clk: sunxi: choose correct name for multiple output factor clocks
+  clk: sunxi: get divs parent clock name from parent factor clock
+  arm: dts: sun4i: rename clock node names to clk at N
+  arm: dts: sun5i: rename clock node names to clk at N
+  arm: dts: sun6i: rename clock node names to clk at N
+  arm: dts: sun7i: rename clock node names to clk at N
+  arm: sun7i: cubietruck: Enable the i2c controllers
+
+ arch/arm/boot/dts/sun4i-a10.dtsi           | 26 +++++++++++++++-----------
+ arch/arm/boot/dts/sun5i-a10s.dtsi          | 26 +++++++++++++++-----------
+ arch/arm/boot/dts/sun5i-a13.dtsi           | 26 +++++++++++++++-----------
+ arch/arm/boot/dts/sun6i-a31.dtsi           | 12 +++++++-----
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 18 ++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi           | 21 ++++++++++++---------
+ drivers/clk/sunxi/clk-sunxi.c              | 27 +++++++++++++++++----------
+ 7 files changed, 99 insertions(+), 57 deletions(-)
+
+-- 
+1.8.5.2
