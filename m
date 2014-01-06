@@ -1,30 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 06 Jan 2014 15:34:01 -0700
-Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
-In-Reply-To: <2030639.dhgZbyhUvO@fb07-iapwap2>
-References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
- <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
- <52CB062C.50802@wwwdotorg.org> <2030639.dhgZbyhUvO@fb07-iapwap2>
-Message-ID: <52CB2F59.3060901@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 6 Jan 2014 14:34:36 -0800
+Subject: Possible arm64 patches for stable
+In-Reply-To: <20131231060453.GA22732@kroah.com>
+References: <20131220172827.GZ31886@sirena.org.uk>
+ <20131231060453.GA22732@kroah.com>
+Message-ID: <20140106223436.GA9235@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2014 03:21 PM, Marc Dietrich wrote:
-> Am Montag, 6. Januar 2014, 12:38:20 schrieb Stephen Warren:
->> On 12/21/2013 01:38 PM, Marc Dietrich wrote:
->>> Add backlight and panel nodes for the PAZ00 TFT LCD panel.
->>>
->>> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
->>> ---
->>> This should enable everything needed. Unfortunately, in my tests it only
->>> switches on the backlight, but the display controller blocks in some
->>> infinit loop, so we get no output (and no working system). I post it here
->>> in case I missed something obvious...
->> As mentioned later on, this works fine with U-Boot (and tests fine here
->> too), so I plan to apply this for 3.15, once I can.
+On Mon, Dec 30, 2013 at 10:04:53PM -0800, Greg Kroah-Hartman wrote:
+> On Fri, Dec 20, 2013 at 05:28:27PM +0000, Mark Brown wrote:
+> > Hi,
+> > 
+> > While reading the kernel logs for arm64 (as one does) I noticed a few
+> > patches that seemed like candidates for either LTS or LTSI.  I've also
+> > had a couple of others mentioned via other routes.  What do you think of
+> > these?
+> > 
+> >   4ecf7ccb1973 arm64: spinlock: retry trylock operation if strex fails on free lock
+> > 
+> > This seems like a correctness fix for spinlocks, though since the
+> > callers should cope with failure it's arguably just an optimisation.
 > 
-> huh? I thought this can go into 3.14 if possible. Patch is harmless and the 
-> merge window still weeks away.
+> I've applied this one to 3.10-stable and will look over the others when
+> I catch up on my larger patch queue, thanks.
 
-The cut-off for new features was at least a week ago. I expect the merge
-window will open this weekend.
+All of the other ones looked good to me and I've queued them up now,
+thanks.
+
+greg k-h
