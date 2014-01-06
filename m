@@ -1,101 +1,146 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Jan 2014 15:53:50 +0000
-Subject: [PATCH v2 3/7] mfd: pm8921: Migrate to irqdomains
-In-Reply-To: <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
-References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
- <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140106155350.GI30156@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Jan 2014 17:03:53 +0100
+Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <52CA603B.3070203@redhat.com>
+References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
+ <201401060816.02998.arnd@arndb.de> <52CA603B.3070203@redhat.com>
+Message-ID: <201401061703.53844.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Convert this driver to use irqdomains so that the PMIC's child
-> devices can be converted to devicetree.
+On Monday 06 January 2014, Hans de Goede wrote:
+> On 01/06/2014 08:16 AM, Arnd Bergmann wrote:
+> > On Monday 06 January 2014, Hans de Goede wrote:
+> >> +Required properties:
+> >> + - compatible: Should be "platform-ohci"
+> >> + - reg: Address range of the ohci registers.
+> >> + - interrupts: Should contain the ohci interrupt.
+> >> +
+> >> +Optional properties:
+> >> + - clocks: array of clocks
+> >> + - clock-names: clock names "ahb" and/or "ohci"
+> >> + - phys: phy
+> >> + - phy-names: "usb_phy"
+> >
+> > Maybe just "usb"? It obviously is a phy, so that part of the name
+> > is a bit redundant. Actually, the "usb" part of the name also seems
+> > redundant. Is it possible to make it an anonymous phy reference
+> > without a phy-names property as we often do for clocks?
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/mfd/pm8921-core.c         | 184 ++++++++++++++------------------------
->  include/linux/mfd/pm8xxx/irq.h    |  36 --------
->  include/linux/mfd/pm8xxx/pm8921.h |  30 -------
->  3 files changed, 65 insertions(+), 185 deletions(-)
->  delete mode 100644 include/linux/mfd/pm8xxx/irq.h
->  delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
+> I'm not a big fan of anonymous references, IE currently the ahci-platform
+> driver is using an anonymous clk reference, but for sunxi (and ie imx too)
+> it needs to be extended to 2 clks, which means using names, while
+> keeping compatibility with the older anonymous using dts (and board)
+> files.
 > 
+> So I can agree to dropping the _phy, but I would like to keep the "usb"
+> name I realize the chances are slim of ever needing 2 phys but never
+> say never ...
 
-<snip>
+Ok, fair enough.
 
-> @@ -56,8 +56,7 @@
->  struct pm_irq_chip {
->  	struct device		*dev;
->  	spinlock_t		pm_irq_lock;
-> -	unsigned int		devirq;
-> -	unsigned int		irq_base;
-> +	struct irq_domain	*domain;
+> > Style-wise, I think I'd prefer not storing error values in the
+> > ohci_platform_priv struct, but rather using NULL pointers for
+> > when the clocks or phy references are unused.
+> 
+> This is a style I picked up from the mmc code, ie do a grep for
+> !IS_ERR in drivers/mmc/host/*.c, but I agree it is not the prettiest,
+> and on looking in other subsystems it is not common, so I'll convert
+> this to storing NULL on error to get the phy or clk.
 
-It's probably best to explicitly specify 'irqdomain' here in order to
-eliminate any possibility of ambiguity.
+Ok, thanks.
 
->  	unsigned int		num_irqs;
->  	unsigned int		num_blocks;
->  	unsigned int		num_masters;
-> @@ -138,7 +137,7 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
->  	for (i = 0; i < 8; i++) {
->  		if (bits & (1 << i)) {
->  			pmirq = block * 8 + i;
-> -			irq = pmirq + chip->irq_base;
-> +			irq = irq_find_mapping(chip->domain, pmirq);
+> >> @@ -83,17 +171,30 @@ static int ohci_platform_probe(struct platform_device *dev)
+> >>   		return -ENXIO;
+> >>   	}
+> >>
+> >> +	hcd = usb_create_hcd(&ohci_platform_hc_driver, &dev->dev,
+> >> +			dev_name(&dev->dev));
+> >> +	if (!hcd)
+> >> +		return -ENOMEM;
+> >> +
+> >> +	if (pdata == &ohci_platform_defaults) {
+> >> +		struct ohci_platform_priv *priv = (struct ohci_platform_priv *)
+> >> +						  hcd_to_ohci(hcd)->priv;
+> >> +
+> >> +		priv->phy = devm_phy_get(&dev->dev, "usb_phy");
+> >> +		if (IS_ERR(priv->phy) && PTR_ERR(priv->phy) == -EPROBE_DEFER) {
+> >> +			err = -EPROBE_DEFER;
+> >> +			goto err_put_hcd;
+> >> +		}
+> >> +
+> >> +		priv->ohci_clk = devm_clk_get(&dev->dev, "ohci");
+> >> +		priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
+> >> +	}
+> >
+> > I think you have to check the clocks for -EPROBE_DEFER as well here, not
+> > just the PHY.
+> 
+> So far I've never seen clk_get return -EPROBE_DEFER, but I guess on some
+> platforms it can.
 
-Going by this patch only, it appears you're calling irq_find_mapping()
-before you've called irq_create_mapping(). This won't work, so unless
-you've called the latter in a previous patch, you should ensure that
-you do so.
+Right. Most clock controllers tend to be initialized at early boot
+time, but some of them are on external PMICs that are only probed after
+i2c or some other subsystem is up.
 
->  			generic_handle_irq(irq);
->  		}
->  	}
-> @@ -197,12 +196,11 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
->  static void pm8xxx_irq_mask_ack(struct irq_data *d)
->  {
->  	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> -	unsigned int pmirq = d->irq - chip->irq_base;
-> -	int	master, irq_bit;
-> +	unsigned int pmirq = irqd_to_hwirq(d);
+> > Otherwise you don't know the difference between "no clock
+> > provided", "error getting the clock reference" and "clock controller not
+> > initialized yet, try again".
+> 
+> I guess of these 3 we really only want to continue on "no clock provided",
+> so I think something like this (for both clks and the phy) would be best:
+> 
+> 		priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
+> 		if (IS_ERR(priv->ahb_clk)) {
+> 			err = PTR_ERR(priv->ahb_clk);
+> 			if (err != -EINVAL && err != -ENODATA)
+> 				goto err_put_hcd;
+> 			priv->ahb_clk = NULL; /* No clock provided */
+> 		}
+> 
+> To clarify -EINVAL will be returned when there is no clock-names, and
+> -ENODATA when the specified name is not found in clock-names.
 
-Why don't you call it hwirq instead of pmirq?
+Ok, looks good.
 
-> +	int	irq_bit;
->  	u8	block, config;
->  
->  	block = pmirq / 8;
+> >> @@ -178,6 +277,12 @@ static int ohci_platform_resume(struct device *dev)
+> >>   #define ohci_platform_resume	NULL
+> >>   #endif /* CONFIG_PM */
+> >>
+> >> +static const struct of_device_id ohci_platform_ids[] = {
+> >> +	{ .compatible = "platform-ohci", },
+> >> +	{ }
+> >> +};
+> >> +MODULE_DEVICE_TABLE(of, ohci_platform_ids);
+> >
+> > I never liked the "platform-*" naming for compatible properties, the
+> > name of the driver is just based on a linux implementation detail
+> > (the platform bus), which could change. How about just calling the
+> > generic one "ohci" or "usb-ohci"?
+> 
+> usb-ohci seems free but usb-ehci are already taken by
+> drivers/usb/host/ehci-ppc-of.c which is as the name implies pretty ppc
+> specific. And since ehci-platform.c can be build on ppc too, we could
+> end up with 2 drivers claiming the same compatibility string on ppc.
+> 
+> Also uhci-platform.c is already using platform-uhci, so using
+> ohci-platform and ehci-platform seems consistent and avoids the
+> conflict with drivers/usb/host/ehci-ppc-of.c
 
-Ah, I guess you're keeping the original naming convention.
+Hmm, that file seems to do two things that ehci-platform doesn't:
+It handles big-endian controllers and it has special initialization
+for compatible="ibm,usb-ehci-440epx". It also uses a different way
+to get to the resources because the driver dates back to before the
+unification of platform_bus and of_platform_bus, but that can be
+trivially changed.
 
-> -	master = block / 8;
+I would hope that we can eventually merge the two drivers, and I'm
+guessing that we will sooner or later need the big-endian support on
+non-ppc machines anyway. The question is what to do about the 440epx
+hack. It may be small enough that we can just leave it as a quirk
+inside #ifdef CONFIG_PPC in the unified driver, or it may end up
+being shared with arm64 X-Gene, which seems to share a common
+ancestry with some of the ppc4xx socs.
 
-What was the point in this anyway? Was it completely superfluous?
-
-<snip>
-
-> +static int pm8xxx_irq_init(struct platform_device *pdev, unsigned int irq)
-> +{
-> +	struct pm_irq_chip  *chip;
-> +	unsigned int nirqs = 256;
-
-No magic numbers please.
-
-> +	chip = devm_kzalloc(&pdev->dev, sizeof(*chip) + sizeof(u8) * nirqs,
-> +			    GFP_KERNEL);
-
-What does the sizeof(u8) add here?
-
-<snip>
-
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> +}
-
-Can't you use the MFD core instead?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
