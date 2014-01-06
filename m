@@ -1,115 +1,202 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  6 Jan 2014 13:58:08 +0800
-Subject: [PATCH v2 4/8] arm: dts: sun4i: rename clock node names to clk@N
-In-Reply-To: <1388987892-23733-1-git-send-email-wens@csie.org>
-References: <1388987892-23733-1-git-send-email-wens@csie.org>
-Message-ID: <1388987892-23733-5-git-send-email-wens@csie.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 6 Jan 2014 14:04:33 +0800
+Subject: [PATCH] ARM: dts: vf610: use the interrupt macros
+In-Reply-To: <1387952367-6321-1-git-send-email-b32955@freescale.com>
+References: <1387952367-6321-1-git-send-email-b32955@freescale.com>
+Message-ID: <20140106060429.GC27227@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree naming conventions state that node names should match
-node function. Change fully functioning clock nodes to match.
+On Wed, Dec 25, 2013 at 02:19:27PM +0800, Huang Shijie wrote:
+> This patch uses the IRQ_TYPE_LEVEL_HIGH/IRQ_TYPE_NONE to replace
+> the hardcode.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610.dtsi |   37 +++++++++++++++++++------------------
+>  1 files changed, 19 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index ef8a0ee..cd5bb86 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -10,6 +10,7 @@
+>  #include "skeleton.dtsi"
+>  #include "vf610-pingrp.h"
+>  #include <dt-bindings/clock/vf610-clock.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+>  
+>  / {
+>  	aliases {
+> @@ -90,7 +91,7 @@
+>  			uart0: serial at 40027000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x40027000 0x1000>;
+> -				interrupts = <0 61 0x00>;
 
-Also add the output name for pll5 to use as the clock name.
+Why is it so special having a 0x00 IRQ trigger type?  Or is it just a
+typo?  While we are at it, we should probably fix it if it's a typo.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 26 +++++++++++++++-----------
- 1 file changed, 15 insertions(+), 11 deletions(-)
+Shawn
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 3ba2b46..45d5283 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -50,42 +50,46 @@
- 			clock-frequency = <0>;
- 		};
- 
--		osc24M: osc24M at 01c20050 {
-+		osc24M: clk at 01c20050 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-osc-clk";
- 			reg = <0x01c20050 0x4>;
- 			clock-frequency = <24000000>;
-+			clock-output-names = "osc24M";
- 		};
- 
--		osc32k: osc32k {
-+		osc32k: clk at 0 {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <32768>;
-+			clock-output-names = "osc32k";
- 		};
- 
--		pll1: pll1 at 01c20000 {
-+		pll1: clk at 01c20000 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-pll1-clk";
- 			reg = <0x01c20000 0x4>;
- 			clocks = <&osc24M>;
-+			clock-output-names = "pll1";
- 		};
- 
--		pll4: pll4 at 01c20018 {
-+		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-pll1-clk";
- 			reg = <0x01c20018 0x4>;
- 			clocks = <&osc24M>;
-+			clock-output-names = "pll4";
- 		};
- 
--		pll5: pll5 at 01c20020 {
-+		pll5: clk at 01c20020 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-pll5-clk";
- 			reg = <0x01c20020 0x4>;
- 			clocks = <&osc24M>;
--			clock-output-names = "pll5_ddr", "pll5_other";
-+			clock-output-names = "pll5_ddr", "pll5_other", "pll5";
- 		};
- 
--		pll6: pll6 at 01c20028 {
-+		pll6: clk at 01c20028 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-pll6-clk";
- 			reg = <0x01c20028 0x4>;
-@@ -108,7 +112,7 @@
- 			clocks = <&cpu>;
- 		};
- 
--		axi_gates: axi_gates at 01c2005c {
-+		axi_gates: clk at 01c2005c {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-axi-gates-clk";
- 			reg = <0x01c2005c 0x4>;
-@@ -123,7 +127,7 @@
- 			clocks = <&axi>;
- 		};
- 
--		ahb_gates: ahb_gates at 01c20060 {
-+		ahb_gates: clk at 01c20060 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-ahb-gates-clk";
- 			reg = <0x01c20060 0x8>;
-@@ -148,7 +152,7 @@
- 			clocks = <&ahb>;
- 		};
- 
--		apb0_gates: apb0_gates at 01c20068 {
-+		apb0_gates: clk at 01c20068 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-apb0-gates-clk";
- 			reg = <0x01c20068 0x4>;
-@@ -172,7 +176,7 @@
- 			clocks = <&apb1_mux>;
- 		};
- 
--		apb1_gates: apb1_gates at 01c2006c {
-+		apb1_gates: clk at 01c2006c {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-apb1-gates-clk";
- 			reg = <0x01c2006c 0x4>;
--- 
-1.8.5.2
+> +				interrupts = <0 61 IRQ_TYPE_NONE>;
+>  				clocks = <&clks VF610_CLK_UART0>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -99,7 +100,7 @@
+>  			uart1: serial at 40028000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x40028000 0x1000>;
+> -				interrupts = <0 62 0x04>;
+> +				interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_UART1>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -108,7 +109,7 @@
+>  			uart2: serial at 40029000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x40029000 0x1000>;
+> -				interrupts = <0 63 0x04>;
+> +				interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_UART2>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -117,7 +118,7 @@
+>  			uart3: serial at 4002a000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x4002a000 0x1000>;
+> -				interrupts = <0 64 0x04>;
+> +				interrupts = <0 64 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_UART3>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -128,7 +129,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "fsl,vf610-dspi";
+>  				reg = <0x4002c000 0x1000>;
+> -				interrupts = <0 67 0x04>;
+> +				interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_DSPI0>;
+>  				clock-names = "dspi";
+>  				spi-num-chipselects = <5>;
+> @@ -138,7 +139,7 @@
+>  			sai2: sai at 40031000 {
+>  				compatible = "fsl,vf610-sai";
+>  				reg = <0x40031000 0x1000>;
+> -				interrupts = <0 86 0x04>;
+> +				interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_SAI2>;
+>  				clock-names = "sai";
+>  				status = "disabled";
+> @@ -147,7 +148,7 @@
+>  			pit: pit at 40037000 {
+>  				compatible = "fsl,vf610-pit";
+>  				reg = <0x40037000 0x1000>;
+> -				interrupts = <0 39 0x04>;
+> +				interrupts = <0 39 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_PIT>;
+>  				clock-names = "pit";
+>  			};
+> @@ -164,7 +165,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "fsl,vf610-qspi";
+>  				reg = <0x40044000 0x1000>;
+> -				interrupts = <0 24 0x04>;
+> +				interrupts = <0 24 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_QSPI0_EN>,
+>  					<&clks VF610_CLK_QSPI0>;
+>  				clock-names = "qspi_en", "qspi";
+> @@ -180,7 +181,7 @@
+>  			gpio1: gpio at 40049000 {
+>  				compatible = "fsl,vf610-gpio";
+>  				reg = <0x40049000 0x1000 0x400ff000 0x40>;
+> -				interrupts = <0 107 0x04>;
+> +				interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				interrupt-controller;
+> @@ -191,7 +192,7 @@
+>  			gpio2: gpio at 4004a000 {
+>  				compatible = "fsl,vf610-gpio";
+>  				reg = <0x4004a000 0x1000 0x400ff040 0x40>;
+> -				interrupts = <0 108 0x04>;
+> +				interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				interrupt-controller;
+> @@ -202,7 +203,7 @@
+>  			gpio3: gpio at 4004b000 {
+>  				compatible = "fsl,vf610-gpio";
+>  				reg = <0x4004b000 0x1000 0x400ff080 0x40>;
+> -				interrupts = <0 109 0x04>;
+> +				interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH>;
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				interrupt-controller;
+> @@ -213,7 +214,7 @@
+>  			gpio4: gpio at 4004c000 {
+>  				compatible = "fsl,vf610-gpio";
+>  				reg = <0x4004c000 0x1000 0x400ff0c0 0x40>;
+> -				interrupts = <0 110 0x04>;
+> +				interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				interrupt-controller;
+> @@ -224,7 +225,7 @@
+>  			gpio5: gpio at 4004d000 {
+>  				compatible = "fsl,vf610-gpio";
+>  				reg = <0x4004d000 0x1000 0x400ff100 0x40>;
+> -				interrupts = <0 111 0x04>;
+> +				interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				interrupt-controller;
+> @@ -242,7 +243,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "fsl,vf610-i2c";
+>  				reg = <0x40066000 0x1000>;
+> -				interrupts =<0 71 0x04>;
+> +				interrupts =<0 71 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_I2C0>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -265,7 +266,7 @@
+>  			uart4: serial at 400a9000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x400a9000 0x1000>;
+> -				interrupts = <0 65 0x04>;
+> +				interrupts = <0 65 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_UART4>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -274,7 +275,7 @@
+>  			uart5: serial at 400aa000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x400aa000 0x1000>;
+> -				interrupts = <0 66 0x04>;
+> +				interrupts = <0 66 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_UART5>;
+>  				clock-names = "ipg";
+>  				status = "disabled";
+> @@ -283,7 +284,7 @@
+>  			fec0: ethernet at 400d0000 {
+>  				compatible = "fsl,mvf600-fec";
+>  				reg = <0x400d0000 0x1000>;
+> -				interrupts = <0 78 0x04>;
+> +				interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_ENET0>,
+>  					<&clks VF610_CLK_ENET0>,
+>  					<&clks VF610_CLK_ENET>;
+> @@ -294,7 +295,7 @@
+>  			fec1: ethernet at 400d1000 {
+>  				compatible = "fsl,mvf600-fec";
+>  				reg = <0x400d1000 0x1000>;
+> -				interrupts = <0 79 0x04>;
+> +				interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_ENET1>,
+>  					<&clks VF610_CLK_ENET1>,
+>  					<&clks VF610_CLK_ENET>;
+> -- 
+> 1.7.2.rc3
+> 
+> 
