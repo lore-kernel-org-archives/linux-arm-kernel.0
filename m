@@ -1,41 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Jan 2014 14:47:41 +0000
-Subject: [PATCH v2 1/7] mfd: Move pm8xxx-irq.c contents into only driver
- that uses it
-In-Reply-To: <1387831563-13535-2-git-send-email-sboyd@codeaurora.org>
-References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
- <1387831563-13535-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140106144741.GH30156@lee--X1>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon,  6 Jan 2014 15:52:01 +0100
+Subject: [RFC PATCH 2/3] staging: imx-drm-core: Use graph to find connection
+ between crtc and encoder
+In-Reply-To: <1389019922-31992-1-git-send-email-p.zabel@pengutronix.de>
+References: <1389019922-31992-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1389019922-31992-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Dec 2013, Stephen Boyd wrote:
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/staging/imx-drm/imx-drm-core.c | 44 ++++++++++++++++++++++++----------
+ 1 file changed, 32 insertions(+), 12 deletions(-)
 
-> The pm8xxx-irq.c code is practically mandatory given that the
-> pm8921-core driver will WARN about it missing and the Kconfig
-> marks it as default y when a PM8xxx chips is enabled. The only
-> reason the file was split out was because we planned to support
-> other pm8xxx chips with different pm8xxx-core.c files. Now that
-> we have DT on ARM this isn't necessary because we should be able
-> to support all the ssbi based PM8xxx chips in one driver and one
-> file with no data bloat. Let's move this code into the only
-> driver that uses it right now (pm8921) so that it's always compiled when
-> needed. In the future we can rename pm8921-core.c to something
-> more generic.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/mfd/Kconfig            |  10 --
->  drivers/mfd/pm8921-core.c      | 348 ++++++++++++++++++++++++++++++++++++++
->  drivers/mfd/pm8xxx-irq.c       | 371 -----------------------------------------
->  include/linux/mfd/pm8xxx/irq.h |  23 ---
->  4 files changed, 348 insertions(+), 404 deletions(-)
->  delete mode 100644 drivers/mfd/pm8xxx-irq.c
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 2490dc3..2c20434 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -23,6 +23,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
++#include <media/v4l2-of.h>
+ 
+ #include "imx-drm.h"
+ 
+@@ -420,9 +421,23 @@ EXPORT_SYMBOL_GPL(imx_drm_remove_crtc);
+  * or removed once the DRM device has been fully initialised.
+  */
+ static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
+-	void *cookie, int id)
++	struct device_node *endpoint)
+ {
++	struct device_node *remote_port;
++	void *cookie;
+ 	unsigned i;
++	int id = 0;
++
++	remote_port = v4l2_of_get_remote_port(endpoint);
++	if (remote_port)
++		of_property_read_u32(remote_port, "reg", &id);
++	else
++		return 0;
++	cookie = remote_port->parent;
++	of_node_put(remote_port);
++
++	/* IPU specific: CSI0/1 at 0/1, DI0/1 at 2/3 */
++	id -= 2;
+ 
+ 	for (i = 0; i < MAX_CRTC; i++) {
+ 		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
+@@ -438,24 +453,21 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np)
+ {
+ 	struct imx_drm_device *imxdrm = drm->dev_private;
++	struct device_node *ep, *last_ep = NULL;
+ 	uint32_t crtc_mask = 0;
+ 	int i, ret = 0;
+ 
+ 	for (i = 0; !ret; i++) {
+-		struct of_phandle_args args;
+ 		uint32_t mask;
+-		int id;
+ 
+-		ret = of_parse_phandle_with_args(np, "crtcs", "#crtc-cells", i,
+-						 &args);
+-		if (ret == -ENOENT)
++		ep = v4l2_of_get_next_endpoint(np, last_ep);
++		if (last_ep)
++			of_node_put(last_ep);
++		if (!ep)
+ 			break;
+-		if (ret < 0)
+-			return ret;
+ 
+-		id = args.args_count > 0 ? args.args[0] : 0;
+-		mask = imx_drm_find_crtc_mask(imxdrm, args.np, id);
+-		of_node_put(args.np);
++		/* CSI */
++		mask = imx_drm_find_crtc_mask(imxdrm, ep);
+ 
+ 		/*
+ 		 * If we failed to find the CRTC(s) which this encoder is
+@@ -463,12 +475,20 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 		 * not been registered yet.  Defer probing, and hope that
+ 		 * the required CRTC is added later.
+ 		 */
+-		if (mask == 0)
++		if (mask == 0) {
++			of_node_put(ep);
+ 			return -EPROBE_DEFER;
++		}
+ 
+ 		crtc_mask |= mask;
++		last_ep = ep;
+ 	}
+ 
++	if (ep)
++		of_node_put(ep);
++	if (i == 0)
++		return -ENOENT;
++
+ 	encoder->possible_crtcs = crtc_mask;
+ 
+ 	/* FIXME: this is the mask of outputs which can clone this output. */
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.5.2
