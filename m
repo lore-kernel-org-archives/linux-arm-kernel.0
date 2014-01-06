@@ -1,64 +1,53 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 06 Jan 2014 10:55:19 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140106001709.GD4093@lunn.ch>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
- <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
- <20140105172756.GA11280@obsidianresearch.com> <52C99851.70806@gmail.com>
- <20140105230746.GB11280@obsidianresearch.com> <52C9E6D0.3000406@gmail.com>
- <20140105234009.GC11280@obsidianresearch.com> <52C9F32D.5080007@gmail.com>
- <20140106001709.GD4093@lunn.ch>
-Message-ID: <52CA7D87.9070606@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 06 Jan 2014 11:02:26 +0100
+Subject: [PATCH v3] ARM: prima2: move to generic reset controller driver
+ framework
+In-Reply-To: <CAGsJ_4wZnb0CLqv-CrJz1G3pXXcW=959L2AzjfTXys2Y_vsk-w@mail.gmail.com>
+References: <1388998927-9227-1-git-send-email-21cnbao@gmail.com>
+ <1389000455.5590.4.camel@pizza.hi.pengutronix.de>
+ <CAGsJ_4wZnb0CLqv-CrJz1G3pXXcW=959L2AzjfTXys2Y_vsk-w@mail.gmail.com>
+Message-ID: <1389002546.5590.6.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On 06/01/2014 01:17, Andrew Lunn wrote:
->>>> Does that power down really disable reading from PCIe controller
->>>> registers or is it just PHY power down?
->>>
->>> I haven't experimented with it, but every block that has a clock gate
->>> has a power down, so I doubt it is just a phy power down.
->>
->> Ok, I see. But it isn't documented in the public FS, is it? If there is
->> an extra powerdown register for each ip block, I guess it will also
->> break reading from its registers.
+Am Montag, den 06.01.2014, 17:33 +0800 schrieb Barry Song:
+> 2014/1/6 Philipp Zabel <p.zabel@pengutronix.de>:
+> > Hi Barry,
+> >
+> >> -
+> >> -int sirfsoc_reset_device(struct device *dev)
+> >> +static int sirfsoc_reset_module(struct reset_controller_dev *rcdev,
+> >> +                                     unsigned long sw_reset_idx)
+> >>  {
+> >> -     u32 reset_bit;
+> >> +     u32 reset_bit = sw_reset_idx;
+> >>
+> >> -     if (of_property_read_u32(dev->of_node, "reset-bit", &reset_bit))
+> >
+> > It seems switching to the reset controller framework is an incompatible
+> > device tree change. I take it this is not an issue because the old
+> > binding was never documented / is not used in the wild?
 > 
-> Hi Sebastian
+> yes. old binding was never documented and used before it was moved to
+> reset controller.
 > 
-> The public Kirkwood FS has a memory power management control register,
-> Offset 0x20118. It is unclear what it actually does, and if you can
-> still access registers when it is off. We would have to poke it and
-> see.
-
-Interesting, this registers is mentioned under the section "Core Clock
-Power Saving" in the kirkwood datasheet, so maybe we should add this
-register to the gating clock
-
-I found similar registers for Armada XP/370, I am going to test what happen
-if the PCxy  Memory Power Down are down.
-
-
-Thanks,
-
-Gregory
-
-
-
+> > If so, apart from a few whitespace issues, this looks good to me.
 > 
-> 	Andrew
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> may i take this as an Ack from you?
 > 
+> sorry. i missed two tab issues and will fix in v4.
+> 
+> ERROR: code indent should use tabs where possible
+> #148: FILE: arch/arm/mach-prima2/common.c:20:
+> +        sirfsoc_of_rstc_init();$
+> 
+> ERROR: code indent should use tabs where possible
+> #149: FILE: arch/arm/mach-prima2/common.c:21:
+> +        of_platform_populate(NULL, of_default_bus_match_table,$
 
+Yes. With this fixed,
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
