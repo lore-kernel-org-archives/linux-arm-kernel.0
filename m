@@ -1,14 +1,13 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 6 Jan 2014 08:36:50 -0400
-Subject: [PATCHv2 6/7] arm: dts: add tmp102 i2c sensor node on dra7-evm
+Date: Mon, 6 Jan 2014 08:36:51 -0400
+Subject: [PATCHv2 7/7] arm: dts: add thermal zones info on tmp102 for DRA7-EVM
 In-Reply-To: <1389011811-13004-1-git-send-email-eduardo.valentin@ti.com>
 References: <1389011811-13004-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1389011811-13004-7-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1389011811-13004-8-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On dra7-evm there is an tmp102 temperature sensor on i2c bus 1.
-This patch adds its device tree node.
+Add simple thermal zone on tmp102.
 
 Cc: Beno?t Cousson <bcousson@baylibre.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
@@ -23,26 +22,34 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/boot/dts/dra7-evm.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/dra7-evm.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 5babba0..36e2c9e 100644
+index 36e2c9e..1ea9c3d 100644
 --- a/arch/arm/boot/dts/dra7-evm.dts
 +++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -212,6 +212,13 @@
- 			};
- 		};
+@@ -95,6 +95,21 @@
  	};
-+
-+	tmp102: tmp102 at 48 {
-+		compatible = "ti,tmp102";
-+		reg = <0x48>;
-+
-+		#thermal-sensor-cells = <0>;
-+	};
  };
  
- &i2c2 {
++&thermal_zones {
++	pcb_thermal: pcb_thermal {
++		polling-delay-passive = <250>; /* milliseconds */
++		polling-delay = <1000>; /* milliseconds */
++		thermal-sensors = <&tmp102>;
++		trips {
++			crit at 80000 {
++			temperature = <80000>;
++				hysteresis = <1000>;
++				type = "critical";
++			};
++		};
++	};
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 	pinctrl-names = "default";
 -- 
 1.8.2.1.342.gfa7285d
