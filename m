@@ -1,120 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Jan 2014 15:09:37 +0000
-Subject: [PATCH v3] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <1389007012-10887-1-git-send-email-21cnbao@gmail.com>
-References: <1389007012-10887-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20140106150936.GA24664@e106331-lin.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 6 Jan 2014 10:17:44 -0500 (EST)
+Subject: [PATCH 2/2] ARM: kconfig: select HAVE_EFFICIENT_UNALIGNED_ACCESS
+ for CPUv6+ && MMU
+In-Reply-To: <20140106145829.GD10449@mudshark.cambridge.arm.com>
+References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
+ <1387282577-2753-2-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.10.1312171528130.7480@knanqh.ubzr>
+ <20140106145829.GD10449@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.10.1401061017090.2060@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 11:16:52AM +0000, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+On Mon, 6 Jan 2014, Will Deacon wrote:
+
+> Hi Nicolas,
 > 
-> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
-> we add a xlate() to let dma clients be able to find right dma_chan by generic
-> "dmas" properties in dts.
+> On Tue, Dec 17, 2013 at 08:34:18PM +0000, Nicolas Pitre wrote:
+> > On Tue, 17 Dec 2013, Will Deacon wrote:
+> > 
+> > > Modern ARM CPUs can perform efficient unaligned memory accesses in
+> > > hardware and this feature is relied up on by code such as the dcache
+> > > word-at-a-time name hashing.
+> > > 
+> > > This patch selects HAVE_EFFICIENT_UNALIGNED_ACCESS for these cores and
+> > > reworks the kconfig select logic for DCACHE_WORD_ACCESS to use the new
+> > > symbol.
+> > > 
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > This symbol could be used in some more places too.  For example this 
+> > would make the code a bit clearer:
 > 
-> Cc: Lars-Peter Clausen <lars@metafoo.de>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  -v3:
->  drop unused variant cap pointed out by Lars-Peter;
->  add dt-binding document
+> Well spotted.
 > 
->  .../devicetree/bindings/dma/sirfsoc-dma.txt        |   42 ++++++++++++++++++++
->  arch/arm/boot/dts/atlas6.dtsi                      |    4 ++
->  arch/arm/boot/dts/prima2.dtsi                      |    4 ++
->  drivers/dma/sirf-dma.c                             |   23 +++++++++++
->  4 files changed, 73 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
+> > diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+> > index 72abdc541f..12c3a5decc 100644
+> > --- a/arch/arm/include/asm/uaccess.h
+> > +++ b/arch/arm/include/asm/uaccess.h
+> > @@ -19,7 +19,7 @@
+> >  #include <asm/unified.h>
+> >  #include <asm/compiler.h>
+> >  
+> > -#if __LINUX_ARM_ARCH__ < 6
+> > +#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> >  #include <asm-generic/uaccess-unaligned.h>
+> >  #else
+> >  #define __get_user_unaligned __get_user
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt b/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
-> new file mode 100644
-> index 0000000..262cf8c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
-> @@ -0,0 +1,42 @@
-> +* CSR SiRFSoC DMA controller
-> +
-> +See dma.txt first
-> +
-> +Required properties:
-> +- compatible: Should be "sirf,prima2-dmac" or "sirf,marco-dmac"
-> +- reg: Should contain DMA registers location and length.
-> +- interrupts: Should contain one interrupt shared by all channel
-> +- #dma-cells: see dma.txt, should be 1, para number
+> The original patch is now queued, so we can add this hunk as a follow-up
+> cleanup patch. I've got you as the author, but can I add your S-o-B please?
 
-para number?
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-> +- dma-channels: physical channels supported
-> +- clocks: clock required
-> +
-> +Example:
-> +
-> +Controller:
-> +dmac0: dma-controller at b00b0000 {
-> +	compatible = "sirf,prima2-dmac";
-> +	reg = <0xb00b0000 0x10000>;
-> +	interrupts = <12>;
-> +	clocks = <&clks 24>;
-> +};
 
-#dma-cells and dma-channels seem to be missing.
 
-> +
-> +
-> +Client:
-> +Use specific request line passing from dmax
-> +For example, spi0 read channel request line is 9 of the 2nd dma controller, while
-> +write channel uses 4 of the 2nd dma controller; spi1 read channel request line is
-> +12 of the 1st dma controller, while write channel uses 13 of the 1st dma controller.
-
-I think this should be described in the #dma-cells description, as this
-described the meaning of the single dma cell.
-
-> +
-> +spi0: spi at b00d0000 {
-> +	compatible = "sirf,prima2-spi";
-> +	dmas = <&dmac1 9>,
-> +		<&dmac1 4>;
-> +	dma-names = "rx", "tx";
-> +};
-> +
-> +spi1: spi at b0170000 {
-> +	compatible = "sirf,prima2-spi";
-> +	dmas = <&dmac0 12>,
-> +		<&dmac0 13>;
-> +	dma-names = "rx", "tx";
-> +};
-> diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-> index b63cfef..aa3ff43 100644
-> --- a/arch/arm/boot/dts/atlas6.dtsi
-> +++ b/arch/arm/boot/dts/atlas6.dtsi
-> @@ -260,6 +260,8 @@
->  				reg = <0xb00b0000 0x10000>;
->  				interrupts = <12>;
->  				clocks = <&clks 24>;
-> +				#dma-cells = <1>;
-> +				#dma-channels = <16>;
-
-is it dma-channels or #dma-channels? The document and examples differ.
-
-[...]
-
-> +static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
-> +	struct of_dma *ofdma)
-> +{
-> +	struct sirfsoc_dma *sdma = ofdma->of_dma_data;
-> +	unsigned int request = dma_spec->args[0];
-> +
-> +	if (request > SIRFSOC_DMA_CHANNELS)
-> +		return NULL;
-> +
-> +	return dma_get_slave_channel(&(sdma->channels[request].chan));
-
-Are the internal brackets necessary? "&" is lower precendence than "->",
-"[]", and ".".
-
-Thanks,
-Mark.
+> 
+> Cheers,
+> 
+> Will
+> 
