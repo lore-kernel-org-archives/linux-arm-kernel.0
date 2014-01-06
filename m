@@ -1,33 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 6 Jan 2014 14:22:47 +0900
-Subject: [PATCH V2 3/5] arm: shmobile: r7s72100: add nodes for i2c
- controllers to dtsi
-In-Reply-To: <20131227042747.GB6161@katana>
-References: <1387402321-21866-1-git-send-email-wsa@the-dreams.de>
- <1387402321-21866-4-git-send-email-wsa@the-dreams.de>
- <20131227042747.GB6161@katana>
-Message-ID: <20140106052247.GB24653@verge.net.au>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Mon, 6 Jan 2014 05:25:32 +0000
+Subject: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20140103230826.GB13489@core.coreip.homeip.net>
+References: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
+ <20140103074511.GA10680@core.coreip.homeip.net>
+ <f9527d65aa234f40af2830d9fb139bbb@BY2PR03MB505.namprd03.prod.outlook.com>
+ <20140103230826.GB13489@core.coreip.homeip.net>
+Message-ID: <0773adbc0c0f4406ab6df6480d4aef51@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 05:27:47AM +0100, Wolfram Sang wrote:
-> On Wed, Dec 18, 2013 at 10:31:59PM +0100, Wolfram Sang wrote:
-> > From: Wolfram Sang <wsa@sang-engineering.com>
-> > 
-> > I decided to put the pinmuxing into the dtsi file since there is only
-> > one pinmux posiibility which one probably wants to have when using the
-> > bus.
-> > 
-> > Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> > Acked-by: Magnus Damm <damm@opensource.se>
+> > > > +static inline int fsl_pwm_calculate_default_ps(struct fsl_pwm_chip *fpc,
+> > > > +					       enum fsl_pwm_clk index)
+> > > > +{
+> > >
+> > > Why do you declare this (and other module-local) function as inline?
+> > > It is usually better let compiler decide if given function should be
+> > > inlined or not.
+> > >
+> >
+> > Could the compiler know when the given function should be inlined by
+> > not declare it?
 > 
-> Simon, I think you could pull in these patches, too. My series does not
-> really depend on the pinctrl stuff. I2C pins are function group 1 and
-> thus activated by default if the bootloader doesn't do weird things.
-> Actually, I coded the PFC stuff after the driver was finished :)
+> Yes.
+> 
+> > And when will be inlined ?
+> 
+> When it makes sense to do so from compiler's point of view: i.e. it is
+> smallish or with single call site and there are enough registers, etc,
+> etc.
+>
 
-That seems reasonable.
+Well, the inline is not very useful here, I will revise this.
 
-Could you send a series which contains the patches you would like
-queued up? Please base it on the latest devel tag, currently
-renesas-devel-v3.13-rc5-20131230, without other patches applied.
+
+Thanks,
+
+--
+Best Regards,
+Xiubo
