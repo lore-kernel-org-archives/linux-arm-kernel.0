@@ -1,81 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 06 Jan 2014 14:19:11 -0800
-Subject: [PATCH v2 0/9] CPU enable method based SMP/hotplug + MSM
- conversion
-In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52CB2BDF.9040208@codeaurora.org>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 06 Jan 2014 23:21:30 +0100
+Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
+In-Reply-To: <52CB062C.50802@wwwdotorg.org>
+References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+ <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
+ <52CB062C.50802@wwwdotorg.org>
+Message-ID: <2030639.dhgZbyhUvO@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping? Can anyone take a look at the generic ARM and DT binding patches
-and provide acks/reviews? I'd like to send this through arm-soc via the
-MSM tree if possible.
+Am Montag, 6. Januar 2014, 12:38:20 schrieb Stephen Warren:
+> On 12/21/2013 01:38 PM, Marc Dietrich wrote:
+> > Add backlight and panel nodes for the PAZ00 TFT LCD panel.
+> > 
+> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> > ---
+> > This should enable everything needed. Unfortunately, in my tests it only
+> > switches on the backlight, but the display controller blocks in some
+> > infinit loop, so we get no output (and no working system). I post it here
+> > in case I missed something obvious...
+> As mentioned later on, this works fine with U-Boot (and tests fine here
+> too), so I plan to apply this for 3.15, once I can.
 
-On 12/23/13 16:39, Stephen Boyd wrote:
-> This is a rework of patches sent a months back by Rohit[1].
-> The goal of these patches is to add support for SMP and (basic)
-> hotplug on MSM based SoCs. To get there, we add support for a
-> generic way to hook in SMP/hotplug support code based on DT. To
-> show how it's used, we convert the MSM8660 SMP support code over
-> to the new method. After that we add support for the rest of the
-> upstream MSM SoCs (note these patches are piled high on top of
-> Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
-> but this should only matter to the MSM maintainers).
->
-> This is one of the last items of code that still requires us to have
-> a mach directory and a machine descriptor. We should be able to move
-> the hotplug/smp code out of mach directories if this approach is
-> accepted.
->
-> Changes since v1:
->  * Added pointers from cpu nodes to saw and acc nodes
->  * Squashed nr_cpus removal into reorganization patch
->  * Reworked bindings/documentation
->  * Rebased onto v3.13-rc4
->
-> [1] https://lkml.org/lkml/2013/8/1/770
-> [2] https://lkml.org/lkml/2013/10/17/520
-> [3] https://lkml.org/lkml/2013/10/18/406
-> [4] http://lkml.org/lkml/2013/10/28/501
->  
->
-> Rohit Vaswani (6):
->   devicetree: bindings: Document Krait/Scorpion cpus and enable-method
->   ARM: msm: Remove pen_release usage
->   ARM: msm: Re-organize platsmp to make it extensible
->   ARM: msm: Add SMP support for KPSSv1
->   ARM: msm: Add SMP support for KPSSv2
->   ARM: dts: msm: Add nodes necessary for SMP boot
->
-> Stephen Boyd (3):
->   devicetree: bindings: Document qcom,kpss-acc
->   devicetree: bindings: Document qcom,saw2 node
->   ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu hotplug/smp
->
->  Documentation/devicetree/bindings/arm/cpus.txt     |  25 +-
->  .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  30 ++
->  .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  35 ++
->  arch/arm/boot/dts/qcom-msm8660-surf.dts            |  24 ++
->  arch/arm/boot/dts/qcom-msm8960-cdp.dts             |  52 +++
->  arch/arm/boot/dts/qcom-msm8974.dtsi                |  69 ++++
->  arch/arm/include/asm/smp.h                         |   9 +
->  arch/arm/kernel/devtree.c                          |  40 +++
->  arch/arm/mach-msm/Makefile                         |   2 +-
->  arch/arm/mach-msm/board-dt.c                       |  14 -
->  arch/arm/mach-msm/common.h                         |   1 -
->  arch/arm/mach-msm/headsmp.S                        |  39 ---
->  arch/arm/mach-msm/hotplug.c                        |  31 +-
->  arch/arm/mach-msm/platsmp.c                        | 371 ++++++++++++++++-----
->  arch/arm/mach-msm/scm-boot.h                       |   8 +-
->  include/asm-generic/vmlinux.lds.h                  |  10 +
->  16 files changed, 595 insertions(+), 165 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->  delete mode 100644 arch/arm/mach-msm/headsmp.S
->
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+huh? I thought this can go into 3.14 if possible. Patch is harmless and the 
+merge window still weeks away.
