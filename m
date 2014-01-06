@@ -1,65 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 06 Jan 2014 10:09:19 +0100
-Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <201401051533.58931.arnd@arndb.de>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
- <201401051533.58931.arnd@arndb.de>
-Message-ID: <52CA72BF.10604@free-electrons.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon,  6 Jan 2014 14:32:54 +0530
+Subject: [PATCH 1/2] ARM: Exynos: Use generic uncompress.h
+Message-ID: <1388998975-32362-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+As a pre-requisite step towards enabling multi-platform support
+for Exynos, enable it to use generic uncompress.h instead of the
+one provided in machine code.
 
-On 05/01/2014 15:33, Arnd Bergmann wrote:
-> On Friday 03 January 2014, Gregory CLEMENT wrote:
->> The first variants of Armada XP SoCs (A0 stepping) have issues related
->> to the i2c controller which prevent to use the offload mechanism and
->> lead to a kernel hang during boot.
->>
->> The driver now check the revision of the SoC. If the revision is not
->> more recent than the A0 or if the driver can't get the SoC revision
->> then it disables the offload mechanism.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Acked-by: Wolfram Sang <wsa@the-dreams.de>
-> 
-> Relying on the soc id patch for a "stable" bug fix seems a little
-> far-reaching to me. I would be happier to first try to do a local
-> detection based on the i2c bus device node itself. Do you know how
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ arch/arm/Kconfig.debug |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-It was my first proposal in case adding the soc id detection was
-a too big things. But it turned out that the amount of code is very
-low so I really think it worth adding it along the fix. Device tree
-is supposed to be stable so as soon as we add something in it we are
-supposed support it forever. Moreover using device tree for something
-we can probe is counter productive.
-
-> common the A0 revision is? You mention "early release of the
-> OpenBlocks AX3-4 boards". Any others that you suspect? If not,
-
-No, from the info I gathered I expected that only OpenBlocks AX3-4
-would be the only product shipped with an A0 version and as I said
-it should be only a limit amount of them.
-
-> how about adding either a boolean property in the node or a
-> new "compatible" value to distinguish the working version from
-> the broken one?
-> 
-> If A0 is very common, you might do the same thing in the opposite
-> way and default to "broken" unless it is explicitly known to be
-> the good version. In general, I'm much in favor of keeping "quirks"
-> local to device drivers if possible and not rely on global system
-> state.
-> 
-> 	Arnd
-> 
-
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index e6c313ec5ece..de379a93c8ba 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1131,7 +1131,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
+ 
+ config DEBUG_UNCOMPRESS
+ 	bool
+-	depends on ARCH_MULTIPLATFORM || ARCH_MSM
++	depends on ARCH_MULTIPLATFORM || ARCH_MSM || ARCH_EXYNOS
+ 	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
+ 		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+ 	help
+@@ -1147,7 +1147,8 @@ config DEBUG_UNCOMPRESS
+ 
+ config UNCOMPRESS_INCLUDE
+ 	string
+-	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM
++	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
++					ARCH_EXYNOS
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
