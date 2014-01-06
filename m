@@ -1,32 +1,111 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 6 Jan 2014 12:13:17 +1100
-Subject: linux-next: manual merge of the sh tree with the  tree
-Message-ID: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 06 Jan 2014 10:47:54 +0900
+Subject: [RFC PATCH 1/3] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <1387785725-24262-2-git-send-email-tinamdar@apm.com>
+References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
+ <1387785725-24262-2-git-send-email-tinamdar@apm.com>
+Message-ID: <007401cf0a81$51429250$f3c7b6f0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Monday, December 23, 2013 5:02 PM, Tanmay Inamdar wrote:
+> 
+> This patch adds the AppliedMicro X-gene SOC PCIe controller driver.
+> APM X-Gene PCIe controller supports maximum upto 8 lanes and
+> GEN3 speed. X-Gene has maximum 5 PCIe ports supported.
 
-Today's linux-next merge of the sh tree got conflicts in
-drivers/tty/serial/sh-sci.c and include/linux/serial_sci.h between
-commits 8fb9631c517b ("serial: sh-sci: Sort headers alphabetically"),
-20bdcab8268c ("serial: sh-sci: Add OF support") and probably others from
-the arm-soc tree and commits ada80ee7fa60 ("serial: sh-sci: Add OF
-support") and b19ef75c56e9 ("serial: sh-sci: OF definitions need
-linux/of.h") from the sh tree.
+(+cc Jason Gunthorpe, Arnd Bergmann)
 
-The arm-soc tree version is dated much more recently than
-the sh tree version and conflicts badly, so for today I have just dropped
-the sh tree (everything in there was committed before April 2013).  Please
-figure this out.
+Hi Tanmay Inamdar,
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/8224246e/attachment.sig>
+I added some minor comments. :-)
+
+> 
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host/Kconfig      |    5 +
+>  drivers/pci/host/Makefile     |    1 +
+>  drivers/pci/host/pcie-xgene.c | 1017 +++++++++++++++++++++++++++++++++++++++++
+
+Would you change the file name to 'pci-xgene.c'?
+Now, all PCI host drivers are using the prefix 'pci-', not 'pcie-'.
+
+[.....]
+
+> +#include <linux/module.h>
+> +#include <linux/delay.h>
+> +#include <linux/pci.h>
+> +#include <linux/slab.h>
+> +#include <linux/memblock.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/jiffies.h>
+> +#include <linux/clk-private.h>
+
+Would you re-order these headers alphabetically?
+It enhances the readability.
+
+[.....]
+
+> +static int xgene_pcie_parse_map_ranges(struct xgene_pcie_port *port)
+> +{
+> +	struct device_node *np = port->node;
+> +	struct of_pci_range range;
+> +	struct of_pci_range_parser parser;
+> +	struct device *dev = port->dev;
+> +	u32 cfg_map_done = 0;
+> +	int ret;
+> +
+> +	if (of_pci_range_parser_init(&parser, np)) {
+> +		dev_err(dev, "missing ranges property\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Get the I/O, memory, config ranges from DT */
+> +	for_each_of_pci_range(&parser, &range) {
+> +		struct resource *res = NULL;
+> +		u64 restype = range.flags & IORESOURCE_TYPE_BITS;
+> +		u64 end = range.cpu_addr + range.size - 1;
+> +		dev_dbg(port->dev, "0x%08x 0x%016llx..0x%016llx -> 0x%016llx\n",
+> +			range.flags, range.cpu_addr, end, range.pci_addr);
+> +
+> +		switch (restype) {
+> +		case IORESOURCE_IO:
+> +			res = &port->res[XGENE_IO];
+> +			of_pci_range_to_resource(&range, np, res);
+> +			xgene_pcie_setup_ob_reg(port->csr_base, OMR1BARL,
+> +						XGENE_IO, res);
+> +			break;
+> +		case IORESOURCE_MEM:
+> +			res = &port->res[XGENE_MEM];
+> +			of_pci_range_to_resource(&range, np, res);
+> +			xgene_pcie_setup_ob_reg(port->csr_base, OMR2BARL,
+> +						XGENE_MEM, res);
+> +			break;
+> +		case 0:
+> +			if (!cfg_map_done) {
+> +				/* config region */
+> +				if (port->type == PTYPE_ROOT_PORT) {
+> +					ret = xgene_pcie_map_cfg(port, &range);
+> +					if (ret)
+> +						return ret;
+> +				}
+> +				cfg_map_done = 1;
+> +			} else {
+> +				/* msi region */
+> +				res = &port->res[XGENE_MSI];
+> +				of_pci_range_to_resource(&range, np, res);
+
+As Jason Gunthorpe said, the DT 'range' property should not
+handle MSI. Please refer to other PCI host drivers such as
+pci-mvebu.c, pci-tegra.c and pcie-designware.c.
+
+Currently, 'struct msi_chip', ' struct irq_domain' are used 
+for implementing MSI feature.
+
+Best regards,
+Jingoo Han
