@@ -1,58 +1,97 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Jan 2014 14:12:37 +0800
-Subject: [PATCH] ARM: i.MX51: Fix IOMUX settings
-In-Reply-To: <1388550301-31215-1-git-send-email-shc_work@mail.ru>
-References: <1388550301-31215-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140106061233.GE27227@S2101-09.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 6 Jan 2014 06:31:01 +0000
+Subject: [RFC] drivers: irq-chip: Enable SGI's for Secure-to-NonSecure
+ communication use-cases
+In-Reply-To: <cd2a9d32529543958b2fe2a7ab252850@BY2PR03MB222.namprd03.prod.outlook.com>
+References: <79CD15C6BA57404B839C016229A409A83EDAD1B8@DBDE04.ent.ti.com>
+ <cd2a9d32529543958b2fe2a7ab252850@BY2PR03MB222.namprd03.prod.outlook.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EDAD2A9@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 01, 2014 at 08:25:01AM +0400, Alexander Shiyan wrote:
-> This patch fix daisy channel settings for MX51_PAD_EIM_D26__UART3_TXD and
-> MX51_PAD_AUD3_BB_FS__UART3_TXD pads. Add missing SION bit for W1 pad.
+> -----Original Message-----
+> From: bhupesh.sharma at freescale.com
+> [mailto:bhupesh.sharma at freescale.com]
+> Sent: Monday, January 06, 2014 11:02 AM
+> To: Hiremath, Vaibhav; 'linux-arm-kernel at lists.infradead.org'
+> Cc: 'Tony Lindgren'; 'linux-omap at vger.kernel.org'; 'Russell King'
+> Subject: RE: [RFC] drivers: irq-chip: Enable SGI's for Secure-to-NonSecure
+> communication use-cases
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-
-Normally, we do not take non-DT platform code change anymore.  But since
-it's a simple fix, I applied it.
-
-Shawn
-
-> ---
->  arch/arm/mach-imx/iomux-mx51.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> > -----Original Message-----
+> > From: linux-arm-kernel [mailto:linux-arm-kernel-
+> > bounces at lists.infradead.org] On Behalf Of Hiremath, Vaibhav
+> > Sent: Monday, January 06, 2014 10:39 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Tony Lindgren; linux-omap at vger.kernel.org; Russell King
+> > Subject: [RFC] drivers: irq-chip: Enable SGI's for Secure-to-NonSecure
+> > communication use-cases
+> >
+> > Hi,
+> >
+> > Currently the Software Generated Interrupts (SGI) are restricted to
+> > use only for SMP architecture for inter-processor communication as
+> > rightly documented in ARM GIC spec V1.
+> >
+> > In the system with the uniprocessor (and/or multiprocessor variants)
+> > architecture with TRUSTZONE enabled device (like, AM43xx device), the
+> > SGI can be used for communication between secure-to-nonsecure world.
+> > And in order to enable SGI event from secure world to non-secure
+> > world, GIC driver __must__ support registration of interrupt service
+> > routines for SGI's; which is currently restricted by GIC driver.
 > 
-> diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
-> index 75bbcc4..e370c98 100644
-> --- a/arch/arm/mach-imx/iomux-mx51.h
-> +++ b/arch/arm/mach-imx/iomux-mx51.h
-> @@ -111,7 +111,7 @@
->  #define MX51_PAD_EIM_D26__EIM_D26		IOMUX_PAD(0x418, 0x084, 0, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_EIM_D26__KEY_COL7		IOMUX_PAD(0x418, 0x084, 1, 0x9cc, 0, NO_PAD_CTRL)
->  #define MX51_PAD_EIM_D26__UART2_RTS		IOMUX_PAD(0x418, 0x084, 4, 0x9e8, 3, MX51_UART_PAD_CTRL)
-> -#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, __NA_, 0, MX51_UART_PAD_CTRL)
-> +#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, 0x9f4, 1, MX51_UART_PAD_CTRL)
->  #define MX51_PAD_EIM_D26__USBOTG_DATA2		IOMUX_PAD(0x418, 0x084, 2, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_EIM_D26__GPT_CMPOUT2		IOMUX_PAD(0x418, 0x084, 5, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_EIM_D27__AUD6_RXC		IOMUX_PAD(0x41c, 0x088, 5, 0x8f4, 0, NO_PAD_CTRL)
-> @@ -451,7 +451,7 @@
->  #define MX51_PAD_AUD3_BB_CK__GPIO4_20		IOMUX_PAD(0x5f8, 0x208, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
->  #define MX51_PAD_AUD3_BB_FS__AUD3_TXFS		IOMUX_PAD(0x5fc, 0x20c, 0, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_AUD3_BB_FS__GPIO4_21		IOMUX_PAD(0x5fc, 0x20c, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-> -#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, __NA_, 0, MX51_UART_PAD_CTRL)
-> +#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, 0x9f4, 3, MX51_UART_PAD_CTRL)
->  #define MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	IOMUX_PAD(0x600, 0x210, 0, __NA_, 0, MX51_ECSPI_PAD_CTRL)
->  #define MX51_PAD_CSPI1_MOSI__GPIO4_22		IOMUX_PAD(0x600, 0x210, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
->  #define MX51_PAD_CSPI1_MOSI__I2C1_SDA		IOMUX_PAD(0x600, 0x210, 0x11, 0x9b4, 1, MX51_I2C_PAD_CTRL)
-> @@ -494,7 +494,7 @@
->  #define MX51_PAD_UART3_TXD__UART1_DSR		IOMUX_PAD(0x634, 0x244, 0, __NA_, 0, MX51_UART_PAD_CTRL)
->  #define MX51_PAD_UART3_TXD__UART3_TXD		IOMUX_PAD(0x634, 0x244, 1, __NA_, 0, MX51_UART_PAD_CTRL)
->  #define MX51_PAD_OWIRE_LINE__GPIO1_24		IOMUX_PAD(0x638, 0x248, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-> -#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0, __NA_, 0, NO_PAD_CTRL)
-> +#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0x10, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_OWIRE_LINE__SPDIF_OUT		IOMUX_PAD(0x638, 0x248, 6, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_KEY_ROW0__KEY_ROW0		IOMUX_PAD(0x63c, 0x24c, 0, __NA_, 0, NO_PAD_CTRL)
->  #define MX51_PAD_KEY_ROW1__KEY_ROW1		IOMUX_PAD(0x640, 0x250, 0, __NA_, 0, NO_PAD_CTRL)
-> -- 
-> 1.8.3.2
+> I am not an expert on this, but as per my understanding the model
+> recommended by ARM is the use of IRQ as a Normal world interrupt source, and
+> FIQ as the Secure world source.
 > 
+[Hiremath, Vaibhav] Absolutely and I also follow same recommendation here.
+
+> If IRQ is received by the Secure world, it should cause a hardware trap to the
+> monitor and the monitor mode should cause a context switch and jumps to the
+> normal world, where the interrupt handler should execute (see reference [1]).
+> 
+
+I think I missed to explicitly talk about FIQ in the RFC, sorry for the confusion.
+Yes, IRQ received by secure world should cause HW trap to monitor mode and 
+Further should cause context switch to public world to handle the interrupt.
+
+And this RFC wants to leverage this, where, any operations on secure world,
+
+        - Functional operation (entered through monitor mode) which want to pass on the 
+          event to public world
+        - Any FIQ (secure interrupts) wants to pass on certain events or information to
+           Public world - It could be any secure peripheral interrupt causing FIQ
+
+Secure world can use IRQ, which is generated by software to pass on the event information
+to public world. Please note that, the SGI is non-secure, so if you raise and SGI from secure 
+world it will follow the execution mentioned above.
+
+So this RFC enables asynchronous communication channel between secure world to 
+Non-secure world using SGI.
+
+> For making a transition from the secure world to the normal world and vice-
+> versa, the core should transition via the monitor mode. Assuming a
+> Uniprocessor system running both Normal and Secure world - thus providing a
+> view of two virtual processors running in a time-sliced fashion, the world in
+> which the processor is executing should be indicated by the NS-bit in the Secure
+> Configuration Register (SCR) in CP15. The IRQ, FIQ, Abort exceptions can all be
+> configured to cause the processor to switch into monitor mode.
+> 
+> The software that executes within monitor mode is implementation defined, but
+> it generally saves the state of the current world and restores the state of the
+> world being switched to.
+> It then performs a return-from-exception to restart processing in the restored
+> world. (see reference [2]).
+> 
+> Does this RFC implementation take into account the monitor mode switch while
+> switching/passing information b/w the two worlds?
+> 
+
+Yes, as recommended by ARM, this RFC is also based on the recommendation, where,
+monitor mode is responsible for saving and restoring contexts.
+RFC doesn't handle the monitor mode implementation which lacks context save/restore.
+
+Please let me know if you still have any confusion on the usecase and on this RFC
+
+Thanks,
+Vaibhav
