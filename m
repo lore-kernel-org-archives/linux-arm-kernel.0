@@ -1,25 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Jan 2014 10:28:50 +0800
-Subject: [BUG] v3.13-rc7: freescale fec_main bugs on boot
-In-Reply-To: <20140105170448.GC27432@n2100.arm.linux.org.uk>
-References: <20140105170448.GC27432@n2100.arm.linux.org.uk>
-Message-ID: <20140106022847.GB26128@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 6 Jan 2014 11:31:51 +0900
+Subject: [PATCH 4/4] ARM: shmobile: lager: Make spi_flash_data const
+In-Reply-To: <1388764128-27686-4-git-send-email-geert@linux-m68k.org>
+References: <1388764128-27686-1-git-send-email-geert@linux-m68k.org>
+ <1388764128-27686-4-git-send-email-geert@linux-m68k.org>
+Message-ID: <20140106023151.GF11231@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 05, 2014 at 05:04:48PM +0000, Russell King - ARM Linux wrote:
-> Second thing is this which was introduced by 7a399e3a2e05 between rc6
-> and rc7:
+On Fri, Jan 03, 2014 at 04:48:48PM +0100, Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 > 
-> +       if (flags & OF_GPIO_ACTIVE_LOW)
-> +               port = GPIOF_OUT_INIT_LOW;
-> +       else
-> +               port = GPIOF_OUT_INIT_HIGH;
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> ---
+>  arch/arm/mach-shmobile/board-lager.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> -       gpio_set_value(phy_reset, 1);
-> +       gpio_set_value(phy_reset, !port);
+> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> index f20c10a18543..40ace7195f84 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+> @@ -263,7 +263,7 @@ static struct mtd_partition spi_flash_part[] = {
+>  	},
+>  };
+>  
+> -static struct flash_platform_data spi_flash_data = {
+> +static const struct flash_platform_data spi_flash_data = {
+>  	.name           = "m25p80",
+>  	.parts          = spi_flash_part,
+>  	.nr_parts       = ARRAY_SIZE(spi_flash_part),
 
-Fabio just sent a patch to revert it, and David has queued it.  Sorry
-for that I did not catch it.
+Should spi_flash_part also be const?
 
-Shawn
+And should flash_platform_data and spi_flash_part be annotated
+as __initconst?
