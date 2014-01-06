@@ -1,52 +1,57 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  6 Jan 2014 13:58:05 +0800
-Subject: [PATCH v2 1/8] clk: sunxi: add clock-output-names dt property support
+Date: Mon,  6 Jan 2014 13:58:06 +0800
+Subject: [PATCH v2 2/8] clk: sunxi: choose correct name for multiple output
+ factor clocks
 In-Reply-To: <1388987892-23733-1-git-send-email-wens@csie.org>
 References: <1388987892-23733-1-git-send-email-wens@csie.org>
-Message-ID: <1388987892-23733-2-git-send-email-wens@csie.org>
+Message-ID: <1388987892-23733-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sunxi clock drivers use dt node name as clock name, but clock
-nodes should be named clk at X, so the names would be the same.
-Let the drivers read clock names from dt clock-output-names
-property.
+Some factor clocks, such as the parent clock of pll5 and pll6, have
+multiple output names. Use the last name as the name for the clock
+itself.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clk/sunxi/clk-sunxi.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 19d9e9e..14a3774 100644
+index 14a3774..7ce7e1c 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -53,6 +53,8 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
- 	if (of_property_read_u32(node, "clock-frequency", &rate))
- 		return;
+@@ -484,7 +484,7 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
+ 	const char *clk_name = node->name;
+ 	const char *parents[SUNXI_MAX_PARENTS];
+ 	void *reg;
+-	int i = 0;
++	int j, i = 0;
  
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
- 	/* set up gate and fixed rate properties */
- 	gate->reg = of_iomap(node, 0);
- 	gate->bit_idx = SUNXI_OSC24M_GATE;
-@@ -595,6 +597,8 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
+ 	reg = of_iomap(node, 0);
+ 
+@@ -493,14 +493,14 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
  	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
  		i++;
  
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
- 	clk = clk_register_mux(NULL, clk_name, parents, i,
- 			       CLK_SET_RATE_NO_REPARENT, reg,
- 			       data->shift, SUNXI_MUX_GATE_WIDTH,
-@@ -654,6 +658,8 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+-	/* Nodes should be providing the name via clock-output-names
+-	 * but originally our dts didn't, and so we used node->name.
+-	 * The new, better nodes look like clk at deadbeef, so we pull the
+-	 * name just in this case */
+-	if (!strcmp("clk", clk_name)) {
+-		of_property_read_string_index(node, "clock-output-names",
+-					      0, &clk_name);
+-	}
++	/*
++	 * factor clocks, such as pll5 and pll6, may have multiple outputs
++	 * Use the last clock output name as this clock's name.
++	 * This matches the behavior of of_clk_get_parent_name()
++	 */
++	j = of_property_count_strings(node, "clock-output-names");
++	of_property_read_string_index(node, "clock-output-names", j - 1,
++				      &clk_name);
  
- 	clk_parent = of_clk_get_parent_name(node, 0);
- 
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
- 	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
- 				   reg, data->shift, data->width,
- 				   data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
+ 	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
+ 	if (!factors)
 -- 
 1.8.5.2
