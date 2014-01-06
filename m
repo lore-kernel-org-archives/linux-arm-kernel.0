@@ -1,28 +1,39 @@
-From: baozich@gmail.com (Chen Baozi)
-Date: Mon, 6 Jan 2014 21:29:57 +0800
-Subject: [Xen-devel] [PATCH] arm/xen: remove redundant semicolon in
- definition of ioremap_cached
-In-Reply-To: <1389003096.13274.29.camel@kazak.uk.xensource.com>
-References: <1388758643-3897-1-git-send-email-baozich@gmail.com>
- <1389003096.13274.29.camel@kazak.uk.xensource.com>
-Message-ID: <839E6A17-6F04-48D1-9905-DF3ACA599AB9@gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon,  6 Jan 2014 08:39:53 -0500
+Subject: [PATCH] ARM: Make pgtbl macro more robust
+Message-ID: <1389015593-31716-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The pgtbl macro couldn't handle the specific
+(TEXT_OFFSET - PG_DIR_SIZE) value that the combination of
+MSM platforms and LPAE created:
 
-On Jan 6, 2014, at 18:11, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+head.S:163: Error: invalid constant (203000) after fixup
 
-> On Fri, 2014-01-03 at 22:17 +0800, Chen Baozi wrote:
->> Reported-by: Wei Liu <liuw@liuw.name>
->> Signed-off-by: Chen Baozi <baozich@gmail.com>
-> 
-> Heh, Wei beat you to the patch by 14 minutes ;-)
+Regardless of whether this combination of configuration options
+will work on currently support platforms at run time, make it
+at least assemble properly.
 
-lol, there must be something wrong with my mail box. I didn?t notice
-it when sending this patch.
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ arch/arm/kernel/head.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> 
-> See <1388757815-11394-1-git-send-email-wei.liu2@citrix.com>
-> 
-> Ian.
-> 
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 9cf6063..af30cac 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -52,7 +52,8 @@
+ 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
+ 
+ 	.macro	pgtbl, rd, phys
+-	add	\rd, \phys, #TEXT_OFFSET - PG_DIR_SIZE
++	add	\rd, \phys, #TEXT_OFFSET
++	sub	\rd, \rd, #PG_DIR_SIZE
+ 	.endm
+ 
+ /*
+-- 
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by the Linux Foundation.
