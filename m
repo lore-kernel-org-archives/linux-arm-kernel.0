@@ -1,212 +1,49 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Mon,  6 Jan 2014 22:35:32 +0100
-Subject: [PATCH v6 3/4] ARM: BCM5301X: add dts files for BCM4708 SoC
-In-Reply-To: <1389044133-27394-1-git-send-email-hauke@hauke-m.de>
-References: <1389044133-27394-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1389044133-27394-4-git-send-email-hauke@hauke-m.de>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Mon, 06 Jan 2014 23:08:50 +0100
+Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
+ CONFIG_ARM_PATCH_PHYS_VIRT.
+In-Reply-To: <52CB051B.1040808@ti.com> (Santosh Shilimkar's message of "Mon, 6
+ Jan 2014 14:33:47 -0500")
+References: <m38uv1uuzr.fsf@t19.piap.pl> <m3ha9gx63v.fsf@t19.piap.pl>
+ <52CB051B.1040808@ti.com>
+Message-ID: <m3ppo4sqz1.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses the newly added BCM5301X SoC code.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/Makefile                  |    1 +
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts |   35 +++++++++++
- arch/arm/boot/dts/bcm4708.dtsi              |   34 +++++++++++
- arch/arm/boot/dts/bcm5301x.dtsi             |   88 +++++++++++++++++++++++++++
- 4 files changed, 158 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
- create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
- create mode 100644 arch/arm/boot/dts/bcm5301x.dtsi
+> I am afraid you didn't understood what the fix is if you say above.
+> arm_dma_limit is broken without this fix for LPAE machines with
+> memory starting 4 GB physical boundary.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d57c1a6..9c385bb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -45,6 +45,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
- 	bcm28155-ap.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
-+dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-new file mode 100644
-index 0000000..5cdcffa
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X arm platform code.
-+ * DTS for Netgear R6250 V1
-+ *
-+ * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4708.dtsi"
-+
-+/ {
-+	compatible = "netgear,r6250v1", "brcm,bcm4708";
-+	model = "Netgear R6250 V1 (BCM4708)";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	soc {
-+		uart0: serial at 18000300 {
-+			status = "okay";
-+		};
-+
-+		uart1: serial at 18000400 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-new file mode 100644
-index 0000000..31141e8
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4708.dtsi
-@@ -0,0 +1,34 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for BCM4708 SoC.
-+ *
-+ * Copyright 2013-2014 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+#include "bcm5301x.dtsi"
-+
-+/ {
-+	compatible = "brcm,bcm4708";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			reg = <0x0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			reg = <0x1>;
-+		};
-+	};
-+
-+};
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-new file mode 100644
-index 0000000..280b190
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -0,0 +1,88 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * Generic DTS part for all BCM53010, BCM53011, BCM53012, BCM53014, BCM53015,
-+ * BCM53016, BCM53017, BCM53018, BCM4707, BCM4708 and BCM4709 SoCs
-+ *
-+ * Copyright 2013-2014 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		uart0: serial at 18000300 {
-+			compatible = "ns16550";
-+			reg = <0x18000300 0x100>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <100000000>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 18000400 {
-+			compatible = "ns16550";
-+			reg = <0x18000400 0x100>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <100000000>;
-+			status = "disabled";
-+		};
-+
-+		scu at 19020000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0x19020000 0x100>;
-+		};
-+
-+		timer at 19020200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x19020200 0x100>;
-+			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_periph>;
-+		};
-+
-+		local-timer at 19020600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x19020600 0x100>;
-+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_periph>;
-+		};
-+
-+		gic: interrupt-controller at 19021000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x19021000 0x1000>,
-+			      <0x19020100 0x100>;
-+		};
-+
-+		L2: cache-controller at 19022000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x19022000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* As long as we do not have a real clock driver us this
-+		 * fixed clock */
-+		clk_periph: periph {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <400000000>;
-+		};
-+	};
-+};
+I wonder what CONFIG_ARM_PATCH_PHYS_VIRT and CONFIG_ZONE_DMA do they
+use?
+
+Of course, CONFIG_ZONE_DMA must be set, because otherwise the patch
+changes a part disabled with #ifdef. CONFIG_ARM_PATCH_PHYS_VIRT must be
+set because otherwise the kernel will not compile at all.
+
+Do you accept the fact the configurations with CONFIG_ZONE_DMA and
+without CONFIG_ARM_PATCH_PHYS_VIRT are now broken - by this very commit?
+
+Now, what "fix" does this commit in its entirety do:
+
+-     arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
++     arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
+
+if under the above circumstances (CONFIG_*) in
+arch/arm/include/asm/memory.h we have:
+
+extern u64 __pv_phys_offset;
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the only usable declaration of this variable
+extern u64 __pv_offset;
+extern void fixup_pv_table(const void *, unsigned long);
+extern const void *__pv_table_begin, *__pv_table_end;
+
+#define PHYS_OFFSET __pv_phys_offset
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 -- 
-1.7.10.4
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
