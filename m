@@ -1,21 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Jan 2014 13:47:57 +0100
-Subject: [PATCH 3/5] ARM: sun5i: a13: Add missing serial aliases
-In-Reply-To: <1388945627-3432-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
- <1388945627-3432-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201401061347.57955.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 06 Jan 2014 16:52:21 +0400
+Subject: [PATCH] ARM: shmobile: lager: Enable VIN in defconfig
+In-Reply-To: <1388990626-21460-1-git-send-email-horms+renesas@verge.net.au>
+References: <1388990626-21460-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <52CAA705.7080909@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 05 January 2014, Maxime Ripard wrote:
-> +       aliases {
-> +               serial1 = &uart1;
-> +               serial3 = &uart3;
-> +       };
-> +
+Hello.
 
-If you only have two uarts active, shouldn't they be aliases
-serial0 and serial1?
+On 06-01-2014 10:43, Simon Horman wrote:
 
-	Arnd
+> Cc: Valentine Barshak <valentine.barshak@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/configs/lager_defconfig | 6 ++++++
+>   1 file changed, 6 insertions(+)
+
+> diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+> index 883443f..7fe482d 100644
+> --- a/arch/arm/configs/lager_defconfig
+> +++ b/arch/arm/configs/lager_defconfig
+> @@ -90,6 +90,12 @@ CONFIG_RCAR_THERMAL=y
+>   CONFIG_REGULATOR=y
+>   CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>   CONFIG_REGULATOR_GPIO=y
+> +CONFIG_MEDIA_SUPPORT=y
+> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+> +CONFIG_V4L_PLATFORM_DRIVERS=y
+> +CONFIG_SOC_CAMERA=y
+> +CONFIG_SOC_CAMERA_PLATFORM=y
+> +CONFIG_VIDEO_RCAR_VIN=y
+
+    I'm afraid the VIN driver would be useless without ADV7180 codec driver.
+
+WBR, Sergei
