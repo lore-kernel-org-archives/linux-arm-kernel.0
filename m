@@ -1,46 +1,50 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 06 Jan 2014 18:42:51 +0100
-Subject: [PATCH 1/3] reset: Add of_reset_control_get
-In-Reply-To: <20131221094213.03658852@skate>
-References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
- <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
- <20131221094213.03658852@skate>
-Message-ID: <1389030171.5590.31.camel@pizza.hi.pengutronix.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 Jan 2014 10:03:45 -0800
+Subject: [PATCH v2 6/7] mfd: pm8921: Add DT match table
+In-Reply-To: <20140106115249.GD30156@lee--X1>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-7-git-send-email-sboyd@codeaurora.org>
+ <20140106115249.GD30156@lee--X1>
+Message-ID: <52CAF001.30501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 21.12.2013, 09:42 +0100 schrieb Thomas Petazzoni:
-> Maxime, Philipp,
-> 
-> On Fri, 20 Dec 2013 22:41:07 +0100, Maxime Ripard wrote:
-> > In some cases, you might need to deassert from reset an hardware block that
-> > doesn't associated to a struct device (CPUs, timers, etc.).
-> > 
-> > Add a small helper to retrieve the reset controller from the device tree
-> > without the need to pass a struct device.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/reset/core.c  | 39 ++++++++++++++++++++++++++++++---------
-> >  include/linux/reset.h |  4 ++++
-> >  2 files changed, 34 insertions(+), 9 deletions(-)
-> 
-> I'd like to add that I have the exact same need as Maxime. Maxime needs
-> of_reset_control_get() for timers, and in my case, I need it for CPUs,
-> since I associated a reset controller to CPU nodes in my DT.
-> 
-> Funnily, even though Maxime and I work like 3 meters away from each
-> other, both of us came up independently with almost exactly the same
-> implementation to solve the exact same problem, without talking to each
-> other about this need. It's only yesterday that we discovered we've had
-> to solve the same problem.
-> 
-> So, definitely looking forward to seeing the feedback about this.
-> 
-> Thanks!
+On 01/06/14 03:52, Lee Jones wrote:
+>> Allow this driver to probe based on devicetree.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  drivers/mfd/pm8921-core.c | 9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
+>> index d13cb6e..290f0da 100644
+>> --- a/drivers/mfd/pm8921-core.c
+>> +++ b/drivers/mfd/pm8921-core.c
+>> @@ -420,6 +420,13 @@ static const struct regmap_config ssbi_regmap_config = {
+>>  	.reg_write = ssbi_reg_write
+>>  };
+>>  
+>> +static const struct of_device_id pm8921_id_table[] = {
+>> +	{ .compatible = "qcom,pm8058", },
+>> +	{ .compatible = "qcom,pm8921", },
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, pm8921_id_table);
+>> +
+>>  static int pm8921_probe(struct platform_device *pdev)
+>>  {
+>>  	struct pm8921 *pmic;
+>> @@ -429,7 +436,6 @@ static int pm8921_probe(struct platform_device *pdev)
+>>  	unsigned int irq;
+>>  	u32 rev;
+>>  
+>> -
+> Sneaky!
 
-This looks like a useful addition. I'll reorder the GPIO reset patch for
-this.
+Sorry, I messed up this patch. This removal is supposed to be in an
+earlier patch. Fixed now.
 
-regards
-Philipp
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
