@@ -1,44 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Jan 2014 16:37:27 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140105235155.GB4093@lunn.ch>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <201401052017.10982.arnd@arndb.de> <20140105235155.GB4093@lunn.ch>
-Message-ID: <201401061637.28194.arnd@arndb.de>
+Date: Mon, 6 Jan 2014 16:41:03 +0100
+Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
+ framework
+In-Reply-To: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
+References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <201401061641.03491.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 January 2014, Andrew Lunn wrote:
-> This raises the question, should mainline try to support any random
-> dtb blob, or only those that have ever shipped with mainline?
+On Monday 06 January 2014, Barry Song wrote:
+> this moves to generic IP module reset framework, and make other drivers
+> use common device_reset() API.
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/sirf,rstc.txt b/Documentation/devicetree/bindings/reset/sirf,rstc.txt
+> new file mode 100644
+> index 0000000..0505de7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/sirf,rstc.txt
+> @@ -0,0 +1,42 @@
+> +CSR SiRFSoC Reset Controller
+> +======================================
+> +
+> +Please also refer to reset.txt in this directory for common reset
+> +controller binding usage.
+> +
+> +Required properties:
+> +- compatible: Should be "sirf,prima2-rstc" or "sirf,marco-rstc"
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +- #reset-cells: 1, see below
+> +
+> +example:
+> +
+> +rstc: reset-controller at 88010000 {
+> +	compatible = "sirf,prima2-rstc";
+> +	reg = <0x88010000 0x1000>;
+> +	#reset-cells = <1>;
+> +};
 
-It should support any dtb that conforms to the binding.
+Binding looks good to me.
 
-> There are some older mainline DT blobs which won't have PCIe in them,
-> since PCIe support was not there day 1. So returning -ENODEV, and the
-> i2c controller assuming an A0 would make sense.
+> +void __init sirfsoc_of_rstc_init(void)
+> +{
+> +	struct device_node *np = of_find_matching_node(NULL, rstc_ids);
+> +	if (!np) {
+> +		pr_err("unable to find compatible sirf rstc node in dtb\n");
+> +		return;
+> +	}
+> +
+> +	sirfsoc_rstc_base = of_iomap(np, 0);
+> +	if (!sirfsoc_rstc_base) {
+> +		pr_err("unable to map rstc cpu registers\n");
+> +		return;
+> +	}
+> +
+> +	sirfsoc_reset_controller.of_node = np;
+> +
+> +	reset_controller_register(&sirfsoc_reset_controller);
+> +}
+> +
 
-That seems reasonable, yes.
-
-> But what should we do if somebody was to boot linux with a FreeBSD DT
-> blob? It is a valid blob, it describes the hardware, but the FreeBSD
-> nodes have different compatibility strings, don't have clocks, etc.
-> Now that is at the extreme of the range, but where do we put the
-> marker for compatibility in this range from current mainline blobs to
-> FreeBSD blobs?
-
-Are you saying that FreeBSD has a different set of bindings for the
-same hardware? That would be rather unfortunate and we should probably
-try to merge the bindings eventually and make sure that either OS can
-boot with any conforming DTB, which means we would accept both compatible
-strings, or that we make an incompatible change to the binding for at
-least one of them before we call the binding stable and move the
-repository to devicetree.org (or whereever it goes after moving out
-of Linux).
-
-On the example of missing clocks, it should work as long as all relevant
-clocks are enabled by the boot loader and the clock properties are
-optional the binding.
+Can't this be a regular platform device? Drivers that get the reference to
+the reset controller should respect a -EPROBE_DEFER error message if they
+get initialized in the wrong order.
 
 	Arnd
