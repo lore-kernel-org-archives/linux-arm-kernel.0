@@ -1,120 +1,44 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon,  6 Jan 2014 11:12:02 -0700
-Subject: [PATCH v8 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
- entries
-In-Reply-To: <1389031922-4309-4-git-send-email-lho@apm.com>
-References: <1389031922-4309-1-git-send-email-lho@apm.com>
- <1389031922-4309-2-git-send-email-lho@apm.com>
- <1389031922-4309-3-git-send-email-lho@apm.com>
- <1389031922-4309-4-git-send-email-lho@apm.com>
-Message-ID: <1389031922-4309-5-git-send-email-lho@apm.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 6 Jan 2014 19:13:27 +0100
+Subject: [PATCH 6/6] at91: dt: sam9261: Added DM9000 in the device tree
+In-Reply-To: <1460399.vQDGWoVpz2@wuerfel>
+References: <1388507534-10570-1-git-send-email-jjhiblot@traphandler.com>
+ <4526077.qASk8HSHKP@wuerfel>
+ <CACh+v5PptkrXERAqBUOv-DSaRDQ5NzJAc919Ne3iN9iVszRP+A@mail.gmail.com>
+ <1460399.vQDGWoVpz2@wuerfel>
+Message-ID: <CACh+v5Mt=bnfnZpux1veEtiOpc1M_yryuy=bDvMOOJf5RT6WxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   81 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 81 insertions(+), 0 deletions(-)
+Hi Arnd,
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 7e0466a..cd1e012 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -221,6 +221,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -269,5 +311,44 @@
- 			apm,tx-boost-gain = <2 3 3 2 3 3>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 12>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>,
-+			      <0x0 0x1f2a0000 0x0 0x10000>,
-+			      <0x0 0x1c000200 0x0 0x100>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>,
-+			      <0x0 0x1f2a0000 0x0 0x10000>,
-+			      <0x0 0x1c000200 0x0 0x100>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>,
-+			      <0x0 0x1f2a0000 0x0 0x10000>,
-+			      <0x0 0x1c000200 0x0 0x100>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
- 	};
- };
--- 
-1.5.5
+sorry for the delay. I'll rework the driver to include some ideas
+proposed by you and Boris. Boris proposed to have several timing
+decoders (a generic one, one for NAND and so on). I plan to use the
+compatibility name to select the decoder.and use the DT representation
+you proposed last : one top "simple-bus" and one sub-node "atmel,smc"
+per chip-select with one (or more) sub-device per chip-select.
+
+Jean-Jacques
+
+
+
+
+2014/1/2 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 02 January 2014 20:31:00 Jean-Jacques Hiblot wrote:
+>> > If each bus interface has a fixed range of registers, you can actually
+>> > collapse the upper two nodes again and just have one device per
+>> > chipselect.
+>> This is indeed the case, but I'd rather keep the top node to highlight
+>> the fact that all the devices are physically tied to the same bus.
+>
+> How about using a top-level "simple-bus" node with the complex ranges
+> property but making the driver match the sub-devices with the smaller
+> register range then?
+>
+>         Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
