@@ -1,39 +1,46 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon,  6 Jan 2014 08:39:53 -0500
-Subject: [PATCH] ARM: Make pgtbl macro more robust
-Message-ID: <1389015593-31716-1-git-send-email-cov@codeaurora.org>
+From: valentine.barshak@cogentembedded.com (Valentine)
+Date: Mon, 06 Jan 2014 18:00:10 +0400
+Subject: [PATCH] ARM: shmobile: lager: Enable VIN in defconfig
+In-Reply-To: <52CAA705.7080909@cogentembedded.com>
+References: <1388990626-21460-1-git-send-email-horms+renesas@verge.net.au>
+ <52CAA705.7080909@cogentembedded.com>
+Message-ID: <52CAB6EA.3010104@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pgtbl macro couldn't handle the specific
-(TEXT_OFFSET - PG_DIR_SIZE) value that the combination of
-MSM platforms and LPAE created:
+On 01/06/2014 04:52 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 06-01-2014 10:43, Simon Horman wrote:
+>
+>> Cc: Valentine Barshak <valentine.barshak@cogentembedded.com>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>   arch/arm/configs/lager_defconfig | 6 ++++++
+>>   1 file changed, 6 insertions(+)
+>
+>> diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+>> index 883443f..7fe482d 100644
+>> --- a/arch/arm/configs/lager_defconfig
+>> +++ b/arch/arm/configs/lager_defconfig
+>> @@ -90,6 +90,12 @@ CONFIG_RCAR_THERMAL=y
+>>   CONFIG_REGULATOR=y
+>>   CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>>   CONFIG_REGULATOR_GPIO=y
+>> +CONFIG_MEDIA_SUPPORT=y
+>> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+>> +CONFIG_V4L_PLATFORM_DRIVERS=y
+>> +CONFIG_SOC_CAMERA=y
+>> +CONFIG_SOC_CAMERA_PLATFORM=y
+>> +CONFIG_VIDEO_RCAR_VIN=y
+>
+>     I'm afraid the VIN driver would be useless without ADV7180 codec driver.
 
-head.S:163: Error: invalid constant (203000) after fixup
+Indeed.
 
-Regardless of whether this combination of configuration options
-will work on currently support platforms at run time, make it
-at least assemble properly.
+>
+> WBR, Sergei
+>
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm/kernel/head.S | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 9cf6063..af30cac 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -52,7 +52,8 @@
- 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
- 
- 	.macro	pgtbl, rd, phys
--	add	\rd, \phys, #TEXT_OFFSET - PG_DIR_SIZE
-+	add	\rd, \phys, #TEXT_OFFSET
-+	sub	\rd, \rd, #PG_DIR_SIZE
- 	.endm
- 
- /*
--- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+Thanks,
+Val.
