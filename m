@@ -1,42 +1,85 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 6 Jan 2014 17:20:03 +0900
-Subject: [PATCH] ARM: shmobile: emev2: Use __initconst for const init
- definition
-In-Reply-To: <1388114048-3630-1-git-send-email-horms+renesas@verge.net.au>
-References: <1388114048-3630-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140106082003.GS24653@verge.net.au>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  6 Jan 2014 09:22:10 +0100
+Subject: [PATCH 2/8] x86: move arch_cpu_uevent() to generic code
+In-Reply-To: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1388996536-27014-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 12:14:08PM +0900, Simon Horman wrote:
-> __initconst must be used instead of __initdata for
-> const init definitions.
-> 
-> This problem was introduced by 3d5de27174955702 ("mach-shmobile: Emma
-> Mobile EV2 DT support V3") in v3.4-rc7.
+Only x86 implements arch_cpu_uevent(), and there is nothing arch
+specific about it, so move it to drivers/base/cpu.c.
 
-I have queued this up.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/x86/kernel/cpu/match.c | 11 -----------
+ drivers/base/cpu.c          | 15 ++++++++++++++-
+ include/linux/cpu.h         |  1 -
+ 3 files changed, 14 insertions(+), 13 deletions(-)
 
-> 
-> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/setup-emev2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-> index c8f2a1a..c71d667 100644
-> --- a/arch/arm/mach-shmobile/setup-emev2.c
-> +++ b/arch/arm/mach-shmobile/setup-emev2.c
-> @@ -58,7 +58,7 @@ static void __init emev2_add_standard_devices_dt(void)
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
->  
-> -static const char *emev2_boards_compat_dt[] __initdata = {
-> +static const char *emev2_boards_compat_dt[] __initconst = {
->  	"renesas,emev2",
->  	NULL,
->  };
-> -- 
-> 1.8.4
-> 
+diff --git a/arch/x86/kernel/cpu/match.c b/arch/x86/kernel/cpu/match.c
+index 36565373af87..ab6082a9020e 100644
+--- a/arch/x86/kernel/cpu/match.c
++++ b/arch/x86/kernel/cpu/match.c
+@@ -78,14 +78,3 @@ ssize_t arch_print_cpu_modalias(struct device *dev,
+ 	*buf++ = '\n';
+ 	return buf - bufptr;
+ }
+-
+-int arch_cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
+-{
+-	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+-	if (buf) {
+-		arch_print_cpu_modalias(NULL, NULL, buf);
+-		add_uevent_var(env, "MODALIAS=%s", buf);
+-		kfree(buf);
+-	}
+-	return 0;
+-}
+diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+index f48370dfc908..270649012e64 100644
+--- a/drivers/base/cpu.c
++++ b/drivers/base/cpu.c
+@@ -286,6 +286,19 @@ static void cpu_device_release(struct device *dev)
+ 	 */
+ }
+ 
++#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
++static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
++{
++	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
++	if (buf) {
++		arch_print_cpu_modalias(NULL, NULL, buf);
++		add_uevent_var(env, "MODALIAS=%s", buf);
++		kfree(buf);
++	}
++	return 0;
++}
++#endif
++
+ /*
+  * register_cpu - Setup a sysfs device for a CPU.
+  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+@@ -307,7 +320,7 @@ int register_cpu(struct cpu *cpu, int num)
+ 	cpu->dev.offline = !cpu_online(num);
+ 	cpu->dev.of_node = of_get_cpu_node(num, NULL);
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+-	cpu->dev.bus->uevent = arch_cpu_uevent;
++	cpu->dev.bus->uevent = cpu_uevent;
+ #endif
+ 	cpu->dev.groups = common_cpu_attr_groups;
+ 	if (cpu->hotpluggable)
+diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+index 03e235ad1bba..dcc4a0d9c45f 100644
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -47,7 +47,6 @@ extern ssize_t arch_cpu_release(const char *, size_t);
+ struct notifier_block;
+ 
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+-extern int arch_cpu_uevent(struct device *dev, struct kobj_uevent_env *env);
+ extern ssize_t arch_print_cpu_modalias(struct device *dev,
+ 				       struct device_attribute *attr,
+ 				       char *bufptr);
+-- 
+1.8.3.2
