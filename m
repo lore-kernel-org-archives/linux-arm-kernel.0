@@ -1,35 +1,38 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 6 Jan 2014 16:37:33 -0600
-Subject: [PATCH] ARM: dts: omap3430-sdp: add dip switch information for MMC
- operation
-Message-ID: <1389047853-26375-1-git-send-email-nm@ti.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 06 Jan 2014 15:38:39 -0700
+Subject: [PATCH v4 1/5] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE to
+ enable this ACPI mode
+In-Reply-To: <20131227045848.GB21429@srcf.ucam.org>
+References: <1387239401-13918-1-git-send-email-al.stone@linaro.org>
+ <1387239401-13918-2-git-send-email-al.stone@linaro.org>
+ <20131227045848.GB21429@srcf.ucam.org>
+Message-ID: <52CB306F.1020201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMC 8 bit mode operation depends on dip switch setting which is not
-obvious - The current board file has this description. However, with
-removal of the board file in the future, this information will be lost
-and has to be rediscovered.
+On 12/26/2013 09:58 PM, Matthew Garrett wrote:
+> On Mon, Dec 16, 2013 at 05:16:37PM -0700, al.stone at linaro.org wrote:
+>
+>> +config ACPI_REDUCED_HARDWARE
+>> +	bool "Hardware-reduced ACPI support"
+>> +	depends on ARM || ARM64
+>> +	help
+>> +	This config adds support for Hardware-reduced ACPI.
+>
+> Well, that's not really true - most of the hardware-reduced ACPI support
+> seems to be built even if this isn't turned on. Maybe
+> ACPI_REDUCED_HARDWARE_ONLY ?
+>
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/omap3430-sdp.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+Aha.  Good point; semantically, it is unclear as is.  I'll clarify
+and re-submit.
 
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index 281914e..cd3d047 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -34,6 +34,10 @@
- &mmc1 {
- 	vmmc-supply = <&vmmc1>;
- 	vmmc_aux-supply = <&vsim>;
-+	/*
-+	 * S6-3 must be in ON position for 8 bit mode to function
-+	 * Else, use 4 bit mode
-+	 */
- 	bus-width = <8>;
- };
- 
 -- 
-1.7.9.5
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
