@@ -1,27 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 5 Jan 2014 16:06:10 -0800
-Subject: linux-next: manual merge of the imx-mxs tree with the tree
-In-Reply-To: <20140106104938.82a53f6d3b4d773607fe7556@canb.auug.org.au>
-References: <20140106104938.82a53f6d3b4d773607fe7556@canb.auug.org.au>
-Message-ID: <CAOesGMiTjUV78Gw1eKKSsz2Q0ODTk9p8hT_FcX1d0F3gMbX4Tw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 6 Jan 2014 01:17:09 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <52C9F32D.5080007@gmail.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-2-git-send-email-gregory.clement@free-electrons.com>
+ <201401051525.52459.arnd@arndb.de> <20140105154023.GA2048@lunn.ch>
+ <20140105172756.GA11280@obsidianresearch.com>
+ <52C99851.70806@gmail.com>
+ <20140105230746.GB11280@obsidianresearch.com>
+ <52C9E6D0.3000406@gmail.com>
+ <20140105234009.GC11280@obsidianresearch.com>
+ <52C9F32D.5080007@gmail.com>
+Message-ID: <20140106001709.GD4093@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 5, 2014 at 3:49 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Shawn,
->
-> Today's linux-next merge of the imx-mxs tree got a conflict in
-> arch/arm/boot/dts/imx6q-sabrelite.dts between commit 8f568b496dd9 ("ARM:
-> imx: Explicitly pass the active level of the PHY reset") from the arm-soc
-> tree and commit e5a5af250568 ("ARM: dts: imx: sabrelite: add Dual
-> Lite/Solo support") from the imx-mxs tree.
->
-> I fixed it up (just used the latter) and can carry the fix as necessary
-> (no action is required).
+> >>Does that power down really disable reading from PCIe controller
+> >>registers or is it just PHY power down?
+> >
+> >I haven't experimented with it, but every block that has a clock gate
+> >has a power down, so I doubt it is just a phy power down.
+> 
+> Ok, I see. But it isn't documented in the public FS, is it? If there is
+> an extra powerdown register for each ip block, I guess it will also
+> break reading from its registers.
 
-Thanks Stephen. The offending patch from the arm-soc side has been
-dropped, but I didn't push out the new for-next yet. It should be gone
-tomorrow. Same for some of the other imx conflicts.
+Hi Sebastian
 
+The public Kirkwood FS has a memory power management control register,
+Offset 0x20118. It is unclear what it actually does, and if you can
+still access registers when it is off. We would have to poke it and
+see.
 
--Olof
+	Andrew
