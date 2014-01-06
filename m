@@ -1,93 +1,118 @@
 From: lho@apm.com (Loc Ho)
-Date: Mon,  6 Jan 2014 11:10:59 -0700
-Subject: [PATCH v6 1/4] PHY: Add function set_speed to generic PHY framework
-In-Reply-To: <1389031862-4285-1-git-send-email-lho@apm.com>
+Date: Mon,  6 Jan 2014 11:11:02 -0700
+Subject: [PATCH v6 4/4] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY DTS
+ entries
+In-Reply-To: <1389031862-4285-4-git-send-email-lho@apm.com>
 References: <1389031862-4285-1-git-send-email-lho@apm.com>
-Message-ID: <1389031862-4285-2-git-send-email-lho@apm.com>
+ <1389031862-4285-2-git-send-email-lho@apm.com>
+ <1389031862-4285-3-git-send-email-lho@apm.com>
+ <1389031862-4285-4-git-send-email-lho@apm.com>
+Message-ID: <1389031862-4285-5-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds function set_speed to the generic PHY framework operation
-structure. This function can be called to instruct the PHY underlying layer
-at specified lane to configure for specified speed in hertz.
+This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
+PHY driver. The PHY for SATA controller 0 and 1 are enabled by default.
 
 Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
 ---
- drivers/phy/phy-core.c  |   21 +++++++++++++++++++++
- include/linux/phy/phy.h |    8 ++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/apm-storm.dtsi |   76 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 76 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index 03cf8fb..b525e72 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -239,6 +239,27 @@ out:
- }
- EXPORT_SYMBOL_GPL(phy_power_off);
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index 359d7b6..7e0466a 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -176,6 +176,51 @@
+ 				reg-names = "csr-reg";
+ 				clock-output-names = "eth8clk";
+ 			};
++
++			sataphy1clk: sataphy1clk at 1f21c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f21c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy1clk";
++				status = "disabled";
++				csr-offset = <0x4>;
++				csr-mask = <0x00>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
++
++			sataphy2clk: sataphy1clk at 1f22c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f22c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy2clk";
++				status = "ok";
++				csr-offset = <0x4>;
++				csr-mask = <0x3a>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
++
++			sataphy3clk: sataphy1clk at 1f23c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f23c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy3clk";
++				status = "ok";
++				csr-offset = <0x4>;
++				csr-mask = <0x3a>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
+ 		};
  
-+int phy_set_speed(struct phy *phy, int lane, u64 speed)
-+{
-+        int ret = -ENOTSUPP;
+ 		serial0: serial at 1c020000 {
+@@ -193,5 +238,36 @@
+ 			reg = <0x0 0x17000014 0x0 0x100>;
+ 			mask = <0x1>;
+ 		};
 +
-+        mutex_lock(&phy->mutex);
-+        if (phy->ops->set_speed) {
-+                ret =  phy->ops->set_speed(phy, lane, speed);
-+                if (ret < 0) {
-+                        dev_err(&phy->dev, "phy set speed failed --> %d\n",
-+                                ret);
-+                        goto out;
-+                }
-+        }
++		phy1: phy at 1f21a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f21a000 0x0 0x100>;
++			#phy-cells = <1>;
++			clocks = <&sataphy1clk 0>;
++			status = "disabled";
++			apm,tx-boost-gain = <2 3 3 2 3 3>;
++			apm,tx-eye-tuning = <2 10 10 2 10 10>;
++		};
 +
-+out:
-+        mutex_unlock(&phy->mutex);
++		phy2: phy at 1f22a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f22a000 0x0 0x100>;
++			#phy-cells = <1>;
++			clocks = <&sataphy2clk 0>;
++			status = "ok";
++			apm,tx-boost-gain = <2 3 2 2 3 2>;
++			apm,tx-eye-tuning = <1 10 10 2 10 5>;
++		};
 +
-+        return ret;
-+}
-+EXPORT_SYMBOL_GPL(phy_set_speed);
-+
- /**
-  * of_phy_get() - lookup and obtain a reference to a phy by phandle
-  * @dev: device that requests this phy
-diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-index 6d72269..ed2b897 100644
---- a/include/linux/phy/phy.h
-+++ b/include/linux/phy/phy.h
-@@ -27,6 +27,7 @@ struct phy;
-  * @exit: operation to be performed while exiting
-  * @power_on: powering on the phy
-  * @power_off: powering off the phy
-+ * @set_speed: set operation speed in hz
-  * @owner: the module owner containing the ops
-  */
- struct phy_ops {
-@@ -34,6 +35,7 @@ struct phy_ops {
- 	int	(*exit)(struct phy *phy);
- 	int	(*power_on)(struct phy *phy);
- 	int	(*power_off)(struct phy *phy);
-+	int	(*set_speed)(struct phy *phy, int lane, u64 speed);
- 	struct module *owner;
++		phy3: phy at 1f23a000 {
++			compatible = "apm,xgene-phy-ext";
++			reg = <0x0 0x1f23a000 0x0 0x100>,
++			      <0x0 0x1f2d0000 0x0 0x100>;
++			#phy-cells = <1>;
++			clocks = <&sataphy3clk 0>;
++			status = "ok";
++			apm,tx-boost-gain = <2 3 3 2 3 3>;
++			apm,tx-eye-tuning = <2 10 10 2 10 12>;
++		};
+ 	};
  };
- 
-@@ -127,6 +129,7 @@ int phy_init(struct phy *phy);
- int phy_exit(struct phy *phy);
- int phy_power_on(struct phy *phy);
- int phy_power_off(struct phy *phy);
-+int phy_set_speed(struct phy *phy, int lane, u64 speed);
- struct phy *phy_get(struct device *dev, const char *string);
- struct phy *devm_phy_get(struct device *dev, const char *string);
- void phy_put(struct phy *phy);
-@@ -199,6 +202,11 @@ static inline int phy_power_off(struct phy *phy)
- 	return -ENOSYS;
- }
- 
-+static inline int phy_set_speed(struct phy *phy, int lane, u64 speed)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline struct phy *phy_get(struct device *dev, const char *string)
- {
- 	return ERR_PTR(-ENOSYS);
 -- 
 1.5.5
