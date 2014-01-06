@@ -1,26 +1,52 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon,  6 Jan 2014 14:17:56 +0100
-Subject: [PATCH 0/2] video: mxsfb: fix broken videomode selection
-Message-ID: <1389014278-4903-1-git-send-email-LW@KARO-electronics.de>
+Date: Mon,  6 Jan 2014 14:17:57 +0100
+Subject: [PATCH 1/2] video: mxsfb: convert pr_debug()/dev_dbg() to
+ pr_err()/dev_err() for error messages
+In-Reply-To: <1389014278-4903-1-git-send-email-LW@KARO-electronics.de>
+References: <1389014278-4903-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1389014278-4903-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch in this set converts some messages that are printed
-in case of errors to be error messages rather than debug messages.
+Make the messages that are printed in case of fatal errors actually
+visible to the user without having to recompile the driver with
+debugging enabled.
 
-The second patch fixes a bug in the video selection code that
-incorrectly OR's together the 'pixelclk-active' and 'de-active'
-flags from all possible video modes specified in DT into one flag.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/video/mxsfb.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-The current code does not allow selecting one specific mode from a
-list of video modes, but always uses the last one of the video modes
-listed in the DT.
-
-
-Since all current dts files only have one entry in their
-'display-timings' node, this bug was not apparent and the fix does not
-change the driver's behaviour for the current users.
-
- b/drivers/video/mxsfb.c |    6 +--
- drivers/video/mxsfb.c   |  120 +++++++++++++++++++++++++++++-----------------------------------------
- 2 files changed, 53 insertions(+), 73 deletions(-)
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 27197a8..d11c35c 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -297,7 +297,7 @@ static int mxsfb_check_var(struct fb_var_screeninfo *var,
+ 		}
+ 		break;
+ 	default:
+-		pr_debug("Unsupported colour depth: %u\n", var->bits_per_pixel);
++		pr_err("Unsupported colour depth: %u\n", var->bits_per_pixel);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -426,7 +426,7 @@ static int mxsfb_set_par(struct fb_info *fb_info)
+ 		ctrl |= CTRL_SET_WORD_LENGTH(3);
+ 		switch (host->ld_intf_width) {
+ 		case STMLCDIF_8BIT:
+-			dev_dbg(&host->pdev->dev,
++			dev_err(&host->pdev->dev,
+ 					"Unsupported LCD bus width mapping\n");
+ 			return -EINVAL;
+ 		case STMLCDIF_16BIT:
+@@ -439,7 +439,7 @@ static int mxsfb_set_par(struct fb_info *fb_info)
+ 		writel(CTRL1_SET_BYTE_PACKAGING(0x7), host->base + LCDC_CTRL1);
+ 		break;
+ 	default:
+-		dev_dbg(&host->pdev->dev, "Unhandled color depth of %u\n",
++		dev_err(&host->pdev->dev, "Unhandled color depth of %u\n",
+ 				fb_info->var.bits_per_pixel);
+ 		return -EINVAL;
+ 	}
+-- 
+1.7.2.5
