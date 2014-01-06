@@ -1,37 +1,42 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Mon, 6 Jan 2014 17:14:48 +0530
-Subject: [PATCH 6/7] clk/samsung: add support for pll2650xx
-In-Reply-To: <1419145.DZQg0ZkHVU@amdc1227>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-7-git-send-email-rahul.sharma@samsung.com>
- <1419145.DZQg0ZkHVU@amdc1227>
-Message-ID: <CAPdUM4P9tE5ohtAb5heMRj3GGjdYrNYp5iX7u-uZySiaCikA7Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 6 Jan 2014 11:50:21 +0000
+Subject: [PATCH v2 4/7] mfd: ssbi: Add regmap read/write helpers
+In-Reply-To: <20131226194133.GJ31766@codeaurora.org>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-5-git-send-email-sboyd@codeaurora.org>
+ <20131224125443.GC30815@sirena.org.uk>
+ <20131226194133.GJ31766@codeaurora.org>
+Message-ID: <20140106115021.GC30156@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Thu, 26 Dec 2013, Stephen Boyd wrote:
 
-On 19 December 2013 17:15, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul,
->
-> On Friday 06 of December 2013 21:26:30 Rahul Sharma wrote:
->> Add support for pll2650xx in samsung pll file. This pll variant
->> is close to pll36xx but uses CON2 registers instead of CON1.
->
-> If the ops are otherwise idential, why not reuse the ops for pll36xx
-> and use CON1 or CON2 register conditionally based on pll->type field?
-> (Just as it is already done for pll4600, 4650 and 4650c.)
->
+> On 12/24, Mark Brown wrote:
+> > On Mon, Dec 23, 2013 at 12:46:00PM -0800, Stephen Boyd wrote:
+> > 
+> > > +int ssbi_reg_read(void *context, unsigned int reg, unsigned int *val)
+> > > +{
+> > > +	*val = 0;
+> > > +	return ssbi_read(context, reg, (u8 *)val, 1);
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(ssbi_reg_read);
+> > > +
+> > > +int ssbi_reg_write(void *context, unsigned int reg, unsigned int val)
+> > > +{
+> > > +	return ssbi_write(context, reg, (u8 *)&val, 1);
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(ssbi_reg_write);
+> > 
+> > Not a big deal but could these just be inlined in the headers?
+> 
+> Sure, I can do that if I need to resend? The only benefit I see
+> is two less symbols exported.
 
-I verified the difference and found that  pll2650xx is fairly
-different in terms of
-Bit Fields, Con2 register, and additional PLL config bits than pll36xx. Due to
-this, I have to add lot of if-else code based on pll type which
-doesn't looks clean.
+Yes please. After this review.
 
-Regards,
-Rahul Sharma.
-
-> Best regards,
-> Tomasz
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
