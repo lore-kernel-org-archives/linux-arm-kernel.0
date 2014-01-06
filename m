@@ -1,31 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 6 Jan 2014 14:34:36 -0800
-Subject: Possible arm64 patches for stable
-In-Reply-To: <20131231060453.GA22732@kroah.com>
-References: <20131220172827.GZ31886@sirena.org.uk>
- <20131231060453.GA22732@kroah.com>
-Message-ID: <20140106223436.GA9235@kroah.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 6 Jan 2014 16:37:33 -0600
+Subject: [PATCH] ARM: dts: omap3430-sdp: add dip switch information for MMC
+ operation
+Message-ID: <1389047853-26375-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 10:04:53PM -0800, Greg Kroah-Hartman wrote:
-> On Fri, Dec 20, 2013 at 05:28:27PM +0000, Mark Brown wrote:
-> > Hi,
-> > 
-> > While reading the kernel logs for arm64 (as one does) I noticed a few
-> > patches that seemed like candidates for either LTS or LTSI.  I've also
-> > had a couple of others mentioned via other routes.  What do you think of
-> > these?
-> > 
-> >   4ecf7ccb1973 arm64: spinlock: retry trylock operation if strex fails on free lock
-> > 
-> > This seems like a correctness fix for spinlocks, though since the
-> > callers should cope with failure it's arguably just an optimisation.
-> 
-> I've applied this one to 3.10-stable and will look over the others when
-> I catch up on my larger patch queue, thanks.
+MMC 8 bit mode operation depends on dip switch setting which is not
+obvious - The current board file has this description. However, with
+removal of the board file in the future, this information will be lost
+and has to be rediscovered.
 
-All of the other ones looked good to me and I've queued them up now,
-thanks.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/omap3430-sdp.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-greg k-h
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index 281914e..cd3d047 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -34,6 +34,10 @@
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+ 	vmmc_aux-supply = <&vsim>;
++	/*
++	 * S6-3 must be in ON position for 8 bit mode to function
++	 * Else, use 4 bit mode
++	 */
+ 	bus-width = <8>;
+ };
+ 
+-- 
+1.7.9.5
