@@ -1,55 +1,48 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 6 Jan 2014 11:27:26 -0600
-Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
-Message-ID: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 06 Jan 2014 18:28:04 +0100
+Subject: [PATCH v4 01/15] reset: Silence warning in reset-controller.h
+In-Reply-To: <1387847559-18330-2-git-send-email-sboyd@codeaurora.org>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1389029284.5590.21.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Am Montag, den 23.12.2013, 17:12 -0800 schrieb Stephen Boyd:
+> If a user of <linux/reset-controller.h> doesn't include
+> <linux/of.h> before including reset-controller.h they'll get a
+> warning as follows:
+> 
+>   include/linux/reset-controller.h:44:17:
+>   warning: 'struct of_phandle_args' declared inside parameter list
+> 
+> This is because of_phandle_args is not forward declared. Add the
+> declaration to silence this warning.
+> 
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  include/linux/reset-controller.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+> index 2f61311..41a4695 100644
+> --- a/include/linux/reset-controller.h
+> +++ b/include/linux/reset-controller.h
+> @@ -21,6 +21,7 @@ struct reset_control_ops {
+>  
+>  struct module;
+>  struct device_node;
+> +struct of_phandle_args;
+>  
+>  /**
+>   * struct reset_controller_dev - reset controller entity that might
 
-Please pull in these patches that cleans up the SOCFPGA clock driver. This is
-V2 of the pull request that includes 4 patches from Steffen Trumtrar.
+Since this is only a warning, I see no need for this to go through the
+clock tree. On the other hand there are no merge conflicts to be
+expected, so that's fine with me either way.
 
-Thanks,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Dinh
-
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v2
-
-for you to fetch changes up to d5387681665e58bafc1a9c745182f03aab0579c3:
-
-  clk: socfpga: split clk code (2014-01-06 11:22:22 -0600)
-
-----------------------------------------------------------------
-v2: SOCFPGA clk cleanups for 3.14
-
-----------------------------------------------------------------
-Dinh Nguyen (3):
-      clk: socfpga: Map the clk manager base address in the clock driver
-      clk: socfpga: Look for the GPIO_DB_CLK by its offset
-      clk: socfpga: Remove socfpga_init_clocks
-
-Steffen Trumtrar (4):
-      clk: socfpga: remove unused field
-      clk: socfpga: fix define typo
-      clk: socfpga: fix compile error
-      clk: socfpga: split clk code
-
- arch/arm/mach-socfpga/socfpga.c  |    5 -
- drivers/clk/socfpga/Makefile     |    3 +
- drivers/clk/socfpga/clk-gate.c   |  223 ++++++++++++++++++++++++++
- drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
- drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
- drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
- drivers/clk/socfpga/clk.h        |   57 +++++++
- 7 files changed, 500 insertions(+), 321 deletions(-)
- create mode 100644 drivers/clk/socfpga/clk-gate.c
- create mode 100644 drivers/clk/socfpga/clk-periph.c
- create mode 100644 drivers/clk/socfpga/clk-pll.c
- create mode 100644 drivers/clk/socfpga/clk.h
+regards
+Philipp
