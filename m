@@ -1,95 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  6 Jan 2014 09:22:08 +0100
-Subject: [PATCH 0/8] arm64: udev autoloaded module for Crypto Extensions sync
- AES
-Message-ID: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon,  6 Jan 2014 09:22:11 +0100
+Subject: [PATCH 3/8] cpu: advertise CPU features over udev in a generic way
+In-Reply-To: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1388996536-27014-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is mostly a repost of patches that I have proposed (and that have
-been discussed) on the list previously. This time, I am resending it as a
-coherent series to try and make a stronger case for the features I am proposing.
+This patch implements a generic modalias 'cpu:type:...:feature:...'
+which enables CPU feature flag based module loading in a generic way.
+All the arch needs to do is enable CONFIG_ARCH_HAS_CPU_AUTOPROBE and
+implement arch_print_cpu_modalias(). The modules need to declare the
+CPU feature they depend on with MODULE_DEVICE_TABLE(cpu, ...)
 
-Patch #8 implements the core AES cipher. It relies on patches 2, 3 and 5 to
-support udev autoloading of the module if the AES extension is supported by the
-CPU it is running on. Patches 6 and 7 are required because the core AES cipher
-may be called from interrupt context.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ include/linux/mod_devicetable.h   | 15 +++++++++++++++
+ scripts/mod/devicetable-offsets.c |  3 +++
+ scripts/mod/file2alias.c          | 10 ++++++++++
+ 3 files changed, 28 insertions(+)
 
-Patch #1 is included as a bonus/reference *only*. It is not intended to be
-merged, but it allows those who would like to try this code to do so on a system
-or emulator that does not have the Crypto Extensions implemented.
-
-Patch #2 moves arch_cpu_uevent() from x86 to generic code, as it is generic in
-nature and can be reused by other archs.
-
-Patch #3 introduces a generic 'cpu' modalias type which can be used to autoload
-modules based on whether the CPU supports a certain optional feature. How IDs
-map to features is not specified, this is up to the arch.
-
-Patch #4 changes the x86 specific 'x86cpu' modalias so it adheres to the syntax
-introduced in patch #3. This is not strictly necessary, but it was suggested in
-a discussion between H. Peter Anvin, Andi Kleen and myself, i.e., that a generic
-solution should also cover the x86 use case (which has 320 feature bits already)
-[http://marc.info/?l=linux-kernel&m=138384467604799&w=2]
-
-@Peter, Andi: could I please have your ack(s) on patch #2, and possibly on
-patch #4 if you still feel that all archs should use the same modalias syntax
-(and you are happy with the way I implemented that)
-
-Patch #5 enables the generic 'cpu' feature matching introduced in patch 3 for
-arm64.
-
-Patch #6 is an optimization to the arm64 kernel mode NEON code that tries to
-avoid pointless saves/restores of the NEON register file.
-
-Patch #7 adds support to the kernel mode NEON code for being called from 
-interrupt context. It also adds support for partial saves/restores.
-
-Patch #8 implements the AES core cipher.
-
-The series depends on 4bff28ccda2b ("arm64: Add hwcaps for crypto and CRC32
-extensions.") which is already in Catalin's tree and in linux-next.
-
-Ard Biesheuvel (8):
-  arm64: add kernel emulation for AES instructions
-  x86: move arch_cpu_uevent() to generic code
-  cpu: advertise CPU features over udev in a generic way
-  x86: align with generic cpu modalias
-  arm64: advertise CPU features for modalias matching
-  arm64: defer reloading a task's FPSIMD state to userland resume
-  arm64: add support for kernel mode NEON in atomic context
-  arm64: add Crypto Extensions based synchronous core AES cipher
-
- arch/arm64/Kconfig                    |   3 +
- arch/arm64/Makefile                   |   2 +
- arch/arm64/crypto/Makefile            |  13 ++
- arch/arm64/crypto/aes-ce-cipher.c     | 112 ++++++++++++
- arch/arm64/emu/Makefile               |  11 ++
- arch/arm64/emu/ce-aes.c               | 331 ++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/fpsimd.h       |  20 ++
- arch/arm64/include/asm/fpsimdmacros.h |  37 ++++
- arch/arm64/include/asm/neon.h         |   6 +-
- arch/arm64/include/asm/thread_info.h  |   4 +-
- arch/arm64/include/asm/traps.h        |  10 +
- arch/arm64/kernel/entry-fpsimd.S      |  24 +++
- arch/arm64/kernel/entry.S             |   6 +-
- arch/arm64/kernel/fpsimd.c            | 108 +++++++++--
- arch/arm64/kernel/process.c           |   3 +-
- arch/arm64/kernel/setup.c             |  20 ++
- arch/arm64/kernel/signal.c            |   3 +
- arch/arm64/kernel/traps.c             |  49 +++++
- arch/x86/kernel/cpu/match.c           |  14 +-
- crypto/Kconfig                        |   6 +
- drivers/base/cpu.c                    |  15 +-
- include/linux/cpu.h                   |   1 -
- include/linux/mod_devicetable.h       |  15 ++
- scripts/mod/devicetable-offsets.c     |   3 +
- scripts/mod/file2alias.c              |  20 +-
- 25 files changed, 793 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
- create mode 100644 arch/arm64/emu/Makefile
- create mode 100644 arch/arm64/emu/ce-aes.c
-
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 45e921401b06..3aad3c0f765c 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -564,6 +564,21 @@ struct x86_cpu_id {
+ #define X86_MODEL_ANY  0
+ #define X86_FEATURE_ANY 0	/* Same as FPU, you can't test for that */
+ 
++/*
++ * Generic table type for matching CPU features.
++ * @feature:	the bit number of the feature (0 - 65535)
++ *
++ * How the bit numbers map to actual CPU features is entirely up to the arch,
++ * although using the same ID space as hwcaps seems obvious.
++ */
++
++struct cpu_feature {
++	__u16	feature;
++};
++
++/* hwcap const are bit masks, so take the log when using them as feature IDs */
++#define CPU_FEATURE_HWCAP(x)	ilog2(x)
++
+ #define IPACK_ANY_FORMAT 0xff
+ #define IPACK_ANY_ID (~0)
+ struct ipack_device_id {
+diff --git a/scripts/mod/devicetable-offsets.c b/scripts/mod/devicetable-offsets.c
+index bb5d115ca671..f282516acc7b 100644
+--- a/scripts/mod/devicetable-offsets.c
++++ b/scripts/mod/devicetable-offsets.c
+@@ -174,6 +174,9 @@ int main(void)
+ 	DEVID_FIELD(x86_cpu_id, model);
+ 	DEVID_FIELD(x86_cpu_id, vendor);
+ 
++	DEVID(cpu_feature);
++	DEVID_FIELD(cpu_feature, feature);
++
+ 	DEVID(mei_cl_device_id);
+ 	DEVID_FIELD(mei_cl_device_id, name);
+ 
+diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
+index 23708636b05c..8a69005228d8 100644
+--- a/scripts/mod/file2alias.c
++++ b/scripts/mod/file2alias.c
+@@ -1135,6 +1135,16 @@ static int do_x86cpu_entry(const char *filename, void *symval,
+ }
+ ADD_TO_DEVTABLE("x86cpu", x86_cpu_id, do_x86cpu_entry);
+ 
++/* LOOKS like cpu:type:*:feature:*FEAT* */
++static int do_cpu_entry(const char *filename, void *symval, char *alias)
++{
++	DEF_FIELD(symval, cpu_feature, feature);
++
++	sprintf(alias, "cpu:type:*:feature:*%04X*", feature);
++	return 1;
++}
++ADD_TO_DEVTABLE("cpu", cpu_feature, do_cpu_entry);
++
+ /* Looks like: mei:S */
+ static int do_mei_entry(const char *filename, void *symval,
+ 			char *alias)
 -- 
 1.8.3.2
