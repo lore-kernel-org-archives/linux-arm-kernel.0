@@ -1,16 +1,14 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 6 Jan 2014 08:36:49 -0400
-Subject: [PATCHv2 5/7] arm: dts: dra7: add thermal data
+Date: Mon, 6 Jan 2014 08:36:50 -0400
+Subject: [PATCHv2 6/7] arm: dts: add tmp102 i2c sensor node on dra7-evm
 In-Reply-To: <1389011811-13004-1-git-send-email-eduardo.valentin@ti.com>
 References: <1389011811-13004-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1389011811-13004-6-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1389011811-13004-7-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds thermal data for DRA7 SoCs. Cpufreq cooling
-will be enabled for MPU domain whenever it crosses 100C.
-GPU, CORE, DSPEVE, IVA will be exposed and system shall
-shutdown when they cross 125C.
+On dra7-evm there is an tmp102 temperature sensor on i2c bus 1.
+This patch adds its device tree node.
 
 Cc: Beno?t Cousson <bcousson@baylibre.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
@@ -25,28 +23,26 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/dra7-evm.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 139472c..4784c0c 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -68,6 +68,15 @@
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 5babba0..36e2c9e 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -212,6 +212,13 @@
+ 			};
+ 		};
  	};
- 
-+	thermal_zones: thermal-zones {
-+		/* SoC thermal zones */
-+		#include "omap4-cpu-thermal.dtsi"
-+		#include "omap5-gpu-thermal.dtsi"
-+		#include "omap5-core-thermal.dtsi"
-+		#include "dra7-dspeve-thermal.dtsi"
-+		#include "dra7-iva-thermal.dtsi"
-+	};
 +
- 	gic: interrupt-controller at 48211000 {
- 		compatible = "arm,cortex-a15-gic";
- 		interrupt-controller;
++	tmp102: tmp102 at 48 {
++		compatible = "ti,tmp102";
++		reg = <0x48>;
++
++		#thermal-sensor-cells = <0>;
++	};
+ };
+ 
+ &i2c2 {
 -- 
 1.8.2.1.342.gfa7285d
