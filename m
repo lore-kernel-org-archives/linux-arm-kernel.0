@@ -1,44 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 06 Jan 2014 18:02:50 +0100
-Subject: [PATCH v3 0/2] Fix i2c bus hang on A0 version of the Armada XP
- SoCs
-In-Reply-To: <20140106165918.GC13111@lunn.ch>
-References: <1389004820-30230-1-git-send-email-gregory.clement@free-electrons.com>
- <20140106165918.GC13111@lunn.ch>
-Message-ID: <52CAE1BA.6050706@free-electrons.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 6 Jan 2014 11:27:26 -0600
+Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
+Message-ID: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2014 17:59, Andrew Lunn wrote:
-> On Mon, Jan 06, 2014 at 11:40:18AM +0100, Gregory CLEMENT wrote:
->> Hi,
->>
->> This the 3rd (and I hope last) version of the series fixing the i2c
->> bus hang on A0 version of the Armada XP SoCs. It occurred on the early
->> release of the OpenBlocks AX3-4 boards. Indeed the first variants of
->> Armada XP SoCs (A0 stepping) have issues related to the i2c controller
->> which prevent to use the offload mechanism and lead to a kernel hang
->> during boot.
-> 
-> Hi Gregory
-> 
-> Tested on my OpenBlocks AX3-4 with an A0 SoC.
-> 
+Hi Mike,
 
-Great! Thanks!
+Please pull in these patches that cleans up the SOCFPGA clock driver. This is
+V2 of the pull request that includes 4 patches from Steffen Trumtrar.
 
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
+Thanks,
 
-I will let Jason add your tested-by flag when he will get the patches
+Dinh
 
-> 
-> Thanks
-> 	   Andrew
-> 
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v2
+
+for you to fetch changes up to d5387681665e58bafc1a9c745182f03aab0579c3:
+
+  clk: socfpga: split clk code (2014-01-06 11:22:22 -0600)
+
+----------------------------------------------------------------
+v2: SOCFPGA clk cleanups for 3.14
+
+----------------------------------------------------------------
+Dinh Nguyen (3):
+      clk: socfpga: Map the clk manager base address in the clock driver
+      clk: socfpga: Look for the GPIO_DB_CLK by its offset
+      clk: socfpga: Remove socfpga_init_clocks
+
+Steffen Trumtrar (4):
+      clk: socfpga: remove unused field
+      clk: socfpga: fix define typo
+      clk: socfpga: fix compile error
+      clk: socfpga: split clk code
+
+ arch/arm/mach-socfpga/socfpga.c  |    5 -
+ drivers/clk/socfpga/Makefile     |    3 +
+ drivers/clk/socfpga/clk-gate.c   |  223 ++++++++++++++++++++++++++
+ drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
+ drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
+ drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
+ drivers/clk/socfpga/clk.h        |   57 +++++++
+ 7 files changed, 500 insertions(+), 321 deletions(-)
+ create mode 100644 drivers/clk/socfpga/clk-gate.c
+ create mode 100644 drivers/clk/socfpga/clk-periph.c
+ create mode 100644 drivers/clk/socfpga/clk-pll.c
+ create mode 100644 drivers/clk/socfpga/clk.h
