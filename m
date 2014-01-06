@@ -1,26 +1,101 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Mon, 06 Jan 2014 23:21:30 +0100
-Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
-In-Reply-To: <52CB062C.50802@wwwdotorg.org>
-References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
- <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
- <52CB062C.50802@wwwdotorg.org>
-Message-ID: <2030639.dhgZbyhUvO@fb07-iapwap2>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 Jan 2014 14:24:41 -0800
+Subject: [PATCH v2 02/10] genirq: Add devm_request_any_context_irq()
+In-Reply-To: <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
+References: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
+ <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <52CB2D29.3050107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 6. Januar 2014, 12:38:20 schrieb Stephen Warren:
-> On 12/21/2013 01:38 PM, Marc Dietrich wrote:
-> > Add backlight and panel nodes for the PAZ00 TFT LCD panel.
-> > 
-> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
-> > ---
-> > This should enable everything needed. Unfortunately, in my tests it only
-> > switches on the backlight, but the display controller blocks in some
-> > infinit loop, so we get no output (and no working system). I post it here
-> > in case I missed something obvious...
-> As mentioned later on, this works fine with U-Boot (and tests fine here
-> too), so I plan to apply this for 3.15, once I can.
+On 01/02/14 16:37, Stephen Boyd wrote:
+> Some drivers use request_any_context_irq() but there isn't a
+> devm_* function for it. Add one so that these drivers don't need
+> to explicitly free the irq on driver detach.
+>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-huh? I thought this can go into 3.14 if possible. Patch is harmless and the 
-merge window still weeks away.
+Thomas, can you please review this patch?
+
+> ---
+>  include/linux/interrupt.h |  5 +++++
+>  kernel/irq/devres.c       | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+>
+> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+> index 0053adde0ed9..a2678d35b5a2 100644
+> --- a/include/linux/interrupt.h
+> +++ b/include/linux/interrupt.h
+> @@ -158,6 +158,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
+>  					 devname, dev_id);
+>  }
+>  
+> +extern int __must_check
+> +devm_request_any_context_irq(struct device *dev, unsigned int irq,
+> +		 irq_handler_t handler, unsigned long irqflags,
+> +		 const char *devname, void *dev_id);
+> +
+>  extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+>  
+>  /*
+> diff --git a/kernel/irq/devres.c b/kernel/irq/devres.c
+> index bd8e788d71e0..1ef0606797c9 100644
+> --- a/kernel/irq/devres.c
+> +++ b/kernel/irq/devres.c
+> @@ -73,6 +73,51 @@ int devm_request_threaded_irq(struct device *dev, unsigned int irq,
+>  EXPORT_SYMBOL(devm_request_threaded_irq);
+>  
+>  /**
+> + *	devm_request_any_context_irq - allocate an interrupt line for a managed device
+> + *	@dev: device to request interrupt for
+> + *	@irq: Interrupt line to allocate
+> + *	@handler: Function to be called when the IRQ occurs
+> + *	@thread_fn: function to be called in a threaded interrupt context. NULL
+> + *		    for devices which handle everything in @handler
+> + *	@irqflags: Interrupt type flags
+> + *	@devname: An ascii name for the claiming device
+> + *	@dev_id: A cookie passed back to the handler function
+> + *
+> + *	Except for the extra @dev argument, this function takes the
+> + *	same arguments and performs the same function as
+> + *	request_any_context_irq().  IRQs requested with this function will be
+> + *	automatically freed on driver detach.
+> + *
+> + *	If an IRQ allocated with this function needs to be freed
+> + *	separately, devm_free_irq() must be used.
+> + */
+> +int devm_request_any_context_irq(struct device *dev, unsigned int irq,
+> +			      irq_handler_t handler, unsigned long irqflags,
+> +			      const char *devname, void *dev_id)
+> +{
+> +	struct irq_devres *dr;
+> +	int rc;
+> +
+> +	dr = devres_alloc(devm_irq_release, sizeof(struct irq_devres),
+> +			  GFP_KERNEL);
+> +	if (!dr)
+> +		return -ENOMEM;
+> +
+> +	rc = request_any_context_irq(irq, handler, irqflags, devname, dev_id);
+> +	if (rc) {
+> +		devres_free(dr);
+> +		return rc;
+> +	}
+> +
+> +	dr->irq = irq;
+> +	dr->dev_id = dev_id;
+> +	devres_add(dev, dr);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(devm_request_any_context_irq);
+> +
+> +/**
+>   *	devm_free_irq - free an interrupt
+>   *	@dev: device to free interrupt for
+>   *	@irq: Interrupt line to free
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
