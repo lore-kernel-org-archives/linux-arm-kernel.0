@@ -1,78 +1,68 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 06 Jan 2014 11:04:34 +0100
-Subject: [PATCH 1/4] input: Add new sun4i-lradc-keys drivers
-In-Reply-To: <20140103182349.GA13489@core.coreip.homeip.net>
-References: <1388604610-20380-1-git-send-email-hdegoede@redhat.com>
- <20140103173605.GN3144@lukather>
- <20140103182349.GA13489@core.coreip.homeip.net>
-Message-ID: <7852278.jiSUdg0kdd@phil>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 6 Jan 2014 10:07:58 +0000
+Subject: [PATCH] clk: clk-divider: fix divisor > 255 bug
+In-Reply-To: <20140103041556.12054.53966@quantum>
+References: <1387190498-15392-1-git-send-email-james.hogan@imgtec.com>
+ <20140103041556.12054.53966@quantum>
+Message-ID: <52CA807E.8020100@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 3. Januar 2014, 10:23:50 schrieb Dmitry Torokhov:
-> On Fri, Jan 03, 2014 at 06:36:05PM +0100, Maxime Ripard wrote:
-> > On Thu, Jan 02, 2014 at 11:36:33PM +0100, Hans de Goede wrote:
-> > > Hi,
-> > > 
-> > > On 01/02/2014 09:20 PM, Maxime Ripard wrote:
-> > > >On Thu, Jan 02, 2014 at 02:45:29PM +0100, Hans de Goede wrote:
-> > > >>>Also, instead of inventing yet another vendor-specific property, why
-> > > >>>not re-use> > >>>
-> > > >>>a button binding similar to gpio-keys like:
-> > > >>>        lradc: lradc at 01c22800 {
-> > > >>>        
-> > > >>>                compatible = "allwinner,sun4i-lradc-keys";
-> > > >>>                reg = <0x01c22800 0x100>;
-> > > >>>                interrupts = <31>;
-> > > >>>                allwinner,chan0-step = <200>;
-> > > >>>		
-> > > >>>		#address-cells = <1>;
-> > > >>>		#size-cells = <0>;
-> > > >>>		
-> > > >>>		button at 0 {
-> > > >>>		
-> > > >>>			reg = <0>; /* your channel index from above */
-> > > >>>			linux,code = <115>; /* already used as dt-property */
-> > > >>>		
-> > > >>>		};
-> > > >>>		
-> > > >>>		button at 1 {
-> > > >>>		
-> > > >>>			reg = <1>;
-> > > >>>			linux,code = <114>;
-> > > >>>		
-> > > >>>		};
-> > > >>
-> > > >>Ugh no. Having a vendor specific property which is KISS certainly
-> > > >>beats this, both wrt ease of writing dts files as well as wrt the
-> > > >>dts parsing code in the driver.
-> > > >
-> > > >I'd agree with Heiko here. This is pretty much the same construct
-> > > >that's already in use in other input drivers, like gpio-keys.
-> > > 
-> > > In the gpio case there is a 1 on 1 relation between a single hw
-> > > entity (the gpio-pin) and a single keycode. Here there is 1 hw entity
-> > > which maps to an array of key-codes, certainly using an array rather
-> > > then a much more complicated construct is the correct data-structure
-> > > to represent this.
-> > 
-> > You can build an array in your driver out of this very easily, it's 10
-> > lines in your probe. And you gain from this something that is more
-> > generic, can be shared by other similar drivers and is consistent with
-> > what is already in use.
+On 03/01/14 04:15, Mike Turquette wrote:
+> Quoting James Hogan (2013-12-16 02:41:38)
+>> Commit 6d9252bd9a4bb (clk: Add support for power of two type dividers)
+>> merged in v3.6 added the _get_val function to convert a divisor value to
+>> a register field value depending on the flags. However it used the type
+>> u8 for the div field, causing divisors larger than 255 to be masked
+>> and the resultant clock rate to be too high.
+>>
+>> E.g. in my case an 11bit divider was supposed to divide 24.576 MHz down
+>> to 32.768KHz. The divisor was correctly calculated as 750 (0x2ee). This
+>> was masked to 238 (0xee) resulting in a frequency of 103.26KHz.
+>>
+>> Signed-off-by: James Hogan <james.hogan@imgtec.com>
 > 
-> How will it be shared? Surely not code-wise, but basically in spirit
-> only. It seems to me that the originally proposed binding is simple and
-> concise and works well for the driver.
+> Taken into clk-next. Thanks for the fix!
 
-I don't think "binding [...] works well for the driver" is the correct 
-direction. From my understanding the binding should describe the hardware in 
-an os-agnostic way (so "linux,foo" properties should stay the exception) and 
-not the data structures used in the driver. The driver itself then implements 
-the binding to convert the binding-data into a structure it wants to use.
+Thanks Mike, is there any chance of getting this into v3.13, or is it
+too late?
 
-The sharing would, as you suggested, be in spirit and in the use of already 
-established dt-properties without introducing more non-standard ones.
+Cheers
+James
 
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: stable at vger.kernel.org
+>> ---
+>> Since this bug was introduced in 3.6, it probably should by applied to
+>> stable 3.10 and 3.12.
+>> ---
+>>  drivers/clk/clk-divider.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+>> index 8d3009e44fba..5543b7df8e16 100644
+>> --- a/drivers/clk/clk-divider.c
+>> +++ b/drivers/clk/clk-divider.c
+>> @@ -87,7 +87,7 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
+>>         return 0;
+>>  }
+>>  
+>> -static unsigned int _get_val(struct clk_divider *divider, u8 div)
+>> +static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
+>>  {
+>>         if (divider->flags & CLK_DIVIDER_ONE_BASED)
+>>                 return div;
+>> -- 
+>> 1.8.1.2
+>>
+>>
 
-Heiko
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/47f6d479/attachment.sig>
