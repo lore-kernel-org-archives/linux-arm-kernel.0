@@ -1,100 +1,40 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 06 Jan 2014 14:24:41 -0800
-Subject: [PATCH v2 02/10] genirq: Add devm_request_any_context_irq()
-In-Reply-To: <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
-References: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
- <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52CB2D29.3050107@codeaurora.org>
+Date: Mon, 06 Jan 2014 14:26:06 -0800
+Subject: [PATCH v2 4/7] mfd: ssbi: Add regmap read/write helpers
+In-Reply-To: <20140106115021.GC30156@lee--X1>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-5-git-send-email-sboyd@codeaurora.org>
+ <20131224125443.GC30815@sirena.org.uk>
+ <20131226194133.GJ31766@codeaurora.org> <20140106115021.GC30156@lee--X1>
+Message-ID: <52CB2D7E.7070505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/14 16:37, Stephen Boyd wrote:
-> Some drivers use request_any_context_irq() but there isn't a
-> devm_* function for it. Add one so that these drivers don't need
-> to explicitly free the irq on driver detach.
+On 01/06/14 03:50, Lee Jones wrote:
+> On Thu, 26 Dec 2013, Stephen Boyd wrote:
 >
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-
-Thomas, can you please review this patch?
-
-> ---
->  include/linux/interrupt.h |  5 +++++
->  kernel/irq/devres.c       | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
+>> On 12/24, Mark Brown wrote:
+>>> On Mon, Dec 23, 2013 at 12:46:00PM -0800, Stephen Boyd wrote:
+>>>
+>>>> +int ssbi_reg_read(void *context, unsigned int reg, unsigned int *val)
+>>>> +{
+>>>> +	*val = 0;
+>>>> +	return ssbi_read(context, reg, (u8 *)val, 1);
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(ssbi_reg_read);
+>>>> +
+>>>> +int ssbi_reg_write(void *context, unsigned int reg, unsigned int val)
+>>>> +{
+>>>> +	return ssbi_write(context, reg, (u8 *)&val, 1);
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(ssbi_reg_write);
+>>> Not a big deal but could these just be inlined in the headers?
+>> Sure, I can do that if I need to resend? The only benefit I see
+>> is two less symbols exported.
+> Yes please. After this review.
 >
-> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-> index 0053adde0ed9..a2678d35b5a2 100644
-> --- a/include/linux/interrupt.h
-> +++ b/include/linux/interrupt.h
-> @@ -158,6 +158,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
->  					 devname, dev_id);
->  }
->  
-> +extern int __must_check
-> +devm_request_any_context_irq(struct device *dev, unsigned int irq,
-> +		 irq_handler_t handler, unsigned long irqflags,
-> +		 const char *devname, void *dev_id);
-> +
->  extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
->  
->  /*
-> diff --git a/kernel/irq/devres.c b/kernel/irq/devres.c
-> index bd8e788d71e0..1ef0606797c9 100644
-> --- a/kernel/irq/devres.c
-> +++ b/kernel/irq/devres.c
-> @@ -73,6 +73,51 @@ int devm_request_threaded_irq(struct device *dev, unsigned int irq,
->  EXPORT_SYMBOL(devm_request_threaded_irq);
->  
->  /**
-> + *	devm_request_any_context_irq - allocate an interrupt line for a managed device
-> + *	@dev: device to request interrupt for
-> + *	@irq: Interrupt line to allocate
-> + *	@handler: Function to be called when the IRQ occurs
-> + *	@thread_fn: function to be called in a threaded interrupt context. NULL
-> + *		    for devices which handle everything in @handler
-> + *	@irqflags: Interrupt type flags
-> + *	@devname: An ascii name for the claiming device
-> + *	@dev_id: A cookie passed back to the handler function
-> + *
-> + *	Except for the extra @dev argument, this function takes the
-> + *	same arguments and performs the same function as
-> + *	request_any_context_irq().  IRQs requested with this function will be
-> + *	automatically freed on driver detach.
-> + *
-> + *	If an IRQ allocated with this function needs to be freed
-> + *	separately, devm_free_irq() must be used.
-> + */
-> +int devm_request_any_context_irq(struct device *dev, unsigned int irq,
-> +			      irq_handler_t handler, unsigned long irqflags,
-> +			      const char *devname, void *dev_id)
-> +{
-> +	struct irq_devres *dr;
-> +	int rc;
-> +
-> +	dr = devres_alloc(devm_irq_release, sizeof(struct irq_devres),
-> +			  GFP_KERNEL);
-> +	if (!dr)
-> +		return -ENOMEM;
-> +
-> +	rc = request_any_context_irq(irq, handler, irqflags, devname, dev_id);
-> +	if (rc) {
-> +		devres_free(dr);
-> +		return rc;
-> +	}
-> +
-> +	dr->irq = irq;
-> +	dr->dev_id = dev_id;
-> +	devres_add(dev, dr);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(devm_request_any_context_irq);
-> +
-> +/**
->   *	devm_free_irq - free an interrupt
->   *	@dev: device to free interrupt for
->   *	@irq: Interrupt line to free
+
+Ok done. Just waiting for you to reply on patch 3 until I resend.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
