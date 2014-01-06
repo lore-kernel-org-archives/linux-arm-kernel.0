@@ -1,46 +1,28 @@
-From: valentine.barshak@cogentembedded.com (Valentine)
-Date: Mon, 06 Jan 2014 18:00:10 +0400
-Subject: [PATCH] ARM: shmobile: lager: Enable VIN in defconfig
-In-Reply-To: <52CAA705.7080909@cogentembedded.com>
-References: <1388990626-21460-1-git-send-email-horms+renesas@verge.net.au>
- <52CAA705.7080909@cogentembedded.com>
-Message-ID: <52CAB6EA.3010104@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Jan 2014 14:28:33 +0000
+Subject: [PATCH] iommu/arm-smmu: change pud/pmd entry fill sequence
+In-Reply-To: <1388750486-5060-1-git-send-email-yifan.zhangm@gmail.com>
+References: <1388750486-5060-1-git-send-email-yifan.zhangm@gmail.com>
+Message-ID: <20140106142833.GC10449@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2014 04:52 PM, Sergei Shtylyov wrote:
-> Hello.
->
-> On 06-01-2014 10:43, Simon Horman wrote:
->
->> Cc: Valentine Barshak <valentine.barshak@cogentembedded.com>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> ---
->>   arch/arm/configs/lager_defconfig | 6 ++++++
->>   1 file changed, 6 insertions(+)
->
->> diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
->> index 883443f..7fe482d 100644
->> --- a/arch/arm/configs/lager_defconfig
->> +++ b/arch/arm/configs/lager_defconfig
->> @@ -90,6 +90,12 @@ CONFIG_RCAR_THERMAL=y
->>   CONFIG_REGULATOR=y
->>   CONFIG_REGULATOR_FIXED_VOLTAGE=y
->>   CONFIG_REGULATOR_GPIO=y
->> +CONFIG_MEDIA_SUPPORT=y
->> +CONFIG_MEDIA_CAMERA_SUPPORT=y
->> +CONFIG_V4L_PLATFORM_DRIVERS=y
->> +CONFIG_SOC_CAMERA=y
->> +CONFIG_SOC_CAMERA_PLATFORM=y
->> +CONFIG_VIDEO_RCAR_VIN=y
->
->     I'm afraid the VIN driver would be useless without ADV7180 codec driver.
+On Fri, Jan 03, 2014 at 12:01:26PM +0000, Yifan Zhang wrote:
+> From: Yifan Zhang <zhangyf@marvell.com>
+> 
+> Pgd/pud entry should be filled only once when their next level pud/pmd
+> created, the value should be pud/pmd start address, while in current
+> code, pgd/pud entry is filled every time when pud/pmd walk occurs,
+> the value is pud/pmd start address + iova pud/pmd index , this is
+> incorrect; Besides, when pud/pmd are created, we need to add pud/pmd
+> index, then pass to next level, while in currect code, if a new pud/pmd
+> created, their iova pud/pmd index is not taken into account, only
+> existing pud/pmd do. This patch change pud/pmd entry fill sequence,
+> fixes the 2 bugs.
+> 
+> Signed-off-by: Yifan Zhang <zhangyf@marvell.com>
 
-Indeed.
+Thanks Yifan, this looks good to me. It's strange that I got the pte
+handling correct, but screwed up the equivalent pmd and pud code!
 
->
-> WBR, Sergei
->
-
-Thanks,
-Val.
+Will
