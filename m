@@ -1,30 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Jan 2014 11:22:12 +0000
-Subject: [PATCH RESEND 3/4] mfd: sec-core: Add cells for S5M8767-clocks
-In-Reply-To: <1388053141-30085-4-git-send-email-tushar.behera@linaro.org>
-References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
- <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
- <1388053141-30085-4-git-send-email-tushar.behera@linaro.org>
-Message-ID: <20140106112212.GP23772@lee--X1>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 6 Jan 2014 20:26:30 +0900
+Subject: [PATCH v7 3/3] mfd: max14577: Add device tree bindings document
+In-Reply-To: <20140106104640.GK23772@lee--X1>
+References: <1386329534-14186-1-git-send-email-k.kozlowski@samsung.com>
+ <1386329534-14186-4-git-send-email-k.kozlowski@samsung.com>
+ <20140106104640.GK23772@lee--X1>
+Message-ID: <CAH9JG2Wcip=5SEmkRBn9KzWajFmn9mQzKma23vk8F67bp9-AkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Dec 2013, Tushar Behera wrote:
+On Mon, Jan 6, 2014 at 7:46 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> Add document describing device tree bindings for MAX14577 MFD driver.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/max14577.txt |   65 ++++++++++++++++++++
+>>  1 file changed, 65 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
+>
+> You still need a DT Ack before I can apply this.
 
-> S5M8767 chip has 3 crystal oscillators running at 32KHz. These are
-> supported by s2mps11-clk driver.
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> CC: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/sec-core.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+Tomasz, can you ack it?
 
-Applied, thanks.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thank you,
+Kyungmin Park
