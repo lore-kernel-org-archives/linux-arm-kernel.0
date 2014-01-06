@@ -1,67 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Jan 2014 16:41:03 +0100
-Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
- framework
-In-Reply-To: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
-References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <201401061641.03491.arnd@arndb.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 06 Jan 2014 15:45:28 +0000
+Subject: [PATCH 1/2] ARM: dcache: select DCACHE_WORD_ACCESS for big-endian
+ CPUs
+In-Reply-To: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
+References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
+Message-ID: <52CACF98.6010300@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 January 2014, Barry Song wrote:
-> this moves to generic IP module reset framework, and make other drivers
-> use common device_reset() API.
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/sirf,rstc.txt b/Documentation/devicetree/bindings/reset/sirf,rstc.txt
-> new file mode 100644
-> index 0000000..0505de7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/sirf,rstc.txt
-> @@ -0,0 +1,42 @@
-> +CSR SiRFSoC Reset Controller
-> +======================================
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be "sirf,prima2-rstc" or "sirf,marco-rstc"
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- #reset-cells: 1, see below
-> +
-> +example:
-> +
-> +rstc: reset-controller at 88010000 {
-> +	compatible = "sirf,prima2-rstc";
-> +	reg = <0x88010000 0x1000>;
-> +	#reset-cells = <1>;
-> +};
+On 17/12/13 12:16, Will Deacon wrote:
+> With commit 11ec50caedb5 ("word-at-a-time: provide generic big-endian
+> zero_bytemask implementation"), the asm-generic word-at-a-time code now
+> provides a zero_bytemask implementation, allowing us to make use of
+> DCACHE_WORD_ACCESS on big-endian CPUs, providing our
+> load_unaligned_zeropad function is endianness-clean.
+>
+> This patch reworks the load_unaligned_zeropad fixup code to work for
+> both big- and little-endian CPUs, then removes the !CPU_BIG_ENDIAN check
+> when selecting DCACHE_WORD_ACCESS.
 
-Binding looks good to me.
 
-> +void __init sirfsoc_of_rstc_init(void)
-> +{
-> +	struct device_node *np = of_find_matching_node(NULL, rstc_ids);
-> +	if (!np) {
-> +		pr_err("unable to find compatible sirf rstc node in dtb\n");
-> +		return;
-> +	}
-> +
-> +	sirfsoc_rstc_base = of_iomap(np, 0);
-> +	if (!sirfsoc_rstc_base) {
-> +		pr_err("unable to map rstc cpu registers\n");
-> +		return;
-> +	}
-> +
-> +	sirfsoc_reset_controller.of_node = np;
-> +
-> +	reset_controller_register(&sirfsoc_reset_controller);
-> +}
-> +
+> @@ -73,7 +77,11 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
+>   	"	bic	%2, %2, #0x3\n"
+>   	"	ldr	%0, [%2]\n"
+>   	"	lsl	%1, %1, #0x3\n"
+> +#ifndef __ARMEB__
+>   	"	lsr	%0, %0, %1\n"
+> +#else
+> +	"	lsl	%0, %0, %1\n"
+> +#endif
 
-Can't this be a regular platform device? Drivers that get the reference to
-the reset controller should respect a -EPROBE_DEFER error message if they
-get initialized in the wrong order.
+IIRC we have ARM_BE() and ARM_LE() helpers for this
 
-	Arnd
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
