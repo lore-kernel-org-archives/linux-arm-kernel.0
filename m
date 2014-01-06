@@ -1,66 +1,208 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  6 Jan 2014 11:40:18 +0100
-Subject: [PATCH v3 0/2] Fix i2c bus hang on A0 version of the Armada XP SoCs
-Message-ID: <1389004820-30230-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Mon,  6 Jan 2014 11:40:19 +0100
+Subject: [PATCH v3 1/2] ARM: mvebu: Add support to get the ID and the revision
+ of a SoC
+In-Reply-To: <1389004820-30230-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1389004820-30230-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1389004820-30230-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+All the mvebu SoCs have information related to their variant and
+revision that can be read from the PCI control register.
 
-This the 3rd (and I hope last) version of the series fixing the i2c
-bus hang on A0 version of the Armada XP SoCs. It occurred on the early
-release of the OpenBlocks AX3-4 boards. Indeed the first variants of
-Armada XP SoCs (A0 stepping) have issues related to the i2c controller
-which prevent to use the offload mechanism and lead to a kernel hang
-during boot.
+This patch adds support for Armada XP and Armada 370. This reading of
+the revision and the ID are done before the PCI initialization to
+avoid any conflicts. Once these data are retrieved, the resources are
+freed to let the PCI subsystem use it.
 
-The first patch add a mean to detect the SoCs version at run-time and
-the second one use this feature in the driver.
-
-These 2 patches should be applied on 3.13-rc and on stable kernel 3.12
-as it fixes a regression introduce by the commit 930ab3d403ae "i2c:
-mv64xxx: Add I2C Transaction Generator support".
-
-The first patch could be latter be extend to also be used with dove,
-kirkwood, orion5x and mv78x00 when there will be merged in mvebu.
-
-Thanks,
-
-Gregory
-
-Changelog:
-v2 -> v3:
-
-- fixed typo in the comments added in i2c-mv64xxx.c
-
-- used pr_fmt instead of %s __func__ in all the pr_* functions
-
-- added a check on the pointer returned by of_get_next_child()
-
-- added a return immediately after the 1st check to be able to get rid
-  of indenting the entire function code inside the if { ... } block.
-
-v1 -> v2:
-
-- Changed the way to test the return of the function mvebu_get_soc_id
-  in order to make it clearer.
-
-- Removed the superfluous parentheses
-
-- Added Wolfram's acked-by on the 2nd patch
-
-
-Gregory CLEMENT (2):
-  ARM: mvebu: Add support to get the ID and the revision of a SoC
-  i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
-
+Cc: stable at vger.kernel.org
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
  arch/arm/mach-mvebu/Makefile       |   2 +-
  arch/arm/mach-mvebu/mvebu-soc-id.c | 121 +++++++++++++++++++++++++++++++++++++
- drivers/i2c/busses/i2c-mv64xxx.c   |  11 +++-
  include/linux/mvebu-soc-id.h       |  32 ++++++++++
- 4 files changed, 164 insertions(+), 2 deletions(-)
+ 3 files changed, 154 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
  create mode 100644 include/linux/mvebu-soc-id.h
 
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 2d04f0e21870..878aebe98dcc 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -3,7 +3,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 
+ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+ 
+-obj-y				 += system-controller.o
++obj-y				 += system-controller.o mvebu-soc-id.o
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
+ obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+ obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
+diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+new file mode 100644
+index 000000000000..afd2fae198c5
+--- /dev/null
++++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+@@ -0,0 +1,121 @@
++/*
++ * Variant and revision information for mvebu SoCs
++ *
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * All the mvebu SoCs have information related to their variant and
++ * revision that can be read from the PCI control register. This is
++ * done before the PCI initialization to avoid any conflict. Once the
++ * ID and revision are retrieved, the mapping is freed.
++ */
++
++#define pr_fmt(fmt) "mvebu-soc-id: " fmt
++
++#include <linux/clk.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mvebu-soc-id.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#define PCIE_DEV_ID_OFF		0x0
++#define PCIE_DEV_REV_OFF	0x8
++
++#define SOC_ID_MASK	    0xFFFF0000
++#define SOC_REV_MASK	    0xFF
++
++static u32 soc_dev_id;
++static u32 soc_rev;
++static bool is_id_valid;
++
++static const struct of_device_id mvebu_pcie_of_match_table[] = {
++	{ .compatible = "marvell,armada-xp-pcie", },
++	{ .compatible = "marvell,armada-370-pcie", },
++	{},
++};
++
++int mvebu_get_soc_id(u32 *dev, u32 *rev)
++{
++	if (is_id_valid) {
++		*dev = soc_dev_id;
++		*rev = soc_rev;
++		return 0;
++	} else
++		return -1;
++}
++
++EXPORT_SYMBOL(mvebu_get_soc_id);
++
++static int __init mvebu_soc_id_init(void)
++{
++	struct device_node *np;
++	int ret = 0;
++	void __iomem *pci_base;
++	struct clk *clk;
++	struct device_node *child;
++
++	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
++	if (!np)
++		return ret;
++
++	/*
++	 * ID and revision are available from any port, so we
++	 * just pick the first one
++	 */
++	child = of_get_next_child(np, NULL);
++	if (child == NULL) {
++		pr_err("cannot get pci node\n");
++		ret = -ENOMEM;
++		goto clk_err;
++	}
++
++	clk = of_clk_get_by_name(child, NULL);
++	if (IS_ERR(clk)) {
++		pr_err("cannot get clock\n");
++		ret = -ENOMEM;
++		goto clk_err;
++	}
++
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		pr_err("cannot enable clock\n");
++		goto clk_err;
++	}
++
++	pci_base = of_iomap(child, 0);
++	if (IS_ERR(pci_base)) {
++		pr_err("cannot map registers\n");
++		ret = -ENOMEM;
++		goto res_ioremap;
++	}
++
++	/* SoC ID */
++	soc_dev_id = readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
++
++	/* SoC revision */
++	soc_rev = readl(pci_base + PCIE_DEV_REV_OFF) & SOC_REV_MASK;
++
++	is_id_valid = true;
++
++	pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
++
++	iounmap(pci_base);
++
++res_ioremap:
++	clk_disable_unprepare(clk);
++
++clk_err:
++	of_node_put(child);
++	of_node_put(np);
++
++	return ret;
++}
++arch_initcall(mvebu_soc_id_init);
++
+diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
+new file mode 100644
+index 000000000000..31654252fe35
+--- /dev/null
++++ b/include/linux/mvebu-soc-id.h
+@@ -0,0 +1,32 @@
++/*
++ * Marvell EBU SoC ID and revision definitions.
++ *
++ * Copyright (C) 2014 Marvell Semiconductor
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __LINUX_MVEBU_SOC_ID_H
++#define __LINUX_MVEBU_SOC_ID_H
++
++/* Armada XP ID */
++#define MV78230_DEV_ID	    0x7823
++#define MV78260_DEV_ID	    0x7826
++#define MV78460_DEV_ID	    0x7846
++
++/* Armada XP Revision */
++#define MV78XX0_A0_REV	    0x1
++#define MV78XX0_B0_REV	    0x2
++
++#ifdef CONFIG_ARCH_MVEBU
++int mvebu_get_soc_id(u32 *dev, u32 *rev);
++#else
++static inline int mvebu_get_soc_id(u32 *dev, u32 *rev)
++{
++	return -1;
++}
++#endif
++
++#endif /* __LINUX_MVEBU_SOC_ID_H */
 -- 
 1.8.1.2
