@@ -1,55 +1,35 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 6 Jan 2014 08:36:51 -0400
-Subject: [PATCHv2 7/7] arm: dts: add thermal zones info on tmp102 for DRA7-EVM
-In-Reply-To: <1389011811-13004-1-git-send-email-eduardo.valentin@ti.com>
-References: <1389011811-13004-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1389011811-13004-8-git-send-email-eduardo.valentin@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 6 Jan 2014 20:43:00 +0800
+Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
+ reset
+In-Reply-To: <20140106111428.GF27432@n2100.arm.linux.org.uk>
+References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
+ <20140103120712.GE25079@S2101-09.ap.freescale.net>
+ <20140104054702.GA6243@quad.lixom.net>
+ <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
+ <20140106022419.GA26128@S2101-09.ap.freescale.net>
+ <20140106111428.GF27432@n2100.arm.linux.org.uk>
+Message-ID: <20140106124258.GA31158@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple thermal zone on tmp102.
+On Mon, Jan 06, 2014 at 11:14:28AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 06, 2014 at 10:24:23AM +0800, Shawn Guo wrote:
+> > This is a typical example that we did not implement device tree
+> > bindings perfectly right in the first place, and we have to live with it
+> > forever.  If someday there is board design using an active high PHY
+> > reset, we basically have to introduce another property for it.
+> 
+> Yes and no.  That third number in the property is always zero at present,
+> right?  If so, just define zero to mean "the default level of reset"
+> which would be the -rc6 behaviour.
+> 
+> Then you can define non-zero values to mean "explicitly state the level".
 
-Cc: Beno?t Cousson <bcousson@baylibre.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
----
- arch/arm/boot/dts/dra7-evm.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+This is not nice either, because the third number in *-gpios property is
+already defined by gpio bindings: 
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 36e2c9e..1ea9c3d 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -95,6 +95,21 @@
- 	};
- };
- 
-+&thermal_zones {
-+	pcb_thermal: pcb_thermal {
-+		polling-delay-passive = <250>; /* milliseconds */
-+		polling-delay = <1000>; /* milliseconds */
-+		thermal-sensors = <&tmp102>;
-+		trips {
-+			crit at 80000 {
-+			temperature = <80000>;
-+				hysteresis = <1000>;
-+				type = "critical";
-+			};
-+		};
-+	};
-+};
-+
- &i2c1 {
- 	status = "okay";
- 	pinctrl-names = "default";
--- 
-1.8.2.1.342.gfa7285d
+  Documentation/devicetree/bindings/gpio/gpio.txt
+  Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+
+Shawn
