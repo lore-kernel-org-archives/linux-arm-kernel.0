@@ -1,38 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 6 Jan 2014 09:09:53 +0100
-Subject: [PATCH 4/4] ARM: shmobile: lager: Make spi_flash_data const
-In-Reply-To: <20140106023151.GF11231@verge.net.au>
-References: <1388764128-27686-1-git-send-email-geert@linux-m68k.org>
- <1388764128-27686-4-git-send-email-geert@linux-m68k.org>
- <20140106023151.GF11231@verge.net.au>
-Message-ID: <CAMuHMdUdJgxf9EckTNKCRF-x5c+w7NAtnYoGo696B5mgESSnmQ@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 06 Jan 2014 09:19:22 +0100
+Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio
+ A701
+In-Reply-To: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
+ (Thierry Reding's message of "Fri, 20 Dec 2013 10:46:52 +0100")
+References: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <87zjn9v7xx.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 6, 2014 at 3:31 AM, Simon Horman <horms@verge.net.au> wrote:
->> -static struct flash_platform_data spi_flash_data = {
->> +static const struct flash_platform_data spi_flash_data = {
->>       .name           = "m25p80",
->>       .parts          = spi_flash_part,
->>       .nr_parts       = ARRAY_SIZE(spi_flash_part),
+Thierry Reding <thierry.reding@gmail.com> writes:
+
+> Recent changes to the pwm-backlight driver have made the power supply
+> mandatory. There is code in the regulator core to deal with situations
+> where no regulator is specified and provide a dummy, but that works on
+> DT-based boards only.
 >
-> Should spi_flash_part also be const?
+> The situation can be remedied by adding a dummy regulator during board
+> initialization.
 
-No, .parts is a non-const pointer (but perhaps it can be made const, but that
-may be more invasive, and have side-effects).
+Haojian, ping ?
+We're at -rc7 and I've seen no pull of this fix. As the display is broken
+without it, I'd really like to have it fixed for v3.13.
 
-> And should flash_platform_data and spi_flash_part be annotated
-> as __initconst?
-
-AFAIU, those are not copied.
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Cheers.
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Robert
