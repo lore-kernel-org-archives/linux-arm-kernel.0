@@ -1,219 +1,191 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  6 Jan 2014 09:22:15 +0100
-Subject: [PATCH 7/8] arm64: add support for kernel mode NEON in atomic context
+Date: Mon,  6 Jan 2014 09:22:16 +0100
+Subject: [PATCH 8/8] arm64: add Crypto Extensions based synchronous core AES
+ cipher
 In-Reply-To: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1388996536-27014-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1388996536-27014-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1388996536-27014-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies kernel_neon_begin() and kernel_neon_end(), so
-they may be called from any context. To address the case where only
-a couple of registers are needed, kernel_neon_begin_partial(u32) is
-introduced which takes as a parameter the number of bottom 'n' NEON
-q-registers required. To mark the end of such a partial section, the
-regular kernel_neon_end() should be used.
+This implements the core AES cipher using the Crypto Extensions,
+using only NEON registers q0 and q1.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/fpsimd.h       | 17 ++++++++++++++
- arch/arm64/include/asm/fpsimdmacros.h | 37 ++++++++++++++++++++++++++++++
- arch/arm64/include/asm/neon.h         |  6 ++++-
- arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++
- arch/arm64/kernel/fpsimd.c            | 43 +++++++++++++++++++++++------------
- 5 files changed, 111 insertions(+), 16 deletions(-)
+ arch/arm64/Makefile               |   1 +
+ arch/arm64/crypto/Makefile        |  13 +++++
+ arch/arm64/crypto/aes-ce-cipher.c | 112 ++++++++++++++++++++++++++++++++++++++
+ crypto/Kconfig                    |   6 ++
+ 4 files changed, 132 insertions(+)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 609bc44ceb8d..dc9ef741c648 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -41,6 +41,19 @@ struct fpsimd_state {
- 	unsigned int last_cpu;
- };
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index e0b75464b7f1..a4b3e253557d 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -46,6 +46,7 @@ core-y		+= arch/arm64/emu/
+ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
+ core-$(CONFIG_KVM) += arch/arm64/kvm/
+ core-$(CONFIG_XEN) += arch/arm64/xen/
++core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+ libs-y		+= $(LIBGCC)
  
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+new file mode 100644
+index 000000000000..ac58945c50b3
+--- /dev/null
++++ b/arch/arm64/crypto/Makefile
+@@ -0,0 +1,13 @@
++#
++# linux/arch/arm64/crypto/Makefile
++#
++# Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License version 2 as
++# published by the Free Software Foundation.
++#
++
++obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
++
++CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
+diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
+new file mode 100644
+index 000000000000..dd132c2d69ab
+--- /dev/null
++++ b/arch/arm64/crypto/aes-ce-cipher.c
+@@ -0,0 +1,112 @@
 +/*
-+ * Struct for stacking the bottom 'n' FP/SIMD registers.
-+ * Mainly intended for kernel use of v8 Crypto Extensions which only
-+ * needs a few registers and may need to execute in atomic context.
-+ */
-+struct fpsimd_partial_state {
-+	u32		num_regs;
-+	u32		fpsr;
-+	u32		fpcr;
-+	__uint128_t	vregs[32] __aligned(16);
-+} __aligned(16);
-+
-+
- #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
- #define VFP_FPSCR_STAT_MASK	0xf800009f
-@@ -57,6 +70,10 @@ struct task_struct;
- extern void fpsimd_save_state(struct fpsimd_state *state);
- extern void fpsimd_load_state(struct fpsimd_state *state);
- 
-+extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
-+				      u32 num_regs);
-+extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
-+
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
- extern void fpsimd_reload_fpstate(void);
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index bbec599c96bd..42990a82c671 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -62,3 +62,40 @@
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
- 	msr	fpcr, x\tmpnr
- .endm
-+
-+.altmacro
-+.macro	q2op, op, q1, q2, state
-+	\op	q\q1, q\q2, [\state, # -16 * \q1 - 16]
-+.endm
-+
-+.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
-+	mrs	x\tmpnr1, fpsr
-+	str	w\numnr, [\state]
-+	mrs	x\tmpnr2, fpcr
-+	stp	w\tmpnr1, w\tmpnr2, [\state, #4]
-+	adr	x\tmpnr1, 0f
-+	add	\state, \state, x\numnr, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+		qb = \qa + 1
-+	q2op	stp, \qa, %qb, \state
-+	.endr
-+0:
-+.endm
-+
-+.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
-+	ldp	w\tmpnr1, w\tmpnr2, [\state, #4]
-+	msr	fpsr, x\tmpnr1
-+	msr	fpcr, x\tmpnr2
-+	adr	x\tmpnr1, 0f
-+	ldr	w\tmpnr2, [\state]
-+	add	\state, \state, x\tmpnr2, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+		qb = \qa + 1
-+	q2op	ldp, \qa, %qb, \state
-+	.endr
-+0:
-+.endm
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-index b0cc58a97780..21a9e35655b7 100644
---- a/arch/arm64/include/asm/neon.h
-+++ b/arch/arm64/include/asm/neon.h
-@@ -8,7 +8,11 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/types.h>
-+
- #define cpu_has_neon()		(1)
- 
--void kernel_neon_begin(void);
-+#define kernel_neon_begin() 	kernel_neon_begin_partial(32)
-+
-+void kernel_neon_begin_partial(u32 num_regs);
- void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-index 6a27cd6dbfa6..d358ccacfc00 100644
---- a/arch/arm64/kernel/entry-fpsimd.S
-+++ b/arch/arm64/kernel/entry-fpsimd.S
-@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
- 	fpsimd_restore x0, 8
- 	ret
- ENDPROC(fpsimd_load_state)
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Save the bottom n FP registers.
++ * linux/arch/arm64/crypto/aes-sync.c
 + *
-+ * x0 - pointer to struct fpsimd_partial_state
-+ */
-+ENTRY(fpsimd_save_partial_state)
-+	fpsimd_save_partial x0, 1, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
-+
-+/*
-+ * Load the bottom n FP registers.
++ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
-+ * x0 - pointer to struct fpsimd_partial_state
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+ENTRY(fpsimd_load_partial_state)
-+	fpsimd_restore_partial x0, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
 +
-+#endif
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 5b13c17e799f..ac105da56c8c 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -143,30 +143,43 @@ void fpsimd_reload_fpstate(void)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++#include <asm/hwcap.h>
++#include <asm/neon.h>
++#include <crypto/aes.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++#include <linux/mod_devicetable.h>
 +
- /*
-  * Kernel-side NEON support functions
-  */
--void kernel_neon_begin(void)
-+void kernel_neon_begin_partial(u32 num_regs)
- {
--	/* Avoid using the NEON in interrupt context */
--	BUG_ON(in_interrupt());
--	preempt_disable();
--
--	/*
--	 * Save the userland FPSIMD state if we have one and if we haven't done
--	 * so already. Clear fpsimd_last_cpu to indicate that there is no
--	 * longer userland context in the registers.
--	 */
--	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
--	__get_cpu_var(fpsimd_last_cpu) = NULL;
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
- 
-+		BUG_ON(num_regs > 32);
-+		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+	} else {
-+		/*
-+		 * Save the userland FPSIMD state if we have one and if we
-+		 * haven't done so already. Clear fpsimd_last_cpu to indicate
-+		 * that there is no longer userland context in the registers.
-+		 */
-+		preempt_disable();
-+		if (current->mm &&
-+		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-+			fpsimd_save_state(&current->thread.fpsimd_state);
-+		__get_cpu_var(fpsimd_last_cpu) = NULL;
++MODULE_DESCRIPTION("Synchronous AES cipher using ARMv8 Crypto Extensions");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL");
++
++static struct cpu_feature const feat_hwcap_aes[] = {
++	{ CPU_FEATURE_HWCAP(HWCAP_AES) },
++	{ }
++};
++MODULE_DEVICE_TABLE(cpu, feat_hwcap_aes);
++
++static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	u32 rounds = 6 + ctx->key_length / 4;
++
++	kernel_neon_begin_partial(2);
++
++	__asm__("	ld1		{v0.16b}, [%[in]]		;"
++		"	ld1		{v1.16b}, [%[key]], #16		;"
++		"0:	aese		v0.16b, v1.16b			;"
++		"	subs		%[rounds], %[rounds], #1	;"
++		"	ld1		{v1.16b}, [%[key]], #16		;"
++		"	beq		1f				;"
++		"	aesmc		v0.16b, v0.16b			;"
++		"	b		0b				;"
++		"1:	eor		v0.16b, v0.16b, v1.16b		;"
++		"	st1		{v0.16b}, [%[out]]		;"
++	: :
++		[out]		"r"(dst),
++		[in]		"r"(src),
++		[rounds]	"r"(rounds),
++		[key]		"r"(ctx->key_enc)
++	:			"cc");
++
++	kernel_neon_end();
++}
++
++static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	u32 rounds = 6 + ctx->key_length / 4;
++
++	kernel_neon_begin_partial(2);
++
++	__asm__("	ld1		{v0.16b}, [%[in]]		;"
++		"	ld1		{v1.16b}, [%[key]], #16		;"
++		"0:	aesd		v0.16b, v1.16b			;"
++		"	ld1		{v1.16b}, [%[key]], #16		;"
++		"	subs		%[rounds], %[rounds], #1	;"
++		"	beq		1f				;"
++		"	aesimc		v0.16b, v0.16b			;"
++		"	b		0b				;"
++		"1:	eor		v0.16b, v0.16b, v1.16b		;"
++		"	st1		{v0.16b}, [%[out]]		;"
++	: :
++		[out]		"r"(dst),
++		[in]		"r"(src),
++		[rounds]	"r"(rounds),
++		[key]		"r"(ctx->key_dec)
++	:			"cc");
++
++	kernel_neon_end();
++}
++
++static struct crypto_alg aes_alg = {
++	.cra_name		= "aes",
++	.cra_driver_name	= "aes-ce",
++	.cra_priority		= 300,
++	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
++	.cra_blocksize		= AES_BLOCK_SIZE,
++	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
++	.cra_module		= THIS_MODULE,
++	.cra_cipher = {
++		.cia_min_keysize	= AES_MIN_KEY_SIZE,
++		.cia_max_keysize	= AES_MAX_KEY_SIZE,
++		.cia_setkey		= crypto_aes_set_key,
++		.cia_encrypt		= aes_cipher_encrypt,
++		.cia_decrypt		= aes_cipher_decrypt
 +	}
- }
--EXPORT_SYMBOL(kernel_neon_begin);
-+EXPORT_SYMBOL(kernel_neon_begin_partial);
++};
++
++static int __init aes_mod_init(void)
++{
++	if (!(elf_hwcap & HWCAP_AES))
++		return -ENODEV;
++	return crypto_register_alg(&aes_alg);
++}
++
++static void __exit aes_mod_exit(void)
++{
++	crypto_unregister_alg(&aes_alg);
++}
++
++module_init(aes_mod_init);
++module_exit(aes_mod_exit);
+diff --git a/crypto/Kconfig b/crypto/Kconfig
+index 7bcb70d216e1..f1d98bc346b6 100644
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -791,6 +791,12 @@ config CRYPTO_AES_ARM_BS
+ 	  This implementation does not rely on any lookup tables so it is
+ 	  believed to be invulnerable to cache timing attacks.
  
- void kernel_neon_end(void)
- {
--	preempt_enable();
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+		fpsimd_load_partial_state(s);
-+	} else
-+		preempt_enable();
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
++config CRYPTO_AES_ARM64_CE
++	tristate "Synchronous AES cipher using ARMv8 Crypto Extensions"
++	depends on ARM64 && KERNEL_MODE_NEON
++	select CRYPTO_ALGAPI
++	select CRYPTO_AES
++
+ config CRYPTO_ANUBIS
+ 	tristate "Anubis cipher algorithm"
+ 	select CRYPTO_ALGAPI
 -- 
 1.8.3.2
