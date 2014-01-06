@@ -1,38 +1,66 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 06 Jan 2014 15:45:28 +0000
-Subject: [PATCH 1/2] ARM: dcache: select DCACHE_WORD_ACCESS for big-endian
- CPUs
-In-Reply-To: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
-References: <1387282577-2753-1-git-send-email-will.deacon@arm.com>
-Message-ID: <52CACF98.6010300@codethink.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jan 2014 15:45:55 +0000
+Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
+References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140106154555.GC24664@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/13 12:16, Will Deacon wrote:
-> With commit 11ec50caedb5 ("word-at-a-time: provide generic big-endian
-> zero_bytemask implementation"), the asm-generic word-at-a-time code now
-> provides a zero_bytemask implementation, allowing us to make use of
-> DCACHE_WORD_ACCESS on big-endian CPUs, providing our
-> load_unaligned_zeropad function is endianness-clean.
->
-> This patch reworks the load_unaligned_zeropad fixup code to work for
-> both big- and little-endian CPUs, then removes the !CPU_BIG_ENDIAN check
-> when selecting DCACHE_WORD_ACCESS.
+On Sun, Jan 05, 2014 at 11:04:39PM +0000, Hans de Goede wrote:
+> Add support for ohci-platform instantiation from devicetree, including
+> optionally getting clks and a phy from devicetree, and enabling / disabling
+> those on power_on / off.
+> 
+> This should allow using ohci-platform from devicetree in various cases.
+> Specifically after this commit it can be used for the ohci controller found
+> on Allwinner sunxi SoCs.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../devicetree/bindings/usb/platform-ohci.txt      |  25 ++++
+>  drivers/usb/host/ohci-platform.c                   | 146 ++++++++++++++++++---
+>  2 files changed, 151 insertions(+), 20 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/platform-ohci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/platform-ohci.txt b/Documentation/devicetree/bindings/usb/platform-ohci.txt
+> new file mode 100644
+> index 0000000..6846f1c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/platform-ohci.txt
+> @@ -0,0 +1,25 @@
+> +Generic Platform OHCI controller
+> +
+> +Required properties:
+> + - compatible: Should be "platform-ohci"
 
+To me, "platform-ohci" seems rather Linux-specific. Platform devices are
+a Linux abstraction that don't correspond to any particular bus type in
+reality.
 
-> @@ -73,7 +77,11 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
->   	"	bic	%2, %2, #0x3\n"
->   	"	ldr	%0, [%2]\n"
->   	"	lsl	%1, %1, #0x3\n"
-> +#ifndef __ARMEB__
->   	"	lsr	%0, %0, %1\n"
-> +#else
-> +	"	lsl	%0, %0, %1\n"
-> +#endif
+We have some "*-generic" bindings. A name of that form might be more
+appropriate. Or we could choose an arbitrary OHCI implementation's
+vendor,ochi string and everything else can declare compatibility with
+that.
 
-IIRC we have ARM_BE() and ARM_LE() helpers for this
+> + - reg: Address range of the ohci registers.
+> + - interrupts: Should contain the ohci interrupt.
+> +
+> +Optional properties:
+> + - clocks: array of clocks
+> + - clock-names: clock names "ahb" and/or "ohci"
 
+A description of what the clocks are might be helpful.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+How about something like:
+
+- clocks: a list of phandle + clock specifier pairs, one for each entry
+  in clock-names.
+
+- clock-names: Should contain:
+   * "ahb" - some description here.
+   * "ohci" - some description here.
+
+Thanks,
+Mark.
