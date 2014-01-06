@@ -1,67 +1,78 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  6 Jan 2014 15:36:43 +0100
-Subject: [PATCH 7/7] ARM: zynq: Introduce zynq_slcr_unlock()
-In-Reply-To: <cover.1389018985.git.michal.simek@xilinx.com>
-References: <cover.1389018985.git.michal.simek@xilinx.com>
-Message-ID: <bf130aff62c16b98b2372c328ee593de92431c41.1389018985.git.michal.simek@xilinx.com>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Mon, 6 Jan 2014 14:39:31 +0000
+Subject: Possible arm64 patches for stable
+In-Reply-To: <20131220172827.GZ31886@sirena.org.uk>
+References: <20131220172827.GZ31886@sirena.org.uk>
+Message-ID: <20140106143931.GD2776@hercules>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call special function for unlocking SLCR.
+Hi Mark,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
- arch/arm/mach-zynq/slcr.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+On Fri, Dec 20, 2013 at 05:28:27PM +0000, Mark Brown wrote:
+> Hi,
+> 
+> While reading the kernel logs for arm64 (as one does) I noticed a few
+> patches that seemed like candidates for either LTS or LTSI.  I've also
+> had a couple of others mentioned via other routes.  What do you think of
+> these?
 
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index f0f6a69..c1f1499 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -71,6 +71,18 @@ static int zynq_slcr_read(u32 *val, u32 offset)
- }
+Thanks, I'm picking some of these for the 3.11 kernel as well.
 
- /**
-+ * zynq_slcr_unlock - Unlock SLCR registers
-+ *
-+ * return:	a negative value on error, 0 on success
-+ */
-+static inline int zynq_slcr_unlock(void)
-+{
-+	zynq_slcr_write(SLCR_UNLOCK_MAGIC, SLCR_UNLOCK_OFFSET);
-+
-+	return 0;
-+}
-+
-+/**
-  * zynq_slcr_system_reset - Reset the entire system.
-  */
- void zynq_slcr_system_reset(void)
-@@ -82,7 +94,7 @@ void zynq_slcr_system_reset(void)
- 	 * Note that this seems to require raw i/o
- 	 * functions or there's a lockup?
- 	 */
--	writel(SLCR_UNLOCK_MAGIC, zynq_slcr_base + SLCR_UNLOCK_OFFSET);
-+	zynq_slcr_unlock();
+> 
+>   4ecf7ccb1973 arm64: spinlock: retry trylock operation if strex fails on free lock
 
- 	/*
- 	 * Clear 0x0F000000 bits of reboot status register to workaround
-@@ -164,7 +176,7 @@ int __init zynq_early_slcr_init(void)
- 	np->data = (__force void *)zynq_slcr_base;
+Already in 3.11.
 
- 	/* unlock the SLCR so that registers can be changed */
--	writel(SLCR_UNLOCK_MAGIC, zynq_slcr_base + SLCR_UNLOCK_OFFSET);
-+	zynq_slcr_unlock();
+> This seems like a correctness fix for spinlocks, though since the
+> callers should cope with failure it's arguably just an optimisation.
+> 
+>   53ae3acd4390 arm64: Only enable local interrupts after the CPU is marked online
+>   82b2f495fba3 arm64: virt: ensure visibility of __boot_cpu_mode
+>   845ad05ec31e arm64: Change kernel stack size to 16K
+>   6db83cea1c97 arm64: fix possible invalid FPSIMD initialization state
+>   7b22c03536a5 arm64: check for number of arguments in syscall_get/set_arguments()
+>   df503ba7f653 arm64: dts: Reserve the memory used for secondary CPU release address
 
- 	pr_info("%s mapped to %p\n", np->name, zynq_slcr_base);
+I'm picking the last 3 commits, as the other ones are already in 3.11.
+   
+> These all look like correctness fixes of one kind or another; the change
+> to 16K stacks is poorly explained but it looks like it's fixing failures
+> of some kind.
+> 
+>   f0dd718090ae arm64: Remove unused cpu_name ascii in arch/arm64/mm/proc.S
 
+This seems to be the wrong SHA1.  I've picked f3a1d7d assuming that's what
+you meant.
+
+> A user was reporting that this caused build failures due to alignment
+> issues with some of the debug options turned on.  I've not fully
+> investigated yet, this might be a toolchain issue though given how
+> simple the change is.
+> 
+>   0d651e4e65e9 clocksource: arch_timer: use virtual counters
+
+This is already in 3.11.
+ 
+> This is as mentioned in the changelog a correctness fix for avoiding
+> clocks going backwards and has also been found to be required to avoid
+> boot hangs with CONFIG_PROVE_RCU_DELAY enabled.
+> 
+> There were also a few others that aren't entirely -stable material but
+> might be a fit for LTSI (and the above might be if not -stable in
+> themselves):
+> 
+>   b5b6c9e9149d arm64: Avoid cache flushing in flush_dcache_page()
+>   7249b79f6b4c arm64: Do not flush the D-cache for anonymous pages
+>   4f00130b70e5 arm64: Use Normal NonCacheable memory for writecombine
+
+I'm picking the last one only (the other 2 are already in 3.11).
+
+> These look like simple, localised optimisations.
+> 
+> Thanks,
+> Mark
+
+Cheers,
 --
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/38ae2957/attachment.sig>
+Luis
