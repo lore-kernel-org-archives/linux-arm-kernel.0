@@ -1,71 +1,121 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 6 Jan 2014 10:08:52 -0800
-Subject: [PATCH v5 1/3] usb: ohci-at91: replace request_mem_region +
- ioremap by devm_ioremap_resource
-In-Reply-To: <1386579115-4324-2-git-send-email-b.brezillon@overkiz.com>
-References: <1386579115-4324-1-git-send-email-b.brezillon@overkiz.com>
- <1386579115-4324-2-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <CAOesGMhtg0vqVaRekfCE3-RZL644xEWBn4oVN22DtZR6L5WTxw@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Mon,  6 Jan 2014 11:11:00 -0700
+Subject: [PATCH v6 2/4] Documentation: Add APM X-Gene SoC 15Gbps Multi-purpose
+ PHY driver binding documentation
+In-Reply-To: <1389031862-4285-2-git-send-email-lho@apm.com>
+References: <1389031862-4285-1-git-send-email-lho@apm.com>
+ <1389031862-4285-2-git-send-email-lho@apm.com>
+Message-ID: <1389031862-4285-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+ .../devicetree/bindings/phy/apm-xgene-phy.txt      |   94 ++++++++++++++++++++
+ 1 files changed, 94 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
 
-On Mon, Dec 9, 2013 at 12:51 AM, Boris BREZILLON
-<b.brezillon@overkiz.com> wrote:
-> Replace the request_mem_region + ioremap calls by the
-> devm_ioremap_resource call which does the same things but with device
-> managed resources.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
-
-Did you build these patches? There's several breakages due to them in
-last night's next. I'm a little puzzled how they passed testing before
-you submitted?
-
-This one fails with:
-
-drivers/usb/host/ohci-at91.c: In function 'usb_hcd_at91_probe':
-drivers/usb/host/ohci-at91.c:157:36: error: 'dev' undeclared (first
-use in this function)
-  hcd->regs = devm_ioremap_resource(dev, res);
-                                    ^
-drivers/usb/host/ohci-at91.c:157:36: note: each undeclared identifier
-is reported only once for each function it appears in
-drivers/usb/host/ohci-at91.c:157:41: error: 'res' undeclared (first
-use in this function)
-  hcd->regs = devm_ioremap_resource(dev, res);
-
-There are more too, the original one I was bisecting for was the below
-one, but the above hit first:
-
-drivers/usb/host/ohci-at91.c: In function 'usb_hcd_at91_probe':
-drivers/usb/host/ohci-at91.c:190:4: error: label 'err' used but not defined
-drivers/usb/host/ohci-at91.c: At top level:
-drivers/usb/host/ohci-at91.c:206:2: warning: data definition has no
-type or storage class [enabled by default]
-drivers/usb/host/ohci-at91.c:206:2: error: type defaults to 'int' in
-declaration of 'at91_stop_hc' [-Werror=implicit-int]
-drivers/usb/host/ohci-at91.c:206:2: warning: parameter names (without
-types) in function declaration [enabled by default]
-drivers/usb/host/ohci-at91.c:206:2: error: conflicting types for 'at91_stop_hc'
-drivers/usb/host/ohci-at91.c:97:13: note: previous definition of
-'at91_stop_hc' was here
-drivers/usb/host/ohci-at91.c:208:5: error: expected '=', ',', ';',
-'asm' or '__attribute__' before ':' token
-drivers/usb/host/ohci-at91.c:210:2: error: expected identifier or '('
-before 'return'
-drivers/usb/host/ohci-at91.c:211:1: error: expected identifier or '('
-before '}' token
-drivers/usb/host/ohci-at91.c:97:13: warning: 'at91_stop_hc' defined
-but not used [-Wunused-function]
- static void at91_stop_hc(struct platform_device *pdev)
-
-
-Somewhat spectacular.  Greg, can you please drop these until he's
-sorted out his submission? :(
-
-
--Olof
+diff --git a/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+new file mode 100644
+index 0000000..4ffbae0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+@@ -0,0 +1,94 @@
++* APM X-Gene 15Gbps Multi-purpose PHY nodes
++
++PHY nodes are defined to describe on-chip 15Gbps Multi-purpose PHY. Each
++PHY (pair of lanes) has its own node.
++
++Required properties:
++- compatible		: Shall be "apm,xgene-phy" or
++			  "apm,xgene-phy-ext". The "apm,xgene-phy" describes
++			  an PHY with internal reference PLL located within
++			  the IP. The "apm,xgene-phy-ext" describes an PHY
++			  where the internal reference PLL located outside of
++			  the IP.
++- reg			: First PHY memory resource is the SDS PHY access
++			  resource.
++			  Second PHY memory resource is the SDS PHY access
++			  resource outside of the IP if it is type
++			  "apm,xgene-phy-ext".
++- #phy-cells		: Shall be 1 as it expects one argument for setting
++			  the mode of the PHY. Possible values are 0 (SATA),
++			  1 (SGMII), 2 (PCIe), 3 (USB), and 4 (XFI).
++
++Optional properties:
++- status		: Shall be "ok" if enabled or "disabled" if disabled.
++			  Default is "ok".
++- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
++			  bit lines from the automatic calibrated position.
++			  Two set of 3-tuple setting for each (up to 3)
++			  supported link speed on the host. Range from 0 to
++			  127 in unit of one bit period. Default is 10.
++- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
++			  data earlier than the nominal sampling point. 1 means
++			  sample data later than the nominal sampling point.
++			  Two set of 3-tuple setting for each (up to 3)
++			  supported link speed on the host. Default is 0.
++- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
++			  gain control. Two set of 3-tuple setting for each
++			  (up to 3) supported link speed on the host. Range is
++			  between 0 to 31 in unit of dB. Default is 3.
++- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
++			  each (up to 3) supported link speed on the host.
++			  Range is between 0 to 199500 in unit of uV.
++			  Default is 199500 uV.
++- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
++			  3-tuple setting for each (up to 3) supported link
++			  speed on the host. Range is 0 to 273000 in unit of
++			  uV. Default is 0.
++- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
++			  3-tuple setting for each (up to 3) supported link
++			  speed on the host. Range is 0 to 127400 in unit uV.
++			  Default is 0x0.
++- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
++			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
++			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
++- apm,tx-speed		: Tx operating speed. One set of 3-tuple for each
++			  supported link speed on the host.
++			   0 = 1-2Gbps
++			   1 = 2-4Gbps (1st tuple default)
++			   2 = 4-8Gbps
++			   3 = 8-15Gbps (2nd tuple default)
++			   4 = 2.5-4Gbps
++			   5 = 4-5Gbps
++			   6 = 5-6Gbps
++			   7 = 6-16Gbps (3rd tuple default)
++
++NOTE: PHY override parameters are board specific setting.
++
++Example:
++		phy1: phy at 1f21a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f21a000 0x0 0x100>;
++			#phy-cells = <1>;
++			status = "disabled";
++			apm,tx-boost-gain = <2 2 2 2 2 2>;
++			apm,tx-eye-tuning = <10 10 10 10 10 10>;
++		};
++
++		phy2: phy at 1f22a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f22a000 0x0 0x100>;
++			#phy-cells = <1>;
++			status = "ok";
++			apm,tx-boost-gain = <2 2 2 2 2 2>;
++			apm,tx-eye-tuning = <10 10 10 5 5 5>;
++		};
++
++		phy3: phy at 1f23a000 {
++			compatible = "apm,xgene-phy-ext";
++			reg = <0x0 0x1f23a000 0x0 0x100>,
++			      <0x0 0x1f2d0000 0x0 0x100>;
++			#phy-cells = <1>;
++			status = "ok";
++			apm,tx-boost-gain = <3 3 3 3 3 3>;
++			apm,tx-eye-tuning = <10 10 10 12 12 12>;
++		};
+-- 
+1.5.5
