@@ -1,57 +1,94 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 06 Jan 2014 13:59:27 -0700
-Subject: [PATCH] ARM: tegra: Remove 3.3V supply and modem regulators
-In-Reply-To: <1389021933-6675-1-git-send-email-treding@nvidia.com>
-References: <1389021933-6675-1-git-send-email-treding@nvidia.com>
-Message-ID: <52CB192F.2020700@wwwdotorg.org>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Mon, 06 Jan 2014 22:17:32 +0100
+Subject: [PATCH v5 3/4] ARM: BCM5301X: add dts files for BCM4708 SoC
+In-Reply-To: <20140106020023.52f28c76@skate>
+References: <1388965601-18329-1-git-send-email-hauke@hauke-m.de>	<1388965601-18329-4-git-send-email-hauke@hauke-m.de>
+ <20140106020023.52f28c76@skate>
+Message-ID: <52CB1D6C.9040303@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2014 08:25 AM, Thierry Reding wrote:
-> GPIO 1 and 2 of the PMIC are not used for the described purpose, so
-> remove them.
+On 01/06/2014 02:00 AM, Thomas Petazzoni wrote:
+> Dear Hauke Mehrtens,
+> 
+> On Mon,  6 Jan 2014 00:46:40 +0100, Hauke Mehrtens wrote:
+> 
+>> +	uart at 18000300 {
+>> +		compatible = "ns16550";
+>> +		reg = <0x18000300 0x100>;
+>> +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+>> +		clock-frequency = <100000000>;
+>> +	};
+>> +
+>> +	uart at 18000400 {
+>> +		compatible = "ns16550";
+>> +		reg = <0x18000400 0x100>;
+>> +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+>> +		clock-frequency = <100000000>;
+>> +	};
+>> +
+>> +	scu at 19020000 {
+>> +		compatible = "arm,cortex-a9-scu";
+>> +		reg = <0x19020000 0x100>;
+>> +	};
+>> +
+>> +	timer at 19020200 {
+>> +		compatible = "arm,cortex-a9-global-timer";
+>> +		reg = <0x19020200 0x100>;
+>> +		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>> +		clocks = <&clk_periph>;
+>> +	};
+>> +
+>> +	local-timer at 19020600 {
+>> +		compatible = "arm,cortex-a9-twd-timer";
+>> +		reg = <0x19020600 0x100>;
+>> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>> +		clocks = <&clk_periph>;
+>> +	};
+>> +
+>> +	gic: interrupt-controller at 19021000 {
+>> +		compatible = "arm,cortex-a9-gic";
+>> +		#interrupt-cells = <3>;
+>> +		#address-cells = <0>;
+>> +		interrupt-controller;
+>> +		reg = <0x19021000 0x1000>,
+>> +		      <0x19020100 0x100>;
+>> +	};
+>> +
+>> +	L2: cache-controller at 19022000 {
+>> +		compatible = "arm,pl310-cache";
+>> +		reg = <0x19022000 0x1000>;
+>> +		cache-unified;
+>> +		cache-level = <2>;
+>> +	};
+> 
+> I don't know if that has been discussed before, but most of the DTS
+> group the internal SoC peripherals in some top-level node that
+> represents the internal bus (or busses) of the SoC, like:
+> 
+> 	<some bus name> {
+> 		uart at ... {
+> 			...
+> 		};
+> 
+> 		gic at ... {
+> 			...
+> 		};
+> 	};
+> 
+> This allows to have the in-SoC peripherals cleanly separated from other
+> things in the DTS. It would also you to use a ranges = <...> property
+> to do an address translation on this bus, and replace the absolute
+> addresses for each of the peripherals by offsets relative to the base
+> address of where all peripherals are mapped.
+> 
+> That said, having this top-level node is most likely not a requirement,
+> so my comment is mainly meant to open the discussion. I'm sure Arnd
+> will give his opinion on this :)
+> 
 
-As far as I can tell, this patch is correct, since those GPIOs are in
-fact used to discharge the rails after disabling them, rather than to
-enable/disable the rails.
+I spited it up like it was done for the rockchip SoCs.
+One dtsi file for a line of SoCs, one for the specific SoC and one for
+the device. How does this ranges stuff work, do you have an example for me?
 
-Equally, these GPIOs affect multiple rails at once, so listing the GPIO
-as a property of a single regulator seems wrong either way.
-
-However, PMU_REGEN1 does seem to feed the "EN" pin of U13C1, a DC/DC
-switcher for power rail 3.3v_modem, so perhaps there's more going on
-here than I see?
-
-In summary, I need Laxman to comment on this and ack the change, and
-explain why these GPIOs were listed as regulator enables when it doesn't
-seem that they are.
-
-> Note: Removing these makes the work-in-progress eDP support work again.
-
-> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-
-> -		vdd_3v3_reg: regulator at 1 {
-> -			compatible = "regulator-fixed";
-> -			reg = <1>;
-> -			regulator-name = "vdd_3v3";
-> -			regulator-min-microvolt = <3300000>;
-> -			regulator-max-microvolt = <3300000>;
-> -			regulator-always-on;
-> -			regulator-boot-on;
-> -			enable-active-high;
-> -			gpio = <&as3722 1 GPIO_ACTIVE_HIGH>;
-> -		};
-> -
-> -		vdd_3v3_modem_reg: regulator at 2 {
-> -			compatible = "regulator-fixed";
-> -			reg = <2>;
-> -			regulator-name = "vdd-modem-3v3";
-> -			regulator-min-microvolt = <3300000>;
-> -			regulator-max-microvolt = <3300000>;
-> -			enable-active-high;
-> -			gpio = <&as3722 2 GPIO_ACTIVE_HIGH>;
-> -		};
-
-Don't you want to simply remove the "enable-active-high" and "gpio"
-properties, but leave the regulator definitions present, in case
-something wants to reference these fixed(?) rails as their supply?
+Hauke
