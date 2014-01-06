@@ -1,86 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 6 Jan 2014 23:41:40 +0000 (UTC)
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <CAL_Jsq+X5G94DUn-zFKQkhEy91cdjCyeciny+kDjr=V6EiBHfQ@mail.gmail.com>
-References: <20131123004334.GJ10023@atomide.com>
- <20131123010850.GN10023@atomide.com> <20131123015034.GP10023@atomide.com>
- <20131124212757.7D224C402A3@trevor.secretlab.ca>
- <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
- <alpine.DEB.2.02.1312302209200.8869@utopia.booyaka.com>
- <CAL_Jsq+X5G94DUn-zFKQkhEy91cdjCyeciny+kDjr=V6EiBHfQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1401062340240.31394@utopia.booyaka.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 6 Jan 2014 18:42:13 -0500
+Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
+ CONFIG_ARM_PATCH_PHYS_VIRT.
+In-Reply-To: <20140106223906.GH27432@n2100.arm.linux.org.uk>
+References: <m38uv1uuzr.fsf@t19.piap.pl> <m3ha9gx63v.fsf@t19.piap.pl>
+ <20140106223906.GH27432@n2100.arm.linux.org.uk>
+Message-ID: <52CB3F55.1050404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Rob,
-
-On Tue, 31 Dec 2013, Rob Herring wrote:
-
-> On Mon, Dec 30, 2013 at 4:10 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > Hi Grant, Rob,
-> >
-> > On Tue, 10 Dec 2013, Paul Walmsley wrote:
-> >
-> >> On Sun, 24 Nov 2013, Grant Likely wrote:
-> >>
-> >> > On Fri, 22 Nov 2013 17:50:35 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> >> > > * Tony Lindgren <tony@atomide.com> [131122 17:16]:
-> >> > > > * Tony Lindgren <tony@atomide.com> [131122 17:09]:
-> >> > > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [131122 16:56]:
-> >> > > > > > On Fri, Nov 22, 2013 at 04:43:35PM -0800, Tony Lindgren wrote:
-> >> > > > > > > +         /* See of_device_resource_notify for populating interrupts */
-> >> > > > > > > +         for (i = 0; i < num_irq; i++, res++) {
-> >> > > > > > > +                 res->flags = IORESOURCE_IRQ;
-> >> > > > > > > +                 res->start = -EPROBE_DEFER;
-> >> > > > > > > +                 res->end = -EPROBE_DEFER;
-> >> > > > > >
-> >> > > > > > NAK.  Definitely a bad idea to start introducing magic values other into
-> >> > > > > > resources.  Please don't do this.
-> >> > > > >
-> >> > > > > Do you have any better ideas on how to sort out this issue then?
-> >> > > >
-> >> > > > I guess we could allocate all the resources lazily here, I'll take a look
-> >> > > > at that.
-> >> > >
-> >> > > Here's a version that allocates the resources lazily with the notifier.
-> >> > > Seems to boot, need to play with it a bit more though to make sure we're
-> >> > > not overwriting resources for any legacy devices.
-> >> >
-> >> > Blurg. Using a notifier really feels like we don't have a good handle on
-> >> > a reasonable solution yet. Basically it means we're hooking into the
-> >> > driver core without /looking/ like we're hooking into the driver core. I
-> >> > don't think this is any better, but I don't have a better suggestion at
-> >> > the moment.   :-(
-> >>
-> >> Unfortunately this patch, or something that accomplishes the same results,
-> >> is somewhat high-priority for us on OMAP.  OMAP37xx got prematurely
-> >> converted to DT booting, and now dynamic power management is broken:
-> >>
-> >>     http://marc.info/?l=linux-arm-kernel&m=138658294830408&w=2
-> >>
-> >> Tony writes that this patch is one of the two patches needed to get things
-> >> working again:
-> >>
-> >>     http://marc.info/?l=linux-arm-kernel&m=138660942506846&w=2
-> >>
-> >> Is it possible to get this patch, or something similar, merged for
-> >> v3.13-rc?
-> >>
-> >> Once something like PM is broken, it's pretty easy for other broken
-> >> patches to make it into the tree, since it becomes very difficult to test
-> >> without turning into a maintainer denial-of-service attack.
-> >
-> > Ping.  Could you please provide some guidance here about what you'd need
-> > to get this solved for v3.13-rc?
+On Monday 06 January 2014 05:39 PM, Russell King - ARM Linux wrote:
+> On Mon, Jan 06, 2014 at 08:28:20PM +0100, Krzysztof Ha?asa wrote:
+>> Russell, Santosh,
+>>
+>> the unneeded commit causing regression is still in place. Please try to
+>> compile an ARM kernel without CONFIG_ARM_PATCH_PHYS_VIRT and with
+>> CONFIG_ZONE_DMA and see for yourself, if you don't believe me.
+>>
+>> Please be aware that this commit fixes nothing, its only function is
+>> causing the regression - so we don't lose anything by reverting it.
+>>
+>> If the attached wasn't clear, what the defective commit presently does
+>> is changing a perfectly valid code into a code referencing a variable
+>> which (without CONFIG_ARM_PATCH_PHYS_VIRT set) doesn't at all exist.
+>>
+>> With CONFIG_ARM_PATCH_PHYS_VIRT set, this commit does precisely nothing.
 > 
-> I agree with doing the platform_get_irq modification and feel free to
-> add my ack. I'm going to be offline for the next week.
+> Right, so, with Assabet, which has CONFIG_DMA_ZONE=y and
+> CONFIG_ARM_PATCH_PHYS_VIRT=y:
+> 
+> $ make O=../build/assabet arch/arm/mm/init.i
+> 
+> gives:
+>   arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
+> 
+> with or without Santosh's patch.  So, with V2P patching in place, there's
+> absolutely no functional difference.
+> 
+> With CONFIG_ARM_PATCH_PHYS_VIRT=n, before Santosh's patch:
+> 
+>   arm_dma_limit = (0xc0000000UL) + arm_dma_zone_size - 1;
+> 
+> After:
+> 
+>   arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
+> 
+> and this breaks the build because there is no __pv_phys_offset symbol.
+> 
+> Now, the case which matters for Santosh is the first case - the one
+> where CONFIG_ARM_PATCH_PHYS_VIRT=y.  We can clearly see that after
+> preprocessing, the results are 100% identical.
+> 
+> Therefore, I find myself agreeing with Krzysztof that the commit is
+> bad, has no functional change for the case it was proposed to solve,
+> and needs to be reverted.
+> 
+May be I missed your point but I ended up creating the patch because
+the CMA reservation was failing on Keystone since the arm_dma_limit
+wasn't right since it wasn't considering the actual __pv_phys_offset.
 
-Thanks Rob!
+Isn't that an issue ?
 
-Tony, would you consider sending this patch upstream for v3.13-rc along 
-with your 37xxevm fix patches?
-
-
-- Paul
+Regards,
+Santosh
