@@ -1,51 +1,77 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 6 Jan 2014 18:56:17 +0800
-Subject: [PATCH v2] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <52CA8A8F.70707@metafoo.de>
-References: <1388992371-7908-1-git-send-email-21cnbao@gmail.com>
- <52CA8A8F.70707@metafoo.de>
-Message-ID: <CAGsJ_4zmHyTBWMouJ78bYgt3Mze6Vv5YSJDWg7=FyjA5RochwQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Jan 2014 12:00:25 +0100
+Subject: [lm-sensors] [PATCH v3 2/5] input: sun4i-ts: Add support for
+ temperature sensor
+In-Reply-To: <52C84665.5070203@roeck-us.net>
+References: <1388506852-3548-1-git-send-email-hdegoede@redhat.com>
+ <1388506852-3548-3-git-send-email-hdegoede@redhat.com>
+ <52C84665.5070203@roeck-us.net>
+Message-ID: <20140106110025.GQ3144@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/6 Lars-Peter Clausen <lars@metafoo.de>:
-> On 01/06/2014 08:12 AM, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
->> we add a xlate() to let dma clients be able to find right dma_chan by generic
->> "dmas" properties in dts.
->>
->> Cc: Lars-Peter Clausen <lars@metafoo.de>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->
-> Looks good to me, but ...
->
-> [...]
->> @@ -81,6 +82,7 @@ struct sirfsoc_dma_regs {
->>
->>  struct sirfsoc_dma {
->>       struct dma_device               dma;
->> +     dma_cap_mask_t                  cap;
->
-> ... the cap field seems to be unused, ...
+Hi Guenter,
 
->>  static int sirfsoc_dma_probe(struct platform_device *op)
->>  {
->>       struct device_node *dn = op->dev.of_node;
->> @@ -744,11 +758,21 @@ static int sirfsoc_dma_probe(struct platform_device *op)
->>       if (ret)
->>               goto free_irq;
->>
->> +     /* Device-tree DMA controller registration */
->> +     ret = of_dma_controller_register(dn, of_dma_sirfsoc_xlate, sdma);
->> +     if (ret) {
->> +             sdma->cap = dma->cap_mask;
->
-> ... it is initialized here, but never used again.
->
+On Sat, Jan 04, 2014 at 09:35:33AM -0800, Guenter Roeck wrote:
+> On 12/31/2013 08:20 AM, Hans de Goede wrote:
+> >The sun4i resisitive touchscreen controller also comes with a built-in
+> >temperature sensor. This commit adds support for it.
+> >
+> >This commit also introduces a new "ts-attached" device-tree property,
+> >when this is not set, the input part of the driver won't register. This way
+> >the internal temperature sensor can be used to measure the SoC temperature
+> >independent of there actually being a touchscreen attached to the controller.
+> >
+> >Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Couple of minor comments below, though no need to resubmit unless someone else has comments.
+> 
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> >---
+> >  .../bindings/input/touchscreen/sun4i.txt           |   5 +
+> >  drivers/input/touchscreen/sun4i-ts.c               | 140 ++++++++++++++++-----
+> >  2 files changed, 114 insertions(+), 31 deletions(-)
+> >
+> >diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> >index e45927e..6bac67b 100644
+> >--- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> >+++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> >@@ -6,10 +6,15 @@ Required properties:
+> >   - reg: mmio address range of the chip
+> >   - interrupts: interrupt to which the chip is connected
+> >
+> >+Optional properties:
+> >+ - allwinner,ts-attached: boolean indicating that an actual touchscreen is
+> >+			  attached to the controller
+> >+
+> Brr. While I understand that you were asked to do this, I don't
+> really see the benefit of another "allwinner" here. As if this
+> wasn't implied by the "compatible" property.
 
-real. thanks!
+It's actually the ePAPR that recommends this.
 
--barry
+Section 6.1.1, General Principles
+
+"
+Some recommended practices includes:
+[..]
+  5. If new properties are needed by the binding, the recommended
+     format for property names is: ?<company>,<property-name>?, where
+     <company> is an OUI or short unique string like a stock ticker
+     that identifies the creator of the binding.
+"
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/24b37344/attachment.sig>
