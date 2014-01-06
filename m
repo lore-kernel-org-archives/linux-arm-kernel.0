@@ -1,29 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 06 Jan 2014 09:19:22 +0100
-Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio
- A701
-In-Reply-To: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
- (Thierry Reding's message of "Fri, 20 Dec 2013 10:46:52 +0100")
-References: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <87zjn9v7xx.fsf@free.fr>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 6 Jan 2014 17:20:03 +0900
+Subject: [PATCH] ARM: shmobile: emev2: Use __initconst for const init
+ definition
+In-Reply-To: <1388114048-3630-1-git-send-email-horms+renesas@verge.net.au>
+References: <1388114048-3630-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140106082003.GS24653@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+On Fri, Dec 27, 2013 at 12:14:08PM +0900, Simon Horman wrote:
+> __initconst must be used instead of __initdata for
+> const init definitions.
+> 
+> This problem was introduced by 3d5de27174955702 ("mach-shmobile: Emma
+> Mobile EV2 DT support V3") in v3.4-rc7.
 
-> Recent changes to the pwm-backlight driver have made the power supply
-> mandatory. There is code in the regulator core to deal with situations
-> where no regulator is specified and provide a dummy, but that works on
-> DT-based boards only.
->
-> The situation can be remedied by adding a dummy regulator during board
-> initialization.
+I have queued this up.
 
-Haojian, ping ?
-We're at -rc7 and I've seen no pull of this fix. As the display is broken
-without it, I'd really like to have it fixed for v3.13.
-
-Cheers.
-
---
-Robert
+> 
+> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/setup-emev2.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+> index c8f2a1a..c71d667 100644
+> --- a/arch/arm/mach-shmobile/setup-emev2.c
+> +++ b/arch/arm/mach-shmobile/setup-emev2.c
+> @@ -58,7 +58,7 @@ static void __init emev2_add_standard_devices_dt(void)
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+>  
+> -static const char *emev2_boards_compat_dt[] __initdata = {
+> +static const char *emev2_boards_compat_dt[] __initconst = {
+>  	"renesas,emev2",
+>  	NULL,
+>  };
+> -- 
+> 1.8.4
+> 
