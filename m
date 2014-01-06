@@ -1,74 +1,65 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon,  6 Jan 2014 14:32:55 +0530
-Subject: [PATCH 2/2] ARM: EXYNOS: Remove uncompress.h
-In-Reply-To: <1388998975-32362-1-git-send-email-sachin.kamat@linaro.org>
-References: <1388998975-32362-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1388998975-32362-2-git-send-email-sachin.kamat@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 06 Jan 2014 10:09:19 +0100
+Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <201401051533.58931.arnd@arndb.de>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <1388743185-24822-3-git-send-email-gregory.clement@free-electrons.com>
+ <201401051533.58931.arnd@arndb.de>
+Message-ID: <52CA72BF.10604@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can use the generic uncompres.h file, there is no need
-for the machine specific header. Remove it.
+Hi Arnd,
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- arch/arm/mach-exynos/include/mach/uncompress.h |   48 ------------------------
- 1 file changed, 48 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/uncompress.h
+On 05/01/2014 15:33, Arnd Bergmann wrote:
+> On Friday 03 January 2014, Gregory CLEMENT wrote:
+>> The first variants of Armada XP SoCs (A0 stepping) have issues related
+>> to the i2c controller which prevent to use the offload mechanism and
+>> lead to a kernel hang during boot.
+>>
+>> The driver now check the revision of the SoC. If the revision is not
+>> more recent than the A0 or if the driver can't get the SoC revision
+>> then it disables the offload mechanism.
+>>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> 
+> Relying on the soc id patch for a "stable" bug fix seems a little
+> far-reaching to me. I would be happier to first try to do a local
+> detection based on the i2c bus device node itself. Do you know how
 
-diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
-deleted file mode 100644
-index 5d7ce36be46f..000000000000
---- a/arch/arm/mach-exynos/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,48 +0,0 @@
--/*
-- * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS - uncompress code
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_UNCOMPRESS_H
--#define __ASM_ARCH_UNCOMPRESS_H __FILE__
--
--#include <asm/mach-types.h>
--
--#include <mach/map.h>
--#include <plat/uncompress.h>
--
--static unsigned int __raw_readl(unsigned int ptr)
--{
--	return *((volatile unsigned int *)ptr);
--}
--
--static void arch_detect_cpu(void)
--{
--	u32 chip_id = __raw_readl(EXYNOS_PA_CHIPID);
--
--	/*
--	 * product_id is bits 31:12
--	 * bits 23:20 describe the exynosX family
--	 * bits 27:24 describe the exynosX family in exynos5420
--	 */
--	chip_id >>= 20;
--
--	if ((chip_id & 0x0f) == 0x5 || (chip_id & 0xf0) == 0x50)
--		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
--	else
--		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
--
--	/*
--	 * For preventing FIFO overrun or infinite loop of UART console,
--	 * fifo_max should be the minimum fifo size of all of the UART channels
--	 */
--	fifo_mask = S5PV210_UFSTAT_TXMASK;
--	fifo_max = 15 << S5PV210_UFSTAT_TXSHIFT;
--}
--#endif /* __ASM_ARCH_UNCOMPRESS_H */
+It was my first proposal in case adding the soc id detection was
+a too big things. But it turned out that the amount of code is very
+low so I really think it worth adding it along the fix. Device tree
+is supposed to be stable so as soon as we add something in it we are
+supposed support it forever. Moreover using device tree for something
+we can probe is counter productive.
+
+> common the A0 revision is? You mention "early release of the
+> OpenBlocks AX3-4 boards". Any others that you suspect? If not,
+
+No, from the info I gathered I expected that only OpenBlocks AX3-4
+would be the only product shipped with an A0 version and as I said
+it should be only a limit amount of them.
+
+> how about adding either a boolean property in the node or a
+> new "compatible" value to distinguish the working version from
+> the broken one?
+> 
+> If A0 is very common, you might do the same thing in the opposite
+> way and default to "broken" unless it is explicitly known to be
+> the good version. In general, I'm much in favor of keeping "quirks"
+> local to device drivers if possible and not rely on global system
+> state.
+> 
+> 	Arnd
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
