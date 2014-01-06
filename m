@@ -1,35 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Jan 2014 20:43:00 +0800
-Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
- reset
-In-Reply-To: <20140106111428.GF27432@n2100.arm.linux.org.uk>
-References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
- <20140103120712.GE25079@S2101-09.ap.freescale.net>
- <20140104054702.GA6243@quad.lixom.net>
- <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
- <20140106022419.GA26128@S2101-09.ap.freescale.net>
- <20140106111428.GF27432@n2100.arm.linux.org.uk>
-Message-ID: <20140106124258.GA31158@S2101-09.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 6 Jan 2014 12:43:37 +0000
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+In-Reply-To: <87ha9yqgpb.fsf@iki.fi>
+References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
+ <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <87ha9yqgpb.fsf@iki.fi>
+Message-ID: <20140106124337.GB9863@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 11:14:28AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 06, 2014 at 10:24:23AM +0800, Shawn Guo wrote:
-> > This is a typical example that we did not implement device tree
-> > bindings perfectly right in the first place, and we have to live with it
-> > forever.  If someday there is board design using an active high PHY
-> > reset, we basically have to introduce another property for it.
+On Tue, Dec 24, 2013 at 05:52:48PM +0000, Antti Miettinen wrote:
+> Sorry to still bring up an old thread, but this still bothers me..
 > 
-> Yes and no.  That third number in the property is always zero at present,
-> right?  If so, just define zero to mean "the default level of reset"
-> which would be the -rc6 behaviour.
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> > [..] dirty cache lines can be migrated across
+> > processors caches. [..]
 > 
-> Then you can define non-zero values to mean "explicitly state the level".
+> What are the conditions under which this can happen? Which CPUs in
+> reality migrate dirty lines between caches? And C==0 does prevent
+> migrations as well as local allocations?
 
-This is not nice either, because the third number in *-gpios property is
-already defined by gpio bindings: 
+It happens if a cache miss is for a cache line that is dirty on another CPU
+that is part of the coherency domain, the line is just moved from one L1
+to the local L1.
 
-  Documentation/devicetree/bindings/gpio/gpio.txt
-  Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+Yes, C bit cleared prevents allocations so it prevents migrations too.
 
-Shawn
+Lorenzo
