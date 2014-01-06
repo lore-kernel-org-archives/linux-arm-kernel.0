@@ -1,60 +1,30 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 06 Jan 2014 12:18:27 +0100
-Subject: [PATCH v3 2/2] arm: dt: zynq: Add SDHCI nodes
-In-Reply-To: <529CE36C.4020707@monstr.eu>
-References: <1386007357-11956-1-git-send-email-soren.brinkmann@xilinx.com>
- <1386007357-11956-2-git-send-email-soren.brinkmann@xilinx.com>
- <529CE36C.4020707@monstr.eu>
-Message-ID: <52CA9103.6060803@monstr.eu>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 6 Jan 2014 11:22:12 +0000
+Subject: [PATCH RESEND 3/4] mfd: sec-core: Add cells for S5M8767-clocks
+In-Reply-To: <1388053141-30085-4-git-send-email-tushar.behera@linaro.org>
+References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
+ <1388053141-30085-1-git-send-email-tushar.behera@linaro.org>
+ <1388053141-30085-4-git-send-email-tushar.behera@linaro.org>
+Message-ID: <20140106112212.GP23772@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2013 08:45 PM, Michal Simek wrote:
-> On 12/02/2013 07:02 PM, Soren Brinkmann wrote:
->> Add nodes for the Arasan SDHCI controller to Zynq dts files.
->>
->> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> ---
->> v2:
->>  - update compatibilty string according to changes in 1/2 (append
->>    '-8.9a' IP version string)
->> ---
->>  arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
->>  arch/arm/boot/dts/zynq-zc702.dts |  4 ++++
->>  arch/arm/boot/dts/zynq-zc706.dts |  4 ++++
->>  arch/arm/boot/dts/zynq-zed.dts   |  4 ++++
->>  4 files changed, 32 insertions(+)
-> 
-> Chris: It is up to you if you want to take this through your tree
-> or just let me to take it through my tree. It is adding new nodes
-> to DTS file that's why it shouldn't be any problem to apply it
-> separately.
-> 
-> Anyway please let me know what you think.
-> If you want to add it to your tree here is my
-> 
-> Acked-by: Michal Simek <monstr@monstr.eu>
+On Thu, 26 Dec 2013, Tushar Behera wrote:
 
-I have added this patch to my zynq/dt branch.
-We discussed this in other patch and these dt changes should go through
-arm-soc tree.
+> S5M8767 chip has 3 crystal oscillators running at 32KHz. These are
+> supported by s2mps11-clk driver.
+> 
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> CC: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/sec-core.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks,
-Michal
-
+Applied, thanks.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140106/d5955f14/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
