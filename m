@@ -1,99 +1,212 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Mon,  6 Jan 2014 22:35:33 +0100
-Subject: [PATCH v6 4/4] ARM: BCM5301X: workaround suppress fault
+Date: Mon,  6 Jan 2014 22:35:32 +0100
+Subject: [PATCH v6 3/4] ARM: BCM5301X: add dts files for BCM4708 SoC
 In-Reply-To: <1389044133-27394-1-git-send-email-hauke@hauke-m.de>
 References: <1389044133-27394-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1389044133-27394-5-git-send-email-hauke@hauke-m.de>
+Message-ID: <1389044133-27394-4-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch I am getting a unhandled fault exception like this
-one after "Freeing unused kernel memory":
-
-Freeing unused kernel memory: 1260K (c02c1000 - c03fc000)
-Unhandled fault: imprecise external abort (0x1c06) at 0xb6f89005
-Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
-
-The address which is here 0xb6f89005 changes from boot to boot, with a
-new build the changes are bigger. With kernel 3.10 I have also seen
-this fault at different places in the boot process, but starting with
-3.11 they are always occurring after the "Freeing unused kernel memory"
-message. I never was able to completely boot to userspace without this
-handler. The abort code is constant 0x1c06. This fault just happens
-once in the boot process I have never seen it happing twice or more.
-
-I also tried changing the CPSR.A bit to 0 in init_early, with this code
-like Afzal suggested, but that did not change anything:
-asm volatile("mrs r12, cpsr\n"
-	"bic r12, r12, #0x00000100\n"
-	"msr cpsr_c, r12" ::: "r12", "cc", "memory");
-
-Disabling the L2 cache by building with CONFIG_CACHE_L2X0 unset did not
-help.
-
-This workaround was copied from the vendor code including most of the
-comments. It says it they think this is caused by the CFE boot loader
-used on this device. I do not have any access to any datasheet or
-errata document to check this.
+This uses the newly added BCM5301X SoC code.
 
 Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-bcm/bcm_5301x.c |   33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/Makefile                  |    1 +
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts |   35 +++++++++++
+ arch/arm/boot/dts/bcm4708.dtsi              |   34 +++++++++++
+ arch/arm/boot/dts/bcm5301x.dtsi             |   88 +++++++++++++++++++++++++++
+ 4 files changed, 158 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+ create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm5301x.dtsi
 
-diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-index ef9740a..edff6976 100644
---- a/arch/arm/mach-bcm/bcm_5301x.c
-+++ b/arch/arm/mach-bcm/bcm_5301x.c
-@@ -9,8 +9,40 @@
- #include <asm/hardware/cache-l2x0.h>
- 
- #include <asm/mach/arch.h>
-+#include <asm/siginfo.h>
-+#include <asm/signal.h>
- 
- 
-+static bool first_fault = true;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d57c1a6..9c385bb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -45,6 +45,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+ 	bcm28155-ap.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
++dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+new file mode 100644
+index 0000000..5cdcffa
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+@@ -0,0 +1,35 @@
++/*
++ * Broadcom BCM470X / BCM5301X arm platform code.
++ * DTS for Netgear R6250 V1
++ *
++ * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
 +
-+static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
-+				 struct pt_regs *regs)
-+{
-+	if (fsr == 0x1c06 && first_fault) {
-+		first_fault = false;
++/dts-v1/;
 +
-+		/*
-+		 * These faults with code 0x1c06 happens for no good reason,
-+		 * possibly left over from the CFE boot loader.
-+		 */
-+		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
-+		addr, fsr);
++#include "bcm4708.dtsi"
 +
-+		/* Returning non-zero causes fault display and panic */
-+		return 0;
-+	}
++/ {
++	compatible = "netgear,r6250v1", "brcm,bcm4708";
++	model = "Netgear R6250 V1 (BCM4708)";
 +
-+	/* Others should cause a fault */
-+	return 1;
-+}
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
 +
-+static void __init bcm5301x_init_early(void)
-+{
-+	/* Install our hook */
-+	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
-+			"imprecise external abort");
-+}
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
 +
- static void __init bcm5301x_dt_init(void)
- {
- 	l2x0_of_init(0, ~0UL);
-@@ -23,6 +55,7 @@ static const char __initconst *bcm5301x_dt_compat[] = {
- };
- 
- DT_MACHINE_START(BCM5301X, "BCM5301X")
-+	.init_early	= bcm5301x_init_early,
- 	.init_machine	= bcm5301x_dt_init,
- 	.dt_compat	= bcm5301x_dt_compat,
- MACHINE_END
++	soc {
++		uart0: serial at 18000300 {
++			status = "okay";
++		};
++
++		uart1: serial at 18000400 {
++			status = "okay";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
+new file mode 100644
+index 0000000..31141e8
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708.dtsi
+@@ -0,0 +1,34 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for BCM4708 SoC.
++ *
++ * Copyright 2013-2014 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcm5301x.dtsi"
++
++/ {
++	compatible = "brcm,bcm4708";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&L2>;
++			reg = <0x0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&L2>;
++			reg = <0x1>;
++		};
++	};
++
++};
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+new file mode 100644
+index 0000000..280b190
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -0,0 +1,88 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * Generic DTS part for all BCM53010, BCM53011, BCM53012, BCM53014, BCM53015,
++ * BCM53016, BCM53017, BCM53018, BCM4707, BCM4708 and BCM4709 SoCs
++ *
++ * Copyright 2013-2014 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
++
++/ {
++	interrupt-parent = <&gic>;
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++
++		uart0: serial at 18000300 {
++			compatible = "ns16550";
++			reg = <0x18000300 0x100>;
++			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++			clock-frequency = <100000000>;
++			status = "disabled";
++		};
++
++		uart1: serial at 18000400 {
++			compatible = "ns16550";
++			reg = <0x18000400 0x100>;
++			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++			clock-frequency = <100000000>;
++			status = "disabled";
++		};
++
++		scu at 19020000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0x19020000 0x100>;
++		};
++
++		timer at 19020200 {
++			compatible = "arm,cortex-a9-global-timer";
++			reg = <0x19020200 0x100>;
++			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clk_periph>;
++		};
++
++		local-timer at 19020600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0x19020600 0x100>;
++			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clk_periph>;
++		};
++
++		gic: interrupt-controller at 19021000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			reg = <0x19021000 0x1000>,
++			      <0x19020100 0x100>;
++		};
++
++		L2: cache-controller at 19022000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x19022000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++		};
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/* As long as we do not have a real clock driver us this
++		 * fixed clock */
++		clk_periph: periph {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <400000000>;
++		};
++	};
++};
 -- 
 1.7.10.4
