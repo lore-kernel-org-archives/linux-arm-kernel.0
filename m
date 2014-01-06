@@ -1,46 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 5 Jan 2014 18:43:33 -0800
-Subject: [PATCH] ARM: imx: Explicitly pass the active level of the PHY
- reset
-In-Reply-To: <20140106022419.GA26128@S2101-09.ap.freescale.net>
-References: <1388750156-23208-1-git-send-email-festevam@gmail.com>
- <20140103120712.GE25079@S2101-09.ap.freescale.net>
- <20140104054702.GA6243@quad.lixom.net>
- <CAOesGMhDUZ6WVCoh50nNYZt+WMQvaWupHLHdjBz68kUaoPxnjQ@mail.gmail.com>
- <20140106022419.GA26128@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMg3U1oGMy8N3ay=9-GL0A4eZqViubKqtisH5dg78dqhDQ@mail.gmail.com>
+From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
+Date: Mon, 6 Jan 2014 09:30:20 +0530
+Subject: [PATCH V2] i2c: s3c2410 : Add polling mode support
+In-Reply-To: <20140103161012.GH7132@katana>
+References: <1384168820-2986-1-git-send-email-yuvaraj.cd@samsung.com>
+ <20140103161012.GH7132@katana>
+Message-ID: <CA+NduCDr4am5+Vyr9NTAzFGjg_zRLjYVRTM2Bj0Wxd0VBEzCpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 5, 2014 at 6:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Sun, Jan 05, 2014 at 09:29:37AM -0800, Olof Johansson wrote:
->> Actually, Russell brought this to my attention (I should have looked
->> closer earlier). You guys have made an incompatible binding change
->> here. In -rc6? That's not cool, we're not doing those any more.
+On Fri, Jan 3, 2014 at 9:40 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> Hi,
 >
-> Yes, the driver change hit mainline too quickly.
->
+> On Mon, Nov 11, 2013 at 04:50:20PM +0530, Yuvaraj Kumar C D wrote:
+>> From: Vasanth Ananthan <vasanthananthan@gmail.com>
 >>
->> What should happen is that the driver change should be reverted
->> instead. You can't rely on every device tree out there changing to
->> accommodate these kind of things any more.
+>> This patch adds polling mode support for i2c-s3c2410 driver.The
+>> SATA PHY controller's CMU and TRSV block's are of I2C register
+>> map in exynos5250.These blocks can be configured using i2c.
+>>
+>> But i2c controller instance on which these block's sits lacks an
+>> interrupt line.Also the current i2c-s3c2410 driver is only interrupt
+>> driven, thus a polling mode support is required in the driver for
+>> supporting this controller. This patch adds this support to the driver.
+>>
+>> Changes from V1:
+>>       1.Changed the is_ack() to have even period b/w polls and
+>>         used usleep_range() instead of udelay().
 >
-> Fabio just sent a revert patch for it, and David has queued it.
+> Mileages vary, but I'd like to see revision changes after the "---".
 >
-> This is a typical example that we did not implement device tree
-> bindings perfectly right in the first place, and we have to live with it
-> forever.  If someday there is board design using an active high PHY
-> reset, we basically have to introduce another property for it.
-
-Yes, or another, more precise, binding name.
-> But
-> it does no harm to correct the level type of the existing property in
-> device tree sources anyway.  So I will still queue Fabio's dts patch [1]
-> for 3.14 - a different one from what you're dropping here.  The
-> patch [1] is against my for-next branch while the dropped one is
-> against mainline.
-
-Sounds good. Thanks!
-
-
--Olof
+>>       ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
+>> -                            dev_name(&pdev->dev), i2c);
+>> +                             dev_name(&pdev->dev), i2c);
+>
+> Unrelated change.
+>
+> Rest looks good, so I'll fix up the things for you and apply to
+> for-next, thanks!
+Thanks Wolfram.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
