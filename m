@@ -1,72 +1,50 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  6 Jan 2014 13:58:10 +0800
-Subject: [PATCH v2 6/8] arm: dts: sun6i: rename clock node names to clk@N
+Date: Mon,  6 Jan 2014 13:58:12 +0800
+Subject: [PATCH v2 8/8] arm: sun7i: cubietruck: Enable the i2c controllers
 In-Reply-To: <1388987892-23733-1-git-send-email-wens@csie.org>
 References: <1388987892-23733-1-git-send-email-wens@csie.org>
-Message-ID: <1388987892-23733-7-git-send-email-wens@csie.org>
+Message-ID: <1388987892-23733-9-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree naming conventions state that node names should match
-node function. Change fully functioning clock nodes to match.
+The Cubietruck makes use of the first three i2c controllers found on the
+Allwinner A20; i2c-0 is used internally for the PMIC, i2c-1 is exposed on
+the board headers, and i2c-2 is used for DDC on the VGA connector. This
+patch enables them in the device tree.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 5256ad9..a1f5193 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -60,17 +60,19 @@
- 			clock-frequency = <24000000>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 8a1009d..f9dcb61 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -33,6 +33,24 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
  		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
++
++		i2c2: i2c at 01c2b400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			status = "okay";
++		};
+ 	};
  
--		osc32k: osc32k {
-+		osc32k: clk at 0 {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <32768>;
-+			clock-output-names = "osc32k";
- 		};
- 
--		pll1: pll1 at 01c20000 {
-+		pll1: clk at 01c20000 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun6i-a31-pll1-clk";
- 			reg = <0x01c20000 0x4>;
- 			clocks = <&osc24M>;
-+			clock-output-names = "pll1";
- 		};
- 
- 		/*
-@@ -120,7 +122,7 @@
- 			clocks = <&ahb1_mux>;
- 		};
- 
--		ahb1_gates: ahb1_gates at 01c20060 {
-+		ahb1_gates: clk at 01c20060 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun6i-a31-ahb1-gates-clk";
- 			reg = <0x01c20060 0x8>;
-@@ -148,7 +150,7 @@
- 			clocks = <&ahb1>;
- 		};
- 
--		apb1_gates: apb1_gates at 01c20060 {
-+		apb1_gates: clk at 01c20068 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun6i-a31-apb1-gates-clk";
- 			reg = <0x01c20068 0x4>;
-@@ -172,7 +174,7 @@
- 			clocks = <&apb2_mux>;
- 		};
- 
--		apb2_gates: apb2_gates at 01c2006c {
-+		apb2_gates: clk at 01c2006c {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun6i-a31-apb2-gates-clk";
- 			reg = <0x01c2006c 0x4>;
+ 	leds {
 -- 
 1.8.5.2
