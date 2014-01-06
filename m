@@ -1,198 +1,127 @@
 From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Mon, 6 Jan 2014 17:05:26 +0530
-Subject: [PATCH 4/7] clk/samsung: add support for multuple clock providers
-In-Reply-To: <11276764.MQ2Wg9nEER@amdc1227>
+Date: Mon, 6 Jan 2014 17:06:50 +0530
+Subject: [PATCH 5/7] clk/samsung: add support for pll2550xx
+In-Reply-To: <1450803.Oy1I8miDAj@amdc1227>
 References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1386345391-23482-5-git-send-email-rahul.sharma@samsung.com>
- <11276764.MQ2Wg9nEER@amdc1227>
-Message-ID: <CAPdUM4M9XkB14y=c29WzX93VysWhZTzFkCKXpkmXtFv1CB2OvQ@mail.gmail.com>
+ <1386345391-23482-6-git-send-email-rahul.sharma@samsung.com>
+ <1450803.Oy1I8miDAj@amdc1227>
+Message-ID: <CAPdUM4PZFK4fMSjJd-gpb4tb3khwWwaG5GeJR5yi_=RMn9EaQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tomasz,
 
-On 11 December 2013 16:45, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul,
+On 19 December 2013 17:31, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Pankaj, Rahul, Arun,
 >
-> Please see my comments inline.
->
-> On Friday 06 of December 2013 21:26:28 Rahul Sharma wrote:
->> Samsung CCF helper functions do not provide support to
->> register multiple Clock Providers for a given SoC. Due to
->> this limitation SoC platforms are not able to use these
->> helpers for registering mulitple clock providers and are
->> forced to bypass this layer.
+> On Friday 06 of December 2013 21:26:29 Rahul Sharma wrote:
+>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
 >>
->> This layer is modified acordingly to enable the support.
+>> exynos5260 use pll2520xx and it has different bitfields
+>> for P,M,S values as compared to pll2550xx. Support for
+>> pll2520xx is added here.
 >>
->> Clockfile for exynos4, exynos5250, exynos5420, exynos5440
->> and S3c64xx are also modified as per changed helper functions.
-> [snip]
->> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
->> index 91bec3e..20de446 100644
->> --- a/drivers/clk/samsung/clk.c
->> +++ b/drivers/clk/samsung/clk.c
->> @@ -15,11 +15,6 @@
->>  #include "clk.h"
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+>> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+>> ---
+>>  drivers/clk/samsung/clk-pll.c |  107 +++++++++++++++++++++++++++++++++++++++++
+>>  drivers/clk/samsung/clk-pll.h |    1 +
+>>  2 files changed, 108 insertions(+)
 >>
->>  static DEFINE_SPINLOCK(lock);
->
-> IMHO you can also move the spinlock into samsung_clk_provider struct, to
-> have more fine grained locking, as you shouldn't need to lock between
-> particular providers, just multiple requests for one.
->
-Done.
-
->> -static struct clk **clk_table;
->> -static void __iomem *reg_base;
->> -#ifdef CONFIG_OF
->> -static struct clk_onecell_data clk_data;
->> -#endif
->>
->>  void samsung_clk_save(void __iomem *base,
->>                                   struct samsung_clk_reg_dump *rd,
->> @@ -55,40 +50,53 @@ struct samsung_clk_reg_dump *samsung_clk_alloc_reg_dump(
+>> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+>> index e8e8953..237a889 100644
+>> --- a/drivers/clk/samsung/clk-pll.c
+>> +++ b/drivers/clk/samsung/clk-pll.c
+>> @@ -710,6 +710,107 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
+>>       return clk;
 >>  }
 >>
->>  /* setup the essentials required to support clock lookup using ccf */
->> -void __init samsung_clk_init(struct device_node *np, void __iomem *base,
->> -                          unsigned long nr_clks)
->> +struct samsung_clk_provider *__init samsung_clk_init(struct device_node *np,
->> +                     void __iomem *base, unsigned long nr_clks)
->>  {
->> -     reg_base = base;
->> +     struct samsung_clk_provider *ctx;
->> +     struct clk **clk_table;
->> +     int ret;
+>> +/*
+>> + * PLL2550xx Clock Type
+>> + */
 >> +
->> +     if (!np)
->> +             return NULL;
+>> +/* Maximum lock time can be 270 * PDIV cycles */
+>> +#define PLL2550XX_LOCK_FACTOR (270)
+>> +
+>> +#define PLL2550XX_MDIV_MASK          (0x3FF)
+>> +#define PLL2550XX_PDIV_MASK          (0x3F)
+>> +#define PLL2550XX_SDIV_MASK          (0x7)
+>> +#define PLL2550XX_LOCK_STAT_MASK     (0x1)
+>> +#define PLL2550XX_MDIV_SHIFT         (9)
+>> +#define PLL2550XX_PDIV_SHIFT         (3)
+>> +#define PLL2550XX_SDIV_SHIFT         (0)
+>> +#define PLL2550XX_LOCK_STAT_SHIFT    (21)
+>> +
+>> +static unsigned long samsung_pll2550xx_recalc_rate(struct clk_hw *hw,
+>> +                             unsigned long parent_rate)
+>> +{
+>> +     struct samsung_clk_pll *pll = to_clk_pll(hw);
+>> +     u32 mdiv, pdiv, sdiv, pll_con;
+>> +     u64 fvco = parent_rate;
+>> +
+>> +     pll_con = __raw_readl(pll->con_reg);
+>> +     mdiv = (pll_con >> PLL2550XX_MDIV_SHIFT) & PLL2550XX_MDIV_MASK;
+>> +     pdiv = (pll_con >> PLL2550XX_PDIV_SHIFT) & PLL2550XX_PDIV_MASK;
+>> +     sdiv = (pll_con >> PLL2550XX_SDIV_SHIFT) & PLL2550XX_SDIV_MASK;
+>> +
+>> +     fvco *= mdiv;
+>> +     do_div(fvco, (pdiv << sdiv));
+>> +
+>> +     return (unsigned long)fvco;
+>> +}
+>> +
+>> +static inline bool samsung_pll2550xx_mp_change(u32 mdiv, u32 pdiv, u32 pll_con)
+>> +{
+>> +     if ((mdiv != ((pll_con >> PLL2550XX_MDIV_SHIFT) &
+>> +                             PLL2550XX_MDIV_MASK)) ||
+>> +             (pdiv != ((pll_con >> PLL2550XX_PDIV_SHIFT) &
+>> +                             PLL2550XX_PDIV_MASK)))
+>> +             return 1;
+>> +     else
+>> +             return 0;
 >
-> This check is incorrect. It's completely correct to call this function
-> with NULL np, when booted without DT and this was handled correctly
-> before this patch. Please keep the same behavior.
->
+> This doesn't look too good. Can you make this consistent with
+> implementations of this helper for other PLLs, such as
+> samsung_pll35xx_mp_change()?
 
-Done.
+I have changed this in V2.
 
->> +
->> +     ctx = kzalloc(sizeof(struct samsung_clk_provider), GFP_KERNEL);
->> +     if (!ctx)
->> +             panic("could not allocate clock provider context.\n");
->>
->>       clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
->>       if (!clk_table)
->>               panic("could not allocate clock lookup table\n");
->>
->> -     if (!np)
->> -             return;
->> +     ctx->reg_base = base;
->> +     ctx->clk_data.clks = clk_table;
->> +     ctx->clk_data.clk_num = nr_clks;
->>
->> -#ifdef CONFIG_OF
->> -     clk_data.clks = clk_table;
->> -     clk_data.clk_num = nr_clks;
->> -     of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->> -#endif
->> +     ret = of_clk_add_provider(np, of_clk_src_onecell_get,
->> +                     &ctx->clk_data);
->> +     if (ret)
->> +             panic("could not register clock provide\n");
->> +
->> +     return ctx;
->>  }
-> [snip]
->> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
->> index c7141ba..433bab3 100644
->> --- a/drivers/clk/samsung/clk.h
->> +++ b/drivers/clk/samsung/clk.h
->> @@ -21,6 +21,17 @@
->>  #include <linux/of_address.h>
->>  #include "clk-pll.h"
->>
->> +/* Context node which holds information about the clock provider. */
->> +/**
->> + * struct samsung_clk_provider: information about clock plovider
 >
-> typo: s/plovider/provider/
+>> +}
+>> +
+>> +static int samsung_pll2550xx_set_rate(struct clk_hw *hw, unsigned long drate,
+>> +                                     unsigned long prate)
+>> +{
+>> +     struct samsung_clk_pll *pll = to_clk_pll(hw);
+>> +     const struct samsung_pll_rate_table *rate;
+>> +     u32 tmp;
+>> +
+>> +     /* Get required rate settings from table */
+>> +     rate = samsung_get_pll_settings(pll, drate);
+>> +     if (!rate) {
+>> +             pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
+>> +                     drate, __clk_get_name(hw->clk));
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     tmp = __raw_readl(pll->con_reg);
+>> +
+>> +     if (!(samsung_pll2550xx_mp_change(rate->mdiv, rate->pdiv, tmp))) {
+>> +             /* If only s change, change just s value only*/
+>> +             tmp &= ~(PLL2550XX_SDIV_MASK << PLL2550XX_SDIV_SHIFT);
+>> +             tmp |= rate->sdiv << PLL2550XX_SDIV_SHIFT;
+>> +             __raw_writel(tmp, pll->con_reg);
+>> +     } else {
+>
+> Please make coding style of this function consistent with implementations
+> of this operation for other PLLs, such as samsung_pll35xx_set_rate().
+>
+> Otherwise the patch looks fine.
 
 Ok.
->
->> + * @reg_base: virtual address for the register base.
->> + * @clk_data: holds clock related data like clk* and number of clocks.
->> + */
->
-> Why two comments? The kerneldoc one should be enough.
->
->> +struct samsung_clk_provider {
->> +     void __iomem *reg_base;
->> +     struct clk_onecell_data clk_data;
->> +};
->> +
->>  /**
->>   * struct samsung_clock_alias: information about mux clock
->>   * @id: platform specific id of the clock.
->> @@ -312,29 +323,40 @@ struct samsung_pll_clock {
->>       __PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE,     \
->>               _lock, _con, _rtable, _alias)
->>
->> -extern void __init samsung_clk_init(struct device_node *np, void __iomem *base,
->> -                                 unsigned long nr_clks);
->> +extern struct samsung_clk_provider *__init samsung_clk_init(
->> +                     struct device_node *np, void __iomem *base,
->> +                     unsigned long nr_clks);
->>  extern void __init samsung_clk_of_register_fixed_ext(
->> +             struct samsung_clk_provider *ctx,
->>               struct samsung_fixed_rate_clock *fixed_rate_clk,
->>               unsigned int nr_fixed_rate_clk,
->>               struct of_device_id *clk_matches);
->>
->> -extern void samsung_clk_add_lookup(struct clk *clk, unsigned int id);
->> +extern void samsung_clk_add_lookup(struct samsung_clk_provider *ctx,
->> +                     struct clk *clk, unsigned int id);
->>
->> -extern void samsung_clk_register_alias(struct samsung_clock_alias *list,
->> -             unsigned int nr_clk);
->> +extern void samsung_clk_register_alias(struct samsung_clk_provider *ctx,
->> +                     struct samsung_clock_alias *list,
->> +                     unsigned int nr_clk);
->>  extern void __init samsung_clk_register_fixed_rate(
->> -             struct samsung_fixed_rate_clock *clk_list, unsigned int nr_clk);
->> +                     struct samsung_clk_provider *ctx,
->> +                     struct samsung_fixed_rate_clock *clk_list,
->> +                     unsigned int nr_clk);
->>  extern void __init samsung_clk_register_fixed_factor(
->> -             struct samsung_fixed_factor_clock *list, unsigned int nr_clk);
->> -extern void __init samsung_clk_register_mux(struct samsung_mux_clock *clk_list,
->> +                     struct samsung_clk_provider *ctx,
->> +                     struct samsung_fixed_factor_clock *list,
->> +                     unsigned int nr_clk);
->> +extern void __init samsung_clk_register_mux(struct samsung_clk_provider *ctx,
->> +             struct samsung_mux_clock *clk_list,
->>               unsigned int nr_clk);
->> -extern void __init samsung_clk_register_div(struct samsung_div_clock *clk_list,
->> +extern void __init samsung_clk_register_div(struct samsung_clk_provider *ctx,
->> +             struct samsung_div_clock *clk_list,
->>               unsigned int nr_clk);
->> -extern void __init samsung_clk_register_gate(
->> +extern void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
->>               struct samsung_gate_clock *clk_list, unsigned int nr_clk);
->> -extern void __init samsung_clk_register_pll(struct samsung_pll_clock *pll_list,
->> -             unsigned int nr_clk, void __iomem *base);
->> +extern void __init samsung_clk_register_pll(struct samsung_clk_provider *ctx,
->> +                     struct samsung_pll_clock *pll_list,
->> +                     unsigned int nr_clk, void __iomem *base);
->>
->>  extern unsigned long _get_rate(const char *clk_name);
->>
->
-> nit: Please keep the indentation consistent in all the function prototypes
-> above.
 
-ok.
-
-regards,
+Regards,
 Rahul Sharma.
 
 >
