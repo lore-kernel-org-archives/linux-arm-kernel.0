@@ -1,95 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Jan 2014 10:42:12 +0000
-Subject: [PATCHv8] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <1389088974-31465-1-git-send-email-denis@eukrea.com>
-References: <1389088974-31465-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140107104212.GD2930@e106331-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 7 Jan 2014 11:45:06 +0100
+Subject: [PATCH 1/4] tty/serial: at91: Handle shutdown more safely
+In-Reply-To: <cover.1389090437.git.nicolas.ferre@atmel.com>
+References: <cover.1389090437.git.nicolas.ferre@atmel.com>
+Message-ID: <dc7afa0aaab583d94211069f3696168f67efbcf3.1389090437.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 10:02:53AM +0000, Denis Carikli wrote:
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v7->v8:
-> - The default-state was renamed to default-brightness-level.
-> - default-brightness-level is now mandatory, like for backlight-pwm,
->   That way we avoid having to handle the case where it's not set,
->   which means that we would need not to set the gpio, but still
->   report a brightness value for sysfs, when not all gpio controllers are
->   able to read the gpio value.
-> - switched the default-brightness-level to boolean values (0 or 1) instead
->   of using strings ("on", "off", "keep").
-> - The documentation was updated accordingly.
-> - The example in the documentation now uses the dts gpio defines.
-> - The "backlight: gpio_backlight: Use a default state enum." patch was then
->   dropped, becuase it is not necessary anymore.
-> 
-> ChangeLog v6->v7:
-> - removed a compilation warning with the removal of the useless ret declaration.
-> 
-> ChangeLog v5->v6:
-> - The default state handling was reworked:
->   - it's now called default-state, and looks like the gpio-leds default-state.
->   - it now has a "keep" option, like for the gpio-leds.
->   - that "keep" option is the default when the default-state property is not set.
-> - The documentation was updated accordingly.
-> 
-> ChangeLog v4->v5:
-> - The default-brightness property now defaults to 0 in the driver.
-> - def_value int becomes a bool.
-> - The check for the gpio validity has been reworked.
-> ---
->  .../bindings/video/backlight/gpio-backlight.txt    |   19 ++++++
->  drivers/video/backlight/gpio_backlight.c           |   64 +++++++++++++++++---
->  2 files changed, 76 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-> new file mode 100644
-> index 0000000..d022add
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-> @@ -0,0 +1,19 @@
-> +gpio-backlight bindings
-> +
-> +Required properties:
-> +  - compatible: "gpio-backlight"
-> +  - gpios: describes the gpio that is used for enabling/disabling the backlight
-> +    (see GPIO binding[0] for more details).
-> +  - default-brightness-level: the default brightness level. Valid values:
-> +    - 0: off
-> +    - 1: on
+From: Marek Roszko <mark.roszko@gmail.com>
 
-If this is a boolean, use a boolean/empty property (default-on would be
-a good candidate, or you could have default-off if most people are gonig
-to want the display on at boot).
+Interrupts were being cleaned up late in the shutdown handler, it is possible
+that an interrupt can occur and schedule a tasklet that runs after the port is
+cleaned up. There is a null dereference due to this race condition with the
+following stacktrace:
 
-[...]
+[<c02092b0>] (atmel_tasklet_func+0x514/0x814) from [<c001fd34>] (tasklet_action+0x70/0xa8)
+[<c001fd34>] (tasklet_action+0x70/0xa8) from [<c001f60c>] (__do_softirq+0x90/0x144)
+[<c001f60c>] (__do_softirq+0x90/0x144) from [<c001fa18>] (irq_exit+0x40/0x4c)
+[<c001fa18>] (irq_exit+0x40/0x4c) from [<c000e298>] (handle_IRQ+0x64/0x84)
+[<c000e298>] (handle_IRQ+0x64/0x84) from [<c000d6c0>] (__irq_svc+0x40/0x50)
+[<c000d6c0>] (__irq_svc+0x40/0x50) from [<c0208060>] (atmel_rx_dma_release+0x88/0xb8)
+[<c0208060>] (atmel_rx_dma_release+0x88/0xb8) from [<c0209740>] (atmel_shutdown+0x104/0x160)
+[<c0209740>] (atmel_shutdown+0x104/0x160) from [<c0205e8c>] (uart_port_shutdown+0x2c/0x38)
 
-> +	ret = of_property_read_u32(np, "default-brightness-level",
-> +				   &gbl->def_value);
+Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+Acked-by: Leilei Zhao <leilei.zhao@atmel.com>
+Cc: <stable@vger.kernel.org> # v3.12
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-This could be:
-
-gbl->def_value = of_property_read_bool(np, "default-on");
-
-Then you don't have to worry about people doing crazy things like having
-default-brightness-level = <6> when you only support a boolean value.
-
-Thanks,
-Mark.
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index c7d99af46a96..48ea47a32d5f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1650,12 +1650,24 @@ static int atmel_startup(struct uart_port *port)
+ static void atmel_shutdown(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++
+ 	/*
+-	 * Ensure everything is stopped.
++	 * Clear out any scheduled tasklets before
++	 * we destroy the buffers
++	 */
++	tasklet_kill(&atmel_port->tasklet);
++
++	/*
++	 * Ensure everything is stopped and
++	 * disable all interrupts, port and break condition.
+ 	 */
+ 	atmel_stop_rx(port);
+ 	atmel_stop_tx(port);
+ 
++	UART_PUT_CR(port, ATMEL_US_RSTSTA);
++	UART_PUT_IDR(port, -1);
++
++
+ 	/*
+ 	 * Shut-down the DMA.
+ 	 */
+@@ -1665,12 +1677,6 @@ static void atmel_shutdown(struct uart_port *port)
+ 		atmel_port->release_tx(port);
+ 
+ 	/*
+-	 * Disable all interrupts, port and break condition.
+-	 */
+-	UART_PUT_CR(port, ATMEL_US_RSTSTA);
+-	UART_PUT_IDR(port, -1);
+-
+-	/*
+ 	 * Free the interrupt
+ 	 */
+ 	free_irq(port->irq, port);
+-- 
+1.8.2.2
