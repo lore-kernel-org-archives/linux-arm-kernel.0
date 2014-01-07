@@ -1,27 +1,33 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 8 Jan 2014 00:02:41 +0100
-Subject: [PATCH v4 2/6] genirq: export percpu irq functions for module
- usage
-In-Reply-To: <1388434457-4194-3-git-send-email-sboyd@codeaurora.org>
-References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
- <1388434457-4194-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140107230240.GF4164@pd.tnic>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 08 Jan 2014 00:06:39 +0100
+Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
+In-Reply-To: <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
+Message-ID: <1591253.8BzYfubhGS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 12:14:13PM -0800, Stephen Boyd wrote:
-> In the near future we're going to use these percpu irq functions
-> in the Krait CPU EDAC driver. Export them so that the EDAC driver
-> can be compiled as a module.
-> 
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Hi Geert,
 
-Applied, thanks.
+On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
+> On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
+> > Geert, could you please verify that the series fixes your QSPI clock
+> > issues with the Koelsch board ?
+> > 
+> > Laurent Pinchart (2):
+> >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
+> >   clk: shmobile: rcar-gen2: Fix qspi divisor
+> 
+> Thanks, both:
+> 
+> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+
+Thank you.
+
+Mike, could you please pick those patches up for v3.14 ?
 
 -- 
-Regards/Gruss,
-    Boris.
+Regards,
 
-Sent from a fat crate under my desk. Formatting is fine.
---
+Laurent Pinchart
