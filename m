@@ -1,108 +1,55 @@
-From: Rongjun.Ying@csr.com (Rongjun Ying)
-Date: Tue, 7 Jan 2014 09:02:19 +0000
-Subject: [PATCH v3] extcon: gpio: Add power resume support
-In-Reply-To: <52CB9A16.9010305@samsung.com>
-References: <1389070590-3139-1-git-send-email-rongjun.ying@csr.com>
- <52CB9A16.9010305@samsung.com>
-Message-ID: <86130EF012BDF348AA0D464A4F449478012AC858E6@SHAASIEXM01.ASIA.ROOT.PRI>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 10:03:30 +0100
+Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <52CA72BF.10604@free-electrons.com>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <201401051533.58931.arnd@arndb.de> <52CA72BF.10604@free-electrons.com>
+Message-ID: <201401071003.31309.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 06 January 2014, Gregory CLEMENT wrote:
+> > Relying on the soc id patch for a "stable" bug fix seems a little
+> > far-reaching to me. I would be happier to first try to do a local
+> > detection based on the i2c bus device node itself. Do you know how
+> 
+> It was my first proposal in case adding the soc id detection was
+> a too big things. But it turned out that the amount of code is very
+> low so I really think it worth adding it along the fix. Device tree
+> is supposed to be stable so as soon as we add something in it we are
+> supposed support it forever. Moreover using device tree for something
+> we can probe is counter productive.
 
+I would still be happier if we did both and only need to check the
+SoC version if the device is in the "possibly broken" category
+but default to the existing behavior.
 
-> -----Original Message-----
-> From: Chanwoo Choi [mailto:cw00.choi at samsung.com]
-> Sent: Tuesday, January 07, 2014 2:09 PM
-> To: RongJun Ying
-> Cc: MyungJoo Ham; Barry Song; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; DL-SHA-WorkGroupLinux; Rongjun Ying
-> Subject: Re: [PATCH v3] extcon: gpio: Add power resume support
-> 
-> Hi RongJun,
-> 
-> On 01/07/2014 01:56 PM, RongJun Ying wrote:
-> > From: Rongjun Ying <rongjun.ying@csr.com>
-> >
-> > When system on the suspend state, Some SoC can't get gpio interrupt.
-> > After system resume, need send extcon uevent to userspace.
-> >
-> > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-> > Reviewed-by: Barry Song <Baohua.Song@csr.com>
-> > ---
-> >  -v3:
-> >  'check_on_resume' instead of 'load_sleep_irq' as Chanwoo Choi's
-> proposal.
-> >
-> >  drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
-> >  include/linux/extcon/extcon-gpio.h |    1 +
-> >  2 files changed, 21 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/extcon/extcon-gpio.c
-> > b/drivers/extcon/extcon-gpio.c index 7e0dff5..fde52c1 100644
-> > --- a/drivers/extcon/extcon-gpio.c
-> > +++ b/drivers/extcon/extcon-gpio.c
-> > @@ -40,6 +40,7 @@ struct gpio_extcon_data {
-> >  	int irq;
-> >  	struct delayed_work work;
-> >  	unsigned long debounce_jiffies;
-> > +	bool check_on_resume;
-> >  };
-> >
-> >  static void gpio_extcon_work(struct work_struct *work) @@ -103,6
-> > +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
-> >  	extcon_data->gpio_active_low = pdata->gpio_active_low;
-> >  	extcon_data->state_on = pdata->state_on;
-> >  	extcon_data->state_off = pdata->state_off;
-> > +	extcon_data->check_on_resume = pdata->check_on_resume;
-> >  	if (pdata->state_on && pdata->state_off)
-> >  		extcon_data->edev.print_state = extcon_gpio_print_state;
-> >  	if (pdata->debounce) {
-> > @@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct
-> platform_device *pdev)
-> >  	return 0;
-> >  }
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int gpio_extcon_resume(struct device *dev) {
-> > +	struct gpio_extcon_data *extcon_data;
-> > +
-> > +	extcon_data = dev_get_drvdata(dev);
-> > +	if (extcon_data->check_on_resume)
-> > +		queue_delayed_work(system_power_efficient_wq,
-> > +			&extcon_data->work, extcon_data->debounce_jiffies);
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-> > +static const struct dev_pm_ops gpio_extcon_pm_ops = {
-> > +	SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
-> 
-> If CONFIG_PM_SLEEP is undefined, gpio_extcon_pm_ops cannot find
-> gpio_extcon_resume function.
-> You should define dummy function for gpio_extcon_resume function.
-> 
-> 
-In the include/Linux/pm.h
-If CONFIG_PM_SLEEP is undefined, the SET_SYSTEM_SLEEP_PM_OPS macro is bypassed.
+My main concern is that this patch is adding platform code that we'd
+otherwise have to carry in the kernel indefinitely. I agree that
+it's best if we can probe stuff automatically, but that doesn't normally
+mean looking at an unrelated piece of information. If the i2c controller
+registers themselves tell us whether this device is broken or not,
+we should use that information. Looking at a global SoC version register
+however is more like checking a board ID in the pre-DT days where the
+board number is the only information we have and everything is
+derived from that.
 
-#ifdef CONFIG_PM_SLEEP
-#define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
-        .suspend = suspend_fn, \
-        .resume = resume_fn, \
-        .freeze = suspend_fn, \
-        .thaw = resume_fn, \
-        .poweroff = suspend_fn, \
-        .restore = resume_fn,
-#else
-#define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
-#endif
+> > common the A0 revision is? You mention "early release of the
+> > OpenBlocks AX3-4 boards". Any others that you suspect? If not,
 > 
-> 
->  To report this email as spam click
-> https://www.mailcontrol.com/sr/MZbqvYs5QwJvpeaetUwhCQ==
-> UfkIuR0P8QH1DW7C+lVo3569nqreWejYcysfmF8UmgH1OQ== .
+> No, from the info I gathered I expected that only OpenBlocks AX3-4
+> would be the only product shipped with an A0 version and as I said
+> it should be only a limit amount of them.
 
+Ok, good. So we really only need to worry about this one board for
+now and can make all the others default to normal operation without
+checking the SoC version.
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+Another idea: Could we have a quirk in the mvebu platform code for
+the AX3-4 to check the SoC version and then change the property for
+the i2c controller based on whether we expect it to work or not?
+This way, we wouldn't even need an interface between the platform
+code and the driver code.
+
+	Arnd
