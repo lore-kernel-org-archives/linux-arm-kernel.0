@@ -1,31 +1,64 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 7 Jan 2014 13:31:11 -0500
-Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available
- for ARM_UNWIND
-In-Reply-To: <20140107163629.GC3350@e103592.cambridge.arm.com>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <201401071533.35309.arnd@arndb.de>
- <20140107144130.GJ27432@n2100.arm.linux.org.uk>
- <4325142.7drL5ndxN9@wuerfel>
- <20140107163629.GC3350@e103592.cambridge.arm.com>
-Message-ID: <20140107133111.0fe49c21@gandalf.local.home>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 7 Jan 2014 11:31:48 -0700
+Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
+In-Reply-To: <201401071635.02006.arnd@arndb.de>
+References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
+ <201401031049.20932.arnd@arndb.de>
+ <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
+ <201401071635.02006.arnd@arndb.de>
+Message-ID: <20140107183148.GD4227@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Jan 2014 16:36:29 +0000
-Dave Martin <Dave.Martin@arm.com> wrote:
+On Tue, Jan 07, 2014 at 04:35:01PM +0100, Arnd Bergmann wrote:
 
-> My other concern was that we might end up in a recursive trace due to
-> the use of non-notrace core functions in the unwinder.  But I seem to
-> remember Steve Rostedt saying the the tracer guards against recursive
-> invocation nowadays -- if so, that shouldn't be a problem.
+> > >> +                       0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
+> > >
+> > > config space is not normally in the ranges property, and I think you will need
+> > > it in the pcie node itself as a 'reg' property so the code can access it.
+> > 
+> > pcie-designware.c does it that way. I just followed their implementation.
+> 
+> I don't remember what led to that, it still seems wrong and I can't
+> find anything in the PCI binding for host bridges telling their
+> config space this way.
 
-I guess it matters what type of tracing you are talking about. The
-function tracer protects against all recursive contexts (normal,
-softirq, irq and NMI) and so does the ring buffer (same levels).
+When we discussed the mvebu PCI driver (which is, so far, the most
+throughly discussed PCI binding) it was concluded that the config
+space ranges like the above was OK only if it exactly described the
+standard ECAM layout.
 
-Those may be the only ones that matter, as things like events shouldn't
-recurse, unless you have an event in the unwinder itself. But that's
-where you take the doctor's advice of "don't do that".
+Idea being that standard/core code should be able to see that ranges,
+map the range and issue config accesses via the ECAM rules.
 
--- Steve
+> > >> +             interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+> > >> +             interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
+> > >
+> > > Only one IRQ for all devices?
+> > 
+> > The node represents a port. I believe that Linux framework uses only
+> > one of the legacy IRQs per port. Rest all remain unused. Hence I
+> > removed them. Please correct me if I am wrong.
+> 
+> Any PCI device can normally have four interrupts (IntA through
+> IntD), which are traditionally separate pins on a PCI bus, but get
+> emulated on PCIe. While it's not common for any normal device to use
+> more than one IRQ, a bridge device will swizzle these (virtual) IRQ
+> lines, so a device behind the bridge actually gets a different host
+> IRQ.
+
+Agree, the binding should handle all four INTA,B,C,D assertions
+delivered to the port. 
+
+If HW is able to decode the 4 ints into seperate Linux interrupt
+numbers then that should be described. If HW routes them all to a
+single number then interrupt-map-mask should be all 0.
+
+Arnd's point about swizzling effects the layout of the
+interrupt-map. When it is placed at the pcie-controller node level the
+map will incorporate one swizzle of the on-the-wire INTx messages. If
+the HW doesn't swizzle the INTx as the TLP passes through the bridge
+then it probably makes more sense to put the interrupt-map in the DT
+node of the bridge like mvebu does.
+
+Jason
