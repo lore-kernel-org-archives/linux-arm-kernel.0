@@ -1,48 +1,43 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  7 Jan 2014 18:57:31 +0100
-Subject: [PATCH v2 1/2] phy-core: phy_get: Leave error logging to the caller
+Date: Tue,  7 Jan 2014 18:57:32 +0100
+Subject: [PATCH v2 2/2] phy-core: Don't propagate -ENOSUPP from
+ phy_pm_runtime_get_sync to caller
 In-Reply-To: <1389117452-3272-1-git-send-email-hdegoede@redhat.com>
 References: <1389117452-3272-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1389117452-3272-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1389117452-3272-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In various cases errors may be expected, ie probe-deferral or a call to
-phy_get from a driver where the use of a phy is optional.
-
-Rather then adding all sort of complicated checks for this, and/or adding
-special functions like devm_phy_get_optional, simply don't log an error,
-and let deciding if get_phy returning an error really should result in a
-dev_err up to the caller.
+The phy-core allows phy_init and phy_power_on to be called multiple times,
+but before this patch -ENOSUPP from phy_pm_runtime_get_sync would be
+propagated to the caller for the 2nd and later calls.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-core.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+ drivers/phy/phy-core.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index 58e0e97..86a248b 100644
+index 86a248b..4ea2987 100644
 --- a/drivers/phy/phy-core.c
 +++ b/drivers/phy/phy-core.c
-@@ -371,17 +371,11 @@ struct phy *phy_get(struct device *dev, const char *string)
- 		index = of_property_match_string(dev->of_node, "phy-names",
- 			string);
- 		phy = of_phy_get(dev, index);
--		if (IS_ERR(phy)) {
--			dev_err(dev, "unable to find phy\n");
--			return phy;
--		}
- 	} else {
- 		phy = phy_lookup(dev, string);
--		if (IS_ERR(phy)) {
--			dev_err(dev, "unable to find phy\n");
--			return phy;
--		}
+@@ -161,6 +161,8 @@ int phy_init(struct phy *phy)
+ 			dev_err(&phy->dev, "phy init failed --> %d\n", ret);
+ 			goto out;
+ 		}
++	} else {
++		ret = 0; /* Override possible ret == -ENOTSUPP */
  	}
-+	if (IS_ERR(phy))
-+		return phy;
  
- 	if (!try_module_get(phy->ops->owner))
- 		return ERR_PTR(-EPROBE_DEFER);
+ out:
+@@ -209,6 +211,8 @@ int phy_power_on(struct phy *phy)
+ 			dev_err(&phy->dev, "phy poweron failed --> %d\n", ret);
+ 			goto out;
+ 		}
++	} else {
++		ret = 0; /* Override possible ret == -ENOTSUPP */
+ 	}
+ 
+ out:
 -- 
 1.8.4.2
