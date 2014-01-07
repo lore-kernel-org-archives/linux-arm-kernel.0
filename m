@@ -1,75 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 7 Jan 2014 12:45:42 -0500
-Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
- CONFIG_ARM_PATCH_PHYS_VIRT.
-In-Reply-To: <20140107011121.GI27432@n2100.arm.linux.org.uk>
-References: <m38uv1uuzr.fsf@t19.piap.pl> <m3ha9gx63v.fsf@t19.piap.pl>
- <20140106223906.GH27432@n2100.arm.linux.org.uk> <52CB3F55.1050404@ti.com>
- <20140107011121.GI27432@n2100.arm.linux.org.uk>
-Message-ID: <52CC3D46.3090102@ti.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 7 Jan 2014 15:47:19 -0200
+Subject: [PATCH v3 01/13] clk: sunxi: register factors clocks behind
+ composite
+In-Reply-To: <52CC31CD.2060005@overkiz.com>
+References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
+ <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
+ <52CC31CD.2060005@overkiz.com>
+Message-ID: <CAAoKrfo+xOoc=S2wJF9XWz3OJoCOG3jD_m5N3XTSWOY6c1LR7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 January 2014 08:11 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 06, 2014 at 06:42:13PM -0500, Santosh Shilimkar wrote:
->> On Monday 06 January 2014 05:39 PM, Russell King - ARM Linux wrote:
->>> On Mon, Jan 06, 2014 at 08:28:20PM +0100, Krzysztof Ha?asa wrote:
->>>> Russell, Santosh,
->>>>
->>>> the unneeded commit causing regression is still in place. Please try to
->>>> compile an ARM kernel without CONFIG_ARM_PATCH_PHYS_VIRT and with
->>>> CONFIG_ZONE_DMA and see for yourself, if you don't believe me.
->>>>
->>>> Please be aware that this commit fixes nothing, its only function is
->>>> causing the regression - so we don't lose anything by reverting it.
->>>>
->>>> If the attached wasn't clear, what the defective commit presently does
->>>> is changing a perfectly valid code into a code referencing a variable
->>>> which (without CONFIG_ARM_PATCH_PHYS_VIRT set) doesn't at all exist.
->>>>
->>>> With CONFIG_ARM_PATCH_PHYS_VIRT set, this commit does precisely nothing.
->>>
-> 
-> /--------------------------------------------------------------
-> | > > Right, so, with Assabet, which has CONFIG_DMA_ZONE=y and
-> | > > CONFIG_ARM_PATCH_PHYS_VIRT=y:
-> | > > 
-> | > > $ make O=../build/assabet arch/arm/mm/init.i
-> | > > 
-> | > > gives:
-> | > >   arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
-> | > > 
-> | > > with or without Santosh's patch.
-> \--------------------------------------------------------------
-> 
->> May be I missed your point but I ended up creating the patch because
->> the CMA reservation was failing on Keystone since the arm_dma_limit
->> wasn't right since it wasn't considering the actual __pv_phys_offset.
->>
->> Isn't that an issue ?
-> 
-> See the above.  Your patch has _no_ effect what so ever when
-> CONFIG_ARM_PATCH_PHYS_VIRT=y - which you have on the Keystone, right?
-> 
-> If you don't believe me, ask make to produce arch/arm/mm/init.i, which
-> is the output from the preprocessor, comparing the resulting generated
-> file both with and without your patch applied.
-> 
-Looks like you are right. I did two fixes to have right arm_dma_limit in
-below order.
+Hi Boris,
 
-1. 787b0d5 {ARM: 7908/1: mm: Fix the arm_dma_limit calculation}
-2. 7c92732 {ARM: 7909/1: mm: Call setup_dma_zone() post early_paging_init()}
+[ Apologies if the email looks weird and for using a link; I'm not
+using my typical email client ]
 
-But with 2 alone the issue gets fixed since with ARM_PATCH_PHYS_VIRT and
-below pre-processor, the PHYS_OFFSET also gets an updated value. I never
-realised that 1 becomes redundant after second patch while creating them. 
+> I'm currently working on the sunxi NFC (Nand Flash Controller) driver
+> and I need to set the NAND clk (which is a mod0 clk type) rate.
+>
+> It seems that the composite clk fallbacks to the mux_hw's determine_rate
+> instead of calling the rate_hw's (or factors hw) round_rate, if rate_hw
+> does not implement determine_rate.
 
-#define PHYS_OFFSET __pv_phys_offset
+That is to be expected; if you have a composite clock that has all
+fixed parents you'd not implement the determine_rate on the rate
+component but on the mux one.
 
-So indeed, 787b0d5{ARM: 7908/1: mm: Fix the arm_dma_limit calculation}
-won't be needed anymore and can be reverted. Sorry it took some time
-for me to reach to your conclusion.
+(...)
 
-Regards,
-Santosh
+> But anyway, I think there is a drawback in the way composite clk
+> implement the determine_rate handler.
+> Mike, shouldn't we choose the best parent (using mux) fullfilling the
+> rate_hw needs ?
+
+Someone using the composite clock may not want their clocks to start
+changing parents though. I believe it's easier and better to just
+implement determine_rate as on this patch on my tree (which I haven't
+sent yet, but it's literally the next in queue.)
+
+http://git.elopez.com.ar/linux/commits/5b4eb3ac406b9c98965714d40e8dd6da943d1ab0
+
+Let me know if that resolves your issue.
+
+Cheers,
+
+Emilio
