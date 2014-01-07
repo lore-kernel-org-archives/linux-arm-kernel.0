@@ -1,31 +1,30 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 7 Jan 2014 09:43:15 -0600
-Subject: [PATCH] dts: socfpga: update L2 tag and data latency
-Message-ID: <1389109395-29530-1-git-send-email-dinguyen@altera.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Jan 2014 15:46:23 +0000
+Subject: [PATCH v8 6/7] arm64, jump label: optimize jump label
+ implementation
+In-Reply-To: <1389104234-15239-7-git-send-email-liuj97@gmail.com>
+References: <1389104234-15239-1-git-send-email-liuj97@gmail.com>
+ <1389104234-15239-7-git-send-email-liuj97@gmail.com>
+Message-ID: <20140107154622.GA4399@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Tue, Jan 07, 2014 at 02:17:13PM +0000, Jiang Liu wrote:
+> Optimize jump label implementation for ARM64 by dynamically patching
+> kernel text.
+> 
+> Signed-off-by: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/Kconfig                  |  1 +
+>  arch/arm64/include/asm/jump_label.h | 52 +++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/Makefile          |  1 +
+>  arch/arm64/kernel/jump_label.c      | 58 +++++++++++++++++++++++++++++++++++++
+>  4 files changed, 112 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/jump_label.h
+>  create mode 100644 arch/arm64/kernel/jump_label.c
 
-Sets the appropriate L2-cache latencies for the SOCFPGA platform.
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
- arch/arm/boot/dts/socfpga.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+Thanks for sticking with this! I think this series is good for merging now.
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 433bfbc..d04dd82 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -468,6 +468,8 @@
- 			interrupts = <0 38 0x04>;
- 			cache-unified;
- 			cache-level = <2>;
-+			arm,tag-latency = <1 1 1>;
-+			arm,data-latency = <2 1 1>;
- 		};
- 
- 		mmc: dwmmc0 at ff704000 {
--- 
-1.7.9.5
+Will
