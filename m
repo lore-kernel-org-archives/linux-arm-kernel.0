@@ -1,29 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Jan 2014 17:41:53 +0100
-Subject: [GIT PULL FOR v3.14] Renesas pinctrl fixes
-In-Reply-To: <1976554.0KiPFU2ADY@avalon>
-References: <1497178.A4PLILmBU4@avalon>
- <CACRpkdZTt=yQGyzD3AnzKF3RjGiC4WdDX3yQY7zw68VFeYf5oQ@mail.gmail.com>
- <1976554.0KiPFU2ADY@avalon>
-Message-ID: <CACRpkdYOUA1zk2MmGD212Afi1LjNONetBZZmqj7X_jY_kxFbYA@mail.gmail.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Tue, 07 Jan 2014 16:43:27 +0000
+Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
+ controller
+In-Reply-To: <6680044.VpT1oREkGO@wuerfel>
+References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
+ <4325123.pn10H18tk9@wuerfel> <52CC2381.2090905@arm.com>
+ <6680044.VpT1oREkGO@wuerfel>
+Message-ID: <52CC2EAF.7050800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 4:52 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Tuesday 07 January 2014 16:50:31 Linus Walleij wrote:
+On 07/01/14 16:12, Arnd Bergmann wrote:
+> On Tuesday 07 January 2014 15:55:45 Sudeep Holla wrote:
+>> On 07/01/14 12:54, Arnd Bergmann wrote:
+>>> On Tuesday 07 January 2014 12:41:42 Sudeep Holla wrote:
+>>>> Hi Tushar,
+>>>>
+>>>> This has been discussed couple of times in past[1][2], and the opinion was not
+>>>> to have these in DT as they are more configuration data than the actual hardware
+>>>> description.
+>>>
+>>> How do you suggest we get rid of the magic constants in platform code then?
+>>> I definitely don't want to keep the current state, and having configuration
+>>> data in DT seems the lesser evil.
+>>>
+>>
+>> I agree, but since these are more L2CC configuration than hardware description,
+>> IMO chosen node is one option. However it's good to get opinion from DT guys.
+> 
+> I think one of the discussions we had during the Edinburgh kernel summit resulted
+> in being more relaxed towards configuration data in device nodes.
+> 
 
->> Now, what do I do about all the other Renesas pinctrl stuff that is
->> floating? Like all the new stuff from Magnus &al? Do you keep track
->> of that or should I start looking at it?
->
-> I wouldn't mind less work of course :-) but I was planning to keep track of
-> the RZ pinctrl patches, at least for the next kernel version. Things will
-> hopefully stabilize after that. I'm waiting for Magnus to repost his patch
-> series (or at least reply to my comments).
+Ok.
 
-OK I'm not touching any of that stuff until you two have settled
-on some way forward. Will be for v3.15 anyway.
+>>> Are there some reasonable defaults that Linux could use independent of the
+>>> platform and of what the boot loader defaults to?
+>>>
+>>
+>> Most of these registers can't be programmed in Non-secure mode. So as mentioned
+>> already in previous discussions it is better to avoid these settings in kernel.
+>> It would be better if bootloader programs these settings even if Linux runs in
+>> secure mode for simplicity.
+> 
+> Yes, that would be ideal, but I fear we have to live with the boot loaders that
+> are in existence already. Whether or not the registers can be programmed in
+> non-secure mode is certainly a piece of information that belongs into the DT
+> node, so we don't try to write them when we shouldn't. We could also have a
 
-Yours,
-Linus Walleij
+But the main problem is that there is no way to detect the current mode (i.e.
+secure or non-secure). So it won't be of any help even if we can get these
+information from DT. It's better to assume Linux runs in non-secure mode and
+avoid using any registers with secure only access. Any attempt to such
+restricted access in non-secure mode results in error.
+
+> property that identifies whether the boot loader has in fact set up the cache
+> controller correctly or whether Linux has to do it. There should be no
+> argument about this being out of scope, since it describes a platform property
+> (presence of a sane boot loader) rather than the actual configuration.
+> 
+> If we decide to have such properties and we boot on a system where we can
+> and should change the settings, is there a way for Linux to know what the
+> settings are supposed to be other than reading them from a DT file or
+> from a per-platform default?
+> 
+
+Yes I understand, but for above mentioned reason it's difficult.
+
+Regards,
+Sudeep
