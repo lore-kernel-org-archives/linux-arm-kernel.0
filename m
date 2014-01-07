@@ -1,48 +1,107 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 07 Jan 2014 13:41:19 -0700
-Subject: [PATCH v2 2/6] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <20140107140502.GE26588@tbergstrom-lnx.Nvidia.com>
-References: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
- <1387891931-9854-3-git-send-email-pdeschrijver@nvidia.com>
- <52CB12D8.7000203@wwwdotorg.org>
- <20140107140502.GE26588@tbergstrom-lnx.Nvidia.com>
-Message-ID: <52CC666F.1010501@wwwdotorg.org>
+From: syin@broadcom.com (Sherman Yin)
+Date: Tue, 7 Jan 2014 12:45:54 -0800
+Subject: [PATCH v4 2/4] pinctrl: Add pinctrl binding for Broadcom Capri
+ SoCs
+In-Reply-To: <CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>	<1387592016-13740-1-git-send-email-syin@broadcom.com>	<1387592016-13740-3-git-send-email-syin@broadcom.com>
+ <CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>
+Message-ID: <52CC6782.4060309@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2014 07:05 AM, Peter De Schrijver wrote:
-> On Mon, Jan 06, 2014 at 09:32:24PM +0100, Stephen Warren wrote:
->> On 12/24/2013 06:32 AM, Peter De Schrijver wrote:
->>> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
-
->>> diff --git a/drivers/misc/fuse/tegra/fuse-tegra20.c b/drivers/misc/fuse/tegra/fuse-tegra20.c
->>
->>> +static int fuse_size;
->>
->> I don't think that's used.
->>
->>> +static u32 tegra20_fuse_readl(const unsigned int offset)
->> ...
->>> +	ret = tegra_apb_readl_using_dma(fuse_phys + FUSE_BEGIN + offset, &val);
->>
->> Shouldn't this use the generic tegra_apb_readl(), so that it works
->> irrespective of whether the Tegra20 APB DMA driver is available?
+On 14-01-07 09:15 AM, Linus Walleij wrote:
+> On Sat, Dec 21, 2013 at 3:13 AM, Sherman Yin <syin@broadcom.com> wrote:
+>> +Optional Properties (for standard pins):
+>> +
+>> +- function:                    String. Specifies the pin mux selection. Values
+>> +                               must be one of: "alt1", "alt2", "alt3", "alt4"
+>> +- input-schmitt-enable:                No arguments. Enable schmitt-trigger mode.
+>> +- input-schmitt-disable:       No arguments. Disable schmitt-trigger mode.
+>> +- bias-pull-up:                        No arguments. Pull up on pin.
+>> +- bias-pull-down:              No arguments. Pull down on pin.
+>> +- bias-disable:                        No arguments. Disable pin bias.
+>> +- slew-rate:                   Integer. Meaning depends on configured pin mux:
+>> +                               *_SCL or *_SDA:
+>> +                                       0: Standard(100kbps)& Fast(400kbps) mode
+>> +                                       1: Highspeed (3.4Mbps) mode
+>> +                               IC_DM or IC_DP:
+>> +                                       0: normal slew rate
+>> +                                       1: fast slew rate
+>> +                               Otherwise:
+>> +                                       0: fast slew rate
+>> +                                       1: normal slew rate
+>> +- input-enable:                        No arguements. Enable input (does not affect
+>> +                               output.)
+>> +- input-disable:               No arguements. Disable input (does not affect
+>> +                               output.)
+>> +- drive-strength:              Integer. Drive strength in mA.  Valid values are
+>> +                               2, 4, 6, 8, 10, 12, 14, 16 mA.
 >
-> tegra_apb_readl() doesn't work reliably on Tegra20 for reading the fuses.
-> So if the Tegra20 APB DMA, this driver should also be unavailable.
+> Also patch
+> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> Since you're adding generic properties.
 
-There's no "depends TEGRA20_APB_DMA" in the Kconfig. Perhaps
-ARCH_TEGRA_2x_SOC or FUSE_TEGRA should "select TEGRA20_APB_DMA"?
+Please note that I removed from this patchset the patch that you've 
+merged to your for-next branch already:
 
->>> +static int tegra_fuse_probe(struct platform_device *pdev)
->> ...
->>> +	fuse_randomness();
->>
->> If this is a driver, and particularly if this could be in a module, is
->> there any guarantee at all that fuse_randomness() gets called early
->> enough to be useful?
-> 
-> For a module this might be true yes... Should we disallow this making a
-> module?
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=8ba3f4d00078e7a49c60c0bd6298f29402c3a0a0
 
-That would simplify things, I expect...
+Is that what you wanted to see in pinctrl-bindings.txt, or is there 
+something else you want to see added to that txt file?  I didn't want to 
+add the description of slew-rate arguments there because this is 
+capri-specific.  I'm not quite sure what else to add.
+
+
+>> +Optional Properties (for I2C pins):
+>> +
+>> +- function:                    String. Specifies the pin mux selection. Values
+>> +                               must be one of: "alt1", "alt2", "alt3", "alt4"
+>> +- bias-pull-up:                        Integer. Pull up strength in Ohm. There are 3
+>> +                               pull-up resisitors (1.2k, 1.8k, 2.7k) available
+>> +                               in parallel for I2C pins, so the valid values
+>> +                               are: 568, 720, 831, 1080, 1200, 1800, 2700 Ohm.
+>
+> Also patch
+> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+
+That doc already says bias-pull-up is specified in Ohm, and the specific 
+values are chip-specific, so I don't think they should be mentioned there.
+
+>> +- bias-disable:                        No arguments. Disable pin bias.
+>> +- slew-rate:                   Integer. Meaning depends on configured pin mux:
+>> +                               *_SCL or *_SDA:
+>> +                                       0: Standard(100kbps)& Fast(400kbps) mode
+>> +                                       1: Highspeed (3.4Mbps) mode
+>> +                               IC_DM or IC_DP:
+>> +                                       0: normal slew rate
+>> +                                       1: fast slew rate
+>> +                               Otherwise:
+>> +                                       0: fast slew rate
+>> +                                       1: normal slew rate
+>
+> Hm that does not seem generic though, so let's not add this to the
+> generic bindings.
+>
+>> +- input-enable:                        No arguements. Enable input (does not affect
+>> +                               output.)
+>> +- input-disable:               No arguements. Disable input (does not affect
+>> +                               output.)
+>> +
+>> +Optional Properties (for HDMI pins):
+>> +
+>> +- function:                    String. Specifies the pin mux selection. Values
+>> +                               must be one of: "alt1", "alt2", "alt3", "alt4"
+>> +- slew-rate:                   Integer. Controls slew rate.
+>> +                                       0: Standard(100kbps)& Fast(400kbps) mode
+>> +                                       1: Highspeed (3.4Mbps) mode
+>
+> Hmmmm slew rate is not specifiec in "bps" but rather in
+> something like volts per second. But maybe it's best to keep
+> this value driver-specific.
+
+Right, I think the slew-rates values are capri specific.
+
+Thanks for the review.
+
+Regards,
+Sherman
