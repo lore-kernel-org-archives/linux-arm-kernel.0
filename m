@@ -1,69 +1,51 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 07 Jan 2014 15:09:26 +0900
-Subject: [PATCH v3] extcon: gpio: Add power resume support
-In-Reply-To: <1389070590-3139-1-git-send-email-rongjun.ying@csr.com>
-References: <1389070590-3139-1-git-send-email-rongjun.ying@csr.com>
-Message-ID: <52CB9A16.9010305@samsung.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Tue, 7 Jan 2014 06:32:02 +0000
+Subject: [PATCH] the eDMA support for the LPUART send driver
+In-Reply-To: <20140105145031.GB27432@n2100.arm.linux.org.uk>
+References: <1388143449-28640-1-git-send-email-yao.yuan@freescale.com>
+ <201401051544.50036.arnd@arndb.de>
+ <20140105145031.GB27432@n2100.arm.linux.org.uk>
+Message-ID: <0602455564214ab7986348ea985fc820@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi RongJun,
+Thanks for your suggestion. It's important for me.
 
-On 01/07/2014 01:56 PM, RongJun Ying wrote:
-> From: Rongjun Ying <rongjun.ying@csr.com>
-> 
-> When system on the suspend state, Some SoC can't get gpio interrupt.
-> After system resume, need send extcon uevent to userspace.
-> 
-> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-> Reviewed-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  -v3:
->  'check_on_resume' instead of 'load_sleep_irq' as Chanwoo Choi's proposal.
-> 
->  drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
->  include/linux/extcon/extcon-gpio.h |    1 +
->  2 files changed, 21 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
-> index 7e0dff5..fde52c1 100644
-> --- a/drivers/extcon/extcon-gpio.c
-> +++ b/drivers/extcon/extcon-gpio.c
-> @@ -40,6 +40,7 @@ struct gpio_extcon_data {
->  	int irq;
->  	struct delayed_work work;
->  	unsigned long debounce_jiffies;
-> +	bool check_on_resume;
->  };
-> 
->  static void gpio_extcon_work(struct work_struct *work)
-> @@ -103,6 +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
->  	extcon_data->gpio_active_low = pdata->gpio_active_low;
->  	extcon_data->state_on = pdata->state_on;
->  	extcon_data->state_off = pdata->state_off;
-> +	extcon_data->check_on_resume = pdata->check_on_resume;
->  	if (pdata->state_on && pdata->state_off)
->  		extcon_data->edev.print_state = extcon_gpio_print_state;
->  	if (pdata->debounce) {
-> @@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct platform_device *pdev)
->  	return 0;
->  }
-> 
-> +#ifdef CONFIG_PM_SLEEP
-> +static int gpio_extcon_resume(struct device *dev)
-> +{
-> +	struct gpio_extcon_data *extcon_data;
-> +
-> +	extcon_data = dev_get_drvdata(dev);
-> +	if (extcon_data->check_on_resume)
-> +		queue_delayed_work(system_power_efficient_wq,
-> +			&extcon_data->work, extcon_data->debounce_jiffies);
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops gpio_extcon_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
+I read the source code for dma_map_single again. I found that both of them(as first argument is dma or uart) worked well. But in my code I found that the *sport->port.dev->dma_mask is not zero. By contrast the dma_mask for dma device is zero.
+You are right. There should be dma device. But I also have a doubt here. Why I find many other driver use the first argument here rather than the dma device pointer.
+They usually use the device like uart. 
 
-If CONFIG_PM_SLEEP is undefined, gpio_extcon_pm_ops cannot find gpio_extcon_resume function.
-You should define dummy function for gpio_extcon_resume function.
+
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Sunday, January 05, 2014 10:51 PM
+To: Yuan Yao-B46683
+Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org; linux-serial at vger.kernel.org
+Subject: Re: [PATCH] the eDMA support for the LPUART send driver
+
+On Sun, Jan 05, 2014 at 03:44:49PM +0100, Arnd Bergmann wrote:
+> On Friday 27 December 2013, Yuan Yao wrote:
+> > +	dma_phys = dma_map_single(sport->port.dev,
+> > +				sport->port.state->xmit.buf,
+> > +				UART_XMIT_SIZE, DMA_TO_DEVICE);
+> 
+> This is wrong: Since the dma is performed by the dma engine rather 
+> than the uart, the first argument here needs to be the dma device 
+> pointer. In fact, dma_map_single is normally supposed to fail on the 
+> uart device as the dma_mask value should be zero. Not sure why this 
+> worked.
+> 
+> > +	if (!dma_phys) {
+> > +		dev_err(sport->port.dev, "Dma_phys single failed\n");
+> > +		return -ENOMEM;
+> > +	}
+> 
+> Please also change all references to "phys" -- it's not a phys address 
+> but a bus address. These are often the same, but that's not for the 
+> driver to know.
+
+This is also not how you test for failure of dma_map_single().  I recommend reading the documentation for the APIs you're trying to use...  Hint: dma_mapping_error().
+
+--
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
