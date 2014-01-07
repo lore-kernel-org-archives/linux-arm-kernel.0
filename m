@@ -1,53 +1,72 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 07 Jan 2014 10:54:41 +0100
-Subject: [PATCH 15/15] sh: intc: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <3670569.dVXQxeaJBM@avalon>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <3670569.dVXQxeaJBM@avalon>
-Message-ID: <2305561.CqXvNryyXG@avalon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  7 Jan 2014 08:00:40 -0200
+Subject: [PATCH] ARM: imx: Use INT_MEM_CLK_LPM as the bit name
+Message-ID: <1389088840-14444-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 December 2013 13:52:31 Laurent Pinchart wrote:
-> Hi Magnus,
-> 
-> Could you tell me who is responsible for merging drivers/sh patches ? If
-> that's one of you, could you please pick this patch up for v3.14 ?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Ping ?
+Bit 17 of register CCM_CGPR is called INT_MEM_CLK_LPM as per the mx6
+reference manual, so use this name instead.
 
-> On Wednesday 27 November 2013 02:18:37 Laurent Pinchart wrote:
-> > This helps increasing build testing coverage.
-> > 
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >  drivers/sh/intc/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
-> > index a305731..f7d9061 100644
-> > --- a/drivers/sh/intc/Kconfig
-> > +++ b/drivers/sh/intc/Kconfig
-> > @@ -6,7 +6,7 @@ comment "Interrupt controller options"
-> > 
-> >  config INTC_USERIMASK
-> >  
-> >  	bool "Userspace interrupt masking support"
-> > 
-> > -	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
-> > +	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A) || COMPILE_TEST
-> > 
-> >  	help
-> >  	
-> >  	  This enables support for hardware-assisted userspace hardirq
-> >  	  masking.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/common.h        | 2 +-
+ arch/arm/mach-imx/cpuidle-imx6q.c | 4 ++--
+ arch/arm/mach-imx/pm-imx6q.c      | 6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 59c3b9b..4f4a95c 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -139,7 +139,7 @@ void imx_anatop_init(void);
+ void imx_anatop_pre_suspend(void);
+ void imx_anatop_post_resume(void);
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+-void imx6q_set_chicken_bit(void);
++void imx6q_set_int_mem_clk_lpm(void);
+ 
+ void imx_cpu_die(unsigned int cpu);
+ int imx_cpu_kill(unsigned int cpu);
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index 23ddfb6..6bcae04 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -68,8 +68,8 @@ int __init imx6q_cpuidle_init(void)
+ 	/* Need to enable SCU standby for entering WAIT modes */
+ 	imx_scu_standby_enable();
+ 
+-	/* Set chicken bit to get a reliable WAIT mode support */
+-	imx6q_set_chicken_bit();
++	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
++	imx6q_set_int_mem_clk_lpm();
+ 
+ 	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
+ }
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index 9d47adc..d45acc0 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -56,15 +56,15 @@
+ #define BM_CLPCR_MASK_L2CC_IDLE		(0x1 << 27)
+ 
+ #define CGPR				0x64
+-#define BM_CGPR_CHICKEN_BIT		(0x1 << 17)
++#define BM_CGPR_INT_MEM_CLK_LPM		(0x1 << 17)
+ 
+ static void __iomem *ccm_base;
+ 
+-void imx6q_set_chicken_bit(void)
++void imx6q_set_int_mem_clk_lpm(void)
+ {
+ 	u32 val = readl_relaxed(ccm_base + CGPR);
+ 
+-	val |= BM_CGPR_CHICKEN_BIT;
++	val |= BM_CGPR_INT_MEM_CLK_LPM;
+ 	writel_relaxed(val, ccm_base + CGPR);
+ }
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.2
