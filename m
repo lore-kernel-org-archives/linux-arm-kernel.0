@@ -1,69 +1,83 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Tue, 07 Jan 2014 08:30:41 -0700
-Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
-In-Reply-To: <1389094187.4815.24.camel@pizza.hi.pengutronix.de>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>	
- <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>	
- <1388767737.19394.32.camel@pizza.hi.pengutronix.de>	
- <20140103170724.GT7383@n2100.arm.linux.org.uk>	
- <1388770004.19394.42.camel@pizza.hi.pengutronix.de>	
- <52C70C1A.3090108@boundarydevices.com>	
- <1389030088.5590.30.camel@pizza.hi.pengutronix.de>	
- <20140106174606.GG27432@n2100.arm.linux.org.uk>	
- <52CB6719.6040604@boundarydevices.com>
- <1389094187.4815.24.camel@pizza.hi.pengutronix.de>
-Message-ID: <52CC1DA1.8030803@boundarydevices.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 16:35:01 +0100
+Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
+In-Reply-To: <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
+References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
+ <201401031049.20932.arnd@arndb.de>
+ <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
+Message-ID: <201401071635.02006.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Tuesday 07 January 2014, Tanmay Inamdar wrote:
+> On Fri, Jan 3, 2014 at 1:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> +Required properties:
+> >> +- status: Either "ok" or "disabled".
+> >> +- device_type: set to "pci"
+> >> +- compatible: should contain "xgene,pcie" to identify the core.
+> >> +- reg: base addresses and lengths of the pcie controller configuration
+> >> +     space register.
+> >> +- #address-cells: set to <3>
+> >> +- #size-cells: set to <2>
+> >> +- ranges: ranges for the PCI memory, I/O regions, config and MSI regions
+> >> +- #interrupt-cells: set to <1>
+> >> +- interrupt-map-mask and interrupt-map: standard PCI properties
+> >> +     to define the mapping of the PCIe interface to interrupt
+> >> +     numbers.
+> >> +- clocks: from common clock binding: handle to pci clock.
+> >> +- clock-names: from common clock binding. Should be "pcieclk".
+> >> +
+> >
+> > Better use an anonymous clock?
+> 
+> Sorry. Can you please elaborate?
 
-On 01/07/2014 04:29 AM, Philipp Zabel wrote:
-> Am Montag, den 06.01.2014, 19:31 -0700 schrieb Eric Nelson:
->> Hi Russell,
->>
->> On 01/06/2014 10:46 AM, Russell King - ARM Linux wrote:
->>> On Mon, Jan 06, 2014 at 06:41:28PM +0100, Philipp Zabel wrote:
->>>> Hi Eric,
->>>>
->>>> Am Freitag, den 03.01.2014, 12:14 -0700 schrieb Eric Nelson:
->>>>> This is an issue we've seen before. The SABRE Lite board has
->>>>> a voltage divider on the HPD pins and some monitors (esp. DVI
->>>>> monitors) either don't drive things high enough to assert HPD or
->>>>> bounce with connect/disconnect.
->>>>
->>>> Yes, I used a DVI monitor.
->>>>
->>>>> We've instrumented our 3.0.35 kernels to use the RX_SENSE bits
->>>>> instead.
->>>>
->>>> Reacting to RX_SENSE0 instead of HPD seems to work.
->>>
->>> However, it's non-compliant, because HPD can be lowered and raised by
->>> the sink when it changes its EDID data (eg, because you're connected
->>> through a switch and the routing has been changed.)
->>>
->>> So, reacting to RX_SENSE0 instead of HPD has to be a work-around enabled
->>> only for those boards which are broken in this regard.
->>>
->>
->> I understand. We'll need to carry some patches for a while though,
->> since there are lots of these boards in the wild.
->
-> Could you point me to your changes? Maybe this could be added to
-> mainline as a quirk enabled by a device tree property on sabrelite only.
->
+I mean drop the "clock-names" property.
 
-We only have them for 3.0.35 at the moment.
+> >> +SoC specific DT Entry:
+> >> +     pcie0: pcie at 1f2b0000 {
+> >> +             status = "disabled";
+> >> +             device_type = "pci";
+> >> +             compatible = "xgene,pcie";
+> >> +             #interrupt-cells = <1>;
+> >> +             #size-cells = <2>;
+> >> +             #address-cells = <3>;
+> >> +             reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
+> >> +             ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
+> >
+> >
+> > Also, do you support no prefetchable memory?
+> 
+> HW has either IO or Memory regions for mapping device's memory space.
+> There is no separate prefetchable memory space.
 
-Here's the patch to use RXSENSE instead of HPD
-	https://github.com/boundarydevices/linux-imx6/commit/c0439e262bb6c23887d96466b2ab7916aa0488d9
+Are you sure the memory is non-prefetchable then? I would have expected
+0x42000000 rather than 0x02000000, but I could be misremembering it.
 
-A follow-up patch disables the disconnect detection entirely
-unless requested:
-	https://github.com/boundarydevices/linux-imx6/commit/d9cd79d11ff9f7a7f89cbc94b68757b67cdfe5fc
+> >
+> >> +                       0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
+> >
+> > config space is not normally in the ranges property, and I think you will need
+> > it in the pcie node itself as a 'reg' property so the code can access it.
+> 
+> pcie-designware.c does it that way. I just followed their implementation.
 
-Regards,
+I don't remember what led to that, it still seems wrong and I can't find anything
+in the PCI binding for host bridges telling their config space this way.
 
+> >> +             interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+> >> +             interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
+> >
+> > Only one IRQ for all devices?
+> 
+> The node represents a port. I believe that Linux framework uses only
+> one of the legacy IRQs per port. Rest all remain unused. Hence I
+> removed them. Please correct me if I am wrong.
 
-Eric
+Any PCI device can normally have four interrupts (IntA through IntD), which are
+traditionally separate pins on a PCI bus, but get emulated on PCIe. While it's
+not common for any normal device to use more than one IRQ, a bridge device
+will swizzle these (virtual) IRQ lines, so a device behind the bridge actually
+gets a different host IRQ.
+
+	Arnd
