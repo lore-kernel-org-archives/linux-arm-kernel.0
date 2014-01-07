@@ -1,50 +1,66 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 07 Jan 2014 13:05:33 +0100
-Subject: ohci-at91 mismerge build error
-In-Reply-To: <20240208.HaoioSGuhF@wuerfel>
-References: <20240208.HaoioSGuhF@wuerfel>
-Message-ID: <52CBED8D.2010402@overkiz.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 7 Jan 2014 17:40:56 +0530
+Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
+ controller
+In-Reply-To: <3479510.EFrgCqQWpu@wuerfel>
+References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
+ <3479510.EFrgCqQWpu@wuerfel>
+Message-ID: <CAHbNUh2Y5JPwAWojJE8Chd6fi5Hbk9c2+11FVBhOA-3Rgr5WpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On 7 January 2014 17:27, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 07 January 2014 17:11:28 Tushar Behera wrote:
+>> Parsed auxiliary control properties for PL310 cache controller.
+>>
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>> ---
+>> These properties are set for Exynos4 platform. If we can pass these properties
+>> through device tree for Exynos4, then we can remove the hard-coded L2_AUX_VAL.
+>
+>
+> The explanation would be good to have in the actual changeset
 
-On 07/01/2014 12:54, Arnd Bergmann wrote:
-> After commit 99f14bd4d1 "Merge 3.13-rc5 into usb-next" (in linux-next as of
-> today), I'm getting this error building any at91 kernel:
->
-> drivers/usb/host/ohci-at91.c: In function 'usb_hcd_at91_probe':
-> drivers/usb/host/ohci-at91.c:190:4: error: label 'err' used but not defined
->      goto err;
->      ^
-> drivers/usb/host/ohci-at91.c: At top level:
-> drivers/usb/host/ohci-at91.c:206:2: warning: data definition has no type or storage class [enabled by default]
->    at91_stop_hc(pdev);
->    ^
-> ...
->
-> The problem is obviously a mismerge between two unrelated changes that
-> resulted in missing opening braces.
+Ok, I will add these explanation to comment section.
 
-Thanks for fixing this: I was about to propose the same patch to resolve
-the issue introduced by this merge (reported by Olof yesterday).
+> comment above the '---' line. Are all of them actually needed?
+> You shouldn't havet o set the ones that are already turned on
+> by the boot loader.
+
+These are the extra options that we used to pass in the kernel. For
+normal operation, I couldn't perceive any difference without these
+properties. The only reason for adding these properties was to be in
+sync with existing auxiliary control value.
+
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+>> index b513cb8..213546d 100644
+>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+>> @@ -44,6 +44,16 @@ Optional properties:
+>>  - cache-id-part: cache id part number to be used if it is not present
+>>    on hardware
+>>  - wt-override: If present then L2 is forced to Write through mode
+>> +- arm,early-write: If present then BRSEP mode (early write response) is enabled.
+>> +- arm,data-prefetch: If present then data prefetching is enabled.
+>> +- arm,instruction-prefetch: If present then instruction prefetching is enabled.
+>> +- arm,ns-interrupt-access: If present then interrupt mask and interrupt clear
+>> +  registers can be read or modified in both secure or non-secure accesses.
+>> +- arm,ns-lockdown: If present then non-secure accesses can write to lockdown
+>> +  register.
+>> +- arm,share-override: If present then shared attribute is ignored internally.
+>> +- arm,full-line-of-zero: If present then 'full line of write zero' behaviour is
+>> +  enabled.
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
-> Please just ignore if this has been reported before
+> Is it intentional that you have the "arm," prefix for the new ones, while
+> it's not there for the existing ones? Should we drop it for consistency?
 >
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 2d0ee5e..091ae49 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -197,7 +197,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   	at91_start_hc(pdev);
->   
->   	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
-> -	if (retval == 0)
-> +	if (retval == 0) {
->   		device_wakeup_enable(hcd->self.controller);
->   		return retval;
->   	}
->
+>         Arnd
+
+No specific reasons for this. I was following "arm,data-latency"
+format. We can drop the "arm," prefix.
+
+Thanks for the review.
+
+-- 
+Tushar Behera
