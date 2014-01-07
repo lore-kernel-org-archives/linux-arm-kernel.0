@@ -1,31 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Jan 2014 16:50:31 +0100
-Subject: [GIT PULL FOR v3.14] Renesas pinctrl fixes
-In-Reply-To: <1497178.A4PLILmBU4@avalon>
-References: <1497178.A4PLILmBU4@avalon>
-Message-ID: <CACRpkdZTt=yQGyzD3AnzKF3RjGiC4WdDX3yQY7zw68VFeYf5oQ@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 07 Jan 2014 15:50:45 +0000
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <1526599.nZ6xaI3TN3@avalon> (Laurent Pinchart's message of "Tue,
+ 07 Jan 2014 16:10:37 +0100")
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2090378.13zHUAnprd@avalon> <1526599.nZ6xaI3TN3@avalon>
+Message-ID: <86d2k37puy.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 9:42 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+Hi Laurent,
 
-> Hi Linus,
+On Tue, Jan 07 2014, Laurent Pinchart wrote:
+> Hi Chris,
 >
-> The following changes since commit 44a45b55a72754e5c9ed047179fb269b530f45fc:
+> On Wednesday 11 December 2013 13:53:21 Laurent Pinchart wrote:
+>> Hi Chris,
+>> 
+>> Could you please pick this patch (and patch 08/15 in the same series) up for
+>> v3.14 ?
 >
->   pinctrl: sh-pfc: ARM: Constify pins and cfg_regs arrays (2013-12-20 12:28:40
-> +0100)
->
-> are available in the git repository at:
->
->   git://linuxtv.org/pinchartl/fbdev.git pinmux/next/pfc
+> Ping ?
 
-Pulled into my pinctrl/devel branch for v3.14.
+Thanks, both pushed to mmc-next for 3.14, sorry for the delay.
 
-Now, what do I do about all the other Renesas pinctrl stuff that is
-floating? Like all the new stuff from Magnus &al? Do you keep track
-of that or should I start looking at it?
-
-Yours,
-Linus Walleij
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
