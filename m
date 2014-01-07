@@ -1,81 +1,149 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 7 Jan 2014 10:09:12 +0800
-Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
- framework
-In-Reply-To: <201401061641.03491.arnd@arndb.de>
-References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
- <201401061641.03491.arnd@arndb.de>
-Message-ID: <CAGsJ_4zE115p011hfDgzQPTUHUYk6WoQvw=vNSJP_yi=TvVkbg@mail.gmail.com>
+Date: Tue, 7 Jan 2014 10:19:30 +0800
+Subject: [PATCH v3] dmaengine: sirf: enable generic dt binding for dma
+ channels
+In-Reply-To: <20140106150936.GA24664@e106331-lin.cambridge.arm.com>
+References: <1389007012-10887-1-git-send-email-21cnbao@gmail.com>
+ <20140106150936.GA24664@e106331-lin.cambridge.arm.com>
+Message-ID: <CAGsJ_4wO33CUnB_oU27gd79i9ZyRyiG4bCZAW3h4YRM-0ODLeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/6 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 06 January 2014, Barry Song wrote:
->> this moves to generic IP module reset framework, and make other drivers
->> use common device_reset() API.
+Hi Mark,
+thanks!
+
+2014/1/6 Mark Rutland <mark.rutland@arm.com>:
+> On Mon, Jan 06, 2014 at 11:16:52AM +0000, Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
 >>
->> diff --git a/Documentation/devicetree/bindings/reset/sirf,rstc.txt b/Documentation/devicetree/bindings/reset/sirf,rstc.txt
+>> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
+>> we add a xlate() to let dma clients be able to find right dma_chan by generic
+>> "dmas" properties in dts.
+>>
+>> Cc: Lars-Peter Clausen <lars@metafoo.de>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  -v3:
+>>  drop unused variant cap pointed out by Lars-Peter;
+>>  add dt-binding document
+>>
+>>  .../devicetree/bindings/dma/sirfsoc-dma.txt        |   42 ++++++++++++++++++++
+>>  arch/arm/boot/dts/atlas6.dtsi                      |    4 ++
+>>  arch/arm/boot/dts/prima2.dtsi                      |    4 ++
+>>  drivers/dma/sirf-dma.c                             |   23 +++++++++++
+>>  4 files changed, 73 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt b/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
 >> new file mode 100644
->> index 0000000..0505de7
+>> index 0000000..262cf8c
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/sirf,rstc.txt
+>> +++ b/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
 >> @@ -0,0 +1,42 @@
->> +CSR SiRFSoC Reset Controller
->> +======================================
+>> +* CSR SiRFSoC DMA controller
 >> +
->> +Please also refer to reset.txt in this directory for common reset
->> +controller binding usage.
+>> +See dma.txt first
 >> +
 >> +Required properties:
->> +- compatible: Should be "sirf,prima2-rstc" or "sirf,marco-rstc"
->> +- reg: should be register base and length as documented in the
->> +  datasheet
->> +- #reset-cells: 1, see below
+>> +- compatible: Should be "sirf,prima2-dmac" or "sirf,marco-dmac"
+>> +- reg: Should contain DMA registers location and length.
+>> +- interrupts: Should contain one interrupt shared by all channel
+>> +- #dma-cells: see dma.txt, should be 1, para number
+>
+> para number?
+
+i copied the document from k3dma.txt and changed for sirfsoc. so
+missed this issue as well:
+
+# grep "para number" *
+k3dma.txt:- #dma-cells: see dma.txt, should be 1, para number
+
+>
+>> +- dma-channels: physical channels supported
+>> +- clocks: clock required
 >> +
->> +example:
+>> +Example:
 >> +
->> +rstc: reset-controller at 88010000 {
->> +     compatible = "sirf,prima2-rstc";
->> +     reg = <0x88010000 0x1000>;
->> +     #reset-cells = <1>;
+>> +Controller:
+>> +dmac0: dma-controller at b00b0000 {
+>> +     compatible = "sirf,prima2-dmac";
+>> +     reg = <0xb00b0000 0x10000>;
+>> +     interrupts = <12>;
+>> +     clocks = <&clks 24>;
 >> +};
 >
-> Binding looks good to me.
+> #dma-cells and dma-channels seem to be missing.
+
+real. #dma-cells is missed.
+
 >
->> +void __init sirfsoc_of_rstc_init(void)
+>> +
+>> +
+>> +Client:
+>> +Use specific request line passing from dmax
+>> +For example, spi0 read channel request line is 9 of the 2nd dma controller, while
+>> +write channel uses 4 of the 2nd dma controller; spi1 read channel request line is
+>> +12 of the 1st dma controller, while write channel uses 13 of the 1st dma controller.
+>
+> I think this should be described in the #dma-cells description, as this
+> described the meaning of the single dma cell.
+
+here it is explaining how to fill the client even though it is mapping
+with the #dma-cells of host.
+
+>
+>> +
+>> +spi0: spi at b00d0000 {
+>> +     compatible = "sirf,prima2-spi";
+>> +     dmas = <&dmac1 9>,
+>> +             <&dmac1 4>;
+>> +     dma-names = "rx", "tx";
+>> +};
+>> +
+>> +spi1: spi at b0170000 {
+>> +     compatible = "sirf,prima2-spi";
+>> +     dmas = <&dmac0 12>,
+>> +             <&dmac0 13>;
+>> +     dma-names = "rx", "tx";
+>> +};
+>> diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
+>> index b63cfef..aa3ff43 100644
+>> --- a/arch/arm/boot/dts/atlas6.dtsi
+>> +++ b/arch/arm/boot/dts/atlas6.dtsi
+>> @@ -260,6 +260,8 @@
+>>                               reg = <0xb00b0000 0x10000>;
+>>                               interrupts = <12>;
+>>                               clocks = <&clks 24>;
+>> +                             #dma-cells = <1>;
+>> +                             #dma-channels = <16>;
+>
+> is it dma-channels or #dma-channels? The document and examples differ.
+
+i realized i don't need dma-channels or #dma-channels at all as in
+sirfsoc, the number of channels of every dma controller is dedicated
+to SIRFSOC_DMA_CHANNELS(16). so i will drop the stuff.
+
+>
+> [...]
+>
+>> +static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
+>> +     struct of_dma *ofdma)
 >> +{
->> +     struct device_node *np = of_find_matching_node(NULL, rstc_ids);
->> +     if (!np) {
->> +             pr_err("unable to find compatible sirf rstc node in dtb\n");
->> +             return;
->> +     }
+>> +     struct sirfsoc_dma *sdma = ofdma->of_dma_data;
+>> +     unsigned int request = dma_spec->args[0];
 >> +
->> +     sirfsoc_rstc_base = of_iomap(np, 0);
->> +     if (!sirfsoc_rstc_base) {
->> +             pr_err("unable to map rstc cpu registers\n");
->> +             return;
->> +     }
+>> +     if (request > SIRFSOC_DMA_CHANNELS)
+>> +             return NULL;
 >> +
->> +     sirfsoc_reset_controller.of_node = np;
->> +
->> +     reset_controller_register(&sirfsoc_reset_controller);
->> +}
->> +
+>> +     return dma_get_slave_channel(&(sdma->channels[request].chan));
 >
-> Can't this be a regular platform device? Drivers that get the reference to
-> the reset controller should respect a -EPROBE_DEFER error message if they
-> get initialized in the wrong order.
+> Are the internal brackets necessary? "&" is lower precendence than "->",
+> "[]", and ".".
 
-Arnd, it is ok if prima2 is not a platform for automotive. here prima2
-actually wants a "right" order for products.
-for example, there are some local hacking to move camera for rearview
-started earlier than other devices as this feature needs to be ready
-as early as possible.
-some earlier boot devices depend on reset module to be ready. so if we
-move to regular platform driver for upstream, it still requires some
-local hacking to move it earlier.
+it is not a big issue. it seems more readable with this bracket.
 
 >
->         Arnd
+> Thanks,
+> Mark.
 
 -barry
