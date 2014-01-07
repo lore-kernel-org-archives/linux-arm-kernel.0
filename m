@@ -1,74 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jan 2014 15:06:31 +0000
-Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <20140107142929.GB8090@e102568-lin.cambridge.arm.com>
-References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
- <1387483575-11430-4-git-send-email-broonie@kernel.org>
- <20140107130540.GA8090@e102568-lin.cambridge.arm.com>
- <20140107133829.GF31886@sirena.org.uk>
- <20140107142929.GB8090@e102568-lin.cambridge.arm.com>
-Message-ID: <20140107150631.GJ31886@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 7 Jan 2014 15:09:21 +0000
+Subject: [PATCH] arm: mm: add memory type for inner-writeback
+In-Reply-To: <1388120328-17148-1-git-send-email-markz@nvidia.com>
+References: <1388120328-17148-1-git-send-email-markz@nvidia.com>
+Message-ID: <20140107150918.GA16947@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 02:29:29PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 07, 2014 at 01:38:29PM +0000, Mark Brown wrote:
-> > On Tue, Jan 07, 2014 at 01:05:40PM +0000, Lorenzo Pieralisi wrote:
+On Fri, Dec 27, 2013 at 04:58:48AM +0000, Mark Zhang wrote:
+> From: Colin Cross <ccross@android.com>
+> 
+> For streaming-style operations (e.g., software rendering of graphics
+> surfaces shared with non-coherent DMA devices), the cost of performing
+> L2 cache maintenance can exceed the benefit of having the larger cache
+> (this is particularly true for OUTER_CACHE configurations like the ARM
+> PL2x0).
+> 
+> This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
+> in the tex remapping tables as an inner-writeback-write-allocate, outer
+> non-cacheable memory type, so that this mapping will be available to
+> clients which will benefit from the reduced L2 maintenance.
+> 
+> Signed-off-by: Gary King <gking@nvidia.com>
 
-> > > It is time we defined what a "disabled" CPU means in ARM world, I need to
-> > > have a proper look into this since this topic has been brought up before.
+Is Colin signing off this patch as well?
 
-> > What is the confusion here - why would there be something architecture
-> > specific going on?
+> --- a/arch/arm/mm/proc-v7-2level.S
+> +++ b/arch/arm/mm/proc-v7-2level.S
+> @@ -144,8 +144,8 @@ ENDPROC(cpu_v7_set_pte_ext)
+>  	 *   NS1 = PRRR[19] = 1		- normal shareable property
+>  	 *   NOS = PRRR[24+n] = 1	- not outer shareable
+>  	 */
+> -.equ	PRRR,	0xff0a81a8
+> -.equ	NMRR,	0x40e040e0
+> +.equ	PRRR,	0xff0a89a8
+> +.equ	NMRR,	0x40e044e0
 
-> I think this check was added following this thread discussion:
+It should be done for the *-3level files.
 
-> http://lkml.indiana.edu/hypermail/linux/kernel/1306.0/03663.html
-
-> So my question is: what does "disabled" mean ? A CPU present in HW
-> that can't/must not be booted ?
-
-Yes, that would seem to be the obvious meaning and consistent with ePAPR
-(in so far as we're paying a blind bit of notice to ePAPR, see other
-threads...).
-
-> ePAPR v1.1 page 43:
-
-> "disabled". The CPU is in a quiescent state. A quiescent CPU is in a state
-> where it cannot interfere with the normal operation of other CPUs, nor can
-> its state be affected by the normal operation of other running CPUs, except
-> by an explicit method for enabling or reenabling the quiescent CPU (see the
-> enable-method property).
-
-> This means that a "disabled" CPU can be booted with eg PSCI but that is
-> not what the thread in the link above wants to achieve. Furthermore, if
-
-I think that's just another bit of ill considered wording from ePAPR
-that doesn't really reflect reality; it seems like what they're trying
-to shoot for there is administratively down.  
-
-At the very least that means hot unplugged, and it seems reasonable to
-read that as being stronger than that.  The current ARM implementation
-is more conservative since it doesn't provide any way to put the core on
-line but it does seem more likely to match what a system integrator
-would be trying to achieve and it also matches the standard meaning of
-disabled.
-
-> we add the check in topology.c, the check must be executed also when
-> building the cpu_logical_map, otherwise a "disabled" cpu would be marked
-> possible and then booted, am I wrong ?
-
-Right, this is a separate issue in the SMP enumeration code - it should
-be paying attention to the property and at the very least defaulting the
-core to being unplugged, though like I say I do find the ARM meaning
-more sane.
-
-In any case I don't vastly care, I guess I'll drop this for now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/b9590c39/attachment-0001.sig>
+-- 
+Catalin
