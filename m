@@ -1,53 +1,26 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Tue, 07 Jan 2014 12:41:42 +0000
-Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
- controller
-In-Reply-To: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
-References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <52CBF606.5080209@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 7 Jan 2014 20:45:46 +0800
+Subject: [PATCHv3][ 1/2] ARM: dts: imx53: Add gpio and input dt includes.
+In-Reply-To: <1389024968-20242-1-git-send-email-denis@eukrea.com>
+References: <1389024968-20242-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140107124544.GG12346@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 11:41, Tushar Behera wrote:
-> Parsed auxiliary control properties for PL310 cache controller.
+On Mon, Jan 06, 2014 at 05:16:07PM +0100, Denis Carikli wrote:
+> This is to permit to use of the includes in the boards dts.
 > 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
-> These properties are set for Exynos4 platform. If we can pass these properties
-> through device tree for Exynos4, then we can remove the hard-coded L2_AUX_VAL.
-> 
->  Documentation/devicetree/bindings/arm/l2cc.txt |   10 ++++++++++
->  arch/arm/include/asm/hardware/cache-l2x0.h     |    1 +
->  arch/arm/mm/cache-l2x0.c                       |   25 ++++++++++++++++++++++++
->  3 files changed, 36 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index b513cb8..213546d 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -44,6 +44,16 @@ Optional properties:
->  - cache-id-part: cache id part number to be used if it is not present
->    on hardware
->  - wt-override: If present then L2 is forced to Write through mode
-> +- arm,early-write: If present then BRSEP mode (early write response) is enabled.
-> +- arm,data-prefetch: If present then data prefetching is enabled.
-> +- arm,instruction-prefetch: If present then instruction prefetching is enabled.
-> +- arm,ns-interrupt-access: If present then interrupt mask and interrupt clear
-> +  registers can be read or modified in both secure or non-secure accesses.
-> +- arm,ns-lockdown: If present then non-secure accesses can write to lockdown
-> +  register.
-> +- arm,share-override: If present then shared attribute is ignored internally.
-> +- arm,full-line-of-zero: If present then 'full line of write zero' behaviour is
-> +  enabled.
->  
-Hi Tushar,
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-This has been discussed couple of times in past[1][2], and the opinion was not
-to have these in DT as they are more configuration data than the actual hardware
-description.
-
-Regards,
-Sudeep
-
-[1] https://lkml.org/lkml/2013/11/7/8
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185610.html
+Applied, thanks.
