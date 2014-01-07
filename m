@@ -1,38 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  7 Jan 2014 17:48:01 +0900
-Subject: [PATCH 1/8] ARM: shmobile: ape6evm: Conditionally select SMSC_PHY
+Date: Tue,  7 Jan 2014 17:48:03 +0900
+Subject: [PATCH 3/8] ARM: shmobile: bockw: Sort Kconfig node's selections
 In-Reply-To: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
 References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1389084488-25984-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1389084488-25984-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ape6evm board uses has an SMSC911X ethernet controller which uses an
-SMSC phy. Select SMSC_PHY for ape6evm if SMSC911X is enabled to make use of the
-SMSC-specific phy driver rather than relying on the generic phy driver.
-
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-shmobile/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 958ccf3d..2673f68 100644
+index b624b5a..6f16983 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -156,11 +156,13 @@ comment "Renesas ARM SoCs Board Type"
- config MACH_APE6EVM
- 	bool "APE6EVM board"
- 	depends on ARCH_R8A73A4
-+	select SMSC_PHY if SMSC911X
- 	select USE_OF
+@@ -207,11 +207,11 @@ config MACH_BOCKW
+ 	bool "BOCK-W platform"
+ 	depends on ARCH_R8A7778
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select RENESAS_INTC_IRQPIN
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select USE_OF
++	select RENESAS_INTC_IRQPIN
+ 	select SND_SOC_AK4554 if SND_SIMPLE_CARD
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
++	select USE_OF
  
- config MACH_APE6EVM_REFERENCE
- 	bool "APE6EVM board - Reference Device Tree Implementation"
- 	depends on ARCH_R8A73A4
-+	select SMSC_PHY if SMSC911X
- 	select USE_OF
- 	---help---
- 	   Use reference implementation of APE6EVM board support
+ config MACH_BOCKW_REFERENCE
+ 	bool "BOCK-W  - Reference Device Tree Implementation"
 -- 
 1.8.4
