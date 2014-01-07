@@ -1,71 +1,36 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Tue, 07 Jan 2014 16:43:27 +0000
-Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
- controller
-In-Reply-To: <6680044.VpT1oREkGO@wuerfel>
-References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
- <4325123.pn10H18tk9@wuerfel> <52CC2381.2090905@arm.com>
- <6680044.VpT1oREkGO@wuerfel>
-Message-ID: <52CC2EAF.7050800@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 07 Jan 2014 09:43:43 -0700
+Subject: [PATCH] ARM: tegra: Remove 3.3V supply and modem regulators
+In-Reply-To: <52CBEF89.6090901@nvidia.com>
+References: <1389021933-6675-1-git-send-email-treding@nvidia.com>
+ <52CB192F.2020700@wwwdotorg.org> <52CBEF89.6090901@nvidia.com>
+Message-ID: <52CC2EBF.60106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 16:12, Arnd Bergmann wrote:
-> On Tuesday 07 January 2014 15:55:45 Sudeep Holla wrote:
->> On 07/01/14 12:54, Arnd Bergmann wrote:
->>> On Tuesday 07 January 2014 12:41:42 Sudeep Holla wrote:
->>>> Hi Tushar,
->>>>
->>>> This has been discussed couple of times in past[1][2], and the opinion was not
->>>> to have these in DT as they are more configuration data than the actual hardware
->>>> description.
->>>
->>> How do you suggest we get rid of the magic constants in platform code then?
->>> I definitely don't want to keep the current state, and having configuration
->>> data in DT seems the lesser evil.
->>>
+On 01/07/2014 05:14 AM, Laxman Dewangan wrote:
+> On Tuesday 07 January 2014 02:29 AM, Stephen Warren wrote:
+>> On 01/06/2014 08:25 AM, Thierry Reding wrote:
+>>> GPIO 1 and 2 of the PMIC are not used for the described purpose, so
+>>> remove them.
+>> As far as I can tell, this patch is correct, since those GPIOs are in
+>> fact used to discharge the rails after disabling them, rather than to
+>> enable/disable the rails.
 >>
->> I agree, but since these are more L2CC configuration than hardware description,
->> IMO chosen node is one option. However it's good to get opinion from DT guys.
-> 
-> I think one of the discussions we had during the Edinburgh kernel summit resulted
-> in being more relaxed towards configuration data in device nodes.
-> 
-
-Ok.
-
->>> Are there some reasonable defaults that Linux could use independent of the
->>> platform and of what the boot loader defaults to?
->>>
+>> Equally, these GPIOs affect multiple rails at once, so listing the GPIO
+>> as a property of a single regulator seems wrong either way.
 >>
->> Most of these registers can't be programmed in Non-secure mode. So as mentioned
->> already in previous discussions it is better to avoid these settings in kernel.
->> It would be better if bootloader programs these settings even if Linux runs in
->> secure mode for simplicity.
-> 
-> Yes, that would be ideal, but I fear we have to live with the boot loaders that
-> are in existence already. Whether or not the registers can be programmed in
-> non-secure mode is certainly a piece of information that belongs into the DT
-> node, so we don't try to write them when we shouldn't. We could also have a
+>> However, PMU_REGEN1 does seem to feed the "EN" pin of U13C1, a DC/DC
+>> switcher for power rail 3.3v_modem, so perhaps there's more going on
+>> here than I see?
+>>
+>> In summary, I need Laxman to comment on this and ack the change, and
+>> explain why these GPIOs were listed as regulator enables when it doesn't
+>> seem that they are.
+>>
+> PMU_REGEN1 is going to U13C1 (DCDC switcher). So if EN is 0, the output
+> will be 0 and when it is 1, the output will be 3.3V.
+> Because this is coming from GPIO, it is added as the fixed regulator.
 
-But the main problem is that there is no way to detect the current mode (i.e.
-secure or non-secure). So it won't be of any help even if we can get these
-information from DT. It's better to assume Linux runs in non-secure mode and
-avoid using any registers with secure only access. Any attempt to such
-restricted access in non-secure mode results in error.
-
-> property that identifies whether the boot loader has in fact set up the cache
-> controller correctly or whether Linux has to do it. There should be no
-> argument about this being out of scope, since it describes a platform property
-> (presence of a sane boot loader) rather than the actual configuration.
-> 
-> If we decide to have such properties and we boot on a system where we can
-> and should change the settings, is there a way for Linux to know what the
-> settings are supposed to be other than reading them from a DT file or
-> from a per-platform default?
-> 
-
-Yes I understand, but for above mentioned reason it's difficult.
-
-Regards,
-Sudeep
+What about PMU_REGEN3, for which that isn't the case, and what about the
+fact that PMU_REGEN1 does a lot more than just enable that DC/DC switcher?
