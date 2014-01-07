@@ -1,52 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jan 2014 08:23:49 +0000
-Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
-In-Reply-To: <52CAF1FF.9090709@wwwdotorg.org>
-References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
- <20131211092435.GC16780@lee--X1> <52B32C05.5010204@wwwdotorg.org>
- <20131220142530.GK3709@lee--X1> <52CAF1FF.9090709@wwwdotorg.org>
-Message-ID: <20140107082349.GC3182@lee--X1>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 7 Jan 2014 15:52:19 +0800
+Subject: [PATCH] ARM: dts: vf610: use the interrupt macros
+In-Reply-To: <20140106060429.GC27227@S2101-09.ap.freescale.net>
+References: <1387952367-6321-1-git-send-email-b32955@freescale.com>
+ <20140106060429.GC27227@S2101-09.ap.freescale.net>
+Message-ID: <20140107075217.GA27279@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Please let me know if this is suitable and I can keep your Ack.
-> 
-> This patch doesn't seem to have made it into next-20140106. I assume
-> that's just because of the holidays, not because it was forgotten?
-
-Right, it was pushed yesterday morning.
-
-> > ----
+On Mon, Jan 06, 2014 at 02:04:33PM +0800, Shawn Guo wrote:
+> On Wed, Dec 25, 2013 at 02:19:27PM +0800, Huang Shijie wrote:
+> > This patch uses the IRQ_TYPE_LEVEL_HIGH/IRQ_TYPE_NONE to replace
+> > the hardcode.
 > > 
-> > mfd: Revert "mfd: Always assign of_node in mfd_add_device()"
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/vf610.dtsi |   37 +++++++++++++++++++------------------
+> >  1 files changed, 19 insertions(+), 18 deletions(-)
 > > 
-> > This reverts commit 68044bee13770918e0b28dd44aa98c889ec7558f.
-> > 
-> > We've had confirmed reports of this patch causing unforeseen issues
-> > with existing MFD users. It has been agreed by the original author
-> > and myself that reversion is the best solution.
-> > 
-> > Acked-by: Stephen Warren <swarren@nvidia.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-> > index 32e8d47..2676492 100644
-> > --- a/drivers/mfd/mfd-core.c
-> > +++ b/drivers/mfd/mfd-core.c
-> > @@ -117,8 +117,6 @@ static int mfd_add_device(struct device *parent, int id,
-> >  			}
-> >  		}
-> >  	}
-> > -	if (!pdev->dev.of_node)
-> > -		pdev->dev.of_node = parent->of_node;
+> > diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> > index ef8a0ee..cd5bb86 100644
+> > --- a/arch/arm/boot/dts/vf610.dtsi
+> > +++ b/arch/arm/boot/dts/vf610.dtsi
+> > @@ -10,6 +10,7 @@
+> >  #include "skeleton.dtsi"
+> >  #include "vf610-pingrp.h"
+> >  #include <dt-bindings/clock/vf610-clock.h>
+> > +#include <dt-bindings/interrupt-controller/irq.h>
 > >  
-> >  	if (cell->pdata_size) {
-> >  		ret = platform_device_add_data(pdev,
-> > 
+> >  / {
+> >  	aliases {
+> > @@ -90,7 +91,7 @@
+> >  			uart0: serial at 40027000 {
+> >  				compatible = "fsl,vf610-lpuart";
+> >  				reg = <0x40027000 0x1000>;
+> > -				interrupts = <0 61 0x00>;
 > 
+> Why is it so special having a 0x00 IRQ trigger type?  Or is it just a
+> typo?  While we are at it, we should probably fix it if it's a typo.
+hi Jingchang:
+  i think it is a typo.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+do you any idea about it?
+
+thanks
+Huang Shijie	
+> 
+> Shawn
+> 
+> > +				interrupts = <0 61 IRQ_TYPE_NONE>;
+> >  				clocks = <&clks VF610_CLK_UART0>;
+> >  				clock-names = "ipg";
+> >  				status = "disabled";
+> > @@ -99,7 +100,7 @@
+> >  			uart1: serial at 40028000 {
+> >  				compatible = "fsl,vf610-lpuart";
+> >  				reg = <0x40028000 0x1000>;
+> > -				interrupts = <0 62 0x04>;
+> > +				interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+> >  				clocks = <&clks VF610_CLK_UART1>;
+> >  				clock-names = "ipg";
+> >  				status = "disabled";
