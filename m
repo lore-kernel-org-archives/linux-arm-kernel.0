@@ -1,50 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 Jan 2014 21:53:34 +0800
-Subject: [PATCH] ARM: dts: imx6sl: add ocram driver support
-In-Reply-To: <1389041857-18512-1-git-send-email-b20788@freescale.com>
-References: <1389041857-18512-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140107135332.GK12346@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Jan 2014 14:55:35 +0100
+Subject: [PATCH] ARM: ux500: turn on PRINTK_TIME in u8500_defconfig
+In-Reply-To: <1387225585-14107-1-git-send-email-olof@lixom.net>
+References: <1387225585-14107-1-git-send-email-olof@lixom.net>
+Message-ID: <CACRpkdYuJTZdxV_vgHBuFuCY300aEW7e2MrFM1mvhr1y5i3XZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 03:57:37PM -0500, Anson Huang wrote:
-> Add ocram driver support on i.MX6SL.
+On Mon, Dec 16, 2013 at 9:26 PM, Olof Johansson <olof@lixom.net> wrote:
 
-s/driver/device, both commit log and patch subject.
+> I recently noticed slow booting of a board, and without printk timestamps it's
+> harder to tell just where the delays are coming from. Enable it.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6sl.dtsi |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index b526118..575e222 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -532,6 +532,12 @@
->  				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
->  			};
->  
-> +			ocram: sram at 00900000 {
-> +				compatible = "mmio-sram";
-> +				reg = <0x00900000 0x20000>;
-> +				clocks = <&clks IMX6SL_CLK_OCRAM>;
-> +			};
-> +
+Patch applied.
 
-When a node is named in form of name at num, we should sort the node in num
-order.  That said, the node should be added before l2-cache at 00a02000
-rather than here.
+I'll take a sweep on other ux500 misc patches and provide a pull
+request to you get this back to ARM SoC by pingpong.
 
-I fixed them all up, and applied the patch.
-
-Shawn
-
->  			src: src at 020d8000 {
->  				compatible = "fsl,imx6sl-src", "fsl,imx51-src";
->  				reg = <0x020d8000 0x4000>;
-> -- 
-> 1.7.9.5
-> 
-> 
+Yours,
+Linus Walleij
