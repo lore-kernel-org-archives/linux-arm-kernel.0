@@ -1,26 +1,24 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  7 Jan 2014 16:47:17 -0700
-Subject: [PATCH 2/2] ARM: tegra: enable LCD panel on Ventana
-In-Reply-To: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
-References: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1389138437-4686-2-git-send-email-swarren@wwwdotorg.org>
+Date: Tue,  7 Jan 2014 16:47:16 -0700
+Subject: [PATCH 1/2] ARM: tegra: enable LCD panel on Seaboard
+Message-ID: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Ventana uses a CLAA101WA01A LCD panel. Enable the relevant display
+Seaboard uses a CLAA101WA01A LCD panel. Enable the relevant display
 controller, backlight, and regulators.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-ventana.dts | 39 ++++++++++++++++++++++++++++++++---
- 1 file changed, 36 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/tegra20-seaboard.dts | 55 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 54 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 571d12e6ac2d..93cbb9928e1d 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index a11b6e7b4759..f4443c1eaba7 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
 @@ -17,6 +17,14 @@
  	};
  
@@ -36,7 +34,7 @@ index 571d12e6ac2d..93cbb9928e1d 100644
  		hdmi at 54280000 {
  			status = "okay";
  
-@@ -309,6 +317,10 @@
+@@ -312,6 +320,10 @@
  		status = "okay";
  	};
  
@@ -47,7 +45,7 @@ index 571d12e6ac2d..93cbb9928e1d 100644
  	i2c at 7000c000 {
  		status = "okay";
  		clock-frequency = <400000>;
-@@ -359,7 +371,7 @@
+@@ -369,7 +381,7 @@
  			#size-cells = <0>;
  		};
  
@@ -56,7 +54,7 @@ index 571d12e6ac2d..93cbb9928e1d 100644
  			reg = <1>;
  			#address-cells = <1>;
  			#size-cells = <0>;
-@@ -557,6 +569,17 @@
+@@ -762,6 +774,17 @@
  		non-removable;
  	};
  
@@ -74,7 +72,7 @@ index 571d12e6ac2d..93cbb9928e1d 100644
  	clocks {
  		compatible = "simple-bus";
  		#address-cells = <1>;
-@@ -581,6 +604,16 @@
+@@ -795,6 +818,16 @@
  		};
  	};
  
@@ -91,23 +89,32 @@ index 571d12e6ac2d..93cbb9928e1d 100644
  	regulators {
  		compatible = "simple-bus";
  		#address-cells = <1>;
-@@ -614,7 +647,7 @@
- 			enable-active-high;
+@@ -839,6 +872,26 @@
+ 			regulator-always-on;
+ 			regulator-boot-on;
  		};
++
++		vdd_pnl_reg: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			regulator-name = "vdd_pnl";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <2800000>;
++			gpio = <&gpio TEGRA_GPIO(C, 6) GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++
++		vdd_bl_reg: regulator at 5 {
++			compatible = "regulator-fixed";
++			reg = <5>;
++			regulator-name = "vdd_bl";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <2800000>;
++			gpio = <&gpio TEGRA_GPIO(W, 0) GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
+ 	};
  
--		regulator at 3 {
-+		vdd_pnl_reg: regulator at 3 {
- 			compatible = "regulator-fixed";
- 			reg = <3>;
- 			regulator-name = "vdd_pnl";
-@@ -624,7 +657,7 @@
- 			enable-active-high;
- 		};
- 
--		regulator at 4 {
-+		vdd_bl_reg: regulator at 4 {
- 			compatible = "regulator-fixed";
- 			reg = <4>;
- 			regulator-name = "vdd_bl";
+ 	sound {
 -- 
 1.8.1.5
