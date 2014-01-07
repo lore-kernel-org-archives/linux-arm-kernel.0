@@ -1,48 +1,118 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 07 Jan 2014 10:18:05 +0100
-Subject: [PATCH 4/5] fb: Add DCU framebuffer driver for Vybrid VF610
- platform
-In-Reply-To: <87eh4laqse.fsf@nbsps.com>
-References: <1373609276-14566-1-git-send-email-b18965@freescale.com>
- <1373609276-14566-5-git-send-email-b18965@freescale.com>
- <20130729111457.GB3029@pengutronix.de> <87eh4laqse.fsf@nbsps.com>
-Message-ID: <1389086285.4244.3.camel@weser.hi.pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 10:27:59 +0100
+Subject: [RFC PATCH 1/3] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <CACoXjck9KvQjB-8t3GYa95pZ6AwAyhyRKVg=5CYog_nFAfCiAQ@mail.gmail.com>
+References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
+ <201401031307.50312.arnd@arndb.de>
+ <CACoXjck9KvQjB-8t3GYa95pZ6AwAyhyRKVg=5CYog_nFAfCiAQ@mail.gmail.com>
+Message-ID: <201401071028.00225.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 06.01.2014, 13:50 -0500 schrieb Bill Pringlemeir:
-> > On Fri, Jul 12, 2013 at 02:07:55PM +0800, Alison Wang wrote:
-> >> The Display Controller Unit (DCU) module is a system master that
-> >> fetches graphics stored in internal or external memory and displays
-> >> them on a TFT LCD panel. A wide range of panel sizes is supported
-> >> and the timing of the interface signals is highly configurable.
-> >> Graphics are read directly from memory and then blended in real-time,
-> >> which allows for dynamic content creation with minimal CPU intervention.
+On Tuesday 07 January 2014, Tanmay Inamdar wrote:
+> > Also, the implementation is wrong since the I/O port range already needs
+> > to be ioremapped in order for inb/outb to work. There is already a
+> > generic implementation of this in include/asm-generic/iomap.h, which
+> > correctly calls ioport_map. Make sure that arm64 uses this implementation
+> > and provides an ioport_map() function like
+> >
+> > static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+> > {
+> >         return PCI_IOBASE + port;
+> > }
 > 
-> On 29 Jul 2013, s.hauer at pengutronix.de wrote:
-> 
-> > Maybe the real question is whether we want to introduce another
-> > framebuffer driver at all instead of making it a DRM driver.
-> 
-> I didn't understand this comment at first.  I thought that the DRM
-> infra-structure had changed or something.  I see a recent post on
-> IMX-DRM and I think there is a mis-conception on the Vybrid SOC.
-> 
-> At first, Freescale was to incorporate a Vivante GC355 GPU for OpenVG.
-> However, this was removed from the design and is only present on some
-> 'Automotive' parts, and not the VF610 nor the Tower boards.  These SOCs
-> only have a multi-level framebuffer with alpha blending.  Was it meant
-> that this be part of the DRM?  It seems that the hardware without the
-> 'Vivante GC355 GPU' is best served by an fb driver.  
+> For X-Gene, IO regions are memory mapped IO regions. So I am not sure
+> if 'ioport_map'
+> would work.
 
-Exactly the multi-level part of the hardware should preferably be
-programmed through the standardized plane stuff in the KMS userspace
-interface, which is part of DRM.
+It should. In fact all ARM and ARM64 platforms I have seen (and most powerpc
+ones) have their IO region memory mapped. The way we handle this in Linux
+is to map the IO space to a fixed virtual address at the time the host
+controller is initialized, and all accesses to an IO port translate to
+a access in this virtual address. See the inb()/outb() implementation on
+arm and arm64, as well as the arm pci_ioremap_io() function for more
+details.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> >> +static void xgene_pcie_setup_lanes(struct xgene_pcie_port *port)
+> >> +{
+> >> +     void *csr_base = port->csr_base;
+> >> +     u32 val;
+> >> +
+> > ...
+> >> +static void xgene_pcie_setup_link(struct xgene_pcie_port *port)
+> >> +{
+> >> +     void *csr_base = port->csr_base;
+> >> +     u32 val;
+> >> +
+> >
+> > Don't these belong into the PHY driver? Can the setup be done in the
+> > firmware instead so we don't have to bother with it in Linux?
+> > Presumably you already need PCI support at boot time already if
+> > you want to boot from a PCI device.
+> 
+> They do look like phy setup functions but they are part of PCIe core
+> register space.
+
+Ok.
+
+> >> +static void xgene_pcie_config_pims(void *csr_base, u32 addr,
+> >> +                                u64 pim, resource_size_t size)
+> >> +{
+> >> +     u32 val;
+> >> +
+> >> +     xgene_pcie_out32(csr_base + addr, lower_32_bits(pim));
+> >> +     val = upper_32_bits(pim) | EN_COHERENCY;
+> >> +     xgene_pcie_out32(csr_base + addr + 0x04, val);
+> >> +     xgene_pcie_out32(csr_base + addr + 0x08, 0x0);
+> >> +     xgene_pcie_out32(csr_base + addr + 0x0c, 0x0);
+> >> +     val = lower_32_bits(size);
+> >> +     xgene_pcie_out32(csr_base + addr + 0x10, val);
+> >> +     val = upper_32_bits(size);
+> >> +     xgene_pcie_out32(csr_base + addr + 0x14, val);
+> >> +}
+> >
+> > I suspect this is for programming the inbound translation window for
+> > DMA transactions (maybe add a comment?), and the second 64-bit word is
+> > for the bus-side address. Are you sure you want a translation starting
+> > at zero, rather than an identity-mapping like this?
+> 
+> Actually it is an unused sub-region. I will remove setting to 0. It
+> defaults to 0 anyways.
+
+Is it always an identity-mapping then?
+
+> >> +struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+> >> +{
+> >> +     struct xgene_pcie_port *port = xgene_pcie_bus_to_port(bus);
+> >> +
+> >> +     return of_node_get(port->node);
+> >> +}
+> >
+> > Another pointless wrapper to remove.
+> 
+> If I remove this, then we get a failure while parsing irqs
+> "pci 0000:00:00.0: of_irq_parse_pci() failed with rc=-22"
+
+I mean it would be just as easy to open-code the function in the
+callers, and more readable.
+
+> >> +static int xgene_pcie_populate_inbound_regions(struct xgene_pcie_port *port)
+> >> +{
+> >> +     struct resource *msi_res = &port->res[XGENE_MSI];
+> >> +     phys_addr_t ddr_size = memblock_phys_mem_size();
+> >> +     phys_addr_t ddr_base = memblock_start_of_DRAM();
+> >
+> > This looks fragile. What about discontiguous memory? It's probably better to
+> > leave this setup to the firmware, which already has to do it.
+> 
+> Idea is to map whole RAM. The memory controller in X-Gene does not
+> allow holes or discontinuity in RAM.
+
+There might be holes in the memory map for other reasons, e.g. some part of
+memory could be reserved for use by a particular piece of software.
+There is actually a definition for a "dma-ranges" property that is normally
+use to communicate this information, i.e. which bus addresses for DMA
+translate into which parent bus (or memory) addresses. I think it would
+be more logical to use that property.
+
+	Arnd
