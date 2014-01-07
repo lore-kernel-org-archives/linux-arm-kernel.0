@@ -1,39 +1,44 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 07 Jan 2014 20:12:42 +0100
-Subject: [PATCH] ARM: s3c24xx: fix build error
-In-Reply-To: <1389119245-2167-1-git-send-email-linus.walleij@linaro.org>
-References: <1389119245-2167-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <22410027.ZzM9gppO8W@phil>
+Date: Tue, 07 Jan 2014 20:36:22 +0100
+Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
+References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
+ <201401071215.06064.arnd@arndb.de>
+ <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
+Message-ID: <3906866.u3Hx8EuvTo@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. Januar 2014, 19:27:25 schrieb Linus Walleij:
-> When enabling device tree on the S3C an additional build
-> bug appears in the Osiris DVS board file:
+Am Dienstag, 7. Januar 2014, 19:27:49 schrieb Linus Walleij:
+> On Tue, Jan 7, 2014 at 12:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 13 December 2013, Linus Walleij wrote:
+> > * The file includes <plat/gpio-cfg.h>, which is not a bug yet, but
+> > 
+> >   will be once we move s3c24xx to multiplatform, which would make
+> >   it impossible to include this file from outside of arch/arm.
 > 
-> CC  arch/arm/mach-s3c24xx/mach-osiris-dvs.o
-> archh/arm/mach-s3c24xx/mach-osiris-dvs.c:
-> In function ?osiris_dvs_notify?:
-> arch/arm/mach-s3c24xx/mach-osiris-dvs.c:77:4:
-> error: implicit declaration of function ?S3C2410_GPB?
-> [-Werror=implicit-function-declaration]
->     gpio_set_value(OSIRIS_GPIO_DVS, 1);
->     ^
+> Yes that needs to be a step for multiplatform enablement.
+> My series only tries to make the problem smaller and remove
+> the dependence on <mach/gpio.h>. All the <mach/*> and
+> <plat/*> stuff needs to go away eventually ...
+>
+> > Note that on Exynos, the solution for the gpio driver dependencies
+> > was to scrap the driver and use pinctrl-exynos instead.
 > 
-> Fix this by explicitly including
-> <linux/platform_data/gpio-samsung-s3c24xx.h>
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> I have tentatively applied this to the GPIO tree so I
-> don't cause build regressions, ACKs are still
-> appreciated from the S3C maintainers.
+> I think the S3C driver is a different piece of hardware unfortunately.
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+both the s3c24xx as well as the exynos pinctrl driver use the common pinctrl-
+samsung infrastructure. The biggest part of the pinctrl-{exynos,s3c24xx} 
+drivers is the handling of the gpio-interrupts and defining the available 
+banks.
+
+In general my multiplatform-plan is to provide the basics (pinctrl, common-
+clock, etc) and then take the easy way out, described in some arm-summit-notes 
+by simply removing the boards and let people with the hardware that care about 
+it readd the specifics :-) .
+
+For example it seems nobody started a S3C2442 machine for quite some time, as 
+it was/is missing the clkdev entries for stuff like the serial ports.
+
+
+Heiko
