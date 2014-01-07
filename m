@@ -1,96 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 20:52:30 +0100
-Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
-In-Reply-To: <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
-References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
- <201401071215.06064.arnd@arndb.de>
- <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
-Message-ID: <201401072052.30599.arnd@arndb.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 7 Jan 2014 20:53:41 +0100
+Subject: [PATCH 1/3] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
+In-Reply-To: <11491980.GOk5XT7hjl@avalon>
+References: <1388763256-25851-1-git-send-email-geert@linux-m68k.org>
+ <1388763256-25851-2-git-send-email-geert@linux-m68k.org>
+ <11491980.GOk5XT7hjl@avalon>
+Message-ID: <CAMuHMdVuDWi+6LCscS0U8vVV=VXXSwXJoTSdokdNjYWHP_8QoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Linus Walleij wrote:
-> On Tue, Jan 7, 2014 at 12:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 13 December 2013, Linus Walleij wrote:
-> 
-> Hm. I just compiled this defconfig on linux-next:
-> 
->   AS      arch/arm/boot/compressed/lib1funcs.o
->   AS      arch/arm/boot/compressed/ashldi3.o
->   AS      arch/arm/boot/compressed/bswapsdi2.o
->   CC      arch/arm/boot/compressed/decompress.o
->   CC      arch/arm/boot/compressed/misc.o
->   GZIP    arch/arm/boot/compressed/piggy.gzip
->   AS      arch/arm/boot/compressed/piggy.gzip.o
->   LD      arch/arm/boot/compressed/vmlinux
->   OBJCOPY arch/arm/boot/zImage
->   Kernel: arch/arm/boot/zImage is ready
-> 
-> It appears that these problems appear if you explicitly
-> enable the DT board support, can't we just put that into
-> the defconfig then, so we don't miss such things?
+On Tue, Jan 7, 2014 at 3:58 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> +static const unsigned int qspi_pins[] = {
+>> +     /* SPCLK, MOSI_IO0, MISO_IO1, IO2, IO3, SSL */
+>> +     RCAR_GP_PIN(1, 4), RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6),
+>> +     RCAR_GP_PIN(1, 7), RCAR_GP_PIN(1, 8), RCAR_GP_PIN(1, 9),
+>> +};
+>
+> The QSPI controller can be used in 1-bit, 2-bit or 4-mode mode, so you should
+> split the pins group to allow that. You could use one pin group for the
+> control signals (SPCLK and SSL), one group for 2-bit data (MOSI + MISO, or IO0
+> + IO1 depending on the mode) and one group for 4-bit data (IO0 + IO1 + IO2 +
+> IO3).
 
-I don't understand. I didn't enable it manually and
-I still get it on linux-next-20130107. Maybe you were
-still on the older linux-next that had not been updated
-for some time?
+OK, while you can't mix "real" functions (half of the pins are FN2, the other
+half FN3), I forgot you can still configure the SoC to use IO2 and IO3 for GPIO.
 
-> > Two problems:
-> >
-> > * Some files that use functions or macros defined in this file
-> >   fail to include it. I see drivers/leds/leds-s3c24xx.c
-> 
-> I merged a patch fixing this by having that file explicitly include
-> <plat/gpip-cfg.h> (it was already including it implicitly).
-> 
-> > and
-> >   mach-osiris-dvs.c,
-> 
-> It needs this:
-> #include <linux/platform_data/gpio-samsung-s3c24xx.h>
-> 
-> (I have sent a patch.)
+Will split in qspi_ctrl (2 control wires), qspi_data2 (2 data wires),
+and qspi_data4 (4 data wires).
 
-Ok, thanks!
+> I assume that usage of the SSL signal is always required. If that's not the
+> case the control signals group should be split in two.
+>
+> Similarly, if the hardware supports "write-only" mode (where the MISO signal
+> isn't connected), that should be supported through a 1-bit data signals group.
 
-> > but there might be more that don't get built
-> >   by default.
-> 
-> Yeah implicit includes are a nightmare for refactoring...
-> I'm trying to grep around for some symbols to see if I
-> can find some lost cases.
+No, the hardware doesn't support three-wire mode.
+Only four-wire (Single/Dual SPI) and six-wire (Quad SPI) are supported.
 
-I just tried building with "make allmodconfig KCONFIG_ALLCONFIG=allconfig",
-with the allconfig file containing a CONFIG_MACH_S3C2410=y statement.
-This caught a number of additionl problems, some related and some not.
+Thanks!
 
-> > * The file includes <plat/gpio-cfg.h>, which is not a bug yet, but
-> >   will be once we move s3c24xx to multiplatform, which would make
-> >   it impossible to include this file from outside of arch/arm.
-> 
-> Yes that needs to be a step for multiplatform enablement.
-> My series only tries to make the problem smaller and remove
-> the dependence on <mach/gpio.h>. All the <mach/*> and
-> <plat/*> stuff needs to go away eventually ...
+Gr{oetje,eeting}s,
 
-True. What is actually the bigger worry here is that the contents
-of the new file, while correctly moved out of mach/gpio.h also
-don't belong into include/linux/platform_data, because they don't
-define a pdata structure but rather the contents that are supposed
-to be passed from the platform code. I would much prefer if you could
-move the file back into mach-s3c24xx/ under a new name and keep it out of
-platform_data. I suspect that the only thing actually needed by the
-gpio driver is the number of GPIO lines per platform, and we can
-find another way to communicate that. Most of the contents should
-be private to the mach-s3c code and not be visible to either the
-gpio driver or any drivers using the plat/gpio-cfg.h interface.
+                        Geert
 
-> > Note that on Exynos, the solution for the gpio driver dependencies
-> > was to scrap the driver and use pinctrl-exynos instead.
-> 
-> I think the S3C driver is a different piece of hardware unfortunately.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-But exynos was using this driver before it moved to the new pinctrl
-driver.
-
-	Arnd
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
