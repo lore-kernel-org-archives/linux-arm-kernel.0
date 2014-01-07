@@ -1,29 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  7 Jan 2014 17:48:00 +0900
-Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
-Message-ID: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue,  7 Jan 2014 17:48:01 +0900
+Subject: [PATCH 1/8] ARM: shmobile: ape6evm: Conditionally select SMSC_PHY
+In-Reply-To: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1389084488-25984-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the SMSC_PHY if ethernet is enabled on shmbile boards
-that have an SMSC phy. This allows the SMSC-specific phy driver
-to be used rather than relying on generic phy code.
+The ape6evm board uses has an SMSC911X ethernet controller which uses an
+SMSC phy. Select SMSC_PHY for ape6evm if SMSC911X is enabled to make use of the
+SMSC-specific phy driver rather than relying on the generic phy driver.
 
-Based on the renesas-devel-v3.13-rc7-20140107 tag
-of my renesas tree.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Simon Horman (8):
-  ARM: shmobile: ape6evm: Conditionally select SMSC_PHY
-  ARM: shmobile: armadillo800eva: Conditionally select SMSC_PHY
-  ARM: shmobile: bockw: Sort Kconfig node's selections
-  ARM: shmobile: bockw: Conditionally select SMSC_PHY
-  ARM: shmobile: kzm9d: Conditionally select SMSC_PHY
-  ARM: shmobile: kzm9g: Conditionally select SMSC_PHY
-  ARM: shmobile: mackerel: Conditionally select SMSC_PHY
-  ARM: shmobile: marzen: Conditionally select SMSC_PHY
-
- arch/arm/mach-shmobile/Kconfig | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 958ccf3d..2673f68 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -156,11 +156,13 @@ comment "Renesas ARM SoCs Board Type"
+ config MACH_APE6EVM
+ 	bool "APE6EVM board"
+ 	depends on ARCH_R8A73A4
++	select SMSC_PHY if SMSC911X
+ 	select USE_OF
+ 
+ config MACH_APE6EVM_REFERENCE
+ 	bool "APE6EVM board - Reference Device Tree Implementation"
+ 	depends on ARCH_R8A73A4
++	select SMSC_PHY if SMSC911X
+ 	select USE_OF
+ 	---help---
+ 	   Use reference implementation of APE6EVM board support
 -- 
 1.8.4
