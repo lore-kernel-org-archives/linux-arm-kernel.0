@@ -1,43 +1,32 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 08 Jan 2014 08:58:49 +0900
-Subject: [PATCH -next] mtd: nuc900_nand: remove redundant return value
- check of platform_get_resource()
-In-Reply-To: <CAPgLHd_RMOPLP2f4nA1vqNNddocMUX7f-gE29TTkuJZPUm=SWw@mail.gmail.com>
-References: <CAPgLHd_RMOPLP2f4nA1vqNNddocMUX7f-gE29TTkuJZPUm=SWw@mail.gmail.com>
-Message-ID: <001401cf0c04$691d63d0$3b582b70$%han@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Jan 2014 15:59:51 -0800
+Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+In-Reply-To: <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
+References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
+ <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20140107235951.GH5074@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 07, 2014 10:39 PM, Wei Yongjun wrote:
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [131230 05:21]:
+> The omapfb driver uses dma_alloc to reserve memory for the framebuffers.
+> However, on some use cases, even when CMA is in use, it's quite probable
+> that omapfb fails to allocate the fb, either due to not enough free dma
+> memory, fragmented dma memory, or CMA failing to make enough contiguous
+> space.
 > 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> This patch adds a kernel cmdline parameter 'omapfb_vram' which can be
+> used to give the size of a memory area reserved exclusively for omapfb,
+> and optionally a physical address where the memory area is reserved.
 > 
-> Remove unneeded error handling on the result of a call
-> to platform_get_resource() when the value is passed to
-> devm_ioremap_resource().
+> The memory area is reserved with memblock, and assigned to omapfb with
+> dma_declare_coherent_memory. The dma_alloc function will first try to
+> allocate the fb from the coherent memory area, and if that fails, it'll
+> use the normal method of allocation.
 > 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Ivaylo Dimitrov <freemangordon@abv.bg>
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+Feel free to queue this along with the DSS patches:
 
-Best regards,
-Jingoo Han
-
-> ---
->  drivers/mtd/nand/nuc900_nand.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
-> index 661fd14..9ee09a8 100644
-> --- a/drivers/mtd/nand/nuc900_nand.c
-> +++ b/drivers/mtd/nand/nuc900_nand.c
-> @@ -268,9 +268,6 @@ static int nuc900_nand_probe(struct platform_device *pdev)
->  	chip->ecc.mode		= NAND_ECC_SOFT;
-> 
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res)
-> -		return -ENXIO;
-> -
->  	nuc900_nand->reg = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(nuc900_nand->reg))
->  		return PTR_ERR(nuc900_nand->reg);
+Acked-by: Tony Lindgren <tony@atomide.com>
