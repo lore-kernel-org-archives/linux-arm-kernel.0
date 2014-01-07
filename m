@@ -1,75 +1,47 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 07 Jan 2014 12:31:46 +0900
-Subject: [RFC PATCH 1/3] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <CACoXjcmqUixctokJ9COLWAsaDTUyVKk9vTAbW1hUhUdcgaj-kg@mail.gmail.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <1387785725-24262-2-git-send-email-tinamdar@apm.com>
- <007401cf0a81$51429250$f3c7b6f0$%han@samsung.com>
- <CACoXjcmqUixctokJ9COLWAsaDTUyVKk9vTAbW1hUhUdcgaj-kg@mail.gmail.com>
-Message-ID: <001101cf0b58$fe73e730$fb5bb590$%han@samsung.com>
+From: B44548@freescale.com (Chao Fu)
+Date: Tue, 7 Jan 2014 03:54:25 +0000
+Subject: [PATCH] spi:fsl-dspi:add support of DSPI IP in big endian
+In-Reply-To: <20131230134217.GC31886@sirena.org.uk>
+References: <1388388474-8662-1-git-send-email-b44548@freescale.com>
+ <20131230134217.GC31886@sirena.org.uk>
+Message-ID: <79669bf1a15247cb95a2609bad5e9c5d@BL2PR03MB163.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 07, 2014 11:45 AM, Tanmay Inamdar wrote:
-> On Sun, Jan 5, 2014 at 5:47 PM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > On Monday, December 23, 2013 5:02 PM, Tanmay Inamdar wrote:
-> >>
-> >> This patch adds the AppliedMicro X-gene SOC PCIe controller driver.
-> >> APM X-Gene PCIe controller supports maximum upto 8 lanes and
-> >> GEN3 speed. X-Gene has maximum 5 PCIe ports supported.
-> >
-> > (+cc Jason Gunthorpe, Arnd Bergmann)
-> >
-> > Hi Tanmay Inamdar,
-> >
-> > I added some minor comments. :-)
-> >
-> >>
-> >> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> >> ---
-> >>  drivers/pci/host/Kconfig      |    5 +
-> >>  drivers/pci/host/Makefile     |    1 +
-> >>  drivers/pci/host/pcie-xgene.c | 1017 +++++++++++++++++++++++++++++++++++++++++
-> >
-> > Would you change the file name to 'pci-xgene.c'?
-> > Now, all PCI host drivers are using the prefix 'pci-', not 'pcie-'.
+> > +#define dspi_readb(c)		readb(c)
+> > +#define dspi_readw(c)		({ u16 __v = (__force u16)
+> __raw_readw(c); __iormb(); __v; })
+> > +#define dspi_readl(c)		({ u32 __v = (__force u32)
+> __raw_readl(c); __iormb(); __v; })
+> > +#define dspi_writeb(v, c)	writeb(v, c)
+> > +#define dspi_writew(v, c)	({ __iowmb(); __raw_writew((__force u16) v,
+> c); })
+> > +#define dspi_writel(v, c)	({ __iowmb(); __raw_writel((__force u32) v,
+> c); })
+> > +
 > 
-> I guess designware is an exception. There is
-> "drivers/pci/host/pcie-designware.c"
+> For type safety and general legibility make these inline functions
+> instead of macros, the generated code should be the same.  It's also not
+> clear why you're adding iowmb()s that weren't in the code before, and see
+> below...
+> 
+[Chao Fu] Thank you, Mark! I will put them into inline functions.
+Here use iowmb for avoiding instruction reorder.
 
-(+cc Thierry Reding, Pratyush Anand, Mohit KUMAR)
+> > @@ -110,9 +120,10 @@ struct fsl_dspi {
+> >
+> >  	void __iomem		*base;
+> >  	int			irq;
+> > -	struct clk 		*clk;
+> > +	struct clk		*clk;
+> >
+> > -	struct spi_transfer 	*cur_transfer;
+> > +	bool			big_endian;
+> > +	struct spi_transfer	*cur_transfer;
+> 
+> Seems like there's some whitespace changes crept in here and elsewhere
+> which makes things harder to review.
 
-Now, the current naming rule is "PCI-" prefix as below.
 
-  - Samsung Exynos: "pci"-exynos.c
-  - Freescale i.MX6: "pci"-imx6.c
-  - Marvell: pci-mvebu.c
-  - Nvidia Tegra: pci-tegra.c
-  - Renesas R-Car: pci-rcar-gen2.c
-
-According to the Thierry Reding's comment,
-"I think we should keep these sorted alphabetically. Also Tegra and
-Marvell are PCIe controllers but they still use the pci- prefix instead
-of pcie-. Perhaps it'd be good to keep consistency here? I initially
-chose pci- because from a software point of view it doesn't matter all
-that much whether it's PCI or PCIe and because the drivers are part of
-the PCI subsystem. However if Exynos now uses the pcie- prefix it makes
-it look like Tegra and Marvell are plain old PCI."
-(https://groups.google.com/forum/#!msg/linux.kernel/qtimJoNSc3w/_1aayHaG54YJ)
-
-However, "pcie-designware.c" is common layer driver for other
-SoC PCI host drivers that use Synopsys Designware PCI IP.
-Thus, currently it is shared by other SoC PCI host drivers
-such as pci-exynos.c, and pci-imx6.c. Also, ST PCI driver will
-use pcie-designware.c as common layer.
-
-Originally, "pci"-designware.c was used. However, Pratyush Anand
-suggested "pci"-designware.c can be renamed to "pcie"-designware.c,
-because Synopsys PCI IP and Synopsys PCI Express IP are different.
-So, currently "pcie"-designware.c is used.
-
-So, if there is no special reason, "pci-" prefix can be used.
-Thank you.
-
-Best regards,
-Jingoo Han
+[Chao Fu] Here is some coding style not in standard in former code, 
+should I take this opportunity to modify here? 
