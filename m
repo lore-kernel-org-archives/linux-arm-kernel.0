@@ -1,18 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 Jan 2014 22:01:06 +0800
-Subject: [PATCH] ARM: imx: Use INT_MEM_CLK_LPM as the bit name
-In-Reply-To: <1389088840-14444-1-git-send-email-festevam@gmail.com>
-References: <1389088840-14444-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140107140104.GL12346@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Jan 2014 15:02:23 +0100
+Subject: [PATCH] ARM: ux500: Enable system suspend with WFI support
+In-Reply-To: <1387378777-7639-1-git-send-email-ulf.hansson@linaro.org>
+References: <1387378777-7639-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdZ+E-BE5WsPa5HLL56riC-BOFp5QxUM+Tp5ZTu-m+KuuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 08:00:40AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Bit 17 of register CCM_CGPR is called INT_MEM_CLK_LPM as per the mx6
-> reference manual, so use this name instead.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Dec 18, 2013 at 3:59 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Applied, thanks.
+> When building for CONFIG_SUSPEND, add the platform suspend callbacks
+> to enable system suspend for ux500.
+>
+> At this initial step, only WFI state is supported, which is reached
+> for both PM_SUSPEND_MEM and PM_SUSPEND_STANDBY.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Patch applied.
+
+Yours,
+Linus Walleij
