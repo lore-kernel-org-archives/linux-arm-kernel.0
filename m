@@ -1,68 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 7 Jan 2014 12:11:47 +0000
-Subject: [PATCH v6 0/3] AArch64: KGDB support
-In-Reply-To: <20140106181201.GE1096@mudshark.cambridge.arm.com>
-References: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
- <20140106181201.GE1096@mudshark.cambridge.arm.com>
-Message-ID: <20140107121147.GE29456@arm.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 7 Jan 2014 17:44:01 +0530
+Subject: [PATCH] ARM: tegra: Remove 3.3V supply and modem regulators
+In-Reply-To: <52CB192F.2020700@wwwdotorg.org>
+References: <1389021933-6675-1-git-send-email-treding@nvidia.com>
+ <52CB192F.2020700@wwwdotorg.org>
+Message-ID: <52CBEF89.6090901@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 06:12:01PM +0000, Will Deacon wrote:
-> On Thu, Dec 19, 2013 at 11:50:48AM +0000, vijay.kilari at gmail.com wrote:
-> > From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> > 
-> > Based on the step-handler and break-handler hooks patch from
-> > Sandeepa, KGDB debugging support is added for EL1
-> > debug in AArch64 mode. Any updates that come for Patch 1 from
-> > Sandeepa will be rebased in next version
-> > 
-> > With second patch,register layout is updated to be inline with GDB tool.
-> > Basic GDB connection, break point set/clear and info commands
-> > are supported except step/next debugging
-> > 
-> > With third patch, step/next debugging support is added, where in
-> > pc is updated to point to the instruction to be stepped and
-> > stopped.
-> > 
-> > With fourth patch, the compile time breakpoint instruction
-> > reordering is fixed by making kgbd_breakpoint() as noinline
-> > 
-> > Tested with ARM64 simulator
-> > 
-> > v6:
-> >  - Change pstate register to 8 bytes to make endian nuetral.
-> >    Use GDB below GDB patch to display pstate in Big endian mode.
-> >    https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
-> >    Thanks to Andrew.
-> 
-> Thanks for getting this new version out. Just a few things before it can be
-> applied:
-> 
->   1. Can you please use "arm64:" instead of "AArch64:" in the patch
->      subjects?
-> 
->   2. Can you get an ack from somebody like Jason on the final patch please?
-> 
->   3. Can you rebase onto the for-next/core branch at the arm64 repo:
-> 
->        git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
-> 
->      you'll get a trivial conflict against arch/arm64/kernel/Makefile.
-
-Just to be clear here, I would only recommend rebasing on top of this
-branch if there are patches queued for upstream which are required by
-the rebased patches and there isn't a topic branch already elsewhere. I
-do *not* recommend this branch for any kind of development (though
-testing is fine and we can fix the trivial Makefile conflicts
-ourselves).
-
->   4. Can you make sure that the gdb patch you linked to actually gets
->      merged? There is still some discussion by the looks of it.
-
-I guess the kernel patches will have to wait for the binutils patch to
-go in. BTW, does this mean that kgdb on arm64 will only work with a
-future version of gdb?
-
--- 
-Catalin
+On Tuesday 07 January 2014 02:29 AM, Stephen Warren wrote:
+> On 01/06/2014 08:25 AM, Thierry Reding wrote:
+>> GPIO 1 and 2 of the PMIC are not used for the described purpose, so
+>> remove them.
+> As far as I can tell, this patch is correct, since those GPIOs are in
+> fact used to discharge the rails after disabling them, rather than to
+> enable/disable the rails.
+>
+> Equally, these GPIOs affect multiple rails at once, so listing the GPIO
+> as a property of a single regulator seems wrong either way.
+>
+> However, PMU_REGEN1 does seem to feed the "EN" pin of U13C1, a DC/DC
+> switcher for power rail 3.3v_modem, so perhaps there's more going on
+> here than I see?
+>
+> In summary, I need Laxman to comment on this and ack the change, and
+> explain why these GPIOs were listed as regulator enables when it doesn't
+> seem that they are.
+>
+PMU_REGEN1 is going to U13C1 (DCDC switcher). So if EN is 0, the output 
+will be 0 and when it is 1, the output will be 3.3V.
+Because this is coming from GPIO, it is added as the fixed regulator.
