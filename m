@@ -1,76 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jan 2014 08:22:33 +0000
-Subject: [PATCH v2 3/7] mfd: pm8921: Migrate to irqdomains
-In-Reply-To: <52CB1323.6080200@codeaurora.org>
-References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
- <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
- <20140106155350.GI30156@lee--X1> <52CB1323.6080200@codeaurora.org>
-Message-ID: <20140107082233.GB3182@lee--X1>
+Date: Tue, 7 Jan 2014 08:23:49 +0000
+Subject: [PATCH 1/3] mfd: always assign of_node in mfd_add_device()
+In-Reply-To: <52CAF1FF.9090709@wwwdotorg.org>
+References: <1386626809-6251-1-git-send-email-swarren@wwwdotorg.org>
+ <20131211092435.GC16780@lee--X1> <52B32C05.5010204@wwwdotorg.org>
+ <20131220142530.GK3709@lee--X1> <52CAF1FF.9090709@wwwdotorg.org>
+Message-ID: <20140107082349.GC3182@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>  	unsigned int		num_irqs;
-> >>  	unsigned int		num_blocks;
-> >>  	unsigned int		num_masters;
-> >> @@ -138,7 +137,7 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
-> >>  	for (i = 0; i < 8; i++) {
-> >>  		if (bits & (1 << i)) {
-> >>  			pmirq = block * 8 + i;
-> >> -			irq = pmirq + chip->irq_base;
-> >> +			irq = irq_find_mapping(chip->domain, pmirq);
-> > Going by this patch only, it appears you're calling irq_find_mapping()
-> > before you've called irq_create_mapping(). This won't work, so unless
-> > you've called the latter in a previous patch, you should ensure that
-> > you do so.
-> >
+> > Please let me know if this is suitable and I can keep your Ack.
 > 
-> Interrupts seem to work. I think that's because the mapping is created
-> when the consumer drivers call request_irq().
+> This patch doesn't seem to have made it into next-20140106. I assume
+> that's just because of the holidays, not because it was forgotten?
+
+Right, it was pushed yesterday morning.
+
+> > ----
+> > 
+> > mfd: Revert "mfd: Always assign of_node in mfd_add_device()"
+> > 
+> > This reverts commit 68044bee13770918e0b28dd44aa98c889ec7558f.
+> > 
+> > We've had confirmed reports of this patch causing unforeseen issues
+> > with existing MFD users. It has been agreed by the original author
+> > and myself that reversion is the best solution.
+> > 
+> > Acked-by: Stephen Warren <swarren@nvidia.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+> > index 32e8d47..2676492 100644
+> > --- a/drivers/mfd/mfd-core.c
+> > +++ b/drivers/mfd/mfd-core.c
+> > @@ -117,8 +117,6 @@ static int mfd_add_device(struct device *parent, int id,
+> >  			}
+> >  		}
+> >  	}
+> > -	if (!pdev->dev.of_node)
+> > -		pdev->dev.of_node = parent->of_node;
+> >  
+> >  	if (cell->pdata_size) {
+> >  		ret = platform_device_add_data(pdev,
+> > 
 > 
-> From what I can tell, if we call irq_find_mapping() and there is no
-> mapping associated with it then we have a spurious irq. If that happens
-> we'll call handle_generic_irq() with 0 and that will cause
-> handle_bad_irq() to be called and a debug message to be logged. That
-> seems like a good outcome.
-
-I would try to adhere to the documentation in case we are missing
-something or some of the semantics change. Please read:
-Documentation/IRQ-domain.txt. Specifically, "=== irq_domain usage ==="
-from line 39, which says to call irq_create_mapping() to indeed, create
-the mapping.
-
-> > What does the sizeof(u8) add here?
-> >
-> 
-> This was just keeping the same code that was already there. I will do
-> sizeof(chip->config[0]) instead which is more future proof if that array
-> changes type later on.
-
-Ah, now I see what it's doing. Perhaps brackets would be of use to
-ensure readers aren't confused. I also think the sizeof() would be
-helpful too, so:
-
-        chip = devm_kzalloc(&pdev->dev, sizeof(*chip) +
-                            (sizeof(chip->config[0]) * nirqs), GFP_KERNEL);
-
-> >> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> >> +}
-> > Can't you use the MFD core instead?
-> >
-> 
-> Are you suggesting using mfd_add_devices()? At first glance it looks
-> like that would require an array of mfd_cell structures that do nothing
-> besides match compatible strings in the DT. Using of_platform_populate()
-> achieves the same goal and doesn't require an array of mfd_cell
-> structures for each different pm8xxx chip that comes along, meaning
-> simpler code.
-
-I'm inclined to agree, but playing Devil's advocate here, as a device
-using the MFD subsystem it's often clearer to readers and other people
-looking for examples if the MFD core functionality is used. For
-instance, I now have no idea what devices the PM8xxx encompasses
-without looking at the DTS file. A small cell structure is a small
-price to pay for code clarity IMHO.
 
 -- 
 Lee Jones
