@@ -1,36 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Jan 2014 23:41:59 +0100
-Subject: [PATCH v2 2/8] clk: sunxi: choose correct name for multiple
- output factor clocks
-In-Reply-To: <20140107221646.GF3103@lukather>
-References: <1388987892-23733-1-git-send-email-wens@csie.org>
- <1388987892-23733-3-git-send-email-wens@csie.org>
- <20140107221646.GF3103@lukather>
-Message-ID: <20140107224159.GJ3103@lukather>
+Date: Tue, 7 Jan 2014 23:49:32 +0100
+Subject: [PATCH 3/5] ARM: sun5i: a13: Add missing serial aliases
+In-Reply-To: <201401061347.57955.arnd@arndb.de>
+References: <1388945627-3432-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1388945627-3432-3-git-send-email-maxime.ripard@free-electrons.com>
+ <201401061347.57955.arnd@arndb.de>
+Message-ID: <20140107224932.GK3103@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 11:16:46PM +0100, Maxime Ripard wrote:
-> On Mon, Jan 06, 2014 at 01:58:06PM +0800, Chen-Yu Tsai wrote:
-> > Some factor clocks, such as the parent clock of pll5 and pll6, have
-> > multiple output names. Use the last name as the name for the clock
-> > itself.
-> > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Mike, Emilio,
-> 
-> This changes the clock names with regard to the previous patches
-> emilio sent that will be merged in 3.14. It would be great if we could
-> merge this in 3.14 as well.
+Hi Arnd,
 
-I've spoken a bit too fast on this, and I'm not really fond of the
-patch 7 i've commented on, that depends on what is done in this patch.
+On Mon, Jan 06, 2014 at 01:47:57PM +0100, Arnd Bergmann wrote:
+> On Sunday 05 January 2014, Maxime Ripard wrote:
+> > +       aliases {
+> > +               serial1 = &uart1;
+> > +               serial3 = &uart3;
+> > +       };
+> > +
+> 
+> If you only have two uarts active, shouldn't they be aliases
+> serial0 and serial1?
 
-We'll see what the outcome of the discussion is.
+Ah, yep, right.
 
+Thanks!
 Maxime
 
 -- 
@@ -43,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/b17944c8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/37d38299/attachment.sig>
