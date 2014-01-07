@@ -1,37 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Jan 2014 23:13:25 +0100
-Subject: [PATCH 0/4] thermal: rcar: Add missing clock handling
-In-Reply-To: <52CC770E.1000004@cogentembedded.com>
-References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
- <52CC770E.1000004@cogentembedded.com>
-Message-ID: <CAMuHMdWBVZ6RNe8B5m3hh+6O=2Sg0NR7sGrAg-xDEKgsGrDnbw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 08 Jan 2014 02:13:47 +0400
+Subject: [PATCH v3 3/3] ARM: shmobile: genmai: Enable r7s72100-ether
+In-Reply-To: <1389061635-4083-4-git-send-email-horms+renesas@verge.net.au>
+References: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
+ <1389061635-4083-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <52CC7C1B.20807@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valentine,
+Hello.
 
-On Tue, Jan 7, 2014 at 10:52 PM, Valentine
-<valentine.barshak@cogentembedded.com> wrote:
-> On 01/07/2014 10:57 PM, Geert Uytterhoeven wrote:
->> This patch series fixes a problem when the thermal-rcar device is
->> instantiated from the device tree on the r8a7791-based Koelsch development
->> board. The driver fails during initialization with:
->
->
-> I think explicitly acquiring the clocks should not be needed.
-> Could you please try the patches from the following series instead?
->
-> http://marc.info/?l=linux-sh&m=138823255807611&w=2
+On 07-01-2014 6:27, Simon Horman wrote:
 
-I already had these applied, and the problem persists.
+    You've removed RFC but still haven't signed off. :-)
 
-Gr{oetje,eeting}s,
+> ---
+> v2
+> * As suggested by Magnus Damm and Sergei Shtylyov
+>    - r7s72100 ethernet is not gigabit so do not refer to it as such
 
-                        Geert
+> * As suggested by Sergei Shtylyov
+>    - set no_ether_link as there is no LINK signal documented
+>      in the manual
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+    I'm OK with the patch, you can add my Acked-by.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+WBR, Sergei
