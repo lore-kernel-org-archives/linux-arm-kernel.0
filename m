@@ -1,72 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Jan 2014 15:33:12 -0800
-Subject: [PATCH v2 1/2] ARM: dts: Add omap specific pinctrl defines to
- use padconf addresses
-In-Reply-To: <4726809.ZkNbraKLQU@avalon>
-References: <1387554677-21100-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1562680.iFW31kAxBU@avalon> <20140107232018.GE5074@atomide.com>
- <4726809.ZkNbraKLQU@avalon>
-Message-ID: <20140107233312.GF5074@atomide.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 8 Jan 2014 00:43:27 +0100
+Subject: [PATCH v4 5/6] edac: Add support for Krait CPU cache error
+ detection
+In-Reply-To: <1388434457-4194-6-git-send-email-sboyd@codeaurora.org>
+References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
+ <1388434457-4194-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140107234327.GH4164@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140107 15:26]:
-> Hi Tony,
+On Mon, Dec 30, 2013 at 12:14:16PM -0800, Stephen Boyd wrote:
+> Add support for the Krait CPU cache error detection. This is a
+> simplified version of the code originally written by Stepan
+> Moskovchenko[1] ported to the EDAC device framework.
 > 
-> On Tuesday 07 January 2014 15:20:18 Tony Lindgren wrote:
-> > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140107 15:10]:
-> > > On Tuesday 07 January 2014 14:30:21 Tony Lindgren wrote:
-> > > > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131220 07:52]:
-> > > > > From: Tony Lindgren <tony@atomide.com>
-> > > > > +/*
-> > > > > + * Macros to allow using the absolute physical address instead of the
-> > > > > + * padconf registers instead of the offset from padconf base.
-> > > > > + */
-> > > > > +#define OMAP_IOPAD_OFFSET(pa, offset)	(((pa) & 0xffff) - (offset))
-> > > > > +
-> > > > > +#define OMAP2420_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x0030)
-> > > > > (val)
-> > > > > +#define OMAP2430_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030)
-> > > > > (val)
-> > > > > +#define OMAP3_CORE1_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030)
-> > > > > (val)
-> > > > > +#define OMAP3_CORE2_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x25a0)
-> > > > > (val)
-> > > > 
-> > > > Sorry for the delay on these, I'm only now getting back to looking
-> > > > at all the emails since the holidays :)
-> > > > 
-> > > > After looking at Nishant's omap3 pinctrl core2 patch, looks like we need
-> > > > to have separate OMAP3430_CORE2_IOPAD and OMAP3630_CORE2_IOPAD defines.
-> > > 
-> > > That was my first impression as well, but I think we actually don't need
-> > > to. The OMAP3430 just has no useful registers in the 0x25a0 - 0x25d7
-> > > area, so we can make the CORE2 macro span that for both 3430 and 3630.
-> > 
-> > Hmm well I already did it :)
+> [1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/tree/arch/arm/mach-msm/cache_erp.c?h=msm-3.4
 > 
-> Haven't you been taught that you should send patches for review before 
-> applying them ? ;-)
+> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/edac/Kconfig      |   8 ++
+>  drivers/edac/Makefile     |   2 +
+>  drivers/edac/krait_edac.c | 346 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 356 insertions(+)
+>  create mode 100644 drivers/edac/krait_edac.c
 
-Using the "trivial change to an earlier patch" clause here ;)
- 
-> > In general my gut feeling is along the lines what you're saying, I think the
-> > padconf registers are all there on all omap3 SoCs, but only some of the
-> > padconf registers are used depending on the SoC revision and package.
-> > 
-> > Anyways, it should not hurt to have the padconf registers defined the
-> > same way as the documentation has them, at least we may get some extra
-> > warnings if people try to configure unused registers for 3430.
-> 
-> As long as the bug is fixed in a reasonably clean way I'm fine with that. This 
-> seems to count as a reasonably clean way, so no complaint :-)
+Looks nice and clean, applied.
 
-Thanks :)
+So, patch 1/6 I'm taking anyway as it is a bugfix - for the others I'll
+wait until 3/6 is cleared which way/how it goes.
 
-BTW, I'm queueing these for v3.14, hopefully everybody is fine
-with that as these changes are getting pretty intrusive for v3.13.
-If people really need these for v3.13, please yell.
+HTH.
 
-Regards,
+-- 
+Regards/Gruss,
+    Boris.
 
-Tony
+Sent from a fat crate under my desk. Formatting is fine.
+--
