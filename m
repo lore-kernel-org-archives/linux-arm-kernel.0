@@ -1,47 +1,49 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 7 Jan 2014 15:47:19 -0200
-Subject: [PATCH v3 01/13] clk: sunxi: register factors clocks behind
- composite
-In-Reply-To: <52CC31CD.2060005@overkiz.com>
-References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
- <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
- <52CC31CD.2060005@overkiz.com>
-Message-ID: <CAAoKrfo+xOoc=S2wJF9XWz3OJoCOG3jD_m5N3XTSWOY6c1LR7w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 7 Jan 2014 12:52:28 -0500
+Subject: [PATCH v3 0/2] gpio: davinci: reuse for keystone arch
+In-Reply-To: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <52CC3EDC.7070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Sekhar,
 
-[ Apologies if the email looks weird and for using a link; I'm not
-using my typical email client ]
+On Tuesday 24 December 2013 06:41 AM, Grygorii Strashko wrote:
+> This series is intended to update Davinci GPIO driver and reuse
+> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
+> Keystone GPIO IP: supports:
+> - up to 32 GPIO lines;
+> - only unbanked irqs;
+> 
+> See Documentation:
+> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+> 
+> This series based on:
+> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/gpio
+> 
+> Changes in v3:
+> - fixed code, changed by mistake; fixed sparse warning 
+> Changes in v2:
+> - minor comments applied, no functional changes
+> 
+> v2: https://lkml.org/lkml/2013/12/18/135
+> v1: https://lkml.org/lkml/2013/12/12/366
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Grygorii Strashko (2):
+>   gpio: davinci: don't create irq_domain in case of unbanked irqs
+>   gpio: davinci: reuse for Keystone SoC
+> 
+>  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+>  drivers/gpio/gpio-davinci.c                        |   82 ++++++++++++++------
+>  2 files changed, 61 insertions(+), 25 deletions(-)
+> 
+Have you picked up the $subject series in your queue ?
 
-> I'm currently working on the sunxi NFC (Nand Flash Controller) driver
-> and I need to set the NAND clk (which is a mod0 clk type) rate.
->
-> It seems that the composite clk fallbacks to the mux_hw's determine_rate
-> instead of calling the rate_hw's (or factors hw) round_rate, if rate_hw
-> does not implement determine_rate.
-
-That is to be expected; if you have a composite clock that has all
-fixed parents you'd not implement the determine_rate on the rate
-component but on the mux one.
-
-(...)
-
-> But anyway, I think there is a drawback in the way composite clk
-> implement the determine_rate handler.
-> Mike, shouldn't we choose the best parent (using mux) fullfilling the
-> rate_hw needs ?
-
-Someone using the composite clock may not want their clocks to start
-changing parents though. I believe it's easier and better to just
-implement determine_rate as on this patch on my tree (which I haven't
-sent yet, but it's literally the next in queue.)
-
-http://git.elopez.com.ar/linux/commits/5b4eb3ac406b9c98965714d40e8dd6da943d1ab0
-
-Let me know if that resolves your issue.
-
-Cheers,
-
-Emilio
+Regards,
+Santosh
