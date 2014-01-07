@@ -1,46 +1,48 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Tue, 7 Jan 2014 16:13:57 +0800
-Subject: [PATCHv9 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
-Message-ID: <1389082438-2199-1-git-send-email-Li.Xiubo@freescale.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 07 Jan 2014 10:13:10 +0100
+Subject: [PATCH 2/2] phy-core: Don't propagate -ENOSUPP from
+ phy_pm_runtime_get_sync to caller
+In-Reply-To: <52CBC152.3070403@ti.com>
+References: <1388963189-13556-1-git-send-email-hdegoede@redhat.com>
+ <1388963189-13556-2-git-send-email-hdegoede@redhat.com>
+ <52CBC152.3070403@ti.com>
+Message-ID: <52CBC526.4050001@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds devicetree node for VF610, and there are 8 channels
-supported.
+Hi,
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
----
+On 01/07/2014 09:56 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Monday 06 January 2014 04:36 AM, Hans de Goede wrote:
+>> The phy-core allows phy_init and phy_power_on to be called multiple times,
+>> but before this patch -ENOSUPP from phy_pm_runtime_get_sync would be
+>> propagated to the caller for the 2nd and later calls.
+>
+> Thanks for fixing this. Have one minor comment below.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   drivers/phy/phy-core.c | 6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+>> index d7b992e..8ee6157 100644
+>> --- a/drivers/phy/phy-core.c
+>> +++ b/drivers/phy/phy-core.c
+>> @@ -161,7 +161,8 @@ int phy_init(struct phy *phy)
+>>   			dev_err(&phy->dev, "phy init failed --> %d\n", ret);
+>>   			goto out;
+>>   		}
+>> -	}
+>> +	} else
+>> +		ret = 0; /* Override possible ret == -ENOTSUPP */
+>
+> 'should use braces in both branches'.
 
-No changes since v7.
+Ok, I'll do a v2 fixing this soonish, any comments on the first patch?
 
+Regards,
 
- arch/arm/boot/dts/vf610.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index d31ce1b..6cce861 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -152,6 +152,19 @@
- 				clock-names = "pit";
- 			};
- 
-+			pwm0: pwm at 40038000 {
-+				compatible = "fsl,vf610-ftm-pwm";
-+				#pwm-cells = <3>;
-+				reg = <0x40038000 0x1000>;
-+				clock-names = "ftm_sys", "ftm_ext",
-+					      "ftm_fix", "ftm_cnt_clk_en";
-+				clocks = <&clks VF610_CLK_FTM0>,
-+					<&clks VF610_CLK_FTM0_EXT_SEL>,
-+					<&clks VF610_CLK_FTM0_FIX_SEL>,
-+					<&clks VF610_CLK_FTM0_EXT_FIX_EN>;
-+				status = "disabled";
-+			};
-+
- 			wdog at 4003e000 {
- 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
- 				reg = <0x4003e000 0x1000>;
--- 
-1.8.4
+Hans
