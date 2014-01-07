@@ -1,58 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Jan 2014 16:58:15 +0000
-Subject: [PATCH] ARM: DT/kernel: fix arch_match_cpu_phys_id to avoid
- erroneous match
-In-Reply-To: <1382358632-32762-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1382358632-32762-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <20140107165815.GF4180@e106331-lin.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 7 Jan 2014 17:59:01 +0100
+Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
+In-Reply-To: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> Geert, could you please verify that the series fixes your QSPI clock issues
+> with the Koelsch board ?
+>
+> Laurent Pinchart (2):
+>   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
+>   clk: shmobile: rcar-gen2: Fix qspi divisor
 
-I was just looking in devtree.c and I noticed this seems to have fallen
-by the wayside. Given that this fixes a possible bug and there have been
-no negative comments, I think it's good for mainline.
+Thanks, both:
 
-Could you place this in the patch system, assuming Russell has no
-comments?
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Cheers,
-Mark.
+Gr{oetje,eeting}s,
 
-On Mon, Oct 21, 2013 at 01:30:32PM +0100, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> The MPIDR contains specific bitfields(MPIDR.Aff{2..0}) which uniquely
-> identify a CPU, in addition to some non-identifying information and
-> reserved bits. The ARM cpu binding defines the 'reg' property to only
-> contain the affinity bits, and any cpu nodes with other bits set in
-> their 'reg' entry are skipped.
-> 
-> As such it is not necessary to mask the phys_id with MPIDR_HWID_BITMASK,
-> and doing so could lead to matching erroneous CPU nodes in the device
-> tree. This patch removes the masking of the physical identifier.
-> 
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/devtree.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index f35906b..41960fb 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -171,7 +171,7 @@ void __init arm_dt_init_cpu_maps(void)
->  
->  bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
->  {
-> -	return (phys_id & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu);
-> +	return phys_id == cpu_logical_map(cpu);
->  }
->  
->  /**
-> -- 
-> 1.8.1.2
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
