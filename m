@@ -1,149 +1,96 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 7 Jan 2014 10:19:30 +0800
-Subject: [PATCH v3] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <20140106150936.GA24664@e106331-lin.cambridge.arm.com>
-References: <1389007012-10887-1-git-send-email-21cnbao@gmail.com>
- <20140106150936.GA24664@e106331-lin.cambridge.arm.com>
-Message-ID: <CAGsJ_4wO33CUnB_oU27gd79i9ZyRyiG4bCZAW3h4YRM-0ODLeA@mail.gmail.com>
+Date: Tue, 7 Jan 2014 10:26:12 +0800
+Subject: [PATCH v2] extcon: gpio: Add power resume support
+In-Reply-To: <1388122847-3276-1-git-send-email-rongjun.ying@csr.com>
+References: <1388122847-3276-1-git-send-email-rongjun.ying@csr.com>
+Message-ID: <CAGsJ_4zYRL2aM4vMxY6RT41ow3M1AjFDpcAcf2itarRjeF2CWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-thanks!
-
-2014/1/6 Mark Rutland <mark.rutland@arm.com>:
-> On Mon, Jan 06, 2014 at 11:16:52AM +0000, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
->> we add a xlate() to let dma clients be able to find right dma_chan by generic
->> "dmas" properties in dts.
->>
->> Cc: Lars-Peter Clausen <lars@metafoo.de>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  -v3:
->>  drop unused variant cap pointed out by Lars-Peter;
->>  add dt-binding document
->>
->>  .../devicetree/bindings/dma/sirfsoc-dma.txt        |   42 ++++++++++++++++++++
->>  arch/arm/boot/dts/atlas6.dtsi                      |    4 ++
->>  arch/arm/boot/dts/prima2.dtsi                      |    4 ++
->>  drivers/dma/sirf-dma.c                             |   23 +++++++++++
->>  4 files changed, 73 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
->>
->> diff --git a/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt b/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
->> new file mode 100644
->> index 0000000..262cf8c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/sirfsoc-dma.txt
->> @@ -0,0 +1,42 @@
->> +* CSR SiRFSoC DMA controller
->> +
->> +See dma.txt first
->> +
->> +Required properties:
->> +- compatible: Should be "sirf,prima2-dmac" or "sirf,marco-dmac"
->> +- reg: Should contain DMA registers location and length.
->> +- interrupts: Should contain one interrupt shared by all channel
->> +- #dma-cells: see dma.txt, should be 1, para number
+2013/12/27 rjying <rjying@gmail.com>:
+> From: Rongjun Ying <rongjun.ying@csr.com>
 >
-> para number?
-
-i copied the document from k3dma.txt and changed for sirfsoc. so
-missed this issue as well:
-
-# grep "para number" *
-k3dma.txt:- #dma-cells: see dma.txt, should be 1, para number
-
+> When system on the suspend state, Some SoC can't get gpio interrupt.
+> After system resume, need send extcon uevent to userspace.
 >
->> +- dma-channels: physical channels supported
->> +- clocks: clock required
->> +
->> +Example:
->> +
->> +Controller:
->> +dmac0: dma-controller at b00b0000 {
->> +     compatible = "sirf,prima2-dmac";
->> +     reg = <0xb00b0000 0x10000>;
->> +     interrupts = <12>;
->> +     clocks = <&clks 24>;
->> +};
->
-> #dma-cells and dma-channels seem to be missing.
+> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
 
-real. #dma-cells is missed.
+Reviewed-by: Barry Song <Baohua.Song@csr.com>
 
->
->> +
->> +
->> +Client:
->> +Use specific request line passing from dmax
->> +For example, spi0 read channel request line is 9 of the 2nd dma controller, while
->> +write channel uses 4 of the 2nd dma controller; spi1 read channel request line is
->> +12 of the 1st dma controller, while write channel uses 13 of the 1st dma controller.
->
-> I think this should be described in the #dma-cells description, as this
-> described the meaning of the single dma cell.
+for CSR SiRFSoC, we need similar patch in extcon to make the lost
+plug/unplug event during sleeping to be resent.
 
-here it is explaining how to fill the client even though it is mapping
-with the #dma-cells of host.
-
+> ---
+>  -v2: Add lost_sleep_irq flags.
 >
->> +
->> +spi0: spi at b00d0000 {
->> +     compatible = "sirf,prima2-spi";
->> +     dmas = <&dmac1 9>,
->> +             <&dmac1 4>;
->> +     dma-names = "rx", "tx";
->> +};
->> +
->> +spi1: spi at b0170000 {
->> +     compatible = "sirf,prima2-spi";
->> +     dmas = <&dmac0 12>,
->> +             <&dmac0 13>;
->> +     dma-names = "rx", "tx";
->> +};
->> diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
->> index b63cfef..aa3ff43 100644
->> --- a/arch/arm/boot/dts/atlas6.dtsi
->> +++ b/arch/arm/boot/dts/atlas6.dtsi
->> @@ -260,6 +260,8 @@
->>                               reg = <0xb00b0000 0x10000>;
->>                               interrupts = <12>;
->>                               clocks = <&clks 24>;
->> +                             #dma-cells = <1>;
->> +                             #dma-channels = <16>;
+>  drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
+>  include/linux/extcon/extcon-gpio.h |    1 +
+>  2 files changed, 21 insertions(+), 0 deletions(-)
 >
-> is it dma-channels or #dma-channels? The document and examples differ.
-
-i realized i don't need dma-channels or #dma-channels at all as in
-sirfsoc, the number of channels of every dma controller is dedicated
-to SIRFSOC_DMA_CHANNELS(16). so i will drop the stuff.
-
+> diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
+> index 7e0dff5..fde52c1 100644
+> --- a/drivers/extcon/extcon-gpio.c
+> +++ b/drivers/extcon/extcon-gpio.c
+> @@ -40,6 +40,7 @@ struct gpio_extcon_data {
+>         int irq;
+>         struct delayed_work work;
+>         unsigned long debounce_jiffies;
+> +       bool lost_sleep_irq;
+>  };
 >
-> [...]
+>  static void gpio_extcon_work(struct work_struct *work)
+> @@ -103,6 +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
+>         extcon_data->gpio_active_low = pdata->gpio_active_low;
+>         extcon_data->state_on = pdata->state_on;
+>         extcon_data->state_off = pdata->state_off;
+> +       extcon_data->lost_sleep_irq = pdata->lost_sleep_irq;
+>         if (pdata->state_on && pdata->state_off)
+>                 extcon_data->edev.print_state = extcon_gpio_print_state;
+>         if (pdata->debounce) {
+> @@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct platform_device *pdev)
+>         return 0;
+>  }
 >
->> +static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
->> +     struct of_dma *ofdma)
->> +{
->> +     struct sirfsoc_dma *sdma = ofdma->of_dma_data;
->> +     unsigned int request = dma_spec->args[0];
->> +
->> +     if (request > SIRFSOC_DMA_CHANNELS)
->> +             return NULL;
->> +
->> +     return dma_get_slave_channel(&(sdma->channels[request].chan));
+> +#ifdef CONFIG_PM_SLEEP
+> +static int gpio_extcon_resume(struct device *dev)
+> +{
+> +       struct gpio_extcon_data *extcon_data;
+> +
+> +       extcon_data = dev_get_drvdata(dev);
+> +       if (extcon_data->lost_sleep_irq)
+> +               queue_delayed_work(system_power_efficient_wq,
+> +                       &extcon_data->work, extcon_data->debounce_jiffies);
+> +       return 0;
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops gpio_extcon_pm_ops = {
+> +       SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
+> +};
+> +
+>  static struct platform_driver gpio_extcon_driver = {
+>         .probe          = gpio_extcon_probe,
+>         .remove         = gpio_extcon_remove,
+>         .driver         = {
+>                 .name   = "extcon-gpio",
+>                 .owner  = THIS_MODULE,
+> +               .pm = &gpio_extcon_pm_ops,
+>         },
+>  };
 >
-> Are the internal brackets necessary? "&" is lower precendence than "->",
-> "[]", and ".".
-
-it is not a big issue. it seems more readable with this bracket.
-
+> diff --git a/include/linux/extcon/extcon-gpio.h b/include/linux/extcon/extcon-gpio.h
+> index 4195810..c7f0c3e 100644
+> --- a/include/linux/extcon/extcon-gpio.h
+> +++ b/include/linux/extcon/extcon-gpio.h
+> @@ -51,6 +51,7 @@ struct gpio_extcon_platform_data {
+>         /* if NULL, "0" or "1" will be printed */
+>         const char *state_on;
+>         const char *state_off;
+> +       bool lost_sleep_irq;
+>  };
 >
-> Thanks,
-> Mark.
+>  #endif /* __EXTCON_GPIO_H__ */
+> --
+> 1.7.5.4
 
 -barry
