@@ -1,33 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 08 Jan 2014 00:06:39 +0100
-Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
-In-Reply-To: <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
-Message-ID: <1591253.8BzYfubhGS@avalon>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 8 Jan 2014 00:06:10 +0100
+Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
+In-Reply-To: <20140107183853.GE4227@obsidianresearch.com>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140107183853.GE4227@obsidianresearch.com>
+Message-ID: <20140107230610.GB2592@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
-> On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
-> > Geert, could you please verify that the series fixes your QSPI clock
-> > issues with the Koelsch board ?
-> > 
-> > Laurent Pinchart (2):
-> >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
-> >   clk: shmobile: rcar-gen2: Fix qspi divisor
+On Tue, Jan 07, 2014 at 11:38:53AM -0700, Jason Gunthorpe wrote:
+> On Tue, Jan 07, 2014 at 05:35:03PM +0100, Gregory CLEMENT wrote:
+> > +static struct property i2c_offload_broken = {
+> > +	.name = "offload-broken",
+> > +};
+> > +
+> > +static void __init i2c_quirk(void)
+> > +{
+> > +	struct device_node *np;
+> > +	u32 dev, rev;
+> > +
+> > +	/*
+> > +	 * Only revisons more recent than A0 support the offload
+> > +	 * mechanism. We can exit only if we are sure that we can
+> > +	 * get the SoC revision and it is more recent than A0.
+> > +	 */
+> > +	if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
+> > +		return;
+> > +
+> > +	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c")
+> > +		of_add_property(np, &i2c_offload_broken);
 > 
-> Thanks, both:
-> 
-> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> I like this approach.
 
-Thank you.
+Sorry, but I don't.
 
-Mike, could you please pick those patches up for v3.14 ?
+> However, when I first read this I thought it should be a -a0 specific
+> compatible string, not a 'offload-broken' property - any idea what the
+> DT consensus is here? I've seen both approach in use ..
 
--- 
-Regards,
+I prefer the replacement of the compatible string. If it should really
+be a seperate property, then it should be a vendor specific property. It
+is not generic, at all.
 
-Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/cd7a5e56/attachment.sig>
