@@ -1,93 +1,101 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue,  7 Jan 2014 18:03:52 +0100
-Subject: [RFC PATCH] clk: composite: support determine_rate using
- rate_ops->round_rate + mux_ops->set_parent
-In-Reply-To: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
-References: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Jan 2014 18:15:01 +0100
+Subject: [PATCH v4 2/4] pinctrl: Add pinctrl binding for Broadcom Capri
+ SoCs
+In-Reply-To: <1387592016-13740-3-git-send-email-syin@broadcom.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-3-git-send-email-syin@broadcom.com>
+Message-ID: <CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the rate_hw does not implement determine_rate, but only round_rate
-we fallback to best_parent selection if mux_hw is present and support
-reparenting.
+On Sat, Dec 21, 2013 at 3:13 AM, Sherman Yin <syin@broadcom.com> wrote:
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/clk/clk-composite.c |   49 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+), 1 deletion(-)
+> Adds pinctrl driver devicetree binding for Broadcom Capri (BCM281xx) SoCs.
+>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> ---
+> v4: Changed valid values for "bias-pull-up" property for I2C pins.  Expanded
+>     pin configuration node example.
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 753d0b7..d3cf49a 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -64,11 +64,57 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
- 	const struct clk_ops *mux_ops = composite->mux_ops;
- 	struct clk_hw *rate_hw = composite->rate_hw;
- 	struct clk_hw *mux_hw = composite->mux_hw;
-+	struct clk *parent;
-+	unsigned long parent_rate;
-+	long tmp_rate;
-+	unsigned long rate_diff;
-+	unsigned long best_rate_diff = ULONG_MAX;
-+	int i;
- 
- 	if (rate_hw && rate_ops && rate_ops->determine_rate) {
- 		rate_hw->clk = hw->clk;
- 		return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
- 						best_parent_p);
-+	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
-+		   mux_hw && mux_ops && mux_ops->set_parent) {
-+		*best_parent_p = NULL;
-+
-+		if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
-+			*best_parent_p = clk_get_parent(mux_hw->clk);
-+			*best_parent_rate = __clk_get_rate(*best_parent_p);
-+
-+			return rate_ops->round_rate(rate_hw, rate,
-+						    best_parent_rate);
-+		}
-+
-+		for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
-+			parent = clk_get_parent_by_index(mux_hw->clk, i);
-+			if (!parent)
-+				continue;
-+
-+			parent_rate = __clk_get_rate(parent);
-+
-+			tmp_rate = rate_ops->round_rate(rate_hw, rate,
-+							&parent_rate);
-+			if (tmp_rate < 0)
-+				continue;
-+
-+			if (tmp_rate < rate)
-+				rate_diff = rate - tmp_rate;
-+			else
-+				rate_diff = tmp_rate - rate;
-+
-+			if (!rate_diff || !*best_parent_p || best_rate_diff > rate_diff) {
-+				*best_parent_p = parent;
-+				*best_parent_rate = parent_rate;
-+				best_rate_diff = rate_diff;
-+			}
-+
-+			if (!rate_diff)
-+				return rate;
-+		}
-+
-+		return best_rate_diff;
- 	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
- 		mux_hw->clk = hw->clk;
- 		return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
-@@ -196,7 +242,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		composite->rate_hw = rate_hw;
- 		composite->rate_ops = rate_ops;
- 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
--		if (rate_ops->determine_rate)
-+		if (rate_ops->determine_rate ||
-+		    (rate_ops->round_rate && clk_composite_ops->set_parent))
- 			clk_composite_ops->determine_rate = clk_composite_determine_rate;
- 	}
- 
--- 
-1.7.9.5
+Starting to look real good...
+
+> +Optional Properties (for standard pins):
+> +
+> +- function:                    String. Specifies the pin mux selection. Values
+> +                               must be one of: "alt1", "alt2", "alt3", "alt4"
+> +- input-schmitt-enable:                No arguments. Enable schmitt-trigger mode.
+> +- input-schmitt-disable:       No arguments. Disable schmitt-trigger mode.
+> +- bias-pull-up:                        No arguments. Pull up on pin.
+> +- bias-pull-down:              No arguments. Pull down on pin.
+> +- bias-disable:                        No arguments. Disable pin bias.
+> +- slew-rate:                   Integer. Meaning depends on configured pin mux:
+> +                               *_SCL or *_SDA:
+> +                                       0: Standard(100kbps)& Fast(400kbps) mode
+> +                                       1: Highspeed (3.4Mbps) mode
+> +                               IC_DM or IC_DP:
+> +                                       0: normal slew rate
+> +                                       1: fast slew rate
+> +                               Otherwise:
+> +                                       0: fast slew rate
+> +                                       1: normal slew rate
+> +- input-enable:                        No arguements. Enable input (does not affect
+> +                               output.)
+> +- input-disable:               No arguements. Disable input (does not affect
+> +                               output.)
+> +- drive-strength:              Integer. Drive strength in mA.  Valid values are
+> +                               2, 4, 6, 8, 10, 12, 14, 16 mA.
+
+Also patch
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+Since you're adding generic properties.
+
+> +Optional Properties (for I2C pins):
+> +
+> +- function:                    String. Specifies the pin mux selection. Values
+> +                               must be one of: "alt1", "alt2", "alt3", "alt4"
+> +- bias-pull-up:                        Integer. Pull up strength in Ohm. There are 3
+> +                               pull-up resisitors (1.2k, 1.8k, 2.7k) available
+> +                               in parallel for I2C pins, so the valid values
+> +                               are: 568, 720, 831, 1080, 1200, 1800, 2700 Ohm.
+
+Also patch
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+
+> +- bias-disable:                        No arguments. Disable pin bias.
+> +- slew-rate:                   Integer. Meaning depends on configured pin mux:
+> +                               *_SCL or *_SDA:
+> +                                       0: Standard(100kbps)& Fast(400kbps) mode
+> +                                       1: Highspeed (3.4Mbps) mode
+> +                               IC_DM or IC_DP:
+> +                                       0: normal slew rate
+> +                                       1: fast slew rate
+> +                               Otherwise:
+> +                                       0: fast slew rate
+> +                                       1: normal slew rate
+
+Hm that does not seem generic though, so let's not add this to the
+generic bindings.
+
+> +- input-enable:                        No arguements. Enable input (does not affect
+> +                               output.)
+> +- input-disable:               No arguements. Disable input (does not affect
+> +                               output.)
+> +
+> +Optional Properties (for HDMI pins):
+> +
+> +- function:                    String. Specifies the pin mux selection. Values
+> +                               must be one of: "alt1", "alt2", "alt3", "alt4"
+> +- slew-rate:                   Integer. Controls slew rate.
+> +                                       0: Standard(100kbps)& Fast(400kbps) mode
+> +                                       1: Highspeed (3.4Mbps) mode
+
+Hmmmm slew rate is not specifiec in "bps" but rather in
+something like volts per second. But maybe it's best to keep
+this value driver-specific.
+
+Yours,
+Linus Walleij
