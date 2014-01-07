@@ -1,45 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 7 Jan 2014 15:23:35 +0530
-Subject: [PATCH v2] phy: kconfig: add depends on "USB_PHY" to OMAP_USB2
- and TWL4030_USB
-In-Reply-To: <20131226130504.GA19462@blackmetal.musicnaut.iki.fi>
-References: <1386079732-19657-1-git-send-email-kishon@ti.com>
- <20131226130504.GA19462@blackmetal.musicnaut.iki.fi>
-Message-ID: <52CBCE9F.7040908@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Jan 2014 10:54:41 +0100
+Subject: [PATCH 15/15] sh: intc: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <3670569.dVXQxeaJBM@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <3670569.dVXQxeaJBM@avalon>
+Message-ID: <2305561.CqXvNryyXG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 December 2013 06:35 PM, Aaro Koskinen wrote:
-> Hi,
+On Wednesday 11 December 2013 13:52:31 Laurent Pinchart wrote:
+> Hi Magnus,
 > 
-> On Tue, Dec 03, 2013 at 07:38:52PM +0530, Kishon Vijay Abraham I wrote:
->> Fixes
->> warning: (OMAP_USB2 && TWL4030_USB) selects USB_PHY which has unmet
->> direct dependencies (USB_SUPPORT)
->> that shows up while disabling USB_SUPPORT from menuconfig.
-> [...]
->>  config TWL4030_USB
->>  	tristate "TWL4030 USB Transceiver Driver"
->>  	depends on TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS
->> +	depends on USB_PHY
->>  	select GENERIC_PHY
->> -	select USB_PHY
->>  	help
->>  	  Enable this to support the USB OTG transceiver on TWL4030
->>  	  family chips (including the TWL5030 and TPS659x0 devices).
-> 
-> This introduced a minor problem in 3.13-rc5: User is no longer able to
-> select TWL4030_USB with menuconfig, since there is no menu entry for
-> enabling USB_PHY. The only way to enable TWL4030_USB is to enable some
-> other option first that happens to select USB_PHY...
+> Could you tell me who is responsible for merging drivers/sh patches ? If
+> that's one of you, could you please pick this patch up for v3.14 ?
 
-huh.. I think we should go back to my v1 [1] or make USB_PHY selectable. I'm
-not sure if there is any other way to handle this.
+Ping ?
 
-Thanks
-Kishon
+> On Wednesday 27 November 2013 02:18:37 Laurent Pinchart wrote:
+> > This helps increasing build testing coverage.
+> > 
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  drivers/sh/intc/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
+> > index a305731..f7d9061 100644
+> > --- a/drivers/sh/intc/Kconfig
+> > +++ b/drivers/sh/intc/Kconfig
+> > @@ -6,7 +6,7 @@ comment "Interrupt controller options"
+> > 
+> >  config INTC_USERIMASK
+> >  
+> >  	bool "Userspace interrupt masking support"
+> > 
+> > -	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
+> > +	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A) || COMPILE_TEST
+> > 
+> >  	help
+> >  	
+> >  	  This enables support for hardware-assisted userspace hardirq
+> >  	  masking.
 
-[1] -> https://groups.google.com/forum/#!topic/linux.kernel/Omf83s4rkwY
-> 
-> A.
-> 
+-- 
+Regards,
+
+Laurent Pinchart
