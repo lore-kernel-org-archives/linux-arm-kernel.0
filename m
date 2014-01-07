@@ -1,52 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 12:15:05 +0100
-Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
-In-Reply-To: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
-References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201401071215.06064.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 7 Jan 2014 12:24:14 +0100
+Subject: [GIT PULL] get rid of <mach/timex.h>
+In-Reply-To: <20131220184715.GT14866@pengutronix.de>
+References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
+ <87bo0clved.fsf@linaro.org> <20131219221758.GS14866@pengutronix.de>
+ <20131220184715.GT14866@pengutronix.de>
+Message-ID: <52CBE3DE.5010706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 December 2013, Linus Walleij wrote:
-> This isolates the custom S3C24xx GPIO definition table to
-> <linux/platform_data/gpio-samsung-s3x24xx.h> as this is
-> used in a few different places in the kernel, removing the
-> need to depend on the implicit inclusion of <mach/gpio.h>
-> from <linux/gpio.h> and thus getting rid of a few nasty
-> cross-dependencies.
+On 20/12/2013 19:47, Uwe Kleine-K?nig :
+> Hello again,
 > 
-> We also delete the nifty CONFIG_S3C24XX_GPIO_EXTRA stuff.
-> The biggest this can ever be for the S3C24XX is
-> CONFIG_S3C24XX_GPIO_EXTRA = 128, and then for CPU_S3C2443 or
-> CPU_S3C2416 32*12 GPIOs are added, so 32*12+128 = 512
-> is the absolute roof value on this platform. So we set
-> the size of ARCH_NR_GPIO to this and the GPIOs array will
-> fit any S3C24XX platform, as per pattern from other archs.
+> On Thu, Dec 19, 2013 at 11:17:58PM +0100, Uwe Kleine-K?nig wrote:
+>> On Thu, Dec 19, 2013 at 07:20:42AM -0800, Kevin Hilman wrote:
+>>> Looks like there are still several users of LATCH, which references CLOCK_TICK_RATE
+>>> and is causing failures on lots of defconfigs.
+>> darn, I missed these because my compile testing was done without
+>> removing the dummy value of CLOCK_TICK_RATE in <asm/timex.h> and I then
+>> relied on the 0day bot who obviously didn't build the critical configs.
+>> :-\
+>>
+>> The problems are fixed by:
+>>  - "ARM: rpc: stop using <mach/timex.h>" which I just sent in this
+>>    thread.
+>>  - "ARM: u300: fix timekeeping when periodic mode is used", a patch I
+>>    sent earlier and that Linus W. wanted to merge. It's not yet in
+>>    -next. Maybe I can take it instead into this series? Linus?
+>>  - The patch pasted below distributed on the respective commits.
+>>    Apart from the netx patch these don't have any affected acks. Sascha,
+>>    I assume I can keep your Ack?
+>>
+>> I'll update my tree when I have feedback by Linus and Sascha.
+> I just did that. I squashed the changes into the respective commits,
+> rebased on Linus W.'s latest pull request and added the rpc change. Now
+> all defconfigs build.
 > 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Please pull
+> 
+> 	git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
+> 
+> which points to 79f08d9ed217318b4f325b7fcf8f26dcd0e41689 now provided
+> you are happy with Linus W.'s series, too.
 
-I'm getting build errors in linux-next for s3c2410_defconfig now
-because of this patch :(
+Hi all,
 
-Two problems:
+Is this pull-request is foreseen to be integrated in arm-soc for 3.14? I
+may have some material for Linus W. that I would like to queue that
+depend on these patches.
 
-* Some files that use functions or macros defined in this file
-  fail to include it. I see drivers/leds/leds-s3c24xx.c and
-  mach-osiris-dvs.c, but there might be more that don't get built
-  by default.
-
-* The file includes <plat/gpio-cfg.h>, which is not a bug yet, but
-  will be once we move s3c24xx to multiplatform, which would make
-  it impossible to include this file from outside of arch/arm.
-
-Note that on Exynos, the solution for the gpio driver dependencies
-was to scrap the driver and use pinctrl-exynos instead.
-
-	Arnd
+Bye,
+-- 
+Nicolas Ferre
