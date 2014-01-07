@@ -1,137 +1,127 @@
 From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Mon, 6 Jan 2014 18:56:21 -0800
-Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <20140103005253.GB12098@obsidianresearch.com>
+Date: Mon, 6 Jan 2014 19:04:07 -0800
+Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
+In-Reply-To: <201401031049.20932.arnd@arndb.de>
 References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <1387785725-24262-3-git-send-email-tinamdar@apm.com>
- <20131223174634.GD25089@obsidianresearch.com>
- <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
- <20140103005253.GB12098@obsidianresearch.com>
-Message-ID: <CACoXjcnykxdjekfmz6B3Ovk-+naCCOCWFZ3t=ZaMWAEPyVs_eQ@mail.gmail.com>
+ <1387785725-24262-4-git-send-email-tinamdar@apm.com>
+ <201401031049.20932.arnd@arndb.de>
+Message-ID: <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 2, 2014 at 4:52 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Thu, Jan 02, 2014 at 01:56:51PM -0800, Tanmay Inamdar wrote:
->> On Mon, Dec 23, 2013 at 9:46 AM, Jason Gunthorpe
->> <jgunthorpe@obsidianresearch.com> wrote:
->> > On Mon, Dec 23, 2013 at 01:32:03PM +0530, Tanmay Inamdar wrote:
->> >> This patch adds the device tree nodes for APM X-Gene PCIe controller and
->> >> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts nodes
->> >> are added.
->> >
->> > Can you include an lspci dump for PCI DT bindings please? It is
->> > impossible to review otherwise..
->> >
+On Fri, Jan 3, 2014 at 1:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 23 December 2013, Tanmay Inamdar wrote:
+>> This patch adds the bindings for X-Gene PCIe driver. The driver resides
+>> under 'drivers/pci/host/pcie-xgene.c' file.
 >>
->> On the X-Gene evaluation platform, there is only one PCIe port
->> enabled. Here is the 'lspci' dump
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ---
+>>  .../devicetree/bindings/pci/xgene-pcie.txt         |   43 ++++++++++++++++++++
+>>  1 file changed, 43 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pcie.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/xgene-pcie.txt b/Documentation/devicetree/bindings/pci/xgene-pcie.txt
+>> new file mode 100644
+>> index 0000000..d92da4f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/xgene-pcie.txt
+>> @@ -0,0 +1,43 @@
+>> +* AppliedMicro X-Gene PCIe interface
+>> +
+>> +Required properties:
+>> +- status: Either "ok" or "disabled".
+>> +- device_type: set to "pci"
+>> +- compatible: should contain "xgene,pcie" to identify the core.
+>> +- reg: base addresses and lengths of the pcie controller configuration
+>> +     space register.
+>> +- #address-cells: set to <3>
+>> +- #size-cells: set to <2>
+>> +- ranges: ranges for the PCI memory, I/O regions, config and MSI regions
+>> +- #interrupt-cells: set to <1>
+>> +- interrupt-map-mask and interrupt-map: standard PCI properties
+>> +     to define the mapping of the PCIe interface to interrupt
+>> +     numbers.
+>> +- clocks: from common clock binding: handle to pci clock.
+>> +- clock-names: from common clock binding. Should be "pcieclk".
+>> +
 >
-> This is a bit hard to read withouth more context, but:
->
->> # lspci -vvv
->> 00:00.0 Class 0604: Device 19aa:e008 (rev 04)
->>         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
->
-> This is an on-chip device? (19aa does not seem to be a VID I can find)
+> Better use an anonymous clock?
 
-oops.. looks like vendor and device IDs are jumbled. You can look for
-e008 vendor ID.
-I will fix it in next version.
-
->
-> Ideally this is the on-chip PCI-PCI bridge which represents the port.
->
-> The problem I see is that your DT binding has a top level stanza per
-> port.
->
-> We *really* prefer to see a single stanza for all ports - but this
-> requires the HW to be able to fit into the Linux resource assignment
-> model - a single resource pool for all ports and standard PCI-PCI
-> bridge config access to assign the resource to a port.
->
-> If your HW can't do this (eg because the port aperture 0xe000000000 is
-> hard wired) then the fall back is to place every port in a distinct
-> domain, with a distinct DT node and have overlapping bus numbers
-> and fixed windows. I don't see PCI domain support in your driver..
-
-Thanks for the suggestion. I will think over this.
-
->
-> There is some kind of an addressing problem because you've done this:
->
-> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
-> +               dev->resource[i].start = dev->resource[i].end = 0;
-> +               dev->resource[i].flags = 0;
-> +       }
-> +}
-> +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_BRIDGE_DEVICEID,
-> +                        xgene_pcie_fixup_bridge);
->
-> Which is usually a sign that something is wonky with how the HW is
-> being fit into the PCI core.
-
-We map the whole DDR range (eg 256 GB) into host's BAR. The Linux PCI
-resource management tries to fit the host's memory into the ranges
-provided (eg 0xe000000000).
-Please let me know if there is any use case to do this mapping.
+Sorry. Can you please elaborate?
 
 >
->> ParErr+ Stepping- SERR+ FastB2B- DisINTx-
->>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
->> <TAbort- <MAbort- >SERR- <PERR- INTx-
->>         Latency: 0, Cache Line Size: 64 bytes
->>         Region 0: Memory at <ignored> (64-bit, prefetchable)
->>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
->>         I/O behind bridge: 0000f000-00000fff
->>         Memory behind bridge: 00c00000-00cfffff
+> The driver also seems to use a phy that is not defined here.
 >
-> [..]
+>> +Example:
+>> +
+>> +SoC specific DT Entry:
+>> +     pcie0: pcie at 1f2b0000 {
+>> +             status = "disabled";
+>> +             device_type = "pci";
+>> +             compatible = "xgene,pcie";
+>> +             #interrupt-cells = <1>;
+>> +             #size-cells = <2>;
+>> +             #address-cells = <3>;
+>> +             reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
+>> +             ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
 >
->> 01:00.0 Class 0200: Device 15b3:1003
->>         Region 0: Memory at e000c00000 (64-bit, non-prefetchable) [size=1M]
->>         Region 2: Memory at e000000000 (64-bit, prefetchable)
->>         [size=8M]
->
-> Something funky is going on here too, the 64 bit address e000000000
-> should be reflected in the 'memory behind bridge' above, not
-> truncated.
+> This is an awfully small memory space for a 64 bit machine. Is that a hardware bug you
+> are working around? If not, please make it as large as you can to allow for arbitrary
+> extension cards with large BARs, at least 4GB.
 
-That's the Mellanox device that is plugged into the system. The
-device's memory gets mapped at '0xe0xxxxxxxx'
+HW does support a lot more than 256MB. I will change it.
 
 >
-> ranges = <0x02000000 0x0 0x00000000 0x90 0x00000000 0x0 0x10000000 /* mem*/
-> +                                 0x01000000 0x0 0x80000000 0x90 0x80000000 0x0 0x00010000 /* io */
-> +                                 0x00000000 0x0 0xd0000000 0x90 0xd0000000 0x0 0x00200000 /* cfg */
-> +                                 0x00000000 0x0 0x79000000 0x00 0x79000000 0x0 0x00800000>; /* msi */
->
-> Ranges has a defined meaning, MSI shouldn't be in ranges, and 'cfg' is
-> only OK if the address encoding exactly matches the funky PCI-E extended
-> configuration address format. You can move these to regs or other
-> properties
+> Also, do you support no prefetchable memory?
 
-ok
+HW has either IO or Memory regions for mapping device's memory space.
+There is no separate prefetchable memory space.
 
 >
-> (MSI is tricky, I'm not aware of DT binding work for MSI :()
+>> +                       0x01000000 0x0 0x80000000 0xe0 0x80000000 0x0 0x00010000 /* io */
 >
+> I/O space at 0x80000000? That won't work with a lot of devices. Can you make it start
+> at bus address 0?
 
-It does not. This is the range required to be mapped by the controller
-to support MSI. I know it is not a standard way of doing. I was just
-trying to utilize 'of_pci_range_to_resource' api.
+Ok.
 
-> Also, unrelated, can you please double check that your HW cannot
-> generate 8 and 16 bit configuration write TLPs natively? The
-> xgene_pcie_cfg_out8/16 hack is not desirable if it can be avoided.
 >
+>> +                       0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
+>
+> config space is not normally in the ranges property, and I think you will need
+> it in the pcie node itself as a 'reg' property so the code can access it.
 
-Sadly HW cannot generate 8 and 16 bit configuration transactions.
+pcie-designware.c does it that way. I just followed their implementation.
 
-> Regards,
-> Jason
+>
+>> +                       0x00000000 0x0 0x79000000 0x00 0x79000000 0x0 0x00800000>; /* msi */
+>
+> Same here. Also I suspect this is a separate irqchip that isn't actually part
+> of the PCIe host. If they are separate devices, I'd strongly recommend modeling
+> them as separate device-nodes in DT to make reuse easier.
+
+You are right. However MSI irqchip needs PCIe core to map above
+mentioned space. I will remove it for now and will send it along with
+MSI patch.
+
+>
+>> +             interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+>> +             interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
+>
+> Only one IRQ for all devices?
+
+The node represents a port. I believe that Linux framework uses only
+one of the legacy IRQs per port. Rest all remain unused. Hence I
+removed them. Please correct me if I am wrong.
+
+>
+>> +             clocks = <&pcie0clk 0>;
+>> +             clock-names = "pcieclk"
+>> +     };
+>> +
+>> +Board specific DT Entry:
+>> +     &pcie0 {
+>> +             status = "ok";
+>> +     };
+>
+>         Arnd
