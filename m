@@ -1,53 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 07 Jan 2014 16:13:49 +0100
-Subject: [PATCH 10/15] irda: sh_irda: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <2434798.8bvsZzgdNb@avalon>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1385515117-23664-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2434798.8bvsZzgdNb@avalon>
-Message-ID: <63153015.VK19yFZrrS@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 16:13:38 +0100
+Subject: [PATCH v3 1/4] ARM: dts: OMAP5: Add 60MHz clock reference to USB
+ Host module
+In-Reply-To: <1389096889-22179-2-git-send-email-rogerq@ti.com>
+References: <1389096889-22179-1-git-send-email-rogerq@ti.com>
+ <1389096889-22179-2-git-send-email-rogerq@ti.com>
+Message-ID: <201401071613.39245.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 December 2013 13:49:15 Laurent Pinchart wrote:
-> Hi Samuel,
+On Tuesday 07 January 2014, Roger Quadros wrote:
+> USB Host driver (drivers/mfd/omap-usb-host.c) expects the 60MHz
+> reference clock to be named "init_60m_fclk". Provide this
+> information.
 > 
-> Could you please pick this patch up for v3.14 ?
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/boot/dts/omap5.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 2f12a47..e0ab379 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -765,6 +765,8 @@
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+>                         ranges;
+> +                       clocks = <&l3init_60m_fclk>;
+> +                       clock-names = "init_60m_fclk";
+>  
+>                         usbhsohci: ohci at 4a064800 {
+>                                 compatible = "ti,ohci-omap3", "usb-ohci";
 
-Ping ?
+The bindings/mfd/omap-usb-host.txt file doesn't document any clocks.
+Please create another patch to document the clock names in this binding
+before you start putting them into the dtsi file. So far the clock
+names are an implementation detail of Linux as they are not part
+of the binding, and with your patch it becomes part of the ABI.
 
-> On Wednesday 27 November 2013 02:18:32 Laurent Pinchart wrote:
-> > This helps increasing build testing coverage.
-> > 
-> > Cc: Samuel Ortiz <samuel@sortiz.org>
-> > Cc: netdev at vger.kernel.org
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > Acked-by: Simon Horman <horms@verge.net.au>
-> > ---
-> > 
-> >  drivers/net/irda/Kconfig | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
-> > index 2a30193..cae5ee2 100644
-> > --- a/drivers/net/irda/Kconfig
-> > +++ b/drivers/net/irda/Kconfig
-> > @@ -403,7 +403,8 @@ config MCS_FIR
-> > 
-> >  config SH_IRDA
-> >  
-> >  	tristate "SuperH IrDA driver"
-> > 
-> > -	depends on IRDA && ARCH_SHMOBILE
-> > +	depends on IRDA
-> > +	depends on ARCH_SHMOBILE || COMPILE_TEST
-> > 
-> >  	help
-> >  	
-> >  	  Say Y here if your want to enable SuperH IrDA devices.
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
