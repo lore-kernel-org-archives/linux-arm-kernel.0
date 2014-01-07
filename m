@@ -1,83 +1,94 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 Jan 2014 14:17:11 +0100
-Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <201401071003.31309.arnd@arndb.de>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <201401051533.58931.arnd@arndb.de> <52CA72BF.10604@free-electrons.com>
- <201401071003.31309.arnd@arndb.de>
-Message-ID: <52CBFE57.5020409@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Jan 2014 14:24:31 +0100
+Subject: [PATCH V2 02/10] ARM: EXYNOS: initial board support for
+ exynos5260 SoC
+In-Reply-To: <1389099548-14649-3-git-send-email-rahul.sharma@samsung.com>
+References: <1389099548-14649-1-git-send-email-rahul.sharma@samsung.com>
+ <1389099548-14649-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <3255549.jEqQKz0UeP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2014 10:03, Arnd Bergmann wrote:
-> On Monday 06 January 2014, Gregory CLEMENT wrote:
->>> Relying on the soc id patch for a "stable" bug fix seems a little
->>> far-reaching to me. I would be happier to first try to do a local
->>> detection based on the i2c bus device node itself. Do you know how
->>
->> It was my first proposal in case adding the soc id detection was
->> a too big things. But it turned out that the amount of code is very
->> low so I really think it worth adding it along the fix. Device tree
->> is supposed to be stable so as soon as we add something in it we are
->> supposed support it forever. Moreover using device tree for something
->> we can probe is counter productive.
+On Tuesday 07 January 2014 18:29:00 Rahul Sharma wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
 > 
-> I would still be happier if we did both and only need to check the
-> SoC version if the device is in the "possibly broken" category
-> but default to the existing behavior.
+> This patch add basic arch side support for exynos5260 SoC.
 > 
-> My main concern is that this patch is adding platform code that we'd
-> otherwise have to carry in the kernel indefinitely. I agree that
-> it's best if we can probe stuff automatically, but that doesn't normally
-> mean looking at an unrelated piece of information. If the i2c controller
-> registers themselves tell us whether this device is broken or not,
-> we should use that information. Looking at a global SoC version register
-> however is more like checking a board ID in the pre-DT days where the
-> board number is the only information we have and everything is
-> derived from that.
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 09e6898..e0c7108 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -52,6 +52,7 @@ static const char name_exynos4210[] = "EXYNOS4210";
+>  static const char name_exynos4212[] = "EXYNOS4212";
+>  static const char name_exynos4412[] = "EXYNOS4412";
+>  static const char name_exynos5250[] = "EXYNOS5250";
+> +static const char name_exynos5260[] = "EXYNOS5260";
+>  static const char name_exynos5410[] = "EXYNOS5410";
+>  static const char name_exynos5420[] = "EXYNOS5420";
+>  static const char name_exynos5440[] = "EXYNOS5440";
+> @@ -92,6 +93,12 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.init		= exynos_init,
+>  		.name		= name_exynos5410,
+>  	}, {
+> +		.idcode		= EXYNOS5260_SOC_ID,
+> +		.idmask		= EXYNOS5_SOC_MASK,
+> +		.map_io		= exynos5_map_io,
+> +		.init		= exynos_init,
+> +		.name		= name_exynos5260,
+> +	}, {
+>  		.idcode		= EXYNOS5420_SOC_ID,
+>  		.idmask		= EXYNOS5_SOC_MASK,
+>  		.map_io		= exynos5_map_io,
 
-Well the way the hardware is designed is exactly like this: between
-two revision of a SoC you can have slightly differences between various
-IP and most of the time this IP don't have a specific register for it.
-Moreover from my experience a change done in a IP of a given revision
-of a SoC will be for this revision and not necessary reported in future
-generation of a SoC. Most of the time the IP are not really under a VCS.
-That means that the SoC ID is the only reliable information to know
-the version of most of the IP inside this SoC.
+I think we've seen enough of these. Please generalize it enough
+so we won't need to add any more entries whenever a new SoC
+comes up. It's probably fine for now to have to tell the difference
+between EXYNOS4 and EXYNOS5, but not new chips within some family.
 
-> 
->>> common the A0 revision is? You mention "early release of the
->>> OpenBlocks AX3-4 boards". Any others that you suspect? If not,
->>
->> No, from the info I gathered I expected that only OpenBlocks AX3-4
->> would be the only product shipped with an A0 version and as I said
->> it should be only a limit amount of them.
-> 
-> Ok, good. So we really only need to worry about this one board for
-> now and can make all the others default to normal operation without
-> checking the SoC version.
-> 
-> Another idea: Could we have a quirk in the mvebu platform code for
-> the AX3-4 to check the SoC version and then change the property for
-> the i2c controller based on whether we expect it to work or not?
-> This way, we wouldn't even need an interface between the platform
-> code and the driver code.
+According to rumors on the web, EXYNOS6 is going to be released
+soon with a 64-bit CPU in it, and since we don't allow platform
+specific code for arm64 like this any more, you should just
+drop it for arm32 as well.
 
-I can try this last approach: using the device tree to pass platform
-parameter from the arch part to the driver.
+> @@ -279,6 +286,15 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+>  	},
+>  };
+>  
+> +static struct map_desc exynos5260_iodesc[] __initdata = {
+> +	{
+> +		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+> +		.pfn		= __phys_to_pfn(EXYNOS5260_PA_SYSRAM_NS),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+> +	},
+> +};
+> +
+>  void exynos4_restart(enum reboot_mode mode, const char *cmd)
+>  {
+>  	__raw_writel(0x1, S5P_SWRESET);
 
+The only difference you have is the map descriptor, and that should
+go away if you only add a proper DT binding for SYSRAM. Try to get
+rid of the remaining map_desc entries while you're at it.
+
+> diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+> index 31cac97..13c802b 100644
+> --- a/arch/arm/plat-samsung/include/plat/map-s5p.h
+> +++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+> @@ -23,6 +23,7 @@
+>  
+>  #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
+>  #define S5P_VA_SYSRAM_NS	S3C_ADDR(0x02410000)
+> +
+>  #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
+>  #define S5P_VA_DMC1		S3C_ADDR(0x02480000)
+>  #define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
 > 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
 
+This hunk doesn't really belong in the patch at all.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
