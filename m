@@ -1,83 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Jan 2014 00:10:33 +0100
-Subject: [GIT PULL] Allwinner DT changes for 3.14, take 2
-Message-ID: <20140107231033.GA18548@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Jan 2014 15:20:18 -0800
+Subject: [PATCH v2 1/2] ARM: dts: Add omap specific pinctrl defines to
+ use padconf addresses
+In-Reply-To: <1562680.iFW31kAxBU@avalon>
+References: <1387554677-21100-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1387554677-21100-2-git-send-email-laurent.pinchart@ideasonboard.com>
+ <20140107223021.GA5074@atomide.com> <1562680.iFW31kAxBU@avalon>
+Message-ID: <20140107232018.GE5074@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140107 15:10]:
+> Hi Tony,
+> 
+> On Tuesday 07 January 2014 14:30:21 Tony Lindgren wrote:
+> > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131220 07:52]:
+> > > From: Tony Lindgren <tony@atomide.com>
+> > > +/*
+> > > + * Macros to allow using the absolute physical address instead of the
+> > > + * padconf registers instead of the offset from padconf base.
+> > > + */
+> > > +#define OMAP_IOPAD_OFFSET(pa, offset)	(((pa) & 0xffff) - (offset))
+> > > +
+> > > +#define OMAP2420_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x0030)
+> > > (val)
+> > > +#define OMAP2430_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030)
+> > > (val)
+> > > +#define OMAP3_CORE1_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030) (val)
+> > > +#define OMAP3_CORE2_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x25a0) (val)
+> > 
+> > Sorry for the delay on these, I'm only now getting back to looking
+> > at all the emails since the holidays :)
+> > 
+> > After looking at Nishant's omap3 pinctrl core2 patch, looks like we need
+> > to have separate OMAP3430_CORE2_IOPAD and OMAP3630_CORE2_IOPAD defines.
+> 
+> That was my first impression as well, but I think we actually don't need to. 
+> The OMAP3430 just has no useful registers in the 0x25a0 - 0x25d7 area, so we 
+> can make the CORE2 macro span that for both 3430 and 3630.
 
-Please pull the following changes on top of the previous pull request.
+Hmm well I already did it :) In general my gut feeling is along the lines
+what you're saying, I think the padconf registers are all there on all
+omap3 SoCs, but only some of the padconf registers are used depending on
+the SoC revision and package.
 
-Thanks!
-Maxime
+Anyways, it should not hurt to have the padconf registers defined the
+same way as the documentation has them, at least we may get some extra
+warnings if people try to configure unused registers for 3430.
+ 
+Regards,
 
-The following changes since commit 81ee429ffdd021626bf191bb8a3ae886dd94adcc:
-
-  ARM: sun6i: dt: Add IP needed to bring up the additional cores (2013-12-16 21:15:12 +0100)
-
-are available in the git repository at:
-
-  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.14-2
-
-for you to fetch changes up to 6267355f0e513bed9a5009924abc7a1e7de22ab3:
-
-  arm: sun7i: cubietruck: Enable the i2c controllers (2014-01-07 23:39:19 +0100)
-
-----------------------------------------------------------------
-Second round of DT additions for 3.14
-
-Mostly:
-  - Addition of the missing PLLs and module clocks
-  - Addition of the external clocks
-  - Addition of the touchscreen controler
-  - I2C nodes of the Cubietruck
-
-----------------------------------------------------------------
-Chen-Yu Tsai (4):
-      ARM: dts: sun7i: Add pin muxing options for clock outputs
-      ARM: dts: sun7i: Change 32768 Hz oscillator node name to clk at N style
-      ARM: dts: sun7i: external clock outputs
-      arm: sun7i: cubietruck: Enable the i2c controllers
-
-Emilio L?pez (6):
-      ARM: sunxi: add PLL4 support
-      ARM: sunxi: add PLL5 and PLL6 support
-      ARM: sun4i: dt: mod0 clocks
-      ARM: sun5i: dt: mod0 clocks
-      ARM: sun7i: dt: mod0 clocks
-      ARM: sunxi: dt: add nodes for the mbus clock
-
-Hans de Goede (3):
-      ARM: dts: sun4i: Add rtp controller node
-      ARM: dts: sun5i: Add rtp controller node
-      ARM: dts: sun7i: Add rtp controller node
-
-Maxime Ripard (3):
-      Merge tag 'sunxi-clk-3.14-for-maxime' of https://bitbucket.org/emiliolopez/linux into sunxi/dt-for-3.14
-      ARM: sun4i: dt: Move the aliases to the DTSI
-      ARM: sun4i: dt: Remove chosen nodes
-
- arch/arm/boot/dts/sun4i-a10-a1000.dts      |   4 -
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts |   9 --
- arch/arm/boot/dts/sun4i-a10-hackberry.dts  |   4 -
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts |   4 -
- arch/arm/boot/dts/sun4i-a10.dtsi           | 154 ++++++++++++++++++++-
- arch/arm/boot/dts/sun5i-a10s.dtsi          | 128 ++++++++++++++++-
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |   4 -
- arch/arm/boot/dts/sun5i-a13.dtsi           | 128 ++++++++++++++++-
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts |  18 +++
- arch/arm/boot/dts/sun7i-a20.dtsi           | 212 +++++++++++++++++++++++++++--
- 10 files changed, 622 insertions(+), 43 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/a07bd353/attachment.sig>
+Tony
