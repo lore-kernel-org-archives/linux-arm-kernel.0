@@ -1,61 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Jan 2014 17:55:06 +0000
-Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
- CONFIG_ARM_PATCH_PHYS_VIRT.
-In-Reply-To: <52CC3D46.3090102@ti.com>
-References: <m38uv1uuzr.fsf@t19.piap.pl> <m3ha9gx63v.fsf@t19.piap.pl>
- <20140106223906.GH27432@n2100.arm.linux.org.uk> <52CB3F55.1050404@ti.com>
- <20140107011121.GI27432@n2100.arm.linux.org.uk> <52CC3D46.3090102@ti.com>
-Message-ID: <20140107175505.GK27432@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 7 Jan 2014 17:56:42 +0000
+Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <20140107150631.GJ31886@sirena.org.uk>
+References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
+ <1387483575-11430-4-git-send-email-broonie@kernel.org>
+ <20140107130540.GA8090@e102568-lin.cambridge.arm.com>
+ <20140107133829.GF31886@sirena.org.uk>
+ <20140107142929.GB8090@e102568-lin.cambridge.arm.com>
+ <20140107150631.GJ31886@sirena.org.uk>
+Message-ID: <20140107175641.GA14603@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 12:45:42PM -0500, Santosh Shilimkar wrote:
-> On Monday 06 January 2014 08:11 PM, Russell King - ARM Linux wrote:
-> > /--------------------------------------------------------------
-> > | > > Right, so, with Assabet, which has CONFIG_DMA_ZONE=y and
-> > | > > CONFIG_ARM_PATCH_PHYS_VIRT=y:
-> > | > > 
-> > | > > $ make O=../build/assabet arch/arm/mm/init.i
-> > | > > 
-> > | > > gives:
-> > | > >   arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
-> > | > > 
-> > | > > with or without Santosh's patch.
-> > \--------------------------------------------------------------
-> > 
-> >> May be I missed your point but I ended up creating the patch because
-> >> the CMA reservation was failing on Keystone since the arm_dma_limit
-> >> wasn't right since it wasn't considering the actual __pv_phys_offset.
-> >>
-> >> Isn't that an issue ?
-> > 
-> > See the above.  Your patch has _no_ effect what so ever when
-> > CONFIG_ARM_PATCH_PHYS_VIRT=y - which you have on the Keystone, right?
-> > 
-> > If you don't believe me, ask make to produce arch/arm/mm/init.i, which
-> > is the output from the preprocessor, comparing the resulting generated
-> > file both with and without your patch applied.
-> > 
-> Looks like you are right. I did two fixes to have right arm_dma_limit in
-> below order.
+On Tue, Jan 07, 2014 at 03:06:31PM +0000, Mark Brown wrote:
+> On Tue, Jan 07, 2014 at 02:29:29PM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Jan 07, 2014 at 01:38:29PM +0000, Mark Brown wrote:
+> > > On Tue, Jan 07, 2014 at 01:05:40PM +0000, Lorenzo Pieralisi wrote:
 > 
-> 1. 787b0d5 {ARM: 7908/1: mm: Fix the arm_dma_limit calculation}
-> 2. 7c92732 {ARM: 7909/1: mm: Call setup_dma_zone() post early_paging_init()}
+> > > > It is time we defined what a "disabled" CPU means in ARM world, I need to
+> > > > have a proper look into this since this topic has been brought up before.
 > 
-> But with 2 alone the issue gets fixed since with ARM_PATCH_PHYS_VIRT and
-> below pre-processor, the PHYS_OFFSET also gets an updated value. I never
-> realised that 1 becomes redundant after second patch while creating them. 
+> > > What is the confusion here - why would there be something architecture
+> > > specific going on?
 > 
-> #define PHYS_OFFSET __pv_phys_offset
+> > I think this check was added following this thread discussion:
 > 
-> So indeed, 787b0d5{ARM: 7908/1: mm: Fix the arm_dma_limit calculation}
-> won't be needed anymore and can be reverted. Sorry it took some time
-> for me to reach to your conclusion.
+> > http://lkml.indiana.edu/hypermail/linux/kernel/1306.0/03663.html
+> 
+> > So my question is: what does "disabled" mean ? A CPU present in HW
+> > that can't/must not be booted ?
+> 
+> Yes, that would seem to be the obvious meaning and consistent with ePAPR
+> (in so far as we're paying a blind bit of notice to ePAPR, see other
+> threads...).
 
-Okay, reverted.
+Just playing devil's advocate and trying to reuse ePAPR bindings as much as
+possible, provided they define what we need on ARM. In this case it seems they
+do not.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> > ePAPR v1.1 page 43:
+> 
+> > "disabled". The CPU is in a quiescent state. A quiescent CPU is in a state
+> > where it cannot interfere with the normal operation of other CPUs, nor can
+> > its state be affected by the normal operation of other running CPUs, except
+> > by an explicit method for enabling or reenabling the quiescent CPU (see the
+> > enable-method property).
+> 
+> > This means that a "disabled" CPU can be booted with eg PSCI but that is
+> > not what the thread in the link above wants to achieve. Furthermore, if
+> 
+> I think that's just another bit of ill considered wording from ePAPR
+> that doesn't really reflect reality; it seems like what they're trying
+> to shoot for there is administratively down.  
+> 
+> At the very least that means hot unplugged, and it seems reasonable to
+> read that as being stronger than that.  The current ARM implementation
+> is more conservative since it doesn't provide any way to put the core on
+> line but it does seem more likely to match what a system integrator
+> would be trying to achieve and it also matches the standard meaning of
+> disabled.
+
+What do you mean by ARM implementation ? The status property is currently
+ignored on ARM. I'd agree with what you are saying but that should be
+specified in DT bindings.
+
+> > we add the check in topology.c, the check must be executed also when
+> > building the cpu_logical_map, otherwise a "disabled" cpu would be marked
+> > possible and then booted, am I wrong ?
+> 
+> Right, this is a separate issue in the SMP enumeration code - it should
+> be paying attention to the property and at the very least defaulting the
+> core to being unplugged, though like I say I do find the ARM meaning
+> more sane.
+
+Again, I tend to agree, since this means that the CPU is there but
+simply is not a "possible" one. To be debated.
+
+> In any case I don't vastly care, I guess I'll drop this for now.
+
+Yes, I think dropping the check is fine for now, we can add it if/when
+we achieve consensus, that should not be a big deal.
+
+Lorenzo
