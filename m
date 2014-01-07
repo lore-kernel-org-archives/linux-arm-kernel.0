@@ -1,112 +1,157 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 07 Jan 2014 18:28:59 +0530
-Subject: [PATCH V2 01/10] clk/exynos5410: move suspend/resume handling to SoC
- driver
+Date: Tue, 07 Jan 2014 18:29:01 +0530
+Subject: [PATCH V2 03/10] pinctrl: exynos: add exynos5260 SoC specific data
 In-Reply-To: <1389099548-14649-1-git-send-email-rahul.sharma@samsung.com>
 References: <1389099548-14649-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1389099548-14649-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1389099548-14649-4-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend/resume handling is already moved for all other Exynos
-SoCs other than Exynos5420 which is addressed in this patch.
+From: Young-Gun Jang <yg1004.jang@samsung.com>
 
+Add Samsung Exynos5260 SoC specific data to enable pinctrl
+support for all platforms based on EXYNOS5260.
+
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5410.c |   49 ++++++++++++++++++++++++++++++----
- 1 file changed, 44 insertions(+), 5 deletions(-)
+ .../bindings/pinctrl/samsung-pinctrl.txt           |    1 +
+ drivers/pinctrl/pinctrl-exynos.c                   |   82 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.c                  |    2 +
+ drivers/pinctrl/pinctrl-samsung.h                  |    1 +
+ 4 files changed, 86 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-index 858b3ff..f94c493 100644
---- a/drivers/clk/samsung/clk-exynos5410.c
-+++ b/drivers/clk/samsung/clk-exynos5410.c
-@@ -16,6 +16,7 @@
- #include <linux/clk-provider.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/syscore_ops.h>
+diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+index 257677d..2b32783 100644
+--- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+@@ -16,6 +16,7 @@ Required Properties:
+   - "samsung,exynos4210-pinctrl": for Exynos4210 compatible pin-controller.
+   - "samsung,exynos4x12-pinctrl": for Exynos4x12 compatible pin-controller.
+   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
++  - "samsung,exynos5260-pinctrl": for Exynos5260 compatible pin-controller.
+   - "samsung,exynos5420-pinctrl": for Exynos5420 compatible pin-controller.
  
- #include "clk.h"
- 
-@@ -60,6 +61,11 @@ enum exynos5410_plls {
- 	nr_plls			/* number of PLLs */
+ - reg: Base address of the pin controller hardware module and length of
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 155b1b3..07c8130 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -1042,6 +1042,88 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+ 	},
  };
  
-+static void __iomem *reg_base;
-+
-+#ifdef CONFIG_PM_SLEEP
-+static struct samsung_clk_reg_dump *exynos5410_save;
-+
- /*
-  * list of controller registers to be saved and restored during a
-  * suspend/resume cycle.
-@@ -89,6 +95,41 @@ static unsigned long exynos5410_clk_regs[] __initdata = {
- 	DIV_KFC0,
- };
- 
-+static int exynos5410_clk_suspend(void)
-+{
-+	samsung_clk_save(reg_base, exynos5410_save,
-+				ARRAY_SIZE(exynos5410_clk_regs));
-+
-+	return 0;
-+}
-+
-+static void exynos5410_clk_resume(void)
-+{
-+	samsung_clk_restore(reg_base, exynos5410_save,
-+				ARRAY_SIZE(exynos5410_clk_regs));
-+}
-+
-+static struct syscore_ops exynos5410_clk_syscore_ops = {
-+	.suspend = exynos5410_clk_suspend,
-+	.resume = exynos5410_clk_resume,
++/* pin banks of exynos5260 pin-controller 0 */
++static struct samsung_pin_bank exynos5260_pin_banks0[] = {
++	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpa0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
++	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpb0", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpb1", 0x10),
++	EXYNOS_PIN_BANK_EINTG(5, 0x0a0, "gpb2", 0x14),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0c0, "gpb3", 0x18),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0e0, "gpb4", 0x1c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpb5", 0x20),
++	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd0", 0x24),
++	EXYNOS_PIN_BANK_EINTG(7, 0x140, "gpd1", 0x28),
++	EXYNOS_PIN_BANK_EINTG(5, 0x160, "gpd2", 0x2c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpe0", 0x30),
++	EXYNOS_PIN_BANK_EINTG(5, 0x1a0, "gpe1", 0x34),
++	EXYNOS_PIN_BANK_EINTG(4, 0x1c0, "gpf0", 0x38),
++	EXYNOS_PIN_BANK_EINTG(8, 0x1e0, "gpf1", 0x3c),
++	EXYNOS_PIN_BANK_EINTG(2, 0x200, "gpk0", 0x40),
++	EXYNOS_PIN_BANK_EINTW(8, 0xc00, "gpx0", 0x00),
++	EXYNOS_PIN_BANK_EINTW(8, 0xc20, "gpx1", 0x04),
++	EXYNOS_PIN_BANK_EINTW(8, 0xc40, "gpx2", 0x08),
++	EXYNOS_PIN_BANK_EINTW(8, 0xc60, "gpx3", 0x0c),
 +};
 +
-+static void exynos5410_clk_sleep_init(void)
-+{
-+	exynos5410_save = samsung_clk_alloc_reg_dump(exynos5410_clk_regs,
-+					ARRAY_SIZE(exynos5410_clk_regs));
-+	if (!exynos5410_save) {
-+		pr_warn("%s: failed to allocate sleep save data, no sleep support!\n",
-+			__func__);
-+		return;
-+	}
++/* pin banks of exynos5260 pin-controller 1 */
++static struct samsung_pin_bank exynos5260_pin_banks1[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpc0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpc1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpc2", 0x08),
++	EXYNOS_PIN_BANK_EINTG(4, 0x060, "gpc3", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(4, 0x080, "gpc4", 0x10),
++};
 +
-+	register_syscore_ops(&exynos5410_clk_syscore_ops);
-+}
-+#else
-+static void exynos5410_clk_sleep_init(void) {}
-+#endif
++/* pin banks of exynos5260 pin-controller 2 */
++static struct samsung_pin_bank exynos5260_pin_banks2[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
++};
 +
- /* list of all parent clocks */
- PNAME(apll_p)		= { "fin_pll", "fout_apll", };
- PNAME(bpll_p)		= { "fin_pll", "fout_bpll", };
-@@ -214,15 +255,11 @@ static struct samsung_pll_clock exynos5410_plls[nr_plls] __initdata = {
- /* register exynos5410 clocks */
- static void __init exynos5410_clk_init(struct device_node *np)
- {
--	void __iomem *reg_base;
--
- 	reg_base = of_iomap(np, 0);
- 	if (!reg_base)
- 		panic("%s: failed to map registers\n", __func__);
- 
--	samsung_clk_init(np, reg_base, CLK_NR_CLKS,
--			exynos5410_clk_regs, ARRAY_SIZE(exynos5410_clk_regs),
--			NULL, 0);
-+	samsung_clk_init(np, reg_base, CLK_NR_CLKS);
- 
- 	samsung_clk_register_pll(exynos5410_plls, ARRAY_SIZE(exynos5410_plls),
- 					reg_base);
-@@ -234,6 +271,8 @@ static void __init exynos5410_clk_init(struct device_node *np)
- 	samsung_clk_register_gate(exynos5410_gate_clks,
- 			ARRAY_SIZE(exynos5410_gate_clks));
- 
-+	exynos5410_clk_sleep_init();
++/*
++ * Samsung pinctrl driver data for Exynos5260 SoC. Exynos5260 SoC includes
++ * three gpio/pin-mux/pinconfig controllers.
++ */
++struct samsung_pin_ctrl exynos5260_pin_ctrl[] = {
++	{
++		/* pin-controller instance 0 data */
++		.pin_banks	= exynos5260_pin_banks0,
++		.nr_banks	= ARRAY_SIZE(exynos5260_pin_banks0),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.weint_con	= EXYNOS_WKUP_ECON_OFFSET,
++		.weint_mask	= EXYNOS_WKUP_EMASK_OFFSET,
++		.weint_pend	= EXYNOS_WKUP_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.eint_wkup_init = exynos_eint_wkup_init,
++		.label		= "exynos5260-gpio-ctrl0",
++	}, {
++		/* pin-controller instance 1 data */
++		.pin_banks	= exynos5260_pin_banks1,
++		.nr_banks	= ARRAY_SIZE(exynos5260_pin_banks1),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos5260-gpio-ctrl1",
++	}, {
++		/* pin-controller instance 2 data */
++		.pin_banks	= exynos5260_pin_banks2,
++		.nr_banks	= ARRAY_SIZE(exynos5260_pin_banks2),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos5260-gpio-ctrl2",
++	},
++};
 +
- 	pr_debug("Exynos5410: clock setup completed.\n");
- }
- CLK_OF_DECLARE(exynos5410_clk, "samsung,exynos5410-clock", exynos5410_clk_init);
+ /* pin banks of exynos5420 pin-controller 0 */
+ static struct samsung_pin_bank exynos5420_pin_banks0[] = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpy7", 0x00),
+diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+index 47ec2e8..0324d4c 100644
+--- a/drivers/pinctrl/pinctrl-samsung.c
++++ b/drivers/pinctrl/pinctrl-samsung.c
+@@ -1120,6 +1120,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ 		.data = (void *)exynos4x12_pin_ctrl },
+ 	{ .compatible = "samsung,exynos5250-pinctrl",
+ 		.data = (void *)exynos5250_pin_ctrl },
++	{ .compatible = "samsung,exynos5260-pinctrl",
++		.data = (void *)exynos5260_pin_ctrl },
+ 	{ .compatible = "samsung,exynos5420-pinctrl",
+ 		.data = (void *)exynos5420_pin_ctrl },
+ 	{ .compatible = "samsung,s5pv210-pinctrl",
+diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
+index 30622d9..bab9c21 100644
+--- a/drivers/pinctrl/pinctrl-samsung.h
++++ b/drivers/pinctrl/pinctrl-samsung.h
+@@ -254,6 +254,7 @@ struct samsung_pmx_func {
+ extern struct samsung_pin_ctrl exynos4210_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
++extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
 -- 
 1.7.9.5
