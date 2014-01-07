@@ -1,72 +1,62 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 7 Jan 2014 10:26:28 +0900
-Subject: [PATCH v2 0/8] SoC and board integration for RSPI on RZ/A1H
-In-Reply-To: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
-References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140107012628.GD2196@verge.net.au>
+Date: Tue, 7 Jan 2014 10:39:36 +0900
+Subject: [PATCH v3 0/4] Lager and Koelsch reference serial port support
+In-Reply-To: <1386767664-20113-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1386767664-20113-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140107013936.GF2196@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 09:15:54PM +0100, Geert Uytterhoeven wrote:
-> This patch series integrates Renesas RSPI on the RZ/A1H aka R7S72100 SoC,
-> and the Genmai development board.
+On Wed, Dec 11, 2013 at 02:14:20PM +0100, Laurent Pinchart wrote:
+> Hello,
 > 
-> The series is based on renesas-devel-v3.13-rc5-20131226, with Magnus'
-> pinctrl, Wolfram's riic, and Simon's sh_eth work applied on top.
+> This patch set implements serial port support for the Lager reference board.
 > 
-> It was tested on the Genmai development board (genmai-reference), using
-> an in-kernel version of Documentation/spi/spidev_test.c, exercising
-> loopback mode on rspi1, with the same outcome as the SDK reference code.
+> The code is available in my git tree at
 > 
-> Notes:
->   1. The proposed DT bindings also talk about QSPI on the R8A779x, as those
->      SoCs use the same driver.
->   2. As the actual spi-rspi driver doesn't use DT yet, platform devices and
->      spi board info are still used from C to instantiate SPI buses and their
->      children, while pinctrl is performed by DT.
->   3. It will not work with the non-reference version of genmai, due to
->      missing pinmux configuration in setup-r7s72100.c.
->   4. Patches [4/8] and [5/8] are new.
+>         git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/serial/boards
 > 
->     [1/8] pinctrl: sh-pfc: r7s72100: Add RSPI support
+> The patches are based on top of the "[PATCH 00/47] sh-sci updates for v3.14"
+> and "[PATCH v3 00/15] Lager and Koelsch multiplatform support" patch series.
 
-I believe that Laurent should handle this.
+Hi Laurent, Hi Magnus,
 
->     [2/8] ARM: shmobile: r7s72100: Add RSPI clocks
+I have marked this series as deferred, but to be honest
+I don't quite recall what we decided to do with it.
 
-This seems fine and independent of the other patches.
-But unfortunately it no longer applies.
-
-Feel free to rebase it if you would like me to queue it up sooner
-than later.
-
->     [3/8] ARM: shmobile: r7s72100: Add RSPI platform devices
-
-I assume this depends on 1/3.
-
-Please add a patch to update the koelsch defconfig.
-
->     [4/8] ARM: shmobile: genmai: Add RSPI children (NEW)
-
-This seems reasonable but I assume it depends on earlier patches.
-
-Please add a patch to update the koelsch defconfig or Kconfig.
-
->     [5/8] [RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux (NEW)
->     [6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI bindings
->     [7/8] [RFC] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
->     [8/8] [RFC] ARM: shmobile: genmai reference: Add RSPI nodes
 > 
-> Gr{oetje,eeting}s,
+> Changes compared to v2:
 > 
-> 						Geert
+> - Added Koelsch support
 > 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> Changes compared to v1:
 > 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
+> - Removed early debugging support as it requires more work before being
+>   mainlined
+> 
+> Laurent Pinchart (4):
+>   ARM: shmobile: r8a7790: Add serial ports to the device tree
+>   ARM: shmobile: r8a7791: Add serial ports to the device tree
+>   ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
+>   ARM: shmobile: koelsch: Enable SCIF0 and SCIF1 serial ports in DT
+> 
+>  arch/arm/boot/dts/r8a7790-lager.dts              |  24 ++-
+>  arch/arm/boot/dts/r8a7790.dtsi                   | 100 +++++++++++++
+>  arch/arm/boot/dts/r8a7791-koelsch.dts            |  24 ++-
+>  arch/arm/boot/dts/r8a7791.dtsi                   | 180 +++++++++++++++++++++++
+>  arch/arm/mach-shmobile/board-koelsch-reference.c |  18 +--
+>  arch/arm/mach-shmobile/board-lager-reference.c   |  18 +--
+>  arch/arm/mach-shmobile/clock-r8a7790.c           |  16 +-
+>  arch/arm/mach-shmobile/clock-r8a7791.c           |  24 +--
+>  arch/arm/mach-shmobile/setup-r8a7790.c           |  26 ++--
+>  arch/arm/mach-shmobile/setup-r8a7791.c           |  34 ++---
+>  10 files changed, 374 insertions(+), 90 deletions(-)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
 > the body of a message to majordomo at vger.kernel.org
