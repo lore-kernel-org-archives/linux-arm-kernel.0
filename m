@@ -1,39 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jan 2014 18:02:52 +0000
-Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <20140107175641.GA14603@e102568-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 7 Jan 2014 18:05:45 +0000
+Subject: [PATCH 0/4] arm64 topology support
+In-Reply-To: <1387483575-11430-1-git-send-email-broonie@kernel.org>
 References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
- <1387483575-11430-4-git-send-email-broonie@kernel.org>
- <20140107130540.GA8090@e102568-lin.cambridge.arm.com>
- <20140107133829.GF31886@sirena.org.uk>
- <20140107142929.GB8090@e102568-lin.cambridge.arm.com>
- <20140107150631.GJ31886@sirena.org.uk>
- <20140107175641.GA14603@e102568-lin.cambridge.arm.com>
-Message-ID: <20140107180252.GJ31886@sirena.org.uk>
+Message-ID: <20140107180545.GB14603@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 05:56:42PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 07, 2014 at 03:06:31PM +0000, Mark Brown wrote:
+On Thu, Dec 19, 2013 at 08:06:11PM +0000, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> Another spin of the arm64 topology work - this should incorporate most
+> of the feedback from Lorenzo, there's a few things that were still under
+> discussion the main ones being:
+> 
+>  - Should we have a smp_store_cpu_info(); like I say I like the errors
+>    it generates for omitted cores and the reuse of the SMP enumeration
+>    code (and cross-check with that I guess - make sure we don't get
+>    confused about which CPUs are getting enabled).
 
-> > At the very least that means hot unplugged, and it seems reasonable to
-> > read that as being stronger than that.  The current ARM implementation
-> > is more conservative since it doesn't provide any way to put the core on
-> > line but it does seem more likely to match what a system integrator
-> > would be trying to achieve and it also matches the standard meaning of
-> > disabled.
+I agree, we should keep it, it makes sense.
 
-> What do you mean by ARM implementation ? The status property is currently
-> ignored on ARM. I'd agree with what you are saying but that should be
-> specified in DT bindings.
+>  - Should we update the binding to allow cores in the root cpu_map node
+>    (since it's less effort in code and not a meaningful difference
+>    semantically), warn if we find cores in the cpu_map node or actively
+>    reject such DTs?
 
-The 32 bit ARM implementation.  That code was supposed to be just
-cut'n'pasted from there, though I see now it wasn't...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/59c818df/attachment.sig>
+I think cpu-map must only contain cluster nodes as descendant children. This
+to prevent creative DTs with cluster and core nodes at top topology level.
+Overall it makes sense, cores can only exist in a cluster container, might
+seem churn but at least that's strict.
+
+> In both cases I don't much mind but I think what's there is reasonable
+> so I've left the code as-is pending further feedback.  I also didn't
+> update the code to get more reuse of the iteration code, like I said I
+> did look at that when writing the code but couldn't find anything that
+> actually made things more pleasant but if someone has some ideas...
+
+I still think that most of the DT parsing code can and should be reused
+also for other purposes (eg IRQ affinity). Comments on the patches
+concerned.
+
+Lorenzo
