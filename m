@@ -1,30 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 Jan 2014 21:25:55 +0800
-Subject: [PATCH] ARM: dts: vf610: use the interrupt macros
-In-Reply-To: <e1421f5854394a4797628684293397da@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1387952367-6321-1-git-send-email-b32955@freescale.com>
- <20140106060429.GC27227@S2101-09.ap.freescale.net>
- <20140107075217.GA27279@shlinux2.ap.freescale.net>
- <e1421f5854394a4797628684293397da@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <20140107132553.GJ12346@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Jan 2014 14:31:59 +0100
+Subject: [PATCH V2 03/10] pinctrl: exynos: add exynos5260 SoC specific data
+In-Reply-To: <1389099548-14649-4-git-send-email-rahul.sharma@samsung.com>
+References: <1389099548-14649-1-git-send-email-rahul.sharma@samsung.com>
+ <1389099548-14649-4-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <3846194.a18yHpXxuP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 09:39:09AM +0000, Jingchang Lu wrote:
-> > > > @@ -90,7 +91,7 @@
-> > > >  			uart0: serial at 40027000 {
-> > > >  				compatible = "fsl,vf610-lpuart";
-> > > >  				reg = <0x40027000 0x1000>;
-> > > > -				interrupts = <0 61 0x00>;
-> > >
-> > > Why is it so special having a 0x00 IRQ trigger type?  Or is it just a
-> > > typo?  While we are at it, we should probably fix it if it's a typo.
-> > hi Jingchang:
-> >   i think it is a typo.
-> > 
-> > do you any idea about it?
->   Yes, it is a typo I made, please help fix it here.
+On Tuesday 07 January 2014 18:29:01 Rahul Sharma wrote:
+> From: Young-Gun Jang <yg1004.jang@samsung.com>
+> 
+> Add Samsung Exynos5260 SoC specific data to enable pinctrl
+> support for all platforms based on EXYNOS5260.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 
-Okay.  I just fixed it up and applied the patch.
+On a similar note to the comment about the platform patch, I think
+it would be good to extend the DT binding in a way that allows
+you to describe the differences between the SoCs without having
+to change the driver every time a new model comes out.
 
-Shawn
+We still have to maintain backwards compatibility with the
+existing bindings I suppose, but I'd rather not see new ones
+added like this. I realize that there is a tradeoff between
+having too much information in DT when it is always fixed, and
+having too much hardcoded in the driver, and at some point there
+was a conscious decision to do it like this, but I fear the
+tradeoff has changed with the number of EXYNOS implementations
+that really only differ in their pin banks.
+
+	Arnd
