@@ -1,36 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Jan 2014 16:44:30 +0100
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <201401071635.02006.arnd@arndb.de>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
- <201401071635.02006.arnd@arndb.de>
-Message-ID: <4687115.Uo6IImEscY@wuerfel>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 7 Jan 2014 09:43:15 -0600
+Subject: [PATCH] dts: socfpga: update L2 tag and data latency
+Message-ID: <1389109395-29530-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014 16:35:01 Arnd Bergmann wrote:
-> > >> +SoC specific DT Entry:
-> > >> +     pcie0: pcie at 1f2b0000 {
-> > >> +             status = "disabled";
-> > >> +             device_type = "pci";
-> > >> +             compatible = "xgene,pcie";
-> > >> +             #interrupt-cells = <1>;
-> > >> +             #size-cells = <2>;
-> > >> +             #address-cells = >;
-> > >> +             reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
-> > >> +             ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
-> > >
-> > >
-> > > Also, do you support no prefetchable memory?
-> > 
-> > HW has either IO or Memory regions for mapping device's memory space.
-> > There is no separate prefetchable memory space.
-> 
-> Are you sure the memory is non-prefetchable then? I would have expected
-> 0x42000000 rather than 0x02000000, but I could be misremembering it.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Nevermind. I just checked and you are right: if you only have
-one memory range, it has to be non-prefetchable.
+Sets the appropriate L2-cache latencies for the SOCFPGA platform.
 
-	Arnd
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ arch/arm/boot/dts/socfpga.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 433bfbc..d04dd82 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -468,6 +468,8 @@
+ 			interrupts = <0 38 0x04>;
+ 			cache-unified;
+ 			cache-level = <2>;
++			arm,tag-latency = <1 1 1>;
++			arm,data-latency = <2 1 1>;
+ 		};
+ 
+ 		mmc: dwmmc0 at ff704000 {
+-- 
+1.7.9.5
