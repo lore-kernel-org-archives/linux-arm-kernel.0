@@ -1,65 +1,38 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 7 Jan 2014 22:33:24 +0800
-Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address
- space
-In-Reply-To: <201401071512.34016.arnd@arndb.de>
-References: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
- <201401071512.34016.arnd@arndb.de>
-Message-ID: <CACVXFVNPcC+7Th-xfD24GiEat=FHMGKXh9Abc_othvR5pdLOYQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 15:33:34 +0100
+Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available for
+ ARM_UNWIND
+In-Reply-To: <CA+KhAHYvbxANa84FMDVV96udwhif2P2_XirPhWVWTKy_8iK72A@mail.gmail.com>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <20130128125023.GA2027@linaro.org>
+ <CA+KhAHYvbxANa84FMDVV96udwhif2P2_XirPhWVWTKy_8iK72A@mail.gmail.com>
+Message-ID: <201401071533.35309.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Tue, Jan 7, 2014 at 10:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 28 October 2013, Ming Lei wrote:
->> This patch uses CONFIG_PAGE_OFFSET to filter symbols which
->> are not in kernel address space because these symbols are
->> generally for generating code purpose and can't be run at
->> kernel mode, so we needn't keep them in /proc/kallsyms.
->>
->> For example, on ARM there are some symbols which are
->> linked in relocatable code section, then perf can't parse
->> symbols any more from /proc/kallsyms, and this patch fixes
->> the problem.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: Michal Marek <mmarek@suse.cz>
->> Acked-by: Rusty Russell <rusty@rustcorp.com.au>
->> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
->
-> Sorry for the late report, but I seem to have encountered a problem with this
-> patch, now that it has made it into all stable kernels.
->
-> When linking an ARM nommu kernel, I get the output "No valid symbol." twice,
-> from scripts/kallsyms. The problem evidently is that PAGE_OFFSET is still
-> set to 0xC0000000 on ARM NOMMU builds but the kernel is linked to start at
-> PLAT_PHYS_OFFSET instead, which may be elsehwere. For most platforms,
-> this is defined in Kconfig these days, so we could get away with
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d1e4098..c477a7c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1592,6 +1592,7 @@ endchoice
->
->  config PAGE_OFFSET
->         hex
-> +       default PHYS_OFFSET if !MMU
->         default 0x40000000 if VMSPLIT_1G
->         default 0x80000000 if VMSPLIT_2G
->         default 0xC0000000
->
-> but there are still a few ARM platforms that define their own PLAT_PHYS_OFFSET
-> in memory.h, and it wouldn't help on non-ARM systems that might have the same
-> problem.
-
-We had posted two patches to address the problem, see below link:
-
-   http://lists.scusting.com/index.php?t=msg&goto=1726509&S=Google
+On Tuesday 29 January 2013, Keun-O Park wrote:
+> On Mon, Jan 28, 2013 at 9:50 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> > On Mon, Jan 28, 2013 at 11:33:11AM +0900, Keun-O Park wrote:
+> >> Hello guys,
+> >>
+> >> Could you please review the patch of fixing bug first of returning
+> >> wrong address when using frame pointer?
+> >> I am wondering if the first patch is not delivered to the mailing.
+> >
+> > I posted a similar patch to alkml a couple of months ago, but I got
+> > no response and it looks like I forgot about it.
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129381.html
+> 
+> Yes, same except initialization of data.addr. :)
+> This means there might be no one interested in using
+> ftrace-irqsoff/premptoff in ARM during a couple of months?
 
 
-Thanks,
--- 
-Ming Lei
+It's been almost a year since we last discussed the patches that were
+posted by Dave and sahara, but nothing has changed in the mainline kernel.
+
+Any chance that someone could be motivated to pick this work up again
+and finally fix return_address().
+
+	Arnd
