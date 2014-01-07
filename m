@@ -1,41 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 07 Jan 2014 15:09:59 -0800
-Subject: [PATCH v4 3/6] ARM: Add Krait L2 accessor functions
-In-Reply-To: <20140107230725.GG4164@pd.tnic>
-References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
- <1388434457-4194-4-git-send-email-sboyd@codeaurora.org>
- <20140107230725.GG4164@pd.tnic>
-Message-ID: <52CC8947.7020900@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Jan 2014 00:08:48 +0100
+Subject: [GIT PULL] Allwinner core changes for 3.14, take 2
+Message-ID: <20140107230848.GA18498@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/14 15:07, Borislav Petkov wrote:
-> On Mon, Dec 30, 2013 at 12:14:14PM -0800, Stephen Boyd wrote:
->> Krait CPUs have a handful of L2 cache controller registers that
->> live behind a cp15 based indirection register. First you program
->> the indirection register (l2cpselr) to point the L2 'window'
->> register (l2cpdr) at what you want to read/write.  Then you
->> read/write the 'window' register to do what you want. The
->> l2cpselr register is not banked per-cpu so we must lock around
->> accesses to it to prevent other CPUs from re-pointing l2cpdr
->> underneath us.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  arch/arm/common/Kconfig                   |  3 ++
->>  arch/arm/common/Makefile                  |  1 +
->>  arch/arm/common/krait-l2-accessors.c      | 58 +++++++++++++++++++++++++++++++
->>  arch/arm/include/asm/krait-l2-accessors.h | 20 +++++++++++
-> I'm no ARM guy but out of curiosity, why is this code not part of the
-> krait edac driver? IOW, is there a compelling reason for it to be in
-> arch/arm/common/?
+Hi Arnd, Kevin, Olof,
 
-This is used for more than just the edac driver. In the future, we'll
-need this for the cpufreq driver and the l2 performance monitor driver.
-I suppose I could have stated that in the commit text.
+Please pull the following patches on top of the previous pull request.
+
+Thanks!
+
+The following changes since commit 73346794b48237b7b4c2a5c02b12e3c4f1da7551:
+
+  ARM: sun6i: Add SMP support for the Allwinner A31 (2013-12-16 21:33:41 +0100)
+
+are available in the git repository at:
+
+  https://github.com/mripard/linux.git tags/sunxi-core-for-3.14-2
+
+for you to fetch changes up to 75cac6abe756fde529a000e725dceed2b908f61a:
+
+  ARM: sunxi: select ARM_PSCI (2014-01-01 23:58:17 +0100)
+
+----------------------------------------------------------------
+Second round of core additions for the Allwinner SoCs
+
+Fixes to select missing configuration options, and update of the maintainer
+file.
+
+----------------------------------------------------------------
+Maxime Ripard (2):
+      ARM: sunxi: Select RESET_CONTROLLER
+      MAINTAINERS: Update Allwinner sunXi maintainer files
+
+Zalan Blenessy (1):
+      ARM: sunxi: select ARM_PSCI
+
+ MAINTAINERS                 | 7 ++++++-
+ arch/arm/mach-sunxi/Kconfig | 2 ++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/34ae0d38/attachment.sig>
