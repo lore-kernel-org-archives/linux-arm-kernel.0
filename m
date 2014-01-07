@@ -1,62 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Jan 2014 15:55:15 -0800
-Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <20140107230733.GD5074@atomide.com>
-References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
- <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com>
- <52BC6B16.80507@ti.com> <52BD856E.7010609@ti.com>
- <52C11284.2030500@ti.com> <20140107230733.GD5074@atomide.com>
-Message-ID: <20140107235514.GG5074@atomide.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 08 Jan 2014 08:58:49 +0900
+Subject: [PATCH -next] mtd: nuc900_nand: remove redundant return value
+ check of platform_get_resource()
+In-Reply-To: <CAPgLHd_RMOPLP2f4nA1vqNNddocMUX7f-gE29TTkuJZPUm=SWw@mail.gmail.com>
+References: <CAPgLHd_RMOPLP2f4nA1vqNNddocMUX7f-gE29TTkuJZPUm=SWw@mail.gmail.com>
+Message-ID: <001401cf0c04$691d63d0$3b582b70$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140107 15:10]:
-> * Sricharan R <r.sricharan@ti.com> [131229 22:30]:
-> > On Friday 27 December 2013 07:19 PM, Sricharan R wrote:
-> > > On Thursday 26 December 2013 11:14 PM, Santosh Shilimkar wrote:
-> > >> On Wednesday 25 December 2013 11:52 PM, Sricharan R wrote:
-> > >>> On Wednesday 18 December 2013 02:49 PM, Sricharan R wrote:
-> > >>>> I have addressed all the comments on this series, can this be merged now ?
-> > >>>>
-> > >>>   Ping..
-> > >>>
-> > >> Thomas has already given his reviewed-by tag so the patches can be
-> > >> taken via arm-soc tree considering OMAP and GIC changes. Can you
-> > >> create a branch with all these patches applied and send it
-> > >> to Tony ?
-> > >>
-> > > Ok, i will send out a branch for this.
-> > > 
-> >  
-> >  I have pushed the below branch
-> > 
-> > git://github.com/Sricharanti/sricharan.git
-> > branch: crossbar
-> > 
-> > This is on top of Tony's linux-omap master branch
+On Tuesday, January 07, 2014 10:39 PM, Wei Yongjun wrote:
 > 
-> The linux-omap master branch cannot be used as a base as it
-> contains tons of commit history not in mainline. So I'll
-> manually applied these patches into omap-for-v3.14/crosbar
-> branch.
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Remove unneeded error handling on the result of a call
+> to platform_get_resource() when the value is passed to
+> devm_ioremap_resource().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Oops, I noticed some errors on these:
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
 
-WARNING: drivers/built-in.o(.text+0xcd0): Section mismatch in reference from the function irqcrossbar_init() to the function .init.text:crossbar_of_init()
-The function irqcrossbar_init() references
-the function __init crossbar_of_init().
-This is often because irqcrossbar_init lacks a __init 
-annotation or the annotation of crossbar_of_init is wrong.
+Best regards,
+Jingoo Han
 
-WARNING: drivers/built-in.o(.text+0xcdc): Section mismatch in reference from the function irqcrossbar_init() to the (unknown reference) .init.rodata:(unknown)
-The function irqcrossbar_init() references
-the (unknown reference) __initconst (unknown).
-This is often because irqcrossbar_init lacks a __initconst 
-annotation or the annotation of (unknown) is wrong.
-
-So I've dropped them for now. Care to fix up those errors and
-base your patches against let's say v3.13-rc5?
-
-Regards,
-
-Tony
+> ---
+>  drivers/mtd/nand/nuc900_nand.c | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
+> index 661fd14..9ee09a8 100644
+> --- a/drivers/mtd/nand/nuc900_nand.c
+> +++ b/drivers/mtd/nand/nuc900_nand.c
+> @@ -268,9 +268,6 @@ static int nuc900_nand_probe(struct platform_device *pdev)
+>  	chip->ecc.mode		= NAND_ECC_SOFT;
+> 
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res)
+> -		return -ENXIO;
+> -
+>  	nuc900_nand->reg = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(nuc900_nand->reg))
+>  		return PTR_ERR(nuc900_nand->reg);
