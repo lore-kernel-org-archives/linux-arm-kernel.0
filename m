@@ -1,36 +1,31 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 7 Jan 2014 09:47:08 -0600
-Subject: [PATCH] ARM: socfpga: Optimize L2 cache settings
-Message-ID: <1389109628-29868-1-git-send-email-dinguyen@altera.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Jan 2014 16:50:31 +0100
+Subject: [GIT PULL FOR v3.14] Renesas pinctrl fixes
+In-Reply-To: <1497178.A4PLILmBU4@avalon>
+References: <1497178.A4PLILmBU4@avalon>
+Message-ID: <CACRpkdZTt=yQGyzD3AnzKF3RjGiC4WdDX3yQY7zw68VFeYf5oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Tue, Jan 7, 2014 at 9:42 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
 
-The L2 cache settings the SOCFPGA platform should have data and
-instruction prefetch, along with the share override bits set.
+> Hi Linus,
+>
+> The following changes since commit 44a45b55a72754e5c9ed047179fb269b530f45fc:
+>
+>   pinctrl: sh-pfc: ARM: Constify pins and cfg_regs arrays (2013-12-20 12:28:40
+> +0100)
+>
+> are available in the git repository at:
+>
+>   git://linuxtv.org/pinchartl/fbdev.git pinmux/next/pfc
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
- arch/arm/mach-socfpga/socfpga.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Pulled into my pinctrl/devel branch for v3.14.
 
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index e8fb821..87164f8 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -169,7 +169,11 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
- 
- static void __init socfpga_cyclone5_init(void)
- {
--	l2x0_of_init(0, ~0UL);
-+	u32 aux_ctrl = 0;
-+	aux_ctrl |= (1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
-+			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
-+			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT);
-+	l2x0_of_init(aux_ctrl, ~0UL);
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 		socfpga_auxdata_lookup, NULL);
- }
--- 
-1.7.9.5
+Now, what do I do about all the other Renesas pinctrl stuff that is
+floating? Like all the new stuff from Magnus &al? Do you keep track
+of that or should I start looking at it?
+
+Yours,
+Linus Walleij
