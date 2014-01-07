@@ -1,46 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jan 2014 14:35:38 +0000
-Subject: [PATCH v7 3/3] mfd: max14577: Add device tree bindings document
-In-Reply-To: <2536498.L12VSLryvi@amdc1227>
-References: <1386329534-14186-1-git-send-email-k.kozlowski@samsung.com>
- <1386329534-14186-4-git-send-email-k.kozlowski@samsung.com>
- <2536498.L12VSLryvi@amdc1227>
-Message-ID: <20140107143538.GI31886@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 15:41:21 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <20140106162442.GB13111@lunn.ch>
+References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
+ <201401061637.28194.arnd@arndb.de> <20140106162442.GB13111@lunn.ch>
+Message-ID: <201401071541.21449.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 03:10:04PM +0100, Tomasz Figa wrote:
-> On Friday 06 of December 2013 12:32:14 Krzysztof Kozlowski wrote:
+On Monday 06 January 2014, Andrew Lunn wrote:
 
-> > +- regulators :
-> > +	Required properties:
-> > +		- compatible : "maxim,max14577-regulator"
+> > That would be rather unfortunate and we should probably
+> > try to merge the bindings eventually and make sure that either OS can
+> > boot with any conforming DTB
+> 
+> It probably requires one of the DT maintainers to talk to FreeBSD
+> equivalents to get some coordination going. We have a lot of generic
+> stuff, like gpio keys, gpio leds, cpu nodes, mtd partitions, etc,
+> which could be done at a high level, and then SoC specific nodes
+> sorted out between individual developers.
 
-> > +	May contain a sub-node per regulator from the list below. Each
+Right. They seem to have quite a selection of dts files by now, which
+are roughly comparable to the ones we have, but slightly different
+in some aspects.
 
-> Is "May" the correct word? Wouldn't it be better to always have
-> configuration specified for all regulators of the cell?
+> > On the example of missing clocks, it should work as long as all relevant
+> > clocks are enabled by the boot loader and the clock properties are
+> > optional the binding.
+> 
+> However, not all clocks are optional. We need the clock in order to
+> know how fast it ticks. So at least the serial ports and i2c will not
+> work, and maybe other devices, i would have to check.
 
-It doesn't achieve anything to force people to include unused regulators
-in the DT - the node is only needed if the kernel needs to do something
-with the regulator.  This means that all the individual regulators end
-up being optional.  The set of 
+Right. We used to have "clock-frequency" properties defined in a number
+of bindings that predate the generic clock binding, but I guess we wouldn't
+do that anymore.
 
-> Now this patch creates a question whether we should keep the existing
-> black-box MFD scheme, where the list of cells is determined by an array
-> hardcoded inside the driver or rather we should completely move to DT
-> based description where of_mfd_populate() could create all MFD cells
-> using description from DT.
-
-This has been discussed before.  The biggest issue is that the Linux
-idea of what cells it wants depends very much on whatever the current
-set of subsystems Linux has and the way we divide the hardware between
-them.  That's not a static thing, we're seeing flux with things like
-extcon and clk at the minute for example.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/a5c95db7/attachment.sig>
+	Arnd
