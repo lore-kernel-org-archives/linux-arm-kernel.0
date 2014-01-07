@@ -1,38 +1,31 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 7 Jan 2014 11:38:53 -0700
-Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
-In-Reply-To: <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
- <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140107183853.GE4227@obsidianresearch.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jan 2014 18:46:58 +0000
+Subject: [PATCH 0/4] arm64 topology support
+In-Reply-To: <20140107182355.GL31886@sirena.org.uk>
+References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
+ <20140107180545.GB14603@e102568-lin.cambridge.arm.com>
+ <20140107182355.GL31886@sirena.org.uk>
+Message-ID: <20140107184658.GN31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 05:35:03PM +0100, Gregory CLEMENT wrote:
-> +static struct property i2c_offload_broken = {
-> +	.name = "offload-broken",
-> +};
-> +
-> +static void __init i2c_quirk(void)
-> +{
-> +	struct device_node *np;
-> +	u32 dev, rev;
-> +
-> +	/*
-> +	 * Only revisons more recent than A0 support the offload
-> +	 * mechanism. We can exit only if we are sure that we can
-> +	 * get the SoC revision and it is more recent than A0.
-> +	 */
-> +	if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
-> +		return;
-> +
-> +	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c")
-> +		of_add_property(np, &i2c_offload_broken);
+On Tue, Jan 07, 2014 at 06:23:55PM +0000, Mark Brown wrote:
+> On Tue, Jan 07, 2014 at 06:05:45PM +0000, Lorenzo Pieralisi wrote:
 
-I like this approach.
+> > I think cpu-map must only contain cluster nodes as descendant children. This
+> > to prevent creative DTs with cluster and core nodes at top topology level.
+> > Overall it makes sense, cores can only exist in a cluster container, might
+> > seem churn but at least that's strict.
 
-However, when I first read this I thought it should be a -a0 specific
-compatible string, not a 'offload-broken' property - any idea what the
-DT consensus is here? I've seen both approach in use ..
+> That still leaves the question of what you want to happen with such
+> maps.
 
-Jason
+I've implemented a warning for this; it seems more constructive than
+rejecting such DTs outright.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/d23d963f/attachment.sig>
