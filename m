@@ -1,28 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 09:53:51 +0100
-Subject: [PATCH] the eDMA support for the LPUART send driver
-In-Reply-To: <0602455564214ab7986348ea985fc820@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1388143449-28640-1-git-send-email-yao.yuan@freescale.com>
- <20140105145031.GB27432@n2100.arm.linux.org.uk>
- <0602455564214ab7986348ea985fc820@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <201401070953.52207.arnd@arndb.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 7 Jan 2014 14:26:50 +0530
+Subject: [PATCH 2/2] phy-core: Don't propagate -ENOSUPP from
+ phy_pm_runtime_get_sync to caller
+In-Reply-To: <1388963189-13556-2-git-send-email-hdegoede@redhat.com>
+References: <1388963189-13556-1-git-send-email-hdegoede@redhat.com>
+ <1388963189-13556-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <52CBC152.3070403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Yao Yuan wrote:
-> Thanks for your suggestion. It's important for me.
+Hi,
+
+On Monday 06 January 2014 04:36 AM, Hans de Goede wrote:
+> The phy-core allows phy_init and phy_power_on to be called multiple times,
+> but before this patch -ENOSUPP from phy_pm_runtime_get_sync would be
+> propagated to the caller for the 2nd and later calls.
+
+Thanks for fixing this. Have one minor comment below.
 > 
-> I read the source code for dma_map_single again. I found that both of them(as first argument is
-> dma or uart) worked well. But in my code I found that the *sport->port.dev->dma_mask is not
-> zero. By contrast the dma_mask for dma device is zero.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/phy/phy-core.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index d7b992e..8ee6157 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -161,7 +161,8 @@ int phy_init(struct phy *phy)
+>  			dev_err(&phy->dev, "phy init failed --> %d\n", ret);
+>  			goto out;
+>  		}
+> -	}
+> +	} else
+> +		ret = 0; /* Override possible ret == -ENOTSUPP */
 
-Ah, it seems you found two more bugs then ;-)
+'should use braces in both branches'.
+>  
+>  out:
+>  	mutex_unlock(&phy->mutex);
+> @@ -209,7 +210,8 @@ int phy_power_on(struct phy *phy)
+>  			dev_err(&phy->dev, "phy poweron failed --> %d\n", ret);
+>  			goto out;
+>  		}
+> -	}
+> +	} else
+> +		ret = 0; /* Override possible ret == -ENOTSUPP */
 
-> You are right. There should be dma device. But I also have a doubt here. Why I find many other
-> driver use the first argument here rather than the dma device pointer.
+same here..
 
-It's a common mistake. Most other linux device driver interfaces require you to pass the
-device you are working on, so it's understandable why people come to the wrong conclusion
-here.
-
-	Arnd
+Thanks
+Kishon
