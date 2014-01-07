@@ -1,54 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 15:12:33 +0100
-Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address
- space
-In-Reply-To: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
-References: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <201401071512.34016.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue,  7 Jan 2014 14:12:01 +0000
+Subject: [PATCH] ARM: dts: Remove leftover spi0 node for SMDK5250
+Message-ID: <1389103921-30616-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 October 2013, Ming Lei wrote:
-> This patch uses CONFIG_PAGE_OFFSET to filter symbols which
-> are not in kernel address space because these symbols are
-> generally for generating code purpose and can't be run at
-> kernel mode, so we needn't keep them in /proc/kallsyms.
-> 
-> For example, on ARM there are some symbols which are
-> linked in relocatable code section, then perf can't parse
-> symbols any more from /proc/kallsyms, and this patch fixes
-> the problem.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Michal Marek <mmarek@suse.cz>
-> Acked-by: Rusty Russell <rusty@rustcorp.com.au>
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+From: Mark Brown <broonie@linaro.org>
 
-Sorry for the late report, but I seem to have encountered a problem with this
-patch, now that it has made it into all stable kernels.
+Now that the SPI controllers are disabled by default for Exynos5250
+there is no need to explicitly disable them in individual board files.
+This hunk appears not to have been merged when doing the original
+conversion, add it now.
 
-When linking an ARM nommu kernel, I get the output "No valid symbol." twice,
-from scripts/kallsyms. The problem evidently is that PAGE_OFFSET is still
-set to 0xC0000000 on ARM NOMMU builds but the kernel is linked to start at
-PLAT_PHYS_OFFSET instead, which may be elsehwere. For most platforms,
-this is defined in Kconfig these days, so we could get away with
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d1e4098..c477a7c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1592,6 +1592,7 @@ endchoice
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 3e69837c435c..b370f8a20cdf 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -164,10 +164,6 @@
+ 		};
+ 	};
  
- config PAGE_OFFSET
- 	hex
-+	default PHYS_OFFSET if !MMU
- 	default 0x40000000 if VMSPLIT_1G
- 	default 0x80000000 if VMSPLIT_2G
- 	default 0xC0000000
-
-but there are still a few ARM platforms that define their own PLAT_PHYS_OFFSET
-in memory.h, and it wouldn't help on non-ARM systems that might have the same
-problem.
-
-	Arnd
+-	spi_0: spi at 12d20000 {
+-		status = "disabled";
+-	};
+-
+ 	spi_1: spi at 12d30000 {
+ 		status = "okay";
+ 
+-- 
+1.8.5.2
