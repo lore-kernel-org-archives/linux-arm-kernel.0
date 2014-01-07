@@ -1,32 +1,93 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Jan 2014 17:59:01 +0100
-Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
-In-Reply-To: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue,  7 Jan 2014 18:02:21 +0100
+Subject: [RFC PATCH] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
+References: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1389114141-11087-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> Geert, could you please verify that the series fixes your QSPI clock issues
-> with the Koelsch board ?
->
-> Laurent Pinchart (2):
->   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
->   clk: shmobile: rcar-gen2: Fix qspi divisor
+In case the rate_hw does not implement determine_rate, but only round_rate
+we fallback to best_parent selection if mux_hw is present and support
+reparenting.
 
-Thanks, both:
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/clk/clk-composite.c |   49 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 1 deletion(-)
 
-Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 753d0b7..d3cf49a 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -64,11 +64,57 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	const struct clk_ops *mux_ops = composite->mux_ops;
+ 	struct clk_hw *rate_hw = composite->rate_hw;
+ 	struct clk_hw *mux_hw = composite->mux_hw;
++	struct clk *parent;
++	unsigned long parent_rate;
++	long tmp_rate;
++	unsigned long rate_diff;
++	unsigned long best_rate_diff = ULONG_MAX;
++	int i;
+ 
+ 	if (rate_hw && rate_ops && rate_ops->determine_rate) {
+ 		rate_hw->clk = hw->clk;
+ 		return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
+ 						best_parent_p);
++	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
++		   mux_hw && mux_ops && mux_ops->set_parent) {
++		*best_parent_p = NULL;
++
++		if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
++			*best_parent_p = clk_get_parent(mux_hw->clk);
++			*best_parent_rate = __clk_get_rate(*best_parent_p);
++
++			return rate_ops->round_rate(rate_hw, rate,
++						    best_parent_rate);
++		}
++
++		for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
++			parent = clk_get_parent_by_index(mux_hw->clk, i);
++			if (!parent)
++				continue;
++
++			parent_rate = __clk_get_rate(parent);
++
++			tmp_rate = rate_ops->round_rate(rate_hw, rate,
++							&parent_rate);
++			if (tmp_rate < 0)
++				continue;
++
++			if (tmp_rate < rate)
++				rate_diff = rate - tmp_rate;
++			else
++				rate_diff = tmp_rate - rate;
++
++			if (!rate_diff || !*best_parent_p || best_rate_diff > rate_diff) {
++				*best_parent_p = parent;
++				*best_parent_rate = parent_rate;
++				best_rate_diff = rate_diff;
++			}
++
++			if (!rate_diff)
++				return rate;
++		}
++
++		return best_rate_diff;
+ 	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+ 		mux_hw->clk = hw->clk;
+ 		return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
+@@ -196,7 +242,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		composite->rate_hw = rate_hw;
+ 		composite->rate_ops = rate_ops;
+ 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+-		if (rate_ops->determine_rate)
++		if (rate_ops->determine_rate ||
++		    (rate_ops->round_rate && clk_composite_ops->set_parent))
+ 			clk_composite_ops->determine_rate = clk_composite_determine_rate;
+ 	}
+ 
+-- 
+1.7.9.5
