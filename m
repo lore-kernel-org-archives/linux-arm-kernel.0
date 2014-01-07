@@ -1,24 +1,29 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Jan 2014 23:17:40 +0100
-Subject: [PATCH v2 3/8] clk: sunxi: get divs parent clock name from
- parent factor clock
-In-Reply-To: <1388987892-23733-4-git-send-email-wens@csie.org>
+Date: Tue, 7 Jan 2014 23:16:46 +0100
+Subject: [PATCH v2 2/8] clk: sunxi: choose correct name for multiple
+ output factor clocks
+In-Reply-To: <1388987892-23733-3-git-send-email-wens@csie.org>
 References: <1388987892-23733-1-git-send-email-wens@csie.org>
- <1388987892-23733-4-git-send-email-wens@csie.org>
-Message-ID: <20140107221740.GG3103@lukather>
+ <1388987892-23733-3-git-send-email-wens@csie.org>
+Message-ID: <20140107221646.GF3103@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 01:58:07PM +0800, Chen-Yu Tsai wrote:
-> Divs clocks consist of a parent factor clock with multiple outputs,
-> and seperate clocks for each output. Get the name of the parent
-> clock from the parent factor clock, instead of the DT node name.
+On Mon, Jan 06, 2014 at 01:58:06PM +0800, Chen-Yu Tsai wrote:
+> Some factor clocks, such as the parent clock of pll5 and pll6, have
+> multiple output names. Use the last name as the name for the clock
+> itself.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks!
+Mike, Emilio,
+
+This changes the clock names with regard to the previous patches
+emilio sent that will be merged in 3.14. It would be great if we could
+merge this in 3.14 as well.
+
 Maxime
 
 -- 
@@ -31,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/fffe0c71/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/656231d9/attachment.sig>
