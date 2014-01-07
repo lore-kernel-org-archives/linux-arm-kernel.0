@@ -1,31 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jan 2014 18:46:58 +0000
-Subject: [PATCH 0/4] arm64 topology support
-In-Reply-To: <20140107182355.GL31886@sirena.org.uk>
-References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
- <20140107180545.GB14603@e102568-lin.cambridge.arm.com>
- <20140107182355.GL31886@sirena.org.uk>
-Message-ID: <20140107184658.GN31886@sirena.org.uk>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Tue, 7 Jan 2014 10:53:41 -0800
+Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
+Message-ID: <1389120821-12007-1-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 06:23:55PM +0000, Mark Brown wrote:
-> On Tue, Jan 07, 2014 at 06:05:45PM +0000, Lorenzo Pieralisi wrote:
+The board schematic states that the "SD_CARD_DET_N gets pulled to GND
+when card is inserted" so the polarity has been updated to active low.
 
-> > I think cpu-map must only contain cluster nodes as descendant children. This
-> > to prevent creative DTs with cluster and core nodes at top topology level.
-> > Overall it makes sense, cores can only exist in a cluster container, might
-> > seem churn but at least that's strict.
+Polarity is now specified with a GPIO define instead of a magic number.
 
-> That still leaves the question of what you want to happen with such
-> maps.
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+---
+ arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-I've implemented a warning for this; it seems more constructive than
-rejecting such DTs outright.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/d23d963f/attachment.sig>
+diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+index 08e47c2..27dd110 100644
+--- a/arch/arm/boot/dts/bcm28155-ap.dts
++++ b/arch/arm/boot/dts/bcm28155-ap.dts
+@@ -13,6 +13,8 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/gpio/gpio.h>
++
+ #include "bcm11351.dtsi"
+ 
+ / {
+@@ -40,7 +42,7 @@
+ 
+ 	sdio4: sdio at 3f1b0000 {
+ 		max-frequency = <48000000>;
+-		cd-gpios = <&gpio 14 0>;
++		cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
+ 		status = "okay";
+ 	};
+ };
+-- 
+1.8.0.1
