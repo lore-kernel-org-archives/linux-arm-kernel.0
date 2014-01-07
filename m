@@ -1,40 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 15:41:21 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <20140106162442.GB13111@lunn.ch>
-References: <1388743185-24822-1-git-send-email-gregory.clement@free-electrons.com>
- <201401061637.28194.arnd@arndb.de> <20140106162442.GB13111@lunn.ch>
-Message-ID: <201401071541.21449.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Jan 2014 14:41:30 +0000
+Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available
+ for ARM_UNWIND
+In-Reply-To: <201401071533.35309.arnd@arndb.de>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <20130128125023.GA2027@linaro.org>
+ <CA+KhAHYvbxANa84FMDVV96udwhif2P2_XirPhWVWTKy_8iK72A@mail.gmail.com>
+ <201401071533.35309.arnd@arndb.de>
+Message-ID: <20140107144130.GJ27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 January 2014, Andrew Lunn wrote:
-
-> > That would be rather unfortunate and we should probably
-> > try to merge the bindings eventually and make sure that either OS can
-> > boot with any conforming DTB
+On Tue, Jan 07, 2014 at 03:33:34PM +0100, Arnd Bergmann wrote:
+> On Tuesday 29 January 2013, Keun-O Park wrote:
+> > On Mon, Jan 28, 2013 at 9:50 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> > > On Mon, Jan 28, 2013 at 11:33:11AM +0900, Keun-O Park wrote:
+> > >> Hello guys,
+> > >>
+> > >> Could you please review the patch of fixing bug first of returning
+> > >> wrong address when using frame pointer?
+> > >> I am wondering if the first patch is not delivered to the mailing.
+> > >
+> > > I posted a similar patch to alkml a couple of months ago, but I got
+> > > no response and it looks like I forgot about it.
+> > >
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129381.html
+> > 
+> > Yes, same except initialization of data.addr. :)
+> > This means there might be no one interested in using
+> > ftrace-irqsoff/premptoff in ARM during a couple of months?
 > 
-> It probably requires one of the DT maintainers to talk to FreeBSD
-> equivalents to get some coordination going. We have a lot of generic
-> stuff, like gpio keys, gpio leds, cpu nodes, mtd partitions, etc,
-> which could be done at a high level, and then SoC specific nodes
-> sorted out between individual developers.
-
-Right. They seem to have quite a selection of dts files by now, which
-are roughly comparable to the ones we have, but slightly different
-in some aspects.
-
-> > On the example of missing clocks, it should work as long as all relevant
-> > clocks are enabled by the boot loader and the clock properties are
-> > optional the binding.
 > 
-> However, not all clocks are optional. We need the clock in order to
-> know how fast it ticks. So at least the serial ports and i2c will not
-> work, and maybe other devices, i would have to check.
+> It's been almost a year since we last discussed the patches that were
+> posted by Dave and sahara, but nothing has changed in the mainline kernel.
+> 
+> Any chance that someone could be motivated to pick this work up again
+> and finally fix return_address().
 
-Right. We used to have "clock-frequency" properties defined in a number
-of bindings that predate the generic clock binding, but I guess we wouldn't
-do that anymore.
+I thought that we had _actively_ decided that we would not use the
+unwinder for these paths - that it was too expensive for these paths,
+and you had to use frame pointers instead.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
