@@ -1,96 +1,59 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 7 Jan 2014 10:26:12 +0800
-Subject: [PATCH v2] extcon: gpio: Add power resume support
-In-Reply-To: <1388122847-3276-1-git-send-email-rongjun.ying@csr.com>
-References: <1388122847-3276-1-git-send-email-rongjun.ying@csr.com>
-Message-ID: <CAGsJ_4zYRL2aM4vMxY6RT41ow3M1AjFDpcAcf2itarRjeF2CWA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  7 Jan 2014 11:27:14 +0900
+Subject: [PATCH v3 2/3] ARM: shmobile: r7s72100: Add clock for r7s72100-ether
+In-Reply-To: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
+References: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1389061635-4083-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/12/27 rjying <rjying@gmail.com>:
-> From: Rongjun Ying <rongjun.ying@csr.com>
->
-> When system on the suspend state, Some SoC can't get gpio interrupt.
-> After system resume, need send extcon uevent to userspace.
->
-> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Barry Song <Baohua.Song@csr.com>
+---
+v2
+* As suggested by Sergei Shtylyov
+  - Add MSTP74 to beginning of enum on a line by itself
+* As suggested by Magnus Damm
+  - r7s72100 ethernet is not gigabit so do not refer to it as such
+---
+ arch/arm/mach-shmobile/clock-r7s72100.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-for CSR SiRFSoC, we need similar patch in extcon to make the lost
-plug/unplug event during sleeping to be resent.
-
-> ---
->  -v2: Add lost_sleep_irq flags.
->
->  drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
->  include/linux/extcon/extcon-gpio.h |    1 +
->  2 files changed, 21 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
-> index 7e0dff5..fde52c1 100644
-> --- a/drivers/extcon/extcon-gpio.c
-> +++ b/drivers/extcon/extcon-gpio.c
-> @@ -40,6 +40,7 @@ struct gpio_extcon_data {
->         int irq;
->         struct delayed_work work;
->         unsigned long debounce_jiffies;
-> +       bool lost_sleep_irq;
->  };
->
->  static void gpio_extcon_work(struct work_struct *work)
-> @@ -103,6 +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
->         extcon_data->gpio_active_low = pdata->gpio_active_low;
->         extcon_data->state_on = pdata->state_on;
->         extcon_data->state_off = pdata->state_off;
-> +       extcon_data->lost_sleep_irq = pdata->lost_sleep_irq;
->         if (pdata->state_on && pdata->state_off)
->                 extcon_data->edev.print_state = extcon_gpio_print_state;
->         if (pdata->debounce) {
-> @@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +#ifdef CONFIG_PM_SLEEP
-> +static int gpio_extcon_resume(struct device *dev)
-> +{
-> +       struct gpio_extcon_data *extcon_data;
-> +
-> +       extcon_data = dev_get_drvdata(dev);
-> +       if (extcon_data->lost_sleep_irq)
-> +               queue_delayed_work(system_power_efficient_wq,
-> +                       &extcon_data->work, extcon_data->debounce_jiffies);
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops gpio_extcon_pm_ops = {
-> +       SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
-> +};
-> +
->  static struct platform_driver gpio_extcon_driver = {
->         .probe          = gpio_extcon_probe,
->         .remove         = gpio_extcon_remove,
->         .driver         = {
->                 .name   = "extcon-gpio",
->                 .owner  = THIS_MODULE,
-> +               .pm = &gpio_extcon_pm_ops,
->         },
->  };
->
-> diff --git a/include/linux/extcon/extcon-gpio.h b/include/linux/extcon/extcon-gpio.h
-> index 4195810..c7f0c3e 100644
-> --- a/include/linux/extcon/extcon-gpio.h
-> +++ b/include/linux/extcon/extcon-gpio.h
-> @@ -51,6 +51,7 @@ struct gpio_extcon_platform_data {
->         /* if NULL, "0" or "1" will be printed */
->         const char *state_on;
->         const char *state_off;
-> +       bool lost_sleep_irq;
->  };
->
->  #endif /* __EXTCON_GPIO_H__ */
-> --
-> 1.7.5.4
-
--barry
+diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
+index e6ab0cd..c4ba651 100644
+--- a/arch/arm/mach-shmobile/clock-r7s72100.c
++++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+@@ -27,6 +27,7 @@
+ #define FRQCR2		0xfcfe0014
+ #define STBCR3		0xfcfe0420
+ #define STBCR4		0xfcfe0424
++#define STBCR7		0xfcfe0430
+ #define STBCR9		0xfcfe0438
+ 
+ #define PLL_RATE 30
+@@ -146,6 +147,7 @@ struct clk div4_clks[DIV4_NR] = {
+ };
+ 
+ enum {	MSTP97, MSTP96, MSTP95, MSTP94,
++	MSTP74,
+ 	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
+ 	MSTP33,	MSTP_NR };
+ 
+@@ -154,6 +156,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
+ 	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
+ 	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
++	[MSTP74] = SH_CLK_MSTP8(&peripheral1_clk, STBCR7, 4, 0), /* Ether */
+ 	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
+ 	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
+ 	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
+@@ -176,6 +179,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
+ 
+ 	/* MSTP clocks */
++	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+ 	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+ 
+ 	/* ICK */
+-- 
+1.8.4
