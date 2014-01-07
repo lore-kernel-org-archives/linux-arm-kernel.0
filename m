@@ -1,52 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Jan 2014 20:53:41 +0100
-Subject: [PATCH 1/3] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
-In-Reply-To: <11491980.GOk5XT7hjl@avalon>
-References: <1388763256-25851-1-git-send-email-geert@linux-m68k.org>
- <1388763256-25851-2-git-send-email-geert@linux-m68k.org>
- <11491980.GOk5XT7hjl@avalon>
-Message-ID: <CAMuHMdVuDWi+6LCscS0U8vVV=VXXSwXJoTSdokdNjYWHP_8QoQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 7 Jan 2014 11:54:12 -0800
+Subject: [PATCH v2 3/7] mfd: pm8921: Migrate to irqdomains
+In-Reply-To: <20140107082233.GB3182@lee--X1>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
+ <20140106155350.GI30156@lee--X1> <52CB1323.6080200@codeaurora.org>
+ <20140107082233.GB3182@lee--X1>
+Message-ID: <20140107195412.GC14405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 3:58 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> +static const unsigned int qspi_pins[] = {
->> +     /* SPCLK, MOSI_IO0, MISO_IO1, IO2, IO3, SSL */
->> +     RCAR_GP_PIN(1, 4), RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6),
->> +     RCAR_GP_PIN(1, 7), RCAR_GP_PIN(1, 8), RCAR_GP_PIN(1, 9),
->> +};
->
-> The QSPI controller can be used in 1-bit, 2-bit or 4-mode mode, so you should
-> split the pins group to allow that. You could use one pin group for the
-> control signals (SPCLK and SSL), one group for 2-bit data (MOSI + MISO, or IO0
-> + IO1 depending on the mode) and one group for 4-bit data (IO0 + IO1 + IO2 +
-> IO3).
+On 01/07, Lee Jones wrote:
+> > >> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> > >> +}
+> > > Can't you use the MFD core instead?
+> > >
+> > 
+> > Are you suggesting using mfd_add_devices()? At first glance it looks
+> > like that would require an array of mfd_cell structures that do nothing
+> > besides match compatible strings in the DT. Using of_platform_populate()
+> > achieves the same goal and doesn't require an array of mfd_cell
+> > structures for each different pm8xxx chip that comes along, meaning
+> > simpler code.
+> 
+> I'm inclined to agree, but playing Devil's advocate here, as a device
+> using the MFD subsystem it's often clearer to readers and other people
+> looking for examples if the MFD core functionality is used. For
+> instance, I now have no idea what devices the PM8xxx encompasses
+> without looking at the DTS file. A small cell structure is a small
+> price to pay for code clarity IMHO.
+> 
 
-OK, while you can't mix "real" functions (half of the pins are FN2, the other
-half FN3), I forgot you can still configure the SoC to use IO2 and IO3 for GPIO.
+Why not just put that information in the binding document? And
+how is this different from adding a bunch of C files to match a
+set of compatible strings that a dts file has just so that we can
+add all the devices on a board (think board files for an SoC).
+Sure it documents the devices on a board, but we've been moving
+away from that by using of_platform_populate().
 
-Will split in qspi_ctrl (2 control wires), qspi_data2 (2 data wires),
-and qspi_data4 (4 data wires).
+IMHO the code is clear. I want to add all subnodes of this
+device's node as children struct devices. Using
+of_platform_populate() says that, whereas mfd_add_devices() says
+I want to add these specific subnodes of this device's node.
 
-> I assume that usage of the SSL signal is always required. If that's not the
-> case the control signals group should be split in two.
->
-> Similarly, if the hardware supports "write-only" mode (where the MISO signal
-> isn't connected), that should be supported through a 1-bit data signals group.
+Also, as more drivers are written and more bindings are ratified
+this platform driver will need to be updated with more cells and
+more compatible strings, causing more inter-tree dependencies and
+more patches. Please, let's avoid this if we can.
 
-No, the hardware doesn't support three-wire mode.
-Only four-wire (Single/Dual SPI) and six-wire (Quad SPI) are supported.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
