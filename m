@@ -1,58 +1,31 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Tue, 7 Jan 2014 14:11:46 +0000
-Subject: [PATCH] ARM: dts: imx6sl: add ocram driver support
-In-Reply-To: <20140107135332.GK12346@S2101-09.ap.freescale.net>
-References: <1389041857-18512-1-git-send-email-b20788@freescale.com>,
- <20140107135332.GK12346@S2101-09.ap.freescale.net>
-Message-ID: <9F47F626-EAD4-41EA-B5BE-D9AC8DD3CC61@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jan 2014 14:11:54 +0000
+Subject: [PATCH 01/11] ARM: ux500: Don't use enums for MSP IDs - for easy
+ DT conversion
+In-Reply-To: <CACRpkda5bQ37OCtO17hj_tVrkAdTXA4-DzgBTaFmuswvb0h9fA@mail.gmail.com>
+References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+ <1387468508-12286-2-git-send-email-lee.jones@linaro.org>
+ <CACRpkda5bQ37OCtO17hj_tVrkAdTXA4-DzgBTaFmuswvb0h9fA@mail.gmail.com>
+Message-ID: <20140107141154.GI3182@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Got them, thanks!
+On Tue, 07 Jan 2014, Linus Walleij wrote:
 
-Sent from my iPad
+> On Thu, Dec 19, 2013 at 4:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> I guess it's best to merge this with the other ASoC patches
+> through Mark's tree?
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-? 2014-1-7?21:52?"Shawn Guo" <shawn.guo@linaro.org> ???
+I'm happy with that, although I haven't heard from Mark for ages.
 
-> On Mon, Jan 06, 2014 at 03:57:37PM -0500, Anson Huang wrote:
->> Add ocram driver support on i.MX6SL.
-> 
-> s/driver/device, both commit log and patch subject.
-> 
->> 
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->> ---
->> arch/arm/boot/dts/imx6sl.dtsi |    6 ++++++
->> 1 file changed, 6 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
->> index b526118..575e222 100644
->> --- a/arch/arm/boot/dts/imx6sl.dtsi
->> +++ b/arch/arm/boot/dts/imx6sl.dtsi
->> @@ -532,6 +532,12 @@
->>                interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
->>            };
->> 
->> +            ocram: sram at 00900000 {
->> +                compatible = "mmio-sram";
->> +                reg = <0x00900000 0x20000>;
->> +                clocks = <&clks IMX6SL_CLK_OCRAM>;
->> +            };
->> +
-> 
-> When a node is named in form of name at num, we should sort the node in num
-> order.  That said, the node should be added before l2-cache at 00a02000
-> rather than here.
-> 
-> I fixed them all up, and applied the patch.
-> 
-> Shawn
-> 
->>            src: src at 020d8000 {
->>                compatible = "fsl,imx6sl-src", "fsl,imx51-src";
->>                reg = <0x020d8000 0x4000>;
->> -- 
->> 1.7.9.5
->> 
->> 
-> 
+Mark, are you still tracking this?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
