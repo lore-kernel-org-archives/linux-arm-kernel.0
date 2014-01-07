@@ -1,55 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Jan 2014 17:12:54 +0100
-Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
- controller
-In-Reply-To: <52CC2381.2090905@arm.com>
-References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
- <4325123.pn10H18tk9@wuerfel> <52CC2381.2090905@arm.com>
-Message-ID: <6680044.VpT1oREkGO@wuerfel>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Jan 2014 17:13:58 +0100
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <86d2k37puy.fsf@void.printf.net>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1526599.nZ6xaI3TN3@avalon> <86d2k37puy.fsf@void.printf.net>
+Message-ID: <2027886.JWMjoveTXm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014 15:55:45 Sudeep Holla wrote:
-> On 07/01/14 12:54, Arnd Bergmann wrote:
-> > On Tuesday 07 January 2014 12:41:42 Sudeep Holla wrote:
-> >> Hi Tushar,
-> >>
-> >> This has been discussed couple of times in past[1][2], and the opinion was not
-> >> to have these in DT as they are more configuration data than the actual hardware
-> >> description.
+On Tuesday 07 January 2014 15:50:45 Chris Ball wrote:
+> On Tue, Jan 07 2014, Laurent Pinchart wrote:
+> > On Wednesday 11 December 2013 13:53:21 Laurent Pinchart wrote:
+> >> Hi Chris,
+> >> 
+> >> Could you please pick this patch (and patch 08/15 in the same series) up
+> >> for v3.14 ?
 > > 
-> > How do you suggest we get rid of the magic constants in platform code then?
-> > I definitely don't want to keep the current state, and having configuration
-> > data in DT seems the lesser evil.
-> > 
+> > Ping ?
 > 
-> I agree, but since these are more L2CC configuration than hardware description,
-> IMO chosen node is one option. However it's good to get opinion from DT guys.
+> Thanks, both pushed to mmc-next for 3.14, sorry for the delay.
 
-I think one of the discussions we had during the Edinburgh kernel summit resulted
-in being more relaxed towards configuration data in device nodes.
+No worries, thank you.
 
-> > Are there some reasonable defaults that Linux could use independent of the
-> > platform and of what the boot loader defaults to?
-> > 
-> 
-> Most of these registers can't be programmed in Non-secure mode. So as mentioned
-> already in previous discussions it is better to avoid these settings in kernel.
-> It would be better if bootloader programs these settings even if Linux runs in
-> secure mode for simplicity.
+-- 
+Regards,
 
-Yes, that would be ideal, but I fear we have to live with the boot loaders that
-are in existence already. Whether or not the registers can be programmed in
-non-secure mode is certainly a piece of information that belongs into the DT
-node, so we don't try to write them when we shouldn't. We could also have a
-property that identifies whether the boot loader has in fact set up the cache
-controller correctly or whether Linux has to do it. There should be no
-argument about this being out of scope, since it describes a platform property
-(presence of a sane boot loader) rather than the actual configuration.
-
-If we decide to have such properties and we boot on a system where we can
-and should change the settings, is there a way for Linux to know what the
-settings are supposed to be other than reading them from a DT file or
-from a per-platform default?
-
-	Arnd
+Laurent Pinchart
