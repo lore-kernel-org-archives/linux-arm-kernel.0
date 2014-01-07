@@ -1,83 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 16:35:01 +0100
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <201401031049.20932.arnd@arndb.de>
- <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
-Message-ID: <201401071635.02006.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jan 2014 15:36:34 +0000
+Subject: [PATCH 01/11] ARM: ux500: Don't use enums for MSP IDs - for easy
+ DT conversion
+In-Reply-To: <1387468508-12286-2-git-send-email-lee.jones@linaro.org>
+References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
+ <1387468508-12286-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140107153634.GK31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Tanmay Inamdar wrote:
-> On Fri, Jan 3, 2014 at 1:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> +Required properties:
-> >> +- status: Either "ok" or "disabled".
-> >> +- device_type: set to "pci"
-> >> +- compatible: should contain "xgene,pcie" to identify the core.
-> >> +- reg: base addresses and lengths of the pcie controller configuration
-> >> +     space register.
-> >> +- #address-cells: set to <3>
-> >> +- #size-cells: set to <2>
-> >> +- ranges: ranges for the PCI memory, I/O regions, config and MSI regions
-> >> +- #interrupt-cells: set to <1>
-> >> +- interrupt-map-mask and interrupt-map: standard PCI properties
-> >> +     to define the mapping of the PCIe interface to interrupt
-> >> +     numbers.
-> >> +- clocks: from common clock binding: handle to pci clock.
-> >> +- clock-names: from common clock binding. Should be "pcieclk".
-> >> +
-> >
-> > Better use an anonymous clock?
-> 
-> Sorry. Can you please elaborate?
+On Thu, Dec 19, 2013 at 03:54:58PM +0000, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I mean drop the "clock-names" property.
-
-> >> +SoC specific DT Entry:
-> >> +     pcie0: pcie at 1f2b0000 {
-> >> +             status = "disabled";
-> >> +             device_type = "pci";
-> >> +             compatible = "xgene,pcie";
-> >> +             #interrupt-cells = <1>;
-> >> +             #size-cells = <2>;
-> >> +             #address-cells = <3>;
-> >> +             reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
-> >> +             ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
-> >
-> >
-> > Also, do you support no prefetchable memory?
-> 
-> HW has either IO or Memory regions for mapping device's memory space.
-> There is no separate prefetchable memory space.
-
-Are you sure the memory is non-prefetchable then? I would have expected
-0x42000000 rather than 0x02000000, but I could be misremembering it.
-
-> >
-> >> +                       0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
-> >
-> > config space is not normally in the ranges property, and I think you will need
-> > it in the pcie node itself as a 'reg' property so the code can access it.
-> 
-> pcie-designware.c does it that way. I just followed their implementation.
-
-I don't remember what led to that, it still seems wrong and I can't find anything
-in the PCI binding for host bridges telling their config space this way.
-
-> >> +             interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-> >> +             interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
-> >
-> > Only one IRQ for all devices?
-> 
-> The node represents a port. I believe that Linux framework uses only
-> one of the legacy IRQs per port. Rest all remain unused. Hence I
-> removed them. Please correct me if I am wrong.
-
-Any PCI device can normally have four interrupts (IntA through IntD), which are
-traditionally separate pins on a PCI bus, but get emulated on PCIe. While it's
-not common for any normal device to use more than one IRQ, a bridge device
-will swizzle these (virtual) IRQ lines, so a device behind the bridge actually
-gets a different host IRQ.
-
-	Arnd
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/2b3e20c2/attachment.sig>
