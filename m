@@ -1,42 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jan 2014 16:11:36 +0000
-Subject: [PATCH v3 09/36] mtd: st_spi_fsm: Provide device look-up table
-In-Reply-To: <52B016A0.3080201@st.com>
-References: <1385727565-25794-1-git-send-email-lee.jones@linaro.org>
- <1385727565-25794-10-git-send-email-lee.jones@linaro.org>
- <20131210220338.GF27149@ld-irv-0074.broadcom.com>
- <52B016A0.3080201@st.com>
-Message-ID: <20140107161136.GK3182@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Jan 2014 17:12:54 +0100
+Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
+ controller
+In-Reply-To: <52CC2381.2090905@arm.com>
+References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
+ <4325123.pn10H18tk9@wuerfel> <52CC2381.2090905@arm.com>
+Message-ID: <6680044.VpT1oREkGO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> +/* SPI Flash Device Table */
-> >> +struct flash_info {
-> >> +	char		*name;
-> >> +	/*
-> >> +	 * JEDEC id zero means "no ID" (most older chips); otherwise it has
-> >> +	 * a high byte of zero plus three data bytes: the manufacturer id,
-> >> +	 * then a two byte device id.
-> >> +	 */
-> >> +	u32		jedec_id;
-> >> +	u16             ext_id;
+On Tuesday 07 January 2014 15:55:45 Sudeep Holla wrote:
+> On 07/01/14 12:54, Arnd Bergmann wrote:
+> > On Tuesday 07 January 2014 12:41:42 Sudeep Holla wrote:
+> >> Hi Tushar,
+> >>
+> >> This has been discussed couple of times in past[1][2], and the opinion was not
+> >> to have these in DT as they are more configuration data than the actual hardware
+> >> description.
 > > 
-> > Will 5 bytes of ID be enough? I think we're running into a need for 6
-> > bytes of ID in m25p80.c right about now. Might make sense to start with
-> > the right number of bytes.
+> > How do you suggest we get rid of the magic constants in platform code then?
+> > I definitely don't want to keep the current state, and having configuration
+> > data in DT seems the lesser evil.
+> > 
 > 
-> Yes, we will need 6 bytes of ID.  The "dirty" stm_spi_fsm driver already handles
-> arbitrary-length IDs.  This will need to be pulled into the "upstream" version
-> at some point.
+> I agree, but since these are more L2CC configuration than hardware description,
+> IMO chosen node is one option. However it's good to get opinion from DT guys.
 
-Just looking at this now. May I do this subsequently? It's a pretty
-big change and I don't want to disturb the patch-set too much at this
-moment. The "dirty" kernel has only been updated with this change
-recently. We will need it too, but we can definitely do without it for
-a little while.
+I think one of the discussions we had during the Edinburgh kernel summit resulted
+in being more relaxed towards configuration data in device nodes.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > Are there some reasonable defaults that Linux could use independent of the
+> > platform and of what the boot loader defaults to?
+> > 
+> 
+> Most of these registers can't be programmed in Non-secure mode. So as mentioned
+> already in previous discussions it is better to avoid these settings in kernel.
+> It would be better if bootloader programs these settings even if Linux runs in
+> secure mode for simplicity.
+
+Yes, that would be ideal, but I fear we have to live with the boot loaders that
+are in existence already. Whether or not the registers can be programmed in
+non-secure mode is certainly a piece of information that belongs into the DT
+node, so we don't try to write them when we shouldn't. We could also have a
+property that identifies whether the boot loader has in fact set up the cache
+controller correctly or whether Linux has to do it. There should be no
+argument about this being out of scope, since it describes a platform property
+(presence of a sane boot loader) rather than the actual configuration.
+
+If we decide to have such properties and we boot on a system where we can
+and should change the settings, is there a way for Linux to know what the
+settings are supposed to be other than reading them from a DT file or
+from a per-platform default?
+
+	Arnd
