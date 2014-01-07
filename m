@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jan 2014 15:37:34 +0000
-Subject: [PATCH 03/11] ASoC: ux500: Provide better checking for Device
- Tree and/or Platform Data
-In-Reply-To: <1387468508-12286-4-git-send-email-lee.jones@linaro.org>
+Date: Tue, 7 Jan 2014 15:37:48 +0000
+Subject: [PATCH 04/11] ASoC: Ux500: Match platform by device node when
+ booting Device Tree
+In-Reply-To: <1387468508-12286-5-git-send-email-lee.jones@linaro.org>
 References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
- <1387468508-12286-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140107153734.GL31886@sirena.org.uk>
+ <1387468508-12286-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140107153748.GM31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 03:55:00PM +0000, Lee Jones wrote:
-> These drivers will not work without platform specific data, which is
-> passed in via Device Tree or Platform Data. To avoid the chance of
-> NULL pointer dereferencing and alike, let's ensure we have at least
-> one of the methods in play before continuing.
+On Thu, Dec 19, 2013 at 03:55:01PM +0000, Lee Jones wrote:
+> We're getting closer to fully enabling the Ux500 ASoC driver for Device
+> Tree. When we switch over from using AUXDATA we'll need to match platform
+> by only Device Tree nodes. In this patch we NULL out the platform_name,
+> and supply nodes for each platform device.
 
 Applied, thanks.
 -------------- next part --------------
@@ -22,4 +22,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/a92cc9d1/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/62ff2af5/attachment.sig>
