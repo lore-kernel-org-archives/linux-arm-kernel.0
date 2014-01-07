@@ -1,137 +1,67 @@
-From: Rongjun.Ying@csr.com (Rongjun Ying)
-Date: Tue, 7 Jan 2014 09:48:43 +0000
-Subject: [PATCH v3] extcon: gpio: Add power resume support
-In-Reply-To: <52CB9989.9010609@samsung.com>
-References: <1389070590-3139-1-git-send-email-rongjun.ying@csr.com>
- <52CB9989.9010609@samsung.com>
-Message-ID: <86130EF012BDF348AA0D464A4F449478012AC8692C@SHAASIEXM01.ASIA.ROOT.PRI>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Tue, 7 Jan 2014 09:49:02 +0000
+Subject: [PATCH] the eDMA support for the LPUART send driver
+In-Reply-To: <201401051544.50036.arnd@arndb.de>
+References: <1388143449-28640-1-git-send-email-yao.yuan@freescale.com>
+ <201401051544.50036.arnd@arndb.de>
+Message-ID: <8c7c4d5a53f74c6aa2f701bcb3dbbeab@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thanks for your suggestion.
 
+I will fix those errors and also add the "jpg" in the next version.
 
-> -----Original Message-----
-> From: Chanwoo Choi [mailto:cw00.choi at samsung.com]
-> Sent: Tuesday, January 07, 2014 2:07 PM
-> To: RongJun Ying
-> Cc: MyungJoo Ham; Barry Song; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; DL-SHA-WorkGroupLinux; Rongjun Ying
-> Subject: Re: [PATCH v3] extcon: gpio: Add power resume support
-> 
-> This patch has conflict as following:
-> You have to implement extcon patch based mainline extcon-next branch.
-> 
-> Applying: extcon: gpio: Add power resume support
-> error: patch failed: drivers/extcon/extcon-gpio.c:103
-> error: drivers/extcon/extcon-gpio.c: patch does not apply Patch failed
-> at 0001 extcon: gpio: Add power resume support The copy of the patch
-> that failed is found in:
->    /home/cwchoi00/kernel/git.kernel/extcon/.git/rebase-apply/patch
-> When you have resolved this problem, run "git am --resolved".
-> If you prefer to skip this patch, run "git am --skip" instead.
-> To restore the original branch and stop patching, run "git am --abort".
-> 
-> This time, I will manually apply this patch on extcon branch.
-> 
-> Thanks,
-> Chanwoo Choi
-> 
-Thank you.
+-----Original Message-----
+From: Arnd Bergmann [mailto:arnd at arndb.de] 
+Sent: Sunday, January 05, 2014 10:45 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Yuan Yao-B46683; gregkh at linuxfoundation.org; linux-serial at vger.kernel.org
+Subject: Re: [PATCH] the eDMA support for the LPUART send driver
 
-RongJun Ying
-
-> On 01/07/2014 01:56 PM, RongJun Ying wrote:
-> > From: Rongjun Ying <rongjun.ying@csr.com>
-> >
-> > When system on the suspend state, Some SoC can't get gpio interrupt.
-> > After system resume, need send extcon uevent to userspace.
-> >
-> > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-> > Reviewed-by: Barry Song <Baohua.Song@csr.com>
-> > ---
-> >  -v3:
-> >  'check_on_resume' instead of 'load_sleep_irq' as Chanwoo Choi's
-> proposal.
-> >
-> >  drivers/extcon/extcon-gpio.c       |   20 ++++++++++++++++++++
-> >  include/linux/extcon/extcon-gpio.h |    1 +
-> >  2 files changed, 21 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/extcon/extcon-gpio.c
-> > b/drivers/extcon/extcon-gpio.c index 7e0dff5..fde52c1 100644
-> > --- a/drivers/extcon/extcon-gpio.c
-> > +++ b/drivers/extcon/extcon-gpio.c
-> > @@ -40,6 +40,7 @@ struct gpio_extcon_data {
-> >  	int irq;
-> >  	struct delayed_work work;
-> >  	unsigned long debounce_jiffies;
-> > +	bool check_on_resume;
-> >  };
-> >
-> >  static void gpio_extcon_work(struct work_struct *work) @@ -103,6
-> > +104,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
-> >  	extcon_data->gpio_active_low = pdata->gpio_active_low;
-> >  	extcon_data->state_on = pdata->state_on;
-> >  	extcon_data->state_off = pdata->state_off;
-> > +	extcon_data->check_on_resume = pdata->check_on_resume;
-> >  	if (pdata->state_on && pdata->state_off)
-> >  		extcon_data->edev.print_state = extcon_gpio_print_state;
-> >  	if (pdata->debounce) {
-> > @@ -159,12 +161,30 @@ static int gpio_extcon_remove(struct
-> platform_device *pdev)
-> >  	return 0;
-> >  }
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int gpio_extcon_resume(struct device *dev) {
-> > +	struct gpio_extcon_data *extcon_data;
-> > +
-> > +	extcon_data = dev_get_drvdata(dev);
-> > +	if (extcon_data->check_on_resume)
-> > +		queue_delayed_work(system_power_efficient_wq,
-> > +			&extcon_data->work, extcon_data->debounce_jiffies);
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-> > +static const struct dev_pm_ops gpio_extcon_pm_ops = {
-> > +	SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume) };
-> > +
-> >  static struct platform_driver gpio_extcon_driver = {
-> >  	.probe		= gpio_extcon_probe,
-> >  	.remove		= gpio_extcon_remove,
-> >  	.driver		= {
-> >  		.name	= "extcon-gpio",
-> >  		.owner	= THIS_MODULE,
-> > +		.pm = &gpio_extcon_pm_ops,
-> >  	},
-> >  };
-> >
-> > diff --git a/include/linux/extcon/extcon-gpio.h
-> > b/include/linux/extcon/extcon-gpio.h
-> > index 4195810..c7f0c3e 100644
-> > --- a/include/linux/extcon/extcon-gpio.h
-> > +++ b/include/linux/extcon/extcon-gpio.h
-> > @@ -51,6 +51,7 @@ struct gpio_extcon_platform_data {
-> >  	/* if NULL, "0" or "1" will be printed */
-> >  	const char *state_on;
-> >  	const char *state_off;
-> > +	bool check_on_resume;
-> >  };
-> >
-> >  #endif /* __EXTCON_GPIO_H__ */
-> > --
-> > 1.7.5.4
-> >
-> >
+On Friday 27 December 2013, Yuan Yao wrote:
+> This patch add eDMA support for LPUART send function.
 > 
-> 
-> 
->  To report this email as spam click
-> https://www.mailcontrol.com/sr/MZbqvYs5QwJvpeaetUwhCQ==
-> BhEym36W00netVd8YYrcUQrAnqreWejYcysfmF8UmgH1OQ== .
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610.dtsi    |  12 +++
+>  drivers/tty/serial/fsl_lpuart.c | 187 
+> ++++++++++++++++++++++++++++++++--------
+>  2 files changed, 163 insertions(+), 36 deletions(-)
 
+Not sure if this got applied already, but you are missing the respective change to Documentation/devicetree/bindings/serial/fsl-lpuart.txt.
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+Please document the dma-names you use here. While you are at it, please also add the "ipg" clock-name.
+
+	Arnd
+
+> +static int fsl_request_dma(struct uart_port *port) {
+> +	struct lpuart_port *sport = container_of(port,
+> +					struct lpuart_port, port);
+> +	struct dma_chan *tx_chan;
+> +	struct dma_slave_config dma_tx_sconfig;
+> +	dma_addr_t dma_phys;
+> +	unsigned char *dma_buf;
+> +	int ret;
+> +
+> +	tx_chan  = dma_request_slave_channel(sport->port.dev, "lpuart-tx");
+> +
+> +	if (!tx_chan) {
+> +		dev_err(sport->port.dev, "Dma TX channel request failed!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	dma_phys = dma_map_single(sport->port.dev,
+> +				sport->port.state->xmit.buf,
+> +				UART_XMIT_SIZE, DMA_TO_DEVICE);
+
+This is wrong: Since the dma is performed by the dma engine rather than the uart, the first argument here needs to be the dma device pointer. In fact, dma_map_single is normally supposed to fail on the uart device as the dma_mask value should be zero. Not sure why this worked.
+
+> +	if (!dma_phys) {
+> +		dev_err(sport->port.dev, "Dma_phys single failed\n");
+> +		return -ENOMEM;
+> +	}
+
+Please also change all references to "phys" -- it's not a phys address but a bus address. These are often the same, but that's not for the driver to know.
+
+	Arnd
