@@ -1,36 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Jan 2014 20:07:47 +0100
-Subject: [PATCH 1/6] pinctrl: sh-pfc: r7s72100: Add RSPI support
-In-Reply-To: <CACRpkdaKty+6G6AR8k=o0m-XpmQ6ER-TmA5LYNtEvjM_7wvtZA@mail.gmail.com>
-References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
- <1387886210-3634-2-git-send-email-geert+renesas@linux-m68k.org>
- <CACRpkdaKty+6G6AR8k=o0m-XpmQ6ER-TmA5LYNtEvjM_7wvtZA@mail.gmail.com>
-Message-ID: <CAMuHMdUrg7Jye2fiLv8BiW-0_o1VSJzuH34b30LnTgGWuneCYg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 07 Jan 2014 14:07:55 -0500 (EST)
+Subject: [PATCH v3 net-next 1/3] sh_eth: Add support for r7s72100
+In-Reply-To: <1389061635-4083-2-git-send-email-horms+renesas@verge.net.au>
+References: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
+ <1389061635-4083-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140107.140755.1722284527902829385.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Simon Horman <horms+renesas@verge.net.au>
+Date: Tue,  7 Jan 2014 11:27:13 +0900
 
-On Tue, Jan 7, 2014 at 8:03 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Dec 24, 2013 at 12:56 PM, Geert Uytterhoeven
-> <geert+renesas@linux-m68k.org> wrote:
->
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->
-> Geert can you please repost any PFC patches you have to Laurent
-> Pinchart on the To: line as well, because I have to use him as a
-> front-end for this stuff lest I drown in patches.
+> @@ -318,6 +371,14 @@ static int sh_eth_is_gether(struct sh_eth_private *mdp)
+>  		return 0;
+>  }
+>  
+> +static int sh_eth_is_rz_fast_ether(struct sh_eth_private *mdp)
+> +{
+> +	if (mdp->reg_offset == sh_eth_offset_fast_rz)
+> +		return 1;
+> +	else
+> +		return 0;
+> +}
 
-Sure, will do when I resend the (updated) series.
+Please make this return a boolean and use true/false.
 
-Gr{oetje,eeting}s,
+> @@ -2061,6 +2155,10 @@ static struct net_device_stats *sh_eth_get_stats(struct net_device *ndev)
+>  {
+>  	struct sh_eth_private *mdp = netdev_priv(ndev);
+>  
+> +	if (sh_eth_is_rz_fast_ether(mdp)) {
+> +		return &ndev->stats;
+> +	}
 
-                        Geert
+Single statement basic blocks do not need curly braces, therefore
+please remove them here.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+THanks.
