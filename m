@@ -1,77 +1,25 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 7 Jan 2014 10:27:34 -0700
-Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <CACoXjcnykxdjekfmz6B3Ovk-+naCCOCWFZ3t=ZaMWAEPyVs_eQ@mail.gmail.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <1387785725-24262-3-git-send-email-tinamdar@apm.com>
- <20131223174634.GD25089@obsidianresearch.com>
- <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
- <20140103005253.GB12098@obsidianresearch.com>
- <CACoXjcnykxdjekfmz6B3Ovk-+naCCOCWFZ3t=ZaMWAEPyVs_eQ@mail.gmail.com>
-Message-ID: <20140107172734.GC4227@obsidianresearch.com>
+From: florian.meier@koalo.de (Florian Meier)
+Date: Tue, 07 Jan 2014 18:37:12 +0100
+Subject: [PATCHv10] dmaengine: Add support for BCM2835
+In-Reply-To: <20140107161547.GA16227@intel.com>
+References: <52CB0180.1040605@koalo.de> <20140107161547.GA16227@intel.com>
+Message-ID: <52CC3B48.7080100@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 06:56:21PM -0800, Tanmay Inamdar wrote:
+Thanks to you and to all who have looked at/corrected my patch!
+I learned a lot!
 
-> > There is some kind of an addressing problem because you've done this:
-> >
-> > +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
-> > +{
-> > +       int i;
-> > +
-> > +       for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
-> > +               dev->resource[i].start = dev->resource[i].end = 0;
-> > +               dev->resource[i].flags = 0;
-> > +       }
-> > +}
-> > +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_BRIDGE_DEVICEID,
-> > +                        xgene_pcie_fixup_bridge);
-> >
-> > Which is usually a sign that something is wonky with how the HW is
-> > being fit into the PCI core.
+On 01/07/2014 05:15 PM, Vinod Koul wrote:
+> On Mon, Jan 06, 2014 at 08:18:24PM +0100, Florian Meier wrote:
+>> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
+>> Currently it only supports cyclic DMA.
+> Applied, thanks
 > 
-> We map the whole DDR range (eg 256 GB) into host's BAR. The Linux PCI
-> resource management tries to fit the host's memory into the ranges
-> provided (eg 0xe000000000).
-> Please let me know if there is any use case to do this mapping.
-
-If you need to set the bridge's BAR like this, then the bridge is not
-non-conforming.. Bridge BAR's should be 0 size unless the bridge
-itself has registers.
-
-Do any registers in this config space work properly? Does the
-secondary status reflect the physical link status properly?
-
-If it is *really* broken you might just consider hiding it from the
-Linux core.
-
-> >>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
-> >> <TAbort- <MAbort- >SERR- <PERR- INTx-
-> >>         Latency: 0, Cache Line Size: 64 bytes
-> >>         Region 0: Memory at <ignored> (64-bit, prefetchable)
-> >>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-> >>         I/O behind bridge: 0000f000-00000fff
-> >>         Memory behind bridge: 00c00000-00cfffff
-> >
-> > [..]
-> >
-> >> 01:00.0 Class 0200: Device 15b3:1003
-> >>         Region 0: Memory at e000c00000 (64-bit, non-prefetchable) [size=1M]
-> >>         Region 2: Memory at e000000000 (64-bit, prefetchable)
-> >>         [size=8M]
-> >
-> > Something funky is going on here too, the 64 bit address e000000000
-> > should be reflected in the 'memory behind bridge' above, not
-> > truncated.
+> --
+> ~Vinod
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> That's the Mellanox device that is plugged into the system. The
-> device's memory gets mapped at '0xe0xxxxxxxx'
-
-Right, but the bridge setup above has:
-
-> >>         Memory behind bridge: 00c00000-00cfffff
-
-Which is wrong, it doesn't include the range '0xe0xxxxxxxx'
-
-Jason
