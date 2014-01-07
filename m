@@ -1,38 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 15:33:34 +0100
-Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available for
- ARM_UNWIND
-In-Reply-To: <CA+KhAHYvbxANa84FMDVV96udwhif2P2_XirPhWVWTKy_8iK72A@mail.gmail.com>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <20130128125023.GA2027@linaro.org>
- <CA+KhAHYvbxANa84FMDVV96udwhif2P2_XirPhWVWTKy_8iK72A@mail.gmail.com>
-Message-ID: <201401071533.35309.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jan 2014 14:35:38 +0000
+Subject: [PATCH v7 3/3] mfd: max14577: Add device tree bindings document
+In-Reply-To: <2536498.L12VSLryvi@amdc1227>
+References: <1386329534-14186-1-git-send-email-k.kozlowski@samsung.com>
+ <1386329534-14186-4-git-send-email-k.kozlowski@samsung.com>
+ <2536498.L12VSLryvi@amdc1227>
+Message-ID: <20140107143538.GI31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Keun-O Park wrote:
-> On Mon, Jan 28, 2013 at 9:50 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> > On Mon, Jan 28, 2013 at 11:33:11AM +0900, Keun-O Park wrote:
-> >> Hello guys,
-> >>
-> >> Could you please review the patch of fixing bug first of returning
-> >> wrong address when using frame pointer?
-> >> I am wondering if the first patch is not delivered to the mailing.
-> >
-> > I posted a similar patch to alkml a couple of months ago, but I got
-> > no response and it looks like I forgot about it.
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129381.html
-> 
-> Yes, same except initialization of data.addr. :)
-> This means there might be no one interested in using
-> ftrace-irqsoff/premptoff in ARM during a couple of months?
+On Tue, Jan 07, 2014 at 03:10:04PM +0100, Tomasz Figa wrote:
+> On Friday 06 of December 2013 12:32:14 Krzysztof Kozlowski wrote:
 
+> > +- regulators :
+> > +	Required properties:
+> > +		- compatible : "maxim,max14577-regulator"
 
-It's been almost a year since we last discussed the patches that were
-posted by Dave and sahara, but nothing has changed in the mainline kernel.
+> > +	May contain a sub-node per regulator from the list below. Each
 
-Any chance that someone could be motivated to pick this work up again
-and finally fix return_address().
+> Is "May" the correct word? Wouldn't it be better to always have
+> configuration specified for all regulators of the cell?
 
-	Arnd
+It doesn't achieve anything to force people to include unused regulators
+in the DT - the node is only needed if the kernel needs to do something
+with the regulator.  This means that all the individual regulators end
+up being optional.  The set of 
+
+> Now this patch creates a question whether we should keep the existing
+> black-box MFD scheme, where the list of cells is determined by an array
+> hardcoded inside the driver or rather we should completely move to DT
+> based description where of_mfd_populate() could create all MFD cells
+> using description from DT.
+
+This has been discussed before.  The biggest issue is that the Linux
+idea of what cells it wants depends very much on whatever the current
+set of subsystems Linux has and the way we divide the hardware between
+them.  That's not a static thing, we're seeing flux with things like
+extcon and clk at the minute for example.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/a5c95db7/attachment.sig>
