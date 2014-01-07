@@ -1,39 +1,39 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 07 Jan 2014 14:07:55 -0500 (EST)
-Subject: [PATCH v3 net-next 1/3] sh_eth: Add support for r7s72100
-In-Reply-To: <1389061635-4083-2-git-send-email-horms+renesas@verge.net.au>
-References: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
- <1389061635-4083-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140107.140755.1722284527902829385.davem@davemloft.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 07 Jan 2014 20:12:42 +0100
+Subject: [PATCH] ARM: s3c24xx: fix build error
+In-Reply-To: <1389119245-2167-1-git-send-email-linus.walleij@linaro.org>
+References: <1389119245-2167-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <22410027.ZzM9gppO8W@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Horman <horms+renesas@verge.net.au>
-Date: Tue,  7 Jan 2014 11:27:13 +0900
+Am Dienstag, 7. Januar 2014, 19:27:25 schrieb Linus Walleij:
+> When enabling device tree on the S3C an additional build
+> bug appears in the Osiris DVS board file:
+> 
+> CC  arch/arm/mach-s3c24xx/mach-osiris-dvs.o
+> archh/arm/mach-s3c24xx/mach-osiris-dvs.c:
+> In function ?osiris_dvs_notify?:
+> arch/arm/mach-s3c24xx/mach-osiris-dvs.c:77:4:
+> error: implicit declaration of function ?S3C2410_GPB?
+> [-Werror=implicit-function-declaration]
+>     gpio_set_value(OSIRIS_GPIO_DVS, 1);
+>     ^
+> 
+> Fix this by explicitly including
+> <linux/platform_data/gpio-samsung-s3c24xx.h>
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I have tentatively applied this to the GPIO tree so I
+> don't cause build regressions, ACKs are still
+> appreciated from the S3C maintainers.
 
-> @@ -318,6 +371,14 @@ static int sh_eth_is_gether(struct sh_eth_private *mdp)
->  		return 0;
->  }
->  
-> +static int sh_eth_is_rz_fast_ether(struct sh_eth_private *mdp)
-> +{
-> +	if (mdp->reg_offset == sh_eth_offset_fast_rz)
-> +		return 1;
-> +	else
-> +		return 0;
-> +}
-
-Please make this return a boolean and use true/false.
-
-> @@ -2061,6 +2155,10 @@ static struct net_device_stats *sh_eth_get_stats(struct net_device *ndev)
->  {
->  	struct sh_eth_private *mdp = netdev_priv(ndev);
->  
-> +	if (sh_eth_is_rz_fast_ether(mdp)) {
-> +		return &ndev->stats;
-> +	}
-
-Single statement basic blocks do not need curly braces, therefore
-please remove them here.
-
-THanks.
+Acked-by: Heiko Stuebner <heiko@sntech.de>
