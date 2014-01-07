@@ -1,22 +1,16 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jan 2014 15:36:34 +0000
-Subject: [PATCH 01/11] ARM: ux500: Don't use enums for MSP IDs - for easy
- DT conversion
-In-Reply-To: <1387468508-12286-2-git-send-email-lee.jones@linaro.org>
-References: <1387468508-12286-1-git-send-email-lee.jones@linaro.org>
- <1387468508-12286-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140107153634.GK31886@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 16:37:02 +0100
+Subject: [PATCHv10] dmaengine: Add support for BCM2835
+In-Reply-To: <52CB0180.1040605@koalo.de>
+References: <52CB0180.1040605@koalo.de>
+Message-ID: <201401071637.03135.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 19, 2013 at 03:54:58PM +0000, Lee Jones wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Monday 06 January 2014, Florian Meier wrote:
+> Add support for DMA controller of BCM2835 as used in the Raspberry Pi.
+> Currently it only supports cyclic DMA.
+> 
+> Signed-off-by: Florian Meier <florian.meier@koalo.de>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/2b3e20c2/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
