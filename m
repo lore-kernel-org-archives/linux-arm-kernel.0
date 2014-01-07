@@ -1,31 +1,26 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 7 Jan 2014 14:54:04 +0200
-Subject: [PATCH v2 1/6] ARM: tegra: export apb dma readl/writel
-In-Reply-To: <52CB0CFE.4070901@wwwdotorg.org>
-References: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
- <1387891931-9854-2-git-send-email-pdeschrijver@nvidia.com>
- <52CB0CFE.4070901@wwwdotorg.org>
-Message-ID: <20140107125404.GD26588@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Jan 2014 13:54:55 +0100
+Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
+ controller
+In-Reply-To: <52CBF606.5080209@arm.com>
+References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
+ <52CBF606.5080209@arm.com>
+Message-ID: <4325123.pn10H18tk9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 09:07:26PM +0100, Stephen Warren wrote:
-> On 12/24/2013 06:32 AM, Peter De Schrijver wrote:
-> > Export APB DMA readl and writel. These are needed because we can't access
-> > the fuses directly on Tegra20 without potentially causing a system hang.
+On Tuesday 07 January 2014 12:41:42 Sudeep Holla wrote:
+> Hi Tushar,
 > 
-> This does a lot more than just export the functions; it also changes the
-> prototypes. I'm not sure why the prototype change was required/useful.
-> This needs to be mentioned in the commit description/subject, and the
-> reasoning explained too.
-> 
-> > diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
-> 
-> > +#if defined(CONFIG_TEGRA20_APB_DMA)
-> > +void tegra_apb_io_init(void);
-> 
-> This seems to be an internal function; why is this one publicly
-> prototyped and/or stubbed?
-> 
+> This has been discussed couple of times in past[1][2], and the opinion was not
+> to have these in DT as they are more configuration data than the actual hardware
+> description.
 
-Ah. this might be a leftover from a previous iteration... Need to check.
+How do you suggest we get rid of the magic constants in platform code then?
+I definitely don't want to keep the current state, and having configuration
+data in DT seems the lesser evil.
+
+Are there some reasonable defaults that Linux could use independent of the
+platform and of what the boot loader defaults to?
+
+	Arnd
