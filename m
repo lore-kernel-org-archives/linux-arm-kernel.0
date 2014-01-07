@@ -1,64 +1,50 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Tue, 07 Jan 2014 21:43:04 +0800
-Subject: [PATCH v7 6/7] arm64,
- jump label: optimize jump label implementation
-In-Reply-To: <20140106185139.GK1096@mudshark.cambridge.arm.com>
-References: <1387725944-810-1-git-send-email-liuj97@gmail.com>
- <1387725944-810-7-git-send-email-liuj97@gmail.com>
- <20140106185139.GK1096@mudshark.cambridge.arm.com>
-Message-ID: <52CC0468.1070004@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 7 Jan 2014 21:53:34 +0800
+Subject: [PATCH] ARM: dts: imx6sl: add ocram driver support
+In-Reply-To: <1389041857-18512-1-git-send-email-b20788@freescale.com>
+References: <1389041857-18512-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140107135332.GK12346@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2014 02:51 AM, Will Deacon wrote:
-> On Sun, Dec 22, 2013 at 03:25:42PM +0000, Jiang Liu wrote:
->> Optimize jump label implementation for ARM64 by dynamically patching
->> kernel text.
-> 
-> Almost!
-> 
->> diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
->> new file mode 100644
->> index 0000000..47cd130
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/jump_label.h
->> @@ -0,0 +1,51 @@
->> +/*
->> + * Copyright (C) 2013 Huawei Ltd.
->> + * Author: Jiang Liu <liuj97@gmail.com>
->> + *
->> + * Based on arch/arm/include/asm/jump_label.h
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#ifndef _ASM_JUMP_LABEL_H
->> +#define _ASM_JUMP_LABEL_H
-> 
-> It's actually prefixed with double-underscore in our other headers.
-OK, will fix.
+On Mon, Jan 06, 2014 at 03:57:37PM -0500, Anson Huang wrote:
+> Add ocram driver support on i.MX6SL.
+
+s/driver/device, both commit log and patch subject.
 
 > 
->> +#include <linux/types.h>
->> +
->> +#ifdef __KERNEL__
->> +
->> +#define JUMP_LABEL_NOP_SIZE		4
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6sl.dtsi |    6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> I know you didn't like including asm/insn.h, but I don't see why that's such
-> a problem. Does it cause a circular dependency or something?
-Not a big deal, just saving some compilation times. Will change to
-include asm/insn.h.
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index b526118..575e222 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -532,6 +532,12 @@
+>  				interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
+>  			};
+>  
+> +			ocram: sram at 00900000 {
+> +				compatible = "mmio-sram";
+> +				reg = <0x00900000 0x20000>;
+> +				clocks = <&clks IMX6SL_CLK_OCRAM>;
+> +			};
+> +
 
+When a node is named in form of name at num, we should sort the node in num
+order.  That said, the node should be added before l2-cache at 00a02000
+rather than here.
+
+I fixed them all up, and applied the patch.
+
+Shawn
+
+>  			src: src at 020d8000 {
+>  				compatible = "fsl,imx6sl-src", "fsl,imx51-src";
+>  				reg = <0x020d8000 0x4000>;
+> -- 
+> 1.7.9.5
 > 
-> Will
 > 
