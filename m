@@ -1,97 +1,54 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 7 Jan 2014 15:52:48 +0000
-Subject: [PATCH] arm: SIGBUS on unsupported ARMv6 unaligned accesses
-In-Reply-To: <1387304271-29226-1-git-send-email-robin.murphy@arm.com>
-References: <1387304271-29226-1-git-send-email-robin.murphy@arm.com>
-Message-ID: <20140107155243.GA3350@e103592.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jan 2014 16:53:49 +0100
+Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
+ framework
+In-Reply-To: <CAGsJ_4zE115p011hfDgzQPTUHUYk6WoQvw=vNSJP_yi=TvVkbg@mail.gmail.com>
+References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
+ <201401061641.03491.arnd@arndb.de>
+ <CAGsJ_4zE115p011hfDgzQPTUHUYk6WoQvw=vNSJP_yi=TvVkbg@mail.gmail.com>
+Message-ID: <201401071653.49964.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 06:17:51PM +0000, Robin Murphy wrote:
-> This patch changes the default behaviour for userspace alignment faults
-> on v6 from silent fixup to SIGBUS. This only affects code that violates
-> the v6 unaligned access model - bad assembly/JIT code or high-level
-> language code in violation of the relevant language spec - which should
-> be corrected rather than unwittingly relying on performance-degrading
-> fixups. Fixup behaviour can still be controlled from boot parameters or
-> at runtime for compatibility with existing incorrect software.
+On Tuesday 07 January 2014, Barry Song wrote:
+> 2014/1/6 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday 06 January 2014, Barry Song wrote:
+> >
+> >> +void __init sirfsoc_of_rstc_init(void)
+> >> +{
+> >> +     struct device_node *np = of_find_matching_node(NULL, rstc_ids);
+> >> +     if (!np) {
+> >> +             pr_err("unable to find compatible sirf rstc node in dtb\n");
+> >> +             return;
+> >> +     }
+> >> +
+> >> +     sirfsoc_rstc_base = of_iomap(np, 0);
+> >> +     if (!sirfsoc_rstc_base) {
+> >> +             pr_err("unable to map rstc cpu registers\n");
+> >> +             return;
+> >> +     }
+> >> +
+> >> +     sirfsoc_reset_controller.of_node = np;
+> >> +
+> >> +     reset_controller_register(&sirfsoc_reset_controller);
+> >> +}
+> >> +
+> >
+> > Can't this be a regular platform device? Drivers that get the reference to
+> > the reset controller should respect a -EPROBE_DEFER error message if they
+> > get initialized in the wrong order.
 > 
-> There will be no impact for v5 and earlier.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Arnd, it is ok if prima2 is not a platform for automotive. here prima2
+> actually wants a "right" order for products.
+> for example, there are some local hacking to move camera for rearview
+> started earlier than other devices as this feature needs to be ready
+> as early as possible.
+> some earlier boot devices depend on reset module to be ready. so if we
+> move to regular platform driver for upstream, it still requires some
+> local hacking to move it earlier.
 
-People sholdn't be relying on transparent alignment fixups any more,
-and anyone doing so is already doing something wrong and would benefit
-from knowing about it.
+I don't understand what you mean. It should be a matter of a few miliseconds
+at most to retry initialization, more likely in the microseconds. How big
+are the delays you are worried about?
 
-Since nobody else has raised concerns, I would vote for going ahead
-with this.
-
-
-People running OABI userspace on v6 might fall foul of this, but I
-think requiring them to pass an alignment= command line parameter
-may be an acceptable compromise.  The alternative is to apply the
-new default only if AEABI && !OABI_COMPAT.  But traditionally, most
-people building with OABI_COMPAT=y are running EABI userspace anyway.
-As you say, people running on v5 shouldn't be affected.
-
-So,
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-Cheers
----Dave
-
-> ---
-> 
-> This is very much the hard-line approach to the issue, but userspace
-> really shouldn't be depending on the ability to execute architecturally
-> invalid code; ultimately this is an ABI that deserves to be broken.
-> The only trouble with going in softly and just turning on the warning
-> alone is that it should already be rare enough to be easily missed.
-> "Break everything AND scream about it" as the default isn't going to
-> make any friends, but does make bad code as visible as possible.
-> 
-> Anyone is of course free to turn warnings off, and/or fixups back on -
-> defaulting to UM_SIGNAL on UM_IGNORE is to ensure fixup has to be
-> explicitly requested, by which point they should be well aware of what
-> they're doing and why.
-> 
->  arch/arm/mm/alignment.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 9240364..9a93315 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -106,10 +106,10 @@ static int safe_usermode(int new_usermode, bool warn)
->  	 * making any progress.
->  	 */
->  	if (cpu_is_v6_unaligned() && !(new_usermode & (UM_FIXUP | UM_SIGNAL))) {
-> -		new_usermode |= UM_FIXUP;
-> +		new_usermode |= UM_SIGNAL;
->  
->  		if (warn)
-> -			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.\n");
-> +			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to signal mode.\n");
->  	}
->  
->  	return new_usermode;
-> @@ -971,7 +971,7 @@ static int __init alignment_init(void)
->  		cr_alignment &= ~CR_A;
->  		cr_no_alignment &= ~CR_A;
->  		set_cr(cr_alignment);
-> -		ai_usermode = safe_usermode(ai_usermode, false);
-> +		ai_usermode = safe_usermode(ai_usermode | UM_WARN, false);
->  	}
->  #endif
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
