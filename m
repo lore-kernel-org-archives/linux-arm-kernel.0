@@ -1,407 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Jan 2014 14:36:06 -0800
-Subject: [PATCH v2 2/2] ARM: omap3: Split the pinmux core device
-In-Reply-To: <1387554677-21100-3-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1387554677-21100-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1387554677-21100-3-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <20140107223605.GB5074@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Jan 2014 23:38:23 +0100
+Subject: [PATCH v2 4/8] arm: dts: sun4i: rename clock node names to clk@N
+In-Reply-To: <1388987892-23733-5-git-send-email-wens@csie.org>
+References: <1388987892-23733-1-git-send-email-wens@csie.org>
+ <1388987892-23733-5-git-send-email-wens@csie.org>
+Message-ID: <20140107223823.GH3103@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131220 07:52]:
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -117,7 +117,18 @@
+On Mon, Jan 06, 2014 at 01:58:08PM +0800, Chen-Yu Tsai wrote:
+> Device tree naming conventions state that node names should match
+> node function. Change fully functioning clock nodes to match.
+> 
+> Also add the output name for pll5 to use as the clock name.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 26 +++++++++++++++-----------
+>  1 file changed, 15 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 3ba2b46..45d5283 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -50,42 +50,46 @@
+>  			clock-frequency = <0>;
+>  		};
 >  
->  		omap3_pmx_core: pinmux at 48002030 {
->  			compatible = "ti,omap3-padconf", "pinctrl-single";
-> -			reg = <0x48002030 0x05cc>;
-> +			reg = <0x48002030 0x0238>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			#interrupt-cells = <1>;
-> +			interrupt-controller;
-> +			pinctrl-single,register-width = <16>;
-> +			pinctrl-single,function-mask = <0xff1f>;
-> +		};
-> +
-> +		omap3_pmx_core2: pinmux at 480025a0 {
-> +			compatible = "ti,omap3-padconf", "pinctrl-single";
-> +			reg = <0x480025a0 0x005c>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			#interrupt-cells = <1>;
+> -		osc24M: osc24M at 01c20050 {
+> +		osc24M: clk at 01c20050 {
+>  			#clock-cells = <0>;
+>  			compatible = "allwinner,sun4i-osc-clk";
+>  			reg = <0x01c20050 0x4>;
+>  			clock-frequency = <24000000>;
+> +			clock-output-names = "osc24M";
+>  		};
+>  
+> -		osc32k: osc32k {
+> +		osc32k: clk at 0 {
+>  			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+>  			clock-frequency = <32768>;
+> +			clock-output-names = "osc32k";
+>  		};
+>  
+> -		pll1: pll1 at 01c20000 {
+> +		pll1: clk at 01c20000 {
+>  			#clock-cells = <0>;
+>  			compatible = "allwinner,sun4i-pll1-clk";
+>  			reg = <0x01c20000 0x4>;
+>  			clocks = <&osc24M>;
+> +			clock-output-names = "pll1";
+>  		};
+>  
+> -		pll4: pll4 at 01c20018 {
+> +		pll4: clk at 01c20018 {
+>  			#clock-cells = <0>;
+>  			compatible = "allwinner,sun4i-pll1-clk";
+>  			reg = <0x01c20018 0x4>;
+>  			clocks = <&osc24M>;
+> +			clock-output-names = "pll4";
+>  		};
+>  
+> -		pll5: pll5 at 01c20020 {
+> +		pll5: clk at 01c20020 {
+>  			#clock-cells = <1>;
+>  			compatible = "allwinner,sun4i-pll5-clk";
+>  			reg = <0x01c20020 0x4>;
+>  			clocks = <&osc24M>;
+> -			clock-output-names = "pll5_ddr", "pll5_other";
+> +			clock-output-names = "pll5_ddr", "pll5_other", "pll5";
 
-Looking at Nishant's similar patch, we need to have separate
-omap3_pmx_core2 for 3430 and 3630. I've updated the patch accordingly
-with the related parts from Nishant's patch and committed it into
-omap-for-v3.14/dt branch.
+Hmmm, I don't really like that bit too much.
 
-Regards,
+This "pll5" clock doesn't actually exist at the hardware point of
+view, which is not really what the DT is used for.
 
-Tony
+I can think of two ways to do what you want withouth this: 
+  - either hardcode the name, since we have a compatible of our own here
+  - or use strchr to take anyhing until '_' and use that as a name
 
-8< ------------------------------
-From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Date: Tue, 7 Jan 2014 14:01:39 -0800
-Subject: [PATCH] ARM: dts: Split omap3 pinmux core device
 
-The omap3_pmx_core pinmux device in the device tree handles the system
-controller module (SCM) PADCONFS fonction. Its control registers are
-split in two distinct areas, with other SCM registers in-between. Those
-other registers can't thus be requested by other drivers as the memory
-region gets reserved by the pinmux driver.
-
-Split the omap3_pmx_core device tree node in two for the two memory
-regions. The second region address and size depends on the SoC model.
-
-The change in omap3.dtsi fixes an "external abort on non-linefetch" when
-doing
-
-cat /sys/kernel/debug/pinctrl/.../pins
-
-on a Nokia N900.
-
-Note that the core2 padconf region is different for 3430 vs 3630,
-and does not exist on 3517 as noted by Nishanth Menon <nm@ti.com>.
-
-Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-By: Sebastian Reichel <sre@debian.org>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[tony at atomide.com: updated for 3430 vs 3630 core2 based on Nishant's patch]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index df33a50..447e714 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -99,7 +99,7 @@
- &omap3_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
--			&hsusbb2_pins
-+			&hsusb2_pins
- 	>;
- 
- 	uart3_pins: pinmux_uart3_pins {
-@@ -109,20 +109,32 @@
- 		>;
- 	};
- 
--	hsusbb2_pins: pinmux_hsusbb2_pins {
-+	hsusb2_pins: pinmux_hsusb2_pins {
- 		pinctrl-single,pins = <
--			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
--			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
--			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
--			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
--			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
--			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
--			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
--			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
--			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
--			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
--			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
--			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-+			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-+			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-+			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-+			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-+			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-+			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-+		>;
-+	};
-+};
-+
-+&omap3_pmx_core2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusb2_2_pins
-+	>;
-+
-+	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-+			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
- 		>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 3ba4a62..5053766 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -93,23 +93,17 @@
- &omap3_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
--			&hsusbb2_pins
-+			&hsusb2_pins
- 	>;
- 
--	hsusbb2_pins: pinmux_hsusbb2_pins {
-+	hsusb2_pins: pinmux_hsusb2_pins {
- 		pinctrl-single,pins = <
--			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
--			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
--			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
--			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
--			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
--			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
--			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
--			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
--			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
--			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
--			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
--			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-+			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-+			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-+			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-+			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-+			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-+			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
- 		>;
- 	};
- 
-@@ -121,6 +115,24 @@
- 	};
- };
- 
-+&omap3_pmx_core2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusb2_2_pins
-+	>;
-+
-+	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3430_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			OMAP3430_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			OMAP3430_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			OMAP3430_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-+			OMAP3430_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			OMAP3430_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	clock-frequency = <2600000>;
- 
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index 165aaf7..c1700932 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -133,8 +133,6 @@
- 			0x194 (PIN_INPUT | MUX_MODE0)   /* i2c3_sda.i2c3_sda */
- 		>;
- 	};
--
--	leds_pins: pinmux_leds_pins { };
- };
- 
- &i2c1 {
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index 1c7e74d..25a2b5f 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -66,28 +66,10 @@
- &omap3_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
--		&hsusbb1_pins
- 		&tfp410_pins
- 		&dss_pins
- 	>;
- 
--	hsusbb1_pins: pinmux_hsusbb1_pins {
--		pinctrl-single,pins = <
--			0x5aa (PIN_OUTPUT | MUX_MODE3)		/* etk_ctl.hsusb1_clk */
--			0x5a8 (PIN_OUTPUT | MUX_MODE3)		/* etk_clk.hsusb1_stp */
--			0x5bc (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d8.hsusb1_dir */
--			0x5be (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d9.hsusb1_nxt */
--			0x5ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d0.hsusb1_data0 */
--			0x5ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d1.hsusb1_data1 */
--			0x5b0 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d2.hsusb1_data2 */
--			0x5b2 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d3.hsusb1_data7 */
--			0x5b4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d4.hsusb1_data4 */
--			0x5b6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d5.hsusb1_data5 */
--			0x5b8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d6.hsusb1_data6 */
--			0x5ba (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d7.hsusb1_data3 */
--		>;
--	};
--
- 	tfp410_pins: tfp410_dvi_pins {
- 		pinctrl-single,pins = <
- 			0x196 (PIN_OUTPUT | MUX_MODE4)   /* hdq_sio.gpio_170 */
-@@ -128,12 +110,36 @@
- 	};
- };
- 
--&leds_pins {
--	pinctrl-single,pins = <
--		0x5c4 (PIN_OUTPUT | MUX_MODE4) /* etk_d12.gpio_26 */
--		0x5c6 (PIN_OUTPUT | MUX_MODE4) /* etk_d13.gpio_27 */
--		0x5c8 (PIN_OUTPUT | MUX_MODE4) /* etk_d14.gpio_28 */
-+&omap3_pmx_core2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&hsusbb1_pins
- 	>;
-+
-+	hsusbb1_pins: pinmux_hsusbb1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25da, PIN_OUTPUT | MUX_MODE3)		/* etk_ctl.hsusb1_clk */
-+			OMAP3630_CORE2_IOPAD(0x25d8, PIN_OUTPUT | MUX_MODE3)		/* etk_clk.hsusb1_stp */
-+			OMAP3630_CORE2_IOPAD(0x25ec, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d8.hsusb1_dir */
-+			OMAP3630_CORE2_IOPAD(0x25ee, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d9.hsusb1_nxt */
-+			OMAP3630_CORE2_IOPAD(0x25dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d0.hsusb1_data0 */
-+			OMAP3630_CORE2_IOPAD(0x25de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d1.hsusb1_data1 */
-+			OMAP3630_CORE2_IOPAD(0x25e0, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d2.hsusb1_data2 */
-+			OMAP3630_CORE2_IOPAD(0x25e2, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d3.hsusb1_data7 */
-+			OMAP3630_CORE2_IOPAD(0x25e4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d4.hsusb1_data4 */
-+			OMAP3630_CORE2_IOPAD(0x25e6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d5.hsusb1_data5 */
-+			OMAP3630_CORE2_IOPAD(0x25e8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d6.hsusb1_data6 */
-+			OMAP3630_CORE2_IOPAD(0x25ea, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d7.hsusb1_data3 */
-+		>;
-+	};
-+
-+	leds_pins: pinmux_leds_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25f4, PIN_OUTPUT | MUX_MODE4) /* etk_d12.gpio_26 */
-+			OMAP3630_CORE2_IOPAD(0x25f6, PIN_OUTPUT | MUX_MODE4) /* etk_d13.gpio_27 */
-+			OMAP3630_CORE2_IOPAD(0x25f8, PIN_OUTPUT | MUX_MODE4) /* etk_d14.gpio_28 */
-+		>;
-+	};
- };
- 
- &i2c3 {
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-index 02a23f8..145c58c 100644
---- a/arch/arm/boot/dts/omap3-igep0030.dts
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -46,10 +46,12 @@
- 	};
- };
- 
--&leds_pins {
--	pinctrl-single,pins = <
--		0x5b0 (PIN_OUTPUT | MUX_MODE4) /* etk_d2.gpio_16 */
--	>;
-+&omap3_pmx_core2 {
-+	leds_pins: pinmux_leds_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4) /* etk_d2.gpio_16 */
-+		>;
-+	};
- };
- 
- &gpmc {
-diff --git a/arch/arm/boot/dts/omap3-zoom3.dts b/arch/arm/boot/dts/omap3-zoom3.dts
-index 15eb9fe..6644f51 100644
---- a/arch/arm/boot/dts/omap3-zoom3.dts
-+++ b/arch/arm/boot/dts/omap3-zoom3.dts
-@@ -80,13 +80,8 @@
- 
- 	mmc3_pins: pinmux_mmc3_pins {
- 		pinctrl-single,pins = <
--			0x168 (PIN_INPUT | MUX_MODE4)	/* mcbsp1_clkx.gpio_162 WLAN IRQ */
--			0x1a0 (PIN_INPUT_PULLUP | MUX_MODE3)	/* mcspi1_cs1.sdmmc3_cmd */
--			0x5a8 (PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_clk.sdmmc3_clk */
--			0x5b4 (PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d4.sdmmc3_dat0 */
--			0x5b6 (WAKEUP_EN | PIN_INPUT_PULLUP | MUX_MODE2) /* etk_d5.sdmmc3_dat1 */
--			0x5b8 (PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d6.sdmmc3_dat2 */
--			0x5b2 (PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d3.sdmmc3_dat3 */
-+			OMAP3_CORE1_IOPAD(0x2198, PIN_INPUT | MUX_MODE4)	/* mcbsp1_clkx.gpio_162 WLAN IRQ */
-+			OMAP3_CORE1_IOPAD(0x21d0, PIN_INPUT_PULLUP | MUX_MODE3)	/* mcspi1_cs1.sdmmc3_cmd */
- 		>;
- 	};
- 
-@@ -125,6 +120,18 @@
- 	};
- };
- 
-+&omap3_pmx_core2 {
-+	mmc3_2_pins: pinmux_mmc3_2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25d8, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_clk.sdmmc3_clk */
-+			OMAP3630_CORE2_IOPAD(0x25e4, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d4.sdmmc3_dat0 */
-+			OMAP3630_CORE2_IOPAD(0x25e6, WAKEUP_EN | PIN_INPUT_PULLUP | MUX_MODE2) /* etk_d5.sdmmc3_dat1 */
-+			OMAP3630_CORE2_IOPAD(0x25e8, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d6.sdmmc3_dat2 */
-+			OMAP3630_CORE2_IOPAD(0x25e2, PIN_INPUT_PULLUP | MUX_MODE2)	/* etk_d3.sdmmc3_dat3 */
-+		>;
-+	};
-+};
-+
- &omap3_pmx_wkup {
- 	wlan_host_wkup: pinmux_wlan_host_wkup_pins {
- 		pinctrl-single,pins = <
-@@ -187,7 +194,7 @@
- 	bus-width = <4>;
- 	cap-power-off-card;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&mmc3_pins>;
-+	pinctrl-0 = <&mmc3_pins &mmc3_2_pins>;
- };
- 
- &uart1 {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index daabf99..427395c 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -117,7 +117,7 @@
- 
- 		omap3_pmx_core: pinmux at 48002030 {
- 			compatible = "ti,omap3-padconf", "pinctrl-single";
--			reg = <0x48002030 0x05cc>;
-+			reg = <0x48002030 0x0238>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			#interrupt-cells = <1>;
-diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
-index 5355d61..77d1246 100644
---- a/arch/arm/boot/dts/omap34xx.dtsi
-+++ b/arch/arm/boot/dts/omap34xx.dtsi
-@@ -25,4 +25,17 @@
- 			clock-latency = <300000>; /* From legacy driver */
- 		};
- 	};
-+
-+	ocp {
-+		omap3_pmx_core2: pinmux at 480025d8 {
-+			compatible = "ti,omap3-padconf", "pinctrl-single";
-+			reg = <0x480025d8 0x24>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
-+			pinctrl-single,register-width = <16>;
-+			pinctrl-single,function-mask = <0xff1f>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
-index 380c22e..b7c7bd9 100644
---- a/arch/arm/boot/dts/omap36xx.dtsi
-+++ b/arch/arm/boot/dts/omap36xx.dtsi
-@@ -38,5 +38,16 @@
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
- 		};
-+
-+		omap3_pmx_core2: pinmux at 480025a0 {
-+			compatible = "ti,omap3-padconf", "pinctrl-single";
-+			reg = <0x480025a0 0x5c>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
-+			pinctrl-single,register-width = <16>;
-+			pinctrl-single,function-mask = <0xff1f>;
-+		};
- 	};
- };
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/3f84527b/attachment.sig>
