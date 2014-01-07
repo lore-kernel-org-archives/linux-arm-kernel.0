@@ -1,72 +1,120 @@
-From: b.brezillon@overkiz.com (Boris Brezillon)
-Date: Tue, 07 Jan 2014 21:46:18 +0100
-Subject: [PATCH v3 01/13] clk: sunxi: register factors clocks behind
- composite
-In-Reply-To: <CAAoKrfo+xOoc=S2wJF9XWz3OJoCOG3jD_m5N3XTSWOY6c1LR7w@mail.gmail.com>
-References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>
- <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
- <52CC31CD.2060005@overkiz.com>
- <CAAoKrfo+xOoc=S2wJF9XWz3OJoCOG3jD_m5N3XTSWOY6c1LR7w@mail.gmail.com>
-Message-ID: <946d982e-e207-4ab4-a9da-02df1938ffa7@email.android.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 07 Jan 2014 21:53:51 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove obsolete tick.h
+Message-ID: <1907750.XQ1uIOEDlS@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 48cf83dc12f2 (ARM: samsung: remove unused tick.h) removed some
+occurences of tick.h. tick.h itself and s3c24xx_ostimer_pending was only
+used by the old timer driver and is not used anymore.
 
+Therefore remove the last 3 occurences.
 
-"Emilio L?pez" <emilio@elopez.com.ar> a ?crit?:
->Hi Boris,
->
->[ Apologies if the email looks weird and for using a link; I'm not
->using my typical email client ]
->
->> I'm currently working on the sunxi NFC (Nand Flash Controller) driver
->> and I need to set the NAND clk (which is a mod0 clk type) rate.
->>
->> It seems that the composite clk fallbacks to the mux_hw's
->determine_rate
->> instead of calling the rate_hw's (or factors hw) round_rate, if
->rate_hw
->> does not implement determine_rate.
->
->That is to be expected; if you have a composite clock that has all
->fixed parents you'd not implement the determine_rate on the rate
->component but on the mux one.
->
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/include/mach/tick.h |   15 --------------
+ arch/arm/mach-s3c64xx/include/mach/tick.h |   31 -----------------------------
+ arch/arm/mach-s5pc100/include/mach/tick.h |   31 -----------------------------
+ 3 files changed, 77 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/tick.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/tick.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/tick.h
 
-Right, but this is not the case for mod0 
-clks, is it ?
-
->(...)
->
->> But anyway, I think there is a drawback in the way composite clk
->> implement the determine_rate handler.
->> Mike, shouldn't we choose the best parent (using mux) fullfilling the
->> rate_hw needs ?
->
->Someone using the composite clock may not want their clocks to start
->changing parents though. I believe it's easier and better to just
->implement determine_rate as on this patch on my tree (which I haven't
->sent yet, but it's literally the next in queue.)
->
-
-Fair enough (I did pretty much the same thing in my first attempt to fix this bug ;-))
-
-
->http://git.elopez.com.ar/linux/commits/5b4eb3ac406b9c98965714d40e8dd6da943d1ab0
->
->Let me know if that resolves your issue.
-
-I'll try it tomorrow.
-
-BTW, I managed to get a working NAND driver (without DMA and hw ECC).
-
-I'll post it on the ML soon (just need to clean it up a little bit).
-
-Best regards,
-
-Boris
-
->
->Cheers,
->
->Emilio
+diff --git a/arch/arm/mach-s3c24xx/include/mach/tick.h b/arch/arm/mach-s3c24xx/include/mach/tick.h
+deleted file mode 100644
+index 544da41..0000000
+--- a/arch/arm/mach-s3c24xx/include/mach/tick.h
++++ /dev/null
+@@ -1,15 +0,0 @@
+-/* linux/arch/arm/mach-s3c2410/include/mach/tick.h
+- *
+- * Copyright 2008 Simtec Electronics
+- *      Ben Dooks <ben@simtec.co.uk>
+- *      http://armlinux.simtec.co.uk/
+- *
+- * S3C2410 - timer tick support
+- */
+-
+-#define SRCPND_TIMER4 (1<<(IRQ_TIMER4 - IRQ_EINT0))
+-
+-static inline int s3c24xx_ostimer_pending(void)
+-{
+-	return __raw_readl(S3C2410_SRCPND) & SRCPND_TIMER4;
+-}
+diff --git a/arch/arm/mach-s3c64xx/include/mach/tick.h b/arch/arm/mach-s3c64xx/include/mach/tick.h
+deleted file mode 100644
+index db9c1b1..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/tick.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/* linux/arch/arm/mach-s3c6400/include/mach/tick.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- *	http://armlinux.simtec.co.uk/
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * S3C64XX - Timer tick support definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_TICK_H
+-#define __ASM_ARCH_TICK_H __FILE__
+-
+-#include <linux/irqchip/arm-vic.h>
+-
+-/* note, the timer interrutps turn up in 2 places, the vic and then
+- * the timer block. We take the VIC as the base at the moment.
+- */
+-static inline u32 s3c24xx_ostimer_pending(void)
+-{
+-	u32 pend = __raw_readl(VA_VIC0 + VIC_RAW_STATUS);
+-	return pend & 1 << (IRQ_TIMER4_VIC - S3C64XX_IRQ_VIC0(0));
+-}
+-
+-#define TICK_MAX	(0xffffffff)
+-
+-#endif /* __ASM_ARCH_6400_TICK_H */
+diff --git a/arch/arm/mach-s5pc100/include/mach/tick.h b/arch/arm/mach-s5pc100/include/mach/tick.h
+deleted file mode 100644
+index 0af8e41..0000000
+--- a/arch/arm/mach-s5pc100/include/mach/tick.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/* linux/arch/arm/mach-s5pc100/include/mach/tick.h
+- *
+- * Copyright 2009 Samsung Electronics Co.
+- *	Byungho Min <bhmin@samsung.com>
+- *
+- * S3C64XX - Timer tick support definitions
+- *
+- * Based on mach-s3c6400/include/mach/tick.h
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_TICK_H
+-#define __ASM_ARCH_TICK_H __FILE__
+-
+-#include <linux/irqchip/arm-vic.h>
+-
+-/* note, the timer interrutps turn up in 2 places, the vic and then
+- * the timer block. We take the VIC as the base at the moment.
+- */
+-static inline u32 s3c24xx_ostimer_pending(void)
+-{
+-	u32 pend = __raw_readl(VA_VIC0 + VIC_RAW_STATUS);
+-	return pend & (1 << (IRQ_TIMER4_VIC - S5P_IRQ_VIC0(0)));
+-}
+-
+-#define TICK_MAX	(0xffffffff)
+-
+-#endif /* __ASM_ARCH_TICK_H */
+-- 
+1.7.10.4
