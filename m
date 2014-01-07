@@ -1,32 +1,38 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue,  7 Jan 2014 19:57:14 +0100
-Subject: [PATCH 2/4] ARM: shmobile: r8a7790: Add thermal clock in device tree
-In-Reply-To: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
-References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1389121036-3555-3-git-send-email-geert@linux-m68k.org>
+Date: Tue,  7 Jan 2014 19:57:12 +0100
+Subject: [PATCH 0/4] thermal: rcar: Add missing clock handling
+Message-ID: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+    Hi all,
 
-Add the missing thermal MSTP clock to the thermal device node.
+This patch series fixes a problem when the thermal-rcar device is
+instantiated from the device tree on the r8a7791-based Koelsch development
+board. The driver fails during initialization with:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
- arch/arm/boot/dts/r8a7790.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+    rcar_thermal e61f0000.thermal: thermal sensor was broken
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index f48487c2a970..b53834e6a55f 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -168,6 +168,7 @@
- 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks R8A7790_CLK_THERMAL>;
- 	};
- 
- 	timer {
--- 
-1.7.9.5
+This does not happen when using legacy platform devices.
+
+This series was tested using Koelsch reference (DT) and non-reference
+(legacy) kernel configurations. It was not tested on r8a7790/Lager
+(which is very similar).
+
+    [1/4] ARM: shmobile: r8a7791: Add thermal clock in device tree
+    [2/4] ARM: shmobile: r8a7790: Add thermal clock in device tree
+    [3/4] thermal: rcar: Add missing clock handling
+    [4/4] thermal: rcar: Spelling s/delaye/delay/g
+
+Thanks for your comments!
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
