@@ -1,51 +1,24 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 6 Jan 2014 18:47:33 -0600
-Subject: [PATCH V2 0/2] ARM: OMAP2+/dts: standardize SoC naming
-In-Reply-To: <1386204578-6018-1-git-send-email-nm@ti.com>
-References: <1386204578-6018-1-git-send-email-nm@ti.com>
-Message-ID: <CAGo_u6o+Lcf0wzmsSir1APd4T3A4D+GPtdRmkBM79mjW2aEGHA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 7 Jan 2014 10:02:26 +0900
+Subject: [PATCH 1/2] ARM: shmobile: Lager: pass Ether PHY IRQ
+In-Reply-To: <201312200219.31121.sergei.shtylyov@cogentembedded.com>
+References: <201312200218.08076.sergei.shtylyov@cogentembedded.com>
+ <201312200219.31121.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20140107010224.GA28639@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit, Tony,
+On Fri, Dec 20, 2013 at 02:19:30AM +0300, Sergei Shtylyov wrote:
+> Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
+> trigger type to be low-level as per the Micrel PHY driver's setup.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-On Wed, Dec 4, 2013 at 6:49 PM, Nishanth Menon <nm@ti.com> wrote:
-> Originally attempted partially in [1], the missing binding were
-> reported as part of Rob's report in [2].
+Hi Sergei,
 
-Would you like me to send this series again since I do not see this in:
-https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.14/dts
+for better or for worse I believe this is a v3.15 candidate.
 
-patchwork links:
-https://patchwork.kernel.org/patch/3286051/
-https://patchwork.kernel.org/patch/3286061/
+Could you repost it once v3.14-rc1 has been released,
+I believe it will include the dependencies of this patch.
 
->
-> So, here is take two of the series, lacking an standard causes issues
-> that was fixed such as [3]. Ideally, we should never again introduce a
-> board file without a exact compatible SoC match.
->
-> I have stayed a bit away from updating board and SoC dts files yet
-> to look at the direction we'd like to go here. If we feel things are
-> good, I would gladly try to clean our mess up.
->
-> Nishanth Menon (2):
->   Documentation: dt: OMAP: explicitly state SoC compatible strings
->   ARM: OMAP2+: board-generic: update SoC compatibility strings
->
->  .../devicetree/bindings/arm/omap/omap.txt          |   53 ++++++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c                |    7 +++
->  2 files changed, 60 insertions(+)
->
-> [1] https://patchwork.kernel.org/patch/2998201/
-> [2] http://marc.info/?l=linux-arm-kernel&m=138378029113665&w=2
-> [3] https://patchwork.kernel.org/patch/3279281/
->
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
