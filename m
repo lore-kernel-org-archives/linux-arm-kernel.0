@@ -1,33 +1,31 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 7 Jan 2014 21:38:32 +0800
-Subject: [PATCH -next] mtd: nuc900_nand: remove redundant return value check
- of platform_get_resource()
-Message-ID: <CAPgLHd_RMOPLP2f4nA1vqNNddocMUX7f-gE29TTkuJZPUm=SWw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jan 2014 13:38:29 +0000
+Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <20140107130540.GA8090@e102568-lin.cambridge.arm.com>
+References: <1387483575-11430-1-git-send-email-broonie@kernel.org>
+ <1387483575-11430-4-git-send-email-broonie@kernel.org>
+ <20140107130540.GA8090@e102568-lin.cambridge.arm.com>
+Message-ID: <20140107133829.GF31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Tue, Jan 07, 2014 at 01:05:40PM +0000, Lorenzo Pieralisi wrote:
+> On Thu, Dec 19, 2013 at 08:06:14PM +0000, Mark Brown wrote:
 
-Remove unneeded error handling on the result of a call
-to platform_get_resource() when the value is passed to
-devm_ioremap_resource().
+> > +		/* check if the cpu is marked as "disabled", if so ignore */
+> > +		if (!of_device_is_available(cn))
+> > +			continue;
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/mtd/nand/nuc900_nand.c | 3 ---
- 1 file changed, 3 deletions(-)
+> It is time we defined what a "disabled" CPU means in ARM world, I need to
+> have a proper look into this since this topic has been brought up before.
 
-diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
-index 661fd14..9ee09a8 100644
---- a/drivers/mtd/nand/nuc900_nand.c
-+++ b/drivers/mtd/nand/nuc900_nand.c
-@@ -268,9 +268,6 @@ static int nuc900_nand_probe(struct platform_device *pdev)
- 	chip->ecc.mode		= NAND_ECC_SOFT;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res)
--		return -ENXIO;
--
- 	nuc900_nand->reg = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(nuc900_nand->reg))
- 		return PTR_ERR(nuc900_nand->reg);
+What is the confusion here - why would there be something architecture
+specific going on?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/c7d57827/attachment.sig>
