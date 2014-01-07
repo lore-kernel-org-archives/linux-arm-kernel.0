@@ -1,36 +1,79 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 7 Jan 2014 10:15:04 +0200
-Subject: [PATCH 0/2] ARM: DTS: am335x-evmsk: Audio and MMC1 fix (for 3.13?)
-In-Reply-To: <1387790915-7217-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1387790915-7217-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <52CBB788.9070404@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jan 2014 08:22:33 +0000
+Subject: [PATCH v2 3/7] mfd: pm8921: Migrate to irqdomains
+In-Reply-To: <52CB1323.6080200@codeaurora.org>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
+ <20140106155350.GI30156@lee--X1> <52CB1323.6080200@codeaurora.org>
+Message-ID: <20140107082233.GB3182@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+> >>  	unsigned int		num_irqs;
+> >>  	unsigned int		num_blocks;
+> >>  	unsigned int		num_masters;
+> >> @@ -138,7 +137,7 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
+> >>  	for (i = 0; i < 8; i++) {
+> >>  		if (bits & (1 << i)) {
+> >>  			pmirq = block * 8 + i;
+> >> -			irq = pmirq + chip->irq_base;
+> >> +			irq = irq_find_mapping(chip->domain, pmirq);
+> > Going by this patch only, it appears you're calling irq_find_mapping()
+> > before you've called irq_create_mapping(). This won't work, so unless
+> > you've called the latter in a previous patch, you should ensure that
+> > you do so.
+> >
+> 
+> Interrupts seem to work. I think that's because the mapping is created
+> when the consumer drivers call request_irq().
+> 
+> From what I can tell, if we call irq_find_mapping() and there is no
+> mapping associated with it then we have a spurious irq. If that happens
+> we'll call handle_generic_irq() with 0 and that will cause
+> handle_bad_irq() to be called and a debug message to be logged. That
+> seems like a good outcome.
 
-On 12/23/2013 11:28 AM, Peter Ujfalusi wrote:
-> Hi,
-> 
-> The audio frequency has been incorrectly set in the DTS file which results
-> incorrect playback frequency on EVM-SK.
-> 
-> The SD card can not be used without the second patch on 3.13-rc5.
+I would try to adhere to the documentation in case we are missing
+something or some of the semantics change. Please read:
+Documentation/IRQ-domain.txt. Specifically, "=== irq_domain usage ==="
+from line 39, which says to call irq_create_mapping() to indeed, create
+the mapping.
 
-Can you take a look at these and if it is possible send it for 3.13?
+> > What does the sizeof(u8) add here?
+> >
+> 
+> This was just keeping the same code that was already there. I will do
+> sizeof(chip->config[0]) instead which is more future proof if that array
+> changes type later on.
 
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (2):
->   ARM: DTS: am335x-evmsk: Correct audio clock frequency
->   ARM: dts: am335x-evmsk: Fix mmc1 support
-> 
->  arch/arm/boot/dts/am335x-evmsk.dts | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
+Ah, now I see what it's doing. Perhaps brackets would be of use to
+ensure readers aren't confused. I also think the sizeof() would be
+helpful too, so:
 
+        chip = devm_kzalloc(&pdev->dev, sizeof(*chip) +
+                            (sizeof(chip->config[0]) * nirqs), GFP_KERNEL);
+
+> >> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> >> +}
+> > Can't you use the MFD core instead?
+> >
+> 
+> Are you suggesting using mfd_add_devices()? At first glance it looks
+> like that would require an array of mfd_cell structures that do nothing
+> besides match compatible strings in the DT. Using of_platform_populate()
+> achieves the same goal and doesn't require an array of mfd_cell
+> structures for each different pm8xxx chip that comes along, meaning
+> simpler code.
+
+I'm inclined to agree, but playing Devil's advocate here, as a device
+using the MFD subsystem it's often clearer to readers and other people
+looking for examples if the MFD core functionality is used. For
+instance, I now have no idea what devices the PM8xxx encompasses
+without looking at the DTS file. A small cell structure is a small
+price to pay for code clarity IMHO.
 
 -- 
-P?ter
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
