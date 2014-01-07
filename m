@@ -1,40 +1,113 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 8 Jan 2014 00:43:27 +0100
-Subject: [PATCH v4 5/6] edac: Add support for Krait CPU cache error
- detection
-In-Reply-To: <1388434457-4194-6-git-send-email-sboyd@codeaurora.org>
-References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
- <1388434457-4194-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140107234327.GH4164@pd.tnic>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  7 Jan 2014 16:47:17 -0700
+Subject: [PATCH 2/2] ARM: tegra: enable LCD panel on Ventana
+In-Reply-To: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
+References: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1389138437-4686-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 12:14:16PM -0800, Stephen Boyd wrote:
-> Add support for the Krait CPU cache error detection. This is a
-> simplified version of the code originally written by Stepan
-> Moskovchenko[1] ported to the EDAC device framework.
-> 
-> [1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/tree/arch/arm/mach-msm/cache_erp.c?h=msm-3.4
-> 
-> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/edac/Kconfig      |   8 ++
->  drivers/edac/Makefile     |   2 +
->  drivers/edac/krait_edac.c | 346 ++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 356 insertions(+)
->  create mode 100644 drivers/edac/krait_edac.c
+From: Stephen Warren <swarren@nvidia.com>
 
-Looks nice and clean, applied.
+Ventana uses a CLAA101WA01A LCD panel. Enable the relevant display
+controller, backlight, and regulators.
 
-So, patch 1/6 I'm taking anyway as it is a bugfix - for the others I'll
-wait until 3/6 is cleared which way/how it goes.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-ventana.dts | 39 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 36 insertions(+), 3 deletions(-)
 
-HTH.
-
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index 571d12e6ac2d..93cbb9928e1d 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -17,6 +17,14 @@
+ 	};
+ 
+ 	host1x at 50000000 {
++		dc at 54200000 {
++			rgb {
++				status = "okay";
++
++				nvidia,panel = <&panel>;
++			};
++		};
++
+ 		hdmi at 54280000 {
+ 			status = "okay";
+ 
+@@ -309,6 +317,10 @@
+ 		status = "okay";
+ 	};
+ 
++	pwm: pwm at 7000a000 {
++		status = "okay";
++	};
++
+ 	i2c at 7000c000 {
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+@@ -359,7 +371,7 @@
+ 			#size-cells = <0>;
+ 		};
+ 
+-		i2c at 1 {
++		lvds_ddc: i2c at 1 {
+ 			reg = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -557,6 +569,17 @@
+ 		non-removable;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++
++		enable-gpios = <&gpio TEGRA_GPIO(D, 4) GPIO_ACTIVE_HIGH>;
++		power-supply = <&vdd_bl_reg>;
++		pwms = <&pwm 0 5000000>;
++
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++	};
++
+ 	clocks {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -581,6 +604,16 @@
+ 		};
+ 	};
+ 
++	panel: panel {
++		compatible = "chungwa,claa101wa01a", "simple-panel";
++
++		power-supply = <&vdd_pnl_reg>;
++		enable-gpios = <&gpio TEGRA_GPIO(B, 2) GPIO_ACTIVE_HIGH>;
++
++		backlight = <&backlight>;
++		ddc-i2c-bus = <&lvds_ddc>;
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -614,7 +647,7 @@
+ 			enable-active-high;
+ 		};
+ 
+-		regulator at 3 {
++		vdd_pnl_reg: regulator at 3 {
+ 			compatible = "regulator-fixed";
+ 			reg = <3>;
+ 			regulator-name = "vdd_pnl";
+@@ -624,7 +657,7 @@
+ 			enable-active-high;
+ 		};
+ 
+-		regulator at 4 {
++		vdd_bl_reg: regulator at 4 {
+ 			compatible = "regulator-fixed";
+ 			reg = <4>;
+ 			regulator-name = "vdd_bl";
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+1.8.1.5
