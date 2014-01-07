@@ -1,42 +1,32 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Tue, 7 Jan 2014 10:53:41 -0800
-Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
-Message-ID: <1389120821-12007-1-git-send-email-tim.kryger@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue,  7 Jan 2014 19:57:14 +0100
+Subject: [PATCH 2/4] ARM: shmobile: r8a7790: Add thermal clock in device tree
+In-Reply-To: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389121036-3555-3-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board schematic states that the "SD_CARD_DET_N gets pulled to GND
-when card is inserted" so the polarity has been updated to active low.
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Polarity is now specified with a GPIO define instead of a magic number.
+Add the missing thermal MSTP clock to the thermal device node.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 ---
- arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 08e47c2..27dd110 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -13,6 +13,8 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- #include "bcm11351.dtsi"
- 
- / {
-@@ -40,7 +42,7 @@
- 
- 	sdio4: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
--		cd-gpios = <&gpio 14 0>;
-+		cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
- 		status = "okay";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index f48487c2a970..b53834e6a55f 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -168,6 +168,7 @@
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks R8A7790_CLK_THERMAL>;
  	};
- };
+ 
+ 	timer {
 -- 
-1.8.0.1
+1.7.9.5
