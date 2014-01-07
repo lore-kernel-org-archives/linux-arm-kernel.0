@@ -1,54 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Jan 2014 00:08:48 +0100
-Subject: [GIT PULL] Allwinner core changes for 3.14, take 2
-Message-ID: <20140107230848.GA18498@lukather>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Tue, 07 Jan 2014 15:11:48 -0800
+Subject: [PATCH v2 1/5] mm: create generic early_ioremap() support
+In-Reply-To: <1389062120-31896-2-git-send-email-msalter@redhat.com>
+References: <1389062120-31896-1-git-send-email-msalter@redhat.com>
+ <1389062120-31896-2-git-send-email-msalter@redhat.com>
+Message-ID: <52CC89B4.4060300@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On 01/06/2014 06:35 PM, Mark Salter wrote:
+> 
+> There is one difference from the existing x86 implementation which
+> should be noted. The generic early_memremap() function does not return
+> an __iomem pointer and a new early_memunmap() function has been added
+> to act as a wrapper for early_iounmap() but with a non __iomem pointer
+> passed in. This is in line with the first patch of this series:
+> 
 
-Please pull the following patches on top of the previous pull request.
+This makes a lot of sense.  However, I would suggest that we preface the
+patch series with a single patch changing the signature for the existing
+x86 function, that way this change becomes bisectable.
 
-Thanks!
-
-The following changes since commit 73346794b48237b7b4c2a5c02b12e3c4f1da7551:
-
-  ARM: sun6i: Add SMP support for the Allwinner A31 (2013-12-16 21:33:41 +0100)
-
-are available in the git repository at:
-
-  https://github.com/mripard/linux.git tags/sunxi-core-for-3.14-2
-
-for you to fetch changes up to 75cac6abe756fde529a000e725dceed2b908f61a:
-
-  ARM: sunxi: select ARM_PSCI (2014-01-01 23:58:17 +0100)
-
-----------------------------------------------------------------
-Second round of core additions for the Allwinner SoCs
-
-Fixes to select missing configuration options, and update of the maintainer
-file.
-
-----------------------------------------------------------------
-Maxime Ripard (2):
-      ARM: sunxi: Select RESET_CONTROLLER
-      MAINTAINERS: Update Allwinner sunXi maintainer files
-
-Zalan Blenessy (1):
-      ARM: sunxi: select ARM_PSCI
-
- MAINTAINERS                 | 7 ++++++-
- arch/arm/mach-sunxi/Kconfig | 2 ++
- 2 files changed, 8 insertions(+), 1 deletion(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/34ae0d38/attachment.sig>
+	-hpa
