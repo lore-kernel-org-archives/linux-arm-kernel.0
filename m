@@ -1,42 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jan 2014 16:13:38 +0100
-Subject: [PATCH v3 1/4] ARM: dts: OMAP5: Add 60MHz clock reference to USB
- Host module
-In-Reply-To: <1389096889-22179-2-git-send-email-rogerq@ti.com>
-References: <1389096889-22179-1-git-send-email-rogerq@ti.com>
- <1389096889-22179-2-git-send-email-rogerq@ti.com>
-Message-ID: <201401071613.39245.arnd@arndb.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Jan 2014 16:15:35 +0100
+Subject: [PATCH 13/15] fbdev: sh-mobile-lcdcfb: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <1542726.dq1lpTml5f@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1542726.dq1lpTml5f@avalon>
+Message-ID: <1917257.yB7aZMXWdP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Roger Quadros wrote:
-> USB Host driver (drivers/mfd/omap-usb-host.c) expects the 60MHz
-> reference clock to be named "init_60m_fclk". Provide this
-> information.
+On Wednesday 11 December 2013 13:51:18 Laurent Pinchart wrote:
+> Hi Jean-Christophe and Tomi,
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/boot/dts/omap5.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 2f12a47..e0ab379 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -765,6 +765,8 @@
->                         #address-cells = <1>;
->                         #size-cells = <1>;
->                         ranges;
-> +                       clocks = <&l3init_60m_fclk>;
-> +                       clock-names = "init_60m_fclk";
->  
->                         usbhsohci: ohci at 4a064800 {
->                                 compatible = "ti,ohci-omap3", "usb-ohci";
+> Could you please pick this patch up for v3.14 ?
 
-The bindings/mfd/omap-usb-host.txt file doesn't document any clocks.
-Please create another patch to document the clock names in this binding
-before you start putting them into the dtsi file. So far the clock
-names are an implementation detail of Linux as they are not part
-of the binding, and with your patch it becomes part of the ABI.
+Ping ?
 
-	Arnd
+> On Wednesday 27 November 2013 02:18:35 Laurent Pinchart wrote:
+> > This helps increasing build testing coverage.
+> > 
+> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: linux-fbdev at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Acked-by: Simon Horman <horms@verge.net.au>
+> > ---
+> > 
+> >  drivers/video/Kconfig | 8 +++++---
+> >  1 file changed, 5 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> > index 4f2e1b3..2aceb08 100644
+> > --- a/drivers/video/Kconfig
+> > +++ b/drivers/video/Kconfig
+> > @@ -10,7 +10,8 @@ config HAVE_FB_ATMEL
+> > 
+> >  config SH_MIPI_DSI
+> >  	tristate
+> > -	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
+> > +	depends on HAVE_CLK
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> > 
+> >  config SH_LCD_MIPI_DSI
+> >  	bool
+> > @@ -1997,7 +1998,8 @@ config FB_W100
+> > 
+> >  config FB_SH_MOBILE_LCDC
+> >  	tristate "SuperH Mobile LCDC framebuffer support"
+> > -	depends on FB && (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
+> > +	depends on FB && HAVE_CLK
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> >  	select FB_SYS_FILLRECT
+> >  	select FB_SYS_COPYAREA
+> >  	select FB_SYS_IMAGEBLIT
+> > @@ -2484,7 +2486,7 @@ endif
+> > 
+> >  config FB_SH_MOBILE_MERAM
+> >  	tristate "SuperH Mobile MERAM read ahead support"
+> > -	depends on (SUPERH || ARCH_SHMOBILE)
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> >  	select GENERIC_ALLOCATOR
+> >  	---help---
+> >  	  Enable MERAM support for the SuperH controller.
+-- 
+Regards,
+
+Laurent Pinchart
