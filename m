@@ -1,40 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 7 Jan 2014 10:04:51 +0900
-Subject: [PATCH 2/4] ARM: shmobile: Set CONFIG_LOCALVERSION in defconfigs
-In-Reply-To: <20140106084739.GA16341@verge.net.au>
-References: <1388764128-27686-1-git-send-email-geert@linux-m68k.org>
- <1388764128-27686-2-git-send-email-geert@linux-m68k.org>
- <20140106022758.GE11231@verge.net.au>
- <CAMuHMdUSbvg593r_2prWaD9BsgXqw+sfur_S9Et5gX1a+v3PuA@mail.gmail.com>
- <20140106084739.GA16341@verge.net.au>
-Message-ID: <20140107010451.GB28639@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Jan 2014 01:11:21 +0000
+Subject: Regression (ARM) arch/arm/mm/init.c doesn't build without
+ CONFIG_ARM_PATCH_PHYS_VIRT.
+In-Reply-To: <52CB3F55.1050404@ti.com>
+References: <m38uv1uuzr.fsf@t19.piap.pl> <m3ha9gx63v.fsf@t19.piap.pl>
+ <20140106223906.GH27432@n2100.arm.linux.org.uk> <52CB3F55.1050404@ti.com>
+Message-ID: <20140107011121.GI27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 05:47:40PM +0900, Simon Horman wrote:
-> On Mon, Jan 06, 2014 at 09:43:11AM +0100, Geert Uytterhoeven wrote:
-> > On Mon, Jan 6, 2014 at 3:27 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > On Fri, Jan 03, 2014 at 04:48:46PM +0100, Geert Uytterhoeven wrote:
-> > >> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> > >>
-> > >> This allows to derive the kernel flavor from the kernel version.
-> > >
-> > > Is this a common practice for ARM?
+On Mon, Jan 06, 2014 at 06:42:13PM -0500, Santosh Shilimkar wrote:
+> On Monday 06 January 2014 05:39 PM, Russell King - ARM Linux wrote:
+> > On Mon, Jan 06, 2014 at 08:28:20PM +0100, Krzysztof Ha?asa wrote:
+> >> Russell, Santosh,
+> >>
+> >> the unneeded commit causing regression is still in place. Please try to
+> >> compile an ARM kernel without CONFIG_ARM_PATCH_PHYS_VIRT and with
+> >> CONFIG_ZONE_DMA and see for yourself, if you don't believe me.
+> >>
+> >> Please be aware that this commit fixes nothing, its only function is
+> >> causing the regression - so we don't lose anything by reverting it.
+> >>
+> >> If the attached wasn't clear, what the defective commit presently does
+> >> is changing a perfectly valid code into a code referencing a variable
+> >> which (without CONFIG_ARM_PATCH_PHYS_VIRT set) doesn't at all exist.
+> >>
+> >> With CONFIG_ARM_PATCH_PHYS_VIRT set, this commit does precisely nothing.
 > > 
-> > Not really, only 5 ARM deconfigs do that.
-> > Globally, ca. 10% of the Linux defconfigs do it.
-> > 
-> > > I'm a little hesitant to take this if its not.
-> > > Particularly as we are planing to deprecate these defconfigs
-> > > in favour of a shared multiplatform defconfig.
-> > 
-> > A shared multiplatform defconfig can still have
-> > CONFIG_LOCALVERSION="-shmobile", so you'll know it's a multiplatform
-> > kernel when you see the dmesg.
-> 
-> Not if it is shared more widely :^)
 
-I'm not really sold on this patch as I don't truly understand
-its motivation and I am reluctant to move towards an
-uncommon practice for ARM. I am not planning to take this
-patch at this time.
+/--------------------------------------------------------------
+| > > Right, so, with Assabet, which has CONFIG_DMA_ZONE=y and
+| > > CONFIG_ARM_PATCH_PHYS_VIRT=y:
+| > > 
+| > > $ make O=../build/assabet arch/arm/mm/init.i
+| > > 
+| > > gives:
+| > >   arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
+| > > 
+| > > with or without Santosh's patch.
+\--------------------------------------------------------------
+
+> May be I missed your point but I ended up creating the patch because
+> the CMA reservation was failing on Keystone since the arm_dma_limit
+> wasn't right since it wasn't considering the actual __pv_phys_offset.
+> 
+> Isn't that an issue ?
+
+See the above.  Your patch has _no_ effect what so ever when
+CONFIG_ARM_PATCH_PHYS_VIRT=y - which you have on the Keystone, right?
+
+If you don't believe me, ask make to produce arch/arm/mm/init.i, which
+is the output from the preprocessor, comparing the resulting generated
+file both with and without your patch applied.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
