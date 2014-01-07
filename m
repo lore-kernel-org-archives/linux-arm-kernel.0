@@ -1,125 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 08 Jan 2014 00:09:37 +0100
-Subject: [PATCH v2 1/2] ARM: dts: Add omap specific pinctrl defines to use
- padconf addresses
-In-Reply-To: <20140107223021.GA5074@atomide.com>
-References: <1387554677-21100-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1387554677-21100-2-git-send-email-laurent.pinchart@ideasonboard.com>
- <20140107223021.GA5074@atomide.com>
-Message-ID: <1562680.iFW31kAxBU@avalon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 07 Jan 2014 15:09:59 -0800
+Subject: [PATCH v4 3/6] ARM: Add Krait L2 accessor functions
+In-Reply-To: <20140107230725.GG4164@pd.tnic>
+References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
+ <1388434457-4194-4-git-send-email-sboyd@codeaurora.org>
+ <20140107230725.GG4164@pd.tnic>
+Message-ID: <52CC8947.7020900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 01/07/14 15:07, Borislav Petkov wrote:
+> On Mon, Dec 30, 2013 at 12:14:14PM -0800, Stephen Boyd wrote:
+>> Krait CPUs have a handful of L2 cache controller registers that
+>> live behind a cp15 based indirection register. First you program
+>> the indirection register (l2cpselr) to point the L2 'window'
+>> register (l2cpdr) at what you want to read/write.  Then you
+>> read/write the 'window' register to do what you want. The
+>> l2cpselr register is not banked per-cpu so we must lock around
+>> accesses to it to prevent other CPUs from re-pointing l2cpdr
+>> underneath us.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/common/Kconfig                   |  3 ++
+>>  arch/arm/common/Makefile                  |  1 +
+>>  arch/arm/common/krait-l2-accessors.c      | 58 +++++++++++++++++++++++++++++++
+>>  arch/arm/include/asm/krait-l2-accessors.h | 20 +++++++++++
+> I'm no ARM guy but out of curiosity, why is this code not part of the
+> krait edac driver? IOW, is there a compelling reason for it to be in
+> arch/arm/common/?
 
-On Tuesday 07 January 2014 14:30:21 Tony Lindgren wrote:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131220 07:52]:
-> > From: Tony Lindgren <tony@atomide.com>
-> > +/*
-> > + * Macros to allow using the absolute physical address instead of the
-> > + * padconf registers instead of the offset from padconf base.
-> > + */
-> > +#define OMAP_IOPAD_OFFSET(pa, offset)	(((pa) & 0xffff) - (offset))
-> > +
-> > +#define OMAP2420_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x0030)
-> > (val)
-> > +#define OMAP2430_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030)
-> > (val)
-> > +#define OMAP3_CORE1_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030) (val)
-> > +#define OMAP3_CORE2_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x25a0) (val)
-> 
-> Sorry for the delay on these, I'm only now getting back to looking
-> at all the emails since the holidays :)
-> 
-> After looking at Nishant's omap3 pinctrl core2 patch, looks like we need
-> to have separate OMAP3430_CORE2_IOPAD and OMAP3630_CORE2_IOPAD defines.
+This is used for more than just the edac driver. In the future, we'll
+need this for the cpufreq driver and the l2 performance monitor driver.
+I suppose I could have stated that in the commit text.
 
-That was my first impression as well, but I think we actually don't need to. 
-The OMAP3430 just has no useful registers in the 0x25a0 - 0x25d7 area, so we 
-can make the CORE2 macro span that for both 3430 and 3630.
-
-> I've committed the following updated version of this patch into
-> omap-for-v3.14/dt branch.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ----------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 7 Jan 2014 14:01:38 -0800
-> Subject: [PATCH] ARM: dts: Add omap specific pinctrl defines to use padconf
-> addresses
-> 
-> As we have one to three pinctrl-single instances for each SoC it is
-> a bit confusing to configure the padconf register offset from the
-> base of the padconf register base.
-> 
-> Let's add macros that allow using the physical address of the
-> padconf register directly, or in most cases, just the last 16-bits
-> of the address as they are shown in the documentation.
-> 
-> Note that most documentation shows two padconf registers for each
-> 32-bit address, so adding 2 to the documentation address is needed for
-> the second padconf register as we treat them as 16-bit registers
-> for omap3+.
-> 
-> For example, omap36xx documentation shows sdmmc2_clk at 0x48002158,
-> so we can just use the last 16-bits of that value:
-> 
-> 	pinctrl-single,pins = <
-> 		OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)
-> 		...
-> 
-> 	>;
-> 
-> And we don't need to separately calculate the offset from the 0x2030
-> base:
-> 
-> 	pinctrl-single,pins = <
-> 		0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
-> 		...
-> 
-> 	>;
-> 
-> Naturally both ways of defining the registers can be used, and I'm
-> not saying we should replace all the existing defines. But it may
-> be handy to use these macros for new entries and when doing other
-> related .dts file clean-up.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> [tony at atomide.com: updated for 3430 vs 3630 core2 range]
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/include/dt-bindings/pinctrl/omap.h
-> +++ b/include/dt-bindings/pinctrl/omap.h
-> @@ -49,5 +49,25 @@
->  #define PIN_OFF_INPUT_PULLDOWN	(OFF_EN | OFF_PULL_EN)
->  #define PIN_OFF_WAKEUPENABLE	WAKEUP_EN
-> 
-> +/*
-> + * Macros to allow using the absolute physical address instead of the
-> + * padconf registers instead of the offset from padconf base.
-> + */
-> +#define OMAP_IOPAD_OFFSET(pa, offset)	(((pa) & 0xffff) - (offset))
-> +
-> +#define OMAP2420_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x0030) (val)
-> +#define OMAP2430_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030) (val)
-> +#define OMAP3_CORE1_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030) (val)
-> +#define OMAP3430_CORE2_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x25d8) (val)
-> +#define OMAP3630_CORE2_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x25a0)
-> (val) +#define OMAP3_WKUP_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2a00)
-> (val) +#define AM33XX_IOPAD(pa, val)		OMAP_IOPAD_OFFSET((pa), 0x0800) 
-(val)
-> +#define OMAP4_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x0040) (val)
-> +#define OMAP4_WKUP_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0xe040) (val)
-> +#define AM4372_IOPAD(pa, val)		OMAP_IOPAD_OFFSET((pa), 0x0800) (val)
-> +#define OMAP5_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2840) (val)
-> +#define OMAP5_WKUP_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0xc840) (val)
-> +#define DRA7XX_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x3400) (val) 
-+
->  #endif
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
