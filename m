@@ -1,207 +1,132 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  7 Jan 2014 17:35:02 +0100
-Subject: [PATCH v4 1/3] ARM: mvebu: Add support to get the ID and the revision
- of a SoC
-In-Reply-To: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1389112504-9931-2-git-send-email-gregory.clement@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 7 Jan 2014 10:36:17 -0600
+Subject: [PATCHv12 00/49] ARM: TI SoC clock DT conversion
+In-Reply-To: <52CB72B3.6070709@ti.com>
+References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
+ <52CB72B3.6070709@ti.com>
+Message-ID: <52CC2D01.7010001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the mvebu SoCs have information related to their variant and
-revision that can be read from the PCI control register.
+On 01/06/2014 09:21 PM, Nishanth Menon wrote:
+> Hi Tero,
+> On 12/20/2013 10:34 AM, Tero Kristo wrote:
+>> Hopefully final post of this series. At least this is going to be the last
+>> post this year as I will be going to x-mas vacation and won't be back before
+>> Jan 2nd. This time I just sent the patches that have changes in them,
+>> the missing ones are exactly the same as in v11.
+>>
+> 
+> There are still a few issues that I see
+> [...]
+> 
+>> Branches available at https://github.com/t-kristo/linux-pm.git:
+>> - branch: 3.13-rc4-dt-clks-v12 : contains everything, shall me merged last
+>> - branch: 3.13-rc4-dt-clks-v12-for-mike : drivers/clk changes
+>> - branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only (from v11, no changes)
+> 
+> For easy maintainer merging, you may want to make this as three branches:
+> 
+> 1. for-mike based on
+> git://git.linaro.org/people/mturquette/linux.git clk-next
+> 
+> 2. for-benoit based on
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+> for_3.14/dts
+> 
+> 3. for-tony based on
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> omap-for-v3.14/board-removal or on a clean k.org tag
+> 
+> 4. A testing branch for the rest of us which consolidates all of these
+> together.
+> 
+> Testing with a rebase of 3.13-rc4-dt-clks-v12 to v3.13-rc7:
+> 
+> Here is my test platforms and logs (boot only - omap2plus_defconfig +
+> common_clk_debug - all boots to sd card based filesystem):
+> 
+> AM335x Family:
+> 
+> AM335x-EVMSK:
+>         http://pastebin.mozilla.org/3955459
+> AM335x-EVM:
+>         http://pastebin.mozilla.org/3955460
+> AM335x-BeagleBone Black:
+>         http://pastebin.mozilla.org/3955476
+> 
+> OMAP3 family:
+> OMAP3430: SDP3430:
+>         http://pastebin.mozilla.org/3955475
+> AM3517-evm: (requires a bootargs fix - remote board - no regressions seen)
+>         http://pastebin.mozilla.org/3955461
+> AM3517-CraneBoard:
+>         http://pastebin.mozilla.org/3955477
+> OMAP3630/DM3730 BeagleBoard-XM:
+>         http://pastebin.mozilla.org/3955474
+> AM37xx-evm:
+>         http://pastebin.mozilla.org/3955472
+> 
+> OMAP4 Family:
+> OMAP4460: PandaBoard-ES:
+>         http://pastebin.mozilla.org/3955478
+> 	NOTE: trace_clk_div_ck seems orphan clock here?
+> 
+> OMAP5 Family:
+> OMAP5432: OMAP5uEVM:
+>         http://pastebin.mozilla.org/3955479
+> 
+> DRA7 Family:
+> 
+> DRA7: DRA7-evm:
+>         http://pastebin.mozilla.org/3955480
 
-This patch adds support for Armada XP and Armada 370. This reading of
-the revision and the ID are done before the PCI initialization to
-avoid any conflicts. Once these data are retrieved, the resources are
-freed to let the PCI subsystem use it.
+one more missing test platform:
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/Makefile       |   2 +-
- arch/arm/mach-mvebu/mvebu-soc-id.c | 120 +++++++++++++++++++++++++++++++++++++
- include/linux/mvebu-soc-id.h       |  32 ++++++++++
- 3 files changed, 153 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
- create mode 100644 include/linux/mvebu-soc-id.h
+AM43xx-epos platform: (needed a few out of tree patches to test on TI
+internal engineering samples):
+	http://pastebin.mozilla.org/3960056
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 2d04f0e21870..878aebe98dcc 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -3,7 +3,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 
- AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
- 
--obj-y				 += system-controller.o
-+obj-y				 += system-controller.o mvebu-soc-id.o
- obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
- obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
- obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-new file mode 100644
-index 000000000000..7aaba3a2f096
---- /dev/null
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -0,0 +1,120 @@
-+/*
-+ * Variant and revision information for mvebu SoCs
-+ *
-+ * Copyright (C) 2014 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * All the mvebu SoCs have information related to their variant and
-+ * revision that can be read from the PCI control register. This is
-+ * done before the PCI initialization to avoid any conflict. Once the
-+ * ID and revision are retrieved, the mapping is freed.
-+ */
-+
-+#define pr_fmt(fmt) "mvebu-soc-id: " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mvebu-soc-id.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#define PCIE_DEV_ID_OFF		0x0
-+#define PCIE_DEV_REV_OFF	0x8
-+
-+#define SOC_ID_MASK	    0xFFFF0000
-+#define SOC_REV_MASK	    0xFF
-+
-+static u32 soc_dev_id;
-+static u32 soc_rev;
-+static bool is_id_valid;
-+
-+static const struct of_device_id mvebu_pcie_of_match_table[] = {
-+	{ .compatible = "marvell,armada-xp-pcie", },
-+	{ .compatible = "marvell,armada-370-pcie", },
-+	{},
-+};
-+
-+int mvebu_get_soc_id(u32 *dev, u32 *rev)
-+{
-+	if (is_id_valid) {
-+		*dev = soc_dev_id;
-+		*rev = soc_rev;
-+		return 0;
-+	} else
-+		return -1;
-+}
-+EXPORT_SYMBOL_GPL(mvebu_get_soc_id);
-+
-+static int __init mvebu_soc_id_init(void)
-+{
-+	struct device_node *np;
-+	int ret = 0;
-+	void __iomem *pci_base;
-+	struct clk *clk;
-+	struct device_node *child;
-+
-+	np = of_find_matching_node(NULL, mvebu_pcie_of_match_table);
-+	if (!np)
-+		return ret;
-+
-+	/*
-+	 * ID and revision are available from any port, so we
-+	 * just pick the first one
-+	 */
-+	child = of_get_next_child(np, NULL);
-+	if (child == NULL) {
-+		pr_err("cannot get pci node\n");
-+		ret = -ENOMEM;
-+		goto clk_err;
-+	}
-+
-+	clk = of_clk_get_by_name(child, NULL);
-+	if (IS_ERR(clk)) {
-+		pr_err("cannot get clock\n");
-+		ret = -ENOMEM;
-+		goto clk_err;
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("cannot enable clock\n");
-+		goto clk_err;
-+	}
-+
-+	pci_base = of_iomap(child, 0);
-+	if (IS_ERR(pci_base)) {
-+		pr_err("cannot map registers\n");
-+		ret = -ENOMEM;
-+		goto res_ioremap;
-+	}
-+
-+	/* SoC ID */
-+	soc_dev_id = readl(pci_base + PCIE_DEV_ID_OFF) >> 16;
-+
-+	/* SoC revision */
-+	soc_rev = readl(pci_base + PCIE_DEV_REV_OFF) & SOC_REV_MASK;
-+
-+	is_id_valid = true;
-+
-+	pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
-+
-+	iounmap(pci_base);
-+
-+res_ioremap:
-+	clk_disable_unprepare(clk);
-+
-+clk_err:
-+	of_node_put(child);
-+	of_node_put(np);
-+
-+	return ret;
-+}
-+core_initcall(mvebu_soc_id_init);
-+
-diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
-new file mode 100644
-index 000000000000..31654252fe35
---- /dev/null
-+++ b/include/linux/mvebu-soc-id.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Marvell EBU SoC ID and revision definitions.
-+ *
-+ * Copyright (C) 2014 Marvell Semiconductor
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __LINUX_MVEBU_SOC_ID_H
-+#define __LINUX_MVEBU_SOC_ID_H
-+
-+/* Armada XP ID */
-+#define MV78230_DEV_ID	    0x7823
-+#define MV78260_DEV_ID	    0x7826
-+#define MV78460_DEV_ID	    0x7846
-+
-+/* Armada XP Revision */
-+#define MV78XX0_A0_REV	    0x1
-+#define MV78XX0_B0_REV	    0x2
-+
-+#ifdef CONFIG_ARCH_MVEBU
-+int mvebu_get_soc_id(u32 *dev, u32 *rev);
-+#else
-+static inline int mvebu_get_soc_id(u32 *dev, u32 *rev)
-+{
-+	return -1;
-+}
-+#endif
-+
-+#endif /* __LINUX_MVEBU_SOC_ID_H */
+
+> 
+> 
+> Patch autoverification report: http://pastebin.mozilla.org/3955695
+> 
+> The following issues need fixes I suppose:
+> * CHECK: spinlock_t definition without comment
+> 	[PATCH 03/49] clk: divider: add support for registering divider
+> 	[PATCH 04/49] clk: mux: add support for registering mux clock from
+> 	[PATCH 05/49] clk: gate: add support for registering gate clock from
+> 
+> * [PATCH 23/49] CLK: TI: DRA7: Add APLL support
+> 	"parent_names = kzalloc(sizeof(char *) * init->num_parents, GFP_KERNEL);"
+> 	* kzalloc without check for NULL
+> 	* will also be good to add some kerneldoc documentation (same with
+> interface.c)
+> * WARNING: static const char * array should probably be static const
+> char * const
+> 	[PATCH 25/49] CLK: TI: add am33xx clock init file
+> 	[PATCH 27/49] CLK: TI: add omap3 clock init file
+> * [PATCH 40/49] ARM: OMAP2+: clock: use driver API instead of direct
+> 	adds a new kernel doc warning "Warning(arch/arm/mach-omap2/clock.c:
+> No description found for parameter 'clk'"
+> * [PATCH 44/49] ARM: OMAP2+: io: use new clock init API
+> 	introduces warning for
+> 		"arch/arm/mach-omap2/io.c: warning: symbol 'omap_clk_soc_init' was
+> not declared. Should it be static?"
+> 	which seems squashed with "[PATCH 45/49] ARM: OMAP4: remove old clock
+> data and link in new"
+> 	will be good to have it not appear in patch 44 itself.
+> 
+> 
+> Also pending is OMAP5 only build failure that Felipe reported and does
+> not seem fixed in V12 as well:
+> http://marc.info/?l=linux-arm-kernel&m=138757010619274&w=2
+> and
+> http://marc.info/?l=linux-arm-kernel&m=138755595914796&w=2
+> 
+
+
 -- 
-1.8.1.2
+Regards,
+Nishanth Menon
