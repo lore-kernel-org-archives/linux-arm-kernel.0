@@ -1,132 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 7 Jan 2014 10:36:17 -0600
-Subject: [PATCHv12 00/49] ARM: TI SoC clock DT conversion
-In-Reply-To: <52CB72B3.6070709@ti.com>
-References: <1387557274-22583-1-git-send-email-t-kristo@ti.com>
- <52CB72B3.6070709@ti.com>
-Message-ID: <52CC2D01.7010001@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 7 Jan 2014 16:36:29 +0000
+Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available
+ for ARM_UNWIND
+In-Reply-To: <4325142.7drL5ndxN9@wuerfel>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <201401071533.35309.arnd@arndb.de>
+ <20140107144130.GJ27432@n2100.arm.linux.org.uk>
+ <4325142.7drL5ndxN9@wuerfel>
+Message-ID: <20140107163629.GC3350@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2014 09:21 PM, Nishanth Menon wrote:
-> Hi Tero,
-> On 12/20/2013 10:34 AM, Tero Kristo wrote:
->> Hopefully final post of this series. At least this is going to be the last
->> post this year as I will be going to x-mas vacation and won't be back before
->> Jan 2nd. This time I just sent the patches that have changes in them,
->> the missing ones are exactly the same as in v11.
->>
+On Tue, Jan 07, 2014 at 03:48:25PM +0000, Arnd Bergmann wrote:
+> On Tuesday 07 January 2014 14:41:30 Russell King - ARM Linux wrote:
+> > On Tue, Jan 07, 2014 at 03:33:34PM +0100, Arnd Bergmann wrote:
+> > > 
+> > > 
+> > > It's been almost a year since we last discussed the patches that were
+> > > posted by Dave and sahara, but nothing has changed in the mainline kernel.
+> > > 
+> > > Any chance that someone could be motivated to pick this work up again
+> > > and finally fix return_address().
+> > 
+> > I thought that we had _actively_ decided that we would not use the
+> > unwinder for these paths - that it was too expensive for these paths,
+> > and you had to use frame pointers instead.
 > 
-> There are still a few issues that I see
-> [...]
-> 
->> Branches available at https://github.com/t-kristo/linux-pm.git:
->> - branch: 3.13-rc4-dt-clks-v12 : contains everything, shall me merged last
->> - branch: 3.13-rc4-dt-clks-v12-for-mike : drivers/clk changes
->> - branch: 3.13-rc4-dt-clks-v11-for-benoit : DT data only (from v11, no changes)
-> 
-> For easy maintainer merging, you may want to make this as three branches:
-> 
-> 1. for-mike based on
-> git://git.linaro.org/people/mturquette/linux.git clk-next
-> 
-> 2. for-benoit based on
-> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
-> for_3.14/dts
-> 
-> 3. for-tony based on
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-> omap-for-v3.14/board-removal or on a clean k.org tag
-> 
-> 4. A testing branch for the rest of us which consolidates all of these
-> together.
-> 
-> Testing with a rebase of 3.13-rc4-dt-clks-v12 to v3.13-rc7:
-> 
-> Here is my test platforms and logs (boot only - omap2plus_defconfig +
-> common_clk_debug - all boots to sd card based filesystem):
-> 
-> AM335x Family:
-> 
-> AM335x-EVMSK:
->         http://pastebin.mozilla.org/3955459
-> AM335x-EVM:
->         http://pastebin.mozilla.org/3955460
-> AM335x-BeagleBone Black:
->         http://pastebin.mozilla.org/3955476
-> 
-> OMAP3 family:
-> OMAP3430: SDP3430:
->         http://pastebin.mozilla.org/3955475
-> AM3517-evm: (requires a bootargs fix - remote board - no regressions seen)
->         http://pastebin.mozilla.org/3955461
-> AM3517-CraneBoard:
->         http://pastebin.mozilla.org/3955477
-> OMAP3630/DM3730 BeagleBoard-XM:
->         http://pastebin.mozilla.org/3955474
-> AM37xx-evm:
->         http://pastebin.mozilla.org/3955472
-> 
-> OMAP4 Family:
-> OMAP4460: PandaBoard-ES:
->         http://pastebin.mozilla.org/3955478
-> 	NOTE: trace_clk_div_ck seems orphan clock here?
-> 
-> OMAP5 Family:
-> OMAP5432: OMAP5uEVM:
->         http://pastebin.mozilla.org/3955479
-> 
-> DRA7 Family:
-> 
-> DRA7: DRA7-evm:
->         http://pastebin.mozilla.org/3955480
+> I don't remember that discussion, but it may well be. What does
+> that mean for the #warning in return_address.c then? Can we
+> just use the frame pointer version based on CONFIG_FRAME_POINTER
+> and ignore whether CONFIG_ARM_UNWIND is set as the patch below,
+> or did I misunderstand?
 
-one more missing test platform:
+For an ARM kernel this may work, but I thought that for THUMB2_KERNEL
+there just isn't usable a framepointer at all.
 
-AM43xx-epos platform: (needed a few out of tree patches to test on TI
-internal engineering samples):
-	http://pastebin.mozilla.org/3960056
+If so, the only choices are to use the unwinder and accept the cost, or
+to decide that return_address() will never work without
+CONFIG_FRAMEPOINTER and remove the build-time warning.
 
 
-> 
-> 
-> Patch autoverification report: http://pastebin.mozilla.org/3955695
-> 
-> The following issues need fixes I suppose:
-> * CHECK: spinlock_t definition without comment
-> 	[PATCH 03/49] clk: divider: add support for registering divider
-> 	[PATCH 04/49] clk: mux: add support for registering mux clock from
-> 	[PATCH 05/49] clk: gate: add support for registering gate clock from
-> 
-> * [PATCH 23/49] CLK: TI: DRA7: Add APLL support
-> 	"parent_names = kzalloc(sizeof(char *) * init->num_parents, GFP_KERNEL);"
-> 	* kzalloc without check for NULL
-> 	* will also be good to add some kerneldoc documentation (same with
-> interface.c)
-> * WARNING: static const char * array should probably be static const
-> char * const
-> 	[PATCH 25/49] CLK: TI: add am33xx clock init file
-> 	[PATCH 27/49] CLK: TI: add omap3 clock init file
-> * [PATCH 40/49] ARM: OMAP2+: clock: use driver API instead of direct
-> 	adds a new kernel doc warning "Warning(arch/arm/mach-omap2/clock.c:
-> No description found for parameter 'clk'"
-> * [PATCH 44/49] ARM: OMAP2+: io: use new clock init API
-> 	introduces warning for
-> 		"arch/arm/mach-omap2/io.c: warning: symbol 'omap_clk_soc_init' was
-> not declared. Should it be static?"
-> 	which seems squashed with "[PATCH 45/49] ARM: OMAP4: remove old clock
-> data and link in new"
-> 	will be good to have it not appear in patch 44 itself.
-> 
-> 
-> Also pending is OMAP5 only build failure that Felipe reported and does
-> not seem fixed in V12 as well:
-> http://marc.info/?l=linux-arm-kernel&m=138757010619274&w=2
-> and
-> http://marc.info/?l=linux-arm-kernel&m=138755595914796&w=2
-> 
+My other concern was that we might end up in a recursive trace due to
+the use of non-notrace core functions in the unwinder.  But I seem to
+remember Steve Rostedt saying the the tracer guards against recursive
+invocation nowadays -- if so, that shouldn't be a problem.
 
-
--- 
-Regards,
-Nishanth Menon
+Cheers
+---Dave
