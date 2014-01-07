@@ -1,29 +1,13 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 07 Jan 2014 15:07:05 +0900
+Date: Tue, 07 Jan 2014 15:09:26 +0900
 Subject: [PATCH v3] extcon: gpio: Add power resume support
 In-Reply-To: <1389070590-3139-1-git-send-email-rongjun.ying@csr.com>
 References: <1389070590-3139-1-git-send-email-rongjun.ying@csr.com>
-Message-ID: <52CB9989.9010609@samsung.com>
+Message-ID: <52CB9A16.9010305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch has conflict as following:
-You have to implement extcon patch based mainline extcon-next branch.
-
-Applying: extcon: gpio: Add power resume support
-error: patch failed: drivers/extcon/extcon-gpio.c:103
-error: drivers/extcon/extcon-gpio.c: patch does not apply
-Patch failed at 0001 extcon: gpio: Add power resume support
-The copy of the patch that failed is found in:
-   /home/cwchoi00/kernel/git.kernel/extcon/.git/rebase-apply/patch
-When you have resolved this problem, run "git am --resolved".
-If you prefer to skip this patch, run "git am --skip" instead.
-To restore the original branch and stop patching, run "git am --abort".
-
-This time, I will manually apply this patch on extcon branch.
-
-Thanks,
-Chanwoo Choi
+Hi RongJun,
 
 On 01/07/2014 01:56 PM, RongJun Ying wrote:
 > From: Rongjun Ying <rongjun.ying@csr.com>
@@ -80,31 +64,6 @@ On 01/07/2014 01:56 PM, RongJun Ying wrote:
 > +
 > +static const struct dev_pm_ops gpio_extcon_pm_ops = {
 > +	SET_SYSTEM_SLEEP_PM_OPS(NULL, gpio_extcon_resume)
-> +};
-> +
->  static struct platform_driver gpio_extcon_driver = {
->  	.probe		= gpio_extcon_probe,
->  	.remove		= gpio_extcon_remove,
->  	.driver		= {
->  		.name	= "extcon-gpio",
->  		.owner	= THIS_MODULE,
-> +		.pm = &gpio_extcon_pm_ops,
->  	},
->  };
-> 
-> diff --git a/include/linux/extcon/extcon-gpio.h b/include/linux/extcon/extcon-gpio.h
-> index 4195810..c7f0c3e 100644
-> --- a/include/linux/extcon/extcon-gpio.h
-> +++ b/include/linux/extcon/extcon-gpio.h
-> @@ -51,6 +51,7 @@ struct gpio_extcon_platform_data {
->  	/* if NULL, "0" or "1" will be printed */
->  	const char *state_on;
->  	const char *state_off;
-> +	bool check_on_resume;
->  };
-> 
->  #endif /* __EXTCON_GPIO_H__ */
-> --
-> 1.7.5.4
-> 
-> 
+
+If CONFIG_PM_SLEEP is undefined, gpio_extcon_pm_ops cannot find gpio_extcon_resume function.
+You should define dummy function for gpio_extcon_resume function.
