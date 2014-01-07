@@ -1,56 +1,27 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 7 Jan 2014 18:19:55 +0100
-Subject: [PATCH v4 1/6] edac: Don't try to cancel workqueue when it's
- never setup
-In-Reply-To: <1388434457-4194-2-git-send-email-sboyd@codeaurora.org>
-References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
- <1388434457-4194-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140107171955.GA4164@pd.tnic>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 7 Jan 2014 17:23:38 +0000
+Subject: [PATCH v2 3/5] arm: add early_ioremap support
+In-Reply-To: <1389062120-31896-4-git-send-email-msalter@redhat.com>
+References: <1389062120-31896-1-git-send-email-msalter@redhat.com>
+ <1389062120-31896-4-git-send-email-msalter@redhat.com>
+Message-ID: <20140107172338.GB6234@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 30, 2013 at 12:14:12PM -0800, Stephen Boyd wrote:
-> We only setup a workqueue for edac devices that use the polling
-> method. We still try to cancel the workqueue if an edac_device
-> uses the irq method though. This causes a warning from debug
-> objects when we remove an edac device:
+On Tue, Jan 07, 2014 at 02:35:18AM +0000, Mark Salter wrote:
+> This patch uses the generic early_ioremap code to implement
+> early_ioremap for ARM. The ARM-specific bits come mostly from
+> an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
+> here:
 > 
-> WARNING: CPU: 0 PID: 56 at lib/debugobjects.c:260 debug_print_object+0x98/0xc0()
-> ODEBUG: assert_init not available (active state 0) object type: timer_list hint: stub_timer+0x0/0x28
-> Modules linked in: krait_edac(-)
-> CPU: 0 PID: 56 Comm: rmmod Not tainted 3.12.0-rc2-00035-g15292a0 #69
-> (unwind_backtrace+0x0/0x144)
-> (show_stack+0x20/0x24)
-> (dump_stack+0x74/0xb4)
-> (warn_slowpath_common+0x78/0x9c)
-> (warn_slowpath_fmt+0x40/0x48)
-> (debug_print_object+0x98/0xc0)
-> (debug_object_assert_init+0xdc/0xec)
-> (del_timer+0x24/0x7c)
-> (try_to_grab_pending+0xc0/0x1b0)
-> (cancel_delayed_work+0x2c/0xa0)
-> (edac_device_workq_teardown+0x1c/0x38)
-> (edac_device_del_device+0xb8/0xe4)
-> (krait_edac_remove+0x50/0x70 [krait_edac])
-> (platform_drv_remove+0x24/0x28)
-> (__device_release_driver+0x68/0xc0)
-> (driver_detach+0xc4/0xc8)
-> (bus_remove_driver+0xac/0x114)
-> (driver_unregister+0x38/0x58)
-> (platform_driver_unregister+0x1c/0x20)
-> (krait_edac_driver_exit+0x14/0x1c [krait_edac])
-> (SyS_delete_module+0x178/0x2b4)
+>   https://lkml.org/lkml/2013/10/3/279
 > 
-> Fix it by skipping the workqueue teardown for such devices.
-> 
-> Acked-by: Borislav Petkov <bp@suse.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
 
-Applied, thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
