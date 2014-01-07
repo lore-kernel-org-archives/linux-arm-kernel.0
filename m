@@ -1,23 +1,18 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Jan 2014 14:55:35 +0100
-Subject: [PATCH] ARM: ux500: turn on PRINTK_TIME in u8500_defconfig
-In-Reply-To: <1387225585-14107-1-git-send-email-olof@lixom.net>
-References: <1387225585-14107-1-git-send-email-olof@lixom.net>
-Message-ID: <CACRpkdYuJTZdxV_vgHBuFuCY300aEW7e2MrFM1mvhr1y5i3XZA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 7 Jan 2014 22:01:06 +0800
+Subject: [PATCH] ARM: imx: Use INT_MEM_CLK_LPM as the bit name
+In-Reply-To: <1389088840-14444-1-git-send-email-festevam@gmail.com>
+References: <1389088840-14444-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140107140104.GL12346@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 16, 2013 at 9:26 PM, Olof Johansson <olof@lixom.net> wrote:
+On Tue, Jan 07, 2014 at 08:00:40AM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Bit 17 of register CCM_CGPR is called INT_MEM_CLK_LPM as per the mx6
+> reference manual, so use this name instead.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> I recently noticed slow booting of a board, and without printk timestamps it's
-> harder to tell just where the delays are coming from. Enable it.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-
-Patch applied.
-
-I'll take a sweep on other ux500 misc patches and provide a pull
-request to you get this back to ARM SoC by pingpong.
-
-Yours,
-Linus Walleij
+Applied, thanks.
