@@ -1,50 +1,144 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Tue, 7 Jan 2014 12:45:53 +0100
-Subject: [RFC PATCH v1 2/5] misc: tda8026: Add NXP TDA8026 PHY driver
-In-Reply-To: <52CBA075.8080506@ti.com>
-References: <1389010062-17185-1-git-send-email-satish.patel@ti.com>
- <1389010062-17185-3-git-send-email-satish.patel@ti.com>
- <20140106153033.GB24664@e106331-lin.cambridge.arm.com>
- <52CBA075.8080506@ti.com>
-Message-ID: <20140107114552.GA900@earth.universe>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Jan 2014 11:50:24 +0000
+Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
+In-Reply-To: <87eh5aowrw.fsf@e102391-lin.cambridge.arm.com>
+References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
+ <20131217185154.GN5711@cbox>
+ <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
+ <52B1C251.9040801@gmail.com>
+ <87eh5aowrw.fsf@e102391-lin.cambridge.arm.com>
+Message-ID: <20140107115024.GB4180@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 12:06:37PM +0530, Satish Patel wrote:
-> >> +       if (pdata->irq == 0) {
-> >> +               /* look for the field irq-gpio in DT */
-> >> +               irq_gpio = of_get_named_gpio(np, "irq-gpio", 0);
-> >> +               if (!gpio_is_valid(irq_gpio)) {
-> >> +                       dev_err(dev, "Failed to get irq gpio,\n");
-> >> +                       return -EIO;
-> >> +               }
-> > 
-> > This is horrible. If the gpio controller can act as an irq controller
+On Wed, Dec 18, 2013 at 06:10:27PM +0000, Marc Zyngier wrote:
+> Hi Rob,
 > 
-> No it's not true. Let me clarify the signal flow,
-> 
-> Pins => GPIO => GPIO BANK => Interrupt controller => CPU/MPU
+> On Wed, Dec 18 2013 at 03:42:09 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > Adding Mark Rutland.
+> >
+> > On 12/18/2013 08:38 AM, Marc Zyngier wrote:
+> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> >> 
+> >>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
+> >>>> The Power State and Coordination Interface (PSCI) specification defines
+> >>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
+> >>>>
+> >>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+> >>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+> >>>> KVM_EXIT_SYSTEM_EVENT exit reason.
+> >>>>
+> >>>> To try this patch from guest kernel, we will need PSCI-based restart and
+> >>>> poweroff support in the guest kenel for both ARM and ARM64.
+> >>>>
+> >>>> Rob Herring has already submitted patches for PSCI-based restart and
+> >>>> poweroff in ARM kernel but these are not merged yet due unstable device
+> >>>> tree bindings of kernel PSCI support. We will be having similar patches
+> >>>> for PSCI-based restart and poweroff in ARM64 kernel.
+> >>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+> >>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
+> >>>
+> >>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>>
+> >>> I can merge this series if Marc acks it as well.
+> >> 
+> >> The patches themselves are mostly fine. One issue though: They implement
+> >> part of the v0.2 spec, but keep on using the range of function IDs that
+> >> we made up for v0.1.
+> >> 
+> >> I just had a chat with the person responsible for the spec, and realized
+> >> that the Function IDs mentionned in the v0.2 spec are not optional, and
+> >> not using them would be in direct violation of the spec (the new numbers
+> >> now come directly from the SMC calling convention).
+> >
+> > News to me. That is exactly the opposite of what Mark Rutland told me.
+> > This would certainly simplify things since the SMC calling convention
+> > IDs encode the size and there would be no reason to put the IDs into
+> > DT.
 
-This is done automatically if you use the gpio controller as
-interrupt source (here with GPIO line 22 as example):
+Hi Rob,
 
-device-tree-node {
-    interrupts-extended = <&gpio1 22>;
+Sorry for the confusion here. My position changed over the course of the
+discussion, so I'm probably arguing against my original side now.
+
+I think the key point was that I wanted a PSCI 0.2 system to function
+with an existing kernel if possible, as all the existing calls still
+exist. That implied placing the numbers (redundantly) into the DT. This
+is important for extending KVM with PSCI 0.2 support without breaking
+support for existing guests and having to have a load of messy flags
+depending on the guest you want to boot.
+
+I agree that we should use the specified function IDs, and therefore we
+do not need to specify the IDs. A new system that old kernels can't run
+on anyway can just have:
+
+psci {
+	compatible = "arm,psci-0.2";
+	methoc = "smc";
 };
 
-alternatively, but then the irqs from the normal irq controller
-can't be used:
+However, it would be nice to have a set of function IDs in the DT for
+existing clients as a fallback. Preferably in the same node (we have the
+compatible list, we may as well use it and make it clear we expect
+clients to use one or the other):
 
-device-tree-node {
-    interrupt-parent = <&gpio1>;
-    interrupts = <22>;
+psci {
+	compatible = "arm,psci-0.2", "arm,psci";
+	method = "smc";
+
+	/* 
+	 * The mandated PSCI 0.2 IDs are used by the client if it
+	 * understands PSCI 0.2. These IDs are for older clients that
+	 * only support the kernel's old PSCI version.
+	 *
+	 * These IDs might not match any of the PSCI 0.2 IDs, and are
+	 * purely here for compatibility with existing software.
+	 */
+	cpu_off = <...>;
+	cpu_on = <...>;
+	cpu_suspend = <...>;
 };
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140107/bc4b2c23/attachment.sig>
+I believe KVM currently uses the same ID numbers regardless of guest
+register-width, which is unfortunately different from what PSCI 0.2 says
+it should. As KVM can figure out the register width of the caller it
+might be able to do the right thing (unless that's in conflict with PSCI
+0.2). At worst we should be able to allocate a third set of
+width-agnostic IDs for older clients that imply the current behaviour.
+
+Does that sound reasonable? Sorry for leading you in circles.
+
+> 
+> Hmmm. I'd hate to contredict Mark. But as he's on holiday (and hopefully
+> unlikely to reply immediately), I win the argument! ;-)
+> 
+> More seriously, given that we have a document specifying the IDs, I'd be
+> inclined to follow it. It is not that often that ARM actually *mandates*
+> something... ;-)
+> 
+> Mark (assuming you're reading this): what were your objections about
+> following the ID mentioned in the spec?
+
+Originally I was worried about more spectacularly bad implementations
+with wrong IDs or a subset of IDs supported. Now I agree that we can
+handle those later if and when they arise, and using the correct IDs is
+a far better option.
+
+The other issue was KVM forwards-compatibility, but I think the above
+covers that.
+
+> 
+> >> So I rekon we need to create a separate range for those. Also, I'd like
+> >> to progress the DT and kernel side of things as well (otherwise this is
+> >> all a bit pointless).
+> >> 
+> >> Rob: what are your plans regarding your PSCI v0.2 patches?
+> >
+> > My plan was to simply add 2 optional properties for reset/off and be
+> > done with it like is done here. I'll leave it to ARM to sort out all of
+> > v0.2 ID and 32-bit vs. 64-bit issues.
+
+Does the above sound OK for adding that support?
+
+Thanks,
+Mark.
