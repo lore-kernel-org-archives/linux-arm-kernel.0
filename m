@@ -1,105 +1,39 @@
 From: liuj97@gmail.com (Jiang Liu)
-Date: Tue,  7 Jan 2014 22:17:11 +0800
-Subject: [PATCH v8 4/7] arm64: introduce aarch64_insn_gen_{nop|branch_imm}()
- helper functions
+Date: Tue,  7 Jan 2014 22:17:12 +0800
+Subject: [PATCH v8 5/7] arm64, jump label: detect %c support for ARM64
 In-Reply-To: <1389104234-15239-1-git-send-email-liuj97@gmail.com>
 References: <1389104234-15239-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1389104234-15239-5-git-send-email-liuj97@gmail.com>
+Message-ID: <1389104234-15239-6-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce aarch64_insn_gen_{nop|branch_imm}() helper functions, which
-will be used to implement jump label on ARM64.
+As commit a9468f30b5eac6 "ARM: 7333/2: jump label: detect %c
+support for ARM", this patch detects the same thing for ARM64
+because some ARM64 GCC versions have the same issue.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Some versions of ARM64 GCC which do support asm goto, do not
+support the %c specifier. Since we need the %c to support jump
+labels on ARM64, detect that too in the asm goto detection script
+to avoid build errors with these versions.
+
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Jiang Liu <liuj97@gmail.com>
 ---
- arch/arm64/include/asm/insn.h | 10 ++++++++++
- arch/arm64/kernel/insn.c      | 40 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ scripts/gcc-goto.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index fb44660..c44ad39 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -66,6 +66,11 @@ enum aarch64_insn_imm_type {
- 	AARCH64_INSN_IMM_MAX
- };
- 
-+enum aarch64_insn_branch_type {
-+	AARCH64_INSN_BRANCH_NOLINK,
-+	AARCH64_INSN_BRANCH_LINK,
-+};
-+
- #define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
- static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
- { return (code & (mask)) == (val); } \
-@@ -89,6 +94,11 @@ int aarch64_insn_write(void *addr, u32 insn);
- enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-+u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
-+				enum aarch64_insn_branch_type type);
-+u32 aarch64_insn_gen_hint(enum aarch64_insn_hint_op op);
-+u32 aarch64_insn_gen_nop(void);
-+
- bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
- 
- int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 7df0807..92f3683 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -14,6 +14,7 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#include <linux/bitops.h>
- #include <linux/compiler.h>
- #include <linux/kernel.h>
- #include <linux/smp.h>
-@@ -262,3 +263,42 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 
- 	return insn;
- }
-+
-+u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
-+					  enum aarch64_insn_branch_type type)
-+{
-+	u32 insn;
-+	long offset;
-+
-+	/*
-+	 * PC: A 64-bit Program Counter holding the address of the current
-+	 * instruction. A64 instructions must be word-aligned.
-+	 */
-+	BUG_ON((pc & 0x3) || (addr & 0x3));
-+
-+	/*
-+	 * B/BL support [-128M, 128M) offset
-+	 * ARM64 virtual address arrangement guarantees all kernel and module
-+	 * texts are within +/-128M.
-+	 */
-+	offset = ((long)addr - (long)pc);
-+	BUG_ON(offset < -SZ_128M || offset >= SZ_128M);
-+
-+	if (type == AARCH64_INSN_BRANCH_LINK)
-+		insn = aarch64_insn_get_bl_value();
-+	else
-+		insn = aarch64_insn_get_b_value();
-+
-+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_26, insn,
-+					     offset >> 2);
-+}
-+
-+u32 __kprobes aarch64_insn_gen_hint(enum aarch64_insn_hint_op op)
-+{
-+	return aarch64_insn_get_hint_value() | op;
-+}
-+
-+u32 __kprobes aarch64_insn_gen_nop(void)
-+{
-+	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
-+}
+diff --git a/scripts/gcc-goto.sh b/scripts/gcc-goto.sh
+index a2af2e8..c9469d3 100644
+--- a/scripts/gcc-goto.sh
++++ b/scripts/gcc-goto.sh
+@@ -5,7 +5,7 @@
+ cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
+ int main(void)
+ {
+-#ifdef __arm__
++#if defined(__arm__) || defined(__aarch64__)
+ 	/*
+ 	 * Not related to asm goto, but used by jump label
+ 	 * and broken on some ARM GCC versions (see GCC Bug 48637).
 -- 
 1.8.1.2
