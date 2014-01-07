@@ -1,48 +1,63 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 07 Jan 2014 10:13:10 +0100
-Subject: [PATCH 2/2] phy-core: Don't propagate -ENOSUPP from
- phy_pm_runtime_get_sync to caller
-In-Reply-To: <52CBC152.3070403@ti.com>
-References: <1388963189-13556-1-git-send-email-hdegoede@redhat.com>
- <1388963189-13556-2-git-send-email-hdegoede@redhat.com>
- <52CBC152.3070403@ti.com>
-Message-ID: <52CBC526.4050001@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 7 Jan 2014 10:22:41 +0100
+Subject: [PATCH v2 0/5] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_o1TEDUYPzUCV1x6D79saUyLdJb1L59GDPwD393CzynQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+@Russell, Nico,
 
-On 01/07/2014 09:56 AM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Monday 06 January 2014 04:36 AM, Hans de Goede wrote:
->> The phy-core allows phy_init and phy_power_on to be called multiple times,
->> but before this patch -ENOSUPP from phy_pm_runtime_get_sync would be
->> propagated to the caller for the 2nd and later calls.
->
-> Thanks for fixing this. Have one minor comment below.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   drivers/phy/phy-core.c | 6 ++++--
->>   1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->> index d7b992e..8ee6157 100644
->> --- a/drivers/phy/phy-core.c
->> +++ b/drivers/phy/phy-core.c
->> @@ -161,7 +161,8 @@ int phy_init(struct phy *phy)
->>   			dev_err(&phy->dev, "phy init failed --> %d\n", ret);
->>   			goto out;
->>   		}
->> -	}
->> +	} else
->> +		ret = 0; /* Override possible ret == -ENOTSUPP */
->
-> 'should use braces in both branches'.
-
-Ok, I'll do a v2 fixing this soonish, any comments on the first patch?
+Care to share your opinion on this alternative approach to allocating
+hwcap feature bits for the ARMv8 Crypto Extensions for 32-bit ARM?
 
 Regards,
+Ard.
 
-Hans
+
+On 23 December 2013 15:06, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This series is a followup to the patch that was recently merged by Catalin that
+> allocates hwcaps bits for CRC and Crypto Extensions instructions so userland can
+> discover whether the current CPU has any of those capabilities.
+>
+> Patch #1 enables ARM support for the ELF_HWCAP2/AT_HWCAP2 ELF auxv entry that
+> was recently added to the kernel and glibc (2.18). It extends the feature bit
+> space to 64 bits (on 32-bit architectures)
+>
+> Patch #2 adds generic support for ELF_HWCAP2/AT_HWCAP2 to the 32-bit ELF compat
+> mode for 64-bit architectures.
+>
+> Patch #3 adds support for ELF_HWCAP2/AT_HWCAP2 to arm64's 32-bit ELF compat mode
+>
+> Patch #4 allocates the HWCAP2 bits in the arch/arm tree. This is necessary
+> because 32-bit ARM binaries can execute both under ARM and under arm64 kernels,
+> so there should be agreement about the meaning of feature bits, even if the ARM
+> kernel has no support yet for ARMv8 32-bit only hardware (such as ARMv8-R)
+>
+> Patch #5 advertises the CRC and Crypto Extensions to 32-bit ELF binaries running
+> under an arm64 kernel.
+>
+> v2 changes:
+> - omitted 2 arm64 specific patches that have already been merged by Catalin
+> - move ARM feature bits to HWCAP2
+>
+> Ard Biesheuvel (5):
+>   ARM: add support for AT_HWCAP2 ELF auxv entry
+>   binfmt_elf: add ELF_HWCAP2 to compat auxv entries
+>   arm64: add AT_HWCAP2 support for 32-bit compat
+>   ARM: introduce HWCAP2 feature bits for ARMv8 Crypto Extensions
+>   arm64: advertise ARMv8 extensions to 32-bit compat ELF binaries
+>
+>  arch/arm/include/asm/hwcap.h      |  3 ++-
+>  arch/arm/include/uapi/asm/hwcap.h |  9 +++++++++
+>  arch/arm/kernel/setup.c           | 16 ++++++++++++++++
+>  arch/arm64/include/asm/hwcap.h    |  9 ++++++++-
+>  arch/arm64/kernel/setup.c         | 33 +++++++++++++++++++++++++++++++++
+>  fs/compat_binfmt_elf.c            |  5 +++++
+>  6 files changed, 73 insertions(+), 2 deletions(-)
+>
+> --
+> 1.8.3.2
+>
