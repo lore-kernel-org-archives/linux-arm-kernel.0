@@ -1,32 +1,22 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue,  7 Jan 2014 19:57:13 +0100
-Subject: [PATCH 1/4] ARM: shmobile: r8a7791: Add thermal clock in device tree
-In-Reply-To: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
-References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1389121036-3555-2-git-send-email-geert@linux-m68k.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Jan 2014 20:03:26 +0100
+Subject: [PATCH 1/6] pinctrl: sh-pfc: r7s72100: Add RSPI support
+In-Reply-To: <1387886210-3634-2-git-send-email-geert+renesas@linux-m68k.org>
+References: <1387886210-3634-1-git-send-email-geert+renesas@linux-m68k.org>
+ <1387886210-3634-2-git-send-email-geert+renesas@linux-m68k.org>
+Message-ID: <CACRpkdaKty+6G6AR8k=o0m-XpmQ6ER-TmA5LYNtEvjM_7wvtZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Tue, Dec 24, 2013 at 12:56 PM, Geert Uytterhoeven
+<geert+renesas@linux-m68k.org> wrote:
 
-Add the missing thermal MSTP clock to the thermal device node.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
- arch/arm/boot/dts/r8a7791.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+Geert can you please repost any PFC patches you have to Laurent
+Pinchart on the To: line as well, because I have to use him as a
+front-end for this stuff lest I drown in patches.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index d8dbf7e7b6a9..3233041d8a44 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -151,6 +151,7 @@
- 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks R8A7791_CLK_THERMAL>;
- 	};
- 
- 	timer {
--- 
-1.7.9.5
+Yours,
+Linus Walleij
