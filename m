@@ -1,10 +1,10 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue,  7 Jan 2014 18:02:21 +0100
+Date: Tue,  7 Jan 2014 18:03:52 +0100
 Subject: [RFC PATCH] clk: composite: support determine_rate using
  rate_ops->round_rate + mux_ops->set_parent
 In-Reply-To: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
 References: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1389114141-11087-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
