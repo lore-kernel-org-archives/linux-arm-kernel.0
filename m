@@ -1,120 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  7 Jan 2014 16:47:16 -0700
-Subject: [PATCH 1/2] ARM: tegra: enable LCD panel on Seaboard
-Message-ID: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Jan 2014 15:55:15 -0800
+Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <20140107230733.GD5074@atomide.com>
+References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
+ <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com>
+ <52BC6B16.80507@ti.com> <52BD856E.7010609@ti.com>
+ <52C11284.2030500@ti.com> <20140107230733.GD5074@atomide.com>
+Message-ID: <20140107235514.GG5074@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+* Tony Lindgren <tony@atomide.com> [140107 15:10]:
+> * Sricharan R <r.sricharan@ti.com> [131229 22:30]:
+> > On Friday 27 December 2013 07:19 PM, Sricharan R wrote:
+> > > On Thursday 26 December 2013 11:14 PM, Santosh Shilimkar wrote:
+> > >> On Wednesday 25 December 2013 11:52 PM, Sricharan R wrote:
+> > >>> On Wednesday 18 December 2013 02:49 PM, Sricharan R wrote:
+> > >>>> I have addressed all the comments on this series, can this be merged now ?
+> > >>>>
+> > >>>   Ping..
+> > >>>
+> > >> Thomas has already given his reviewed-by tag so the patches can be
+> > >> taken via arm-soc tree considering OMAP and GIC changes. Can you
+> > >> create a branch with all these patches applied and send it
+> > >> to Tony ?
+> > >>
+> > > Ok, i will send out a branch for this.
+> > > 
+> >  
+> >  I have pushed the below branch
+> > 
+> > git://github.com/Sricharanti/sricharan.git
+> > branch: crossbar
+> > 
+> > This is on top of Tony's linux-omap master branch
+> 
+> The linux-omap master branch cannot be used as a base as it
+> contains tons of commit history not in mainline. So I'll
+> manually applied these patches into omap-for-v3.14/crosbar
+> branch.
 
-Seaboard uses a CLAA101WA01A LCD panel. Enable the relevant display
-controller, backlight, and regulators.
+Oops, I noticed some errors on these:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra20-seaboard.dts | 55 +++++++++++++++++++++++++++++++++-
- 1 file changed, 54 insertions(+), 1 deletion(-)
+WARNING: drivers/built-in.o(.text+0xcd0): Section mismatch in reference from the function irqcrossbar_init() to the function .init.text:crossbar_of_init()
+The function irqcrossbar_init() references
+the function __init crossbar_of_init().
+This is often because irqcrossbar_init lacks a __init 
+annotation or the annotation of crossbar_of_init is wrong.
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a11b6e7b4759..f4443c1eaba7 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -17,6 +17,14 @@
- 	};
- 
- 	host1x at 50000000 {
-+		dc at 54200000 {
-+			rgb {
-+				status = "okay";
-+
-+				nvidia,panel = <&panel>;
-+			};
-+		};
-+
- 		hdmi at 54280000 {
- 			status = "okay";
- 
-@@ -312,6 +320,10 @@
- 		status = "okay";
- 	};
- 
-+	pwm: pwm at 7000a000 {
-+		status = "okay";
-+	};
-+
- 	i2c at 7000c000 {
- 		status = "okay";
- 		clock-frequency = <400000>;
-@@ -369,7 +381,7 @@
- 			#size-cells = <0>;
- 		};
- 
--		i2c at 1 {
-+		lvds_ddc: i2c at 1 {
- 			reg = <1>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -762,6 +774,17 @@
- 		non-removable;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+
-+		enable-gpios = <&gpio TEGRA_GPIO(D, 4) GPIO_ACTIVE_HIGH>;
-+		power-supply = <&vdd_bl_reg>;
-+		pwms = <&pwm 0 5000000>;
-+
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+
- 	clocks {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -795,6 +818,16 @@
- 		};
- 	};
- 
-+	panel: panel {
-+		compatible = "chungwa,claa101wa01a", "simple-panel";
-+
-+		power-supply = <&vdd_pnl_reg>;
-+		enable-gpios = <&gpio TEGRA_GPIO(B, 2) GPIO_ACTIVE_HIGH>;
-+
-+		backlight = <&backlight>;
-+		ddc-i2c-bus = <&lvds_ddc>;
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -839,6 +872,26 @@
- 			regulator-always-on;
- 			regulator-boot-on;
- 		};
-+
-+		vdd_pnl_reg: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "vdd_pnl";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio TEGRA_GPIO(C, 6) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		vdd_bl_reg: regulator at 5 {
-+			compatible = "regulator-fixed";
-+			reg = <5>;
-+			regulator-name = "vdd_bl";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio TEGRA_GPIO(W, 0) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	sound {
--- 
-1.8.1.5
+WARNING: drivers/built-in.o(.text+0xcdc): Section mismatch in reference from the function irqcrossbar_init() to the (unknown reference) .init.rodata:(unknown)
+The function irqcrossbar_init() references
+the (unknown reference) __initconst (unknown).
+This is often because irqcrossbar_init lacks a __initconst 
+annotation or the annotation of (unknown) is wrong.
+
+So I've dropped them for now. Care to fix up those errors and
+base your patches against let's say v3.13-rc5?
+
+Regards,
+
+Tony
