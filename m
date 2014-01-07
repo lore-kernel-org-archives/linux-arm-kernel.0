@@ -1,42 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 7 Jan 2014 15:09:21 +0000
-Subject: [PATCH] arm: mm: add memory type for inner-writeback
-In-Reply-To: <1388120328-17148-1-git-send-email-markz@nvidia.com>
-References: <1388120328-17148-1-git-send-email-markz@nvidia.com>
-Message-ID: <20140107150918.GA16947@localhost>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Jan 2014 16:10:37 +0100
+Subject: [PATCH 07/15] mmc: sdhi: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <2090378.13zHUAnprd@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2090378.13zHUAnprd@avalon>
+Message-ID: <1526599.nZ6xaI3TN3@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 04:58:48AM +0000, Mark Zhang wrote:
-> From: Colin Cross <ccross@android.com>
+Hi Chris,
+
+On Wednesday 11 December 2013 13:53:21 Laurent Pinchart wrote:
+> Hi Chris,
 > 
-> For streaming-style operations (e.g., software rendering of graphics
-> surfaces shared with non-coherent DMA devices), the cost of performing
-> L2 cache maintenance can exceed the benefit of having the larger cache
-> (this is particularly true for OUTER_CACHE configurations like the ARM
-> PL2x0).
-> 
-> This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
-> in the tex remapping tables as an inner-writeback-write-allocate, outer
-> non-cacheable memory type, so that this mapping will be available to
-> clients which will benefit from the reduced L2 maintenance.
-> 
-> Signed-off-by: Gary King <gking@nvidia.com>
+> Could you please pick this patch (and patch 08/15 in the same series) up for
+> v3.14 ?
 
-Is Colin signing off this patch as well?
+Ping ?
 
-> --- a/arch/arm/mm/proc-v7-2level.S
-> +++ b/arch/arm/mm/proc-v7-2level.S
-> @@ -144,8 +144,8 @@ ENDPROC(cpu_v7_set_pte_ext)
->  	 *   NS1 = PRRR[19] = 1		- normal shareable property
->  	 *   NOS = PRRR[24+n] = 1	- not outer shareable
->  	 */
-> -.equ	PRRR,	0xff0a81a8
-> -.equ	NMRR,	0x40e040e0
-> +.equ	PRRR,	0xff0a89a8
-> +.equ	NMRR,	0x40e044e0
-
-It should be done for the *-3level files.
-
+> On Wednesday 27 November 2013 02:18:29 Laurent Pinchart wrote:
+> > This helps increasing build testing coverage.
+> > 
+> > The driver doesn't compile on (at least) x86 due (possibly among others)
+> > to missing readsw/writesw I/O accessors, restrict compilation to SUPERH
+> > or ARM.
+> > 
+> > Whether the CTL_DMA_ENABLE register is part of the standard TMIO
+> > controller or is Renesas-specific is unknown and impossible to test as
+> > we have no current or planned TMIO DMA users other than SUPERH and
+> > ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
+> > for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
+> > list would extend this to multiarch kernels, but would break the driver
+> > for non-shmobile platforms if the register is Renesas-specific. We can
+> > thus get rid of the conditional compilation completely without
+> > introducing any further issue, and let future non-Renesas users deal
+> > with the situation if it turns out to be a the problem.
+> > 
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Cc: Ian Molton <ian@mnementh.co.uk>
+> > Cc: linux-mmc at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Acked-by: Simon Horman <horms@verge.net.au>
+> > ---
+> > 
+> >  drivers/mmc/host/Kconfig | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> > index 7fc5099..ca1315e 100644
+> > --- a/drivers/mmc/host/Kconfig
+> > +++ b/drivers/mmc/host/Kconfig
+> > @@ -479,7 +479,8 @@ config MMC_TMIO
+> > 
+> >  config MMC_SDHI
+> >  
+> >  	tristate "SH-Mobile SDHI SD/SDIO controller support"
+> > 
+> > -	depends on SUPERH || ARCH_SHMOBILE
+> > +	depends on SUPERH || ARM
+> > +	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+> > 
+> >  	select MMC_TMIO_CORE
+> >  	help
+> >  	
+> >  	  This provides support for the SDHI SD/SDIO controller found in
 -- 
-Catalin
+Regards,
+
+Laurent Pinchart
