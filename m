@@ -1,26 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 Jan 2014 20:45:46 +0800
-Subject: [PATCHv3][ 1/2] ARM: dts: imx53: Add gpio and input dt includes.
-In-Reply-To: <1389024968-20242-1-git-send-email-denis@eukrea.com>
-References: <1389024968-20242-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140107124544.GG12346@S2101-09.ap.freescale.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 7 Jan 2014 14:51:22 +0200
+Subject: pull request for some small fixes
+In-Reply-To: <20140106054322.26907.37296@quantum>
+References: <20131223162705.GE3378@tbergstrom-lnx.Nvidia.com>
+ <20140106054322.26907.37296@quantum>
+Message-ID: <20140107125122.GC26588@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 05:16:07PM +0100, Denis Carikli wrote:
-> This is to permit to use of the includes in the boards dts.
+On Mon, Jan 06, 2014 at 06:43:22AM +0100, Mike Turquette wrote:
+> Quoting Peter De Schrijver (2013-12-23 08:27:05)
+> > The following changes since commit 62ce7cd62f534023224912dc9b909963f26a38da:
+> > 
+> >   clk: tegra: fix __clk_lookup() return value checks (2013-11-28 15:09:22 +0200)
+> > 
+> > are available in the git repository at:
+> >   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-next-1
 > 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Hi Peter,
+> 
+> Do you intend for this to go as fixes for 3.13-rc8? The fixes are based
 
-Applied, thanks.
+Yes.
+
+> off of a commit from my clk-next branch.
+> 
+Do you want me to rebase them on 3.13-rc7?
+
+Cheers,
+
+Peter.
