@@ -1,66 +1,68 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 7 Jan 2014 17:40:56 +0530
-Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
- controller
-In-Reply-To: <3479510.EFrgCqQWpu@wuerfel>
-References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
- <3479510.EFrgCqQWpu@wuerfel>
-Message-ID: <CAHbNUh2Y5JPwAWojJE8Chd6fi5Hbk9c2+11FVBhOA-3Rgr5WpA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 7 Jan 2014 12:11:47 +0000
+Subject: [PATCH v6 0/3] AArch64: KGDB support
+In-Reply-To: <20140106181201.GE1096@mudshark.cambridge.arm.com>
+References: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
+ <20140106181201.GE1096@mudshark.cambridge.arm.com>
+Message-ID: <20140107121147.GE29456@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2014 17:27, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 07 January 2014 17:11:28 Tushar Behera wrote:
->> Parsed auxiliary control properties for PL310 cache controller.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> ---
->> These properties are set for Exynos4 platform. If we can pass these properties
->> through device tree for Exynos4, then we can remove the hard-coded L2_AUX_VAL.
->
->
-> The explanation would be good to have in the actual changeset
+On Mon, Jan 06, 2014 at 06:12:01PM +0000, Will Deacon wrote:
+> On Thu, Dec 19, 2013 at 11:50:48AM +0000, vijay.kilari at gmail.com wrote:
+> > From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> > 
+> > Based on the step-handler and break-handler hooks patch from
+> > Sandeepa, KGDB debugging support is added for EL1
+> > debug in AArch64 mode. Any updates that come for Patch 1 from
+> > Sandeepa will be rebased in next version
+> > 
+> > With second patch,register layout is updated to be inline with GDB tool.
+> > Basic GDB connection, break point set/clear and info commands
+> > are supported except step/next debugging
+> > 
+> > With third patch, step/next debugging support is added, where in
+> > pc is updated to point to the instruction to be stepped and
+> > stopped.
+> > 
+> > With fourth patch, the compile time breakpoint instruction
+> > reordering is fixed by making kgbd_breakpoint() as noinline
+> > 
+> > Tested with ARM64 simulator
+> > 
+> > v6:
+> >  - Change pstate register to 8 bytes to make endian nuetral.
+> >    Use GDB below GDB patch to display pstate in Big endian mode.
+> >    https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
+> >    Thanks to Andrew.
+> 
+> Thanks for getting this new version out. Just a few things before it can be
+> applied:
+> 
+>   1. Can you please use "arm64:" instead of "AArch64:" in the patch
+>      subjects?
+> 
+>   2. Can you get an ack from somebody like Jason on the final patch please?
+> 
+>   3. Can you rebase onto the for-next/core branch at the arm64 repo:
+> 
+>        git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+> 
+>      you'll get a trivial conflict against arch/arm64/kernel/Makefile.
 
-Ok, I will add these explanation to comment section.
+Just to be clear here, I would only recommend rebasing on top of this
+branch if there are patches queued for upstream which are required by
+the rebased patches and there isn't a topic branch already elsewhere. I
+do *not* recommend this branch for any kind of development (though
+testing is fine and we can fix the trivial Makefile conflicts
+ourselves).
 
-> comment above the '---' line. Are all of them actually needed?
-> You shouldn't havet o set the ones that are already turned on
-> by the boot loader.
+>   4. Can you make sure that the gdb patch you linked to actually gets
+>      merged? There is still some discussion by the looks of it.
 
-These are the extra options that we used to pass in the kernel. For
-normal operation, I couldn't perceive any difference without these
-properties. The only reason for adding these properties was to be in
-sync with existing auxiliary control value.
-
->>
->> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->> index b513cb8..213546d 100644
->> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->> @@ -44,6 +44,16 @@ Optional properties:
->>  - cache-id-part: cache id part number to be used if it is not present
->>    on hardware
->>  - wt-override: If present then L2 is forced to Write through mode
->> +- arm,early-write: If present then BRSEP mode (early write response) is enabled.
->> +- arm,data-prefetch: If present then data prefetching is enabled.
->> +- arm,instruction-prefetch: If present then instruction prefetching is enabled.
->> +- arm,ns-interrupt-access: If present then interrupt mask and interrupt clear
->> +  registers can be read or modified in both secure or non-secure accesses.
->> +- arm,ns-lockdown: If present then non-secure accesses can write to lockdown
->> +  register.
->> +- arm,share-override: If present then shared attribute is ignored internally.
->> +- arm,full-line-of-zero: If present then 'full line of write zero' behaviour is
->> +  enabled.
->
-> Is it intentional that you have the "arm," prefix for the new ones, while
-> it's not there for the existing ones? Should we drop it for consistency?
->
->         Arnd
-
-No specific reasons for this. I was following "arm,data-latency"
-format. We can drop the "arm," prefix.
-
-Thanks for the review.
+I guess the kernel patches will have to wait for the binutils patch to
+go in. BTW, does this mean that kgdb on arm64 will only work with a
+future version of gdb?
 
 -- 
-Tushar Behera
+Catalin
