@@ -1,40 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Jan 2014 12:54:58 +0100
-Subject: ohci-at91 mismerge build error
-Message-ID: <20240208.HaoioSGuhF@wuerfel>
+Date: Tue, 07 Jan 2014 12:57:36 +0100
+Subject: [PATCH] ARM: cache-l2x0: Parse properties from DT for PL310 cache
+ controller
+In-Reply-To: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
+References: <1389094888-24348-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <3479510.EFrgCqQWpu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 99f14bd4d1 "Merge 3.13-rc5 into usb-next" (in linux-next as of
-today), I'm getting this error building any at91 kernel:
+On Tuesday 07 January 2014 17:11:28 Tushar Behera wrote:
+> Parsed auxiliary control properties for PL310 cache controller.
+> 
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+> These properties are set for Exynos4 platform. If we can pass these properties
+> through device tree for Exynos4, then we can remove the hard-coded L2_AUX_VAL.
 
-drivers/usb/host/ohci-at91.c: In function 'usb_hcd_at91_probe':
-drivers/usb/host/ohci-at91.c:190:4: error: label 'err' used but not defined
-    goto err;
-    ^
-drivers/usb/host/ohci-at91.c: At top level:
-drivers/usb/host/ohci-at91.c:206:2: warning: data definition has no type or storage class [enabled by default]
-  at91_stop_hc(pdev);
-  ^
-...
 
-The problem is obviously a mismerge between two unrelated changes that
-resulted in missing opening braces.
+The explanation would be good to have in the actual changeset
+comment above the '---' line. Are all of them actually needed?
+You shouldn't havet o set the ones that are already turned on
+by the boot loader.
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> index b513cb8..213546d 100644
+> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> @@ -44,6 +44,16 @@ Optional properties:
+>  - cache-id-part: cache id part number to be used if it is not present
+>    on hardware
+>  - wt-override: If present then L2 is forced to Write through mode
+> +- arm,early-write: If present then BRSEP mode (early write response) is enabled.
+> +- arm,data-prefetch: If present then data prefetching is enabled.
+> +- arm,instruction-prefetch: If present then instruction prefetching is enabled.
+> +- arm,ns-interrupt-access: If present then interrupt mask and interrupt clear
+> +  registers can be read or modified in both secure or non-secure accesses.
+> +- arm,ns-lockdown: If present then non-secure accesses can write to lockdown
+> +  register.
+> +- arm,share-override: If present then shared attribute is ignored internally.
+> +- arm,full-line-of-zero: If present then 'full line of write zero' behaviour is
+> +  enabled.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Please just ignore if this has been reported before
+Is it intentional that you have the "arm," prefix for the new ones, while
+it's not there for the existing ones? Should we drop it for consistency?
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 2d0ee5e..091ae49 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -197,7 +197,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	at91_start_hc(pdev);
- 
- 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
--	if (retval == 0)
-+	if (retval == 0) {
- 		device_wakeup_enable(hcd->self.controller);
- 		return retval;
- 	}
+	Arnd
